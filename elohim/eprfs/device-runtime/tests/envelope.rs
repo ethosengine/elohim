@@ -1,14 +1,19 @@
 use elohim_device_runtime::{
-    envelope::{self, Envelope, Store},
+    envelope::{
+        self,
+        stage::{self, NetworkStage},
+        Envelope, Store,
+    },
     session::{Registry, SessionIdentity, Source},
 };
 use serde_json::json;
-use std::path::Path;
+use std::{ffi::OsString, path::Path};
 
 fn binding(home: &Path, id: &str) -> Envelope {
     Envelope {
         generation: 1,
         predecessor: None,
+        stage: NetworkStage::Enforced,
         identity: SessionIdentity {
             runtime: "codex".into(),
             session: Some(id.into()),
@@ -28,6 +33,168 @@ fn binding(home: &Path, id: &str) -> Envelope {
         covenant_seal: None,
         witness: None,
     }
+}
+
+fn stage_declaration(device_key: &Path, declared: &str) {
+    let home = device_key.parent().unwrap();
+    std::fs::create_dir_all(home).unwrap();
+    std::fs::write(
+        home.join("stage.json"),
+        serde_json::to_vec(&json!({
+            "stage": declared,
+            "declaredBy": "test:device-runtime",
+            "reason": "isolated stage contract",
+            "futureField": "ignored by older readers",
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
+
+fn stage_env(value: Option<&str>, dev_mode: Option<&str>) -> impl Fn(&str) -> Option<OsString> {
+    let value = value.map(OsString::from);
+    let dev_mode = dev_mode.map(OsString::from);
+    move |key| match key {
+        stage::DEVICE_STAGE_ENV => value.clone(),
+        "DEV_MODE" => dev_mode.clone(),
+        _ => None,
+    }
+}
+
+#[test]
+fn a_simulacra_session_in_an_enforced_home_is_refused_naming_the_isolated_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = dir.path().join("device/ed25519.seed");
+    let error = stage::resolve_with(&key, &stage_env(Some("simulacra"), None)).unwrap_err();
+    assert_eq!(error.kind, "stage-mismatch");
+    assert!(error
+        .detail
+        .contains("simulacra session in a enforced device home"));
+    assert!(error
+        .detail
+        .contains("isolated XDG_CONFIG_HOME declared simulacra"));
+}
+
+#[test]
+fn an_undeclared_process_in_a_simulacra_home_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = dir.path().join("device/ed25519.seed");
+    stage_declaration(&key, "simulacra");
+    let error = stage::resolve_with(&key, &stage_env(None, None)).unwrap_err();
+    assert_eq!(error.kind, "stage-mismatch");
+    assert!(error
+        .detail
+        .contains("enforced session in a simulacra device home"));
+}
+
+#[test]
+fn matching_explicit_simulacra_declarations_are_admitted() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = dir.path().join("device/ed25519.seed");
+    stage_declaration(&key, "simulacra");
+    assert_eq!(
+        stage::resolve_with(&key, &stage_env(Some("simulacra"), None)).unwrap(),
+        NetworkStage::Simulacra
+    );
+}
+
+#[test]
+fn bootstrap_and_coordinated_are_refused_as_device_plane_declarations() {
+    for declared in ["bootstrap", "coordinated"] {
+        for source in ["process", "home"] {
+            let dir = tempfile::tempdir().unwrap();
+            let key = dir.path().join("device/ed25519.seed");
+            let process = if source == "process" {
+                Some(declared)
+            } else {
+                stage_declaration(&key, declared);
+                None
+            };
+            let error = stage::resolve_with(&key, &stage_env(process, None)).unwrap_err();
+            assert_eq!(error.kind, "stage-invalid");
+            assert!(error.detail.contains(declared));
+        }
+    }
+}
+
+#[test]
+fn stage_never_derives_from_dev_mode() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = dir.path().join("device/ed25519.seed");
+    assert_eq!(
+        stage::resolve_with(&key, &stage_env(None, Some("1"))).unwrap(),
+        NetworkStage::Enforced
+    );
+}
+
+#[test]
+fn device_stage_strings_round_trip_through_the_shared_vocabulary() {
+    for stage in NetworkStage::ALL {
+        assert_eq!(stage.label().parse::<NetworkStage>(), Ok(stage));
+    }
+}
+
+#[test]
+fn an_enforced_envelope_is_byte_identical_to_the_pre_stage_record() {
+    const PRE_STAGE_ENVELOPE: &str = concat!(
+        r#"{"generation":1,"predecessor":null,"identity":{"runtime":"codex","#,
+        r#""session":"historic","ownerPid":7,"ownerStartTime":"42","#,
+        r#""source":"runtimeAncestor"},"ownerPidNamespace":null,"ownerBootId":null,"#,
+        r#""device":"did:key:fixture","steward":"human:matthew","model":null,"#,
+        r#""repository":"/fixture/repo","berthStore":null,"#,
+        r#""openedAt":"2026-10-27T00:00:00Z","closedAt":null,"#,
+        r#""covenantSeal":null,"witness":null}"#,
+    );
+    const PRE_STAGE_RECORD_CID: &str =
+        "bafkreicjqumvehgp2p5vq7vrq47otft7uovyybjxfdzc54ghdweehh6hd4";
+
+    let historic = PRE_STAGE_ENVELOPE.as_bytes();
+    let decoded: Envelope = serde_json::from_slice(historic).unwrap();
+    assert_eq!(decoded.stage, NetworkStage::Enforced);
+    let rewritten = serde_json::to_vec(&decoded).unwrap();
+    assert_eq!(rewritten, historic);
+    assert_eq!(
+        eprfs_core::BlobCid::compute_raw(historic).to_string(),
+        PRE_STAGE_RECORD_CID
+    );
+    assert_eq!(
+        eprfs_core::BlobCid::compute_raw(&rewritten).to_string(),
+        PRE_STAGE_RECORD_CID
+    );
+}
+
+#[test]
+fn a_simulacra_envelope_carries_the_shared_stage_string() {
+    let mut record = binding(Path::new("/fixture"), "simulacra");
+    record.stage = NetworkStage::Simulacra;
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["stage"], "simulacra");
+    assert_eq!(
+        serde_json::from_value::<Envelope>(value).unwrap().stage,
+        NetworkStage::Simulacra
+    );
+}
+
+#[test]
+fn simulacra_sessions_use_the_stage_partition_without_moving_enforced_sessions() {
+    let dir = tempfile::tempdir().unwrap();
+    let key = dir.path().join("device/ed25519.seed");
+    let enforced = Store::lock_for_stage(&key, NetworkStage::Enforced).unwrap();
+    assert_eq!(
+        enforced.path("enforced").unwrap(),
+        dir.path().join("device/sessions/enforced.json")
+    );
+    drop(enforced);
+    let simulacra = Store::lock_for_stage(&key, NetworkStage::Simulacra).unwrap();
+    assert_eq!(
+        simulacra.path("simulacra").unwrap(),
+        dir.path()
+            .join("device/stages/simulacra/sessions/simulacra.json")
+    );
+    let stage_less = serde_json::to_vec(&binding(dir.path(), "simulacra")).unwrap();
+    std::fs::write(simulacra.path("simulacra").unwrap(), stage_less).unwrap();
+    let error = simulacra.read("simulacra").unwrap_err();
+    assert_eq!(error.kind, "stage-mismatch");
 }
 #[test]
 fn binding_is_idempotent_private_and_cannot_be_reused_or_traverse() {

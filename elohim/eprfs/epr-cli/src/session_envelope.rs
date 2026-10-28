@@ -6,7 +6,11 @@ use crate::{
 };
 use elohim_device_runtime::{
     bin_store,
-    envelope::{self, Envelope, Store},
+    envelope::{
+        self,
+        stage::{self, NetworkStage},
+        Envelope, Store,
+    },
 };
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use serde_json::{json, Value};
@@ -29,6 +33,14 @@ pub fn current_id() -> Result<String> {
 }
 fn home() -> Result<PathBuf> {
     device_key::resolve_path().map_err(err)
+}
+fn device_stage(device_key: &Path) -> Result<NetworkStage> {
+    stage::resolve(device_key).map_err(err)
+}
+fn has_session_store(device_key: &Path, stage: NetworkStage) -> Result<bool> {
+    stage::sessions_directory(device_key, stage)
+        .map(|path| path.is_dir())
+        .map_err(err)
 }
 fn persistent_home() -> Result<PathBuf> {
     let absolute_override = ["XDG_CONFIG_HOME", "ELOHIM_DEVICE_KEY_FILE"]
@@ -123,6 +135,7 @@ pub fn executor_cid() -> Result<String> {
 pub fn open(model: Option<&str>) -> Result<Envelope> {
     let root = root()?;
     let key_path = persistent_home()?;
+    let stage = device_stage(&key_path)?;
     let key = device_key::DeviceKey::load(&key_path).map_err(err)?;
     let steward = match actor::device_state_read_only(&root, &key_path) {
         actor::DeviceState::Standing(s) => s.subject,
@@ -141,6 +154,7 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     let proposed = Envelope {
         generation: 1,
         predecessor: None,
+        stage,
         identity,
         owner_pid_namespace,
         owner_boot_id,
@@ -158,7 +172,7 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     // Reentrant facet subprocesses (berth fold emission) may already hold a shared
     // lifecycle guard. A fully initialized lazy open is a read, never a lock upgrade.
     {
-        let store = Store::shared(&key_path).map_err(err)?;
+        let store = Store::shared_for_stage(&key_path, stage).map_err(err)?;
         if let Some(record) = store.existing(&proposed, &proc_root).map_err(err)? {
             if root
                 .join(recall::RECALL_DIR_REL)
@@ -170,7 +184,7 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
             }
         }
     }
-    let store = Store::lock(&key_path).map_err(err)?;
+    let store = Store::lock_for_stage(&key_path, stage).map_err(err)?;
     let record = store.open(proposed, &proc_root).map_err(err)?;
     if root
         .join(recall::RECALL_DIR_REL)
@@ -197,10 +211,11 @@ pub fn covenant_scope(id: &str) -> Result<(String, Option<Store>)> {
         return Err(format!("session-invalid: {id}"));
     }
     let key = home()?;
-    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+    let stage = device_stage(&key)?;
+    if !has_session_store(&key, stage)? {
         return Ok((id.to_owned(), None));
     }
-    let store = Store::shared(&key).map_err(err)?;
+    let store = Store::shared_for_stage(&key, stage).map_err(err)?;
     let scope = store
         .read(id)
         .map_err(err)?
@@ -227,10 +242,11 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
         ));
     }
     let key = home()?;
-    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+    let stage = device_stage(&key)?;
+    if !has_session_store(&key, stage)? {
         return Ok(guard);
     }
-    let store = Store::shared(&key).map_err(err)?;
+    let store = Store::shared_for_stage(&key, stage).map_err(err)?;
     if let Some(record) = store
         .binding(id, &session::resolve(), &proc_root())
         .map_err(err)?
@@ -252,10 +268,11 @@ pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {
 /// standalone store and reads as unbound.
 fn device_scoped_binding(id: &str) -> Result<Option<Envelope>> {
     let key = home()?;
-    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+    let stage = device_stage(&key)?;
+    if !has_session_store(&key, stage)? {
         return Ok(None);
     }
-    let store = Store::shared(&key).map_err(err)?;
+    let store = Store::shared_for_stage(&key, stage).map_err(err)?;
     let Some(record) = store
         .binding(id, &session::resolve(), &proc_root())
         .map_err(err)?
@@ -323,8 +340,9 @@ fn berth_path(record: &Envelope) -> Result<Option<PathBuf>> {
 pub fn open_lazily() -> Result<()> {
     let id = current_id()?;
     let key = home()?;
-    let closed = if key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
-        Store::shared(&key)
+    let stage = device_stage(&key)?;
+    let closed = if has_session_store(&key, stage)? {
+        Store::shared_for_stage(&key, stage)
             .map_err(err)?
             .read(&id)
             .map_err(err)?
@@ -365,7 +383,9 @@ fn prepare_berth(id: &str, path: &Path) -> Result<()> {
         ));
     }
     open_lazily()?;
-    let store = Store::lock(&home()?).map_err(err)?;
+    let key = home()?;
+    let stage = device_stage(&key)?;
+    let store = Store::lock_for_stage(&key, stage).map_err(err)?;
     let mut record = store
         .binding(id, &session::resolve(), &proc_root())
         .map_err(err)?
@@ -529,7 +549,7 @@ fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
 pub fn run(args: &[String]) -> Result<ExitCode> {
     let verb = args.first().map(String::as_str).unwrap_or("help");
     if args.iter().any(|s| s == "--help") || verb == "help" {
-        println!("epr session id|open [--model MODEL]|show|close|gc [--json]");
+        println!("epr session id|open [--declare] [--model MODEL]|show|close|gc [--json]");
         return Ok(ExitCode::SUCCESS);
     }
     let mut model = None;
@@ -551,6 +571,9 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
                 i += 1;
                 model = Some(args.get(i).ok_or("--model needs a value")?.as_str());
             }
+            // The process declaration remains ELOHIM_DEVICE_STAGE; this acknowledgement lets
+            // explicit opens reach the same resolver used by lazy and facet entry points.
+            "--declare" if verb == "open" => {}
             other => return Err(format!("unexpected session argument {other}")),
         }
         i += 1;
@@ -571,7 +594,9 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     let value = if verb == "open" {
         serde_json::to_value(open(model)?).map_err(err)?
     } else {
-        let store = Store::lock(&home()?).map_err(err)?;
+        let key = home()?;
+        let stage = device_stage(&key)?;
+        let store = Store::lock_for_stage(&key, stage).map_err(err)?;
         if verb == "gc" {
             let proc_root = proc_root();
             let mut closed = Vec::new();

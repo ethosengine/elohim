@@ -1,9 +1,15 @@
 //! Private device-local session binding. Facet authority stays in its original store.
+/// Device-home stage declaration and process-to-home admission.
+pub mod stage {
+    include!("stage.rs");
+}
+
 use crate::{
     bin_store::{files, Refusal, Result},
     session::{self, SessionIdentity, Source},
 };
 use serde::{Deserialize, Serialize};
+use stage::NetworkStage;
 use std::{
     fs,
     os::unix::fs::{MetadataExt, PermissionsExt},
@@ -21,6 +27,14 @@ pub struct Envelope {
     /// Exact archived predecessor and its untouched covenant seal.
     #[serde(default)]
     pub predecessor: Option<Predecessor>,
+    /// Declared device-home stage; historic envelopes are Enforced and retain their bytes.
+    #[serde(
+        default = "stage::enforced",
+        skip_serializing_if = "stage::is_enforced",
+        serialize_with = "stage::serialize",
+        deserialize_with = "stage::deserialize"
+    )]
+    pub stage: NetworkStage,
     /// P1 identity; its session string is the envelope key.
     pub identity: SessionIdentity,
     /// PID namespace inode observed through the configured proc root at opening.
@@ -145,22 +159,28 @@ impl Envelope {
 /// Serialized envelope mutations, independent of CLI, git, and facet implementations.
 pub struct Store {
     directory: PathBuf,
+    stage: NetworkStage,
     _lock: files::Lock,
 }
 impl Store {
-    /// Lock the sessions directory beside the device key. Never reads or creates a key.
+    /// Lock the historical Enforced sessions directory. Never reads or creates a key.
     pub fn lock(device_key: &Path) -> Result<Self> {
-        Self::locked(device_key, false)
+        Self::lock_for_stage(device_key, NetworkStage::Enforced)
     }
-    /// Shared lifecycle guard for facet writers; closure takes the exclusive form.
+    /// Lock the sessions directory for an already verified device-home stage.
+    pub fn lock_for_stage(device_key: &Path, stage: NetworkStage) -> Result<Self> {
+        Self::locked(device_key, stage, false)
+    }
+    /// Shared lifecycle guard for Enforced facet writers; closure takes the exclusive form.
     pub fn shared(device_key: &Path) -> Result<Self> {
-        Self::locked(device_key, true)
+        Self::shared_for_stage(device_key, NetworkStage::Enforced)
     }
-    fn locked(device_key: &Path, shared: bool) -> Result<Self> {
-        let directory = device_key
-            .parent()
-            .ok_or_else(|| Refusal::new("device-home", "key has no parent"))?
-            .join("sessions");
+    /// Take a shared lifecycle guard for an already verified device-home stage.
+    pub fn shared_for_stage(device_key: &Path, stage: NetworkStage) -> Result<Self> {
+        Self::locked(device_key, stage, true)
+    }
+    fn locked(device_key: &Path, stage: NetworkStage, shared: bool) -> Result<Self> {
+        let directory = stage::sessions_directory(device_key, stage)?;
         fs::create_dir_all(&directory)?;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
         let lock = if shared {
@@ -170,6 +190,7 @@ impl Store {
         };
         Ok(Self {
             directory,
+            stage,
             _lock: lock,
         })
     }
@@ -198,6 +219,16 @@ impl Store {
                 let record: Envelope = serde_json::from_slice(&bytes)?;
                 if record.id() != id {
                     return Err(Refusal::new("session-invalid", "record key differs"));
+                }
+                if record.stage != self.stage {
+                    return Err(Refusal::new(
+                        "stage-mismatch",
+                        format!(
+                            "{} envelope in a {} session store",
+                            record.stage.label(),
+                            self.stage.label()
+                        ),
+                    ));
                 }
                 Ok(Some(record))
             }
@@ -232,6 +263,16 @@ impl Store {
     /// not authenticate runtime authorship. Runtime and children are one device principal.
     /// No authority is inherited: clauses must be re-offered and berth facets never transfer.
     pub fn existing(&self, proposed: &Envelope, proc_root: &Path) -> Result<Option<Envelope>> {
+        if proposed.stage != self.stage {
+            return Err(Refusal::new(
+                "stage-mismatch",
+                format!(
+                    "{} envelope in a {} session store",
+                    proposed.stage.label(),
+                    self.stage.label()
+                ),
+            ));
+        }
         // Only successor admission requires real process evidence: a leaked isolation
         // root must not turn a live predecessor into permission to take over its id.
         // Ordinary liveness/GC retain their caller's root. Fixtures opt in explicitly;
@@ -269,6 +310,7 @@ impl Store {
             )?;
             Self::require_live(&old)?;
             if old.identity != proposed.identity
+                || old.stage != proposed.stage
                 || old.device != proposed.device
                 || old.steward != proposed.steward
                 || old.repository != proposed.repository
@@ -327,6 +369,16 @@ impl Store {
     }
     /// Persist an updated close checkpoint while holding the same lock as facet release.
     pub fn save(&self, record: &Envelope) -> Result<()> {
+        if record.stage != self.stage {
+            return Err(Refusal::new(
+                "stage-mismatch",
+                format!(
+                    "{} envelope in a {} session store",
+                    record.stage.label(),
+                    self.stage.label()
+                ),
+            ));
+        }
         files::atomic_json(&self.path(record.id())?, record)
     }
     /// Retain the exact private covenant view whose CID witnesses closure; this grants nothing.

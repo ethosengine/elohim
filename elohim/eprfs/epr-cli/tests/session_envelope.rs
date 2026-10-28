@@ -15,6 +15,79 @@ fn run_fixture_stage(base: &std::path::Path, stage: &str) {
     );
 }
 
+fn stage_open(fixture: &std::path::Path, process_stage: Option<&str>) -> std::process::Output {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let repo = fixture.join("repo");
+    let mut command = std::process::Command::new("python3");
+    command
+        .arg(fixture.join("exec.py"))
+        .arg(env!("CARGO_BIN_EXE_epr"))
+        .args(["session", "open", "--declare"])
+        .current_dir(&repo)
+        .env("EPR_UNDER_TEST", "1")
+        .env(
+            "EPR_AGENT_RUNTIMES",
+            root.join("genesis/agentic/agent-runtimes.json"),
+        )
+        .env("EPR_BIN_TOOLS", fixture.join("registry.json"))
+        .env("BIN_STORE", fixture.join("stores"))
+        .env("EPR_PROC_ROOT", fixture.join("proc"))
+        .env("XDG_CONFIG_HOME", fixture.join("config-home"))
+        .env("ELOHIM_SESSION_ID", "stage-fixture")
+        .env("ELOHIM_SESSION_OWNER_PID", "4101")
+        .env("FIXTURE_OWNER", "4101")
+        .env("CLAUDE_PROJECT_DIR", &repo)
+        .env("CLAUDE_CONFIG_DIR", fixture.join("config"))
+        .env("BERTH_DIR", fixture.join("berth"))
+        .env("BERTH_UNDER_TEST", "1")
+        .env("BRIT_BUILD_REF_BIN", fixture.join("brit-stub"))
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env_remove("DEV_MODE")
+        .env_remove("ELOHIM_DEVICE_STAGE");
+    if let Some(stage) = process_stage {
+        command.env("ELOHIM_DEVICE_STAGE", stage);
+    }
+    command.output().unwrap()
+}
+
+#[test]
+fn simulacra_session_open_in_an_enforced_home_names_the_isolated_home_cure() {
+    let fixture = tempfile::tempdir().unwrap();
+    run_fixture_stage(fixture.path(), "setup");
+    let output = stage_open(fixture.path(), Some("simulacra"));
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("stage-mismatch: simulacra session in a enforced device home"));
+    assert!(error.contains("isolated XDG_CONFIG_HOME declared simulacra"));
+    assert!(!fixture
+        .path()
+        .join("config-home/elohim/device/sessions")
+        .exists());
+}
+
+#[test]
+fn undeclared_session_open_in_a_simulacra_home_is_refused_before_state_is_written() {
+    let fixture = tempfile::tempdir().unwrap();
+    run_fixture_stage(fixture.path(), "setup");
+    let home = fixture.path().join("config-home/elohim/device");
+    std::fs::write(
+        home.join("stage.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "stage": "simulacra",
+            "declaredBy": "test:epr-cli",
+            "reason": "isolated session fixture",
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let output = stage_open(fixture.path(), None);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("stage-mismatch: enforced session in a simulacra device home"));
+    assert!(!home.join("stages/simulacra/sessions").exists());
+}
+
 #[test]
 fn runtime_child_resumes_without_inheriting_authority() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
@@ -106,6 +179,76 @@ fn native_session_views_match_the_wire_schema() {
             serde_json::from_slice(&std::fs::read(fixture.path().join(output)).unwrap()).unwrap();
         validator.validate(&actual).unwrap();
     }
+}
+
+#[test]
+fn simulacra_session_views_match_the_wire_schema() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let fixture = tempfile::tempdir().unwrap();
+    run_fixture_stage(fixture.path(), "setup");
+    let home = fixture.path().join("config-home/elohim/device");
+    std::fs::write(
+        home.join("stage.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "stage": "simulacra",
+            "declaredBy": "test:epr-cli",
+            "reason": "isolated session fixture",
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let output = stage_open(fixture.path(), Some("simulacra"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["stage"], "simulacra");
+
+    let schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../sdk/schemas/v1/views/session-envelope.schema.json"
+    ))
+    .unwrap();
+    let resource = || jsonschema::Resource::from_contents(schema.clone()).unwrap();
+    for (verb, actual) in [
+        ("open", envelope.clone()),
+        ("close", envelope.clone()),
+        (
+            "gc",
+            serde_json::json!({"closed": [envelope.clone()], "failed": []}),
+        ),
+    ] {
+        let contract: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(root.join(format!(
+                "elohim/sdk/schemas/v1/views/session-envelope-{verb}.schema.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        let validator = jsonschema::options()
+            .with_resource("epr:schema:view:session-envelope", resource())
+            .build(&contract)
+            .unwrap();
+        validator.validate(&actual).unwrap();
+    }
+
+    let view = serde_json::json!({
+        "live": true,
+        "envelope": envelope,
+        "berth": {},
+        "claims": [],
+        "covenant": {},
+        "standing": {},
+        "capabilityTier": "fixture",
+        "recallSession": "fixture",
+        "pinnedTools": {},
+    });
+    jsonschema::validator_for(&schema)
+        .unwrap()
+        .validate(&view)
+        .unwrap();
 }
 
 #[test]

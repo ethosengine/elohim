@@ -57,6 +57,11 @@
           },
           "description": "Raw CID of the exact archived predecessor bytes and its untouched seal; null for the first generation."
         },
+        "stage": {
+          "type": "string",
+          "enum": ["simulacra"],
+          "description": "Declared device-home stage. Omitted for Enforced envelopes so historic record bytes remain stable; Bootstrap and Coordinated are not valid device-plane declarations."
+        },
         "identity": {
           "title": "SessionIdentity",
           "description": "P1 identity observed at opening and retained as a private binding. Current owner liveness is checked against pid and start time.",

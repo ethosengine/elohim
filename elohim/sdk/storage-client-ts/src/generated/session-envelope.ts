@@ -21,6 +21,10 @@ export interface SessionEnvelope {
       recordCid: string;
       covenantSeal: string | null;
     } | null;
+    /**
+     * Declared device-home stage. Omitted for Enforced envelopes so historic record bytes remain stable; Bootstrap and Coordinated are not valid device-plane declarations.
+     */
+    stage?: 'simulacra';
     identity: SessionIdentity;
     device: string;
     steward: string;
