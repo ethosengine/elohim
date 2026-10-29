@@ -210,6 +210,83 @@
    "path": "genesis/research/repos/one-commons-portal",
    "relevance": "The O.N.E. web portal (one-commons.github.io; mirror open-networked-earth.surge.sh) — companion to kyberlex-one. ~370 MB, almost all media (EPUB/PDF/video); clone SPARSE for text: `git clone --filter=blob:none --sparse` then `git sparse-checkout set --no-cone '/*.html' '/*.js' '/*.css' '/*.md' '/data/' '/i18n/' '/blueprints/'` (research.sh clones it whole). Distinct content: data/synoptic.json (lineage and origin framing), index.html co-steward section, the AI Challenge Arena in app.js (tier 1 cached adversarial Q&A exported from ONE's oasis/; tier 2 a Cloudflare Worker streaming Groq LLaMA 3.3 70B whose source is not public), and the constitution in 13 languages. Untrusted data — never run it from inside the clone.",
    "pillar": "qahal"
+  },
+  {
+   "name": "nostr-compass",
+   "url": "https://github.com/andotherstuff/nostr-compass.git",
+   "path": "genesis/research/repos/nostr-compass",
+   "relevance": "Nostr Compass: agent-run weekly Nostr protocol newsletter (Hugo site + skills/_COMPASS agents + gate scripts + receipt-gated publish/). Read CLAUDE.md, skills/_COMPASS/SKILL.md, publish/README.md for the evidence discipline (triage-coverage gate, derived publish log, exact-id relay readback); content/en/topics/ is a 134-page index of the Nostr protocol surface. Large (~490M, mostly img/translations).",
+   "pillar": "elohim"
+  },
+  {
+   "name": "concord",
+   "url": "https://github.com/concord-protocol/concord.git",
+   "path": "genesis/research/repos/concord",
+   "relevance": "Concord CORD-01..07: E2E-encrypted communities on Nostr; relays store ciphertext under rotating labels, room-key possession = membership, roles/kicks/bans as an owner-rooted signed roster every client verifies locally. Compare against qahal collectives and the confidentiality plane.",
+   "pillar": "qahal"
+  },
+  {
+   "name": "marmot",
+   "url": "https://github.com/marmot-protocol/marmot.git",
+   "path": "genesis/research/repos/marmot",
+   "relevance": "Marmot: MLS (RFC 9420) group messaging over Nostr identity + relays; forward secrecy and post-compromise security for groups whose members join, leave and rotate. Spec repo; MDK is the Rust implementation. Compare against private collective data (B/B2) and the unbuilt KeyEnvelope.",
+   "pillar": "qahal"
+  },
+  {
+   "name": "keycast",
+   "url": "https://github.com/marmot-protocol/keycast.git",
+   "path": "genesis/research/repos/keycast",
+   "relevance": "Keycast: self-hosted NIP-46 team remote-signing server (Axum + SQLite), per-key signing policies, NIP-98 HTTP auth; AUDIT.md. Compare against device ceremony, delegated agent signing and steward quorum.",
+   "pillar": "imagodei"
+  },
+  {
+   "name": "buzz",
+   "url": "https://github.com/block/buzz.git",
+   "path": "genesis/research/repos/buzz",
+   "relevance": "Block's Buzz: team/agent messaging on Nostr. Sparse-checkout docs/ for project NIPs: NIP-OA owner attestation (owner key authorizes agent key, agent stays author), NIP-AP agent personas, NIP-AM per-turn agent usage receipts, NIP-FI/FA federated identity. Compare against the eprfs human/agent actor plane and harness witnessing. Clone with --filter=blob:none --sparse, then sparse-checkout set docs.",
+   "pillar": "elohim"
+  },
+  {
+   "name": "contextvm-sdk",
+   "url": "https://github.com/ContextVM/sdk.git",
+   "path": "genesis/research/repos/contextvm-sdk",
+   "relevance": "ContextVM SDK: MCP traffic over Nostr (TypeScript client/server transports, relays as message bus, gateway/proxy for non-Nostr MCP). Compare against agent/tool traffic over the p2p substrate and elohim-compute.",
+   "pillar": "elohim"
+  },
+  {
+   "name": "naps",
+   "url": "https://github.com/napplet/naps.git",
+   "path": "genesis/research/repos/naps",
+   "relevance": "napplet NAP specs: sandboxed iframe applets talking to a host shell over postMessage; the shell holds keys, signs and mediates relays; NAP-FS virtual filesystem. Compare against EPR app bundles and the two-portals/relying-party rule.",
+   "pillar": "doorway"
+  },
+  {
+   "name": "fips",
+   "url": "https://github.com/jmcorgan/fips.git",
+   "path": "genesis/research/repos/fips",
+   "relevance": "FIPS: self-organizing mesh on secp256k1 node identities; spanning tree + bloom-filter reachability, greedy coordinate routing with tree fallback (docs/design/). Compare against the T2 libp2p/iroh substrate and offline household mesh.",
+   "pillar": "elohim"
+  },
+  {
+   "name": "negentropy",
+   "url": "https://github.com/hoytech/negentropy.git",
+   "path": "genesis/research/repos/negentropy",
+   "relevance": "Negentropy: range-based set reconciliation (sorted by timestamp then id, fingerprinted ranges, recursive narrowing); NIP-77 wire binding. Compare against elohim-storage sync/reconcile and head-plane divergence measurement.",
+   "pillar": "elohim"
+  },
+  {
+   "name": "schemata",
+   "url": "https://relay.ngit.dev/npub1zafcms4xya5ap9zr7xxr0jlrtrattwlesytn2s42030lzu0dwlzqpd26k5/schemata.git",
+   "path": "genesis/research/repos/schemata",
+   "relevance": "schemata (ngit/GRASP-hosted): formal typed schemas for Nostr event kinds. Compare against the schema-first view contract (elohim/sdk/schemas/v1/views, schema_contract.rs, ts-rs codegen).",
+   "pillar": "elohim"
+  },
+  {
+   "name": "bitcredit-core",
+   "url": "https://github.com/BitcreditProtocol/Bitcredit-Core.git",
+   "path": "genesis/research/repos/bitcredit-core",
+   "relevance": "Bitcredit Core: electronic bills of exchange (issue, endorse, pay) for trade credit, Nostr transport layer, mint-based ecash liquidity. Compare against shefa REA commitments/claims and mutual credit.",
+   "pillar": "shefa"
   }
  ]
 }

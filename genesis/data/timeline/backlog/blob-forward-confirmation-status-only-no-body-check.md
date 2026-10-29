@@ -38,3 +38,5 @@ evidence about storage's responses rather than about storage's content.
 
 **Done when:** the read-back verifies content, not just status, and `forwarded_to_storage:true` can be cited as
 proof the bytes are retrievable — or the field is renamed to say what it actually establishes.
+
+**Prior art for the fix (2026-10-29).** Nostr Compass's publish pipeline treats a relay's acceptance as the writer's word only. Its log stage then *independently recovers the exact signed events by id* from at least five durable relays, excludes the write-only relay from readback evidence, and credits only the deploy matched to the merge commit (`genesis/research/repos/nostr-compass/publish/README.md`, stages BROADCAST and LOG). The same shape here: confirm storage holds the bundle by reading it back *by hash* from storage directly (not through the cache-first doorway path) and hashing the body, so `forwarded_to_storage:true` is derived from a readback rather than asserted. See the [Nostr Compass survey](epr:nostr-compass-ecosystem-cross-pollination-2026-10-29), Part I T2.

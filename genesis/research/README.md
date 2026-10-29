@@ -284,6 +284,14 @@ Is realtime SCM possible? [Backstitch](https://backstitch.dev) (Ink & Switch) is
 
 ---
 
+## The Ecosystem Mirror — Nostr Compass and the Nostr prior art it indexes
+
+What does a protocol ecosystem look like when it ships the surfaces before the substrate, and what does an agent-run account of it teach our own machinery? [Nostr Compass](https://nostrcompass.org/en/about/) is a weekly, MIT-licensed Nostr newsletter with a 134-page topic index. It is produced by an agent pipeline (`CLAUDE.md`, `skills/_COMPASS/`, ten agents) that runs on receipts. A release may be skipped but never silently skipped (a blocking triage-coverage gate). The publication log is generated from the run's receipts and never hand-edited. Only the deploy matched to the merge commit is credited. Each signed event is read back by id from at least five durable relays. That is our own evidence discipline, gated more mechanically than our research mint pass. **Take its gates and leave its trust root**: every receipt ends in one key's signature. Part II uses the topic index as a map and reads ten cloned projects through four cuts. (1) A Nostr event id fuses author and clock, while an EPR CID excludes the proof. (2) Every Nostr client re-derives authority, while ours belongs in one integrity validator, which we have not yet built for collectives. (3) Concord's `prev`-chained editions independently reach our declared-head ordering. (4) Nostr has no succession when a key is lost for good; ours is designed and three recovery variants are still stubbed. The takes are range-recursive reconciliation (negentropy), LAN discovery for iroh (FIPS), an authority citation re-rooted in CIDv1 links up the holon graph (Concord's `vac`, minus its owner key), so a holon answers to the constitutional constraints of the holons above it, not only to its own roster, and *a delegate cannot widen its own grant* (Keycast). Also taken: agent authorship kept apart from its authorizer, with private per-turn usage records (Block's Buzz), schema sample fixtures (schemata) and claim transfer (Bitcredit). Reading napplets against our tree found a live defect: html5-app bundles run same-origin with `allow-scripts allow-same-origin` and can read the session token.
+
+[Cross-pollination survey →](epr:nostr-compass-ecosystem-cross-pollination-2026-10-29) · sibling: [The Forge Problem — ngit](epr:ngit-nostr-git-forge-cross-pollination-2026-10-29) · manifest clones: `nostr-compass`, `concord`, `marmot`, `keycast`, `buzz`, `contextvm-sdk`, `naps`, `fips`, `negentropy`, `schemata`, `bitcredit-core`.
+
+---
+
 ## The Collective — Hypha DAO
 
 [Hypha DAO](https://github.com/hypha-dao) is a decade-deep project building tooling for DAOs/DHOs — "Decentralised Human Organisations" — and the closest external mirror for our *autonomous-entity and collectives* work (the recursive-Qahal substrate: `Collective` / `Membership` / `CollabAgreement`).
