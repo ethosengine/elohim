@@ -22,7 +22,7 @@ and, as the bonus, to clarify the primitives (epr, epr-rea, eprfs, ark, berth, b
 and implementation plan in rakia. Then: "go ahead and plan and execute the sprint … treat it as your
 overnight /shift."
 
-**Start here.** Paste into a new session on ethosengine:
+**Start here.** Paste into a new session on ethosengine (after stopping the two residents named below):
 
 > Carry on with the closure-keyed landing; read
 > genesis/docs/superpowers/sprints/2026-10-29-closure-keyed-landing-handoff.md first, then the design
@@ -31,7 +31,17 @@ overnight /shift."
 > builds; publish, deploy and dataplane validation disabled`, and write the first DELTA on
 > push-delivers-within-budget from the first dev wave whose closures are unchanged.
 
-## What landed where (nothing on dev yet at the time of writing)
+## State at 2026-10-29 ~19:10Z
+
+| Where | What | Evidence |
+|---|---|---|
+| **dev** | γ (gate cost vector, ledger union, honest stage-wallclock sensor, berth fold + reap) 228a80b2f; deployments comment 4d8291732; presence backlog atom 9b31b86e4; expired-grant atom DELTA f8dc1991b; γ habit DELTAs 24c156adc — on top of shem's lanes (bf810489c: adam grant renewed to 2026-11-05T13:15Z) | pre-push gates passed; `berth status` now prints the hold fold |
+| **PR #217** (`shift/2026-10-29-integration-capacity`, lane α + design + S2e + handoff) | closure-keyed edge build; off dev/main builds locally, publishes nothing; held-peer no-wait; branch rules; `env[...]` → get/setProperty + a static lint | **edge PR-217 #3 SUCCESS 51.5 min**: `GATE_ONLY …`, both closures derived on the ci-builder, oracle `miss http-404` (no closure tag yet), `elohim-doorway:closure-98d542dcaf1e03bb` (9.4 min) and `elohim-storage:closure-9b60477e766b771d` (21.9 min) built; Push/Deploy/Validation NOT_EXECUTED — design done-when (a) |
+| **PR #218** (`shift/2026-10-29-jenkins-sponsored-agent`, S2d′) | attestation written on the device at harvest time; the inert Jenkins attest arm deleted; seven review findings fixed (Jenkins stays the delivery default; notes an explicit partial view; note writes serialized across worktrees; malformed graphs isolated; one hook deadline; fenced fixtures; suites in the gate) | orchestrator PR-218 #1 SUCCESS (the Jenkinsfile change compiles and runs); `just gate orchestrator` 202/202; first live harvest wrote 37 `ci:<pipeline>` notes |
+
+**What blocks the two dev landings:** the local pre-push's storage clippy (5.5–6.2 GB) is shed by the RAM guard at 80% beside two unmoored residents (pids 2146360 seed-row storage 7.5 GB, 2051424 T3 join-alpha conductor 4.6 GB; the classifier denied the shift a `kill -TERM`). Three sheds on 2026-10-29. Stop them, then from each worktree: `git fetch origin dev && git rebase origin/dev && GATE_EVIDENCE=reuse git push origin HEAD:dev` (α first: its branch contains γ; the S2d′ branch after a rebase). The first dev wave after α builds and pushes the closure tags (one storage roll by design); the next dev wave whose storage/doorway closure is unchanged is measurement 1.
+
+## What landed where (as first written, 2026-10-29 ~15:00Z)
 
 | Branch | Commits (origin/dev e67c6cef8 + …) | State |
 |---|---|---|
