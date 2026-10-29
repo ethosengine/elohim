@@ -95,9 +95,14 @@ pub fn upsert_with_anchor(
     // If incoming anchor is None, leave dht_anchor_hash untouched — a non-null
     // anchor written by an earlier upsert is preserved.
 
-    // A revocation carried by the incoming row lands only on a row that has
-    // none; a row's first revocation time stands and is never cleared.
-    if let Some(ref ts) = new.revoked_at {
+    // A revocation carried by the incoming row, or one already projected for
+    // this cid (before the row existed), lands only on a row that has none; a
+    // row's first revocation time stands and is never cleared.
+    let tombstone = match new.revoked_at {
+        Some(_) => None,
+        None => super::mishpat_revocations::projected_revoked_at(conn, &new.cid)?,
+    };
+    if let Some(ts) = new.revoked_at.as_deref().or(tombstone.as_deref()) {
         diesel::update(
             mc::mishpat_commitments
                 .filter(mc::cid.eq(&new.cid))

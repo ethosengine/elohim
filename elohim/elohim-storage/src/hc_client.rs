@@ -1088,6 +1088,24 @@ impl HcClient {
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, StorageError> {
+        self.call_zome_mishpat_guarded(zome_name, fn_name, payload, None)
+            .await
+    }
+
+    /// [`Self::call_zome_mishpat`] with an optional `precondition` evaluated
+    /// AFTER the call has waited for the chain write gate and its admission
+    /// permit, immediately before the call is offered to the conductor.
+    /// `Err(reason)` = submit nothing; the call returns
+    /// `StorageError::Validation` and no zome call is made. It is the re-check
+    /// a queued write needs when the state that justified it can change while
+    /// it waits (a revocation whose pin is restored meanwhile).
+    pub async fn call_zome_mishpat_guarded(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: Vec<u8>,
+        precondition: Option<&(dyn Fn() -> Result<(), String> + Send + Sync)>,
+    ) -> Result<Vec<u8>, StorageError> {
         let cell_id = self.mishpat_cell_id.clone().ok_or_else(|| {
             StorageError::NotFound(
                 "mishpat cell not provisioned in installed happ — governance zome calls \
@@ -1120,6 +1138,16 @@ impl HcClient {
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
+                    // Both waits are behind us: the chain lock and the permit.
+                    // The last moment the caller's state can be read before the
+                    // call is offered.
+                    if let Some(precondition) = precondition {
+                        precondition().map_err(|reason| {
+                            StorageError::Validation(format!(
+                                "{zome_name}::{fn_name} not offered: its precondition no longer holds: {reason}"
+                            ))
+                        })?;
+                    }
                     let conn = self.connection();
                     let offered_connection = conn.clone();
                     let offered_zome = zome_name.to_owned();
@@ -1563,6 +1591,16 @@ impl HcClient {
     /// fill the pod's own `humans.agent_pub_key` from its own cell key.
     pub fn agent_key_uhcak(&self) -> String {
         self.cell_id.agent_pubkey().to_string()
+    }
+
+    /// The agent key of the MISHPAT cell as `uhCAk…`, or `None` when that cell
+    /// is not provisioned. [`Self::call_zome_mishpat`] targets exactly this
+    /// cell, and a zome call is made as its cell's agent, so this is the key a
+    /// mishpat write from this client is authored under.
+    pub fn mishpat_agent_key_uhcak(&self) -> Option<String> {
+        self.mishpat_cell_id
+            .as_ref()
+            .map(|cell| cell.agent_pubkey().to_string())
     }
 
     /// Get conductor health metrics for backpressure decisions
@@ -2561,7 +2599,15 @@ mod connection_adoption_tests {
     #[test]
     fn every_dispatch_reports_transport_evidence_by_generation() {
         let source = include_str!("hc_client.rs");
-        for name in ["call_zome_imagodei", "call_zome_mishpat", "call_zome_timed"] {
+        // `call_zome_mishpat` delegates its dispatch to the guarded form.
+        assert!(
+            source.contains("self.call_zome_mishpat_guarded(zome_name, fn_name, payload, None)")
+        );
+        for name in [
+            "call_zome_imagodei",
+            "call_zome_mishpat_guarded",
+            "call_zome_timed",
+        ] {
             let body = source
                 .split(&format!("pub async fn {name}("))
                 .nth(1)

@@ -17859,38 +17859,72 @@ impl HttpServer {
         if rows == 0 {
             return Ok(response::not_found(&format!("pin {} not found", id)));
         }
+        // The pin as removed: its scope and the removal time the status flip
+        // just wrote, the evidence the revocation is claimed and signed with.
+        let removed_pin = db::acquisition_pins::get_pin_by_id(&mut conn, id)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
         drop(conn);
 
-        // Withdraw the commons offer: author a revokes-commitment targeting the
-        // pin's commitment_cid. Best-effort — the provide reconciler's stranded-
-        // row revoke arm is the backstop if the conductor is unavailable here.
-        if let (Some(target_cid), Some(hc)) = (
+        // Withdraw the commons offer: a revokes-commitment targeting the pin's
+        // commitment_cid, through the same claim protocol as the reconciler's
+        // removed-pin arm (`provide_reconcile::submit_revocation`): one claim
+        // per target in `mishpat_revocations`, so the route and the arm never
+        // both revoke one row and a repeated DELETE submits nothing; the
+        // evidence (the scope has no other pin) re-checked immediately before
+        // the call; an unknown outcome recorded so the arm, when switched on,
+        // retries it.
+        if let (Some(target_cid), Some(hc), Some(pool), Some(pin)) = (
             offer_cid,
             self.hc_registry.as_ref().and_then(|r| r.lamad_client()),
+            self.db_pool.clone(),
+            removed_pin,
         ) {
-            let signed_at = crate::db::models::current_timestamp();
-            let payload_json = crate::services::conductor_commitment_author::build_revoke_payload(
-                &target_cid,
-                &signed_at,
-            );
-            let input = crate::services::conductor_writes::CreateMishpatCommitmentInput {
-                action: "revokes-commitment".to_string(),
-                payload_json,
-                signed_at,
+            use crate::services::provide_reconcile::CommitmentRevoker;
+            let revoker = crate::services::conductor_commitment_author::ConductorRevoker::new(hc);
+            // The provider is the projected row's when it has landed; before
+            // that, this node's own signing key (the back-reference was written
+            // by this node's author).
+            let projected_provider = pool.get().ok().and_then(|mut c| {
+                db::mishpat_commitments::get_by_cid(&mut c, &target_cid)
+                    .ok()
+                    .flatten()
+                    .map(|row| row.provider)
+            });
+            let provider = match projected_provider {
+                Some(p) => Some(p),
+                None => revoker.revoke_authority().await,
             };
-            if let Err(e) = crate::chain_write_gate::as_writer(
-                crate::chain_write_gate::WriterKind::HttpAuthor,
-                crate::services::conductor_writes::call_create_commitment(&hc, input),
-            )
-            .await
-            {
-                tracing::warn!(
+            match provider {
+                None => tracing::warn!(
                     target: "elohim_storage::provide",
                     pin = id,
                     target_cid = %target_cid,
-                    error = %e,
-                    "un-pin: revokes-commitment author failed; reconciler stranded-row arm will retry"
-                );
+                    "un-pin: no mishpat signing key established; the offer is not revoked now (the removed-pin arm is the backstop when it is switched on)"
+                ),
+                Some(provider) => {
+                    let plan = crate::services::provide_reconcile::PlannedRevocation {
+                        cid: target_cid.clone(),
+                        head_ref: pin.head_ref.clone(),
+                        provider,
+                        pin_id: pin.id,
+                        removed_at: pin.updated_at.clone(),
+                    };
+                    let outcome = crate::services::provide_reconcile::submit_revocation(
+                        &pool,
+                        &revoker,
+                        &plan,
+                        crate::chain_write_gate::WriterKind::HttpAuthor,
+                        chrono::Utc::now(),
+                    )
+                    .await;
+                    tracing::info!(
+                        target: "elohim_storage::provide",
+                        pin = id,
+                        target_cid = %target_cid,
+                        outcome = ?outcome,
+                        "un-pin: revokes-commitment"
+                    );
+                }
             }
         }
 

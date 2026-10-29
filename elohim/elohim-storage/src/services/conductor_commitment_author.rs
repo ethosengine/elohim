@@ -16,11 +16,13 @@
 //!    content-store commitment, so `content_store_commitment_cid = None` →
 //!    `fulfills == []`; `bounded_by` is the new commitment CID).
 //!
-//! `revoke_commons` authors a `revokes-commitment` whose projection
+//! [`ConductorRevoker`] authors a `revokes-commitment` whose projection
 //! (`mishpat_projection::parse_revokes_commitment`) sets `revoked_at` on the
-//! target row — the stranded-row safety-net arm of the reconciler. The
-//! authoritative un-pin revocation lives in `http::handle_remove_pin` (T10),
-//! which targets the pin's `commitment_cid` directly.
+//! target row. Both submitters use it through
+//! `provide_reconcile::submit_revocation`: the un-pin route
+//! (`http::handle_remove_pin`, targeting the pin's `commitment_cid`) and the
+//! reconciler's removed-pin arm. A re-pin after a revocation authors a renewal
+//! (`build_content_payload_renewing`), never the revoked entry again.
 //!
 //! ## Idempotency
 //!
@@ -45,7 +47,8 @@ use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
 use crate::services::conductor_writes::{self, CreateMishpatCommitmentInput};
 use crate::services::economic_event_emit_service::{self, EmitEconomicEventInput};
 use crate::services::provide_reconcile::{
-    CommitmentAuthor, ProvideAuthorRequest, ProvideRenewal, ProvideRevokeRequest,
+    CommitmentAuthor, CommitmentRevoker, ProvideAuthorRequest, ProvideRenewal,
+    ProvideRevokeRequest, RevokeError, RevokePrecondition,
 };
 use crate::services::rate_history::DieselRateHistory;
 
@@ -291,6 +294,88 @@ fn agent_provider_candidates(candidates: &[Option<&str>]) -> Vec<String> {
     out
 }
 
+/// May a client whose mishpat writes are authored by `signer` revoke the row
+/// `req` names? Only when the row's provider IS that signer: a revocation is
+/// the provider withdrawing its own offer, and this node signs as no one else.
+fn authorize_revoke(signer: Option<&str>, req: &ProvideRevokeRequest) -> Result<(), String> {
+    match signer {
+        Some(signer)
+            if crate::identity_namespace::is_agent_cid(signer) && signer == req.provider =>
+        {
+            Ok(())
+        }
+        _ => Err(format!(
+            "commitment {} is provided by {}, not by this conductor's mishpat cell agent; \
+             refusing to revoke it",
+            req.target_cid, req.provider
+        )),
+    }
+}
+
+/// Production [`CommitmentRevoker`]: a `revokes-commitment` through the local
+/// conductor's mishpat cell, signed by that cell's agent key. The HTTP un-pin
+/// route uses it directly; [`ConductorCommitmentAuthor`] delegates to it.
+pub struct ConductorRevoker {
+    hc: Arc<HcClient>,
+}
+
+impl ConductorRevoker {
+    pub fn new(hc: Arc<HcClient>) -> Self {
+        Self { hc }
+    }
+}
+
+#[async_trait]
+impl CommitmentRevoker for ConductorRevoker {
+    async fn revoke_authority(&self) -> Option<String> {
+        self.hc
+            .mishpat_agent_key_uhcak()
+            .filter(|key| crate::identity_namespace::is_agent_cid(key))
+    }
+
+    async fn revoke_commons(
+        &self,
+        req: &ProvideRevokeRequest,
+        precondition: &RevokePrecondition,
+    ) -> Result<(), RevokeError> {
+        // One client for the check and the call: the key compared here is the
+        // key of the cell the call writes on.
+        let hc = &self.hc;
+        authorize_revoke(hc.mishpat_agent_key_uhcak().as_deref(), req)
+            .map_err(RevokeError::Refused)?;
+        // The refusal reason, if the precondition refuses: then no call was
+        // offered, which the caller must be able to tell from a failed call.
+        let refusal: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+        let guarded = || {
+            precondition().inspect_err(|reason| {
+                if let Ok(mut slot) = refusal.lock() {
+                    *slot = Some(reason.clone());
+                }
+            })
+        };
+        // `signed_at` comes with the request (fixed by the first claim of this
+        // target), so every attempt carries the same entry.
+        let payload_json = build_revoke_payload(&req.target_cid, &req.signed_at);
+        let outcome = conductor_writes::call_create_commitment_guarded(
+            hc,
+            CreateMishpatCommitmentInput {
+                action: "revokes-commitment".to_string(),
+                payload_json,
+                signed_at: req.signed_at.clone(),
+            },
+            &guarded,
+        )
+        .await;
+        match outcome {
+            Ok(_) => Ok(()),
+            Err(e) => match refusal.lock().ok().and_then(|mut slot| slot.take()) {
+                Some(reason) => Err(RevokeError::Refused(reason)),
+                None => Err(RevokeError::Failed(e)),
+            },
+        }
+    }
+}
+
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
 /// existing commitment CID. PURE for unit-testability.
 pub fn build_revoke_payload(target_cid: &str, signed_at: &str) -> String {
@@ -471,23 +556,24 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 
         Ok(new_cid)
     }
+}
 
-    async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
-        let signed_at = chrono::Utc::now().to_rfc3339();
-        let payload_json = build_revoke_payload(&req.target_cid, &signed_at);
-        crate::chain_write_gate::as_writer(
-            crate::chain_write_gate::WriterKind::Provide,
-            conductor_writes::call_create_commitment(
-                &self.hc,
-                CreateMishpatCommitmentInput {
-                    action: "revokes-commitment".to_string(),
-                    payload_json,
-                    signed_at,
-                },
-            ),
-        )
-        .await?;
-        Ok(())
+#[async_trait]
+impl CommitmentRevoker for ConductorCommitmentAuthor {
+    async fn revoke_authority(&self) -> Option<String> {
+        ConductorRevoker::new(self.hc.clone())
+            .revoke_authority()
+            .await
+    }
+
+    async fn revoke_commons(
+        &self,
+        req: &ProvideRevokeRequest,
+        precondition: &RevokePrecondition,
+    ) -> Result<(), RevokeError> {
+        ConductorRevoker::new(self.hc.clone())
+            .revoke_commons(req, precondition)
+            .await
     }
 }
 
@@ -495,6 +581,25 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    fn revoke_req(provider: &str) -> ProvideRevokeRequest {
+        ProvideRevokeRequest {
+            target_cid: "uhCEkTarget".to_string(),
+            head_ref: "epr:X".to_string(),
+            provider: provider.to_string(),
+            signed_at: "2026-10-13T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn only_the_signing_cell_agent_may_revoke_its_own_row() {
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkCell")).is_ok());
+        // A row another agent provides (a session key handed off by a doorway).
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkSession")).is_err());
+        // No mishpat cell, or a signer that is not an agent key.
+        assert!(authorize_revoke(None, &revoke_req("uhCAkCell")).is_err());
+        assert!(authorize_revoke(Some("12D3Koo"), &revoke_req("12D3Koo")).is_err());
+    }
 
     // -----------------------------------------------------------------------
     // build_content_payload — the wire contract. The conductor round-trip is
