@@ -21,6 +21,8 @@ import { request } from 'undici';
 
 import { E2EWorld } from '../src/framework/world.js';
 
+import { closeAccountCleanup } from './auth-lifecycle.steps.js';
+
 // eslint-disable-next-line sonarjs/no-hardcoded-passwords -- a2o fixture credential, matches genesis/seeder/src/seed-humans.ts
 const FIXTURE_PASSWORD = 'Test2026!';
 
@@ -29,11 +31,12 @@ When(
   async function (this: E2EWorld, doorwayId: string) {
     const doorway = this.getDoorway(doorwayId);
     const unique = `e2e-admin-reach-${Date.now()}`;
+    const requested = `${unique}@test.elohim.host`;
     const { statusCode, body } = await request(`${doorway.url}/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        identifier: `${unique}@test.elohim.host`,
+        identifier: requested,
         password: FIXTURE_PASSWORD,
         displayName: unique,
       }),
@@ -41,6 +44,27 @@ When(
     const text = await body.text();
     this.contentIds.set('adminReach:status', String(statusCode));
     this.contentIds.set('adminReach:body', text);
+
+    // A successful register installs a hosted cell on one of the doorway's
+    // pool conductors. Close the account afterwards so each run hands that
+    // conductor slot back instead of keeping it for good.
+    let registered: { token?: unknown; identifier?: unknown } | undefined;
+    try {
+      registered = JSON.parse(text) as { token?: unknown; identifier?: unknown };
+    } catch {
+      registered = undefined; // a non-JSON body is the Then step's to report
+    }
+    const token = registered?.token;
+    if (statusCode >= 200 && statusCode < 300 && typeof token === 'string' && token) {
+      const identifier =
+        typeof registered?.identifier === 'string' && registered.identifier
+          ? registered.identifier
+          : requested;
+      const doorwayUrl = doorway.url;
+      this.onCleanup(async () => {
+        await closeAccountCleanup(this, doorwayUrl, identifier, token);
+      });
+    }
   }
 );
 

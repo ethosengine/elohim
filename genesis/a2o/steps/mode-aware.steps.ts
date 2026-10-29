@@ -19,6 +19,10 @@ import { Human } from '../src/framework/human.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
 
+import { closeAccountCleanup } from './auth-lifecycle.steps.js';
+
+import type { AuthResponse } from '../src/framework/api/doorway-client.js';
+
 /**
  * Register a human with a device appropriate for the current mode.
  * In HTTP mode: BrowserDevice (API-only, fast).
@@ -35,6 +39,7 @@ Given(
       displayName: `${humanName} (E2E ${runId})`,
     };
     const human = new Human(humanName, creds);
+    let auth: AuthResponse;
 
     if (this.deviceMode === 'playwright') {
       const browser = await this.getBrowser();
@@ -43,7 +48,7 @@ Given(
       await device.init();
       human.addDevice(device);
 
-      const auth = await device.register({
+      auth = await device.register({
         identifier: creds.identifier,
         password: creds.password,
         displayName: creds.displayName,
@@ -58,7 +63,7 @@ Given(
       const device = new BrowserDevice(`${humanName}-browser`, doorway.url);
       human.addDevice(device);
 
-      const auth = await device.register({
+      auth = await device.register({
         identifier: creds.identifier,
         password: creds.password,
         displayName: creds.displayName,
@@ -71,18 +76,15 @@ Given(
 
     this.addHuman(humanName, human);
 
-    // Register cleanup to soft-delete the ephemeral user after the scenario
-    const identifier = creds.identifier;
+    // Close the ephemeral account through the product path, which uninstalls
+    // its hosted cell and releases the conductor slot. The admin soft-delete
+    // this replaced left the cell installed, so every run pinned one slot on
+    // the doorway's pool for good (alpha: 50/50 on two conductors, 2026-10-28).
+    const identifier = auth.identifier || creds.identifier;
     const doorwayUrl = doorway.url;
+    const humanToken = auth.token;
     this.onCleanup(async () => {
-      try {
-        const admin = await this.getAdminClient(doorwayUrl);
-        const list = await admin.adminListUsers({ search: identifier, limit: 1 });
-        const match = list.users.find(u => u.identifier === identifier);
-        if (match) await admin.adminDeleteUser(match.id);
-      } catch {
-        // best-effort cleanup
-      }
+      await closeAccountCleanup(this, doorwayUrl, identifier, humanToken);
     });
   }
 );
