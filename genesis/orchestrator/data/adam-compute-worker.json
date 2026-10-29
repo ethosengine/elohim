@@ -17,9 +17,9 @@
     "grant": {
       "recipient": "uhCAkjxGE9wOMFIuQWeXHSgSwrLH1yy7vCSfwA-OSe6Fy0LFSZNJS",
       "scope": "measure-stage",
-      "issuedAt": "2026-10-22T04:54:39Z",
-      "validFrom": "2026-10-22T04:54:39Z",
-      "validUntil": "2026-10-29T04:54:39Z",
+      "issuedAt": "2026-10-29T13:15:00Z",
+      "validFrom": "2026-10-29T13:15:00Z",
+      "validUntil": "2026-11-05T13:15:00Z",
       "bounds": {
         "epr_scope": [
           "*"

@@ -79,9 +79,30 @@ test("the declared Adam 24Gi worker fits its current full envelope", async () =>
       enabled: true,
       image: config.image || `registry/worker@sha256:${"a".repeat(64)}`,
       performer: config.performer || "adam-key",
+      // The envelope does not depend on the grant's window; the test below owns that.
+      runnerGrant: { ...config.runnerGrant, enabled: false },
     },
   );
   assert.match(output, /memory: 24576Mi/);
+});
+
+test("the declared Adam runner grant is inside its window, or withdrawn", async (t) => {
+  const { runnerGrant } = JSON.parse(
+    await readFile(
+      new URL("./data/adam-compute-worker.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  if (runnerGrant?.enabled !== true) return;
+  const { validUntil } = runnerGrant.grant;
+  const left = Date.parse(validUntil) - Date.now();
+  assert.ok(
+    left > 0,
+    `adam's runner grant expired at ${validUntil}: renew the window or withdraw it ` +
+      "through a reviewed deploy-only commit (genesis/agentic/compute/operations.md)",
+  );
+  if (left < 48 * 3600 * 1000)
+    t.diagnostic(`adam's runner grant expires at ${validUntil}, in under 48 h`);
 });
 
 test("quantity() mirrors bridges/k8s/src/lib.rs's parser over the same examples", () => {
