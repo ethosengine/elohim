@@ -146,4 +146,25 @@ grep -q 'answered nothing (error: unable to upgrade connection: container not fo
 grep -q "cannot be asked" <<<"$OUT" || fail "h: no not-running reading: $OUT"
 echo "h ok"
 
+# i. the storage data volume reuses the script with a label: storage-pvc / STORAGE-* names
+STORE_CLAIM=storage-data-elohim-adam-alpha-0
+scenario storagefull
+printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\ntank/k8s/pvc-1 20971520 20971520 0 100%% /data\n' > "$SCENARIO/df"
+printf 'elohim-adam-alpha-0\tdata=%s \n' "$STORE_CLAIM" > "$SCENARIO/pods"
+printf 'elohim-storage\tdata=/data \n' > "$SCENARIO/pod"
+set +e
+OUT="$(bash "$SCRIPT" "$STORE_CLAIM" "$NS" 20Gi storage 2>&1)"
+CODE=$?
+set -e
+[ "$CODE" -eq 0 ] || fail "i: exit $CODE"
+grep -q "^storage-pvc: $STORE_CLAIM: " <<<"$OUT" || fail "i: no storage-pvc prefix: $OUT"
+grep -q "STORAGE-VOLUME-FULL" <<<"$OUT" || fail "i: no STORAGE-VOLUME-FULL: $OUT"
+grep -q "CONDUCTOR" <<<"$OUT" && fail "i: conductor wording leaked: $OUT"
+grep -q "recycle this storage.s pod" <<<"$OUT" || fail "i: pod wording: $OUT"
+set +e
+OUT="$(bash "$SCRIPT" "$STORE_CLAIM" "$NS" 80Gi storage 2>&1)"
+set -e
+grep -q "STORAGE-PVC-GROW-REFUSED" <<<"$OUT" || fail "i: no STORAGE-PVC-GROW-REFUSED: $OUT"
+echo "i ok"
+
 echo "grow-conductor-pvc.test.sh: all scenarios pass"

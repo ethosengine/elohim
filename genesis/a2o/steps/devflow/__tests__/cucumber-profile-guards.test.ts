@@ -13,7 +13,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const GUARD = 'steps/devflow/cargo-toolchain.guard.ts';
 const DIR_GLOB = 'steps/' + '*/' + '*.ts';
 
-test('every profile selecting rust-style.feature loads the cargo guard', async () => {
+void test('every profile selecting rust-style.feature loads the cargo guard', async () => {
   const mod = await import(pathToFileURL(resolve(root, 'cucumber.mjs')).href);
   const profiles = mod.default() as Record<string, { require: string[]; paths: string[] }>;
   const feature = 'features/devflow/rust-style.feature';

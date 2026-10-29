@@ -9,7 +9,10 @@
 # reconciler. It is WARN-ONLY: a volume that cannot be grown in place is named,
 # with the move the operator has to make, and the roll goes on.
 #
-# Usage: grow-conductor-pvc.sh <claim> <namespace> <size>   (size like 20Gi)
+# Usage: grow-conductor-pvc.sh <claim> <namespace> <size> [label]   (size like 20Gi)
+# label (default "conductor") names the volume's owner in every message and exit name,
+# so the storage data volume reuses this reconciler: label "storage" prints
+# storage-pvc: lines and STORAGE-PVC-GROW-REFUSED / STORAGE-VOLUME-FULL.
 #
 # Reads the live claim because the repo cannot know its storage class: the class
 # is immutable, so a manifest with the wrong one would make `kubectl apply`
@@ -18,13 +21,15 @@
 set -euo pipefail
 # A defect in this script must never fail a conductor deploy: it is a reconciler
 # of a declared size, and the roll it precedes is the thing that matters.
-trap 'echo "conductor-pvc: ${1:-?}: CONDUCTOR-PVC-GROW-SKIPPED — this script failed at line $LINENO; the roll goes on"; exit 0' ERR
+trap 'echo "${4:-conductor}-pvc: ${1:-?}: $(printf %s "${4:-conductor}" | tr a-z A-Z)-PVC-GROW-SKIPPED — this script failed at line $LINENO; the roll goes on"; exit 0' ERR
 
 claim="$1"
 namespace="$2"
 size="$3"
+label="${4:-conductor}"
+LABEL="$(printf %s "$label" | tr a-z A-Z)"
 
-say() { echo "conductor-pvc: $claim: $*"; }
+say() { echo "${label}-pvc: $claim: $*"; }
 
 to_bytes() { # <k8s quantity> -> integer bytes (Ki/Mi/Gi/Ti and K/M/G/T)
   # Bash 64-bit arithmetic, not awk: the CI agent's awk prints any `%d` above
@@ -57,7 +62,7 @@ to_bytes() { # <k8s quantity> -> integer bytes (Ki/Mi/Gi/Ti and K/M/G/T)
 # every conductor after eve's).
 if ! fields="$(kubectl get pvc "$claim" -n "$namespace" \
   -o jsonpath='{.spec.storageClassName}{"\t"}{.spec.resources.requests.storage}{"\t"}{.status.capacity.storage}' 2>/dev/null)"; then
-  say "absent — nothing to grow (the claim appears at the conductor's first boot); declared $size"
+  say "absent — nothing to grow (the claim appears at the ${label}'s first boot); declared $size"
   exit 0
 fi
 IFS=$'\t' read -r class requested capacity <<<"$fields"
@@ -76,7 +81,7 @@ read_filesystem() {
   pods="$(kubectl get pods -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.volumes[*]}{.name}{"="}{.persistentVolumeClaim.claimName}{" "}{end}{"\n"}{end}' 2>/dev/null || true)"
   pod="$(printf '%s\n' "$pods" | awk -F'\t' -v c="$claim" 'index(" " $2 " ", "=" c " ") { print $1; exit }')"
   if [ -z "$pod" ]; then
-    say "filesystem not read — no pod mounts the claim yet (it appears with the conductor's pod)"
+    say "filesystem not read — no pod mounts the claim yet (it appears with the ${label}'s pod)"
     return 0
   fi
   volname="$(printf '%s\n' "$pods" | awk -F'\t' -v p="$pod" '$1 == p { n = split($2, a, " "); for (i = 1; i <= n; i++) { split(a[i], kv, "="); if (kv[2] != "") print kv[1] "=" kv[2] } }' | awk -F'=' -v c="$claim" '$2 == c { print $1; exit }')"
@@ -96,7 +101,7 @@ read_filesystem() {
   why="$(head -n 1 "$err" 2>/dev/null || true)"
   rm -f "$err"
   if [ -z "$line" ]; then
-    say "filesystem not read — df $mount in $pod/$container answered nothing${why:+ ($why)}; a container that is not running cannot be asked (a conductor crash-looping on a full volume is the 2026-10-08 shape) — read the claim's kubelet capacity series instead"
+    say "filesystem not read — df $mount in $pod/$container answered nothing${why:+ ($why)}; a container that is not running cannot be asked (a ${label} crash-looping on a full volume is the 2026-10-08 shape) — read the claim's kubelet capacity series instead"
     return 0
   fi
   read -r _ total used avail _ <<<"$line"
@@ -106,7 +111,7 @@ read_filesystem() {
   shown="$(awk -v t="$total" -v u="$used" -v a="$avail" -v g="$gib" 'BEGIN { printf "capacity %.2f GiB, used %.2f GiB, free %.2f GiB", t/g, u/g, a/g }')"
   # Full means the conductor cannot take a chain write: under 5 % or under 512 MiB free.
   if [ "$((avail * 20))" -lt "$total" ] || [ "$avail" -lt 536870912 ]; then
-    say "CONDUCTOR-VOLUME-FULL — the claim says ${requested:-?} but the filesystem at $mount in $pod reads $shown: on a ZFS dataset with quota, snapshots count against it (shem 2026-10-01, 2026-10-08); operator: zfs set refquota=$size quota=none on the dataset behind this claim (or take the k8s datasets out of sanoid autosnap), then recycle this conductor's pod so lair and SQLite see the space"
+    say "${LABEL}-VOLUME-FULL — the claim says ${requested:-?} but the filesystem at $mount in $pod reads $shown: on a ZFS dataset with quota, snapshots count against it (shem 2026-10-01, 2026-10-08); operator: zfs set refquota=$size quota=none on the dataset behind this claim (or take the k8s datasets out of sanoid autosnap), then recycle this ${label}'s pod so lair and SQLite see the space"
   elif [ "$((total * 10))" -lt "$((declared_bytes * 9))" ]; then
     say "filesystem at $mount reads $shown — under the declared $size by more than a tenth: the quota is being consumed outside the filesystem (snapshots); not yet full"
   else
@@ -127,7 +132,7 @@ if [ -n "$class" ]; then
   expandable="$(kubectl get storageclass "$class" -o jsonpath='{.allowVolumeExpansion}' 2>/dev/null || echo false)"
 fi
 if [ "$expandable" != "true" ]; then
-  say "CONDUCTOR-PVC-GROW-REFUSED — class '${class:-?}' does not allow expansion (allowVolumeExpansion=${expandable:-false}); operator: move the data to a volume of at least $size under the same claim name, as doorway-B's key volume was moved on 2026-09-30"
+  say "${LABEL}-PVC-GROW-REFUSED — class '${class:-?}' does not allow expansion (allowVolumeExpansion=${expandable:-false}); operator: move the data to a volume of at least $size under the same claim name, as doorway-B's key volume was moved on 2026-09-30"
   exit 0
 fi
 
@@ -136,6 +141,6 @@ if kubectl patch pvc "$claim" -n "$namespace" --type merge -p "$patch"; then
   say "request raised to $size; the filesystem grows when the volume's pod next restarts if the class needs that (status.conditions shows FileSystemResizePending until then)"
   kubectl get pvc "$claim" -n "$namespace" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}{"\n"}' 2>/dev/null || true
 else
-  say "CONDUCTOR-PVC-GROW-REFUSED — the cluster refused the raised request (see above); the live volume is unchanged"
+  say "${LABEL}-PVC-GROW-REFUSED — the cluster refused the raised request (see above); the live volume is unchanged"
 fi
 exit 0
