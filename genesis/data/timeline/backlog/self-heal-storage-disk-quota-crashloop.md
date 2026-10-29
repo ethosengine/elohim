@@ -9,7 +9,7 @@ written: "2026-10-28"
 author: "runtime-triage"
 status: "backlog"
 priority: "high"
-self_heal_status: blocked
+self_heal_status: open
 severity: high
 fingerprints: [ccce437a2ecf]
 nodes: [alpha-b, elohim-adam-alpha, elohim-susan-alpha, elohim-eve-alpha, elohim-gertrude-alpha, shem]
@@ -109,8 +109,12 @@ at 18:30Z). Builds #1756 to #1758 observed the outage; none caused it.
    quota, grows past 29 GB and stays up, which is why only shem pods crashloop.
 4. `scripts/ci/grow-conductor-pvc.sh` + `deployments.json storageDataSize: "80Gi"` (1e1d74265,
    on origin/dev): the declared reconciler ran in #1757 and printed `STORAGE-PVC-GROW-REFUSED`
-   for all four claims; the class does not allow expansion, so the repo cannot grow them. Kubelet
-   capacity still reads 21,487,026,176 bytes after the roll.
+   for all four claims, saying the class does not allow expansion. That was wrong: `shem-zfs`
+   does expand (the operator resized all four claims to 80Gi on 2026-10-29). The deployer cannot
+   read cluster-scoped storageclasses, and the script turned an unanswered read into `false`.
+   Fixed on the big train: only a class that answers `false` is refused; an unread one goes on to
+   the patch and the cluster decides. Kubelet capacity still read 21,487,026,176 bytes after the
+   roll.
 5. Storage start path: a full volume makes the process exit on its first write instead of serving
    reads. The pod goes NotReady, the ClusterIP Service `elohim-adam-alpha` drops its only
    endpoint, and the elohim.host doorway's breaker (`doorway/doorway-service/src/routes/upstream_health.rs`)
@@ -120,10 +124,12 @@ at 18:30Z). Builds #1756 to #1758 observed the outage; none caused it.
 ## Fix path
 
 1. **Operator, now (unblocks adam and elohim.host):** give `storage-data-elohim-adam-alpha-0`
-   room on shem. The class refuses expansion, so either raise the quota on the ZFS dataset behind
-   the claim (`zfs set refquota=80G quota=none` there, matching `storageDataSize`) or move the
-   data to a larger volume under the same claim name, then let the pod restart. The same move
-   applies to gertrude, eve and susan. Only an operator can do this; it is cluster state.
+   room on shem: resize the claim to 80Gi AND raise the dataset's hand-set refquota to 80G (the
+   resize alone left 0 free, because the 2026-10-01 refquota of 20G stayed), then restart the pod.
+   The same move applies to gertrude, eve and susan. **Done by the operator 2026-10-29 ~17:00Z:**
+   all four Running/Ready, about 60G free each, elohim.host 200 with storage reachable. The
+   StatefulSet's volumeClaimTemplate stays 20Gi by design (immutable); the live claims carry the
+   size.
 2. **Stop the growth (repo, in flight):** `fix/storage-sled-bounded` (`c956510b0` and siblings,
    merged into `land/big-train`, not on dev): `apply_changes` skips the save when the heads equal
    the stored heads and no orphan is queued, counted by `elohim_sync_doc_writes_total{outcome}`.
@@ -145,9 +151,10 @@ at 18:30Z). Builds #1756 to #1758 observed the outage; none caused it.
 
 ## Current decision
 
-**2026-10-29: blocked on the operator (fix path step 1).** No repo change can bring adam back:
-the volume is full, the class refuses expansion (`STORAGE-PVC-GROW-REFUSED` in #1757), and the
-reclaim needs free space to run. Steps 2 and 3 are the repo half and must land before (or with)
+**2026-10-29: step 1 done by the operator (~17:00Z); open on steps 2 and 3.** No repo change
+could bring adam back: the volume was full, the grow step falsely refused (an unread class read as
+`false`, fixed on the big train), and the reclaim needs free space to run. 80G buys about two days
+at 1.1 GB/h. Steps 2 and 3 are the repo half and must land before (or with)
 the volume action, or the volume refills. Do not roll the fleet to "fix" it: #1757 already
 recreated adam's pod and it crashed the same way.
 

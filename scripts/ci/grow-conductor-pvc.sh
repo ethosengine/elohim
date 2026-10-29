@@ -127,18 +127,30 @@ if [ -n "$requested" ] && [ "$(to_bytes "$requested")" -ge "$declared_bytes" ]; 
   exit 0
 fi
 
-expandable="false"
+# An unreadable class is not a refusing class. The deployer cannot read
+# cluster-scoped storageclasses, and on 2026-10-29 this step reported shem-zfs as
+# non-expandable for four full storage volumes while the class did allow it (the
+# operator resized them by hand). Only a class that answers `false` is refused
+# here; an unanswered read goes on to the patch, and the cluster decides.
+expandable="unknown"
 if [ -n "$class" ]; then
-  expandable="$(kubectl get storageclass "$class" -o jsonpath='{.allowVolumeExpansion}' 2>/dev/null || echo false)"
+  if read_class="$(kubectl get storageclass "$class" -o jsonpath='{.allowVolumeExpansion}' 2>/dev/null)"; then
+    expandable="${read_class:-false}"
+  fi
 fi
-if [ "$expandable" != "true" ]; then
-  say "${LABEL}-PVC-GROW-REFUSED — class '${class:-?}' does not allow expansion (allowVolumeExpansion=${expandable:-false}); operator: move the data to a volume of at least $size under the same claim name, as doorway-B's key volume was moved on 2026-09-30"
+if [ "$expandable" = "false" ]; then
+  say "${LABEL}-PVC-GROW-REFUSED — class '${class:-?}' does not allow expansion (allowVolumeExpansion=false); operator: move the data to a volume of at least $size under the same claim name, as doorway-B's key volume was moved on 2026-09-30"
   exit 0
 fi
+[ "$expandable" = "unknown" ] && say "class '${class:-?}' not readable from here; asking the cluster to grow the claim, which refuses it if the class does not expand"
 
 patch="{\"spec\":{\"resources\":{\"requests\":{\"storage\":\"$size\"}}}}"
 if kubectl patch pvc "$claim" -n "$namespace" --type merge -p "$patch"; then
   say "request raised to $size; the filesystem grows when the volume's pod next restarts if the class needs that (status.conditions shows FileSystemResizePending until then)"
+  # A raised request does not move a refquota set by hand on the dataset (shem
+  # 2026-10-01): the four storage volumes resized on 2026-10-29 kept 0 free until
+  # the operator raised it too.
+  [ "${class:-}" = "shem-zfs" ] && say "operator: on shem also run zfs set refquota=$size on the dataset behind this claim if one was set by hand, or the filesystem stays at its old size"
   kubectl get pvc "$claim" -n "$namespace" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}{"\n"}' 2>/dev/null || true
 else
   say "${LABEL}-PVC-GROW-REFUSED — the cluster refused the raised request (see above); the live volume is unchanged"
