@@ -3639,7 +3639,11 @@ impl HttpServer {
 
         // info level (default): basic operational data
         if detail >= elohim_compute::DetailLevel::Info {
-            let stats = self.blob_store.stats().await?;
+            // A read of the store's running tally, never a walk of the blob
+            // tree: this endpoint is the liveness probe, and a walk made its
+            // latency grow with the number of blobs held (3715 blobs answered
+            // in 3–7 s on a loaded household, past every restart arm's bound).
+            let stats = self.blob_store.stats();
             body["blobs"] = serde_json::json!({
                 "total": stats.total_blobs,
                 "iroh_served": self.blob_iroh_served_count.load(std::sync::atomic::Ordering::Relaxed),
@@ -21042,6 +21046,40 @@ mod tests {
         let present = server.handle_head_shard(&hash).await.unwrap();
         assert_eq!(present.status(), StatusCode::OK);
         assert_eq!(present.headers()[header::CONTENT_LENGTH], "21");
+    }
+
+    /// `/health` is the liveness probe for every storage peer, so its cost
+    /// must not grow with the blobs a peer holds. It reports the store's
+    /// running tally: taking the blob tree away after the writes leaves the
+    /// answer unchanged, which a walk on the request path could not do.
+    #[tokio::test]
+    async fn health_reports_the_blob_tally_without_walking_the_tree() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
+        let server = HttpServer::new(store.clone(), "127.0.0.1:0".parse().unwrap());
+        let mut expected_bytes = 0u64;
+        for i in 0..3u32 {
+            let bytes = format!("health tally witness {i}");
+            expected_bytes += bytes.len() as u64;
+            store.store(bytes.as_bytes()).await.unwrap();
+        }
+
+        async fn read_health(server: &HttpServer) -> serde_json::Value {
+            let resp = server.handle_status_for_test().await.unwrap();
+            let body = http_body_util::BodyExt::collect(resp.into_body())
+                .await
+                .unwrap()
+                .to_bytes();
+            serde_json::from_slice(&body).unwrap()
+        }
+        let health = read_health(&server).await;
+        assert_eq!(health["blobs"]["total"].as_u64(), Some(3));
+        assert_eq!(health["bytes"].as_u64(), Some(expected_bytes));
+
+        std::fs::remove_dir_all(dir.path().join("blobs")).unwrap();
+        let health = read_health(&server).await;
+        assert_eq!(health["blobs"]["total"].as_u64(), Some(3));
+        assert_eq!(health["bytes"].as_u64(), Some(expected_bytes));
     }
 
     #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]

@@ -6735,13 +6735,12 @@ async fn async_main(
     }
 
     // Print stats before exit
-    if let Ok(stats) = blob_store.stats().await {
-        info!(
-            blobs = stats.total_blobs,
-            bytes = stats.total_bytes,
-            "Final storage stats"
-        );
-    }
+    let stats = blob_store.stats();
+    info!(
+        blobs = stats.total_blobs,
+        bytes = stats.total_bytes,
+        "Final storage stats"
+    );
 
     Ok(())
 }

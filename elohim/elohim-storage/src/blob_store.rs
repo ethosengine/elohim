@@ -27,13 +27,26 @@ use crate::error::StorageError;
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
 use sha2::{Digest, Sha256};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::fs;
 use tracing::{debug, info};
 
 /// Raw codec for CID (raw bytes, no structure)
 const RAW_CODEC: u64 = 0x55;
+
+/// The bytes written at a chunked blob's path; its content lives in `<hash>.d/`.
+const CHUNKED_MARKER: &[u8] = b"CHUNKED";
+
+/// How many locks serialise `store`/`delete` of the same blob name.
+///
+/// A name always maps to the same stripe, so a store and a delete of one blob
+/// never interleave and the running tally moves exactly once per file created
+/// or removed. Different names in one stripe also wait for each other, which at
+/// 256 stripes costs little.
+const MUTATION_STRIPES: usize = 256;
 
 /// Chunk size for large blobs (1MB)
 pub const CHUNK_SIZE: usize = 1024 * 1024;
@@ -71,17 +84,38 @@ pub struct StoreAndAnnounceResult {
 pub struct BlobStore {
     /// Root directory for blob storage
     root_dir: PathBuf,
+    /// What [`Self::stats`] reports, kept current by every write and delete
+    /// this store makes. `/health` reads it on every request, so it must cost
+    /// the same for ten blobs as for ten million.
+    tally: BlobTally,
+    /// Per-name mutation locks; see [`MUTATION_STRIPES`].
+    stripes: Box<[tokio::sync::Mutex<()>]>,
 }
 
 impl BlobStore {
     /// Create a new blob store at the given directory
+    ///
+    /// Walks the blob tree once, on a blocking thread with plain `std::fs`
+    /// calls, to seed the running tally. The walk finishes before the store
+    /// is returned, so no write can race it, and nothing walks the tree again
+    /// for the life of the process.
     pub async fn new<P: AsRef<Path>>(root_dir: P) -> Result<Self, StorageError> {
         let root_dir = root_dir.as_ref().to_path_buf();
 
         // Ensure directory exists
         fs::create_dir_all(&root_dir).await?;
 
-        info!(path = %root_dir.display(), "Initialized blob store");
+        let blobs_dir = root_dir.join("blobs");
+        let seeded = tokio::task::spawn_blocking(move || scan_blob_tree(&blobs_dir))
+            .await
+            .map_err(|error| StorageError::Internal(format!("blob tally seed walk: {error}")))?;
+
+        info!(
+            path = %root_dir.display(),
+            blobs = seeded.total_blobs,
+            bytes = seeded.total_bytes,
+            "Initialized blob store"
+        );
 
         if std::env::var("ELOHIM_COMPUTE_LOCAL_API").as_deref() == Ok("1") {
             let payload_root = root_dir.clone();
@@ -96,7 +130,45 @@ impl BlobStore {
             });
         }
 
-        Ok(Self { root_dir })
+        Ok(Self::with_tally(root_dir, seeded))
+    }
+
+    fn with_tally(root_dir: PathBuf, seeded: StorageStats) -> Self {
+        Self {
+            root_dir,
+            tally: BlobTally::seeded(seeded),
+            stripes: (0..MUTATION_STRIPES)
+                .map(|_| tokio::sync::Mutex::new(()))
+                .collect(),
+        }
+    }
+
+    /// The lock that serialises mutations of the blob filed under `name`.
+    fn stripe(&self, name: &str) -> &tokio::sync::Mutex<()> {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        name.hash(&mut hasher);
+        // `MUTATION_STRIPES` fits in u64 and the remainder fits back in usize.
+        let index = (hasher.finish() % self.stripes.len() as u64) as usize;
+        &self.stripes[index]
+    }
+
+    /// Write a new entry at a blob path and count it.
+    ///
+    /// The caller holds the name's stripe and has seen the path absent. A
+    /// failed write is removed rather than left as a partial file, so the tally
+    /// and the tree agree on the failure too.
+    async fn write_entry(
+        &self,
+        path: &Path,
+        contents: &[u8],
+        footprint: EntryFootprint,
+    ) -> Result<(), StorageError> {
+        if let Err(error) = fs::write(path, contents).await {
+            fs::remove_file(path).await.ok();
+            return Err(error.into());
+        }
+        self.tally.add(footprint);
+        Ok(())
     }
 
     /// Get the root directory of this blob store.
@@ -115,7 +187,8 @@ impl BlobStore {
     pub fn new_memory() -> Self {
         let temp_dir = std::env::temp_dir().join(format!("elohim-blobs-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).ok();
-        Self { root_dir: temp_dir }
+        let seeded = scan_blob_tree(&temp_dir.join("blobs"));
+        Self::with_tally(temp_dir, seeded)
     }
 
     /// Compute SHA256 hash of data (legacy format)
@@ -210,6 +283,7 @@ impl BlobStore {
         let (cid, hash) = Self::compute_addresses(data);
         let cid_str = cid.to_string();
         let blob_path = self.blob_path(&hash);
+        let _stripe = self.stripe(&hash).lock().await;
 
         // Check if already exists
         if fs::metadata(&blob_path).await.is_ok() {
@@ -231,7 +305,8 @@ impl BlobStore {
 
         if data.len() <= MAX_INLINE_SIZE {
             // Store as single file
-            fs::write(&blob_path, data).await?;
+            self.write_entry(&blob_path, data, EntryFootprint::inline(data))
+                .await?;
 
             info!(cid = %cid_str, hash = %hash, size = data.len(), "Stored blob");
 
@@ -260,6 +335,7 @@ impl BlobStore {
         let cid = Cid::new_v1(DAG_CBOR_CODEC, mh);
         let cid_str = cid.to_string();
         let blob_path = self.blob_path(&hash);
+        let _stripe = self.stripe(&hash).lock().await;
 
         // Check if already exists
         if fs::metadata(&blob_path).await.is_ok() {
@@ -279,7 +355,8 @@ impl BlobStore {
             fs::create_dir_all(parent).await?;
         }
 
-        fs::write(&blob_path, data).await?;
+        self.write_entry(&blob_path, data, EntryFootprint::inline(data))
+            .await?;
 
         info!(cid = %cid_str, hash = %hash, size = data.len(), "Stored DAG-CBOR blob");
 
@@ -351,6 +428,8 @@ impl BlobStore {
     }
 
     /// Store a large blob as chunks
+    ///
+    /// Called from [`Self::store`] with the hash's stripe already held.
     async fn store_chunked(
         &self,
         hash: &str,
@@ -385,8 +464,18 @@ impl BlobStore {
         });
         fs::write(&index_path, index_json.to_string()).await?;
 
-        // Write a marker file at the blob path
-        fs::write(&blob_path, b"CHUNKED").await?;
+        // Write a marker file at the blob path. Only the marker counts as a
+        // blob; the chunk directory and index are excluded from the tally as
+        // they always were from the walk.
+        self.write_entry(
+            &blob_path,
+            CHUNKED_MARKER,
+            EntryFootprint {
+                bytes: data.len() as u64,
+                chunked: true,
+            },
+        )
+        .await?;
 
         info!(
             cid = %cid,
@@ -588,77 +677,51 @@ impl BlobStore {
     /// Delete a blob
     pub async fn delete(&self, hash: &str) -> Result<(), StorageError> {
         let blob_path = self.blob_path(hash);
+        let _stripe = self.stripe(hash).lock().await;
+
+        // What the entry contributes to the tally, read before anything is
+        // removed: a chunked blob's size lives in the index deleted below.
+        let observed_path = blob_path.clone();
+        let observed = tokio::task::spawn_blocking(move || {
+            std::fs::metadata(&observed_path)
+                .ok()
+                .map(|metadata| EntryFootprint::on_disk(&observed_path, metadata.len()))
+        })
+        .await
+        .ok()
+        .flatten();
 
         // Check if chunked
-        if let Ok(content) = fs::read(&blob_path).await {
-            if content == b"CHUNKED" {
-                // Delete chunk directory
-                let chunk_dir = blob_path.with_extension("d");
-                fs::remove_dir_all(&chunk_dir).await.ok();
+        if observed.is_some_and(|footprint| footprint.chunked) {
+            // Delete chunk directory
+            let chunk_dir = blob_path.with_extension("d");
+            fs::remove_dir_all(&chunk_dir).await.ok();
 
-                // Delete chunk index
-                let index_path = self.chunk_index_path(hash);
-                fs::remove_file(&index_path).await.ok();
-            }
+            // Delete chunk index
+            let index_path = self.chunk_index_path(hash);
+            fs::remove_file(&index_path).await.ok();
         }
 
-        // Delete main file
-        fs::remove_file(&blob_path).await.ok();
+        // Delete main file. Only a removal this call made moves the tally.
+        if fs::remove_file(&blob_path).await.is_ok() {
+            if let Some(footprint) = observed {
+                self.tally.remove(footprint);
+            }
+        }
 
         info!(hash = %hash, "Deleted blob");
         Ok(())
     }
 
     /// Get storage statistics
-    pub async fn stats(&self) -> Result<StorageStats, StorageError> {
-        let blobs_dir = self.root_dir.join("blobs");
-        let mut total_blobs = 0u64;
-        let mut total_bytes = 0u64;
-        let mut chunked_blobs = 0u64;
-
-        if let Ok(mut entries) = fs::read_dir(&blobs_dir).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if entry.path().is_dir() {
-                    if let Ok(mut subentries) = fs::read_dir(entry.path()).await {
-                        while let Ok(Some(subentry)) = subentries.next_entry().await {
-                            let path = subentry.path();
-                            if !path.to_string_lossy().contains(".chunks")
-                                && !path.to_string_lossy().ends_with(".d")
-                            {
-                                total_blobs += 1;
-                                if let Ok(metadata) = fs::metadata(&path).await {
-                                    if metadata.len() == 7 {
-                                        // Might be a chunked marker
-                                        if let Ok(content) = fs::read(&path).await {
-                                            if content == b"CHUNKED" {
-                                                chunked_blobs += 1;
-                                                // Get actual size from chunk index
-                                                if let Some(hash) = path
-                                                    .file_name()
-                                                    .map(|f| f.to_string_lossy().to_string())
-                                                {
-                                                    if let Ok(size) = self.size(&hash).await {
-                                                        total_bytes += size;
-                                                        continue;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    total_bytes += metadata.len();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(StorageStats {
-            total_blobs,
-            total_bytes,
-            chunked_blobs,
-        })
+    ///
+    /// Constant time: this reads the running tally and touches no file. The
+    /// tally is seeded by one walk in [`Self::new`] and then moved by every
+    /// store and delete, so it equals what a walk of the tree would report
+    /// for every change made through this store. A change made to the tree
+    /// by anything else is seen at the next start.
+    pub fn stats(&self) -> StorageStats {
+        self.tally.snapshot()
     }
 
     /// List all blob hashes currently stored in the local pantry.
@@ -717,11 +780,150 @@ impl BlobStore {
 }
 
 /// Storage statistics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StorageStats {
     pub total_blobs: u64,
     pub total_bytes: u64,
     pub chunked_blobs: u64,
+}
+
+/// What one primary entry of the blob tree contributes to [`StorageStats`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EntryFootprint {
+    bytes: u64,
+    chunked: bool,
+}
+
+impl EntryFootprint {
+    /// The footprint of `contents` written inline at a blob path, as a later
+    /// walk would read it back.
+    fn inline(contents: &[u8]) -> Self {
+        Self {
+            bytes: contents.len() as u64,
+            chunked: contents == CHUNKED_MARKER,
+        }
+    }
+
+    /// Read the footprint of the entry at `path`, whose length is `len`.
+    ///
+    /// A chunked marker reports its blob's size from the chunk index, falling
+    /// back to the marker's own length when the index cannot be read. This is
+    /// the rule the per-request walk applied before the tally replaced it.
+    fn on_disk(path: &Path, len: u64) -> Self {
+        let is_marker = len == CHUNKED_MARKER.len() as u64
+            && std::fs::read(path).is_ok_and(|contents| contents == CHUNKED_MARKER);
+        if !is_marker {
+            return Self {
+                bytes: len,
+                chunked: false,
+            };
+        }
+        let bytes = std::fs::read_to_string(path.with_extension("chunks"))
+            .ok()
+            .and_then(|index| serde_json::from_str::<serde_json::Value>(&index).ok())
+            .map_or(len, |index| index["size_bytes"].as_u64().unwrap_or(0));
+        Self {
+            bytes,
+            chunked: true,
+        }
+    }
+}
+
+/// The running [`StorageStats`] of one [`BlobStore`].
+#[derive(Debug, Default)]
+struct BlobTally {
+    blobs: AtomicU64,
+    bytes: AtomicU64,
+    chunked: AtomicU64,
+}
+
+impl BlobTally {
+    fn seeded(stats: StorageStats) -> Self {
+        Self {
+            blobs: AtomicU64::new(stats.total_blobs),
+            bytes: AtomicU64::new(stats.total_bytes),
+            chunked: AtomicU64::new(stats.chunked_blobs),
+        }
+    }
+
+    fn add(&self, footprint: EntryFootprint) {
+        self.blobs.fetch_add(1, Ordering::Relaxed);
+        self.bytes.fetch_add(footprint.bytes, Ordering::Relaxed);
+        if footprint.chunked {
+            self.chunked.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Subtract an entry, saturating at zero: an entry placed in the tree by
+    /// another process after the seed walk was never counted.
+    fn remove(&self, footprint: EntryFootprint) {
+        let saturating_sub = |counter: &AtomicU64, amount: u64| {
+            // The closure always returns `Some`, so the update cannot fail.
+            let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                Some(current.saturating_sub(amount))
+            });
+        };
+        saturating_sub(&self.blobs, 1);
+        saturating_sub(&self.bytes, footprint.bytes);
+        if footprint.chunked {
+            saturating_sub(&self.chunked, 1);
+        }
+    }
+
+    fn snapshot(&self) -> StorageStats {
+        StorageStats {
+            total_blobs: self.blobs.load(Ordering::Relaxed),
+            total_bytes: self.bytes.load(Ordering::Relaxed),
+            chunked_blobs: self.chunked.load(Ordering::Relaxed),
+        }
+    }
+}
+
+/// Is this shard-directory entry a blob, rather than a chunk index
+/// (`<hash>.chunks`) or a chunk directory (`<hash>.d`)?
+fn is_primary_entry(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy())
+        .unwrap_or_default();
+    !name.contains(".chunks") && !name.ends_with(".d")
+}
+
+/// Walk `blobs/<shard>/<entry>` once with blocking `std::fs` calls.
+///
+/// This is the only walk that feeds [`BlobStore::stats`], and it runs once per
+/// store, at construction. It counts what the per-request walk counted: every
+/// primary entry is a blob, an entry whose metadata cannot be read adds no
+/// bytes, and a chunked marker adds its blob's indexed size.
+fn scan_blob_tree(blobs_dir: &Path) -> StorageStats {
+    let mut stats = StorageStats::default();
+    let Ok(shards) = std::fs::read_dir(blobs_dir) else {
+        return stats;
+    };
+    for shard in shards.flatten() {
+        let shard_path = shard.path();
+        if !shard_path.is_dir() {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(&shard_path) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !is_primary_entry(&path) {
+                continue;
+            }
+            stats.total_blobs += 1;
+            if let Ok(metadata) = std::fs::metadata(&path) {
+                let footprint = EntryFootprint::on_disk(&path, metadata.len());
+                stats.total_bytes += footprint.bytes;
+                if footprint.chunked {
+                    stats.chunked_blobs += 1;
+                }
+            }
+        }
+    }
+    stats
 }
 
 #[cfg(test)]
@@ -891,5 +1093,162 @@ mod tests {
             .exists_by_address("bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             .await
             .unwrap_or(false));
+    }
+
+    /// The tally against a fresh walk of the same tree: they must agree after
+    /// every change made through the store.
+    fn assert_tally_matches_tree(store: &BlobStore) {
+        assert_eq!(
+            store.stats(),
+            scan_blob_tree(&store.root_dir.join("blobs")),
+            "the running tally drifted from the blob tree"
+        );
+    }
+
+    #[tokio::test]
+    async fn stats_stay_exact_across_every_store_and_delete() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+        assert_eq!(store.stats(), StorageStats::default());
+
+        let inline = store.store(b"inline tally witness").await.unwrap();
+        assert_tally_matches_tree(&store);
+        let cbor = store
+            .store_dag_cbor(b"dag-cbor tally witness")
+            .await
+            .unwrap();
+        assert_tally_matches_tree(&store);
+        let large = vec![7u8; MAX_INLINE_SIZE + 1];
+        let chunked = store.store(&large).await.unwrap();
+        assert!(chunked.chunked);
+        assert_tally_matches_tree(&store);
+        // The bytes literally equal to the chunked marker, stored inline, are
+        // read back by a walk as a marker with no index; the tally agrees.
+        let marker_lookalike = store.store(CHUNKED_MARKER).await.unwrap();
+        assert_tally_matches_tree(&store);
+
+        let expected_bytes = (b"inline tally witness".len()
+            + b"dag-cbor tally witness".len()
+            + large.len()
+            + CHUNKED_MARKER.len()) as u64;
+        assert_eq!(
+            store.stats(),
+            StorageStats {
+                total_blobs: 4,
+                total_bytes: expected_bytes,
+                chunked_blobs: 2,
+            }
+        );
+
+        // A repeat store counts nothing.
+        assert!(
+            store
+                .store(b"inline tally witness")
+                .await
+                .unwrap()
+                .already_existed
+        );
+        assert_tally_matches_tree(&store);
+
+        for hash in [
+            &inline.hash,
+            &cbor.hash,
+            &chunked.hash,
+            &marker_lookalike.hash,
+        ] {
+            store.delete(hash).await.unwrap();
+            assert_tally_matches_tree(&store);
+        }
+        assert_eq!(store.stats(), StorageStats::default());
+
+        // Deleting what is absent, or deleting twice, moves nothing.
+        store.delete(&inline.hash).await.unwrap();
+        store
+            .delete(&BlobStore::compute_hash(b"never stored"))
+            .await
+            .unwrap();
+        assert_eq!(store.stats(), StorageStats::default());
+    }
+
+    #[tokio::test]
+    async fn stats_read_the_tally_and_never_walk_the_tree() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+        for i in 0..32u32 {
+            store.store(format!("blob {i}").as_bytes()).await.unwrap();
+        }
+        let before = store.stats();
+        assert_eq!(before.total_blobs, 32);
+
+        // Change the tree behind the store's back: plant entries a walk would
+        // count, then take the whole tree away. A `stats` that walked would
+        // report either; the tally reports neither.
+        let planted = temp_dir.path().join("blobs").join("ffff");
+        std::fs::create_dir_all(&planted).unwrap();
+        for i in 0..64u32 {
+            std::fs::write(planted.join(format!("sha256-planted-{i}")), b"x").unwrap();
+        }
+        assert_eq!(store.stats(), before);
+        std::fs::remove_dir_all(temp_dir.path().join("blobs")).unwrap();
+        assert_eq!(store.stats(), before);
+
+        // The next start seeds from what is really there.
+        let restarted = BlobStore::new(temp_dir.path()).await.unwrap();
+        assert_eq!(restarted.stats(), StorageStats::default());
+    }
+
+    #[tokio::test]
+    async fn seed_walk_counts_what_the_request_walk_counted() {
+        let temp_dir = TempDir::new().unwrap();
+        let first = BlobStore::new(temp_dir.path()).await.unwrap();
+        first.store(b"seeded inline").await.unwrap();
+        first.store(&vec![1u8; MAX_INLINE_SIZE + 3]).await.unwrap();
+        // A zero-byte placeholder is skipped by `list_hashes` but was always
+        // counted as a blob by the stats walk.
+        let real = first.store(b"placeholder neighbour").await.unwrap();
+        let subdir = &real.hash.strip_prefix("sha256-").unwrap()[..4];
+        std::fs::write(
+            temp_dir
+                .path()
+                .join("blobs")
+                .join(subdir)
+                .join(BlobStore::compute_hash(b"placeholder")),
+            b"",
+        )
+        .unwrap();
+
+        let restarted = BlobStore::new(temp_dir.path()).await.unwrap();
+        assert_eq!(
+            restarted.stats(),
+            StorageStats {
+                total_blobs: 4,
+                total_bytes: (b"seeded inline".len()
+                    + MAX_INLINE_SIZE
+                    + 3
+                    + b"placeholder neighbour".len()) as u64,
+                chunked_blobs: 1,
+            }
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_stores_of_one_blob_count_it_once() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = std::sync::Arc::new(BlobStore::new(temp_dir.path()).await.unwrap());
+        let writers: Vec<_> = (0..16)
+            .map(|_| {
+                let store = store.clone();
+                tokio::spawn(async move { store.store(b"raced blob").await.unwrap() })
+            })
+            .collect();
+        let mut created = 0;
+        for writer in writers {
+            if !writer.await.unwrap().already_existed {
+                created += 1;
+            }
+        }
+        assert_eq!(created, 1, "exactly one writer creates the blob");
+        assert_eq!(store.stats().total_blobs, 1);
+        assert_tally_matches_tree(&store);
     }
 }
