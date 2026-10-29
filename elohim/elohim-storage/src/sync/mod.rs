@@ -90,6 +90,29 @@ pub async fn new_change_origin_timestamps(
         .collect()
 }
 
+/// How often [`spawn_sled_tree_sampler`] walks the sync sled.
+pub const SLED_TREE_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(900);
+
+/// Report the sync sled's live per-tree entries and bytes on a background
+/// interval (`elohim_node_store_entries` and `elohim_node_store_bytes` with
+/// `store="sync_sled"`, `part="tree_<name>"`). The walk reads every live
+/// value, so it runs on the blocking pool and never on a request path. Set
+/// beside the file-size reading of the same directory, the gap between the
+/// two is what sled holds on disk that no tree references any more.
+pub fn spawn_sled_tree_sampler(sync: Arc<SyncManager>) {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(SLED_TREE_SAMPLE_INTERVAL);
+        loop {
+            tick.tick().await;
+            let walker = sync.clone();
+            match tokio::task::spawn_blocking(move || walker.sled_tree_totals()).await {
+                Ok(trees) => crate::metrics::set_sled_tree_totals(&trees),
+                Err(e) => tracing::warn!(error = %e, "sync sled tree sample failed"),
+            }
+        }
+    });
+}
+
 impl SyncManager {
     /// Create a new sync manager
     pub fn new(doc_store: Arc<DocStore>, stream_tracker: Arc<StreamTracker>) -> Self {
@@ -315,6 +338,12 @@ impl SyncManager {
     /// Get document count for an app
     pub async fn count_documents(&self, h_app_id: &str) -> Result<u64, StorageError> {
         self.doc_store.count(h_app_id).await
+    }
+
+    /// Live per-tree contents of the sync sled database. See
+    /// [`DocStore::sled_tree_totals`]; background sampling only.
+    pub fn sled_tree_totals(&self) -> Vec<crate::services::store_footprint::SledTreeTotals> {
+        self.doc_store.sled_tree_totals()
     }
 
     /// Every document in the store, across all namespaces. This is what a

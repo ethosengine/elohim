@@ -5055,6 +5055,25 @@ async fn async_main(
         }
     }
 
+    // The sync sled's live per-tree contents, beside the file-size reading of
+    // the same directory (store_footprint above). One owner per process: the
+    // libp2p node's SyncManager when it exists, else the iroh one (in Dual
+    // mode they are the same Arc).
+    {
+        #[cfg(feature = "p2p")]
+        let libp2p_sync: Option<Arc<elohim_storage::sync::SyncManager>> =
+            p2p_node.as_ref().map(|n| n.sync_manager().clone());
+        #[cfg(not(feature = "p2p"))]
+        let libp2p_sync: Option<Arc<elohim_storage::sync::SyncManager>> = None;
+        #[cfg(feature = "p2p-iroh")]
+        let sled_sync = libp2p_sync.or_else(|| iroh_sync_manager.clone());
+        #[cfg(not(feature = "p2p-iroh"))]
+        let sled_sync = libp2p_sync;
+        if let Some(sync) = sled_sync {
+            elohim_storage::sync::spawn_sled_tree_sampler(sync);
+        }
+    }
+
     // T22: Construct EprFanOutCtx and inject into HTTP layer.
     //
     // The fan-out context activates the FeedbackSignal arrival pipeline:

@@ -236,6 +236,11 @@ lazy_static! {
     /// DNA hash for per-DNA conductor databases; measure = "apparent" (file
     /// length) | "allocated" (blocks on disk). Splits heads from installed code,
     /// and bytes held from disk taken. Set by `services::store_footprint`.
+    ///
+    /// A keyed store also reports its live contents under `part="tree_<name>"`
+    /// with measure = "logical" (key + value bytes held now) | "largest" (the
+    /// largest single value). Today only the sync sled does; the file reading
+    /// of `store="sync_sled"` minus its trees' "logical" is sled garbage.
     pub static ref NODE_STORE_BYTES: IntGaugeVec = IntGaugeVec::new(
         Opts::new(
             "elohim_node_store_bytes",
@@ -2138,6 +2143,19 @@ lazy_static! {
 // The sync DocStore write outcomes sit in their own block for the same reason
 // as the one below: the first block is at the crate's macro recursion limit.
 lazy_static! {
+    /// Live entries behind an `elohim_node_store_bytes` class that is a
+    /// keyed store rather than a set of files. Today: each tree of the sync
+    /// sled (`scope="storage"`, `store="sync_sled"`, `part="tree_<name>"`),
+    /// sampled by `sync::spawn_sled_tree_sampler`.
+    pub static ref NODE_STORE_ENTRIES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_node_store_entries",
+            "Live entries by keyed store class.",
+        ),
+        &["scope", "store", "part", "dna"],
+    )
+    .unwrap();
+
     /// Sync DocStore document writes after an apply, by outcome: "written"
     /// (the encoded document changed and was stored) | "unchanged" (it was
     /// byte-identical to the stored copy, so the rewrite was skipped). A high
@@ -3330,6 +3348,7 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(NODE_STORE_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_STORE_FILES.clone()));
+        let _ = REGISTRY.register(Box::new(NODE_STORE_ENTRIES.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_KNOWN_HOLDERS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_APP_ENABLED.clone()));
         // Pre-touch every supervised role at 1, so a pod that has never probed
@@ -4683,6 +4702,24 @@ pub fn set_store_footprint(
             .with_label_values(&[scope, &k.store, k.part, &k.dna])
             .set(t.files as i64);
         previous.insert(k.clone());
+    }
+}
+
+/// Replace the sync sled's per-tree reading (see `NODE_STORE_ENTRIES`).
+/// Tree names are a small fixed set (documents, metadata, kademlia_*,
+/// __sled__default), so the label space stays bounded.
+pub fn set_sled_tree_totals(trees: &[crate::services::store_footprint::SledTreeTotals]) {
+    for t in trees {
+        let part = format!("tree_{}", t.tree);
+        NODE_STORE_ENTRIES
+            .with_label_values(&["storage", "sync_sled", &part, ""])
+            .set(t.entries as i64);
+        NODE_STORE_BYTES
+            .with_label_values(&["storage", "sync_sled", &part, "", "logical"])
+            .set(t.logical_bytes as i64);
+        NODE_STORE_BYTES
+            .with_label_values(&["storage", "sync_sled", &part, "", "largest"])
+            .set(t.largest_value_bytes as i64);
     }
 }
 

@@ -355,6 +355,13 @@ impl DocStore {
         Ok(self.docs.len() as u64)
     }
 
+    /// Live entries and bytes of every tree in this store's sled database,
+    /// including trees other components share it with (the Kademlia
+    /// records). O(live bytes) and synchronous: background sampling only.
+    pub fn sled_tree_totals(&self) -> Vec<crate::services::store_footprint::SledTreeTotals> {
+        crate::services::store_footprint::sled_trees(&self.db)
+    }
+
     /// Flush changes to disk
     pub async fn flush(&self) -> Result<(), StorageError> {
         self.db
