@@ -13,6 +13,7 @@ import { join, resolve, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { compile } from 'json-schema-to-typescript';
+import { tableRows } from './lib/table-enum.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../../../');
@@ -310,6 +311,16 @@ const INTERFACE_FILES = [
   // Lane S (post-station-4 sprint, R-S4) — GET /db/content/search: recipe, lens, fold
   // answers and per-candidate provenance over the storage content projection's lexical fold.
   { src: 'views/content-search-view.ts', dest: 'content-search-view.ts' },
+  // EPR content chrome (chrome trust edge, 2026-10-15) — the context island every
+  // medium mounts <elohim-omni> from (Ephemeral, Category C; rebuilt per request).
+  // Its vocabularies (FrameCapability, PageInfoSection + their tables) ride
+  // schema-enums.ts via the `_table` marker.
+  { src: 'views/chrome-context.ts', dest: 'chrome-context.ts' },
+  // Content-chrome facing — GET /api/v1/epr/{id}/chrome: every reading the chrome
+  // shows for one record (Ephemeral, Category C). ts-rs also emits the same names
+  // into storage-client-ts (precedent: resilience-snapshot-view, lens-market-view);
+  // this schema is the wire authority, the ts-rs copy serves the storage client.
+  { src: 'views/content-chrome-facing.ts', dest: 'content-chrome-facing.ts' },
 ];
 
 /**
@@ -517,7 +528,7 @@ function inlineRefs(schema, refMap) {
           // Inline the referenced schema (strip meta-schema fields),
           // then recursively inline any nested $ref in the result
           const { $id, $schema, _dna, _source, ...rest } = target;
-          Object.assign(result, inlineRefs(rest, refMap));
+          Object.assign(result, inlineRefs(forTypeCompile(rest), refMap));
         } else {
           result[key] = value;
         }
@@ -529,6 +540,21 @@ function inlineRefs(schema, refMap) {
     }
   }
   return result;
+}
+
+/**
+ * A `_table` enum carries its per-value annotations (x-label, x-sandbox, ...) as an
+ * `oneOf` of `{ const, x-... }` beside the plain `enum`. The type is the `enum`
+ * alone; handing the annotation `oneOf` to json-schema-to-typescript would emit an
+ * intersection with one alias per value. Drop it (and the generator marker) for
+ * type compilation only — the table itself is emitted by generateEnumConstants.
+ */
+function forTypeCompile(schema) {
+  if (!schema || typeof schema !== 'object' || !schema._table || !Array.isArray(schema.enum)) {
+    return schema;
+  }
+  const { oneOf, _table, ...rest } = schema;
+  return rest;
 }
 
 async function generateFromDir(subdir, refMap) {
@@ -550,7 +576,7 @@ async function generateFromDir(subdir, refMap) {
     const name = basename(file, '.schema.json');
 
     // Inline $ref before passing to compiler
-    const schema = inlineRefs(schemaRaw, refMap);
+    const schema = inlineRefs(forTypeCompile(schemaRaw), refMap);
 
     try {
       let ts = await compile(schema, schema.title || name, {
@@ -603,6 +629,12 @@ async function generateEnumConstants() {
   for (const file of files) {
     const raw = await readFile(join(ENUM_DIR, file), 'utf8');
     const schema = JSON.parse(raw);
+
+    if (!schema._dna && !schema._codegen && schema._table) {
+      blocks.push(...formatTsTable(schema));
+      blocks.push('');
+      continue;
+    }
 
     // `_dna` enums are mirrored as generated DNA constants; `_codegen` enums are
     // generated everywhere EXCEPT a DNA (e.g. rea-action, whose DNA const is
@@ -660,6 +692,56 @@ function formatTsConst(name, values) {
   // Fall back to multi-line for long arrays
   const items = values.map((v) => `  '${v}',`).join('\n');
   return `export const ${name} = [\n${items}\n] as const;`;
+}
+
+function tsLiteral(v) {
+  if (v === null) return 'null';
+  if (typeof v === 'boolean') return String(v);
+  return `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
+function tsAnnotationType(rows, key) {
+  const kinds = new Set(rows.map((r) => (r[key] === null ? 'null' : typeof r[key])));
+  const base = kinds.has('boolean') ? 'boolean' : 'string';
+  return kinds.has('null') ? `${base} | null` : base;
+}
+
+/**
+ * Emit a non-DNA vocabulary enum carrying a `_table` marker: ALL_* constant, the
+ * backward-compatible bare alias, the type alias, and (when the schema maps any
+ * annotations) a `<CONSTANT>_TABLE` of one row per value. Formatted in-script
+ * (Prettier's 100-column object wrap) because schema-enums.ts is distributed
+ * without a Prettier pass.
+ */
+function formatTsTable(schema) {
+  const title = schema.title;
+  const baseName = schema._table.constant;
+  const out = [];
+  out.push(formatTsConst(`ALL_${baseName}`, schema.enum));
+  out.push(`export const ${baseName} = ALL_${baseName};`);
+  out.push(`export type ${title} = (typeof ALL_${baseName})[number];`);
+  const mapping = schema._table.annotations || {};
+  const keys = Object.keys(mapping);
+  if (keys.length === 0) return out;
+  const rows = tableRows(schema);
+  const fields = [['value', title], ...keys.map((k) => [mapping[k].ts, tsAnnotationType(rows, k)])];
+  out.push(
+    [
+      `export interface ${title}Entry {`,
+      ...fields.map(([f, t]) => `  readonly ${f}: ${t};`),
+      `}`,
+    ].join('\n'),
+  );
+  const rowLines = rows.map((r) => {
+    const props = [['value', tsLiteral(r.value)], ...keys.map((k) => [mapping[k].ts, tsLiteral(r[k])])];
+    const single = `  { ${props.map(([f, v]) => `${f}: ${v}`).join(', ')} },`;
+    if (single.length <= 100) return single;
+    return ['  {', ...props.map(([f, v]) => `    ${f}: ${v},`), '  },'].join('\n');
+  });
+  out.push(
+    [`export const ${baseName}_TABLE: readonly ${title}Entry[] = [`, ...rowLines, `];`].join('\n'),
+  );
+  return out;
 }
 
 /**
@@ -723,6 +805,36 @@ function collapseUnionAliases(ts, printWidth = 100) {
   );
 }
 
+const CHROME_VOCAB_PATH = resolve(
+  REPO_ROOT,
+  'elohim/elohim-chrome-asset/src/generated/chrome-vocabulary.json',
+);
+
+async function sameFile(path, content) {
+  try {
+    return (await readFile(path, 'utf8')) === content;
+  } catch {
+    return false;
+  }
+}
+
+/** The element's vocabulary: FrameCapability rows + PageInfoSection rows, as JSON. */
+async function generateChromeVocabulary() {
+  const read = async (f) => JSON.parse(await readFile(join(ENUM_DIR, f), 'utf8'));
+  const caps = tableRows(await read('frame-capability.schema.json')).map((r) => ({
+    value: r.value,
+    label: r['x-label'],
+    sandbox: r['x-sandbox'],
+    allow: r['x-allow'],
+    device: r['x-device'],
+  }));
+  const sections = tableRows(await read('page-info-section.schema.json')).map((r) => ({
+    value: r.value,
+    label: r['x-label'],
+  }));
+  return JSON.stringify({ frameCapabilities: caps, pageInfoSections: sections }, null, 2) + '\n';
+}
+
 async function main() {
   // --- Part 1: Interface generation (into the cache, or a temp dir under --verify) ---
   {
@@ -767,10 +879,20 @@ async function main() {
     for (const dir of dirs) interfaceOutputs.set(join(dir, dest), content);
   }
 
+  // --- Part 2b: the chrome element's vocabulary (one vocabulary, no hand copy) ---
+  // elohim-chrome-asset splices this JSON into omni-element.js (include_str + a
+  // placeholder replace), so the element's capability table and page-info labels are
+  // projections of the same schemas the TS tables come from.
+  const chromeVocab = await generateChromeVocabulary();
+
   if (VERIFY) {
     let hasFailure = false;
     let skippedCache = 0;
     let staleCache = 0;
+    if (!(await sameFile(CHROME_VOCAB_PATH, chromeVocab))) {
+      console.error(`FAIL: ${CHROME_VOCAB_PATH} is stale. Run: pnpm run schema:codegen:ts`);
+      hasFailure = true;
+    }
 
     // Verify enum files
     for (const outPath of ENUM_OUTPUT_PATHS) {
@@ -837,6 +959,10 @@ async function main() {
     console.log('TypeScript codegen is up to date.');
     return;
   }
+
+  await mkdir(dirname(CHROME_VOCAB_PATH), { recursive: true });
+  await writeFile(CHROME_VOCAB_PATH, chromeVocab);
+  console.log(`Distributed: ${CHROME_VOCAB_PATH}`);
 
   // Distribute enum files
   for (const outPath of ENUM_OUTPUT_PATHS) {

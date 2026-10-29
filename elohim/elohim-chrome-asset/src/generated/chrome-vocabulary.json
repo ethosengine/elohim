@@ -1,0 +1,90 @@
+{
+  "frameCapabilities": [
+    {
+      "value": "forms",
+      "label": "Submit forms",
+      "sandbox": "allow-forms",
+      "allow": null,
+      "device": false
+    },
+    {
+      "value": "popups",
+      "label": "Open windows",
+      "sandbox": "allow-popups",
+      "allow": null,
+      "device": false
+    },
+    {
+      "value": "downloads",
+      "label": "Download files",
+      "sandbox": "allow-downloads",
+      "allow": null,
+      "device": false
+    },
+    {
+      "value": "fullscreen",
+      "label": "Go fullscreen",
+      "sandbox": null,
+      "allow": "fullscreen",
+      "device": false
+    },
+    {
+      "value": "clipboard-write",
+      "label": "Copy to your clipboard",
+      "sandbox": null,
+      "allow": "clipboard-write",
+      "device": false
+    },
+    {
+      "value": "camera",
+      "label": "Camera",
+      "sandbox": null,
+      "allow": "camera",
+      "device": true
+    },
+    {
+      "value": "microphone",
+      "label": "Microphone",
+      "sandbox": null,
+      "allow": "microphone",
+      "device": true
+    },
+    {
+      "value": "geolocation",
+      "label": "Location",
+      "sandbox": null,
+      "allow": "geolocation",
+      "device": true
+    }
+  ],
+  "pageInfoSections": [
+    {
+      "value": "source",
+      "label": "Source"
+    },
+    {
+      "value": "delivery",
+      "label": "Delivery"
+    },
+    {
+      "value": "holders",
+      "label": "Holders"
+    },
+    {
+      "value": "steward",
+      "label": "Steward"
+    },
+    {
+      "value": "claims",
+      "label": "Claims"
+    },
+    {
+      "value": "permissions",
+      "label": "Permissions"
+    },
+    {
+      "value": "yours",
+      "label": "Yours"
+    }
+  ]
+}

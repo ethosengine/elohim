@@ -7135,3 +7135,107 @@ fn runtime_observation_matches_schema() {
         &serde_json::to_value(observed).unwrap(),
     );
 }
+
+// ── Content-chrome facing (chrome-trust-edge): the wire struct ──────────────
+// Source of truth: the Notarized content record + its projections; the view is
+// Ephemeral (Category C). This binds the elohim-views struct to the schema; the
+// fold-driven contract (every lens folded from a relation) rides beside the fold.
+
+fn content_chrome_view_full() -> elohim_views::ContentChromeFacingView {
+    use elohim_views::{
+        ContentChromeAppLens, ContentChromeClaim, ContentChromeClaimsLens, ContentChromeFacingView,
+        ContentChromeHoldersLens, ContentChromeSteward, ContentChromeStewardLens,
+        ContentChromeThemeHint, EprCouplingView, StewardingCollectiveEntry,
+    };
+    ContentChromeFacingView {
+        record_id: "evolution-of-trust".into(),
+        title: "The Evolution of Trust".into(),
+        format: "html5-app".into(),
+        mode: "trustful".into(),
+        reach: "commons".into(),
+        witness: "green".into(),
+        computed_at: "2026-10-15T12:00:01Z".into(),
+        content_address: Some("bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy".into()),
+        app: Some(ContentChromeAppLens {
+            entry: "index.html".into(),
+            capabilities: vec!["forms".into(), "fullscreen".into()],
+            presents: false,
+            sources: Some(vec!["https://fonts.example.org".into()]),
+            theme_hint: Some(ContentChromeThemeHint {
+                color_scheme: Some("dark".into()),
+                theme_color: Some("#111".into()),
+            }),
+            fallback_url: Some("https://ncase.me/trust/".into()),
+        }),
+        holders: Some(ContentChromeHoldersLens {
+            holders: 2,
+            target: 3,
+            headline: "Held by 2 households".into(),
+            reassurance: "watching".into(),
+            as_of: "2026-10-15T12:00:00Z".into(),
+            held_by: vec![StewardingCollectiveEntry {
+                id: "household:dowell".into(),
+                kind: "household".into(),
+                label: Some("Dowell".into()),
+                intra_hub_peers: Some(3),
+            }],
+            commitment_backed_collectives: 1,
+        }),
+        claims: Some(ContentChromeClaimsLens {
+            attestations: vec![ContentChromeClaim {
+                id: "bafyreiclaim".into(),
+                kind: "attestation:content-quality".into(),
+                issuer_cid: "uhCAkreviewer".into(),
+                proof_class: "witness".into(),
+                title: "Reviewed for accuracy".into(),
+                created_at: "2026-10-01T00:00:00Z".into(),
+                revoked: true,
+                expires_at: Some("2027-10-01T00:00:00Z".into()),
+            }],
+        }),
+        legs: Some(EprCouplingView {
+            knowledge: None,
+            value: None,
+            governance: Some("bafyreigov".into()),
+        }),
+        steward: Some(ContentChromeStewardLens {
+            stewards: vec![ContentChromeSteward {
+                presence_id: "presence-matthew".into(),
+                contribution_type: "author".into(),
+                allocation_ratio: 1.0,
+                governance_state: "active".into(),
+                display_name: Some("Matthew".into()),
+            }],
+        }),
+    }
+}
+
+#[test]
+fn content_chrome_facing_view_struct_matches_schema() {
+    let schema = load_schema("views/content-chrome-facing.schema.json");
+    assert_source_of_truth_declared(&schema, "content-chrome-facing");
+
+    let full = serde_json::to_value(content_chrome_view_full()).unwrap();
+    validate_against_schema("views/content-chrome-facing.schema.json", &full);
+
+    // Unselected lenses are absent keys, never null — and still valid.
+    let mut bare_view = content_chrome_view_full();
+    bare_view.witness = "amber".into();
+    bare_view.content_address = None;
+    bare_view.app = None;
+    bare_view.holders = None;
+    bare_view.legs = None;
+    let bare = serde_json::to_value(bare_view).unwrap();
+    for lens in ["contentAddress", "app", "holders", "legs"] {
+        assert!(bare.get(lens).is_none(), "{lens} must be absent, not null");
+    }
+    validate_against_schema("views/content-chrome-facing.schema.json", &bare);
+
+    let mut nulled = bare.clone();
+    nulled["holders"] = Value::Null;
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(
+        !validator.is_valid(&nulled),
+        "holders: null must not satisfy the schema"
+    );
+}

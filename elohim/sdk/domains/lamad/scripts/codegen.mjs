@@ -114,7 +114,11 @@ function schemaTypeToTs(prop) {
   if (prop.type === 'number' || prop.type === 'integer') return 'number';
   if (prop.type === 'boolean') return 'boolean';
   if (prop.type === 'array') {
-    if (prop.items) return `${schemaTypeToTs(prop.items)}[]`;
+    if (prop.items) {
+      // A union element type needs parentheses: `('a' | 'b')[]`, not `'a' | 'b'[]`.
+      const item = schemaTypeToTs(prop.items);
+      return item.includes(' | ') ? `(${item})[]` : `${item}[]`;
+    }
     return 'unknown[]';
   }
   if (prop.type === 'object') {
@@ -429,7 +433,37 @@ ${valueEntries.join('\n')}
 
 async function loadSchema(refPath) {
   const fullPath = resolve(LAMAD_DIR, refPath);
-  return JSON.parse(await readFile(fullPath, 'utf8'));
+  const schema = JSON.parse(await readFile(fullPath, 'utf8'));
+  return inlineFileRefs(schema, dirname(fullPath));
+}
+
+/**
+ * Inline `$ref`s that name another schema FILE (e.g. a body schema's
+ * `capabilities.items` → `../../../schemas/v1/enums/frame-capability.schema.json`),
+ * so the lightweight converter above sees the referenced `enum`/`type` instead of
+ * falling through to `unknown`. In-document `#/$defs/...` refs are left alone
+ * (`schemaTypeToTs` names them). The referenced schema's own identity and
+ * generator metadata are dropped; for a `_table` enum the per-value annotation
+ * `oneOf` is dropped too — it annotates values the `enum` already lists.
+ */
+async function inlineFileRefs(node, baseDir) {
+  if (node === null || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return Promise.all(node.map((n) => inlineFileRefs(n, baseDir)));
+  // Whole-file refs only: a `file.schema.json#/$defs/X` pointer (a schema naming
+  // its own defs by filename) is left for `schemaTypeToTs`, as before.
+  if (typeof node.$ref === 'string' && !node.$ref.includes('#')) {
+    const refPath = resolve(baseDir, node.$ref);
+    const target = JSON.parse(await readFile(refPath, 'utf8'));
+    const { $id, $schema, _source, _dna, _tiers, _table, ...targetRest } = target;
+    if (_table && Array.isArray(targetRest.enum)) delete targetRest.oneOf;
+    const { $ref, ...siblings } = node;
+    return { ...(await inlineFileRefs(targetRest, dirname(refPath))), ...siblings };
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    out[k] = await inlineFileRefs(v, baseDir);
+  }
+  return out;
 }
 
 async function main() {
@@ -482,7 +516,13 @@ async function main() {
 
   // --- Generate body-types.ts ---
   const bodyBlocks = [];
-  for (const [, { schema }] of bodySchemas) {
+  // Formats may share one body schema (html5-app and spa-bundle share the
+  // app-bundle body): emit each schema's interfaces once.
+  const emittedBodies = new Set();
+  for (const [, { schema, title }] of bodySchemas) {
+    const key = schema.$id || title;
+    if (emittedBodies.has(key)) continue;
+    emittedBodies.add(key);
     bodyBlocks.push(generateInterfacesFromSchema(schema));
   }
   const bodyContent =
