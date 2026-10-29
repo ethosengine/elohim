@@ -125,6 +125,18 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
+    // Local declared-view relay mode: a separate argv form that answers only
+    // /api/local-views and starts no Mongo, conductor or hosted-agent service.
+    // Never reached from the ordinary `Args::parse()` command lines.
+    let local_args: Vec<String> = std::env::args().collect();
+    if local_args.get(1).map(String::as_str) == Some("--local-view-relay") {
+        anyhow::ensure!(
+            local_args.len() == 3,
+            "--local-view-relay requires one loopback listen address"
+        );
+        return doorway::server::local_peer::serve(local_args[2].parse()?).await;
+    }
+
     // Parse command line arguments (.env already loaded in main()).
     let args = Args::parse();
 
