@@ -613,6 +613,7 @@ spec:
         storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
+            # Fixed at creation (volumeClaimTemplates are immutable): the live size is deployments.json storageDataSize, grown by scripts/ci/grow-conductor-pvc.sh.
             storage: 20Gi
 ---
 # Headless service for StatefulSet DNS-based peer discovery

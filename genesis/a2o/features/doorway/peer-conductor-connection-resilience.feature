@@ -103,7 +103,7 @@ Feature: Doorways stay responsive and expose recovery evidence during failures
     # reconnect_attempts: 0 for every peer — the diagnostic had to come from
     # conductor-side log floods instead of the doorway's own health surface.
 
-  @requires:shem @act:iii
+  @requires:shem @requires:shem-host @act:iii
   Scenario: Conductor fleet survives a doorway reconnect storm
     Given a doorway fronting the full multi-tenant conductor fleet
     And every conductor session is severed at the same moment

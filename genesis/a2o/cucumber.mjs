@@ -104,7 +104,9 @@ export default function () {
     },
     'rust-style': {
       requireModule: ['tsx'],
-      require: ['steps/devflow/rust-style.steps.ts'],
+      // The cargo guard rides along: this narrow require list bypasses the `steps/*/*.ts` glob, and
+      // without it a runner with no cargo FAILS the scenario instead of skipping it.
+      require: ['steps/devflow/cargo-toolchain.guard.ts', 'steps/devflow/rust-style.steps.ts'],
       paths: ['features/devflow/rust-style.feature'],
       format: ['progress'],
     },

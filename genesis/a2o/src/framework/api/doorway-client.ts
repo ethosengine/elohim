@@ -267,6 +267,23 @@ export interface AdminUsersResponse {
 }
 
 /**
+ * `GET /admin/hosted-users` — every user row holding a conductor assignment
+ * (`admin_conductors.rs` HostedUserSummary, camelCase on the wire).
+ */
+export interface AdminHostedUserSummary {
+  identifier: string;
+  agentPubKey: string;
+  conductorId?: string | null;
+  humanId: string;
+  isActive: boolean;
+}
+
+export interface AdminHostedUsersResponse {
+  total: number;
+  users: AdminHostedUserSummary[];
+}
+
+/**
  * `GET /admin/users/{id}` — the doorway's own field names.
  *
  * Both blocks carry each limit TWICE, in bytes and in MB (`admin_users.rs`
@@ -629,6 +646,26 @@ export class DoorwayClient {
 
   async adminDeleteUser(userId: string): Promise<AdminMutationResponse> {
     return this.delete<AdminMutationResponse>(`/admin/users/${encodeURIComponent(userId)}`, {});
+  }
+
+  /** `GET /admin/hosted-users` — rows that hold a cell on a pool conductor. */
+  async adminListHostedUsers(): Promise<AdminHostedUsersResponse> {
+    return this.get<AdminHostedUsersResponse>('/admin/hosted-users');
+  }
+
+  /**
+   * `DELETE /admin/hosted-users/{agentPubKey}` — uninstall the agent's cell and
+   * release its conductor slot (`AgentProvisioner::deprovision_agent`).
+   *
+   * `adminDeleteUser` is a SOFT delete: it flips Mongo flags and leaves the cell
+   * installed, so the slot stays counted against the conductor's ceiling for
+   * good (the doorway re-seeds capacity from persisted mappings on every start).
+   */
+  async adminDeprovisionHostedUser(agentPubKey: string): Promise<AdminMutationResponse> {
+    return this.delete<AdminMutationResponse>(
+      `/admin/hosted-users/${encodeURIComponent(agentPubKey)}`,
+      {}
+    );
   }
 
   /**

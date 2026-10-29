@@ -16,6 +16,8 @@ import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
 
+import { closeAccountCleanup } from './auth-lifecycle.steps.js';
+
 // ---------------------------------------------------------------------------
 // Types (mirrors doorway Rust responses)
 // ---------------------------------------------------------------------------
@@ -116,18 +118,14 @@ When(
     this.addHuman(humanName, human);
     this.contentIds.set('lastAuthResponse', JSON.stringify(auth));
 
-    // Register cleanup to soft-delete the ephemeral operator after the scenario
-    const identifier = creds.identifier;
+    // Close the ephemeral operator through the product path, which uninstalls
+    // its hosted cell and releases the conductor slot (the admin soft-delete
+    // this replaced left the cell installed and the slot counted for good).
+    const identifier = auth.identifier || creds.identifier;
     const doorwayUrl = doorway.url;
+    const humanToken = auth.token;
     this.onCleanup(async () => {
-      try {
-        const admin = await this.getAdminClient(doorwayUrl);
-        const list = await admin.adminListUsers({ search: identifier, limit: 1 });
-        const match = list.users.find(u => u.identifier === identifier);
-        if (match) await admin.adminDeleteUser(match.id);
-      } catch {
-        // best-effort cleanup
-      }
+      await closeAccountCleanup(this, doorwayUrl, identifier, humanToken);
     });
   }
 );

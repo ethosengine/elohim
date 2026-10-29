@@ -1,4 +1,4 @@
-@e2e @devflow @act:host @concern:rust-style
+@e2e @devflow @act:host @requires:cargo @concern:rust-style
 Feature: A developer can improve Rust style incrementally without hiding new debt
 
   Developers and coding agents share the same repository gate. Existing unexplained lint
