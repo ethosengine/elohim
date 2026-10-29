@@ -826,8 +826,11 @@ mod tests {
         }
     }
 
+    /// Every key and value of one tree, in key order.
+    type Entries = Vec<(Vec<u8>, Vec<u8>)>;
+
     /// Every key and value of every tree.
-    fn contents(db: &sled::Db) -> BTreeMap<Vec<u8>, Vec<(Vec<u8>, Vec<u8>)>> {
+    fn contents(db: &sled::Db) -> BTreeMap<Vec<u8>, Entries> {
         db.tree_names()
             .into_iter()
             .map(|name| {
