@@ -54,10 +54,18 @@ const STATE_ROOT: &str = "genesis/docs/_state";
 const SKIP_NAMES: [&str; 3] = ["INDEX.md", "CLAUDE.md", "README.md"];
 
 /// Status words, by bucket. Transcribed from the kit; a word in none of them is `UNKNOWN`.
-const LANDED_WORDS: [&str; 8] = [
+///
+/// The seat-report vocabulary is also read here: every `task-*-report.md` carries exactly one of
+/// `DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED | HOLD` (the valueflow-implementer
+/// contract, which the PostToolUse observer mints from, so the report's status is not ours to
+/// rewrite). `DONE_WITH_CONCERNS` is a discharging self-claim exactly like `DONE`: it lands in the
+/// LANDED bucket and, without a `verified_by:`, reads CLAIMED-ONLY. The three non-discharging
+/// statuses leave the gap open, so they read as in-flight work.
+const LANDED_WORDS: [&str; 9] = [
     "landed",
     "stable",
     "done",
+    "done_with_concerns",
     "complete",
     "completed",
     "shipped",
@@ -74,7 +82,10 @@ const DEAD_WORDS: [&str; 6] = [
     "deprecated",
     "retired",
 ];
-const ACTIVE_WORDS: [&str; 11] = [
+const ACTIVE_WORDS: [&str; 14] = [
+    "needs_context",
+    "blocked",
+    "hold",
     "draft",
     "design",
     "brainstorm",
@@ -996,6 +1007,15 @@ mod tests {
         assert_eq!(status_bucket(""), "NONE");
         assert_eq!(status_bucket("   "), "NONE");
         assert_eq!(status_bucket("whatever"), "UNKNOWN");
+    }
+
+    #[test]
+    fn seat_report_statuses_have_a_bucket() {
+        assert_eq!(status_bucket("DONE"), "LANDED");
+        assert_eq!(status_bucket("DONE_WITH_CONCERNS"), "LANDED");
+        assert_eq!(status_bucket("NEEDS_CONTEXT"), "ACTIVE");
+        assert_eq!(status_bucket("BLOCKED"), "ACTIVE");
+        assert_eq!(status_bucket("HOLD"), "ACTIVE");
     }
 
     #[test]
