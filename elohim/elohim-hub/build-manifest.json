@@ -1,0 +1,84 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-hub",
+  "manualOnly": true,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
+  "description": "Peer-native projection serving and private local observation history",
+  "steps": {
+    "gate-contract": {
+      "description": "Verify owning native contract boundary",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-hub/**",
+          "elohim/eprfs/epr-cli/src/view/**",
+          "elohim/eprfs/epr-cli/tests/fixtures/views/**",
+          "elohim/eprfs/epr-cli/src/flow/acceptance.rs",
+          "app/elohim-app/src/app/avodah/declared-views/view-contract.ts",
+          "elohim/sdk/schemas/v1/manifest/work-composition.schema.json",
+          "elohim/sdk/schemas/v1/manifest/app-manifest.schema.json",
+          "elohim/sdk/schemas/tests/work-composition.test.mjs"
+        ],
+        "buildProcess": [
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock",
+          "app/scripts/local-view-launcher.mjs",
+          "app/scripts/local-view-launcher.test.mjs",
+          "app/scripts/local-view-contract.mjs"
+        ]
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Contract Gate",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-hub": {
+        "dir": "elohim/elohim-hub",
+        "inputs": {
+          "sources": [
+            "elohim/elohim-hub/**",
+            "elohim/eprfs/epr-cli/src/view/**",
+            "elohim/eprfs/epr-cli/tests/fixtures/views/**",
+            "elohim/eprfs/epr-cli/src/flow/acceptance.rs",
+            "app/elohim-app/src/app/avodah/declared-views/view-contract.ts",
+            "elohim/sdk/schemas/v1/manifest/work-composition.schema.json",
+            "elohim/sdk/schemas/v1/manifest/app-manifest.schema.json",
+            "elohim/sdk/schemas/tests/work-composition.test.mjs"
+          ],
+          "buildProcess": [
+            "elohim/Cargo.toml",
+            "elohim/Cargo.lock",
+            "app/scripts/local-view-launcher.mjs",
+            "app/scripts/local-view-launcher.test.mjs",
+            "app/scripts/local-view-contract.mjs"
+          ]
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-hub",
+          "cargo": {
+            "workspace": "elohim",
+            "profile": "dev",
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
+          }
+        },
+        "steps": [
+          "gate-contract"
+        ]
+      }
+    }
+  },
+  "deployment": {}
+}

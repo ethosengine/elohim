@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "constitution",
+    "elohim-hub",
     "elohim-agent/elohim-agent-service",
     "elohim-agent/gate-client",
     "elohim-agent/gate-types",

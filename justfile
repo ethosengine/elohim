@@ -643,6 +643,16 @@ _gate-elohim-compute:
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
 
+# Private projection serving; the native capture evaluator remains in eprfs.
+_gate-elohim-hub:
+    cargo fmt --manifest-path elohim/Cargo.toml -p elohim-hub --check
+    cargo clippy --manifest-path elohim/Cargo.toml -p elohim-hub --all-targets -- -D warnings
+    cargo test --manifest-path elohim/Cargo.toml -p elohim-hub
+    cargo build --manifest-path elohim/Cargo.toml -p elohim-hub --example local-view
+    node app/scripts/local-view-contract.mjs "$CARGO_TARGET_DIR/debug/examples/local-view"
+    node --test app/scripts/local-view-launcher.test.mjs
+    node --test elohim/sdk/schemas/tests/work-composition.test.mjs
+
 _gate-elohim-live-session:
     cd elohim && cargo fmt --check -p elohim-live-session && cargo clippy -p elohim-live-session --all-targets -- -D warnings && cargo test -p elohim-live-session --all-targets
 
