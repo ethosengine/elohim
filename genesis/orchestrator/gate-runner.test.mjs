@@ -39,7 +39,7 @@ describe('gate expectations and feature-branch CI deferral', () => {
     }));
     mkdirSync(resolve(root, '.eprfs/status'), { recursive: true });
     const flowsPath = resolve(root, '.eprfs/status/flows.jsonl');
-    writeFileSync(flowsPath, samples.map(row => JSON.stringify({ record: {
+    writeFileSync(flowsPath, samples.map(row => JSON.stringify({ cid: row.cid, record: {
       occurredAt: row.occurredAt,
       classifiedAs: ['run:observation', row.subject, 'measure:gate-cycle-seconds@1',
         `value:${row.value}`, `env:run-kind=${row.kind}`, `env:exit=${row.exit}`,
@@ -82,6 +82,8 @@ describe('gate expectations and feature-branch CI deferral', () => {
     assert.ok(result.calls[0].args.includes('run-kind=deferred'));
     assert.ok(result.calls[0].args.includes('exit=ok'));
     assert.ok(result.calls[0].args.includes('project=fixture'));
+    assert.ok(!result.calls[0].args.some(arg => /^(cpu_s|throttled_s|rss_peak_bytes|memory_high_events|io_full_pct_max)=/.test(arg)),
+      'a deferred run has no measured cost');
   });
 
   for (const [name, gate, env, reason] of [
@@ -117,9 +119,9 @@ describe('gate expectations and feature-branch CI deferral', () => {
     assert.ok(result.output.includes(expected.replace('fixture:', 'other:')));
   });
 
-  test('two ledgers retain append order with the current checkout last despite older author dates', t => {
+  test('main, sibling and current ledgers deduplicate rows and retain append order despite older author dates', t => {
     const main = fixture(t, { samples: Array.from({ length: 25 }, (_, i) => ({
-      ...rows[0], value: i < 15 ? 9000 : 660, exit: i < 5 ? 'fail' : 'ok',
+      ...rows[0], cid: `main-${i}`, value: i < 15 ? 9000 : 660, exit: i < 5 ? 'fail' : 'ok',
       occurredAt: new Date(Date.UTC(2026, 9, 25, 0, 25 - i)).toISOString(),
     })) });
     const current = fixture(t, { samples: [
@@ -137,8 +139,20 @@ describe('gate expectations and feature-branch CI deferral', () => {
     writeFileSync(resolve(gitDir, 'gitdir'), `${resolve(current.root, '.git')}\n`);
     writeFileSync(resolve(current.root, '.git'), `gitdir: ${gitDir}\n`);
 
+    const mainRows = readFileSync(main.flowsPath, 'utf8');
+    const currentRows = readFileSync(current.flowsPath, 'utf8');
+    const siblingPath = resolve(main.root, '.worktrees/sibling/.eprfs/status/flows.jsonl');
+    mkdirSync(dirname(siblingPath), { recursive: true });
+    const siblingRow = JSON.stringify({ cid: 'sibling-run', record: {
+      occurredAt: '2026-09-30T00:00:00Z',
+      classifiedAs: ['run:observation', 'fixture/justfile', 'measure:gate-cycle-seconds@1',
+        'value:1800', 'env:run-kind=full-gate', 'env:exit=ok', 'env:project=fixture'],
+    } });
+    writeFileSync(siblingPath, `${mainRows}\n${siblingRow}\n${siblingRow}`);
+    writeFileSync(current.flowsPath, `${mainRows}\n${siblingRow}\n${currentRows}\n${currentRows}`);
+
     const result = current.run();
-    assert.ok(result.output.includes('[gate] fixture: expect ~12 min (p90 11 min, max 20 min; 10 runs) · failed locally 1 of last 20'), result.output);
+    assert.ok(result.output.includes('[gate] fixture: expect ~14 min (p90 20 min, max 30 min; 10 runs) · failed locally 1 of last 20'), result.output);
     assert.equal(result.status, 7, 'the current checkout failure keeps the recipe local');
     assert.doesNotMatch(result.output, /deferred to CI/);
   });
@@ -157,6 +171,17 @@ describe('gate expectations and feature-branch CI deferral', () => {
 
   test('a readable empty sidecar prints no recorded runs and keeps the recipe', t => {
     const result = fixture(t, { samples: [] }).run();
+    assert.equal(result.status, 7);
+    assert.match(result.output, /\[gate\] fixture: no recorded runs yet/);
+  });
+
+  test('an empty sibling sidecar is readable history even when the invoking ledger is absent', t => {
+    const f = fixture(t);
+    rmSync(f.flowsPath);
+    const siblingPath = resolve(f.root, '.worktrees/sibling/.eprfs/status/flows.jsonl');
+    mkdirSync(dirname(siblingPath), { recursive: true });
+    writeFileSync(siblingPath, '');
+    const result = f.run();
     assert.equal(result.status, 7);
     assert.match(result.output, /\[gate\] fixture: no recorded runs yet/);
   });

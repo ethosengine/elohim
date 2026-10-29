@@ -12,7 +12,7 @@
 // rakia-executor can also wrap: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, writeSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
@@ -108,6 +108,63 @@ export function attributor({ run, dir, root = process.cwd(), now = () => Date.no
   };
 }
 
+/** Sample RSS for the child's tree; CPU and pressure describe its enclosing cgroup/host.
+ * Missing kernel counters remain null, never a fabricated zero. Cgroup paths are retained
+ * so the final counters can still be read after the child has exited.
+ */
+export function createCostSampler(pid, { readFile = readFileSync, listDir = readdirSync,
+  proc = '/proc', cgroup = '/sys/fs/cgroup' } = {}) {
+  const cost = { cpu_s: null, throttled_s: null, rss_peak_bytes: null,
+    memory_high_events: null, io_full_pct_max: null };
+  const read = path => { try { return readFile(path, 'utf8'); } catch { return ''; } };
+  const counter = (text, key) => {
+    const found = text.match(new RegExp(`^${key}\\s+(\\d+)$`, 'm'));
+    return found ? Number(found[1]) : null;
+  };
+  const group = read(join(proc, String(pid), 'cgroup')).match(/^0::(.*)$/m)?.[1];
+  // A cgroup namespace reports '/' for its root. Never walk outside its mounted tree.
+  const groupPath = group !== undefined && !group.split('/').includes('..') ? join(cgroup, group) : null;
+  const counters = () => {
+    const cpu = groupPath ? read(join(groupPath, 'cpu.stat')) : '';
+    const memory = groupPath ? read(join(groupPath, 'memory.events')) : '';
+    return { cpu_s: counter(cpu, 'usage_usec'), throttled_s: counter(cpu, 'throttled_usec'),
+      memory_high_events: counter(memory, 'high') };
+  };
+  const initial = counters();
+  const sample = () => {
+    let entries = [];
+    try { entries = listDir(proc); } catch { /* proc unavailable */ }
+    const processes = new Map();
+    for (const entry of entries) {
+      if (!/^\d+$/.test(entry)) continue;
+      const status = read(join(proc, entry, 'status'));
+      const parent = counter(status, 'PPid:');
+      const rss = status.match(/^VmRSS:\s+(\d+)\s+kB$/m);
+      if (parent !== null) processes.set(Number(entry), { parent, rss: rss ? Number(rss[1]) * 1024 : null });
+    }
+    const tree = new Set([pid]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [id, p] of processes) {
+        if (!tree.has(id) && tree.has(p.parent)) { tree.add(id); changed = true; }
+      }
+    }
+    const readings = [...tree].map(id => processes.get(id)?.rss).filter(value => value != null);
+    if (readings.length) cost.rss_peak_bytes = Math.max(cost.rss_peak_bytes ?? 0, readings.reduce((a, b) => a + b, 0));
+    const latest = counters();
+    for (const key of Object.keys(latest)) {
+      if (initial[key] !== null && latest[key] !== null && latest[key] >= initial[key]) {
+        cost[key] = (latest[key] - initial[key]) / (key.endsWith('_s') ? 1e6 : 1);
+      }
+    }
+    const io = read(join(proc, 'pressure/io')).match(/^full\s+avg10=(\d+(?:\.\d+)?)/m);
+    if (io) cost.io_full_pct_max = Math.max(cost.io_full_pct_max ?? 0, Number(io[1]));
+    return { ...cost };
+  };
+  return { sample };
+}
+
 function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (!parsed) {
@@ -124,6 +181,9 @@ function main() {
     stdio: ['inherit', 'pipe', 'pipe'],
     env: tapChildEnv(process.env, Boolean(process.stdout.isTTY)),
   });
+  const sampler = createCostSampler(child.pid);
+  sampler.sample();
+  const sampling = setInterval(() => sampler.sample(), 5000);
   // One recognizer reads both streams: rustc diagnostics go to stderr, test output to stdout.
   const out = lineSplitter(line => recognizer.push(line));
   const err = lineSplitter(line => recognizer.push(line));
@@ -138,11 +198,13 @@ function main() {
     process.exitCode = 127;
   });
   child.on('close', (code, signal) => {
+    clearInterval(sampling);
+    const cost = sampler.sample();
     out.end();
     err.end();
     recognizer.end();
     try {
-      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary() })}\n`);
+      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost })}\n`);
     } catch { /* no fd 3: run by hand */ }
     // Exit only after forwarded bytes drain, then carry the child's status or signal.
     const finish = () => {

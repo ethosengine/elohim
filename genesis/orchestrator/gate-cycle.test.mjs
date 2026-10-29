@@ -298,3 +298,31 @@ test('nothing here can fail a gate', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+
+test('cycle observations carry every measured cost axis, retaining zero and unknown', () => {
+  const cost = { cpu_s: 42.5, throttled_s: 0, rss_peak_bytes: 123456,
+    memory_high_events: 3, io_full_pct_max: null };
+  const args = observationArgs('.', 90, { kind: 'full-gate', exit: 'ok', cost });
+  for (const [key, value] of Object.entries(cost)) {
+    const at = args.indexOf(`${key}=${value ?? 'unknown'}`);
+    assert.ok(at > 0, key);
+    assert.equal(args[at - 1], '--env');
+  }
+});
+
+
+test('recordCycle propagates sampled cost on failed runs without judging their duration', t => {
+  const { dir, measures, ledger } = sandbox();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const notes = [];
+  const cost = { cpu_s: 12, throttled_s: 1, rss_peak_bytes: 1024, memory_high_events: 0, io_full_pct_max: 2 };
+  recordCycle(project, 5000, 143, {}, {
+    root: dir, measuresPath: measures, ledgerPath: ledger,
+    runEpr: args => notes.push(args), print: () => {}, now: () => 't',
+  }, { cost, signal: 'SIGTERM', testOutput: false });
+  assert.equal(notes.length, 1);
+  assert.ok(notes[0].includes('failure_class=environment'));
+  for (const [key, value] of Object.entries(cost)) assert.ok(notes[0].includes(`${key}=${value}`));
+  assert.equal(existsSync(ledger), false);
+});

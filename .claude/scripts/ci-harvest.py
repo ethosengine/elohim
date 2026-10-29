@@ -464,10 +464,16 @@ def delivery_folds(series):
         return []
     out = []
     n = s.get("considered")
-    p90 = (s.get("publishVerify") or {}).get("p90Min")
+    phase = s.get("publishVerify") or {}
+    p90 = phase.get("p90Min") if phase.get("n") != 0 else None
+    source = "publish+verify phases"
+    if not isinstance(p90, (int, float)):
+        stage = (s.get("stages") or {}).get("Publish and Verify App Delivery") or {}
+        p90 = stage.get("p90Min") if stage.get("n", 0) > 0 else None
+        source = "whole Publish and Verify App Delivery stage (phase cases absent)"
     if isinstance(p90, (int, float)):
         out.append(("stage-wallclock@1", p90,
-                    f"ci-harvest: {DELIVERY_JOB}/dev publish+verify p90 over the last {n} builds"))
+                    f"ci-harvest: {DELIVERY_JOB}/dev {source} p90 over the last {n} builds"))
     cost = s.get("costPerDeliveredHours")
     hours = s.get("pipelineHours")
     if isinstance(cost, (int, float)):

@@ -13,6 +13,7 @@ import { dirname, join } from 'path';
 import { parse as parseYaml } from 'yaml';
 
 export const GATE_CYCLE_MEASURE = 'gate-cycle-seconds@1';
+export const COST_FIELDS = ['cpu_s', 'throttled_s', 'rss_peak_bytes', 'memory_high_events', 'io_full_pct_max'];
 
 /** Consecutive under-ceiling runs that close a finding — one may be a warm cache. */
 const CLOSE_STREAK = 2;
@@ -65,6 +66,9 @@ export function observationArgs(subject, seconds, run) {
     args.push('--env', `first_red_s=${Math.round(run.firstRedSeconds)}`);
   }
   if (run.project) args.push('--env', `project=${run.project}`);
+  if (run.cost) {
+    for (const key of COST_FIELDS) args.push('--env', `${key}=${run.cost[key] ?? 'unknown'}`);
+  }
   return args;
 }
 
@@ -146,6 +150,7 @@ export function recordCycle(project, seconds, status, env, deps, signals = {}) {
         kind, exit, jobs: env.CARGO_BUILD_JOBS, project: project.name,
         failureClass: classifyFailure(status, signals),
         firstRedSeconds: signals.firstRedSeconds,
+        cost: signals.cost,
       }));
     } catch { /* the observation is best-effort; the verdict below does not need it */ }
     if (exit !== 'ok') return;

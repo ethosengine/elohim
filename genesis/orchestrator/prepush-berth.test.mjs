@@ -3,7 +3,7 @@
 // pushed `[build:edge]` also alpha-fleet, any `[build:*]` also jenkins-dispatch, and every claim the
 // push took is released on every exit. Like serving-receipt.test.mjs, this runs the ACTUAL hook's
 // block (sliced between its markers), here against a stub `berth` that logs each call and answers
-// from a table, inside a scratch repository whose commits carry the build tags.
+// from a table, against deterministic commit-message and identity reads.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -57,24 +57,25 @@ const cleanEnv = Object.fromEntries(
   ),
 );
 
-/** A scratch checkout with a stub berth, a base commit and one pushed commit carrying `message`. */
+/** A scratch hook environment with stub berth and commit-message reads. */
 function fixture(t, message, answers = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-berth-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const git = (...args) => {
-    const r = spawnSync("git", ["-C", dir, ...args], { encoding: "utf8", env: cleanEnv });
-    assert.equal(r.status, 0, r.stderr);
-    return r.stdout.trim();
-  };
-  git("init", "--quiet");
-  git("config", "user.email", "fixture@example.test");
-  const id = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test"];
-  git(...id, "commit", "--quiet", "--allow-empty", "-m", "base");
-  const base = git("rev-parse", "HEAD");
-  git(...id, "commit", "--quiet", "--allow-empty", "-m", message);
-  const head = git("rev-parse", "HEAD");
+  const base = "1".repeat(40);
+  const head = "2".repeat(40);
   const bin = join(dir, "genesis/agentic/bin");
   mkdirSync(bin, { recursive: true });
+  // The hook only reads commit messages and identity; no git process or repository is needed.
+  writeFileSync(join(bin, "message"), message);
+  writeFileSync(join(bin, "git"), `#!/usr/bin/env bash
+case "$1" in
+  config) echo fixture@example.test ;;
+  cat-file) exit 0 ;;
+  log) cat "$(dirname "$0")/message" ;;
+  *) echo "unexpected fixture git read: $*" >&2; exit 99 ;;
+esac
+`);
+  chmodSync(join(bin, "git"), 0o755);
   writeFileSync(join(bin, "berth"), STUB_BERTH);
   chmodSync(join(bin, "berth"), 0o755);
   writeFileSync(
@@ -103,6 +104,7 @@ function runBlock(fx, { ref = "refs/heads/dev", local = fx.head, after = "echo G
     encoding: "utf8",
     env: {
       ...cleanEnv,
+      PATH: `${fx.bin}:${cleanEnv.PATH}`,
       BERTH_OFFLINE_OK: "",
       ELOHIM_SESSION_ID: "",
       ELOHIM_SESSION_OWNER_PID: "",
@@ -135,6 +137,17 @@ test("prepush_refuses_while_peer_holds_dev_integration", (t) => {
 });
 
 test("prepush_releases_on_gate_failure", (t) => {
+  // Signal/trap cases own a test process; they must not share the suite's process state.
+  if (process.env.PREPUSH_FAILURE_CHILD !== "1") {
+    const child = spawnSync(process.execPath, ["--test", "--test-reporter=tap", "--test-name-pattern=^prepush_releases_on_gate_failure$", fileURLToPath(import.meta.url)], {
+      encoding: "utf8", timeout: 30_000, killSignal: "SIGKILL",
+      env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "NODE_TEST_CONTEXT")), PREPUSH_FAILURE_CHILD: "1" },
+    });
+    assert.equal(child.error, undefined, `${child.stdout}${child.stderr}`);
+    assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
+    assert.match(child.stdout, /# pass 1\b/, "the isolated case actually ran");
+    return;
+  }
   const fx = fixture(t, "feat: a build [build:app]");
   const failed = runBlock(fx, { after: "echo GATES-RAN; exit 1" });
   assert.equal(failed.status, 1, failed.out);

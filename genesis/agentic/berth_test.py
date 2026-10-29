@@ -38,6 +38,75 @@ CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
                     "mesh": {"daemon": True}}}
 
 
+class HoldFoldAndReapTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.now = 10 * 86400
+        self.berth = Berth(self.directory.name, obs=FakeObservation(),
+                           now=lambda: self.now, policy_path=MISSING_POLICY)
+        self.berth.pid_alive = lambda pid: pid == 10
+        self.berth.pid_start = lambda pid: 100 if pid == 10 else None
+
+    def test_holds_pair_resource_and_session_ignore_renews_and_use_release_window(self):
+        b = self.berth
+        def event(kind, at, session="a", resource="dev-integration", **fields):
+            return {"kind": kind, "at": at, "session": session, "resource": resource, **fields}
+        rows = [event("claim", 0), event("release", 10),  # outside seven days
+                event("claim", self.now - 8 * 86400, "long"),
+                event("release", self.now - 6 * 86400, "long"),
+                event("claim", self.now - 400), event("renew", self.now - 200),
+                event("claim", self.now - 300, resource="cargo"),
+                event("release", self.now - 100), event("release", self.now - 50, resource="cargo"),
+                event("refuse", self.now - 90, "waiter", holder="a"),
+                event("claim", self.now - 40, "open"),
+                event("release", self.now - 30, "unmatched"),
+                event("refuse", self.now + 1, "future"),
+                {"kind": "claim", "at": "bad", "resource": "x", "session": "a"}]
+        Path(b.ledger_path).write_text("\n".join(json.dumps(row) for row in rows) + "\nbroken tail\n")
+        groups = b.hold_summary()
+        self.assertEqual(groups[("dev-integration", "a")]["durations"], [300])
+        self.assertEqual(groups[("cargo", "a")]["durations"], [250])
+        self.assertEqual(groups[("dev-integration", "long")]["durations"], [2 * 86400])
+        self.assertEqual(groups[("dev-integration", "waiter")], {"durations": [], "refusals": 1})
+        self.assertNotIn(("dev-integration", "open"), groups)
+        self.assertNotIn(("dev-integration", "future"), groups)
+        status = render_status(b)
+        self.assertIn("dev-integration hold p50/p90/max 5m/48h00/48h00 (n=2), refusals 1", status)
+        self.assertIn("dev-integration / a hold p50/p90/max 5m/5m/5m", status)
+
+    def test_reap_preserves_live_incarnations_and_recent_moorings_and_cleans_both_lease_shapes(self):
+        b = self.berth
+        stale = self.now - b.mooring_ttl_s - 1
+        for session, last, pid, start in [("dead", stale, 20, 1), ("alive", stale, 10, 100),
+                                           ("reused", stale, 10, 99), ("recent", self.now - 1, 10, 100),
+                                           ("no-pid", stale, None, None)]:
+            Path(b._moor_path(session)).write_text(json.dumps({"session": session, "last_seen": last,
+                                                              "pid": pid, "pid_start": start}))
+        expired = {"holder": "alive", "since": self.now - 30, "ttl_s": 30}
+        current = {"holder": "recent", "since": self.now - 1, "ttl_s": 60}
+        daemon = {"holder": "recent", "since": stale, "ttl_s": None}
+        b._write_leases({"push": expired, "cargo/slots": [expired, current], "mesh": daemon,
+                         "abandoned": {"holder": "dead", "since": stale, "ttl_s": None},
+                         "orphan": {"holder": "missing", "since": stale, "ttl_s": None}})
+        removed = b.reap()
+        self.assertEqual(set(removed["moorings"]), {"dead", "reused", "no-pid"})
+        self.assertEqual(len(removed["leases"]), 4)
+        self.assertEqual(set(b.moorings()), {"alive", "recent"})
+        self.assertEqual(b.leases(), {"cargo/slots": [current], "mesh": daemon})
+        self.assertEqual(b.reap(), {"moorings": [], "leases": []})
+        self.assertEqual(b.hold_summary(), {})  # reaping never invents a completed hold
+        self.assertEqual(sum(row["kind"] == "reap" for row in b.ledger(0)), 4)
+
+    def test_reap_cli_uses_the_injected_store_and_status_reports_unknown_without_samples(self):
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(main(["berth", "reap"]), 0)
+        self.assertIn("reaped 0 moorings, 0 leases", out.getvalue())
+        self.assertIn("dev-integration hold p50/p90/max unknown/unknown/unknown (n=0), refusals 0",
+                      render_status(self.berth))
+
+
 class CapacityTransitionTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
