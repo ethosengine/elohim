@@ -3792,7 +3792,13 @@ async fn async_main(
             }
             None => {
                 let sync_sled_path = config.storage_dir.join("sync.sled");
-                let doc_store = match DocStore::at_path(&sync_sled_path).await {
+                let opened = elohim_storage::sync::sled_reclaim::open_sync_sled_async(
+                    sync_sled_path.clone(),
+                    elohim_storage::sync::sled_reclaim::SYNC_SLED_CACHE_BYTES,
+                    elohim_storage::sync::sled_reclaim::ReclaimPolicy::from_env(),
+                )
+                .await;
+                let doc_store = match opened.and_then(DocStore::from_db) {
                     Ok(store) => Arc::new(store),
                     Err(e) => {
                         error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");

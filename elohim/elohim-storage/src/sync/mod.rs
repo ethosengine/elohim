@@ -22,6 +22,7 @@
 
 pub mod doc_store;
 pub mod projector;
+pub mod sled_reclaim;
 pub mod stream;
 
 pub use doc_store::{DocStore, DocStoreConfig, StoredDocument};

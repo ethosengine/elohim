@@ -3008,16 +3008,16 @@ impl P2PNode {
 
         // Open sled database ONCE — shared between Kademlia store and DocStore.
         // sled uses flock() which prevents multiple opens of the same path.
+        // The open first returns disk an earlier build leaked (sled 0.34 keeps
+        // overwritten blob values), bounded and before the HTTP listener;
+        // ELOHIM_SLED_RECLAIM=off skips it. See `sync::sled_reclaim`.
         let sled_path = config.storage_dir.join("sync.sled");
-        if let Some(parent) = sled_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        let sled_db = sled::Config::new()
-            .path(&sled_path)
-            .cache_capacity(64 * 1024 * 1024)
-            .mode(sled::Mode::HighThroughput)
-            .open()
-            .map_err(|e| StorageError::Database(format!("Failed to open sync.sled: {}", e)))?;
+        let sled_db = crate::sync::sled_reclaim::open_sync_sled_async(
+            sled_path,
+            crate::sync::sled_reclaim::SYNC_SLED_CACHE_BYTES,
+            crate::sync::sled_reclaim::ReclaimPolicy::from_env(),
+        )
+        .await?;
 
         // Clone handle for the behaviour closure (sled::Db is Arc-based, clone is cheap)
         let kad_db = sled_db.clone();
