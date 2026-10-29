@@ -154,6 +154,17 @@ test('explicit BRIT_BIN selects unified build plan, never older PATH brit or rak
   ]);
 });
 
+test('brit verify is bounded by BRIT_ADVISORY_TIMEOUT_S and a timeout stays a warn, exit 0', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-timeout-'));
+  const slow = stub(dir, 'brit', 'sleep 5; echo should-not-finish');
+  const env = { BRIT_BIN: slow, BRIT_ADVISORY_TIMEOUT_S: '1', PATH: `${dir}:/usr/bin:/bin`, REPO_ROOT: dir };
+  const started = Date.now();
+  const verify = helper(['verify'], env);
+  assert.equal(verify.status, 0, verify.stderr);
+  assert.match(verify.stderr, /brit verify timed out after 1s — advisory only/);
+  assert.ok(Date.now() - started < 4000, 'the helper returned at the timeout, not after the slow verify');
+});
+
 test('invalid explicit BRIT_BIN never falls back to old tools or blocks build-ref', () => {
   const dir = mkdtempSync(join(tmpdir(), 'brit-helper-invalid-'));
   const log = join(dir, 'argv.log');

@@ -50,10 +50,16 @@ case "${1:-}" in
             exit 0
         fi
         # This checks Git repository integrity, not EPR authorization or native governance.
-        echo "[brit-helper] running repository-integrity advisory: $BRIT_BIN verify $*" >&2
-        "$BRIT_BIN" verify "$@" || {
+        # Bounded: a real verify on this repository is ~15-17 s wall / ~60 s CPU (brit daily-driver
+        # sprint, 2026-10-29); past BRIT_ADVISORY_TIMEOUT_S (default 60) it is a warn, never a wait.
+        echo "[brit-helper] running repository-integrity advisory (timeout ${BRIT_ADVISORY_TIMEOUT_S:-60}s): $BRIT_BIN verify $*" >&2
+        timeout "${BRIT_ADVISORY_TIMEOUT_S:-60}" "$BRIT_BIN" verify "$@" || {
             rc=$?
-            echo "[brit-helper] WARN: brit verify exited $rc — advisory only, not failing the build" >&2
+            if [ "$rc" -eq 124 ]; then
+                echo "[brit-helper] WARN: brit verify timed out after ${BRIT_ADVISORY_TIMEOUT_S:-60}s — advisory only, not failing the build" >&2
+            else
+                echo "[brit-helper] WARN: brit verify exited $rc — advisory only, not failing the build" >&2
+            fi
             exit 0
         }
         ;;
@@ -61,7 +67,7 @@ case "${1:-}" in
         shift
         if [ -n "$BRIT_BIN" ] && "$BRIT_BIN" build plan --help >/dev/null 2>&1; then
             echo "[brit-helper] running: $BRIT_BIN build plan $*" >&2
-            "$BRIT_BIN" build plan "$@" || {
+            timeout "${BRIT_ADVISORY_TIMEOUT_S:-60}" "$BRIT_BIN" build plan "$@" || {
                 rc=$?
                 echo "[brit-helper] WARN: brit build plan exited $rc — advisory only, not failing the build" >&2
                 exit 0

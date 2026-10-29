@@ -1007,8 +1007,18 @@ brit_advisory() {
   if [ ! -x "$HELPER" ]; then
     return 0  # helper not present (e.g., older branch); silently skip
   fi
+  # Run only when the pushed range touches what brit reads (BRIT_ADVISORY=always forces it):
+  # the brit gitlink, brit's own tree, the brit scripts, any build-manifest.json, this hook.
+  if [ "${BRIT_ADVISORY:-}" != "always" ] && git rev-parse --verify origin/dev >/dev/null 2>&1; then
+    BRIT_BASE="$(git merge-base origin/dev HEAD 2>/dev/null || echo origin/dev)"
+    if ! git diff --name-only "$BRIT_BASE" HEAD -- elohim/brit .brit genesis/orchestrator/scripts/brit-helper.sh genesis/orchestrator/scripts/brit-attest.mjs '**/build-manifest.json' .husky 2>/dev/null | grep -q .; then
+      echo ""
+      echo "── brit advisory (Stage 1a — warn-only): skipped — no brit-relevant path in the pushed range (BRIT_ADVISORY=always to force)"
+      return 0
+    fi
+  fi
   echo ""
-  echo "── brit advisory (Stage 1a — warn-only) ─────────────────────"
+  echo "── brit advisory (Stage 1a — warn-only; each call bounded by BRIT_ADVISORY_TIMEOUT_S, default 60s) ─────────────────────"
   REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
   # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
   if git rev-parse --verify origin/dev >/dev/null 2>&1; then
