@@ -222,7 +222,15 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
 # elohim-views lives under crates/ (2026-09-23), so the crates/<name> path deps (`../elohim-views`)
 # resolve inside the copied crates/ tree. elohim-facings is COPY'd flattened to /app/elohim-facings,
 # so its `../../crates/elohim-views` dep is re-rooted to the flattened layout.
-RUN sed -i 's|path = "../../crates/elohim-views"|path = "../crates/elohim-views"|' elohim-facings/Cargo.toml
+# Its `../sdk/domains/lamad/types` dep (folds/content_chrome.rs) would read /app/sdk/... from
+# /app/elohim-facings; the type crate is COPYd to /sdk above, so it is re-rooted to
+# `../../sdk/...` — the SAME /sdk/domains/lamad/types elohim-storage resolves, one package.
+# Without this the build aborts at resolve: "failed to read /app/sdk/domains/lamad/types/Cargo.toml".
+RUN sed -i \
+    -e 's|path = "../../crates/elohim-views"|path = "../crates/elohim-views"|' \
+    -e 's|path = "../sdk/domains/lamad/types"|path = "../../sdk/domains/lamad/types"|' \
+    elohim-facings/Cargo.toml && \
+    grep -q 'path = "../../sdk/domains/lamad/types"' elohim-facings/Cargo.toml
 
 
 # Constitution crate uses workspace inheritance — inline the values since
