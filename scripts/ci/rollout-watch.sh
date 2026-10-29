@@ -80,6 +80,14 @@ if [ "${ENABLED}" = "0" ] || [ "${KIND}" != "statefulset" ]; then
   plain_wait
 fi
 
+# `wait -n` (bash 4.3) is what keeps the healthy path free of poll latency, and
+# associative arrays need 4.0. On an older bash `wait -n` would fail at once
+# and the loop below would read pods without pause, so fall back instead.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 3 ]; }; then
+  echo "rollout-watch: bash ${BASH_VERSION} lacks wait -n — crashloop watch OFF, plain rollout wait" >&2
+  plain_wait
+fi
+
 for knob in "ROLLOUT_FASTFAIL_POLL_SECS=${POLL_SECS}" \
             "ROLLOUT_FASTFAIL_MIN_RESTARTS=${MIN_RESTARTS}" \
             "ROLLOUT_FASTFAIL_RISE_POLLS=${RISE_POLLS}"; do
