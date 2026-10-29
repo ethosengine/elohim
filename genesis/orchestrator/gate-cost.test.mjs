@@ -5,10 +5,14 @@
  *   node --test genesis/orchestrator/gate-cost.test.mjs genesis/orchestrator/gate-cycle.test.mjs
  */
 import { test } from 'node:test';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import {
   CI_BRANCH_PATTERN,
   readCycleRows,
+  readCycleUnion,
   costOf,
   formatExpectation,
   deferDecision,
@@ -243,4 +247,35 @@ test('branch matching is pure even for a caller-supplied global expression', () 
 
 test('no branch names is insufficient evidence of CI coverage', () => {
   assert.deepEqual(deferDecision({ ...eligible, branches: [] }), { defer: false, why: 'no CI branch supplied' });
+});
+
+
+test('union includes every sibling, deduplicates row CIDs and keeps append rather than author order', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-union-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); };
+  const event = (cid, value, occurredAt) => ({ cid, record: { occurredAt,
+    classifiedAs: ['run:observation', subject, 'measure:gate-cycle-seconds@1',
+      `value:${value}`, 'env:run-kind=full-gate', 'env:exit=ok', 'env:project=eprfs'] } });
+  const first = event('first', 10, '2026-10-29T00:00:00Z');
+  const second = event('second', 20, '2026-10-28T00:00:00Z');
+  const third = event('third', 30, '2026-10-27T00:00:00Z');
+  const fourth = event('fourth', 40, '2026-10-26T00:00:00Z');
+  const ledger = (at, rows) => write(join(at, '.eprfs/status/flows.jsonl'), rows.map(JSON.stringify).join('\n'));
+  ledger(root, [first]);
+  ledger(join(root, '.worktrees/alpha'), [first, second]);
+  ledger(join(root, '.worktrees/beta'), [third]);
+  mkdirSync(join(root, '.worktrees/empty'), { recursive: true });
+  const current = join(root, '.worktrees/current');
+  ledger(current, [first, fourth]);
+  write(join(current, '.git'), 'gitdir: ../../.git/worktrees/current\n');
+  write(join(root, '.git/worktrees/current/commondir'), '../..\n');
+  const rows = readCycleUnion(current).rows;
+  assert.deepEqual(rows.map(row => row.value), [10, 20, 30, 40]);
+  assert.deepEqual(readCycleUnion(root).rows, rows);
+  assert.equal(readCycleUnion(current).skipped, 0);
+  assert.equal(readCycleUnion(current).readableLedgers, 4);
+  rmSync(join(root, '.eprfs'), { recursive: true });
+  assert.deepEqual(readCycleUnion(current).rows.map(row => row.value), [10, 20, 30, 40]);
+  assert.equal(readCycleUnion(current).readableLedgers, 3);
 });

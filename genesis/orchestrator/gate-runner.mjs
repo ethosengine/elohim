@@ -10,8 +10,8 @@ import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { projectsFromStale, walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
-import { classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
-import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleRows } from './gate-cost.mjs';
+import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
+import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
   ageOf, emitGateVerdict, gateEvidence, recordEvidence, reusableHit, selfAgentId,
   siblingGovernanceChange, siblingVerdicts,
@@ -315,20 +315,10 @@ export function runProject(project, printOnly, namesOnly, {
 
   write(`\n[gate] ${project.name} (${project.dir})\n`);
   if (!cycleRowsByRoot.has(root)) {
-    // The sidecar is device-local and gitignored: a linked worktree's holds only its own runs,
-    // and the history lives in the main checkout's. Read both; an unreadable one is skipped.
-    // Each observation is written to exactly one sidecar, so the two never overlap.
-    // Rows have author dates, not append timestamps, so cross-ledger recency is unknown.
-    // Preserve each ledger's order and put the current checkout last.
-    const dirs = gitDirs(root);
-    const roots = [...(dirs && dirs.gitDir !== dirs.commonDir ? [dirname(dirs.commonDir)] : []), root];
-    let rows = null;
-    for (const at of roots) {
-      try {
-        rows = [...(rows || []), ...readCycleRows(resolve(at, '.eprfs/status/flows.jsonl')).rows];
-      } catch { /* An absent sidecar contributes nothing. */ }
-    }
-    cycleRowsByRoot.set(root, rows);
+    // Main and sibling sidecars may share copied rows. Keep their append order and
+    // deduplicate through the union, while distinguishing unknown from empty history.
+    const union = readCycleUnion(root);
+    cycleRowsByRoot.set(root, union.readableLedgers ? union.rows : null);
   }
   const rows = cycleRowsByRoot.get(root);
   let costDecision = null;
@@ -509,6 +499,7 @@ export function runProject(project, printOnly, namesOnly, {
     ran = direct();
   }
   const { result, tapped } = ran;
+  const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
@@ -527,6 +518,7 @@ export function runProject(project, printOnly, namesOnly, {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,
+      cost,
       commit: gateCommit,
       buildRefBin: evidence.buildRefBin,
       root,
@@ -551,7 +543,7 @@ export function runProject(project, printOnly, namesOnly, {
   // Cycle time is observed here because this is the one place every gate runs.
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
   // Untapped output is unavailable, not evidence that no tests ran.
-  const signals = { ...(tapped?.signals || {}), signal: result.signal, firstRedSeconds: tapped?.firstRedSeconds ?? undefined };
+  const signals = { ...(tapped?.signals || {}), signal: result.signal, firstRedSeconds: tapped?.firstRedSeconds ?? undefined, cost };
   recordCycle(project, seconds, status, cycleEnv, cycleDeps, signals);
   liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: {
     exit: status, seconds: Math.round(seconds), failure_class: classifyFailure(status, signals) ?? null,

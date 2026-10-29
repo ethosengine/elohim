@@ -144,4 +144,19 @@ check("no publish+verify reading → no stage fold (skipped, never 0)",
 check("unreadable series → no folds", ci_harvest.delivery_folds(None) == []
       and ci_harvest.delivery_folds({"pipelines": {}}) == [])
 
+# The whole-stage sensor keeps reporting after phase JUnit cases disappear.
+stage = {"n": 10, "p90Min": 10.9}
+series_unmeasured["pipelines"]["elohim"]["stages"] = {"Publish and Verify App Delivery": stage}
+fallback = {m: (v, r) for m, v, r in ci_harvest.delivery_folds(series_unmeasured)}
+check("whole-stage p90 replaces missing phase cases", fallback["stage-wallclock@1"][0] == 10.9)
+check("fallback reason identifies the sensor", "whole Publish and Verify" in fallback["stage-wallclock@1"][1])
+series_unmeasured["pipelines"]["elohim"]["publishVerify"]["p90Min"] = 122.5
+check("n=0 never revives a stale phase reading",
+      dict((m, v) for m, v, _ in ci_harvest.delivery_folds(series_unmeasured))["stage-wallclock@1"] == 10.9)
+series_ok["pipelines"]["elohim"]["stages"] = {"Publish and Verify App Delivery": stage}
+check("measured phases take precedence over the broader stage",
+      dict((m, v) for m, v, _ in ci_harvest.delivery_folds(series_ok))["stage-wallclock@1"] == 9.5)
+stage["n"] = 0
+check("empty whole-stage series is not a zero reading",
+      "stage-wallclock@1" not in dict((m, v) for m, v, _ in ci_harvest.delivery_folds(series_unmeasured)))
 print(f"ok — {_passed} checks")

@@ -14,20 +14,16 @@ cluster: "arch-dataplane-refactor-backlog"
 tags: [rakia, submodule, delegated-compute, ci]
 ---
 
-**2026-10-20 — the source is now LOST, not just untracked.** No `rakia-executor/` exists in
-`elohim/rakia` (pin `720c132`), in any `.worktrees/*` or `.claude/worktrees/*` copy, in rakia's
-object store (`git fsck --unreachable` finds nothing), on `origin` (branches: main,
-feat/app-bundle-class, feat/build-plan-fingerprints-param, feat/gate-run-attested), or as a built
-`compute-executor`/`ark` anywhere under `/projects` (the cargo pool family dirs for
-`elohim__rakia` and `elohim/dev` are gone). So no peer in this workspace can RUN a stage until the
-executor is rewritten or recovered from wherever the operator kept a copy. What still works without
-it: naming a stage (`genesis/agentic/compute/cid-executor.mjs`, whose task CID storage's own
-`content_cid` accepts — verified 2026-10-20 against the household) and a provider deciding
-admission (`POST …/tasks/{ref}/accept`). The scenarios that need a stage to run are held by the new
-`compute-executor` cap (all three cluster-state files, `available: false`). **Updated cure:** the
-operator recovers the executor source (or it is rewritten against `genesis/agentic/compute/
-worker.mjs`'s calls: `artifact`, `cid`, `receipt-path`, `run`, `cleanup`), commits it upstream,
-moves the pin, then flips `compute-executor` in all three cluster-state files.
+**DELTA 2026-10-29 — executor source present; dev-slot build still missing.** The source landed
+upstream in rakia `39cd2eb` (2026-10-21, “feat: execute bounded compute tasks with durable
+receipts”) and is present in the current submodule tree at `elohim/rakia/rakia-executor/`.
+The earlier “source is LOST” conclusion is superseded: the remaining local blocker is that the
+executor is unbuilt in the dev slot. Build and verify that executor before claiming local
+execution readiness; source recovery or a rewrite is no longer the cure. The existing
+`cid-executor.mjs` can still name submitted stages. `adam-compute-worker.json` is enabled with
+a grant, which is a deployment declaration rather than proof of dev-slot build or runtime
+readiness. This correction leaves the cluster-state declarations to their own governed flow.
+The original frontmatter and dated evidence below retain the backlog atom's provenance.
 
 **Evidence (2026-09-07 05:4xZ, compute-leg prep):** `git -C elohim/rakia status` shows `rakia-executor/` untracked; the superproject pin is `13cb31dddb…` (heads/main). The binary at `/projects/.cargo-target-pool/family/dev/elohim__rakia/dev/debug/compute-executor` was built from that uncommitted work. `scripts/ci/build-compute-worker.sh` and `genesis/agentic/compute/operations.md` both require it. **Cure (operator-owned, the submodule is theirs):** commit `rakia-executor/` in the rakia repo, push, bump the pin in elohim. **Done when:** a fresh `git submodule update --init elohim/rakia` contains `rakia-executor/Cargo.toml` and `just gate rakia` builds `compute-executor`.
 

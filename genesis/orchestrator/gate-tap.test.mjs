@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { attributor, lineSplitter, tapChildEnv } from './gate-tap.mjs';
+import { attributor, createCostSampler, lineSplitter, tapChildEnv } from './gate-tap.mjs';
 
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
 
@@ -153,7 +153,7 @@ describe('gate-tap attribution', () => {
   function journal(t) {
     const root = mkdtempSync(resolve(tmpdir(), 'gate-tap-attr-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
-    spawnSync('git', ['init', '-q'], { cwd: root });
+    mkdirSync(resolve(root, '.git')); // root discovery needs only the marker, not git
     mkdirSync(resolve(root, 'crate/src'), { recursive: true });
     writeFileSync(resolve(root, 'crate/src/head.rs'), 'fn f() {}\n');
     mkdirSync(resolve(root, '.eprfs/status/lsp'), { recursive: true });
@@ -185,4 +185,53 @@ describe('gate-tap attribution', () => {
     assert.equal(attributor({ run, dir: 'crate', root })(head).failure.attribution, undefined);
     assert.equal(attributor({ run: null })(head), head);
   });
+});
+
+
+test('cost samples sum only descendants, retain peaks and take cgroup counter deltas after exit', () => {
+  const files = new Map([
+    ['/proc/20/cgroup', '0::/gate\n'],
+    ['/proc/20/status', 'PPid:\t1\nVmRSS:\t10 kB\n'],
+    ['/proc/21/status', 'PPid:\t20\nVmRSS:\t30 kB\n'],
+    ['/proc/22/status', 'PPid:\t21\nVmRSS:\t60 kB\n'],
+    ['/proc/90/status', 'PPid:\t1\nVmRSS:\t99999 kB\n'],
+    ['/sys/fs/cgroup/gate/cpu.stat', 'usage_usec 1000000\nthrottled_usec 200000\n'],
+    ['/sys/fs/cgroup/gate/memory.events', 'low 0\nhigh 7\n'],
+    ['/proc/pressure/io', 'some avg10=99.0\nfull avg10=1.50 avg60=2.00 total=123\n'],
+  ]);
+  const sampler = createCostSampler(20, {
+    readFile: path => { if (!files.has(path)) throw new Error('gone'); return files.get(path); },
+    listDir: () => ['90', '22', '21', '20', 'pressure', '999'],
+  });
+  assert.deepEqual(sampler.sample(), { cpu_s: 0, throttled_s: 0, rss_peak_bytes: 102400,
+    memory_high_events: 0, io_full_pct_max: 1.5 });
+  files.set('/sys/fs/cgroup/gate/cpu.stat', 'usage_usec 4500000\nthrottled_usec 700000\n');
+  files.set('/sys/fs/cgroup/gate/memory.events', 'high 10\n');
+  files.set('/proc/pressure/io', 'full avg10=4.25 avg60=1.00\n');
+  files.delete('/proc/20/status');
+  files.delete('/proc/20/cgroup');
+  files.delete('/proc/21/status');
+  files.delete('/proc/22/status');
+  assert.deepEqual(sampler.sample(), { cpu_s: 3.5, throttled_s: 0.5, rss_peak_bytes: 102400,
+    memory_high_events: 3, io_full_pct_max: 4.25 });
+  files.set('/proc/pressure/io', 'full avg10=0.01\n');
+  assert.equal(sampler.sample().io_full_pct_max, 4.25);
+});
+
+test('missing kernel files are unknown, and disappearing processes do not break the tap', () => {
+  const sampler = createCostSampler(7, {
+    readFile: () => { throw new Error('unavailable'); },
+    listDir: () => { throw new Error('unavailable'); },
+  });
+  assert.deepEqual(sampler.sample(), { cpu_s: null, throttled_s: null, rss_peak_bytes: null,
+    memory_high_events: null, io_full_pct_max: null });
+});
+
+test('fd 3 carries all five cost axes beside the failure signals', t => {
+  const { summary, result } = tap(t, 'sleep 0.05');
+  assert.equal(result.status, 0);
+  for (const key of ['cpu_s', 'throttled_s', 'rss_peak_bytes', 'memory_high_events', 'io_full_pct_max']) {
+    assert.ok(Object.hasOwn(summary, key), key);
+    assert.ok(summary[key] === null || Number.isFinite(summary[key]), key);
+  }
 });

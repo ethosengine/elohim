@@ -108,25 +108,17 @@ bare one — followed by the reminder that a citation is not an attenuation.
 
 ### Why this rule is declared inline instead of bound to a pinned policy
 
-Its two siblings above bind pinned rows in `.claude/epr-meta/policies.yaml`. This one cannot: that
-registry stood at 64,922 bytes of a 65,536-byte cap (99.1%) when the rule was written, and the cap
-is enforced by **both** governance hosts — `_lib/epr_meta.py` `load_policies` and the native
-evaluator at `elohim/eprfs/eprfs-meta/src/evaluation.rs:519` (`MAX_MANIFEST_BYTES`, `lib.rs:39`).
-One more row flips the registry to "exceeds size cap", which drops *every* policy-bound rule to
-`unknown policy — rule NOT enforced`: a total governance outage. Fitting a rule into the remaining
-614 bytes would have meant shrinking it to an unreadable stub — attenuating the rule's legibility
-instead of the actual disturbance, which is this rule's own anti-pattern.
+Its two siblings above bind pinned rows in `.claude/epr-meta/policies.yaml`. The registry's
+former 65,536-byte limit no longer prevents this rule from joining them: both
+`_lib/epr_meta.py` (`_MAX_REGISTRY_BYTES`) and `elohim/eprfs/eprfs-meta/src/lib.rs`
+(`MAX_REGISTRY_BYTES`) now allow 1 MiB. The roughly 73 KB policy registry is well below that
+limit. The earlier 99.1%-full rationale is obsolete.
 
-The open item, escalated rather than taken unilaterally and recorded at the `load_policies` call
-site: **a registry is not a manifest and should not borrow a manifest's cap.**
-`_lib/seam_census.py` (~line 175) already ratified that distinction and carved out
-`_MAX_REGISTRY_BYTES` after `elohim-storage`'s seam registry crossed 64KB and contributed zero cells
-to the concern x seam matrix for two days; the sibling registry `measures.yaml` is already 72KB and
-loads only because no cap is applied to it at all. Fixing it is a two-host source change plus an
-`epr` rebuild, and changing one host alone makes the two disagree (`python=refer` vs `rust=permit`)
-on every governed write. Until then this rule is inline, and it is duplicated in
-`../manifests/.epr-meta` for the manifest surface — a define-once-bind-many cost the full registry
-is charging.
+The rule remains inline for this prose-only correction so its existing ratified terms and
+scope remain unchanged. It does not technically need to live inline: moving this rule and
+its duplicate in `../manifests/.epr-meta` into one pinned policy is a separate governance
+change requiring a shared policy row and both bindings to be verified together. Until that
+migration, the duplication is explicit maintenance debt, not protection against a size cap.
 
 Consequence to expect, and it is correct: an inline `ask` with no ratified policy pin is referred
 once by `epr:validator-escalation-ladder`. Under the agency charter, accepting the merge at the

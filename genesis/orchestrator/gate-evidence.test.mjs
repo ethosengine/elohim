@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nativeGateState } from './gate-source-state.mjs';
+import { COST_FIELDS } from './gate-cycle.mjs';
 import {
   attestationStep,
   closureKey,
@@ -779,6 +780,8 @@ test('runProject reuses without executing or attesting and observes run-kind=reu
   assert.ok(note.args.includes('run-kind=reused'));
   assert.ok(note.args.includes('exit=ok'));
   assert.equal(note.args[note.args.indexOf('--value') + 1], '0');
+  assert.ok(!note.args.some(arg => COST_FIELDS.some(key => arg.startsWith(`${key}=`))),
+    'reuse does not measure a new cost vector');
 });
 
 test('runProject reuses a sibling green, labels it sibling, and records sibling reuse', async t => {
@@ -891,6 +894,56 @@ test('runProject keeps running and recording in report mode or with an unreadabl
   }
 });
 
+const measuredCost = { cpu_s: 42.5, throttled_s: 0, rss_peak_bytes: 123456,
+  memory_high_events: 3, io_full_pct_max: 2.5 };
+for (const [name, summary, status, tap] of [
+  ['successful fd-3 measurements', measuredCost, 0, true],
+  ['failed fd-3 measurements', measuredCost, 7, true],
+  ['missing sensors', { cpu_s: 0, throttled_s: null }, 0, true],
+  ['missing fd-3 summary', null, 0, true],
+  ['untapped execution', null, 0, false],
+]) {
+  test(`runProject carries ${name} into cycle env and attestation output`, async t => {
+    const { runProject } = await import('./gate-runner.mjs');
+    const { root, env } = evidenceFixture(t);
+    const fd3 = summary ? { ...summary, signals: { sawTestOutput: true }, firstRedSeconds: 2 } : null;
+    const { spawn, calls } = fakeSpawn([
+      [isFingerprint, fingerprintReply('bafy-a')],
+      ...closureReplies,
+      [isStatus, { status: 0, stdout: '' }],
+      [isFind, { status: 0, stdout: '[]' }],
+      [isPut, { status: 0, stdout: 'recorded' }],
+      [(bin, args) => bin === process.execPath && args[0].endsWith('/gate-tap.mjs'),
+        { status, output: [null, null, null, fd3 ? Buffer.from(`${JSON.stringify(fd3)}\n`) : null] }],
+      [(bin) => bin === 'bash', { status, stdout: '' }],
+      [(bin) => bin === 'epr', { status: 0, stdout: '' }],
+    ]);
+    assert.equal(runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+      root, env: { ...env, GATE_RUN_KIND: 'full-gate' }, spawn, tap, write: () => {}, warn: () => {},
+    }), status);
+    const executions = calls.filter(c => c.bin === 'bash' || c.bin === process.execPath);
+    assert.equal(executions.length, 1);
+    if (tap) assert.deepEqual(executions[0].opts.stdio, ['inherit', 'inherit', 'inherit', 'pipe']);
+    const puts = calls.filter(c => isPut(c.bin, c.args));
+    assert.equal(puts.length, 1);
+    const verdict = JSON.parse(puts[0].args[puts[0].args.indexOf('--output-json') + 1]);
+    assert.equal(verdict.exit, status === 0 ? 0 : 1);
+    const cycles = calls.filter(c => c.bin === 'epr' && c.args[0] === 'flow' && c.args[1] === 'note');
+    assert.equal(cycles.length, 1);
+    const args = cycles[0].args;
+    const cycleEnv = args.filter((_, i) => args[i - 1] === '--env');
+    const costEnv = cycleEnv.filter(arg => COST_FIELDS.some(key => arg.startsWith(`${key}=`)));
+    if (summary) {
+      const expected = Object.fromEntries(COST_FIELDS.map(key => [key, summary[key] ?? null]));
+      assert.deepEqual(verdict.cost, expected);
+      assert.deepEqual(costEnv, COST_FIELDS.map(key => `${key}=${expected[key] ?? 'unknown'}`));
+    } else {
+      assert.equal(Object.hasOwn(verdict, 'cost'), false);
+      assert.deepEqual(costEnv, [], 'unmeasured runs never fabricate zero cost');
+    }
+  });
+}
+
 test('a native evaluator older than the verb names itself, not the closure', function evaluator_miss_names_the_device(t) {
   const project = { dir: 'elohim/eprfs' };
   const fake = result => () => ({ status: 2, stdout: '', stderr: '', ...result });
@@ -905,4 +958,16 @@ test('a native evaluator older than the verb names itself, not the closure', fun
     run: fake({ status: 0, stdout: JSON.stringify({ clean: false, status: ' M x', closureCid: '', closure: [] }) }) });
   assert.equal(dirty.miss, 'source closure dirty');
   assert.equal(nativeGateState(project, { root: '/nowhere', env: {} }).miss, 'no toolchain declared');
+});
+
+
+test('attestation output carries the measured cost vector unchanged', () => {
+  const cost = { cpu_s: 42.5, throttled_s: 0, rss_peak_bytes: 123456,
+    memory_high_events: null, io_full_pct_max: 2.5 };
+  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'cid', stderr: '' }]]);
+  const put = recordEvidence(project, 'key', { success: true, seconds: 60, cost,
+    commit: 'commit', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn });
+  assert.equal(put.status, 0);
+  const args = calls[0].args;
+  assert.deepEqual(JSON.parse(args[args.indexOf('--output-json') + 1]).cost, cost);
 });

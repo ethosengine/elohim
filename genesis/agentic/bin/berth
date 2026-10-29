@@ -40,6 +40,7 @@ Commands:
                                                                    other devices' moorings and steward
                                                                    leases, read from this device's fold
   berth ledger  [-n 30]                                            the append-only record
+  berth reap                                                       remove dead expired moorings and expired leases
   berth overrun-check [RESOURCE]                                   emit dev-berth-held-by-measure@1 once
                                                                    for a lease held past its ttl (hooks)
 
@@ -836,6 +837,86 @@ class Berth:
                 f.write(str(round(self.now(), 3)))
         except OSError:
             pass
+
+    def hold_summary(self, days=7):
+        """Completed holds, by resource/session, released in the window. Renewals do not
+        restart the hold. Unreleased/reaped claims have no measured end and are excluded.
+        Refusals belong to the requesting session, not to the incumbent they name.
+        """
+        now = self.now()
+        start = now - days * 86400
+        pending, groups = {}, {}
+
+        def group(key):
+            return groups.setdefault(key, {"durations": [], "refusals": 0})
+
+        for ev in self.ledger(0):
+            at = ev.get("at")
+            resource, session = ev.get("resource"), ev.get("session")
+            if not isinstance(at, (int, float)) or not isinstance(resource, str) or not isinstance(session, str):
+                continue
+            if at > now:
+                continue
+            key = (resource, session)
+            kind = ev.get("kind")
+            if kind == "claim":
+                pending[key] = at
+                prior = ev.get("took_over_from")
+                if prior:
+                    pending.pop((resource, prior), None)
+            elif kind == "release":
+                holders = [session] + (ev.get("forced_from") or "").split(",")
+                for holder in set(holders):
+                    held = (resource, holder)
+                    since = pending.pop(held, None)
+                    if since is not None and start <= at and at >= since:
+                        group(held)["durations"].append(at - since)
+            elif kind == "reap":
+                pending.pop(key, None)
+            elif kind == "refuse" and at >= start:
+                group(key)["refusals"] += 1
+        return groups
+
+    def reap(self):
+        """Prune under the same lock as touch/claim. A stale heartbeat alone never kills
+        a living process's mooring. Reaping is not a release-time measurement.
+        """
+        removed = {"moorings": [], "leases": []}
+        with self._locked():
+            now = self.now()
+            for session, m in self.moorings().items():
+                if now - m.get("last_seen", 0) < m.get("ttl_s", self.mooring_ttl_s):
+                    continue
+                pid = m.get("pid")
+                if pid and self.pid_alive(pid):
+                    want, have = m.get("pid_start"), self.pid_start(pid)
+                    if want is None or have is None or want == have:
+                        continue
+                os.remove(self._moor_path(session))
+                removed["moorings"].append(session)
+                self.record("unmoor", session=session, reason="reap")
+            leases = self.leases()
+            for key, value in list(leases.items()):
+                slots = isinstance(value, list)
+                kept = []
+                for lease in value if slots else [value]:
+                    ttl = lease.get("ttl_s")
+                    expired = ttl is not None and now >= lease.get("since", 0) + ttl
+                    if expired or not self.holder_is_live(lease):
+                        resource = key.removesuffix("/slots")
+                        session = lease.get("holder")
+                        removed["leases"].append({"resource": resource, "holder": session})
+                        self.record("reap", resource=resource, session=session, reason="expired",
+                                    expired_at=lease.get("since", 0) + ttl if ttl is not None else None)
+                    else:
+                        kept.append(lease)
+                if kept:
+                    leases[key] = kept if slots else kept[0]
+                else:
+                    del leases[key]
+            if removed["leases"]:
+                self._write_leases(leases)
+        return removed
 
     # ------------------------------------------------------------ moorings
     def moorings(self):
@@ -1640,6 +1721,23 @@ def render_status(b):
             else:
                 lines.append(f"    {res:<11} free")
     lines += _other_devices_lines(b, view, view_line)
+    groups = b.hold_summary()
+    resources = sorted({resource for resource, _ in groups} | {"dev-integration"})
+    lines.append("  holds (last 7 days, completed; refusals by requester):")
+    def hold_line(resource, holder, durations, refusals):
+        values = sorted(durations)
+        # Nearest rank, as in the gate-cost p90 fold.
+        p50 = values[(len(values) + 1) // 2 - 1] if values else None
+        p90 = values[(len(values) * 9 + 9) // 10 - 1] if values else None
+        stats = "/".join(_age(v) if v is not None else "unknown" for v in
+                         (p50, p90, max(values) if values else None))
+        return f"    {resource}{holder} hold p50/p90/max {stats} (n={len(values)}), refusals {refusals}"
+    for resource in resources:
+        selected = [(holder, stats) for (res, holder), stats in groups.items() if res == resource]
+        lines.append(hold_line(resource, "", [d for _, stats in selected for d in stats["durations"]],
+                               sum(stats["refusals"] for _, stats in selected)))
+        for holder, stats in sorted(selected):
+            lines.append(hold_line(resource, f" / {holder}", stats["durations"], stats["refusals"]))
     ram = _guard_state("ram-guard")
     io = _guard_state("io-guard")
     if ram:
@@ -1823,6 +1921,10 @@ def _main(argv):
         n = int(_opt(argv, "-n", "30"))
         for ev in b.ledger(n):
             print(_fmt_ledger(ev))
+        return 0
+    if cmd == "reap":
+        removed = b.reap()
+        print(f"berth: reaped {len(removed['moorings'])} moorings, {len(removed['leases'])} leases")
         return 0
     if cmd == "overrun-check":
         # Hook-facing (ram-guard's prompt event): never fails the caller, prints only on an emit.

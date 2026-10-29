@@ -1,20 +1,22 @@
 // Gate cost — fold recorded full runs into an expectation and a pure decision
 // about deferring a slow, locally reliable gate to feature-branch CI.
 
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
+import { dirname, resolve } from 'path';
 import { GATE_CYCLE_MEASURE, minutes } from './gate-cycle.mjs';
 
 // genesis/orchestrator/Jenkinsfile:1894 — Groovy ==~ matches the whole branch name.
 export const CI_BRANCH_PATTERN = /^(?:dev|dev-.+|feat-.+|claude\/.+)$/;
 
 /** Read the flows sidecar; unrelated records are ignored, malformed lines counted. */
-export function readCycleRows(flowsPath, readFile = readFileSync) {
+export function readCycleRows(flowsPath, readFile = readFileSync, seen = new Set()) {
   const rows = [];
   let skipped = 0;
   for (const line of readFile(flowsPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     try {
-      const { record } = JSON.parse(line);
+      const row = JSON.parse(line);
+      const { record } = row;
       const tags = record?.classifiedAs;
       if (!Array.isArray(tags)) throw new Error('missing classifiedAs');
       if (!tags.includes(`measure:${GATE_CYCLE_MEASURE}`)) continue;
@@ -32,10 +34,47 @@ export function readCycleRows(flowsPath, readFile = readFileSync) {
           typeof occurredAt !== 'string' || !Number.isFinite(Date.parse(occurredAt))) {
         throw new Error('malformed gate cycle');
       }
+      // A CID is the row identity, not its time/value (two runs can measure the same cost).
+      const identity = row.cid || JSON.stringify(row);
+      if (seen.has(identity)) continue;
+      seen.add(identity);
       rows.push({ value, kind, exit, project, subject, occurredAt });
     } catch { skipped += 1; }
   }
   return { rows, skipped };
+}
+
+/** Main plus every sibling sidecar, preserving each ledger's append order. Author dates
+ * cannot order separate ledgers. Use main, sorted siblings, then the invoking worktree;
+ * keep a copied row only at its first occurrence. Read git metadata as files, never a process.
+ */
+export function readCycleUnion(root) {
+  let main = resolve(root);
+  try {
+    const marker = readFileSync(resolve(root, '.git'), 'utf8').trim();
+    if (marker.startsWith('gitdir: ')) {
+      const gitDir = resolve(root, marker.slice(8));
+      main = dirname(resolve(gitDir, readFileSync(resolve(gitDir, 'commondir'), 'utf8').trim()));
+    }
+  } catch { /* ordinary checkout, or no git metadata */ }
+  let siblings = [];
+  try {
+    siblings = readdirSync(resolve(main, '.worktrees'), { withFileTypes: true })
+      .filter(entry => entry.isDirectory()).map(entry => resolve(main, '.worktrees', entry.name)).sort();
+  } catch { /* no linked worktrees */ }
+  const current = resolve(root);
+  const roots = [...new Set([main, ...siblings.filter(at => at !== current), current])];
+  const seen = new Set();
+  const result = { rows: [], skipped: 0, readableLedgers: 0 };
+  for (const at of roots) {
+    try {
+      const part = readCycleRows(resolve(at, '.eprfs/status/flows.jsonl'), readFileSync, seen);
+      result.readableLedgers += 1;
+      result.rows.push(...part.rows);
+      result.skipped += part.skipped;
+    } catch { /* an unreadable sidecar contributes no evidence */ }
+  }
+  return result;
 }
 
 /** Legacy subjects count only when the caller has established they are unshared. */

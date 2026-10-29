@@ -2158,10 +2158,10 @@ habits:
       - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-10-28 (GREEN preserved; a defect in the A3 part 1 fence, found live and fixed): the holder fence required every other device to acknowledge the head carrying the LATEST renew, but berth re-reads the view right after writing a renew, before any head carries it, so every renew self-demoted and any push longer than ttl/3 (600 s) was refused at its first renew. Live at about 14:39Z the rules-digest push was refused "self-demoted: no head from <shem> within 1770s" while shem's head was 1 s old and acknowledged every head of ours. The fence now anchors on the newest claim or renew each other device has acknowledged, valid while younger than ttl − fence_margin (spec D6). `a_renew_in_flight_rides_on_the_last_acknowledged_one` fails on the old code and passes on the fix; lease_view 20/20, including `partition_longer_than_ttl_never_has_two_effective_holders`.
-    evidence-fingerprint: sha256:ec6c65cec397561f
-    evidence-bytes: 18945
-    evidence-entries: 21
+      DELTA 2026-10-29 (status unchanged; first fold of the hold): `berth status` now folds the last seven days of completed holds by resource and session and prints p50/p90/max with refusals — on this device dev-integration read p50 2m / p90 55m / max 1h59 (n=44), refusals 12 (landed f8dc1991b/228a80b2f, berth_test 120 OK); a `reap` arm clears moorings past their ttl with no live pid and expired leases (a push lease had sat EXPIRED 811 h of a 30 m ttl). Observed the same day: a sibling's dev-integration hold spanned its whole 4,970 s pre-push and refused this device's push for 2 h 40 m; the sibling answered a `berth say` within 15 min once this session armed `berth inbox --follow` — presence is reactive until the inbox-notice hook exists (backlog agent-presence-listens-to-the-space-by-default).
+    evidence-fingerprint: sha256:b0a037ff0c4fa868
+    evidence-bytes: 19751
+    evidence-entries: 22
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
@@ -2319,10 +2319,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-28 (RED preserved; edge gate-only port): adapted c1b5a9fea, b689b9e15 and d3d9b5852 to current CI; a tagged PR dispatches strict edge cargo gates and local builds without publication, deployment or validation siblings, including both compute-worker publication paths. Local `cd genesis/orchestrator && node --test validate-only-pipeline.test.mjs run-class.test.mjs` exits 0 (30 validation/gate-only cases plus run-class coverage); ordinary pod YAML is byte-identical and dev/main remain outside the opt-in guard. No cargo, push or live Jenkins run; runtime delivery remains unmeasured.
-    evidence-fingerprint: sha256:584894e2cd290f80
-    evidence-bytes: 33371
-    evidence-entries: 31
+      DELTA 2026-10-29 (ACTIVE, RED preserved; the sensor is honest again): ci-harvest folds stage-wallclock@1 from the whole 'Publish and Verify App Delivery' stage when the junit phase cases are absent (n=0), as measures.yaml:1036-1049 prescribes — the headline had carried 122.5 min from 2026-09-27 for 32 days while the stage read 10.9 min p90 (landed f8dc1991b/228a80b2f; `ci_harvest_stage_budget_test.py` 38 ok). The closure-keyed edge build (design S1a) is implemented on shift/2026-10-29-integration-capacity and goes up as a PR: measured starting point edge/dev #1753 = 50.6 min in doorway QG + build doorway + build storage on an unchanged closure; target ≤ 15 on the first dev wave whose storage/doorway closure is unchanged. Not measured yet: nothing of α has reached dev.
+    evidence-fingerprint: sha256:97e99661a5593483
+    evidence-bytes: 34156
+    evidence-entries: 32
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
@@ -2380,9 +2380,9 @@ habits:
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
       DELTA 2026-10-29 (RED preserved; reuse is dark on shem): four 10-28/29 pushes from shem's prepared worktree printed `rakia unavailable — path-only selection` and `elohim-storage not reused: rakia oracle unavailable; reuse needs it` even with a green attestation for the identical closure (`evidence: hit green … commit a70838fad`), so each paid the full storage gate (1782 s). No `rakia` CLI is on PATH, and the pinned elohim/rakia (9db775b) builds only `compute-executor`; `rakia affected` exists in brit's CLI baseline but not as a binary here. Backlog gate-reuse-dark-without-rakia-cli.
-    evidence-fingerprint: sha256:aa171700752a5489
-    evidence-bytes: 8501
-    evidence-entries: 10
+    evidence-fingerprint: sha256:07858776ff16824a
+    evidence-bytes: 9313
+    evidence-entries: 11
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

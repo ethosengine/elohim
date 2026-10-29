@@ -52,6 +52,8 @@ retire-when: >
   no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
   and its wall clock stops being the delivery path this habit watches.
 ---
+DELTA 2026-10-29 (ACTIVE, RED preserved; the sensor is honest again): ci-harvest folds stage-wallclock@1 from the whole 'Publish and Verify App Delivery' stage when the junit phase cases are absent (n=0), as measures.yaml:1036-1049 prescribes — the headline had carried 122.5 min from 2026-09-27 for 32 days while the stage read 10.9 min p90 (landed f8dc1991b/228a80b2f; `ci_harvest_stage_budget_test.py` 38 ok). The closure-keyed edge build (design S1a) is implemented on shift/2026-10-29-integration-capacity and goes up as a PR: measured starting point edge/dev #1753 = 50.6 min in doorway QG + build doorway + build storage on an unchanged closure; target ≤ 15 on the first dev wave whose storage/doorway closure is unchanged. Not measured yet: nothing of α has reached dev.
+
 DELTA 2026-10-28 (RED preserved; edge gate-only port): adapted c1b5a9fea, b689b9e15 and d3d9b5852 to current CI; a tagged PR dispatches strict edge cargo gates and local builds without publication, deployment or validation siblings, including both compute-worker publication paths. Local `cd genesis/orchestrator && node --test validate-only-pipeline.test.mjs run-class.test.mjs` exits 0 (30 validation/gate-only cases plus run-class coverage); ordinary pod YAML is byte-identical and dev/main remain outside the opt-in guard. No cargo, push or live Jenkins run; runtime delivery remains unmeasured.
 
 DELTA 2026-10-17b (ACTIVE, RED preserved; post-restart write-readiness exceeds 120 s after caughtUp): app-delivery-refuses-fast 1/4 scenarios, 22/50 steps; deploy-window stations unmeasured.

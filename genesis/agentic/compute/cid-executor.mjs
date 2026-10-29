@@ -5,8 +5,8 @@
 //   cid-executor cid <task.json>   -> the task's CIDv1 dag-cbor over its JSON
 //
 // Every other subcommand (run, receipt-path, cleanup) refuses: this tool can NAME a stage, it
-// can never RUN one. It exists because the executor's source (elohim/rakia/rakia-executor) was
-// never committed and is no longer on any disk this workspace can reach
+// can never RUN one. The executor source is present at elohim/rakia/rakia-executor
+// (rakia 39cd2eb, 2026-10-21); the executor is unbuilt in the dev slot, not lost
 // (genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md), while a
 // requester still has to name what it submits. Nothing here is trusted on its word: the
 // sponsor's custody re-hashes every chunk it stocks, and a provider's storage recomputes the

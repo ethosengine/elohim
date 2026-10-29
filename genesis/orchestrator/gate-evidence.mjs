@@ -464,7 +464,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
  * CID, a stored verdict node as the output, and `--success` as observed (red is stored too —
  * a known-red closure is information). Returns the spawn result; never throws.
  */
-export function recordEvidence(project, key, { success, seconds, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync }) {
+export function recordEvidence(project, key, { success, seconds, cost, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync }) {
   if (dirty !== false) {
     return { status: 1, stdout: '', stderr: dirty === null ? 'working tree state unknown' : `working tree dirty under ${project.dir}` };
   }
@@ -474,7 +474,7 @@ export function recordEvidence(project, key, { success, seconds, commit, buildRe
       return { status: 1, stdout: '', stderr: 'source closure dirty, changed, or unavailable after gate' };
     }
   }
-  const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}) };
+  const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}), ...(cost ? { cost } : {}) };
   const args = [
     '--repo', root,
     'build', 'put',

@@ -40,7 +40,9 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
   declaration that changes moves the identity even when the files it matches do not. Its
   sibling command-line tool brit-build-ref reads and writes the signed attestations, which
   live as notes in the repository's own git refs; a closure may carry several, and the
-  newest green is the one a hit names. Before a gate runs, the runner asks
+  newest green is the one a hit names (or the newest red when no green exists). This is
+  display precedence only: reuse also checks the newest verdict, and a newer red prevents
+  an older green from standing in. Before a gate runs, the runner asks
   for a signed attestation of that closure and prints one line to its output: a hit with
   the signer, the age and the commit that carried it, or a miss. After the gate runs, the
   runner records the verdict it observed — red as well as green — against the same closure,
@@ -91,9 +93,31 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
     Scenario: The first run of a closure is a miss, and the gate records what it saw
       When the gate runs for project "sample" at commit "A"
       Then the gate printed "evidence: miss"
-      And the recipe ran once
+      And the recipe ran once during this invocation
       And the closure of project "sample" at commit "A" carries one green attestation signed by this workspace
       And the cycle observation for that run records its kind as "full-gate"
+
+    # Operational parameter: sample every 5 seconds, plus start and completion.
+    # RSS is the child's process tree; CPU/memory pressure is its cgroup; I/O is host-wide.
+    # Runnable unit proof: gate-tap, gate-cycle and gate-evidence.test.mjs.
+    @wip @concern:push-gate-pays-once
+    Scenario: A gate's cycle row and its attestation carry the cost vector the run measured
+      Given Matthew needs to distinguish CPU work, throttling and memory pressure behind a slow gate
+      And the scratch gate's kernel counter readings are controlled by the fixture
+      And its child process tree reaches a sampled RSS peak of 102400 bytes
+      And its cgroup counters advance by 3.5 CPU seconds, 0.5 throttled seconds and 3 memory high events during the run
+      And the highest sampled host I/O full avg10 pressure is 4.25 percent
+      When the gate runs for project "sample" at commit "A"
+      Then its cycle observation carries these measured environment slots:
+        | slot               | value  |
+        | cpu_s              | 3.5    |
+        | throttled_s        | 0.5    |
+        | rss_peak_bytes     | 102400 |
+        | memory_high_events | 3      |
+        | io_full_pct_max    | 4.25   |
+      And the attestation's verdict cost carries the same five values
+      And those observed costs are output evidence and do not change the source closure identity
+      And the cost evidence leaves the gate's exit verdict unchanged
 
     @wip @concern:brit-native-daily-driver
     Scenario: A commit outside the step's inputs leaves the closure unchanged, and the gate names the evidence it holds
@@ -178,7 +202,7 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
       And a commit "B" changes "src/lib.rs" so that the recipe succeeds
       When the gate runs for project "sample" at commit "B"
       Then the gate printed "evidence: miss"
-      And the recipe ran once
+      And the recipe ran once during this invocation
       And the closure of project "sample" at commit "B" carries one green attestation signed by this workspace
       And the closure of project "sample" at commit "A" still carries only its red attestation
 
@@ -188,7 +212,7 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
       And the recipe now succeeds without any file changing
       When the gate runs for project "sample" at commit "A"
       Then the gate printed "evidence: hit red" naming this workspace as signer and commit "A"
-      And the recipe ran once
+      And the recipe ran once during this invocation
       And the closure of project "sample" at commit "A" carries a red attestation and a newer green one
       # The newest green is now the one a hit names.
       When the gate runs a third time for project "sample" at commit "A"
@@ -245,6 +269,7 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
 
     Background:
       Given the operator has exported GATE_EVIDENCE=reuse
+      And project "sample" is enabled for reuse
       And the author's roster in the scratch repository lists this workspace's device
       And a signer is admitted when its key is a device on the author's roster or a key the repository names
 
@@ -267,7 +292,7 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
     @wip @concern:brit-native-daily-driver
     Scenario: The integrator's fast-forward reuses the author's green through a key the repository admits by name
       Given the gate ran green for project "sample" at commit "A" on the author's device
-      And the integrator's workspace key is one the repository admits by name, and is on nobody's roster
+      And the author's device key is one the repository admits by name, and is on nobody's roster
       When the integrator's workspace runs the gate for project "sample" at commit "A"
       Then the gate printed "evidence: hit green" naming the author's device as signer and commit "A"
       And the recipe did not run
@@ -279,5 +304,5 @@ Feature: A gate remembers the closure it judged, not the branch that carried it
       And the recipe now succeeds without any file changing
       When the gate runs for project "sample" at commit "A"
       Then the gate printed "evidence: hit red" naming that device as signer
-      And the recipe ran once
+      And the recipe ran once during this invocation
       And the cycle observation for that run records its kind as "full-gate"
