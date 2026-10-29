@@ -26,6 +26,19 @@
 // --from attestations is a partial commit-level view. Notes do not preserve the complete
 // wave plan or Jenkins wall-clock timing; builtAt is the device's harvest timestamp.
 // Jenkins remains the default and the only source for delivery bounds and --stages.
+// The notes are read THROUGH brit (`brit-build-ref build get`, one verified read per ci:<pipeline>
+// note) when the binary is on BRIT_BUILD_REF_BIN / BRIT_BUILD_REF / PATH. The env must name a REAL
+// binary: /opt/rust/cargo/bin/brit-build-ref is a symlink to the bin-store launcher, which resolves
+// only through PATH and refuses its own alias (`REFUSED launcher-alias`, exit 127) when named
+// directly. A note brit reports `unverifiable:` is absent to this series — dropped from the run
+// and named once on stderr. The output says which reader produced it (`verification.reader`, and
+// the source label): `brit-verified` only when the binary verifies what it prints (it knows
+// `signer --json`); the pinned 76ba95d8a0 binary echoes stored bytes, so its reads are
+// `brit-unverified` — and a body it cannot decode is its `Error: JSON error: …` exit 1, which this
+// reader maps to the same absent-and-named outcome rather than letting one stray body collapse
+// the series; with no brit the notes are read from git directly and labelled `raw-git`.
+// UNVERIFIED is always said, never implied. A git failure inside brit is NOT MEASURED, never an
+// empty series, and an empty or all-refused series never falls back to Jenkins.
 //
 // CLI:  node genesis/orchestrator/delivery-series.mjs [--window 10] [--min-rate 0.8]
 //         [--max-p90-min 240] [--json] [--from jenkins|attestations] [--repo <path>]
@@ -36,8 +49,9 @@
 // The --stages defaults mirror the bounds declared in .claude/epr-meta/measures.yaml
 // (stage-wallclock-ceiling@1, delivery-cost-ceiling@1); the test pins the two together.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { resolveBin, signerIdentity } from './gate-evidence.mjs';
 
 const JENKINS = process.env.JENKINS || 'https://jenkins.ethosengine.com';
 const JOB = '/job/elohim-orchestrator/job/dev';
@@ -106,14 +120,46 @@ export function summarize(runs, { window = 10 } = {}) {
 // ── --from attestations: brit build notes instead of the Jenkins API ──────────────────────
 
 const BUILD_NOTES = 'refs/notes/brit/build/';
+const BUILD_REF_ENV = ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'];
+
+/** The inverse of brit's `encode_segment` (brit-epr refs.rs): the step name a notes ref carries. */
+export function decodeSegment(seg) {
+  return seg
+    .replace(/%3A/g, ':')
+    .replace(/%40/g, '@')
+    .replace(/%3F/g, '?')
+    .replace(/%2A/g, '*')
+    .replace(/%5B/g, '[')
+    .replace(/%5C/g, '\\')
+    .replace(/%5E/g, '^')
+    .replace(/%7E/g, '~')
+    .replace(/%20/g, ' ')
+    .replace(/%2E%2E/g, '..');
+}
+
+const firstLine = text => (text ?? '').trim().split('\n')[0];
+/** The pinned 76ba95d8a0 `build get` on a body serde_json cannot parse (anyhow over `RefError::Json`). */
+const PINNED_JSON_ERROR = /^Error: JSON error: (.*)$/;
+
+/** A `ci:<pipeline>` step of the series: the prefix, and no further `:` (step notes stay out). */
+const seriesStep = (step, prefix) => step.startsWith(prefix) && !step.slice(prefix.length).includes(':');
 
 /**
- * Every build attestation note in `repo` → [{step, commit, success, durationMs, harvestedAt}].
- * An unreadable repository or a malformed note reads as absent, never as a build.
+ * The repository's signer identity for a series read: gate-evidence.mjs `signerIdentity` owns the
+ * rule (`signer --json` first; the seed file only under the pinned 76ba95d8a0, which answers the
+ * verb with clap's usage error, exit 2) and this asks it once, of the binary the series resolved.
+ * No brit-build-ref at all is `via: 'none'` — a raw-git series names no signer.
+ *
+ * @returns {{agentId: string|null, via: 'signer'|'agent-key'|'none'}}
  */
-export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
-  const git = (args, input) =>
-    execFileSync('git', args, { cwd: repo, input, stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 256 * 2 ** 20 }).toString();
+export function britSigner(buildRefBin, repo, { spawn = spawnSync, env = process.env } = {}) {
+  if (!buildRefBin) return { agentId: null, via: 'none' };
+  return signerIdentity(repo, spawn, { env, buildRefBin });
+}
+
+/** Every series (ref, step, blob, commit) under refs/notes/brit/build/, via git — enumeration only, never a body. */
+function listBuildNotes(repo, prefix) {
+  const git = args => execFileSync('git', args, { cwd: repo, stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 256 * 2 ** 20 }).toString();
   let refs;
   try {
     refs = git(['for-each-ref', '--format=%(refname)', BUILD_NOTES]).split('\n').filter(Boolean);
@@ -122,13 +168,107 @@ export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
   }
   const notes = [];
   for (const ref of refs) {
+    const step = decodeSegment(ref.slice(BUILD_NOTES.length));
+    if (!seriesStep(step, prefix)) continue;
     for (const line of git(['notes', '--ref', ref, 'list']).split('\n').filter(Boolean)) {
       const [blob, commit] = line.split(' ');
-      notes.push({ blob, commit });
+      notes.push({ ref, step, blob, commit });
     }
   }
+  return notes;
+}
+
+/** A parsed BuildAttestationContentNode → this series' row, or null when it is not one. */
+function attestationRow(node, commit, prefix, { verified, reader }) {
+  // brit serializes BuildAttestationContentNode camelCase (stepName, buildDurationMs, builtAt).
+  if (!node || typeof node.stepName !== 'string' || typeof node.success !== 'boolean') return null;
+  if (!seriesStep(node.stepName, prefix)) return null;
+  return {
+    step: node.stepName.slice(prefix.length),
+    commit,
+    success: node.success,
+    durationMs: Number(node.buildDurationMs) || 0,
+    harvestedAt: node.builtAt,
+    inputsHashKind: node.hardwareProfile?.inputsHashKind ?? 'tree',
+    orchestratorBuild: node.hardwareProfile?.orchestratorBuild,
+    verified,
+    reader,
+  };
+}
+
+/**
+ * The build attestation series plus how it was read.
+ *
+ *   reader = 'brit-verified'   every row passed brit's verified read (`build get`, stdout ⇔ verified)
+ *          = 'brit-unverified' the pinned brit decoded the bytes but verifies nothing
+ *          = 'raw-git'         no brit: git notes read directly, nothing verified
+ *
+ * A note brit reports `unverifiable:` is ABSENT: not a row, counted in `unverifiable`, and named
+ * once through `warn` with its ref, commit and brit's reason. The pinned brit has no
+ * `unverifiable:` — a body it cannot decode is `Error: JSON error: …` exit 1 (refs.rs
+ * `RefError::Json` under anyhow), and only under the brit-unverified reader is that exit 1 read
+ * the same way (absent, counted, named); the verified binary reports a decode failure as
+ * `unverifiable: … does not decode`, exit 0, so its exit 1 is never a decode. Any other failure
+ * inside brit (exit ≠ 0) throws — it is not an empty series. An unreadable repository (no git) is
+ * an empty series.
+ */
+export function readAttestationSeries(
+  repo,
+  { prefix = 'ci:', buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, process.env), spawn = spawnSync, env = process.env, warn = console.error, signer } = {}
+) {
+  const notes = listBuildNotes(repo, prefix);
+  if (!buildRefBin) {
+    return { attestations: readRawNotes(repo, notes, prefix), reader: 'raw-git', buildRef: null, signer: null, unverifiable: 0 };
+  }
+  const who = signer ?? britSigner(buildRefBin, repo, { spawn, env });
+  const reader = who.via === 'signer' ? 'brit-verified' : 'brit-unverified';
+  const verified = reader === 'brit-verified';
+  const attestations = [];
+  let unverifiable = 0;
+  for (const n of notes) {
+    const r = spawn(buildRefBin, ['--repo', repo, 'build', 'get', '--step', n.step, '--commit', n.commit], {
+      cwd: repo,
+      encoding: 'utf8',
+      env,
+      timeout: 60_000,
+      maxBuffer: 16 * 2 ** 20,
+    });
+    if (r.status !== 0) {
+      const head = firstLine(r.stderr);
+      const pinnedDecode = reader === 'brit-unverified' && r.status === 1 ? PINNED_JSON_ERROR.exec(head) : null;
+      if (pinnedDecode) {
+        unverifiable += 1;
+        warn(`delivery-series: unverifiable ${n.ref} @ ${n.commit}: does not decode: ${pinnedDecode[1]} (pinned brit-build-ref exit 1) — read as absent`);
+        continue;
+      }
+      throw new Error(`brit-build-ref build get --step ${n.step} --commit ${n.commit}: exit ${r.status ?? r.signal}: ${head || 'no stderr'}`);
+    }
+    if ((r.stdout ?? '').trim() === '') {
+      const refused = /^unverifiable: (\S+) (.*)$/m.exec(r.stderr ?? '');
+      if (refused) {
+        unverifiable += 1;
+        warn(`delivery-series: unverifiable ${n.ref} @ ${refused[1]}: ${refused[2]} — read as absent`);
+      } else {
+        warn(`delivery-series: ${n.ref} @ ${n.commit} is listed but brit-build-ref reports no build ref — read as absent`);
+      }
+      continue;
+    }
+    let node;
+    try {
+      node = JSON.parse(r.stdout);
+    } catch {
+      throw new Error(`brit-build-ref build get --step ${n.step} --commit ${n.commit}: stdout is not JSON`);
+    }
+    const row = attestationRow(node, n.commit, prefix, { verified, reader });
+    if (row) attestations.push(row);
+  }
+  return { attestations, reader, buildRef: buildRefBin, signer: who.agentId, unverifiable };
+}
+
+/** The raw-git reader: one `cat-file --batch` over every note body, nothing verified. */
+function readRawNotes(repo, notes, prefix) {
   if (notes.length === 0) return [];
-  // One `cat-file --batch` for every note body: "<sha> blob <size>\n<body>\n" per object.
+  // "<sha> blob <size>\n<body>\n" per object.
   const out = execFileSync('git', ['cat-file', '--batch'], {
     cwd: repo,
     input: notes.map(n => n.blob).join('\n') + '\n',
@@ -144,24 +284,22 @@ export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
     at = eol + 1 + Number(size) + 1;
     if (type !== 'blob') continue;
     try {
-      // brit serializes BuildAttestationContentNode camelCase (stepName, buildDurationMs, builtAt).
-      const node = JSON.parse(body);
-      if (typeof node.stepName !== 'string' || typeof node.success !== 'boolean') continue;
-      if (!node.stepName.startsWith(prefix) || node.stepName.slice(prefix.length).includes(':')) continue;
-      attestations.push({
-        step: node.stepName.slice(prefix.length),
-        commit: n.commit,
-        success: node.success,
-        durationMs: Number(node.buildDurationMs) || 0,
-        harvestedAt: node.builtAt,
-        inputsHashKind: node.hardwareProfile?.inputsHashKind ?? 'tree',
-        orchestratorBuild: node.hardwareProfile?.orchestratorBuild,
-      });
+      const row = attestationRow(JSON.parse(body), n.commit, prefix, { verified: false, reader: 'raw-git' });
+      if (row) attestations.push(row);
     } catch {
       // Not an attestation body; skip it.
     }
   }
   return attestations;
+}
+
+/**
+ * Every ci:<pipeline> build attestation note in `repo` →
+ * [{step, commit, success, durationMs, harvestedAt, inputsHashKind, orchestratorBuild, verified, reader}].
+ * `readAttestationSeries` with only the rows; see it for the reader semantics.
+ */
+export function readBuildAttestations(repo, options = {}) {
+  return readAttestationSeries(repo, options).attestations;
 }
 
 /** Notes lack a recoverable wave plan: a successful subset cannot prove delivery. */
@@ -179,6 +317,8 @@ export function attestationRuns(attestations) {
     planned: null,
     outcome: Object.fromEntries(builds.map(b => [b.step, b.success ? 'SUCCESS' : 'FAILURE'])),
     delivered: 'unknown',
+    // A run is verified only when every note in it came through brit's verified read.
+    verified: builds.every(b => b.verified === true),
     timedOut: null,
     harvestedAt: builds.map(b => b.harvestedAt).filter(Boolean).sort().at(-1) ?? null,
   })).sort((x, y) => (y.harvestedAt ?? '').localeCompare(x.harvestedAt ?? ''));
@@ -475,8 +615,29 @@ async function main(argv) {
   let runs;
   const source = from;
   const partial = source === 'attestations' ? 'partial: commit-level view; wave wall-clock unknown' : null;
+  let verification = null;
   if (source === 'attestations') {
-    runs = attestationRuns(readBuildAttestations(strArg(argv, '--repo', process.cwd())));
+    const repo = strArg(argv, '--repo', process.cwd());
+    let series;
+    try {
+      series = readAttestationSeries(repo);
+    } catch (e) {
+      console.error(`delivery-series: brit build attestations in ${repo} unreadable — ${e.message}. NOT MEASURED.`);
+      return 2;
+    }
+    runs = attestationRuns(series.attestations);
+    verification = {
+      reader: series.reader,
+      buildRef: series.buildRef,
+      signer: series.signer,
+      attestations: series.attestations.length,
+      unverifiable: series.unverifiable,
+    };
+    if (runs.length === 0) {
+      // An all-refused repository is not an empty one: the count is named here, not only per note.
+      const refused = series.unverifiable > 0 ? ` (${series.unverifiable} listed, every one unverifiable — read as absent)` : '';
+      console.error(`delivery-series: no brit build attestations under ${BUILD_NOTES} in ${repo}${refused}.`);
+    }
   }
   if (source === 'jenkins') {
     try {
@@ -489,11 +650,12 @@ async function main(argv) {
   const summary = summarize(runs, { window });
   const code = partial ? 2 : verdict(summary, { minRate, maxP90Min });
   if (argv.includes('--json')) {
-    console.log(JSON.stringify({ source, ...(partial ? { partial } : {}), ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
+    console.log(JSON.stringify({ source, ...(partial ? { partial } : {}), ...(verification ? { verification } : {}), ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
     return code;
   }
   if (partial) {
     console.log(partial);
+    console.log(`source: ${source}${verificationLabel(verification)}`);
     for (const r of summary.runs) console.log(`#${r.number} delivered: unknown; harvestedAt: ${r.harvestedAt ?? 'unknown'} — ${JSON.stringify(r.outcome)}`);
     return code;
   }
@@ -510,6 +672,14 @@ async function main(argv) {
       ` (source: ${source})`
   );
   return code;
+}
+
+/** The reader behind an attestation series, said beside the source; unverified is never implied. */
+function verificationLabel(v) {
+  if (!v) return '';
+  if (v.reader === 'brit-verified') return ', brit-verified';
+  if (v.reader === 'brit-unverified') return `, UNVERIFIED — brit-build-ref ${v.buildRef} reads notes without verifying them`;
+  return ', UNVERIFIED — raw git notes, no brit-build-ref on BRIT_BUILD_REF_BIN or PATH';
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
