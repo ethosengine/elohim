@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nativeGateState } from './gate-source-state.mjs';
@@ -27,6 +28,7 @@ import {
   resolveBin,
   selfAgentId,
   siblingGovernanceChange,
+  signerIdentity,
   stepFingerprints,
 } from './gate-evidence.mjs';
 
@@ -62,8 +64,11 @@ const isRevParse = (bin, args) => bin === 'git' && args[0] === 'rev-parse';
 const isStatus = (bin, args) => bin === 'git' && args[0] === 'status';
 const isFind = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'find';
 const isPut = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'put';
+const isGet = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'build' && args[3] === 'get';
+const isSigner = (bin, args) => bin.endsWith('brit-build-ref') && args[2] === 'signer' && args[3] === '--json';
 const isPeerVerdicts = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'verdicts';
 const isMergeBase = (bin, args) => bin === 'git' && args[0] === 'merge-base';
+const getMiss = (_bin, args) => ({ status: 0, stdout: '', stderr: `no build ref found for step=${args[5]} commit=${args[7]}\n` });
 const sources = ['elohim/elohim-storage/src/**', '.claude/data/**', 'elohim/brit'];
 const isShow = (bin, args) => bin === 'git' && args[0] === 'show';
 const isTree = (bin, args) => bin === 'git' && args[0] === 'ls-tree';
@@ -251,10 +256,12 @@ test('gateEvidence is fail-open: no brit, an attested project, or a refused read
 });
 
 test('recordEvidence puts the verdict against the closure with the manifest file and a stored verdict, red included', () => {
-  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'bafyrei…\n', stderr: '' }]]);
-  const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, dirty: false, spawn });
+  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'bafyrei…\n', stderr: '' }], [isGet, getMiss]]);
+  const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, dirty: false, spawn, warn: () => {} });
   assert.equal(r.status, 0);
-  const args = calls[0].args;
+  assert.ok(isGet(calls[0].bin, calls[0].args), 'the note is read before it is written');
+  assert.deepEqual(calls[0].args, ['--repo', '/repo', 'build', 'get', '--step', 'gate:elohim-storage', '--commit', 'abc123']);
+  const args = calls.find(c => isPut(c.bin, c.args)).args;
   assert.deepEqual(args.slice(0, 6), ['--repo', '/repo', 'build', 'put', '--step', 'gate:elohim-storage']);
   assert.equal(args[args.indexOf('--manifest-path') + 1], '/repo/elohim/holochain/build-manifest.json');
   assert.deepEqual(JSON.parse(args[args.indexOf('--output-json') + 1]), { exit: 1, seconds: 1875, jobs: 1 });
@@ -263,6 +270,107 @@ test('recordEvidence puts the verdict against the closure with the manifest file
   assert.equal(args[args.indexOf('--duration-ms') + 1], '1875400');
   assert.equal(args[args.indexOf('--commit') + 1], 'abc123');
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', env: {}, spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
+});
+
+const UNVERIFIABLE_SHA = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+const UNVERIFIABLE_REASON = 'signature does not verify against agentId "ab"';
+const BUILD_REF = 'refs/notes/brit/build/gate%3Aelohim-storage';
+
+test('a note brit reports unverifiable is absent to findEvidence, and named once with its ref and reason', () => {
+  const warnings = [];
+  const warn = line => warnings.push(line);
+  // find: the verified rows on stdout, one `unverifiable:` line per refused note on stderr, exit 0.
+  const { spawn } = fakeSpawn([[isFind, { status: 0, stdout: `[${JSON.stringify(greenRow)}]\n`, stderr: `unverifiable: ${UNVERIFIABLE_SHA} ${UNVERIFIABLE_REASON}\n` }]]);
+  const found = findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn, warn });
+  assert.deepEqual(found.rows, [greenRow], 'only the rows brit verified are evidence');
+  assert.deepEqual(found.unverifiable, [{ commit: UNVERIFIABLE_SHA, reason: UNVERIFIABLE_REASON }]);
+  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: unverifiable note ignored on ${BUILD_REF} at ${UNVERIFIABLE_SHA}: ${UNVERIFIABLE_REASON}\n`]);
+  // A git failure is still an error, never an empty hit.
+  const failed = fakeSpawn([[isFind, { status: 1, stdout: '', stderr: `Error: git command failed: git notes --ref ${BUILD_REF} list: fatal: not a notes commit\n` }]]);
+  assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: failed.spawn, warn }).error,
+    `build find failed: Error: git command failed: git notes --ref ${BUILD_REF} list: fatal: not a notes commit`);
+  assert.equal(warnings.length, 1);
+});
+
+test('gateEvidence counts ignored unverifiable notes on its line and still reports the miss', t => {
+  const { root, env } = evidenceFixture(t);
+  const warnings = [];
+  const { spawn } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: '[]\n', stderr: `unverifiable: ${UNVERIFIABLE_SHA} ${UNVERIFIABLE_REASON}\nunverifiable: ${'a'.repeat(40)} does not decode: unknown field \`trusted\`\n` }],
+  ]);
+  const result = gateEvidence(project, { root, env, commit: 'abc', spawn, warn: line => warnings.push(line) });
+  assert.deepEqual(result.rows, []);
+  assert.equal(result.unverifiable.length, 2);
+  assert.match(result.line, /^miss; closure scope tree \(unknown reads\); 2 unverifiable notes ignored$/);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[1], /does not decode: unknown field `trusted`/);
+});
+
+test('recordEvidence reads the note first: an unverifiable or foreign note is named, then replaced', () => {
+  const warnings = [];
+  const warn = line => warnings.push(line);
+  const put = [isPut, { status: 0, stdout: 'bafyrecorded\n', stderr: '' }];
+  const unverifiable = fakeSpawn([[isGet, { status: 0, stdout: '', stderr: `no build ref found for step=gate:elohim-storage commit=abc\nunverifiable: ${UNVERIFIABLE_SHA} ${UNVERIFIABLE_REASON}\n` }], put]);
+  let r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: unverifiable.spawn, warn });
+  assert.equal(r.status, 0);
+  assert.deepEqual(unverifiable.calls.map(c => c.args[3]), ['get', 'put']);
+  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: unverifiable note on ${BUILD_REF} at ${UNVERIFIABLE_SHA}: ${UNVERIFIABLE_REASON}; replacing it\n`]);
+
+  warnings.length = 0;
+  const node = { agentId: 'ab'.repeat(32), inputsHash: 'closure-1', success: true, stepName: 'gate:elohim-storage', builtAt: '2026-10-24T12:00:00Z', manifestCid: [1, 85, 18, 32], outputCid: [1, 85, 18, 32], signature: '', hardwareProfile: '{}', buildDurationMs: 1 };
+  const foreign = fakeSpawn([[isGet, { status: 0, stdout: JSON.stringify(node, null, 2) + '\n', stderr: '' }], put]);
+  r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: foreign.spawn, warn });
+  assert.equal(r.status, 0);
+  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: ${BUILD_REF} at abc holds closure closure-1 (green, signer abababababab); replacing it with closure closure-2\n`]);
+
+  // Under `just gate` the caller's rev is HEAD: the warn names the sha git resolves it to.
+  warnings.length = 0;
+  const RESOLVED = '9'.repeat(40);
+  const isVerify = (bin, args) => isRevParse(bin, args) && args[1] === '--verify' && args[3] === 'HEAD^{commit}';
+  const head = fakeSpawn([[isGet, { status: 0, stdout: JSON.stringify(node, null, 2) + '\n', stderr: '' }], [isVerify, { status: 0, stdout: `${RESOLVED}\n`, stderr: '' }], put]);
+  r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'HEAD', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: head.spawn, warn });
+  assert.equal(r.status, 0);
+  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: ${BUILD_REF} at ${RESOLVED} holds closure closure-1 (green, signer abababababab); replacing it with closure closure-2\n`]);
+  assert.equal(head.calls.filter(c => isPut(c.bin, c.args))[0].args.at(-1), 'HEAD', 'the put still names the caller\'s rev; only the warn is resolved');
+  // A rev git cannot resolve is named as given rather than dropped.
+  warnings.length = 0;
+  const unresolved = fakeSpawn([[isGet, { status: 0, stdout: JSON.stringify(node, null, 2) + '\n', stderr: '' }], [isVerify, { status: 128, stdout: '', stderr: 'fatal: Needed a single revision\n' }], put]);
+  recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'HEAD', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: unresolved.spawn, warn });
+  assert.match(warnings[0], new RegExp(`${BUILD_REF} at HEAD holds closure closure-1`));
+
+  warnings.length = 0;
+  const unreadable = fakeSpawn([[isGet, { status: 1, stdout: '', stderr: `Error: git command failed: git notes --ref ${BUILD_REF} list: fatal: boom\n` }], put]);
+  r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: unreadable.spawn, warn });
+  assert.equal(r.status, 0, 'a failed read never blocks the write');
+  assert.match(warnings[0], /could not be read \(Error: git command failed: git notes --ref .* list: fatal: boom\); writing anyway/);
+
+  warnings.length = 0;
+  const same = fakeSpawn([[isGet, { status: 0, stdout: JSON.stringify({ ...node, inputsHash: 'closure-2' }) + '\n', stderr: '' }], put]);
+  r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: same.spawn, warn });
+  assert.equal(r.status, 0);
+  assert.deepEqual(warnings, [], 'the same closure and verdict is refreshed silently (a new builtAt is the run\'s own information)');
+});
+
+test('recordEvidence names REFUSED concurrent update and refusing-to-write as expected refusals, one line each', () => {
+  const concurrent = `Error: REFUSED concurrent update: ref=${BUILD_REF} expected=${'0'.repeat(40)} observed=${'1'.repeat(40)} attempts=3\n`;
+  let fake = fakeSpawn([[isGet, getMiss], [isPut, { status: 1, stdout: '', stderr: concurrent }]]);
+  let r = recordEvidence(project, 'k', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: fake.spawn, warn: () => {} });
+  assert.equal(r.status, 1, 'nothing was recorded, so no verdict is emitted from this put');
+  assert.equal(r.refused, 'concurrent update');
+  assert.equal(r.stderr, `expected refusal (concurrent update), not a failure: REFUSED concurrent update: ref=${BUILD_REF} expected=${'0'.repeat(40)} observed=${'1'.repeat(40)} attempts=3`);
+
+  fake = fakeSpawn([[isGet, getMiss], [isPut, { status: 1, stdout: '', stderr: `Error: refusing to write ${BUILD_REF}: signature does not verify: invalid signature hex\n` }]]);
+  r = recordEvidence(project, 'k', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: fake.spawn, warn: () => {} });
+  assert.equal(r.refused, 'would not verify');
+  assert.equal(r.stderr, `expected refusal (would not verify), not a failure: refusing to write ${BUILD_REF}: signature does not verify: invalid signature hex`);
+
+  fake = fakeSpawn([[isGet, getMiss], [isPut, { status: 101, stdout: '', stderr: 'boom\n' }]]);
+  r = recordEvidence(project, 'k', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: fake.spawn, warn: () => {} });
+  assert.equal(r.refused, undefined);
+  assert.equal(r.stderr, 'boom\n', 'any other failure passes through unchanged');
 });
 
 test('a completed brit record emits one device-gated crossing verdict and failures stay advisory', () => {
@@ -460,7 +568,7 @@ test('selfAgentId derives the RFC 8032 public key from the common-dir seed', t =
   writeFileSync(join(root, 'common/brit/agent-key'), Buffer.from(seed, 'hex'));
   for (const common of ['common', join(root, 'common')]) {
     const { spawn, calls } = fakeSpawn([[isRevParse, { status: 0, stdout: `${common}\n` }]]);
-    assert.equal(selfAgentId(root, spawn), publicKey);
+    assert.equal(selfAgentId(root, spawn, { env: { PATH: '' } }), publicKey);
     assert.deepEqual(calls[0].args, ['rev-parse', '--git-common-dir']);
     assert.equal(calls[0].opts.cwd, root);
   }
@@ -469,16 +577,79 @@ test('selfAgentId derives the RFC 8032 public key from the common-dir seed', t =
 test('selfAgentId returns null for missing or wrong-length keys and refused git reads', t => {
   const { root } = evidenceFixture(t);
   const { spawn } = fakeSpawn([[isRevParse, { status: 0, stdout: '.git\n' }]]);
-  assert.equal(selfAgentId(root, spawn), null);
+  const noBrit = { env: { PATH: '' } };
+  assert.equal(selfAgentId(root, spawn, noBrit), null);
   mkdirSync(join(root, '.git/brit'), { recursive: true });
   for (const length of [0, 31, 33, 64]) {
     writeFileSync(join(root, '.git/brit/agent-key'), Buffer.alloc(length));
-    assert.equal(selfAgentId(root, spawn), null);
+    assert.equal(selfAgentId(root, spawn, noBrit), null);
   }
-  assert.equal(selfAgentId(root, () => { throw new Error('unreadable'); }), null);
+  assert.equal(selfAgentId(root, () => { throw new Error('unreadable'); }, noBrit), null);
+});
+
+test('selfAgentId asks brit-build-ref signer --json first and reads the seed only when brit predates the verb', t => {
+  const { root, env } = evidenceFixture(t);
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  const other = 'ab'.repeat(32);
+  const cases = [
+    // brit knows the verb: its answer is the answer, even against a seed file that disagrees.
+    [{ status: 0, stdout: `{"agentId":"${other}"}\n`, stderr: '' }, other, 'signer', 'brit names the key'],
+    [{ status: 0, stdout: '{"agentId":null}\n', stderr: '' }, null, 'signer', 'brit says no key exists'],
+    [{ status: 1, stdout: '', stderr: 'Error: cannot load the repository signer key\n\nCaused by:\n    0: seed has 31 bytes\n' }, null, 'signer', 'brit cannot load the key'],
+    [{ status: 0, stdout: 'garbage\n', stderr: '' }, null, 'signer', 'brit printed something else'],
+    // the pinned brit (76ba95d8a0): clap usage error, exit 2 → the seed read, as before the pin move.
+    [OLD_BRIT_SIGNER, publicKey, 'agent-key', 'old brit falls back to the seed'],
+    [{ status: 2, stdout: '', stderr: "error: unexpected argument '--json'\n" }, null, 'signer', 'another usage error is not the fallback'],
+  ];
+  for (const [reply, expected, via, why] of cases) {
+    const { spawn, calls } = fakeSpawn([
+      [isSigner, reply],
+      [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ]);
+    assert.equal(selfAgentId(root, spawn, { env }), expected, why);
+    assert.deepEqual(calls[0].args, ['--repo', root, 'signer', '--json']);
+    assert.equal(calls[0].bin, env.BRIT_BUILD_REF_BIN);
+    assert.equal(calls[0].opts.env, env, 'the signer is asked under the caller\'s env, as the rest of the gate is');
+    // signerIdentity is the owner of the rule; selfAgentId is its agentId, and `via` names who answered.
+    const { spawn: again, calls: onlyOnce } = fakeSpawn([[isSigner, reply], [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }]]);
+    assert.deepEqual(signerIdentity(root, again, { env }), { agentId: expected, via }, why);
+    assert.equal(onlyOnce.filter(c => isSigner(c.bin, c.args)).length, 1, 'signer --json is asked exactly once per identity read');
+  }
+  // An explicit buildRefBin is the one asked, whatever env names.
+  const { spawn: explicit, calls: explicitCalls } = fakeSpawn([[isSigner, { status: 0, stdout: `{"agentId":"${other}"}\n`, stderr: '' }]]);
+  assert.equal(selfAgentId(root, explicit, { env, buildRefBin: '/elsewhere/brit-build-ref' }), other);
+  assert.equal(explicitCalls[0].bin, '/elsewhere/brit-build-ref');
+  // No brit-build-ref resolvable at all: the seed read stands (nothing else can answer).
+  const { spawn: bare } = fakeSpawn([[(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }]]);
+  assert.equal(selfAgentId(root, bare, { env: { PATH: '' } }), publicKey);
+  assert.deepEqual(signerIdentity(root, bare, { env: { PATH: '' } }), { agentId: publicKey, via: 'agent-key' });
+});
+
+test('selfAgentId runs the real signer streams through the pinned and the new brit doubles', t => {
+  const { root } = evidenceFixture(t);
+  // The seed fallback asks git for the common dir with the real spawn: this root must be a repository.
+  assert.equal(spawnSync('git', ['init', '-q', '.'], { cwd: root }).status, 0);
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  const stubDir = mkdtempSync(join(tmpdir(), 'brit-signer-stub-'));
+  t.after(() => rmSync(stubDir, { recursive: true, force: true }));
+  const bin = join(stubDir, 'brit-build-ref');
+  const install = body => { writeFileSync(bin, `#!/bin/sh\n${body}\n`); chmodSync(bin, 0o755); };
+  const env = { BRIT_BUILD_REF_BIN: bin, PATH: '' };
+  const otherKey = 'cd'.repeat(32);
+  install(`[ "$3 $4" = "signer --json" ] || exit 9\nprintf '{"agentId":"%s"}\\n' ${otherKey}`);
+  assert.equal(selfAgentId(root, undefined, { env }), otherKey);
+  install(`printf "error: unrecognized subcommand 'signer'\\n\\nUsage: brit-build-ref [OPTIONS] <COMMAND>\\n\\nFor more information, try '--help'.\\n" >&2\nexit 2`);
+  assert.equal(selfAgentId(root, undefined, { env }), publicKey);
+  install("echo '{\"agentId\":null}'");
+  assert.equal(selfAgentId(root, undefined, { env }), null);
 });
 
 const greenRow = { commit: 'aaaaaaaaa1', attestation: { success: true, agentId: publicKey, builtAt: '2026-10-24T12:00:00Z' } };
+// brit at 7e4a83115e: `signer --json` names the repository key; the pinned 76ba95d8a0 has no such subcommand.
+const signerReply = [isSigner, { status: 0, stdout: `{"agentId":"${publicKey}"}\n`, stderr: '' }];
+const OLD_BRIT_SIGNER = { status: 2, stdout: '', stderr: "error: unrecognized subcommand 'signer'\n\nUsage: brit-build-ref [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n" };
 const cleanEvidence = { rows: [greenRow], key: 'closure', dirty: false };
 const reuseContext = { selfId: publicKey, enabled: true, mode: 'reuse', selectorCheck: () => ({ ok: true }) };
 const unexpectedSelector = () => { throw new Error('selector must not be consulted'); };
@@ -766,6 +937,7 @@ test('runProject reuses without executing or attesting and observes run-kind=reu
     ...closureReplies,
     [isStatus, { status: 0, stdout: '' }],
     [isFind, { status: 0, stdout: JSON.stringify([greenRow]) }],
+    signerReply,
     [(bin, args) => bin === 'git' && args[0] === 'diff', { status: 0, stdout: '' }],
     [(bin) => bin === 'epr', { status: 0, stdout: '' }],
   ]);
@@ -797,6 +969,7 @@ test('runProject reuses a sibling green, labels it sibling, and records sibling 
     ...closureReplies,
     [isStatus, { status: 0, stdout: '' }],
     [isFind, { status: 0, stdout: '[]' }],
+    signerReply,
     [isPeerVerdicts, (_bin, args) => ({ status: 0, stdout: JSON.stringify([{
       ...siblingGreen,
       closure: args[args.indexOf('--closure') + 1],
@@ -828,6 +1001,8 @@ test('a governance-class change refuses a sibling verdict and runs the gate', as
     ...closureReplies,
     [isStatus, { status: 0, stdout: '' }],
     [isFind, { status: 0, stdout: '[]' }],
+    signerReply,
+    [isGet, getMiss],
     [isPeerVerdicts, (_bin, args) => ({ status: 0, stdout: JSON.stringify([{
       ...siblingGreen, closure: args[args.indexOf('--closure') + 1],
     }]) })],
@@ -858,6 +1033,8 @@ test('epr peer verdicts failure is a miss and the gate runs', async t => {
     ...closureReplies,
     [isStatus, { status: 0, stdout: '' }],
     [isFind, { status: 0, stdout: '[]' }],
+    signerReply,
+    [isGet, getMiss],
     [isPeerVerdicts, { status: 2, stdout: '', stderr: 'not a device' }],
     [(bin) => bin === 'bash', { status: 0, stdout: '', stderr: '' }],
     [isPut, { status: 0, stdout: 'bafyrecorded\n', stderr: '' }],
@@ -912,6 +1089,7 @@ for (const [name, summary, status, tap] of [
       ...closureReplies,
       [isStatus, { status: 0, stdout: '' }],
       [isFind, { status: 0, stdout: '[]' }],
+      [isGet, getMiss],
       [isPut, { status: 0, stdout: 'recorded' }],
       [(bin, args) => bin === process.execPath && args[0].endsWith('/gate-tap.mjs'),
         { status, output: [null, null, null, fd3 ? Buffer.from(`${JSON.stringify(fd3)}\n`) : null] }],
@@ -964,10 +1142,10 @@ test('a native evaluator older than the verb names itself, not the closure', fun
 test('attestation output carries the measured cost vector unchanged', () => {
   const cost = { cpu_s: 42.5, throttled_s: 0, rss_peak_bytes: 123456,
     memory_high_events: null, io_full_pct_max: 2.5 };
-  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'cid', stderr: '' }]]);
+  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'cid', stderr: '' }], [isGet, getMiss]]);
   const put = recordEvidence(project, 'key', { success: true, seconds: 60, cost,
-    commit: 'commit', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn });
+    commit: 'commit', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn, warn: () => {} });
   assert.equal(put.status, 0);
-  const args = calls[0].args;
+  const args = calls.find(c => isPut(c.bin, c.args)).args;
   assert.deepEqual(JSON.parse(args[args.indexOf('--output-json') + 1]).cost, cost);
 });

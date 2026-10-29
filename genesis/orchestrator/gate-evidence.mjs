@@ -13,6 +13,13 @@
 // after a local miss, an admitted sibling device's crossing verdict may stand in under D5's
 // red, dirt, selector and governance fences. Evidence reads are fail-open; a missing brit,
 // fingerprint, device read, or required git object runs the gate as it always has.
+//
+// Every read here is brit's VERIFIED read (`build find`, `build get`, `signer`): stdout holds
+// only what brit verified; a stored note that fails verification is `unverifiable: <commit>
+// <reason>` on stderr at exit 0. Such a note is absent to this reader and is named once on the
+// warn stream with its ref and reason, never counted as a hit and never dropped silently. The
+// writer reads the commit's note before `build put`, and brit's two refusals (`REFUSED
+// concurrent update`, `refusing to write`) are expected outcomes, never a gate failure.
 
 import { nativeGateKey, nativeGateState, usesNativeClosure } from './gate-source-state.mjs';
 import { spawnSync } from 'child_process';
@@ -20,11 +27,20 @@ import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { delimiter, isAbsolute, join, relative, resolve } from 'path';
 import { globCovers, readSet } from './gate-input-audit.mjs';
+import { buildNotesRef, expectedRefusal, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
 export function attestationStep(project) {
   return `gate:${project.name}`;
 }
+
+/** The notes ref a gate project's attestations live under (brit's segment encoding). */
+export function attestationRef(project) {
+  return buildNotesRef(attestationStep(project));
+}
+
+const BUILD_REF_ENV = ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'];
+const stderrWarn = line => process.stderr.write(line);
 
 function isExecutable(path) {
   try {
@@ -100,6 +116,12 @@ function gitRead(root, args, spawn) {
   } catch {
     return null;
   }
+}
+
+/** The full sha `rev` names (`HEAD`, a short sha, a ref), or `rev` itself when git cannot say. */
+function resolvedCommit(root, rev, spawn) {
+  const sha = gitRead(root, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`], spawn)?.trim();
+  return sha && /^[0-9a-f]{40,64}$/.test(sha) ? sha : rev;
 }
 
 function recipeAt(project, root, commit, spawn) {
@@ -181,8 +203,53 @@ function rustcHash(project, root, env, cargoEnv, spawn) {
   }
 }
 
-/** brit-build-ref's signing seed is shared by every worktree of this repository. */
-export function selfAgentId(root, spawn = spawnSync) {
+// The pinned brit (76ba95d8a0) has no `signer` verb: clap answers with this usage error, exit 2.
+const SIGNER_UNKNOWN = /^error: unrecognized subcommand 'signer'/;
+
+/**
+ * The signer-preference rule, owned HERE for every orchestrator reader (delivery-series.mjs
+ * delegates; genesis/a2o/scripts/lib/household-attestation.ts `resolveWorkspaceIdentity` is the
+ * a2o-side port of the same rule, kept separate only because that module runs under tsx and
+ * node type-stripping with node builtins alone — its test pins the same streams).
+ *
+ * `brit-build-ref signer --json` is the authority (it loads the key exactly as `build put` would
+ * and never mints one): its `{"agentId": …}` is the answer, null included, and a brit that
+ * cannot load the key (exit 1) or prints no JSON answers null — never second-guessed by reading
+ * the file. The seed read under `<git-common-dir>/brit/agent-key` stands in only when no
+ * brit-build-ref resolves or the resolved one predates the verb (the pin before 7e4a83115e,
+ * clap usage error exit 2), so the answer is the same on either side of the pin move.
+ *
+ * @returns {{agentId: string|null, via: 'signer'|'agent-key'}} `via` names who answered.
+ */
+export function signerIdentity(root, spawn = spawnSync, { env = process.env, buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env) } = {}) {
+  if (buildRefBin) {
+    let r = null;
+    try {
+      r = spawn(buildRefBin, ['--repo', root, 'signer', '--json'], { cwd: root, encoding: 'utf8', timeout: 15_000, env });
+    } catch {
+      r = null;
+    }
+    if (r && r.status === 0) {
+      try {
+        const id = JSON.parse(r.stdout).agentId;
+        return { agentId: typeof id === 'string' && /^[0-9a-f]{64}$/.test(id) ? id : null, via: 'signer' };
+      } catch {
+        return { agentId: null, via: 'signer' };
+      }
+    }
+    const predatesVerb = r?.status === 2 && SIGNER_UNKNOWN.test(String(r.stderr || '').trim());
+    if (r && !predatesVerb) return { agentId: null, via: 'signer' };
+  }
+  return { agentId: seedAgentId(root, spawn), via: 'agent-key' };
+}
+
+/** The hex ed25519 public key brit-build-ref signs this repository's attestations with (see `signerIdentity`). */
+export function selfAgentId(root, spawn = spawnSync, options = {}) {
+  return signerIdentity(root, spawn, options).agentId;
+}
+
+/** The public key derived from the seed at `<git-common-dir>/brit/agent-key`, or null. Pre-`signer` brit only. */
+function seedAgentId(root, spawn) {
   try {
     const common = gitRead(root, ['rev-parse', '--git-common-dir'], spawn)?.trim();
     if (!common) return null;
@@ -253,8 +320,13 @@ export function dirtyPaths(project, { root, spawn = spawnSync, commit = 'HEAD', 
   return out.split('\n').map(line => line.slice(3).trim()).filter(Boolean);
 }
 
-/** `brit-build-ref build find` rows for this project's closure, or `{ error }`. */
-export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSync }) {
+/**
+ * `brit-build-ref build find` for this project's closure: `{ rows, unverifiable }` or `{ error }`.
+ * `rows` are the attestations brit verified (stdout). Each note brit could not verify under this
+ * step's ref — whatever closure it claims — is listed in `unverifiable` and named once on `warn`
+ * with the ref, commit and brit's reason; it is never a row. A non-zero exit is a failed read.
+ */
+export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSync, warn = stderrWarn }) {
   // `--repo` is a top-level option of brit-build-ref: it precedes the subcommand.
   const r = spawn(
     buildRefBin,
@@ -262,12 +334,18 @@ export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSyn
     { cwd: root, encoding: 'utf8', timeout: 60_000 }
   );
   if (r.status !== 0) return { error: `build find failed: ${(r.stderr || '').trim().split('\n').pop() || `exit ${r.status}`}` };
+  let rows;
   try {
-    const rows = JSON.parse(r.stdout);
-    return Array.isArray(rows) ? { rows } : { error: 'build find: not an array' };
+    rows = JSON.parse(r.stdout);
   } catch {
     return { error: 'build find: not JSON' };
   }
+  if (!Array.isArray(rows)) return { error: 'build find: not an array' };
+  const unverifiable = unverifiableNotes(r.stderr);
+  for (const note of unverifiable) {
+    warn(`[gate] ${project.name} evidence: unverifiable note ignored on ${attestationRef(project)} at ${note.commit}: ${note.reason}\n`);
+  }
+  return { rows, unverifiable };
 }
 
 export function ageOf(iso, now = Date.now()) {
@@ -394,10 +472,10 @@ export function describeEvidence(rows, now = Date.now()) {
  * Resolve the closure and look for evidence. Returns `{ key, rows, line }` on a resolved
  * closure (rows may be empty) or `{ line }` alone when the closure is unavailable.
  */
-export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now() } = {}) {
+export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn } = {}) {
   if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
   const britBin = resolveBin('brit', ['BRIT_BIN'], env);
-  const buildRefBin = resolveBin('brit-build-ref', ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'], env);
+  const buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env);
   if (!britBin || !buildRefBin) {
     return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
   }
@@ -439,10 +517,12 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     reads,
   });
   const key = createHash('sha256').update(material).digest('hex');
-  const found = findEvidence(project, key, { buildRefBin, root, spawn });
+  const found = findEvidence(project, key, { buildRefBin, root, spawn, warn });
   if (found.error) return { key, material, line: `unavailable (${found.error}); closure scope ${scope}` };
   const dirty = dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
   let line = `${describeEvidence(found.rows, now)}; closure scope ${scope}`;
+  const ignored = found.unverifiable.length;
+  if (ignored > 0) line += `; ${ignored} unverifiable note${ignored === 1 ? '' : 's'} ignored`;
   if (dirty === null) line += '; working tree state unknown, nothing will be recorded';
   else if (dirty.length > 0) line += `; working tree dirty under ${project.dir} (${dirty.length} path${dirty.length === 1 ? '' : 's'}): the evidence names the commit, not these bytes, and nothing will be recorded`;
   const checkoutMismatch = env.GATE_EVIDENCE_RECORD === '0';
@@ -452,6 +532,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     key,
     material,
     rows: found.rows,
+    unverifiable: found.unverifiable,
     line,
     buildRefBin,
     nativeKey,
@@ -462,9 +543,14 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
 /**
  * Record this run's verdict against the closure: `build put` with the manifest file's own
  * CID, a stored verdict node as the output, and `--success` as observed (red is stored too —
- * a known-red closure is information). Returns the spawn result; never throws.
+ * a known-red closure is information). The commit's note is read first (brit's verified
+ * `build get`): an unverifiable note, a note for another closure, or a failed read is named on
+ * `warn` before the write replaces it; the same closure and verdict is refreshed silently.
+ * brit's expected refusals come back as `status` 1 with `refused` naming the class and a
+ * one-line `stderr` that says so; any other failure passes through. Returns the spawn result
+ * shape; never throws.
  */
-export function recordEvidence(project, key, { success, seconds, cost, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync }) {
+export function recordEvidence(project, key, { success, seconds, cost, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync, warn = stderrWarn }) {
   if (dirty !== false) {
     return { status: 1, stdout: '', stderr: dirty === null ? 'working tree state unknown' : `working tree dirty under ${project.dir}` };
   }
@@ -473,6 +559,19 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
     if (!nativeKey || !after || JSON.stringify(nativeKey) !== JSON.stringify(after)) {
       return { status: 1, stdout: '', stderr: 'source closure dirty, changed, or unavailable after gate' };
     }
+  }
+  const ref = attestationRef(project);
+  const existing = readBuildNote(attestationStep(project), commit, { buildRefBin, root, spawn });
+  // The warn names the commit brit read, not the caller's rev (`HEAD` under `just gate`): the
+  // unverifiable line carries brit's resolved sha; the other two resolve it here.
+  const sha = existing.state === 'unverifiable' ? existing.commit : resolvedCommit(root, commit, spawn);
+  if (existing.state === 'unverifiable') {
+    warn(`[gate] ${project.name} evidence: unverifiable note on ${ref} at ${sha}: ${existing.reason}; replacing it\n`);
+  } else if (existing.state === 'unreadable') {
+    warn(`[gate] ${project.name} evidence: ${ref} at ${sha} could not be read (${existing.reason}); writing anyway\n`);
+  } else if (existing.state === 'verified' && (existing.node.inputsHash !== key || existing.node.success !== success)) {
+    const held = `${existing.node.success === true ? 'green' : 'red'}, signer ${String(existing.node.agentId || 'unsigned').slice(0, 12)}`;
+    warn(`[gate] ${project.name} evidence: ${ref} at ${sha} holds closure ${String(existing.node.inputsHash).slice(0, 12)} (${held}); replacing it with closure ${key.slice(0, 12)}\n`);
   }
   const verdict = { exit: success ? 0 : 1, seconds: Math.round(seconds), ...(jobs ? { jobs } : {}), ...(cost ? { cost } : {}) };
   const args = [
@@ -486,11 +585,17 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
     '--duration-ms', String(Math.round(seconds * 1000)),
     '--commit', commit,
   ];
+  let r;
   try {
-    return spawn(buildRefBin, args, { cwd: root, encoding: 'utf8', timeout: 60_000 });
+    r = spawn(buildRefBin, args, { cwd: root, encoding: 'utf8', timeout: 60_000 });
   } catch (error) {
     return { status: 1, stdout: '', stderr: String(error) };
   }
+  if (r.status === 0) return r;
+  const refusal = expectedRefusal(r.stderr);
+  return refusal
+    ? { ...r, status: 1, refused: refusal.kind, stderr: `expected refusal (${refusal.kind}), not a failure: ${refusal.line}` }
+    : r;
 }
 
 function buildPutIdentity(stdout) {

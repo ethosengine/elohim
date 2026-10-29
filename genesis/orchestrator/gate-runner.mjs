@@ -410,7 +410,7 @@ export function runProject(project, printOnly, namesOnly, {
   const gateCommit = (env.GATE_COMMIT || '').trim() || 'HEAD';
   let evidence = { line: 'unavailable (evidence lookup threw)' };
   try {
-    evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn });
+    evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn, warn });
   } catch (error) {
     evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
   }
@@ -419,8 +419,10 @@ export function runProject(project, printOnly, namesOnly, {
   // A Task (gate-task.mjs) carries the same reuse rules into ark's derivation look-up, which
   // reads brit itself; the gate then runs through ark only on a miss.
   let task = null;
+  // The signer is asked of the binary gateEvidence resolved from childEnv, never one from process.env.
+  const signerOptions = { env: childEnv, buildRefBin: evidence.buildRefBin };
   if (taskEnabled(project, env)) {
-    const selfId = selfAgentId(root, spawn);
+    const selfId = selfAgentId(root, spawn, signerOptions);
     task = prepareTask(project, {
       root, env, childEnv, args, evidence, spawn, device: selfId,
       reuse: {
@@ -441,7 +443,7 @@ export function runProject(project, printOnly, namesOnly, {
   const reuseContext = {
     mode: env.GATE_EVIDENCE,
     enabled: Array.isArray(enabled) && enabled.includes(project.name),
-    selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn) : null,
+    selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn, signerOptions) : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
   };
   let decision = task ? { reuse: false, why: 'decided by the Task' }
@@ -528,6 +530,7 @@ export function runProject(project, printOnly, namesOnly, {
       env,
       cargoEnv: cargoEnvOf(childEnv),
       spawn,
+      warn,
     });
     const note = put.status === 0
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
