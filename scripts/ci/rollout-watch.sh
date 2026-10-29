@@ -267,7 +267,11 @@ while :; do
       exit $?
     fi
     kill "${rollout_pid}" 2>/dev/null
-    wait "${rollout_pid}" 2>/dev/null
+    # It may have finished between the check above and the kill: a clean
+    # exit the kill never reached is still a finished rollout.
+    if wait "${rollout_pid}" 2>/dev/null; then
+      exit 0
+    fi
     artifact_dir="${OUTPUT_ROOT}/${NAMESPACE}--statefulset--${NAME}"
     mkdir -p "${artifact_dir}"
     printf '%s\n' "${verdict}" > "${artifact_dir}/fast-fail.reason"
