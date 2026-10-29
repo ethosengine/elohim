@@ -58,6 +58,16 @@ export async function pinBuild(dist, destination) {
   return { id, assets };
 }
 const secret = () => randomBytes(32).toString("base64url");
+/** The interface the viewer binds. A loopback origin (the default `http://localhost:<port>`)
+ * binds loopback only, so no other machine on the network can reach the viewer. Only a
+ * non-loopback origin (a workspace gateway such as Che, which reaches the container
+ * through its pod address) binds every IPv4 interface. */
+export function viewerListenHost(origin) {
+  const host = new URL(origin).hostname;
+  if (host === "localhost" || host === "[::1]" || host.startsWith("127."))
+    return host === "[::1]" ? "::1" : "127.0.0.1";
+  return "0.0.0.0";
+}
 const equal = (a, b) =>
   typeof a === "string" &&
   a.length === b.length &&
@@ -330,7 +340,7 @@ async function main() {
     `${origin}/avodah/views/${viewId}#capability=${capability}\n`,
     { mode: 0o600 },
   );
-  server.listen(port, "0.0.0.0", () =>
+  server.listen(port, viewerListenHost(origin), () =>
     console.log(
       `Pinned build ${manifest.id}\nPrivate launch link: ${linkPath}\nReader: loopback ${readerPort}; viewer: ${origin}`,
     ),

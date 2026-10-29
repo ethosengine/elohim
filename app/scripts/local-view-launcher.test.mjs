@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { request as httpRequest } from "node:http";
-import { accessServer } from "./local-view-launcher.mjs";
+import { accessServer, viewerListenHost } from "./local-view-launcher.mjs";
 
 test("launch capability is single-use, origin-bound, expiring and view-scoped", async () => {
   const server = accessServer({
@@ -166,4 +166,15 @@ test("workspace redirect serves the shell but never relaxes API or host checks",
     await new Promise((resolve) => server.close(resolve));
     await rm(build, { recursive: true, force: true });
   }
+});
+
+test("a loopback origin binds the viewer to loopback; only a workspace origin binds every interface", () => {
+  assert.equal(viewerListenHost("http://localhost:4200"), "127.0.0.1");
+  assert.equal(viewerListenHost("http://127.0.0.1:4200"), "127.0.0.1");
+  assert.equal(viewerListenHost("http://[::1]:4200"), "::1");
+  assert.equal(
+    viewerListenHost("https://workspace-angular-dev.code.ethosengine.com"),
+    "0.0.0.0",
+  );
+  assert.equal(viewerListenHost("http://localhost.evil.invalid:4200"), "0.0.0.0");
 });
