@@ -43,7 +43,7 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const JENKINS = 'https://jenkins.ethosengine.com';
+const JENKINS = process.env.JENKINS || 'https://jenkins.ethosengine.com';
 const JOB = '/job/elohim-orchestrator/job/dev';
 const DELIVERED = new Set(['SUCCESS', 'UNSTABLE']);
 // A fire-and-forget (longRunning, standalone) pipeline reports DISPATCHED: the
@@ -115,7 +115,7 @@ const BUILD_NOTES = 'refs/notes/brit/build/';
  * Every build attestation note in `repo` → [{step, commit, success, durationMs, builtAt}].
  * An unreadable repository or a malformed note reads as absent, never as a build.
  */
-export function readBuildAttestations(repo) {
+export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
   const git = (args, input) =>
     execFileSync('git', args, { cwd: repo, input, stdio: ['pipe', 'pipe', 'ignore'], maxBuffer: 256 * 2 ** 20 }).toString();
   let refs;
@@ -151,12 +151,15 @@ export function readBuildAttestations(repo) {
       // brit serializes BuildAttestationContentNode camelCase (stepName, buildDurationMs, builtAt).
       const node = JSON.parse(body);
       if (typeof node.stepName !== 'string' || typeof node.success !== 'boolean') continue;
+      if (!node.stepName.startsWith(prefix) || node.stepName.slice(prefix.length).includes(':')) continue;
       attestations.push({
-        step: node.stepName,
+        step: node.stepName.slice(prefix.length),
         commit: n.commit,
         success: node.success,
         durationMs: Number(node.buildDurationMs) || 0,
         builtAt: node.builtAt,
+        inputsHashKind: node.hardwareProfile?.inputsHashKind ?? 'tree',
+        orchestratorBuild: node.hardwareProfile?.orchestratorBuild,
       });
     } catch {
       // Not an attestation body; skip it.
@@ -167,7 +170,7 @@ export function readBuildAttestations(repo) {
 
 /**
  * Build attestations → the classifyRun shape, one run per commit, newest first. `number` is
- * the short commit (a note knows no orchestrator build number); `minutes` is the wall clock
+ * the orchestrator build when recorded, otherwise the short commit; `minutes` is the wall clock
  * from the first build's start (built_at − duration) to the last build's end.
  */
 export function attestationRuns(attestations) {
@@ -186,7 +189,7 @@ export function attestationRuns(attestations) {
     const first = Math.min(...builds.map(b => b.start));
     const last = Math.max(...builds.map(b => b.end));
     return {
-      number: commit.slice(0, 12),
+      number: builds.find(b => typeof b.orchestratorBuild === 'number')?.orchestratorBuild ?? commit.slice(0, 12),
       commit,
       result: delivered ? 'SUCCESS' : 'FAILURE',
       minutes: Math.round((last - first) / 6000) / 10,
@@ -472,8 +475,8 @@ function strArg(argv, flag, fallback) {
 }
 
 async function main(argv) {
-  const from = strArg(argv, '--from', 'jenkins');
-  if (from !== 'jenkins' && from !== 'attestations') {
+  let from = strArg(argv, '--from', null);
+  if (from !== null && from !== 'jenkins' && from !== 'attestations') {
     console.error(`delivery-series: --from ${from} — expected jenkins or attestations. NOT MEASURED.`);
     return 2;
   }
@@ -488,10 +491,15 @@ async function main(argv) {
   const minRate = arg(argv, '--min-rate', 0.8);
   const maxP90Min = arg(argv, '--max-p90-min', 240);
   let runs;
+  if (from === null) {
+    runs = attestationRuns(readBuildAttestations(strArg(argv, '--repo', process.cwd())));
+    from = runs.length >= window ? 'attestations' : 'jenkins';
+    if (from === 'jenkins') console.error(`delivery-series: ${runs.length} of ${window} waves attested on this device; reading Jenkins.`);
+  }
   let source = 'jenkins';
   if (from === 'attestations') {
     const repo = strArg(argv, '--repo', process.cwd());
-    runs = attestationRuns(readBuildAttestations(repo));
+    runs ??= attestationRuns(readBuildAttestations(repo));
     if (runs.length > 0) source = 'attestations';
     else console.error(`delivery-series: no brit build attestations under ${BUILD_NOTES} in ${repo}; reading Jenkins.`);
   }

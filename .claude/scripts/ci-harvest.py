@@ -24,8 +24,7 @@ Modes:
                  one-line notice and decides for itself. Pass this only from a
                  topical surface — pipeline/CI work, a /shift kickoff, or a
                  stasis sweep — where draining the ledger IS the session's job.
-  --wait JOB     bounded poll until JOB's running build completes, then
-                 harvest that job (post-push loop-closer; run in background)
+  --attest N     attest and observe one orchestrator wave, including outside the listing window
   --jobs a,b     restrict harvest to listed jobs
 
 Fail-safe: in --hook mode every error exits 0 silently — a Jenkins outage
@@ -39,6 +38,9 @@ import json
 import os
 import re
 import sys
+import shutil
+import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -145,6 +147,11 @@ _SKIPPED_AFTER_FAILURE_MS = 1000
 _BUDGET_CONCERN_FALLBACK = "push-delivers-within-budget"
 DELIVERY_SERIES = os.path.join(PROJECT, "genesis", "orchestrator", "delivery-series.mjs")
 DELIVERY_JOB = "elohim"
+ATTEST_JOB = "elohim-orchestrator"
+OBSERVE_PIPELINE = "elohim-edge"
+BRIT_ATTEST = os.path.join(PROJECT, "genesis", "orchestrator", "scripts", "brit-attest.mjs")
+OFFER_PATH = "bridges/.epr-meta/offers/jenkins-edge-pipeline.offer.md"
+ATTESTED = {"SUCCESS", "UNSTABLE", "FAILURE", "ABORTED"}
 
 # ── Quiesce leg ──────────────────────────────────────────────────────────────
 # The fleet-quiesce gate prints, once per poll, everything needed to understand
@@ -642,6 +649,7 @@ def harvest_job(job, cursor, taxonomy):
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
         return out  # job missing / offline — silent
     completed = [b for b in data.get("builds", []) if b.get("result")]
+    out["completed"] = [(b["number"], b["result"]) for b in completed]
     if not completed:
         return out
     completed.sort(key=lambda b: b["number"])  # oldest → newest
@@ -816,17 +824,176 @@ def reconcile(results, cursor):
         kept.append(e)
     entries = kept
     write_jsonl(LEDGER_PATH, entries)
-    os.makedirs(os.path.dirname(CURSOR_PATH), exist_ok=True)
-    tmp = CURSOR_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(cursor, fh, indent=1)
-    os.replace(tmp, CURSOR_PATH)
+    write_cursor(cursor)
     fcntl.flock(lock, fcntl.LOCK_UN)
     lock.close()
     return new_entries, bumped, confirmed, reopened
 
 
-def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=False):
+def brit_build_ref_bin():
+    return os.environ.get("BRIT_BUILD_REF_BIN") or shutil.which("brit-build-ref")
+
+
+def jenkins_bridge_bin():
+    selected = os.environ.get("JENKINS_BRIDGE_BIN") or shutil.which("jenkins-bridge")
+    if selected:
+        return selected
+    candidate = os.path.join(os.environ.get("CARGO_POOL_ROOT", "/projects/.cargo-target-pool"),
+                             "family", "dev", "jenkins-bridge", "dev", "debug", "jenkins-bridge")
+    try:
+        if not os.path.isfile(candidate):
+            return None
+        latest = subprocess.run(["git", "log", "-1", "--format=%ct", "--", "bridges/jenkins/src"],
+                                cwd=PROJECT, capture_output=True, text=True, timeout=5, check=True)
+        if os.path.getmtime(candidate) > int(latest.stdout.strip()):
+            return candidate
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def attest_waves(orch_result, cursor, force=False):
+    """Device-local verdicts and governed observations; either leg can catch up independently."""
+    out = {"attested": [], "observed": [], "deferred": []}
+    # A stuck local binary must leave time for the hook to render and persist the memo.
+    deadline = time.monotonic() + 60
+
+    def run(args, limit=60, **kwargs):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("harvest attestation budget exhausted; retry next harvest")
+        return subprocess.run(args, cwd=PROJECT, capture_output=True, text=True,
+                              timeout=min(limit, remaining), **kwargs)
+
+    def fetch_graph(n):
+        try:
+            graph = get_json(f"/job/{ATTEST_JOB}/job/{BRANCH}/{n}/artifact/actual-build-graph.json")
+            return graph if isinstance(graph, dict) else None
+        except (OSError, ValueError):
+            return None
+
+    try:
+        attested = cursor.setdefault("attested", {})
+        observed = cursor.setdefault("observed", {})
+        completed = sorted({n for n, _ in (orch_result or {}).get("completed", [])})
+        if not completed:
+            return out
+        brit = brit_build_ref_bin()
+        if brit is None:
+            out["deferred"].append("brit-build-ref absent")
+            return out
+
+        # Standing is read once, before any wfapi request. Neither mint nor approval is ours.
+        bridge = jenkins_bridge_bin()
+        bridge_root = os.environ.get("JENKINS_BRIDGE_ROOT", PROJECT)
+        active = False
+        if bridge is None:
+            out["deferred"].append("observe deferred: jenkins-bridge not on PATH — no fresh dev-pool binary; just gate jenkins-bridge")
+        else:
+            try:
+                status = run([bridge, "offer", "status", "--root", bridge_root, "--json"], limit=5)
+                if status.returncode:
+                    out["deferred"].append(status.stderr.strip() or "observe deferred: offer status unreadable")
+                else:
+                    offer = json.loads(status.stdout)
+                    if offer.get("minted") != "yes":
+                        out["deferred"].append(f'observe deferred: offer {offer.get("offer")} unminted — '
+                                               f'jenkins-bridge offer mint --root {bridge_root}, then a distinct Steward\'s approving verdict '
+                                               '(offer not minted/Proposed)')
+                    elif offer.get("state") != "active":
+                        missing = offer.get("missing") or status.stderr.strip()
+                        out["deferred"].append(f'observe deferred: offer {offer.get("offer")} {offer.get("state")} — {missing}')
+                    else:
+                        active = True
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                out["deferred"].append(f"observe deferred: {exc}")
+
+        # Attestation has priority. Already attested waves still owe an observation after
+        # an offer becomes Active (or a transient observe refusal); the memos are separate.
+        pending = [n for n in completed if force or str(n) not in attested]
+        candidates = pending[:MAX_BUILDS_PER_JOB]
+        if len(pending) > len(candidates):
+            out["deferred"].append(f"{len(pending) - len(candidates)} wave(s) waiting for next harvest")
+        if active:
+            # Inspect all already-attested observation debt in the bounded listing. Missing
+            # or queued edge records must not permanently occupy the ten observation slots.
+            candidates += [n for n in completed if n not in candidates and str(n) in attested
+                           and (force or str(n) not in observed)]
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            graphs = dict(zip(candidates, ex.map(fetch_graph, candidates)))
+        eligible = {}
+        for n, graph in graphs.items():
+            if graph is None:
+                out["deferred"].append(f"#{n}: graph unreadable")
+                continue
+            edge = graph.get("results", {}).get(OBSERVE_PIPELINE, {})
+            if (active and (force or str(n) not in observed) and edge.get("buildNumber") is not None
+                    and edge.get("result") in ATTESTED):
+                eligible[n] = edge["buildNumber"]
+        if len(eligible) > MAX_BUILDS_PER_JOB:
+            out["deferred"].append(f"{len(eligible) - MAX_BUILDS_PER_JOB} observation(s) waiting for next harvest")
+            eligible = dict(list(eligible.items())[:MAX_BUILDS_PER_JOB])
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            describes = dict(zip(eligible, ex.map(lambda n: _get_describe(OBSERVE_PIPELINE, eligible[n]), eligible)))
+
+        for n, graph in graphs.items():
+            if graph is None:
+                continue
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    graph_path = os.path.join(tmp, "actual-build-graph.json")
+                    with open(graph_path, "w", encoding="utf-8") as fh:
+                        json.dump(graph, fh)
+                    if force or str(n) not in attested:
+                        result = run(["node", BRIT_ATTEST, "--json", graph_path],
+                                     env={**os.environ, "BRIT_BUILD_REF_BIN": brit, "REPO_ROOT": PROJECT})
+                        report = json.loads(result.stdout)
+                        if result.returncode or report.get("deferred"):
+                            out["deferred"].extend(d["why"] for d in report.get("deferred", []))
+                            if result.returncode:
+                                out["deferred"].append(f"#{n}: attestation failed: {result.stderr.strip()}")
+                        elif not report.get("commit"):
+                            out["deferred"].append(f"#{n}: attestation report has no commit")
+                        else:
+                            attested[str(n)] = report["commit"][:12]
+                            out["attested"].append(n)
+                    if n not in eligible:
+                        continue
+                    describe = describes[n]
+                    if describe is None:
+                        out["deferred"].append(f"#{n}: edge #{eligible[n]} stages unreadable")
+                        continue
+                    wfapi_path = os.path.join(tmp, "wfapi.json")
+                    with open(wfapi_path, "w", encoding="utf-8") as fh:
+                        json.dump(describe, fh)
+                    result = run([bridge, "observe", "--stages", wfapi_path, "--graph", graph_path,
+                                  "--root", bridge_root, "--offer", OFFER_PATH, "--json"])
+                    if result.returncode == 0:
+                        outcome = json.loads(result.stdout)
+                        memo = {"edge": outcome["build"], "process": outcome["process"],
+                                "appended": outcome["appended"], "present": outcome["present"]}
+                        observed[str(n)] = memo
+                        out["observed"].append(memo)
+                    else:
+                        out["deferred"].append(result.stderr.strip() or f"#{n}: observe deferred (exit {result.returncode})")
+                    # S1b hook point: resolve dev-landing@1 intent for graph["commitSha"],
+                    # then append this device's Affirm/Dismiss. No intent resolver exists yet.
+            except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                out["deferred"].append(f"#{n}: {exc}")
+    except Exception as exc:  # never break SessionStart, including malformed external records
+        out["deferred"].append(f"attest deferred: {exc}")
+    return out
+
+
+def write_cursor(cursor):
+    os.makedirs(os.path.dirname(CURSOR_PATH), exist_ok=True)
+    tmp = CURSOR_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(cursor, fh, indent=1)
+    os.replace(tmp, CURSOR_PATH)
+
+
+def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=False, waves=None):
     urgent = [r for r in results if r["urgent"]]
     parts, sys_parts = [], []
     if urgent:
@@ -897,6 +1064,14 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=
                 f"judgment before decompose: {paths} — graduate the lesson to the "
                 f"anti-patterns museum if worthy, then delete the entry."
             )
+    context = " ".join(parts) if parts else "; ".join(sys_parts)
+    if waves:
+        attested = waves["attested"]
+        if attested:
+            sys_parts.append(f"attested {len(attested)} wave(s) (#{attested[0]}…#{attested[-1]})")
+        for observed in waves["observed"]:
+            sys_parts.append(f'observed edge #{observed["edge"]} (+{observed["appended"]}/={observed["present"]}) {observed["process"]}')
+        sys_parts.extend(waves["deferred"])
     if not parts and not sys_parts:
         return None
     if as_hook:
@@ -905,7 +1080,7 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=
                 "systemMessage": "ci-harvest: " + "; ".join(sys_parts),
                 "hookSpecificOutput": {
                     "hookEventName": "SessionStart",
-                    "additionalContext": " ".join(parts) if parts else "; ".join(sys_parts),
+                    "additionalContext": context,
                 },
             }
         )
@@ -922,11 +1097,14 @@ def run_harvest(jobs, as_hook, dispatch=False):
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = list(ex.map(lambda j: harvest_job(j, cursor, taxonomy), jobs))
     new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
+    orch = next((r for r in results if r["job"] == ATTEST_JOB), None)
+    waves = attest_waves(orch, cursor) if orch else None
+    write_cursor(cursor)
     # Price it (Lane D1): a fresh App build moves the delivery series, so fold its two readings
     # where `epr flow report` reads bounds. Only then — the node series costs Jenkins reads.
     if any(r["job"] == DELIVERY_JOB and r["builds_seen"] for r in results):
         record_delivery_measures()
-    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch)
+    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch, waves)
     if rendered:
         print(rendered)
     elif not as_hook:
@@ -934,28 +1112,10 @@ def run_harvest(jobs, as_hook, dispatch=False):
         print(f"ci-harvest: nothing new ({watermark})")
 
 
-def wait_mode(job, timeout_mins):
-    """Post-push loop-closer: poll until the job's current build completes."""
-    deadline = time.time() + timeout_mins * 60
-    while time.time() < deadline:
-        try:
-            data = get_json(f"/job/{job}/job/{BRANCH}/lastBuild/api/json?tree=number,result,building")
-            if not data.get("building") and data.get("result"):
-                print(f'ci-harvest --wait: {job}/dev #{data["number"]} completed '
-                      f'{data["result"]}; harvesting.')
-                run_harvest([job], as_hook=False)
-                return
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
-        time.sleep(60)
-    print(f"ci-harvest --wait: timed out after {timeout_mins}m waiting on {job}/dev")
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--hook", action="store_true", help="SessionStart-hook JSON output")
-    ap.add_argument("--wait", metavar="JOB", help="poll JOB until its build completes, then harvest")
-    ap.add_argument("--timeout-mins", type=int, default=30)
+    ap.add_argument("--attest", type=int, metavar="N", help="reach back to orchestrator wave N")
     ap.add_argument("--jobs", help="comma-separated job subset")
     ap.add_argument(
         "--dispatch",
@@ -965,8 +1125,13 @@ def main():
     )
     args = ap.parse_args()
     jobs = [j.strip() for j in args.jobs.split(",")] if args.jobs else JOBS
-    if args.wait:
-        wait_mode(args.wait, args.timeout_mins)
+    if args.attest is not None:
+        cursor = load_cursor()
+        waves = attest_waves({"completed": [(args.attest, None)]}, cursor, force=True)
+        write_cursor(cursor)
+        rendered = render([], [], [], [], [], args.hook, waves=waves)
+        if rendered:
+            print(rendered)
     else:
         run_harvest(jobs, as_hook=args.hook, dispatch=args.dispatch)
 

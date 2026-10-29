@@ -309,7 +309,7 @@ function repoWithNotes() {
     return git('rev-parse', 'HEAD');
   };
   const note = (step, sha, body) =>
-    git('-c', 'user.name=brit', '-c', 'user.email=b@b', 'notes', '--ref', `refs/notes/brit/build/${step}`, 'add', '-f', '-m', JSON.stringify(body), sha);
+    git('-c', 'user.name=brit', '-c', 'user.email=b@b', 'notes', '--ref', `refs/notes/brit/build/${encodeURIComponent(step)}`, 'add', '-f', '-m', JSON.stringify(body), sha);
   // The payload brit-build-ref writes: the whole BuildAttestationContentNode, camelCase, with
   // each CID serialized as its bytes.
   const cid = [1, 85, 18, 32, ...Array(32).fill(0)];
@@ -326,16 +326,19 @@ function repoWithNotes() {
     signature: '',
   });
   const c1 = commit();
-  note('elohim', c1, node('elohim', true, 600_000, '2026-09-24T10:10:00+00:00'));
+  note('ci:elohim', c1, node('ci:elohim', true, 600_000, '2026-09-24T10:10:00+00:00'));
   const c2 = commit();
-  note('elohim', c2, node('elohim', false, 1_200_000, '2026-09-24T11:20:00+00:00'));
-  note('elohim-edge', c2, node('elohim-edge', true, 600_000, '2026-09-24T11:00:00+00:00'));
+  note('ci:elohim', c2, node('ci:elohim', false, 1_200_000, '2026-09-24T11:20:00+00:00'));
+  note('ci:elohim-edge', c2, node('ci:elohim-edge', true, 600_000, '2026-09-24T11:00:00+00:00'));
+  note('gate:orchestrator', c2, node('gate:orchestrator', true, 100, '2026-09-24T11:20:00+00:00'));
+  note('ci:elohim-edge:build-storage', c2, node('ci:elohim-edge:build-storage', true, 100, '2026-09-24T11:20:00+00:00'));
   return { dir, c1, c2 };
 }
 
-test('readBuildAttestations reads every refs/notes/brit/build/* note', () => {
+test('only ci:<pipeline> notes form the series', () => {
   const { dir, c1, c2 } = repoWithNotes();
   const got = readBuildAttestations(dir).sort((a, b) => a.builtAt.localeCompare(b.builtAt));
+  assert.ok(got.every(a => a.inputsHashKind === 'tree'));
   assert.deepEqual(
     got.map(a => [a.step, a.commit, a.success, a.durationMs]),
     [
@@ -371,4 +374,18 @@ test('--stages is not in a build note: refused as not measured, never guessed', 
   const r = spawnSync('node', [cli, '--stages', '--from', 'attestations', '--repo', dir], { encoding: 'utf8' });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /NOT MEASURED/);
+});
+
+
+test('default source uses attestations only when they cover the window', () => {
+  const { dir } = repoWithNotes();
+  const cli = join(import.meta.dirname, 'delivery-series.mjs');
+  const env = { ...process.env, JENKINS: 'http://127.0.0.1:1' };
+  const enough = spawnSync('node', [cli, '--repo', dir, '--json', '--window', '2'], { env, encoding: 'utf8' });
+  assert.equal(JSON.parse(enough.stdout).source, 'attestations');
+  assert.equal(enough.stderr, '');
+  const short = spawnSync('node', [cli, '--repo', dir, '--json', '--window', '5'], { env, encoding: 'utf8' });
+  assert.equal(short.status, 2);
+  assert.match(short.stderr, /2 of 5 waves attested on this device; reading Jenkins\./);
+  assert.match(short.stderr, /Jenkins unreadable/);
 });

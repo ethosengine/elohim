@@ -6,6 +6,7 @@
     "actualBuildGraph": "actual-build-graph.json",
     "buildGraphReconciliation": "build-graph-reconciliation.json"
   },
+  "edge": { "buildEnv": "build.env" },
   "genesis": {
     "conductorReadiness": "conductor-readiness.json",
     "seedResultsConductorIdentities": "seed-results-conductor-identities.json",

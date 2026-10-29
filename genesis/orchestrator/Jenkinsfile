@@ -2278,6 +2278,51 @@ def hydrateStageAnnotations(String pipelineName, def buildNumber, String branch)
     return annotations
 }
 
+// Archived edge closures describe produced images, separately from the pipeline verdict.
+def hydrateClosureFields(String pipelineName, def buildNumber, String branch) {
+    if (pipelineName != 'elohim-edge' || !buildNumber) return [:]
+    def buildEnv = readJSON(file: 'genesis/orchestrator/build-artifacts.json').edge.buildEnv
+    def downstreamDir = "downstream-artifacts/elohim-edge-${buildNumber}"
+    try {
+        copyArtifacts(
+            projectName: "elohim-edge/${branch}",
+            selector: specific(buildNumber.toString()),
+            filter: buildEnv,
+            target: downstreamDir,
+            optional: true,
+            flatten: true,
+            fingerprintArtifacts: false,
+        )
+    } catch (Exception e) {
+        echo "[closure] copyArtifacts failed for ${pipelineName} #${buildNumber}: ${e.message}"
+        return [:]
+    }
+    def path = "${downstreamDir}/${buildEnv}"
+    if (!fileExists(path)) return [:]
+    def values = [:]
+    readFile(path).readLines().each { line ->
+        def separator = line.indexOf('=')
+        if (separator > 0) values[line.substring(0, separator)] = line.substring(separator + 1)
+    }
+    def closure = [:]
+    def outputDigest = [:]
+    def closureHit = [:]
+    [STORAGE: 'build-storage', DOORWAY: 'build-doorway'].each { kind, step ->
+        def key = values["${kind}_CLOSURE".toString()]
+        def digest = values["${kind}_DIGEST".toString()]
+        if (key && key ==~ /sha256:[a-f0-9]{64}/) closure[step] = key
+        if (digest && digest ==~ /sha256:[a-f0-9]{64}/) outputDigest[step] = digest
+        if (values.containsKey("${kind}_CLOSURE_HIT".toString())) {
+            closureHit[step] = values["${kind}_CLOSURE_HIT".toString()] == 'true'
+        }
+    }
+    return [closure: closure, outputDigest: outputDigest, closureHit: closureHit].findAll { k, v -> !v.isEmpty() }
+}
+
+def withClosureFields(String name, Map result) {
+    return result + hydrateClosureFields(name, result?.buildNumber, env.BRANCH_NAME)
+}
+
 /**
  * Print a decision matrix showing what will be built and why
  */
@@ -2971,7 +3016,7 @@ spec:
                                 // propagation from this orchestrator.
                                 def dependencyBarrier = needsDetachedDependencyBarrier(name, pipelines)
                                 def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier)
-                                results[name] = result
+                                results[name] = withClosureFields(name, result)
                                 recordPipelineResult(name, result, pipelineBaselines)
                             } else if (runnable) {
                                 def parallelBuilds = [:]
@@ -2980,7 +3025,7 @@ spec:
                                         echo "🔨 Building: ${name}"
                                         // wait=null → auto-derive per longRunning (inside triggerInLevel)
                                         def result = triggerInLevel(name, pipelines, changedFiles, barrierRuns)
-                                        results[name] = result
+                                        results[name] = withClosureFields(name, result)
                                         recordPipelineResult(name, result, pipelineBaselines)
                                     }
                                 }
@@ -3112,7 +3157,6 @@ spec:
                             def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
                             archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
                             env.ACTUAL_BUILD_GRAPH_POSTED = 'true'
-                            sh 'REPO_ROOT="$WORKSPACE" sh genesis/orchestrator/scripts/brit-helper.sh attest "${ACTUAL_BUILD_GRAPH_FILE:-actual-build-graph.json}" || true'
 
                             // Defensive null-safety: actual.results may be null if
                             // Execute Builds wrote the file before populating any

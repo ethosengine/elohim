@@ -1,38 +1,18 @@
 #!/usr/bin/env node
-// brit-attest — one brit build attestation per pipeline an orchestrator run executed.
-//
-// Called as `brit-helper.sh attest <actual-build-graph.json>` at the end of an orchestrator
-// run (Lane F3 of the native-delivery sprint). For each pipeline the run awaited, it runs
-//   brit-build-ref build put --step <pipeline> --manifest <cid> --output <cid>
-//     --inputs-hash <tree> --success <bool> --duration-ms <ms> --hardware <json> --commit <sha>
-// which writes a signed BuildAttestationContentNode to refs/notes/brit/build/<pipeline>, a note
-// on the built commit. delivery-series.mjs --from attestations reads those notes back, so the
-// delivery series no longer needs the Jenkins API.
-//
-// The fields, and what each one honestly is today:
-//   manifest_cid  raw CIDv1 (sha2-256) of the pipeline's build-manifest.json bytes at the commit.
-//   inputs_hash   the commit's git tree hash: the whole source tree the build consumed. A
-//                 per-pipeline input closure is rakia's job, not this script's.
-//   output_cid    raw CIDv1 of the run record {pipeline, commit, result, buildNumber, url}. The
-//                 artifact's own CID (image digest, bundle CID) joins when the pipeline publishes
-//                 one (Lane N's release manifest); until then the run record is what was produced.
-//   agent_id      brit's signing key for this workspace. Z.D names a deploy-service agent per
-//                 pipeline (`agent:deploy-service-<operator>-<pipeline>`), but that agent is a
-//                 NAME today, with no provisioned key. agent_id must stay the key that signed
-//                 (brit verifies the signature against it), so the name rides in
-//                 hardware_profile.performer with performer_key "unprovisioned".
-//   success       Jenkins SUCCESS or UNSTABLE. FAILURE and ABORTED attest success=false.
-//                 DISPATCHED (fire-and-forget) has no verdict yet and is not attested.
-//
-// BRIT_NOTES_REMOTE=<remote> fetches refs/notes/brit/build/* first and pushes it after, so the
-// notes outlive the CI workspace. Unset, the notes stay in the local clone.
-//
-// Never fails the build: every problem is a WARN on stderr and exit 0.
+// brit-attest — the device writes Jenkins verdicts when its harvest reads an archived graph.
+// ci:<pipeline> records the pipeline verdict using --output-json (addressable brit content),
+// keyed by the commit tree. ci:<pipeline>:<step> records a produced image using its raw digest
+// CID and the exact sha256:-prefixed closure key. A closure hit produces no new step note.
+// hardware identifies service:jenkins as performer and the downstream URL as provenance;
+// writer identifies this device. brit's agentId remains this device's signing key.
+// Notes stay on this device: no remote fetch/push, runner key, or roster entry.
+// An existing note with the same inputsHash is preserved, including its builtAt timestamp.
+// Every failure is advisory; --json always emits one report and exits 0 for harvest retries.
 
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { arch, cpus, platform, totalmem } from 'node:os';
+import { arch, hostname, platform } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -65,22 +45,18 @@ export function rawCid(bytes) {
   return 'b' + base32(Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), digest]));
 }
 
-/** The Z.D deploy-service agent name for a pipeline. A name only: no key is provisioned. */
-export function performerName(pipeline, operator = 'matthew') {
-  return `agent:deploy-service-${operator}-${pipeline}`;
+/** Wrap an OCI sha256 digest as raw CIDv1; the digest already hashes the manifest bytes. */
+export function cidOfDigest(digest) {
+  if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new Error(`invalid sha256 digest: ${digest}`);
+  return 'b' + base32(Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), Buffer.from(digest.slice(7), 'hex')]));
 }
 
-/**
- * One orchestrator run → the `build put` argument lists, plus what it skipped and why.
- * Pure: every read of the repository is passed in.
- *
- * @param {{commitSha?:string, executionOrder?:string[], results?:object}} graph
- * @param {{commit:string, tree:string, manifestBytes:(pipeline:string)=>Buffer|null,
- *   machine:object, operator?:string}} ctx
- */
+/** Pure plan: repository reads and the device identity are supplied by the caller. */
 export function planAttestations(graph, ctx) {
   const planned = [];
   const skipped = [];
+  // Jenkins env.BUILD_NUMBER is a decimal string in archived graphs.
+  const orchestratorBuild = Number(graph.buildNumber) || null;
   const results = graph?.results ?? {};
   const order = graph?.executionOrder?.length ? graph.executionOrder : Object.keys(results);
   for (const pipeline of order) {
@@ -95,41 +71,43 @@ export function planAttestations(graph, ctx) {
       skipped.push({ pipeline, why: 'no build-manifest.json for this pipeline' });
       continue;
     }
+    const durationMs = Math.max(0, Math.round(Number(r.duration) || 0));
     const record = {
-      pipeline,
-      commit: ctx.commit,
-      result,
-      buildNumber: r.buildNumber ?? null,
-      url: r.url ?? null,
+      pipeline, commit: ctx.commit, result, buildNumber: r.buildNumber ?? null,
+      url: r.url ?? null, durationMs, orchestratorBuild,
     };
+    for (const field of ['closure', 'outputDigest', 'closureHit']) {
+      if (r[field] != null) record[field] = r[field];
+    }
     const hardware = {
-      ...ctx.machine,
-      performer: performerName(pipeline, ctx.operator),
-      performer_key: 'unprovisioned',
+      runner: 'jenkins', performer: 'service:jenkins', provenance: r.url ?? null,
+      orchestratorBuild, writer: ctx.machine,
     };
-    planned.push({
-      pipeline,
-      args: [
-        'build',
-        'put',
-        '--step',
-        pipeline,
-        '--manifest',
-        rawCid(manifest),
-        '--output',
-        rawCid(Buffer.from(JSON.stringify(record))),
-        '--inputs-hash',
-        ctx.tree,
-        '--success',
-        String(SUCCEEDED.has(result)),
-        '--duration-ms',
-        String(Math.max(0, Math.round(Number(r.duration) || 0))),
-        '--hardware',
-        JSON.stringify(hardware),
-        '--commit',
-        ctx.commit,
-      ],
+    const plan = (step, kind, output, inputs, success, extra = {}) => planned.push({
+      pipeline, step, kind,
+      args: ['build', 'put', '--step', step, '--manifest', rawCid(manifest), ...output,
+        '--inputs-hash', inputs, '--success', String(success), '--duration-ms', String(durationMs),
+        '--hardware', JSON.stringify({ ...hardware, inputsHashKind: kind, ...extra }), '--commit', ctx.commit],
     });
+    plan(`ci:${pipeline}`, 'tree', ['--output-json', JSON.stringify(record)], ctx.tree, SUCCEEDED.has(result));
+    for (const [step, closure] of Object.entries(r.closure ?? {})) {
+      if (r.closureHit?.[step] === true) {
+        skipped.push({ pipeline, step, why: 'closure hit: nothing produced' });
+        continue;
+      }
+      const digest = r.outputDigest?.[step];
+      if (!/^sha256:[a-f0-9]{64}$/.test(digest)) {
+        skipped.push({ pipeline, step, why: 'no digest archived' });
+        continue;
+      }
+      if (!/^sha256:[a-f0-9]{64}$/.test(closure)) {
+        skipped.push({ pipeline, step, why: 'invalid closure key' });
+        continue;
+      }
+      const image = { 'build-storage': 'elohim-storage', 'build-doorway': 'elohim-doorway' }[step];
+      plan(`ci:${pipeline}:${step}`, 'closure-v3', ['--output', cidOfDigest(digest)], closure, true,
+        image ? { artifact: `harbor.ethosengine.com/ethosengine/${image}@${digest}` } : {});
+    }
   }
   return { planned, skipped };
 }
@@ -166,85 +144,73 @@ function manifestReader(repo, commit) {
 }
 
 function machine(env) {
-  return {
-    // BUILD_URL exists only inside a Jenkins build (JENKINS_URL is also set on dev workspaces).
-    runner: env.BUILD_URL ? 'jenkins' : 'local',
-    node: env.NODE_NAME ?? env.HOSTNAME ?? null,
-    os: platform(),
-    arch: arch(),
-    cpus: cpus().length,
-    mem_gb: Math.round(totalmem() / 2 ** 30),
-  };
+  return { node: env.HOSTNAME ?? hostname(), os: platform(), arch: arch() };
 }
 
-/** @returns {Promise<number>} always 0 — attestation is advisory until Stage 2. */
+/** Always 0; deferred work is explicitly reported so the harvest does not memoise it. */
 export async function main(argv, { env = process.env } = {}) {
-  const [graphPath] = argv;
+  const graphPath = argv.find(arg => arg !== '--json');
   const bin = env.BRIT_BUILD_REF_BIN;
   const repo = env.REPO_ROOT || process.cwd();
-  if (!graphPath || !bin) {
-    warn('usage: BRIT_BUILD_REF_BIN=<bin> brit-attest.mjs <actual-build-graph.json>');
-    return 0;
-  }
-  let graph;
+  const report = { commit: null, orchestratorBuild: null, written: [], present: [], skipped: [], deferred: [] };
+  const defer = why => { report.deferred.push({ why }); warn(why); };
   try {
-    graph = JSON.parse(readFileSync(graphPath, 'utf8'));
+    const graph = JSON.parse(readFileSync(graphPath, 'utf8'));
+    report.commit = graph.commitSha ?? null;
+    report.orchestratorBuild = Number(graph.buildNumber) || null;
+    if (!bin) { defer('brit-build-ref absent'); return 0; }
+    let commit;
+    let tree;
+    try {
+      commit = git(repo, ['rev-parse', `${graph.commitSha || env.GIT_COMMIT_HASH || 'HEAD'}^{commit}`]).toString().trim();
+      tree = git(repo, ['rev-parse', `${commit}^{tree}`]).toString().trim();
+    } catch {
+      defer(`commit ${graph.commitSha || 'HEAD'} not in this clone`);
+      return 0;
+    }
+    report.commit = commit;
+    const { planned, skipped } = planAttestations(graph, {
+      commit, tree, manifestBytes: manifestReader(repo, commit), machine: machine(env),
+    });
+    report.skipped = skipped;
+    for (const s of skipped) console.error(`[brit-attest] skip ${s.pipeline}: ${s.why}`);
+    for (const p of planned) {
+      const entry = { pipeline: p.pipeline, step: p.step, kind: p.kind };
+      try {
+        // The selected path consumes this override. Passing it to bin-launch again
+        // asks the launcher to execute itself and is correctly refused as launcher-alias.
+        const childEnv = { ...env };
+        delete childEnv.BRIT_BUILD_REF_BIN;
+        const options = { cwd: repo, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 };
+        const existing = spawnSync(bin, ['--repo', repo, 'build', 'get', '--step', p.step, '--commit', commit], { ...options, encoding: 'utf8' });
+        if (existing.error) throw existing.error;
+        if (existing.status !== 0) throw new Error(existing.stderr.trim() || `build get exited ${existing.status}`);
+        let node;
+        const absent = `${existing.stdout}\n${existing.stderr}`.trim().startsWith('no build ref found for step=');
+        if (!absent) node = JSON.parse(existing.stdout);
+        const inputs = p.args[p.args.indexOf('--inputs-hash') + 1];
+        if (node?.inputsHash === inputs) {
+          report.present.push(entry);
+          console.error(`[brit-attest] present ${p.step}`);
+          continue;
+        }
+        const cid = execFileSync(bin, ['--repo', repo, ...p.args], options).toString().trim();
+        report.written.push({ ...entry, cid, ...(node ? { rewritten: true } : {}) });
+        console.error(`[brit-attest] ${node ? 'rewritten' : 'written'} ${p.step} → ${cid}`);
+      } catch (e) {
+        if (e.code === 'ENOENT') { defer('brit-build-ref absent'); break; }
+        defer(`build get/put ${p.step} failed: ${(e.stderr?.toString() || e.message).trim().split('\n')[0]}`);
+      }
+    }
+    console.error(`[brit-attest] ${report.written.length}/${planned.length} notes attested on ${commit.slice(0, 12)}`);
   } catch (e) {
-    warn(`${graphPath} unreadable (${e.message}); nothing attested`);
-    return 0;
+    defer(`${graphPath ?? 'graph'} unreadable or attestation failed: ${e.message.split('\n')[0]}`);
+  } finally {
+    if (argv.includes('--json')) console.log(JSON.stringify(report));
   }
-  let commit;
-  let tree;
-  try {
-    commit = git(repo, ['rev-parse', `${graph.commitSha || env.GIT_COMMIT_HASH || 'HEAD'}^{commit}`]).toString().trim();
-    tree = git(repo, ['rev-parse', `${commit}^{tree}`]).toString().trim();
-  } catch (e) {
-    warn(`commit ${graph.commitSha || 'HEAD'} not in this clone (${e.message.split('\n')[0]}); nothing attested`);
-    return 0;
-  }
-  const { planned, skipped } = planAttestations(graph, {
-    commit,
-    tree,
-    manifestBytes: manifestReader(repo, commit),
-    machine: machine(env),
-    operator: env.BRIT_DEPLOY_OPERATOR || 'matthew',
-  });
-  for (const s of skipped) console.error(`[brit-attest] skip ${s.pipeline}: ${s.why}`);
-  if (planned.length === 0) return 0;
-
-  const remote = env.BRIT_NOTES_REMOTE;
-  const refspec = `${NOTES_PREFIX}*:${NOTES_PREFIX}*`;
-  if (remote) {
-    try {
-      git(repo, ['fetch', '--quiet', remote, `+${refspec}`]);
-    } catch (e) {
-      warn(`fetch ${remote} ${NOTES_PREFIX}* failed (${e.message.split('\n')[0]}); attesting on the local notes`);
-    }
-  }
-  let written = 0;
-  for (const p of planned) {
-    try {
-      const cid = execFileSync(bin, ['--repo', repo, ...p.args], { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
-      console.error(`[brit-attest] ${p.pipeline} ${p.args[p.args.indexOf('--success') + 1] === 'true' ? 'success' : 'failure'} → ${cid}`);
-      written += 1;
-    } catch (e) {
-      warn(`build put ${p.pipeline} failed: ${(e.stderr?.toString() || e.message).trim().split('\n')[0]}`);
-    }
-  }
-  if (remote && written > 0) {
-    try {
-      git(repo, ['push', '--quiet', remote, refspec]);
-      console.error(`[brit-attest] pushed ${NOTES_PREFIX}* to ${remote}`);
-    } catch (e) {
-      warn(`push ${remote} ${NOTES_PREFIX}* failed (${e.message.split('\n')[0]}); attestations stay in this clone`);
-    }
-  }
-  console.error(`[brit-attest] ${written}/${planned.length} pipelines attested on ${commit.slice(0, 12)}`);
   return 0;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  main(process.argv.slice(2))
-    .catch(e => warn(e.message))
-    .finally(() => process.exit(0));
+  main(process.argv.slice(2)).finally(() => process.exit(0));
 }
