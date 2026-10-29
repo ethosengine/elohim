@@ -343,7 +343,7 @@ export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSyn
   if (!Array.isArray(rows)) return { error: 'build find: not an array' };
   const unverifiable = unverifiableNotes(r.stderr);
   for (const note of unverifiable) {
-    warn(`[gate] ${project.name} evidence: unverifiable note ignored on ${attestationRef(project)} at ${note.commit}: ${note.reason}\n`);
+    warn(`[gate] ${project.name} evidence: unverifiable note on ${attestationRef(project)} at ${note.commit}: ${note.reason}; it vetoes reuse until replaced or removed\n`);
   }
   return { rows, unverifiable };
 }
@@ -416,6 +416,13 @@ export function reusableHit(evidence, {
   if (mode !== 'reuse') return { reuse: false, why: 'report-only' };
   if (!enabled) return { reuse: false, why: 'project not enabled for reuse' };
   if (selfId == null) return { reuse: false, why: 'no workspace key' };
+  // D5 (steward-space spec :850): a red of any provenance or verification state vetoes. brit
+  // cannot say what closure or verdict a note it will not vouch for carried, so one unverifiable
+  // note under this step is read as a possible red: the gate runs, and the line names the cure.
+  const vetoed = (evidence.unverifiable || [])[0];
+  if (vetoed) {
+    return { reuse: false, why: `unverifiable note under this step at ${String(vetoed.commit || '').slice(0, 9)}: ${vetoed.reason} (a red of any verification state vetoes; replace or remove the note)` };
+  }
   const row = [...(evidence.rows || [])].sort(
     (a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0)
   )[0];
@@ -522,7 +529,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const dirty = dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
   let line = `${describeEvidence(found.rows, now)}; closure scope ${scope}`;
   const ignored = found.unverifiable.length;
-  if (ignored > 0) line += `; ${ignored} unverifiable note${ignored === 1 ? '' : 's'} ignored`;
+  if (ignored > 0) line += `; ${ignored} unverifiable note${ignored === 1 ? '' : 's'} (reuse vetoed)`;
   if (dirty === null) line += '; working tree state unknown, nothing will be recorded';
   else if (dirty.length > 0) line += `; working tree dirty under ${project.dir} (${dirty.length} path${dirty.length === 1 ? '' : 's'}): the evidence names the commit, not these bytes, and nothing will be recorded`;
   const checkoutMismatch = env.GATE_EVIDENCE_RECORD === '0';

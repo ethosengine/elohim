@@ -284,7 +284,7 @@ test('a note brit reports unverifiable is absent to findEvidence, and named once
   const found = findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn, warn });
   assert.deepEqual(found.rows, [greenRow], 'only the rows brit verified are evidence');
   assert.deepEqual(found.unverifiable, [{ commit: UNVERIFIABLE_SHA, reason: UNVERIFIABLE_REASON }]);
-  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: unverifiable note ignored on ${BUILD_REF} at ${UNVERIFIABLE_SHA}: ${UNVERIFIABLE_REASON}\n`]);
+  assert.deepEqual(warnings, [`[gate] elohim-storage evidence: unverifiable note on ${BUILD_REF} at ${UNVERIFIABLE_SHA}: ${UNVERIFIABLE_REASON}; it vetoes reuse until replaced or removed\n`]);
   // A git failure is still an error, never an empty hit.
   const failed = fakeSpawn([[isFind, { status: 1, stdout: '', stderr: `Error: git command failed: git notes --ref ${BUILD_REF} list: fatal: not a notes commit\n` }]]);
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: failed.spawn, warn }).error,
@@ -292,7 +292,7 @@ test('a note brit reports unverifiable is absent to findEvidence, and named once
   assert.equal(warnings.length, 1);
 });
 
-test('gateEvidence counts ignored unverifiable notes on its line and still reports the miss', t => {
+test('gateEvidence counts unverifiable notes on its line as a reuse veto and still reports the miss', t => {
   const { root, env } = evidenceFixture(t);
   const warnings = [];
   const { spawn } = fakeSpawn([
@@ -304,7 +304,7 @@ test('gateEvidence counts ignored unverifiable notes on its line and still repor
   const result = gateEvidence(project, { root, env, commit: 'abc', spawn, warn: line => warnings.push(line) });
   assert.deepEqual(result.rows, []);
   assert.equal(result.unverifiable.length, 2);
-  assert.match(result.line, /^miss; closure scope tree \(unknown reads\); 2 unverifiable notes ignored$/);
+  assert.match(result.line, /^miss; closure scope tree \(unknown reads\); 2 unverifiable notes \(reuse vetoed\)$/);
   assert.equal(warnings.length, 2);
   assert.match(warnings[1], /does not decode: unknown field `trusted`/);
 });
@@ -533,6 +533,14 @@ test('an unreadable Rust source falls back to tree scope and a missing tree refu
   assert.equal(result.line, 'unavailable (read tree absent at abc)');
   assert.equal(result.key, undefined);
   assert.ok(!calls.some(c => isFind(c.bin, c.args)));
+});
+
+test('D5: one unverifiable note under the step vetoes reuse even beside a green of our own', () => {
+  const vetoed = { commit: 'deadbeefcafe', reason: 'signature does not verify against agentId "aa"' };
+  const decided = reusableHit({ rows: [greenRow], dirty: false, unverifiable: [vetoed] }, { ...reuseContext, selectorCheck: unexpectedSelector });
+  assert.equal(decided.reuse, false);
+  assert.match(decided.why, /^unverifiable note under this step at deadbeefc: signature does not verify/);
+  assert.match(decided.why, /vetoes/);
 });
 
 test('dirtyPaths checks read files, directories and absent paths, or the whole tree including hook ledgers', t => {

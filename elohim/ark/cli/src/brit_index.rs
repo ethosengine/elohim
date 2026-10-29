@@ -271,7 +271,7 @@ pub fn say_unverifiable(step: &str, found: &Found) {
     let refused = build_ref_name(step);
     for note in &found.unverifiable {
         eprintln!(
-            "ark brit: unverifiable attestation on {refused} at {}: {}; read as absent",
+            "ark brit: unverifiable attestation on {refused} at {}: {}; it vetoes reuse until replaced or removed",
             note.commit, note.reason
         );
     }
@@ -463,6 +463,20 @@ impl BritIndex {
         let found = self.find()?;
         say_unverifiable(&self.step, &found);
         let held = !found.rows.is_empty();
+        // D5 (steward-space spec :850): a red of any provenance or verification state vetoes.
+        // brit cannot say what closure or verdict a note it will not vouch for carried, so one
+        // unverifiable note under this step is a possible red: nothing is reused, the task runs.
+        if let Some(note) = found.unverifiable.first() {
+            let why = format!(
+                "unverifiable note under this step at {}: {} (a red of any verification state \
+                 vetoes; replace or remove the note)",
+                note.commit, note.reason
+            );
+            return Ok(Decided {
+                held,
+                ..other(&why)
+            });
+        }
         let self_id = if asks_signer(&self.ctx) {
             self.self_id()?
         } else {
@@ -486,19 +500,11 @@ impl BritIndex {
                     held,
                 })
             }
-            // A refused note is absent, and the reason says so: `ark task` prints this line.
-            Err(why) => {
-                let refused = found.unverifiable.len();
-                let why = if refused == 0 {
-                    why
-                } else {
-                    format!("{why} ({refused} note(s) unverifiable, read as absent)")
-                };
-                Ok(Decided {
-                    held,
-                    ..other(&why)
-                })
-            }
+            // `ark task` prints this line.
+            Err(why) => Ok(Decided {
+                held,
+                ..other(&why)
+            }),
         }
     }
 }

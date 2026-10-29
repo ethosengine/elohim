@@ -440,8 +440,24 @@ enum FakeSigner {
     Unsupported,
 }
 
+/// What the fake `brit-build-ref` says on stderr beside its rows for every other subcommand:
+/// nothing (every note verified), or one `unverifiable: <commit> <reason>` line, the way the
+/// daily-driver brit names a note it will not vouch for.
+#[derive(Clone, Copy)]
+enum FakeFind {
+    Clean,
+    OneUnverifiable,
+}
+
 fn task_fixture(root: &Path, method: &str, script: &str, rows: &Value) -> TaskFixture {
-    task_fixture_with(root, method, script, rows, FakeSigner::Answers("me"))
+    task_fixture_with(
+        root,
+        method,
+        script,
+        rows,
+        FakeSigner::Answers("me"),
+        FakeFind::Clean,
+    )
 }
 
 fn task_fixture_with(
@@ -450,6 +466,7 @@ fn task_fixture_with(
     script: &str,
     rows: &Value,
     signer: FakeSigner,
+    find: FakeFind,
 ) -> TaskFixture {
     let child = root.join("child.sh");
     fs::write(&child, format!("#!/bin/sh\n{script}\n")).unwrap();
@@ -463,10 +480,18 @@ fn task_fixture_with(
                                    \"For more information, try '--help'.\" >&2; exit 2"
             .to_string(),
     };
+    let find_stderr = match find {
+        FakeFind::Clean => String::new(),
+        FakeFind::OneUnverifiable => {
+            "printf '%s\\n' 'unverifiable: deadbeefcafe signature does not \
+                                      verify against agentId \"aa\"' >&2; "
+                .to_string()
+        }
+    };
     fs::write(
         &brit,
         format!(
-            "#!/bin/sh\ncase \"$3\" in\n  signer) {signer_case} ;;\n  *) cat <<'ROWS'\n{rows}\nROWS\n  ;;\nesac\n"
+            "#!/bin/sh\ncase \"$3\" in\n  signer) {signer_case} ;;\n  *) {find_stderr}cat <<'ROWS'\n{rows}\nROWS\n  ;;\nesac\n"
         ),
     )
     .unwrap();
@@ -677,6 +702,7 @@ fn task_run_reuses_under_a_brit_without_signer() {
         "touch ran; exit 0",
         &rows,
         FakeSigner::Unsupported,
+        FakeFind::Clean,
     );
     let reuse =
         json!({"mode": "reuse", "enabled": true, "selfId": "me", "dirty": false, "commit": head});
@@ -693,6 +719,63 @@ fn task_run_reuses_under_a_brit_without_signer() {
     );
     assert_eq!(task.statuses()[1]["value"]["hit"], true);
     assert_eq!(task.statuses()[1]["value"]["record"]["computedBy"], "me");
+}
+
+/// D5: one note brit will not vouch for under the step vetoes reuse. The same green row that
+/// is reused above sits beside an `unverifiable:` line, and ark runs the task instead.
+#[test]
+fn task_run_does_not_reuse_beside_an_unverifiable_note() {
+    let root = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(root.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}");
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    };
+    git(&["init", "-q"]);
+    git(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "a",
+    ]);
+    let head = git(&["rev-parse", "HEAD"]);
+    let output = elohim_epr::cid::compute_cid(b"verdict").to_bytes();
+    let rows = json!([{"commit": head, "attestation": {
+        "agentId": "me", "builtAt": "2026-10-26T10:00:00Z", "success": true,
+        "outputCid": output, "signature": "sig",
+    }}]);
+    let task = task_fixture_with(
+        root.path(),
+        "brit-gate:fixture",
+        "touch ran; exit 0",
+        &rows,
+        FakeSigner::Answers("me"),
+        FakeFind::OneUnverifiable,
+    );
+    let reuse =
+        json!({"mode": "reuse", "enabled": true, "selfId": "me", "dirty": false, "commit": head});
+    let out = task.command(Some(&reuse)).output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        root.path().join("ran").exists(),
+        "an unverifiable note under the step vetoes reuse, so the child runs"
+    );
+    assert!(
+        stderr.contains("vetoes reuse until replaced or removed"),
+        "the refused note is named once: {stderr}"
+    );
+    assert_eq!(task.statuses()[1]["value"]["hit"], false);
 }
 
 /// SIGTERM to ark mid-run reaches the child and its own children, and the answer is unanswered
