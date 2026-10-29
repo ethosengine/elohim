@@ -12,6 +12,8 @@ import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
 
+import { closeAccountCleanup } from './auth-lifecycle.steps.js';
+
 /**
  * Generate unique test credentials so parallel runs don't collide.
  */
@@ -48,6 +50,17 @@ Given(
     human.setToken(doorwayId, auth.token);
 
     this.addHuman(humanName, human);
+
+    // Close the ephemeral account after the scenario: it uninstalls the hosted
+    // cell this registration installed and releases its conductor slot.
+    // Cleanup runs last-registered-first, so any content this human authors
+    // later in the scenario is deleted before the account (and its bearer) go.
+    const identifier = auth.identifier || creds.identifier;
+    const doorwayUrl = doorway.url;
+    const humanToken = auth.token;
+    this.onCleanup(async () => {
+      await closeAccountCleanup(this, doorwayUrl, identifier, humanToken);
+    });
   }
 );
 

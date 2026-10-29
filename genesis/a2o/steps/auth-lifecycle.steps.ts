@@ -19,7 +19,11 @@ import { getFixture } from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
 
-import type { AuthResponse, HealthResponse } from '../src/framework/api/doorway-client.js';
+import type {
+  AuthResponse,
+  DoorwayClient,
+  HealthResponse,
+} from '../src/framework/api/doorway-client.js';
 
 // ---------------------------------------------------------------------------
 // Ephemeral-human cleanup — product path first, admin soft-delete fallback
@@ -33,9 +37,58 @@ interface CloseAccountResponse {
 }
 
 /**
- * Admin soft-delete — the pre-Task-9 cleanup path, kept as a fallback for a
- * build where `POST /auth/close-account` hasn't landed yet (404/405) or a
- * genuine request-level failure reaching it. Never throws.
+ * Local-part prefixes a2o mints for throwaway accounts. The admin fallback will
+ * release a hosted cell ONLY for an identifier carrying one of these: it must
+ * never be able to deregister a real person's agent, whatever it is handed.
+ */
+const EPHEMERAL_LOCAL_PART_PREFIXES = ['e2e-', 'portal-a2o-'];
+
+function isEphemeralIdentifier(identifier: string): boolean {
+  const local = identifier.split('@')[0];
+  return EPHEMERAL_LOCAL_PART_PREFIXES.some(prefix => local.startsWith(prefix));
+}
+
+/**
+ * Release the hosted cell an ephemeral account holds, through the admin
+ * deprovision route (`DELETE /admin/hosted-users/{agentPubKey}`). The admin
+ * soft-delete alone never does this: it flips Mongo flags and leaves the cell
+ * installed, so every run that ended on it permanently consumed one conductor
+ * slot (alpha reached 50/50 on two conductors that way, 2026-10-28). Never throws.
+ */
+async function releaseHostedCell(
+  admin: DoorwayClient,
+  identifier: string,
+  reason: 'route-absent' | 'request-error'
+): Promise<void> {
+  if (!isEphemeralIdentifier(identifier)) {
+    console.warn(
+      `[auth-lifecycle cleanup] admin fallback (${reason}) will not deprovision ${identifier}: ` +
+        `not an a2o-minted identifier (${EPHEMERAL_LOCAL_PART_PREFIXES.join(', ')})`
+    );
+    return;
+  }
+  try {
+    const hosted = await admin.adminListHostedUsers();
+    const rows = hosted.users.filter(u => u.identifier === identifier && u.conductorId);
+    for (const row of rows) {
+      await admin.adminDeprovisionHostedUser(row.agentPubKey);
+      console.warn(
+        `[auth-lifecycle cleanup] ${identifier} cell released on ${String(row.conductorId)} ` +
+          `via admin deprovision fallback (${reason})`
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `[auth-lifecycle cleanup] admin deprovision for ${identifier} failed: ${String(err)}`
+    );
+  }
+}
+
+/**
+ * Admin fallback — the pre-Task-9 cleanup path, kept for a build where
+ * `POST /auth/close-account` hasn't landed yet (404/405) or a genuine
+ * request-level failure reaching it. Releases the hosted cell first (an
+ * a2o-minted identifier only), then soft-deletes the row. Never throws.
  */
 async function adminSoftDeleteFallback(
   world: E2EWorld,
@@ -45,6 +98,7 @@ async function adminSoftDeleteFallback(
 ): Promise<void> {
   try {
     const admin = await world.getAdminClient(doorwayUrl);
+    await releaseHostedCell(admin, identifier, reason);
     const list = await admin.adminListUsers({ search: identifier, limit: 1 });
     const match = list.users.find(u => u.identifier === identifier);
     if (!match) {
@@ -161,7 +215,9 @@ When(
 
     // Register cleanup to close the ephemeral human's account after the
     // scenario, through the product path (see closeAccountCleanup above).
-    const identifier = creds.identifier;
+    // The doorway gateway-scopes identifiers, so name the account the way it
+    // KEEPS it — the admin fallback matches rows exactly.
+    const identifier = auth.identifier || creds.identifier;
     const doorwayUrl = doorway.url;
     const humanToken = auth.token;
     this.onCleanup(async () => {
