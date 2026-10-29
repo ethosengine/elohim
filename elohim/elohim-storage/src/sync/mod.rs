@@ -38,7 +38,10 @@ pub struct SyncManager {
     /// Document store
     doc_store: Arc<DocStore>,
     /// Stream position tracker
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "every constructor hands the manager the node's stream tracker for the incremental-sync cursor; no sync path reads it yet"
+    )]
     stream_tracker: Arc<StreamTracker>,
 }
 
