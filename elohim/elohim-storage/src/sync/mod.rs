@@ -261,6 +261,39 @@ impl SyncManager {
             .map(|c| c.raw_bytes().to_vec()))
     }
 
+    /// Whether a sync pull for `remote_heads` could bring this node anything.
+    ///
+    /// `false` only when every remote head is a change this doc already holds
+    /// (`get_change_by_hash` is `Some` for each): the remote's whole history is
+    /// then a subset of ours, so its `SyncChanges` answer could only repeat
+    /// what we have. Equal heads are the common case, but a node AHEAD of its
+    /// peer also holds every remote head while its own heads differ, and the
+    /// old `local != remote` test pulled there on every round, asking with
+    /// heads the peer does not know: at best an empty answer, at worst a
+    /// redelivery of changes we hold (which the apply then had to rule a
+    /// no-op), each round, per peer.
+    ///
+    /// `true` (pull) for a doc we do not hold, an unparseable head, a head we
+    /// lack, or a read error: when in doubt, ask. An empty `remote_heads` is
+    /// an empty remote doc, which has nothing to give.
+    ///
+    /// One document load for all heads, not one per head.
+    pub async fn needs_pull(&self, h_app_id: &str, doc_id: &str, remote_heads: &[String]) -> bool {
+        if remote_heads.is_empty() {
+            return false;
+        }
+        let doc = match self.doc_store.get(h_app_id, doc_id).await {
+            Ok(Some(stored)) => match Automerge::load(&stored.data) {
+                Ok(doc) => doc,
+                Err(_) => return true,
+            },
+            Ok(None) | Err(_) => return true,
+        };
+        !remote_heads.iter().all(|head| {
+            parse_change_hash(head).is_some_and(|hash| doc.get_change_by_hash(&hash).is_some())
+        })
+    }
+
     /// Get current heads for a document
     pub async fn get_heads(
         &self,
@@ -372,6 +405,63 @@ mod tests {
         );
         let stream_tracker = Arc::new(StreamTracker::new());
         (SyncManager::new(doc_store, stream_tracker), temp_dir)
+    }
+
+    fn edit(doc: &mut Automerge, key: &str, value: &str) {
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, key, value)?;
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    fn heads_of(doc: &mut Automerge) -> Vec<String> {
+        doc.get_heads().iter().map(|h| hex::encode(h.0)).collect()
+    }
+
+    /// A pull is skipped exactly when we already hold every remote head:
+    /// equal heads, and also when we are ahead of the peer. It still happens
+    /// when the peer has a change we lack, when we lack the doc, and when a
+    /// head cannot be parsed.
+    #[tokio::test]
+    async fn a_pull_is_needed_only_for_a_remote_head_we_lack() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let (ns, id) = ("elohim", "node:pull");
+
+        let mut remote = Automerge::new();
+        edit(&mut remote, "title", "v1");
+        let remote_v1 = heads_of(&mut remote);
+        assert!(sync.needs_pull(ns, id, &remote_v1).await, "we lack the doc");
+        assert!(
+            !sync.needs_pull(ns, id, &[]).await,
+            "an empty remote doc has nothing to give"
+        );
+
+        sync.apply_changes(ns, id, vec![remote.save()])
+            .await
+            .unwrap();
+        assert!(!sync.needs_pull(ns, id, &remote_v1).await, "equal heads");
+
+        // We move ahead with a local change: our heads differ from the peer's,
+        // but the peer's heads are all ours.
+        let mut local = sync.get_or_create_doc(ns, id).await.unwrap();
+        edit(&mut local, "body", "ours");
+        sync.apply_changes(ns, id, vec![local.save()])
+            .await
+            .unwrap();
+        assert_ne!(sync.get_heads(ns, id).await.unwrap(), remote_v1);
+        assert!(
+            !sync.needs_pull(ns, id, &remote_v1).await,
+            "ahead of the peer"
+        );
+
+        // The peer makes a change we have not seen.
+        edit(&mut remote, "title", "v2");
+        assert!(
+            sync.needs_pull(ns, id, &heads_of(&mut remote)).await,
+            "a head we lack"
+        );
+        assert!(sync.needs_pull(ns, id, &["not-a-hash".to_string()]).await);
     }
 
     #[tokio::test]
