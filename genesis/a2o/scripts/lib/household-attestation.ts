@@ -459,6 +459,48 @@ export function attestationRef(check: string): string {
  * directory holding the `.git` common dir). `cwd` defaults to the workspace; the household writer
  * runs it from its repo root. Returns the runner's result; never throws on a non-zero exit.
  */
+/** One of the two refusals `brit-build-ref validate put` prints on the verified-read line. */
+export interface PutRefusal {
+  kind: 'concurrent-update' | 'would-not-verify';
+  /** The ref brit named, else `fallbackRef`. */
+  ref: string;
+  reason: string;
+  /** The first stderr line, verbatim. */
+  line: string;
+}
+
+/**
+ * The two refusals `brit-build-ref … put` prints (brit 7e4a83115e), read from the FIRST stderr
+ * line only (`Error: …` is anyhow's main). Both are the writer's contract working — a ref another
+ * writer moved, or bytes that would not read back — never a failure of the caller: the report on
+ * disk stays the evidence and the put is deferred. One owner for every writer (this module's
+ * publishHouseholdEvidence and genesis/agentic/compute/stage/collect-stage.mjs).
+ *
+ *   Error: REFUSED concurrent update: ref=<ref> expected=<oid> observed=<oid> attempts=<n>
+ *   Error: refusing to write <ref>: <reason>
+ */
+export function classifyPutRefusal(
+  stderr: string | undefined,
+  fallbackRef: string
+): PutRefusal | null {
+  const line = firstLine(stderr ?? '');
+  const concurrent = /^Error: REFUSED concurrent update: (.*)$/.exec(line);
+  if (concurrent) {
+    const ref = /\bref=(\S+)/.exec(concurrent[1])?.[1] ?? fallbackRef;
+    return { kind: 'concurrent-update', ref, reason: concurrent[1], line };
+  }
+  const wouldNotVerify = /^Error: refusing to write (\S+): (.*)$/.exec(line);
+  if (wouldNotVerify) {
+    return {
+      kind: 'would-not-verify',
+      ref: wouldNotVerify[1] || fallbackRef,
+      reason: wouldNotVerify[2],
+      line,
+    };
+  }
+  return null;
+}
+
 export function putAttestation(
   brit: string,
   workspace: string,
@@ -573,11 +615,11 @@ export function publishHouseholdEvidence(opts: {
       written += 1;
       continue;
     }
-    const line = firstLine(r.stderr);
-    // brit refusing a ref another writer moved, or bytes that would not read back, is the
-    // writer's contract working (the report on disk stays the evidence) — never a failure here.
-    if (/^Error: (REFUSED concurrent update|refusing to write)\b/.test(line)) {
-      log(`validation attestation deferred for ${a.check}: ${line}`);
+    const refusal = classifyPutRefusal(r.stderr, attestationRef(a.check));
+    if (refusal) {
+      log(
+        `validation attestation deferred for ${a.check} (${refusal.kind} on ${refusal.ref}): ${refusal.reason}`
+      );
     } else {
       log(`validation attestation FAILED for ${a.check} (exit ${r.status}): ${r.stderr.trim()}`);
     }

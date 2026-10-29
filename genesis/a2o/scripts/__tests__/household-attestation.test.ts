@@ -1023,12 +1023,12 @@ describe('the writer gets before it puts, and a brit refusal is an expected, war
       [
         'concurrent',
         `Error: REFUSED concurrent update: ref=refs/notes/brit/validate/a2o-household/${CONCERN}/${SUT.replace(':', '%3A')} expected=0000000000000000000000000000000000000000 observed=1111111111111111111111111111111111111111 attempts=3\n`,
-        /deferred for .*: Error: REFUSED concurrent update: ref=refs\/notes\/brit\/validate\/a2o-household\/.* attempts=3$/m,
+        /deferred for .* \(concurrent-update on refs\/notes\/brit\/validate\/a2o-household\/.*\): ref=.* attempts=3$/m,
       ],
       [
         'would not verify',
         `Error: refusing to write refs/notes/brit/validate/a2o-household/${CONCERN}/${SUT.replace(':', '%3A')}: signature does not verify against agentId "${OTHER_ID}"\n`,
-        /deferred for .*: Error: refusing to write refs\/notes\/brit\/validate\/a2o-household\/.*: signature does not verify against agentId/m,
+        /deferred for .* \(would-not-verify on refs\/notes\/brit\/validate\/a2o-household\/.*\): signature does not verify against agentId/m,
       ],
       [
         'other',

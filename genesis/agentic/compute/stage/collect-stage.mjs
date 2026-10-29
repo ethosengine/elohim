@@ -25,8 +25,10 @@ import { loadCucumber } from "../../../a2o/scripts/lib/load-cucumber.ts";
 import {
   PEER_STAGE_SCOPE,
   RECEIPT_SCHEMA,
+  attestationRef,
   checkNameFor,
   cidToString,
+  classifyPutRefusal,
   gitCommonDir as defaultGitCommonDir,
   putAttestation as defaultPutAttestation,
   resolveBinary as defaultResolveBinary,
@@ -141,6 +143,7 @@ export async function collectStageEvidence({
   runners = {},
   env = process.env,
   now = () => new Date(),
+  log = (line) => console.warn(line),
 }) {
   const runSync = runners.run ?? defaultSyncRunner;
   const resolveBin = runners.resolveBinary ?? defaultResolveBinary;
@@ -349,10 +352,31 @@ export async function collectStageEvidence({
     };
   } else {
     const r = putRef(brit, workspaceDir, attestation, runSync, cwd);
-    attestationOutcome =
-      r.status === 0
-        ? { ok: true, check: attestation.check, artifact: attestation.artifact }
-        : { ok: false, status: r.status, stderr: (r.stderr || "").trim() };
+    const refusal =
+      r.status === 0 ? null : classifyPutRefusal(r.stderr, attestationRef(attestation.check));
+    if (r.status === 0) {
+      attestationOutcome = { ok: true, check: attestation.check, artifact: attestation.artifact };
+    } else if (refusal) {
+      // Expected, warn-only: brit refused the put (a ref another writer moved, or bytes that
+      // would not read back). The stage's verdict and durable copy stand; the ref is not written.
+      attestationOutcome = {
+        ok: false,
+        deferred: true,
+        kind: refusal.kind,
+        ref: refusal.ref,
+        reason: refusal.reason,
+        check: attestation.check,
+        artifact: attestation.artifact,
+        status: r.status,
+        stderr: refusal.line,
+      };
+      log(
+        `validation attestation deferred for ${attestation.check} (${refusal.kind} on ` +
+          `${refusal.ref}): ${refusal.reason}`,
+      );
+    } else {
+      attestationOutcome = { ok: false, status: r.status, stderr: (r.stderr || "").trim() };
+    }
   }
 
   // (6)-(9): the local-ledger half — D3's own module (sprint report, epr fulfil/note, habit
