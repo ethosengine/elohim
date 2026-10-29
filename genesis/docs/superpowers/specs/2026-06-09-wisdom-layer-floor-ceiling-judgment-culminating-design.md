@@ -217,6 +217,8 @@ then, the recursion terminates at one human's recognition, witnessed by whatever
 **Terminator 1 — the DNA clamp wall (the only structurally non-capturable element).** ⚠ **DESIGNED,
 NOT BUILT.** The validator this anchor names — `validate_ratifies_limit_gradient` — returns **zero
 `.rs` hits across the tree**; it exists only as a cross-citation among the six 2026-06-09 design docs.
+
+> **Correction (2026-10-29, grounding run wf_94c4bd4b-8c2).** The "zero `.rs` hits" reading above is stale: `validate_ratifies_limit_gradient` exists at `elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs:918` (the reject-at-write validator with its wall checks), and the walls it reads are declared in `elohim/elohim-storage/src/services/limit_gradient_registry.rs`. What remains true: the wall widths are still `TBD-OPERATOR` by the registry's own comment and the three `limitarian-governor.feature` scenarios are `@wip`, so the anchor is BUILT but its widths are UNRATIFIED. Read "designed, not built" as "built, not yet ratified".
 *As designed*, the single element no layer can move is the deterministic wall core sets once, enforced
 reject-at-write; *every* judgment component would operate beneath it; *none* — not the Global apex, not
 a human supermajority — could ratify outside it. The regress *would* stop here because the wall is **not

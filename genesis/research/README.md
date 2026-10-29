@@ -144,6 +144,8 @@ Two confirmations from a second lineage: friction-gradient limitarianism is Mead
 
 [Meadows and the Elohim substrate →](epr:meadows-systems-dynamics-cross-pollination-2026-08-11)
 
+**The limits, measured on our own devices (2026-10-29).** The grounding that turned the limit canon into numbers: the hard CPU/RAM/disk/endurance ceilings of ethosengine, shem, the CI builders and the Che workspace cgroup; the per-conductor / per-hosted-human cost model and the fixture ceilings on the household and alpha meshes; the critical path of one dev push with a duration on every arrow (and the finding that the headline's 122.5-minute stage-wallclock was a dead sensor reading from 2026-09-27); which limits the register already observes and which are numb; and the ranked options for widening integration without adding nodes. It fed the closure-keyed landing-plane design. [Integration capacity grounding →](epr:integration-capacity-grounding-2026-10-29)
+
 **Next exploration, not yet surveyed: degrowth / post-growth.** *Limits to Growth* is degrowth's founding text, so the survey belongs here. The questions it owes this corpus are listed in [which abundance, from the demand side §5](epr:abundance-rest-and-the-cost-of-production-2026-10-11): whether degrowth actually conflicts with canon's "build until the scarcity that yields rent is gone", or whether Hickel's *selective* degrowth is the intensive column under another name; who is asked to degrow, since nobody below the floor can be; chosen sufficiency versus imposed austerity; and whether degrowth has any answer to the rebound effect besides willpower.
 
 ---
