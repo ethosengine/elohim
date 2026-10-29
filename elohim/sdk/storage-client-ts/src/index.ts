@@ -25,7 +25,7 @@
  */
 
 // Types
-export * from './app-lifecycle';
+export * from './app-lifecycle.js';
 
 export {
   StorageConfig,

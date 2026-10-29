@@ -7,7 +7,7 @@ import {
   UnsupportedLifecycle,
   UnsupportedCapabilityError,
   type AppResidencyView,
-} from '../../../../elohim/sdk/storage-client-ts/src/app-lifecycle';
+} from '@elohim/storage-client';
 
 let adapter: UnsupportedLifecycle;
 let failure: unknown;

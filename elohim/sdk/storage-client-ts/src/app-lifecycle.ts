@@ -1,19 +1,19 @@
-import type { AppSyncProgressView } from "./generated/AppSyncProgressView";
+import type { AppSyncProgressView } from "./generated/AppSyncProgressView.js";
 /** Shared client contracts. Adapters implement these; declaration is not live delivery. */
-import type { AppReleaseView } from "./generated/AppReleaseView";
-import type { AppOpenInput } from "./generated/AppOpenInput";
-import type { AppInstanceView } from "./generated/AppInstanceView";
-import type { AppResidencyView } from "./generated/AppResidencyView";
-import type { AppContinuationView } from "./generated/AppContinuationView";
-import type { AppAttachmentInput } from "./generated/AppAttachmentInput";
-import type { AppRouteView } from "./generated/AppRouteView";
-import type { AppSyncDemandView } from "./generated/AppSyncDemandView";
-import type { AppSyncUrgency } from "./generated/AppSyncUrgency";
-import type { AppSyncTargetView } from "./generated/AppSyncTargetView";
-import type { AppReleaseAnswer } from "./generated/AppReleaseAnswer";
-import type { AppInstanceAnswer } from "./generated/AppInstanceAnswer";
-import type { ObservationIntentView } from "./generated/ObservationIntentView";
-import type { ObservationAcceptedView } from "./generated/ObservationAcceptedView";
+import type { AppReleaseView } from "./generated/AppReleaseView.js";
+import type { AppOpenInput } from "./generated/AppOpenInput.js";
+import type { AppInstanceView } from "./generated/AppInstanceView.js";
+import type { AppResidencyView } from "./generated/AppResidencyView.js";
+import type { AppContinuationView } from "./generated/AppContinuationView.js";
+import type { AppAttachmentInput } from "./generated/AppAttachmentInput.js";
+import type { AppRouteView } from "./generated/AppRouteView.js";
+import type { AppSyncDemandView } from "./generated/AppSyncDemandView.js";
+import type { AppSyncUrgency } from "./generated/AppSyncUrgency.js";
+import type { AppSyncTargetView } from "./generated/AppSyncTargetView.js";
+import type { AppReleaseAnswer } from "./generated/AppReleaseAnswer.js";
+import type { AppInstanceAnswer } from "./generated/AppInstanceAnswer.js";
+import type { ObservationIntentView } from "./generated/ObservationIntentView.js";
+import type { ObservationAcceptedView } from "./generated/ObservationAcceptedView.js";
 
 export type {
   AppReleaseView,
