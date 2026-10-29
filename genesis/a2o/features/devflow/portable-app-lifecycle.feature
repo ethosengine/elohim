@@ -1,4 +1,4 @@
-@devflow @wip @concern:release-retention
+@devflow @concern:release-retention
 Feature: An app follows its person without making the hub a dependency
   Matthew wants to open the same work from his hub or his laptop and keep working offline.
   App developers use an adapter: an implementation of the shared app lifecycle interface.
@@ -6,9 +6,6 @@ Feature: An app follows its person without making the hub a dependency
   Lifecycle contracts distinguish held bytes, execution, authority and private continuity.
   Foundation scenarios (tagged lifecycle-contract) exercise contracts; pending scenarios (tagged
   wip) require real runtime delivery.
-
-  The lifecycle SDK and its step adapter arrive in a separate port, so the contract scenarios stay
-  pending in this repository for now.
 
   Each scenario names which of the four facts it exercises. Held bytes are the executable and data
   a device holds; execution is where the app runs; authority is who may reach it; private
