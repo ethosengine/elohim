@@ -21,6 +21,11 @@ import json
 import os
 import tempfile
 from pathlib import Path
+SCRATCH_PARENT = Path(tempfile.gettempdir()).resolve()
+WORKTREE_ROOT = Path(__file__).resolve().parents[4]
+if SCRATCH_PARENT == WORKTREE_ROOT or WORKTREE_ROOT in SCRATCH_PARENT.parents:
+    raise RuntimeError("REFUSED: set TMPDIR outside the tree")
+
 
 here = Path(__file__).resolve()
 root = None
@@ -103,7 +108,7 @@ check("BUDGET_EXHAUSTED carries the pricing habit's concern",
       ci_harvest._scan_for_budget_timeout(own_timeout).get("concern") == "push-delivers-within-budget")
 
 # ---------------------------------------------------------------- reconcile persists the field
-with tempfile.TemporaryDirectory() as tmp:
+with tempfile.TemporaryDirectory(dir=SCRATCH_PARENT) as tmp:
     ci_harvest.LEDGER_PATH = os.path.join(tmp, "ci-findings.jsonl")
     ci_harvest.CURSOR_PATH = os.path.join(tmp, "ci-cursor.json")
     first = dict(f, build=1725)

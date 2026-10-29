@@ -16,6 +16,11 @@ import importlib.util
 import re
 import tempfile
 from pathlib import Path
+SCRATCH_PARENT = Path(tempfile.gettempdir()).resolve()
+WORKTREE_ROOT = Path(__file__).resolve().parents[4]
+if SCRATCH_PARENT == WORKTREE_ROOT or WORKTREE_ROOT in SCRATCH_PARENT.parents:
+    raise RuntimeError("REFUSED: set TMPDIR outside the tree")
+
 
 here = Path(__file__).resolve()
 root = None
@@ -70,7 +75,7 @@ TAIL_NO_MEASURE_2 = f"{BANNER}\nunrelated trailing noise on a different build\n"
 
 
 def with_habits_fixture(fn):
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(dir=SCRATCH_PARENT) as td:
         habits_path = Path(td) / "habits.yaml"
         habits_path.write_text(HABITS_FIXTURE, encoding="utf-8")
         orig = ci_harvest.HABITS_PATH
@@ -110,7 +115,7 @@ got_fp2 = ci_harvest.fingerprint("elohim-edge", f2["category"], f2["ident"])
 check("fingerprint stable across repeat no-measures", got_fp2 == expected_fp)
 
 # No habits.yaml at all (FileNotFoundError) → concern omitted, never guessed.
-with tempfile.TemporaryDirectory() as td:
+with tempfile.TemporaryDirectory(dir=SCRATCH_PARENT) as td:
     missing = Path(td) / "does-not-exist.yaml"
     orig = ci_harvest.HABITS_PATH
     ci_harvest.HABITS_PATH = str(missing)

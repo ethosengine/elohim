@@ -12,6 +12,9 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[4]
+SCRATCH_PARENT = Path(tempfile.gettempdir()).resolve()
+if SCRATCH_PARENT == ROOT or ROOT in SCRATCH_PARENT.parents:
+    raise RuntimeError("REFUSED: set TMPDIR outside the tree")
 spec = importlib.util.spec_from_file_location("ci_harvest", ROOT / ".claude/scripts/ci-harvest.py")
 ci = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ci)
@@ -30,7 +33,8 @@ def rendered(out, hook=False):
 
 class HarvestTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.real_get_json = ci.get_json
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH_PARENT)
         self.addCleanup(self.tmp.cleanup)
         self.cursor = {"jobs": {}}
         self.calls = []
@@ -57,13 +61,13 @@ class HarvestTests(unittest.TestCase):
 
     def get_graph(self, path):
         self.graph_reads.append(path)
-        return self.graph
+        return {**self.graph, "buildNumber": int(path.split("/artifact/")[0].split("/")[-1])} if self.graph else self.graph
 
     def run_command(self, args, **kwargs):
         self.calls.append(args)
         if args[0] == "node":
             self.assertEqual(args[1:3], [ci.BRIT_ATTEST, "--json"])
-            self.assertEqual(json.loads(Path(args[3]).read_text()), self.graph)
+            self.assertEqual(json.loads(Path(args[3]).read_text())["results"], self.graph["results"])
             self.assertEqual(kwargs["env"]["REPO_ROOT"], ci.PROJECT)
             self.assertEqual(kwargs["env"]["BRIT_BUILD_REF_BIN"], "/stub/brit")
             return subprocess.CompletedProcess(args, 0, json.dumps(self.attestation), "")
@@ -71,7 +75,7 @@ class HarvestTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, json.dumps(self.offer), "")
         self.assertEqual(args[1], "observe")
         self.assertEqual(args[args.index("--offer") + 1], ci.OFFER_PATH)
-        self.assertEqual(json.loads(Path(args[args.index("--graph") + 1]).read_text()), self.graph)
+        self.assertEqual(json.loads(Path(args[args.index("--graph") + 1]).read_text())["results"], self.graph["results"])
         return subprocess.CompletedProcess(args, self.observe_exit, json.dumps(self.outcome), self.observe_stderr)
 
     def count(self, word):
@@ -137,7 +141,7 @@ class HarvestTests(unittest.TestCase):
         self.cursor["attested"] = {str(n): SHA[:12] for n in range(2161, 2176)}
         def graph_at(path):
             n = int(path.split("/artifact/")[0].split("/")[-1])
-            return {**GRAPH, "results": {}} if n < 2175 else GRAPH
+            return {**GRAPH, "buildNumber": n, "results": {}} if n < 2175 else GRAPH
         with patch.object(ci, "get_json", side_effect=graph_at):
             out = ci.attest_waves(completed(range(2161, 2176)), self.cursor)
         self.assertEqual(self.count("node"), 0)
@@ -172,7 +176,7 @@ class HarvestTests(unittest.TestCase):
         self.assertEqual(self.cursor["observed"], {})
 
     def test_queued_or_missing_edge_build_observes_nothing(self):
-        for edge in [{}, {"result": "DISPATCHED", "buildNumber": None}]:
+        for edge in [{"result": "NOT_DISPATCHED"}, {"result": "DISPATCHED", "buildNumber": None}]:
             self.graph = {**GRAPH, "results": {"elohim-edge": edge}}
             out = ci.attest_waves(completed(), {})
             self.assertEqual(out["attested"], [2175])
@@ -229,10 +233,157 @@ class HarvestTests(unittest.TestCase):
         self.assertEqual(self.cursor["attested"], {})
         self.assertTrue(out["deferred"])
 
+    def test_invalid_graphs_are_isolated_and_never_memoised(self):
+        corruptions = [{"commitSha": None}, {"commitSha": "HEAD"}, {"buildNumber": "no"},
+                       {"results": None}, {"results": []}, {"results": {"edge": None}},
+                       {"results": {"edge": {}}}, {"results": {"edge": {"result": "SUCCESS", "duration": "no"}}},
+                       {"results": {"edge": {"result": "SUCCESS", "closure": []}}}]
+        for corrupt in corruptions:
+            with self.subTest(corrupt=corrupt):
+                self.calls.clear()
+                def graph_at(path):
+                    n = int(path.split("/artifact/")[0].split("/")[-1])
+                    return {**GRAPH, "buildNumber": n, **(corrupt if n == 2174 else {})}
+                cursor = {}
+                with patch.object(ci, "get_json", side_effect=graph_at):
+                    out = ci.attest_waves(completed([2174, 2175]), cursor)
+                self.assertEqual(out["attested"], [2175])
+                self.assertNotIn("2174", cursor["attested"])
+                self.assertTrue(any("#2174: invalid" in why for why in out["deferred"]))
+                self.assertEqual(self.count("node"), 1)
+
+    def test_cursor_merges_under_lock_with_unique_temporary_files(self):
+        ci.write_cursor({"jobs": {"a": 4}, "attested": {"1": "first"}, "recent": {"a": ["SUCCESS"]}})
+        stale = {"jobs": {"a": 2, "b": 3}, "attested": {"2": "second"}, "observed": {"1": {"process": "p"}}, "recent": {"a": ["FAILURE"]}}
+        real_replace = os.replace
+        temps = []
+        def replace(src, dest):
+            temps.append(src)
+            with open(ci.CURSOR_PATH + ".lock", "a") as competing:
+                with self.assertRaises(BlockingIOError):
+                    ci.fcntl.flock(competing, ci.fcntl.LOCK_EX | ci.fcntl.LOCK_NB)
+            real_replace(src, dest)
+        with patch.object(ci.os, "replace", side_effect=replace):
+            ci.write_cursor(stale)
+            ci.write_cursor(stale)
+        saved = ci.load_cursor()
+        self.assertEqual(saved["attested"], {"1": "first", "2": "second"})
+        self.assertEqual(saved["jobs"], {"a": 4, "b": 3})
+        self.assertEqual(saved["recent"]["a"], ["SUCCESS"])
+        self.assertEqual(len(set(temps)), 2)
+        self.assertTrue(all(Path(t).parent == Path(ci.CURSOR_PATH).parent for t in temps))
+        self.assertTrue(all(not Path(t).exists() for t in temps))
+
+    def test_hook_cursor_lock_is_nonblocking_and_does_not_replace_busy_state(self):
+        ci.write_cursor({"jobs": {"a": 1}})
+        with open(ci.CURSOR_PATH + ".lock", "a") as held:
+            ci.fcntl.flock(held, ci.fcntl.LOCK_EX)
+            with patch.object(ci, "HOOK_DEADLINE", ci.time.monotonic() + 75):
+                with self.assertRaises(BlockingIOError):
+                    ci.write_cursor({"jobs": {"a": 2}})
+        self.assertEqual(ci.load_cursor()["jobs"]["a"], 1)
+
+    def test_network_and_emitter_use_the_remaining_hook_budget(self):
+        clock = [60.0]
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{}'
+        with patch.object(ci, "HOOK_DEADLINE", 75), patch.object(ci.time, "monotonic", side_effect=lambda: clock[0]), \
+             patch.object(ci.urllib.request, "urlopen", return_value=response) as read:
+            self.assertEqual(self.real_get_json("/fixture"), {})
+            self.assertEqual(read.call_args.kwargs["timeout"], 5)
+            clock[0] = 65
+            with self.assertRaises(TimeoutError):
+                self.real_get_json("/fixture")
+            self.assertEqual(read.call_count, 1)
+        series = {"pipelines": []}
+        calls = []
+        def run(args, **kwargs):
+            calls.append(kwargs)
+            if args[0] == "node":
+                clock[0] += 2
+                return subprocess.CompletedProcess(args, 0, json.dumps(series), "")
+            clock[0] += kwargs["timeout"]
+            raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+        clock[0] = 60
+        with patch.object(ci, "HOOK_DEADLINE", 75), patch.object(ci.time, "monotonic", side_effect=lambda: clock[0]), \
+             patch.object(ci.subprocess, "run", side_effect=run), \
+             patch.object(ci, "delivery_folds", return_value=[("stage-wallclock@1", 20, "fixture")]):
+            self.assertEqual(ci.record_delivery_measures(), [])
+        self.assertEqual([c["timeout"] for c in calls], [5, 3])
+        self.assertEqual(clock[0], 65)
+
+    def test_python_fixtures_refuse_scratch_symlink_into_worktree(self):
+        link = Path(self.tmp.name) / "in-tree"
+        link.symlink_to(ROOT, target_is_directory=True)
+        # subprocess.run is mocked for harvest calls; use Popen for this isolated refusal.
+        for name in ("attest", "stage_budget", "no_measure"):
+            with subprocess.Popen([sys.executable, str(ROOT / f".claude/scripts/_lib/__tests__/ci_harvest_{name}_test.py")],
+                                  env={**os.environ, "TMPDIR": str(link)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as child:
+                stdout, stderr = child.communicate(timeout=5)
+                self.assertNotEqual(child.returncode, 0)
+                self.assertIn(b"REFUSED: set TMPDIR outside the tree", stdout + stderr)
+
+    def test_one_virtual_deadline_harvest_attest_delivery_persist_render(self):
+        # Exercise main -> harvest -> actual attest wrapper -> actual delivery wrapper
+        # -> real cursor merge/replace -> render. Every slow subprocess obeys its timeout.
+        for exhaust in ("harvest", "attest", "delivery"):
+            with self.subTest(exhaust=exhaust):
+                now = [0.0]
+                phases = []
+                def advance(seconds):
+                    now[0] += seconds
+                def harvest(job, cursor, taxonomy):
+                    phases.append("harvest")
+                    advance(12)
+                    if exhaust == "harvest":
+                        advance(ci.remaining(100))
+                        raise TimeoutError("hook budget exhausted")
+                    return {"job": job, "new": [], "green": 2175, "urgent": None, "last": 2175,
+                            "builds_seen": [2175], "sequence": [(2175, "SUCCESS")], **completed()}
+                def subprocess_run(args, **kwargs):
+                    phase = "delivery" if ci.DELIVERY_SERIES in args else "attest"
+                    phases.append(phase)
+                    cost = 100 if phase == exhaust else 3
+                    advance(min(cost, kwargs["timeout"]))
+                    if cost > kwargs["timeout"]:
+                        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+                    return self.run_command(args, **kwargs)
+                real_render = ci.render
+                def render(*args, **kwargs):
+                    phases.append("render")
+                    advance(3)
+                    return real_render(*args, **kwargs)
+                cursor_path = str(Path(self.tmp.name) / (exhaust + ".json"))
+                with patch.object(ci.time, "monotonic", side_effect=lambda: now[0]), \
+                     patch.object(ci, "HOOK_DEADLINE", None), \
+                     patch.object(ci.signal, "signal"), patch.object(ci.signal, "setitimer"), \
+                     patch.dict(os.environ, {"HOOK_BUDGET_S": "75"}), \
+                     patch.object(sys, "argv", ["ci-harvest.py", "--hook", "--jobs", ci.ATTEST_JOB + "," + ci.DELIVERY_JOB]), \
+                     patch.object(ci, "CURSOR_PATH", cursor_path), \
+                     patch.object(ci, "LEDGER_PATH", str(Path(self.tmp.name) / (exhaust + ".jsonl"))), \
+                     patch.object(ci, "load_taxonomy", return_value={}), \
+                     patch.object(ci, "harvest_job", side_effect=harvest), \
+                     patch.object(ci.subprocess, "run", side_effect=subprocess_run), \
+                     patch.object(ci, "render", side_effect=render), contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(ci.main(), 0)
+                self.assertLessEqual(now[0], 75)
+                self.assertTrue(Path(cursor_path).exists(), "cursor persists even after budget exhaustion")
+                self.assertEqual(phases[-1], "render")
+                if exhaust == "harvest":
+                    self.assertNotIn("attest", phases)
+                    self.assertNotIn("delivery", phases)
+                elif exhaust == "attest":
+                    self.assertIn("attest", phases)
+                    self.assertNotIn("delivery", phases)
+                else:
+                    self.assertIn("attest", phases)
+                    self.assertIn("delivery", phases)
+                    self.assertIn("2175", json.loads(Path(cursor_path).read_text())["attested"])
+
 
 class BinaryResolutionTests(unittest.TestCase):
     def test_stale_pool_is_not_used_fresh_pool_is(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"CARGO_POOL_ROOT": tmp}, clear=True), \
+        with tempfile.TemporaryDirectory(dir=SCRATCH_PARENT) as tmp, patch.dict(os.environ, {"CARGO_POOL_ROOT": tmp}, clear=True), \
              patch.object(ci.shutil, "which", return_value=None), \
              patch.object(ci.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "200", "")) as git:
             path = Path(tmp) / "family/dev/jenkins-bridge/dev/debug/jenkins-bridge"

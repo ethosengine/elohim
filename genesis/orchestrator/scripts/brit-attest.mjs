@@ -7,13 +7,14 @@
 // writer identifies this device. brit's agentId remains this device's signing key.
 // Notes stay on this device: no remote fetch/push, runner key, or roster entry.
 // An existing note with the same inputsHash is preserved, including its builtAt timestamp.
+// Explicit rewrite policy: a different inputsHash replaces the note under the same lock.
 // Every failure is advisory; --json always emits one report and exits 0 for harvest retries.
 
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, openSync, closeSync, mkdirSync } from 'node:fs';
 import { arch, hostname, platform } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { loadPipelineRegistry } from '../pipeline-registry.mjs';
@@ -51,8 +52,27 @@ export function cidOfDigest(digest) {
   return 'b' + base32(Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), Buffer.from(digest.slice(7), 'hex')]));
 }
 
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const buildNumber = value => /^(?:[1-9][0-9]*)$/.test(String(value)) && Number.isSafeInteger(Number(value));
+export function validateGraph(graph) {
+  if (!object(graph) || typeof graph.commitSha !== 'string' || !/^[a-f0-9]{40}$/i.test(graph.commitSha)) throw new Error('invalid commitSha: full 40-hex SHA required');
+  if (!buildNumber(graph.buildNumber)) throw new Error('invalid buildNumber: numeric build identity required');
+  if (!object(graph.results)) throw new Error('invalid results: map required');
+  if (graph.executionOrder !== undefined && (!Array.isArray(graph.executionOrder) || graph.executionOrder.some(p => typeof p !== 'string' || !p))) throw new Error('invalid executionOrder');
+  for (const [pipeline, r] of Object.entries(graph.results)) {
+    if (!object(r) || !new Set([...ATTESTED, 'DISPATCHED', 'NOT_DISPATCHED', 'NOT_BUILT', 'ERROR', 'SKIPPED']).has(r.result)) throw new Error(`invalid results.${pipeline}: result record required`);
+    if (r.buildNumber != null && !buildNumber(r.buildNumber)) throw new Error(`invalid results.${pipeline}.buildNumber`);
+    if (r.duration != null && (typeof r.duration !== 'number' || !Number.isFinite(r.duration) || r.duration < 0)) throw new Error(`invalid results.${pipeline}.duration`);
+    if (r.url != null && typeof r.url !== 'string') throw new Error(`invalid results.${pipeline}.url`);
+    for (const field of ['closure', 'outputDigest', 'closureHit']) {
+      if (r[field] != null && (!object(r[field]) || Object.values(r[field]).some(v => typeof v !== (field === 'closureHit' ? 'boolean' : 'string')))) throw new Error(`invalid results.${pipeline}.${field}`);
+    }
+  }
+}
+
 /** Pure plan: repository reads and the device identity are supplied by the caller. */
 export function planAttestations(graph, ctx) {
+  validateGraph(graph);
   const planned = [];
   const skipped = [];
   // Jenkins env.BUILD_NUMBER is a decimal string in archived graphs.
@@ -112,8 +132,15 @@ export function planAttestations(graph, ctx) {
   return { planned, skipped };
 }
 
+let deadline = Infinity;
+function timeout() {
+  const left = deadline - performance.now();
+  if (left <= 0) throw new Error('attestation budget exhausted');
+  return Math.max(1, Math.min(5000, Math.floor(left)));
+}
+
 function git(repo, args, opts = {}) {
-  return execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+  return execFileSync('git', args, { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], timeout: timeout(), ...opts });
 }
 
 function warn(msg) {
@@ -149,23 +176,26 @@ function machine(env) {
 
 /** Always 0; deferred work is explicitly reported so the harvest does not memoise it. */
 export async function main(argv, { env = process.env } = {}) {
+  deadline = performance.now() + (Number(env.ATTEST_BUDGET_MS) > 0 ? Number(env.ATTEST_BUDGET_MS) : 60_000);
   const graphPath = argv.find(arg => arg !== '--json');
   const bin = env.BRIT_BUILD_REF_BIN;
   const repo = env.REPO_ROOT || process.cwd();
   const report = { commit: null, orchestratorBuild: null, written: [], present: [], skipped: [], deferred: [] };
   const defer = why => { report.deferred.push({ why }); warn(why); };
+  let lock;
   try {
     const graph = JSON.parse(readFileSync(graphPath, 'utf8'));
-    report.commit = graph.commitSha ?? null;
+    validateGraph(graph);
+    report.commit = graph.commitSha;
     report.orchestratorBuild = Number(graph.buildNumber) || null;
     if (!bin) { defer('brit-build-ref absent'); return 0; }
     let commit;
     let tree;
     try {
-      commit = git(repo, ['rev-parse', `${graph.commitSha || env.GIT_COMMIT_HASH || 'HEAD'}^{commit}`]).toString().trim();
+      commit = git(repo, ['rev-parse', `${graph.commitSha}^{commit}`]).toString().trim();
       tree = git(repo, ['rev-parse', `${commit}^{tree}`]).toString().trim();
     } catch {
-      defer(`commit ${graph.commitSha || 'HEAD'} not in this clone`);
+      defer(`commit ${graph.commitSha} not in this clone`);
       return 0;
     }
     report.commit = commit;
@@ -174,6 +204,14 @@ export async function main(argv, { env = process.env } = {}) {
     });
     report.skipped = skipped;
     for (const s of skipped) console.error(`[brit-attest] skip ${s.pipeline}: ${s.why}`);
+    // flock locks the inherited open file description; this parent owns it until close.
+    // The common directory serializes direct invocations across every linked worktree.
+    const common = resolve(repo, git(repo, ['rev-parse', '--git-common-dir']).toString().trim());
+    mkdirSync(join(common, 'brit'), { recursive: true });
+    lock = openSync(join(common, 'brit', 'attest.lock'), 'a');
+    const acquired = spawnSync('flock', ['-n', '-E', '75', '3'], { stdio: ['ignore', 'pipe', 'pipe', lock], timeout: timeout() });
+    if (acquired.status === 75) { defer('deferred: attest lock busy'); return 0; }
+    if (acquired.error || acquired.status !== 0) throw new Error('attest lock unavailable');
     for (const p of planned) {
       const entry = { pipeline: p.pipeline, step: p.step, kind: p.kind };
       try {
@@ -181,7 +219,7 @@ export async function main(argv, { env = process.env } = {}) {
         // asks the launcher to execute itself and is correctly refused as launcher-alias.
         const childEnv = { ...env };
         delete childEnv.BRIT_BUILD_REF_BIN;
-        const options = { cwd: repo, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 };
+        const options = { cwd: repo, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], timeout: timeout() };
         const existing = spawnSync(bin, ['--repo', repo, 'build', 'get', '--step', p.step, '--commit', commit], { ...options, encoding: 'utf8' });
         if (existing.error) throw existing.error;
         if (existing.status !== 0) throw new Error(existing.stderr.trim() || `build get exited ${existing.status}`);
@@ -194,7 +232,7 @@ export async function main(argv, { env = process.env } = {}) {
           console.error(`[brit-attest] present ${p.step}`);
           continue;
         }
-        const cid = execFileSync(bin, ['--repo', repo, ...p.args], options).toString().trim();
+        const cid = execFileSync(bin, ['--repo', repo, ...p.args], { ...options, timeout: timeout() }).toString().trim();
         report.written.push({ ...entry, cid, ...(node ? { rewritten: true } : {}) });
         console.error(`[brit-attest] ${node ? 'rewritten' : 'written'} ${p.step} → ${cid}`);
       } catch (e) {
@@ -206,6 +244,7 @@ export async function main(argv, { env = process.env } = {}) {
   } catch (e) {
     defer(`${graphPath ?? 'graph'} unreadable or attestation failed: ${e.message.split('\n')[0]}`);
   } finally {
+    if (lock !== undefined) closeSync(lock);
     if (argv.includes('--json')) console.log(JSON.stringify(report));
   }
   return 0;

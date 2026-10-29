@@ -3,9 +3,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+function scratch(prefix) {
+  const parent = realpathSync(tmpdir());
+  const root = realpathSync(resolve(import.meta.dirname, '../..'));
+  const rel = relative(root, parent);
+  if (!rel || (rel !== '..' && !rel.startsWith(`..${sep}`))) {
+    throw new Error('REFUSED: set TMPDIR outside the tree');
+  }
+  const dir = mkdtempSync(join(parent, prefix));
+  scratchDirs.push(dir);
+  return dir;
+}
+const scratchDirs = [];
+process.on('exit', () => { for (const dir of scratchDirs) rmSync(dir, { recursive: true, force: true }); });
+import { join, relative, resolve, sep } from 'node:path';
 
 
 const HELPER = join(import.meta.dirname, 'scripts', 'brit-helper.sh');
@@ -36,7 +50,7 @@ function fixtureGit(cwd, args, inherited = process.env) {
 
 /** A git repo with one commit and one pipeline manifest, as a CI workspace would hold. */
 function workspace(inherited = process.env) {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-'));
+  const dir = scratch('brit-helper-');
   const git = (...args) => fixtureGit(dir, args, inherited);
   git('init', '-q', '.');
   mkdirSync(join(dir, 'app'));
@@ -52,7 +66,7 @@ function workspace(inherited = process.env) {
 }
 
 test('fixture Git ignores hostile inherited repository and config paths', () => {
-  const decoy = mkdtempSync(join(tmpdir(), 'brit-helper-decoy-'));
+  const decoy = scratch('brit-helper-decoy-');
   fixtureGit(decoy, ['init', '-q', '.']);
   const hostile = {
     ...process.env,
@@ -94,7 +108,7 @@ function stub(dir, name, body) {
 }
 
 test('explicit BRIT_BIN selects unified build plan, never older PATH brit or rakia', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-plan-'));
+  const dir = scratch('brit-helper-plan-');
   const log = join(dir, 'argv.log');
   stub(dir, 'brit', `echo old-brit >> '${log}'`);
   stub(dir, 'rakia', `echo old-rakia >> '${log}'`);
@@ -123,7 +137,7 @@ test('brit verify is bounded by BRIT_ADVISORY_TIMEOUT_S and a timeout stays a wa
 });
 
 test('invalid explicit BRIT_BIN never falls back to old tools or blocks build-ref', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-invalid-'));
+  const dir = scratch('brit-helper-invalid-');
   const log = join(dir, 'argv.log');
   stub(dir, 'brit', `echo old-brit >> '${log}'`);
   stub(dir, 'rakia', `echo old-rakia >> '${log}'`);
@@ -148,7 +162,7 @@ test('invalid explicit BRIT_BIN never falls back to old tools or blocks build-re
 test('a brit without `build plan` stays advisory and never falls back to a rakia binary', () => {
   // `rakia` on PATH is now the bin-store launcher alias for the same pinned brit, so there is no
   // older plan engine to fall back to: an old brit is reported, and nothing else is executed.
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-no-plan-'));
+  const dir = scratch('brit-helper-no-plan-');
   const log = join(dir, 'argv.log');
   stub(dir, 'brit', 'exit 2'); // An old brit with no `build plan` namespace.
   stub(dir, 'rakia', `printf 'rakia:%s\\n' "$*" >> '${log}'`);
@@ -159,7 +173,7 @@ test('a brit without `build plan` stays advisory and never falls back to a rakia
 });
 
 test('a failing unified plan remains warn-only, and pre-push supplies --since', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-failure-'));
+  const dir = scratch('brit-helper-failure-');
   const unified = stub(dir, 'unified-brit', '[ "$3" = "--help" ] && exit 0\nexit 17');
   const r = helper(['plan', '--since', 'origin/dev'], {
     BRIT_BIN: unified,

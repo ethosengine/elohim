@@ -260,9 +260,23 @@ test('a stage absent from a build is no sample: p50/p90 over present samples onl
 // ── --from attestations: the series read from brit build notes, not the Jenkins API ─────────
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+function scratch(prefix) {
+  const parent = realpathSync(tmpdir());
+  const root = realpathSync(resolve(import.meta.dirname, '../..'));
+  const rel = relative(root, parent);
+  if (!rel || (rel !== '..' && !rel.startsWith(`..${sep}`))) {
+    throw new Error('REFUSED: set TMPDIR outside the tree');
+  }
+  const dir = mkdtempSync(join(parent, prefix));
+  scratchDirs.push(dir);
+  return dir;
+}
+const scratchDirs = [];
+process.on('exit', () => { for (const dir of scratchDirs) rmSync(dir, { recursive: true, force: true }); });
+import { join, relative, resolve, sep } from 'node:path';
 import { attestationRuns, readBuildAttestations } from './delivery-series.mjs';
 
 const at = (step, commit, success, minutes, endIso) => ({
@@ -270,7 +284,7 @@ const at = (step, commit, success, minutes, endIso) => ({
   commit,
   success,
   durationMs: minutes * 60_000,
-  builtAt: endIso,
+  harvestedAt: endIso,
 });
 
 test('attestations group by commit into the orchestrator series shape, newest first', () => {
@@ -284,25 +298,38 @@ test('attestations group by commit into the orchestrator series shape, newest fi
   const [newest, older] = runs;
   assert.equal(newest.commit, 'bbbb2222bbbb2222');
   assert.equal(newest.number, 'bbbb2222bbbb');
-  assert.deepEqual(newest.planned, ['elohim-edge', 'elohim']);
+  assert.equal(newest.planned, null);
   assert.deepEqual(newest.outcome, { 'elohim-edge': 'SUCCESS', elohim: 'FAILURE' });
-  assert.equal(newest.delivered, false);
-  assert.equal(newest.result, 'FAILURE');
-  // Wall clock = first start (12:00) to last end (14:40), not the sum of the builds.
-  assert.equal(newest.minutes, 160);
-  assert.equal(older.delivered, true);
-  assert.equal(older.minutes, 55);
+  assert.equal(newest.delivered, 'unknown');
+  assert.equal(newest.result, null);
+  // Harvest timestamps are not Jenkins start/end times.
+  assert.equal(newest.minutes, null);
+  assert.equal(older.delivered, 'unknown');
+  assert.equal(older.minutes, null);
   // A build note says nothing about a timeout: unknown, never "no timeout".
   assert.equal(newest.timedOut, null);
   const s = summarize(runs, { window: 10 });
-  assert.equal(s.delivered, 1);
+  assert.equal(s.delivered, null);
   assert.equal(s.timedOut, null);
-  assert.equal(s.lastDelivered, 'aaaa1111aaaa');
+  assert.equal(s.lastDelivered, null);
 });
 
-function repoWithNotes() {
-  const dir = mkdtempSync(join(tmpdir(), 'delivery-attest-'));
-  const git = (...args) => execFileSync('git', args, { cwd: dir }).toString().trim();
+function fixtureGitEnv(home, inherited = process.env) {
+  return {
+    ...Object.fromEntries(Object.entries(inherited).filter(([key]) => !key.startsWith('GIT_'))),
+    HOME: home,
+    GIT_CONFIG_GLOBAL: join(home, '.gitconfig-fixture-disabled'),
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+}
+
+function fixtureGit(cwd, args, inherited = process.env) {
+  return execFileSync('git', args, { cwd, env: fixtureGitEnv(cwd, inherited) }).toString().trim();
+}
+
+function repoWithNotes(inherited = process.env) {
+  const dir = scratch('delivery-attest-');
+  const git = (...args) => fixtureGit(dir, args, inherited);
   git('init', '-q', '.');
   const commit = () => {
     git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'c');
@@ -337,7 +364,7 @@ function repoWithNotes() {
 
 test('only ci:<pipeline> notes form the series', () => {
   const { dir, c1, c2 } = repoWithNotes();
-  const got = readBuildAttestations(dir).sort((a, b) => a.builtAt.localeCompare(b.builtAt));
+  const got = readBuildAttestations(dir).sort((a, b) => a.harvestedAt.localeCompare(b.harvestedAt));
   assert.ok(got.every(a => a.inputsHashKind === 'tree'));
   assert.deepEqual(
     got.map(a => [a.step, a.commit, a.success, a.durationMs]),
@@ -347,25 +374,27 @@ test('only ci:<pipeline> notes form the series', () => {
       ['elohim', c2, false, 1_200_000],
     ]
   );
-  assert.deepEqual(readBuildAttestations(mkdtempSync(join(tmpdir(), 'no-git-'))), []);
+  assert.deepEqual(readBuildAttestations(scratch('no-git-')), []);
 });
 
 test('--from attestations prints the same JSON shape as the Jenkins series, sourced from notes', () => {
   const { dir, c2 } = repoWithNotes();
   const cli = join(import.meta.dirname, 'delivery-series.mjs');
-  const r = spawnSync('node', [cli, '--from', 'attestations', '--repo', dir, '--json', '--window', '2'], { encoding: 'utf8' });
+  const r = spawnSync('node', [cli, '--from', 'attestations', '--repo', dir, '--json', '--window', '2'], { env: fixtureGitEnv(dir), encoding: 'utf8' });
   const out = JSON.parse(r.stdout);
   assert.equal(out.source, 'attestations');
   assert.equal(out.considered, 2);
-  assert.equal(out.delivered, 1);
+  assert.equal(out.delivered, null);
   assert.equal(out.runs[0].commit, c2);
   assert.deepEqual(out.runs[0].outcome, { 'elohim-edge': 'SUCCESS', elohim: 'FAILURE' });
   for (const key of ['window', 'considered', 'delivered', 'rate', 'timedOut', 'p50DeliveredMin', 'p90DeliveredMin', 'lastDelivered', 'runs', 'bounds', 'exit']) {
     assert.ok(key in out, `shape keeps ${key}`);
   }
-  // 1 of 2 delivered is outside the 80% bound.
-  assert.equal(out.exit, 1);
-  assert.equal(r.status, 1);
+  // Partial notes never establish delivery or wall-clock bounds.
+  assert.equal(out.partial, 'partial: commit-level view; wave wall-clock unknown');
+  assert.equal(out.p90DeliveredMin, null);
+  assert.equal(out.exit, 2);
+  assert.equal(r.status, 2);
 });
 
 test('--stages is not in a build note: refused as not measured, never guessed', () => {
@@ -377,15 +406,36 @@ test('--stages is not in a build note: refused as not measured, never guessed', 
 });
 
 
-test('default source uses attestations only when they cover the window', () => {
+test('default remains Jenkins even with enough old notes; explicit notes label both formats', () => {
   const { dir } = repoWithNotes();
   const cli = join(import.meta.dirname, 'delivery-series.mjs');
-  const env = { ...process.env, JENKINS: 'http://127.0.0.1:1' };
-  const enough = spawnSync('node', [cli, '--repo', dir, '--json', '--window', '2'], { env, encoding: 'utf8' });
-  assert.equal(JSON.parse(enough.stdout).source, 'attestations');
-  assert.equal(enough.stderr, '');
-  const short = spawnSync('node', [cli, '--repo', dir, '--json', '--window', '5'], { env, encoding: 'utf8' });
-  assert.equal(short.status, 2);
-  assert.match(short.stderr, /2 of 5 waves attested on this device; reading Jenkins\./);
-  assert.match(short.stderr, /Jenkins unreadable/);
+  const env = { ...fixtureGitEnv(dir), JENKINS: 'http://127.0.0.1:1' };
+  for (const window of ['1', '2', '5']) {
+    const r = spawnSync('node', [cli, '--repo', dir, '--json', '--window', window], { env, encoding: 'utf8' });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /Jenkins unreadable/);
+    assert.equal(r.stdout, '');
+  }
+  const text = spawnSync('node', [cli, '--repo', dir, '--from', 'attestations'], { env, encoding: 'utf8' });
+  assert.equal(text.status, 2);
+  assert.match(text.stdout, /partial: commit-level view; wave wall-clock unknown/);
+  assert.doesNotMatch(text.stdout, /DELIVERED|bound/);
+});
+
+test('a successful note cannot prove a wave with an uncompleted planned pipeline delivered', () => {
+  const runs = attestationRuns([{ ...at('elohim', 'a'.repeat(40), true, 60, '2026-10-29T10:00:00Z'),
+    executionOrder: ['elohim', 'elohim-edge'] }]);
+  assert.equal(runs[0].delivered, 'unknown');
+  assert.equal(runs[0].minutes, null);
+  assert.equal(runs[0].harvestedAt, '2026-10-29T10:00:00Z');
+  assert.equal(summarize(runs).p90DeliveredMin, null);
+  assert.equal(verdict(summarize(runs)), 2);
+});
+
+test('delivery fixture sanitizes hostile Git environment', () => {
+  const decoy = scratch('delivery-decoy-');
+  fixtureGit(decoy, ['init', '-q', '.']);
+  const { dir, c2 } = repoWithNotes({ ...process.env, GIT_DIR: join(decoy, '.git'), GIT_COMMON_DIR: join(decoy, '.git'), GIT_WORK_TREE: decoy, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.bare', GIT_CONFIG_VALUE_0: 'true' });
+  assert.equal(fixtureGit(dir, ['rev-parse', 'HEAD']), c2);
+  assert.equal(fixtureGit(decoy, ['for-each-ref']), '');
 });

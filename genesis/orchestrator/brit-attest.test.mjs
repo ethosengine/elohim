@@ -2,10 +2,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, openSync, closeSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+function scratch(prefix) {
+  const parent = realpathSync(tmpdir());
+  const root = realpathSync(resolve(import.meta.dirname, '../..'));
+  const rel = relative(root, parent);
+  if (!rel || (rel !== '..' && !rel.startsWith(`..${sep}`))) {
+    throw new Error('REFUSED: set TMPDIR outside the tree');
+  }
+  const dir = mkdtempSync(join(parent, prefix));
+  scratchDirs.push(dir);
+  return dir;
+}
+const scratchDirs = [];
+process.on('exit', () => { for (const dir of scratchDirs) rmSync(dir, { recursive: true, force: true }); });
+import { join, relative, resolve, sep } from 'node:path';
 import { cidOfDigest, planAttestations, rawCid } from './scripts/brit-attest.mjs';
 import { attestationRuns, readBuildAttestations } from './delivery-series.mjs';
 
@@ -43,7 +57,7 @@ function fixtureGit(cwd, args, inherited = process.env) {
 
 /** A git repo with one commit and one pipeline manifest, as a CI workspace would hold. */
 function workspace(inherited = process.env) {
-  const dir = mkdtempSync(join(tmpdir(), 'brit-helper-'));
+  const dir = scratch('brit-helper-');
   const git = (...args) => fixtureGit(dir, args, inherited);
   git('init', '-q', '.');
   mkdirSync(join(dir, 'app'));
@@ -218,3 +232,104 @@ test('real brit notes stay on the device and a second run preserves builtAt',
     execFileSync(process.env.BRIT_BUILD_REF_TEST_BIN, ['--repo', w.dir, ...args], { env: fixtureGitEnv(w.dir) });
     t.diagnostic(`real build put: ${(performance.now() - started).toFixed(3)} ms (one fixture call, including launcher)`);
   });
+
+
+test('malformed provenance and result records defer before any note access; never use HEAD', () => {
+  const w = workspace();
+  const bin = stub(w);
+  for (const corruption of [{ commitSha: undefined }, { commitSha: 'HEAD' }, { commitSha: 'abc123' },
+    { buildNumber: null }, { buildNumber: 'no' }, { results: null }, { results: [] },
+    { results: { elohim: null } }, { results: { elohim: {} } },
+    { results: { elohim: { result: 'SUCCESS', duration: 'bad' } } },
+    { results: { elohim: { result: 'SUCCESS', closure: [] } } }]) {
+    writeFileSync(w.graphPath, JSON.stringify({ ...graph, commitSha: w.sha, ...corruption }));
+    const r = invoke(w, bin, { GIT_COMMIT_HASH: w.sha });
+    assert.equal(r.status, 0, r.stderr);
+    const report = JSON.parse(r.stdout);
+    assert.equal(report.written.length, 0);
+    assert.match(report.deferred[0].why, /invalid/);
+    assert.equal(existsSync(join(w.dir, 'calls')), false, 'no get or put for a malformed wave');
+  }
+});
+
+test('the shared common-dir lock defers both direct and linked-worktree writers', () => {
+  const w = workspace();
+  const linked = scratch('brit-linked-');
+  w.git('worktree', 'add', '--detach', linked, w.sha);
+  const bin = stub(w);
+  mkdirSync(join(w.dir, '.git', 'brit'));
+  const fd = openSync(join(w.dir, '.git', 'brit', 'attest.lock'), 'a');
+  try {
+    assert.equal(spawnSync('flock', ['-n', '3'], { stdio: ['ignore', 'pipe', 'pipe', fd] }).status, 0);
+    for (const repo of [w.dir, linked]) {
+      const r = invoke(w, bin, { REPO_ROOT: repo });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(JSON.parse(r.stdout).deferred[0].why, 'deferred: attest lock busy');
+    }
+    assert.equal(existsSync(join(w.dir, 'calls')), false);
+  } finally { closeSync(fd); }
+  assert.equal(JSON.parse(invoke(w, bin).stdout).written.length, 2, 'release permits retry');
+});
+
+test('simultaneous writers serialize get/compare/put and retry preserves existing notes', async () => {
+  const w = workspace();
+  const bin = join(w.dir, 'slow-brit');
+  const tree = w.git('rev-parse', `${w.sha}^{tree}`);
+  writeFileSync(bin, `#!/bin/sh
+if [ "$4" = get ]; then
+  if [ -f '${w.dir}/stored' ]; then cat '${w.dir}/stored'; else echo 'no build ref found for step=stub commit=stub'; fi
+else
+  sleep 0.2
+  echo '{"inputsHash":"${tree}"}' > '${w.dir}/stored'
+  echo write >> '${w.dir}/writes'
+  echo bafystub
+fi
+`);
+  chmodSync(bin, 0o755);
+  const launch = () => new Promise((resolve, reject) => {
+    const child = spawn('node', [CLI, '--json', w.graphPath], {
+      env: { ...fixtureGitEnv(w.dir), REPO_ROOT: w.dir, BRIT_BUILD_REF_BIN: bin },
+    });
+    let output = '';
+    child.stdout.on('data', data => { output += data; });
+    child.on('error', reject);
+    child.on('close', code => { try { assert.equal(code, 0); resolve(JSON.parse(output)); } catch (e) { reject(e); } });
+  });
+  const reports = await Promise.all([launch(), launch()]);
+  assert.equal(reports.filter(r => r.deferred.some(d => d.why === 'deferred: attest lock busy')).length, 1);
+  assert.equal(readFileSync(join(w.dir, 'writes'), 'utf8').trim().split('\n').length, 1);
+  assert.equal(JSON.parse(invoke(w, bin).stdout).present.length, 2);
+});
+
+test('all Node fixture suites refuse in-tree and symlinked scratch before writes', () => {
+  const outside = scratch('scratch-link-');
+  const root = resolve(import.meta.dirname, '../..');
+  const link = join(outside, 'in-tree');
+  symlinkSync(root, link);
+  for (const suite of ['brit-attest', 'brit-helper', 'delivery-series']) {
+    for (const parent of [root, link]) {
+      const r = spawnSync('node', ['--test', '--test-name-pattern', 'same inputsHash|fixture Git ignores|only ci:', join(import.meta.dirname, `${suite}.test.mjs`)], {
+        env: { ...Object.fromEntries(Object.entries(fixtureGitEnv(outside)).filter(([key]) => key !== 'NODE_TEST_CONTEXT')), TMPDIR: parent }, encoding: 'utf8',
+      });
+      assert.equal(r.status, 1, `${suite}: ${r.stdout} ${r.stderr}`);
+      assert.match(r.stdout + r.stderr, /REFUSED: set TMPDIR outside the tree/);
+    }
+  }
+});
+
+test('attestation child budget defers before a git or note call', () => {
+  const w = workspace();
+  const r = invoke(w, stub(w), { ATTEST_BUDGET_MS: '0.00001' });
+  assert.equal(r.status, 0);
+  assert.equal(JSON.parse(r.stdout).written.length, 0);
+  assert.equal(existsSync(join(w.dir, 'calls')), false);
+});
+
+
+test('the declared orchestrator gate includes Node and Python attestation regressions', () => {
+  const scripts = JSON.parse(readFileSync(join(import.meta.dirname, 'package.json'), 'utf8')).scripts;
+  assert.match(scripts.test, /(?:^| )brit-attest\.test\.mjs(?: |$)/);
+  const recipes = readFileSync(join(import.meta.dirname, 'justfile'), 'utf8');
+  assert.match(recipes, /^gate:.*\btest-harvest\b/m);
+  assert.match(recipes, /test-harvest:[\s\S]*ci_harvest_\*_test\.py/);
+});

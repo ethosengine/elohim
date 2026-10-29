@@ -23,13 +23,9 @@
 // never guessed. #1719–#1725 spent ≈12 pipeline-hours and delivered nothing; that is the
 // number this mode puts in front of a reader.
 //
-// --from attestations (Lane F3) reads the same series from brit build attestations — the git
-// notes `brit-helper.sh attest` writes under refs/notes/brit/build/<pipeline>, one signed
-// BuildAttestationContentNode per pipeline per commit — instead of the Jenkins API. One run is
-// one commit; its minutes are the wall clock from the first build's start to the last build's
-// end. A note carries no timeout reason, so `timedOut` reads unknown (null), never 0. With no
-// notes in the repository it says so on stderr and reads Jenkins. Fetch the notes first:
-//   git fetch origin '+refs/notes/brit/build/*:refs/notes/brit/build/*'
+// --from attestations is a partial commit-level view. Notes do not preserve the complete
+// wave plan or Jenkins wall-clock timing; builtAt is the device's harvest timestamp.
+// Jenkins remains the default and the only source for delivery bounds and --stages.
 //
 // CLI:  node genesis/orchestrator/delivery-series.mjs [--window 10] [--min-rate 0.8]
 //         [--max-p90-min 240] [--json] [--from jenkins|attestations] [--repo <path>]
@@ -91,13 +87,13 @@ function percentile(sorted, p) {
 /** Summarize the newest `window` work-bearing runs (runs newest-first). */
 export function summarize(runs, { window = 10 } = {}) {
   const recent = runs.filter(Boolean).slice(0, window);
-  const delivered = recent.filter(r => r.delivered);
-  const minutes = delivered.map(r => r.minutes).sort((a, b) => a - b);
+  const delivered = recent.filter(r => r.delivered === true);
+  const minutes = delivered.map(r => r.minutes).filter(Number.isFinite).sort((a, b) => a - b);
   return {
     window,
     considered: recent.length,
-    delivered: delivered.length,
-    rate: recent.length ? delivered.length / recent.length : null,
+    delivered: recent.some(r => r.delivered === 'unknown') ? null : delivered.length,
+    rate: recent.length && recent.every(r => typeof r.delivered === 'boolean') ? delivered.length / recent.length : null,
     // A source that cannot see timeouts (build notes) makes the count unknown, not zero.
     timedOut: recent.some(r => r.timedOut == null) ? null : recent.filter(r => r.timedOut).length,
     p50DeliveredMin: percentile(minutes, 50),
@@ -112,7 +108,7 @@ export function summarize(runs, { window = 10 } = {}) {
 const BUILD_NOTES = 'refs/notes/brit/build/';
 
 /**
- * Every build attestation note in `repo` → [{step, commit, success, durationMs, builtAt}].
+ * Every build attestation note in `repo` → [{step, commit, success, durationMs, harvestedAt}].
  * An unreadable repository or a malformed note reads as absent, never as a build.
  */
 export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
@@ -157,7 +153,7 @@ export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
         commit: n.commit,
         success: node.success,
         durationMs: Number(node.buildDurationMs) || 0,
-        builtAt: node.builtAt,
+        harvestedAt: node.builtAt,
         inputsHashKind: node.hardwareProfile?.inputsHashKind ?? 'tree',
         orchestratorBuild: node.hardwareProfile?.orchestratorBuild,
       });
@@ -168,43 +164,29 @@ export function readBuildAttestations(repo, { prefix = 'ci:' } = {}) {
   return attestations;
 }
 
-/**
- * Build attestations → the classifyRun shape, one run per commit, newest first. `number` is
- * the orchestrator build when recorded, otherwise the short commit; `minutes` is the wall clock
- * from the first build's start (built_at − duration) to the last build's end.
- */
+/** Notes lack a recoverable wave plan: a successful subset cannot prove delivery. */
 export function attestationRuns(attestations) {
   const byCommit = new Map();
   for (const a of attestations) {
-    const end = Date.parse(a.builtAt);
-    if (!Number.isFinite(end)) continue;
     if (!byCommit.has(a.commit)) byCommit.set(a.commit, []);
-    byCommit.get(a.commit).push({ ...a, end, start: end - a.durationMs });
+    byCommit.get(a.commit).push(a);
   }
-  const runs = [...byCommit].map(([commit, builds]) => {
-    builds.sort((x, y) => x.start - y.start);
-    const planned = builds.map(b => b.step);
-    const outcome = Object.fromEntries(builds.map(b => [b.step, b.success ? 'SUCCESS' : 'FAILURE']));
-    const delivered = builds.every(b => b.success);
-    const first = Math.min(...builds.map(b => b.start));
-    const last = Math.max(...builds.map(b => b.end));
-    return {
-      number: builds.find(b => typeof b.orchestratorBuild === 'number')?.orchestratorBuild ?? commit.slice(0, 12),
-      commit,
-      result: delivered ? 'SUCCESS' : 'FAILURE',
-      minutes: Math.round((last - first) / 6000) / 10,
-      planned,
-      outcome,
-      delivered,
-      timedOut: null,
-      endedAt: last,
-    };
-  });
-  return runs.sort((x, y) => y.endedAt - x.endedAt).map(({ endedAt, ...r }) => r);
+  return [...byCommit].map(([commit, builds]) => ({
+    number: builds.find(b => typeof b.orchestratorBuild === 'number')?.orchestratorBuild ?? commit.slice(0, 12),
+    commit,
+    result: null,
+    minutes: null,
+    planned: null,
+    outcome: Object.fromEntries(builds.map(b => [b.step, b.success ? 'SUCCESS' : 'FAILURE'])),
+    delivered: 'unknown',
+    timedOut: null,
+    harvestedAt: builds.map(b => b.harvestedAt).filter(Boolean).sort().at(-1) ?? null,
+  })).sort((x, y) => (y.harvestedAt ?? '').localeCompare(x.harvestedAt ?? ''));
 }
 
 /** 0 within bounds · 1 outside · 2 insufficient evidence. */
 export function verdict(summary, { minRate = 0.8, maxP90Min = 240 } = {}) {
+  if (summary.runs.some(r => r.delivered === 'unknown')) return 2;
   if (summary.considered < Math.min(summary.window, 3)) return 2;
   if (summary.rate < minRate) return 1;
   if (summary.p90DeliveredMin == null || summary.p90DeliveredMin > maxP90Min) return 1;
@@ -475,7 +457,7 @@ function strArg(argv, flag, fallback) {
 }
 
 async function main(argv) {
-  let from = strArg(argv, '--from', null);
+  const from = strArg(argv, '--from', 'jenkins');
   if (from !== null && from !== 'jenkins' && from !== 'attestations') {
     console.error(`delivery-series: --from ${from} — expected jenkins or attestations. NOT MEASURED.`);
     return 2;
@@ -491,17 +473,10 @@ async function main(argv) {
   const minRate = arg(argv, '--min-rate', 0.8);
   const maxP90Min = arg(argv, '--max-p90-min', 240);
   let runs;
-  if (from === null) {
+  const source = from;
+  const partial = source === 'attestations' ? 'partial: commit-level view; wave wall-clock unknown' : null;
+  if (source === 'attestations') {
     runs = attestationRuns(readBuildAttestations(strArg(argv, '--repo', process.cwd())));
-    from = runs.length >= window ? 'attestations' : 'jenkins';
-    if (from === 'jenkins') console.error(`delivery-series: ${runs.length} of ${window} waves attested on this device; reading Jenkins.`);
-  }
-  let source = 'jenkins';
-  if (from === 'attestations') {
-    const repo = strArg(argv, '--repo', process.cwd());
-    runs ??= attestationRuns(readBuildAttestations(repo));
-    if (runs.length > 0) source = 'attestations';
-    else console.error(`delivery-series: no brit build attestations under ${BUILD_NOTES} in ${repo}; reading Jenkins.`);
   }
   if (source === 'jenkins') {
     try {
@@ -512,9 +487,14 @@ async function main(argv) {
     }
   }
   const summary = summarize(runs, { window });
-  const code = verdict(summary, { minRate, maxP90Min });
+  const code = partial ? 2 : verdict(summary, { minRate, maxP90Min });
   if (argv.includes('--json')) {
-    console.log(JSON.stringify({ source, ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
+    console.log(JSON.stringify({ source, ...(partial ? { partial } : {}), ...summary, bounds: { minRate, maxP90Min }, exit: code }, null, 2));
+    return code;
+  }
+  if (partial) {
+    console.log(partial);
+    for (const r of summary.runs) console.log(`#${r.number} delivered: unknown; harvestedAt: ${r.harvestedAt ?? 'unknown'} — ${JSON.stringify(r.outcome)}`);
     return code;
   }
   for (const r of summary.runs) {
