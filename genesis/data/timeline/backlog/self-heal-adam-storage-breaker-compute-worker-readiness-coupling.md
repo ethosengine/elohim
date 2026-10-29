@@ -146,6 +146,12 @@ worker's own process lifetime.
 
 ## Current decision
 
+**2026-10-29:** `ccce437a2ecf` fired again (poll 270), but this recurrence is NOT this concern:
+edge #1757's rollout evidence reads `compute-worker=true/;elohim-node=false/CrashLoopBackOff`.
+Adam's storage itself refuses to start on a full `storage-data` volume (`Disk quota exceeded
+(os error 122)` since 2026-10-28T18:41Z). That recurrence is canonicalized in
+`self-heal-storage-disk-quota-crashloop.md`; the ledger line cites it.
+
 **2026-10-27:** The blocking campaign branch `feat/jenkins-native-bdd-land` is no
 longer on origin; the render has been untouched since 2026-10-23 (`9dcd88757`).
 Option A is implemented on `fix/compute-worker-supervise`, awaiting the steward's
