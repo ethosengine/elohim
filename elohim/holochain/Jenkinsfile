@@ -589,13 +589,28 @@ def dataplaneNoMeasureReason(String log) {
  * Wait for one workload rollout and synchronously preserve pod evidence before
  * propagating a timeout/failure. The bash helper is best-effort and read-only;
  * its artifact must never replace the rollout's original verdict.
+ *
+ * scripts/ci/rollout-watch.sh runs the same `kubectl rollout status`, and for a
+ * statefulset stops waiting when a pod of the update revision is crashlooping
+ * (exit 4) instead of spending the whole timeout on a peer that cannot come up.
+ * The reason it wrote lands in ROLLOUT_FAST_FAILS (keyed by workload name) so
+ * the roll gate and the junit testcase can name it.
  */
+@groovy.transform.Field
+def ROLLOUT_FAST_FAILS = java.util.Collections.synchronizedMap([:])
+
 def waitForRolloutWithEvidence(String resourceType, String resourceName, String namespace, String timeout) {
     def rolloutStatus = sh(
-        script: "kubectl rollout status ${resourceType}/${resourceName} -n ${namespace} --timeout=${timeout}",
+        script: "bash '${env.WORKSPACE}/scripts/ci/rollout-watch.sh' '${resourceType}' '${resourceName}' '${namespace}' '${timeout}'",
         returnStatus: true,
     )
     if (rolloutStatus != 0) {
+        def evidenceDir = "rollout-evidence/${namespace}--${resourceType}--${resourceName}"
+        def fastFail = null
+        if (rolloutStatus == 4) {
+            fastFail = sh(script: "cat '${evidenceDir}/fast-fail.reason' 2>/dev/null || echo 'crashloop (fast-fail.reason unreadable)'", returnStdout: true).trim()
+            ROLLOUT_FAST_FAILS[resourceName.toString()] = fastFail
+        }
         def captureStatus = sh(
             script: "bash '${env.WORKSPACE}/scripts/ci/capture-rollout-evidence.sh' '${resourceType}' '${resourceName}' '${namespace}'",
             returnStatus: true,
@@ -603,8 +618,15 @@ def waitForRolloutWithEvidence(String resourceType, String resourceName, String 
         if (captureStatus != 0) {
             echo "WARNING: rollout evidence collector exited ${captureStatus}; the rollout failure remains authoritative"
         }
-        error "${resourceType}/${resourceName} rollout failed with exit ${rolloutStatus}; evidence capture exit ${captureStatus}, expected artifact: rollout-evidence/${namespace}--${resourceType}--${resourceName}/"
+        def verdict = fastFail ? "FAST-FAILED before its ${timeout} timeout (crashloop: ${fastFail})" : "failed with exit ${rolloutStatus}"
+        error "${resourceType}/${resourceName} rollout ${verdict}; evidence capture exit ${captureStatus}, expected artifact: ${evidenceDir}/"
     }
+}
+
+/** The fast-fail reason recorded for a peer's storage or conductor rollout, or null. */
+def rolloutFastFailFor(Map humanConfig) {
+    def prefix = humanConfig.resourcePrefix.toString()
+    return ROLLOUT_FAST_FAILS[prefix] ?: ROLLOUT_FAST_FAILS["${prefix}-conductor".toString()]
 }
 
 // Read-only G2 evidence after both provider halves have rolled. Kubernetes Ready
@@ -1113,6 +1135,8 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
                 echo "roll gate step ${step.index} (${step.phase}): HALTED — no gate run, the settle budget is preserved for a re-deploy."
             } else if (rollState.lastRolled == null) {
                 echo "roll gate step ${step.index} (${step.phase}): no conductor CHANGED in this step — nothing restarted, nothing to settle, no gate. Steady-state deploys pay zero gate wall-clock."
+            } else if (rolloutFastFailFor(byName[rollState.lastRolled])) {
+                echo "roll gate step ${step.index} (${step.phase}): SKIPPED — ${rollState.lastRolled}'s rollout fast-failed (${rolloutFastFailFor(byName[rollState.lastRolled])}); a crashlooping peer cannot settle, so no settle budget is spent on it."
             } else {
                 if (!runPeerRollGate(byName[rollState.lastRolled], "${gateState.left}", stateFile)) {
                     // An implementation/environment failure is different from a
@@ -1239,6 +1263,7 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
             workloadKind: (hc.workloadKind ?: 'statefulset'),
             archetype: (hc.deviceArchetype ?: 'unknown'),
             passed: outcomes[hc.resourcePrefix] == true,
+            fastFail: rolloutFastFailFor(hc),
         ]
     }
     def passed = cases.count { it.passed }
@@ -1249,7 +1274,8 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
         if (c.passed) {
             "  <testcase ${attrs}/>"
         } else {
-            def msg = "${c.workloadKind}/${c.name} (archetype=${c.archetype}) rollout did not complete, or kubectl apply failed. See the build log and archived rollout-evidence/${c.namespace}--${c.workloadKind}--${c.name}/ bundle for actual pod conditions, events, states, and bounded container logs."
+            def why = c.fastFail ? "rollout FAST-FAILED on a crashlooping pod (${c.fastFail})" : 'rollout did not complete, or kubectl apply failed'
+            def msg = "${c.workloadKind}/${c.name} (archetype=${c.archetype}) ${why}. See the build log and archived rollout-evidence/${c.namespace}--${c.workloadKind}--${c.name}/ bundle for actual pod conditions, events, states, and bounded container logs."
             // Minimal XML escape for the attribute value.
             msg = msg.replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
             "  <testcase ${attrs}><failure message=\"${msg}\" type=\"rollout-failed\"/></testcase>"
