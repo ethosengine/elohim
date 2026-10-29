@@ -17,11 +17,11 @@ graduation-trigger: >-
   conductor, and a gate neither device paid is carried by the device whose own guard lines admit it — each
   proven by a DELTA line on the habit it names and by closure-keyed-build.feature / landing-queue.feature green @act:host.
 cites:
-  - "steward-space-landing-plane-design | The steward space | sha256:53718b5898db3b15 | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
-  - "workspace-berth-carrying-capacity-design | The workspace is a berth | sha256:f7f53bb9e7686d19 | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
-  - "compute-envelope-tevah | Tevah | sha256:d427a367f3b01a6e | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
-  - "peer-executed-stage-design | The first Jenkins stage executed by a peer | sha256:41d3536b4a97b0f8 | path: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md"
-  - "per-substrate-limitarian-governor-design | Per-Substrate Limitarian Governor | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md"
+  - "steward-space-landing-plane-design | the Arm A slices (A8 sibling verdict, A9 landing intent, A10 Jenkins as witness) this design turns into sprint slices, and the reflexive rule it inherits | sha256:53718b5898db3b15 | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
+  - "workspace-berth-carrying-capacity-design | the berth lease classes, VSM table and operator rulings on carrying capacity the CAS window and the carry obey | sha256:f7f53bb9e7686d19 | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
+  - "compute-envelope-tevah | ark's RuntimeManifest, placement Task and envelope Bound that a carried gate runs inside and that Envelope::demand extends | sha256:d427a367f3b01a6e | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
+  - "peer-executed-stage-design | the measure-class stage a peer runs for Jenkins (rung H proven, rung A owed) — what this design does NOT make Jenkins do | sha256:41d3536b4a97b0f8 | path: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md"
+  - "per-substrate-limitarian-governor-design | the limitarian mechanism (walls reject-at-write, super-linear friction, compute ratified at household→community) the capacity plane applies to gates | sha256:5d10a556e2ec7a14 | path: genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md"
   - genesis/research/integration-capacity-grounding-2026-10-29.md
   - genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
   - genesis/orchestrator/.epr-meta/sprint-lands-each-closure-once.habit.md

@@ -10,9 +10,9 @@ serves: [push-delivers-within-budget, sprint-lands-each-closure-once, push-gate-
 refines: closure-keyed-landing-plane-design
 tags: [rakia, brit, lvi, epr-peer, berth, ark, onboarding, native-ci, scaffold]
 cites:
-  - "closure-keyed-landing-plane-design | The landing plane, closure-keyed | sha256:9156f36238a93744 | path: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
-  - "steward-space-landing-plane-design | The steward space | sha256:53718b5898db3b15 | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
-  - "restart-to-connected-sprint-plan-20261026 | Sprint plan | sha256:d2c664288eedeaed | path: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md"
+  - "closure-keyed-landing-plane-design | the design whose slices this plan sequences into the concern table (build, attest, reuse, carry, landing) | sha256:9156f36238a93744 | path: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
+  - "steward-space-landing-plane-design | the steward space's Arm A/B rungs that the onboarding story (fork an lvi workspace, join, carry jobs) graduates through | sha256:53718b5898db3b15 | path: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md"
+  - "restart-to-connected-sprint-plan-20261026 | the prior sprint on arriving as a device and reconnecting peers — the reliability floor this plan assumes | sha256:d2c664288eedeaed | path: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md"
   - genesis/research/integration-capacity-grounding-2026-10-29.md
   - elohim/rakia/docs/plans/README.md
   - elohim/rakia/docs/plans/stage-2-canopy.md
