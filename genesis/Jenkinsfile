@@ -2150,6 +2150,21 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // named storage peers, the doorway's storage pool).
                         def meshEnv = householdMeshEnv(doorwayHost)
 
+                        // Free hosted-conductor slots leaked by earlier a2o runs (soft-delete
+                        // leaves the cell installed). Once per build, before any a2o stage
+                        // registers humans; never fails the build.
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            try {
+                                withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
+                                    withEnv(["API_KEY_ADMIN=${env.ADMIN_KEY}"]) {
+                                        sh "node '${env.WORKSPACE}/genesis/scripts/ci/reclaim-ephemeral-hosted.mjs' '${doorwayHost}'"
+                                    }
+                                }
+                            } catch (e) {
+                                echo "reclaim-ephemeral-hosted skipped: ${e}"
+                            }
+                        }
+
                         // Install E2E driver dependencies
                         dir('genesis/a2o') {
                             sh 'pnpm install --frozen-lockfile 2>/dev/null || pnpm install'
