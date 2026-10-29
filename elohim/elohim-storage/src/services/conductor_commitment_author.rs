@@ -45,7 +45,7 @@ use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
 use crate::services::conductor_writes::{self, CreateMishpatCommitmentInput};
 use crate::services::economic_event_emit_service::{self, EmitEconomicEventInput};
 use crate::services::provide_reconcile::{
-    CommitmentAuthor, ProvideAuthorRequest, ProvideRevokeRequest,
+    CommitmentAuthor, ProvideAuthorRequest, ProvideRenewal, ProvideRevokeRequest,
 };
 use crate::services::rate_history::DieselRateHistory;
 
@@ -114,7 +114,30 @@ pub fn build_content_payload(
     valid_until: &str,
     rate_per_minute: i64,
 ) -> String {
-    serde_json::json!({
+    build_content_payload_renewing(
+        provider,
+        head_ref,
+        reach,
+        valid_from,
+        valid_until,
+        rate_per_minute,
+        None,
+    )
+}
+
+/// [`build_content_payload`] for a provide that may renew a revoked
+/// commitment. With `renewal: None` the bytes are exactly
+/// [`build_content_payload`]'s, so an unrenewed commitment keeps its cid.
+pub fn build_content_payload_renewing(
+    provider: &str,
+    head_ref: &str,
+    reach: &str,
+    valid_from: &str,
+    valid_until: &str,
+    rate_per_minute: i64,
+    renewal: Option<&ProvideRenewal>,
+) -> String {
+    let mut payload = serde_json::json!({
         "action": "replicates-commons",
         "variant": "content",
         "head_ref": head_ref,
@@ -131,8 +154,20 @@ pub fn build_content_payload(
         "provider": provider,
         "valid_from": valid_from,
         "valid_until": valid_until,
-    })
-    .to_string()
+    });
+    // The lineage is added only to a renewal: an unrenewed payload keeps the
+    // exact keys (and so the cid) it has always had. The mishpat integrity zome
+    // checks only `variant` and `bounds.reach_ceiling` on this action and the
+    // coordinator reads named fields without refusing others, so these two keys
+    // move no DNA hash.
+    if let (Some(renewal), serde_json::Value::Object(fields)) = (renewal, &mut payload) {
+        fields.insert("renewal".to_string(), serde_json::json!(renewal.sequence));
+        fields.insert(
+            "supersedes".to_string(),
+            serde_json::json!(renewal.supersedes),
+        );
+    }
+    payload.to_string()
 }
 
 /// Build the ProvideAnnounce [`EmitEconomicEventInput`] for a content provide.
@@ -362,13 +397,14 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 
         // Step 1 — notarise the replicates-content Commitment. The content's own
         // reach (Stage B) rides the request; `reach_ceiling` stays commons.
-        let payload_json = build_content_payload(
+        let payload_json = build_content_payload_renewing(
             &provider,
             &req.head_ref,
             &req.reach,
             &valid_from,
             &valid_until,
             DEFAULT_RATE_PER_MINUTE,
+            req.renewal.as_ref(),
         );
         let new_cid = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::Provide,
@@ -524,6 +560,104 @@ mod tests {
             ],
             "top-level keys must be exactly the contract set"
         );
+    }
+
+    /// The payload `build_content_payload` produced before renewals existed,
+    /// kept verbatim so a change to the live builder cannot silently re-key
+    /// every unrenewed commitment.
+    fn legacy_content_payload(
+        provider: &str,
+        head_ref: &str,
+        reach: &str,
+        valid_from: &str,
+        valid_until: &str,
+        rate_per_minute: i64,
+    ) -> String {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": head_ref,
+            "reach": reach,
+            "bounds": {
+                "rate_per_minute": rate_per_minute,
+                "reach_ceiling": "commons",
+                "epr_scope": [head_ref],
+            },
+            "provider": provider,
+            "valid_from": valid_from,
+            "valid_until": valid_until,
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn an_unrenewed_commitment_keeps_the_bytes_it_had_before_renewals() {
+        let args = (
+            "uhCAkSteward",
+            "epr:album-1",
+            "household",
+            "2026-10-29T00:00:00+00:00",
+            "2027-10-29T00:00:00+00:00",
+            60,
+        );
+        let legacy = legacy_content_payload(args.0, args.1, args.2, args.3, args.4, args.5);
+        assert_eq!(
+            build_content_payload(args.0, args.1, args.2, args.3, args.4, args.5),
+            legacy
+        );
+        assert_eq!(
+            build_content_payload_renewing(args.0, args.1, args.2, args.3, args.4, args.5, None),
+            legacy,
+            "renewal 0 must reproduce today's entry, so nothing re-keys"
+        );
+    }
+
+    #[test]
+    fn a_renewal_is_a_new_entry_that_names_its_predecessor() {
+        let same_day = |renewal: Option<&ProvideRenewal>| {
+            build_content_payload_renewing(
+                "uhCAkSteward",
+                "epr:album-1",
+                "commons",
+                "2026-10-29T00:00:00+00:00",
+                "2027-10-29T00:00:00+00:00",
+                60,
+                renewal,
+            )
+        };
+        let first = ProvideRenewal {
+            sequence: 1,
+            supersedes: "uhCEkRevokedToday".to_string(),
+        };
+        let original = same_day(None);
+        let renewed = same_day(Some(&first));
+        assert_ne!(
+            renewed, original,
+            "re-pinning on the day of the revocation must not re-author the revoked entry"
+        );
+        let v: Value = serde_json::from_str(&renewed).expect("json");
+        assert_eq!(v["renewal"], 1);
+        assert_eq!(v["supersedes"], "uhCEkRevokedToday");
+        // Everything the contract already carried is unchanged.
+        let o: Value = serde_json::from_str(&original).expect("json");
+        for key in [
+            "action",
+            "variant",
+            "head_ref",
+            "reach",
+            "bounds",
+            "provider",
+            "valid_from",
+            "valid_until",
+        ] {
+            assert_eq!(v[key], o[key], "{key} unchanged by a renewal");
+        }
+        // A second renewal of the same scope is a third distinct entry.
+        let second = ProvideRenewal {
+            sequence: 2,
+            supersedes: "uhCEkRenewedThenRevoked".to_string(),
+        };
+        assert_ne!(same_day(Some(&second)), renewed);
     }
 
     #[test]

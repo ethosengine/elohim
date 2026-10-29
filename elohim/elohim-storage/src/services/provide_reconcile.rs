@@ -74,6 +74,29 @@ pub struct ProvideAuthorRequest {
     /// the `content:<reach>` provide row by it. Defaults to "commons" when the
     /// caller has no per-content reach (back-compat with the commons loop).
     pub reach: String,
+    /// `Some` when this provide renews a commitment of this node for the same
+    /// scope that was revoked (see [`ProvideRenewal`]); `None` for a provide
+    /// with no revoked predecessor, whose payload is exactly what it was before
+    /// renewals existed, so its cid is unchanged.
+    pub renewal: Option<ProvideRenewal>,
+}
+
+/// The lineage a renewed provide commitment carries.
+///
+/// A commitment's cid is the entry hash of its content, and the author buckets
+/// validity to the UTC day, so without this a scope re-pinned on the day its
+/// commitment was revoked would re-author the revoked entry byte for byte: the
+/// same cid, which the projection keeps revoked. A renewal is a NEW commitment
+/// by an explicit sequence: its payload names the commitment it renews and its
+/// place in the lineage, so its cid differs from every predecessor's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProvideRenewal {
+    /// 1 for the first renewal of an unrenewed commitment, then one more than
+    /// the commitment it renews. An unrenewed commitment is sequence 0 and
+    /// carries no renewal fields.
+    pub sequence: u64,
+    /// The cid (entry hash) of the commitment this one renews.
+    pub supersedes: String,
 }
 
 /// A revocation the reconciler decided to author for a removed pin.
@@ -292,6 +315,47 @@ fn row_reach_matches(row: &crate::db::models::MishpatCommitment, desired_reach: 
         .is_none_or(|stored| stored == desired_reach)
 }
 
+/// The one spelling a scope is compared in. The pin API stores a head_ref bare
+/// (`X`); a commitment keeps the spelling it was authored with (`epr:X` or
+/// `X`). Both name the same scope.
+pub fn scope_key(head_ref: &str) -> &str {
+    head_ref.strip_prefix("epr:").unwrap_or(head_ref)
+}
+
+/// A row's place in its scope's lineage: the `renewal` its payload carried,
+/// projected into `bounds_json`; 0 for an unrenewed commitment.
+fn renewal_sequence(row: &crate::db::models::MishpatCommitment) -> u64 {
+    serde_json::from_str::<serde_json::Value>(&row.bounds_json)
+        .ok()
+        .and_then(|b| b.get("renewal").and_then(|v| v.as_u64()))
+        .unwrap_or(0)
+}
+
+/// The renewal a new provide for a scope carries, given every commitment this
+/// node's providers made for that scope (revoked or not).
+///
+/// The scope's lineage head is its row with the highest renewal sequence, then
+/// the latest `valid_from`, then the latest projection, then the greatest cid.
+/// A new provide renews the head when the head was revoked, or when the head is
+/// itself a renewal (so a lineage, once begun, never falls back to sequence 0
+/// and re-authors a cid it already used). Otherwise (no history, or an
+/// unrevoked unrenewed head: a lapse or a reach change) it is unrenewed and
+/// keeps today's identity, so nothing that was never revoked re-keys.
+pub fn renewal_for(history: &[crate::db::models::MishpatCommitment]) -> Option<ProvideRenewal> {
+    let head = history.iter().max_by(|a, b| {
+        renewal_sequence(a)
+            .cmp(&renewal_sequence(b))
+            .then_with(|| a.valid_from.cmp(&b.valid_from))
+            .then_with(|| a.created_at.cmp(&b.created_at))
+            .then_with(|| a.cid.cmp(&b.cid))
+    })?;
+    let sequence = renewal_sequence(head);
+    (head.revoked_at.is_some() || sequence > 0).then(|| ProvideRenewal {
+        sequence: sequence.saturating_add(1),
+        supersedes: head.cid.clone(),
+    })
+}
+
 /// One desired provide derived from a caught-up pin.
 #[derive(Debug, Clone)]
 pub struct DesiredProvide {
@@ -432,11 +496,41 @@ impl ProvideReconciler {
                 continue;
             }
 
+            // A scope this node revoked is re-offered as a renewal with
+            // lineage, never as a replay of the revoked entry (whose cid the
+            // projection keeps revoked).
+            let history = {
+                let bare = scope_key(&d.head_ref);
+                let spellings = vec![bare.to_string(), format!("epr:{bare}")];
+                let read = pool.get().map_err(|e| e.to_string()).and_then(|mut conn| {
+                    crate::db::mishpat_commitments::commons_provides_for_scope(
+                        &mut conn,
+                        &own_providers,
+                        &spellings,
+                    )
+                    .map_err(|e| e.to_string())
+                });
+                match read {
+                    Ok(rows) => rows,
+                    Err(e) => {
+                        // Authoring without the lineage could re-author a revoked
+                        // cid; wait for a pass that can read it.
+                        tracing::warn!(
+                            target: "elohim_storage::provide",
+                            head_ref = %d.head_ref,
+                            error = %e,
+                            "provide reconcile: scope lineage unreadable; not authoring this pass"
+                        );
+                        continue;
+                    }
+                }
+            };
             latch.insert(key.clone(), ProvideStage::Authoring);
             let req = ProvideAuthorRequest {
                 provider: self_provider.to_string(),
                 head_ref: d.head_ref.clone(),
                 reach: d.reach.clone(),
+                renewal: renewal_for(&history),
             };
             match crate::chain_write_gate::as_writer(
                 crate::chain_write_gate::WriterKind::Provide,
@@ -868,6 +962,113 @@ mod tests {
 
     const FUTURE: &str = "2099-01-01T00:00:00Z";
     const PAST: &str = "2020-01-01T00:00:00Z";
+
+    /// The renewal the single authored request carried.
+    async fn authored_renewal(author: &MockAuthor) -> Option<ProvideRenewal> {
+        let authored = author.authored.lock().await;
+        assert_eq!(authored.len(), 1, "exactly one author call");
+        authored[0].renewal.clone()
+    }
+
+    #[tokio::test]
+    async fn a_scope_with_no_history_authors_an_unrenewed_commitment() {
+        let pool = test_pool();
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(authored_renewal(&author).await, None);
+    }
+
+    #[tokio::test]
+    async fn a_re_pin_after_a_revocation_renews_the_revoked_commitment() {
+        let pool = test_pool();
+        seed_commons_row(&pool, "uhCEkRevoked", "epr:X", "proposed", true);
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(
+            authored_renewal(&author).await,
+            Some(ProvideRenewal {
+                sequence: 1,
+                supersedes: "uhCEkRevoked".to_string(),
+            }),
+            "a re-pin after a revoke is a NEW commitment with lineage"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_renewal_continues_the_sequence_of_the_commitment_it_renews() {
+        let pool = test_pool();
+        seed_commons_row(&pool, "uhCEkFirst", "epr:X", "proposed", true);
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "uhCEkSecond",
+            "epr:X",
+            "proposed",
+            true,
+            FUTURE,
+            r#"{"reach":"commons","reach_ceiling":"commons","renewal":1,"supersedes":"uhCEkFirst"}"#,
+        );
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(
+            authored_renewal(&author).await,
+            Some(ProvideRenewal {
+                sequence: 2,
+                supersedes: "uhCEkSecond".to_string(),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_lapsed_unrevoked_history_authors_an_unrenewed_commitment() {
+        let pool = test_pool();
+        seed_commons_row_full(
+            &pool,
+            MockAuthor::DEFAULT_PROVIDER,
+            "uhCEkLapsed",
+            "epr:X",
+            "active",
+            false,
+            PAST,
+            &bounds_with_reach("commons"),
+        );
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(
+            authored_renewal(&author).await,
+            None,
+            "renewal is the revoke case; a lapse keeps today's identity rule"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_lineage_reads_both_spellings_of_a_scope() {
+        let pool = test_pool();
+        // The commitment kept the spelling it was authored with; the pin is bare.
+        seed_commons_row(&pool, "uhCEkPrefixed", "epr:X", "proposed", true);
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "X")).await;
+        assert_eq!(
+            authored_renewal(&author).await.map(|r| r.supersedes),
+            Some("uhCEkPrefixed".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn another_providers_revoked_commitment_is_not_this_nodes_lineage() {
+        let pool = test_pool();
+        seed_commons_row_for(
+            &pool,
+            "uhCAkSomeoneElse",
+            "uhCEkTheirs",
+            "epr:X",
+            "proposed",
+            true,
+        );
+        let author = MockAuthor::new();
+        reconcile_once(&pool, &author, desired(1, "epr:X")).await;
+        assert_eq!(authored_renewal(&author).await, None);
+    }
 
     fn bounds_with_reach(reach: &str) -> String {
         format!(r#"{{"reach":"{reach}","reach_ceiling":"commons","rate_per_minute":6}}"#)

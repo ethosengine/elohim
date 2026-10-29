@@ -319,6 +319,22 @@ pub fn live_commons_provides_for_providers(
         .load(conn)
 }
 
+/// Every `replicates-commons` row of `providers` for one scope, revoked or
+/// not, under any of `recipients` (a scope keeps the spelling it was authored
+/// with, so the caller passes each). The provide reconciler reads a scope's
+/// lineage from these when it authors.
+pub fn commons_provides_for_scope(
+    conn: &mut SqliteConnection,
+    providers: &[String],
+    recipients: &[String],
+) -> QueryResult<Vec<MishpatCommitment>> {
+    mc::mishpat_commitments
+        .filter(mc::action.eq("replicates-commons"))
+        .filter(mc::provider.eq_any(providers))
+        .filter(mc::recipient.eq_any(recipients))
+        .load(conn)
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
