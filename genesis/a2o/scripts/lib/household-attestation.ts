@@ -14,8 +14,24 @@
  * `name=value` text `hashSutParts` hashes, so its short fingerprint IS `env.sut`: the attestation
  * is keyed by the tree it verified, not by a timestamp.
  *
+ * Two brit-build-ref lineages answer on a host, and this module speaks to both: the pinned
+ * 76ba95d8a0 line (no `signer`; `validate get` prints stored bytes unverified) and the
+ * verified-reads line (`signer --json`; `get` prints only a record that decodes strictly,
+ * verifies against its own signer and binds to its ref — anything else is a stderr
+ * `unverifiable: <ref> <reason>` line, exit 0). `resolveWorkspaceIdentity` tells them apart by the
+ * clap usage error (exit 2) the pinned build prints for `signer`. A record brit reports
+ * unverifiable is ABSENT to every reader here and warned once, naming the ref and the reason;
+ * under the pinned build the reader verifies the stored bytes itself and says so.
+ *
  * This file is imported both by build-sprint-report.ts (tsx) and by serving-receipt.mjs (node's
  * type stripping), and its session adapter both use only node builtins at runtime.
+ *
+ * Ownership of the signer-preference rule (`signer --json` first; the seed file only under the
+ * pinned brit): genesis/orchestrator/gate-evidence.mjs `signerIdentity` owns it for every
+ * orchestrator reader (delivery-series.mjs delegates). `resolveWorkspaceIdentity` below is the
+ * a2o-side port of that one rule, kept as a separate function only because this module must stay
+ * node-builtins-only and must not import the orchestrator package; its test pins the same
+ * streams, and a change to the rule lands in both places together.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -313,6 +329,131 @@ const defaultRunner: Runner = (cmd, args, cwd) => {
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? String(r.error ?? '') };
 };
 
+// ─── which brit-build-ref answers ────────────────────────────────────────────
+
+/**
+ * The brit-build-ref lineage on this host. `verified-reads` knows `signer` and its `get` prints
+ * only a verified record; `pinned` (76ba95d8a0) prints a clap usage error for `signer` and its
+ * `validate get` prints stored bytes unverified; `absent` is no binary at all.
+ */
+export interface BritProbe {
+  kind: typeof VERIFIED_READS | 'pinned' | 'absent';
+  bin: string | null;
+}
+
+/** The first stderr line clap prints (exit 2) for a subcommand a binary does not know. */
+const UNKNOWN_SUBCOMMAND = /^error: unrecognized subcommand '([^']+)'/;
+
+function firstLine(text: string): string {
+  return text.trim().split('\n')[0] ?? '';
+}
+
+/** Who answered for the workspace key, and what it said. */
+export interface WorkspaceIdentity {
+  /** Hex ed25519 public key brit signs with, or null when none is on record. */
+  agentId: string | null;
+  /** `brit signer` is the binary's own answer; the file is read only when brit cannot be asked. */
+  source: typeof SIGNER | typeof KEY_FILE;
+  brit: BritProbe;
+  /** Why a brit that knows `signer` named no key (its first stderr line); absent otherwise. */
+  note?: string;
+}
+
+const SIGNER = 'brit signer';
+const KEY_FILE = 'agent-key file';
+const VERIFIED_READS = 'verified-reads';
+
+/**
+ * The workspace's signing identity, preferring `brit-build-ref signer --json` (never mints a key;
+ * `{"agentId":null}` is no key on record, exit 1 is a key brit refuses to load — neither is
+ * second-guessed by reading the file). The seed file is read only when the pinned brit answers
+ * `signer` with clap's usage error, or when no brit-build-ref is on this host at all. The binary
+ * is `BRIT_BUILD_REF_BIN`, else `BRIT_BUILD_REF`, else the first on `PATH`.
+ */
+export function resolveWorkspaceIdentity(
+  repoRoot: string,
+  env: Env,
+  run: Runner = defaultRunner
+): WorkspaceIdentity {
+  // BRIT_BUILD_REF_BIN is the orchestrator's name for the same binary (gate-evidence.mjs).
+  const explicit = env.BRIT_BUILD_REF_BIN ?? env.BRIT_BUILD_REF;
+  const bin = resolveBinary('brit-build-ref', explicit, env.PATH);
+  if (bin) {
+    const r = run(bin, ['--repo', repoRoot, 'signer', '--json'], repoRoot);
+    const err = firstLine(r.stderr);
+    const unknown = r.status === 2 && UNKNOWN_SUBCOMMAND.exec(err)?.[1] === 'signer';
+    if (!unknown) {
+      const brit: BritProbe = { kind: VERIFIED_READS, bin };
+      if (r.status !== 0) {
+        const note = err || `signer --json exited ${r.status ?? 'without a status'}`;
+        return { agentId: null, source: SIGNER, brit, note };
+      }
+      let id: unknown;
+      try {
+        id = (JSON.parse(r.stdout) as { agentId?: unknown })?.agentId;
+      } catch {
+        return { agentId: null, source: SIGNER, brit, note: 'signer --json printed no JSON' };
+      }
+      if (id === null) return { agentId: null, source: SIGNER, brit };
+      if (typeof id === 'string' && /^[0-9a-f]{64}$/.test(id)) {
+        return { agentId: id, source: SIGNER, brit };
+      }
+      return { agentId: null, source: SIGNER, brit, note: 'signer --json named no 64-hex agentId' };
+    }
+  }
+  const brit: BritProbe = { kind: bin ? 'pinned' : 'absent', bin };
+  const common = gitCommonDir(repoRoot);
+  return { agentId: common ? workspaceAgentId(common) : null, source: KEY_FILE, brit };
+}
+
+/** What a reader that verified the bytes itself says about its verifier. */
+function localVerifier(kind: BritProbe['kind']): string {
+  return kind === 'pinned'
+    ? 'verified locally; the pinned brit-build-ref has no verified read'
+    : 'verified locally; brit-build-ref is not on this host';
+}
+
+// ─── ref segments ───────────────────────────────────────────────────────────
+
+/** The characters brit's `encode_segment` percent-encodes in a ref path segment. */
+const SEGMENT_ESCAPES: [string, string][] = [
+  [':', '%3A'],
+  ['@', '%40'],
+  ['?', '%3F'],
+  ['*', '%2A'],
+  ['[', '%5B'],
+  ['\\', '%5C'],
+  ['^', '%5E'],
+  ['~', '%7E'],
+  [' ', '%20'],
+];
+
+/** `encode_segment` (brit-epr refs.rs): the ref path brit writes a step or check under. */
+export function encodeRefSegment(s: string): string {
+  let out = '';
+  for (const c of s) {
+    const code = c.codePointAt(0) ?? 0;
+    const esc = SEGMENT_ESCAPES.find(([plain]) => plain === c)?.[1];
+    if (esc) out += esc;
+    else if (code < 0x20 || code === 0x7f)
+      out += `%${code.toString(16).toUpperCase().padStart(2, '0')}`;
+    else out += c;
+  }
+  return out.replaceAll('..', '%2E%2E');
+}
+
+/** `decode_segment`: the check a validate ref's path names. */
+export function decodeRefSegment(s: string): string {
+  let out = s;
+  for (const [plain, esc] of SEGMENT_ESCAPES) out = out.replaceAll(esc, plain);
+  return out.replaceAll('%2E%2E', '..');
+}
+
+/** The ref `validate put --step a2o-household --check <check>` writes. */
+export function attestationRef(check: string): string {
+  return `${ATTESTATION_REF_PREFIX}${encodeRefSegment(check)}`;
+}
+
 /**
  * One `brit-build-ref validate put` of `attestation` under the workspace key of `workspace` (the
  * directory holding the `.git` common dir). `cwd` defaults to the workspace; the household writer
@@ -385,7 +526,8 @@ export function publishHouseholdEvidence(opts: {
     log('epr flow fulfill skipped: no epr binary on this host (EPR_BIN or PATH)');
   }
 
-  const brit = resolveBinary('brit-build-ref', env.BRIT_BUILD_REF, env.PATH);
+  const identity = resolveWorkspaceIdentity(repoRoot, env, run);
+  const brit = identity.brit.bin;
   if (!brit) {
     log(
       'validation attestation skipped: brit-build-ref is not built on this host ' +
@@ -406,15 +548,49 @@ export function publishHouseholdEvidence(opts: {
     return lines;
   }
   let written = 0;
+  let kept = 0;
   for (const a of attestations) {
+    // Read first: what is at the ref decides whether this put is unneeded, or replaces a record.
+    const prior = readAttestationRef(brit, identity.brit.kind, workspace, a.check, run, repoRoot);
+    if (prior.ok) {
+      const same =
+        prior.node.resultSummary === JSON.stringify(a.summary) &&
+        prior.node.result === a.result &&
+        (identity.agentId === null || prior.node.validatorId === identity.agentId);
+      if (same) {
+        kept += 1;
+        log(
+          `validation attestation already on record for ${a.check} ` +
+            `(run ${a.summary.runId}, verified by ${prior.verifiedBy}); not rewritten`
+        );
+        continue;
+      }
+    } else if (prior.reason !== null) {
+      log(`household attestation unverifiable: ${prior.reason}; replacing it`);
+    }
     const r = putAttestation(brit, workspace, a, run, repoRoot);
-    if (r.status === 0) written += 1;
-    else log(`validation attestation FAILED for ${a.check} (exit ${r.status}): ${r.stderr.trim()}`);
+    if (r.status === 0) {
+      written += 1;
+      continue;
+    }
+    const line = firstLine(r.stderr);
+    // brit refusing a ref another writer moved, or bytes that would not read back, is the
+    // writer's contract working (the report on disk stays the evidence) — never a failure here.
+    if (/^Error: (REFUSED concurrent update|refusing to write)\b/.test(line)) {
+      log(`validation attestation deferred for ${a.check}: ${line}`);
+    } else {
+      log(`validation attestation FAILED for ${a.check} (exit ${r.status}): ${r.stderr.trim()}`);
+    }
   }
   const who = moored ? `${moored.principal ?? '?'} via ${moored.session}` : 'no berth mooring';
+  const note = identity.note ? `: ${identity.note}` : '';
+  const key = identity.agentId
+    ? `workspace key ${identity.agentId.slice(0, 12)}… via ${identity.source}`
+    : `no workspace key via ${identity.source}${note}`;
   log(
-    `validation attestations: ${written}/${attestations.length} written under ` +
-      `${ATTESTATION_REF_PREFIX}<concern>/${attestations[0].summary.sut} (workspace key; ${who})`
+    `validation attestations: ${written + kept}/${attestations.length} written under ` +
+      `${ATTESTATION_REF_PREFIX}<concern>/${attestations[0].summary.sut} (${key}; ${who})` +
+      (kept ? `; ${kept} already on record` : '')
   );
   return lines;
 }
@@ -547,26 +723,153 @@ export function workspaceAgentId(commonDir: string): string | null {
   }
 }
 
-/** Every household validate ref for `concern`, parsed; unreadable blobs are skipped. */
+/** One verified read of a validate ref: the node, or why it is absent to this reader. */
+type AttestationRead =
+  | { ok: true; node: ValidationNodeJson; verifiedBy: 'brit' | 'local' }
+  | { ok: false; reason: string | null };
+
+/**
+ * `brit-build-ref validate get` for `check`: stdout is the verified record; otherwise the
+ * `unverifiable:` stderr line (`<ref> <reason>`) is the reason, a bare miss is `null` (nothing
+ * stored), and a non-zero exit or non-JSON stdout is a reason of its own — never a hit.
+ */
+function britValidateGet(
+  bin: string,
+  repo: string,
+  check: string,
+  run: Runner,
+  cwd: string
+): AttestationRead {
+  const r = run(
+    bin,
+    ['--repo', repo, 'validate', 'get', '--step', ATTESTATION_STEP, '--check', check],
+    cwd
+  );
+  const ref = attestationRef(check);
+  if (r.status !== 0) {
+    const exit = r.status ?? 'without a status';
+    return {
+      ok: false,
+      reason: `${ref} brit-build-ref validate get exited ${exit}: ${firstLine(r.stderr)}`,
+    };
+  }
+  if (r.stdout.trim()) {
+    try {
+      return { ok: true, node: JSON.parse(r.stdout), verifiedBy: 'brit' };
+    } catch {
+      return { ok: false, reason: `${ref} brit-build-ref validate get printed no JSON` };
+    }
+  }
+  const unverifiable = r.stderr.split('\n').find(l => l.startsWith('unverifiable: '));
+  if (unverifiable) {
+    const rest = unverifiable.slice('unverifiable: '.length);
+    return { ok: false, reason: `${rest} (brit-build-ref verified read)` };
+  }
+  return { ok: false, reason: null };
+}
+
+/**
+ * The reader's own verification of stored bytes — the pinned brit prints them unverified — with
+ * brit's reasons: strict shape, the signature against the node's own `validatorId`, and the
+ * check the ref names.
+ */
+function localVerifiedRead(
+  bytes: string | null,
+  ref: string,
+  check: string,
+  kind: BritProbe['kind']
+): AttestationRead {
+  const refuse = (why: string): AttestationRead => ({
+    ok: false,
+    reason: `${ref} ${why} (${localVerifier(kind)})`,
+  });
+  if (bytes === null) return { ok: false, reason: null };
+  let node: ValidationNodeJson;
+  try {
+    node = JSON.parse(bytes);
+  } catch (error) {
+    return refuse(`does not decode: ${(error as Error).message}`);
+  }
+  if (!node || typeof node !== 'object') return refuse('does not decode: not an object');
+  if (!verifyValidationNode(node)) {
+    const id = JSON.stringify(String(node.validatorId));
+    return refuse(`signature does not verify against agentId ${id}`);
+  }
+  if (node.checkName !== check) {
+    const stored = JSON.stringify(node.checkName);
+    return refuse(`checkName ${stored} does not match this ref's ${JSON.stringify(check)}`);
+  }
+  return { ok: true, node, verifiedBy: 'local' };
+}
+
+function gitText(repoRoot: string, args: string[]): string {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path -- git is a standard system tool
+  return execFileSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+}
+
+/** The stored blob at `ref`/`oid`, or null when git lists nothing there. */
+function storedBytes(repoRoot: string, object: string): string | null {
+  try {
+    return gitText(repoRoot, ['cat-file', 'blob', object]);
+  } catch {
+    return null;
+  }
+}
+
+/** The validate ref for `check` through the verified read the host's brit affords. */
+function readAttestationRef(
+  bin: string,
+  kind: BritProbe['kind'],
+  repo: string,
+  check: string,
+  run: Runner,
+  cwd: string
+): AttestationRead {
+  if (kind === VERIFIED_READS) return britValidateGet(bin, repo, check, run, cwd);
+  const ref = attestationRef(check);
+  return localVerifiedRead(storedBytes(repo, ref), ref, check, kind);
+}
+
+export interface ReadOptions {
+  /** Which brit answers (from `resolveWorkspaceIdentity`); absent reads verify locally. */
+  brit?: BritProbe;
+  run?: Runner;
+  /** Receives one line per record that is absent to this reader, naming the ref and the reason. */
+  warn?: (line: string) => void;
+}
+
+export interface HouseholdAttestation {
+  ref: string;
+  node: ValidationNodeJson;
+  /** `brit`: brit-build-ref's verified read printed it; `local`: this module verified the bytes. */
+  verifiedBy: 'brit' | 'local';
+}
+
+/**
+ * Every household validate ref for `concern` that verifies. With a verified-reads brit each ref
+ * goes through `validate get` and only what brit prints is returned; otherwise the stored bytes
+ * are verified here. A record that does not verify is absent and warned once:
+ * `household attestation unverifiable: <ref> <reason> (<verifier>)`.
+ */
 export function readHouseholdAttestations(
   repoRoot: string,
-  concern: string
-): { ref: string; node: ValidationNodeJson }[] {
-  const git = (args: string[], input?: string) =>
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- git is a standard system tool
-    execFileSync('git', args, {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      input,
-      maxBuffer: 256 * 1024 * 1024,
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
+  concern: string,
+  opts: ReadOptions = {}
+): HouseholdAttestation[] {
+  const brit = opts.brit ?? { kind: 'absent', bin: null };
+  const run = opts.run ?? defaultRunner;
+  const warn = opts.warn ?? ((_line: string) => undefined);
   let listing: string;
   try {
-    listing = git([
+    listing = gitText(repoRoot, [
       'for-each-ref',
       '--format=%(objectname) %(objecttype) %(refname)',
-      `${ATTESTATION_REF_PREFIX}${concern}/`,
+      `${ATTESTATION_REF_PREFIX}${encodeRefSegment(concern)}/`,
     ]);
   } catch {
     return [];
@@ -575,13 +878,17 @@ export function readHouseholdAttestations(
     .split('\n')
     .map(l => l.split(' '))
     .filter(([oid, type, ref]) => oid && type === 'blob' && ref);
-  const out: { ref: string; node: ValidationNodeJson }[] = [];
+  const out: HouseholdAttestation[] = [];
   for (const [oid, , ref] of refs) {
-    try {
-      out.push({ ref, node: JSON.parse(git(['cat-file', 'blob', oid])) });
-    } catch {
-      /* an unreadable attestation is no attestation */
-    }
+    const check = decodeRefSegment(ref.slice(ATTESTATION_REF_PREFIX.length));
+    const read =
+      brit.kind === VERIFIED_READS && brit.bin
+        ? britValidateGet(brit.bin, repoRoot, check, run, repoRoot)
+        : localVerifiedRead(storedBytes(repoRoot, oid), ref, check, brit.kind);
+    if (read.ok) out.push({ ref, node: read.node, verifiedBy: read.verifiedBy });
+    else if (read.reason === null) {
+      warn(`household attestation unverifiable: ${ref} listed but nothing is stored there`);
+    } else warn(`household attestation unverifiable: ${read.reason}`);
   }
   return out;
 }

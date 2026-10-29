@@ -683,11 +683,12 @@ function withFixture(fn) {
   }
 }
 
-function check(root, reports, paths, peerStatuses) {
+function check(root, reports, paths, peerStatuses, env) {
   const out = [];
   const ok = checkReports(root, reports, paths, {
     attestations: true,
     peerStatuses,
+    env,
     log: (l) => out.push(l),
     warn: (l) => out.push(l),
   });
@@ -1159,4 +1160,247 @@ test("the prefetch refuses a task record that names another request", async () =
   );
   assert.equal(got.statuses.size, 0);
   assert.match(got.skipped, /returned task record for uhCkk-other-/);
+});
+
+// ── brit-build-ref lineages: `signer --json` identity and verified reads ────────
+// Stubs print the EXACT streams the two lineages print (brit 7e4a83115e read from source; the
+// pinned 76ba95d8a0 executed): `{"agentId":…}` / clap's exit-2 usage error for `signer`, and
+// `validate get`'s miss + `unverifiable: <ref> <reason>` lines. They live under TMPDIR.
+const PINNED_SIGNER_STDERR =
+  "error: unrecognized subcommand 'signer'\n\nUsage: brit-build-ref [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n";
+const C2_PATHS = ["scripts/ci/fleet-write-readiness.sh"];
+
+function stubBrit(kind, agentId) {
+  const dir = mkdtempSync(join(tmpdir(), `brit-stub-${kind}-`));
+  mkdirSync(join(dir, "get"));
+  const signer =
+    kind === "new"
+      ? `printf '%s\\n' '${JSON.stringify({ agentId })}'; exit 0`
+      : `printf '%s' "${PINNED_SIGNER_STDERR.replaceAll("\n", "\\n")}" >&2; exit 2`;
+  const bin = join(dir, "brit-build-ref");
+  writeFileSync(
+    bin,
+    `#!/bin/sh
+DIR='${dir}'
+printf '%s\\n' "$*" >> "$DIR/calls.log"
+if [ "$1" = "--repo" ]; then shift 2; fi
+case "$1 $2" in
+  "signer --json"|"signer ") ${signer} ;;
+  "validate get")
+    step=''; check=''
+    while [ $# -gt 0 ]; do
+      [ "$1" = "--step" ] && step="$2"
+      [ "$1" = "--check" ] && check="$2"
+      shift
+    done
+    key=$(printf '%s' "$check" | tr '/:' '__')
+    if [ -f "$DIR/get/$key.out" ]; then cat "$DIR/get/$key.out"; fi
+    if [ -f "$DIR/get/$key.err" ]; then cat "$DIR/get/$key.err" >&2
+    elif [ ! -f "$DIR/get/$key.out" ]; then printf 'no validate ref found for step=%s check=%s\\n' "$step" "$check" >&2; fi
+    exit 0 ;;
+  *) printf "error: unrecognized subcommand '%s'\\n" "$1" >&2; exit 2 ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  return { bin, dir };
+}
+
+function stubGet(dir, check, r) {
+  const key = check.replaceAll(/[/:]/g, "_");
+  if (r.out !== undefined) writeFileSync(join(dir, "get", `${key}.out`), r.out);
+  if (r.err !== undefined) writeFileSync(join(dir, "get", `${key}.err`), r.err);
+}
+
+function stubCalls(dir) {
+  return readFileSync(join(dir, "calls.log"), "utf8").trim().split("\n");
+}
+
+function withStub(kind, agentId, fn) {
+  const stub = stubBrit(kind, agentId);
+  try {
+    fn(stub);
+  } finally {
+    rmSync(stub.dir, { recursive: true, force: true });
+  }
+}
+
+function putStory(root, story, overrides) {
+  const node = householdNode(root, story, overrides);
+  const sut = JSON.parse(node.resultSummary).sut;
+  putRef(root, story.concern, sut, node);
+  return {
+    node,
+    sut,
+    check: checkNameFor(story.concern, sut),
+    ref: `refs/notes/brit/validate/a2o-household/${story.concern}/${sut.replace(":", "%3A")}`,
+  };
+}
+
+test("the new brit's `signer --json` names the workspace key with no key file on disk; the receipt says brit verified the read", () => {
+  withFixture((root, reports) => {
+    rmSync(join(root, ".git/brit/agent-key"));
+    const story = RECEIPT_STORIES.refusesFast;
+    const { node, check: checkName } = putStory(root, story);
+    withStub("new", VECTOR.node.validatorId, (stub) => {
+      stubGet(stub.dir, checkName, {
+        out: JSON.stringify(node, null, 2) + "\n",
+      });
+      const { ok, out } = check(root, reports, C2_PATHS, undefined, {
+        BRIT_BUILD_REF: stub.bin,
+      });
+      assert.equal(ok, true, out);
+      assert.match(
+        out,
+        /signed by workspace [0-9a-f]{12}…\); every app-delivery-refuses-fast\.feature station passed on current source; read verified by brit-build-ref\.$/m,
+      );
+      assert.deepEqual(stubCalls(stub.dir), [
+        `--repo ${root} signer --json`,
+        `--repo ${root} validate get --step a2o-household --check ${checkName}`,
+      ]);
+    });
+    // Without a brit and without the file there is no workspace key, so no attestation receipt.
+    const bare = check(root, reports, C2_PATHS, undefined, {
+      PATH: "/nonexistent",
+    });
+    assert.equal(bare.ok, false, bare.out);
+    assert.doesNotMatch(bare.out, /brit validation attestation/);
+  });
+});
+
+test("a record the new brit reports `unverifiable:` for is absent — warned by ref and reason — and the report file still admits", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const { check: checkName, ref } = putStory(root, story);
+    const id = VECTOR.node.validatorId;
+    withStub("new", id, (stub) => {
+      stubGet(stub.dir, checkName, {
+        err: `no validate ref found for step=a2o-household check=${checkName}\nunverifiable: ${ref} signature does not verify against agentId "${id}"\n`,
+      });
+      const env = { BRIT_BUILD_REF: stub.bin };
+      let r = check(root, reports, C2_PATHS, undefined, env);
+      assert.equal(r.ok, false, r.out);
+      assert.ok(
+        r.out.includes(
+          `[pre-push] household attestation unverifiable: ${ref} signature does not verify against agentId "${id}" (brit-build-ref verified read)`,
+        ),
+        r.out,
+      );
+      assert.match(
+        r.out,
+        /missing household receipt — produce it: just test mesh/,
+      );
+      assert.doesNotMatch(r.out, /brit validation attestation/);
+      writeFileSync(
+        join(reports, "sprint-report-household-z.json"),
+        JSON.stringify(storyReport(root, story)),
+      );
+      r = check(root, reports, C2_PATHS, undefined, env);
+      assert.equal(r.ok, true, r.out);
+      assert.match(
+        r.out,
+        /sprint-report-household-z\.json; every .* station passed/,
+      );
+      assert.doesNotMatch(r.out, /brit validation attestation/);
+    });
+  });
+});
+
+test("a new brit that names no key, or refuses to load one, admits no attestation: the key file is not its fallback", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const { node, check: checkName } = putStory(root, story, { peer: PEER });
+    withStub("new", null, (stub) => {
+      stubGet(stub.dir, checkName, {
+        out: JSON.stringify(node, null, 2) + "\n",
+      });
+      const env = { BRIT_BUILD_REF: stub.bin };
+      const r = check(
+        root,
+        reports,
+        C2_PATHS,
+        new Map([[PEER.requestActionHash, verifiedTask()]]),
+        env,
+      );
+      assert.equal(r.ok, false, r.out);
+      assert.doesNotMatch(r.out, /brit validation attestation/);
+      assert.deepEqual(peerRequestsOf(root, undefined, { env }), []);
+      assert.deepEqual(stubCalls(stub.dir), [
+        `--repo ${root} signer --json`,
+        `--repo ${root} signer --json`,
+      ]);
+    });
+    withStub("new", null, (stub) => {
+      writeFileSync(
+        stub.bin,
+        '#!/bin/sh\nprintf "Error: cannot load the repository signer key\\n\\nCaused by:\\n    seed is 31 bytes\\n" >&2\nexit 1\n',
+        { mode: 0o755 },
+      );
+      const r = check(root, reports, C2_PATHS, undefined, {
+        BRIT_BUILD_REF: stub.bin,
+      });
+      assert.equal(r.ok, false, r.out);
+      assert.match(
+        r.out,
+        /^\[pre-push\] no workspace key via brit signer: Error: cannot load the repository signer key$/m,
+      );
+    });
+  });
+});
+
+test("the pinned brit (clap exit 2 for `signer`) falls back to the key file; its unverified `validate get` is never asked, and the receipt says the read was verified locally", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    putStory(root, story);
+    withStub("pinned", null, (stub) => {
+      const { ok, out } = check(root, reports, C2_PATHS, undefined, {
+        BRIT_BUILD_REF: stub.bin,
+      });
+      assert.equal(ok, true, out);
+      assert.match(
+        out,
+        /station passed on current source; read verified locally \(the pinned brit-build-ref has no verified read\)\.$/m,
+      );
+      assert.deepEqual(stubCalls(stub.dir), [`--repo ${root} signer --json`]);
+    });
+    const none = check(root, reports, C2_PATHS, undefined, {
+      PATH: "/nonexistent",
+    });
+    assert.equal(none.ok, true, none.out);
+    assert.match(
+      none.out,
+      /read verified locally \(brit-build-ref is not on this host\)\.$/m,
+    );
+  });
+});
+
+test("under the pinned brit a tampered or misfiled record is warned by ref and reason, never silently dropped", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const good = householdNode(root, story);
+    const sut = JSON.parse(good.resultSummary).sut;
+    putRef(root, story.concern, sut, {
+      ...good,
+      validatedAt: "2026-09-25T00:00:00Z",
+    });
+    putRef(root, story.concern, `misfiled-${sut}`, good);
+    const { ok, out } = check(root, reports, C2_PATHS, undefined, {
+      PATH: "/nonexistent",
+    });
+    assert.equal(ok, false, out);
+    const prefix = `refs/notes/brit/validate/a2o-household/${story.concern}/`;
+    const verifier = "(verified locally; brit-build-ref is not on this host)";
+    assert.ok(
+      out.includes(
+        `[pre-push] household attestation unverifiable: ${prefix}${sut.replace(":", "%3A")} signature does not verify against agentId "${VECTOR.node.validatorId}" ${verifier}`,
+      ),
+      out,
+    );
+    assert.ok(
+      out.includes(
+        `[pre-push] household attestation unverifiable: ${prefix}misfiled-${sut.replace(":", "%3A")} checkName "${checkNameFor(story.concern, sut)}" does not match this ref's "${story.concern}/misfiled-${sut}" ${verifier}`,
+      ),
+      out,
+    );
+  });
 });

@@ -23,6 +23,7 @@ import {
   putAttestation,
   readHouseholdAttestations,
   resolveMooring,
+  resolveWorkspaceIdentity,
   sutArtifactCidBytes,
   sutOf,
   verifyValidationNode,
@@ -294,7 +295,7 @@ describe('publishHouseholdEvidence', () => {
         cmd: epr,
         args: ['flow', 'fulfill', '/r/sprint-report-household-1.json', '--root', repo],
       });
-      const puts = calls.filter(c => c.cmd === brit);
+      const puts = calls.filter(c => c.cmd === brit && c.args[3] === 'put');
       assert.equal(puts.length, 3);
       for (const p of puts) {
         assert.deepEqual(p.args.slice(0, 6), [
@@ -369,6 +370,7 @@ describe('readHouseholdAttestations', () => {
         [VECTOR.ref]
       );
       assert.deepEqual(found[0].node, VECTOR.node);
+      assert.equal(found[0].verifiedBy, 'local');
       assert.deepEqual(readHouseholdAttestations(repo, 'absent'), []);
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -651,5 +653,427 @@ describe('a peer-executed stage is admitted by its verified DHT chain, never by 
       refusal(peerNode({ ...PEER, rung: 'Z' } as unknown as PeerStage), verified()),
       'peer block is malformed'
     );
+  });
+});
+
+// ─── the brit-build-ref contract, old pin and new ──────────────────────────────
+//
+// Stub executables print the EXACT streams the two brit lineages print (read from source at
+// brit 7e4a83115e and executed on the pinned 76ba95d8a0): `signer --json`, `validate get`'s
+// miss + `unverifiable:` lines, and `validate put`'s refusals. Fixtures live under TMPDIR, never
+// in the tree.
+
+const PINNED_SIGNER_STDERR =
+  "error: unrecognized subcommand 'signer'\n\nUsage: brit-build-ref [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n";
+
+/** The pinned signer stderr as a single-quoted `printf` argument (newlines as `\n`). */
+const PINNED_SIGNER_SH = PINNED_SIGNER_STDERR.replaceAll('\n', String.raw`\n`);
+
+/** A stub brit-build-ref: `kind` picks the lineage; `get/<key>.{out,err,code}` script `validate get`. */
+function stubBrit(kind: 'new' | 'pinned', agentId: string | null): { bin: string; dir: string } {
+  const dir = mkdtempSync(join(tmpdir(), `brit-stub-${kind}-`));
+  mkdirSync(join(dir, 'get'));
+  const signer =
+    kind === 'new'
+      ? String.raw`printf '%s\n' '${JSON.stringify({ agentId })}'; exit 0`
+      : String.raw`printf '%s' "${PINNED_SIGNER_SH}" >&2; exit 2`;
+  const script = String.raw`#!/bin/sh
+DIR='${dir}'
+printf '%s\n' "$*" >> "$DIR/calls.log"
+if [ "$1" = "--repo" ]; then shift 2; fi
+case "$1 $2" in
+  "signer --json"|"signer ") ${signer} ;;
+  "validate get")
+    step=''; check=''
+    while [ $# -gt 0 ]; do
+      [ "$1" = "--step" ] && step="$2"
+      [ "$1" = "--check" ] && check="$2"
+      shift
+    done
+    key=$(printf '%s' "$check" | tr '/:' '__')
+    if [ -f "$DIR/get/$key.out" ]; then cat "$DIR/get/$key.out"; fi
+    if [ -f "$DIR/get/$key.err" ]; then cat "$DIR/get/$key.err" >&2
+    elif [ ! -f "$DIR/get/$key.out" ]; then printf 'no validate ref found for step=%s check=%s\\n' "$step" "$check" >&2; fi
+    if [ -f "$DIR/get/$key.code" ]; then exit "$(cat "$DIR/get/$key.code")"; fi
+    exit 0 ;;
+  "validate put")
+    if [ -f "$DIR/put.out" ]; then cat "$DIR/put.out"; else printf 'bafyreistub\\n'; fi
+    if [ -f "$DIR/put.err" ]; then cat "$DIR/put.err" >&2; fi
+    if [ -f "$DIR/put.code" ]; then exit "$(cat "$DIR/put.code")"; fi
+    exit 0 ;;
+  *) printf "error: unrecognized subcommand '%s'\\n" "$1" >&2; exit 2 ;;
+esac
+`;
+  const bin = join(dir, 'brit-build-ref');
+  writeFileSync(bin, script);
+  chmodSync(bin, 0o755);
+  return { bin, dir };
+}
+
+function stubGet(dir: string, check: string, r: { out?: string; err?: string; code?: number }) {
+  const key = check.replaceAll(/[/:]/g, '_');
+  if (r.out !== undefined) writeFileSync(join(dir, 'get', `${key}.out`), r.out);
+  if (r.err !== undefined) writeFileSync(join(dir, 'get', `${key}.err`), r.err);
+  if (r.code !== undefined) writeFileSync(join(dir, 'get', `${key}.code`), String(r.code));
+}
+
+function stubPut(dir: string, r: { out?: string; err?: string; code?: number }) {
+  if (r.out !== undefined) writeFileSync(join(dir, 'put.out'), r.out);
+  if (r.err !== undefined) writeFileSync(join(dir, 'put.err'), r.err);
+  if (r.code !== undefined) writeFileSync(join(dir, 'put.code'), String(r.code));
+}
+
+function calls(dir: string): string[] {
+  try {
+    return readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n');
+  } catch {
+    return [];
+  }
+}
+
+function keyedRepo(prefix: string, seedHex = VECTOR.seedHex): string {
+  const repo = scratchRepo(prefix);
+  mkdirSync(join(repo, '.git', 'brit'));
+  writeFileSync(join(repo, '.git', 'brit', 'agent-key'), Buffer.from(seedHex, 'hex'));
+  return repo;
+}
+
+const VECTOR_CHECK = VECTOR.node.checkName;
+const OTHER_ID = 'ab'.repeat(32);
+
+describe('workspace identity prefers `brit-build-ref signer --json`', () => {
+  it('reads the id the new brit reports, with no key file to read at all', () => {
+    const repo = scratchRepo('ident-new-');
+    const brit = stubBrit('new', OTHER_ID);
+    try {
+      const id = resolveWorkspaceIdentity(repo, { BRIT_BUILD_REF: brit.bin });
+      assert.deepEqual(id, {
+        agentId: OTHER_ID,
+        source: 'brit signer',
+        brit: { kind: 'verified-reads', bin: brit.bin },
+      });
+      assert.deepEqual(calls(brit.dir), [`--repo ${repo} signer --json`]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('BRIT_BUILD_REF_BIN (the orchestrator name) wins over BRIT_BUILD_REF, which wins over PATH', () => {
+    const repo = scratchRepo('ident-env-');
+    const a = stubBrit('new', OTHER_ID);
+    const b = stubBrit('new', VECTOR.node.validatorId);
+    try {
+      const env = { BRIT_BUILD_REF_BIN: a.bin, BRIT_BUILD_REF: b.bin, PATH: '/nonexistent-bin' };
+      assert.equal(resolveWorkspaceIdentity(repo, env).agentId, OTHER_ID);
+      assert.equal(
+        resolveWorkspaceIdentity(repo, { BRIT_BUILD_REF: b.bin, PATH: '/nonexistent-bin' }).agentId,
+        VECTOR.node.validatorId
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(a.dir, { recursive: true, force: true });
+      rmSync(b.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a new brit that reports no key, or refuses to load one, is never second-guessed by the file', () => {
+    const repo = keyedRepo('ident-none-');
+    const none = stubBrit('new', null);
+    const broken = stubBrit('new', OTHER_ID);
+    writeFileSync(
+      broken.bin,
+      '#!/bin/sh\nprintf "Error: cannot load the repository signer key\\n\\nCaused by:\\n    seed is 31 bytes\\n" >&2\nexit 1\n'
+    );
+    try {
+      const noKey = resolveWorkspaceIdentity(repo, { BRIT_BUILD_REF: none.bin });
+      assert.equal(noKey.agentId, null, 'the key file is not consulted');
+      assert.equal(noKey.source, 'brit signer');
+      const refused = resolveWorkspaceIdentity(repo, { BRIT_BUILD_REF: broken.bin });
+      assert.equal(refused.agentId, null);
+      assert.equal(refused.source, 'brit signer');
+      assert.equal(refused.note, 'Error: cannot load the repository signer key');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(none.dir, { recursive: true, force: true });
+      rmSync(broken.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to the key file only for the pinned brit (clap exit 2) or no brit at all', () => {
+    const repo = keyedRepo('ident-pinned-');
+    const pinned = stubBrit('pinned', null);
+    try {
+      const viaPinned = resolveWorkspaceIdentity(repo, { BRIT_BUILD_REF: pinned.bin });
+      assert.deepEqual(viaPinned, {
+        agentId: VECTOR.node.validatorId,
+        source: 'agent-key file',
+        brit: { kind: 'pinned', bin: pinned.bin },
+      });
+      const viaNone = resolveWorkspaceIdentity(repo, { PATH: '/nonexistent-bin' });
+      assert.deepEqual(viaNone, {
+        agentId: VECTOR.node.validatorId,
+        source: 'agent-key file',
+        brit: { kind: 'absent', bin: null },
+      });
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(pinned.dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('a record brit reports `unverifiable:` for is absent to the reader, and said so', () => {
+  const TAMPERED_REF = `${ATTESTATION_REF_PREFIX}${CONCERN}/sha256%3Abad`;
+  const TAMPERED_CHECK = `${CONCERN}/sha256:bad`;
+
+  function refsRepo(): string {
+    const repo = scratchRepo('read-brit-');
+    const good = git(repo, ['hash-object', '-w', '--stdin'], JSON.stringify(VECTOR.node)).trim();
+    const bad = git(
+      repo,
+      ['hash-object', '-w', '--stdin'],
+      JSON.stringify({ ...VECTOR.node, result: 'fail' })
+    ).trim();
+    git(repo, ['update-ref', VECTOR.ref, good]);
+    git(repo, ['update-ref', TAMPERED_REF, bad]);
+    return repo;
+  }
+
+  it('new brit: `validate get` per listed ref, decoded from the ref; stdout is the hit, `unverifiable:` is a warned absence', () => {
+    const repo = refsRepo();
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    const reason = `signature does not verify against agentId ${JSON.stringify(VECTOR.node.validatorId)}`;
+    stubGet(brit.dir, VECTOR_CHECK, { out: JSON.stringify(VECTOR.node, null, 2) + '\n' });
+    stubGet(brit.dir, TAMPERED_CHECK, {
+      err: `no validate ref found for step=a2o-household check=${TAMPERED_CHECK}\nunverifiable: ${TAMPERED_REF} ${reason}\n`,
+    });
+    try {
+      const warned: string[] = [];
+      const found = readHouseholdAttestations(repo, CONCERN, {
+        brit: { kind: 'verified-reads', bin: brit.bin },
+        warn: l => warned.push(l),
+      });
+      assert.deepEqual(
+        found.map(f => [f.ref, f.verifiedBy]),
+        [[VECTOR.ref, 'brit']]
+      );
+      assert.deepEqual(found[0].node, VECTOR.node);
+      assert.deepEqual(warned, [
+        `household attestation unverifiable: ${TAMPERED_REF} ${reason} (brit-build-ref verified read)`,
+      ]);
+      assert.deepEqual(
+        calls(brit.dir).sort(),
+        [
+          `--repo ${repo} validate get --step a2o-household --check ${TAMPERED_CHECK}`,
+          `--repo ${repo} validate get --step a2o-household --check ${VECTOR_CHECK}`,
+        ].sort()
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('new brit: a git failure (exit 1) or non-JSON stdout is an absence with a warning, never a hit', () => {
+    const repo = refsRepo();
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    stubGet(brit.dir, VECTOR_CHECK, {
+      err: 'Error: git command failed: git for-each-ref: fatal: not a git repository\n',
+      code: 1,
+    });
+    stubGet(brit.dir, TAMPERED_CHECK, { out: 'not json\n' });
+    try {
+      const warned: string[] = [];
+      const found = readHouseholdAttestations(repo, CONCERN, {
+        brit: { kind: 'verified-reads', bin: brit.bin },
+        warn: l => warned.push(l),
+      });
+      assert.deepEqual(found, []);
+      assert.equal(warned.length, 2);
+      assert.match(warned.join('\n'), /validate get exited 1: Error: git command failed/);
+      assert.match(warned.join('\n'), /printed no JSON/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('pinned or absent brit: the reader verifies locally with the same reasons, and names its verifier', () => {
+    const repo = refsRepo();
+    const filed = `${ATTESTATION_REF_PREFIX}${CONCERN}/sha256%3Aother`;
+    const good = git(repo, ['hash-object', '-w', '--stdin'], JSON.stringify(VECTOR.node)).trim();
+    git(repo, ['update-ref', filed, good]);
+    const junk = git(repo, ['hash-object', '-w', '--stdin'], '{not json').trim();
+    git(repo, ['update-ref', `${ATTESTATION_REF_PREFIX}${CONCERN}/sha256%3Ajunk`, junk]);
+    try {
+      for (const kind of ['pinned', 'absent'] as const) {
+        const warned: string[] = [];
+        const found = readHouseholdAttestations(repo, CONCERN, {
+          brit: { kind, bin: kind === 'pinned' ? '/bin/false' : null },
+          warn: l => warned.push(l),
+        });
+        assert.deepEqual(
+          found.map(f => [f.ref, f.verifiedBy]),
+          [[VECTOR.ref, 'local']]
+        );
+        const verifier =
+          kind === 'pinned'
+            ? 'verified locally; the pinned brit-build-ref has no verified read'
+            : 'verified locally; brit-build-ref is not on this host';
+        const otherCheck = JSON.stringify(`${CONCERN}/sha256:other`);
+        const got = [...warned];
+        got.sort();
+        const want = [
+          `household attestation unverifiable: ${TAMPERED_REF} signature does not verify against agentId ${JSON.stringify(VECTOR.node.validatorId)} (${verifier})`,
+          `household attestation unverifiable: ${filed} checkName ${JSON.stringify(VECTOR_CHECK)} does not match this ref's ${otherCheck} (${verifier})`,
+          `household attestation unverifiable: ${ATTESTATION_REF_PREFIX}${CONCERN}/sha256%3Ajunk does not decode: Expected property name or '}' in JSON at position 1 (line 1 column 2) (${verifier})`,
+        ];
+        want.sort();
+        assert.deepEqual(got, want);
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('the writer gets before it puts, and a brit refusal is an expected, warn-only outcome', () => {
+  const PARTS = { a2o: 'tree:1' };
+  const SUT = hashSutParts(PARTS);
+  const CHECKS = [CONCERN, 'doorway-failover', 'mixed'].map(c => `${c}/${SUT}`).sort();
+
+  function publish(repo: string, brit: string) {
+    const lines: string[] = [];
+    publishHouseholdEvidence({
+      report: householdReport(PARTS),
+      reportPath: '/r/sprint-report-household-1.json',
+      repoRoot: repo,
+      env: { BRIT_BUILD_REF: brit, PATH: '/nonexistent-bin' },
+      log: l => lines.push(l),
+    });
+    return lines;
+  }
+
+  it('every put is preceded by a get of the same check; the summary names the signer', () => {
+    const repo = keyedRepo('writer-order-');
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    try {
+      const lines = publish(repo, brit.bin);
+      const log = calls(brit.dir);
+      assert.equal(log[0], `--repo ${repo} signer --json`);
+      const verbs = log.slice(1).map(l => l.split(' ').slice(2, 4).join(' '));
+      assert.deepEqual(verbs, [
+        'validate get',
+        'validate put',
+        'validate get',
+        'validate put',
+        'validate get',
+        'validate put',
+      ]);
+      const checks = log.slice(1).map(l => / --check (\S+)/.exec(l)?.[1]);
+      for (let i = 0; i < checks.length; i += 2) assert.equal(checks[i], checks[i + 1]);
+      assert.deepEqual([...new Set(checks)].sort(), CHECKS);
+      assert.match(
+        lines.at(-1) ?? '',
+        /3\/3 written under refs\/notes\/brit\/validate\/a2o-household\/<concern>\/sha256:[0-9a-f]{16} \(workspace key [0-9a-f]{12}… via brit signer; no berth mooring\)/
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a verified record of this same run is kept, not rewritten', () => {
+    const repo = keyedRepo('writer-idem-');
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    const [mine] = attestationsFromReport(
+      householdReport(PARTS),
+      'sprint-report-household-1.json',
+      null
+    ).filter(a => a.summary.concern === CONCERN);
+    const stored = resign({
+      ...VECTOR.node,
+      artifactCid: [...sutArtifactCidBytes(PARTS)],
+      checkName: mine.check,
+      resultSummary: JSON.stringify(mine.summary),
+    });
+    stubGet(brit.dir, mine.check, { out: JSON.stringify(stored, null, 2) + '\n' });
+    try {
+      const lines = publish(repo, brit.bin);
+      const puts = calls(brit.dir).filter(l => l.includes(' validate put '));
+      assert.equal(puts.length, 2, 'the other two concerns are put');
+      assert.ok(!puts.some(l => l.includes(`--check ${mine.check} `)), 'this one is not');
+      assert.ok(
+        lines.includes(
+          `validation attestation already on record for ${mine.check} (run run-1, verified by brit); not rewritten`
+        ),
+        lines.join('\n')
+      );
+      assert.match(lines.at(-1) ?? '', /3\/3 written under/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('REFUSED concurrent update and refusing-to-write are deferred (warn-only), anything else still FAILED', () => {
+    const repo = keyedRepo('writer-refuse-');
+    const cases: [string, string, RegExp][] = [
+      [
+        'concurrent',
+        `Error: REFUSED concurrent update: ref=refs/notes/brit/validate/a2o-household/${CONCERN}/${SUT.replace(':', '%3A')} expected=0000000000000000000000000000000000000000 observed=1111111111111111111111111111111111111111 attempts=3\n`,
+        /deferred for .*: Error: REFUSED concurrent update: ref=refs\/notes\/brit\/validate\/a2o-household\/.* attempts=3$/m,
+      ],
+      [
+        'would not verify',
+        `Error: refusing to write refs/notes/brit/validate/a2o-household/${CONCERN}/${SUT.replace(':', '%3A')}: signature does not verify against agentId "${OTHER_ID}"\n`,
+        /deferred for .*: Error: refusing to write refs\/notes\/brit\/validate\/a2o-household\/.*: signature does not verify against agentId/m,
+      ],
+      [
+        'other',
+        'Error: git command failed: update-ref refs/notes/brit/validate/x failed 3 times with the ref unmoved: fatal: disk full\n',
+        /validation attestation FAILED for .* \(exit 1\): Error: git command failed: update-ref/m,
+      ],
+    ];
+    try {
+      for (const [label, stderr, expect] of cases) {
+        const brit = stubBrit('new', VECTOR.node.validatorId);
+        stubPut(brit.dir, { err: stderr, code: 1 });
+        try {
+          const lines = publish(repo, brit.bin);
+          assert.match(lines.join('\n'), expect, label);
+          assert.match(lines.at(-1) ?? '', /0\/3 written under/, label);
+          if (label !== 'other') assert.doesNotMatch(lines.join('\n'), /FAILED/, label);
+        } finally {
+          rmSync(brit.dir, { recursive: true, force: true });
+        }
+      }
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('an unverifiable record at the ref is named, then replaced', () => {
+    const repo = keyedRepo('writer-unverifiable-');
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    const check = `${CONCERN}/${SUT}`;
+    const ref = `${ATTESTATION_REF_PREFIX}${CONCERN}/${SUT.replace(':', '%3A')}`;
+    stubGet(brit.dir, check, {
+      err: `no validate ref found for step=a2o-household check=${check}\nunverifiable: ${ref} does not decode: unknown field \`protocolReach\`\n`,
+    });
+    try {
+      const lines = publish(repo, brit.bin);
+      const named = `household attestation unverifiable: ${ref} does not decode: unknown field \`protocolReach\` (brit-build-ref verified read); replacing it`;
+      assert.ok(lines.includes(named), lines.join('\n'));
+      assert.equal(
+        calls(brit.dir).filter(l => l.includes(` validate put `) && l.includes(`--check ${check} `))
+          .length,
+        1
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
   });
 });
