@@ -292,6 +292,12 @@ What does a protocol ecosystem look like when it ships the surfaces before the s
 
 [Cross-pollination survey →](epr:nostr-compass-ecosystem-cross-pollination-2026-10-29) · sibling: [The Forge Problem — ngit](epr:ngit-nostr-git-forge-cross-pollination-2026-10-29) · manifest clones: `nostr-compass`, `concord`, `marmot`, `keycast`, `buzz`, `contextvm-sdk`, `naps`, `fips`, `negentropy`, `schemata`, `bitcredit-core`.
 
+## The Forge Problem — ngit (Nostr)
+
+Who may move a ref, how does a reader prove it, and what makes a forge usable every day? [ngit](https://ngit.dev) is a protocol family for *"Git collaboration, without the platform"*. Maintainer-signed ref state is replicated on Nostr relays as the source of truth, and git objects sit on interchangeable hosts that act as caches. Four small protocols sit around that cut: NIP-34 (announcements, ref state, patches, PRs, issues, status), GRASP (relay plus git hosting that accepts a push only against signed state and serves only the refs signed events justify), NIP-C1 CI (separate signers for coordinator and compute provider) and NIP-82 / ncontainer (releases and OCI tags as signed pointers over content-addressed blobs). The verdict, after a 41-agent challenge pass corrected the first draft: **ngit is daily-driven because it does not replace git** — stock porcelain, a remote helper carrying signed authority, a small CLI owning only evidence and social objects. That was the lesson brit needed: brit could not open our monorepo and read its own evidence without checking signatures, so forge objects were the wrong next work. Most of ngit's forge vocabulary is already ours in other terms or owned by the closure-keyed landing plane. **We leave** the keypair as a repository's root and state with no expected prior ordered by the signer's clock. The survey produced the brit daily-driver sprint (open from final trust, fail-closed verified reads, CAS writes, a signer verb, named git bridges). Radicle, the obvious sibling, is not yet surveyed.
+
+[Cross-pollination survey →](epr:ngit-nostr-git-forge-cross-pollination-2026-10-29) · manifest clones: `ngit-docs`, `ngit`, `ngit-grasp`, `grasp`, `ngit-ci`.
+
 ---
 
 ## The Collective — Hypha DAO
