@@ -2379,10 +2379,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-27 (GREEN held; A8 sibling verdict reuse implemented, live two-device receipt pending): a completed clean gate now records one crossing `gate-verdict@1` observation after brit `build put`; `epr peer verdicts` projects only matching folded rows from roster-admitted non-self devices; and the runner may reuse a sibling green only behind the existing project allow-list, exact closure, clean inputs, selector pass, all-device red veto, and D5 governance-class refusal. The visible line says `independence: sibling`, its cycle row says `run-kind=sibling-reused`, and no quorum surface consumes it. Evidence: `node --test genesis/orchestrator/gate-evidence.test.mjs` green, including admitted/unadmitted, red, dirty, selector, governance and native-read-failure cases; the Rust integration test is authored but intentionally not run in this Codex slice because the operator reserved Cargo. A live folded two-device verdict remains the next proof.
-    evidence-fingerprint: sha256:79e7c00889c235d8
-    evidence-bytes: 7907
-    evidence-entries: 9
+      DELTA 2026-10-29 (RED preserved; reuse is dark on shem): four 10-28/29 pushes from shem's prepared worktree printed `rakia unavailable — path-only selection` and `elohim-storage not reused: rakia oracle unavailable; reuse needs it` even with a green attestation for the identical closure (`evidence: hit green … commit a70838fad`), so each paid the full storage gate (1782 s). No `rakia` CLI is on PATH, and the pinned elohim/rakia (9db775b) builds only `compute-executor`; `rakia affected` exists in brit's CLI baseline but not as a binary here. Backlog gate-reuse-dark-without-rakia-cli.
+    evidence-fingerprint: sha256:aa171700752a5489
+    evidence-bytes: 8501
+    evidence-entries: 10
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
