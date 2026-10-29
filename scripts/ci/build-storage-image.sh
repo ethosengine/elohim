@@ -5,12 +5,25 @@
 # scripts/ci per the Jenkinsfile-size canon).
 #
 # Env (exported by withBuildVars in the Jenkinsfile):
-#   IMAGE_TAG          image tag for this build (e.g. 1.0.0-dev-<sha>)
-#   GIT_COMMIT_HASH    full commit hash (cache-bust + provenance args)
+#   STORAGE_TAG / DOORWAY_TAG: closure tags; *_CLOSURE / *_CLOSURE_MATERIAL: keys
+#   GIT_COMMIT_HASH    full commit hash (provenance)
 set -euo pipefail
 
+# The doorway build uses this same recipe with build-doorway. Image config
+# labels preserve closure identity across registry manifest conversions.
+STEP="${1:-build-storage}"
+case "$STEP" in
+    build-storage) IMAGE=elohim-storage; TAG="${STORAGE_TAG:?}"; KEY="${STORAGE_CLOSURE:?}"; MATERIAL="${STORAGE_CLOSURE_MATERIAL:?}"; DOCKERFILE=elohim/elohim-storage/Dockerfile ;;
+    build-doorway) IMAGE=elohim-doorway; TAG="${DOORWAY_TAG:?}"; KEY="${DOORWAY_CLOSURE:?}"; MATERIAL="${DOORWAY_CLOSURE_MATERIAL:?}"; DOCKERFILE=doorway/doorway-service/Dockerfile ;;
+    *) exit 2 ;;
+esac
+[[ "$KEY" =~ ^sha256:[a-f0-9]{64}$ && "$MATERIAL" =~ ^sha256:[a-f0-9]{64}$ ]] || exit 2
+[[ "$GIT_COMMIT_HASH" =~ ^[a-f0-9]{40}$ ]] || exit 2
+hex="${KEY#sha256:}"
+[ "$TAG" = "closure-${hex:0:16}" ] || exit 2
 buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
+args=()
+if [ "$STEP" = build-storage ]; then
 # ── Conductor pin: resolved from the submodule pointer, not hand-edited ──────
 # elohim-storage embeds the holochain conductor (embedded-conductor mode). Which
 # conductor is decided HERE, by the SHA this commit's elohim/holochain-conductor
@@ -64,24 +77,23 @@ conductor_pin_hint() {
 }
 trap 'conductor_pin_hint' ERR
 
-# CACHE_BUST=${GIT_COMMIT_HASH} forces re-execution of the cargo build layer
-# when source changes. BuildKit retains layer cache for unchanged COPY+RUN
-# pairs (base image, apt installs, cargo deps), which is what we want —
-# removing --no-cache restores ~15 min savings on rebuilds with no source
-# change. Base-image freshness is addressed by pinning the FROM tag.
+    args+=(--build-arg "CONDUCTOR_SOURCE_IMAGE=${CONDUCTOR_PIN}")
+fi
 
+# CACHE_BUST is the closure key; unrelated commit ids never bust the cargo layer.
 # Pull the pinned base image (matches the Dockerfile FROM; keep in sync).
 nerdctl -n k8s.io pull rust:1.94.0-slim-bookworm || true
 
 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
     nerdctl -n k8s.io build \
-    --build-arg CACHE_BUST="${GIT_COMMIT_HASH}" \
-    --build-arg GIT_COMMIT_SHORT="$(echo "${GIT_COMMIT_HASH}" | cut -c1-7)" \
+    --build-arg CACHE_BUST="${KEY}" \
+    --build-arg GIT_COMMIT_SHORT="${GIT_COMMIT_HASH:0:7}" \
     --build-arg GIT_COMMIT_FULL="${GIT_COMMIT_HASH}" \
     --build-arg BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
     --build-arg RUSTC_VERSION="$(rustc --version 2>/dev/null | head -1 || echo unknown)" \
-    --build-arg CONDUCTOR_SOURCE_IMAGE="${CONDUCTOR_PIN}" \
-    -t "elohim-storage:${IMAGE_TAG}" \
-    -f elohim/elohim-storage/Dockerfile .
-
-nerdctl -n k8s.io tag "elohim-storage:${IMAGE_TAG}" "elohim-storage:${GIT_COMMIT_HASH}"
+    "${args[@]}" \
+    --label "elohim.host/closure=${KEY}" \
+    --label "elohim.host/closure-material=${MATERIAL}" \
+    --label "org.opencontainers.image.revision=${GIT_COMMIT_HASH}" \
+    -t "${IMAGE}:${TAG}" \
+    -f "$DOCKERFILE" .

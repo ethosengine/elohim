@@ -241,7 +241,7 @@ The rows this survey fed, each citing `epr:nostr-compass-ecosystem-cross-pollina
 - **arch-authority-in-integrity-backlog**: row 19 (N3, reframed twice by the operator: a holon's acts must answer to the constitutional constraints of the holons above it and to councils drawn to a decision's reach, not only to its own roster; CID chain over holon links; blocked on holon links, charter heads and the standing redraft), row 20 (N4 delegate cannot widen its own grant; policies as values). Cut 2 cites rows 1, 4 and 14, which already held the membership-link finding.
 - **arch-confidentiality-plane-backlog**: row 14 (S1 private-collective primitive).
 - **arch-device-recognition-backlog**: row 28 (S2 short authentication string on device add).
-- **arch-workspace-discipline-backlog**: row 54 (N8 schema samples and limitations ledger).
+- **arch-workspace-discipline-backlog**: row 58 (N8 schema samples and limitations ledger).
 - **commons-holonic-stewardship-backlog**: row 51 (N9 claim transfer, S4 recourse).
 - **blob-forward-confirmation-status-only-no-body-check** (standalone): Part I T2 appended as prior art for the fix.
 - **New standalone security entry**: [security-html5-app-iframe-same-origin-reads-session-token](epr:security-html5-app-iframe-same-origin-reads-session-token) (N7). It is a live defect, not a borrow, so it is not a cluster row. A Codex adversarial review of it surfaced a sibling with a worse sink, [security-markdown-renderer-raw-html-bypasses-sanitizer](epr:security-markdown-renderer-raw-html-bypasses-sanitizer): markdown runs script in the shell document itself.

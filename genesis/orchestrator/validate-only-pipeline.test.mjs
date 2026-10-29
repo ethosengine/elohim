@@ -171,7 +171,7 @@ describe("orchestrator validate-only dispatch", () => {
     // run class (run-class.test.mjs pins the class contract itself).
     assert.match(
       orchestrator,
-      /if \(name == 'elohim-edge' && env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'\) runClass = 'verify'/,
+      /if \(name == 'elohim-edge' && env\.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' && !gateOnlyRun\(\)\) runClass = 'verify'/,
     );
     assert.match(
       orchestrator,
@@ -400,23 +400,25 @@ describe("PR edge gate-only isolation", () => {
   const pr = { CHANGE_ID: "215", BRANCH_NAME: "ci/edge-gate-only" };
   const stages = staticStages(edge);
 
-  test("tag parsing is case-insensitive, PR-only, and inert on dev/main", () => {
+  test("tag parsing is case-insensitive and branch authority needs no tag or parameter", () => {
     for (const message of ["[edge:gate-only]", "ci: gates\n\n[EDGE:GATE-ONLY]"]) {
       assert.equal(tagApplies(message, pr), true);
       for (const branch of ["dev", "main"]) {
         assert.equal(tagApplies(message, { ...pr, BRANCH_NAME: branch }), false);
       }
-      assert.equal(tagApplies(message, { BRANCH_NAME: pr.BRANCH_NAME }), false);
+      assert.equal(tagApplies(message, { BRANCH_NAME: pr.BRANCH_NAME }), true);
     }
     for (const message of [null, "", "[build:edge]", "[edge:validate-only]", "[edge:gate-only-extra]"]) {
       assert.equal(tagApplies(message, pr), false);
     }
     assert.equal(gateOnly({ GATE_ONLY: true }, pr), true);
     for (const params of [{}, { GATE_ONLY: false }]) {
-      assert.equal(gateOnly(params, pr), false);
+      assert.equal(gateOnly(params, pr), true);
     }
-    for (const env of [{ BRANCH_NAME: "ci/manual" }, { ...pr, BRANCH_NAME: "dev" }, { ...pr, BRANCH_NAME: "main" }]) {
-      assert.equal(gateOnly({ GATE_ONLY: true }, env), false);
+    assert.equal(gateOnly({}, { BRANCH_NAME: "ci/manual" }), true);
+    for (const env of [{ ...pr, BRANCH_NAME: "dev" }, { ...pr, BRANCH_NAME: "main" }]) {
+      assert.equal(gateOnly({ GATE_ONLY: true }, env), true);
+      assert.equal(gateOnly({ GATE_ONLY: true }, { ...env, CHANGE_ID: null }), false);
     }
   });
 
@@ -425,24 +427,25 @@ describe("PR edge gate-only isolation", () => {
     assert.ok(rule.indexOf("if (!gateOnlyTagApplies(commitMsg)) return") < rule.indexOf("readFile("));
     assert.match(rule, /EDGE_VALIDATE_ONLY_FROM_TAG == 'true'[\s\S]*error\(/);
     assert.match(rule, /if \(!readFile\('elohim\/holochain\/Jenkinsfile'\)\.contains\("name: 'GATE_ONLY'"\)\) \{\s*error\(/);
-    assert.ok(rule.indexOf("readFile(") < rule.indexOf("env.EDGE_GATE_ONLY_FROM_TAG = 'true'"));
+    assert.doesNotMatch(rule, /EDGE_GATE_ONLY_FROM_TAG/);
+    assert.ok(rule.indexOf("readFile(") < rule.indexOf("echo '[edge:gate-only]"));
     const checkout = stageBlock(orchestrator, "Checkout");
     assert.ok(checkout.indexOf("applyGateOnlyTag(commitMsg)") < checkout.indexOf("if (env.BUILD_TRIGGER == 'WEBHOOK')"));
   });
 
-  test("edge fails closed on a lost parameter, missing tag or conflicting mode", () => {
+  test("edge accepts untagged branches and rejects conflicting modes", () => {
     const body = guardExpression(topLevelDef(edge, "checkGateOnlyRequest"))
       .replace("boolean tagged =", "const tagged =")
       .replace(/^\s*echo .*$/gm, "");
     const check = new Function("commitMsg", "env", "params", "isGateOnly", "isValidateOnly", "error", body);
     const request = (message, params = {}, env = pr, validate = false) =>
       check(message, env, params, () => gateOnly(params, env), () => validate, (message) => { throw new Error(message); });
-    assert.throws(() => request("[edge:gate-only]"), /requires a PR dispatch/);
-    assert.throws(() => request("[EDGE:GATE-ONLY]", { GATE_ONLY: false }), /requires a PR dispatch/);
-    assert.throws(() => request("ordinary commit", { GATE_ONLY: true }), /requires an \[edge:gate-only\]/);
+    assert.doesNotThrow(() => request("[edge:gate-only]"));
+    assert.doesNotThrow(() => request("[EDGE:GATE-ONLY]", { GATE_ONLY: false }));
+    assert.doesNotThrow(() => request("ordinary commit", { GATE_ONLY: true }));
     assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true, DEPLOY_ONLY: true }), /conflicts/);
     assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true }, pr, true), /conflicts/);
-    assert.throws(() => request("[edge:gate-only]", { GATE_ONLY: true }, { BRANCH_NAME: "ci/manual" }), /requires a PR dispatch/);
+    assert.doesNotThrow(() => request("[edge:gate-only]", { GATE_ONLY: true }, { BRANCH_NAME: "ci/manual" }));
     assert.doesNotThrow(() => request("[edge:gate-only]", { GATE_ONLY: true }));
     assert.doesNotThrow(() => request("ordinary commit"));
     for (const branch of ["dev", "main"]) {
@@ -468,7 +471,7 @@ describe("PR edge gate-only isolation", () => {
   test("dispatch names the PR job before logging and carries only safe parameters", () => {
     const trigger = topLevelDef(orchestrator, "triggerPipeline");
     assert.match(trigger, /gateOnlyDownstream = name == 'elohim-edge' && gateOnlyRun\(\)/);
-    const rewrite = trigger.indexOf('if (gateOnlyDownstream) jobBranch = "PR-${env.CHANGE_ID}"');
+    const rewrite = trigger.indexOf('if (gateOnlyDownstream) jobBranch = env.CHANGE_ID ? "PR-${env.CHANGE_ID}" : env.BRANCH_NAME');
     assert.ok(rewrite > -1 && rewrite < trigger.indexOf('echo "▶️ Triggering'));
     for (const param of ["FORCE_BUILD", "FORCE_DEPLOY"]) {
       assert.ok(trigger.includes(`${param}', value: !belowDeploy && !gateOnlyDownstream`));
@@ -540,7 +543,7 @@ describe("PR edge gate-only isolation", () => {
     }
   });
 
-  test("ordinary pod YAML stays byte-identical; only opted-in PRs get the larger budget", () => {
+  test("integration pod YAML stays byte-identical; off-branch gates get the larger budget", () => {
     const pod = topLevelDef(edge, "edgePodYaml");
     const template = pod.match(/String yaml = '''([\s\S]+?)'''/)[1];
     const replacements = [...pod.matchAll(/\.replace\('([^']+)', g \? '([^']+)' : '([^']+)'\)/g)];

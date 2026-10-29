@@ -841,7 +841,7 @@ def applyDeployPendingPass(String mode, graphPipelines, Map runClasses) {
     if (mode != 'auto') suppressed = "mode ${mode} dispatches no deploy"
     if (env.RUN_CLASS_FROM_TAG) suppressed = "[run:${env.RUN_CLASS_FROM_TAG}] caps this run below deploy"
     if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') suppressed = '[edge:validate-only] isolates this run'
-    if (gateOnlyRun()) suppressed = '[edge:gate-only] isolates this run'
+    if (gateOnlyRun()) suppressed = 'off dev/main isolates this run'
     if (params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true') suppressed = 'DEPLOY_ONLY redeploys the edge only'
     String stateFile = '.orch-deploy-pending-state.json'
     String outFile = '.orch-deploy-pending.json'
@@ -939,11 +939,10 @@ def runClassBelowDeploy(String cls) {
     return ['verify', 'measure', 'profile'].contains(cls)
 }
 
-// The tag opts a PR into off-box gates. Integration pushes (including a
-// retained tag on a merge) and ordinary branch/manual runs keep their routing.
+// The historical tag remains accepted; branch authority no longer needs it.
 def gateOnlyTagApplies(String commitMsg) {
     (commitMsg ?: '').toLowerCase().contains('[edge:gate-only]') &&
-        env.CHANGE_ID && env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main'
+        env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main'
 }
 
 def applyGateOnlyTag(String commitMsg) {
@@ -956,11 +955,10 @@ def applyGateOnlyTag(String commitMsg) {
     if (!readFile('elohim/holochain/Jenkinsfile').contains("name: 'GATE_ONLY'")) {
         error('[edge:gate-only] refused: edge Jenkinsfile has no GATE_ONLY parameter; rebase onto dev')
     }
-    env.EDGE_GATE_ONLY_FROM_TAG = 'true'
-    echo '[edge:gate-only] — edge quality gates and local builds only; no publish or deploy'
+    echo '[edge:gate-only] — edge quality gates and local builds; no publish or deploy'
 }
 
-def gateOnlyRun() { env.EDGE_GATE_ONLY_FROM_TAG == 'true' }
+def gateOnlyRun() { !!env.CHANGE_ID || (env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main') }
 
 def applyGateOnlyOverride(graphPipelines) {
     if (!gateOnlyRun()) return graphPipelines
@@ -1285,10 +1283,10 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     // downstream that has not yet declared RUN_CLASS still never rolls on a
     // sub-deploy class. [edge:validate-only] is the edge-scoped verify.
     String runClass = runClassFor(name, env.PIPELINE_RUN_CLASSES)
-    if (name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') runClass = 'verify'
+    if (name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' && !gateOnlyRun()) runClass = 'verify'
     boolean belowDeploy = runClassBelowDeploy(runClass)
     boolean gateOnlyDownstream = name == 'elohim-edge' && gateOnlyRun()
-    if (gateOnlyDownstream) jobBranch = "PR-${env.CHANGE_ID}"
+    if (gateOnlyDownstream) jobBranch = env.CHANGE_ID ? "PR-${env.CHANGE_ID}" : env.BRANCH_NAME
     echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}] RUN_CLASS=${runClass}..."
 
     try {
@@ -1928,7 +1926,7 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
 
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-            def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+            def isDevBranch = !env.CHANGE_ID && env.BRANCH_NAME == 'dev'
             // A pipeline below deploy (verify/measure/profile) deploys nothing, so
             // it never pulls Genesis in.
             def triggeringPipeline = graphPipelines.find {
@@ -2436,9 +2434,8 @@ spec:
     }
 
     environment {
-        // For PR builds, CHANGE_BRANCH holds the source branch (e.g. 'staging');
-        // use it so downstream jobs are triggered on the real branch, not 'PR-NNN'.
-        BRANCH_NAME = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'dev'}"
+        // Preserve BRANCH_NAME as the job identity; source is checkout/selection only.
+        SOURCE_BRANCH = "${env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: ''}"
         NPM_TOKEN = credentials('ee-nexus-npm-token')
     }
 
@@ -2502,7 +2499,7 @@ spec:
         // SUCCESS, rolling all seven alpha peers for 3h04m and reopening the
         // post-roll CellDisabled write outage (+108min to first recovery, the
         // authoring hosts' lamad cells still down +9h) for no new information.
-        cron('0 9 * * *')
+        cron(!env.CHANGE_ID && env.BRANCH_NAME == 'dev' ? '0 9 * * *' : '')
     }
 
     options {
@@ -2544,7 +2541,7 @@ spec:
                         // under its own name so the changeset baseline chain is unchanged.
                         def scmVars = checkout([
                             $class: 'GitSCM',
-                            branches: [[name: "*/${env.BRANCH_NAME}"]],
+                            branches: [[name: "*/${env.SOURCE_BRANCH}"]],
                             extensions: [
                                 // shallow:true with depth:200 cuts clone size ~10x while
                                 // preserving enough history for orchestrator changeset diffs
@@ -2560,7 +2557,7 @@ spec:
                                 url: 'https://github.com/ethosengine/elohim.git',
                                 credentialsId: 'ee-bot-pat',
                                 refspec: [
-                                    "+refs/heads/${env.BRANCH_NAME}:refs/remotes/origin/${env.BRANCH_NAME}",
+                                    "+refs/heads/${env.SOURCE_BRANCH}:refs/remotes/origin/${env.SOURCE_BRANCH}",
                                     "+refs/heads/${env.CHANGE_TARGET ?: 'dev'}:refs/remotes/origin/${env.CHANGE_TARGET ?: 'dev'}"
                                 ].unique().join(' ')
                             ]]

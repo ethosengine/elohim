@@ -148,14 +148,16 @@ resources:
     role: the rakia compute-executor — the binary a provider's worker RUNS a pinned stage with
     available: false
     note: >
-      False since 2026-10-20 because the executor itself is gone, not because a lane withholds it:
-      its source (elohim/rakia/rakia-executor) was never committed upstream, and no disk this
-      workspace reaches still holds the source or a build. Requesters still NAME stages
-      (genesis/agentic/compute/cid-executor.mjs) and providers still decide admission, so only
-      scenarios that read back what a stage RAN are held. Cure and owner:
+      False since 2026-10-20 because no provider on this workspace can RUN a stage: the executor is
+      unbuilt here, not gone. Its source is on the rakia pin since 39cd2eb (2026-10-21, "feat: execute
+      bounded compute tasks with durable receipts") at elohim/rakia/rakia-executor/ (OPERATIONS.md names
+      the build); no compute-executor binary exists under the cargo pool's dev slot (corrected
+      2026-10-29; the earlier "never committed upstream / source lost" reading predates that pin).
+      Requesters still NAME stages (genesis/agentic/compute/cid-executor.mjs) and providers still decide
+      admission, so only scenarios that read back what a stage RAN are held. Cure and owner:
       genesis/data/timeline/backlog/rakia-executor-untracked-in-submodule-pin.md. Flip in all three
-      cluster-state files together once a rebuilt executor is on the pin; a run may assert it with
-      ELOHIM_CAP_COMPUTE_EXECUTOR_STATUS=available.
+      cluster-state files together once the executor is built from the pin and a provider runs it; a run
+      may assert it with ELOHIM_CAP_COMPUTE_EXECUTOR_STATUS=available.
 
 # Cap vocabulary must stay in sync across cluster-state.yaml, cluster-state.act1-household.yaml and this
 # file. A cap declared in one and missing from another silently demotes to a fixture precondition in the

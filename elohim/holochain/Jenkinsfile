@@ -36,6 +36,69 @@
 // HELPER FUNCTIONS
 // ============================================================================
 
+def closureKey(String step) {
+    def key = sh(script: "bash '${env.WORKSPACE}/scripts/ci/closure-input-digest.sh' '${step}'", returnStdout: true).trim()
+    if (!(key ==~ /sha256:[a-f0-9]{64}/)) error("Cannot derive ${step} closure")
+    return key
+}
+
+def setupEdgeVersion() {
+    sh 'git config --global --add safe.directory "*"'
+
+    // Parse VERSION file with component-specific versions
+    def versionMap = parseVersionFile()
+    def gitHash = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+    def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+
+    // Compute tag: main→baseVersion, others→baseVersion-branch-hash
+    def computeTag = { String baseVer ->
+        (env.BRANCH_NAME == 'main') ? baseVer : "${baseVer}-${sanitizedBranch}-${gitHash.take(8)}"
+    }
+
+    // Per-component tags
+    def edgenodeTag = computeTag(versionMap['EDGENODE_VERSION'] ?: '1.0.0')
+    def doorwayKey = closureKey('build-doorway')
+    def doorwayTag = "closure-${doorwayKey.substring(7, 23)}"
+    def storageKey = closureKey('build-storage')
+    def storageTag = "closure-${storageKey.substring(7, 23)}"
+    def happInstallerTag = computeTag(versionMap['HAPP_INSTALLER_VERSION'] ?: '1.0.0')
+    def doorwayAppTag = computeTag(versionMap['DOORWAY_APP_VERSION'] ?: '1.0.0')
+    def agentSdkTag = computeTag(versionMap['AGENT_SDK_VERSION'] ?: '0.1.0')
+    // hApp is built by DNA pipeline — use floating tag, not commit-specific
+    def happTag = getHappFloatingTag()
+
+    // Backward compat: IMAGE_TAG = edgenode tag (primary image)
+    def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
+
+    def buildEnvContent = """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${edgenodeTag}
+EDGENODE_TAG=${edgenodeTag}
+DOORWAY_TAG=${doorwayTag}
+STORAGE_TAG=${storageTag}
+STORAGE_CLOSURE=${storageKey}
+DOORWAY_CLOSURE=${doorwayKey}
+STORAGE_CLOSURE_MATERIAL=${storageKey}
+DOORWAY_CLOSURE_MATERIAL=${doorwayKey}
+HAPP_INSTALLER_TAG=${happInstallerTag}
+DOORWAY_APP_TAG=${doorwayAppTag}
+AGENT_SDK_TAG=${agentSdkTag}
+HAPP_TAG=${happTag}
+BRANCH_NAME=${env.BRANCH_NAME}"""
+
+    writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
+    archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+
+    echo "Component tags:"
+    echo "  EDGENODE_TAG=${edgenodeTag}"
+    echo "  DOORWAY_TAG=${doorwayTag}"
+    echo "  STORAGE_TAG=${storageTag}"
+    echo "  HAPP_INSTALLER_TAG=${happInstallerTag}"
+    echo "  DOORWAY_APP_TAG=${doorwayAppTag}"
+    echo "  AGENT_SDK_TAG=${agentSdkTag}"
+    echo "  HAPP_TAG=${happTag}"
+}
+
 def loadBuildVars() {
     def rootEnv = "${env.WORKSPACE}/build.env"
     def path = fileExists(rootEnv) ? rootEnv : 'build.env'
@@ -61,8 +124,12 @@ def withBuildVars(props, Closure body) {
         "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
         "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
         "EDGENODE_TAG=${props.EDGENODE_TAG ?: props.IMAGE_TAG ?: ''}",
-        "DOORWAY_TAG=${props.DOORWAY_TAG ?: props.IMAGE_TAG ?: ''}",
-        "STORAGE_TAG=${props.STORAGE_TAG ?: props.IMAGE_TAG ?: ''}",
+        "DOORWAY_TAG=${props.DOORWAY_TAG ?: ''}",
+        "STORAGE_TAG=${props.STORAGE_TAG ?: ''}",
+        "STORAGE_CLOSURE=${props.STORAGE_CLOSURE ?: ''}",
+        "DOORWAY_CLOSURE=${props.DOORWAY_CLOSURE ?: ''}",
+        "STORAGE_CLOSURE_MATERIAL=${props.STORAGE_CLOSURE_MATERIAL ?: ''}",
+        "DOORWAY_CLOSURE_MATERIAL=${props.DOORWAY_CLOSURE_MATERIAL ?: ''}",
         "HAPP_INSTALLER_TAG=${props.HAPP_INSTALLER_TAG ?: props.IMAGE_TAG ?: ''}",
         "DOORWAY_APP_TAG=${props.DOORWAY_APP_TAG ?: props.IMAGE_TAG ?: ''}",
         "AGENT_SDK_TAG=${props.AGENT_SDK_TAG ?: props.IMAGE_TAG ?: ''}",
@@ -362,7 +429,66 @@ def checkEdgeNodeHealth(String url) {
  * (unstable) while the gate stabilizes; flip to blocking once green streak
  * established. Top-level def = own CPS method (pipeline block at 64KB limit).
  */
+// One decision before either parallel gate. Registry failure is a miss, never reuse.
+def decideImageClosures() {
+    def props = loadBuildVars()
+    withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
+        ['STORAGE': 'elohim-storage', 'DOORWAY': 'elohim-doorway'].each { kind, repo ->
+            def key = props["${kind}_CLOSURE"]
+            if (!(key ==~ /sha256:[a-f0-9]{64}/)) error("Missing ${kind} closure")
+            def verdict = sh(script: "bash '${env.WORKSPACE}/scripts/ci/harbor-oracle.sh' 'ethosengine/${repo}' '${key}'", returnStdout: true).trim()
+            def hit = verdict ==~ /hit sha256:[a-f0-9]{64}/
+            env.setProperty("${kind}_CLOSURE_HIT", hit ? 'true' : 'false')
+            env.setProperty("${kind}_CLOSURE", key)
+            env.setProperty("${kind}_DIGEST", hit ? verdict.substring(4) : '')
+            echo "${kind} closure ${key}: ${verdict}"
+        }
+    }
+}
+
+def closurePresent(String kind, String stageName) {
+    if (isGateOnly() || env.getProperty("${kind}_CLOSURE_HIT") != 'true') return false
+    def shortKey = env.getProperty("${kind}_CLOSURE").substring(7, 23)
+    echo "${stageName}: skipped — closure ${shortKey} present (${env.getProperty("${kind}_DIGEST")})"
+    return true
+}
+
+def runDoorwayStageBody() {
+    if (closurePresent('DOORWAY', 'Build Doorway')) return
+    withBuildVars(loadBuildVars()) {
+        sh "bash '${env.WORKSPACE}/scripts/ci/build-storage-image.sh' build-doorway"
+    }
+}
+
+// Closure images have exactly one tag. Never feed them to commit/dev-latest push helpers.
+def pushClosureImage(String kind, String imageName) {
+    if (!shouldRunStep("cargo-build-${kind.toLowerCase()}")) return
+    if (closurePresent(kind, "Push ${imageName}")) {
+        env.IMAGES_PUSHED = 'true'
+        return
+    }
+    def tag = env.getProperty("${kind}_TAG")
+    def remote = "harbor.ethosengine.com/ethosengine/${imageName}:${tag}"
+    sh "nerdctl -n k8s.io tag '${imageName}:${tag}' '${remote}'"
+    sh "nerdctl -n k8s.io push '${remote}'"
+    env.IMAGES_PUSHED = 'true'
+    def digest = sh(script: "nerdctl -n k8s.io image inspect '${remote}' --format '{{range .RepoDigests}}{{println .}}{{end}}' | sed -n 's|.*@\\(sha256:[a-f0-9]*\\)|\\1|p' | head -1", returnStdout: true).trim()
+    if (digest ==~ /sha256:[a-f0-9]{64}/) env.setProperty("${kind}_DIGEST", digest)
+}
+
+def pushOtherDevAliases() {
+    ['elohim-edgenode', 'elohim-happ-installer', 'doorway-app', 'elohim-agent-sdk'].each { imageName ->
+        def local = "${imageName}:${env.IMAGE_TAG}"
+        if (sh(script: "nerdctl -n k8s.io image inspect '${local}' >/dev/null 2>&1", returnStatus: true) == 0) {
+            def remote = "harbor.ethosengine.com/ethosengine/${imageName}:dev-latest"
+            sh "nerdctl -n k8s.io tag '${local}' '${remote}'"
+            sh "nerdctl -n k8s.io push '${remote}'"
+        }
+    }
+}
+
 def runStorageQualityGate() {
+    if (closurePresent('STORAGE', 'Quality Gate: Storage')) return
     try {
         // Stage-local timeout: a runaway gate (cold dep-graph compile, hung
         // test) degrades to UNSTABLE instead of eating the pipeline-global
@@ -382,6 +508,7 @@ def runStorageQualityGate() {
  * `check` target. Non-blocking (unstable).
  */
 def runDoorwayQualityGate() {
+    if (closurePresent('DOORWAY', 'Quality Gate: Doorway')) return
     try {
         // Same stage-local timeout as the storage gate: a runaway gate degrades
         // to UNSTABLE instead of eating the pipeline-global budget.
@@ -403,6 +530,7 @@ def runDoorwayQualityGate() {
  * non-blocking; the storage gate keeps its own timeout.
  */
 def runQualityGates() {
+    decideImageClosures()
     if (shouldRunStep('cargo-build-doorway') || shouldRunStep('cargo-build-storage')) {
         sh "bash '${env.WORKSPACE}/scripts/ci/quality-gate-no-image-export.test.sh'"
     }
@@ -436,6 +564,7 @@ def runElohimSdkFeatureMatrix() {
  * ceiling (edge #1134, edge #1351 both died there at compile).
  */
 def runStorageStageBody() {
+    if (closurePresent('STORAGE', 'Build Storage')) return
     if (shouldRunStep('sdk-feature-matrix')) {
         runElohimSdkFeatureMatrix()
     }
@@ -453,7 +582,7 @@ def buildStorageImage() {
     def props = loadBuildVars()
 
     withBuildVars(props) {
-        echo "Building elohim-storage: ${IMAGE_TAG}"
+        echo "Building elohim-storage: ${STORAGE_TAG}"
         // Bash body in scripts/ci (Jenkinsfile-size canon: helpers stay
         // heredoc-free); reads IMAGE_TAG/GIT_COMMIT_HASH from withBuildVars env.
         sh "bash '${env.WORKSPACE}/scripts/ci/build-storage-image.sh'"
@@ -661,6 +790,9 @@ def captureEnabledComputeWorkerGrant(List humans, Map outcomes) {
  * validates no placeholders remain, then applies to Kubernetes.
  */
 def deployEdgeWithManifest(String env, String namespace, String manifestTemplate, String envFile, String resourceName = 'elohim-edgenode') {
+    if (params.DEPLOY_ONLY == true || !shouldRunStep('cargo-build-storage') || !shouldRunStep('cargo-build-doorway')) {
+        error('REFUSED combined edge render: no live per-component workload source; use per-human/doorway deployment')
+    }
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
     // Digest-pinned doorway ref (tag@sha256:…) when the push captured one —
@@ -1031,10 +1163,7 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
                 stageResult: 'UNSTABLE',
                 message: "deploy ${hc.resourcePrefix}: rollout failed — see junit testcase (kubectl describe pod -n ${hc.namespace} -l app.kubernetes.io/name=${hc.resourcePrefix} for cluster-side reason)",
             ) {
-                deployHumanManifest(hc, envFile, allHumans)
-                // Only reached on clean return — catchError swallows
-                // exceptions before this line on any failure path.
-                outcomes[hc.resourcePrefix] = true
+                outcomes[hc.resourcePrefix] = deployHumanManifest(hc, envFile, allHumans)
             }
         }
     }
@@ -1404,7 +1533,7 @@ def resolveRelayUrl(Map primaryDoorway, String humanName, String humanEnv) {
 // Holochain 0.7 has one iroh transport line, so every environment consumes the
 // storage image produced by this commit.
 def resolveStorageImage(String humanEnv, versions) {
-    return "harbor.ethosengine.com/ethosengine/elohim-storage:${versions.STORAGE_TAG}"
+    return versions.STORAGE_REF
 }
 
 /**
@@ -1876,16 +2005,71 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin, S
  *   · this human's scheduling REQUESTS double (two pods, each with the
  *     conductor-sized budget). Check node capacity before the migration roll.
  */
+// Env files are render inputs, never evidence of a previous deployment.
+// Unselected closure images are resolved per workload, including DEPLOY_ONLY.
+def writeDeploymentVersions(String path, String targetEnv) {
+    def defaults = readProperties(file: path)
+    def values = [SITE_TAG: defaults.SITE_TAG ?: (targetEnv == 'prod' ? 'latest' : 'dev-latest')]
+    ['EDGENODE_TAG', 'HAPP_INSTALLER_TAG', 'DOORWAY_APP_TAG', 'HAPP_TAG', 'AGENT_SDK_TAG'].each { key -> values[key] = env.getProperty(key) }
+    values.HAPP_TAG = getHappFloatingTag()
+    ['STORAGE', 'DOORWAY'].each { kind ->
+        def selected = params.DEPLOY_ONLY != true && shouldRunStep("cargo-build-${kind.toLowerCase()}")
+        ['TAG', 'CLOSURE', 'DIGEST'].each { field ->
+            def key = "${kind}_${field}"
+            values[key] = selected ? (env.getProperty(key) ?: '') : ''
+        }
+    }
+    writeFile file: path, text: values.collect { key, value -> "${key}=${value}" }.join('\n') + '\n'
+}
+
+def workloadImageVersions(String kind, String workload, String namespace, versions) {
+    if (params.DEPLOY_ONLY == true || !shouldRunStep("cargo-build-${kind.toLowerCase()}")) {
+        def live = sh(script: "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' --live '${kind}' '${workload}' '${namespace}'", returnStdout: true).trim()
+        versions.putAll(readProperties(text: live))
+    } else {
+        if (!(versions["${kind}_DIGEST"] ==~ /sha256:[a-f0-9]{64}/) || !(versions["${kind}_CLOSURE"] ==~ /sha256:[a-f0-9]{64}/)) {
+            error("REFUSED ${workload}: selected ${kind} lacks a published digest/closure")
+        }
+        versions["${kind}_REF"] = "harbor.ethosengine.com/ethosengine/elohim-${kind.toLowerCase()}:${versions["${kind}_TAG"]}@${versions["${kind}_DIGEST"]}"
+    }
+    return versions
+}
+
+def recordWorkloadImage(String kind, String workload, String namespace, versions) {
+    sh "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' --record-image '${kind}' '${workload}' '${namespace}' '${versions["${kind}_CLOSURE"]}' '${versions["${kind}_REF"]}'"
+}
+
+// Sidecars have no STEPS filter: ordinary runs build them, deploy-only retains them.
+def retainDoorwaySidecars(String manifest, String workload, String namespace, versions) {
+    if (params.DEPLOY_ONLY != true) return
+    def source = readFile(manifest)
+    [DOORWAY_APP_TAG: 'doorway-app', AGENT_SDK_TAG: 'elohim-agent-sdk'].each { key, image ->
+        if (source.contains("${key}_PLACEHOLDER")) {
+            versions[key] = sh(script: "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' --live-container '${workload}' '${namespace}' '${image}' '${image}'", returnStdout: true).trim()
+        }
+    }
+}
+
+def reportHeldStorageReadiness(Map human) {
+    def ready = sh(script: "kubectl get pod '${human.resourcePrefix}-0' -n '${human.namespace}' -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || true", returnStdout: true).trim()
+    if (ready == 'True') {
+        echo "${human.resourcePrefix}: held, Ready"
+        return true
+    } else {
+        unstable("${human.resourcePrefix}: held, NotReady (pre-existing)")
+        return false
+    }
+}
+
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
-    def versions = readProperties(file: envFile)
+    def versions = workloadImageVersions('STORAGE', "statefulset/${humanConfig.resourcePrefix}", humanConfig.namespace, readProperties(file: envFile))
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
     def builtStorageImage = resolveStorageImage(humanConfig.env, versions)
-    // Content-keyed storage image (2026-09-22): hold the live image when the
-    // storage build inputs did not move. Only when THIS run built storage from
-    // HEAD — DEPLOY_ONLY / a STEPS subset renders an image HEAD's digest does
-    // not describe, so it passes '' (cannot judge → roll, record cleared).
-    def storageInputs = (params.DEPLOY_ONLY != true && shouldRunStep('cargo-build-storage')) ? sh(script: "bash '${env.WORKSPACE}/scripts/ci/storage-input-digest.sh' || true", returnStdout: true).trim() : ''
-    def storageImage = resolveStorageWorkloadImage(humanConfig, builtStorageImage, storageInputs)
+    // This persisted closure describes the selected tag, including a hit or
+    // a prior deployment retained by a STEPS subset. Absent means cannot judge.
+    def storageInputs = versions.STORAGE_CLOSURE ?: ''
+    def storageImage = (params.DEPLOY_ONLY == true || !shouldRunStep('cargo-build-storage')) ? builtStorageImage : resolveStorageWorkloadImage(humanConfig, builtStorageImage, storageInputs)
+    versions.STORAGE_REF = storageImage
     // Resolve the floating hApp tag to its content digest so a DNA-pipeline tag
     // move (new hApp bytes, no edge commit) surfaces as an STS spec change and
     // the genesis-peer surge guard lets the rollout restart proceed. FAIL SAFE
@@ -2124,25 +2308,28 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     sh "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' --record '${humanConfig.resourcePrefix}' '${humanConfig.namespace}' '${storageInputs}'"
     if (applyCode == 0 && podInputsBefore && podInputsBefore == podInputsAfter) {
         echo "⏭️ ${humanConfig.resourcePrefix}: pod template + config unchanged (${podInputsAfter}) — no storage restart"
+        if (!reportHeldStorageReadiness(humanConfig)) return false
     } else {
         echo "${humanConfig.resourcePrefix}: pod inputs changed (${podInputsBefore ?: 'none'} -> ${podInputsAfter ?: 'unreadable'}) — restarting storage"
         sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
+        waitForRolloutWithEvidence('statefulset', humanConfig.resourcePrefix, humanConfig.namespace, '600s')
     }
-    waitForRolloutWithEvidence('statefulset', humanConfig.resourcePrefix, humanConfig.namespace, '600s')
 
     // ── Conductor half is DEFERRED to the staggered phase (rung 3) ──────────
     // Ordering still holds: deployHumansInParallel runs EVERY storage rollout
-    // to Ready (releasing each holochain-data-<prefix>-0 from its retiring
-    // embedded conductor) before the sequential conductor phase re-adopts
+    // to Ready when changed (held peers are sampled once), releasing each
+    // retiring embedded conductor before the sequential conductor phase re-adopts
     // them — single writer by phase ordering instead of per-branch chaining.
     // A conductor-touching change therefore rolls ONE conductor at a time,
     // genesis pair last, instead of all seven at once (the 2026-08-06
     // fleet-wide no-authorities regime; spec
     // 2026-08-06-staggered-conductor-restart-mitigation-design.md).
+    recordWorkloadImage('STORAGE', "statefulset/${humanConfig.resourcePrefix}", humanConfig.namespace, versions)
     CONDUCTOR_DEPLOY_QUEUE[humanConfig.resourcePrefix] = [sedArgs: sedArgs, conductorPin: conductorPin, happRollKey: happ.rollKey]
 
     def componentName = humanConfig.resourcePrefix.replace('elohim-', '')
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${humanConfig.namespace} ${deployVersion} ${componentName} || true"
+    return true
 }
 
 /**
@@ -2157,7 +2344,8 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     def conductorUrls = computeConductorUrls(targetEnv, allHumans)
     def hostingConductorUrls = computeHostingConductorUrls(targetEnv, allHumans)
     def storageUrls = computeStorageUrls(targetEnv, allHumans)
-    def versions = readProperties(file: envFile)
+    def versions = workloadImageVersions('DOORWAY', "deployment/${depName}", "elohim-${targetEnv}", readProperties(file: envFile))
+    retainDoorwaySidecars(manifest, "deployment/${depName}", "elohim-${targetEnv}", versions)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
 
     // Digest-pinned doorway ref — see deployEdgeWithManifest note.
@@ -2198,6 +2386,7 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' ${outputFile}"
     sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
     waitForRolloutWithEvidence('deployment', depName, "elohim-${targetEnv}", '300s')
+    recordWorkloadImage('DOORWAY', "deployment/${depName}", "elohim-${targetEnv}", versions)
 }
 
 /**
@@ -2245,47 +2434,10 @@ def deployDoorwaysWithTestShape(String targetEnv, String envFile, List allHumans
     emitDeployJunit("${targetEnv}-doorway", cases, outcomes)
 }
 
-// DEPLOY_ONLY pre-flight: Setup Version was skipped, so loadBuildVars'
-// computed-from-HEAD tags were never built/pushed (cf. edge #920 ImagePullBackOff
-// post-mortem). Reuse the env file's existing tags and verify each exists in
-// Harbor before kubectl apply (~1s per tag, fail-fast on missing manifest).
-// Extracted from per-environment deploy stages to keep each stage's CPS
-// method body under the JVM 64KB size limit (cf. edge #922 method-too-large).
+// Image retention is verified against each live workload before it is rendered.
 def deployOnlyEnvFilePreflight(String envFile, String targetEnv) {
-    echo "DEPLOY_ONLY=true — preserving existing tags in ${envFile} (no overwrite)"
-    def existing = readProperties(file: envFile)
-    echo "  EDGENODE_TAG=${existing.EDGENODE_TAG}"
-    echo "  DOORWAY_TAG=${existing.DOORWAY_TAG}"
-    echo "  STORAGE_TAG=${existing.STORAGE_TAG}"
-    echo "  HAPP_INSTALLER_TAG=${existing.HAPP_INSTALLER_TAG}"
-    echo "  DOORWAY_APP_TAG=${existing.DOORWAY_APP_TAG}"
-    echo "  HAPP_TAG=${existing.HAPP_TAG}"
-    // Doorway: verify by digest when the env file carries one — its SHA tags
-    // are retention-stripped, so the tag 404ing is expected while the digest
-    // (what the deploy actually renders) is the real availability check.
-    def doorwayCheckRef = ((existing.DOORWAY_DIGEST ?: '') ==~ /sha256:[a-f0-9]{64}/) ? existing.DOORWAY_DIGEST : existing.DOORWAY_TAG
-    def checks = [
-        ['elohim-edgenode', existing.EDGENODE_TAG],
-        ['elohim-doorway', doorwayCheckRef],
-        ['elohim-storage', existing.STORAGE_TAG],
-        ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
-        ['doorway-app', existing.DOORWAY_APP_TAG],
-    ]
-    def missing = []
-    checks.each { repo, tag ->
-        if (!tag || tag == 'null') return
-        def rc = sh(
-            script: "curl -sf -o /dev/null 'https://harbor.ethosengine.com/v2/ethosengine/${repo}/manifests/${tag}'",
-            returnStatus: true,
-        )
-        if (rc != 0) {
-            missing << "${repo}:${tag}"
-        }
-    }
-    if (missing) {
-        error "DEPLOY_ONLY pre-flight failed — missing Harbor manifests: ${missing.join(', ')}. Update ${envFile} or run a non-DEPLOY_ONLY build first."
-    }
-    echo "✅ Harbor pre-flight passed — all tags exist"
+    echo "DEPLOY_ONLY — storage and doorway require live workload image/closure evidence"
+    writeDeploymentVersions(envFile, targetEnv)
 }
 
 def shouldRunStep(String stepName) {
@@ -2350,22 +2502,15 @@ def skipBuildStage() {
     (params.DEPLOY_ONLY == true) || isValidateOnly()
 }
 
-// GATE_ONLY is a dispatch contract for a tagged PR, never an integration mode.
-// Usable before Checkout too, when Kubernetes chooses this run's pod resources.
+// Branch authority applies even to manual runs and retained commit tags.
 def isGateOnly() {
-    params.GATE_ONLY == true && env.CHANGE_ID &&
-        env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main'
+    !!env.CHANGE_ID || (env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main')
 }
 
 def checkGateOnlyRequest(String commitMsg) {
-    boolean tagged = commitMsg.toLowerCase().contains('[edge:gate-only]')
-    if (tagged && env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main' && !isGateOnly()) {
-        error('[edge:gate-only] requires a PR dispatch with GATE_ONLY=true; refusing to build/publish')
-    }
     if (!isGateOnly()) return
-    if (!tagged) error('GATE_ONLY requires an [edge:gate-only] commit tag')
     if (isValidateOnly() || params.DEPLOY_ONLY == true) {
-        error('[edge:gate-only] conflicts with validation-only or deploy-only parameters')
+        error('Off dev/main conflicts with validation-only or deploy-only parameters')
     }
     echo 'GATE_ONLY — strict cargo quality gates and local builds; publish, deploy and dataplane validation disabled'
 }
@@ -2564,7 +2709,7 @@ pipeline {
         booleanParam(
             name: 'GATE_ONLY',
             defaultValue: false,
-            description: 'Strict quality gates and local builds only; no publication, deployment or validation. Requires a PR head tagged [edge:gate-only].'
+            description: 'Branch-derived gate-only mode off dev/main; this parameter is redundant. Strict quality gates and local builds; no publication, deployment or validation.'
         )
         booleanParam(
             name: 'VALIDATE_ONLY',
@@ -2734,54 +2879,7 @@ pipeline {
             steps {
                 container('builder') {
                     script {
-                        sh 'git config --global --add safe.directory "*"'
-
-                        // Parse VERSION file with component-specific versions
-                        def versionMap = parseVersionFile()
-                        def gitHash = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
-                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
-
-                        // Compute tag: main→baseVersion, others→baseVersion-branch-hash
-                        def computeTag = { String baseVer ->
-                            (env.BRANCH_NAME == 'main') ? baseVer : "${baseVer}-${sanitizedBranch}-${gitHash}"
-                        }
-
-                        // Per-component tags
-                        def edgenodeTag = computeTag(versionMap['EDGENODE_VERSION'] ?: '1.0.0')
-                        def doorwayTag = computeTag(versionMap['DOORWAY_VERSION'] ?: '1.0.0')
-                        def storageTag = computeTag(versionMap['STORAGE_VERSION'] ?: '1.0.0')
-                        def happInstallerTag = computeTag(versionMap['HAPP_INSTALLER_VERSION'] ?: '1.0.0')
-                        def doorwayAppTag = computeTag(versionMap['DOORWAY_APP_VERSION'] ?: '1.0.0')
-                        def agentSdkTag = computeTag(versionMap['AGENT_SDK_VERSION'] ?: '0.1.0')
-                        // hApp is built by DNA pipeline — use floating tag, not commit-specific
-                        def happTag = getHappFloatingTag()
-
-                        // Backward compat: IMAGE_TAG = edgenode tag (primary image)
-                        def baseVersion = versionMap['HAPP_VERSION'] ?: versionMap['APP_VERSION'] ?: '1.0.0'
-
-                        def buildEnvContent = """BASE_VERSION=${baseVersion}
-GIT_COMMIT_HASH=${gitHash}
-IMAGE_TAG=${edgenodeTag}
-EDGENODE_TAG=${edgenodeTag}
-DOORWAY_TAG=${doorwayTag}
-STORAGE_TAG=${storageTag}
-HAPP_INSTALLER_TAG=${happInstallerTag}
-DOORWAY_APP_TAG=${doorwayAppTag}
-AGENT_SDK_TAG=${agentSdkTag}
-HAPP_TAG=${happTag}
-BRANCH_NAME=${env.BRANCH_NAME}"""
-
-                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
-                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
-
-                        echo "Component tags:"
-                        echo "  EDGENODE_TAG=${edgenodeTag}"
-                        echo "  DOORWAY_TAG=${doorwayTag}"
-                        echo "  STORAGE_TAG=${storageTag}"
-                        echo "  HAPP_INSTALLER_TAG=${happInstallerTag}"
-                        echo "  DOORWAY_APP_TAG=${doorwayAppTag}"
-                        echo "  AGENT_SDK_TAG=${agentSdkTag}"
-                        echo "  HAPP_TAG=${happTag}"
+                        setupEdgeVersion()
                     }
                 }
             }
@@ -2833,28 +2931,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps {
                 container('builder') {
                     script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo "Building Doorway Gateway: ${IMAGE_TAG}"
-
-                            sh """#!/bin/bash
-                                set -euo pipefail
-
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                                # Build from repo root with doorway/doorway-service/Dockerfile
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    --build-arg GIT_COMMIT_SHORT=\$(echo ${GIT_COMMIT_HASH} | cut -c1-7) \\
-                                    --build-arg GIT_COMMIT_FULL=${GIT_COMMIT_HASH} \\
-                                    --build-arg BUILD_TIMESTAMP=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \\
-                                    -t elohim-doorway:${IMAGE_TAG} \\
-                                    -f doorway/doorway-service/Dockerfile .
-
-                                nerdctl -n k8s.io tag elohim-doorway:${IMAGE_TAG} elohim-doorway:${GIT_COMMIT_HASH}
-                            """
-                        }
+                        runDoorwayStageBody()
                     }
                 }
             }
@@ -2884,7 +2961,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Doorway App') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
+                expression { !skipBuildStage() && !isGateOnly() }
             }}
             steps {
                 container('builder') {
@@ -2925,7 +3002,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Agent SDK') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
+                expression { !skipBuildStage() && !isGateOnly() }
             }}
             steps {
                 container('builder') {
@@ -2988,7 +3065,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Edge Node Image') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
+                expression { !skipBuildStage() && !isGateOnly() }
                 expression { shouldRunStep('build-edge-image') }
                 expression { params.SKIP_LEGACY_IMAGES != true }
             }}
@@ -3037,7 +3114,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build hApp Installer') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
-                expression { !skipBuildStage() }
+                expression { !skipBuildStage() && !isGateOnly() }
                 expression { params.SKIP_LEGACY_IMAGES != true }
             }}
             steps {
@@ -3114,25 +3191,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     env.IMAGES_PUSHED = 'true'
                                 }
 
-                                def doorwayPushed = sh(
-                                    script: "bash '${env.WORKSPACE}/scripts/ci/push-harbor-tracked.sh' elohim-doorway elohim-doorway '${DOORWAY_TAG}' 'Doorway'",
-                                    returnStatus: true
-                                ) == 0
-
-                                if (doorwayPushed) {
-                                    env.IMAGES_PUSHED = 'true'
-                                    // Harbor retention strips this repo's SHA tags after push
-                                    // (backlog: harbor-retention-strips-doorway-sha-tags) — carry
-                                    // the push-time digest so deploys pin tag@digest and a
-                                    // stripped tag can't strand rollouts in ImagePullBackOff.
-                                    def dwDigest = sh(script: "cat '${env.WORKSPACE}/elohim-doorway.digest' 2>/dev/null || true", returnStdout: true).trim()
-                                    if (dwDigest ==~ /sha256:[a-f0-9]{64}/) {
-                                        env.DOORWAY_DIGEST = dwDigest
-                                        echo "Doorway deploy pin: ${DOORWAY_TAG}@${dwDigest}"
-                                    }
-                                }
-
-                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-storage elohim-storage '${STORAGE_TAG}' 'elohim-storage'"
+                                pushClosureImage('DOORWAY', 'elohim-doorway')
+                                pushClosureImage('STORAGE', 'elohim-storage')
 
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-happ-installer elohim-happ-installer '${HAPP_INSTALLER_TAG}' 'hApp Installer'"
 
@@ -3148,7 +3208,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 // Also push dev-latest aliases on dev branch for backward compat
                                 if (env.BRANCH_NAME == 'dev') {
-                                    sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-dev-latest-aliases.sh'"
+                                    pushOtherDevAliases()
                                 }
                                 publishComputeWorkerIfRequested()
                             }
@@ -3165,17 +3225,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     expression { !isGateOnly() && !isValidateOnly() }
                     anyOf {
                         branch 'dev'
-                        allOf {
-                            anyOf {
-                                changeset "doorway/**"
-                                changeset "elohim/elohim-storage/**"
-                                changeset "elohim/holochain/edgenode/**"
-                            }
-                            anyOf {
-                                expression { env.BRANCH_NAME ==~ /feat-.+/ }
-                                expression { env.BRANCH_NAME ==~ /claude\/.+/ }
-                            }
-                        }
                         expression { params.FORCE_DEPLOY }
                         expression { params.FORCE_BUILD }
                     }
@@ -3261,31 +3310,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 echo "=== Deploying ${envHumans.size()} humans to ${targetEnv} ==="
 
-                                // DEPLOY_ONLY: reuse the env file's existing tags (the
-                                // currently-deployed/known-good ones from a prior real build).
-                                // Build stages were skipped, so EDGENODE_TAG/DOORWAY_TAG/etc.
-                                // from Setup Version's loadBuildVars are computed-from-HEAD
-                                // and have NEVER been built or pushed to Harbor — applying
-                                // them to k8s would cause ImagePullBackOff (cf. edge #920
-                                // post-mortem). Skip the rewrite; readProperties(envFile)
-                                // downstream picks up the unchanged dev-latest tags.
+                                // Resolve unselected closure images from live workloads at render time.
                                 if (params.DEPLOY_ONLY) {
                                     deployOnlyEnvFilePreflight(ec.envFile, targetEnv)
                                 } else {
                                     // Normal build: write env file with current build tags (preserve SITE_TAG)
-                                    def currentSiteTag = readProperties(file: ec.envFile).SITE_TAG ?: 'dev-latest'
-                                    writeFile file: ec.envFile, text: """# ${targetEnv.capitalize()} Environment - auto-updated by pipeline after each deploy
-# Format: COMPONENT_TAG=harbor-image-tag
-SITE_TAG=${currentSiteTag}
-EDGENODE_TAG=${EDGENODE_TAG}
-DOORWAY_TAG=${DOORWAY_TAG}
-DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
-STORAGE_TAG=${STORAGE_TAG}
-HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
-DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
-HAPP_TAG=${HAPP_TAG}
-AGENT_SDK_TAG=${AGENT_SDK_TAG}
-"""
+                                    writeDeploymentVersions(ec.envFile, targetEnv)
                                 }
 
                                 // Deploy infra (idempotent)
@@ -3363,17 +3393,6 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                     expression { env.DEPLOY_REFUSED != 'true' }
                     anyOf {
                         branch 'dev'
-                        allOf {
-                            anyOf {
-                                changeset 'doorway/**'
-                                changeset 'elohim/elohim-storage/**'
-                                changeset 'elohim/holochain/edgenode/**'
-                            }
-                            anyOf {
-                                expression { env.BRANCH_NAME ==~ /feat-.+/ }
-                                expression { env.BRANCH_NAME ==~ /claude\/.+/ }
-                            }
-                        }
                         expression { params.FORCE_DEPLOY }
                         expression { params.FORCE_BUILD }
                         expression { isValidateOnly() }
@@ -3421,19 +3440,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             if (params.DEPLOY_ONLY) {
                                 deployOnlyEnvFilePreflight(envFile, 'staging')
                             } else {
-                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
-                                writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
-# Format: COMPONENT_TAG=harbor-image-tag
-SITE_TAG=${currentSiteTag}
-EDGENODE_TAG=${EDGENODE_TAG}
-DOORWAY_TAG=${DOORWAY_TAG}
-DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
-STORAGE_TAG=${STORAGE_TAG}
-HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
-DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
-HAPP_TAG=${HAPP_TAG}
-AGENT_SDK_TAG=${AGENT_SDK_TAG}
-"""
+                                writeDeploymentVersions(envFile, 'staging')
                             }
                             // Deploy infra (MongoDB + NATS) — idempotent
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
@@ -3532,19 +3539,7 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             if (params.DEPLOY_ONLY) {
                                 deployOnlyEnvFilePreflight(envFile, 'prod')
                             } else {
-                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
-                                writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
-# Format: COMPONENT_TAG=harbor-image-tag
-SITE_TAG=${currentSiteTag}
-EDGENODE_TAG=${EDGENODE_TAG}
-DOORWAY_TAG=${DOORWAY_TAG}
-DOORWAY_DIGEST=${env.DOORWAY_DIGEST ?: ''}
-STORAGE_TAG=${STORAGE_TAG}
-HAPP_INSTALLER_TAG=${HAPP_INSTALLER_TAG}
-DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
-HAPP_TAG=${HAPP_TAG}
-AGENT_SDK_TAG=${AGENT_SDK_TAG}
-"""
+                                writeDeploymentVersions(envFile, 'prod')
                             }
                             // Per-human manifests — topology-aware, parallelized.
                             deployHumansInParallel(prodHumans, envFile, allHumans)
@@ -3576,10 +3571,10 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             sh """
                                 nerdctl -n k8s.io rmi elohim-edgenode:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-edgenode:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi elohim-doorway:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-doorway:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi elohim-storage:${IMAGE_TAG} || true
-                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-storage:${IMAGE_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-doorway:${DOORWAY_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-doorway:${DOORWAY_TAG} || true
+                                nerdctl -n k8s.io rmi elohim-storage:${STORAGE_TAG} || true
+                                nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-storage:${STORAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-happ-installer:${IMAGE_TAG} || true
                                 nerdctl -n k8s.io rmi elohim-agent-sdk:${IMAGE_TAG} || true

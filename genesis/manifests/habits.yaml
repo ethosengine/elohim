@@ -2302,10 +2302,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-29 (ACTIVE, RED preserved; the sensor is honest again): ci-harvest folds stage-wallclock@1 from the whole 'Publish and Verify App Delivery' stage when the junit phase cases are absent (n=0), as measures.yaml:1036-1049 prescribes — the headline had carried 122.5 min from 2026-09-27 for 32 days while the stage read 10.9 min p90 (landed f8dc1991b/228a80b2f; `ci_harvest_stage_budget_test.py` 38 ok). The closure-keyed edge build (design S1a) is implemented on shift/2026-10-29-integration-capacity and goes up as a PR: measured starting point edge/dev #1753 = 50.6 min in doorway QG + build doorway + build storage on an unchanged closure; target ≤ 15 on the first dev wave whose storage/doorway closure is unchanged. Not measured yet: nothing of α has reached dev.
-    evidence-fingerprint: sha256:55434829d7a91a81
-    evidence-bytes: 33538
-    evidence-entries: 31
+      DELTA 2026-10-29c (ACTIVE, RED preserved; the first receipt of the closure-keyed edge build, PR #217): off dev/main a wave builds locally, publishes and deploys nothing — elohim-edge/PR-217 #3 (dispatched by orchestrator PR-217 #2, SUCCESS, 51.5 min) printed `GATE_ONLY — strict cargo quality gates and local builds; publish, deploy and dataplane validation disabled`, derived both closures on the ci-builder (`STORAGE closure sha256:9b60477e…: miss http-404`, `DOORWAY closure sha256:98d542dc…: miss http-404` — a registry with no closure tag yet is a reasoned miss), built `elohim-doorway:closure-98d542dcaf1e03bb` (9.4 min) and `elohim-storage:closure-9b60477e766b771d` (21.9 min) through `nerdctl build` with the three closure labels, and left Push to Harbor, Deploy Edge Node - Alpha and Dataplane Validation NOT_EXECUTED. The first wave (#2) died in the Groovy sandbox on a dynamic `env[...]` subscript — fixed (29959b37e) and now refused statically by the cps-scope lint. Still owed: the dev landing (local pre-push blocked by a RAM shed beside 11.8 GB of unmoored residents), then the first unchanged-closure dev wave reading ≤ 15 min in doorway QG + build doorway + build storage against 50.6.
+    evidence-fingerprint: sha256:5a3dca2041c80e7c
+    evidence-bytes: 34756
+    evidence-entries: 32
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
