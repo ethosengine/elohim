@@ -1298,6 +1298,12 @@ const CRATE_READ_FNS: &[&str] = &[
     "get_rea_commitment",
     "get_rea_economic_event",
     "get_record_for_action",
+    // One action's receipt rows + one local `get_details`; commits nothing.
+    // The extern (content_store/src/record_witness.rs) is a coordinator-only
+    // addition still to land — see genesis/data/timeline/backlog/
+    // 2026-10-29-record-witness-coordinator-extern.md; until it does, the call
+    // fails and the content chrome's witness reads amber.
+    "get_record_witness_facts",
     "list_feedback_signal_refs_by_signer",
     "resolve_canonical_election",
     "resolve_canonical_elections",

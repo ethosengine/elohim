@@ -118,6 +118,7 @@ pub async fn handle_api_request(
     render_capability: Option<crate::views::RenderCapabilityProfile>,
     extensions: Option<crate::views::CapabilityExtensions>,
     observation_manager: Arc<crate::observation::manager::ObservationManagerBackend>,
+    content_chrome: bool,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -173,6 +174,37 @@ pub async fn handle_api_request(
             hc_registry.as_ref(),
         )
         .await
+    } else if content_chrome
+        && sub_path.starts_with("epr/")
+        && method == Method::GET
+        && epr::is_chrome_facing_path(sub_path.trim_start_matches("epr/"))
+    {
+        // GET /api/v1/epr/{id}/chrome — the content-chrome facing. Answered only
+        // with the content chrome on (`ELOHIM_CONTENT_CHROME`); off, the path
+        // falls through to `epr::handle` exactly as before the chrome.
+        let id = sub_path
+            .trim_start_matches("epr/")
+            .trim_end_matches("/chrome")
+            .to_string();
+        epr::get_chrome_facing(&req, &id, &pool, &app_ctx).await
+    } else if content_chrome
+        && sub_path.starts_with("epr/")
+        && method == Method::POST
+        && epr::is_content_signals_path(sub_path.trim_start_matches("epr/"))
+    {
+        // POST /api/v1/epr/{id}/signals — content-address signal intake. Routed
+        // here (not inside epr::handle) because it records through the
+        // observation manager under this peer's own agent key. Recorded rows are
+        // read through GET /api/v1/observations/by-subject.
+        let id = sub_path
+            .trim_start_matches("epr/")
+            .trim_end_matches("/signals")
+            .to_string();
+        let observer = hc_registry
+            .as_ref()
+            .and_then(|r| r.lamad_client())
+            .map(|hc| hc.agent_key_uhcak());
+        epr::post_content_signals(req, &id, &pool, &app_ctx, &observation_manager, observer).await
     } else if sub_path.starts_with("epr") {
         let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
         epr::handle(

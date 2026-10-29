@@ -583,6 +583,13 @@ pub struct HttpServer {
             std::collections::HashMap<String, crate::app_deliverability::DeliverabilityVerdict>,
         >,
     >,
+    /// The content-chrome switch (`ELOHIM_CONTENT_CHROME`, OFF by default; see
+    /// [`crate::services::content_chrome_facing::content_chrome_enabled`]).
+    /// Off: the chrome facing and signal routes are not answered and
+    /// `/manifest` is exactly [`build_manifest`]. On:
+    /// `GET /api/v1/epr/{id}/chrome`, `POST /api/v1/epr/{id}/signals`, and both
+    /// declared in `/manifest` so a doorway's registry reaches them.
+    content_chrome: bool,
     /// T7 (head-plane trust-gradient program): process-lifetime
     /// verification-memo store, wired once at startup via
     /// [`Self::with_memo_store`] and cloned into the per-request
@@ -1522,6 +1529,7 @@ impl HttpServer {
                 std::collections::HashMap::new(),
             )),
             memo_store: None,
+            content_chrome: false,
             search_index: None,
             reach_gates_prepared: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
@@ -1989,6 +1997,13 @@ impl HttpServer {
 
     /// Wire the content search fold `GET /db/content/search` ranks over (Lane S, R-S4) — the same
     /// `Arc` the content service wakes after each write.
+    /// Turn the content chrome on (`ELOHIM_CONTENT_CHROME`). Off by default:
+    /// every route it touches answers exactly as it did before the chrome.
+    pub fn with_content_chrome(mut self, enabled: bool) -> Self {
+        self.content_chrome = enabled;
+        self
+    }
+
     pub fn with_search_index(mut self, index: Arc<crate::search::SearchIndex>) -> Self {
         self.search_index = Some(index);
         self
@@ -3090,6 +3105,7 @@ impl HttpServer {
                         self.render_capability.clone(),
                         self.extensions.clone(),
                         self.observation_manager.clone(),
+                        self.content_chrome,
                     )
                     .await
                 } else {
@@ -3813,7 +3829,12 @@ impl HttpServer {
     /// Infrastructure endpoints (/health, /shard/*, /sync/*, /import/*) are
     /// intentionally omitted — doorway proxies only API routes.
     async fn handle_manifest(&self) -> Result<Response<Full<Bytes>>, StorageError> {
-        let routes = build_manifest();
+        // Content chrome off (the default): exactly the route manifest.
+        let routes = if self.content_chrome {
+            build_manifest_with_content_chrome()
+        } else {
+            build_manifest()
+        };
         let body = serde_json::to_string(&routes)
             .map_err(|e| StorageError::Internal(format!("Failed to serialize manifest: {}", e)))?;
         Ok(Response::builder()
@@ -18468,6 +18489,42 @@ fn correlate_issues(entries: &[crate::db::models::ObservationEntry]) -> Vec<Obse
 /// in doorway. Security-adjacent: this exposes the CRDT doc-sync plane through
 /// doorway. The sync API does not itself enforce reach (it shares the known
 /// http-reach-enforcement-gap); GET reads mirror /db content-read posture.
+/// The route manifest with the content chrome's two routes declared — what
+/// `GET /manifest` serves when the content chrome is on. Off, the manifest is
+/// exactly [`build_manifest`], so a doorway's registry never proxies a route
+/// this peer does not answer.
+pub fn build_manifest_with_content_chrome() -> doorway_client::DoorwayRoutes {
+    let chrome = DoorwayRoutesBuilder::new()
+        // /api/v1/epr/:id/chrome — the content-chrome facing. Ephemeral
+        // (Category C): recomputed per request from the Notarized record and the
+        // projections it composes (holders, couplings, attestations,
+        // stewardship); never stored, no entry type. `:id` is a record id or a
+        // content address.
+        .route(
+            Route::get("/api/v1/epr/{id}/chrome")
+                .handler("get_epr_chrome_facing")
+                .cache_ttl(30)
+                .public_if_reach("commons")
+                .build(),
+        )
+        // /api/v1/epr/:id/signals — content-address signal intake. Records a
+        // browser CSP / Reporting API report (or a chrome/inspector intent) as an
+        // `undeclared-behaviour` observation by this peer about the content
+        // address; body-size bounded and rate-limited per address; never fans
+        // out. Unauthenticated by nature (browsers post reports without
+        // credentials) — it records evidence, never a verdict, and accepts only
+        // subjects this peer holds a record for.
+        .route(
+            Route::post("/api/v1/epr/{id}/signals")
+                .handler("post_epr_content_signals")
+                .build(),
+        )
+        .build();
+    let mut routes = build_manifest();
+    routes.routes.extend(chrome.routes);
+    routes
+}
+
 pub fn build_manifest() -> doorway_client::DoorwayRoutes {
     DoorwayRoutesBuilder::new()
         // =====================================================================
@@ -21605,6 +21662,34 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/epr/{scope}/lens-market"),
             "missing /api/v1/epr/{{scope}}/lens-market (lens-market S7 — doorway reachability)"
+        );
+        // Content chrome (chrome-trust-edge): declared only when the chrome is
+        // on, so the default manifest is unchanged. On, the same route-shadow
+        // guard discipline as lens-market applies (api/mod.rs dispatches
+        // `is_chrome_facing_path` / `is_content_signals_path`).
+        assert!(
+            !paths.contains(&"/api/v1/epr/{id}/chrome")
+                && !paths.contains(&"/api/v1/epr/{id}/signals"),
+            "content-chrome routes stay out of the default manifest"
+        );
+        let chrome_manifest = build_manifest_with_content_chrome();
+        let chrome_paths: Vec<&str> = chrome_manifest
+            .routes
+            .iter()
+            .map(|r| r.path.as_str())
+            .collect();
+        assert!(
+            chrome_paths.contains(&"/api/v1/epr/{id}/chrome"),
+            "missing /api/v1/epr/{{id}}/chrome (content-chrome facing — doorway reachability)"
+        );
+        assert!(
+            chrome_paths.contains(&"/api/v1/epr/{id}/signals"),
+            "missing /api/v1/epr/{{id}}/signals (content-address signal intake — the doorway relay target)"
+        );
+        assert_eq!(
+            chrome_manifest.routes.len(),
+            manifest.routes.len() + 2,
+            "the chrome manifest adds exactly its two routes"
         );
         // Wave 3 M1 — vf-graphql bridge endpoint
         assert!(
