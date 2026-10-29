@@ -7,7 +7,7 @@ title: "Two rescued devflow stories read as REVISE to a cold reader: their core 
 slug: "story-legibility-rescued-lifecycle-and-declared-views"
 written: "2026-10-29"
 author: "claude (overnight integration pass, session 3f9afd7a, steward human:matthew)"
-status: "open"
+status: "done"
 priority: "medium"
 ci_status: none
 jobs: []
@@ -60,3 +60,7 @@ The steward rules the variance floor. Each feature then gets a revision, followe
 fresh blind reader each round until its verdict is READY. The declared-views and
 app-lifecycle cucumber profiles must stay green throughout. Today they run 8 scenarios,
 32 steps (declared-views), and 2 scenarios, 6 steps (app-lifecycle).
+
+## Resolution (2026-10-29)
+
+Both features went through the context-isolated blind-reader revision loop with the steward's go-ahead. Final verdicts: `portable-app-lifecycle.feature` READY after 3 rounds; `declared-local-views.feature` READY after 1 round. Only prose changed: the diff touches no step lines (Given, When, Then, And, But) and no tags. Profile checks hold: `app-lifecycle` passes 2 scenarios and `declared-views --dry-run` resolves 8 scenarios.
