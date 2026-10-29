@@ -174,7 +174,7 @@ test('deploy readers receive the selected closure and preserve unselected images
   const writer = edge.match(/def writeDeploymentVersions\([^\n]+\) \{([\s\S]*?)^\}/m)[1];
   assert.match(writer, /selected = params.DEPLOY_ONLY != true && shouldRunStep\("cargo-build-\$\{kind.toLowerCase\(\)\}"\)/);
   assert.match(writer, /\['TAG', 'CLOSURE', 'DIGEST'\]/);
-  assert.match(writer, /selected \? \(env\[key\] \?: ''\) : ''/);
+  assert.match(writer, /selected \? \(env\.getProperty\(key\) \?: ''\) : ''/);
   assert.equal((edge.match(/^\s+writeDeploymentVersions\(/gm) ?? []).length, 4);
   assert.match(edge, /def storageInputs = versions.STORAGE_CLOSURE \?: ''/);
   assert.match(edge, /def pushClosureImage[^\n]+\{\s*if \(!shouldRunStep\("cargo-build-\$\{kind.toLowerCase\(\)\}"\)\) return/);
