@@ -24,7 +24,7 @@ function cargoOnPath(): boolean {
   return (process.env.PATH ?? '')
     .split(delimiter)
     .filter(Boolean)
-    .some((dir) => isExecutableFile(join(dir, 'cargo')));
+    .some(dir => isExecutableFile(join(dir, 'cargo')));
 }
 
 let announced = false;
