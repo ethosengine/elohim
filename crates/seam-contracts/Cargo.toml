@@ -9,7 +9,7 @@
 
 [package]
 name = "elohim-seam-contracts"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 # MSRV = the highest `rust-version` declared anywhere in-tree, so this crate can
 # never be the thing that forces a toolchain bump. Verified 2026-08-02:

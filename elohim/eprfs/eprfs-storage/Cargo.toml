@@ -11,7 +11,7 @@ publish = ["elohim"]
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-eprfs-core = { version = "0.3.1", path = "../eprfs-core", registry = "elohim" }
+eprfs-core = { version = "0.3.2", path = "../eprfs-core", registry = "elohim" }
 serde.workspace = true
 serde_json.workspace = true
 tempfile = "3"

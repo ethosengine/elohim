@@ -22,9 +22,14 @@ pub fn repository_agent(root: &Path) -> FlowResult<AgentRef> {
         path: path.clone(),
         source,
     })?;
+    parse_repository_agent(&path, &bytes)
+}
+
+/// Validate declaration text already read through some evidence boundary.
+pub fn parse_repository_agent(path: &Path, bytes: &str) -> FlowResult<AgentRef> {
     let declaration: Declaration =
-        serde_yaml::from_str(&bytes).map_err(|source| FlowError::Yaml {
-            path: path.clone(),
+        serde_yaml::from_str(bytes).map_err(|source| FlowError::Yaml {
+            path: path.to_path_buf(),
             source,
         })?;
     let valid = declaration.agent.strip_prefix("repo:").is_some_and(|name| {
@@ -48,8 +53,13 @@ pub fn repository_agent(root: &Path) -> FlowResult<AgentRef> {
 }
 
 pub fn repository_scope(root: &Path) -> FlowResult<Cid> {
+    scope_of(&repository_agent(root)?)
+}
+
+/// The flow scope a repository agent names.
+pub fn scope_of(agent: &AgentRef) -> FlowResult<Cid> {
     Ok(atom_cid(&PinnedRef {
-        id: repository_agent(root)?.0,
+        id: agent.0.clone(),
         version: 1,
     })?)
 }

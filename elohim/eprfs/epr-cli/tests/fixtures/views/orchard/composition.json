@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "purpose": "Orchard \u00b7 seasonal work",
+  "groups": [
+    {
+      "id": "goals",
+      "label": "Season goals",
+      "role": "focus",
+      "view": "goals.view.json",
+      "conditionField": "conditions",
+      "claimPrefix": "NOTE "
+    },
+    {
+      "id": "plots",
+      "label": "Plots",
+      "role": "work",
+      "view": "board.view.json"
+    }
+  ],
+  "links": [
+    {
+      "from": "plots",
+      "field": "goal",
+      "to": "goals",
+      "targetField": "$identity",
+      "label": "Cultivates"
+    }
+  ],
+  "presentation": {
+    "titleField": "$title",
+    "statusField": "$status",
+    "columns": [],
+    "terminalValues": [
+      "done",
+      "complete",
+      "completed",
+      "resolved",
+      "closed"
+    ],
+    "readings": [
+      "workflow evidence",
+      "measurements"
+    ],
+    "reconciliationReading": "workflow evidence"
+  },
+  "bounds": {
+    "max_files": 10000,
+    "max_bytes": 134217728,
+    "max_depth": 12
+  }
+}

@@ -20,7 +20,10 @@ use crate::views::{
 use super::get_conn;
 
 /// Handle `/api/v1/peer-statuses*` requests.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the api dispatcher passes each request its context and three capability profiles"
+)]
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,

@@ -702,14 +702,14 @@ impl ReportOptions {
 }
 
 /// One structured observation read back out of the sidecar.
-#[derive(Debug, Clone)]
-pub(super) struct Fold {
+#[derive(Debug, Clone, Serialize)]
+pub struct Fold {
     cid: String,
-    pub(super) measure: MeasureRef,
-    pub(super) subject: String,
-    pub(super) value: f64,
+    pub measure: MeasureRef,
+    pub subject: String,
+    pub value: f64,
     unit: Option<String>,
-    pub(super) env: BTreeMap<String, String>,
+    pub env: BTreeMap<String, String>,
     pub(super) occurred_at: String,
     /// Sidecar append position — the tie-break when two folds share a HEAD-derived timestamp,
     /// which is the common case rather than the exceptional one (notes are dated by the tree they
@@ -2015,8 +2015,13 @@ pub(super) fn read_folds(root: &Path) -> FlowResult<Vec<Fold>> {
         return Ok(Vec::new());
     }
     let records = SidecarFlowStore::open(root)?.records()?;
+    Ok(folds_from_records(&records))
+}
+
+/// Structured observations over one captured record set; no implicit repository resources.
+pub fn folds_from_records(records: &[(cid::Cid, FlowRecord)]) -> Vec<Fold> {
     let mut folds = Vec::new();
-    for (seq, (cid, record)) in records.into_iter().enumerate() {
+    for (seq, (cid, record)) in records.iter().enumerate() {
         let FlowRecord::Event(event) = record else {
             continue;
         };
@@ -2033,7 +2038,7 @@ pub(super) fn read_folds(root: &Path) -> FlowResult<Vec<Fold>> {
         };
         folds.push(fold);
     }
-    Ok(folds)
+    folds
 }
 
 /// Project one event's slot vector back onto a [`Fold`], or `None` when it carries no measurement.

@@ -187,67 +187,6 @@ Carries the cross-cutting `ci-trigger:` ignore set (projected into `.ci-ignore` 
 `.claude/scripts/ci-ignore-projector.py`) and the author-time rules listed above. **`.ci-ignore` is GENERATED from
 this leg — never hand-edit it.**
 
-## Application lifecycle — authoritative homes and composition
-
-
-Every application, including developer tools, composes the same lifecycle. Local-first
-is a requirement across it, not a transport or a maturity tier. Private work, shared
-editing, published versions and web exposure are independent choices: sharing does
-not publish, publication need not be public, and a doorway is optional. Presence is
-transient; it is not a document change or evidence of authority.
-
-The [working-version standard](../genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md)
-owns working-state and publication lifecycle semantics. The
-[sync-state contract](../genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md)
-owns per-copy freshness vocabulary. The [hub boundary design](../genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md)
-owns the peer-serving/doorway split. Extend these existing standards when a common
-contract changes; this map routes work to them rather than restating their schemas.
-
-| Concern | Authoritative implementation home | What consumers may compose |
-|---|---|---|
-| Application declarations and reusable client lifecycle | [SDK governance](../elohim/sdk/.epr-meta): app-manifest schema and domain declarations; `storage-client-ts`; matching [Rust SDK](../crates/elohim-sdk/.epr-meta) | Apps choose whether a type has working state, its publication rule and passing-state needs. Framework adapters bind the common contract; they do not invent another lifecycle or vocabulary. |
-| Durable working state and merging | Shared SDK client persistence on the person's device; [storage](../elohim/elohim-storage/.epr-meta/manifest.md) document store and authorized sync on a node; Automerge merges values | Apps supply domain edits. Solo drafts stay out of published projections, listing and automatic peer sync. Editor admission comes from signed authorization, never a merged field. |
-| Presence and gestures | The working-version standard's passing-state contract; reusable SDK and peer transport implementation when built | Apps declare transient meanings. No durable presence log, notary write per gesture or authority inferred from a heartbeat. The shared transport remains unchosen in that standard. |
-| Publication and canonical authority | [DNA governance](../elohim/holochain/dna/.epr-meta/manifest.md): existing integrity/coordinator authority; storage's verified projection; SDK composes fixing and submission | Apps choose a declared submission policy and display observed outcomes. CRDT convergence, a build result or byte possession cannot elect a head. |
-| Published byte custody and replication | Storage's blob, reach, replication and release-adoption services; EPRFS for filesystem projection | Apps and SDKs request and verify held content. They do not create a separate replication network or infer authority from availability. |
-| Peer-native app serving and rendering | [Hub governance](../elohim/elohim-hub/.epr-meta), composed into the node runtime | Apps provide bundles and declared capabilities. Serving by peer key and render/deliverability behavior are shared runtime concerns, even on a single person's device. |
-| Web-facing projection and hosted access | [Doorway governance](../doorway/doorway-service/.epr-meta/manifest.md) | Mount the same underlying capabilities for browsers/web2: names, TLS, host routing and edge caches. Do not make doorway the sole owner of drafts, publication or app execution. |
-| Domain UX and framework bindings | [Application governance](../app/.epr-meta), domain app manifests and shared client libraries | Compose the contracts above into screens and domain actions. Reusable persistence, sync or authority fixes go to their owner before adding another application-specific implementation. |
-
-**Sprint routing.** A brief names the existing habit/scenario it serves, the standard
-it changes (if any), the authoritative producer, consuming adapters, and the owning
-gate. A shared missing capability is work at the producer with an application journey
-as its proof. Keep implementation work and consumer wiring in the same acceptance
-chain; a frontend workaround does not close a missing SDK/storage contract. Changing
-a shared wire shape updates its generative source and projections together.
-
-The current [placement contract](../genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md) owns app needs and their first-reader gates. The [portable-app lifecycle roadmap](../genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md)
-adds resident execution and executable residency to this composition. Foundation contracts precede
-Che access, Rakia adoption and platform integration. Rust primitives own behavior; SDKs expose it
-and environment bridges translate it. Passing-state sessions compose the separate live-session
-standard. Private observation continuity across explicitly admitted own devices never authorizes
-pooling, public gossip, or cross-person access. Declaration, implementation and delivery evidence
-remain separately reported.
-
-**Proof at the seams.** Qualify the relevant transitions: reopen local work offline;
-admit authorized editors while refusing unauthorized listing/serving/sync; merge
-without silently publishing; fix and submit with pending/current/not-current outcomes;
-serve verified published bytes from a peer with no doorway; then expose the same
-capability through the doorway without widening reach. Use component contract tests
-and the existing [shared-sheet story](../genesis/a2o/features/federation/local-first-shared-sheet.feature)
-where applicable. A solo publication needs no collaborative editing, and a one-act
-type need not acquire a working document to satisfy a universal checklist.
-
-**Declared versus delivered.** The working-version standard is Draft and records
-missing persistence, admission and publication composition. Its verbs and proposed
-manifest fields are not an implemented API merely because this map names their
-owner. The local-view reader and portable-runtime implementations from the rescue remain separate ports. Review,
-local manifest advisories and owning gates hold the boundary; there is no automatic
-cross-project architecture checker. Do not turn a missing shared primitive into a
-second per-app standard or claim a draft privacy guarantee before the serving and
-sync paths enforce it. New entities/routes still require the P2P design gate;
-this map adds none and does not choose the unresolved presence transport.
-
 ## Reach context — claim, human standing, Mishpat affirmation
 
 Operator declaration, 2026-09-29: Matthew is the human operator of record for this developer

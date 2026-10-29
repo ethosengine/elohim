@@ -29,7 +29,9 @@ pub mod process;
 pub mod ready;
 pub mod report;
 pub mod repository_validators;
+pub mod seam;
 pub mod setup;
+pub mod view;
 
 pub use error::{Error, Result};
 pub use report::{Finding, FindingStatus, Report};

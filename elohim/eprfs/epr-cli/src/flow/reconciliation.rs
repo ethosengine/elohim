@@ -8,7 +8,7 @@ use elohim_epr_rea::{Commitment, FlowEvent, FlowRecord, Magnitude, ReaVerb};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use super::{acceptance, body_cid_of_file, confine_under, Labels};
+use super::{acceptance, Labels};
 
 #[derive(Debug, Serialize)]
 pub struct Reconciliation {
@@ -59,18 +59,18 @@ fn tag(event: &FlowEvent, value: &str) -> bool {
     event.classified_as.first().is_some_and(|s| s == value)
 }
 
-fn source_issues(root: &Path, scope: &Cid, path: Option<&str>) -> Vec<String> {
+fn source_issues(
+    root: &(impl acceptance::EvidenceResources + ?Sized),
+    scope: &Cid,
+    path: Option<&str>,
+) -> Vec<String> {
     let Some(path) = path else {
         return vec![
             "current source unestablished: no resolvable source path or label for this scope"
                 .into(),
         ];
     };
-    let canonical = std::fs::canonicalize(root).ok();
-    let actual = canonical
-        .as_ref()
-        .and_then(|base| confine_under(base, &base.join(path)).ok())
-        .and_then(|p| body_cid_of_file(&p));
+    let actual = root.read_text(path).ok().map(|text| super::body_cid(&text));
     if actual.as_ref() == Some(scope) {
         Vec::new()
     } else {
@@ -92,6 +92,25 @@ pub fn reconcile(
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
+    reconcile_with(
+        root,
+        scope,
+        path,
+        records,
+        &labels,
+        crate::govern::evaluator_identity(),
+    )
+}
+
+/// Pure reading over an explicit record set, labels and supporting byte resources.
+pub fn reconcile_with(
+    root: &(impl acceptance::EvidenceResources + ?Sized),
+    scope: &Cid,
+    path: Option<&str>,
+    records: &[(Cid, FlowRecord)],
+    labels: &Labels,
+    evaluator: serde_json::Value,
+) -> Reconciliation {
     let issues = source_issues(
         root,
         scope,
@@ -189,7 +208,7 @@ pub fn reconcile(
     }
     Reconciliation {
         version: "acceptance-reconciliation-v1",
-        evaluator: crate::govern::evaluator_identity(),
+        evaluator,
         scope_cid: scope.to_string(),
         record_set_fingerprint: format!("sha256:{:x}", hasher.finalize()),
         assertions,
@@ -238,7 +257,7 @@ fn assertion(
 }
 
 fn commitment_evidence(
-    root: &Path,
+    root: &(impl acceptance::EvidenceResources + ?Sized),
     id: &Cid,
     commitment: &Commitment,
     records: &[(Cid, FlowRecord)],

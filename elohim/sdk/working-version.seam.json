@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "id": "working-version-reuse",
+  "responsibility": "Reusable client working-version persistence and sync belong in the SDK; apps supply domain edits. The standard includes undelivered lifecycle work.",
+  "owner": [
+    "elohim/sdk/*",
+    "crates/elohim-sdk/*",
+    "elohim/elohim-storage/src/sync/*"
+  ],
+  "allowedConsumers": [
+    "app/*",
+    "doorway/*"
+  ],
+  "authoritativeContracts": [
+    {
+      "path": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md",
+      "needle": "The TypeScript SDK can load and merge an Automerge document (`AutomergeSync`,\n  `elohim/sdk/storage-client-ts/src/sync.ts`).",
+      "status": "planned"
+    },
+    {
+      "path": "elohim/sdk/.epr-meta",
+      "needle": "Browser persistence and offline resumption belong\nin shared client support; UI frameworks bind it rather than implementing independent\nqueues, publication state machines or admission rules.",
+      "status": "contract"
+    }
+  ],
+  "reusableInterfaces": [
+    {
+      "path": "elohim/sdk/storage-client-ts/src/sync.ts",
+      "needle": "export class AutomergeSync {",
+      "status": "implemented"
+    },
+    {
+      "path": "elohim/elohim-storage/src/sync/doc_store.rs",
+      "needle": "pub struct DocStore {",
+      "status": "implemented"
+    }
+  ],
+  "detection": [
+    "Automerge.save(",
+    "Automerge.load(",
+    "indexedDB.open(",
+    "generateSyncMessage(",
+    "new AutomergeSync(",
+    "getChangesSince(",
+    "loadIncremental("
+  ],
+  "composition": [
+    "new AutomergeSync("
+  ],
+  "exclusions": [
+    "*/tests/*",
+    "*.spec.ts",
+    "*.test.ts"
+  ],
+  "appliesTo": [
+    "*.rs",
+    "*.ts",
+    "*.tsx",
+    "*.js"
+  ]
+}

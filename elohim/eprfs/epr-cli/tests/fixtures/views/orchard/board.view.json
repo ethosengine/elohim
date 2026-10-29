@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "purpose": "Read the orchard",
+  "sources": {
+    "items": {
+      "path": "plots",
+      "reader": "frontmatter",
+      "pattern": "*.md"
+    },
+    "ledger": {
+      "path": "observations/harvest.jsonl",
+      "reader": "flows",
+      "optional": true
+    }
+  },
+  "subjects": "items",
+  "identity": "plot",
+  "select": {
+    "op": "contains",
+    "field": "varieties",
+    "value": "pear"
+  },
+  "fields": [
+    "phase",
+    "varieties",
+    "goal"
+  ],
+  "relationships": {},
+  "readings": {
+    "harvest evidence": {
+      "reader": "reconciliation",
+      "input": "ledger"
+    }
+  },
+  "bounds": {
+    "max_files": 100,
+    "max_bytes": 1048576,
+    "max_depth": 5
+  },
+  "capture": "selected",
+  "presentation": {
+    "titleField": "$identity",
+    "statusField": "phase",
+    "columns": [
+      {
+        "value": "growing",
+        "label": "Growing"
+      },
+      {
+        "value": "harvested",
+        "label": "Harvested"
+      }
+    ],
+    "terminalValues": [
+      "harvested"
+    ],
+    "readings": [
+      "harvest evidence"
+    ],
+    "reconciliationReading": "harvest evidence"
+  }
+}

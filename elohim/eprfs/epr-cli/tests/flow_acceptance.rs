@@ -507,3 +507,105 @@ fn actionable_rejected_review_and_revised_delivery_never_suggest_acceptance() {
     let view = flow::context::context(root, "scope.md").unwrap();
     assert_eq!(view.actionable.ranked[0].action, "independent-review");
 }
+
+#[test]
+fn captured_view_reuses_valid_acceptance_and_requires_declared_supporting_resources() {
+    use elohim_epr_cli::view;
+    let (dir, on, options) = fixture();
+    let root = dir.path();
+    accept(root, &on, &options).unwrap();
+    std::fs::write(
+        root.join("scope.md"),
+        "---\nid: experience\nkind: work\nstatus: open\n---\nThe intended feature",
+    )
+    .unwrap();
+    let mut declaration = serde_json::json!({
+        "version":1, "purpose":"Read accepted work from explicit captured evidence",
+        "sources": {
+            "subjects":{"path":"scope.md","reader":"frontmatter"},
+            "flows":{"path":".eprfs/status/flows.jsonl","reader":"flows"},
+            "actors":{"path":".eprfs/status/actors.jsonl","reader":"actors"},
+            "support":{"path":["evidence.txt","acceptance.json"],"reader":"bytes"}
+        },
+        "subjects":"subjects", "identity":"id", "select":{"op":"eq","field":"kind","value":"work"},
+        "fields":["status"], "readings":{"accepted experience":{"reader":"reconciliation","input":"flows"}},
+        "bounds":{"max_files":100,"max_bytes":1048576,"max_depth":8}, "capture":"selected"
+    });
+    std::fs::write(root.join("view.json"), declaration.to_string()).unwrap();
+    let log_before = std::fs::read(root.join(".eprfs/status/flows.jsonl")).unwrap();
+    let captured = view::project(root, "view.json").unwrap();
+    let reading = &captured.projection.subjects[0];
+    assert_eq!(reading.fields["status"], "open");
+    assert_eq!(
+        reading.readings["accepted experience"]["value"]["assertions"][0]["acceptance"],
+        "accepted"
+    );
+    assert_eq!(
+        std::fs::read(root.join(".eprfs/status/flows.jsonl")).unwrap(),
+        log_before
+    );
+    let store = TempDir::new().unwrap();
+    let cid = view::save(store.path(), &captured).unwrap();
+    declaration["sources"]
+        .as_object_mut()
+        .unwrap()
+        .remove("support");
+    std::fs::write(root.join("view.json"), declaration.to_string()).unwrap();
+    let unsupported = view::project(root, "view.json").unwrap();
+    assert_eq!(
+        unsupported.projection.subjects[0].readings["accepted experience"]["value"]["assertions"]
+            [0]["acceptance"],
+        "revalidation-required"
+    );
+    dir.close().unwrap();
+    assert_eq!(
+        view::reopen(store.path(), &cid)
+            .unwrap()
+            .projection
+            .subjects[0]
+            .readings["accepted experience"]["value"]["assertions"][0]["acceptance"],
+        "accepted"
+    );
+}
+
+#[test]
+fn composition_follows_bounded_acceptance_dependencies_and_retains_old_verdict() {
+    use elohim_epr_cli::view;
+    use serde_json::json;
+    let (dir, on, options) = fixture();
+    let root = dir.path();
+    accept(root, &on, &options).unwrap();
+    std::fs::write(
+        root.join("scope.md"),
+        "---\nid: experience\nkind: work\nstatus: open\n---\nThe intended feature",
+    )
+    .unwrap();
+    let presentation = json!({"titleField":"$identity","statusField":"status","columns":[],"terminalValues":["done"],"readings":["evidence"],"reconciliationReading":"evidence"});
+    let child = json!({"version":1,"purpose":"Native acceptance","sources":{"items":{"path":"scope.md","reader":"frontmatter"},"flows":{"path":".eprfs/status/flows.jsonl","reader":"flows"},"actors":{"path":".eprfs/status/actors.jsonl","reader":"actors"}},"subjects":"items","identity":"id","select":{"op":"eq","field":"kind","value":"work"},"fields":["status"],"readings":{"evidence":{"reader":"reconciliation","input":"flows"}},"evidence_roots":["acceptance.json","evidence.txt"],"bounds":{"max_files":100,"max_bytes":1048576,"max_depth":8},"capture":"selected","presentation":presentation});
+    std::fs::write(root.join("child.json"), child.to_string()).unwrap();
+    let composition = json!({"version":2,"purpose":"Accepted work","groups":[{"id":"goals","label":"Goals","role":"focus","view":"child.json"},{"id":"work","label":"Work","role":"work","view":"child.json"}],"links":[],"bounds":{"max_files":100,"max_bytes":1048576,"max_depth":8},"presentation":{"titleField":"$title","statusField":"$status","columns":[],"terminalValues":[],"readings":[],"reconciliationReading":null}});
+    std::fs::write(root.join("composition.json"), composition.to_string()).unwrap();
+    let before = view::project(root, "composition.json").unwrap();
+    assert_eq!(
+        before.projection.subjects[0].readings["evidence"]["value"]["assertions"][0]["acceptance"],
+        "accepted"
+    );
+    assert!(before.bytes.contains_key("acceptance.json"));
+    assert!(before.bytes.contains_key("evidence.txt"));
+    let store = TempDir::new().unwrap();
+    let cid = view::save(store.path(), &before).unwrap();
+    std::fs::write(root.join("evidence.txt"), "changed evidence").unwrap();
+    let after = view::project(root, "composition.json").unwrap();
+    assert_eq!(
+        after.projection.subjects[0].readings["evidence"]["value"]["assertions"][0]["acceptance"],
+        "revalidation-required"
+    );
+    assert_eq!(
+        view::reopen(store.path(), &cid)
+            .unwrap()
+            .projection
+            .subjects[0]
+            .readings["evidence"]["value"]["assertions"][0]["acceptance"],
+        "accepted"
+    );
+}

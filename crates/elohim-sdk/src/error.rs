@@ -8,6 +8,9 @@ pub type Result<T> = std::result::Result<T, SdkError>;
 /// SDK error types
 #[derive(Error, Debug)]
 pub enum SdkError {
+    /// An adapter declares the interface but cannot perform this operation.
+    #[error("Unsupported capability: {0}")]
+    Unsupported(&'static str),
     /// Content not found
     #[error("Content not found: {0}")]
     NotFound(String),

@@ -1,0 +1,105 @@
+{
+  "app-release": {
+    "appId": "orchard",
+    "releaseCid": "fixture-release",
+    "target": "browser",
+    "artifactCids": [
+      "fixture-artifact"
+    ],
+    "requiredCapabilities": []
+  },
+  "app-open-input": {
+    "release": {
+      "appId": "orchard",
+      "releaseCid": "fixture-release",
+      "target": "browser",
+      "artifactCids": [
+        "fixture-artifact"
+      ],
+      "requiredCapabilities": []
+    },
+    "operationId": "open-1",
+    "grantRef": "reference-not-proof"
+  },
+  "app-instance": {
+    "instanceId": "instance-1",
+    "deviceId": "device-1",
+    "release": {
+      "appId": "orchard",
+      "releaseCid": "fixture-release",
+      "target": "browser",
+      "artifactCids": [
+        "fixture-artifact"
+      ],
+      "requiredCapabilities": []
+    }
+  },
+  "app-residency": {
+    "releaseCid": "fixture-release",
+    "pinned": true,
+    "running": false,
+    "artifactsVerified": true,
+    "dataVerified": null
+  },
+  "app-continuation": {
+    "sourceInstanceId": "instance-1",
+    "releaseCid": "fixture-release",
+    "checkpointCid": "private-checkpoint",
+    "formatVersion": 1
+  },
+  "app-attachment-input": {
+    "instanceId": "instance-1",
+    "grantRef": "reference-not-proof",
+    "origin": "https://example.test"
+  },
+  "app-route": {
+    "url": "https://example.test/private/app",
+    "expiresAt": "2026-10-15T00:00:00Z"
+  },
+  "app-sync-target": {
+    "deviceId": "device-1",
+    "streamId": "observations",
+    "epoch": "1",
+    "endPosition": "9007199254740993"
+  },
+  "app-sync-demand": {
+    "scope": "own:observations",
+    "urgency": "foreground",
+    "targets": [
+      {
+        "deviceId": "device-1",
+        "streamId": "observations",
+        "epoch": "1",
+        "endPosition": "9007199254740993"
+      }
+    ]
+  },
+  "app-release-answer": {
+    "state": "present",
+    "value": {
+      "appId": "orchard",
+      "releaseCid": "fixture-release",
+      "target": "browser",
+      "artifactCids": [
+        "fixture-artifact"
+      ],
+      "requiredCapabilities": []
+    }
+  },
+  "app-instance-answer": {
+    "state": "unreachable",
+    "reason": "timeout"
+  },
+  "app-sync-progress": {
+    "target": {
+      "deviceId": "device-1",
+      "streamId": "observations",
+      "epoch": "1",
+      "endPosition": "9007199254740993"
+    },
+    "reachable": false,
+    "localEpoch": null,
+    "localPosition": null,
+    "caughtUp": null
+  }
+}

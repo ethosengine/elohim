@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:seam-guidance-method:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "artifact_type",
+    "governance",
+    "composition",
+    "executor",
+    "application"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "artifact_type": {
+      "const": "algorithm-content"
+    },
+    "governance": {
+      "type": "object",
+      "required": ["owner"],
+      "properties": {
+        "owner": {
+          "const": "governance-plane-single-evaluator"
+        }
+      }
+    },
+    "composition": {
+      "const": [
+        "normalize",
+        "resolve",
+        "detect",
+        "verify-sources",
+        "bound-packet",
+        "agent-review",
+        "validate-review"
+      ]
+    },
+    "executor": {
+      "const": "native-seam-v1"
+    },
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "review",
+        "maxCandidates",
+        "packetBytes",
+        "deadlineMs",
+        "inference",
+        "persistence",
+        "contributions"
+      ],
+      "properties": {
+        "mode": {
+          "const": "advisory"
+        },
+        "review": {
+          "const": "active-agent"
+        },
+        "maxCandidates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "packetBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 8192
+        },
+        "deadlineMs": {
+          "const": 2000
+        },
+        "inference": {
+          "const": "none"
+        },
+        "persistence": {
+          "const": "none"
+        },
+        "contributions": {
+          "const": "explicit-only"
+        }
+      }
+    }
+  }
+}

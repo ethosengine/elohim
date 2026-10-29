@@ -641,15 +641,15 @@ habits:
     active: false
     checks:
       - "Native seam guidance: just gate eprfs; cargo test -p elohim-epr-cli --test seam_guidance (use the manifest cargo target). Eight acceptance tests include a 28-case labeled corpus, Claude/Codex equivalence, source/algorithm/application freshness, review validation, boundaries and privacy. GREEN 2026-10-12."
-      - "node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs; python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py; pnpm run elohim-agent:packages:verify — schema, registration preservation, adapter privacy/degradation and projection fidelity. GREEN 2026-10-12."
+      - "just gate seam-guidance-contracts (node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs; python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py) — declaration and method schemas for the five declarations the opt-in binding names, the binding list, cited needles, and adapter privacy/degradation; node --test elohim/sdk/domains/elohim-agent/scripts/hook-package.test.mjs — read-only registration verification; pnpm run elohim-agent:packages:verify — projection fidelity. GREEN 2026-10-28."
       - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — 11 assertions, GREEN 2026-08-12. Validator ACCOUNTING against the shared scope registry (no implemented validator undeclared; each host implements exactly its declared share), WIRING (both live decision surfaces call the native evaluator), and ATTRIBUTION (both hosts name themselves by content address; the ledger stamps an evaluator on every decision; a dispute record names both builds)."
       - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
       - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
-      DELTA 2026-10-28 (rescue absolutes guard; status unchanged): restored 0ee5dfde8's Python classifier, frame, advisory dispatch policy, landing measures and root binding; the post-write hook is a package-master HookPackage projected through current dev tooling. Classifier 53/53, hook 8/8, frame atoms 82/82, policy 81/81 and evaluator 42/42 checks pass (exit 0); package verification passes 2260 checks (exit 0). Canon lift and policy pins regenerated and fresh. The native registry declares this validator Python-only; no native parity or blocking enforcement claimed.
-    evidence-fingerprint: sha256:8cb012519e25adb3
-    evidence-bytes: 11354
-    evidence-entries: 6
+      DELTA 2026-10-28b — Seam guidance is opt-in. The root binding is withdrawn: with no `.epr-meta` cascade binding the validator, `epr govern seam` reports `enabled: false` with an empty packet and the hook wrappers stay silent; ordinary governed writes never run the classifier. The two composition sections and the binding to enable moved to `.epr-meta/composition.md`, and the declarations cite that file, so the root manifest is unchanged on this branch and no longer marks every crate touched for RS-GOV-04. The second check now names suites that exist: `just gate seam-guidance-contracts` (4 node tests, 6 python tests, EXIT=0); `hook-package.test.mjs` 5/5 on origin/dev e67c6cef8, where port/a-small landed it; `pnpm run elohim-agent:packages:verify` 2,252 assertions EXIT=0. Habit status remains green.
+    evidence-fingerprint: sha256:9967d35d20ea4214
+    evidence-bytes: 13068
+    evidence-entries: 8
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
@@ -1504,23 +1504,10 @@ habits:
       - "cargo test --features 'p2p p2p-iroh' --lib -- retention release_ledger holds blob_arrivals shard_service a_forgotten_blob (elohim/elohim-storage)"
       - "fleet read: elohim_node_holds_bytes{store=blobs,reason} per alpha peer, own_unnamed falling at 64 blobs per pass for bytes older than a day and unrecorded naming what nobody can account for, beside elohim_release_retention_releases{standing}, elohim_release_retention_blobs_held{reason} and elohim_node_store_bytes{store=blobs|blobs_iroh|cache}"
     evidence: >
-      DELTA 2026-10-07b (status red -> GREEN; the fleet read completes check 3). Read from Prometheus at
-      04:23Z, 33 minutes after the roll: the blob store fell by exactly the bytes the holds pass released,
-      one gauge step after each pass, on every peer — matthew 1,297 MB -> 492 MB (own_unnamed 238 -> 6
-      blobs over five passes of 64, 64, 64, 40; 984 MB released), adam 841 -> 353 MB (134 -> 6; 487 MB),
-      jessica 331 -> 294 MB (75 -> 7; 36.6 MB), james -36.6 MB, susan, eve and gertrude -33.5 MB each
-      (their eight bundles, all gone at the second pass). matthew's and adam's iroh stores fell with it
-      (-265 MB each at 04:16Z: the BLAKE3 alias computed from the bytes before the delete). kept_release
-      and served did not move on any peer (matthew and jessica keep 9 releases, 50.9 MB; the others one);
-      release_retention_failures_total 0 everywhere. Doorway alpha answered 200 on /, /version.json and
-      /db/content/elohim-host-landing at 04:07Z, 04:10Z and 04:23Z, through matthew's second to fifth
-      passes. What is left on the fleet is what the rule keeps: kept releases, served bundles, pledged
-      bytes, and the unrecorded (matthew 88 MB, adam 84 MB) that nothing deletes. The two scenarios are
-      green on the household (DELTA 2026-10-06b), the unit checks pass (87 lib tests under both
-      transports), and the fleet gauges read as the rule predicts: green. Retire-when stands as written.
-    evidence-fingerprint: sha256:737aa694781b6180
-    evidence-bytes: 7183
-    evidence-entries: 4
+      DELTA 2026-10-28 (portable-app foundation re-landed from rescue snapshot 0ee5dfde8; status unchanged): bounded demand leases (elohim-seam-contracts 0.1.2), Rust/TypeScript lifecycle contracts, ts-rs App*.ts regenerated by `cargo test export_bindings` (byte-identical to the snapshot), app-* schemas moved to the 2020-12 dialect, and the browser/workspace bridges. Gates: app-lifecycle-contracts, elohim-sdk, seam-contracts, browser-bridge, workspace-bridge and schema-validate EXIT=0; storage-client-ts red only on the http-tier large-leaf timeout under host load (passes alone, 15/15). Live residency enforcement and durable continuation remain future work.
+    evidence-fingerprint: sha256:743eb9da844d03a1
+    evidence-bytes: 7843
+    evidence-entries: 5
     first_move: >
       Keep reading what is let go. matthew's recentlyLetGo on GET /admin/adoption names the 232
       blobs (984 MB) that read own_unnamed on 2026-10-07; the ledger gap had named 449 MB of

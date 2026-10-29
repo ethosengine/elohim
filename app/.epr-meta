@@ -9,7 +9,7 @@ purpose: >
 
 # app — compose shared application capabilities
 
-Use the [root lifecycle map](../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+Use the [root lifecycle map](../.epr-meta/composition.md#application-lifecycle--authoritative-homes-and-composition)
 and [SDK authority](../elohim/sdk/.epr-meta) before planning persistence, collaboration
 or publication. Apps own domain actions and UX; domain app manifests declare their
 choices. Shared client libraries bind SDK capabilities to their framework. Author

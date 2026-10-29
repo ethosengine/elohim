@@ -81,6 +81,22 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     }
+    if raw.first().map(String::as_str) == Some("view") {
+        return match elohim_epr_cli::view::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                if raw.iter().any(|a| a == "--json") {
+                    println!(
+                        "{}",
+                        serde_json::json!({"version": 1, "diagnostics": [error]})
+                    );
+                } else {
+                    eprintln!("epr view: {error}");
+                }
+                ExitCode::from(2)
+            }
+        };
+    }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
             Ok(code) => code,
@@ -392,5 +408,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
 }

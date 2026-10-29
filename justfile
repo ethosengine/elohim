@@ -673,6 +673,12 @@ _gate-eprfs:
       cd elohim/eprfs && cargo clippy "$@" --all-targets -- -D warnings
     @just _eprfs-ingest-around test
 
+# Native seam guidance's non-Rust contracts: the declaration and method schemas hold every
+# declaration the opt-in binding names, and the hook adapter stays private and fails visibly.
+_gate-seam-guidance-contracts:
+    node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs
+    python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py
+
 # Build epr and bin-launch at HEAD in the eprfs gate's slot and ingest the build. Pre-push runs
 # this (`gate-runner.mjs --target eprfs --recipe _eprfs-deliver`) when the gate was satisfied by
 # a receipt: the receipt carries the test verdict for this exact epr source closure across

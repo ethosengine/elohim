@@ -80,7 +80,7 @@ pub mod store;
 pub mod walk;
 
 #[cfg(feature = "sidecar")]
-pub use actor::SidecarActorStore;
+pub use actor::{decode_actor_records, SidecarActorStore};
 pub use actor::{
     parse_acting_participant, parse_agent_ref, parse_participant_ref, record_signing_message,
     ActorClaim, ActorRecord, ActorStore, ActorWitness, AsOfBasis, MemoryActorStore, ParticipantRef,
@@ -119,7 +119,7 @@ pub use stock::{
     StockError, Window, Within,
 };
 #[cfg(feature = "sidecar")]
-pub use store::SidecarFlowStore;
+pub use store::{decode_flow_records, SidecarFlowStore};
 pub use store::{FlowRecord, FlowStore, MemoryFlowStore};
 pub use walk::{FlowWalk, Frontier, Lineage};
 

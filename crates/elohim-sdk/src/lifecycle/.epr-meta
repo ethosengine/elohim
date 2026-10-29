@@ -1,0 +1,17 @@
+---
+epr-meta-version: 1
+id: portable-app-lifecycle-contract
+covers: subtree
+purpose: >
+  Client-facing portable app lifecycle contracts. Runtime adapters own effects and authority;
+  generic demand leases live in the lower-level seam-contracts crate. These interfaces do not
+  implement a process supervisor, session channel, replica store or authentication portal.
+---
+
+Source vocabulary comes from SDK schemas; shared Rust views generate client types. Passing-state
+sessions belong to the live-session work, not this module. Observation persistence reuses the
+existing observation intent and receipt, retaining signed=absent/as-asserted until actual proof.
+No successful no-op defaults: missing adapters report Unsupported. Contracts are not delivery.
+
+The owning roadmap is `genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md`.
+The native gate is `just gate elohim-sdk`; views use `just gate app-lifecycle-contracts`.

@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "workspace-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+description = "Workspace endpoint discovery adapter; no ingress or app authority"
+publish = false
+
+[dependencies]
+url = "2"

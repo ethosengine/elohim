@@ -17,7 +17,7 @@ cites:
 
 # Portable app lifecycle
 
-Recovered from `0ee5dfde8` on 2026-10-28. This remains a draft migration contract; its foundation runtime is a separate port. The newer [What every app inherits](../specs/2026-10-20-what-every-app-inherits-placement-contract-design.md) governs placement and manifest needs. A need becomes declarable only with its first reader; this recovery does not reopen undeclarable fields.
+Recovered from `0ee5dfde8` on 2026-10-28. This remains a draft migration contract; its foundation contracts (the SDK lifecycle interfaces, wire views and environment adapters) were ported separately on 2026-10-29. The newer [What every app inherits](../specs/2026-10-20-what-every-app-inherits-placement-contract-design.md) governs placement and manifest needs. A need becomes declarable only with its first reader; this recovery does not reopen undeclarable fields.
 
 ## Delivery contract
 

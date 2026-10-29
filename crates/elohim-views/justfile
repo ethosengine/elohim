@@ -1,0 +1,12 @@
+# The manifest gate runner supplies the native pool slot and toolchain.
+gate:
+    rustfmt --edition 2021 --check src/app_lifecycle.rs tests/app_lifecycle.rs
+    cargo clippy --locked --all-targets -- -D warnings
+    cargo test --locked --test app_lifecycle
+    node --test ../../elohim/sdk/schemas/tests/app-lifecycle.test.mjs
+    pnpm --dir ../../elohim/sdk/storage-client-ts exec tsc -p tsconfig.lifecycle-contract.json
+    pnpm --dir ../../elohim/sdk/storage-client-ts exec vitest run tests/app-lifecycle.test.ts
+    # The story steps consume the built public export, like every a2o step; the package's
+    # prebuild chain builds its workspace dependencies first.
+    pnpm --dir ../../elohim/sdk/storage-client-ts run build
+    pnpm --dir ../../genesis/a2o exec cucumber-js --profile app-lifecycle

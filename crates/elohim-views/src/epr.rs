@@ -8,11 +8,6 @@ use crate::infrastructure::*;
 use crate::lamad::*;
 use crate::shared::*;
 use serde::{Deserialize, Serialize};
-#[allow(
-    unused_imports,
-    reason = "`Value` is not named in this module; the import came across unchanged with the migration from elohim-storage/src/views.rs"
-)]
-use serde_json::Value;
 use ts_rs::TS;
 
 /// Coupling legs for an EPR envelope. All legs are optional at the wire level;

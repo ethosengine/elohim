@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-device-runtime"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "elohim-ark-core",
  "elohim-settings",
@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64",
  "chrono",
@@ -608,6 +608,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
+ "ts-rs",
  "unicode-normalization",
 ]
 
@@ -669,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-seam-contracts"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
 ]
@@ -688,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-agent"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -700,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -716,14 +717,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-host"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "eprfs-meta"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "eprfs-core",
  "serde",
@@ -1698,6 +1699,7 @@ checksum = "e640d9b0964e9d39df633548591090ab92f7a4567bc31d3891af23471a3365c6"
 dependencies = [
  "chrono",
  "lazy_static",
+ "serde_json",
  "thiserror 2.0.18",
  "ts-rs-macros",
 ]

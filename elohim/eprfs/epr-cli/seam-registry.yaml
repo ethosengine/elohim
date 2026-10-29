@@ -47,6 +47,46 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: seam::classify::classify
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/seam/classify.rs
+      modulePath: elohim_epr_cli::seam::classify
+    summary: >
+      Governed algorithm-content classifies explicit owner-local declarations into advisory
+      candidates. The native method and application policy are pinned beside verified source
+      spans. Composition remains a candidate, not immunity or a placement verdict.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Ephemeral local report; no DHT entry, head, contribution or persisted draft."
+      - id: C4
+        status: partial
+        justification: "Invalid input is a named coverage gap; lexical hints cannot establish semantic correctness."
+      - id: C6a
+        status: answered
+        justification: "512 KiB proposal, at most three injected candidates, 8 KiB packet, two-second hook deadline."
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: labeled_corpus_and_harness_parity
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: governed_method_and_application_are_pinned_and_executed
+        kind: integration
+  - name: seam::review::validate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/seam/review.rs
+      modulePath: elohim_epr_cli::seam::review
+    summary: "Checks exact proposal association and freshly verified citations without certifying agent judgment."
+    concernIds:
+      - id: C4
+        status: answered
+        justification: "Changed proposal, governing declarations, application or source bytes invalidate prior reviews."
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/seam_guidance.rs
+        testName: reviews_bind_exact_proposal_declarations_contracts_and_citations
+        kind: integration
   - name: integrate::integrate
     kind: state-transition
     sourceLocation:
@@ -1967,3 +2007,47 @@ decisionPoints:
       - path: elohim/eprfs/epr-cli/tests/peer.rs
         testName: peer_verdicts_reads_only_matching_folded_admitted_siblings
         kind: integration
+  - name: view::project / view::save / view::reopen
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/view/mod.rs
+      modulePath: elohim_epr_cli::view
+    summary: >
+      A bounded repository declaration selects existing artifacts and native readings.
+      Captured governance and evidence are explicit inputs. Save retains raw EPRFS blobs
+      and source trees; reopen verifies all retained bytes without consulting a checkout.
+      Stable subject identities preserve baseline cohorts; missing subjects never imply completion.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Rebuildable local projections and private retained bytes, with no DHT heads,
+          publication, HTTP routes or new workflow acts. Native acceptance remains authoritative.
+      - id: C4
+        status: answered
+        justification: >
+          Missing optional evidence is explicitly unavailable. Required bindings, malformed
+          declarations, duplicate identities, escaping paths and corrupt snapshots refuse.
+      - id: C6a
+        status: answered
+        justification: >
+          Declarations bound traversal depth, entries and captured bytes before source reads.
+          No-follow descriptor traversal and nonblocking regular-file reads reject symlinks and FIFOs.
+      - id: C6b
+        status: partial
+        justification: >
+          Exact input bytes and discovery membership are rechecked before returning a capture.
+          This is optimistic local consistency, not a filesystem-wide transaction against hostile writers.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/view.rs
+        testName: same_binary_reads_two_declarations_without_repository_configuration
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/view.rs
+        testName: sources_are_exact_binary_and_text_bytes_and_reopen_without_checkout
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/view.rs
+        testName: authored_status_production_review_acceptance_and_measurements_are_independent
+        kind: integration
+      - path: elohim/eprfs/epr-cli/src/view/mod.rs
+        testName: concurrent_content_and_membership_changes_refuse
+        kind: unit

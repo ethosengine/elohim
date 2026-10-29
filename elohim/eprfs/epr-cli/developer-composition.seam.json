@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "developer-domain-composition",
+  "responsibility": "Git interpretation belongs in Brit or explicit Git adapters; build/service interpretation in Rakia. Shared governance and content primitives remain domain neutral.",
+  "owner": [
+    "elohim/brit/*",
+    "elohim/rakia/*",
+    "elohim/eprfs/epr-cli/src/git.rs",
+    "elohim/eprfs/epr-cli/src/integrate.rs"
+  ],
+  "allowedConsumers": ["elohim/eprfs/epr-cli/*", "genesis/orchestrator/*"],
+  "authoritativeContracts": [
+    {
+      "path": ".epr-meta/composition.md",
+      "needle": "Repository interpretation\nbelongs in Brit or an explicitly identified Git adapter.",
+      "status": "contract"
+    }
+  ],
+  "reusableInterfaces": [
+    {
+      "path": "elohim/eprfs/epr-cli/src/govern.rs",
+      "needle": "pub fn evaluate(root: &Path, args: &[String]) -> Result<Value> {",
+      "status": "implemented"
+    },
+    {
+      "path": "elohim/eprfs/epr-cli/src/git.rs",
+      "needle": "pub enum ChangeKind {",
+      "status": "implemented"
+    }
+  ],
+  "detection": [
+    "git::",
+    "gix::",
+    "update-ref",
+    "source_commit",
+    "build_recipe",
+    "Jenkinsfile",
+    "govern::evaluate("
+  ],
+  "composition": ["crate::git::", "govern::evaluate("],
+  "exclusions": ["*/tests/*", "*/seam/*"],
+  "appliesTo": [
+    "elohim/eprfs/*.rs",
+    "elohim/epr/*.rs",
+    "genesis/orchestrator/*.mjs"
+  ]
+}
