@@ -1009,6 +1009,11 @@ brit_advisory() {
   fi
   # Run only when the pushed range touches what brit reads (BRIT_ADVISORY=always forces it):
   # the brit gitlink, brit's own tree, the brit scripts, any build-manifest.json, this hook.
+  # KNOWN GAP, accepted for a warn-only stage: `brit verify` checks the integrity of the WHOLE
+  # repository, so an ordinary commit that rewrites history or corrupts the object store gets no
+  # Stage 1a signal until a brit-relevant path changes. Stage 2 (the stage that makes this leg
+  # blocking) must drop the path gate or run verify on every push within its bound — do not
+  # inherit this gate unknowingly. (steward-space-reliability-plan, 2026-10-29)
   if [ "${BRIT_ADVISORY:-}" != "always" ] && git rev-parse --verify origin/dev >/dev/null 2>&1; then
     BRIT_BASE="$(git merge-base origin/dev HEAD 2>/dev/null || echo origin/dev)"
     if ! git diff --name-only "$BRIT_BASE" HEAD -- elohim/brit .brit genesis/orchestrator/scripts/brit-helper.sh genesis/orchestrator/scripts/brit-attest.mjs '**/build-manifest.json' .husky 2>/dev/null | grep -q .; then
