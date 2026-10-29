@@ -149,6 +149,14 @@ at 18:30Z). Builds #1756 to #1758 observed the outage; none caused it.
    so `rollout-evidence/*/--elohim-node--previous.log` carries only a Forbidden line. Grant those
    reads in the RBAC manifest or name Loki as the log source in the summary.
 
+6. **Matthew's claim is unbounded, not safe (repo, recorded).** matthew is on
+   `openebs-hostpath` on ethosengine, which enforces no per-volume quota: his 20Gi claim held
+   29G on 2026-10-29 without failing. Its real ceiling is ethosengine's shared 3.6T array
+   (`/dev/md127`, 2.5T free), shared with grafana, loki, harbor-db, jenkins, openbao, keycloak-pg
+   and the other peers there. At the shem rate that is months, not days, but a full array takes
+   all of them down together. Steps 2 and 3 must reach matthew too; the reclaim's free-space
+   guard passes there. Recorded as `$storageDataComment` on matthew in deployments.json.
+
 ## Current decision
 
 **2026-10-29: step 1 done by the operator (~17:00Z); open on steps 2 and 3.** No repo change

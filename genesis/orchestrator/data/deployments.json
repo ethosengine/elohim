@@ -53,6 +53,7 @@
     },
     {
       "name": "matthew",
+      "$storageDataComment": "2026-10-29 (operator reading): no storageDataSize on purpose. matthew's storage-data claim is on openebs-hostpath, which enforces no per-volume quota, so its 20Gi is a label: /data held 29G that day without failing. The real ceiling is the free space of ethosengine's shared 3.6T array (/dev/md127, 2.5T free, 30% used), which also holds grafana, loki, harbor-db, jenkins, openbao, keycloak-pg and the other elohim peers there. A full volume here fails all of them together, not matthew alone, so unbounded sled growth is the risk, not EDQUOT. Declaring a size would claim a limit nothing enforces; the startup sled reclaim must run here too.",
       "hostsAgents": true,
       "$hostsAgentsComment": "2026-10-14: a doorway OPERATOR's conductor (matthew, adam) is the only one that hosts agents. The doorway pools every conductor for projection and discovery, but DOORWAY_HOSTING_CONDUCTORS (rendered from this flag) gives every other conductor a hosted-agent ceiling of 0, so a hosted human never lands on a member's own device. Hosted is a declared stage on the fixture (agencyPhase), never a default.",
       "runtimeManifest": {
