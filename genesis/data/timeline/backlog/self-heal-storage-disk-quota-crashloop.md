@@ -155,7 +155,8 @@ at 18:30Z). Builds #1756 to #1758 observed the outage; none caused it.
    (`/dev/md127`, 2.5T free), shared with grafana, loki, harbor-db, jenkins, openbao, keycloak-pg
    and the other peers there. At the shem rate that is months, not days, but a full array takes
    all of them down together. Steps 2 and 3 must reach matthew too; the reclaim's free-space
-   guard passes there. Recorded as `$storageDataComment` on matthew in deployments.json.
+   guard passes there. matthew declares `storageDataSize: 80Gi` for consistency with the shem
+   four (operator ruling 2026-10-29); on hostpath it is a label, recorded as `$storageDataComment`.
 
 ## Current decision
 
