@@ -3,7 +3,7 @@
 # Never invokes a real git, registry, container runtime or compiler.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-T="$(mktemp -d "${ROOT}/scripts/ci/.closure-test.XXXXXX")"
+T="$(mktemp -d "${TMPDIR:-/tmp}/closure-test.XXXXXX")"
 export TMPDIR="$T"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/repo/scripts/ci" "$T/repo/elohim/holochain" \
