@@ -31,6 +31,25 @@ overnight /shift."
 > builds; publish, deploy and dataplane validation disabled`, and write the first DELTA on
 > push-delivers-within-budget from the first dev wave whose closures are unchanged.
 
+## State at 2026-10-29 ~21:45Z — the inherited integrations on one line
+
+The operator closed the steward-space (a60b1c22) and brit daily-driver (elohim-f1) sessions and handed their integrations here. A grounding workflow (three read-only lanes, three adversarial verifiers, one planner) produced a dependency-ordered landing plan; this is its state.
+
+| Where | What | State |
+|---|---|---|
+| `integ/2026-10-29-landing` (worktree `.worktrees/landing-2026-10-29`, from origin/dev 24c156adc) | sensors bound (150a7a6a4, 27cbf5826) · MAP/INDEX docs beacc1258 · memory-stasis round 6 split: docs 13b870345, epr-cli bf56a972f (16 memory files superseded by the working tree) · land2 minus its tip: a2o stations ef7bda3e9/642e60ca4, A3 lease generation 53f1c4135/00ae71d1c · A4 debt DELTA e4fc02caf · prettier 7c79ddfb4 | green: berth_test 128, prepush-berth 19, brit-helper 11, orchestrator, gherkin-prepush-lint, rust-style, genesis-a2o, genesis; running: eprfs; owed: cargo-bridge, jenkins-bridge. Not pushed: the dev hold lifts on shem's explicit note. |
+| `shift/2026-10-29-jenkins-sponsored-agent` (PR #218) | rebased onto the line (48e77bd27), both DELTA lines kept in date order, timeout bound intact | projection check OK, brit-helper 6/6; orchestrator gate owed; not pushed (one push per batch, after the line lands) |
+| `shift/2026-10-29-integration-capacity` (PR #217) | merges into the line without conflict (16 commits) | PR builds orchestrator #4 / edge #5 were running at 21:30Z; its storage gate runs on the line once the eprfs gate ends — the two residents are gone (RAM 20%) |
+| `tt/b-s1` d266a8644 | B-S1 reach verifier, committed uncompiled | elohim-storage gate + the household witness `@concern:reach-enforced-http` owed; `ship` verdict stands as `fix` |
+| `tt/d1-doorway` 002b76af3 | D1 projection cache reach filter, never built | doorway gate owed; joins the line on green |
+| `tt/s2-6a-rebased` 013694da9 | session envelope declares its device stage, red tests | `cargo test -p elohim-epr-cli --test session_envelope` must be green first |
+| brit `feat/s2-1a-find-verified` eb8125c0d (in `.worktrees/tt-s2-1a/elohim/brit`) | find-verified, one test red (`git_errors_preserve_anyhow_main_diagnostics`) | second pin move after the daily-driver pin; run-ci push after the fix |
+| `fix/brit-readers-2026-10-29` (worktree `.worktrees/brit-readers`) | L8: every brit note reader honours the verified-read contract (unverifiable = absent, `signer --json`, get-before-put refusals) | workflow wf_1fca27c5-bd1 in flight; its Rust half is written uncompiled and pays `elohim-ark`, `eprfs`, `cargo-bridge`, `jenkins-bridge` after |
+| brit daily-driver 7e4a83115e | `Tests pass` red once (restore test; i386 DNS environmental); failed jobs re-run (attempt 2) with the operator's go | on green: fast-forward brit `main`, pin on the line, DELTA on `pin-attestation` |
+| dropped | a68d761a9 (land2 tip, duplicate 60 s bound); nine fully-landed `tt/*` branches and worktrees removed after `git cherry` re-check | reflog keeps every tip 90 days |
+
+Operator decisions 2026-10-29 ~21:35Z: residents stopped (`kill -TERM 2146360 2051424`); brit re-run then fast-forward on green, advisories as a follow-up; the Nostr Compass commit 7a53fd61c rides the line as written; the dev hold lifts on shem's note.
+
 ## State at 2026-10-29 ~19:10Z
 
 | Where | What | Evidence |
