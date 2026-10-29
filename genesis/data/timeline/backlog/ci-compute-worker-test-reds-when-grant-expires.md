@@ -40,3 +40,15 @@ render, and `deployments.json`'s "enabled with a grant" line should say "grant e
 
 **Done when:** `node --test genesis/orchestrator/compute-worker.test.mjs` is green on a date past any
 grant's expiry, and the declaration's grant status is read, not assumed, by whatever renders it.
+
+**DELTA 2026-10-29 ~15:00Z (overnight shift, closure-keyed-edge-build).** Cured on dev by shem's lanes
+push 5 (bf810489c "Renew adam's runner grant for a second seven-day window (steward-approved)" —
+Matthew: "renew please"): the grant window is 2026-10-29T13:15:00Z..2026-11-05T13:15:00Z with identical
+parties and bounds, the envelope test renders with runnerGrant disabled (off the clock), and
+b68e348bd adds a named test. A renderer-degrade arm (omit the worker with a named
+`COMPUTE-WORKER-GRANT-EXPIRED` line instead of failing adam's deploy) was drafted on this branch and
+dropped before landing so two fixes to the same files would not collide. Still open from this atom:
+whether an inactive window should degrade rather than refuse (the operator chose renewal), and that a
+grant is a time-bomb for every gate unless its renewal is scheduled before `validUntil` — the next
+expiry is 2026-11-05T13:15:00Z.
+
