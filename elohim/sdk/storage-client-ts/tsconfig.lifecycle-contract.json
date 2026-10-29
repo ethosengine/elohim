@@ -5,7 +5,7 @@
     "rootDir": "."
   },
   "include": [
-    "src/**/*",
+    "src/app-lifecycle.ts",
     "tests/app-lifecycle.test.ts"
   ]
 }

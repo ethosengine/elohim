@@ -10,6 +10,7 @@ import {
 let adapter: UnsupportedLifecycle;
 let failure: unknown;
 let residency: AppResidencyView;
+let offline: boolean | undefined;
 Given('a portable app adapter with no runtime implementation', () => {
   adapter = new UnsupportedLifecycle();
   failure = undefined;
@@ -42,7 +43,11 @@ Given('a release whose artifacts are verified but whose data is not', () => {
     artifactsVerified: true,
     dataVerified: null,
   };
+  offline = undefined;
+});
+When('a client asks whether the release is available offline', () => {
+  offline = availableOffline(residency);
 });
 Then('the release is not available offline', () => {
-  assert.equal(availableOffline(residency), false);
+  assert.equal(offline, false);
 });

@@ -14,13 +14,15 @@
           "crates/elohim-views/**",
           "elohim/sdk/schemas/v1/views/app-*.schema.json",
           "elohim/sdk/schemas/v1/enums/app-sync-urgency.schema.json",
+          "elohim/sdk/schemas/v1/enums/answer-reason.schema.json",
           "elohim/sdk/schemas/tests/app-lifecycle.test.mjs",
           "elohim/sdk/storage-client-ts/src/generated/App*.ts",
           "elohim/sdk/storage-client-ts/src/app-lifecycle.ts",
           "elohim/sdk/storage-client-ts/tests/app-lifecycle.test.ts",
           "elohim/sdk/storage-client-ts/tsconfig.lifecycle-contract.json",
           "genesis/a2o/features/devflow/portable-app-lifecycle.feature",
-          "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts"
+          "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts",
+          "genesis/a2o/cucumber.mjs"
         ],
         "buildProcess": []
       },
@@ -44,13 +46,15 @@
             "crates/elohim-views/**",
             "elohim/sdk/schemas/v1/views/app-*.schema.json",
             "elohim/sdk/schemas/v1/enums/app-sync-urgency.schema.json",
+            "elohim/sdk/schemas/v1/enums/answer-reason.schema.json",
             "elohim/sdk/schemas/tests/app-lifecycle.test.mjs",
             "elohim/sdk/storage-client-ts/src/generated/App*.ts",
             "elohim/sdk/storage-client-ts/src/app-lifecycle.ts",
             "elohim/sdk/storage-client-ts/tests/app-lifecycle.test.ts",
             "elohim/sdk/storage-client-ts/tsconfig.lifecycle-contract.json",
             "genesis/a2o/features/devflow/portable-app-lifecycle.feature",
-            "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts"
+            "genesis/a2o/steps/devflow/portable-app-lifecycle.steps.ts",
+            "genesis/a2o/cucumber.mjs"
           ],
           "buildProcess": []
         },
