@@ -2049,6 +2049,16 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         sh "kubectl delete statefulset/${humanConfig.resourcePrefix}-conductor -n ${humanConfig.namespace} --ignore-not-found=true"
     }
 
+    // The storage data volume's declared size (deployments.json storageDataSize). The
+    // volumeClaimTemplate is immutable, so the claim is grown here, before the apply.
+    // Warn-only, same reconciler as the conductor volume, label `storage`.
+    if (humanConfig.storageDataSize) {
+        def storageGrowCode = sh(script: "bash '${env.WORKSPACE}/scripts/ci/grow-conductor-pvc.sh' 'storage-data-${humanConfig.resourcePrefix}-0' '${humanConfig.namespace}' '${humanConfig.storageDataSize}' storage", returnStatus: true)
+        if (storageGrowCode != 0) {
+            echo "storage-pvc: storage-data-${humanConfig.resourcePrefix}-0: grow step exited ${storageGrowCode} — ignored, the roll goes on"
+        }
+    }
+
     // Apply with forbidden-field drift fallback. StatefulSet spec fields like
     // volumeClaimTemplates, selector, serviceName, and podManagementPolicy are
     // immutable after creation. When a template change touches one, kubectl apply
