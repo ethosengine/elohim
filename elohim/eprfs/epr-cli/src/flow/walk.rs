@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use chrono::{DateTime, Duration, Utc};
 use cid::Cid;
@@ -743,6 +744,13 @@ impl TierView {
 #[derive(Debug, Clone, Serialize)]
 pub struct AttestedBuild {
     pub step: String,
+    /// Read through `brit-build-ref build get` (true), or raw from the git note with
+    /// `git notes show` because no brit was found (false). This says who read the note, not
+    /// that its signature was checked: a brit from the daily-driver line forward verifies on
+    /// `get` and names a refused note `unverifiable:`, while the pinned brit's `get_build_ref`
+    /// is a raw `read_note` (elohim/brit/brit-epr/src/elohim/refs.rs:41-45), so a read by it
+    /// is still unverified until the pin moves.
+    pub brit_read: bool,
     pub build_duration_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub built_at: Option<String>,
@@ -830,8 +838,19 @@ impl HabitView {
             );
         }
         if let Some(ms) = self.cost.attested_build_ms {
+            let raw = self
+                .cost
+                .attested_builds
+                .iter()
+                .filter(|a| !a.brit_read)
+                .count();
+            let label = if raw == 0 {
+                String::new()
+            } else {
+                format!(" ({raw} read raw: no brit-build-ref found)")
+            };
             println!(
-                "    cost: {} attested build(s) on HEAD, {:.1} min",
+                "    cost: {} attested build(s) on HEAD, {:.1} min{label}",
                 self.cost.attested_builds.len(),
                 ms as f64 / 60_000.0
             );
@@ -1205,10 +1224,52 @@ fn read_receipts(root: &Path) -> BTreeMap<String, BTreeMap<String, RungReading>>
 /// Build attestations noted on HEAD under `refs/notes/brit/build/`.
 ///
 /// brit writes one git note per step per commit (`BritRefManager::put_build_ref`), its payload
-/// the camelCase `BuildAttestationContentNode`. Read-only: `git for-each-ref` then `git notes
-/// show`. No note, no git, or an unparseable payload is simply no attestation.
+/// the camelCase `BuildAttestationContentNode`. The ref names come from `git for-each-ref`; each
+/// note is then read through `brit-build-ref build get` when that binary is at
+/// `BRIT_BUILD_REF_BIN`, `BRIT_BUILD_REF` or on `PATH`: a note brit names `unverifiable:` is
+/// absent and said once on stderr, a miss is absent (a verifying brit, the daily-driver line
+/// forward; the pinned brit's `get` is itself raw, see [`AttestedBuild::brit_read`]). Without
+/// brit the note is read raw with `git notes show` and labelled so. No note, no git, or an
+/// unparseable payload is simply no attestation.
 fn attested_builds(root: &Path) -> Vec<AttestedBuild> {
-    let run = |args: &[&str]| -> Option<String> {
+    attested_builds_read_by(root, brit_build_ref().as_deref())
+}
+
+/// `brit-build-ref` as ark's `resolve_build_ref` finds it: the first set of `BRIT_BUILD_REF_BIN`
+/// and `BRIT_BUILD_REF` (relative to the working directory), else `PATH`.
+fn brit_build_ref() -> Option<PathBuf> {
+    for key in ["BRIT_BUILD_REF_BIN", "BRIT_BUILD_REF"] {
+        let declared = std::env::var(key).unwrap_or_default();
+        let declared = declared.trim();
+        if declared.is_empty() {
+            continue;
+        }
+        let path = std::env::current_dir().ok()?.join(declared);
+        return path.is_file().then_some(path);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|dir| dir.join("brit-build-ref"))
+        .find(|path| path.is_file())
+}
+
+/// Undo brit's `encode_segment`: the ref suffix back to the step name.
+fn decode_brit_segment(segment: &str) -> String {
+    segment
+        .replace("%3A", ":")
+        .replace("%40", "@")
+        .replace("%3F", "?")
+        .replace("%2A", "*")
+        .replace("%5B", "[")
+        .replace("%5C", "\\")
+        .replace("%5E", "^")
+        .replace("%7E", "~")
+        .replace("%20", " ")
+        .replace("%2E%2E", "..")
+}
+
+/// [`attested_builds`] with the brit to read through, or none for the raw `git notes` read.
+fn attested_builds_read_by(root: &Path, brit: Option<&Path>) -> Vec<AttestedBuild> {
+    let git = |args: &[&str]| -> Option<String> {
         let out = crate::process::build_command("git", args, root, &[])
             .output()
             .ok()?;
@@ -1216,7 +1277,7 @@ fn attested_builds(root: &Path) -> Vec<AttestedBuild> {
             .success()
             .then(|| String::from_utf8_lossy(&out.stdout).to_string())
     };
-    let Some(refs) = run(&[
+    let Some(refs) = git(&[
         "for-each-ref",
         "--format=%(refname)",
         "refs/notes/brit/build/",
@@ -1225,8 +1286,16 @@ fn attested_builds(root: &Path) -> Vec<AttestedBuild> {
     };
     let mut out = Vec::new();
     for refname in refs.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        let Some(body) = run(&["notes", "--ref", refname, "show", "HEAD"]) else {
-            continue;
+        let step = decode_brit_segment(refname.trim_start_matches("refs/notes/brit/build/"));
+        let (body, brit_read) = match brit {
+            Some(bin) => match verified_note(bin, root, &step, refname) {
+                Some(body) => (body, true),
+                None => continue,
+            },
+            None => match git(&["notes", "--ref", refname, "show", "HEAD"]) {
+                Some(body) => (body, false),
+                None => continue,
+            },
         };
         let Ok(v) = serde_json::from_str::<serde_json::Value>(body.trim()) else {
             continue;
@@ -1242,12 +1311,8 @@ fn attested_builds(root: &Path) -> Vec<AttestedBuild> {
             step: v
                 .get("stepName")
                 .and_then(serde_json::Value::as_str)
-                .map(ToString::to_string)
-                .unwrap_or_else(|| {
-                    refname
-                        .trim_start_matches("refs/notes/brit/build/")
-                        .to_string()
-                }),
+                .map_or(step, ToString::to_string),
+            brit_read,
             build_duration_ms: ms,
             built_at: v
                 .get("builtAt")
@@ -1257,6 +1322,48 @@ fn attested_builds(root: &Path) -> Vec<AttestedBuild> {
         });
     }
     out
+}
+
+/// `brit-build-ref build get` for one step on HEAD: the node's JSON as brit read it, or none. Exit 0
+/// with an empty stdout is absent — a note brit refused is named on stderr as `unverifiable:
+/// <commit> <reason>` and said here once with its ref; a miss says nothing. A read brit could
+/// not make (exit 1) is named too, so no note disappears without a word, and is never read raw.
+fn verified_note(bin: &Path, root: &Path, step: &str, refname: &str) -> Option<String> {
+    let mut command = Command::new(bin);
+    command
+        .arg("--repo")
+        .arg(root)
+        .args(["build", "get", "--step", step, "--commit", "HEAD"])
+        .current_dir(root);
+    for key in crate::process::GIT_LOCATION_ENV {
+        command.env_remove(key);
+    }
+    for (key, value) in crate::git::trust_env(root) {
+        command.env(key, value);
+    }
+    let out = match command.output() {
+        Ok(out) => out,
+        Err(error) => {
+            eprintln!("walk: brit-build-ref could not run for {refname}: {error}");
+            return None;
+        }
+    };
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if !out.status.success() {
+        let last = stderr.trim().lines().last().unwrap_or("");
+        eprintln!("walk: brit-build-ref build get failed for {refname}: {last}");
+        return None;
+    }
+    if out.stdout.iter().any(|b| !b.is_ascii_whitespace()) {
+        return Some(String::from_utf8_lossy(&out.stdout).to_string());
+    }
+    for refused in stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("unverifiable: "))
+    {
+        eprintln!("walk: unverifiable attestation on {refname} at {refused}; read as absent");
+    }
+    None
 }
 
 /// A habit's id and checks — from its atom's frontmatter on a walk, from the register on status.
@@ -1727,5 +1834,145 @@ impl CidWalk {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod attested_build_tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::*;
+
+    const STEP_REF: &str = "refs/notes/brit/build/gate%3Ax";
+    const NOTE: &str = r#"{"agentId":"6d65","buildDurationMs":1200,"builtAt":"2026-10-26T10:00:00Z","hardwareProfile":"x","inputsHash":"k","manifestCid":[1,85,18,32],"outputCid":[1,85,18,32],"signature":"00","stepName":"gate:x","success":true}"#;
+
+    fn git(root: &Path, args: &[&str]) -> String {
+        let out = crate::process::build_command("git", args, root, &[])
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// A repository with one commit and brit's `gate:x` note on it.
+    fn repo_with_note() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-q"]);
+        git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "a"]);
+        git(
+            dir.path(),
+            &["notes", "--ref", STEP_REF, "add", "-f", "-m", NOTE, "HEAD"],
+        );
+        dir
+    }
+
+    /// A stand-in `brit-build-ref` that records its arguments beside itself, prints exactly what
+    /// the contract says and exits as it does; written where the test runs, never in the tree.
+    fn stub(dir: &Path, stdout: &str, stderr: &str, code: i32) -> PathBuf {
+        let mut script =
+            String::from("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$(dirname \"$0\")/args\"\n");
+        if !stdout.is_empty() {
+            script.push_str(&format!("cat <<'BRIT_OUT'\n{stdout}\nBRIT_OUT\n"));
+        }
+        if !stderr.is_empty() {
+            script.push_str(&format!("cat >&2 <<'BRIT_ERR'\n{stderr}\nBRIT_ERR\n"));
+        }
+        script.push_str(&format!("exit {code}\n"));
+        let path = dir.join("brit-build-ref");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn without_brit_the_raw_note_is_read_and_labelled_raw() {
+        let repo = repo_with_note();
+        let builds = attested_builds_read_by(repo.path(), None);
+        assert_eq!(builds.len(), 1);
+        let build = &builds[0];
+        assert!(
+            !build.brit_read,
+            "a raw git note is never called a brit read"
+        );
+        assert_eq!(build.step, "gate:x");
+        assert_eq!(build.build_duration_ms, 1200);
+        assert_eq!(build.success, Some(true));
+    }
+
+    #[test]
+    fn brit_reads_the_note_for_the_decoded_step() {
+        let repo = repo_with_note();
+        let bin_dir = tempfile::tempdir().unwrap();
+        let bin = stub(bin_dir.path(), NOTE, "", 0);
+        let builds = attested_builds_read_by(repo.path(), Some(bin.as_path()));
+        assert_eq!(builds.len(), 1);
+        assert!(builds[0].brit_read);
+        assert_eq!(builds[0].step, "gate:x");
+        let args = std::fs::read_to_string(bin_dir.path().join("args")).unwrap();
+        assert!(
+            args.contains("--step\ngate:x\n--commit\nHEAD\n"),
+            "the ref suffix is decoded back to the step: {args}"
+        );
+    }
+
+    #[test]
+    fn a_note_brit_names_unverifiable_is_absent_never_raw() {
+        let repo = repo_with_note();
+        let head = git(repo.path(), &["rev-parse", "HEAD"]);
+        let bin_dir = tempfile::tempdir().unwrap();
+        let bin = stub(
+            bin_dir.path(),
+            "",
+            &format!(
+                "no build ref found for step=gate:x commit=HEAD\n\
+                 unverifiable: {head} does not decode: unknown field `trusted`"
+            ),
+            0,
+        );
+        assert!(
+            attested_builds_read_by(repo.path(), Some(bin.as_path())).is_empty(),
+            "a note brit refused is absent, and the raw note on HEAD is not read instead"
+        );
+    }
+
+    #[test]
+    fn a_miss_from_brit_is_absent() {
+        let repo = repo_with_note();
+        let bin_dir = tempfile::tempdir().unwrap();
+        let bin = stub(
+            bin_dir.path(),
+            "",
+            "no build ref found for step=gate:x commit=HEAD",
+            0,
+        );
+        assert!(attested_builds_read_by(repo.path(), Some(bin.as_path())).is_empty());
+    }
+
+    #[test]
+    fn a_failed_brit_read_is_absent_never_raw() {
+        let repo = repo_with_note();
+        let bin_dir = tempfile::tempdir().unwrap();
+        let bin = stub(
+            bin_dir.path(),
+            "",
+            "Error: git command failed: git notes --ref refs/notes/brit/build/gate%3Ax list: \
+             fatal: bad object",
+            1,
+        );
+        assert!(attested_builds_read_by(repo.path(), Some(bin.as_path())).is_empty());
+    }
+
+    #[test]
+    fn decode_brit_segment_undoes_brits_encoding() {
+        assert_eq!(decode_brit_segment("gate%3Ax"), "gate:x");
+        assert_eq!(decode_brit_segment("a%20b%2E%2Ec%40d%5Ce"), "a b..c@d\\e");
     }
 }

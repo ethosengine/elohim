@@ -430,13 +430,46 @@ struct TaskFixture {
     brit: PathBuf,
 }
 
+/// How the fake `brit-build-ref` answers `signer --json` (ark passes `--repo <repo> signer
+/// --json`, so the subcommand is `$3`): as the daily-driver brit, with this workspace's agent
+/// id, or as the pinned brit that has no `signer` at all (clap's usage error, exit 2), under
+/// which ark falls back to the reuse context's own `selfId`.
+#[derive(Clone, Copy)]
+enum FakeSigner {
+    Answers(&'static str),
+    Unsupported,
+}
+
 fn task_fixture(root: &Path, method: &str, script: &str, rows: &Value) -> TaskFixture {
+    task_fixture_with(root, method, script, rows, FakeSigner::Answers("me"))
+}
+
+fn task_fixture_with(
+    root: &Path,
+    method: &str,
+    script: &str,
+    rows: &Value,
+    signer: FakeSigner,
+) -> TaskFixture {
     let child = root.join("child.sh");
     fs::write(&child, format!("#!/bin/sh\n{script}\n")).unwrap();
     let material = root.join("material.json");
     fs::write(&material, r#"{"project":"fixture","v":3}"#).unwrap();
     let brit = root.join("brit-build-ref");
-    fs::write(&brit, format!("#!/bin/sh\ncat <<'ROWS'\n{rows}\nROWS\n")).unwrap();
+    let signer_case = match signer {
+        FakeSigner::Answers(id) => format!("printf '%s\\n' '{{\"agentId\":\"{id}\"}}'"),
+        FakeSigner::Unsupported => "printf '%s\\n' \"error: unrecognized subcommand 'signer'\" \
+                                   \"\" 'Usage: brit-build-ref [OPTIONS] <COMMAND>' \"\" \
+                                   \"For more information, try '--help'.\" >&2; exit 2"
+            .to_string(),
+    };
+    fs::write(
+        &brit,
+        format!(
+            "#!/bin/sh\ncase \"$3\" in\n  signer) {signer_case} ;;\n  *) cat <<'ROWS'\n{rows}\nROWS\n  ;;\nesac\n"
+        ),
+    )
+    .unwrap();
     for path in [&child, &brit] {
         Command::new("chmod").arg("+x").arg(path).status().unwrap();
     }
@@ -603,6 +636,63 @@ fn task_run_reuses_an_admitted_attestation_and_runs_nothing() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("not reused: report-only"));
     assert!(root.path().join("ran").exists());
     assert_eq!(task.statuses()[1]["value"]["hit"], false);
+}
+
+/// Under the pinned brit, which has no `signer` subcommand, the reuse context's own `selfId` is
+/// the workspace key: the same attestation is still reused and runs nothing.
+#[test]
+fn task_run_reuses_under_a_brit_without_signer() {
+    let root = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(root.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}");
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    };
+    git(&["init", "-q"]);
+    git(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "a",
+    ]);
+    let head = git(&["rev-parse", "HEAD"]);
+    let output = elohim_epr::cid::compute_cid(b"verdict").to_bytes();
+    let rows = json!([{"commit": head, "attestation": {
+        "agentId": "me", "builtAt": "2026-10-26T10:00:00Z", "success": true,
+        "outputCid": output, "signature": "sig",
+    }}]);
+    let task = task_fixture_with(
+        root.path(),
+        "brit-gate:fixture",
+        "touch ran; exit 0",
+        &rows,
+        FakeSigner::Unsupported,
+    );
+    let reuse =
+        json!({"mode": "reuse", "enabled": true, "selfId": "me", "dirty": false, "commit": head});
+    let out = task.command(Some(&reuse)).output().unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !root.path().join("ran").exists(),
+        "a hit under the old brit runs no child"
+    );
+    assert_eq!(task.statuses()[1]["value"]["hit"], true);
+    assert_eq!(task.statuses()[1]["value"]["record"]["computedBy"], "me");
 }
 
 /// SIGTERM to ark mid-run reaches the child and its own children, and the answer is unanswered
