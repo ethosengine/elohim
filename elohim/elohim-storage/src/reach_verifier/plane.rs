@@ -116,9 +116,6 @@ pub enum RequestPlane {
     NotEgress(NotEgress),
 }
 
-/// Follow-on doorway slices that share this reach-census rollout.
-pub(crate) const EXTERNAL_PENDING_SLICES: [&str; 4] = ["D1", "D2", "D3", "D4"];
-
 #[cfg(feature = "p2p")]
 /// Classify every shard request arm.
 pub fn shard_request(request: &crate::p2p::ShardRequest) -> RequestPlane {
@@ -197,6 +194,10 @@ pub fn view_kind(kind: &crate::views::ViewKind) -> RequestPlane {
 
 #[cfg(test)]
 mod tests {
+    /// Follow-on doorway slices that share this reach-census rollout; the census test below
+    /// is their only reader, so they live with it.
+    const EXTERNAL_PENDING_SLICES: [&str; 4] = ["D1", "D2", "D3", "D4"];
+
     use super::*;
 
     #[test]
