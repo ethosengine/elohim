@@ -1542,6 +1542,10 @@ def humanManifestSedArgs(Map humanConfig, versions, String deployVersion, String
         // by name, so the class only takes effect for NEWLY minted claims —
         // migrate existing data before flipping (done for alpha 2026-09-30).
         "s|STORAGE_CLASS_PLACEHOLDER|${humanConfig.storageClass ?: ((humanConfig.nodeTypes ?: []).contains('remote') ? 'shem-zfs' : 'openebs-hostpath')}|g",
+        // The storage-data claim template states the human's real size, so the
+        // manifest and the live claim agree. Undeclared humans keep 20Gi, the size
+        // every claim was minted at.
+        "s|STORAGE_DATA_SIZE_PLACEHOLDER|${humanConfig.storageDataSize ?: '20Gi'}|g",
         // Per-human placeholders (no-ops on the consolidated manifest, which
         // has these values hand-coded for Adam).
         "s|HUMAN_LABEL_PLACEHOLDER|${humanConfig.humanLabel}|g",
