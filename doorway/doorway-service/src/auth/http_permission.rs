@@ -139,7 +139,10 @@ pub(crate) fn is_operator_actuator(method: &hyper::Method, path: &str) -> bool {
 ///
 /// 401 when no valid credential resolved (nothing presented, or invalid);
 /// 403 when a caller resolved but below Admin. Never consults `dev_mode`.
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "the Err is the finished 401/403 response, built once per refused request and sent as is; boxing it would add an allocation on the refusal path only to shrink a Result that is matched immediately by every caller"
+)]
 pub(crate) fn require_admin_permission<B>(
     state: &AppState,
     req: &Request<B>,
