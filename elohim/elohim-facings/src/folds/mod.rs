@@ -4,6 +4,7 @@
 //! (`reach_projection`, `rea_economic`, `operational_weave`,
 //! `epr_content_perspective`) over the same `crate::fold` combinators.
 
+pub mod content_chrome;
 pub mod contributor_reflexive;
 pub mod epr_content;
 pub mod lens_affinity;
