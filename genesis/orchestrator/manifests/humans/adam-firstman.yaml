@@ -411,6 +411,11 @@ spec:
         storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
+            # Fixed at creation and equal to the live StatefulSet's template; never
+            # the claim's real size. Adam's live claim is 80Gi (operator resize plus
+            # a hand-raised ZFS refquota, 2026-10-29), declared as deployments.json
+            # storageDataSize and only ever raised by scripts/ci/grow-conductor-pvc.sh.
+            # Applying this template never shrinks an existing claim.
             storage: 20Gi
 ---
 # Headless service for StatefulSet DNS-based peer discovery
