@@ -106,7 +106,7 @@ RS=$'\x1e'
 # "nil pointer evaluating interface {}.<field>" when a PARENT field is absent
 # (a pod with no labels, a container status without lastState), and an error
 # here would only skip the poll — the guard keeps the poll measuring.
-STS_TEMPLATE='{{with .status}}{{.updateRevision}}{{end}}{{"\x1f"}}{{with .spec}}{{with .selector}}{{range $key, $value := .matchLabels}}{{printf "%s=%s," $key $value}}{{end}}{{end}}{{end}}'
+STS_TEMPLATE='{{.metadata.generation}}{{"\x1f"}}{{with .status}}{{.observedGeneration}}{{end}}{{"\x1f"}}{{with .status}}{{.updateRevision}}{{end}}{{"\x1f"}}{{with .spec}}{{with .selector}}{{range $key, $value := .matchLabels}}{{printf "%s=%s," $key $value}}{{end}}{{end}}{{end}}'
 LAST_TERMINATED_NONE='{{"\x1f"}}{{"\x1f"}}'
 CONTAINER_FIELDS='{{$p}}{{"\x1f"}}{{$r}}{{"\x1f"}}{{$d}}{{"\x1f"}}{{.name}}{{"\x1f"}}{{.restartCount}}{{"\x1f"}}{{with .state}}{{with .waiting}}{{.reason}}{{end}}{{end}}{{"\x1f"}}{{with .lastState}}{{with .terminated}}{{.reason}}{{"\x1f"}}{{.exitCode}}{{"\x1f"}}{{.message}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{"\x1e"}}'
 PODS_TEMPLATE='{{range .items}}{{$p := .metadata.name}}{{$r := ""}}{{with .metadata.labels}}{{$r = index . "controller-revision-hash"}}{{end}}{{$d := .metadata.deletionTimestamp}}{{with .status}}{{range .initContainerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{range .containerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{end}}{{end}}'
@@ -142,19 +142,25 @@ warn_read() {
 
 # Read the update revision's pods once; set `verdict` when one crashloops.
 probe() {
-  local sts_line revision pods_raw record
-  sts_line="$(kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" -o "go-template=${STS_TEMPLATE}" 2>/dev/null)" \
+  local sts_line generation observed revision sel_line pods_raw record
+  sts_line="$(kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" --request-timeout=10s -o "go-template=${STS_TEMPLATE}" 2>/dev/null)" \
     || { warn_read "statefulset get"; return 0; }
-  revision="${sts_line%%"${US}"*}"
+  IFS="${US}" read -r generation observed revision sel_line <<< "${sts_line}"
+  # The controller has not yet observed the applied spec (kubectl's own
+  # rollout status waits on the same condition): .status.updateRevision and
+  # the existing pods still describe the PREVIOUS rollout, so judge nothing.
+  if ! [[ "${generation}" =~ ^[0-9]+$ ]] || ! [[ "${observed}" =~ ^[0-9]+$ ]] \
+     || [ "${observed}" -eq 0 ] || [ "${generation}" -gt "${observed}" ]; then
+    return 0
+  fi
   if [ -z "${selector}" ]; then
-    selector="${sts_line#*"${US}"}"
-    selector="${selector%,}"
+    selector="${sel_line%,}"
   fi
   if ! present "${revision}" || [ -z "${selector}" ]; then
     warn_read "update revision or selector unresolved"
     return 0
   fi
-  pods_raw="$(kubectl get pods -n "${NAMESPACE}" -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>/dev/null)" \
+  pods_raw="$(kubectl get pods -n "${NAMESPACE}" --request-timeout=10s -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>/dev/null)" \
     || { warn_read "pods get"; return 0; }
 
   verdict_table=""
@@ -205,22 +211,61 @@ echo "rollout-watch: waiting for statefulset/${NAME} in ${NAMESPACE} (timeout ${
 kubectl rollout status "statefulset/${NAME}" -n "${NAMESPACE}" "--timeout=${TIMEOUT}" &
 rollout_pid=$!
 sleeper=""
+probe_pid=""
+state_file="$(mktemp)"
 cleanup() {
   if [ -n "${sleeper}" ]; then kill "${sleeper}" 2>/dev/null; fi
+  if [ -n "${probe_pid}" ]; then
+    # The probe's kubectl children too: an orphan would hold this script's
+    # output pipes open and the caller would still wait on it.
+    pkill -P "${probe_pid}" 2>/dev/null
+    kill "${probe_pid}" 2>/dev/null
+  fi
+  rm -f "${state_file}"
 }
 trap cleanup EXIT
 
+# The pod reads run in a background subshell so the rollout's completion is
+# observed the moment kubectl exits, never behind a slow read; a finished
+# rollout's own exit status always wins over any probe result.
+run_probe() {
+  (
+    probe
+    declare -p last_restarts rises selector read_warned verdict verdict_table > "${state_file}.new" 2>/dev/null \
+      && mv "${state_file}.new" "${state_file}"
+  ) &
+  probe_pid=$!
+}
+
 while :; do
-  sleep "${POLL_SECS}" &
-  sleeper=$!
-  # Returns on whichever ends first: the rollout (no added latency) or a poll tick.
+  if [ -z "${sleeper}" ]; then
+    sleep "${POLL_SECS}" &
+    sleeper=$!
+  fi
+  # Returns on whichever ends first: the rollout, a running probe, or a tick.
   wait -n
   if ! kill -0 "${rollout_pid}" 2>/dev/null; then
     wait "${rollout_pid}"
     exit $?
   fi
-  probe
+  if ! kill -0 "${sleeper}" 2>/dev/null; then
+    sleeper=""
+    if [ -z "${probe_pid}" ]; then run_probe; fi
+  fi
+  if [ -n "${probe_pid}" ] && ! kill -0 "${probe_pid}" 2>/dev/null; then
+    probe_pid=""
+    if [ -s "${state_file}" ]; then
+      # shellcheck disable=SC1090
+      source "${state_file}"
+      : > "${state_file}"
+    fi
+  fi
   if [ -n "${verdict}" ]; then
+    # A rollout that finished while the probe ran stands as finished.
+    if ! kill -0 "${rollout_pid}" 2>/dev/null; then
+      wait "${rollout_pid}"
+      exit $?
+    fi
     kill "${rollout_pid}" 2>/dev/null
     wait "${rollout_pid}" 2>/dev/null
     artifact_dir="${OUTPUT_ROOT}/${NAMESPACE}--statefulset--${NAME}"

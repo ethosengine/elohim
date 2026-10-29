@@ -31,12 +31,17 @@ if (args[0] === 'rollout' && args[1] === 'status') {
 }
 if (args[0] === 'get' && args[1].startsWith('statefulset/')) {
   if (scenario.stsFails) process.exit(1);
-  process.stdout.write(scenario.revision + '\\x1f' + 'app=peer,');
-  process.exit(0);
+  const out = () => {
+    process.stdout.write((scenario.generation ?? 1) + '\\x1f' + (scenario.observed ?? 1) + '\\x1f' + scenario.revision + '\\x1f' + 'app=peer,');
+    process.exit(0);
+  };
+  if (scenario.stsDelayMs) setTimeout(out, scenario.stsDelayMs); else out();
+  return;
 }
 if (args[0] === 'get' && args[1] === 'pods') {
   if (scenario.podsFail) { console.error('Forbidden'); process.exit(1); }
   const counter = dir + '/pod-reads';
+  if (scenario.podsDelayMs) { setTimeout(() => process.exit(1), scenario.podsDelayMs); return; }
   const n = existsSync(counter) ? Number(fs.readFileSync(counter, 'utf8')) : 0;
   fs.writeFileSync(counter, String(n + 1));
   const polls = scenario.polls;
@@ -200,7 +205,7 @@ test("the watcher is read-only, and its go-templates never read a field under an
   // when `.a` is absent; every nested read must sit under a `with`.
   const templates = body.split("\n").filter((l) => /^[A-Z_]+_TEMPLATE=|^CONTAINER_FIELDS=/.test(l)).join("\n");
   assert.ok(templates.includes("PODS_TEMPLATE="), "templates not found");
-  assert.doesNotMatch(templates, /\.lastState\.terminated|\.state\.waiting|index \.metadata\.labels|\.spec\.selector\.matchLabels|\.status\.updateRevision/);
+  assert.doesNotMatch(templates, /\.lastState\.terminated|\.state\.waiting|index \.metadata\.labels|\.spec\.selector\.matchLabels|\.status\.updateRevision|\.status\.observedGeneration/);
   assert.doesNotMatch(body, /kubectl (apply|delete|patch|replace|scale|annotate|label|exec|rollout (restart|undo|pause|resume))/);
 });
 
@@ -226,4 +231,34 @@ test("edge Jenkinsfile skips the roll gate for a fast-failed peer and names it i
   assert.match(jenkinsfile, /rollout FAST-FAILED on a crashlooping pod/);
   // CPS 64KB method-size ratchet (sequenced-roll.test.sh owns the baseline).
   assert.ok((jenkinsfile.match(/sh """/g) ?? []).length <= 10, "an inline sh heredoc was added");
+});
+
+test("a rollout that completes while a pod read is slow returns at once with its own exit 0", async (t) => {
+  const r = await run(t, { rollout: { code: 0, afterMs: 1500 }, stsDelayMs: 4000 });
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  assert.ok(r.elapsed < 3500, `success was delayed behind a probe: ${r.elapsed}ms`);
+  assert.equal(r.reason, null);
+});
+
+test("a crashlooping read that lands after the rollout succeeded never turns it into exit 4", async (t) => {
+  const crash = rec({ restarts: 9, waiting: "CrashLoopBackOff", lastReason: "Error", lastExit: "1" });
+  const r = await run(t, { rollout: { code: 0, afterMs: 1500 }, stsDelayMs: 2500, polls: [crash] });
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  assert.equal(r.reason, null);
+});
+
+test("a stale status (generation not yet observed) judges no pod against the old updateRevision", async (t) => {
+  const crash = rec({ rev: "rev-old", restarts: 9, waiting: "CrashLoopBackOff", lastReason: "Error", lastExit: "1" });
+  for (const sc of [{ generation: 2, observed: 1 }, { generation: 1, observed: 0 }]) {
+    const r = await run(t, { ...sc, revision: "rev-old", rollout: { code: 0, afterMs: 3000 }, polls: [crash] });
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+    assert.equal(r.reason, null);
+    assert.equal(podReads(r.calls), 0, "pods were read against a stale status");
+  }
+});
+
+test("once the generation is observed the crashloop is judged as before", async (t) => {
+  const r = await run(t, { generation: 2, observed: 2, rollout: { hang: true },
+    polls: [rec({ restarts: 3, waiting: "CrashLoopBackOff" })] });
+  assert.equal(r.code, 4, r.stdout + r.stderr);
 });
