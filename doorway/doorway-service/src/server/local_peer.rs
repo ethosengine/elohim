@@ -58,6 +58,19 @@ fn forwardable_path(path: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'-' | b'_'))
 }
 
+/// The client that carries the reader capability. The reader is on this machine, so the
+/// request must never leave it: `no_proxy` drops every proxy, including the system proxy
+/// reqwest otherwise reads from `HTTP_PROXY`/`ALL_PROXY` (which would receive the
+/// Authorization header whenever `NO_PROXY` does not name loopback), and redirects are
+/// not followed.
+fn reader_client(builder: reqwest::ClientBuilder) -> Option<reqwest::Client> {
+    builder
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .ok()
+}
+
 fn refused() -> Response<Full<Bytes>> {
     let mut response = Response::new(Full::new(Bytes::new()));
     *response.status_mut() = StatusCode::NOT_FOUND;
@@ -93,12 +106,7 @@ pub async fn relay_to<B>(req: Request<B>, target: Option<&reqwest::Url>) -> Resp
     }
     static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
     let Some(client) = CLIENT
-        .get_or_init(|| {
-            reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .build()
-                .ok()
-        })
+        .get_or_init(|| reader_client(reqwest::Client::builder()))
         .as_ref()
     else {
         return refused();
@@ -230,6 +238,48 @@ mod tests {
                 StatusCode::NOT_FOUND
             );
         }
+    }
+
+    #[tokio::test]
+    async fn the_reader_client_never_routes_through_a_proxy() {
+        // A stand-in proxy that would receive the capability if the client used it.
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_url = format!("http://{}", proxy.local_addr().unwrap());
+        let reader = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let reader_address = reader.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (stream, _) = reader.accept().await.unwrap();
+            let service =
+                hyper::service::service_fn(|_req: Request<hyper::body::Incoming>| async {
+                    Ok::<_, std::convert::Infallible>(Response::new(Full::new(Bytes::from(
+                        "reader",
+                    ))))
+                });
+            let _ = hyper::server::conn::http1::Builder::new()
+                .serve_connection(hyper_util::rt::TokioIo::new(stream), service)
+                .await;
+        });
+        // Even a builder that already names a proxy loses it: `no_proxy` clears explicit
+        // proxies as well as the system (environment) proxy.
+        let client = reader_client(
+            reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .proxy(reqwest::Proxy::all(&proxy_url).unwrap()),
+        )
+        .unwrap();
+        let body = client
+            .get(format!("http://{reader_address}/api/local-views"))
+            .header(reqwest::header::AUTHORIZATION, "Bearer reader-token")
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+        assert_eq!(body, "reader");
+        let reached_proxy =
+            tokio::time::timeout(std::time::Duration::from_millis(200), proxy.accept()).await;
+        assert!(reached_proxy.is_err(), "the proxy received a connection");
     }
 
     #[tokio::test]
