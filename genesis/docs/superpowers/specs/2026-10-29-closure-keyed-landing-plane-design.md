@@ -345,7 +345,7 @@ Paste into a new session:
 
 ## 11. Unresolved frontier (pruned to what this design depends on)
 
-1. **Why the four shem `elohim-node` containers exit** — Loki last line before exit on the four pods; the only thing that turns S1a's and S2c's receipts from stage-level to job-level. (Operator; day zero.)
+1. **Why the four shem `elohim-node` containers exit** — ANSWERED 2026-10-29 by shem's session: EDQUOT on the 100%-full `storage-data` PVCs (superseded sled blobs rewritten each minute; grow refused, class not expandable; operator raises the ZFS quota). Remaining: — Loki last line before exit on the four pods; the only thing that turns S1a's and S2c's receipts from stage-level to job-level. (Operator; day zero.)
 2. **What stretches the storage gate 642 → 2,613 s** — S1c's cost vector with and without the residents answers it; it decides whether the day-zero shed is worth 33 min per storage-selecting push or ~0.
 3. **Who holds what, how long, across the two devices** — S1c's berth fold; it is also the falsifier for S1b's claim that the gain is hours per week, and the A4 trigger if `unconfirmed`, not gate time, drives the window.
 4. **Whether a Jenkins pod ever waits for cloud capacity** — the kubernetes-cloud `containerCap`/plugin inventory; sets whether S1a's 6–8 waves run co-resident or queue. (Operator.)
