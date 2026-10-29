@@ -35,9 +35,12 @@ pub const ISSUE_ISSUED: &str = "issued";
 pub const ISSUE_UNCONFIRMED: &str = "unconfirmed";
 
 /// How long an attempt with an unknown outcome is left before it is taken
-/// again. Longer than any conductor call is allowed to run, so a live attempt
-/// is never taken over; long enough that the projection of an attempt that did
-/// commit has normally arrived and stops the retry.
+/// again: long enough that the projection of an attempt that did commit has
+/// normally arrived and stops the retry. It does NOT bound a live attempt: the
+/// wait for the chain write gate and the admission permit has no deadline, so
+/// an attempt can still be queued when a later one takes it over. That one is
+/// fenced instead: its last-moment precondition asks [`holds_attempt`], and
+/// only the newest open attempt passes.
 pub const RETRY_SETTLE: chrono::Duration = chrono::Duration::minutes(15);
 
 /// Attempts at most for one target. Each attempt that is not answered may be a
@@ -199,8 +202,14 @@ pub fn claim(
     }
 }
 
-/// Record how attempt `attempt` ended (`issued` or `unconfirmed`). Ignored if a
-/// later attempt has been taken meanwhile.
+/// Record how attempt `attempt` ended (`issued` or `unconfirmed`).
+///
+/// `issued` settles the target whichever attempt made it: an earlier attempt
+/// that was queued past the settle time and taken over can still reach the
+/// conductor and be accepted, and the later attempt must then find the target
+/// settled ([`holds_attempt`]) rather than submit again. Any other outcome is
+/// recorded only while `attempt` is the open attempt, so it never overwrites an
+/// accepted one or a later attempt's claim.
 pub fn finish(
     conn: &mut SqliteConnection,
     target_cid: &str,
@@ -208,13 +217,40 @@ pub fn finish(
     outcome: &str,
 ) -> QueryResult<usize> {
     let now = current_timestamp();
-    diesel::update(
-        mr::mishpat_revocations
-            .filter(mr::target_cid.eq(target_cid))
-            .filter(mr::attempts.eq(attempt)),
-    )
-    .set((mr::issue_outcome.eq(outcome), mr::updated_at.eq(&now)))
-    .execute(conn)
+    let target = mr::mishpat_revocations.filter(mr::target_cid.eq(target_cid));
+    if outcome == ISSUE_ISSUED {
+        diesel::update(target)
+            .set((mr::issue_outcome.eq(outcome), mr::updated_at.eq(&now)))
+            .execute(conn)
+    } else {
+        diesel::update(
+            target
+                .filter(mr::attempts.eq(attempt))
+                .filter(mr::issue_outcome.eq(ISSUE_PENDING)),
+        )
+        .set((mr::issue_outcome.eq(outcome), mr::updated_at.eq(&now)))
+        .execute(conn)
+    }
+}
+
+/// Is `attempt` still the open attempt at `target_cid`? False once a later
+/// attempt has taken it over, once any attempt was accepted, and once a
+/// revocation of the target is projected. The submitter asks this at the last
+/// moment before the conductor call is offered, so a queued attempt that was
+/// taken over submits nothing.
+pub fn holds_attempt(
+    conn: &mut SqliteConnection,
+    target_cid: &str,
+    attempt: i32,
+) -> QueryResult<bool> {
+    let open: i64 = mr::mishpat_revocations
+        .filter(mr::target_cid.eq(target_cid))
+        .filter(mr::revoked_at.is_null())
+        .filter(mr::attempts.eq(attempt))
+        .filter(mr::issue_outcome.eq(ISSUE_PENDING))
+        .count()
+        .get_result(conn)?;
+    Ok(open == 1)
 }
 
 /// Give back attempt `attempt`, which submitted NOTHING (its precondition
@@ -302,6 +338,35 @@ pub fn retry_due(
         .collect())
 }
 
+/// Accepted submissions whose last attempt is older than [`RETRY_SETTLE`] with
+/// no revocation projected: the conductor said the revocation committed, but
+/// this peer's projection never showed it (its post-commit signal was lost), so
+/// the target row still reads live. Reported, never submitted again: the
+/// outcome is known, and what is missing is the projection, not the entry.
+pub fn unprojected(
+    conn: &mut SqliteConnection,
+    now: chrono::DateTime<chrono::Utc>,
+) -> QueryResult<Vec<SubmissionRecord>> {
+    let settled_before = (now - RETRY_SETTLE)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+    mr::mishpat_revocations
+        .filter(mr::revoked_at.is_null())
+        .filter(mr::issue_outcome.eq(ISSUE_ISSUED))
+        .filter(mr::last_attempt_at.le(&settled_before))
+        .select((
+            mr::target_cid,
+            mr::revoked_at,
+            mr::issued_at,
+            mr::issue_outcome,
+            mr::signed_at,
+            mr::attempts,
+            mr::last_attempt_at,
+        ))
+        .order(mr::target_cid.asc())
+        .load(conn)
+}
+
 /// Unknown outcomes out of attempts: a revocation this peer may or may not
 /// have made, with none projected. Reported every pass; never retried
 /// automatically.
@@ -378,6 +443,47 @@ mod tests {
             },
             "the retry carries the signing time of the first claim"
         );
+    }
+
+    #[test]
+    fn an_accepted_answer_from_a_taken_over_attempt_settles_the_target() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        // Attempt 1 waits on the chain past the settle time; attempt 2 is
+        // taken, then attempt 1 reaches the conductor after all and is
+        // accepted.
+        claim(&mut conn, "uhCEkA", "s", at(0)).expect("1");
+        assert!(matches!(
+            claim(&mut conn, "uhCEkA", "s", at(16)).expect("2"),
+            Claim::Submit { attempt: 2, .. }
+        ));
+        finish(&mut conn, "uhCEkA", 1, ISSUE_ISSUED).expect("finish 1");
+        let record = get(&mut conn, "uhCEkA").expect("read").expect("record");
+        assert_eq!(
+            record.issue_outcome.as_deref(),
+            Some(ISSUE_ISSUED),
+            "an accepted revocation is accepted whichever attempt made it"
+        );
+        assert_eq!(
+            claim(&mut conn, "uhCEkA", "s", at(60)).expect("later"),
+            Claim::Held
+        );
+    }
+
+    #[test]
+    fn an_accepted_submission_with_no_projection_is_reported_once_settled() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        claim(&mut conn, "uhCEkA", "s", at(0)).expect("claim");
+        finish(&mut conn, "uhCEkA", 1, ISSUE_ISSUED).expect("finish");
+        assert!(unprojected(&mut conn, at(5)).expect("early").is_empty());
+        let late = unprojected(&mut conn, at(16)).expect("late");
+        assert_eq!(late.len(), 1);
+        assert_eq!(late[0].target_cid, "uhCEkA");
+        record_projected(&mut conn, "uhCEkA", "2026-10-29T00:00:00Z").expect("project");
+        assert!(unprojected(&mut conn, at(16))
+            .expect("projected")
+            .is_empty());
     }
 
     #[test]

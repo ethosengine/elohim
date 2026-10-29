@@ -203,7 +203,15 @@ pub struct RevokeSweep {
     /// Cids out of attempts with no revocation projected: this node may or may
     /// not have revoked them. Reported on every pass until the operator acts.
     pub stuck: Vec<String>,
+    /// Cids whose revocation the conductor accepted, older than the settle
+    /// time, with none projected: the row still reads live because its
+    /// signal never arrived. Reported on every pass; never submitted again.
+    pub unprojected: Vec<String>,
 }
+
+/// What [`ProvideReconciler::observe_withdrawn`] read: the plans, the stuck
+/// targets, the accepted-but-unprojected targets.
+type ObservedWithdrawal = (Vec<PlannedRevocation>, Vec<String>, Vec<String>);
 
 /// What one submission through [`submit_revocation`] came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,7 +224,8 @@ pub enum Submission {
     /// a revocation is projected, or the target is out of attempts.
     NotDue,
     /// Nothing was submitted: the evidence did not hold (before the claim, or
-    /// at the last moment before the call).
+    /// at the last moment before the call), or the attempt was taken over
+    /// while it waited.
     NoLongerHolds(String),
 }
 
@@ -259,6 +268,75 @@ pub fn revocation_still_holds(
     Ok(())
 }
 
+/// The revocations the HTTP un-pin of `removed` submits: this node's offers
+/// for the pin's scope, once no pin of the scope is held.
+///
+/// An offer is found two ways, because the back-reference sits on the pin the
+/// reconciler authored for, which need not be the pin removed last:
+/// - live content rows of the signing key `authority` for the scope (the same
+///   rows the removed-pin arm revokes);
+/// - the `commitment_cid` back-reference of ANY pin of the scope whose target
+///   the projection has not seen yet (judged on the pins alone, as
+///   [`revocation_still_holds`] judges an unprojected target).
+///
+/// A back-reference whose target is projected is decided by its row: revoked,
+/// lapsed or another key's rows are not this node's to revoke. Empty while the
+/// scope is still pinned.
+pub fn unpin_revocations(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    removed: &crate::db::models::AcquisitionPin,
+    authority: &str,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<Vec<PlannedRevocation>, String> {
+    let scope = scope_key(&removed.head_ref);
+    let pins =
+        crate::db::acquisition_pins::list_all_pins(conn).map_err(|e| format!("pin read: {e}"))?;
+    if !withdrawn_scopes(&pins).contains_key(scope) {
+        return Ok(Vec::new());
+    }
+    let plan = |cid: String, head_ref: String| PlannedRevocation {
+        cid,
+        head_ref,
+        provider: authority.to_string(),
+        pin_id: removed.id,
+        removed_at: removed.updated_at.clone(),
+    };
+    let mut rows =
+        crate::db::mishpat_commitments::live_commons_provides_for_provider(conn, authority)
+            .map_err(|e| format!("commitment read: {e}"))?;
+    rows.sort_by(|a, b| {
+        a.created_at
+            .cmp(&b.created_at)
+            .then_with(|| a.cid.cmp(&b.cid))
+    });
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut plans = Vec::new();
+    for row in rows {
+        if is_content_provide(&row)
+            && row_stands_readably(&row, now)
+            && scope_key(&row.recipient) == scope
+            && seen.insert(row.cid.clone())
+        {
+            plans.push(plan(row.cid, row.recipient));
+        }
+    }
+    for pin in pins.iter().filter(|p| scope_key(&p.head_ref) == scope) {
+        let Some(cid) = pin.commitment_cid.as_ref() else {
+            continue;
+        };
+        if seen.contains(cid) {
+            continue;
+        }
+        let projected = crate::db::mishpat_commitments::get_by_cid(conn, cid)
+            .map_err(|e| format!("commitment read: {e}"))?
+            .is_some();
+        if !projected && seen.insert(cid.clone()) {
+            plans.push(plan(cid.clone(), pin.head_ref.clone()));
+        }
+    }
+    Ok(plans)
+}
+
 /// Submit the revocation `plan` describes, through the one protocol both
 /// submitters use: the removed-pin arm and the HTTP un-pin route.
 ///
@@ -268,11 +346,15 @@ pub fn revocation_still_holds(
 ///    ([`crate::db::mishpat_revocations::claim`]). Only one submitter holds a
 ///    target's attempt at a time; the first claim fixes `signed_at`, so every
 ///    attempt is the same entry.
-/// 3. The call is made with the evidence check as its precondition, run by the
-///    revoker AFTER the call has waited for the chain write gate and the
-///    conductor admission permit, immediately before the call is offered. A
-///    scope re-pinned during that wait is not revoked, and the claim is given
-///    back ([`crate::db::mishpat_revocations::release`]).
+/// 3. The call is made with a precondition run by the revoker AFTER the call
+///    has waited for the chain write gate and the conductor admission permit,
+///    immediately before the call is offered: this caller must still hold the
+///    attempt ([`crate::db::mishpat_revocations::holds_attempt`]; that wait has
+///    no deadline, so a later attempt may have taken it over, or an earlier
+///    one been accepted, meanwhile), and the evidence must still hold. Either
+///    refusal submits nothing; the claim is given back
+///    ([`crate::db::mishpat_revocations::release`], a no-op for an attempt
+///    that was taken over).
 /// 4. The answer is recorded: `issued`, or `unconfirmed` (the call may have
 ///    committed; a later claim retries it after the settle time, bounded).
 pub async fn submit_revocation<R: CommitmentRevoker + ?Sized>(
@@ -305,6 +387,17 @@ pub async fn submit_revocation<R: CommitmentRevoker + ?Sized>(
     let precondition_plan = plan.clone();
     let precondition = move || -> Result<(), String> {
         let mut conn = precondition_pool.get().map_err(|e| format!("pool: {e}"))?;
+        let held = crate::db::mishpat_revocations::holds_attempt(
+            &mut conn,
+            &precondition_plan.cid,
+            attempt,
+        )
+        .map_err(|e| format!("revocation record read: {e}"))?;
+        if !held {
+            return Err(format!(
+                "attempt {attempt} is no longer the open attempt (a later one took it over, or one was accepted)"
+            ));
+        }
         revocation_still_holds(&mut conn, &precondition_plan)
     };
     let req = ProvideRevokeRequest {
@@ -799,6 +892,8 @@ pub struct ProvideReconciler {
     /// Stuck targets already warned about this process (they are reported on
     /// every pass's [`RevokeSweep`] regardless).
     stuck_reported: Arc<Mutex<HashSet<String>>>,
+    /// Accepted-but-unprojected targets already warned about this process.
+    unprojected_reported: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Default for ProvideReconciler {
@@ -820,6 +915,7 @@ impl ProvideReconciler {
             sightings: Arc::new(Mutex::new(HashMap::new())),
             dry_run_logged: Arc::new(Mutex::new(HashSet::new())),
             stuck_reported: Arc::new(Mutex::new(HashSet::new())),
+            unprojected_reported: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -1091,7 +1187,8 @@ impl ProvideReconciler {
             return RevokeSweep::default();
         }
         let mut sightings = self.sightings.lock().await;
-        let (withdrawn, stuck) = match Self::observe_withdrawn(pool, author, now).await {
+        let (withdrawn, stuck, unprojected) = match Self::observe_withdrawn(pool, author, now).await
+        {
             Ok(observed) => observed,
             Err(reason) => {
                 // An unobserved pass is not a sighting, and it breaks the run.
@@ -1105,6 +1202,7 @@ impl ProvideReconciler {
             }
         };
         self.report_stuck(&stuck).await;
+        self.report_unprojected(&unprojected).await;
         // Count this sighting. A row not withdrawn on this pass is dropped, so
         // its count starts over if it is withdrawn again.
         let counted: HashMap<String, u32> = withdrawn
@@ -1120,6 +1218,7 @@ impl ProvideReconciler {
             observed: true,
             withdrawn_rows: withdrawn.len(),
             stuck,
+            unprojected,
             ..RevokeSweep::default()
         };
         sweep.planned = withdrawn
@@ -1231,15 +1330,35 @@ impl ProvideReconciler {
         }
     }
 
+    /// Warn once a process for each accepted revocation that never projected.
+    /// The pass also carries them in [`RevokeSweep::unprojected`] every time.
+    async fn report_unprojected(&self, unprojected: &[String]) {
+        let mut reported = self.unprojected_reported.lock().await;
+        for cid in unprojected {
+            if reported.insert(cid.clone()) {
+                tracing::warn!(
+                    target: "elohim_storage::provide",
+                    target_cid = %cid,
+                    "provide revoke arm: the conductor accepted this revocation but no projection of it has \
+                     arrived, so the commitment still reads live here. It is not submitted again; the \
+                     revocation's signal was lost"
+                );
+            }
+        }
+    }
+
     /// Read what the revoke arm decides on: this node's live content rows for
     /// withdrawn scopes that are free to submit (no record) or due for another
-    /// attempt (unknown outcome, settled, attempts left), oldest first; and the
-    /// targets out of attempts. `Err` = the pass could not observe.
+    /// attempt (unknown outcome, settled, attempts left), oldest first, then
+    /// due attempts whose target never projected, planned from the
+    /// back-reference of a withdrawn pin; the targets out of attempts; and the
+    /// accepted revocations that never projected. `Err` = the pass could not
+    /// observe.
     async fn observe_withdrawn<A: CommitmentAuthor + ?Sized>(
         pool: &DbPool,
         author: &A,
         now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<(Vec<PlannedRevocation>, Vec<String>), String> {
+    ) -> Result<ObservedWithdrawal, String> {
         let authority = author
             .revoke_authority()
             .await
@@ -1250,11 +1369,16 @@ impl ProvideReconciler {
             .into_iter()
             .map(|r| r.target_cid)
             .collect();
+        let unprojected: Vec<String> = crate::db::mishpat_revocations::unprojected(&mut conn, now)
+            .map_err(|e| format!("revocation record read: {e}"))?
+            .into_iter()
+            .map(|r| r.target_cid)
+            .collect();
         let pins = crate::db::acquisition_pins::list_all_pins(&mut conn)
             .map_err(|e| format!("pin read: {e}"))?;
         let withdrawn = withdrawn_scopes(&pins);
         if withdrawn.is_empty() {
-            return Ok((Vec::new(), stuck));
+            return Ok((Vec::new(), stuck, unprojected));
         }
         // Rows the signing key provides, and no others (not a session key's).
         let mut rows = crate::db::mishpat_commitments::live_commons_provides_for_provider(
@@ -1273,23 +1397,58 @@ impl ProvideReconciler {
                 .cmp(&b.created_at)
                 .then_with(|| a.cid.cmp(&b.cid))
         });
-        Ok((
-            rows.into_iter()
-                .filter(|r| is_content_provide(r) && row_stands_readably(r, now))
-                .filter(|r| !claimed.contains(&r.cid) || due.contains(&r.cid))
-                .filter_map(|r| {
-                    let scope = withdrawn.get(scope_key(&r.recipient))?;
-                    Some(PlannedRevocation {
-                        cid: r.cid,
-                        head_ref: r.recipient,
-                        provider: r.provider,
-                        pin_id: scope.pin_id,
-                        removed_at: scope.removed_at.clone(),
-                    })
+        let mut planned: Vec<PlannedRevocation> = rows
+            .into_iter()
+            .filter(|r| is_content_provide(r) && row_stands_readably(r, now))
+            .filter(|r| !claimed.contains(&r.cid) || due.contains(&r.cid))
+            .filter_map(|r| {
+                let scope = withdrawn.get(scope_key(&r.recipient))?;
+                Some(PlannedRevocation {
+                    cid: r.cid,
+                    head_ref: r.recipient,
+                    provider: r.provider,
+                    pin_id: scope.pin_id,
+                    removed_at: scope.removed_at.clone(),
                 })
-                .collect(),
-            stuck,
-        ))
+            })
+            .collect();
+        // A due attempt whose target the projection has never seen: the un-pin
+        // route claims from a pin's back-reference before the offer projects,
+        // and a crash then leaves it pending with no row to plan it from. It is
+        // planned from that back-reference, judged on the pins alone as the
+        // route judged it, so it is retried and, out of attempts, reported.
+        let mut due_unprojected: Vec<&String> = due
+            .iter()
+            .filter(|cid| !planned.iter().any(|p| &p.cid == *cid))
+            .collect();
+        due_unprojected.sort();
+        for cid in due_unprojected {
+            if crate::db::mishpat_commitments::get_by_cid(&mut conn, cid)
+                .map_err(|e| format!("commitment read: {e}"))?
+                .is_some()
+            {
+                // Projected: its row decides (lapsed, revoked or not ours).
+                continue;
+            }
+            let found = pins.iter().find_map(|p| {
+                if p.commitment_cid.as_ref() != Some(cid) {
+                    return None;
+                }
+                withdrawn
+                    .get(scope_key(&p.head_ref))
+                    .map(|scope| (p.head_ref.clone(), scope))
+            });
+            if let Some((head_ref, scope)) = found {
+                planned.push(PlannedRevocation {
+                    cid: cid.clone(),
+                    head_ref,
+                    provider: authority.clone(),
+                    pin_id: scope.pin_id,
+                    removed_at: scope.removed_at.clone(),
+                });
+            }
+        }
+        Ok((planned, stuck, unprojected))
     }
 
     /// Observe-only pass: re-derive the per-key stage latch from the live DHT
@@ -2545,6 +2704,9 @@ mod tests {
         no_authority: std::sync::atomic::AtomicBool,
         attempts: std::sync::atomic::AtomicUsize,
         repin_while_waiting: Option<(DbPool, String)>,
+        /// While the call waits, a later caller takes the attempt over: it
+        /// claims `cid` at the given time.
+        take_over_while_waiting: Option<(DbPool, String, chrono::DateTime<chrono::Utc>)>,
         inner: MockAuthor,
     }
 
@@ -2565,6 +2727,15 @@ mod tests {
             // The wait for the chain gate and the admission permit.
             if let Some((pool, head_ref)) = &self.repin_while_waiting {
                 pin(pool, head_ref, PIN_STATUS_ACTIVE);
+            }
+            if let Some((pool, cid, at)) = &self.take_over_while_waiting {
+                let mut conn = pool.get().expect("conn");
+                let taken = crate::db::mishpat_revocations::claim(&mut conn, cid, "later", *at)
+                    .expect("take over");
+                assert!(matches!(
+                    taken,
+                    crate::db::mishpat_revocations::Claim::Submit { attempt: 2, .. }
+                ));
             }
             // The precondition runs after the wait, before the call.
             precondition().map_err(RevokeError::Refused)?;
@@ -2613,6 +2784,57 @@ mod tests {
             recorded_outcome(&pool, "cid:gone"),
             None,
             "a claim that submitted nothing is given back"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_attempt_taken_over_while_it_waits_submits_nothing() {
+        let pool = test_pool();
+        let gone = pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
+        let now = chrono::Utc::now();
+        // The call waits on the chain past the settle time; a later caller
+        // takes the attempt over before this one reaches the conductor.
+        let author = FlakyAuthor {
+            take_over_while_waiting: Some((
+                pool.clone(),
+                "cid:gone".to_string(),
+                now + crate::db::mishpat_revocations::RETRY_SETTLE + chrono::Duration::minutes(1),
+            )),
+            ..FlakyAuthor::default()
+        };
+        let plan = PlannedRevocation {
+            cid: "cid:gone".to_string(),
+            head_ref: "epr:gone".to_string(),
+            provider: CELL.to_string(),
+            pin_id: gone,
+            removed_at: removed_at(&pool, gone),
+        };
+        let outcome = submit_revocation(
+            &pool,
+            &author,
+            &plan,
+            crate::chain_write_gate::WriterKind::Provide,
+            now,
+        )
+        .await;
+        assert!(
+            matches!(outcome, Submission::NoLongerHolds(_)),
+            "the attempt that was taken over is fenced: {outcome:?}"
+        );
+        assert_eq!(
+            author.attempts.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "only the caller holding the attempt reaches the conductor"
+        );
+        let mut conn = pool.get().expect("conn");
+        let record = crate::db::mishpat_revocations::get(&mut conn, "cid:gone")
+            .expect("record read")
+            .expect("record");
+        assert_eq!(record.attempts, 2, "the later attempt is left as it was");
+        assert_eq!(
+            record.issue_outcome.as_deref(),
+            Some(crate::db::mishpat_revocations::ISSUE_PENDING)
         );
     }
 
@@ -2746,6 +2968,166 @@ mod tests {
             recorded_outcome(&pool, "cid:gone").as_deref(),
             Some(crate::db::mishpat_revocations::ISSUE_ISSUED)
         );
+    }
+
+    /// Insert a pin under `agent` carrying the back-reference `cid`, then
+    /// leave it in `status`.
+    fn pin_with_offer(pool: &DbPool, agent: &str, head_ref: &str, cid: &str, status: &str) -> i32 {
+        let id = pin_as(pool, agent, head_ref, PIN_STATUS_ACTIVE);
+        let mut conn = pool.get().expect("conn");
+        crate::db::acquisition_pins::set_commitment_cid(&mut conn, id, cid).expect("back-ref");
+        if status != PIN_STATUS_ACTIVE {
+            crate::db::acquisition_pins::set_pin_status(&mut conn, id, status).expect("status");
+        }
+        id
+    }
+
+    /// What the un-pin route does once `pin_id` is removed: plan, then submit
+    /// each plan through the shared protocol.
+    async fn unpin(pool: &DbPool, author: &MockAuthor, pin_id: i32) -> Vec<Submission> {
+        let now = chrono::Utc::now();
+        let plans = {
+            let mut conn = pool.get().expect("conn");
+            crate::db::acquisition_pins::set_pin_status(&mut conn, pin_id, PIN_STATUS_REMOVED)
+                .expect("remove");
+            let removed = crate::db::acquisition_pins::get_pin_by_id(&mut conn, pin_id)
+                .expect("read")
+                .expect("pin");
+            unpin_revocations(&mut conn, &removed, CELL, now).expect("plans")
+        };
+        let mut outcomes = Vec::new();
+        for plan in &plans {
+            outcomes.push(
+                submit_revocation(
+                    pool,
+                    author,
+                    plan,
+                    crate::chain_write_gate::WriterKind::HttpAuthor,
+                    now,
+                )
+                .await,
+            );
+        }
+        outcomes
+    }
+
+    #[tokio::test]
+    async fn the_last_pin_of_a_scope_revokes_the_offer_an_earlier_pin_carries() {
+        let pool = test_pool();
+        // Two pins of one scope; the back-reference is on the first only.
+        let first = pin_with_offer(&pool, "device-1", "epr:x", "cid:x", PIN_STATUS_ACTIVE);
+        let last = pin_as(&pool, "device-2", "x", PIN_STATUS_ACTIVE);
+        content_row(&pool, CELL, "cid:x", "epr:x");
+        // Another provider's offer for the scope is not this node's to revoke.
+        content_row(&pool, "uhCAkOther", "cid:other", "epr:x");
+        let author = MockAuthor::new();
+
+        unpin(&pool, &author, first).await;
+        assert!(
+            revoked_targets(&author).await.is_empty(),
+            "the scope is still pinned"
+        );
+        unpin(&pool, &author, last).await;
+        assert_eq!(
+            revoked_targets(&author).await,
+            vec!["cid:x"],
+            "removing the last pin withdraws the scope's offer"
+        );
+
+        // The same when the offer has not projected yet: the earlier pin's
+        // back-reference names it.
+        let pool = test_pool();
+        let first = pin_with_offer(&pool, "device-1", "y", "cid:y", PIN_STATUS_ACTIVE);
+        let last = pin_as(&pool, "device-2", "epr:y", PIN_STATUS_ACTIVE);
+        let author = MockAuthor::new();
+        unpin(&pool, &author, first).await;
+        unpin(&pool, &author, last).await;
+        assert_eq!(revoked_targets(&author).await, vec!["cid:y"]);
+    }
+
+    #[tokio::test]
+    async fn a_pending_claim_whose_target_never_projected_is_retried() {
+        let pool = test_pool();
+        // The route claimed from the pin's back-reference before the offer
+        // projected, and the process stopped before the call.
+        let gone = pin_with_offer(
+            &pool,
+            "local-device",
+            "gone",
+            "cid:gone",
+            PIN_STATUS_REMOVED,
+        );
+        let crashed_at = chrono::Utc::now();
+        {
+            let mut conn = pool.get().expect("conn");
+            crate::db::mishpat_revocations::claim(
+                &mut conn,
+                "cid:gone",
+                &removed_at(&pool, gone),
+                crashed_at,
+            )
+            .expect("claim");
+        }
+        let author = MockAuthor::new();
+        let early = revoke_passes_at(
+            &applying(),
+            &pool,
+            &author,
+            REVOKE_AFTER_STRANDED_PASSES,
+            crashed_at + chrono::Duration::minutes(1),
+        )
+        .await;
+        assert!(early.planned.is_empty(), "a pending claim is in flight");
+
+        let settled = crashed_at
+            + crate::db::mishpat_revocations::RETRY_SETTLE
+            + chrono::Duration::minutes(1);
+        revoke_passes_at(
+            &applying(),
+            &pool,
+            &author,
+            REVOKE_AFTER_STRANDED_PASSES,
+            settled,
+        )
+        .await;
+        let revoked = author.revoked.lock().await;
+        assert_eq!(
+            revoked.len(),
+            1,
+            "retried though its target never projected"
+        );
+        assert_eq!(revoked[0].target_cid, "cid:gone");
+        assert_eq!(revoked[0].signed_at, removed_at(&pool, gone));
+    }
+
+    #[tokio::test]
+    async fn an_accepted_revocation_that_never_projects_is_reported() {
+        let pool = test_pool();
+        pin(&pool, "gone", PIN_STATUS_REMOVED);
+        content_row(&pool, CELL, "cid:gone", "epr:gone");
+        // The conductor accepts; the revocation's signal never arrives.
+        let author = MockAuthor::new();
+        let start = chrono::Utc::now();
+        let r = applying();
+        let sweep = revoke_passes_at(&r, &pool, &author, REVOKE_AFTER_STRANDED_PASSES, start).await;
+        assert_eq!(sweep.issued, vec!["cid:gone"]);
+        assert!(sweep.unprojected.is_empty(), "not before the settle time");
+
+        let settled =
+            start + crate::db::mishpat_revocations::RETRY_SETTLE + chrono::Duration::minutes(1);
+        let sweep =
+            revoke_passes_at(&r, &pool, &author, REVOKE_AFTER_STRANDED_PASSES, settled).await;
+        assert_eq!(sweep.unprojected, vec!["cid:gone"], "reported, not silent");
+        assert_eq!(
+            revoked_targets(&author).await,
+            vec!["cid:gone"],
+            "an accepted revocation is never submitted again"
+        );
+
+        // Once it projects, it is no longer reported.
+        project_revocation(&pool, "cid:gone", &start.to_rfc3339());
+        let sweep = revoke_passes_at(&r, &pool, &author, 1, settled).await;
+        assert!(sweep.unprojected.is_empty());
     }
 
     #[tokio::test]
