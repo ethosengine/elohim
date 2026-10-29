@@ -24,4 +24,6 @@ retire-when: >
   dataplane in a collective space (S2), so this repo-local queue adds no information; or it retires
   together with push-delivers-within-budget.
 ---
+DELTA 2026-10-29 (RED, inactive; one clause moves): 'the one Jenkins verdict on that tip reaches every device's fold' now has a writer — the device's harvest attests each orchestrator wave as `ci:<pipeline>` brit notes (S2d′, 37 notes on first run); the fold across devices and the landing-intent reference (A9/S1b) are still owed, so the clause stays red.
+
 DELTA 2026-10-27 (BORN red, inactive): nothing in the invariant is kept yet. The 2026-10-27 overnight evidence: both devices fixed the same eprfs reds (no claim crossed), a fix crossed as prose and was re-typed, shem's push held dev-integration for 3 h+ and was refused three times, and the orchestrator ran 8 consecutive FAILUREs at 2.4-4.7 h each. landing-queue.feature is not written. Inactive because the WIP fence is full; it is the upstream station of push-delivers-within-budget.

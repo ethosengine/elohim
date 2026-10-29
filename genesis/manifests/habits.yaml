@@ -2303,9 +2303,9 @@ habits:
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
       DELTA 2026-10-29c (ACTIVE, RED preserved; the first receipt of the closure-keyed edge build, PR #217): off dev/main a wave builds locally, publishes and deploys nothing — elohim-edge/PR-217 #3 (dispatched by orchestrator PR-217 #2, SUCCESS, 51.5 min) printed `GATE_ONLY — strict cargo quality gates and local builds; publish, deploy and dataplane validation disabled`, derived both closures on the ci-builder (`STORAGE closure sha256:9b60477e…: miss http-404`, `DOORWAY closure sha256:98d542dc…: miss http-404` — a registry with no closure tag yet is a reasoned miss), built `elohim-doorway:closure-98d542dcaf1e03bb` (9.4 min) and `elohim-storage:closure-9b60477e766b771d` (21.9 min) through `nerdctl build` with the three closure labels, and left Push to Harbor, Deploy Edge Node - Alpha and Dataplane Validation NOT_EXECUTED. The first wave (#2) died in the Groovy sandbox on a dynamic `env[...]` subscript — fixed (29959b37e) and now refused statically by the cps-scope lint. Still owed: the dev landing (local pre-push blocked by a RAM shed beside 11.8 GB of unmoored residents), then the first unchanged-closure dev wave reading ≤ 15 min in doorway QG + build doorway + build storage against 50.6.
-    evidence-fingerprint: sha256:5a3dca2041c80e7c
-    evidence-bytes: 34756
-    evidence-entries: 32
+    evidence-fingerprint: sha256:218783fb602c82f5
+    evidence-bytes: 35912
+    evidence-entries: 33
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
@@ -2401,10 +2401,10 @@ habits:
       - "node --test genesis/orchestrator/gate-evidence.test.mjs (sibling-signer cases)"
       - "per-sprint bounds over gate-cycle-seconds@1 + delivery-series.mjs: duplicate gated closures = 0, duplicate claims = 0, lease p90 < 120 s, >= 2 intents per Jenkins wave (unwired until A0)"
     evidence: >
-      DELTA 2026-10-27 (BORN red, inactive): nothing in the invariant is kept yet. The 2026-10-27 overnight evidence: both devices fixed the same eprfs reds (no claim crossed), a fix crossed as prose and was re-typed, shem's push held dev-integration for 3 h+ and was refused three times, and the orchestrator ran 8 consecutive FAILUREs at 2.4-4.7 h each. landing-queue.feature is not written. Inactive because the WIP fence is full; it is the upstream station of push-delivers-within-budget.
-    evidence-fingerprint: sha256:2d1ebe69da6cfcdc
-    evidence-bytes: 486
-    evidence-entries: 1
+      DELTA 2026-10-29 (RED, inactive; one clause moves): 'the one Jenkins verdict on that tip reaches every device's fold' now has a writer — the device's harvest attests each orchestrator wave as `ci:<pipeline>` brit notes (S2d′, 37 notes on first run); the fold across devices and the landing-intent reference (A9/S1b) are still owed, so the clause stays red.
+    evidence-fingerprint: sha256:0f4175fb100cbfe5
+    evidence-bytes: 848
+    evidence-entries: 2
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
