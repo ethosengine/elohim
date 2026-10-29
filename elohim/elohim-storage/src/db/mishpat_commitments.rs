@@ -29,6 +29,12 @@ use super::models::{current_timestamp, MishpatCommitment, NewMishpatCommitment};
 /// written anchor — doing so would silently strip the notarised provenance that
 /// the `ProjectionCommitmentFetcher` requires before granting a bounds-pass.
 ///
+/// **Revocation is monotonic:** a revocation is a notarized act and a replay of
+/// the commitment it names is not. A commitment signal carries no revocation,
+/// so its projection arrives with `revoked_at: None`; that must never clear a
+/// revoked row. `revoked_at` is written only when the row has none, and only
+/// from an incoming `Some(_)`, so the first revocation time stands.
+///
 /// Timestamps are always computed in Rust via `current_timestamp()` so every
 /// row uses ISO 8601 `YYYY-MM-DDTHH:MM:SSZ` format instead of the SQL
 /// `datetime('now')` default (`YYYY-MM-DD HH:MM:SS`).
@@ -65,7 +71,8 @@ pub fn upsert_with_anchor(
             mc::bounds_json.eq(new.bounds_json.clone()),
             mc::valid_from.eq(new.valid_from.clone()),
             mc::valid_until.eq(new.valid_until.clone()),
-            mc::revoked_at.eq(new.revoked_at.clone()),
+            // `revoked_at` is absent on purpose: revocation is monotonic and is
+            // applied below, never cleared by a replay.
             mc::state.eq(new.state.clone()),
             // Anchor-preservation: only overwrite when incoming is Some(_).
             // When None, the existing column value is kept via the EXCLUDED
@@ -87,6 +94,18 @@ pub fn upsert_with_anchor(
     }
     // If incoming anchor is None, leave dht_anchor_hash untouched — a non-null
     // anchor written by an earlier upsert is preserved.
+
+    // A revocation carried by the incoming row lands only on a row that has
+    // none; a row's first revocation time stands and is never cleared.
+    if let Some(ref ts) = new.revoked_at {
+        diesel::update(
+            mc::mishpat_commitments
+                .filter(mc::cid.eq(&new.cid))
+                .filter(mc::revoked_at.is_null()),
+        )
+        .set(mc::revoked_at.eq(ts))
+        .execute(conn)?;
+    }
 
     mc::mishpat_commitments
         .filter(mc::cid.eq(&new.cid))
@@ -503,6 +522,41 @@ mod tests {
             Some(ts),
             "revoked_at must reflect the supplied timestamp"
         );
+    }
+
+    /// A commitment signal carries no revocation, so the projection of a
+    /// replayed one arrives with `revoked_at: None`. It must leave a revoked
+    /// row revoked: a revocation is a notarized act, and a replay is not.
+    #[test]
+    fn a_replayed_commitment_keeps_its_revocation() {
+        let mut conn = test_conn();
+        let cid = "commitment:replayed-after-revoke";
+        upsert_with_anchor(&mut conn, sample_commitment(cid, Some("h1"))).expect("project");
+        set_revoked_at(&mut conn, cid, "2026-10-13T00:00:00Z").expect("revoke");
+
+        let replayed = upsert_with_anchor(&mut conn, sample_commitment(cid, Some("h1")))
+            .expect("replay the commitment signal");
+        assert_eq!(
+            replayed.revoked_at.as_deref(),
+            Some("2026-10-13T00:00:00Z"),
+            "a replay must never clear a revocation"
+        );
+    }
+
+    /// The first revocation time stands: a later projection that carries a
+    /// different `revoked_at` does not move it.
+    #[test]
+    fn the_first_revocation_time_stands() {
+        let mut conn = test_conn();
+        let cid = "commitment:revoked-twice";
+        let mut first = sample_commitment(cid, Some("h1"));
+        first.revoked_at = Some("2026-10-13T00:00:00Z".to_string());
+        upsert_with_anchor(&mut conn, first).expect("project revoked");
+
+        let mut later = sample_commitment(cid, Some("h1"));
+        later.revoked_at = Some("2027-01-01T00:00:00Z".to_string());
+        let row = upsert_with_anchor(&mut conn, later).expect("project again");
+        assert_eq!(row.revoked_at.as_deref(), Some("2026-10-13T00:00:00Z"));
     }
 
     #[test]

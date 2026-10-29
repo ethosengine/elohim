@@ -368,7 +368,10 @@ pub(crate) struct HcConnection {
     app_ws: AppWebsocket,
     /// Held so the credentials outlive every clone of the app websocket that
     /// signs with them.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "held only to keep the signing credentials alive as long as the app websocket clones that sign with them; never read"
+    )]
     signer: Arc<ClientAgentSigner>,
     generation: u64,
     /// The transport ledger's doubt epoch when THIS SNAPSHOT was taken for a
