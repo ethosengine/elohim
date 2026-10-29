@@ -23,7 +23,12 @@
 //! whether its document named this content (`document_match`) — are RECORDED
 //! beside it for the gates to weigh. It does refuse a subject the peer cannot
 //! name: the path must resolve to a servable record, so a stranger cannot mint
-//! observations about arbitrary strings.
+//! observations about arbitrary strings. And it refuses a record the caller may
+//! not read at its reach (the chrome route's own reach gate — so an anonymous
+//! browser report reaches commons/public content only), or whose reach is
+//! narrower than the observation's ([`UNDECLARED_BEHAVIOUR_REACH`]): neither
+//! learns the record's content address, and the observation plane never carries
+//! an address further than its record's reach.
 //!
 //! Bodies accepted (the doorway forwards them unchanged):
 //! - `application/reports+json` — Reporting API, an array of reports; only
@@ -59,6 +64,28 @@ pub const UNDECLARED_BEHAVIOUR: &str = "undeclared-behaviour";
 /// `elohim/sdk/domains/elohim/manifest.json` `observation_kinds`
 /// (`attestation-feeding`, reach `community`).
 pub const UNDECLARED_BEHAVIOUR_OBSERVATION: &str = "elohim:undeclared-behaviour";
+
+/// The reach the [`UNDECLARED_BEHAVIOUR_OBSERVATION`] kind is declared at in the
+/// manifest — how far the observation plane carries the subject's content
+/// address. The intake refuses a record whose own reach is narrower
+/// (`api::epr::resolve_signal_subject`); a test holds this equal to the
+/// manifest's declaration.
+pub const UNDECLARED_BEHAVIOUR_REACH: &str = "community";
+
+/// Observation kinds this intake alone records. Their payload carries facts the
+/// intake stamps from the path a report arrived by (`reported_via`,
+/// `relayed_by`, `observed_origin`, `document_match`), so the generic self-row
+/// route `POST /api/v1/observations` refuses them: a caller there would assert
+/// those facts instead of the path carrying them. The kind is declared in the
+/// manifest (so the observation plane carries it and payloads validate) whether
+/// or not the content chrome is on; this list is what keeps that declaration
+/// from widening the generic route.
+pub const INTAKE_ONLY_OBSERVATION_KINDS: &[&str] = &[UNDECLARED_BEHAVIOUR_OBSERVATION];
+
+/// Whether `kind` is recorded only by this intake ([`INTAKE_ONLY_OBSERVATION_KINDS`]).
+pub fn is_intake_only_observation_kind(kind: &str) -> bool {
+    INTAKE_ONLY_OBSERVATION_KINDS.contains(&kind)
+}
 
 /// The largest body the route reads (64 KiB — a Reporting API batch).
 pub const MAX_SIGNAL_BODY_BYTES: usize = 64 * 1024;
@@ -903,6 +930,16 @@ mod tests {
             .get(UNDECLARED_BEHAVIOUR_OBSERVATION)
             .expect("elohim manifest declares elohim:undeclared-behaviour");
         assert_eq!(decl.retention_class, "attestation-feeding");
+        assert_eq!(
+            decl.reach, UNDECLARED_BEHAVIOUR_REACH,
+            "the intake's reach floor is the reach the manifest declares the kind at"
+        );
+        assert!(
+            INTAKE_ONLY_OBSERVATION_KINDS
+                .iter()
+                .all(|kind| registry.get(kind).is_some()),
+            "every intake-only kind is manifest-declared"
+        );
         let mut full_signal = browser("connect-src");
         full_signal.blocked_uri = Some("https://x.example/a".into());
         full_signal.disposition = Some("enforce".into());

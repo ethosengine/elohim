@@ -18513,7 +18513,9 @@ pub fn build_manifest_with_content_chrome() -> doorway_client::DoorwayRoutes {
         // address; body-size bounded and rate-limited per address; never fans
         // out. Unauthenticated by nature (browsers post reports without
         // credentials) — it records evidence, never a verdict, and accepts only
-        // subjects this peer holds a record for.
+        // subjects this peer holds a record for, that the caller may read at the
+        // record's reach (anonymous: commons/public), and whose reach is no
+        // narrower than the observation's (`api::epr::resolve_signal_subject`).
         .route(
             Route::post("/api/v1/epr/{id}/signals")
                 .handler("post_epr_content_signals")
