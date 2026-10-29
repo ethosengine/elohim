@@ -55,22 +55,13 @@ When('device A evaluates the named brit attestation for reuse', pending);
 
 Then('the verdict resolves as proven from admitted {string}', pending);
 
-Then(
-  "device A verifies the named brit attestation with device B's workspace brit key",
-  pending
-);
+Then("device A verifies the named brit attestation with device B's workspace brit key", pending);
 
-Then(
-  'device A may reuse the verdict for {string} instead of repeating the gate',
-  pending
-);
+Then('device A may reuse the verdict for {string} instead of repeating the gate', pending);
 
 Given('device B has an active steward lease naming resource {string}', pending);
 
-Given(
-  "device B signs a head whose committed tree contains that lease and an inbox note",
-  pending
-);
+Given('device B signs a head whose committed tree contains that lease and an inbox note', pending);
 
 When(
   "device A verifies device B's head signature, committed root, and both records' membership",
@@ -79,10 +70,7 @@ When(
 
 When('device A folds those records from admitted {string}', pending);
 
-Then(
-  "device B's crossed lease holds {string} on device A",
-  pending
-);
+Then("device B's crossed lease holds {string} on device A", pending);
 
 Then("device A's inbox identifies {string} as the note's proven crossing peer", pending);
 
@@ -113,16 +101,16 @@ Given(
 
 Given("device C is not admitted by matthew's present roster", pending);
 
-When("device A verifies device C's signed tree and asks for a reusable verdict for {string}", pending);
+When(
+  "device A verifies device C's signed tree and asks for a reusable verdict for {string}",
+  pending
+);
 
 Then("device C's verdict is marked revoked on device A", pending);
 
 Then('device A receives no reusable sibling verdict for {string}', pending);
 
-Given(
-  "device A's local flow store contains a lease claim forged with {string}",
-  pending
-);
+Given("device A's local flow store contains a lease claim forged with {string}", pending);
 
 Given('no proven crossing from device B contains that claim', pending);
 
@@ -132,10 +120,7 @@ Then('the forged claim remains visible as unproven', pending);
 
 Then('the forged claim holds no steward-scoped resource', pending);
 
-Given(
-  "device A's local flow store contains a green gate verdict forged with {string}",
-  pending
-);
+Given("device A's local flow store contains a green gate verdict forged with {string}", pending);
 
 Given('no proven crossing from device B contains that verdict', pending);
 
@@ -145,10 +130,7 @@ Then('the forged verdict remains visible as unproven', pending);
 
 Then('the peer verdict list contains no reusable green verdict for that closure', pending);
 
-Given(
-  "device A's local flow store contains an inbox note forged with {string}",
-  pending
-);
+Given("device A's local flow store contains an inbox note forged with {string}", pending);
 
 Given('no proven crossing from device B contains that note', pending);
 
@@ -194,10 +176,7 @@ Given(
   pending
 );
 
-Given(
-  'device B signs later head {string} with committed root {string}',
-  pending
-);
+Given('device B signs later head {string} with committed root {string}', pending);
 
 Given('device B serves a self-consistent tree rooted at {string}', pending);
 
@@ -206,16 +185,13 @@ When('device A folds the signed head from device B', pending);
 Then('the fold fails crossing-integrity verification', pending);
 
 Then(
-  'device A keeps {string} as device B\'s folded head and {string} as its committed root',
+  "device A keeps {string} as device B's folded head and {string} as its committed root",
   pending
 );
 
 Then('no record from {string} gains proven crossing provenance', pending);
 
-Given(
-  'the local brit note index contains a green gate note for closure {string}',
-  pending
-);
+Given('the local brit note index contains a green gate note for closure {string}', pending);
 
 Given("that note is not signed by device A's workspace brit key", pending);
 
@@ -230,15 +206,9 @@ Then('device A runs the gate instead of reusing that note', pending);
 
 Given('device A has a proven green sibling verdict for closure {string}', pending);
 
-Given(
-  'device A has an unproven crossed red verdict for the same closure',
-  pending
-);
+Given('device A has an unproven crossed red verdict for the same closure', pending);
 
-Given(
-  'no later verified green declares that it rechecked and replaced that red verdict',
-  pending
-);
+Given('no later verified green declares that it rechecked and replaced that red verdict', pending);
 
 When('device A asks for reusable gate evidence for {string}', pending);
 
@@ -251,10 +221,7 @@ Given(
   pending
 );
 
-Given(
-  'no later verified green declares that it rechecked and replaced that red note',
-  pending
-);
+Given('no later verified green declares that it rechecked and replaced that red note', pending);
 
 Then('brit does not accept the red note as positive reusable evidence', pending);
 
@@ -273,10 +240,7 @@ When(
   pending
 );
 
-When(
-  'device A verifies its signed-head provenance and matching brit attestation',
-  pending
-);
+When('device A verifies its signed-head provenance and matching brit attestation', pending);
 
 Then('the replacement green verdict is proven', pending);
 
@@ -284,12 +248,12 @@ Then('the earlier red no longer vetoes closure {string}', pending);
 
 Then('device A may reuse the replacement green verdict', pending);
 
+Given('device A holds an unproven gate verdict from device B', pending);
+
 Given(
-  'device A holds an unproven gate verdict from device B',
+  "device B's retained events tree under its signed head contains the original verdict",
   pending
 );
-
-Given("device B's retained events tree under its signed head contains the original verdict", pending);
 
 Given("device A's held set already contains that record", pending);
 
@@ -322,29 +286,20 @@ Given(
   pending
 );
 
-Given(
-  "device A's own key validly signs the head anchor",
-  pending
-);
+Given("device A's own key validly signs the head anchor", pending);
 
 Given("the anchor's committed tree contains the record and matches its receipt", pending);
 
 When("device A resolves the record's crossing provenance", pending);
 
-Then(
-  'the record resolves as unproven because its claimed origin is the local device',
-  pending
-);
+Then('the record resolves as unproven because its claimed origin is the local device', pending);
 
 Then(
   /^the record grants no (crossed lease effect|crossing-peer identity|reusable green gate result)$/,
   pending
 );
 
-Given(
-  "Matthew's roster admits real workspaces {string} and {string}",
-  pending
-);
+Given("Matthew's roster admits real workspaces {string} and {string}", pending);
 
 Given('both device homes declare enforce posture', pending);
 
@@ -353,10 +308,7 @@ Given(
   pending
 );
 
-Given(
-  'the pair requests admission for shared lease coordination on {string}',
-  pending
-);
+Given('the pair requests admission for shared lease coordination on {string}', pending);
 
 When(
   'each workspace probes its running binary and emits a receipt with the observed release and crossing-enforcement capability',
