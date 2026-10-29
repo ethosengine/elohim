@@ -4639,7 +4639,7 @@ impl HttpServer {
         hash: &str,
         agent_id: Option<&str>,
     ) -> Option<Response<Full<Bytes>>> {
-        use crate::blob_reach::{blob_serve_verdict, lookup_references, BlobServeVerdict};
+        use crate::blob_reach::lookup_references;
 
         let pool = self.db_pool.as_ref()?;
         let mut conn = match pool.get() {
@@ -4690,64 +4690,26 @@ impl HttpServer {
         }
 
         let refs = match lookup_references(&mut conn, &candidates) {
-            Ok(r) => r,
+            Ok(records) => Ok(records),
             Err(e) => {
                 warn!(error = %e, hash = %hash, "blob reach lookup failed; serving (fail-open residual)");
-                return None;
+                Err(())
             }
         };
-
-        match blob_serve_verdict(&refs, agent_id.is_some()) {
-            BlobServeVerdict::Serve => None,
-            BlobServeVerdict::RequireIdentity { required_reach } => {
-                warn!(
-                    hash = %hash,
-                    required_reach = %required_reach,
-                    "blob refused: every referencing content row is reach-gated and the caller resolved to no identity"
-                );
-                Some(Self::blob_reach_forbidden(
-                    "Authentication required",
-                    &required_reach,
-                ))
-            }
-            // Above `community`: identity presence is not enough. Full per-reader
-            // authorization on the HTTP byte route rides the same unblock as the
-            // content route's Layer 1.5 (coupled to `humans.agent_pub_key`
-            // population; see `http-reach-enforcement-gap`). Until then this path
-            // fails CLOSED — no above-community blob-bearing row exists in any
-            // seeded corpus today, so this refuses nothing real while never
-            // leaking. The P2P resolve path remains the reach-authorized delivery
-            // channel for those readers.
-            BlobServeVerdict::Authorize { candidates } => {
-                let required_reach = candidates
-                    .first()
-                    .map(|r| r.reach.clone())
-                    .unwrap_or_else(|| "restricted".to_string());
-                warn!(
-                    hash = %hash,
-                    required_reach = %required_reach,
-                    "blob refused: above-community reach requires per-reader authorization not yet performed on the HTTP byte route (fail-closed)"
-                );
-                Some(Self::blob_reach_forbidden(
-                    "Reach authorization required",
-                    &required_reach,
-                ))
-            }
-        }
-    }
-
-    /// A 403 for the byte route, shaped like the content route's refusal
-    /// (`requiredReach` field) so both routes answer identically. `nosniff`
-    /// because the body is JSON and must never be interpreted as anything else.
-    fn blob_reach_forbidden(error: &str, required_reach: &str) -> Response<Full<Bytes>> {
-        Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .header(header::CONTENT_TYPE, "application/json")
-            .header("X-Content-Type-Options", "nosniff")
-            .body(Full::new(Bytes::from(format!(
-                r#"{{"error":"{error}","requiredReach":"{required_reach}"}}"#
-            ))))
-            .unwrap()
+        let verifier = crate::reach_verifier::ReachVerifier::from_http_extractor(
+            agent_id,
+            self.memo_store.clone(),
+        );
+        verifier
+            .judge_address_records(
+                &mut conn,
+                &db::AppContext::default_lamad(),
+                crate::reach_verifier::EgressPlane::HttpBlob,
+                hash,
+                refs.as_deref().map_err(|_| ()),
+            )
+            .refusal()
+            .map(|refusal| refusal.http_blob_response())
     }
 
     /// GET /blob/{hash} - Reassemble blob from shards
@@ -20983,19 +20945,14 @@ pub fn reach_admits(
     reach: &str,
     id: &str,
 ) -> bool {
-    let idx = crate::epr_service::reach_level_index(reach);
-    if idx == 0 {
-        return true;
-    }
-    let Some(human) = requester else {
-        return false;
-    };
-    if idx <= crate::epr_service::reach_level_index("community") {
-        return true;
-    }
-    gate.service
-        .authorize_reach_for_human_with_own_trust(conn, ctx, reach, human, id)
-        .is_ok()
+    crate::reach_verifier::judge_resolved_http_row(
+        conn,
+        ctx,
+        requester,
+        &gate.service,
+        &crate::reach_verifier::Subject::row(id, reach),
+    )
+    .is_permit()
 }
 
 /// Simple response container for integration test assertions.

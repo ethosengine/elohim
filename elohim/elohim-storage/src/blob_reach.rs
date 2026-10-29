@@ -55,98 +55,26 @@
 //! carries no row's audience. The absence is answered honestly ("no row claims
 //! these bytes"), never guessed at.
 
-use crate::epr_service::reach_level_index;
+pub use crate::reach_verifier::rules::http_blob::{
+    blob_serve_verdict, requires_authorization, serves_anonymously, BlobServeVerdict,
+};
 
 /// One content row that references a blob's bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlobReference {
+    /// Content row that declares this reference.
     pub content_id: String,
+    /// Reach declared by the referencing row.
     pub reach: String,
 }
 
 impl BlobReference {
+    /// Construct one content-row reference to shared bytes.
     pub fn new(content_id: impl Into<String>, reach: impl Into<String>) -> Self {
         Self {
             content_id: content_id.into(),
             reach: reach.into(),
         }
-    }
-}
-
-/// What the byte route must do for this caller.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BlobServeVerdict {
-    /// Serve the bytes. Either no content row claims them, or at least one
-    /// referencing row is itself servable to this caller with no further check.
-    Serve,
-    /// Every referencing row is reach-gated and the caller resolved to no
-    /// identity. `required_reach` names the LEAST restricted gated tier among
-    /// them — the same field the content route reports as `requiredReach`, so
-    /// the two routes answer a refused caller identically.
-    RequireIdentity { required_reach: String },
-    /// The caller resolved to an identity, and every referencing row sits above
-    /// `community` — so presence of an identity is not enough and the real
-    /// authorizer must run, exactly as the content route's Layer 1.5 does. Serve
-    /// iff it grants against ANY candidate.
-    Authorize { candidates: Vec<BlobReference> },
-}
-
-/// Does this reach serve to a caller who presented no identity?
-///
-/// The SAME test the content route's Layer 1 applies (`reach == "commons" ||
-/// reach == "public"`), expressed through the shared index so an added tier
-/// cannot silently become anonymously-servable here while staying gated there.
-/// `reach_level_index` maps an UNRECOGNIZED tier to `u8::MAX` (most restricted),
-/// so a typo or a new vocabulary word fails CLOSED.
-pub fn serves_anonymously(reach: &str) -> bool {
-    reach_level_index(reach) == reach_level_index("public")
-}
-
-/// Is this reach above the tier where identity-presence alone suffices?
-///
-/// Mirrors the content route's Layer 1.5 trigger (`index > index("community")`).
-pub fn requires_authorization(reach: &str) -> bool {
-    reach_level_index(reach) > reach_level_index("community")
-}
-
-/// The Layer-1 decision for a blob, given every content row that references it.
-///
-/// PURE — no DB, no clock, no request. `identity_resolved` is whether the caller
-/// resolved to an explicit agent identity (the content route's
-/// `extract_agent_cid_explicit(&req).is_some()`); header PRESENCE is not
-/// identity, which is why the caller passes a bool it has already resolved
-/// rather than the header.
-pub fn blob_serve_verdict(refs: &[BlobReference], identity_resolved: bool) -> BlobServeVerdict {
-    // C4 — honest absence: no row claims these bytes, so there is no audience to
-    // enforce. See the module docs for why this is not a fallthrough.
-    if refs.is_empty() {
-        return BlobServeVerdict::Serve;
-    }
-
-    // Any publicly-reachable referencing row makes the bytes public already.
-    if refs.iter().any(|r| serves_anonymously(&r.reach)) {
-        return BlobServeVerdict::Serve;
-    }
-
-    if !identity_resolved {
-        // Report the least restricted gated tier — the one a caller could most
-        // plausibly satisfy — matching the content route's single-row answer.
-        let required_reach = refs
-            .iter()
-            .min_by_key(|r| reach_level_index(&r.reach))
-            .map(|r| r.reach.clone())
-            .unwrap_or_else(|| "restricted".to_string());
-        return BlobServeVerdict::RequireIdentity { required_reach };
-    }
-
-    // Identity resolved. Rows at or below `community` serve on identity alone,
-    // exactly as the content route treats them.
-    if refs.iter().any(|r| !requires_authorization(&r.reach)) {
-        return BlobServeVerdict::Serve;
-    }
-
-    BlobServeVerdict::Authorize {
-        candidates: refs.to_vec(),
     }
 }
 
