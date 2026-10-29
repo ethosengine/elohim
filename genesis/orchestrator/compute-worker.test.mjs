@@ -535,7 +535,8 @@ fi
             stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0],
           );
         } catch (error) {
-          if (error.code === "ENOENT") return false;
+          // A process that exits between open and read answers ESRCH.
+          if (["ENOENT", "ESRCH"].includes(error.code)) return false;
           throw error;
         }
       };
