@@ -72,6 +72,12 @@ export default function () {
       format: ['progress'],
     },
     // Isolated native fixtures: no deployed environment or global E2E hooks.
+    'declared-views': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/declared-local-views.steps.ts'],
+      paths: ['features/devflow/declared-local-views.feature'],
+      format: ['progress'],
+    },
     ceremony: {
       requireModule: ['tsx'],
       require: ['steps/devflow/ceremony-reconciliation.steps.ts'],
