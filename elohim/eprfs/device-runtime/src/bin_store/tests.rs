@@ -82,6 +82,9 @@ struct State {
     health_bad: Option<String>,
     health_dirty: bool,
     health_move: Option<String>,
+    peer_check_fail: bool,
+    peer_check_not_device: bool,
+    peer_check_unsupported: bool,
     verdict: Option<Value>,
     judge_calls: usize,
     calls: Vec<CommandSpec>,
@@ -99,6 +102,7 @@ impl Runner for Fake {
         let mut s = self.state.lock().unwrap();
         s.calls.push(c.clone());
         let mut out = String::new();
+        let mut err = String::new();
         let mut success = true;
         if c.program == "git" {
             let a = &c.args[..];
@@ -154,6 +158,21 @@ impl Runner for Fake {
                 .clone()
                 .unwrap_or(json!({"outcome":"pass","tier":"witnessed","conclusion":"success"}))
                 .to_string();
+        } else if c
+            .args
+            .starts_with(&["peer".into(), "serve".into(), "--check".into()])
+        {
+            if s.peer_check_unsupported {
+                success = false;
+                err = "epr peer: invalid arguments: unknown peer argument `--check`".into();
+            } else if s.peer_check_not_device {
+                success = false;
+                out =
+                    json!({"ok":false,"kind":"not-a-device","reason":"no device key"}).to_string();
+            } else if s.peer_check_fail {
+                success = false;
+                err = "epr peer: peer-key-mismatch".into();
+            }
         } else if c.args == ["flow", "report", "scope"] {
             let lock = Lock::acquire(&self.root.join("store"), Duration::from_millis(20)).unwrap();
             drop(lock);
@@ -191,7 +210,7 @@ impl Runner for Fake {
         Ok(CommandOutput {
             success,
             stdout: out,
-            stderr: String::new(),
+            stderr: err,
         })
     }
 }
@@ -285,6 +304,10 @@ impl Fixture {
     fn land(&self, r: &Release) -> Result<Release> {
         self.store
             .land(&r.cid, &self.commit(), self.tmp.path(), false)
+    }
+    fn land_expected(&self, r: &Release, expected: Option<&str>) -> Result<Release> {
+        self.store
+            .land_expected(&r.cid, &self.commit(), self.tmp.path(), false, expected)
     }
     fn install(&self) -> Result<Value> {
         atomic_bytes(&self.path("native"), b"#!/bin/sh\nexit 0\n", 0o755).unwrap();
@@ -624,6 +647,167 @@ fn test_land_updates_heads_under_lock() {
     let v: Value = read_json(&f.store.root.join("current.json")).unwrap();
     assert_eq!(v["cid"], b.cid);
     assert_eq!(v["commit"], f.commit());
+}
+#[test]
+fn land_refuses_current_moved_naming_both() {
+    let f = Fixture::new("epr");
+    let current = f.release("current");
+    let expected = f.release("expected");
+    let candidate = f.release("candidate");
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().descended = false;
+
+    let error = f
+        .land_expected(&candidate, Some(&expected.cid))
+        .unwrap_err();
+
+    assert_eq!(error.kind, "current-moved");
+    assert!(error.detail.contains(&expected.cid), "{}", error.detail);
+    assert!(error.detail.contains(&current.cid), "{}", error.detail);
+    assert_eq!(f.store.head("current"), Some(current.cid));
+}
+#[test]
+fn expect_none_refuses_when_current_exists() {
+    let f = Fixture::new("epr");
+    let current = f.release("current");
+    let candidate = f.release("candidate");
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().calls.clear();
+
+    let error = f.land_expected(&candidate, None).unwrap_err();
+
+    assert_eq!(error.kind, "current-moved");
+    assert!(error.detail.contains("expected none"), "{}", error.detail);
+    assert!(error.detail.contains(&current.cid), "{}", error.detail);
+    assert!(!f
+        .state
+        .lock()
+        .unwrap()
+        .calls
+        .iter()
+        .any(|call| call.args.iter().any(|arg| arg == "--check")));
+}
+#[test]
+fn failing_check_leaves_current_byte_identical() {
+    let f = Fixture::new("epr");
+    let current = f.release("current");
+    let candidate = f.release("candidate");
+    f.land(&current).unwrap();
+    let before = fs::read(f.store.root.join("current.json")).unwrap();
+    f.state.lock().unwrap().peer_check_fail = true;
+
+    let error = f.land_expected(&candidate, Some(&current.cid)).unwrap_err();
+
+    assert_eq!(error.kind, "health-peer-check-failed");
+    assert_eq!(fs::read(f.store.root.join("current.json")).unwrap(), before);
+    let record = f.store.record(&candidate.cid).unwrap();
+    assert!(record.extra["refusals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "health-peer-check-failed"));
+}
+#[test]
+fn unsupported_check_lands_with_note() {
+    let f = Fixture::new("epr");
+    let candidate = f.release("pre-s1");
+    f.state.lock().unwrap().peer_check_unsupported = true;
+
+    f.land_expected(&candidate, None).unwrap();
+
+    assert_eq!(f.store.head("current"), Some(candidate.cid.clone()));
+    let record = f.store.record(&candidate.cid).unwrap();
+    assert!(record.extra["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "peer-check-unsupported"));
+}
+#[test]
+fn a_not_a_device_check_still_lands() {
+    let f = Fixture::new("epr");
+    let candidate = f.release("non-device");
+    f.state.lock().unwrap().peer_check_not_device = true;
+
+    f.land_expected(&candidate, None).unwrap();
+
+    assert_eq!(f.store.head("current"), Some(candidate.cid.clone()));
+    let record = f.store.record(&candidate.cid).unwrap();
+    assert!(record.extra["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "peer-check-not-a-device"));
+}
+#[test]
+fn revert_to_pre_s1_release_lands() {
+    let f = Fixture::new("epr");
+    let old = f.release("pre-s1");
+    let newer = f.release("newer");
+    f.land(&old).unwrap();
+    f.land(&newer).unwrap();
+    {
+        let mut state = f.state.lock().unwrap();
+        state.peer_check_unsupported = true;
+        state.calls.clear();
+    }
+
+    let landed = f
+        .store
+        .land_expected(&old.cid, &f.commit(), f.tmp.path(), true, Some(&newer.cid))
+        .unwrap();
+
+    assert_eq!(landed.ring, "reverted");
+    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    assert!(f.state.lock().unwrap().calls.iter().any(|call| {
+        call.program.contains(&old.cid)
+            && call
+                .args
+                .starts_with(&["peer".into(), "serve".into(), "--check".into()])
+    }));
+    let record = f.store.record(&old.cid).unwrap();
+    assert!(record.extra["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "peer-check-unsupported"));
+}
+#[test]
+fn bootstrap_keeps_one_expected_prior_across_cached_candidates() {
+    let f = Fixture::new("epr");
+    let current = f.release("damaged-current");
+    let candidate_a = f.release("candidate-a");
+    let candidate_b = f.release("candidate-b");
+    let moved = f.release("concurrent-move");
+    f.head(&current);
+    atomic_bytes(
+        &f.store.root.join(&current.cid).join("epr"),
+        b"damaged",
+        0o755,
+    )
+    .unwrap();
+    let failed = [&candidate_a, &candidate_b, &moved]
+        .into_iter()
+        .min_by(|left, right| left.cid.cmp(&right.cid))
+        .unwrap();
+    {
+        let mut state = f.state.lock().unwrap();
+        state.health_bad = Some(failed.cid.clone());
+        state.health_move = Some(moved.cid.clone());
+    }
+
+    let error = f.store.bootstrap(f.tmp.path(), None).unwrap_err();
+
+    assert_eq!(error.kind, "current-moved");
+    assert!(error.detail.contains(&current.cid), "{}", error.detail);
+    assert!(error.detail.contains(&moved.cid), "{}", error.detail);
+    assert_eq!(f.store.head("current"), Some(moved.cid.clone()));
+    let failed = f.store.record(&failed.cid).unwrap();
+    assert!(failed.extra["refusals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "health-flow-failed"));
 }
 #[test]
 fn test_reingest_preserves_primary_provenance_and_appends_sources() {

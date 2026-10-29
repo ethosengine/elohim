@@ -279,6 +279,9 @@ habits:
     active: false
     checks:
       - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift. A 4th scenario (2026-08-25) probes the BYTE route — a restricted row's bytes refused on GET /blob/{hash} to an anonymous caller — and is @wip (A2O_RUN_WIP=1 locally) until a fleet build carries the storage-side blob reach gate."
+      - "a2o @concern:reach-enforced-p2p (planned genesis/a2o/features/dataplane/reach-enforced-p2p.feature — a transport-bound stranger must receive the same answer for a scoped id as for an unknown id, with same-peer non-vacuity proof that the scoped head and bytes are held)."
+      - "a2o @concern:reach-enforced-doorway (planned genesis/a2o/features/dataplane/reach-enforced-doorway.feature — an anonymous doorway caller must receive the same answer for scoped projection/cache content as for an unknown id)."
+      - "a2o @concern:reach-enforced-everywhere (genesis/a2o/features/dataplane/reach-on-tree-root.feature — 6 scenario declarations, 10 peer-expanded cases, all @wip: a private tree root hides listings, existence, pieces and root-relative public-file access from a stranger while a member fetches only from admitted peers)."
     evidence:
       - "2026-08-27c: the conductor admin socket's DEV_MODE hole is CLOSED ON THE FLEET — edge #1386 (SUCCESS, image 1.0.0-dev-9a207277, all 7 statefulsets + both doorways rolled ~23:26Z) carries 13ed1721e: one predicate (native_local_first_operator = loopback ∧ pre-coordination ∧ no declared JWT_SECRET) decides the credential-free grant, every admin frame is filtered, and the keyless-API `|| !is_configured()` arm no longer hands Public to a remote caller. Probed 2026-08-28T00:12Z: anonymous WebSocket upgrade to /hc/admin → HTTP 401 {\"error\":\"Authentication required. Use POST /hc/connect.\"} on BOTH doorway-alpha.elohim.host and elohim.host (was an unfiltered admin passthrough — install_app/uninstall_app/revoke_agent_key reachable from the open internet). Same build: the quiesce gate ADMITTED a measure (A-QUIESCED, first since #1383) and Dataplane Validation ran 87 scenarios (3 passed, 1 failed = inventory-convergence caughtUp 30 min post-restart, 83 HELD @act:i). Stays RED on the invariant: /head-record · /epr-head · /apps/{cid} · direct /shard·/ipfs plane conflation is untouched, and the flip needs the household lane's byte-route scenario green on a fleet build, not a probe."
       - "2026-08-25b: the storage blob byte-route gate and the doorway loopback seed gate are DEPLOYED to alpha (edge #1380 SUCCESS, 286089679). First observable effect on the fleet: genesis #1503 Upload Blob-Backed Content 403 — CI had been uploading seed blobs unauthenticated through the dev_mode hole every build (a latent Jenkinsfile readFile-vs-container bug hid the missing bearer behind a 'credential not visible' echo); fixed 47fb60f58, genesis #1504 uploads HTTP 200 with the Admin bearer — the gate now refuses anonymous remote writes and admits the authenticated CI actor. reach-enforced-http.feature is @act:i (HELD on the fleet by LAYERS design); its authority is the household lane: 3/3 + byte-route 1/1 on the deployed commit's binary. Stays RED on the invariant, not the check: /head-record · /epr-head · /apps/{cid} · direct /shard·/ipfs still serve community anon (plane conflation) and the DEV_MODE JWT forgery still passes as Admin on every deployed doorway — both filed, operator-owned."
@@ -287,16 +290,17 @@ habits:
       - "2026-08-20: HTTP-plane cure committed (41f7780aa) — the listing now resolves the requester and authorizes per row via epr_service::authorize_reach_for_human_with_own_trust, deny-by-default when unresolvable; the same header-presence check on the single-item route's Layer 1 is cured too; and reach_level_index's `_ => 0` fail-open (an UNRECOGNIZED tier read as the most permissive, making the authorizer's own `_ => Err` unreachable) now fails closed to u8::MAX. Stays RED until the scenario runs green against a deploy carrying the fix — a flip needs a build number, not a commit."
       - "2026-08-20 scope, held honestly: the doorway strips client-supplied identity headers (probed: X-Agent-Cid/X-Agent-Id return the anonymous result), so the cure closes the bypass for doorway-fronted traffic. It does NOT make identity unforgeable — extract_agent_cid returns the header verbatim — so a caller reaching elohim-storage directly in-cluster can still assert an identity and receive that identity's authorized reach. That residual is identity-cross-signed's, not this habit's."
     first_move: >
-      HTTP egress is wired and cured (2026-08-20). Wire the remaining four planes
-      the same way — one check per plane asserting a scoped-tier row does NOT
-      reach an unauthorized peer/client. Next: the CRDT sync plane (today
-      broadcast-only fail-closed = exclusion, not enforcement —
-      reach_is_distribution_safe in sync/projector.rs), then shard/blob, where
-      the responder does no reach check at all BY DESIGN (custody is deliberately
-      reach-blind; the boundary is serving, so the check belongs on the serve
-      path, not on custody).
+      Extract one shared verifier without changing HTTP response bytes, then bind each
+      censused egress plane to it and prove P2P and doorway refusal against an unknown-id
+      control. Start with CRDT sync, whose projector excludes scoped rows but whose
+      responders do not authorize a viewer. The shard responder is not reach-blind: it
+      has a custody-standing gate for `private` only; extend that boundary to every
+      recognized scoped tier without silently changing community before its operator
+      ruling.
     notes:
       - "The invariant's original first clause ('One reach vocabulary') was moved out of the checkable statement 2026-08-20 and is tracked in refs below. It is a RECONCILIATION goal, not an enforcement property, and elohim-storage/CLAUDE.md forbids canonizing a single vocabulary while the drift is open — so a check honoring it could not be written without violating a standing rule. That clause is why this habit sat unwired. The wired check asserts a relation instead and names no tier."
+      - "`@concern:reach-by-key` is declared by genesis/a2o/features/dataplane/peer-reach-through-relay.feature, but no habit declares that concern. It is not evidence for this habit until an owning habit names it."
+      - "P2P identity-spoof residual and proof floor: Authorize and Custody rows use `min_proof=SelfAssertedBinding` as the compatibility floor for community and custody delivery. A peer can therefore bind its authenticated transport identity to a custodian's agent, resolve as that custodian, and receive private bytes; an ordinary-stranger refusal test does not exercise this bypass. The residual closes only when C2-S2 supplies usable `CrossSigned` bindings for every participating P2P transport and operator Ruling 2 flips these rows from `SelfAssertedBinding` to `CrossSigned`."
     refs:
       - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
       - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
@@ -1375,8 +1379,10 @@ habits:
       - "store growth, per DNA, read from a STOPPED conductor (`app/elohim-app/scripts/conductor-store-sniff.py <data-root> --json`, folded as `dna-actions-per-day@1`, `wal-main-ratio@1`, `subject-anchor-links@1`) and rendered by `epr flow report --bound <id>` for each of `dna-actions-per-day-ceiling@1`, `wal-main-ratio-ceiling@1` and `subject-anchor-links-ceiling@1`: lamad at most 5,000 actions a day per peer at idle, WAL no larger than its database, at most 100 attestation links on one subject anchor. Fleet: the conductor's integrated-ops series is a proxy for the first; nothing on the fleet reports WAL or anchor size."
     evidence: >
       DELTA 2026-10-28 (rescue Avodah client port; status unchanged): restored the declared board, evidence comparison, captured sources and explicit offline retention from 0ee5dfde8; 4 focused Vitest files / 8 tests pass (exit 0), targeted ESLint has no errors (exit 0). App-wide tsc exits 2 on existing cross-workspace diagnostics; browser verification is unavailable under the container sandbox. Native reader/launcher delivery, owner binding and contract regeneration remain separate work; no runtime acceptance claimed. local-view-board.feature requires this shift's blind-reader pass.
-    evidence-fingerprint: sha256:987ff3a1ef0dc9d6
-    evidence-bytes: 62164
+
+      2026-10-29, fleet store growth at rest (sync.sled): every alpha storage pod's `sync.sled` grew about 1.1 GB/h while the corpus stayed flat (matthew 14.9 to 29.6 GB between 10-28 06:40Z and 10-29 00:40Z, `elohim_node_store_bytes{store="sync_sled"}`). Loki shows the writer: `node:manifesto` was applied once a minute on every pod from an off-fleet iroh peer (`e84ec663…`). That peer cannot name our heads, so it answers each round with the full history (34 MB), all of it already held. Each apply rewrote the 17.5 MB doc, and sled 0.34 keeps the superseded blob file: the file count grew by about 47 an hour at about 17.5 MB a file. Cure on `fix/storage-sled-bounded` (`5c4fb85d5`, `389899f8d`, `014b876bf`, `c956510b0`): `SyncManager::apply_changes` skips the write when the heads equal the stored heads and no orphan is queued, and `elohim_sync_doc_writes_total{outcome}` counts written and unchanged applies. `just gate elohim-storage` exited 0 on `c956510b0` (4796 lib tests). Its footprint test reproduced the retention before the cure: ten no-op redeliveries of a 2.6 MB doc grew the sled from 2.6 to 29 MB. Not yet deployed. Open: the off-fleet peer's heads never converge with ours, existing garbage is not reclaimed, and the Kademlia trees have no TTL or byte cap.
+    evidence-fingerprint: sha256:2f1f74d6a0ca954c
+    evidence-bytes: 63440
     evidence-entries: 32
     refs:
       - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — what unbounded per-call cost did to the fleet"
@@ -2204,8 +2210,10 @@ habits:
       - 2026-10-22 DELTA: Edge #1685 published worker sha256:742f3ded663a429fcec704e63954fd0bd68476cdd72f83a0673c0724a99c5a32 from original source04ef on the pinned v2 base. All 52 exact-image-binary CLI/ELF checks passed on the E5-2667 host using host libraries; this is distinct from full-image bootstrap proof. Adam activation now selects that digest without changing the fixed commissioning grant. Native G2 and peer-stage evidence remain unobserved; habit RED.
 
       - 2026-10-27 DELTA (status stays RED; readiness decoupling prepared, not landed): `fix/compute-worker-supervise` renders an in-container supervisor after edge #1739's worker CrashLoopBackOff took adam's :8090 endpoint and #1740 read `https://elohim.host/epr-head/*` HTTP 502; activation and the authority probe now accept only the live `worker.mjs` child, never the supervisor or a retained receipt. Run on the workspace (outside a sandbox) at 2026-10-27T16Z: compute-worker 16/16, capture-compute-worker-grant 34/34, runner-capture-activation 27/27, runner-authority-transport 7/7. No live Adam recovery is claimed; landing rolls adam's pod and awaits the steward.
-    evidence-fingerprint: sha256:872941ccd0c7958e
-    evidence-bytes: 12040
+
+      - 2026-10-28 DELTA (status stays RED; worker-image port prepared): direct-publication work from a3f974a7f is restored with legacy builders retained, source selection advances to origin/dev 084fdd742 (contains native grant reader 435a81350), and activation refusal retains a classified archive status. `node --test --test-isolation=none` passes 35 dispatch/grant/registry checks and 12 focused refusal cases; full subprocess suites remain blocked by sandbox EPERM/EINVAL (receipts: genesis/local-dev/port-e-worker-image/verification.json). Git staging is refused by the read-only worktree index. No image digest, deployment, native G2 success or off-host BDD is claimed.
+    evidence-fingerprint: sha256:80821687e89f60c4
+    evidence-bytes: 12711
     evidence-entries: 14
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
@@ -2311,10 +2319,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 16 h at 85 % (4 h per part short of target: delivery-series, measurement-liveness, no-op-rolls, ledger). Station 2 became a declared time gauge (43 s baseline → 12 s target, reading 10 s from the 10-18 runs), with `per_week: 4` evidenced by `[build:edge]` commits on dev first-parent, 4 in each of the last two weeks. That is a floor, since household restarts are uncounted, so the habit now reads time returned at about 0.04 h/week. The budget binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.
-    evidence-fingerprint: sha256:e2e9bfe0865b20cc
-    evidence-bytes: 32770
-    evidence-entries: 30
+      DELTA 2026-10-28 (RED preserved; edge gate-only port): adapted c1b5a9fea, b689b9e15 and d3d9b5852 to current CI; a tagged PR dispatches strict edge cargo gates and local builds without publication, deployment or validation siblings, including both compute-worker publication paths. Local `cd genesis/orchestrator && node --test validate-only-pipeline.test.mjs run-class.test.mjs` exits 0 (30 validation/gate-only cases plus run-class coverage); ordinary pod YAML is byte-identical and dev/main remain outside the opt-in guard. No cargo, push or live Jenkins run; runtime delivery remains unmeasured.
+    evidence-fingerprint: sha256:584894e2cd290f80
+    evidence-bytes: 33371
+    evidence-entries: 31
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"

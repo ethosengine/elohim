@@ -16,17 +16,17 @@ relatedNodeIds:
   - "habit:reach-enforced-everywhere"
   - "habit:dataplane-convergence"
 cites:
-  - genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
   - genesis/research/ontology-systems-survey-reach-reconciliation-2026-07-22.md
   - genesis/research/owl2-graduation-floor-ceiling-ontology-2026-07-23.md
-  - genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md
-  - genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md
-  - genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md
-  - genesis/docs/superpowers/plans/2026-07-23-ontology-keel-slice1-verdict-spine-plan.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md
-  - genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md
+  - "deterministic-reach-archetype-floor-design | Deterministic Reach-Archetype Floor | sha256:a2ee1687a1759a0f | path: genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md"
+  - "reach-projection-facing-lens-design | Reach / Projection Facing | sha256:d42aab6a7663c6d3 | path: genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md"
+  - "epr-reachability-economics | 2026-05-29-epr-reachability-economics | sha256:19e359867f22af5a | path: genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md"
+  - "ontology-keel-slice1-verdict-spine-plan | Ontology Keel Slice 1 | sha256:059f604e7ebc7821 | path: genesis/docs/superpowers/plans/2026-07-23-ontology-keel-slice1-verdict-spine-plan.md"
+  - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:f6a9cca9990d21c3 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
+  - "ai-stewarded-commons-reimplementation-plan | A Commons That Keeps Its Promises | sha256:0d5f1300b5d615dc | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
+  - "doorway-auth-posture-declared-stage | Doorway Auth Posture | sha256:97ba36fbe79abc18 | path: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md"
+  - "social-reach-nervous-system | Social Reach | sha256:d85af6961ce566c6 | path: genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md"
   - .epr-meta/reach-enforced-everywhere.habit.md
   - genesis/data/timeline/backlog/arch-authority-in-integrity-backlog.md
   - genesis/data/timeline/backlog/arch-confidentiality-plane-backlog.md
@@ -234,23 +234,31 @@ refuse by construction.
   ownership, and credential-as-lens. Row 26 (custodial account class for wards) is the
   supported-decision case §10 Q5's key lifecycle must serve.
 
-## 3. Enforcement census: where reach is decided (static reading, 2026-09-29)
+## 3. Enforcement census: where reach is decided (static reading begun 2026-09-29;
+Track B expansion 2026-10-28)
 
 `S` = `elohim/elohim-storage/src`, `D` = `doorway/doorway-service/src`.
 
 | Plane | Where | What it reads | Rule |
 |---|---|---|---|
-| DNA integrity | `content_store_integrity/src/healing.rs:73` | the entry's `reach` | checks the value is in the enum. **No rule on changing reach, and no monotonicity.** `Content` is a **public** DHT entry, including private and intimate rows. |
+| Holochain DHT `Content` — **Residual(DNA)** | `content_store_integrity/src/lib.rs:490-527,3672-3676`; `healing.rs:73` | the public entry's `reach`, body or `blob_cid`, and metadata | Integrity checks that reach is in the enum, but `Content` has no private entry visibility. Every DNA member can receive every tier, including the legacy full body. A storage verifier cannot close this plane; it belongs to the private-entry or encryption arc, and the habit cannot retire while it remains. |
 | DNA cache hint | `content_store_integrity/src/lib.rs:544` | reach | only `commons` counts as public; `public` does not |
 | DNA defaults | `content_store/src/providers.rs:204` | – | `community` (storage defaults to `public`, `S/db/content_diesel.rs:401`) |
 | Storage HTTP gate | `S/api/content_reach_gate.rs:269-314` | the stored reach column and the `X-Agent-Cid` header | L1: public/commons are anonymous. L1.5: the authorizer runs only above community. **Community = any identified caller.** |
 | Storage authorizer | `S/epr_service.rs:473-600` | Human; stewards (`stewardship_allocations → contributor_presences`); local `human_relationships`; `collective_participations` | community = any consented membership in any collective. familiar = shares a collective with a steward. trusted = relationship ≥ trusted, **consent not checked**. intimate = mutual intimate with a **steward, not the author**. self/private = creator. |
 | Storage P2P | `S/epr_service.rs:368` | agent key; peer-supplied `reach_ceiling` | fast path for ≤ community; community requires membership here (not on HTTP) |
+| EPR read protocol: `Resolve`, `ResolveBatch`, `QueryDelivery`, `GetDocument` | `S/epr_service.rs:124-279`; `S/p2p/mod.rs:6872-6886,9430-9475`; `S/p2p_iroh/epr_backend.rs:59-68` | `Resolve` reads a request-body `agent_pubkey`; the other three read no viewer | `Resolve` uses the self-asserted key, a peer-supplied trust ceiling and a fail-open pool/lookup path. `ResolveBatch` returns heads without authorization. `QueryDelivery` reveals whether a blob hash is warm and which cache tier serves it. `GetDocument` returns an unimplemented error but is an ungated protocol variant. |
 | Tier index | `S/epr_service.rs:845/861` | – | 8 tiers collapsed to 6 (public = commons, self = private) |
 | EPR-head view | `S/views_convert/lamad.rs:137` | the head's `qahal.reach` | **missing → `commons`** (confirmed) |
 | P2P body fallback | `S/http.rs:10163` → `content_reach_gate.rs:320` | the resolved head's reach | missing → refused (the opposite of the row above). The bytes are fetched before the gate runs. |
 | Blob bytes | `S/blob_reach.rs:119` | reach of every referencing row | the most open referencing row wins. Unreferenced blobs serve. `PUT /blob` stamps the manifest `commons`. |
+| Explicit-peer blob protocol `/elohim/blob/1.0.0` | `S/p2p/blob_protocol.rs:31`; `S/p2p/mod.rs:6384-6473` | address syntax and `blob_store` | **No reach gate.** A peer that knows the address receives bytes or the shard manifest, bypassing the shard plane's private-only custody check. |
+| `iroh-blobs` ALPN | `S/p2p_iroh/node.rs:73-76` | BLAKE3 hash and blob store | `BlobsProtocol::new(..., None)` installs no request interceptor. A node that knows the hash can request the bytes; inventory gossip supplies hashes. |
 | EPR atom plane | `S/p2p/mod.rs:10284` | caller vs signer | open/commons are open; **every middle tier is author-only** |
+| Kademlia `epr:{id}` head records | `S/p2p/mod.rs:4781,5494,9449,9525,10138` | locally derived, announced, received or acquired EPR heads | **No reach gate at any `put_record` site.** The publish arm, drain, inbound `Announce`, response cache and post-acquisition path all place scoped heads in the public DHT with `expires: None`; Kad has no remote delete, so stopping publication cannot retract records already distributed. |
+| Kademlia atom providers | `S/p2p/mod.rs:5116-5118`; `S/services/epr_store.rs:446-475`; `S/p2p/fanout.rs:56-82` | atom CID, kind and fanout classification | `KadStartProviding` advertises provider records. Content-like private/self/intimate atoms are suppressed, community uses `KadLight`, and open tiers use `Kad`; integrity kinds advertise through Kad at every declared reach. Provider existence remains a separate egress surface. |
+| Kademlia inbound `GET_VALUE` | `S/p2p/mod.rs:6608-6696`; libp2p record store | any locally stored record | **No application authorization hook.** The event loop handles outbound provider-query progress and otherwise logs Kad events; the libp2p record store answers inbound record requests, including scoped `epr:{id}` records received through announce or response caching. |
+| Blob inventory gossip: snapshot, bounded pages and delta | `S/p2p/inventory_broadcaster.rs:225-423`; callers `S/p2p/mod.rs:9083,9163` | every locally held blob hash | `build_snapshot`, `build_bounded_inventory_publications` and event-driven `build_delta` have no reach predicate. Scoped and private-only hashes are advertised on `INVENTORY_TOPIC`, completing discovery for the reach-blind blob protocols. |
 | Shard serve/receive | `S/private_reach.rs:33-39`, `p2p/private_receive.rs` | reach; custody commitments | **only `private` is gated (confirmed, deliberate).** self, intimate, trusted, familiar and unknown tiers serve to any peer. |
 | Author earning | `S/p2p/reach_authorization.rs:78-101` | signer is a "known agent" | Stage 1 only: any `peer_identity_bindings` row passes. **Fails open on a DB error.** |
 | Compose earning | `S/services/reach_earning.rs:207` | standing plus manifest thresholds | on the author side; **no viewer parameter**; the sole caller is `epr_compose.rs` |
@@ -258,9 +266,16 @@ refuse by construction.
 | Edge reach | `S/db/authored_edges.rs:79,98` | reach of the source atom | edge ≤ source |
 | Fanout | `S/p2p/fanout.rs:72-94` | reach | private/self/intimate are DirectOnly (currently no push at all). trusted/familiar/community get CID-only gossip on `topic_for(pillar, reach, None)`, **one topic shared by every collective**. |
 | Automerge / view federation | `S/sync/projector.rs:264`, `view_federation.rs:662` | reach | community/public/commons rows ship to **every peer** |
+| P2P CRDT document sync | `S/p2p/mod.rs:8084-8487`; `S/p2p_iroh/sync_backend.rs:484-531` | caller-named namespace and document id | Projection admission uses `reach_is_distribution_safe`, but responders serve any stored document to a connected peer. Narrowing does not retract a projected document, and non-projection namespaces have no content-row reach to consult. |
+| View federation `Cluster` / `PeerTopology` | `S/p2p/view_federation.rs:376-482,692-739,942-1010` | request-body `agent_cid`; distribution-safe reach for head and content inventory | Head and content inventory broadcast community. `Cluster` and `PeerTopology` compare the caller-supplied `agent_cid` with the local advertised id, so a peer can name that id; collective, participation and human inventory rows carry no reach or consent filter. |
+| Storage HTTP `/api/v1/epr` | `S/api/epr.rs:150-224,288-298,936-987`; routes `S/http.rs:20699-20756` | atom reach and whether `Authorization` is non-empty | public/commons are open; every scoped atom is visible when any bearer text is present, including an unverifiable bearer. The list path grants all atoms on header presence, and `lens-market` has no reach check. |
+| Storage HTTP `GET /epr-head/{id}` | `S/http.rs:15952-16063`; doorway forwarder `D/routes/epr.rs:37-54` | provenance only | **No reach gate.** Anonymous callers can receive scoped head metadata through storage and the doorway. The local-only rule applies to `PUT`, not this read. |
+| Storage HTTP `GET /account/export/{human_id}` | `S/http.rs:3356-3359,16777-16890` | caller-supplied human id | **No authorization.** The export includes content ids and reaches, human relationships, stewardship allocations and collective participations for the named human. Direct storage callers are not distinguished from the person's own client. |
+| Storage HTTP `/sync/v1/{hAppId}/docs...` | `S/http.rs:7276-7528,18583-18603`; doorway proxy `D/server/http.rs:2891-2895` | arbitrary namespace and document id from the route | Reads have no identity or reach check. Any DocStore namespace can be listed and read through storage and the doorway; only the `elohim` projector has a content-row admission rule. |
 | Doorway fold | `D/services/serve_eligibility.rs:147,535-575` | projection reach; whether the JWT authenticated; `MembershipPrerequisite` gate hints | commons/public serve. private/invited refuse everyone. **Every other tier, including `self` and `intimate`, is served to any authenticated requester when the projection has no audience hints (confirmed).** Undeclared refuses. |
 | Doorway legacy | `D/cache/access_control.rs:14,44`; `reach_aware_serving.rs:50` | – | geographic ladder; `should_serve_response` is called only from tests |
 | Doorway caching | `D/routes/freshness.rs:243`, `projection/cache_refresh.rs:97`, `cache/rules.rs:45`, `ssr.rs:261` | the response's reach | only public, commons or absent is stocked. **Absent is stocked.** |
+| Doorway projection `GET /api/v1/cache/{type}[/{id}]` | `D/routes/api.rs:167-174,187-296`; `D/cache/resolution.rs:275-330`; `D/projection/engine.rs:138-222` | projection documents written from conductor signals; optional `Agent <x>` header | Projection hits and collections serve without access-control filtering. The signal engine accepts documents without a reach predicate, and the route treats an unverified `Agent <x>` header as authenticated for conductor fallback. Warm/cache-refresh writers filter open reach, but they are not the only projection writer. |
 | Steward | `steward/node/src/storage/reach.rs` | – | a 6-value locality enum (dormant) |
 | epr crate | `elohim/epr/src/reach.rs`; `verdict.rs` | – | canonical openness 1-8 (distinguishes private < self and public < commons). `Verdict{Permit,Refuse,Refer}` exists, but **`ReachVerdict::into_verdict` has no production caller**. |
 | gate-client | `elohim/elohim-agent/gate-client/src/dag/reach_aggregation.rs` | attestation counts | a separate vocabulary (protocol/public/community/self-reach) |

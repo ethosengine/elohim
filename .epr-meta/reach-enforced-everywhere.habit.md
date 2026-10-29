@@ -13,17 +13,21 @@ status: red
 active: false
 checks:
   - "a2o @concern:reach-enforced-http (genesis/a2o/features/dataplane/reach-enforced-http.feature — runs in the edge Dataplane Validation stage; 3 scenarios asserting an unverifiable bearer token, a self-asserted X-Agent-Cid, and a self-asserted X-Agent-Id each return exactly the anonymous listing). Names NO reach tier: it asserts a RELATION, so it holds under any vocabulary and does not wait on the drift. A 4th scenario (2026-08-25) probes the BYTE route — a restricted row's bytes refused on GET /blob/{hash} to an anonymous caller — and is @wip (A2O_RUN_WIP=1 locally) until a fleet build carries the storage-side blob reach gate."
+  - "a2o @concern:reach-enforced-p2p (planned genesis/a2o/features/dataplane/reach-enforced-p2p.feature — a transport-bound stranger must receive the same answer for a scoped id as for an unknown id, with same-peer non-vacuity proof that the scoped head and bytes are held)."
+  - "a2o @concern:reach-enforced-doorway (planned genesis/a2o/features/dataplane/reach-enforced-doorway.feature — an anonymous doorway caller must receive the same answer for scoped projection/cache content as for an unknown id)."
+  - "a2o @concern:reach-enforced-everywhere (genesis/a2o/features/dataplane/reach-on-tree-root.feature — 6 scenario declarations, 10 peer-expanded cases, all @wip: a private tree root hides listings, existence, pieces and root-relative public-file access from a stranger while a member fetches only from admitted peers)."
 first_move: >
-  HTTP egress is wired and cured (2026-08-20). Wire the remaining four planes
-  the same way — one check per plane asserting a scoped-tier row does NOT
-  reach an unauthorized peer/client. Next: the CRDT sync plane (today
-  broadcast-only fail-closed = exclusion, not enforcement —
-  reach_is_distribution_safe in sync/projector.rs), then shard/blob, where
-  the responder does no reach check at all BY DESIGN (custody is deliberately
-  reach-blind; the boundary is serving, so the check belongs on the serve
-  path, not on custody).
+  Extract one shared verifier without changing HTTP response bytes, then bind each
+  censused egress plane to it and prove P2P and doorway refusal against an unknown-id
+  control. Start with CRDT sync, whose projector excludes scoped rows but whose
+  responders do not authorize a viewer. The shard responder is not reach-blind: it
+  has a custody-standing gate for `private` only; extend that boundary to every
+  recognized scoped tier without silently changing community before its operator
+  ruling.
 notes:
   - "The invariant's original first clause ('One reach vocabulary') was moved out of the checkable statement 2026-08-20 and is tracked in refs below. It is a RECONCILIATION goal, not an enforcement property, and elohim-storage/CLAUDE.md forbids canonizing a single vocabulary while the drift is open — so a check honoring it could not be written without violating a standing rule. That clause is why this habit sat unwired. The wired check asserts a relation instead and names no tier."
+  - "`@concern:reach-by-key` is declared by genesis/a2o/features/dataplane/peer-reach-through-relay.feature, but no habit declares that concern. It is not evidence for this habit until an owning habit names it."
+  - "P2P identity-spoof residual and proof floor: Authorize and Custody rows use `min_proof=SelfAssertedBinding` as the compatibility floor for community and custody delivery. A peer can therefore bind its authenticated transport identity to a custodian's agent, resolve as that custodian, and receive private bytes; an ordinary-stranger refusal test does not exercise this bypass. The residual closes only when C2-S2 supplies usable `CrossSigned` bindings for every participating P2P transport and operator Ruling 2 flips these rows from `SelfAssertedBinding` to `CrossSigned`."
 refs:
   - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
   - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
@@ -63,3 +67,5 @@ DELTA 2026-10-09a (RED preserved; household evidence for lane C): reach-enforced
 
 DELTA 2026-10-18 (RED preserved; household lane C re-measured on the merged tree): reach-enforced-http.feature 3/3, 24/24 steps (sprint-report-household-20261018T114938Z-80db9208) on dev 80db9208b — storage built with p2p+p2p-iroh, conductors on fork 96bcd2bee; the three @wip scenarios stay @wip. The flip still needs the fleet build and its Dataplane Validation leg.
 DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 16 h at 85 % (4 h per part short of target: the crdt-sync, shard, dht and doorway planes). It binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.
+
+DELTA 2026-10-28 (RED preserved; two-track design census, records only): the 2026-10-09a claim (reach-enforced-http 3/3 twice, run 2292a2e2) names no durable sprint report or receipt, so it cannot back a flip; the 2026-10-18 run (sprint-report-household-20261018T114938Z-80db9208) is the HTTP evidence of record. Checks now name the planned reach-enforced-p2p and reach-enforced-doorway stations and the @wip reach-on-tree-root feature; first_move is re-aimed at one shared verifier (elohim-storage src/reach_verifier, HTTP bytes unchanged) bound plane by plane, starting with CRDT sync; the P2P identity-spoof residual of the SelfAssertedBinding proof floor is recorded in notes. Census rows: genesis/data/timeline/backlog/reach-delivery-subsystem-solutioning-bootstrap.md.

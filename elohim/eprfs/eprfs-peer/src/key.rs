@@ -24,9 +24,20 @@ pub struct PeerKey {
 }
 
 impl PeerKey {
-    /// The key file's name inside the directory given to [`Self::load_or_generate`]. On a
-    /// workspace device that directory is `$XDG_CONFIG_HOME/epr/peer` (spec §3.1).
+    /// The key file's name inside the directory given to [`Self::load`] or
+    /// [`Self::load_or_generate`]. On a workspace device that directory is
+    /// `$XDG_CONFIG_HOME/epr/peer` (spec §3.1).
     pub const FILE_NAME: &'static str = "iroh.key";
+
+    /// Load the existing key from `dir/iroh.key` without creating a directory or key.
+    ///
+    /// # Errors
+    ///
+    /// The same existing-file errors as [`Self::load_or_generate`], including
+    /// [`PeerError::KeyIo`] with [`io::ErrorKind::NotFound`] when the key is absent.
+    pub fn load(dir: &Path) -> Result<PeerKey, PeerError> {
+        load_file(&dir.join(Self::FILE_NAME))
+    }
 
     /// Load the key from `dir/iroh.key`, or generate and persist one when the file does not
     /// exist.
@@ -45,7 +56,7 @@ impl PeerKey {
     /// - [`PeerError::KeyIo`] for any filesystem failure.
     pub fn load_or_generate(dir: &Path) -> Result<PeerKey, PeerError> {
         let path = dir.join(Self::FILE_NAME);
-        match load(&path) {
+        match load_file(&path) {
             Err(PeerError::KeyIo { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
                 generate(dir, &path)
             }
@@ -80,7 +91,7 @@ fn key_io(path: &Path) -> impl FnOnce(io::Error) -> PeerError + '_ {
 }
 
 /// Open, check the mode on the open handle (so the file checked is the file read), then read.
-fn load(path: &Path) -> Result<PeerKey, PeerError> {
+fn load_file(path: &Path) -> Result<PeerKey, PeerError> {
     let mut file = File::open(path).map_err(key_io(path))?;
     let meta = file.metadata().map_err(key_io(path))?;
     let mode = meta.permissions().mode() & 0o777;
@@ -124,7 +135,7 @@ fn generate(dir: &Path, path: &Path) -> Result<PeerKey, PeerError> {
             Ok(PeerKey { secret })
         }
         // A concurrent first start published first: its key is this device's key.
-        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => load(path),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => load_file(path),
         Err(e) => Err(key_io(path)(e)),
     }
 }

@@ -30,6 +30,25 @@ pub(crate) fn open_log(root: &Path, name: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
+impl crate::store::SidecarFlowStore {
+    /// Probe the flow log under `root` through a shared, read-only handle.
+    ///
+    /// Returns `false` when the log is absent. This method never creates the status directory or
+    /// log, so health checks cannot turn an empty checkout into a flow store.
+    pub fn probe(root: &Path) -> Result<bool> {
+        let path = root.join(".eprfs").join("status").join("flows.jsonl");
+        let log = match LockedLog::shared(&path) {
+            Ok(log) => log,
+            Err(FabricError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(false)
+            }
+            Err(error) => return Err(error),
+        };
+        log.contents()?;
+        Ok(true)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct LockedLog {
     file: File,
@@ -130,5 +149,16 @@ mod tests {
             .expect("transaction ended even while a duplicate descriptor remains alive");
         drop(reader);
         drop(inherited);
+    }
+
+    #[test]
+    fn flow_probe_reads_without_creating() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!crate::store::SidecarFlowStore::probe(dir.path()).unwrap());
+        assert!(!dir.path().join(".eprfs").exists());
+
+        let path = open_log(dir.path(), "flows.jsonl").unwrap();
+        assert!(crate::store::SidecarFlowStore::probe(dir.path()).unwrap());
+        assert_eq!(std::fs::read(path).unwrap(), Vec::<u8>::new());
     }
 }

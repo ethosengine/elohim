@@ -64,6 +64,23 @@ fn key_reused_across_restarts() {
 }
 
 #[test]
+fn load_reads_an_existing_key_and_never_creates_one() {
+    let present = tempfile::tempdir().expect("tempdir");
+    let generated = PeerKey::load_or_generate(present.path()).expect("generate fixture key");
+    let loaded = PeerKey::load(present.path()).expect("load existing key");
+    assert_eq!(loaded.node_id(), generated.node_id());
+
+    let absent = tempfile::tempdir().expect("tempdir");
+    let peer_dir = absent.path().join("missing/peer");
+    assert!(matches!(
+        PeerKey::load(&peer_dir),
+        Err(PeerError::KeyIo { source, .. })
+            if source.kind() == std::io::ErrorKind::NotFound
+    ));
+    assert!(!peer_dir.exists(), "load-only never creates the peer dir");
+}
+
+#[test]
 fn key_never_in_debug_output() {
     let dir = tempfile::tempdir().expect("tempdir");
     let key = PeerKey::load_or_generate(dir.path()).expect("generate");

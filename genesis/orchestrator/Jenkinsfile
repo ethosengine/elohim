@@ -703,7 +703,7 @@ def dispatchValidationSibling(List ran, Map results) {
     def edge = results['elohim-edge']
     if (!ran.contains('elohim-edge') || !edge?.success || edge.skipped || edge.dispatched) return
     if (edge.deployRefused || !edge.validationOwed) return
-    if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || runClassBelowDeploy(runClassFor('elohim-edge', env.PIPELINE_RUN_CLASSES))) return
+    if (gateOnlyRun() || env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || runClassBelowDeploy(runClassFor('elohim-edge', env.PIPELINE_RUN_CLASSES))) return
     def config = getPipelineMetadata('elohim-edge')
     String job = "${config.jenkinsJob ?: 'elohim-edge'}/${config.jenkinsBranch ?: env.BRANCH_NAME}"
     try {
@@ -841,6 +841,7 @@ def applyDeployPendingPass(String mode, graphPipelines, Map runClasses) {
     if (mode != 'auto') suppressed = "mode ${mode} dispatches no deploy"
     if (env.RUN_CLASS_FROM_TAG) suppressed = "[run:${env.RUN_CLASS_FROM_TAG}] caps this run below deploy"
     if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') suppressed = '[edge:validate-only] isolates this run'
+    if (gateOnlyRun()) suppressed = '[edge:gate-only] isolates this run'
     if (params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true') suppressed = 'DEPLOY_ONLY redeploys the edge only'
     String stateFile = '.orch-deploy-pending-state.json'
     String outFile = '.orch-deploy-pending.json'
@@ -936,6 +937,35 @@ def runClassFor(String name, String encoded) {
 @NonCPS
 def runClassBelowDeploy(String cls) {
     return ['verify', 'measure', 'profile'].contains(cls)
+}
+
+// The tag opts a PR into off-box gates. Integration pushes (including a
+// retained tag on a merge) and ordinary branch/manual runs keep their routing.
+def gateOnlyTagApplies(String commitMsg) {
+    (commitMsg ?: '').toLowerCase().contains('[edge:gate-only]') &&
+        env.CHANGE_ID && env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main'
+}
+
+def applyGateOnlyTag(String commitMsg) {
+    if (!gateOnlyTagApplies(commitMsg)) return
+    if (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') {
+        error('[edge:gate-only] and [edge:validate-only] conflict; use one tag per commit')
+    }
+    // Refuse version skew before dispatch: an older edge job could ignore an
+    // unknown parameter and publish. No shell or CPS Matcher crosses a step.
+    if (!readFile('elohim/holochain/Jenkinsfile').contains("name: 'GATE_ONLY'")) {
+        error('[edge:gate-only] refused: edge Jenkinsfile has no GATE_ONLY parameter; rebase onto dev')
+    }
+    env.EDGE_GATE_ONLY_FROM_TAG = 'true'
+    echo '[edge:gate-only] — edge quality gates and local builds only; no publish or deploy'
+}
+
+def gateOnlyRun() { env.EDGE_GATE_ONLY_FROM_TAG == 'true' }
+
+def applyGateOnlyOverride(graphPipelines) {
+    if (!gateOnlyRun()) return graphPipelines
+    env.PIPELINE_RUN_CLASSES = 'elohim-edge=build'
+    return ['elohim-edge']
 }
 
 /** step → class for the pre-graph metadata fallback; absent reads as build. */
@@ -1257,6 +1287,8 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
     String runClass = runClassFor(name, env.PIPELINE_RUN_CLASSES)
     if (name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true') runClass = 'verify'
     boolean belowDeploy = runClassBelowDeploy(runClass)
+    boolean gateOnlyDownstream = name == 'elohim-edge' && gateOnlyRun()
+    if (gateOnlyDownstream) jobBranch = "PR-${env.CHANGE_ID}"
     echo "▶️ Triggering ${jobName}/${jobBranch} [${waitMode}] RUN_CLASS=${runClass}..."
 
     try {
@@ -1287,10 +1319,10 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
             }
             return dispatchResult(result, shouldWait || detachedBarrier)
         }
-        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !belowDeploy)]
+        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !belowDeploy && !gateOnlyDownstream)]
         buildParams.add(stringParam(name: 'RUN_CLASS', value: runClass))
         if (config.deploymentCheck) {
-            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !belowDeploy))
+            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: !belowDeploy && !gateOnlyDownstream))
         }
         // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
         // their build stages and go straight to deploy. Safe to send to all
@@ -1298,10 +1330,15 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // when not deploy-bearing.
         // Two activation paths: operator param OR [deploy-only] commit tag.
         // Third path: the deploy-pending re-dispatch of the App (applyDeployPendingPass).
-        def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true' || env.PENDING_DEPLOY_DISPATCH == name
+        def deployOnlyDownstream = !gateOnlyDownstream && ((params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true' || env.PENDING_DEPLOY_DISPATCH == name)
         buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: deployOnlyDownstream))
         if (name == 'elohim-edge') {
             buildParams.add(booleanParam(name: 'VALIDATE_ONLY', value: validateOnlyDownstream))
+            if (gateOnlyDownstream) {
+                buildParams.add(booleanParam(name: 'GATE_ONLY', value: true))
+                buildParams.add(booleanParam(name: 'SKIP_LEGACY_IMAGES', value: true))
+                buildParams.add(stringParam(name: 'STEPS', value: 'all'))
+            }
         }
         // CHANGED_PATHS — newline-delimited list of changed source paths
         // from this orchestrator run's changeset. Downstream pipelines that
@@ -2633,6 +2670,7 @@ spec:
                             env.EDGE_VALIDATE_ONLY_FROM_TAG = 'true'
                             echo "🧪 [edge:validate-only] detected — isolating dispatch to edge Dataplane Validation"
                         }
+                        applyGateOnlyTag(commitMsg)
                         env.RUN_CLASS_FROM_TAG = parseRunClassTag(commitMsg)
 
                         // [deploy-only] — DELIBERATELY webhook-gated. This tag tells the orchestrator
@@ -2763,6 +2801,7 @@ spec:
                             echo '🧪 EDGE_VALIDATE_ONLY: dispatching elohim-edge only; Genesis and unrelated graph work suppressed'
                         }
 
+                        graphPipelines = applyGateOnlyOverride(graphPipelines)
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
                         // Bridge changedFiles to Execute Builds (file, not env: stashChangedPaths).
                         stashChangedPaths(changedFiles)
@@ -3148,7 +3187,7 @@ spec:
         stage('Verify Deployment') {
             when {
                 expression {
-                    params.VERIFY_DEPLOYMENT && params.MODE != 'status' && (env.PIPELINES_TO_RUN ?: '') != ''
+                    !gateOnlyRun() && params.VERIFY_DEPLOYMENT && (params.MODE ?: 'auto') != 'status' && (env.PIPELINES_TO_RUN ?: '') != ''
                 }
             }
             steps {
@@ -3252,7 +3291,7 @@ spec:
         }
 
         stage('E2E Federation Smoke (Advisory)') {
-            when { expression { readJSON(text: env.BUILD_RESULTS ?: '{}').any { it.value?.success } } }
+            when { expression { !gateOnlyRun() && readJSON(text: env.BUILD_RESULTS ?: '{}').any { it.value?.success } } }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     container('builder') {

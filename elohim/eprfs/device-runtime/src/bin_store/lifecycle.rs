@@ -1,5 +1,6 @@
 use super::{
     files,
+    landing::Expect,
     source::{self, CommandSpec},
     IngestOptions, Pin, Refusal, Release, Result, Status, Store,
 };
@@ -11,7 +12,21 @@ use std::{
     path::Path,
     time::{Duration, UNIX_EPOCH},
 };
+
+struct PrepareOptions<'a> {
+    mode: ark_core::declaration::FollowMode,
+    pin: Option<&'a str>,
+    expect: Expect,
+}
+
 impl Store {
+    fn committed_current(&self) -> Option<String> {
+        self.root
+            .join("current.json")
+            .is_file()
+            .then(|| self.head("current"))
+            .flatten()
+    }
     /// Reconstruct the status view. Optional lazy pin creation follows normal resolution.
     pub fn status(
         &self,
@@ -121,8 +136,9 @@ impl Store {
     /// Seed a store locally before attempting builds or downloads. A verified current needs no network.
     pub fn bootstrap(&self, repo: &Path, closure: Option<&Path>) -> Result<Release> {
         self.repair_heads()?;
-        if let Some(cid) = self
-            .head("current")
+        let expected = self.committed_current();
+        if let Some(cid) = expected
+            .clone()
             // Admissible, not merely verified: a same-commit epr-only current would otherwise
             // stand forever once the declaration adds bin-launch.
             .filter(|c| self.root.join("current.json").is_file() && self.admissible(c))
@@ -157,8 +173,17 @@ impl Store {
             eligible.sort();
             eligible.dedup();
             for (_, commit, cid) in eligible {
-                if let Ok(record) = self.land_mode(&cid, &commit, repo, false, true) {
-                    return Ok(record);
+                match self.land_mode(
+                    &cid,
+                    &commit,
+                    repo,
+                    false,
+                    true,
+                    Expect::Prior(expected.clone()),
+                ) {
+                    Ok(record) => return Ok(record),
+                    Err(error) if error.kind == "current-moved" => return Err(error),
+                    Err(_) => {}
                 }
             }
         }
@@ -172,7 +197,7 @@ impl Store {
         let commit = state["head"]
             .as_str()
             .ok_or_else(|| Refusal::new("source-mismatch", "missing HEAD"))?;
-        self.adopt(repo, commit, closure, "bootstrap")
+        self.adopt(repo, commit, closure, "bootstrap", Expect::Prior(expected))
     }
     fn adopt(
         &self,
@@ -180,14 +205,18 @@ impl Store {
         commit: &str,
         closure: Option<&Path>,
         gate: &str,
+        expect: Expect,
     ) -> Result<Release> {
         self.prepare_declared(
             repo,
             commit,
             closure,
             gate,
-            ark_core::declaration::FollowMode::Apply,
-            None,
+            PrepareOptions {
+                mode: ark_core::declaration::FollowMode::Apply,
+                pin: None,
+                expect,
+            },
         )
     }
     fn prepare_declared(
@@ -196,9 +225,9 @@ impl Store {
         commit: &str,
         closure: Option<&Path>,
         gate: &str,
-        mode: ark_core::declaration::FollowMode,
-        pin: Option<&str>,
+        options: PrepareOptions<'_>,
     ) -> Result<Release> {
+        let PrepareOptions { mode, pin, expect } = options;
         let mut records = self.records();
         if let Some(pin) = pin {
             records.sort_by_key(|record| record.cid != pin);
@@ -215,7 +244,7 @@ impl Store {
                 && (complete || pin == Some(record.cid.as_str()))
                 && self.verified(&record.cid)
             {
-                return self.finish_declared(record, commit, repo, mode, pin);
+                return self.finish_declared(record, commit, repo, mode, pin, expect.clone());
             }
         }
         let mut attempts=vec!["verified current unavailable (epr bin status --tool <tool> --json)".to_owned(),"no verified stored candidate for wanted commit (epr bin status --tool <tool> --commit <sha> --json)".into()];
@@ -230,7 +259,9 @@ impl Store {
                     closure: true,
                 },
             ) {
-                Ok(record) => return self.finish_declared(record, commit, repo, mode, pin),
+                Ok(record) => {
+                    return self.finish_declared(record, commit, repo, mode, pin, expect.clone())
+                }
                 Err(e) => attempts.push(format!(
                     "local closure: {}; epr bin ingest --tool {} --closure {}",
                     e.kind,
@@ -244,7 +275,7 @@ impl Store {
             );
         }
         match self.build_release(repo, commit, gate, &mut attempts, &files::env) {
-            Ok(record) => self.finish_declared(record, commit, repo, mode, pin),
+            Ok(record) => self.finish_declared(record, commit, repo, mode, pin, expect),
             Err(e) => {
                 attempts.push(format!("{}: {}", e.kind, e.detail));
                 Err(Refusal::new("bootstrap-unavailable", attempts.join("; ")))
@@ -258,6 +289,7 @@ impl Store {
         repo: &Path,
         mode: ark_core::declaration::FollowMode,
         pin: Option<&str>,
+        expect: Expect,
     ) -> Result<Release> {
         if pin.is_some_and(|pin| pin != record.cid) {
             return Err(Refusal::new(
@@ -266,7 +298,7 @@ impl Store {
             ));
         }
         if mode.applies() {
-            return self.land(&record.cid, commit, repo, false);
+            return self.land_mode(&record.cid, commit, repo, false, false, expect);
         }
         self.require_published(repo, commit)?;
         self.require_attestation(&mut record, commit, repo, false)?;
@@ -284,6 +316,7 @@ impl Store {
         if follow.mode.applies() && follow.pin.is_none() {
             return self.follow(repo, closure);
         }
+        let expected = self.committed_current();
         let state = self.source_state(repo)?;
         let commit = state["head"]
             .as_str()
@@ -296,8 +329,11 @@ impl Store {
             commit,
             closure,
             "follow",
-            follow.mode,
-            follow.pin.as_deref(),
+            PrepareOptions {
+                mode: follow.mode,
+                pin: follow.pin.as_deref(),
+                expect: Expect::Prior(expected),
+            },
         )?;
         Ok(json!({"followed":follow.mode.applies(), "observed":record.cid, "mode":follow.mode}))
     }
@@ -516,10 +552,8 @@ impl Store {
     pub fn follow(&self, repo: &Path, closure: Option<&Path>) -> Result<Value> {
         let landed: Value =
             files::read_json(&self.root.join("current.json")).unwrap_or(Value::Null);
-        let Some(old) = landed["commit"]
-            .as_str()
-            .filter(|_| self.head("current").is_some())
-        else {
+        let expected = self.committed_current();
+        let Some(old) = landed["commit"].as_str().filter(|_| expected.is_some()) else {
             return Ok(
                 json!({"followed":false,"why":"no landed head; bootstrap seeds the first one"}),
             );
@@ -571,7 +605,7 @@ impl Store {
         if state["clean"] != true {
             return Ok(json!({"followed":false,"why":"epr sources are dirty in this checkout"}));
         }
-        let record = self.adopt(repo, commit, closure, "follow")?;
+        let record = self.adopt(repo, commit, closure, "follow", Expect::Prior(expected))?;
         let mut value = serde_json::to_value(record)?;
         value["followed"] = json!(true);
         Ok(value)

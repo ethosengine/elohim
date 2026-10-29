@@ -84,6 +84,9 @@ pub struct Berth {
     /// Named local ports available to manifest templates.
     #[serde(default)]
     pub ports: BTreeMap<String, u16>,
+    /// Captured environment values available to manifest templates.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     /// Process name to resolved local artifact path.
     #[serde(default)]
     pub artifacts: BTreeMap<String, PathBuf>,
@@ -169,6 +172,11 @@ impl Berth {
                         return Ok(port.to_string());
                     }
                 }
+                if let Some(env_key) = key.strip_prefix("env.") {
+                    if let Some(value) = self.env.get(env_key) {
+                        return Ok(value.clone());
+                    }
+                }
                 Err(BerthError::UnknownTemplate(key.to_string()))
             }
         }
@@ -219,6 +227,35 @@ mod tests {
             berth.resolve_template("conductor", artifact, "{data_root"),
             Err(BerthError::Malformed(_))
         ));
+    }
+
+    #[test]
+    fn berth_resolves_env_templates_and_names_absent_key() {
+        let berth = Berth {
+            env: BTreeMap::from([("XDG_CONFIG_HOME".to_string(), "/nix/xdg/config".to_string())]),
+            ..Berth::default()
+        };
+        let artifact = Path::new("/opt/elohim/epr");
+
+        assert_eq!(
+            berth
+                .resolve_template("epr", artifact, "config={env.XDG_CONFIG_HOME}/elohim",)
+                .unwrap(),
+            "config=/nix/xdg/config/elohim"
+        );
+        assert_eq!(
+            berth.resolve_template("epr", artifact, "{env.EPR_CHECKOUT}"),
+            Err(BerthError::UnknownTemplate("env.EPR_CHECKOUT".to_string()))
+        );
+    }
+
+    #[test]
+    fn historic_berth_bytes_unchanged() {
+        let historic = br#"{"manifest":"bafy-manifest","node":"uhCAk-node","data_root":"/srv/elohim/alpha","log_level":"debug","passphrase":"empty","ports":{"admin_ws":4444},"artifacts":{"conductor":"/opt/elohim/conductor"},"incarnation":7}"#;
+        let berth: Berth = serde_json::from_slice(historic).unwrap();
+
+        assert!(berth.env.is_empty());
+        assert_eq!(serde_json::to_vec(&berth).unwrap(), historic);
     }
 
     #[test]

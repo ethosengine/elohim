@@ -2,6 +2,34 @@ use super::{files, source::CommandSpec, Refusal, Release, Result, Store};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
+#[derive(Clone)]
+/// Expected committed head for one landing attempt.
+pub(super) enum Expect {
+    /// Allow a caller that does not name a prior; CAS callers use `Prior`.
+    Any,
+    /// Require the exact prior CID, or no committed head when absent.
+    Prior(Option<String>),
+}
+
+impl Expect {
+    fn check(&self, found: &Option<String>) -> Result<()> {
+        let Self::Prior(expected) = self else {
+            return Ok(());
+        };
+        if expected == found {
+            return Ok(());
+        }
+        Err(Refusal::new(
+            "current-moved",
+            format!(
+                "expected {}, found {}",
+                expected.as_deref().unwrap_or("none"),
+                found.as_deref().unwrap_or("none")
+            ),
+        ))
+    }
+}
+
 impl Store {
     fn validate_land(
         &self,
@@ -90,10 +118,31 @@ impl Store {
         }
         Ok((record, old, metadata))
     }
-    /// Promote a verified, clean, descended and healthy candidate. Health runs outside the lock;
-    /// both source state and current metadata are revalidated before committing the move.
+    /// Promote a verified, clean, descended and healthy candidate without a caller-supplied prior.
+    /// Health runs outside the lock; source state and metadata are revalidated before the move.
     pub fn land(&self, cid: &str, commit: &str, repo: &Path, revert: bool) -> Result<Release> {
-        self.land_mode(cid, commit, repo, revert, false)
+        self.land_mode(cid, commit, repo, revert, false, Expect::Any)
+    }
+    /// Promote a candidate only when the committed head equals `expected`; `None` expects no head.
+    pub fn land_expected(
+        &self,
+        cid: &str,
+        commit: &str,
+        repo: &Path,
+        revert: bool,
+        expected: Option<&str>,
+    ) -> Result<Release> {
+        if let Some(expected) = expected {
+            files::require_cid(expected)?;
+        }
+        self.land_mode(
+            cid,
+            commit,
+            repo,
+            revert,
+            false,
+            Expect::Prior(expected.map(str::to_owned)),
+        )
     }
     pub(super) fn land_mode(
         &self,
@@ -102,26 +151,52 @@ impl Store {
         repo: &Path,
         revert: bool,
         cached: bool,
+        expect: Expect,
     ) -> Result<Release> {
         let outcome = (|| {
             let (mut record, expected, expected_meta) = {
                 let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+                let found = self
+                    .root
+                    .join("current.json")
+                    .is_file()
+                    .then(|| self.head("current"))
+                    .flatten();
+                expect.check(&found)?;
                 let state = self.validate_land(cid, commit, repo, revert, cached)?;
                 files::touch(&self.artifact(cid)?.join(".used"))?;
                 state
             };
             self.require_attestation(&mut record, commit, repo, false)?;
-            self.health(cid, commit, repo)?;
+            let health_note = self.health(cid, commit, repo)?;
             let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+            let found = self
+                .root
+                .join("current.json")
+                .is_file()
+                .then(|| self.head("current"))
+                .flatten();
+            expect.check(&found)?;
             let (mut latest, old, meta) = self.validate_land(cid, commit, repo, revert, cached)?;
             if old != expected || meta != expected_meta {
                 return Err(Refusal::new(
                     "current-moved",
-                    "committed head moved during health check",
+                    format!(
+                        "expected {}, found {}; committed head moved during health check",
+                        expected.as_deref().unwrap_or("none"),
+                        old.as_deref().unwrap_or("none")
+                    ),
                 ));
+            }
+            let has_health_note = health_note.is_some();
+            if let Some((kind, detail)) = health_note {
+                Self::add_note(&mut latest, kind, detail);
             }
             if old.as_deref() == Some(cid) {
                 // Health/admission still run, but this is maintenance, not a landing.
+                if has_health_note {
+                    self.save(&latest)?;
+                }
                 self.repair_heads_locked()?;
                 return Ok(latest);
             }
@@ -223,7 +298,32 @@ impl Store {
             let _ = self.save(&record);
         }
     }
-    fn health(&self, cid: &str, commit: &str, repo: &Path) -> Result<()> {
+    fn add_note(record: &mut Release, kind: &str, detail: &str) {
+        let list = record.extra.entry("notes").or_insert(json!([]));
+        if !list.is_array() {
+            *list = json!([]);
+        }
+        if let Some(list) = list.as_array_mut() {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos();
+            let at = format!("{}.{nanos:09}Z", files::now().trim_end_matches('Z'));
+            match list
+                .iter_mut()
+                .find(|row| row["kind"] == kind && row["detail"] == detail)
+            {
+                Some(row) => row["at"] = json!(at),
+                None => list.push(json!({"kind":kind,"detail":detail,"at":at})),
+            }
+        }
+    }
+    fn health(
+        &self,
+        cid: &str,
+        commit: &str,
+        repo: &Path,
+    ) -> Result<Option<(&'static str, &'static str)>> {
         let dir = self.artifact(cid)?;
         self.identity(&dir, cid, commit)
             .map_err(|e| Refusal::new("health-identity-mismatch", e.detail))?;
@@ -243,8 +343,48 @@ impl Store {
                     "flow report scope failed",
                 ));
             }
+            let candidate = dir.join("epr");
+            let check_args = vec![
+                "peer".to_owned(),
+                "serve".to_owned(),
+                "--check".to_owned(),
+                "--root".to_owned(),
+                repo.to_string_lossy().into_owned(),
+                "--json".to_owned(),
+            ];
+            let mut spec = CommandSpec::new(candidate.to_string_lossy(), check_args);
+            spec.cwd = Some(repo.into());
+            spec.timeout = Duration::from_secs(30);
+            spec.env.insert(
+                "EPR_BIN".into(),
+                Some(candidate.to_string_lossy().into_owned()),
+            );
+            let checked = self
+                .run(&spec)
+                .map_err(|error| Refusal::new("health-peer-check-failed", error.detail))?;
+            if !checked.success {
+                if checked.stderr.contains("unknown peer argument `--check`") {
+                    return Ok(Some((
+                        "peer-check-unsupported",
+                        "candidate does not advertise peer serve --check",
+                    )));
+                }
+                let refusal_kind = serde_json::from_str::<Value>(&checked.stdout)
+                    .ok()
+                    .and_then(|value| value["kind"].as_str().map(str::to_owned));
+                if refusal_kind.as_deref() == Some("not-a-device") {
+                    return Ok(Some((
+                        "peer-check-not-a-device",
+                        "candidate check found no device standing in this checkout",
+                    )));
+                }
+                return Err(Refusal::new(
+                    "health-peer-check-failed",
+                    "peer serve --check refused the candidate",
+                ));
+            }
         }
-        Ok(())
+        Ok(None)
     }
     pub(super) fn require_attestation(
         &self,

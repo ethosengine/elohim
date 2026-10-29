@@ -1,5 +1,7 @@
 //! Binding the device's iroh endpoint.
 
+mod relays;
+
 use std::net::{SocketAddr, SocketAddrV4};
 
 use iroh::{Endpoint, NodeAddr, NodeId, RelayMap, RelayMode, RelayUrl};
@@ -8,10 +10,13 @@ use url::Url;
 use crate::error::PeerError;
 use crate::key::PeerKey;
 
-/// The environment variable naming the relay the device peers home to. Same semantics as
-/// elohim-storage's `ELOHIM_IROH_RELAY_URL`: set and non-empty, it must parse; unset or empty,
-/// there is no relay.
-pub const RELAY_ENV: &str = "EPR_PEER_RELAY_URL";
+/// The environment variable carrying an ordered relay override.
+///
+/// Empty or absent values retain the Rulebook relays. `off` is the only value that disables
+/// relaying.
+pub const RELAY_ENV: &str = "EPR_PEER_RELAYS";
+
+const LEGACY_RELAY_ENV: &str = "EPR_PEER_RELAY_URL";
 
 /// Bind this device's iroh endpoint on `key`, offering `alpns` to inbound peers.
 ///
@@ -68,16 +73,25 @@ pub async fn bind_on(
         .map_err(|e| PeerError::Bind(Box::new(e)))
 }
 
-/// The relay [`RELAY_ENV`] names, if any.
+/// The first relay resolved from [`RELAY_ENV`], the legacy relay variable, the Rulebook, or the
+/// compiled two-premise default.
+///
+/// Returning one relay preserves compatibility with a peer fixed to that relay. Path-aware
+/// endpoint consumers may use the complete ordered plan. Empty or absent environment values never
+/// disable relaying; only `off` returns `None`.
 ///
 /// # Errors
 ///
-/// [`PeerError::InvalidRelayUrl`] when it is set to something that is not a URL.
+/// [`PeerError::InvalidRelayUrl`] when an override or Rulebook entry is not a URL, or
+/// [`PeerError::Policy`] when a discovered Rulebook cannot be read or parsed.
 pub fn relay_from_env() -> Result<Option<Url>, PeerError> {
-    relay_from_value(std::env::var(RELAY_ENV).ok().as_deref())
+    relays::first_from_env()
 }
 
-/// [`relay_from_env`] over a given value: unset or blank is no relay; anything else must parse.
+/// Parse one legacy relay value without consulting the Rulebook.
+///
+/// This helper preserves the single-value parsing surface for callers that already selected a
+/// source. [`relay_from_env`] owns relay resolution and its non-disabling defaults.
 ///
 /// # Errors
 ///
