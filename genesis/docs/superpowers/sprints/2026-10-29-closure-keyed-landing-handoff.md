@@ -6,9 +6,9 @@ status: handoff
 author: "Claude Fable 5.1 (overnight shift closure-keyed-edge-build), for the operator (steward of record)"
 habits: [push-delivers-within-budget, sprint-lands-each-closure-once, push-gate-pays-once, devices-share-one-berth]
 cites:
-  - genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md
+  - "closure-keyed-landing-plane-design | The landing plane, closure-keyed | sha256:9156f36238a93744 | path: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
   - genesis/research/integration-capacity-grounding-2026-10-29.md
-  - genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md
+  - "native-dev-tooling-over-peers-plan | Native developer CI/CD over peers | sha256:ee8d1c37411b1f46 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
   - genesis/data/timeline/backlog/agent-presence-listens-to-the-space-by-default.md
   - genesis/data/timeline/backlog/ci-compute-worker-test-reds-when-grant-expires.md
 ---
