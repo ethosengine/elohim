@@ -134,7 +134,7 @@ async fn serve() -> Fixture {
         let digest = BlobStore::parse_content_address(&stored.hash).unwrap();
         let cid = BlobStore::hash_to_cid(&digest).unwrap().to_string();
         fixtures.push(TierFixture {
-            tier: *tier,
+            tier,
             id,
             slug,
             sha: stored.hash,
