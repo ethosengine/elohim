@@ -8,31 +8,55 @@
 //!
 //! See README.md and ARCHITECTURE.md for details.
 
+#[cfg(not(any(feature = "runtime", feature = "local-view-only")))]
+compile_error!("elohim-node needs the default `runtime` feature or `local-view-only`");
+
+#[cfg(not(feature = "local-view-only"))]
 mod config;
+#[cfg(not(feature = "local-view-only"))]
 mod dashboard;
+#[cfg(not(feature = "local-view-only"))]
 mod elohim_service;
+#[cfg(not(feature = "local-view-only"))]
 mod network;
+#[cfg(not(feature = "local-view-only"))]
 mod pod;
+#[cfg(not(feature = "local-view-only"))]
 mod update;
 
+#[cfg(not(feature = "local-view-only"))]
 mod api;
+#[cfg(not(feature = "local-view-only"))]
 mod cluster;
+#[cfg(not(feature = "local-view-only"))]
 mod p2p;
+#[cfg(not(feature = "local-view-only"))]
 mod storage;
+#[cfg(not(feature = "local-view-only"))]
 mod sync;
 
+#[cfg(not(feature = "local-view-only"))]
 use std::net::SocketAddr;
+#[cfg(not(feature = "local-view-only"))]
 use std::path::PathBuf;
+#[cfg(not(feature = "local-view-only"))]
 use std::sync::Arc;
 
+#[cfg(not(feature = "local-view-only"))]
 use clap::Parser;
+#[cfg(not(feature = "local-view-only"))]
 use tokio::sync::{mpsc, Mutex, RwLock};
+#[cfg(not(feature = "local-view-only"))]
 use tracing::{error, info};
 
+#[cfg(not(feature = "local-view-only"))]
 use config::Config;
+#[cfg(not(feature = "local-view-only"))]
 use dashboard::{create_router, DashboardState};
+#[cfg(not(feature = "local-view-only"))]
 use pod::{Pod, PodConfig};
 
+#[cfg(not(feature = "local-view-only"))]
 #[derive(Parser)]
 #[command(name = "elohim-node")]
 #[command(about = "Always-on infrastructure runtime for the Elohim Protocol")]
@@ -62,6 +86,7 @@ struct Cli {
     pod_cmd: Option<pod::cli::PodCommands>,
 }
 
+#[cfg(not(feature = "local-view-only"))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing
@@ -298,4 +323,22 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Small production-buildable composition for private local views.
+#[cfg(feature = "local-view-only")]
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let args: Vec<_> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--local-view-contract") {
+        print!("{}", elohim_hub::local_views::typescript_contract());
+        return Ok(());
+    }
+    anyhow::ensure!(
+        args.len() == 3 && args[1] == "--local-view",
+        "usage: elohim-node --local-view <config>"
+    );
+    elohim_hub::local_views::serve(std::path::Path::new(&args[2]))
+        .await
+        .map_err(anyhow::Error::msg)
 }

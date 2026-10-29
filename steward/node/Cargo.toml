@@ -6,14 +6,16 @@ description = "Always-on infrastructure runtime for the Elohim Protocol"
 license = "Apache-2.0"
 
 [dependencies]
+# Private declared-view serving; linked only by the non-default `local-view-only` build.
+elohim-hub = { path = "../../elohim/elohim-hub", optional = true }
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
 # Sync engine
-automerge = "0.10"
+automerge = { version = "0.10", optional = true }
 
 # P2P networking (matches elohim-storage 0.54)
-libp2p = { version = "0.54", features = [
+libp2p = { optional = true, version = "0.54", features = [
     "tokio",
     "tcp",
     "quic",
@@ -32,38 +34,38 @@ libp2p = { version = "0.54", features = [
 ] }
 
 # Storage (elohim-storage as library for unified P2P)
-rusqlite = { version = "0.37", features = ["bundled"] }
-elohim-storage = { path = "../../elohim/elohim-storage", default-features = false, features = ["p2p"] }
+rusqlite = { optional = true, version = "0.37", features = ["bundled"] }
+elohim-storage = { optional = true, path = "../../elohim/elohim-storage", default-features = false, features = ["p2p"] }
 
 # Wire-shape View types — boundary is now explicit; view imports must use elohim-views, not elohim-storage
-elohim-views = { path = "../../crates/elohim-views" }
-elohim-bitswap = { path = "../../elohim/elohim-bitswap" }
-sled = "0.34"
-cid = "0.11"
+elohim-views = { optional = true, path = "../../crates/elohim-views" }
+elohim-bitswap = { optional = true, path = "../../elohim/elohim-bitswap" }
+sled = { version = "0.34", optional = true }
+cid = { version = "0.11", optional = true }
 
 # AI agent orchestration
-elohim-agent = { path = "../../elohim/elohim-agent/elohim-agent-service", default-features = false }
-constitution = { path = "../../elohim/constitution" }
+elohim-agent = { optional = true, path = "../../elohim/elohim-agent/elohim-agent-service", default-features = false }
+constitution = { optional = true, path = "../../elohim/constitution" }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_yaml = "0.9"
-toml = "0.8"
-rmp-serde = "1"
-rmpv = "1"
+serde = { optional = true, version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.8", optional = true }
+rmp-serde = { version = "1", optional = true }
+rmpv = { version = "1", optional = true }
 
 # Crypto for bootstrap signing
-ed25519-dalek = { version = "2", features = ["rand_core"] }
-rand = "0.8"
+ed25519-dalek = { optional = true, version = "2", features = ["rand_core"] }
+rand = { version = "0.8", optional = true }
 
 # API
-axum = "0.7"
-tonic = "0.11"
-tokio-tungstenite = "0.21"
+axum = { version = "0.7", optional = true }
+tonic = { version = "0.11", optional = true }
+tokio-tungstenite = { version = "0.21", optional = true }
 
 # HTTP middleware
-tower-http = { version = "0.5", features = ["fs"] }
+tower-http = { optional = true, version = "0.5", features = ["fs"] }
 
 # HTTP client for updates.
 # rustls-tls (not the default native-tls) so the tree carries no openssl:
@@ -71,31 +73,31 @@ tower-http = { version = "0.5", features = ["fs"] }
 # Every sibling manifest (elohim/Cargo.toml workspace, elohim-storage,
 # elohim-sdk, elohim-storage-client) is already 0.12 + rustls-tls; this was the
 # last 0.11/native-tls holdout.
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { optional = true, version = "0.12", default-features = false, features = [
     "json",
     "stream",
     "rustls-tls",
 ] }
-futures = "0.3"
+futures = { version = "0.3", optional = true }
 
 # Crypto for update verification
-sha2 = "0.10"
+sha2 = { version = "0.10", optional = true }
 
 # Utilities
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-thiserror = "1"
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { optional = true, version = "0.3", features = ["env-filter"] }
+thiserror = { version = "1", optional = true }
 anyhow = "1"
-clap = { version = "4", features = ["derive", "env"] }
-uuid = { version = "1", features = ["v4"] }
-chrono = { version = "0.4", features = ["serde"] }
-hostname = "0.3"
-num_cpus = "1.16"
-async-trait = "0.1"
-crc32fast = "1.4"
+clap = { optional = true, version = "4", features = ["derive", "env"] }
+uuid = { optional = true, version = "1", features = ["v4"] }
+chrono = { optional = true, version = "0.4", features = ["serde"] }
+hostname = { version = "0.3", optional = true }
+num_cpus = { version = "1.16", optional = true }
+async-trait = { version = "0.1", optional = true }
+crc32fast = { version = "1.4", optional = true }
 
 # System metrics
-sysinfo = "0.30"
+sysinfo = { version = "0.30", optional = true }
 
 # Platform-specific
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -111,9 +113,35 @@ tonic-build = "0.11"
 name = "elohim-node"
 path = "src/main.rs"
 
+# The integration tests exercise the always-on runtime; a `local-view-only` build has none of it.
+[[test]]
+name = "config_test"
+required-features = ["runtime"]
+
+[[test]]
+name = "sync_engine_test"
+required-features = ["runtime"]
+
+[[test]]
+name = "transport_test"
+required-features = ["runtime"]
+
 [features]
-default = []
+# `runtime` is the always-on node and is what every existing build gets; it only names
+# the dependency set the node already had, so the default build is unchanged.
+default = ["runtime"]
+# `cargo build --no-default-features --features local-view-only`: a small binary whose only
+# mode is `--local-view <config>` (app/scripts/local-view-launcher.sh). Not a default.
+local-view-only = ["dep:elohim-hub"]
+runtime = ["dep:automerge", "dep:libp2p", "dep:rusqlite", "dep:elohim-storage", "dep:elohim-views", "dep:elohim-bitswap", "dep:sled", "dep:cid", "dep:elohim-agent", "dep:constitution", "dep:serde", "dep:serde_json", "dep:serde_yaml", "dep:toml", "dep:rmp-serde", "dep:rmpv", "dep:ed25519-dalek", "dep:rand", "dep:axum", "dep:tonic", "dep:tokio-tungstenite", "dep:tower-http", "dep:reqwest", "dep:futures", "dep:sha2", "dep:tracing", "dep:tracing-subscriber", "dep:thiserror", "dep:clap", "dep:uuid", "dep:chrono", "dep:hostname", "dep:num_cpus", "dep:async-trait", "dep:crc32fast", "dep:sysinfo"]
 bitswap = []
+
+# The local viewer serves bounded but repository-sized captures through HTTP proxies.
+# Keep its optimized build separate from ordinary runtime development artifacts.
+[profile.local-view]
+inherits = "dev"
+opt-level = 2
+debug = 0
 
 # ---------------------------------------------------------------------------
 # The vendored holochain_serialized_bytes 0.0.56 [patch.crates-io] stanza that
