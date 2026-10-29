@@ -59,6 +59,29 @@
           "recipe": "_gate-eprfs",
           "cargo": { "targetDir": "/tmp/eprfs-gate-target", "profile": "dev", "rustflags": "" }
         }
+      },
+      "seam-guidance-contracts": {
+        "dir": "elohim/sdk/domains/elohim-agent",
+        "inputs": {
+          "sources": [
+            "elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs",
+            "elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py",
+            "elohim/sdk/schemas/v1/seam-guidance.schema.json",
+            "elohim/sdk/schemas/v1/seam-guidance-method.schema.json",
+            ".epr-meta/elohim/algorithms/seam-guidance.json",
+            ".epr-meta/composition.md",
+            "elohim/sdk/working-version.seam.json",
+            "elohim/sdk/app-lifecycle.seam.json",
+            "elohim/elohim-storage/.epr-meta/publication-authority.seam.json",
+            "elohim/elohim-storage/.epr-meta/peer-serving.seam.json",
+            "elohim/eprfs/epr-cli/developer-composition.seam.json",
+            ".claude/hooks/native-seam-guidance.py",
+            ".codex/hooks/native-seam-guidance.py",
+            ".claude/scripts/_lib/epr_client.py"
+          ],
+          "buildProcess": ["justfile"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-seam-guidance-contracts" }
       }
     }
   },
