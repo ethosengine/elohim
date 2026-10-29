@@ -2171,6 +2171,45 @@ lazy_static! {
     .unwrap();
 }
 
+// The sync sled reclaim series sit in their own block: the first block is at
+// the crate's macro recursion limit.
+lazy_static! {
+    /// Boot-time sync sled reclaim decisions, by outcome
+    /// (`sync::sled_reclaim::ReclaimOutcome::as_str`): "reclaimed", the
+    /// no-op outcomes "disabled" | "small" | "not_bloated", the refusals
+    /// "refused_free_space" | "refused_attempts", and the aborts
+    /// "aborted_budget" | "aborted_mismatch" | "aborted_error". One per boot.
+    pub static ref SYNC_SLED_RECLAIM: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_sled_reclaim_total",
+            "Boot-time sync sled reclaim decisions by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
+    /// The last boot's sync sled reclaim reading. label: measure =
+    /// "before" (allocated bytes of the directory before) | "after" (after;
+    /// equal to before unless reclaimed) | "logical" (live key + value bytes).
+    /// before minus after is what the reclaim returned to the volume.
+    pub static ref SYNC_SLED_RECLAIM_BYTES: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_sync_sled_reclaim_bytes",
+            "Sync sled size around the last boot-time reclaim decision.",
+        ),
+        &["measure"],
+    )
+    .unwrap();
+
+    /// Wall-clock seconds the last boot's reclaim decision took (bounded by
+    /// `sync::sled_reclaim::DEFAULT_BUDGET` plus the swap).
+    pub static ref SYNC_SLED_RECLAIM_SECONDS: Gauge = Gauge::new(
+        "elohim_sync_sled_reclaim_seconds",
+        "Seconds the last boot-time sync sled reclaim decision took.",
+    )
+    .unwrap();
+}
+
 // The retired-pin backoff series sit in their own block: the first block is at
 // the crate's macro recursion limit.
 lazy_static! {
@@ -3770,6 +3809,14 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(IROH_SYNC_CHANGES_APPLIED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOC_WRITES.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_SLED_RECLAIM.clone()));
+        for outcome in crate::sync::sled_reclaim::ReclaimOutcome::ALL {
+            SYNC_SLED_RECLAIM
+                .with_label_values(&[outcome.as_str()])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(SYNC_SLED_RECLAIM_BYTES.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_SLED_RECLAIM_SECONDS.clone()));
         for outcome in ["written", "unchanged"] {
             SYNC_DOC_WRITES.with_label_values(&[outcome]).inc_by(0);
         }
@@ -4957,6 +5004,23 @@ pub fn add_iroh_sync_changes_applied(n: u64) {
 /// Record one sync DocStore write outcome ("written" | "unchanged").
 pub fn inc_sync_doc_write(outcome: &str) {
     SYNC_DOC_WRITES.with_label_values(&[outcome]).inc();
+}
+
+/// Record one boot's sync sled reclaim decision (see `SYNC_SLED_RECLAIM`).
+pub fn record_sync_sled_reclaim(
+    outcome: &str,
+    before: u64,
+    after: u64,
+    logical: u64,
+    elapsed: std::time::Duration,
+) {
+    SYNC_SLED_RECLAIM.with_label_values(&[outcome]).inc();
+    for (measure, bytes) in [("before", before), ("after", after), ("logical", logical)] {
+        SYNC_SLED_RECLAIM_BYTES
+            .with_label_values(&[measure])
+            .set(i64::try_from(bytes).unwrap_or(i64::MAX));
+    }
+    SYNC_SLED_RECLAIM_SECONDS.set(elapsed.as_secs_f64());
 }
 
 /// Record one iroh-blobs fetch by result.
