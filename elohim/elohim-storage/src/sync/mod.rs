@@ -126,14 +126,14 @@ impl SyncManager {
         doc_id: &str,
         changes: Vec<Vec<u8>>,
     ) -> Result<Vec<String>, StorageError> {
-        // Keep the stored bytes: an apply that changes nothing (a peer
-        // re-delivering changes this doc already holds) must not rewrite the
-        // whole document — see `DocStore::save_if_changed`.
+        // Keep the stored record: an apply that changes nothing (a peer
+        // redelivering changes this doc already holds) must not rewrite the
+        // whole document. See `DocStore::save_if_changed`.
         let (mut doc, stored) = match self.doc_store.get(h_app_id, doc_id).await? {
             Some(stored) => {
                 let doc = Automerge::load(&stored.data)
                     .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
-                (doc, Some(stored.data))
+                (doc, Some(stored))
             }
             None => (self.get_or_create_doc(h_app_id, doc_id).await?, None),
         };
@@ -144,9 +144,10 @@ impl SyncManager {
                 .map_err(|e| StorageError::Sync(format!("Failed to apply changes: {}", e)))?;
         }
 
-        // Save updated document (skipped when byte-identical to what is stored)
-        let _ = &stored; // RED: old behaviour
-        self.doc_store.save(h_app_id, doc_id, &doc).await?;
+        // Save updated document (skipped when it holds exactly what is stored)
+        self.doc_store
+            .save_if_changed(h_app_id, doc_id, &doc, stored.as_ref())
+            .await?;
 
         // Return new heads
         let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();

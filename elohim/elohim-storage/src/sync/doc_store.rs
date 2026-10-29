@@ -2,7 +2,7 @@
 //!
 //! Stores Automerge documents in sled for durability and fast access.
 
-use automerge::Automerge;
+use automerge::{Automerge, ReadDoc};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tracing::{debug, info};
@@ -28,6 +28,11 @@ impl Default for DocStoreConfig {
             cache_size: 64 * 1024 * 1024, // 64MB
         }
     }
+}
+
+/// A document's heads as stored: hex-encoded, in `get_heads` (sorted) order.
+fn hex_heads(doc: &Automerge) -> Vec<String> {
+    doc.get_heads().iter().map(|h| hex::encode(h.0)).collect()
 }
 
 /// Stored document metadata
@@ -126,39 +131,59 @@ impl DocStore {
         self.put_encoded(h_app_id, doc_id, doc, doc.save())
     }
 
-    /// Save an Automerge document unless the bytes it would write are exactly
-    /// the bytes already stored for it. Returns `true` when a write happened.
+    /// Save an Automerge document unless it holds exactly what is already
+    /// stored for it. Returns `true` when a write happened.
     ///
-    /// `stored` is the `data` field the caller loaded `doc` from (`None` when
-    /// the document is new, which always writes). The skip compares the full
-    /// encoded document — including the orphaned changes `Automerge::save`
-    /// retains by default — so it can only drop a write whose result would be
-    /// byte-identical to what is on disk: a document's latest state is never
-    /// lost, only its redundant rewrite.
+    /// `stored` is the record the caller loaded `doc` from, before applying
+    /// anything to it (`None` when the document is new, which always writes).
+    /// The write is skipped only when one of these holds:
+    ///
+    /// - the heads equal the stored heads and Automerge holds no queued
+    ///   (orphaned) change. Equal heads mean the same set of applied changes.
+    ///   An empty queue means nothing is waiting on a dependency, and the
+    ///   stored copy had no orphans either, because loading it would have
+    ///   queued them again. So the document is the stored one.
+    /// - `doc.save()` is byte-identical to the stored bytes.
+    ///
+    /// A change waiting on a missing dependency does not move the heads, but it
+    /// sits in the queue, and `Automerge::save` keeps it. So that case is
+    /// written, and the orphan is never dropped. A document's latest state is
+    /// never lost; only the redundant rewrite is.
     ///
     /// Why it exists: sled 0.34 keeps a large value as a separate blob file and
-    /// does not reliably remove the old one when the value is overwritten, so
-    /// every rewrite of a multi-megabyte document leaves its previous copy on
-    /// disk. A sync round that re-delivers changes a peer already holds used to
-    /// rewrite the whole document each time; on the alpha fleet that was one
-    /// ~17 MB rewrite of `node:manifesto` a minute per pod, ~1 GB/h of
-    /// `sync.sled` growth with no new content.
+    /// does not remove the old one when the value is overwritten, so every
+    /// rewrite of a multi-megabyte document leaves its previous copy on disk. A
+    /// sync round that redelivers changes we already hold used to rewrite the
+    /// whole document each time. On the alpha fleet that was one ~17 MB rewrite
+    /// of `node:manifesto` a minute per pod: ~1 GB/h of `sync.sled` growth with
+    /// no new content. Byte equality alone does not catch this, because a
+    /// re-encoded document is not byte-stable across a load.
     pub async fn save_if_changed(
         &self,
         h_app_id: &str,
         doc_id: &str,
         doc: &Automerge,
-        stored: Option<&[u8]>,
+        stored: Option<&StoredDocument>,
     ) -> Result<bool, StorageError> {
+        if let Some(stored) = stored {
+            if hex_heads(doc) == stored.heads && doc.get_missing_deps(&[]).is_empty() {
+                return Ok(self.skip_unchanged(h_app_id, doc_id));
+            }
+        }
         let data = doc.save();
-        if stored == Some(data.as_slice()) {
-            crate::metrics::inc_sync_doc_write("unchanged");
-            debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Document unchanged; write skipped");
-            return Ok(false);
+        if stored.is_some_and(|s| s.data == data) {
+            return Ok(self.skip_unchanged(h_app_id, doc_id));
         }
         self.put_encoded(h_app_id, doc_id, doc, data)?;
         crate::metrics::inc_sync_doc_write("written");
         Ok(true)
+    }
+
+    /// Record a skipped rewrite; always `false` (no write happened).
+    fn skip_unchanged(&self, h_app_id: &str, doc_id: &str) -> bool {
+        crate::metrics::inc_sync_doc_write("unchanged");
+        debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Document unchanged; write skipped");
+        false
     }
 
     /// Write `data` (the caller's `doc.save()`) and the index row for it.
@@ -169,7 +194,7 @@ impl DocStore {
         doc: &Automerge,
         data: Vec<u8>,
     ) -> Result<(), StorageError> {
-        let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
+        let heads = hex_heads(doc);
         let change_count = doc.get_changes(&[]).len() as u64;
 
         let stored = StoredDocument {
