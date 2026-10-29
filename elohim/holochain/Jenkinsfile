@@ -438,18 +438,18 @@ def decideImageClosures() {
             if (!(key ==~ /sha256:[a-f0-9]{64}/)) error("Missing ${kind} closure")
             def verdict = sh(script: "bash '${env.WORKSPACE}/scripts/ci/harbor-oracle.sh' 'ethosengine/${repo}' '${key}'", returnStdout: true).trim()
             def hit = verdict ==~ /hit sha256:[a-f0-9]{64}/
-            env["${kind}_CLOSURE_HIT"] = hit ? 'true' : 'false'
-            env["${kind}_CLOSURE"] = key
-            env["${kind}_DIGEST"] = hit ? verdict.substring(4) : ''
+            env.setProperty("${kind}_CLOSURE_HIT", hit ? 'true' : 'false')
+            env.setProperty("${kind}_CLOSURE", key)
+            env.setProperty("${kind}_DIGEST", hit ? verdict.substring(4) : '')
             echo "${kind} closure ${key}: ${verdict}"
         }
     }
 }
 
 def closurePresent(String kind, String stageName) {
-    if (isGateOnly() || env["${kind}_CLOSURE_HIT"] != 'true') return false
-    def shortKey = env["${kind}_CLOSURE"].substring(7, 23)
-    echo "${stageName}: skipped — closure ${shortKey} present (${env["${kind}_DIGEST"]})"
+    if (isGateOnly() || env.getProperty("${kind}_CLOSURE_HIT") != 'true') return false
+    def shortKey = env.getProperty("${kind}_CLOSURE").substring(7, 23)
+    echo "${stageName}: skipped — closure ${shortKey} present (${env.getProperty("${kind}_DIGEST")})"
     return true
 }
 
@@ -467,13 +467,13 @@ def pushClosureImage(String kind, String imageName) {
         env.IMAGES_PUSHED = 'true'
         return
     }
-    def tag = env["${kind}_TAG"]
+    def tag = env.getProperty("${kind}_TAG")
     def remote = "harbor.ethosengine.com/ethosengine/${imageName}:${tag}"
     sh "nerdctl -n k8s.io tag '${imageName}:${tag}' '${remote}'"
     sh "nerdctl -n k8s.io push '${remote}'"
     env.IMAGES_PUSHED = 'true'
     def digest = sh(script: "nerdctl -n k8s.io image inspect '${remote}' --format '{{range .RepoDigests}}{{println .}}{{end}}' | sed -n 's|.*@\\(sha256:[a-f0-9]*\\)|\\1|p' | head -1", returnStdout: true).trim()
-    if (digest ==~ /sha256:[a-f0-9]{64}/) env["${kind}_DIGEST"] = digest
+    if (digest ==~ /sha256:[a-f0-9]{64}/) env.setProperty("${kind}_DIGEST", digest)
 }
 
 def pushOtherDevAliases() {
@@ -2010,13 +2010,13 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin, S
 def writeDeploymentVersions(String path, String targetEnv) {
     def defaults = readProperties(file: path)
     def values = [SITE_TAG: defaults.SITE_TAG ?: (targetEnv == 'prod' ? 'latest' : 'dev-latest')]
-    ['EDGENODE_TAG', 'HAPP_INSTALLER_TAG', 'DOORWAY_APP_TAG', 'HAPP_TAG', 'AGENT_SDK_TAG'].each { key -> values[key] = env[key] }
+    ['EDGENODE_TAG', 'HAPP_INSTALLER_TAG', 'DOORWAY_APP_TAG', 'HAPP_TAG', 'AGENT_SDK_TAG'].each { key -> values[key] = env.getProperty(key) }
     values.HAPP_TAG = getHappFloatingTag()
     ['STORAGE', 'DOORWAY'].each { kind ->
         def selected = params.DEPLOY_ONLY != true && shouldRunStep("cargo-build-${kind.toLowerCase()}")
         ['TAG', 'CLOSURE', 'DIGEST'].each { field ->
             def key = "${kind}_${field}"
-            values[key] = selected ? (env[key] ?: '') : ''
+            values[key] = selected ? (env.getProperty(key) ?: '') : ''
         }
     }
     writeFile file: path, text: values.collect { key, value -> "${key}=${value}" }.join('\n') + '\n'
