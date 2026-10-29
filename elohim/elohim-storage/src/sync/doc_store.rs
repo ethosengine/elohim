@@ -123,7 +123,52 @@ impl DocStore {
         doc_id: &str,
         doc: &Automerge,
     ) -> Result<(), StorageError> {
+        self.put_encoded(h_app_id, doc_id, doc, doc.save())
+    }
+
+    /// Save an Automerge document unless the bytes it would write are exactly
+    /// the bytes already stored for it. Returns `true` when a write happened.
+    ///
+    /// `stored` is the `data` field the caller loaded `doc` from (`None` when
+    /// the document is new, which always writes). The skip compares the full
+    /// encoded document — including the orphaned changes `Automerge::save`
+    /// retains by default — so it can only drop a write whose result would be
+    /// byte-identical to what is on disk: a document's latest state is never
+    /// lost, only its redundant rewrite.
+    ///
+    /// Why it exists: sled 0.34 keeps a large value as a separate blob file and
+    /// does not reliably remove the old one when the value is overwritten, so
+    /// every rewrite of a multi-megabyte document leaves its previous copy on
+    /// disk. A sync round that re-delivers changes a peer already holds used to
+    /// rewrite the whole document each time; on the alpha fleet that was one
+    /// ~17 MB rewrite of `node:manifesto` a minute per pod, ~1 GB/h of
+    /// `sync.sled` growth with no new content.
+    pub async fn save_if_changed(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        doc: &Automerge,
+        stored: Option<&[u8]>,
+    ) -> Result<bool, StorageError> {
         let data = doc.save();
+        if stored == Some(data.as_slice()) {
+            crate::metrics::inc_sync_doc_write("unchanged");
+            debug!(h_app_id = %h_app_id, doc_id = %doc_id, "Document unchanged; write skipped");
+            return Ok(false);
+        }
+        self.put_encoded(h_app_id, doc_id, doc, data)?;
+        crate::metrics::inc_sync_doc_write("written");
+        Ok(true)
+    }
+
+    /// Write `data` (the caller's `doc.save()`) and the index row for it.
+    fn put_encoded(
+        &self,
+        h_app_id: &str,
+        doc_id: &str,
+        doc: &Automerge,
+        data: Vec<u8>,
+    ) -> Result<(), StorageError> {
         let heads: Vec<String> = doc.get_heads().iter().map(|h| hex::encode(h.0)).collect();
         let change_count = doc.get_changes(&[]).len() as u64;
 

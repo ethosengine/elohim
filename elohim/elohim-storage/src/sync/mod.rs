@@ -123,7 +123,17 @@ impl SyncManager {
         doc_id: &str,
         changes: Vec<Vec<u8>>,
     ) -> Result<Vec<String>, StorageError> {
-        let mut doc = self.get_or_create_doc(h_app_id, doc_id).await?;
+        // Keep the stored bytes: an apply that changes nothing (a peer
+        // re-delivering changes this doc already holds) must not rewrite the
+        // whole document — see `DocStore::save_if_changed`.
+        let (mut doc, stored) = match self.doc_store.get(h_app_id, doc_id).await? {
+            Some(stored) => {
+                let doc = Automerge::load(&stored.data)
+                    .map_err(|e| StorageError::Sync(format!("Failed to load doc: {}", e)))?;
+                (doc, Some(stored.data))
+            }
+            None => (self.get_or_create_doc(h_app_id, doc_id).await?, None),
+        };
 
         // Apply each change blob incrementally
         for change_bytes in changes {
@@ -131,7 +141,8 @@ impl SyncManager {
                 .map_err(|e| StorageError::Sync(format!("Failed to apply changes: {}", e)))?;
         }
 
-        // Save updated document
+        // Save updated document (skipped when byte-identical to what is stored)
+        let _ = &stored; // RED: old behaviour
         self.doc_store.save(h_app_id, doc_id, &doc).await?;
 
         // Return new heads
@@ -552,5 +563,203 @@ mod tests {
                 "{bad} must be Ok(None)"
             );
         }
+    }
+
+    /// Total bytes of every file under `dir` (sled keeps large values as
+    /// separate blob files, so the directory — not one file — is the footprint).
+    fn dir_bytes(dir: &std::path::Path) -> u64 {
+        let mut total = 0;
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            total += if path.is_dir() {
+                dir_bytes(&path)
+            } else {
+                std::fs::metadata(&path).unwrap().len()
+            };
+        }
+        total
+    }
+
+    /// A string that DEFLATE cannot shrink, so the saved doc really is `len` bytes.
+    fn incompressible(len: usize) -> String {
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        (0..len)
+            .map(|_| {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                char::from(b'!' + ((state >> 33) % 90) as u8)
+            })
+            .collect()
+    }
+
+    /// The alpha-fleet defect: a peer that cannot name our heads answers every
+    /// round with the doc's whole history, which we already hold. That apply
+    /// changes nothing, so it must not rewrite the stored document — the
+    /// `last_modified` stamp of the stored copy stays where the real write put it.
+    #[tokio::test]
+    async fn redelivered_history_does_not_rewrite_the_stored_document() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let (ns, id) = ("elohim", "node:manifesto");
+        let mut author = Automerge::new();
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "manifesto")?;
+                tx.put(automerge::ROOT, "body", "v1")?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes(ns, id, vec![author.save()])
+            .await
+            .unwrap();
+        let first = sync.doc_store.get(ns, id).await.unwrap().unwrap();
+
+        let (whole_history, _) = sync.get_changes_since(ns, id, &[]).await.unwrap();
+        for _ in 0..3 {
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            let heads = sync
+                .apply_changes(ns, id, whole_history.clone())
+                .await
+                .unwrap();
+            assert_eq!(heads, first.heads, "a redelivery must not move the heads");
+        }
+        let after = sync.doc_store.get(ns, id).await.unwrap().unwrap();
+        assert_eq!(after.data, first.data);
+        assert_eq!(
+            after.last_modified, first.last_modified,
+            "a no-op apply must not rewrite the stored document"
+        );
+        assert_eq!(sync.get_doc_field(ns, id, "body").await.unwrap(), "v1");
+    }
+
+    /// The skip never drops a real change: a new change after redeliveries is
+    /// stored, and survives a reload.
+    #[tokio::test]
+    async fn a_new_change_after_redeliveries_is_still_stored() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let (ns, id) = ("elohim", "node:concept-skip");
+        let mut author = Automerge::new();
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "v1")?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes(ns, id, vec![author.save()])
+            .await
+            .unwrap();
+        sync.apply_changes(ns, id, vec![author.save()])
+            .await
+            .unwrap();
+
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "v2")?;
+                Ok(())
+            })
+            .unwrap();
+        let heads = sync
+            .apply_changes(ns, id, vec![author.save()])
+            .await
+            .unwrap();
+        let expected: Vec<String> = author
+            .get_heads()
+            .iter()
+            .map(|h| hex::encode(h.0))
+            .collect();
+        assert_eq!(heads, expected);
+        assert_eq!(sync.get_heads(ns, id).await.unwrap(), expected);
+        assert_eq!(sync.get_doc_field(ns, id, "title").await.unwrap(), "v2");
+    }
+
+    /// A change whose dependency has not arrived leaves the heads where they
+    /// were, but Automerge queues it and `save()` retains it. The skip compares
+    /// encoded bytes, not heads, so that orphan is still persisted: when its
+    /// dependency arrives in a LATER apply (which reloads from the store), both
+    /// land.
+    #[tokio::test]
+    async fn an_orphaned_change_is_persisted_even_though_heads_do_not_move() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let (ns, id) = ("elohim", "node:concept-orphan");
+        let mut base = Automerge::new();
+        base.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, "seed", "s")?;
+            Ok(())
+        })
+        .unwrap();
+        sync.apply_changes(ns, id, vec![base.save()]).await.unwrap();
+        let held_heads = sync.get_heads(ns, id).await.unwrap();
+
+        let mut author = base.fork();
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "one")?;
+                Ok(())
+            })
+            .unwrap();
+        let after_one = author.get_heads();
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "title", "two")?;
+                Ok(())
+            })
+            .unwrap();
+        let second_only = author.save_after(&after_one);
+        let first_only = author
+            .get_change_by_hash(&after_one[0])
+            .expect("the author holds its own first change")
+            .raw_bytes()
+            .to_vec();
+
+        let heads = sync.apply_changes(ns, id, vec![second_only]).await.unwrap();
+        assert_eq!(heads, held_heads, "an orphan does not move the heads");
+
+        sync.apply_changes(ns, id, vec![first_only]).await.unwrap();
+        let expected: Vec<String> = author
+            .get_heads()
+            .iter()
+            .map(|h| hex::encode(h.0))
+            .collect();
+        assert_eq!(
+            sync.get_heads(ns, id).await.unwrap(),
+            expected,
+            "the orphan persisted by the earlier apply must land once its dependency arrives"
+        );
+        assert_eq!(sync.get_doc_field(ns, id, "title").await.unwrap(), "two");
+    }
+
+    /// The footprint bound itself: a multi-megabyte doc redelivered every round
+    /// must not grow `sync.sled`. Before the skip, each redelivery rewrote the
+    /// whole doc and sled 0.34 kept the previous copy's blob file.
+    #[tokio::test]
+    async fn redelivering_a_large_doc_does_not_grow_the_sled_footprint() {
+        let (sync, tmp) = test_sync_manager().await;
+        let (ns, id) = ("elohim", "node:large");
+        let mut author = Automerge::new();
+        author
+            .transact::<_, _, automerge::AutomergeError>(|tx| {
+                tx.put(automerge::ROOT, "body", incompressible(2 * 1024 * 1024))?;
+                Ok(())
+            })
+            .unwrap();
+        sync.apply_changes(ns, id, vec![author.save()])
+            .await
+            .unwrap();
+        sync.doc_store.flush().await.unwrap();
+        let sled_dir = tmp.path().join("sync-mod.sled");
+        let baseline = dir_bytes(&sled_dir);
+
+        let (whole_history, _) = sync.get_changes_since(ns, id, &[]).await.unwrap();
+        for _ in 0..10 {
+            sync.apply_changes(ns, id, whole_history.clone())
+                .await
+                .unwrap();
+        }
+        sync.doc_store.flush().await.unwrap();
+        let after = dir_bytes(&sled_dir);
+        assert!(
+            after <= baseline + 1024 * 1024,
+            "ten redeliveries grew sync.sled from {baseline} to {after} bytes"
+        );
     }
 }

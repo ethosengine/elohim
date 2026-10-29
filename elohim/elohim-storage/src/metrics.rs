@@ -1939,6 +1939,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Sync DocStore document writes after an apply, by outcome: "written"
+    /// (the encoded document changed and was stored) | "unchanged" (it was
+    /// byte-identical to the stored copy, so the rewrite was skipped). A high
+    /// "unchanged" rate names a peer re-delivering changes this node already
+    /// holds; each skipped write is a whole-document sled rewrite not made.
+    pub static ref SYNC_DOC_WRITES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_doc_writes_total",
+            "Sync DocStore document writes after an apply, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Blob fetches attempted over iroh-blobs. label: result = "ok" |
     /// "dial_failed" | "not_found" | "verify_failed" | "error".
     pub static ref IROH_BLOB_FETCHES: IntCounterVec = IntCounterVec::new(
@@ -3732,6 +3746,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(IROH_SYNC_REQUESTS.clone()));
         let _ = REGISTRY.register(Box::new(IROH_SYNC_CHANGES_APPLIED.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_DOC_WRITES.clone()));
+        for outcome in ["written", "unchanged"] {
+            SYNC_DOC_WRITES.with_label_values(&[outcome]).inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(IROH_BLOB_FETCHES.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
@@ -4893,6 +4911,11 @@ pub fn inc_iroh_sync_request(kind: &str, result: &str) {
 /// Record Automerge changes applied from an iroh sync answer.
 pub fn add_iroh_sync_changes_applied(n: u64) {
     IROH_SYNC_CHANGES_APPLIED.inc_by(n);
+}
+
+/// Record one sync DocStore write outcome ("written" | "unchanged").
+pub fn inc_sync_doc_write(outcome: &str) {
+    SYNC_DOC_WRITES.with_label_values(&[outcome]).inc();
 }
 
 /// Record one iroh-blobs fetch by result.
