@@ -46,6 +46,12 @@ start until all three are closed.**
    returns the rows without verifying the signature against `agentId`.
    - Cure: deserialize the typed `BuildAttestationContentNode`, check the canonical signature and
      the stored CID relationship, and test forged `agentId`, altered `success` and bad signatures.
+   - Status 2026-10-29: implemented on brit branch `feat/daily-driver-evidence-layer` (slice G2 of the brit
+     daily-driver sprint, commit `628c2edd98`): strict typed decode, signature verified against the note's own
+     `agentId`, rows bound to their step and `inputsHash`, failure kept distinct from absence. The live corpus
+     verifies 90/90 build notes and 24/24 covenant refs. The gap closes when brit main carries it and the
+     parent pin moves. Still open for S2: a build attestation does not sign the commit it annotates, so the
+     notes-tree placement is unauthenticated (a signed-shape change; next brit sprint).
 
 Probe for done: an a2o station under `genesis/a2o/features/devflow/` where a device outside the
 admitted roster, and a local forged `via:`, each try to cause a lease effect or a sibling reuse, and
