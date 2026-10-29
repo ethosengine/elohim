@@ -357,6 +357,9 @@ dev action="status" profile="isolated" seed="false" build="false" *extra:
         esac
         exec "{{ app_dir }}/scripts/hc-start.sh" --conductor
         ;;
+      # Private declared-view reader: `just dev view <repo-relative declaration>`; nothing
+      # starts unless asked, and the reader binds loopback only (app/scripts/local-view-launcher.sh).
+      view) exec "{{ root }}/app/scripts/local-view-launcher.sh" "{{ profile }}" ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
       package)
         package_app="{{ profile }}"
@@ -375,7 +378,7 @@ dev action="status" profile="isolated" seed="false" build="false" *extra:
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be start|conductor|app|package|view|shift|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
