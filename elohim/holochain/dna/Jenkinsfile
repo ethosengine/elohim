@@ -222,6 +222,7 @@ def runSweettestShard(int n, int total, String shardPodYaml) {
  * Runs with cwd = elohim/holochain/dna/elohim (elohim.happ, dna-hashes.actual).
  */
 def pushHappCandidate(String commit) {
+    if (env.BRANCH_NAME != 'dev' && env.BRANCH_NAME != 'main') return
     withCredentials([usernamePassword(
         credentialsId: 'harbor-robot-registry',
         usernameVariable: 'HARBOR_USER',
@@ -1050,7 +1051,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') } }
             steps {
                 container('builder') {
                     dir('elohim/holochain/dna/elohim') {
@@ -1074,7 +1075,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
 
                             // Determine floating tag for K8s manifests
-                            def floatingTag = (env.BRANCH_NAME == 'main') ? 'latest' : 'dev-latest'
+                            def floatingTag = (env.BRANCH_NAME == 'dev') ? 'dev-latest' : 'latest'
 
                             // Push hApp and WASM to Harbor
                             withCredentials([usernamePassword(
