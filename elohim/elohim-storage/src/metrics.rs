@@ -1939,20 +1939,6 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Sync DocStore document writes after an apply, by outcome: "written"
-    /// (the encoded document changed and was stored) | "unchanged" (it was
-    /// byte-identical to the stored copy, so the rewrite was skipped). A high
-    /// "unchanged" rate names a peer re-delivering changes this node already
-    /// holds; each skipped write is a whole-document sled rewrite not made.
-    pub static ref SYNC_DOC_WRITES: IntCounterVec = IntCounterVec::new(
-        Opts::new(
-            "elohim_sync_doc_writes_total",
-            "Sync DocStore document writes after an apply, by outcome.",
-        ),
-        &["outcome"],
-    )
-    .unwrap();
-
     /// Blob fetches attempted over iroh-blobs. label: result = "ok" |
     /// "dial_failed" | "not_found" | "verify_failed" | "error".
     pub static ref IROH_BLOB_FETCHES: IntCounterVec = IntCounterVec::new(
@@ -2145,6 +2131,24 @@ lazy_static! {
     pub static ref SYNC_IN_SYNC_TOTAL: IntCounter = IntCounter::new(
         "elohim_sync_in_sync_total",
         "Sync rounds where a peer answered InSync (digest match, nothing enumerated).",
+    )
+    .unwrap();
+}
+
+// The sync DocStore write outcomes sit in their own block for the same reason
+// as the one below: the first block is at the crate's macro recursion limit.
+lazy_static! {
+    /// Sync DocStore document writes after an apply, by outcome: "written"
+    /// (the encoded document changed and was stored) | "unchanged" (it was
+    /// byte-identical to the stored copy, so the rewrite was skipped). A high
+    /// "unchanged" rate names a peer re-delivering changes this node already
+    /// holds; each skipped write is a whole-document sled rewrite not made.
+    pub static ref SYNC_DOC_WRITES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_doc_writes_total",
+            "Sync DocStore document writes after an apply, by outcome.",
+        ),
+        &["outcome"],
     )
     .unwrap();
 }
