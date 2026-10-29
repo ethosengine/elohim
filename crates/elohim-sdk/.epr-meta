@@ -10,7 +10,7 @@ purpose: >
 ---
 # crates/elohim-sdk — Rust client SDK
 
-The [application lifecycle composition map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+The [application lifecycle composition map](../../.epr-meta/composition.md#application-lifecycle--authoritative-homes-and-composition)
 and [SDK contract home](../../elohim/sdk/.epr-meta) also govern the Rust client surface.
 Mirror the shared working-version, sync-state and publication semantics as they are
 implemented; do not fork their vocabulary or make HTTP availability a prerequisite

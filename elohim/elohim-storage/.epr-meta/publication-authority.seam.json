@@ -19,7 +19,7 @@
       "status": "planned"
     },
     {
-      "path": ".epr-meta/manifest.md",
+      "path": ".epr-meta/composition.md",
       "needle": "Editor admission comes from signed authorization, never a merged field.",
       "status": "contract"
     }

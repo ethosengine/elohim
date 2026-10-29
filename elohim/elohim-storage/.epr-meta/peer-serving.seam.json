@@ -6,7 +6,7 @@
   "allowedConsumers": ["doorway/*"],
   "authoritativeContracts": [
     {
-      "path": ".epr-meta/manifest.md",
+      "path": ".epr-meta/composition.md",
       "needle": "Do not make doorway the sole owner of drafts, publication or app execution.",
       "status": "contract"
     }

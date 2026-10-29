@@ -308,3 +308,22 @@ fn abstention_cannot_hide_failure_and_invalid_method_revisions_invalidate_review
         "invalid"
     );
 }
+
+#[test]
+fn guidance_is_silent_until_a_cascade_binds_it() {
+    let dir = TempDir::new().unwrap();
+    put(
+        dir.path(),
+        ".epr-meta/manifest.md",
+        "---\nepr-meta-version: 1\nid: unbound\nroot: true\n---\nNo seam binding here.\n",
+    );
+    let report = classify(
+        dir.path(),
+        "app/src/drafts.ts",
+        "export const bytes = Automerge.save(doc);\n",
+    );
+    assert_eq!(report["enabled"], false);
+    assert_eq!(report["packet"], "");
+    assert_eq!(report["coverageGaps"], json!([]));
+    assert_eq!(report["candidates"], json!([]));
+}

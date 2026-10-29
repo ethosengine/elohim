@@ -74,6 +74,10 @@ pub fn evaluate(root: &Path, input: &Value) -> Value {
     let mut candidates = Vec::new();
     let mut gaps = Vec::new();
     let mut evaluations = Vec::new();
+    // Guidance is opt-in: a repository whose cascade binds the validator for none of the
+    // proposed targets has not enabled it, and that is silence, not a coverage gap.
+    let mut bound_targets = 0usize;
+    let mut unbound = Vec::new();
     for change in &proposal.changes {
         // Deletion and rename source must be covered too. Guidance never authorizes either.
         let targets = if let Some(from) = &change.from {
@@ -105,8 +109,10 @@ pub fn evaluate(root: &Path, input: &Value) -> Value {
                             .or_else(|| rule.parameters["ref"].as_str())
                             == Some(classify::REFERENCE)
                     });
-                    if !bound {
-                        gaps.push(json!(format!("no native seam binding for {target}")));
+                    if bound {
+                        bound_targets += 1;
+                    } else {
+                        unbound.push(json!(format!("no native seam binding for {target}")));
                     }
 
                     for verdict in &evaluation.verdicts {
@@ -140,6 +146,11 @@ pub fn evaluate(root: &Path, input: &Value) -> Value {
             }
         }
     }
+    if bound_targets == 0 && gaps.is_empty() {
+        return json!({"advisoryOnly": true, "enabled": false, "candidates": [],
+            "coverageGaps": [], "packet": ""});
+    }
+    gaps.extend(unbound);
     // Includes session/repository, every proposed byte, resolved governance and source identities.
     let binding = json!({"version": 1, "proposal": proposal, "evaluations": evaluations});
     let proposal_id = identity(

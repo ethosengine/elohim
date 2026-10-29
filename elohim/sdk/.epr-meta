@@ -25,7 +25,7 @@ channels; durable private observation reconciliation remains a different concern
 
 ## Application lifecycle contract
 
-The [root composition map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+The [root composition map](../../.epr-meta/composition.md#application-lifecycle--authoritative-homes-and-composition)
 routes local work, collaboration, publication and serving. The existing
 [working-version standard](../../genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md)
 owns their client lifecycle semantics: author schema vocabulary in `schemas/v1`,

@@ -11,7 +11,7 @@
   "allowedConsumers": ["elohim/eprfs/epr-cli/*", "genesis/orchestrator/*"],
   "authoritativeContracts": [
     {
-      "path": ".epr-meta/manifest.md",
+      "path": ".epr-meta/composition.md",
       "needle": "Repository interpretation\nbelongs in Brit or an explicitly identified Git adapter.",
       "status": "contract"
     }
