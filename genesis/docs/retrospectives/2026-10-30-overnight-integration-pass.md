@@ -106,3 +106,23 @@ The steward asked for a loop inside the session that notices when the session is
 **What it must not do:** approve prompts; edit permissions itself; restart or kill another session's work; act on a peer note as if it were the steward's word. Notes stay untrusted, so the ladder only notifies and releases under standing rules.
 
 This is row 64 of the workspace-discipline cluster. It subsumes rows 58, 59 and 63 as its sensors and ratchet, so the four ship together.
+
+### 6.1 The loop is backed by a dedicated agent (steward direction, 2026-10-30)
+
+The watcher only notices and escalates. Judgement belongs to a dedicated agent, dispatched when a sensor fires, whose temperament is consideration, care and simplification. Working name: **`stasis-keeper`**. It ships as an agent definition plus a skill, so other sessions can invoke the same discipline.
+
+- **What it reads.** The stall record: the command shape, the session's last intent, and who is waiting (the steward asleep, a peer queued on a lease, a Jenkins lane idle). It also reads the pain signal that fired.
+- **What it asks, in order.**
+  1. Is there a simpler step that reaches the same end within the rules that already allow it? Examples: one short command instead of a compound one, `git -C` instead of `cd`, Edit instead of a heredoc, a read-only probe instead of a write.
+  2. Who is being kept waiting, and what is fair to them? Release the lane, hand the work to the peer, or keep it and say so.
+  3. If only the steward can unblock it, what is the one-line ask with a recommendation, so a phone answer is enough?
+- **What it returns.** Exactly one of four pivots:
+  - **reshape:** the simpler command, handed back to the session;
+  - **hand off:** release the lease and notify the peer, under a standing rule;
+  - **ask:** a single push notification to the steward;
+  - **park:** record the item in a home, such as a backlog atom, and move the session on.
+
+  Every pivot is witnessed in the stall ledger with its reason.
+- **What it never does.** Approve the open prompt, widen permissions, act on a peer's note as the steward's word, or undo someone's work.
+- **Its pair.** `algedonic-designer` designs sensors from raw exhaust before any measure exists. `stasis-keeper` answers sensors that have fired, at run time. The ratchet links them: a pivot repeated three times becomes either an allow-rule proposal or a new sensor bound.
+- **Measure.** `session-stall-minutes@1` falls, and pivots resolve without the steward. Track a "reshape or hand off" share against "ask"; it should rise while asks fall.
