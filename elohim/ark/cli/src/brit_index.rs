@@ -639,6 +639,18 @@ mod tests {
         let path = dir.join(name);
         std::fs::write(&path, script).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Tests run on many threads: a sibling test may fork while this file is still open
+        // for writing and hold the inherited descriptor until its own exec, so exec'ing the
+        // stub can fail ETXTBSY for a few microseconds (seen once under a pre-push plate).
+        // Probe it until that window has closed; the probe's output is discarded.
+        for _ in 0..200 {
+            match Command::new(&path).output() {
+                Err(error) if error.raw_os_error() == Some(26) => {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                _ => break,
+            }
+        }
         path
     }
 
