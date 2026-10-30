@@ -959,8 +959,25 @@ pub fn handle_mishpat_signal(
                         }
                     }
 
-                    crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
-                        .map_err(|e| StorageError::Database(e.to_string()))?;
+                    let projected =
+                        crate::db::mishpat_commitments::upsert_with_anchor(conn, new_row)
+                            .map_err(|e| StorageError::Database(e.to_string()))?;
+                    // A revocation that arrived before this commitment was
+                    // applied to the row by the upsert; withdraw the mirror the
+                    // arm above just wrote, or a revoked promise reads as live
+                    // coverage.
+                    if projected.revoked_at.is_some() {
+                        if let Err(e) = crate::db::rea_commitments::cancel_mirrored_replication(
+                            conn,
+                            &projected.cid,
+                        ) {
+                            tracing::warn!(
+                                error = %e,
+                                cid = %projected.cid,
+                                "handle_mishpat_signal: mirror cancel for an already-revoked commitment failed (non-fatal)"
+                            );
+                        }
+                    }
                     tracing::info!(
                         cid = %entry_hash,
                         action_hash = %action_hash,
@@ -1010,6 +1027,12 @@ pub fn handle_mishpat_signal(
                     // both; each no-ops (0 rows) when the CID lives in the other
                     // table. Without the lenses call a revoke targeting a lens
                     // silently matched 0 rows and the lens stayed live in the market.
+                    // The revocation is also kept apart from the row it names,
+                    // so one that lands before its target is applied when the
+                    // target arrives (`upsert_with_anchor`, and the mirror
+                    // check in the Upsert arm above).
+                    crate::db::mishpat_revocations::record_projected(conn, &target_cid, &signed_at)
+                        .map_err(|e| StorageError::Database(e.to_string()))?;
                     let affected_commitments = crate::db::mishpat_commitments::set_revoked_at(
                         conn,
                         &target_cid,

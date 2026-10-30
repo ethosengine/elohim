@@ -184,6 +184,10 @@ pub mod acquisition_pins;
 // Spec: 2026-06-07-epr-acquisition-pull-queue-design.md §6.5.
 pub mod mishpat_commitments;
 
+// Mishpat revocations — projected revocation tombstones (Category A projection)
+// and this peer's own record of the revocations it submitted (local).
+pub mod mishpat_revocations;
+
 // Release ledger — the releases this peer's adoption controller has verified,
 // in first-seen order (Category C, local). Read by the release retention pass.
 pub mod release_ledger;
