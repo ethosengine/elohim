@@ -7864,6 +7864,15 @@ async fn handle_request(
     // received — the tile measures inbound load, not successful responses.
     state.request_counters.increment(request_category(&path));
 
+    // ── Local declared-view relay (opt-in, developer-only) ─────────────────
+    // Not a registry route: its target is a loopback reader on this machine,
+    // not a storage peer. Dormant unless LOCAL_VIEW_READER_URL names a loopback
+    // http reader; until then every /api/local-views request answers 404 and
+    // no other path reaches this branch (server/local_peer.rs).
+    if super::local_peer::is_local_view_path(&path) {
+        return Ok(to_boxed(super::local_peer::relay(req).await));
+    }
+
     // ── Wisdom-as-system-auth gate ─────────────────────────────────────────────
     // Fires before any routing for state-changing methods on gate-mapped paths.
     // In DevContext (Phase 1) the gate always allows — this is transparent to

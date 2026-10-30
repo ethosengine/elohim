@@ -1,0 +1,26 @@
+---
+epr-meta-version: 1
+id: peer-application-serving-composition
+purpose: >
+  The declared home for peer-native app serving and rendering, composed with storage
+  into the node runtime. Links the application lifecycle to the existing hub/web seam;
+  private declared-view serving is implemented here; broader application runtime composition remains planned.
+---
+
+# elohim-hub — peer application serving
+
+The [root lifecycle map](../../.epr-meta/manifest.md#application-lifecycle--authoritative-homes-and-composition)
+routes applications here for peer-native serving. The existing
+[hub boundary design](../../genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md)
+owns the split; [this directory's placement guide](README.md#the-web-seam) describes
+the test and current implementation debt. Follow that guide when extending the
+runtime code and its manifest-owned gate.
+
+Own app-file serving, rendering and deliverability when a peer can be addressed and
+verified by key. Compose storage's verified bytes and head decisions; do not elect a
+new canonical head based on what can render. A locally held usable version can be
+served with its observed status. SDK/storage own working-state persistence and sync;
+doorway owns browser/web2 accommodation. The same peer service must work without a
+doorway, and the hub must not depend on doorway names or certificates. Test peer-local
+serving before claiming its doorway projection delivers the same capability. Review
+and existing storage/doorway placement advisories hold this boundary today.

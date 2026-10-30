@@ -1,0 +1,24 @@
+[package]
+name = "elohim-hub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# The elohim workspace's axum line; the hub binds and serves its own listener, so no
+# consumer's axum version has to match it.
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+base64 = "0.22"
+ts-rs = { version = "10.1", features = ["serde-json-impl"] }
+# The `epr view` capture evaluator. Default features (`peer`, `lsp`) carry the iroh peer and
+# the language server; a projection reader needs neither.
+elohim-epr-cli = { path = "../eprfs/epr-cli", default-features = false }
+eprfs-core = { path = "../eprfs/eprfs-core" }
+rustix = { version = "1", features = ["fs"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
