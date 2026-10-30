@@ -9,6 +9,7 @@ purpose: >
   (did-tests). Wire shapes here are STANDARDS-BOUND: the contract is the W3C DID 1.1 TR,
   mechanized locally as schemas/did-document-1.1.schema.json + the did11_conformance tests.
 rules:
+  - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: did11-conformance-on-wire-shape-edits
     class: inject
     when: { write: "*.rs", contains-any: ["DidDocument", "VerificationMethod", "publicKeyMultibase", "@context", "DID_CONTEXT"] }

@@ -30,6 +30,44 @@ def yaml_available() -> bool:
     return yaml is not None
 
 
+# Invocation-scoped parse memo (opt-in via `parse_memo()`): a gate that resolves many cascades
+# over the same manifests re-parses the same YAML dozens of times (46 pure-Python parses, ~14 s,
+# for one 8-file commit). Inside the context each distinct text is parsed once — with libyaml's
+# C loader when present — and every caller receives its own deep copy, so no caller can see
+# another's mutation. Outside the context behaviour is byte-for-byte the previous safe_load.
+import contextlib as _contextlib
+import copy as _copy
+
+_PARSE_MEMO: dict | None = None
+
+
+def _safe_load(text: str):
+    if _PARSE_MEMO is None:
+        return yaml.safe_load(text)
+    key = hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
+    if key not in _PARSE_MEMO:
+        try:
+            loader = getattr(yaml, "CSafeLoader", None) or yaml.SafeLoader
+            _PARSE_MEMO[key] = ("ok", yaml.load(text, Loader=loader))  # noqa: S506 — safe loader
+        except Exception as e:  # noqa: BLE001 — replayed to every caller exactly as raised
+            _PARSE_MEMO[key] = ("err", e)
+    kind, value = _PARSE_MEMO[key]
+    if kind == "err":
+        raise value
+    return _copy.deepcopy(value)
+
+
+@_contextlib.contextmanager
+def parse_memo():
+    global _PARSE_MEMO
+    outer = _PARSE_MEMO
+    _PARSE_MEMO = {} if outer is None else outer
+    try:
+        yield
+    finally:
+        _PARSE_MEMO = outer
+
+
 def _flow_depth_ok(text: str) -> bool:
     """Cheap O(n) guard: reject a manifest whose flow-collection nesting (`[`/`{`) exceeds
     MAX_FLOW_DEPTH, so a `[[[[…]]]]` parse-bomb never reaches PyYAML (which RecursionErrors ~2s,
@@ -98,7 +136,7 @@ def load_meta(path: Path) -> dict:
     if block is None or yaml is None:
         return {}
     try:
-        data = yaml.safe_load(block) or {}
+        data = _safe_load(block) or {}
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}
@@ -335,7 +373,7 @@ def check_meta(path: Path) -> list[str]:
     if yaml is None:
         return []  # PyYAML-absent is surfaced as its own advisory by the hook, not a per-manifest error
     try:
-        data = yaml.safe_load(block)
+        data = _safe_load(block)
     except Exception:
         return ["not valid YAML"]
     if data is None:
@@ -1837,7 +1875,33 @@ def _escalation_ladder(write: dict) -> bool:
     return any(not _rule_backed_by_ratified_policy(rid, content, policies) for rid in introduced)
 
 
+# ── Commit-time formatting ratchet (`epr:validator-staged-format`, bound by commit-format-ratchet@1).
+# The measurement happens in the staged git adapter (_lib.epr_meta_git.format_phase via
+# _lib.epr_format), which materializes the index and its committed config closure and runs the
+# pinned formatters; the adapter hands this callback a precomputed per-file result under
+# `write["staged_format"]`. Outside that adapter (the Claude PreToolUse resolver, the range gate,
+# the native evaluator) there is no commit evidence, so the validator is NOT APPLICABLE — it
+# returns None, which is never a claim that the file was checked. Drift takes the rule's declared
+# class (deny); an unmeasured result (missing tool, parse failure, timeout) routes to `ask` with
+# the install cure; clean / debt / ignored / outside fire nothing (debt is reported by the adapter).
+def _staged_format(write: dict) -> Verdict | None:
+    result = write.get("staged_format")
+    if not isinstance(result, dict):
+        return None
+    state = result.get("state")
+    cure = result.get("cure") or ""
+    if state == "drift":
+        return Verdict(None, f"{result.get('reason')}. Cure: {cure}", None,
+                       "formatting-drift", result.get("evidence") or None)
+    if state == "unmeasured":
+        return Verdict("ask", f"formatting UNMEASURED for {result.get('path')}: "
+                              f"{result.get('reason')}. Cure: {cure or 'see the reason'}",
+                       None, "formatter-unmeasured", result.get("evidence") or None)
+    return None
+
+
 REFERENCE_VALIDATORS = {
+    "epr:validator-staged-format": _staged_format,
     "epr:validator-p2p-design-gate": _p2p_design_gate,
     "epr:validator-brand-vocabulary-boundary": _brand_vocabulary_boundary,
     "epr:validator-sovereignty-ontology-guard": _sovereignty_ontology_guard,
@@ -1910,7 +1974,7 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
         text = p.read_text()
         if not _flow_depth_ok(text):
             return {}, [f"{POLICY_REGISTRY_REL} nesting too deep — refusing to parse"]
-        data = yaml.safe_load(text) or {}
+        data = _safe_load(text) or {}
     except Exception as e:  # noqa: BLE001
         return {}, [f"{POLICY_REGISTRY_REL} unreadable/invalid: {e}"]
     if not isinstance(data, dict) or data.get("epr-meta-policies-version") != 1:

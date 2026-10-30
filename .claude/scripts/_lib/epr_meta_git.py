@@ -10,9 +10,13 @@ Real logic lives HERE (in _lib, tested under __tests__) so .claude/hooks/ stays 
 transport can be swapped — exactly what .claude/hooks/.epr-meta declares. Driven by the thin CLI
 .claude/scripts/epr-meta-git-gate.py and .husky/{pre-commit,pre-push}.
 
-Fail-open: a guard bug NEVER blocks a commit. Restorative (Mishpat, not punishment): a malformed
-manifest downgrades deny->ask; editing an .epr-meta is never blocked; consequence lands on the
-write (rejectable, fixable), never on the agent.
+Governance phase — fail-open: a governance-rule bug never blocks a commit. Restorative (Mishpat,
+not punishment): a malformed manifest downgrades deny->ask; editing an .epr-meta is never blocked;
+consequence lands on the write (rejectable, fixable), never on the agent.
+
+Formatting phase (`format_phase`, commit-format-ratchet@1) — fail-CLOSED by steward ruling
+2026-10-30 ("we should never commit unlinted code"): every failure is a refusing Verdict with a
+named cure, never an empty result. See the section at the bottom of this module.
 """
 from __future__ import annotations
 
@@ -136,3 +140,148 @@ def run(mode: str, rng: str | None, *, ack: bool, runner=git) -> tuple[int, list
         parent_exists = head_has_parent(mode, rng, path, runner=runner)
         verdicts.append(verdict_for(path, build_write(path, status, content, parent_exists)))
     return decide(verdicts, ack=ack)
+
+
+# ── Commit-time formatting ratchet (policy commit-format-ratchet@1) ──────────────────────────────
+# Separate from the governance comparison above on purpose: the native evaluator scopes
+# `epr:validator-staged-format` to Python (DeclaredElsewhere), so folding a formatting deny into
+# the per-file decision the two hosts compare would read as an EVALUATOR DISAGREEMENT. The CLI
+# folds this phase's exit into the final code instead, so a native permit never clears it.
+#
+# Unlike the governance phase, this phase does NOT fail open: a selected file without a completed
+# result, an unreadable index, or a concurrent index change refuses (deny, not acknowledgeable);
+# a missing tool or an unmeasurable file refuses as `ask` with its install cure (EPR_META_ACK=1
+# acknowledges, and the acknowledgement is witnessed). Bypassing all hooks stays git's own
+# `--no-verify` / HUSKY=0 — there is no new switch.
+from _lib import epr_format  # noqa: E402
+
+FORMAT_GATE_RULE = epr_format.FORMAT_POLICY_ID
+
+
+def _format_rules_for(target: Path, write: dict, cache: dict, policy_cache: dict):
+    """(matched staged-format rules, problem) for one snapshot path through the REAL cascade."""
+    key = str(target.parent)
+    if key not in cache:
+        chain = epr_meta.collect_cascade(target)
+        problems = [(m, errs) for m in chain if (errs := epr_meta.check_meta(m))]
+        merged = epr_meta.merge_rules(chain)
+        bound = [rid for rid, r in merged["rules"].items()
+                 if str(r.get("policy", "")).startswith(f"{epr_format.FORMAT_POLICY_ID}@")
+                 or r.get("validator") == epr_format.STAGED_FORMAT_VALIDATOR]
+        root = epr_meta.find_repo_root(target)
+        if str(root) not in policy_cache:
+            policy_cache[str(root)] = epr_meta.load_policies(root)
+        policies, pol_errs = policy_cache[str(root)]
+        exp_errs = epr_meta.expand_policies(merged, policies)
+        rules = {rid: r for rid, r in merged["rules"].items()
+                 if r.get("validator") == epr_format.STAGED_FORMAT_VALIDATOR}
+        problem = None
+        if problems:
+            problem = "; ".join(f"{m}: {', '.join(e)}" for m, e in problems)
+        lost = [rid for rid in bound if rid not in rules]
+        if lost:
+            problem = (f"formatting binding(s) {lost} did not resolve to the staged-format "
+                       f"validator ({'; '.join(pol_errs + exp_errs) or 'unknown cause'})")
+        cache[key] = (rules, problem)
+    rules, problem = cache[key]
+    matched = {rid: r for rid, r in rules.items()
+               if epr_meta._matches_when(r.get("when") or {}, write)}  # noqa: SLF001
+    return matched, problem
+
+
+def format_phase(repo: Path, *, git: "epr_format.Git | None" = None,
+                 scratch: Path | None = None) -> tuple[list[tuple[str, object]], list[str], dict]:
+    """Judge the STAGED index against every staged-format binding in its own committed cascade.
+    Returns ([(path, Verdict)], notices, stats). Never raises: every failure is a Verdict."""
+    repo = Path(repo)
+    git = git or epr_format.Git(repo)
+    verdicts: list[tuple[str, object]] = []
+    notices: list[str] = []
+    stats: dict = {"selected": 0, "checked": 0}
+
+    def refuse(cls: str, reason: str, refer: str):
+        verdicts.append(("(staged index)", epr_meta.Verdict(cls, reason,
+                                                             f"{FORMAT_GATE_RULE}:{refer}", refer)))
+
+    try:
+        with epr_meta.parse_memo(), epr_format.StagedFormatter(repo, git, scratch=scratch) as sf:
+            changes = epr_format.staged_changes(git, sf.head)
+            if not changes:
+                sf.verify_unchanged()
+                return verdicts, notices, stats
+            candidates = [c for c in changes
+                          if Path(c.path).suffix.lower() in epr_format.FORMAT_CANDIDATE_EXTS]
+            if candidates and not epr_meta.yaml_available():
+                refuse("ask", "PyYAML is unavailable, so the formatting policy cannot be resolved "
+                              f"for {len(candidates)} staged file(s). Cure: {epr_format.CURE_PYTHON}",
+                       "environment")
+                return verdicts, notices, stats
+            if any(c.path.endswith(".rs") for c in candidates) and epr_format.tomllib is None:
+                refuse("ask", "Python tomllib is unavailable, so Cargo editions cannot be "
+                              f"resolved. Cure: {epr_format.CURE_PYTHON}", "environment")
+                return verdicts, notices, stats
+            sf.prefetch_closure(changes)
+            rescans = sf.contract_rescans(changes)
+            if rescans:
+                sf.prefetch_closure(rescans)
+                changes = changes + rescans
+            # The governance closure, from the index: every ancestor manifest + the registry.
+            closure = [epr_format.POLICY_REGISTRY_REL]
+            for c in changes:
+                for d in epr_format.ancestors(c.path):
+                    closure.extend(epr_format.join(d, n) for n in epr_format.MANIFEST_CANDIDATES)
+            sf.index.prefetch(closure)
+            for rel in dict.fromkeys(closure):
+                if sf.index.read(rel) is not None:
+                    sf.index.materialize(rel)
+            cache: dict = {}
+            policy_cache: dict = {}
+            selected, rules_by_path = [], {}
+            for c in changes:
+                write = build_write(c.path, "A" if c.is_new else "M", None, True)
+                rules, problem = _format_rules_for(sf.index.path(c.path), write, cache,
+                                                   policy_cache)
+                if problem:
+                    refuse("ask", f"the formatting policy for {c.path} cannot be resolved from the "
+                                  f"staged manifests: {problem}. Fix the manifest or registry.",
+                           "policy-unresolved")
+                    return verdicts, notices, stats
+                if rules:
+                    selected.append(c)
+                    rules_by_path[c.path] = rules
+            stats["selected"] = len(selected)
+            if not selected:
+                sf.verify_unchanged()
+                return verdicts, notices, stats
+            try:
+                results = sf.judge(selected)
+            except epr_format.MissingTool as e:
+                refuse("ask", f"{e} — {len(selected)} governed staged file(s) cannot be checked. "
+                              f"Cure: {e.cure}", "missing-tool")
+                return verdicts, notices, stats
+            sf.verify_unchanged()
+            stats["rust_pool"] = epr_format.RUST_POOL
+            stats["prettier_workers"] = sf.prettier.launches
+            stats["git_calls"] = git.calls
+            for c in selected:
+                res = results.get(c.path)
+                if res is None:
+                    raise epr_format.EnforcementError(
+                        f"{c.path} was selected by the formatting policy but no result came back")
+                if res.state not in ("outside", "ignored"):
+                    stats["checked"] += 1
+                write = {"path": c.path, "content": None, "is_new": c.is_new,
+                         "is_new_subdir": False, "staged_format": res.as_dict()}
+                v = epr_meta.combine(epr_meta.evaluate({"rules": rules_by_path[c.path]}, write))
+                if v is not None:
+                    verdicts.append((c.path, v))
+                elif res.state == "debt":
+                    notices.append(f"[notice] {res.reason}. ({res.cure})")
+    except epr_format.EnforcementError as e:
+        refuse("deny", f"formatting gate could not complete: {e}", "enforcement")
+    except epr_format.GitError as e:
+        refuse("deny", f"formatting gate could not read the index: {e}", "enforcement")
+    except Exception as e:  # noqa: BLE001 — an engine bug refuses; it never permits silently
+        refuse("deny", f"formatting gate internal error: {type(e).__name__}: {e}. Report it; to "
+                       f"commit anyway bypass all hooks with --no-verify", "enforcement")
+    return verdicts, notices, stats

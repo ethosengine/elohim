@@ -147,9 +147,12 @@ def _native(evidence):
             "evaluator": {"id": "stub", "version": "0", "cid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e"}}
 
 
-def _run_gate(native):
+def _run_gate(native, fmt=None):
     saved = (gg.changed_files, gg.content_of, gg.head_has_parent, gg.verdict_for,
-             epr_client.govern, epr_meta.witness)
+             epr_client.govern, epr_meta.witness, gg.format_phase)
+    # The formatting phase has its own fixtures (epr_format_test.py, real repos and hooks); here
+    # it is stubbed so these cases isolate the governance fold.
+    gg.format_phase = lambda root, **k: (fmt or [], [], {})
     gg.changed_files = lambda mode, rng: [("docs/w.md", "A")]
     gg.content_of = lambda mode, rng, path: "Members hold a self-sovereign identity.\n"
     gg.head_has_parent = lambda mode, rng, path: True
@@ -167,7 +170,7 @@ def _run_gate(native):
     finally:
         os.chdir(cwd)
         (gg.changed_files, gg.content_of, gg.head_has_parent, gg.verdict_for,
-         epr_client.govern, epr_meta.witness) = saved
+         epr_client.govern, epr_meta.witness, gg.format_phase) = saved
     return code, err.getvalue()
 
 
@@ -178,5 +181,50 @@ check("frame line: stderr carries the advisory `[frame]` line naming `frame bafy
 check("frame line: stderr names the full classification CID", f"classification {_CID}" in _err)
 _code, _err = _run_gate(_native(None))
 check("no evidence: exit 0 and no `[frame]` line", _code == 0 and "[frame]" not in _err)
+
+# ── the formatting phase folds into the exit OUTSIDE the two-host comparison ──
+_DRIFT = Verdict("deny", "x.rs was rustfmt-formatted at HEAD and this commit leaves it unformatted",
+                 "commit-format-ratchet", "formatting-drift")
+_MISSING = Verdict("ask", "rustfmt is not installed. Cure: rustup component add rustfmt --toolchain 1.96.1",
+                   "commit-format-ratchet:missing-tool", "missing-tool")
+_code, _err = _run_gate(_native(None), fmt=[("x.rs", _DRIFT)])
+check("format drift refuses even when the native evaluator PERMITS", _code == 1)
+check("…without an EVALUATOR DISAGREEMENT (formatting is not a compared decision)",
+      "DISAGREEMENT" not in _err and "commit refused by the formatting ratchet" in _err)
+os.environ["EPR_META_ACK"] = "1"
+try:
+    _code_ack, _ = _run_gate(_native(None), fmt=[("x.rs", _DRIFT)])
+    _code_missing_ack, _err_m = _run_gate(_native(None), fmt=[("(staged index)", _MISSING)])
+finally:
+    del os.environ["EPR_META_ACK"]
+check("EPR_META_ACK=1 does not waive formatting drift (deny)", _code_ack == 1)
+check("EPR_META_ACK=1 acknowledges a missing formatter (ask)", _code_missing_ack == 0
+      and "acknowledged" in _err_m)
+_code_m, _err_m = _run_gate(_native(None), fmt=[("(staged index)", _MISSING)])
+check("a missing formatter refuses with its cure without acknowledgement",
+      _code_m == 1 and "rustup component add rustfmt" in _err_m)
+
+# ── a staged-mode internal error refuses (named cure); --range keeps fail-open ──
+import subprocess  # noqa: E402
+
+_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+with tempfile.TemporaryDirectory() as _td:
+    _boom = Path(_td) / "boom.py"
+    _boom.write_text(
+        "import runpy, sys\n"
+        f"sys.path.insert(0, {str(REPO / '.claude/scripts')!r})\n"
+        "from _lib import epr_meta_git\n"
+        "def _raise(*a, **k): raise RuntimeError('engine exploded')\n"
+        "epr_meta_git.format_phase = _raise\n"
+        "epr_meta_git.changed_files = _raise\n"
+        f"sys.argv = [{str(REPO / '.claude/scripts/epr-meta-git-gate.py')!r}] + sys.argv[1:]\n"
+        "runpy.run_path(sys.argv[0], run_name='__main__')\n")
+    _staged = subprocess.run([sys.executable, str(_boom), "--staged"], cwd=_td, env=_env,
+                             capture_output=True, text=True)
+    _ranged = subprocess.run([sys.executable, str(_boom), "--range", "A..B"], cwd=_td, env=_env,
+                             capture_output=True, text=True)
+check("--staged: an internal error REFUSES with a named cure",
+      _staged.returncode == 1 and "--no-verify" in _staged.stderr)
+check("--range: an internal error keeps the fail-open posture", _ranged.returncode == 0)
 
 print(f"\n{_passed} checks passed")
