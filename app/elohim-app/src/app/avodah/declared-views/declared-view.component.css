@@ -189,10 +189,10 @@ svg text {
   stroke-width: 5;
 }
 .authored {
-  color: #818cf8;
+  color: var(--lamad-accent-secondary, #818cf8);
 }
 .accepted {
-  color: #10b981;
+  color: var(--lamad-success, #10b981);
 }
 .table-scroll {
   overflow-x: auto;
