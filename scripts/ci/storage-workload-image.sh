@@ -39,6 +39,58 @@ ANNOTATION="elohim.host/storage-inputs"
 ANNOTATION_JSONPATH='{.metadata.annotations.elohim\.host/storage-inputs}'
 HARBOR_PREFIX="${HARBOR_MANIFEST_URL_PREFIX:-https://harbor.ethosengine.com/v2}"
 
+# Non-closure sidecars are built on every ordinary edge run. DEPLOY_ONLY
+# retains their exact live template reference, never a checkout default.
+if [ "${1:-}" = --live-container ]; then
+    WORKLOAD="${2:?workload}" NS="${3:?namespace}" CONTAINER="${4:?container}" IMAGE="${5:?image}"
+    LIVE_IMAGE="$("${KUBECTL}" get "$WORKLOAD" -n "$NS" \
+        -o "jsonpath={.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].image}")" || {
+        echo "REFUSED ${WORKLOAD}: live ${CONTAINER} read failed" >&2; exit 1;
+    }
+    PREFIX="harbor.ethosengine.com/ethosengine/${IMAGE}:"
+    REF="${LIVE_IMAGE#"$PREFIX"}"
+    if [ "$REF" = "$LIVE_IMAGE" ] || ! [[ "$REF" =~ ^[a-zA-Z0-9_.-]+(@sha256:[a-f0-9]{64})?$ ]]; then
+        echo "REFUSED ${WORKLOAD}: no usable live ${CONTAINER} image" >&2; exit 1
+    fi
+    printf '%s\n' "$REF"
+    exit 0
+fi
+
+# Both closure images use the live pod template as their retention authority.
+# Deployment records bind the full closure to that exact digest-pinned reference.
+# No Node/Python dependency: this path runs in the deploy container.
+if [ "${1:-}" = "--live" ] || [ "${1:-}" = "--record-image" ]; then
+    MODE="$1" KIND="${2:?kind}" WORKLOAD="${3:?workload}" NS="${4:?namespace}"
+    case "$KIND" in
+        STORAGE) CONTAINER=elohim-node; IMAGE=elohim-storage ;;
+        DOORWAY) CONTAINER=doorway; IMAGE=elohim-doorway ;;
+        *) exit 2 ;;
+    esac
+    refuse() { echo "REFUSED ${WORKLOAD}: $*; cannot retain ${KIND} from live workload" >&2; exit 1; }
+    LIVE_IMAGE="$("${KUBECTL}" get "$WORKLOAD" -n "$NS" \
+        -o "jsonpath={.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].image}")" || refuse 'live image read failed'
+    PREFIX="harbor.ethosengine.com/ethosengine/${IMAGE}:"
+    [[ "$LIVE_IMAGE" == "$PREFIX"* ]] || refuse 'missing or unsupported live image reference'
+    REF="${LIVE_IMAGE#"$PREFIX"}"
+    [[ "$REF" =~ ^[a-zA-Z0-9_.-]+@sha256:[a-f0-9]{64}$ ]] || refuse 'live image is not digest pinned'
+    TAG="${REF%@*}" DIGEST="${REF##*@}"
+    if [ "$MODE" = --record-image ]; then
+        CLOSURE="${5:?closure}" EXPECTED_IMAGE="${6:?expected image}"
+        [ "$LIVE_IMAGE" = "$EXPECTED_IMAGE" ] || refuse 'live image changed before recording closure'
+        [[ "$CLOSURE" =~ ^sha256:[a-f0-9]{64}$ ]] || refuse 'invalid closure'
+        "${KUBECTL}" annotate "$WORKLOAD" -n "$NS" \
+            "elohim.host/closure-image=${LIVE_IMAGE}" "elohim.host/image-closure=${CLOSURE}" --overwrite
+        exit $?
+    fi
+    RECORDED_IMAGE="$("${KUBECTL}" get "$WORKLOAD" -n "$NS" -o 'jsonpath={.metadata.annotations.elohim\.host/closure-image}')" || refuse 'image record read failed'
+    CLOSURE="$("${KUBECTL}" get "$WORKLOAD" -n "$NS" -o 'jsonpath={.metadata.annotations.elohim\.host/image-closure}')" || refuse 'closure read failed'
+    [ "$RECORDED_IMAGE" = "$LIVE_IMAGE" ] || refuse 'closure record does not describe the live image'
+    [[ "$CLOSURE" =~ ^sha256:[a-f0-9]{64}$ ]] || refuse 'live closure unavailable'
+    printf '%s_REF=%s\n%s_TAG=%s\n%s_DIGEST=%s\n%s_CLOSURE=%s\n' \
+        "$KIND" "$LIVE_IMAGE" "$KIND" "$TAG" "$KIND" "$DIGEST" "$KIND" "$CLOSURE"
+    exit 0
+fi
+
 if [ "${1:-}" = "--record" ]; then
     STS="${2:?--record <sts> <namespace> <input-digest>}"
     NS="${3:?--record <sts> <namespace> <input-digest>}"

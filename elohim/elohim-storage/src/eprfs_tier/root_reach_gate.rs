@@ -27,11 +27,13 @@
 //! `blob_reach`'s helpers; [`ReachGate::root_level`] maps them through the protocol schema's
 //! `elohim_epr::Reach` and leaves any other word unknown, which an `AskPolicy` reads narrowly.
 
-use eprfs_core::{BlobCid, ReachGate, ReachLevel, ReachReason, ReachRefusal, Requester};
+#[cfg(test)]
+use eprfs_core::ReachReason;
+use eprfs_core::{BlobCid, ReachGate, ReachLevel, ReachRefusal, Requester};
 
-use crate::blob_reach::{blob_serve_verdict, BlobReference, BlobServeVerdict};
-use crate::epr_service::reach_level_index;
+use crate::blob_reach::BlobReference;
 use crate::private_reach::{is_private, private_serve_verdict, PrivateServeFacts, WithholdReason};
+use crate::reach_verifier::{CandidateVerdict, EgressPlane, Subject, Verdict};
 
 /// The held records could not be read (a pool checkout, a query or the conductor failed). Never
 /// read as "no record": the gate answers `AuthorizerUnavailable`.
@@ -39,8 +41,9 @@ use crate::private_reach::{is_private, private_serve_verdict, PrivateServeFacts,
 pub struct RecordsUnavailable;
 
 /// The records a serving peer already holds, as the gate reads them. Implemented by the host over
-/// its projections (content rows, release records, the head plane, `rea_commitments`); every
-/// call is synchronous and bounded, and none fetches from the network.
+/// its projections (content rows, release records, the head plane, `rea_commitments`). The
+/// compatibility adapter consumes custody facts pre-resolved by its host; pooled transport paths
+/// use `ReachVerifier::judge_pooled`, whose custody pre-fetch is asynchronous.
 pub trait ReachRecords: Send + Sync {
     /// Every held record that declares `root` as the root of a tree, with its reach.
     fn root_records(&self, root: &BlobCid) -> Result<Vec<BlobReference>, RecordsUnavailable>;
@@ -70,10 +73,12 @@ pub struct RootReachGate<R> {
 }
 
 impl<R: ReachRecords> RootReachGate<R> {
+    /// Construct a root gate over held reach records.
     pub fn new(records: R) -> Self {
         Self { records }
     }
 
+    /// Return the held-record adapter used by this gate.
     pub fn records(&self) -> &R {
         &self.records
     }
@@ -81,60 +86,44 @@ impl<R: ReachRecords> RootReachGate<R> {
     fn judge(
         &self,
         who: &Requester,
-        subject: &BlobCid,
+        subject: Subject,
+        cid: &BlobCid,
         records: Result<Vec<BlobReference>, RecordsUnavailable>,
     ) -> Result<(), ReachRefusal> {
-        let Ok(refs) = records else {
-            return Err(refusal(ReachReason::AuthorizerUnavailable, None));
-        };
-        if refs.is_empty() {
-            return Err(refusal(ReachReason::NoRecord, None));
-        }
-        let identity_resolved = who.agent().is_some();
-        let candidates = match blob_serve_verdict(&refs, identity_resolved) {
-            BlobServeVerdict::Serve => return Ok(()),
-            BlobServeVerdict::RequireIdentity { required_reach } => {
-                return Err(refusal(ReachReason::IdentityRequired, Some(required_reach)))
-            }
-            BlobServeVerdict::Authorize { candidates } => candidates,
-        };
-        // Serve iff ANY candidate grants; a failure to read one is remembered, so a refusal that
-        // might have been a grant says so.
-        let mut unavailable = false;
-        for record in &candidates {
-            let granted = if is_private(&record.reach) {
-                let verdict =
-                    private_serve_verdict(&self.records.private_facts(who, subject, record));
-                if verdict.reason() == Some(WithholdReason::AuthorityUnavailable) {
-                    unavailable = true;
-                }
-                verdict.is_serve()
-            } else {
-                match self.records.authorize(who, record) {
-                    Ok(granted) => granted,
-                    Err(RecordsUnavailable) => {
-                        unavailable = true;
-                        false
+        let refs = records.as_deref().map_err(|_| ());
+        match crate::reach_verifier::judge_record_fold(
+            EgressPlane::EprfsTier,
+            &subject,
+            refs,
+            who.agent().is_some(),
+            |record, rule| match rule {
+                crate::reach_verifier::rules::Rule::Authorize => {
+                    match self.records.authorize(who, record) {
+                        Ok(true) => CandidateVerdict::Permit,
+                        Ok(false) => CandidateVerdict::Deny,
+                        Err(RecordsUnavailable) => CandidateVerdict::RecordsUnavailable,
                     }
                 }
-            };
-            if granted {
-                return Ok(());
-            }
+                crate::reach_verifier::rules::Rule::Custody if is_private(&record.reach) => {
+                    match private_serve_verdict(&self.records.private_facts(who, cid, record)) {
+                        crate::private_reach::PrivateServeVerdict::Serve(_) => {
+                            CandidateVerdict::Permit
+                        }
+                        crate::private_reach::PrivateServeVerdict::Withhold(
+                            WithholdReason::AuthorityUnavailable,
+                        ) => CandidateVerdict::RecordsUnavailable,
+                        crate::private_reach::PrivateServeVerdict::Withhold(reason) => {
+                            CandidateVerdict::CustodyWithheld(reason)
+                        }
+                    }
+                }
+                _ => CandidateVerdict::Deny,
+            },
+        ) {
+            Verdict::Permit(_) => Ok(()),
+            Verdict::Refuse(refusal) => Err(refusal.into_eprfs()),
         }
-        if unavailable {
-            return Err(refusal(ReachReason::AuthorizerUnavailable, None));
-        }
-        let least = candidates
-            .iter()
-            .min_by_key(|r| reach_level_index(&r.reach))
-            .map(|r| r.reach.clone());
-        Err(refusal(ReachReason::OutsideStanding, least))
     }
-}
-
-fn refusal(reason: ReachReason, needs_standing: Option<String>) -> ReachRefusal {
-    ReachRefusal::new(reason, needs_standing)
 }
 
 /// A record's reach as `Reach::openness()`, when the word is one of the protocol schema's eight.
@@ -146,11 +135,25 @@ fn openness(reach: &str) -> Option<ReachLevel> {
 
 impl<R: ReachRecords> ReachGate for RootReachGate<R> {
     fn admit_root(&self, who: &Requester, root: &BlobCid) -> Result<(), ReachRefusal> {
-        self.judge(who, root, self.records.root_records(root))
+        self.judge(
+            who,
+            Subject::Root {
+                cid: root.to_string(),
+            },
+            root,
+            self.records.root_records(root),
+        )
     }
 
     fn admit_object(&self, who: &Requester, cid: &BlobCid) -> Result<(), ReachRefusal> {
-        self.judge(who, cid, self.records.object_records(cid))
+        self.judge(
+            who,
+            Subject::Address {
+                hash: cid.to_string(),
+            },
+            cid,
+            self.records.object_records(cid),
+        )
     }
 
     /// The widest reach among the root's records (any one record makes the root that open, the

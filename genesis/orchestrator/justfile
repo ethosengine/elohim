@@ -36,7 +36,7 @@ test-jenkinsfile-lints:
 # non-optional here: gate-runner.mjs / pipeline-registry.mjs / graph-walker.mjs
 # are now the ONLY local gate detector+executor, so a break in them aborts
 # every push in the repo. Pre-push calls `just gate` on any orchestrator change.
-gate: lint test-jenkinsfile-lints test-suite test-berth
+gate: lint test-jenkinsfile-lints test-suite test-harvest test-berth
 
 # berth holds pre-push's dev-integration lease and every device's notes; its suite ran under no gate
 # until a pool-policy class (3899eb7f9) left one of its tests red unnoticed.
@@ -58,3 +58,11 @@ test-suite:
 # Run after editing PIPELINES.
 ci-pipeline-list:
   @node scripts/generate-pipeline-list.mjs
+
+# Harvester regressions, including attestation and hook deadline coverage.
+test-harvest:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for suite in ../../.claude/scripts/_lib/__tests__/ci_harvest_*_test.py; do
+      python3 "$suite"
+    done

@@ -13,6 +13,11 @@
 // and, without that env, refuses them and falls through to report files.
 // Governance metadata is not source-under-test: a `.epr-meta` path is never a serving change, and
 // a component's identity leaves its `.epr-meta` entries out (sut.ts owns that one definition).
+// The workspace key is whatever `brit-build-ref signer --json` names (the seed file is read only
+// under the pinned brit, whose `signer` is a clap usage error, or with no brit at all); each
+// candidate ref is read through brit's verified `validate get` when the host's brit has one, else
+// verified here — a record that does not verify is absent, warned once by ref and reason, and the
+// receipt line says which verifier read it.
 //
 // usage: serving-receipt.mjs <repo-root> <reports-dir> [<file: changed serving paths, one per line>]
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -27,9 +32,8 @@ import {
 } from "../../a2o/scripts/lib/sut.ts";
 import {
   admitAttestation,
-  gitCommonDir,
   readHouseholdAttestations,
-  workspaceAgentId,
+  resolveWorkspaceIdentity,
 } from "../../a2o/scripts/lib/household-attestation.ts";
 
 /** The household stories whose passing run is a receipt, and the concern each rolls up under. */
@@ -127,6 +131,25 @@ export function boundStatus(peerStatuses, hash) {
   return status?.requestActionHash === hash ? status : undefined;
 }
 
+/**
+ * Who signs for this workspace and which brit answers, resolved once per run: `options.identity`
+ * when the caller already asked, else `brit-build-ref signer --json` under `options.env`.
+ */
+function workspaceOf(root, options = {}) {
+  return (
+    options.identity ??
+    resolveWorkspaceIdentity(root, options.env ?? process.env)
+  );
+}
+
+/** How the receipt line names the read that produced its attestation. */
+function readLabel(verifiedBy, brit) {
+  if (verifiedBy === "brit") return "read verified by brit-build-ref";
+  return brit.kind === "pinned"
+    ? "read verified locally (the pinned brit-build-ref has no verified read)"
+    : "read verified locally (brit-build-ref is not on this host)";
+}
+
 /** The newest attestation that admits `story` on the current source, or null. */
 export function findAttestationReceipt(
   root,
@@ -135,15 +158,18 @@ export function findAttestationReceipt(
   names,
   normalize,
   peerStatuses = new Map(),
+  options = {},
 ) {
-  const common = gitCommonDir(root);
-  const workspaceId = common ? workspaceAgentId(common) : null;
+  const identity = workspaceOf(root, options);
+  const workspaceId = identity.agentId;
   if (!workspaceId) return null;
-  const candidates = readHouseholdAttestations(root, story.concern).sort(
-    (a, b) =>
-      String(b.node.validatedAt).localeCompare(String(a.node.validatedAt)),
+  const candidates = readHouseholdAttestations(root, story.concern, {
+    brit: identity.brit,
+    warn: options.warn,
+  }).sort((a, b) =>
+    String(b.node.validatedAt).localeCompare(String(a.node.validatedAt)),
   );
-  for (const { ref, node } of candidates) {
+  for (const { ref, node, verifiedBy } of candidates) {
     const verdict = admitAttestation(node, story.concern, workspaceId, (hash) =>
       boundStatus(peerStatuses, hash),
     );
@@ -158,7 +184,7 @@ export function findAttestationReceipt(
       summary: { byConcern: { [story.concern]: { scenarios: s.scenarios } } },
     };
     if (validateReceipt(asReport, expected, names, story, normalize))
-      return { ref, node, summary: s };
+      return { ref, node, summary: s, verifiedBy, brit: identity.brit };
   }
   return null;
 }
@@ -184,9 +210,18 @@ export function findReportReceipt(reports, story, expected, names, normalize) {
 export function checkReports(root, reports, paths, options = {}) {
   const log = options.log ?? console.log;
   const warn = options.warn ?? console.error;
+  const env = options.env ?? process.env;
   const attestations =
-    options.attestations ?? process.env.SERVING_RECEIPT_ATTESTATIONS !== "0";
+    options.attestations ?? env.SERVING_RECEIPT_ATTESTATIONS !== "0";
   const peerStatuses = options.peerStatuses ?? new Map();
+  const identity = attestations
+    ? (options.identity ?? resolveWorkspaceIdentity(root, env))
+    : null;
+  if (identity?.note)
+    warn(
+      `[pre-push] no workspace key via ${identity.source}: ${identity.note}`,
+    );
+  const reads = { identity, warn: (line) => warn(`[pre-push] ${line}`) };
   const probe = createSutProbe(root, {}); // Environment overrides cannot claim matching source.
   const expected = Object.fromEntries(
     DEFAULT_SUT_COMPONENTS.filter((c) => c.path).map((c) => [
@@ -220,13 +255,14 @@ export function checkReports(root, reports, paths, options = {}) {
             names,
             normalize,
             peerStatuses,
+            reads,
           );
           if (hit) {
             const peer = hit.summary.peer;
             const ran = peer
               ? ` stage ran on peer ${peer.provider.slice(0, 12)}… (rung ${peer.rung}), completion ${peer.completionActionHash.slice(0, 12)}… verified on the requester's task record;`
               : "";
-            found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…);${ran} every ${feature} station passed on current source.`;
+            found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…);${ran} every ${feature} station passed on current source; ${readLabel(hit.verifiedBy, hit.brit)}.`;
           }
         } else {
           const hit = findReportReceipt(
@@ -265,13 +301,20 @@ export function checkReports(root, reports, paths, options = {}) {
  * The request action hashes named by `summary.peer` on this workspace's candidate attestations
  * for `stories` — the task records the reader must fetch before it can admit a peer stage.
  */
-export function peerRequestsOf(root, stories = Object.values(RECEIPT_STORIES)) {
-  const common = gitCommonDir(root);
-  const workspaceId = common ? workspaceAgentId(common) : null;
+export function peerRequestsOf(
+  root,
+  stories = Object.values(RECEIPT_STORIES),
+  options = {},
+) {
+  const identity = workspaceOf(root, options);
+  const workspaceId = identity.agentId;
   if (!workspaceId) return [];
   const hashes = new Set();
   for (const story of stories)
-    for (const { node } of readHouseholdAttestations(root, story.concern)) {
+    for (const { node } of readHouseholdAttestations(root, story.concern, {
+      brit: identity.brit,
+      warn: options.warn,
+    })) {
       if (node.validatorId !== workspaceId) continue;
       try {
         const hash = JSON.parse(node.resultSummary)?.peer?.requestActionHash;
@@ -344,12 +387,18 @@ async function main() {
   const [root, reports, list] = process.argv.slice(2);
   const paths = list ? readFileSync(list, "utf8").split("\n") : undefined;
   let peerStatuses = new Map();
+  let identity;
   if (process.env.SERVING_RECEIPT_ATTESTATIONS !== "0") {
-    const prefetched = await prefetchPeerStatuses(peerRequestsOf(root));
+    // One `signer` ask and one verified read per ref for the whole run: the prefetch's warnings
+    // are the reader's warnings, so the collector stays quiet and checkReports says it once.
+    identity = resolveWorkspaceIdentity(root, process.env);
+    const prefetched = await prefetchPeerStatuses(
+      peerRequestsOf(root, undefined, { identity }),
+    );
     peerStatuses = prefetched.statuses;
     if (prefetched.skipped) console.error(`[pre-push] ${prefetched.skipped}`);
   }
-  return checkReports(root, reports, paths, { peerStatuses });
+  return checkReports(root, reports, paths, { peerStatuses, identity });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

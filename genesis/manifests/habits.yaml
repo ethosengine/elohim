@@ -2158,10 +2158,10 @@ habits:
       - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-10-29 (status unchanged; first fold of the hold): `berth status` now folds the last seven days of completed holds by resource and session and prints p50/p90/max with refusals — on this device dev-integration read p50 2m / p90 55m / max 1h59 (n=44), refusals 12 (landed f8dc1991b/228a80b2f, berth_test 120 OK); a `reap` arm clears moorings past their ttl with no live pid and expired leases (a push lease had sat EXPIRED 811 h of a 30 m ttl). Observed the same day: a sibling's dev-integration hold spanned its whole 4,970 s pre-push and refused this device's push for 2 h 40 m; the sibling answered a `berth say` within 15 min once this session armed `berth inbox --follow` — presence is reactive until the inbox-notice hook exists (backlog agent-presence-listens-to-the-space-by-default).
-    evidence-fingerprint: sha256:b0a037ff0c4fa868
-    evidence-bytes: 19751
-    evidence-entries: 22
+      DELTA 2026-10-29 (status unchanged; landing line integ/2026-10-29-landing): A4-B1/R1/S1 landed 2026-10-28 via land1 (b01b1c90c) without a line here; their proof is the A4-H stations in genesis/a2o/features/devflow/steward-space (ebf044eb5), all `@wip` until the receipts script `genesis/local-dev/steward-space/a4-receipts.sh` exists. The A3 lease-generation release (d6ad4024b) rides this line with the sensors bound (150a7a6a4) ahead of it; `a68d761a9` (a second 60 s bound on the same advisory) is dropped as its duplicate.
+    evidence-fingerprint: sha256:12cd6b283d9ea5e8
+    evidence-bytes: 21307
+    evidence-entries: 24
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
@@ -2283,10 +2283,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-10-16 (RED preserved; unit legs pass): `node --test gate-attest.test.mjs gate-oracle.test.mjs` in `genesis/orchestrator` reports `ℹ pass 2`, exit 0; red holds pending the named operational legs, including two further pin-moving pushes selecting by the oracle and their pin-attestation@1 observations.
-    evidence-fingerprint: sha256:11100b3200f99aae
-    evidence-bytes: 4117
-    evidence-entries: 6
+      DELTA 2026-10-29 (RED preserved; the readers precede the pin): brit main fast-forwarded 76ba95d8a0..7e4a83115e at ~22:50Z after the re-run turned `Tests pass` green (the restore-test red was a flake; i386 DNS environmental; cargo-deny-advisories still red, so no snapshot release and both devices build from source). The pin commit ef58a3e59 waits on feat/brit-daily-driver for the landing line; the reader fixes (fix/brit-readers-2026-10-29) land ahead of it so the first pin-moving push selected by the oracle reads notes the new way. Second pin-moving push: S2-1a, reconciled against the new main by workflow wf_18b0660e-ab0.
+    evidence-fingerprint: sha256:fd0642307683168c
+    evidence-bytes: 4746
+    evidence-entries: 7
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
@@ -2319,10 +2319,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-29 (ACTIVE, RED preserved; the sensor is honest again): ci-harvest folds stage-wallclock@1 from the whole 'Publish and Verify App Delivery' stage when the junit phase cases are absent (n=0), as measures.yaml:1036-1049 prescribes — the headline had carried 122.5 min from 2026-09-27 for 32 days while the stage read 10.9 min p90 (landed f8dc1991b/228a80b2f; `ci_harvest_stage_budget_test.py` 38 ok). The closure-keyed edge build (design S1a) is implemented on shift/2026-10-29-integration-capacity and goes up as a PR: measured starting point edge/dev #1753 = 50.6 min in doorway QG + build doorway + build storage on an unchanged closure; target ≤ 15 on the first dev wave whose storage/doorway closure is unchanged. Not measured yet: nothing of α has reached dev.
-    evidence-fingerprint: sha256:97e99661a5593483
-    evidence-bytes: 34156
-    evidence-entries: 32
+      DELTA 2026-10-29e (ACTIVE, RED preserved; fix round on the rebased fix/brit-readers-2026-10-29, now exactly 8 over the landing head e8e0d1344): readBuildNote no longer tolerates a miss line on stdout — build_cmd.rs prints it on stderr on every lineage this tree can read (76ba95d8a0 is the only commit touching it), so stdout is the node or unreadable, as delivery-series.mjs and the epr-cli walk already held; the slow-brit fixture prints the miss where brit does. delivery-series imports `unverifiableNotes` from brit-attest.mjs instead of matching the line itself; household-attestation.ts names `classifyPutRefusal` as its deliberate port of `expectedRefusal`. The unreadable-note asymmetry stands and is now named at both sites: brit-attest defers (a harvest retries for free, nothing is written over what was not read), recordEvidence writes anyway (the gate's rule is last run wins, named; the read only names what the put replaces; brit's put still refuses a concurrent update). A would-not-verify refusal stays counted and not deferred (identical bytes refuse again; the cure is the device's signer, not a harvest retry). Node: brit-attest 23 (+1 real-binary skip), delivery-series 34, gate-evidence 63, gate-runner 50, serving-receipt 35, brit-helper 6, collect-stage 5, household-attestation 35, all green; Rust still uncompiled.
+    evidence-fingerprint: sha256:3a4ae0b062ee254d
+    evidence-bytes: 39858
+    evidence-entries: 36
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
@@ -2445,10 +2445,10 @@ habits:
       - "node --test genesis/orchestrator/gate-evidence.test.mjs (sibling-signer cases)"
       - "per-sprint bounds over gate-cycle-seconds@1 + delivery-series.mjs: duplicate gated closures = 0, duplicate claims = 0, lease p90 < 120 s, >= 2 intents per Jenkins wave (unwired until A0)"
     evidence: >
-      DELTA 2026-10-27 (BORN red, inactive): nothing in the invariant is kept yet. The 2026-10-27 overnight evidence: both devices fixed the same eprfs reds (no claim crossed), a fix crossed as prose and was re-typed, shem's push held dev-integration for 3 h+ and was refused three times, and the orchestrator ran 8 consecutive FAILUREs at 2.4-4.7 h each. landing-queue.feature is not written. Inactive because the WIP fence is full; it is the upstream station of push-delivers-within-budget.
-    evidence-fingerprint: sha256:2d1ebe69da6cfcdc
-    evidence-bytes: 486
-    evidence-entries: 1
+      DELTA 2026-10-29 (RED, inactive; one clause moves): 'the one Jenkins verdict on that tip reaches every device's fold' now has a writer — the device's harvest attests each orchestrator wave as `ci:<pipeline>` brit notes (S2d′, 37 notes on first run); the fold across devices and the landing-intent reference (A9/S1b) are still owed, so the clause stays red.
+    evidence-fingerprint: sha256:0f4175fb100cbfe5
+    evidence-bytes: 848
+    evidence-entries: 2
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

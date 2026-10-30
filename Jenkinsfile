@@ -1140,6 +1140,11 @@ def appDeployFailureMessage(String kind, String name, def detail) {
 // END HELPER METHODS
 // ============================================================================
 
+// Package publication uses job identity; source branches never grant authority.
+def mayPublishPackages() {
+    !env.CHANGE_ID && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main')
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -1485,18 +1490,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'ls -la dist/ dist/generated/'
                             // Publish to Nexus so downstream pipelines (genesis) can resolve without workspace root
                             // Only publish if this version doesn't already exist (prevents tarball overwrite + integrity mismatch)
-                            sh '''#!/bin/bash
-                                set -euo pipefail
-                                PKG_VERSION=$(node -p "require('./package.json').version")
-                                echo "Checking if @elohim/storage-client@${PKG_VERSION} exists on Nexus..."
-                                if npm view "@elohim/storage-client@${PKG_VERSION}" --registry=https://nexus.ethosengine.com/repository/npm/ version 2>/dev/null; then
-                                    echo "ℹ️  @elohim/storage-client@${PKG_VERSION} already published, skipping"
-                                else
-                                    echo "Publishing @elohim/storage-client@${PKG_VERSION} to Nexus..."
-                                    pnpm publish --no-git-checks
-                                    echo "✅ Published @elohim/storage-client@${PKG_VERSION}"
-                                fi
-                            '''
+                            if (mayPublishPackages()) {
+                                sh '''#!/bin/bash
+                                    set -euo pipefail
+                                    PKG_VERSION=$(node -p "require('./package.json').version")
+                                    echo "Checking if @elohim/storage-client@${PKG_VERSION} exists on Nexus..."
+                                    if npm view "@elohim/storage-client@${PKG_VERSION}" --registry=https://nexus.ethosengine.com/repository/npm/ version 2>/dev/null; then
+                                        echo "ℹ️  @elohim/storage-client@${PKG_VERSION} already published, skipping"
+                                    else
+                                        echo "Publishing @elohim/storage-client@${PKG_VERSION} to Nexus..."
+                                        pnpm publish --no-git-checks
+                                        echo "✅ Published @elohim/storage-client@${PKG_VERSION}"
+                                    fi
+                                '''
+                            }
                         }
                     }
                     dir('app/elohim-app') {
@@ -1803,7 +1810,7 @@ VEOF
             // Each env has its own genesis/orchestrator/manifests/elohim-app/<env>/ingress.yaml.
             when {
                 allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') }
                     expression { shouldRunStep('build-angular') }
                 }
             }
@@ -1830,7 +1837,7 @@ VEOF
         stage('Publish and Verify App Delivery') {
             when {
                 allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') }
                     expression { shouldRunStep('build-angular') }
                 }
             }
@@ -1910,7 +1917,7 @@ VEOF
         }
 
         stage('Push to Harbor Registry') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') } }
             steps {
                 container('builder'){
                     script {
@@ -2002,7 +2009,7 @@ VEOF
         stage('Deploy to Staging') {
             when {
                 allOf {
-                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') }
                     anyOf { branch 'staging'; expression { env.BRANCH_NAME ==~ /staging-.+/ } }
                 }
             }
@@ -2023,7 +2030,7 @@ VEOF
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { env.BRANCH_NAME == 'dev' }
                 }
             }
             steps {
@@ -2062,7 +2069,7 @@ VEOF
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { env.BRANCH_NAME == 'dev' }
                 }
             }
             steps {
@@ -2137,7 +2144,7 @@ VEOF
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
-                    expression { env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /feat-.+/ || env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { env.BRANCH_NAME == 'dev' }
                 }
             }
             steps {

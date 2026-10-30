@@ -48,12 +48,12 @@
 //! intimate atom held elsewhere.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use diesel::SqliteConnection;
 use http_body_util::Full;
-use hyper::{header, Response, StatusCode};
+use hyper::Response;
 
 use crate::db::{self, AppContext};
 use crate::error::StorageError;
@@ -189,14 +189,6 @@ pub fn gated_read_refusal(
     ))
 }
 
-fn forbidden(body: String) -> Response<Full<Bytes>> {
-    Response::builder()
-        .status(StatusCode::FORBIDDEN)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Full::new(Bytes::from(body)))
-        .unwrap()
-}
-
 /// Layers 1 and 1.5 of the reach gate for one atom at `reach`.
 pub fn reach_refusal(
     conn: &mut SqliteConnection,
@@ -206,108 +198,16 @@ pub fn reach_refusal(
     agent_cid: Option<&str>,
     memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
 ) -> Option<Response<Full<Bytes>>> {
-    Caller::new(agent_cid, memo_store).refusal(conn, ctx, content_id, reach)
-}
-
-/// The requester of one request: who the explicit `X-Agent-Cid` names, and
-/// the reach authorizer that judges them — each resolved at most ONCE and
-/// only when a restricted tier first needs it, then reused for every atom the
-/// request judges (a graph walk or an edge list asks per node).
-struct Caller {
-    agent_cid: Option<String>,
-    memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
-    /// `humans.id`, then agent key — `None` inside when it resolves to no one.
-    human: OnceLock<Option<crate::db::models::Human>>,
-    authorizer: OnceLock<crate::epr_service::EprService>,
-}
-
-impl Caller {
-    fn new(
-        agent_cid: Option<&str>,
-        memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
-    ) -> Self {
-        Self {
-            agent_cid: agent_cid.map(str::to_owned),
-            memo_store,
-            human: OnceLock::new(),
-            authorizer: OnceLock::new(),
-        }
-    }
-
-    fn human(&self, conn: &mut SqliteConnection) -> Option<&crate::db::models::Human> {
-        self.human
-            .get_or_init(|| {
-                let idv = self.agent_cid.as_deref()?;
-                crate::db::humans::get_human_by_id(conn, idv)
-                    .ok()
-                    .flatten()
-                    .or_else(|| {
-                        crate::db::humans::get_human_by_agent_key(conn, idv)
-                            .ok()
-                            .flatten()
-                    })
-            })
-            .as_ref()
-    }
-
-    fn authorizer(&self) -> &crate::epr_service::EprService {
-        self.authorizer.get_or_init(|| {
-            crate::epr_service::EprService::new(
-                None,
-                None,
-                None,
-                crate::p2p::trust_cache::PeerTrustCache::new(),
-            )
-            // The memo store is the process-lifetime Arc wired at startup
-            // (`HttpServer::with_memo_store`); the gradient selection lives in
-            // the service's own dormancy gate (flag off ⇒ inert).
-            .with_memo_store(self.memo_store.clone())
-        })
-    }
-
-    /// Layers 1 and 1.5 for one atom at `reach`.
-    fn refusal(
-        &self,
-        conn: &mut SqliteConnection,
-        ctx: &AppContext,
-        content_id: &str,
-        reach: &str,
-    ) -> Option<Response<Full<Bytes>>> {
-        // Layer 1: commons/public serve without auth; restricted content
-        // requires a caller that RESOLVES via the explicit `X-Agent-Cid` header.
-        let is_public = reach == "commons" || reach == "public";
-        if !is_public && self.agent_cid.is_none() {
-            return Some(forbidden(format!(
-                r#"{{"error":"Authentication required","requiredReach":"{}"}}"#,
-                reach
-            )));
-        }
-
-        // Layer 1.5: steward-specific reach authorization for tiers ABOVE
-        // community — the SAME gate the P2P transport path uses (single source
-        // of truth), resolving the requester by humans.id, then agent key. Deny
-        // by default when the requester cannot be resolved.
-        if crate::epr_service::reach_level_index(reach)
-            > crate::epr_service::reach_level_index("community")
-        {
-            let Some(human) = self.human(conn) else {
-                return Some(forbidden(format!(
-                    r#"{{"error":"Reach authorization required","requiredReach":"{}"}}"#,
-                    reach
-                )));
-            };
-            if let Err(reason) = self
-                .authorizer()
-                .authorize_reach_for_human_with_own_trust(conn, ctx, reach, human, content_id)
-            {
-                return Some(forbidden(format!(
-                    r#"{{"error":"Reach denied","requiredReach":"{}","reason":"{}"}}"#,
-                    reach, reason
-                )));
-            }
-        }
-        None
-    }
+    crate::reach_verifier::ReachVerifier::from_http_extractor(agent_cid, memo_store)
+        .judge_row(
+            conn,
+            ctx,
+            crate::reach_verifier::EgressPlane::HttpRow,
+            content_id,
+            reach,
+        )
+        .refusal()
+        .map(|refusal| refusal.http_row_response())
 }
 
 /// Reaches Layer 1 serves to anyone, identified or not.
@@ -335,14 +235,14 @@ pub fn resolved_head_refusal(
 /// restricted atom); verdicts are memoized per (atom, reach) for the life of
 /// one request.
 pub struct ReachFilter {
-    caller: Caller,
+    verifier: crate::reach_verifier::ReachVerifier,
     verdicts: Mutex<HashMap<(String, String), bool>>,
 }
 
 impl std::fmt::Debug for ReachFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReachFilter")
-            .field("identified", &self.caller.agent_cid.is_some())
+            .field("identified", &self.verifier.identity_present())
             .finish_non_exhaustive()
     }
 }
@@ -355,7 +255,9 @@ impl ReachFilter {
         memo_store: Option<Arc<dyn crate::trust::VerificationMemoStore>>,
     ) -> Self {
         Self {
-            caller: Caller::new(agent_cid, memo_store),
+            verifier: crate::reach_verifier::ReachVerifier::from_http_extractor(
+                agent_cid, memo_store,
+            ),
             verdicts: Mutex::new(HashMap::new()),
         }
     }
@@ -364,9 +266,7 @@ impl ReachFilter {
     /// anonymous caller (who reads nothing else), `None` for an identified one
     /// (whose rights above `community` are per-atom and judged in Rust).
     pub fn sql_readable_reaches(&self) -> Option<Vec<String>> {
-        self.caller
-            .agent_cid
-            .is_none()
+        (!self.verifier.identity_present())
             .then(|| OPEN_REACHES.iter().map(|r| r.to_string()).collect())
     }
 
@@ -391,7 +291,16 @@ impl ReachFilter {
         if let Some(verdict) = self.verdicts.lock().ok().and_then(|m| m.get(&key).copied()) {
             return verdict;
         }
-        let verdict = self.caller.refusal(conn, ctx, content_id, &key.1).is_none();
+        let verdict = self
+            .verifier
+            .judge_row(
+                conn,
+                ctx,
+                crate::reach_verifier::EgressPlane::HttpEdge,
+                content_id,
+                &key.1,
+            )
+            .is_permit();
         if let Ok(mut m) = self.verdicts.lock() {
             m.insert(key, verdict);
         }

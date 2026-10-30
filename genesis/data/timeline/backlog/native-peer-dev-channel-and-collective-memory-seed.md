@@ -199,3 +199,14 @@ by which a release cites the stories it governs, and whether a device's green ga
 counts as a soak attestation on a candidate. If R2 turns out to need its own notion of a release
 head, the gate runs before R2 instead. The conversation, jobs and collective-memory half serves no
 declared habit yet and waits for one.
+
+**The landing plane, closure-keyed (2026-10-29).** The jobs half of this seed now has a design that
+names its rungs: [the closure-keyed landing-plane design](epr:closure-keyed-landing-plane-design)
+turns the steward space's A8 (sibling verdict = the build cache), A9 (the landing intent as a
+`FlowRecord::Intent` atom; `dev-integration` held only for a 600 s CAS window) and A10 (Jenkins as
+witness, attestation written on the device) into sprint slices, and adds the carry (S3a: a gate
+neither device paid runs on the device whose own guard lines admit it, over eprfs-peer). The
+operator's ruling the same day: master peer utilization of compute before adding hardware; enlisted
+machines enter as enrolled devices running `epr peer serve`, never as Jenkins agents; the onboarding
+story is "fork an lvi workspace, join, and your peer carries integration jobs while it is on".
+

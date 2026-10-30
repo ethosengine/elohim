@@ -109,6 +109,8 @@ The original mechanism wired the decay tick period to `τ_budget = β·T_c(C_tar
 
 **And:** the `T_c`/inflow-exponent estimate becomes a **stake-bearing, honesty-classed, human-ratified setpoint** — subject to the same discipline as every other governed quantity — *not* a free-running observation that silently sets the clock. Until (i) or (ii) is built, the honest statement is: **"the human is sovereign over the clock only at band-edges and only at re-ratification cadence; between those the Elohim sets the tempo within the band — a delegation of the clock, not retention of it."** Do not claim recognition-not-power for the cadence without building (ii).
 
+> **Correction (2026-10-29).** The premise below ("returns zero `.rs` hits", a vapor validator) is stale: the validator exists at `elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs:918` with its walls in `elohim/elohim-storage/src/services/limit_gradient_registry.rs` (widths TBD-OPERATOR). The fix's conclusion — do not fold a runtime-τ check into the write-time wall — still stands on its own reasoning.
+
 **[adversarial-fix] Do not extend `validate_ratifies_limit_gradient`.** The wisdom spec proved it returns zero `.rs` hits — a citation-ring that "terminates nothing" (`…wisdom…:218,231`). You cannot extend a vapor validator into a runtime-`τ` check and call the result a deterministic floor. The delay-margin check is an advisory at ratification + the live `DelayBreach`, not a DNA wall, until that validator is actually built.
 
 ---

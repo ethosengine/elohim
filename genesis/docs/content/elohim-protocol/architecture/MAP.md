@@ -4,14 +4,14 @@ id: map
 tier: architecture
 status: Living document
 created: 2026-06-02
-last-verified: 2026-08-26
+last-verified: 2026-10-28
 maintainers: Matthew Dowell + Opus 4.8
 realizes:
   - genesis/docs/content/elohim-protocol/value_scanner/epic.md (the household living core — the default reading path)
 informed-by:
   - genesis/docs/content/elohim-protocol/architecture/INDEX.md (the graph; MAP is the walk over it)
   - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md (the composition-stack router that runs upstream of this lattice)
-  - .claude/memory-kit/Q1-canonical-organization.md (the two-axis analysis this map renders)
+  - the Q1 canonical-organization two-axis analysis this map renders (retired to git 2026-06-02 at 62f67e4b3; read it with `git show 62f67e4b3^:.claude/memory-kit/Q1-canonical-organization.md`)
 informs:
   - new-developer onboarding; any sprint that needs "where does X live and what do I read first"
 memory_anchors:
@@ -212,7 +212,11 @@ read-mass it absorbs); (2) seeds **D8** (doorway-access-tier-patterns, doorway-s
 [`doorway-two-axis-scaling`](./2026-06-11-doorway-two-axis-scaling.md) before touching capacity or
 graduation, and [`doorway-auth-posture-declared-stage`](./2026-08-25-doorway-auth-posture-declared-stage.md)
 before changing a write gate); for a refusal symptom, use the operational companion
-[`doorway-auth-refusal-runbook`](./2026-08-25-doorway-auth-refusal-runbook.md); (3)
+[`doorway-auth-refusal-runbook`](./2026-08-25-doorway-auth-refusal-runbook.md); for an outage or
+failover question, the household drill
+[`doorway-chaos-operations-runbook`](./2026-09-14-doorway-chaos-operations-runbook.md) and the operator's
+[`apex-multi-a-failover-runbook`](./2026-09-26-apex-multi-a-failover-runbook.md) (two doorways behind
+one public name); (3)
 pillar guide [`doorway/CLAUDE.md`](../../../../../doorway/CLAUDE.md); (4) code
 `doorway/doorway-service/` (Rust gateway) + `app/elohim-app/src/app/doorway/` (Angular integration);
 (5) scenarios `genesis/a2o/features/doorway/`, `ssr/`, `peer-oauth-portal/`. **Frame it correctly:**
@@ -245,7 +249,7 @@ pass** — they are implementation-spec work, listed here so the walk is honest.
 | **doorway-access-tier ↔ doorway-ssr-runtime** — both doorway; seam clear (reach-gating vs compute) but conceptually tight; candidate for a shared doorway sub-index | STRADDLE | OPEN (low-risk) | — (INDEX D8 rows) |
 | **Cold-archive terminus** — tiered-quilt names the shelved terminus; records-lifecycle defers "organization-dissolution"; neither closes "what happens at the terminus" | STRADDLE | OPEN | `gap-items/architecture__2026-05-11-tiered-quilt-stewardship-design.json` (the terminus is not yet among its items — needs agent decomposition) |
 | **Infrastructure crates** — `elohim-bitswap`, `elohim-compute`, `elohim-render` lack README/CLAUDE.md; unclear what is load-bearing vs operational. (`elohim-cache-core` and `elohim-token` have since been documented — this row narrowed to the remaining three) | CODE-NO-DOC | OPEN (narrowed) | — |
-| **Lattice coverage** — §1's D1–D10 lattice was drawn over the substrate-spine seeds and has not absorbed every later seed or the standing cross-cutting *principle* docs (`trust-as-efficiency-signal`, `social-reach-nervous-system`, `protocol-formal-substrate-rationale`, `ubiquitous-wisdom-dissolves-chokepoint`, `compute-commitment-substrate-floor`, `governance-layers-architecture`, `cluster-topology`, `imagodei-surfaces-design`, `blob-custody-reconciliation`, `qahal-epr-household-lattice`, `bloom-mastery-progression`, `alpha-test-bench-compute-envelope`). Some are genuinely lattice-external (a principle that governs *every* surface has no single D#); the rest need a domain assignment. Assigning them is a **domain-boundary decision**, not a navigation edit — it is deliberately not done in a currency pass | STRADDLE | OPEN (needs an operator-gated §1 pass) | — (this row is the tracker) |
+| **Lattice coverage** — §1's D1–D10 lattice was drawn over the substrate-spine seeds and has not absorbed every later seed or the standing cross-cutting *principle* docs (`trust-as-efficiency-signal`, `social-reach-nervous-system`, `protocol-formal-substrate-rationale`, `ubiquitous-wisdom-dissolves-chokepoint`, `compute-commitment-substrate-floor`, `governance-layers-architecture`, `cluster-topology`, `imagodei-surfaces-design`, `blob-custody-reconciliation`, `qahal-epr-household-lattice`, `bloom-mastery-progression`, `alpha-test-bench-compute-envelope`, `wave2-relay-sovereignty`). The operational runbooks (`doorway-chaos-operations-runbook`, `apex-multi-a-failover-runbook`) and the measured reports (`conductor-store-growth-report`, `storage-physics-benchmark`) sit outside the lattice by kind — operations and evidence, not seeds — and are reached from the doorway stanza and *How to use this MAP*. Some are genuinely lattice-external (a principle that governs *every* surface has no single D#); the rest need a domain assignment. Assigning them is a **domain-boundary decision**, not a navigation edit — it is deliberately not done in a currency pass | STRADDLE | OPEN (needs an operator-gated §1 pass) | — (this row is the tracker) |
 | **brit crate** (git-as-covenant) — rich internal design docs, NOT surfaced in canonical architecture | CODE-NO-DOC | OPEN | `elohim/brit/` internal docs |
 | **Code→spec backlinks one-directional** — specs cite code paths, but code files don't cite back via `// architecture:` headers (INDEX recommends, not enforced); graph is traversable spec→code, not code→spec | CODE-NO-DOC | OPEN (mechanize later) | INDEX.md §"How to use this directory" |
 
@@ -263,7 +267,12 @@ pass** — they are implementation-spec work, listed here so the walk is honest.
   door is the [**substrate trust-contract runbook**](./2026-07-12-substrate-trust-contract-runbook.md):
   the invariants the dataplane holds, the probe watching each one, and the per-red decision tree. It is
   the operate-time counterpart to this walk, and where it and this map disagree, **the probes are the
-  authority**.
+  authority**. Doorway outages and failover have their own runbooks (see the doorway stanza).
+- **Sizing storage or a conductor?** Start from the measured reports, not from a design's estimate:
+  [`conductor-store-growth-report`](./2026-09-24-conductor-store-growth-report.md) (what grows in a
+  conductor store and why) and [`storage-physics-benchmark`](./2026-10-05-storage-physics-benchmark.md)
+  (what the corpus should cost to hold at five holders, against what the fleet holds). Read each
+  `status:` line for what was measured and what was estimated.
 
 MAP is a **Living document**: when a pillar guide lands, a gap closes, or a seed graduates, update the
 relevant stanza/row here and the matching row in [INDEX](./INDEX.md). The two files split cleanly and

@@ -29,7 +29,8 @@ Commands:
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
                 [--closure KEY] [--offline-ok]                      take one unit; exit 3 if held or refused
-  berth release RESOURCE --session S [--force]                     --force gives back whoever holds it
+  berth release RESOURCE --session S [--expected-claimed-at T] [--force]
+                                                                   --force gives back whoever holds it
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
                                                                    holds it; --force = override row
   berth say     --session S [--to SESSION] TEXT                    a deliberation note; the addressee reads
@@ -1013,8 +1014,13 @@ class Berth:
 
     def _unmoor(self, session):
         """Cleanup under a caller-held lifecycle guard (including native close/GC)."""
-        for res in {key.removesuffix("/slots") for key in self.leases()}:
-            self._release(res, session, reason="unmoor")
+        leases = self.leases()
+        for res in {key.removesuffix("/slots") for key in leases}:
+            candidates = [leases.get(res)] + leases.get(res + "/slots", [])
+            generations = [self._lease_generation(lease) for lease in candidates
+                           if isinstance(lease, dict) and lease.get("holder") == session]
+            for claimed_at in generations:
+                self._release(res, session, reason="unmoor", expected_claimed_at=claimed_at)
         with self._locked():
             try:
                 os.remove(self._moor_path(session))
@@ -1208,7 +1214,8 @@ class Berth:
                 # The lease stays: it was held before. Its renew did not cross, so say so.
                 return None, lease, (f"renewed here, but {failed[0]} — the other devices still hold its "
                                      f"earlier terms")
-            self._release(resource, session, reason=f"steward: {failed[0]}")
+            self._release(resource, session, reason=f"steward: {failed[0]}",
+                          expected_claimed_at=lease.get("claimed_at"))
             self.take_fold_failures(resource)
             return False, None, failed[0]
         if ok and steward:
@@ -1303,32 +1310,58 @@ class Berth:
                     closure=closure, **_lease_times(lease), **{"class": klass})
         return True, lease, "claimed"
 
-    def release(self, resource, session, reason=None, force=False):
-        """Give back this session's lease. `force` gives back WHOEVER holds it (a forced `mesh stop`
-        took the household down under them) and says so on the record."""
+    def release(self, resource, session, reason=None, force=False, expected_claimed_at=None):
+        """Give back this session's lease generation. A caller-held `expected_claimed_at` refuses
+        a different generation before deletion; without one this is an explicit operator release of
+        every local generation found under the lock. `force` gives back every holder. Each removed
+        generation gets its own bound release record."""
         with envelope_guard(session, self.dir):
-            return self._release(resource, session, reason, force)
+            return self._release(resource, session, reason, force, expected_claimed_at)
 
-    def _release(self, resource, session, reason=None, force=False):
-        """Release under the lifecycle guard held by claim, unmoor or release."""
+    @staticmethod
+    def _lease_generation(lease):
+        """The generation token of a local lease, including the pre-`claimed_at` storage shape."""
+        return lease.get("claimed_at", lease.get("since"))
+
+    def _release(self, resource, session, reason=None, force=False, expected_claimed_at=None):
+        """Compare and release under the lifecycle guard held by claim, unmoor or release."""
         with self._locked():
             leases = self.leases()
             changed = []
             cur = leases.get(resource)
-            if cur and (force or cur.get("holder") == session):
+            if (cur and (force or cur.get("holder") == session)
+                    and (expected_claimed_at is None
+                         or self._lease_generation(cur) == expected_claimed_at)):
                 del leases[resource]
-                changed.append(cur.get("holder"))
+                changed.append(cur)
             slots = leases.get(resource + "/slots")
             if slots:
-                kept = [l for l in slots if not force and l.get("holder") != session]
+                released = []
+                kept = []
+                for lease in slots:
+                    if ((force or lease.get("holder") == session)
+                            and (expected_claimed_at is None
+                                 or self._lease_generation(lease) == expected_claimed_at)):
+                        released.append(lease)
+                    else:
+                        kept.append(lease)
                 if len(kept) != len(slots):
-                    changed += [l.get("holder") for l in slots if l not in kept]
+                    changed += released
                     leases[resource + "/slots"] = kept
             if changed:
                 self._write_leases(leases)
-                forced = [h for h in changed if h != session]
-                self.record("release", resource=resource, session=session, reason=reason,
-                            forced_from=",".join(map(str, forced)) if forced else None)
+                for lease in changed:
+                    holder = str(lease.get("holder"))
+                    generation = self._lease_generation(lease)
+                    fields = {"resource": resource, "session": session, "reason": reason}
+                    if expected_claimed_at is not None:
+                        fields["claimed_at"] = expected_claimed_at
+                    if holder == session:
+                        fields["claimed_at"] = generation
+                    else:
+                        fields["forced_from"] = holder
+                        fields["forced_claimed_at"] = {holder: generation}
+                    self.record("release", **fields)
         return bool(changed)
 
     def owner_check(self, resource, session, action, force=False, note=None):
@@ -1546,7 +1579,8 @@ class Berth:
                         holder=f"{verdict['device']}/{verdict['session']}", **{"class": klass})
             if mine:
                 # This session's own unsettled lease lost: it must not linger here or on the channel.
-                self._release(resource, session, reason=f"steward: {reason}")
+                self._release(resource, session, reason=f"steward: {reason}",
+                              expected_claimed_at=mine.get("claimed_at"))
             return True, None, False, reason
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
         return True, seen, "renewing" if mine else False, None
@@ -1609,7 +1643,8 @@ class Berth:
                             **{"class": lease.get("class")})
                 failed = self.take_fold_failures(resource)
                 if failed:
-                    self._release(resource, session, reason=f"steward: {failed[0]}")
+                    self._release(resource, session, reason=f"steward: {failed[0]}",
+                                  expected_claimed_at=lease.get("claimed_at"))
                     return False, None, failed[0]
                 delayed, delayed_err = self.peer_leases()
                 delayed_verdict = (delayed or {}).get(resource)
@@ -1622,7 +1657,8 @@ class Berth:
             waiting = (verdict.get("waiting_on") or ["another device"])[0]
             reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
         if held or not renewal:
-            self._release(resource, session, reason=f"steward: {reason}")
+            self._release(resource, session, reason=f"steward: {reason}",
+                          expected_claimed_at=lease.get("claimed_at"))
         if kind in ("unconfirmed", "pending") and (view or {}).get("serving") is False:
             # Unacknowledged because this device never announced it: the cure is here.
             reason = f"{reason}\n{DAEMON_DOWN_LINE}"
@@ -2078,7 +2114,8 @@ def _main(argv):
             return 1
         if ok:
             head, _, tail = reason.partition("; ")
-            print(f"{res}: {head} by {session} (session from {source})" + (f"\n  {tail}" if tail else ""))
+            print(f"{res}: {head} by {session} (session from {source}) "
+                  f"claimed_at={lease.get('claimed_at')}" + (f"\n  {tail}" if tail else ""))
             return 0
         if lease is None:
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
@@ -2088,10 +2125,23 @@ def _main(argv):
         return 3
     if cmd == "release":
         if not argv:
-            print("usage: berth release RESOURCE --session S", file=sys.stderr)
+            print("usage: berth release RESOURCE --session S [--expected-claimed-at T] [--force]",
+                  file=sys.stderr)
+            return 2
+        expected_option = "--expected-claimed-at" in argv
+        expected = _opt(argv, "--expected-claimed-at")
+        if expected_option and expected is None:
+            print("berth: --expected-claimed-at requires a claim generation", file=sys.stderr)
+            return 2
+        try:
+            expected_claimed_at = float(expected) if expected is not None else None
+        except ValueError:
+            print(f"berth: --expected-claimed-at {expected!r} is not a claim generation",
+                  file=sys.stderr)
             return 2
         force = "--force" in argv
-        done = b.release(argv[0], session, force=force, reason="forced" if force else None)
+        done = b.release(argv[0], session, force=force, reason="forced" if force else None,
+                         expected_claimed_at=expected_claimed_at)
         print(f"{argv[0]}: {'released' if done else 'was not held'} by {session}" + (" (forced)" if force and done else ""))
         failed = b.take_fold_failures(argv[0])
         if failed:

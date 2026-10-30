@@ -44,7 +44,11 @@
           "elohim/epr/**"
         ],
         "buildProcess": [
-          "elohim/holochain/Jenkinsfile"
+          "elohim/holochain/Jenkinsfile",
+          "scripts/ci/build-storage-image.sh",
+          "scripts/ci/closure-input-digest.sh",
+          "scripts/ci/harbor-oracle.sh",
+          "scripts/ci/storage-input-digest.sh"
         ]
       },
       "outputs": {
@@ -109,7 +113,11 @@
           "scripts/ci/elohim-sdk-feature-matrix.sh"
         ],
         "buildProcess": [
-          "elohim/holochain/Jenkinsfile"
+          "elohim/holochain/Jenkinsfile",
+          "scripts/ci/build-storage-image.sh",
+          "scripts/ci/closure-input-digest.sh",
+          "scripts/ci/harbor-oracle.sh",
+          "scripts/ci/storage-input-digest.sh"
         ]
       },
       "outputs": {

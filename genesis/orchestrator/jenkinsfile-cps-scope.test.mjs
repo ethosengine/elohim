@@ -497,6 +497,25 @@ export function lintMatcherInCpsScope(text) {
 // TESTS
 // ══════════════════════════════════════════════════════════════════
 
+
+/**
+ * Flag a dynamic subscript on `env` anywhere in a Jenkinsfile.
+ *
+ * `env["${kind}_X"] = v` and `env[key]` are `putAt`/`getAt` on EnvActionImpl, which
+ * script-security REJECTS at run time (`RejectedAccessException: … putAt`), after every
+ * static lint has passed — PR-217 edge #2 (2026-10-29) died this way at the first stage
+ * that reached it. `env.X`, `env.setProperty(name, v)` and `env.getProperty(name)` are
+ * whitelisted; those are the only forms allowed.
+ */
+export function lintEnvSubscript(text) {
+    const violations = [];
+    text.split('\n').forEach((line, i) => {
+        const code = line.replace(/\/\/.*$/, '');
+        if (/(^|[^\w.])env\s*\[/.test(code)) violations.push(`line ${i + 1}: ${line.trim()}`);
+    });
+    return violations;
+}
+
 describe('jenkinsfile cps-scope lint', () => {
     it('every triggerPipeline arg is in scope in its enclosing script{} block', () => {
         const text = readFileSync(ORCH_JENKINSFILE, 'utf8');
@@ -527,6 +546,24 @@ describe('jenkinsfile cps-scope lint', () => {
                 `data. See parseBuildTagTokens() for the canonical example.\n`
             );
         }
+    });
+
+
+    it('no dynamic env[...] subscript in any Jenkinsfile (script-security rejects putAt/getAt)', () => {
+        const files = ['Jenkinsfile', 'elohim/holochain/Jenkinsfile', 'elohim/holochain/dna/Jenkinsfile',
+            'genesis/orchestrator/Jenkinsfile', 'app/elohim-library/Jenkinsfile', 'genesis/Jenkinsfile'];
+        const root = resolve(__dirname, '..', '..');
+        const violations = files.flatMap(f => lintEnvSubscript(readFileSync(resolve(root, f), 'utf8')).map(v => `${f}: ${v}`));
+        if (violations.length) {
+            assert.fail(`\nenv[...] subscript in a sandboxed Jenkinsfile:\n\n  ` + violations.join('\n  ') +
+                `\n\nFix: env.setProperty(name, value) / env.getProperty(name) (or env.X for a literal name).\n`);
+        }
+    });
+
+    it('negative control: the env-subscript lint catches env["${k}_X"] = v and env[key], ignores env.X and env.getProperty', () => {
+        assert.equal(lintEnvSubscript('env["${kind}_HIT"] = hit ? "true" : "false"').length, 1);
+        assert.equal(lintEnvSubscript('values[key] = env[key]').length, 1);
+        assert.equal(lintEnvSubscript('env.FOO = "x"; def y = env.getProperty(key); env.setProperty(name, v); myenv[1]').length, 0);
     });
 
     it('negative control: the Matcher lint catches an inline `=~`, and ignores `==~`', () => {

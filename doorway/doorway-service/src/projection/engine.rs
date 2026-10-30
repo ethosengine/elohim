@@ -1,8 +1,8 @@
 //! Projection Engine - type-agnostic signal processing
 //!
 //! The engine receives generic projection signals from DNA and stores
-//! opaque data in MongoDB projections. Doorway does NOT interpret signal
-//! content - it just stores what DNA tells it to store.
+//! anonymous-open data in MongoDB projections. Doorway does not interpret
+//! content fields beyond the declared reach needed to bound this public cache.
 //!
 //! # Architecture
 //!
@@ -24,9 +24,11 @@
 //!
 //! ## Type-Agnostic Design
 //!
-//! Doorway does NOT define content types - the Holochain DNA does.
+//! Doorway does not define content types - the Holochain DNA does.
 //! Signals include explicit metadata (search_tokens, invalidates, ttl)
-//! so doorway can process any type without parsing the data field.
+//! so doorway can process any type. The projection cache admits only an exact
+//! `public` or `commons` reach declaration; missing and unrecognized values are
+//! invalidations, not cache entries.
 
 use std::sync::Arc;
 
@@ -42,8 +44,8 @@ use super::store::ProjectionStore;
 
 /// Generic projection signal from DNA post_commit.
 ///
-/// Doorway is type-agnostic - it stores whatever DNA sends without
-/// parsing the `data` field. DNA provides explicit metadata for:
+/// Doorway is type-agnostic - it stores anonymous-open data for any DNA type.
+/// DNA provides explicit metadata for:
 /// - Search indexing (search_tokens)
 /// - Cache invalidation (invalidates)
 /// - TTL/expiry (ttl_secs)
@@ -63,7 +65,7 @@ pub struct ProjectionSignal {
     pub action: String,
     /// Document ID, or blob_hash for "update_endpoints" action
     pub id: String,
-    /// Opaque data - doorway never parses this
+    /// Projected data. Doorway reads only its declared reach for cache admission.
     /// For "update_endpoints", this should be a JSON array of endpoint URLs
     pub data: JsonValue,
     /// Holochain action hash
@@ -132,9 +134,9 @@ impl ProjectionEngine {
 
     /// Process a single projection signal.
     ///
-    /// This is type-agnostic - doorway stores whatever DNA sends without
-    /// parsing the data field. DNA provides explicit metadata for search
-    /// tokens and cache invalidation.
+    /// This is content-type-agnostic. DNA provides explicit metadata for search
+    /// tokens and cache invalidation, while doorway admits only data declaring
+    /// an exact anonymous-open reach.
     pub async fn process_signal(&self, signal: ProjectionSignal) -> Result<(), DoorwayError> {
         info!(
             doc_type = signal.doc_type,
@@ -145,29 +147,47 @@ impl ProjectionEngine {
 
         match signal.action.as_str() {
             "commit" | "update" => {
-                // Store opaque data with DNA-provided metadata
-                let mut doc = ProjectedDocument::new(
-                    &signal.doc_type,
-                    &signal.id,
-                    &signal.action_hash,
-                    &signal.author,
-                    signal.data,
-                );
+                let reach = signal
+                    .data
+                    .get("reach")
+                    .and_then(JsonValue::as_str)
+                    .filter(|reach| super::cache_refresh::CACHEABLE_REACHES.contains(reach))
+                    .map(str::to_owned);
 
-                if let Some(ref entry_hash) = signal.entry_hash {
-                    doc = doc.with_entry_hash(entry_hash);
+                if let Some(reach) = reach {
+                    let mut doc = ProjectedDocument::new(
+                        &signal.doc_type,
+                        &signal.id,
+                        &signal.action_hash,
+                        &signal.author,
+                        signal.data,
+                    )
+                    .with_reach(reach);
+
+                    if let Some(ref entry_hash) = signal.entry_hash {
+                        doc = doc.with_entry_hash(entry_hash);
+                    }
+
+                    if !signal.search_tokens.is_empty() {
+                        doc = doc.with_search_tokens(signal.search_tokens.clone());
+                    }
+
+                    self.store.set(doc).await?;
+                    debug!(
+                        doc_type = signal.doc_type,
+                        id = signal.id,
+                        "Document projected"
+                    );
+                } else {
+                    // A narrowing update must remove a previously open projection.
+                    let pattern = format!("{}:{}", signal.doc_type, signal.id);
+                    self.store.invalidate(&pattern).await?;
+                    debug!(
+                        doc_type = signal.doc_type,
+                        id = signal.id,
+                        "Document omitted from anonymous projection"
+                    );
                 }
-
-                if !signal.search_tokens.is_empty() {
-                    doc = doc.with_search_tokens(signal.search_tokens.clone());
-                }
-
-                self.store.set(doc).await?;
-                debug!(
-                    doc_type = signal.doc_type,
-                    id = signal.id,
-                    "Document projected"
-                );
             }
             "delete" => {
                 // Delete by invalidating the cache entry
@@ -268,6 +288,22 @@ pub fn spawn_engine_task(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::projection::ProjectionConfig;
+
+    fn projection_signal(id: &str, data: JsonValue) -> ProjectionSignal {
+        ProjectionSignal {
+            doc_type: "Content".to_string(),
+            action: "commit".to_string(),
+            id: id.to_string(),
+            data,
+            action_hash: format!("action-{id}"),
+            entry_hash: None,
+            author: "uhCAkAuthor".to_string(),
+            search_tokens: vec![],
+            invalidates: vec![],
+            ttl_secs: None,
+        }
+    }
 
     #[test]
     fn test_signal_serialization() {
@@ -343,5 +379,51 @@ mod tests {
     fn test_config_default() {
         let config = EngineConfig::default();
         assert_eq!(config.buffer_size, 1000);
+    }
+
+    #[tokio::test]
+    async fn signal_admission_requires_exact_anonymous_open_reach() {
+        let store = Arc::new(ProjectionStore::memory_only(ProjectionConfig::default()));
+        let engine = ProjectionEngine::new(store.clone(), EngineConfig::default());
+
+        for (id, data) in [
+            ("intimate", serde_json::json!({"reach": "intimate"})),
+            ("absent", serde_json::json!({"title": "No reach"})),
+            ("non-string", serde_json::json!({"reach": 7})),
+            ("wrong-case", serde_json::json!({"reach": "Public"})),
+        ] {
+            engine
+                .process_signal(projection_signal(id, data))
+                .await
+                .unwrap();
+            assert!(
+                store.get("Content", id).await.is_none(),
+                "{id} must not enter the anonymous projection"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn narrowing_signal_invalidates_existing_open_projection() {
+        let store = Arc::new(ProjectionStore::memory_only(ProjectionConfig::default()));
+        let engine = ProjectionEngine::new(store.clone(), EngineConfig::default());
+
+        engine
+            .process_signal(projection_signal(
+                "narrowed",
+                serde_json::json!({"reach": "commons"}),
+            ))
+            .await
+            .unwrap();
+        assert!(store.get("Content", "narrowed").await.is_some());
+
+        engine
+            .process_signal(projection_signal(
+                "narrowed",
+                serde_json::json!({"reach": "intimate"}),
+            ))
+            .await
+            .unwrap();
+        assert!(store.get("Content", "narrowed").await.is_none());
     }
 }

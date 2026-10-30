@@ -307,7 +307,7 @@ spec:
         }
 
         stage('Push to Harbor Registry') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { expression { env.PIPELINE_SKIPPED != 'true' && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main') } }
             steps {
                 container('builder') {
                     withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
@@ -329,7 +329,7 @@ spec:
         }
 
         stage('Deploy') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; branch 'dev' } }
             steps {
                 container('builder') {
                     script {
@@ -361,7 +361,7 @@ spec:
         }
 
         stage('Verify Deploy') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf { expression { env.PIPELINE_SKIPPED != 'true' }; branch 'dev' } }
             steps {
                 container('builder') {
                     sh '''#!/bin/bash

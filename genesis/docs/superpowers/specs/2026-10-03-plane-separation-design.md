@@ -1,7 +1,7 @@
 ---
 title: "Plane separation — who writes on a person's chain, and where everything else goes"
 id: plane-separation-design
-status: Ruled
+status: Approved — ruled 2026-10-03; each ruling becomes a plan when its work starts
 class: architecture
 serves: zome-call-cost-bounded
 date: 2026-10-03

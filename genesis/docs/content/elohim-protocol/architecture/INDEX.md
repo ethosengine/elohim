@@ -3,7 +3,7 @@ title: Architecture — Index
 tier: architecture
 status: Living document
 created: 2026-05-24
-last-verified: 2026-08-26
+last-verified: 2026-10-28
 maintainers: Matthew Dowell + Opus 4.7
 ---
 
@@ -137,6 +137,17 @@ Routers and runbooks rather than subject seeds. Two of these are what the root `
 | [`2026-07-12-substrate-trust-contract-runbook.md`](./2026-07-12-substrate-trust-contract-runbook.md) | The dataplane's trust contract — the invariants you may assume, the probe watching each one, and the per-red decision tree. The **operate-time** door; where it and a design doc disagree, the probes are the authority |
 | [`2026-08-25-doorway-auth-refusal-runbook.md`](./2026-08-25-doorway-auth-refusal-runbook.md) | The write-path authorization runbook — refusal probes and decision trees that keep doorway auth failures distinct from dataplane divergence |
 | [`cluster-topology.md`](./cluster-topology.md) | The live P2P modeling canvas — the multi-node topology the test environment actually runs, as distinct from the protocol architecture it hosts |
+| [`2026-09-14-doorway-chaos-operations-runbook.md`](./2026-09-14-doorway-chaos-operations-runbook.md) | The governed-site chaos drill — three separate questions (a sibling entrance keeps serving; the public name selects a survivor after withdrawal; every entrance honors the current notarized authority across the split and recovery), driven by `features/dataplane/doorway-apex-transition.feature` on the household |
+| [`2026-09-26-apex-multi-a-failover-runbook.md`](./2026-09-26-apex-multi-a-failover-runbook.md) | The operator's runbook for two doorways behind `elohim.host` — beacon-owned multi-A records, withdraw → re-admit, and an outside client loop as the evidence. Every step is an operator act; the repository stages only the commented manifest blocks |
+
+### Measured reports — evidence the design is read against
+
+Measurements, not designs: each answers one question with numbers from the household or the fleet and names the limits those numbers ask for. Read the `status:` line for what was measured and what was estimated.
+
+| Report | What it measures |
+|---|---|
+| [`2026-09-24-conductor-store-growth-report.md`](./2026-09-24-conductor-store-growth-report.md) | What grows in a conductor store — the per-entry DHT cost, the writer behind the growth, and the write-ahead-log checkpoint gap (household mesh) |
+| [`2026-10-05-storage-physics-benchmark.md`](./2026-10-05-storage-physics-benchmark.md) | What the genesis corpus should cost to hold at five holders, priced against what the fleet's conductors and storage actually persist |
 
 ### Governance, upgrade, and agent authority
 
@@ -159,11 +170,13 @@ Seeds whose subject sits inside one pillar rather than across the substrate.
 | [`2026-06-04-qahal-epr-household-lattice-design.md`](./2026-06-04-qahal-epr-household-lattice-design.md) | The qahal household living-core lattice — a deliberately thin frame gathering the qahal work |
 | [`2026-06-11-bloom-mastery-progression-design.md`](./2026-06-11-bloom-mastery-progression-design.md) | Mastery progression over a Bloom-style gradient (lamad) |
 
-> **Frontmatter-contract exceptions.** Five documents in this directory do not declare `tier:` —
+> **Frontmatter-contract exceptions.** Eight documents in this directory do not declare `tier:` —
 > `2026-06-21-elohim-seam-map-concern-routing`, `2026-07-12-substrate-trust-contract-runbook`
 > (both `status: reference`), `2026-06-04-qahal-epr-household-lattice-design`,
 > `2026-06-11-bloom-mastery-progression-design`, and `2026-08-05-wave2-relay-sovereignty-design`
-> (all three `status: Draft`; the last also carries `class: substrate`). They are catalogued above
+> (all three `status: Draft`; the last also carries `class: substrate`), plus
+> `2026-09-26-apex-multi-a-failover-runbook` (an operator runbook) and the two measured reports,
+> `2026-09-24-conductor-store-growth-report` and `2026-10-05-storage-physics-benchmark`. They are catalogued above
 > because they live here and are cited as canonical; whether `reference` should be a declared tier
 > alongside `architecture` is an open question for the contract, not a defect in the docs.
 

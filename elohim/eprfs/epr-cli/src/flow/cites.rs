@@ -368,13 +368,16 @@ fn set_cites_block(fm_lines: &[String], items: &[String], quote: bool) -> (Vec<S
     (out, replaced)
 }
 
-/// Insert an `id:` line after `title:` (or at the top of the block when there is no title).
+/// Insert an `id:` line after the TOP-LEVEL `title:` (or at the top of the block when there is
+/// none). Only a column-0 key counts: a memory entry nests `title:` under `metadata:`, and an `id:`
+/// written at column 0 after that nested line splits the mapping and leaves the rest of it
+/// (`type:`, `originSessionId:`) indented under a scalar — invalid YAML.
 fn insert_id(fm_lines: &[String], slug: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut done = false;
     for line in fm_lines {
         out.push(line.clone());
-        if !done && line.trim_start().starts_with("title:") {
+        if !done && line.starts_with("title:") {
             out.push(format!("id: {slug}"));
             done = true;
         }
@@ -2002,6 +2005,29 @@ mod tests {
         let taken: BTreeSet<String> = ["a".into(), "a-2".into()].into_iter().collect();
         assert_eq!(allocate_slug("a", &taken), "a-3");
         assert_eq!(allocate_slug("b", &taken), "b");
+    }
+
+    #[test]
+    fn insert_id_never_lands_inside_a_nested_mapping() {
+        let lines = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // A memory entry: the only `title:` is nested under `metadata:`.
+        let nested = lines(&["name: n", "metadata:", "  title: T", "  type: project"]);
+        assert_eq!(
+            insert_id(&nested, "s"),
+            lines(&[
+                "id: s",
+                "name: n",
+                "metadata:",
+                "  title: T",
+                "  type: project"
+            ])
+        );
+        // A top-level title still wins over a nested one, wherever the nested one sits.
+        let both = lines(&["metadata:", "  title: N", "title: T", "x: 1"]);
+        assert_eq!(
+            insert_id(&both, "s"),
+            lines(&["metadata:", "  title: N", "title: T", "id: s", "x: 1"])
+        );
     }
 
     #[test]

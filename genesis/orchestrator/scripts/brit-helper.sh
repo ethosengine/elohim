@@ -9,11 +9,6 @@
 #   brit-helper.sh verify
 #   brit-helper.sh plan --since refs/notes/brit/build-baselines/__global__
 #   brit-helper.sh build-ref build put --step <name> --inputs-hash <hash> ...
-#   brit-helper.sh attest <actual-build-graph.json>
-#       one signed build attestation per pipeline the orchestrator run awaited, as a
-#       git note under refs/notes/brit/build/<pipeline> (scripts/brit-attest.mjs holds
-#       the field mapping). BRIT_NOTES_REMOTE=<remote> fetches and pushes those notes.
-#       Never fails the build.
 
 set -e
 
@@ -50,10 +45,16 @@ case "${1:-}" in
             exit 0
         fi
         # This checks Git repository integrity, not EPR authorization or native governance.
-        echo "[brit-helper] running repository-integrity advisory: $BRIT_BIN verify $*" >&2
-        "$BRIT_BIN" verify "$@" || {
+        # Bounded: a real verify on this repository is ~15-17 s wall / ~60 s CPU (brit daily-driver
+        # sprint, 2026-10-29); past BRIT_ADVISORY_TIMEOUT_S (default 60) it is a warn, never a wait.
+        echo "[brit-helper] running repository-integrity advisory (timeout ${BRIT_ADVISORY_TIMEOUT_S:-60}s): $BRIT_BIN verify $*" >&2
+        timeout "${BRIT_ADVISORY_TIMEOUT_S:-60}" "$BRIT_BIN" verify "$@" || {
             rc=$?
-            echo "[brit-helper] WARN: brit verify exited $rc — advisory only, not failing the build" >&2
+            if [ "$rc" -eq 124 ]; then
+                echo "[brit-helper] WARN: brit verify timed out after ${BRIT_ADVISORY_TIMEOUT_S:-60}s — advisory only, not failing the build" >&2
+            else
+                echo "[brit-helper] WARN: brit verify exited $rc — advisory only, not failing the build" >&2
+            fi
             exit 0
         }
         ;;
@@ -61,7 +62,7 @@ case "${1:-}" in
         shift
         if [ -n "$BRIT_BIN" ] && "$BRIT_BIN" build plan --help >/dev/null 2>&1; then
             echo "[brit-helper] running: $BRIT_BIN build plan $*" >&2
-            "$BRIT_BIN" build plan "$@" || {
+            timeout "${BRIT_ADVISORY_TIMEOUT_S:-60}" "$BRIT_BIN" build plan "$@" || {
                 rc=$?
                 echo "[brit-helper] WARN: brit build plan exited $rc — advisory only, not failing the build" >&2
                 exit 0
@@ -87,24 +88,8 @@ case "${1:-}" in
             exit 0
         }
         ;;
-    attest)
-        shift
-        if [ -z "$BRIT_BUILD_REF_BIN" ]; then
-            echo "[brit-helper] WARN: brit-build-ref not installed; build attestations skipped (Stage 1a)" >&2
-            exit 0
-        fi
-        if ! command -v node >/dev/null 2>&1; then
-            echo "[brit-helper] WARN: node not on PATH; build attestations skipped" >&2
-            exit 0
-        fi
-        echo "[brit-helper] attesting builds from ${1:-(no graph)} with $BRIT_BUILD_REF_BIN" >&2
-        BRIT_BUILD_REF_BIN="$BRIT_BUILD_REF_BIN" REPO_ROOT="${REPO_ROOT:-$(pwd)}" \
-            node "$(dirname "$0")/brit-attest.mjs" "$@" || \
-            echo "[brit-helper] WARN: brit-attest exited $? — advisory only, not failing the build" >&2
-        exit 0
-        ;;
     *)
-        echo "[brit-helper] usage: $0 {verify|plan|build-ref|attest} [args...]" >&2
+        echo "[brit-helper] usage: $0 {verify|plan|build-ref} [args...]" >&2
         exit 64
         ;;
 esac

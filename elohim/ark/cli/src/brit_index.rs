@@ -173,6 +173,178 @@ pub fn resolve_build_ref() -> Option<PathBuf> {
         .find(|path| executable(path))
 }
 
+/// brit's notes ref for a build step: `refs/notes/brit/build/<step>`, the characters git forbids
+/// in a ref name percent-encoded as brit's `BritRefManager::encode_segment` encodes them.
+pub fn build_ref_name(step: &str) -> String {
+    let mut out = String::with_capacity(step.len());
+    for c in step.chars() {
+        match c {
+            ':' => out.push_str("%3A"),
+            '@' => out.push_str("%40"),
+            '?' => out.push_str("%3F"),
+            '*' => out.push_str("%2A"),
+            '[' => out.push_str("%5B"),
+            '\\' => out.push_str("%5C"),
+            '^' => out.push_str("%5E"),
+            '~' => out.push_str("%7E"),
+            ' ' => out.push_str("%20"),
+            c if c.is_ascii_control() => out.push_str(&format!("%{:02X}", u32::from(c))),
+            c => out.push(c),
+        }
+    }
+    format!("refs/notes/brit/build/{}", out.replace("..", "%2E%2E"))
+}
+
+/// One `unverifiable: <commit> <reason>` line on a brit read's stderr: a stored note brit refused
+/// to verify. Every reader treats it as absent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unverifiable {
+    pub commit: String,
+    pub reason: String,
+}
+
+/// The `unverifiable:` lines of a brit read's stderr, in order. Every other line (the miss line,
+/// a usage error) is left alone.
+pub fn parse_unverifiable(stderr: &str) -> Vec<Unverifiable> {
+    stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("unverifiable: "))
+        .map(|rest| {
+            let (commit, reason) = rest.split_once(' ').unwrap_or((rest, ""));
+            Unverifiable {
+                commit: commit.to_string(),
+                reason: reason.to_string(),
+            }
+        })
+        .collect()
+}
+
+/// What `build find` answered: the rows brit verified, and the notes it refused.
+#[derive(Debug, Clone, Default)]
+pub struct Found {
+    pub rows: Vec<Row>,
+    pub unverifiable: Vec<Unverifiable>,
+}
+
+/// `build find` for a step and closure key. The rows are brit's stdout, the verified read; each
+/// `unverifiable:` line on its stderr names a note brit refused, which is absent here (a row on
+/// that commit is dropped) and returned for the look-up to say once ([`say_unverifiable`]). This
+/// prints nothing itself, because one `ark task` reads the same closure twice (the look-up, then
+/// `record`). A read git could not answer (exit 1) is an error, never an absence.
+pub fn find_rows(bin: &Path, repo: &Path, step: &str, inputs_hash: &str) -> Result<Found, String> {
+    let out = Command::new(bin)
+        .arg("--repo")
+        .arg(repo)
+        .args([
+            "build",
+            "find",
+            "--step",
+            step,
+            "--inputs-hash",
+            inputs_hash,
+        ])
+        .current_dir(repo)
+        .output()
+        .map_err(|error| format!("build find: {error}"))?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if !out.status.success() {
+        let last = stderr.trim().lines().last().unwrap_or("").to_string();
+        return Err(format!("build find failed: {last}"));
+    }
+    let rows: Vec<Row> =
+        serde_json::from_slice(&out.stdout).map_err(|_| "build find: not JSON rows".to_string())?;
+    let unverifiable = parse_unverifiable(&stderr);
+    let rows = rows
+        .into_iter()
+        .filter(|row| {
+            !unverifiable
+                .iter()
+                .any(|note| row.commit.as_deref() == Some(note.commit.as_str()))
+        })
+        .collect();
+    Ok(Found { rows, unverifiable })
+}
+
+/// Say each note brit refused for `step`, once, with its ref and reason: the one place a
+/// `find` result is voiced, so a closure read twice is said once.
+pub fn say_unverifiable(step: &str, found: &Found) {
+    let refused = build_ref_name(step);
+    for note in &found.unverifiable {
+        eprintln!(
+            "ark brit: unverifiable attestation on {refused} at {}: {}; it vetoes reuse until replaced or removed",
+            note.commit, note.reason
+        );
+    }
+}
+
+/// Whether a look-up consults the signer at all: `reusableHit` refuses on the mode and the
+/// policy list before it reads the key, so a report-only or unlisted project asks brit for no
+/// signer and `signer --json` is spawned only when its answer can decide anything.
+pub fn asks_signer(ctx: &ReuseContext) -> bool {
+    ctx.mode.as_deref() == Some("reuse") && ctx.enabled
+}
+
+/// What `brit-build-ref signer --json` says this repository's signer is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Signer {
+    /// brit answered: the key's agent id, or none when the repository keeps no key.
+    Known(Option<String>),
+    /// This brit predates `signer` (clap's usage error, exit 2): the caller's own reading of the
+    /// key file stands.
+    Unsupported,
+    /// brit knows `signer` but could not answer; its first stderr line.
+    Failed(String),
+}
+
+/// clap's first stderr line when the pinned brit has no `signer` subcommand.
+const SIGNER_UNKNOWN: &str = "error: unrecognized subcommand 'signer'";
+
+/// `signer --json`, which never mints a key. An error is why brit could not be run at all.
+pub fn signer(bin: &Path, repo: &Path) -> Result<Signer, String> {
+    let out = Command::new(bin)
+        .arg("--repo")
+        .arg(repo)
+        .args(["signer", "--json"])
+        .current_dir(repo)
+        .output()
+        .map_err(|error| format!("signer: {error}"))?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let first = stderr.lines().next().unwrap_or("").trim().to_string();
+    if out.status.code() == Some(2) && first.starts_with(SIGNER_UNKNOWN) {
+        return Ok(Signer::Unsupported);
+    }
+    if !out.status.success() {
+        return Ok(Signer::Failed(if first.is_empty() {
+            format!("signer: {}", out.status)
+        } else {
+            first
+        }));
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Answer {
+        agent_id: Option<String>,
+    }
+    Ok(match serde_json::from_slice::<Answer>(&out.stdout) {
+        Ok(answer) => Signer::Known(answer.agent_id),
+        Err(_) => Signer::Failed("signer: not JSON".to_string()),
+    })
+}
+
+/// This workspace's signer: brit's answer over the caller's own reading of the key file. The
+/// caller's reading stands only under a brit that predates `signer`; a brit that knows the key
+/// and cannot load it leaves the workspace with no key, said once.
+pub fn self_id_from(answer: Signer, callers: Option<String>) -> Option<String> {
+    match answer {
+        Signer::Known(id) => id,
+        Signer::Unsupported => callers,
+        Signer::Failed(why) => {
+            eprintln!("ark brit: {why}; this workspace has no key");
+            None
+        }
+    }
+}
+
 /// The brit-backed index for one gate closure.
 pub struct BritIndex {
     pub build_ref: Option<PathBuf>,
@@ -222,25 +394,26 @@ impl BritIndex {
         )
     }
 
-    /// `build find` for this closure's step and key.
-    pub fn find(&self) -> Result<Vec<Row>, String> {
-        let bin = self.build_ref.as_ref().ok_or_else(|| {
+    fn bin(&self) -> Result<&Path, String> {
+        self.build_ref.as_deref().ok_or_else(|| {
             "brit-build-ref not on BRIT_BUILD_REF_BIN/BRIT_BUILD_REF or PATH".to_string()
-        })?;
-        let out = Command::new(bin)
-            .arg("--repo")
-            .arg(&self.repo)
-            .args(["build", "find", "--step", &self.step, "--inputs-hash"])
-            .arg(&self.inputs_hash)
-            .current_dir(&self.repo)
-            .output()
-            .map_err(|error| format!("build find: {error}"))?;
-        if !out.status.success() {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let last = stderr.trim().lines().last().unwrap_or("").to_string();
-            return Err(format!("build find failed: {last}"));
-        }
-        serde_json::from_slice(&out.stdout).map_err(|_| "build find: not JSON rows".to_string())
+        })
+    }
+
+    /// `build find` for this closure's step and key: the verified rows, with every note brit
+    /// refused absent ([`find_rows`]); [`BritIndex::decide`] names them, `record` reads silently.
+    pub fn find(&self) -> Result<Found, String> {
+        find_rows(self.bin()?, &self.repo, &self.step, &self.inputs_hash)
+    }
+
+    /// This workspace's signer, from `signer --json` first and from the reuse context's own
+    /// reading of the key file only under a brit that has no `signer` ([`self_id_from`]). Asked
+    /// only when the answer can decide anything ([`asks_signer`]).
+    pub fn self_id(&self) -> Result<Option<String>, String> {
+        Ok(self_id_from(
+            signer(self.bin()?, &self.repo)?,
+            self.ctx.self_id.clone(),
+        ))
     }
 
     fn key(&self) -> Result<DerivationKey, String> {
@@ -287,11 +460,35 @@ impl BritIndex {
                 "this index answers only the method it was opened for",
             ));
         }
-        let rows = self.find()?;
-        let held = !rows.is_empty();
+        let found = self.find()?;
+        say_unverifiable(&self.step, &found);
+        let held = !found.rows.is_empty();
+        // D5 (steward-space spec :850): a red of any provenance or verification state vetoes.
+        // brit cannot say what closure or verdict a note it will not vouch for carried, so one
+        // unverifiable note under this step is a possible red: nothing is reused, the task runs.
+        if let Some(note) = found.unverifiable.first() {
+            let why = format!(
+                "unverifiable note under this step at {}: {} (a red of any verification state \
+                 vetoes; replace or remove the note)",
+                note.commit, note.reason
+            );
+            return Ok(Decided {
+                held,
+                ..other(&why)
+            });
+        }
+        let self_id = if asks_signer(&self.ctx) {
+            self.self_id()?
+        } else {
+            self.ctx.self_id.clone()
+        };
+        let ctx = ReuseContext {
+            self_id,
+            ..self.ctx.clone()
+        };
         match reusable(
-            &rows,
-            &self.ctx,
+            &found.rows,
+            &ctx,
             unchanged_since(&self.repo, &self.ctx.commit),
         ) {
             Ok(row) => {
@@ -303,6 +500,7 @@ impl BritIndex {
                     held,
                 })
             }
+            // `ark task` prints this line.
             Err(why) => Ok(Decided {
                 held,
                 ..other(&why)
@@ -378,8 +576,8 @@ impl DerivationIndex for BritIndex {
         if self.key().map_err(refuse)? != record.key {
             return Err(refuse("the record is keyed for another closure".into()));
         }
-        let rows = self.find().map_err(refuse)?;
-        let stands = rows.iter().any(|row| {
+        let found = self.find().map_err(refuse)?;
+        let stands = found.rows.iter().any(|row| {
             row.attestation.success == Some(true)
                 && row.attestation.agent_id.as_deref() == Some(record.computed_by.as_str())
                 && self
@@ -425,6 +623,193 @@ mod tests {
 
     fn same(_: &str) -> Result<(), String> {
         Ok(())
+    }
+
+    /// A stand-in `brit-build-ref` that prints exactly what the contract says and exits as it
+    /// does; written where the test runs, never in the tree.
+    fn stub(dir: &Path, name: &str, stdout: &str, stderr: &str, code: i32) -> PathBuf {
+        let mut script = String::from("#!/bin/sh\n");
+        if !stdout.is_empty() {
+            script.push_str(&format!("cat <<'BRIT_OUT'\n{stdout}\nBRIT_OUT\n"));
+        }
+        if !stderr.is_empty() {
+            script.push_str(&format!("cat >&2 <<'BRIT_ERR'\n{stderr}\nBRIT_ERR\n"));
+        }
+        script.push_str(&format!("exit {code}\n"));
+        let path = dir.join(name);
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Tests run on many threads: a sibling test may fork while this file is still open
+        // for writing and hold the inherited descriptor until its own exec, so exec'ing the
+        // stub can fail ETXTBSY for a few microseconds (seen once under a pre-push plate).
+        // Probe it until that window has closed; the probe's output is discarded.
+        for _ in 0..200 {
+            match Command::new(&path).output() {
+                Err(error) if error.raw_os_error() == Some(26) => {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                _ => break,
+            }
+        }
+        path
+    }
+
+    const OLD_SIGNER_STDERR: &str = "error: unrecognized subcommand 'signer'\n\n\
+        Usage: brit-build-ref [OPTIONS] <COMMAND>\n\n\
+        For more information, try '--help'.";
+
+    fn find_row(commit: &str) -> String {
+        format!(
+            r#"{{"commit":"{commit}","attestation":{{"agentId":"6d65","buildDurationMs":1200,"builtAt":"2026-10-26T10:00:00Z","hardwareProfile":"x","inputsHash":"k","manifestCid":[1,85,18,32],"outputCid":[1,85,18,32],"signature":"00","stepName":"gate:x","success":true}}}}"#
+        )
+    }
+
+    #[test]
+    fn a_note_brit_names_unverifiable_is_absent_and_the_rest_stand() {
+        let dir = tempfile::tempdir().unwrap();
+        let stdout = format!("[{},{}]", find_row("aaaa1111"), find_row("bbbb2222"));
+        let stderr = "unverifiable: bbbb2222 signature does not verify against agentId \"6d65\"\n\
+                      unverifiable: cccc3333 stepName \"gate:y\" does not match this ref's \"gate:x\"";
+        let bin = stub(dir.path(), "brit-build-ref", &stdout, stderr, 0);
+        let found = find_rows(&bin, dir.path(), "gate:x", "k").unwrap();
+        let commits: Vec<&str> = found
+            .rows
+            .iter()
+            .map(|row| row.commit.as_deref().unwrap())
+            .collect();
+        assert_eq!(commits, ["aaaa1111"], "a refused note is never a hit");
+        assert_eq!(
+            found.unverifiable,
+            [
+                Unverifiable {
+                    commit: "bbbb2222".into(),
+                    reason: "signature does not verify against agentId \"6d65\"".into(),
+                },
+                Unverifiable {
+                    commit: "cccc3333".into(),
+                    reason: "stepName \"gate:y\" does not match this ref's \"gate:x\"".into(),
+                },
+            ]
+        );
+        assert_eq!(found.rows[0].attestation.output_cid, [1, 85, 18, 32]);
+    }
+
+    #[test]
+    fn a_find_miss_is_empty_and_a_failed_git_read_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let miss = stub(dir.path(), "miss", "[]", "", 0);
+        let found = find_rows(&miss, dir.path(), "gate:x", "k").unwrap();
+        assert!(found.rows.is_empty() && found.unverifiable.is_empty());
+        let failed = stub(
+            dir.path(),
+            "failed",
+            "",
+            "Error: git command failed: git notes --ref refs/notes/brit/build/gate%3Ax list: \
+             fatal: not a git repository",
+            1,
+        );
+        let why = find_rows(&failed, dir.path(), "gate:x", "k").unwrap_err();
+        assert_eq!(
+            why,
+            "build find failed: Error: git command failed: git notes --ref \
+             refs/notes/brit/build/gate%3Ax list: fatal: not a git repository"
+        );
+    }
+
+    #[test]
+    fn parse_unverifiable_reads_only_its_lines() {
+        let lines = "no build ref found for step=gate:x commit=HEAD\n\
+                     unverifiable: aaaa1111 does not decode: unknown field `trusted`\n";
+        assert_eq!(
+            parse_unverifiable(lines),
+            [Unverifiable {
+                commit: "aaaa1111".into(),
+                reason: "does not decode: unknown field `trusted`".into(),
+            }]
+        );
+        assert!(parse_unverifiable("[]\n").is_empty());
+    }
+
+    #[test]
+    fn build_ref_name_encodes_as_brit_does() {
+        assert_eq!(build_ref_name("gate:x"), "refs/notes/brit/build/gate%3Ax");
+        assert_eq!(
+            build_ref_name("a b..c@d"),
+            "refs/notes/brit/build/a%20b%2E%2Ec%40d"
+        );
+    }
+
+    #[test]
+    fn signer_json_is_read_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = "6d65".repeat(16);
+        let keyed = stub(
+            dir.path(),
+            "keyed",
+            &format!(r#"{{"agentId":"{id}"}}"#),
+            "",
+            0,
+        );
+        assert_eq!(
+            signer(&keyed, dir.path()).unwrap(),
+            Signer::Known(Some(id.clone()))
+        );
+        let keyless = stub(dir.path(), "keyless", r#"{"agentId":null}"#, "", 0);
+        assert_eq!(signer(&keyless, dir.path()).unwrap(), Signer::Known(None));
+        assert_eq!(
+            self_id_from(Signer::Known(Some(id.clone())), Some("file".into())),
+            Some(id)
+        );
+        assert_eq!(self_id_from(Signer::Known(None), Some("file".into())), None);
+    }
+
+    #[test]
+    fn a_brit_without_signer_leaves_the_callers_reading_of_the_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = stub(dir.path(), "old", "", OLD_SIGNER_STDERR, 2);
+        assert_eq!(signer(&old, dir.path()).unwrap(), Signer::Unsupported);
+        assert_eq!(
+            self_id_from(Signer::Unsupported, Some("file".into())),
+            Some("file".into())
+        );
+        assert_eq!(self_id_from(Signer::Unsupported, None), None);
+    }
+
+    #[test]
+    fn a_brit_that_cannot_load_the_key_leaves_no_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let broken = stub(
+            dir.path(),
+            "broken",
+            "",
+            "Error: cannot load the repository signer key\n\nCaused by:\n    seed has 31 bytes",
+            1,
+        );
+        let answer = signer(&broken, dir.path()).unwrap();
+        assert_eq!(
+            answer,
+            Signer::Failed("Error: cannot load the repository signer key".into())
+        );
+        assert_eq!(self_id_from(answer, Some("file".into())), None);
+    }
+
+    /// The signer is consulted only once the mode and the policy list would let it decide: a
+    /// report-only or unlisted project spawns no `signer --json`, and its context stands as is.
+    #[test]
+    fn the_signer_is_asked_only_under_reuse_for_an_enabled_project() {
+        assert!(asks_signer(&ctx()));
+        assert!(!asks_signer(&ReuseContext {
+            mode: None,
+            ..ctx()
+        }));
+        assert!(!asks_signer(&ReuseContext {
+            mode: Some("report".into()),
+            ..ctx()
+        }));
+        assert!(!asks_signer(&ReuseContext {
+            enabled: false,
+            ..ctx()
+        }));
     }
 
     /// Each refusal `reusableHit` makes, in its order and its words.

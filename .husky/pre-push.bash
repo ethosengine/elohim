@@ -126,8 +126,8 @@ done
 # side. The messages are matched with here-strings, never a pipe: under pipefail an early-exiting
 # `grep -q` on more than a pipe buffer of messages read as "no tag" (SIGPIPE).
 #
-#   berth exit 0  held for this push, released on every exit below (pass, failed gate, refusal,
-#                 Ctrl-C); a claim that only RENEWED a lease this session already held (a session
+#   berth exit 0  held for this push, and released on exit with the generation token returned by
+#                 claim; a claim that only RENEWED a lease this session already held (a session
 #                 watching a deploy) is left to that session, never released here
 #   berth exit 3  the push is refused before any check runs; berth's reason line is printed as is
 #   berth exit 4  no session resolvable: moor a hook-owned holder and retry; refuse if still unleased
@@ -165,7 +165,7 @@ trap 'exit 129' HUP
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
 BERTH_HELD=""
 BERTH_KEPT="" # leases this session already held: renewed while the gates run, never released
-BERTH_CLAIMING=""
+declare -A BERTH_CLAIMED_AT=()
 BERTH_HOOK_SESSION=""
 berth_moor_hook() {
   local principal
@@ -177,13 +177,17 @@ berth_moor_hook() {
     --runtime git-hook --principal "$principal" --task "pre-push to${BERTH_TARGETS}"
 }
 berth_release_claims() {
-  local res
-  # A claim still in flight when the push ends (Ctrl-C mid-settle) may have written its lease.
-  for res in $BERTH_HELD $BERTH_CLAIMING; do
-    "$BERTH_BIN" release "$res" >/dev/null 2>&1 ||
+  local res claimed_at
+  # Only a claim whose generation reached this caller can be released. An interrupted claim stays
+  # bounded by its ttl instead of letting this cleanup guess at a later generation of the session.
+  for res in $BERTH_HELD; do
+    claimed_at="${BERTH_CLAIMED_AT[$res]-}"
+    [ -n "$claimed_at" ] || continue
+    "$BERTH_BIN" release "$res" --expected-claimed-at "$claimed_at" >/dev/null 2>&1 ||
       echo "[pre-push] berth: $res released here, but did not reach the channel — run: berth release $res" >&2
   done
   BERTH_HELD=""
+  BERTH_CLAIMED_AT=()
   if [ -n "$BERTH_HOOK_SESSION" ]; then
     "$BERTH_BIN" unmoor --session "$BERTH_HOOK_SESSION" >/dev/null 2>&1 ||
       echo "[pre-push] berth: hook mooring cleanup failed — run: berth unmoor --session $BERTH_HOOK_SESSION" >&2
@@ -268,7 +272,6 @@ if [ -n "$BERTH_TARGETS" ]; then
   BERTH_FLAGS=(--class verify --ttl "$BERTH_TTL_S" --note "pre-push to${BERTH_TARGETS}")
   [ "${BERTH_OFFLINE_OK-}" = "1" ] && BERTH_FLAGS+=(--offline-ok)
   for BERTH_RES in $BERTH_NEEDS; do
-    BERTH_CLAIMING="$BERTH_RES"
     BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
     BERTH_RC=$?
     if [ "$BERTH_RC" -eq 4 ] && [ "$BERTH_RES" = dev-integration ]; then
@@ -280,7 +283,6 @@ if [ -n "$BERTH_TARGETS" ]; then
       BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
       BERTH_RC=$?
     fi
-    BERTH_CLAIMING=""
     [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
     case "$BERTH_RC" in
       0)
@@ -290,6 +292,9 @@ if [ -n "$BERTH_TARGETS" ]; then
           BERTH_KEPT="$BERTH_KEPT $BERTH_RES"
         else
           BERTH_HELD="$BERTH_HELD $BERTH_RES"
+          if [[ "$BERTH_OUT" =~ (^|[[:space:]])claimed_at=([0-9]+([.][0-9]+)?)($|[[:space:]]) ]]; then
+            BERTH_CLAIMED_AT["$BERTH_RES"]="${BASH_REMATCH[2]}"
+          fi
         fi
         ;;
       1)
@@ -1007,8 +1012,23 @@ brit_advisory() {
   if [ ! -x "$HELPER" ]; then
     return 0  # helper not present (e.g., older branch); silently skip
   fi
+  # Run only when the pushed range touches what brit reads (BRIT_ADVISORY=always forces it):
+  # the brit gitlink, brit's own tree, the brit scripts, any build-manifest.json, this hook.
+  # KNOWN GAP, accepted for a warn-only stage: `brit verify` checks the integrity of the WHOLE
+  # repository, so an ordinary commit that rewrites history or corrupts the object store gets no
+  # Stage 1a signal until a brit-relevant path changes. Stage 2 (the stage that makes this leg
+  # blocking) must drop the path gate or run verify on every push within its bound — do not
+  # inherit this gate unknowingly. (steward-space-reliability-plan, 2026-10-29)
+  if [ "${BRIT_ADVISORY:-}" != "always" ] && git rev-parse --verify origin/dev >/dev/null 2>&1; then
+    BRIT_BASE="$(git merge-base origin/dev HEAD 2>/dev/null || echo origin/dev)"
+    if ! git diff --name-only "$BRIT_BASE" HEAD -- elohim/brit .brit genesis/orchestrator/scripts/brit-helper.sh genesis/orchestrator/scripts/brit-attest.mjs '**/build-manifest.json' .husky 2>/dev/null | grep -q .; then
+      echo ""
+      echo "── brit advisory (Stage 1a — warn-only): skipped — no brit-relevant path in the pushed range (BRIT_ADVISORY=always to force)"
+      return 0
+    fi
+  fi
   echo ""
-  echo "── brit advisory (Stage 1a — warn-only) ─────────────────────"
+  echo "── brit advisory (Stage 1a — warn-only; each call bounded by BRIT_ADVISORY_TIMEOUT_S, default 60s) ─────────────────────"
   REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
   # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
   if git rev-parse --verify origin/dev >/dev/null 2>&1; then

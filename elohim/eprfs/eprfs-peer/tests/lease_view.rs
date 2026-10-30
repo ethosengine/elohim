@@ -444,7 +444,15 @@ fn a_folded_overlapping_lease_is_held_by_its_holder() {
     // Released on A and folded: B's claim no longer meets it.
     let s = store(vec![
         a_claim(),
-        from(&h.a.did, record("release", "claude-1", T0 + 20.0, &[])),
+        from(
+            &h.a.did,
+            record(
+                "release",
+                "claude-1",
+                T0 + 20.0,
+                &[("claimed_at", format!("{T0:.3}"))],
+            ),
+        ),
         own(claim("codex-1", T0 + 30.0)),
     ]);
     let heads = table(&h.b.did, &[(5, 3)], &s, &[(&h.a.did, 5, ms(T0) + 31_000)]);
@@ -473,11 +481,556 @@ fn a_folded_overlapping_lease_is_held_by_its_holder() {
     );
 }
 
+#[test]
+fn an_older_fence_release_without_claim_identity_cannot_make_a_live_lease_free() {
+    const HOLDER_SESSION: &str = "3f9afd7a-13f3-4b7c-889b-07c40a679213";
+    const LOCAL_SESSION: &str = "a60b1c22-d9df-413d-8848-0321540e049e";
+    const CLAIMED_AT: f64 = 1_793_200_535.994;
+    const LOCAL_CLAIMED_AT: f64 = 1_793_199_567.806;
+    const STATUS_AT: f64 = 1_793_201_571.0;
+
+    let h = household();
+    let local_seen = serde_json::to_string(&BTreeMap::from([(h.a.did.as_str(), 11142)]))
+        .expect("seen vector is JSON");
+    let local_claim = record(
+        "claim",
+        LOCAL_SESSION,
+        LOCAL_CLAIMED_AT,
+        &[
+            ("claimed_at", format!("{LOCAL_CLAIMED_AT:.3}")),
+            ("class", "verify".into()),
+            ("dseq", "4661".into()),
+            ("expires_at", "1793201367.806".into()),
+            ("last_renewed_at", "1793199567.806".into()),
+            ("note", "pre-push to dev".into()),
+            ("seen", local_seen),
+            ("session_source", "envelope".into()),
+            ("ttl_s", "1800".into()),
+        ],
+    );
+    let local_renew = record(
+        "renew",
+        LOCAL_SESSION,
+        1_793_200_171.233,
+        &[
+            ("claimed_at", format!("{LOCAL_CLAIMED_AT:.3}")),
+            ("class", "verify".into()),
+            ("dseq", "4662".into()),
+            ("expires_at", "1793201971.233".into()),
+            ("last_renewed_at", "1793200171.233".into()),
+            ("note", "pre-push to dev".into()),
+            ("session_source", "envelope".into()),
+            ("ttl_s", "1800".into()),
+        ],
+    );
+    let local_release = record(
+        "release",
+        LOCAL_SESSION,
+        1_793_200_483.644,
+        &[("dseq", "4663".into())],
+    );
+    let seen = serde_json::to_string(&BTreeMap::from([(h.b.did.as_str(), 7952)]))
+        .expect("seen vector is JSON");
+    let legacy_claim = record(
+        "claim",
+        HOLDER_SESSION,
+        1_793_200_535.995,
+        &[
+            ("claimed_at", format!("{CLAIMED_AT:.3}")),
+            ("class", "verify".into()),
+            ("dseq", "440".into()),
+            ("expires_at", "1793202335.994".into()),
+            ("last_renewed_at", "1793200535.994".into()),
+            ("note", "pre-push to dev".into()),
+            ("seen", seen),
+            ("session_source", "envelope".into()),
+            ("ttl_s", "1800".into()),
+        ],
+    );
+    let legacy_renew = |at: f64, dseq: u64, expires_at: &str| {
+        record(
+            "renew",
+            HOLDER_SESSION,
+            at,
+            &[
+                ("claimed_at", format!("{CLAIMED_AT:.3}")),
+                ("class", "verify".into()),
+                ("dseq", dseq.to_string()),
+                ("expires_at", expires_at.into()),
+                ("last_renewed_at", format!("{at:.3}")),
+                ("note", "pre-push to dev".into()),
+                ("session_source", "envelope".into()),
+                ("ttl_s", "1800".into()),
+            ],
+        )
+    };
+    // The older writer's release identifies only the session. It does not bind the claim whose
+    // authority it ends, so a newer reader keeps the bounded lease until its last renew expires.
+    let legacy_release = record(
+        "release",
+        HOLDER_SESSION,
+        1_793_201_508.381,
+        &[("dseq", "444".into())],
+    );
+    let s = store(vec![
+        own(local_claim),
+        own(local_renew),
+        own(local_release),
+        from(&h.a.did, legacy_claim),
+        from(
+            &h.a.did,
+            legacy_renew(1_793_201_144.574, 442, "1793202944.574"),
+        ),
+        from(
+            &h.a.did,
+            legacy_renew(1_793_201_269.934, 443, "1793203069.934"),
+        ),
+        from(&h.a.did, legacy_release),
+    ]);
+    let mut heads = table(
+        &h.b.did,
+        &[(7952, 3)],
+        &s,
+        &[(&h.a.did, 7952, ms(STATUS_AT))],
+    );
+    heads.devices.get_mut(&h.a.did).expect("holder head").seq = 11212;
+
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &h.admission(), ms(STATUS_AT)),
+        Some(held(&h.a.did, HOLDER_SESSION, CLAIMED_AT, false))
+    );
+
+    // An older unbounded claim has no expiry on which a newer reader can rely. Its explicit
+    // session-only release remains effective, so an old daemon lease cannot block forever.
+    let unbounded = store(vec![
+        from(&h.a.did, claim("legacy-daemon", T0)),
+        from(&h.a.did, record("release", "legacy-daemon", T0 + 20.0, &[])),
+        own(claim("codex-after-daemon", T0 + 30.0)),
+    ]);
+    let unbounded_heads = table(
+        &h.b.did,
+        &[(6, 3)],
+        &unbounded,
+        &[(&h.a.did, 6, ms(T0) + 31_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &unbounded,
+            &unbounded_heads,
+            &h.admission(),
+            ms(T0) + 31_500,
+        ),
+        Some(effective("codex-after-daemon"))
+    );
+}
+
 /// A record as berth stamps it with its device's record counter, `dseq`.
 fn counted(event: FlowEvent, dseq: u64) -> FlowEvent {
     let mut event = event;
     event.classified_as.push(format!("env:dseq={dseq}"));
     event
+}
+
+#[test]
+fn a_stale_cleanup_bound_to_an_older_generation_cannot_release_a_reclaim() {
+    const SESSION: &str = "pre-push-same-session";
+    const FIRST_GENERATION: f64 = T0;
+    const SECOND_GENERATION: f64 = T0 + 10.0;
+
+    let h = household();
+    // Attempt N's caller retains the generation it acquired. Its cleanup runs after the same
+    // session acquired N+1, so the release carries N and cannot close N+1.
+    let sequence = || {
+        vec![
+            counted(claim_ttl(SESSION, FIRST_GENERATION, 120), 1),
+            counted(claim_ttl(SESSION, SECOND_GENERATION, 120), 2),
+            counted(
+                record(
+                    "release",
+                    SESSION,
+                    T0 + 20.0,
+                    &[("claimed_at", format!("{FIRST_GENERATION:.3}"))],
+                ),
+                3,
+            ),
+        ]
+    };
+    let s = store(
+        sequence()
+            .into_iter()
+            .map(|event| from(&h.a.did, event))
+            .collect(),
+    );
+    let heads = table(&h.b.did, &[], &s, &[(&h.a.did, 0, ms(T0) + 21_000)]);
+
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &h.admission(), ms(T0) + 21_000),
+        Some(held(&h.a.did, SESSION, SECOND_GENERATION, false))
+    );
+
+    // The same history on the producing device retains N+1 too. A cleanup implementation must
+    // compare its caller-held N token before deleting the local lease and recording this event.
+    let own_store = store(sequence().into_iter().map(own).collect());
+    let own_heads = table(
+        &h.a.did,
+        &[(3, 3)],
+        &own_store,
+        &[(&h.b.did, 3, ms(T0) + 21_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &own_store,
+            &own_heads,
+            &h.admission(),
+            ms(T0) + 21_000
+        ),
+        Some(effective(SESSION))
+    );
+}
+
+#[test]
+fn berth_release_rejects_a_stale_generation_before_deleting_or_recording() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let berth = repo.join("genesis/agentic/bin/berth");
+    let script = r#"
+import os
+import runpy
+import sys
+import tempfile
+
+Berth = runpy.run_path(sys.argv[1])["Berth"]
+
+class Observation:
+    def available(self):
+        return False
+
+clock = [1000.0]
+resource = "lease-mixed-producer"
+session = "pre-push-same-session"
+
+with tempfile.TemporaryDirectory() as directory:
+    os.environ["BERTH_UNDER_TEST"] = "1"
+    os.environ["ELOHIM_DEVICE_KEY_FILE"] = os.path.join(
+        directory,
+        "no-device",
+        "ed25519.seed",
+    )
+    berth = Berth(
+        directory,
+        obs=Observation(),
+        now=lambda: clock[0],
+        policy_path="/nonexistent/lease-mixed-policy.json",
+    )
+    berth.moor(session)
+    ok, first, reason = berth.claim(resource, session, ttl_s=10)
+    assert ok, reason
+    first_generation = first["claimed_at"]
+
+    clock[0] = 1011.0
+    ok, second, reason = berth.claim(resource, session, ttl_s=10)
+    assert ok, reason
+    assert reason == "re-claimed after its own lease lapsed", reason
+    second_generation = second["claimed_at"]
+    assert second_generation != first_generation
+
+    released = berth.release(
+        resource,
+        session,
+        expected_claimed_at=first_generation,
+    )
+    assert released is False
+    retained = berth.leases()[resource]
+    assert retained["claimed_at"] == second_generation
+    assert not [row for row in berth.ledger(1000) if row.get("kind") == "release"]
+"#;
+    let output = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&berth)
+        .output()
+        .expect("python3 runs the berth producer regression");
+
+    assert!(
+        output.status.success(),
+        "berth producer regression failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+#[test]
+fn forced_release_preserves_the_callers_newer_generation_in_producer_and_replay() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let berth = repo.join("genesis/agentic/bin/berth");
+    let script = r#"
+import json
+import os
+import runpy
+import sys
+import tempfile
+
+Berth = runpy.run_path(sys.argv[1])["Berth"]
+
+class Observation:
+    def available(self):
+        return False
+
+clock = [1792769289.0]
+resource = "dev-integration"
+operator = "operator"
+other = "other"
+
+with tempfile.TemporaryDirectory() as directory:
+    os.environ["BERTH_UNDER_TEST"] = "1"
+    os.environ["ELOHIM_DEVICE_KEY_FILE"] = os.path.join(
+        directory,
+        "no-device",
+        "ed25519.seed",
+    )
+    berth = Berth(
+        directory,
+        obs=Observation(),
+        now=lambda: clock[0],
+        policy_path="/nonexistent/lease-mixed-policy.json",
+    )
+    berth.moor(operator)
+    berth.moor(other)
+    berth.capacities[resource] = 2
+    ok, other_lease, reason = berth.claim(resource, other)
+    assert ok, reason
+    clock[0] += 10
+    ok, operator_lease, reason = berth.claim(resource, operator)
+    assert ok, reason
+    clock[0] += 10
+
+    released = berth.release(
+        resource,
+        operator,
+        force=True,
+        expected_claimed_at=other_lease["claimed_at"],
+    )
+    assert released is True
+    retained = berth.leases()[resource + "/slots"]
+    assert [lease["holder"] for lease in retained] == [operator]
+    release = [row for row in berth.ledger(1000) if row.get("kind") == "release"][-1]
+    print(json.dumps({
+        "operator_claimed_at": operator_lease["claimed_at"],
+        "other_claimed_at": other_lease["claimed_at"],
+        "release": release,
+    }))
+"#;
+    let output = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&berth)
+        .output()
+        .expect("python3 runs the forced-release producer regression");
+    assert!(
+        output.status.success(),
+        "berth producer regression failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let produced: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("producer output is JSON");
+    let release = produced["release"].as_object().expect("release record");
+    let seconds = |value: &serde_json::Value| value.as_f64().expect("unix seconds");
+    let operator_claimed_at = seconds(&produced["operator_claimed_at"]);
+    let other_claimed_at = seconds(&produced["other_claimed_at"]);
+    let release_at = seconds(&release["at"]);
+    let direct_claimed_at = seconds(&release["claimed_at"]);
+    let forced_from = release["forced_from"].as_str().expect("forced holder");
+    let forced_claimed_at = serde_json::to_string(&release["forced_claimed_at"])
+        .expect("forced generation map is JSON");
+    let sequence = || {
+        vec![
+            claim(forced_from, other_claimed_at),
+            claim("operator", operator_claimed_at),
+            record(
+                "release",
+                "operator",
+                release_at,
+                &[
+                    ("claimed_at", format!("{direct_claimed_at:.3}")),
+                    ("forced_from", forced_from.to_string()),
+                    ("forced_claimed_at", forced_claimed_at.clone()),
+                ],
+            ),
+        ]
+    };
+
+    let h = household();
+    let own_store = store(sequence().into_iter().map(own).collect());
+    let own_heads = table(
+        &h.a.did,
+        &[(3, 3)],
+        &own_store,
+        &[(&h.b.did, 3, ms(T0) + 21_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &own_store,
+            &own_heads,
+            &h.admission(),
+            ms(T0) + 21_000,
+        ),
+        Some(effective("operator"))
+    );
+
+    let folded_store = store(
+        sequence()
+            .into_iter()
+            .map(|event| from(&h.a.did, event))
+            .collect(),
+    );
+    let folded_heads = table(
+        &h.b.did,
+        &[],
+        &folded_store,
+        &[(&h.a.did, 0, ms(T0) + 21_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &folded_store,
+            &folded_heads,
+            &h.admission(),
+            ms(T0) + 21_000,
+        ),
+        Some(held(&h.a.did, "operator", operator_claimed_at, false))
+    );
+}
+
+#[test]
+fn forced_releases_match_each_target_generation_and_fail_closed_for_bounded_legacy_claims() {
+    const SESSION: &str = "forced-holder";
+    let h = household();
+
+    let matching_map = serde_json::json!({ (SESSION): T0 }).to_string();
+    let matching = store(vec![
+        from(&h.a.did, claim_ttl(SESSION, T0, 120)),
+        from(
+            &h.a.did,
+            record(
+                "release",
+                "operator",
+                T0 + 20.0,
+                &[
+                    ("forced_from", SESSION.into()),
+                    ("forced_claimed_at", matching_map),
+                ],
+            ),
+        ),
+        own(claim("after-match", T0 + 30.0)),
+    ]);
+    let matching_heads = table(
+        &h.b.did,
+        &[(6, 3)],
+        &matching,
+        &[(&h.a.did, 6, ms(T0) + 31_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &matching,
+            &matching_heads,
+            &h.admission(),
+            ms(T0) + 31_500,
+        ),
+        Some(effective("after-match"))
+    );
+
+    let stale_map = serde_json::json!({ (SESSION): T0 }).to_string();
+    let stale = store(vec![
+        from(&h.a.did, claim_ttl(SESSION, T0, 120)),
+        from(&h.a.did, claim_ttl(SESSION, T0 + 10.0, 120)),
+        from(
+            &h.a.did,
+            record(
+                "release",
+                "operator",
+                T0 + 20.0,
+                &[
+                    ("forced_from", SESSION.into()),
+                    ("forced_claimed_at", stale_map),
+                ],
+            ),
+        ),
+    ]);
+    let stale_heads = table(&h.b.did, &[], &stale, &[(&h.a.did, 0, ms(T0) + 21_000)]);
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &stale,
+            &stale_heads,
+            &h.admission(),
+            ms(T0) + 21_000,
+        ),
+        Some(held(&h.a.did, SESSION, T0 + 10.0, false))
+    );
+
+    let legacy_bounded = store(vec![
+        from(&h.a.did, claim_ttl(SESSION, T0, 120)),
+        from(
+            &h.a.did,
+            record(
+                "release",
+                "operator",
+                T0 + 20.0,
+                &[("forced_from", SESSION.into())],
+            ),
+        ),
+    ]);
+    let legacy_bounded_heads = table(
+        &h.b.did,
+        &[],
+        &legacy_bounded,
+        &[(&h.a.did, 0, ms(T0) + 21_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &legacy_bounded,
+            &legacy_bounded_heads,
+            &h.admission(),
+            ms(T0) + 21_000,
+        ),
+        Some(held(&h.a.did, SESSION, T0, false))
+    );
+
+    let legacy_unbounded = store(vec![
+        from(&h.a.did, claim(SESSION, T0)),
+        from(
+            &h.a.did,
+            record(
+                "release",
+                "operator",
+                T0 + 20.0,
+                &[("forced_from", SESSION.into())],
+            ),
+        ),
+        own(claim("after-legacy", T0 + 30.0)),
+    ]);
+    let legacy_unbounded_heads = table(
+        &h.b.did,
+        &[(6, 3)],
+        &legacy_unbounded,
+        &[(&h.a.did, 6, ms(T0) + 31_000)],
+    );
+    assert_eq!(
+        verdict(
+            &h.b.did,
+            &legacy_unbounded,
+            &legacy_unbounded_heads,
+            &h.admission(),
+            ms(T0) + 31_500,
+        ),
+        Some(effective("after-legacy"))
+    );
 }
 
 #[test]

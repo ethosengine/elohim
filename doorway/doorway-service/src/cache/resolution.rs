@@ -39,6 +39,7 @@ use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+use crate::projection::cache_refresh::is_cacheable_reach;
 use crate::projection::ProjectionStore;
 use crate::types::{DoorwayError, Result};
 use crate::worker::{RequesterIdentity, WorkerPool, ZomeCallBuilder, ZomeCallConfig};
@@ -193,7 +194,7 @@ impl DoorwayResolver {
     /// Resolve content with requester identity for access control.
     ///
     /// Identity is passed through to the conductor for DNA-level access control.
-    /// Doorway doesn't enforce access - DNA decides based on reach/governance rules.
+    /// Projection hits remain limited to exact anonymous-open reach declarations.
     pub async fn resolve_with_identity(
         &self,
         content_type: &str,
@@ -279,20 +280,27 @@ impl DoorwayResolver {
         initial: &elohim_cache_core::ResolutionResult,
         requester: Option<RequesterIdentity>,
     ) -> Result<(serde_json::Value, String, SourceTier, bool)> {
-        // Try projection first
-        // Note: Projection returns cached data without access control checks
-        // For reach-restricted content, conductor fallback handles access control
+        // Try projection first. This cache can prove only anonymous-open reach;
+        // every narrower, missing, or unrecognized declaration falls through to
+        // the authoritative conductor.
         if initial.source_id == "projection" || self.projection.is_some() {
             if let Some(ref projection) = self.projection {
                 debug!(content_type = content_type, id = id, "Trying projection");
                 if let Some(doc) = projection.get(content_type, id).await {
-                    debug!(content_type = content_type, id = id, "Projection hit");
-                    return Ok((
-                        doc.data,
-                        "projection".to_string(),
-                        SourceTier::Projection,
-                        initial.cached,
-                    ));
+                    if is_cacheable_reach(&doc.data) {
+                        debug!(content_type = content_type, id = id, "Projection hit");
+                        return Ok((
+                            doc.data,
+                            "projection".to_string(),
+                            SourceTier::Projection,
+                            initial.cached,
+                        ));
+                    }
+                    debug!(
+                        content_type = content_type,
+                        id = id,
+                        "Projection entry is not anonymous-open"
+                    );
                 }
             }
         }
@@ -451,6 +459,7 @@ impl DoorwayResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::projection::{ProjectedDocument, ProjectionConfig};
 
     #[tokio::test]
     async fn test_resolver_creation() {
@@ -504,5 +513,33 @@ mod tests {
         // Still no conductor available because no worker pool — resolution_count
         // should be zero since nothing has been resolved.
         assert_eq!(resolver.stats.read().unwrap().resolution_count, 0);
+    }
+
+    #[tokio::test]
+    async fn projection_resolution_requires_exact_anonymous_open_reach() {
+        let projection = Arc::new(ProjectionStore::memory_only(ProjectionConfig::default()));
+        for (id, reach) in [
+            ("public", Some("public")),
+            ("commons", Some("commons")),
+            ("intimate", Some("intimate")),
+            ("unknown", Some("Public")),
+            ("absent", None),
+        ] {
+            let data = match reach {
+                Some(reach) => serde_json::json!({"id": id, "reach": reach}),
+                None => serde_json::json!({"id": id}),
+            };
+            let doc =
+                ProjectedDocument::new("Content", id, format!("action-{id}"), "uhCAkAuthor", data);
+            assert!(doc.reach.is_none());
+            projection.set(doc).await.unwrap();
+        }
+        let resolver = DoorwayResolver::projection_only(projection);
+
+        assert!(resolver.resolve("Content", "public").await.is_ok());
+        assert!(resolver.resolve("Content", "commons").await.is_ok());
+        assert!(resolver.resolve("Content", "intimate").await.is_err());
+        assert!(resolver.resolve("Content", "unknown").await.is_err());
+        assert!(resolver.resolve("Content", "absent").await.is_err());
     }
 }

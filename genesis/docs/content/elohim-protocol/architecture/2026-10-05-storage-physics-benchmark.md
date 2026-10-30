@@ -2,7 +2,8 @@
 title: What the genesis corpus should cost to hold — a storage benchmark at five holders, and what the fleet holds instead
 id: storage-physics-benchmark
 date: 2026-10-05
-status: Benchmark draft — corpus and household measured; fleet read from Prometheus; per-head floor is an estimate
+tier: architecture
+status: Draft — benchmark; corpus and household measured; fleet read from Prometheus; per-head floor is an estimate
 author: Fable session 2026-10-05 (shem)
 cites:
   - "conductor-store-growth-report | the measured per-entry DHT cost this benchmark prices heads with | path: genesis/docs/content/elohim-protocol/architecture/2026-09-24-conductor-store-growth-report.md"

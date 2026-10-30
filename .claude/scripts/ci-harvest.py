@@ -24,8 +24,7 @@ Modes:
                  one-line notice and decides for itself. Pass this only from a
                  topical surface — pipeline/CI work, a /shift kickoff, or a
                  stasis sweep — where draining the ledger IS the session's job.
-  --wait JOB     bounded poll until JOB's running build completes, then
-                 harvest that job (post-push loop-closer; run in background)
+  --attest N     attest and observe one orchestrator wave, including outside the listing window
   --jobs a,b     restrict harvest to listed jobs
 
 Fail-safe: in --hook mode every error exits 0 silently — a Jenkins outage
@@ -33,12 +32,17 @@ must never break session start.
 """
 
 import argparse
+import contextlib
+import signal
 import fcntl
 import hashlib
 import json
 import os
 import re
 import sys
+import shutil
+import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -145,6 +149,11 @@ _SKIPPED_AFTER_FAILURE_MS = 1000
 _BUDGET_CONCERN_FALLBACK = "push-delivers-within-budget"
 DELIVERY_SERIES = os.path.join(PROJECT, "genesis", "orchestrator", "delivery-series.mjs")
 DELIVERY_JOB = "elohim"
+ATTEST_JOB = "elohim-orchestrator"
+OBSERVE_PIPELINE = "elohim-edge"
+BRIT_ATTEST = os.path.join(PROJECT, "genesis", "orchestrator", "scripts", "brit-attest.mjs")
+OFFER_PATH = "bridges/.epr-meta/offers/jenkins-edge-pipeline.offer.md"
+ATTESTED = {"SUCCESS", "UNSTABLE", "FAILURE", "ABORTED"}
 
 # ── Quiesce leg ──────────────────────────────────────────────────────────────
 # The fleet-quiesce gate prints, once per poll, everything needed to understand
@@ -184,9 +193,99 @@ def _load_quiesce_parser():
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
+# One hook deadline, including initial reads. The last ten seconds belong to
+# persistence/render. SIGALRM bounds total response time (socket timeouts alone do not).
+HOOK_DEADLINE = None
+PERSIST_RESERVE_S = 10
+
+
+def remaining(limit, persistence=False):
+    if HOOK_DEADLINE is None:
+        return limit
+    left = HOOK_DEADLINE - time.monotonic() - (0 if persistence else PERSIST_RESERVE_S)
+    if left <= 0:
+        raise TimeoutError("hook budget exhausted; retry next harvest")
+    return min(limit, left)
+
+
+def budget_available():
+    try:
+        remaining(1)
+        return True
+    except TimeoutError:
+        return False
+
+
+def reserve_persistence():
+    if HOOK_DEADLINE is not None:
+        signal.signal(signal.SIGALRM, lambda _signum, _frame: sys.exit(0))
+        signal.setitimer(signal.ITIMER_REAL, max(0.001, HOOK_DEADLINE - time.monotonic()))
+
+
+def budget_alarm(_signum, _frame):
+    raise TimeoutError("hook budget exhausted; retry next harvest")
+
+
+def read_many(fn, values):
+    # No worker may outlive a hook's deadline or delay interpreter shutdown.
+    if HOOK_DEADLINE is not None:
+        out = []
+        for value in values:
+            remaining(1)
+            out.append(fn(value))
+        return out
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        return list(ex.map(fn, values))
+
+
+@contextlib.contextmanager
+def cursor_lock():
+    os.makedirs(os.path.dirname(CURSOR_PATH), exist_ok=True)
+    with open(CURSOR_PATH + ".lock", "a") as lock:
+        if HOOK_DEADLINE is not None:
+            remaining(1, persistence=True)
+        fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if HOOK_DEADLINE is not None else 0))
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def ledger_lock():
+    os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
+    with open(LEDGER_PATH + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if HOOK_DEADLINE is not None else 0))
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def merge_cursor(cursor):
+    """Merge under the cursor lock; stale harvests cannot erase a newer memo or watermark."""
+    current = load_cursor()
+    disk_jobs = dict(current.get("jobs", {}))
+    for section, incoming in cursor.items():
+        if not isinstance(incoming, dict):
+            current[section] = incoming
+            continue
+        dest = current.setdefault(section, {})
+        for key, value in incoming.items():
+            if section in ("jobs", "green"):
+                dest[key] = max(dest.get(key, 0), value)
+            elif section in ("recent", "green_streak"):
+                if cursor.get("jobs", {}).get(key, 0) >= disk_jobs.get(key, 0):
+                    dest[key] = value
+            else:
+                dest.setdefault(key, value)
+    cursor.clear()
+    cursor.update(current)
+
+
 def get_json(path):
     req = urllib.request.Request(JENKINS + path, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+    with urllib.request.urlopen(req, timeout=remaining(HTTP_TIMEOUT)) as resp:
         return json.loads(resp.read().decode("utf-8", "replace"))
 
 
@@ -201,13 +300,13 @@ def get_console_tail(job, build, nbytes=None):
     n = nbytes or CONSOLE_TAIL
     base = f"/job/{job}/job/{BRANCH}/{build}/logText/progressiveText"
     probe = urllib.request.Request(JENKINS + base + "?start=2000000000")
-    with urllib.request.urlopen(probe, timeout=HTTP_TIMEOUT) as resp:
+    with urllib.request.urlopen(probe, timeout=remaining(HTTP_TIMEOUT)) as resp:
         size = int(resp.headers.get("X-Text-Size", "0"))
     if size <= 0:
         return ""
     start = max(0, size - n)
     req = urllib.request.Request(JENKINS + base + f"?start={start}")
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT * 4) as resp:
+    with urllib.request.urlopen(req, timeout=remaining(HTTP_TIMEOUT * 4)) as resp:
         return resp.read(n + 4096).decode("utf-8", "replace")
 
 
@@ -496,19 +595,29 @@ def record_delivery_measures():
     try:
         r = subprocess.run(["node", DELIVERY_SERIES, "--stages", "--json", "--window", "10",
                             "--pipelines", DELIVERY_JOB],
-                           capture_output=True, text=True, timeout=45, cwd=PROJECT)
+                           capture_output=True, text=True, timeout=remaining(45), cwd=PROJECT)
         series = json.loads(r.stdout) if r.stdout.strip() else None
     except (OSError, subprocess.SubprocessError, ValueError):
         return []
-    try:
-        sys.path.insert(0, os.path.join(PROJECT, ".claude", "hooks"))
-        import _observation  # the shared emitter every fold producer uses
-    except Exception:  # noqa: BLE001
-        return []
     landed = []
+    # The emitter may probe and invoke multiple native commands. Bound the entire
+    # emitter process by the same remaining budget, including all of its children.
+    emit_code = (
+        "import json,sys; sys.path.insert(0, sys.argv[1]); import _observation; "
+        "v=json.load(sys.stdin); "
+        "sys.exit(0 if _observation.emit(v['measure'], '.', v['value'], "
+        "reason=v['reason'], root=v['root']) else 1)"
+    )
     for measure, value, reason in delivery_folds(series):
-        if _observation.emit(measure, ".", value, reason=reason, root=PROJECT):
-            landed.append((measure, value))
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", emit_code, os.path.join(PROJECT, ".claude", "hooks")],
+                input=json.dumps({"measure": measure, "value": value, "reason": reason, "root": PROJECT}),
+                capture_output=True, text=True, timeout=remaining(15), cwd=PROJECT)
+            if result.returncode == 0:
+                landed.append((measure, value))
+        except (OSError, subprocess.SubprocessError):
+            break
     return landed
 
 
@@ -642,6 +751,7 @@ def harvest_job(job, cursor, taxonomy):
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
         return out  # job missing / offline — silent
     completed = [b for b in data.get("builds", []) if b.get("result")]
+    out["completed"] = [(b["number"], b["result"]) for b in completed]
     if not completed:
         return out
     completed.sort(key=lambda b: b["number"])  # oldest → newest
@@ -727,106 +837,319 @@ def reconcile(results, cursor):
     and double seen-bumps); the inverted order would permanently skip
     findings instead.
     """
-    os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
-    lock = open(LEDGER_PATH + ".lock", "w")  # noqa: SIM115 — held for fn lifetime
-    fcntl.flock(lock, fcntl.LOCK_EX)
-    entries = load_jsonl(LEDGER_PATH)
-    by_fp = {e["fp"]: e for e in entries}
-    new_entries, bumped = [], []
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    for r in results:
-        for f in r["new"]:
-            fp = fingerprint(r["job"], f["category"], f["ident"])
-            entry = by_fp.get(fp)
-            if entry is None:
-                if len(new_entries) >= MAX_NEW_FINDINGS:
+    with cursor_lock(), ledger_lock():
+        os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
+        merge_cursor(cursor)
+        previous_jobs = dict(cursor["jobs"])
+        entries = load_jsonl(LEDGER_PATH)
+        by_fp = {e["fp"]: e for e in entries}
+        new_entries, bumped = [], []
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        for r in results:
+            for f in r["new"]:
+                fp = fingerprint(r["job"], f["category"], f["ident"])
+                entry = by_fp.get(fp)
+                if entry is None:
+                    if len(new_entries) >= MAX_NEW_FINDINGS:
+                        continue
+                    entry = {
+                        "ts": now,
+                        "fp": fp,
+                        "class": f.get("class", "ci-failure"),
+                        "category": f["category"],
+                        "job": r["job"],
+                        "line": f["display"][:300],
+                        "status": "open",
+                        "seen": 1,
+                        "first_build": f["build"],
+                        "last_build": f["build"],
+                        **({"concern": f["concern"]} if f.get("concern") else {}),
+                        # A FIELD, never a fingerprint input (see _STAGE_BUDGET_LENS above).
+                        **({"durationMillis": f["durationMillis"]}
+                           if f.get("durationMillis") is not None else {}),
+                    }
+                    by_fp[fp] = entry
+                    entries.append(entry)
+                    new_entries.append(entry)
+                elif f["build"] > entry.get("last_build", 0):
+                    entry["seen"] = entry.get("seen", 1) + 1
+                    entry["last_build"] = f["build"]
+                    if f.get("durationMillis") is not None:
+                        entry["durationMillis"] = f["durationMillis"]  # the latest build's clock
+                    if entry not in new_entries:
+                        bumped.append(entry)
+            if r["builds_seen"]:
+                cursor["jobs"][r["job"]] = max(
+                    cursor["jobs"].get(r["job"], 0), max(r["builds_seen"])
+                )
+            if r["green"]:
+                cursor["green"][r["job"]] = max(cursor["green"].get(r["job"], 0), r["green"])
+            # Consecutive-green streak per job (the COMPUTABLE disappearance
+            # evidence — build-number arithmetic lies across aborted gaps) and
+            # the rolling result window (pass/unstable/fail ratio = the
+            # agentic-developer loop's FLOOR rail).
+            streaks = cursor.setdefault("green_streak", {})
+            recent = cursor.setdefault("recent", {})
+            for _n, res in r.get("sequence", []):
+                if _n <= previous_jobs.get(r["job"], 0):
                     continue
-                entry = {
-                    "ts": now,
-                    "fp": fp,
-                    "class": f.get("class", "ci-failure"),
-                    "category": f["category"],
-                    "job": r["job"],
-                    "line": f["display"][:300],
-                    "status": "open",
-                    "seen": 1,
-                    "first_build": f["build"],
-                    "last_build": f["build"],
-                    **({"concern": f["concern"]} if f.get("concern") else {}),
-                    # A FIELD, never a fingerprint input (see _STAGE_BUDGET_LENS above).
-                    **({"durationMillis": f["durationMillis"]}
-                       if f.get("durationMillis") is not None else {}),
-                }
-                by_fp[fp] = entry
-                entries.append(entry)
-                new_entries.append(entry)
-            elif f["build"] > entry.get("last_build", 0):
-                entry["seen"] = entry.get("seen", 1) + 1
-                entry["last_build"] = f["build"]
-                if f.get("durationMillis") is not None:
-                    entry["durationMillis"] = f["durationMillis"]  # the latest build's clock
-                if entry not in new_entries:
-                    bumped.append(entry)
-        if r["builds_seen"]:
-            cursor["jobs"][r["job"]] = max(
-                cursor["jobs"].get(r["job"], 0), max(r["builds_seen"])
-            )
-        if r["green"]:
-            cursor["green"][r["job"]] = max(cursor["green"].get(r["job"], 0), r["green"])
-        # Consecutive-green streak per job (the COMPUTABLE disappearance
-        # evidence — build-number arithmetic lies across aborted gaps) and
-        # the rolling result window (pass/unstable/fail ratio = the
-        # agentic-developer loop's FLOOR rail).
-        streaks = cursor.setdefault("green_streak", {})
-        recent = cursor.setdefault("recent", {})
-        for _n, res in r.get("sequence", []):
-            if res == "SUCCESS":
-                streaks[r["job"]] = streaks.get(r["job"], 0) + 1
-            else:
-                streaks[r["job"]] = 0
-            window = recent.setdefault(r["job"], [])
-            window.append(res)
-            del window[:-RECENT_WINDOW]
+                if res == "SUCCESS":
+                    streaks[r["job"]] = streaks.get(r["job"], 0) + 1
+                else:
+                    streaks[r["job"]] = 0
+                window = recent.setdefault(r["job"], [])
+                window.append(res)
+                del window[:-RECENT_WINDOW]
 
-    # Deterministic lifecycle — no agent, no ceremony (spec §3.3):
-    # confirmation-by-disappearance and recurrence-reopen are computable.
-    confirmed, reopened, kept = [], [], []
-    for e in entries:
-        if e.get("class") == "ci-failure" and e.get("status") == "triaged":
-            tab = e.get("triaged_at_build")
-            if tab is not None and e.get("last_build", 0) > tab:
-                e["status"] = "open"  # recurred after the fix — it didn't take
-                reopened.append(e)
-            elif (
-                tab is not None
-                and cursor.get("green_streak", {}).get(e.get("job", ""), 0) >= CONFIRM_STREAK
-            ):
-                confirmed.append(e)  # decomposed — ledger line not kept
-                # Judgment was made ONCE at triage time: decompose_on_confirm
-                # means no museum-worthy lesson — the backlog entry deletes
-                # deterministically too. Otherwise the entry is reported for
-                # graduate-then-decompose.
-                bl = e.get("backlog")
-                if e.get("decompose_on_confirm") and bl:
-                    try:
-                        os.remove(os.path.join(PROJECT, bl))
-                    except OSError:
-                        pass
+        # Deterministic lifecycle — no agent, no ceremony (spec §3.3):
+        # confirmation-by-disappearance and recurrence-reopen are computable.
+        confirmed, reopened, kept = [], [], []
+        for e in entries:
+            if e.get("class") == "ci-failure" and e.get("status") == "triaged":
+                tab = e.get("triaged_at_build")
+                if tab is not None and e.get("last_build", 0) > tab:
+                    e["status"] = "open"  # recurred after the fix — it didn't take
+                    reopened.append(e)
+                elif (
+                    tab is not None
+                    and cursor.get("green_streak", {}).get(e.get("job", ""), 0) >= CONFIRM_STREAK
+                ):
+                    confirmed.append(e)  # decomposed — ledger line not kept
+                    # Judgment was made ONCE at triage time: decompose_on_confirm
+                    # means no museum-worthy lesson — the backlog entry deletes
+                    # deterministically too. Otherwise the entry is reported for
+                    # graduate-then-decompose.
+                    bl = e.get("backlog")
+                    if e.get("decompose_on_confirm") and bl:
+                        try:
+                            os.remove(os.path.join(PROJECT, bl))
+                        except OSError:
+                            pass
+                    continue
+            kept.append(e)
+        entries = kept
+        write_jsonl(LEDGER_PATH, entries)
+        _write_cursor_locked(cursor)
+        return new_entries, bumped, confirmed, reopened
+
+
+def brit_build_ref_bin():
+    return os.environ.get("BRIT_BUILD_REF_BIN") or shutil.which("brit-build-ref")
+
+
+def jenkins_bridge_bin():
+    selected = os.environ.get("JENKINS_BRIDGE_BIN") or shutil.which("jenkins-bridge")
+    if selected:
+        return selected
+    candidate = os.path.join(os.environ.get("CARGO_POOL_ROOT", "/projects/.cargo-target-pool"),
+                             "family", "dev", "jenkins-bridge", "dev", "debug", "jenkins-bridge")
+    try:
+        if not os.path.isfile(candidate):
+            return None
+        latest = subprocess.run(["git", "log", "-1", "--format=%ct", "--", "bridges/jenkins/src"],
+                                cwd=PROJECT, capture_output=True, text=True, timeout=remaining(5), check=True)
+        if os.path.getmtime(candidate) > int(latest.stdout.strip()):
+            return candidate
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def attest_waves(orch_result, cursor, force=False):
+    """Device-local verdicts and governed observations; either leg can catch up independently."""
+    out = {"attested": [], "observed": [], "deferred": []}
+    # A stuck local binary must leave time for the hook to render and persist the memo.
+    deadline = HOOK_DEADLINE - PERSIST_RESERVE_S if HOOK_DEADLINE is not None else time.monotonic() + 60
+
+    def run(args, limit=60, **kwargs):
+        left = min(deadline - time.monotonic(), remaining(limit))
+        if left <= 0:
+            raise TimeoutError("harvest attestation budget exhausted; retry next harvest")
+        return subprocess.run(args, cwd=PROJECT, capture_output=True, text=True,
+                              timeout=min(limit, left), **kwargs)
+
+    def fetch_graph(n):
+        try:
+            graph = get_json(f"/job/{ATTEST_JOB}/job/{BRANCH}/{n}/artifact/actual-build-graph.json")
+            return graph if isinstance(graph, dict) else None
+        except (OSError, ValueError):
+            return None
+
+    try:
+        attested = cursor.setdefault("attested", {})
+        observed = cursor.setdefault("observed", {})
+        completed = sorted({n for n, _ in (orch_result or {}).get("completed", [])})
+        if not completed:
+            return out
+        brit = brit_build_ref_bin()
+        if brit is None:
+            out["deferred"].append("brit-build-ref absent")
+            return out
+
+        # Standing is read once, before any wfapi request. Neither mint nor approval is ours.
+        bridge = jenkins_bridge_bin()
+        bridge_root = os.environ.get("JENKINS_BRIDGE_ROOT", PROJECT)
+        active = False
+        if bridge is None:
+            out["deferred"].append("observe deferred: jenkins-bridge not on PATH — no fresh dev-pool binary; just gate jenkins-bridge")
+        else:
+            try:
+                status = run([bridge, "offer", "status", "--root", bridge_root, "--json"], limit=5)
+                if status.returncode:
+                    out["deferred"].append(status.stderr.strip() or "observe deferred: offer status unreadable")
+                else:
+                    offer = json.loads(status.stdout)
+                    if offer.get("minted") != "yes":
+                        out["deferred"].append(f'observe deferred: offer {offer.get("offer")} unminted — '
+                                               f'jenkins-bridge offer mint --root {bridge_root}, then a distinct Steward\'s approving verdict '
+                                               '(offer not minted/Proposed)')
+                    elif offer.get("state") != "active":
+                        missing = offer.get("missing") or status.stderr.strip()
+                        out["deferred"].append(f'observe deferred: offer {offer.get("offer")} {offer.get("state")} — {missing}')
+                    else:
+                        active = True
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                out["deferred"].append(f"observe deferred: {exc}")
+
+        # Attestation has priority. Already attested waves still owe an observation after
+        # an offer becomes Active (or a transient observe refusal); the memos are separate.
+        pending = [n for n in completed if force or str(n) not in attested]
+        candidates = pending[:MAX_BUILDS_PER_JOB]
+        if len(pending) > len(candidates):
+            out["deferred"].append(f"{len(pending) - len(candidates)} wave(s) waiting for next harvest")
+        if active:
+            # Inspect all already-attested observation debt in the bounded listing. Missing
+            # or queued edge records must not permanently occupy the ten observation slots.
+            candidates += [n for n in completed if n not in candidates and str(n) in attested
+                           and (force or str(n) not in observed)]
+        graphs = {}
+        for n in candidates:
+            if not budget_available():
+                out["deferred"].append("hook budget exhausted; retry next harvest")
+                break
+            graphs[n] = fetch_graph(n)
+        eligible = {}
+        for n, graph in graphs.items():
+            if graph is None:
+                out["deferred"].append(f"#{n}: graph unreadable")
                 continue
-        kept.append(e)
-    entries = kept
-    write_jsonl(LEDGER_PATH, entries)
-    os.makedirs(os.path.dirname(CURSOR_PATH), exist_ok=True)
-    tmp = CURSOR_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(cursor, fh, indent=1)
-    os.replace(tmp, CURSOR_PATH)
-    fcntl.flock(lock, fcntl.LOCK_UN)
-    lock.close()
-    return new_entries, bumped, confirmed, reopened
+            try:
+                validate_graph(graph, n)
+                edge = graph["results"].get(OBSERVE_PIPELINE, {})
+                if (active and (force or str(n) not in observed) and edge.get("buildNumber") is not None
+                        and edge.get("result") in ATTESTED):
+                    eligible[n] = edge["buildNumber"]
+            except ValueError as exc:
+                out["deferred"].append(f"#{n}: {exc}")
+                graphs[n] = None
+        if len(eligible) > MAX_BUILDS_PER_JOB:
+            out["deferred"].append(f"{len(eligible) - MAX_BUILDS_PER_JOB} observation(s) waiting for next harvest")
+            eligible = dict(list(eligible.items())[:MAX_BUILDS_PER_JOB])
+        describes = {}
+        for n in eligible:
+            if not budget_available():
+                break
+            describes[n] = _get_describe(OBSERVE_PIPELINE, eligible[n])
+
+        for n, graph in graphs.items():
+            if graph is None:
+                continue
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    graph_path = os.path.join(tmp, "actual-build-graph.json")
+                    with open(graph_path, "w", encoding="utf-8") as fh:
+                        json.dump(graph, fh)
+                    if force or str(n) not in attested:
+                        result = run(["node", BRIT_ATTEST, "--json", graph_path],
+                                     env={**os.environ, "BRIT_BUILD_REF_BIN": brit, "REPO_ROOT": PROJECT,
+                                          "ATTEST_BUDGET_MS": str(max(1, int((deadline - time.monotonic()) * 1000)))})
+                        report = json.loads(result.stdout)
+                        if result.returncode or report.get("deferred"):
+                            out["deferred"].extend(d["why"] for d in report.get("deferred", []))
+                            if result.returncode:
+                                out["deferred"].append(f"#{n}: attestation failed: {result.stderr.strip()}")
+                        elif not report.get("commit"):
+                            out["deferred"].append(f"#{n}: attestation report has no commit")
+                        else:
+                            attested[str(n)] = report["commit"][:12]
+                            out["attested"].append(n)
+                    if n not in eligible:
+                        continue
+                    describe = describes.get(n)
+                    if describe is None:
+                        out["deferred"].append(f"#{n}: edge #{eligible[n]} stages unreadable")
+                        continue
+                    wfapi_path = os.path.join(tmp, "wfapi.json")
+                    with open(wfapi_path, "w", encoding="utf-8") as fh:
+                        json.dump(describe, fh)
+                    result = run([bridge, "observe", "--stages", wfapi_path, "--graph", graph_path,
+                                  "--root", bridge_root, "--offer", OFFER_PATH, "--json"])
+                    if result.returncode == 0:
+                        outcome = json.loads(result.stdout)
+                        memo = {"edge": outcome["build"], "process": outcome["process"],
+                                "appended": outcome["appended"], "present": outcome["present"]}
+                        observed[str(n)] = memo
+                        out["observed"].append(memo)
+                    else:
+                        out["deferred"].append(result.stderr.strip() or f"#{n}: observe deferred (exit {result.returncode})")
+                    # S1b hook point: resolve dev-landing@1 intent for graph["commitSha"],
+                    # then append this device's Affirm/Dismiss. No intent resolver exists yet.
+            except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                out["deferred"].append(f"#{n}: {exc}")
+    except Exception as exc:  # never break SessionStart, including malformed external records
+        out["deferred"].append(f"attest deferred: {exc}")
+    return out
 
 
-def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=False):
+def write_cursor(cursor):
+    with cursor_lock():
+        merge_cursor(cursor)
+        _write_cursor_locked(cursor)
+
+
+def _write_cursor_locked(cursor):
+    # Caller owns cursor_lock through merge and replace. Each writer owns its temp file.
+    fd, tmp = tempfile.mkstemp(prefix=".ci-cursor-", dir=os.path.dirname(CURSOR_PATH))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(cursor, fh, indent=1)
+        os.replace(tmp, CURSOR_PATH)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def validate_graph(graph, number):
+    def build_id(value):
+        return not isinstance(value, bool) and re.fullmatch(r"[1-9][0-9]*", str(value)) is not None
+
+    if not isinstance(graph.get("commitSha"), str) or not re.fullmatch(r"[a-fA-F0-9]{40}", graph["commitSha"]):
+        raise ValueError("invalid commitSha: full 40-hex SHA required")
+    if not build_id(graph.get("buildNumber")) or int(graph["buildNumber"]) != number:
+        raise ValueError("invalid buildNumber: must match requested wave")
+    if not isinstance(graph.get("results"), dict):
+        raise ValueError("invalid results: map required")
+    order = graph.get("executionOrder", [])
+    if not isinstance(order, list) or any(not isinstance(p, str) or not p for p in order):
+        raise ValueError("invalid executionOrder")
+    for pipeline, record in graph["results"].items():
+        if not isinstance(record, dict) or not isinstance(record.get("result"), str) or record["result"] not in ATTESTED | {"DISPATCHED", "NOT_DISPATCHED", "NOT_BUILT", "ERROR", "SKIPPED"}:
+            raise ValueError(f"invalid results.{pipeline}: result record required")
+        if record.get("buildNumber") is not None and not build_id(record["buildNumber"]):
+            raise ValueError(f"invalid results.{pipeline}.buildNumber")
+        duration = record.get("duration")
+        if duration is not None and (isinstance(duration, bool) or not isinstance(duration, (float, int)) or not 0 <= duration < float("inf")):
+            raise ValueError(f"invalid results.{pipeline}.duration")
+        if record.get("url") is not None and not isinstance(record["url"], str):
+            raise ValueError(f"invalid results.{pipeline}.url")
+        for field in ("closure", "outputDigest", "closureHit"):
+            value = record.get(field)
+            expected = bool if field == "closureHit" else str
+            if value is not None and (not isinstance(value, dict) or any(not isinstance(v, expected) for v in value.values())):
+                raise ValueError(f"invalid results.{pipeline}.{field}")
+
+
+def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=False, waves=None):
     urgent = [r for r in results if r["urgent"]]
     parts, sys_parts = [], []
     if urgent:
@@ -897,6 +1220,14 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=
                 f"judgment before decompose: {paths} — graduate the lesson to the "
                 f"anti-patterns museum if worthy, then delete the entry."
             )
+    context = " ".join(parts) if parts else "; ".join(sys_parts)
+    if waves:
+        attested = waves["attested"]
+        if attested:
+            sys_parts.append(f"attested {len(attested)} wave(s) (#{attested[0]}…#{attested[-1]})")
+        for observed in waves["observed"]:
+            sys_parts.append(f'observed edge #{observed["edge"]} (+{observed["appended"]}/={observed["present"]}) {observed["process"]}')
+        sys_parts.extend(waves["deferred"])
     if not parts and not sys_parts:
         return None
     if as_hook:
@@ -905,7 +1236,7 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=
                 "systemMessage": "ci-harvest: " + "; ".join(sys_parts),
                 "hookSpecificOutput": {
                     "hookEventName": "SessionStart",
-                    "additionalContext": " ".join(parts) if parts else "; ".join(sys_parts),
+                    "additionalContext": context,
                 },
             }
         )
@@ -919,43 +1250,50 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=
 def run_harvest(jobs, as_hook, dispatch=False):
     cursor = load_cursor()
     taxonomy = load_taxonomy()
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        results = list(ex.map(lambda j: harvest_job(j, cursor, taxonomy), jobs))
-    new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
-    # Price it (Lane D1): a fresh App build moves the delivery series, so fold its two readings
-    # where `epr flow report` reads bounds. Only then — the node series costs Jenkins reads.
-    if any(r["job"] == DELIVERY_JOB and r["builds_seen"] for r in results):
-        record_delivery_measures()
-    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch)
-    if rendered:
-        print(rendered)
-    elif not as_hook:
-        watermark = ", ".join(f'{r["job"]}@{r["last"]}' for r in results if r["last"])
-        print(f"ci-harvest: nothing new ({watermark})")
-
-
-def wait_mode(job, timeout_mins):
-    """Post-push loop-closer: poll until the job's current build completes."""
-    deadline = time.time() + timeout_mins * 60
-    while time.time() < deadline:
+    results = []
+    new_entries, bumped, confirmed, reopened = [], [], [], []
+    waves = {"attested": [], "observed": [], "deferred": []}
+    try:
+        # Retain each completed job even if a later read consumes the work budget.
+        if HOOK_DEADLINE is not None:
+            for job in jobs:
+                remaining(1)
+                results.append(harvest_job(job, cursor, taxonomy))
+        else:
+            results = read_many(lambda j: harvest_job(j, cursor, taxonomy), jobs)
+        orch = next((r for r in results if r["job"] == ATTEST_JOB), None)
+        if orch and budget_available():
+            waves = attest_waves(orch, cursor)
+        if budget_available() and any(r["job"] == DELIVERY_JOB and r["builds_seen"] for r in results):
+            record_delivery_measures()
+    except (OSError, subprocess.SubprocessError) as exc:
+        waves["deferred"].append(str(exc))
+    finally:
+        # Switch to the final deadline during the reserved persistence/render leg.
+        # All locks remain nonblocking. A busy writer retains authority; next hook retries.
+        reserve_persistence()
         try:
-            data = get_json(f"/job/{job}/job/{BRANCH}/lastBuild/api/json?tree=number,result,building")
-            if not data.get("building") and data.get("result"):
-                print(f'ci-harvest --wait: {job}/dev #{data["number"]} completed '
-                      f'{data["result"]}; harvesting.')
-                run_harvest([job], as_hook=False)
-                return
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
-        time.sleep(60)
-    print(f"ci-harvest --wait: timed out after {timeout_mins}m waiting on {job}/dev")
+            new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
+        except OSError as exc:
+            waves["deferred"].append(f"cursor deferred: {exc}")
+        rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch, waves)
+        if rendered:
+            print(rendered)
+        elif not as_hook:
+            watermark = ", ".join(f'{r["job"]}@{r["last"]}' for r in results if r["last"])
+            print(f"ci-harvest: nothing new ({watermark})")
+    return 0
 
 
 def main():
+    global HOOK_DEADLINE
+    if "--hook" in sys.argv:
+        HOOK_DEADLINE = time.monotonic() + max(0.001, float(os.environ.get("HOOK_BUDGET_S", "75")))
+        signal.signal(signal.SIGALRM, budget_alarm)
+        signal.setitimer(signal.ITIMER_REAL, max(0.001, HOOK_DEADLINE - time.monotonic() - PERSIST_RESERVE_S))
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--hook", action="store_true", help="SessionStart-hook JSON output")
-    ap.add_argument("--wait", metavar="JOB", help="poll JOB until its build completes, then harvest")
-    ap.add_argument("--timeout-mins", type=int, default=30)
+    ap.add_argument("--attest", type=int, metavar="N", help="reach back to orchestrator wave N")
     ap.add_argument("--jobs", help="comma-separated job subset")
     ap.add_argument(
         "--dispatch",
@@ -965,10 +1303,20 @@ def main():
     )
     args = ap.parse_args()
     jobs = [j.strip() for j in args.jobs.split(",")] if args.jobs else JOBS
-    if args.wait:
-        wait_mode(args.wait, args.timeout_mins)
+    if args.attest is not None:
+        cursor = load_cursor()
+        waves = attest_waves({"completed": [(args.attest, None)]}, cursor, force=True)
+        reserve_persistence()
+        try:
+            write_cursor(cursor)
+        except OSError as exc:
+            waves["deferred"].append(f"cursor deferred: {exc}")
+        rendered = render([], [], [], [], [], args.hook, waves=waves)
+        if rendered:
+            print(rendered)
     else:
         run_harvest(jobs, as_hook=args.hook, dispatch=args.dispatch)
+    return 0
 
 
 if __name__ == "__main__":
