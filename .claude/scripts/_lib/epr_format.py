@@ -80,6 +80,9 @@ FORMAT_CANDIDATE_EXTS = {".rs", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".
 RUSTFMT_TIMEOUT_S = 20
 PRETTIER_TIMEOUT_S = 60
 RUST_POOL = max(1, min(8, os.cpu_count() or 2))
+# One Prettier worker per ~PRETTIER_PER_WORKER files, at most PRETTIER_POOL (each costs ~0.6 s to start).
+PRETTIER_POOL = max(1, min(4, (os.cpu_count() or 2) // 2))
+PRETTIER_PER_WORKER = 16
 EMPTY_RUSTFMT_REL = ".epr-format/empty-rustfmt.toml"
 
 WORKER = Path(__file__).resolve().parent / "epr_format_prettier.mjs"
@@ -808,11 +811,16 @@ class StagedFormatter:
                          base / "head", "HEAD")
         self.fingerprint = index_fingerprint(self.git)
         self.rustfmt = Rustfmt(pinned_toolchain(self.index))
-        self.prettier = PrettierWorker()
+        self.prettier_pool: list[PrettierWorker] = []
         self.notices: list[str] = []
 
+    @property
+    def prettier_launches(self) -> int:
+        return sum(w.launches for w in self.prettier_pool)
+
     def close(self):
-        self.prettier.close()
+        for w in self.prettier_pool:
+            w.close()
         self._tmp.cleanup()
 
     def __enter__(self):
@@ -892,8 +900,8 @@ class StagedFormatter:
         return [p.decode("utf-8", "surrogateescape") for p in raw.split(b"\0") if p]
 
     def measure_side(self, tree: Tree, jobs: list[tuple[str, str, bytes, object]]) -> dict:
-        """jobs: (id, rel, data, contract) → {id: Measure}. Rust in a bounded pool, Prettier in
-        one batched worker call."""
+        """jobs: (id, rel, data, contract) → {id: Measure}. Rust in a bounded pool; Prettier in one
+        batched worker, fanned out to at most PRETTIER_POOL workers for a large batch (a merge)."""
         out: dict[str, Measure] = {}
         rust = [j for j in jobs if isinstance(j[3], RustContract)]
         pret = [j for j in jobs if isinstance(j[3], PrettierContract)]
@@ -907,8 +915,16 @@ class StagedFormatter:
         if pret:
             items = [_prettier_item(tree, rel, data, c, self.repo / c.package_dir, ident)
                      for ident, rel, data, c in pret]
-            for r in self.prettier.run(items):
-                out[r["id"]] = _measure_from_worker(r)
+            k = max(1, min(PRETTIER_POOL, len(items) // PRETTIER_PER_WORKER))
+            while len(self.prettier_pool) < k:
+                self.prettier_pool.append(PrettierWorker())
+            chunks = [items[i::k] for i in range(k)]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=k) as pool:
+                answers = list(pool.map(lambda wc: wc[0].run(wc[1]),
+                                        zip(self.prettier_pool[:k], chunks)))
+            for batch in answers:
+                for r in batch:
+                    out[r["id"]] = _measure_from_worker(r)
         return out
 
     def judge(self, changes: list[Change]) -> dict[str, FileResult]:

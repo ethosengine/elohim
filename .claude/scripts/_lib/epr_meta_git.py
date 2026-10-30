@@ -261,7 +261,7 @@ def format_phase(repo: Path, *, git: "epr_format.Git | None" = None,
                 return verdicts, notices, stats
             sf.verify_unchanged()
             stats["rust_pool"] = epr_format.RUST_POOL
-            stats["prettier_workers"] = sf.prettier.launches
+            stats["prettier_workers"] = sf.prettier_launches
             stats["git_calls"] = git.calls
             for c in selected:
                 res = results.get(c.path)
