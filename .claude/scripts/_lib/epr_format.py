@@ -26,8 +26,10 @@ Contracts are derived from what each project already declares, never imposed:
                the nearest committed rustfmt.toml/.rustfmt.toml (or an explicit empty config, so
                a home-directory config cannot interfere).
   * Prettier — a file matched by the `prettier --check <globs>` in the `format:check` script of an
-               ancestor package.json, with that package's ignore files, its own installed
-               Prettier, the nearest config and .editorconfig.
+               ancestor package.json (`!` globs exclude, as in the CLI), with that package's own
+               installed Prettier and .editorconfig. `--config <file>` names the config (else the
+               nearest is discovered); `--ignore-path <file>…` replaces the default
+               .gitignore/.prettierignore. Any other flag is unmodelled and refuses as unmeasured.
 A file in neither is `outside` the contract: not checked, and never reported as checked-clean.
 
 States: clean · drift · debt · ignored · outside · unmeasured. Anything that prevents a
@@ -273,7 +275,15 @@ class Tree:
     def __init__(self, git: Git | None, prefix: str | None, root: Path, label: str):
         self.git, self.prefix, self.root, self.label = git, prefix, Path(root), label
         self._cache: dict[str, bytes | None] = {}
+        self.parsed: dict[str, object] = {}   # rel -> parsed JSON/TOML (or the ContractError)
+        self.memo: dict[tuple, object] = {}   # contract memo keyed by directory
+        self.known: set[str] | None = None    # every path this side holds, once listed
         (self.root / ".git").mkdir(parents=True, exist_ok=True)  # project-root marker
+
+    def know(self, paths: set[str]) -> None:
+        """Record the complete path listing of this side: a later prefetch answers every absent
+        candidate from it, so only blobs that exist cost a `cat-file` read."""
+        self.known = paths
 
     def prefetch(self, rels) -> None:
         missing = [r for r in dict.fromkeys(rels) if r not in self._cache]
@@ -283,6 +293,13 @@ class Tree:
             for r in missing:
                 self._cache[r] = None
             return
+        if self.known is not None:
+            for r in missing:
+                if r not in self.known:
+                    self._cache[r] = None
+            missing = [r for r in missing if r in self.known]
+            if not missing:
+                return
         got = self.git.batch([f"{self.prefix}{r}" for r in missing])
         for r in missing:
             hit = got.get(f"{self.prefix}{r}")
@@ -316,6 +333,7 @@ class DiskTree(Tree):
     def __init__(self, root: Path):
         self.git, self.prefix, self.root, self.label = None, None, Path(root), "worktree"
         self._cache = {}
+        self.parsed, self.memo, self.known = {}, {}, None
 
     def prefetch(self, rels) -> None:
         for r in rels:
@@ -347,9 +365,18 @@ class PrettierContract:
     package_dir: str
     globs: tuple[str, ...]
     closure_digest: str       # config, editorconfig, ignore files, package fields
+    config: str | None = None                 # repo-relative `--config` file, None = discovered
+    ignore_paths: tuple[str, ...] | None = None   # repo-relative `--ignore-path`s, None = defaults
 
     def identity(self):
-        return ("prettier", self.package_dir, self.globs, self.closure_digest)
+        return ("prettier", self.package_dir, self.globs, self.closure_digest, self.config,
+                self.ignore_paths)
+
+    def ignore_files(self) -> tuple[str, ...]:
+        """The ignore files the CLI reads: the declared --ignore-path list, else the defaults."""
+        if self.ignore_paths is not None:
+            return self.ignore_paths
+        return tuple(join(self.package_dir, n) for n in PRETTIER_IGNORE_NAMES)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -371,16 +398,31 @@ def _digest(*parts: bytes | None) -> str:
     return h.hexdigest()[:16]
 
 
-def _toml(tree: Tree, rel: str):
+def _parsed(tree: Tree, rel: str, parse, kind: str):
+    """Parse one closure file once per side; a parse failure is remembered and re-raised."""
+    if rel in tree.parsed:
+        hit = tree.parsed[rel]
+        if isinstance(hit, ContractError):
+            raise hit
+        return hit
     data = tree.read(rel)
     if data is None:
+        tree.parsed[rel] = None
         return None
-    if tomllib is None:
-        raise MissingTool("Python tomllib is unavailable — Cargo.toml cannot be read", CURE_PYTHON)
     try:
-        return tomllib.loads(data.decode("utf-8"))
+        value = parse(data.decode("utf-8"))
     except Exception as e:  # noqa: BLE001
-        raise ContractError(f"{tree.label}:{rel} is not valid TOML: {e}") from e
+        err = ContractError(f"{tree.label}:{rel} is not valid {kind}: {e}")
+        tree.parsed[rel] = err
+        raise err from e
+    tree.parsed[rel] = value
+    return value
+
+
+def _toml(tree: Tree, rel: str):
+    if tomllib is None and tree.read(rel) is not None:
+        raise MissingTool("Python tomllib is unavailable — Cargo.toml cannot be read", CURE_PYTHON)
+    return _parsed(tree, rel, lambda t: tomllib.loads(t), "TOML")
 
 
 def resolve_edition(tree: Tree, pkg_dir: str, manifest: dict) -> str:
@@ -416,6 +458,20 @@ def resolve_edition(tree: Tree, pkg_dir: str, manifest: dict) -> str:
 
 
 def rust_contract(tree: Tree, rel: str):
+    key = ("rust", posixpath.dirname(rel))
+    if key not in tree.memo:
+        try:
+            tree.memo[key] = _rust_contract(tree, rel)
+        except ContractError as e:
+            tree.memo[key] = e
+    hit = tree.memo[key]
+    if isinstance(hit, ContractError):
+        raise hit
+    return hit
+
+
+def _rust_contract(tree: Tree, rel: str):
+    """The rustfmt contract depends only on the file's directory (memoized by rust_contract)."""
     dirs = ancestors(rel)
     tree.prefetch([join(d, n) for d in dirs for n in ("Cargo.toml", *RUST_CONFIG_NAMES)])
     edition = None
@@ -441,33 +497,70 @@ def rust_contract(tree: Tree, rel: str):
 _SHELL_OPS = {"&&", "||", ";", "|", "&"}
 
 
-def parse_prettier_check(script: str) -> tuple[str, ...] | None:
-    """Globs from a `prettier --check <globs>` script. None = the script is not a Prettier check.
-    A flag this gate cannot model raises ContractError (unmeasured, never silently narrowed)."""
+@dataclasses.dataclass(frozen=True)
+class PrettierCheck:
+    """What a `prettier --check` script declares, paths relative to the owning package."""
+    globs: tuple[str, ...]
+    config: str | None = None                    # --config <path>
+    ignore_paths: tuple[str, ...] | None = None  # --ignore-path <path>… (replaces the defaults)
+
+
+# Flags that take a value and that this gate models; everything else unknown refuses.
+_VALUE_FLAGS = ("--config", "--ignore-path")
+
+
+def parse_prettier_check(script: str) -> PrettierCheck | None:
+    """Globs and the configuration flags of a `prettier --check <globs>` script. None = the script
+    is not a Prettier check. `--config` and `--ignore-path` are modelled exactly as the CLI applies
+    them (an explicit config file; ignore files that REPLACE the default .gitignore/.prettierignore).
+    Any other flag raises ContractError (unmeasured, never silently narrowed)."""
     try:
         toks = shlex.split(script)
     except ValueError as e:
         raise ContractError(f"format:check script is not parseable: {e}") from e
     for i, t in enumerate(toks):
         if t == "prettier" or t.endswith("/prettier"):
-            globs, checking = [], False
-            for a in toks[i + 1:]:
+            globs, checking, config, ignores = [], False, None, []
+            rest = toks[i + 1:]
+            j = 0
+            while j < len(rest):
+                a = rest[j]
+                j += 1
                 if a in _SHELL_OPS:
                     break
                 if a in ("--check", "-c"):
                     checking = True
+                    continue
+                flag, eq, val = a.partition("=")
+                if flag in _VALUE_FLAGS:
+                    if not eq:
+                        if j >= len(rest) or rest[j] in _SHELL_OPS or rest[j].startswith("-"):
+                            raise ContractError(f"format:check passes `{flag}` without a value")
+                        val = rest[j]
+                        j += 1
+                    if flag == "--config":
+                        if config is not None:
+                            raise ContractError("format:check passes `--config` twice")
+                        config = val
+                    else:
+                        ignores.append(val)
                 elif a.startswith("-"):
                     raise ContractError(f"format:check passes `{a}` to prettier, which this gate "
                                         f"does not model")
                 else:
-                    globs.append(a[2:] if a.startswith("./") else a)
+                    neg = a.startswith("!")
+                    g = a[1:] if neg else a
+                    g = g[2:] if g.startswith("./") else g
+                    globs.append(("!" if neg else "") + g)
             if not checking:
                 return None
             for g in globs:
                 if not any(c in g for c in "*?{["):
                     raise ContractError(f"format:check names `{g}` without a glob; this gate "
                                         f"models extension globs only")
-            return tuple(globs)
+            if globs and all(g.startswith("!") for g in globs):
+                raise ContractError("format:check names only negated globs")
+            return PrettierCheck(tuple(globs), config, tuple(ignores) if ignores else None)
     return None
 
 
@@ -517,63 +610,109 @@ def _glob_regex(pat: str) -> re.Pattern:
 _GLOB_CACHE: dict[str, list[re.Pattern]] = {}
 
 
+def _glob_hit(g: str, rel: str) -> bool:
+    pats = _GLOB_CACHE.get(g)
+    if pats is None:
+        pats = _GLOB_CACHE[g] = [_glob_regex(p) for p in _brace_expand(g)]
+    return any(p.match(rel) for p in pats)
+
+
 def glob_match(globs, rel: str) -> bool:
-    for g in globs:
-        pats = _GLOB_CACHE.get(g)
-        if pats is None:
-            pats = _GLOB_CACHE[g] = [_glob_regex(p) for p in _brace_expand(g)]
-        if any(p.match(rel) for p in pats):
-            return True
-    return False
+    """Prettier CLI semantics: a file is selected by any positive glob and by no `!` glob."""
+    pos = [g for g in globs if not g.startswith("!")]
+    neg = [g[1:] for g in globs if g.startswith("!")]
+    return any(_glob_hit(g, rel) for g in pos) and not any(_glob_hit(g, rel) for g in neg)
 
 
 def _json(tree: Tree, rel: str):
-    data = tree.read(rel)
-    if data is None:
-        return None
-    try:
-        return json.loads(data.decode("utf-8"))
-    except Exception as e:  # noqa: BLE001
-        raise ContractError(f"{tree.label}:{rel} is not valid JSON: {e}") from e
+    return _parsed(tree, rel, json.loads, "JSON")
+
+
+def _package_path(tree: Tree, pkg_dir: str, p: str, flag: str) -> str:
+    """A `--config`/`--ignore-path` value, resolved from the package directory to a repo path."""
+    rel = posixpath.normpath(join(pkg_dir, p))
+    if p.startswith("/") or rel == ".." or rel.startswith("../"):
+        raise ContractError(f"{join(pkg_dir, 'package.json')} format:check `{flag} {p}` points "
+                            f"outside the repository")
+    return "" if rel == "." else rel
+
+
+def _package_check(tree: Tree, d: str):
+    """(package.json dict, PrettierCheck) for directory d, or None. Memoized per directory."""
+    key = ("pcheck", d)
+    if key not in tree.memo:
+        try:
+            pj = _json(tree, join(d, "package.json"))
+            script = (pj.get("scripts") or {}).get("format:check") if isinstance(pj, dict) else None
+            check = parse_prettier_check(script) if isinstance(script, str) else None
+            tree.memo[key] = (pj, script, check) if check and check.globs else None
+        except ContractError as e:
+            tree.memo[key] = e
+    hit = tree.memo[key]
+    if isinstance(hit, ContractError):
+        raise hit
+    return hit
 
 
 def prettier_contract(tree: Tree, rel: str):
     if "node_modules" in rel.split("/"):
         return Outside("node_modules")
     dirs = ancestors(rel)
-    tree.prefetch([join(d, n) for d in dirs
-                   for n in ("package.json", ".editorconfig", *PRETTIER_CONFIG_NAMES,
-                             *PRETTIER_IGNORE_NAMES)])
+    if ("pdir", dirs[0]) not in tree.memo:
+        tree.prefetch([join(d, n) for d in dirs
+                       for n in ("package.json", ".editorconfig", *PRETTIER_CONFIG_NAMES,
+                                 *PRETTIER_IGNORE_NAMES)])
+        tree.memo[("pdir", dirs[0])] = True
     for d in dirs:
-        pj = _json(tree, join(d, "package.json"))
-        if not isinstance(pj, dict):
+        owner = _package_check(tree, d)
+        if owner is None:
             continue
-        script = (pj.get("scripts") or {}).get("format:check")
-        if not isinstance(script, str):
-            continue
-        globs = parse_prettier_check(script)
-        if not globs:
-            continue
+        _pj, _script, check = owner
         sub = rel[len(d) + 1:] if d else rel
-        if not glob_match(globs, sub):
+        if not glob_match(check.globs, sub):
             continue
-        parts: list[bytes | None] = [json.dumps(
-            {"type": pj.get("type"), "prettier": pj.get("prettier"), "script": script},
-            sort_keys=True).encode()]
-        for a in dirs:  # config + editorconfig chain from the file up to the root
-            parts.append(a.encode())
-            for n in (*PRETTIER_CONFIG_NAMES, ".editorconfig"):
-                parts.append(tree.read(join(a, n)))
-            if a != d:
-                apj = _json(tree, join(a, "package.json"))
-                if isinstance(apj, dict):
-                    parts.append(json.dumps({"type": apj.get("type"),
-                                             "prettier": apj.get("prettier")},
-                                            sort_keys=True).encode())
-        for n in PRETTIER_IGNORE_NAMES:
-            parts.append(tree.read(join(d, n)))
-        return PrettierContract(d, globs, _digest(*parts))
+        key = ("prettier", dirs[0], d)
+        if key not in tree.memo:
+            try:
+                tree.memo[key] = _prettier_closure(tree, dirs, d, owner)
+            except ContractError as e:
+                tree.memo[key] = e
+        hit = tree.memo[key]
+        if isinstance(hit, ContractError):
+            raise hit
+        return hit
     return Outside("no package declares a Prettier format:check contract for this path")
+
+
+def _prettier_closure(tree: Tree, dirs: list[str], d: str, owner) -> PrettierContract:
+    """The contract a package's format:check gives files in dirs[0]: it depends only on the
+    directory, so it is computed once per (directory, owning package)."""
+    pj, script, check = owner
+    config = _package_path(tree, d, check.config, "--config") if check.config else None
+    ignores = (tuple(_package_path(tree, d, p, "--ignore-path") for p in check.ignore_paths)
+               if check.ignore_paths is not None else None)
+    if config is not None and tree.read(config) is None:
+        raise ContractError(f"{join(d, 'package.json')} format:check `--config {check.config}` "
+                            f"names {config}, which {tree.label} does not hold")
+    parts: list[bytes | None] = [json.dumps(
+        {"type": pj.get("type"), "prettier": pj.get("prettier"), "script": script},
+        sort_keys=True).encode()]
+    for a in dirs:  # config + editorconfig chain from the file up to the root
+        parts.append(a.encode())
+        for n in (*PRETTIER_CONFIG_NAMES, ".editorconfig"):
+            parts.append(tree.read(join(a, n)))
+        if a != d:
+            apj = _json(tree, join(a, "package.json"))
+            if isinstance(apj, dict):
+                parts.append(json.dumps({"type": apj.get("type"),
+                                         "prettier": apj.get("prettier")},
+                                        sort_keys=True).encode())
+    if config is not None:
+        parts.extend([b"config", config.encode(), tree.read(config)])
+    contract = PrettierContract(d, check.globs, "", config, ignores)
+    for p in contract.ignore_files():
+        parts.extend([p.encode(), tree.read(p)])
+    return dataclasses.replace(contract, closure_digest=_digest(*parts))
 
 
 def contract_for(tree: Tree, rel: str):
@@ -600,12 +739,14 @@ class FileResult:
 
 @dataclasses.dataclass
 class Measure:
-    """One formatter run over one blob: formatted | unformatted | ignored | outside | error."""
+    """One formatter run over one blob: formatted | unformatted | ignored | outside | error |
+    missing (the formatter this contract needs is not installed; `cure` names the install)."""
     state: str
     detail: str = ""
     syntax: bool = False       # the formatter rejected the input itself (parse failure)
     tool: str = ""
     config: str | None = None
+    cure: str = ""             # state "missing": the install cure for the absent formatter
 
 
 # ── formatter adapters ──
@@ -624,6 +765,7 @@ class Rustfmt:
         self.pin = pin
         self._binary = None
         self._version = None
+        self._missing: MissingTool | None = None   # a failed resolution is not retried per side
         self._lock = threading.Lock()
 
     def cure(self) -> str:
@@ -631,30 +773,39 @@ class Rustfmt:
 
     def binary(self) -> tuple[str, str]:
         with self._lock:
-            if self._binary is None:
-                args = ["rustup", "which", "rustfmt"] + (["--toolchain", self.pin] if self.pin else [])
-                try:
-                    proc = subprocess.run(args, capture_output=True, text=True, timeout=15)
-                except FileNotFoundError as e:
-                    raise MissingTool("rustup is not on PATH, so the pinned rustfmt cannot be "
-                                      "resolved", self.cure()) from e
-                except subprocess.TimeoutExpired as e:
-                    raise MissingTool("`rustup which rustfmt` timed out", self.cure()) from e
-                path = proc.stdout.strip()
-                if proc.returncode != 0 or not path or not os.access(path, os.X_OK):
-                    raise MissingTool(f"rustfmt is not installed for toolchain "
-                                      f"{self.pin or '(active)'}: "
-                                      f"{(proc.stderr or proc.stdout).strip()[:200]}", self.cure())
-                try:
-                    ver = subprocess.run([path, "--version"], capture_output=True, text=True,
-                                         timeout=15)
-                except (OSError, subprocess.TimeoutExpired) as e:
-                    raise MissingTool(f"rustfmt at {path} does not run: {e}", self.cure()) from e
-                if ver.returncode != 0:
-                    raise MissingTool(f"rustfmt at {path} does not run: {ver.stderr.strip()[:200]}",
-                                      self.cure())
-                self._binary, self._version = path, ver.stdout.strip()
-            return self._binary, self._version
+            if self._missing is not None:
+                raise self._missing
+            try:
+                return self._resolve()
+            except MissingTool as e:
+                self._missing = e
+                raise
+
+    def _resolve(self) -> tuple[str, str]:
+        if self._binary is None:
+            args = ["rustup", "which", "rustfmt"] + (["--toolchain", self.pin] if self.pin else [])
+            try:
+                proc = subprocess.run(args, capture_output=True, text=True, timeout=15)
+            except FileNotFoundError as e:
+                raise MissingTool("rustup is not on PATH, so the pinned rustfmt cannot be "
+                                  "resolved", self.cure()) from e
+            except subprocess.TimeoutExpired as e:
+                raise MissingTool("`rustup which rustfmt` timed out", self.cure()) from e
+            path = proc.stdout.strip()
+            if proc.returncode != 0 or not path or not os.access(path, os.X_OK):
+                raise MissingTool(f"rustfmt is not installed for toolchain "
+                                  f"{self.pin or '(active)'}: "
+                                  f"{(proc.stderr or proc.stdout).strip()[:200]}", self.cure())
+            try:
+                ver = subprocess.run([path, "--version"], capture_output=True, text=True,
+                                     timeout=15)
+            except (OSError, subprocess.TimeoutExpired) as e:
+                raise MissingTool(f"rustfmt at {path} does not run: {e}", self.cure()) from e
+            if ver.returncode != 0:
+                raise MissingTool(f"rustfmt at {path} does not run: {ver.stderr.strip()[:200]}",
+                                  self.cure())
+            self._binary, self._version = path, ver.stdout.strip()
+        return self._binary, self._version
 
     def measure(self, tree: Tree, rel: str, data: bytes, contract: RustContract) -> Measure:
         binary, version = self.binary()
@@ -754,20 +905,20 @@ def _prettier_item(tree: Tree, rel: str, data: bytes, contract: PrettierContract
         for n in (*PRETTIER_CONFIG_NAMES, ".editorconfig", "package.json"):
             if tree.read(join(d, n)) is not None:
                 tree.materialize(join(d, n))
-    ignore = []
-    for n in PRETTIER_IGNORE_NAMES:
-        p = join(contract.package_dir, n)
-        if tree.read(p) is not None:
-            ignore.append(str(tree.materialize(p)))
-    return {"id": ident, "file": str(target), "ignorePaths": ignore,
+    ignore = [str(tree.materialize(p)) for p in contract.ignore_files()
+              if tree.read(p) is not None]
+    item = {"id": ident, "file": str(target), "ignorePaths": ignore,
             "resolveFrom": str(resolve_from)}
+    if contract.config:
+        item["config"] = str(tree.materialize(contract.config))
+    return item
 
 
 def _measure_from_worker(r: dict) -> Measure:
     state = r.get("state")
     if state == "missing":
-        raise MissingTool(f"Prettier is not installed for this package: {r.get('detail', '')}",
-                          CURE_PRETTIER)
+        return Measure("missing", f"Prettier is not installed for this package: "
+                                  f"{r.get('detail', '')}", cure=CURE_PRETTIER)
     tool = f"prettier {r.get('version', '?')}"
     if state in ("formatted", "unformatted", "ignored"):
         return Measure(state, tool=tool, config=r.get("configFile"))
@@ -786,8 +937,13 @@ def _cure_for(formatter: str, rel: str, contract) -> str:
                 f"review the result, then `git add {rel}`")
     pkg = contract.package_dir or "."
     sub = rel[len(contract.package_dir) + 1:] if contract.package_dir else rel
-    return (f"`(cd {pkg} && pnpm exec prettier --write {shlex.quote(sub)})`, review the result, "
-            f"then `git add {rel}`")
+    flags = ""
+    if contract.config:
+        flags += f" --config {shlex.quote(posixpath.relpath(contract.config, pkg))}"
+    for ip in contract.ignore_paths or ():
+        flags += f" --ignore-path {shlex.quote(posixpath.relpath(ip, pkg))}"
+    return (f"`(cd {pkg} && pnpm exec prettier{flags} --write {shlex.quote(sub)})`, review the "
+            f"result, then `git add {rel}`")
 
 
 @dataclasses.dataclass
@@ -879,6 +1035,8 @@ class StagedFormatter:
                 if (kind == "rust") != rel.endswith(".rs"):
                     continue
                 extra[rel] = Change(rel, "M", rel, mode, mode, blob, blob, False, True)
+        if extra:
+            self._prime_listings(extra)
         out = []
         for rel, ch in extra.items():
             try:
@@ -891,6 +1049,22 @@ class StagedFormatter:
             if now.identity() != then.identity():
                 out.append(ch)
         return out
+
+    def _prime_listings(self, extra: dict[str, Change]) -> None:
+        """Before a rescan computes two contracts for each of possibly thousands of files, list
+        each side once and fetch every closure file that exists in ONE `cat-file` per side —
+        otherwise each new directory costs its own git launch per side (a root package.json
+        change measured 3,436 launches and 155 s before this)."""
+        if self.index.known is None:
+            raw = self.git.out("ls-files", "-z", "--full-name")
+            self.index.know({p.decode("utf-8", "surrogateescape") for p in raw.split(b"\0") if p})
+        if self.head and self.base.known is None:
+            raw = self.git.out("ls-tree", "-r", "-z", "--name-only", "--full-tree", self.head)
+            self.base.know({p.decode("utf-8", "surrogateescape") for p in raw.split(b"\0") if p})
+        dirs = dict.fromkeys(a for r in extra for a in ancestors(r))
+        want = [join(d, n) for d in dirs for n in self.CLOSURE_NAMES]
+        self.index.prefetch(want)
+        self.base.prefetch(want)
 
     def _deleted_paths(self) -> list[str]:
         if not self.head:
@@ -906,7 +1080,12 @@ class StagedFormatter:
         rust = [j for j in jobs if isinstance(j[3], RustContract)]
         pret = [j for j in jobs if isinstance(j[3], PrettierContract)]
         if rust:
-            self.rustfmt.binary()  # MissingTool surfaces once, before any pool work
+            try:
+                self.rustfmt.binary()  # MissingTool surfaces once, before any pool work
+            except MissingTool as e:
+                for ident, *_ in rust:
+                    out[ident] = Measure("missing", str(e), cure=e.cure)
+                rust = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=RUST_POOL) as pool:
                 futs = {pool.submit(self.rustfmt.measure, tree, rel, data, c): ident
                         for ident, rel, data, c in rust}
@@ -919,12 +1098,19 @@ class StagedFormatter:
             while len(self.prettier_pool) < k:
                 self.prettier_pool.append(PrettierWorker())
             chunks = [items[i::k] for i in range(k)]
-            with concurrent.futures.ThreadPoolExecutor(max_workers=k) as pool:
-                answers = list(pool.map(lambda wc: wc[0].run(wc[1]),
-                                        zip(self.prettier_pool[:k], chunks)))
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=k) as pool:
+                    answers = list(pool.map(lambda wc: wc[0].run(wc[1]),
+                                            zip(self.prettier_pool[:k], chunks)))
+            except MissingTool as e:  # node or the worker itself is absent
+                answers = [[{"id": it["id"], "state": "missing-tool", "detail": str(e),
+                             "cure": e.cure} for it in items]]
             for batch in answers:
                 for r in batch:
-                    out[r["id"]] = _measure_from_worker(r)
+                    if r.get("state") == "missing-tool":
+                        out[r["id"]] = Measure("missing", r["detail"], cure=r["cure"])
+                    else:
+                        out[r["id"]] = _measure_from_worker(r)
         return out
 
     def judge(self, changes: list[Change]) -> dict[str, FileResult]:
@@ -959,7 +1145,11 @@ class StagedFormatter:
                   "config": (m.config if m else None), "contract": list(item.contract.identity())}
             if m is None:
                 raise EnforcementError(f"{path} was selected but no formatting result came back")
-            if m.state == "ignored":
+            if m.state == "missing":
+                results[path] = FileResult(path, fmt, "unmeasured",
+                                           f"{m.detail} — the staged blob cannot be checked",
+                                           m.cure, missing_tool=True, evidence=ev)
+            elif m.state == "ignored":
                 results[path] = FileResult(path, fmt, "ignored", "ignored by the package's "
                                            "ignore files", evidence=ev)
             elif m.state == "outside":
@@ -1004,7 +1194,11 @@ class StagedFormatter:
                       "headState": m.state if m else None, "tool": m.tool if m else None}
                 if m is None:
                     raise EnforcementError(f"{path}: no HEAD baseline result came back")
-                if m.state == "error" and not m.syntax:
+                if m.state == "missing":
+                    results[path] = FileResult(path, fmt, "unmeasured",
+                                               f"{m.detail} — the HEAD baseline cannot be checked",
+                                               m.cure, missing_tool=True, evidence=ev)
+                elif m.state == "error" and not m.syntax:
                     results[path] = FileResult(path, fmt, "unmeasured",
                                                f"{fmt} could not measure the HEAD baseline: "
                                                f"{m.detail}", "re-run the commit", evidence=ev)
@@ -1048,15 +1242,19 @@ def check_worktree_file(repo: Path, path: str | Path) -> FileResult | None:
             m = Rustfmt(pinned_toolchain(tree)).measure(tree, rel, data, contract)
         else:
             worker = PrettierWorker()
+            item = {"id": rel, "file": str(repo / rel),
+                    "ignorePaths": [str(repo / p) for p in contract.ignore_files()
+                                    if tree.read(p) is not None],
+                    "resolveFrom": str(repo / contract.package_dir)}
+            if contract.config:
+                item["config"] = str(repo / contract.config)
             try:
-                [r] = worker.run([{"id": rel, "file": str(repo / rel),
-                                   "ignorePaths": [str(repo / join(contract.package_dir, n))
-                                                   for n in PRETTIER_IGNORE_NAMES
-                                                   if tree.read(join(contract.package_dir, n)) is not None],
-                                   "resolveFrom": str(repo / contract.package_dir)}])
+                [r] = worker.run([item])
             finally:
                 worker.close()
             m = _measure_from_worker(r)
+        if m.state == "missing":
+            return FileResult(rel, fmt, "unmeasured", m.detail, m.cure, missing_tool=True)
         if m.state == "formatted":
             return FileResult(rel, fmt, "clean")
         if m.state in ("ignored", "outside"):

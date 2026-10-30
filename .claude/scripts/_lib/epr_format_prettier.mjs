@@ -2,7 +2,7 @@
 // Batch Prettier worker for the commit-time formatting ratchet (_lib/epr_format.py).
 //
 // One process per gate invocation. Each stdin line is {"items":[{id, file, ignorePaths,
-// resolveFrom}]}; each stdout line is {"results":[{id, state, version, configFile, detail,
+// resolveFrom, config?}]}; each stdout line is {"results":[{id, state, version, configFile, detail,
 // syntax}]}. `file` is a path inside a disposable snapshot tree (the index or HEAD bytes with
 // their committed config closure), so resolveConfig/getFileInfo see the COMMITTED configuration,
 // never the worktree's. Prettier itself is loaded from the owning package (`resolveFrom`), once
@@ -40,8 +40,11 @@ async function checkOne(item) {
     if (!info.inferredParser) {
       return { id: item.id, state: 'outside', version, detail: 'Prettier infers no parser' };
     }
-    const config = (await prettier.resolveConfig(item.file, { editorconfig: true })) ?? {};
-    const configFile = await prettier.resolveConfigFile(item.file);
+    // `config` is the package's `--config <file>` (the CLI then skips discovery but still merges
+    // .editorconfig); without it Prettier discovers the nearest config, as the CLI does.
+    const opts = item.config ? { editorconfig: true, config: item.config } : { editorconfig: true };
+    const config = (await prettier.resolveConfig(item.file, opts)) ?? {};
+    const configFile = item.config ?? (await prettier.resolveConfigFile(item.file));
     const source = await readFile(item.file, 'utf8');
     const ok = await prettier.check(source, { ...config, filepath: item.file });
     return { id: item.id, state: ok ? 'formatted' : 'unformatted', version, configFile };

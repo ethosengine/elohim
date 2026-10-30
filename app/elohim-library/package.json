@@ -11,6 +11,7 @@
     "test:sync-genesis": "node --test scripts/sync-genesis.test.mjs",
     "lint": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src",
     "lint:fix": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src --fix",
+    "format:check": "prettier --check \"projects/{elohim-service,lamad-ui,html5-app-plugin}/src/**/*.ts\" \"projects/lamad-ui/src/**/*.html\" \"!**/*.spec.ts\"",
     "sync-genesis": "node scripts/sync-genesis.mjs",
     "prestorybook": "pnpm run sync-genesis",
     "storybook": "storybook dev -p 6006 --config-dir .storybook",

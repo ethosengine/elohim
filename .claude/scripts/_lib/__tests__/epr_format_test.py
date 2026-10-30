@@ -181,6 +181,17 @@ def build_template():
     write(t, "cjs/.gitignore", "node_modules/\n")
     write(t, "cjs/src/ok.ts", "export function f() {\n\treturn 'x';\n}\n")
     write(t, "cjs/scripts/outside.ts", TS_BAD)  # not under the package's src/** contract
+    # Prettier with explicit flags (app/elohim-elements/elohim-core's shape): `--config` names the
+    # parent's config, so a nearer config is NOT discovered; `--ignore-path` REPLACES the
+    # package's default ignore files.
+    write(t, "elem/.prettierrc.js", "module.exports = {\n  singleQuote: true,\n};\n")
+    write(t, "elem/.prettierignore", "**/skipped.ts\n")
+    write(t, "elem/core/package.json", json.dumps({"name": "core", "scripts": {
+        "format:check": 'prettier --config ../.prettierrc.js --ignore-path ../.prettierignore '
+                        '--check "src/**/*.ts" "*.scss"'}}, indent=2) + "\n")
+    write(t, "elem/core/.prettierrc.json", '{"singleQuote": false}\n')  # a decoy discovery finds
+    write(t, "elem/core/.prettierignore", "src/default-ignored.ts\n")  # replaced by --ignore-path
+    write(t, "elem/core/src/ok.ts", TS_CLEAN)
     write(t, "docs/readme.md", "# anything   goes\n")
     git(t, "add", "-A")
     git(t, "commit", "-q", "--no-verify", "-m", "template")
@@ -190,7 +201,7 @@ def fixture(name: str, *, prettier=True, hooks="direct") -> Path:
     d = TMP / name
     shutil.copytree(TEMPLATE, d, symlinks=True)
     if prettier and PRETTIER:
-        for pkg in ("esm", "cjs"):
+        for pkg in ("esm", "cjs", "elem/core"):
             (d / pkg / "node_modules").mkdir()
             os.symlink(PRETTIER, d / pkg / "node_modules" / "prettier")
     if hooks == "direct":
@@ -214,6 +225,13 @@ def env_with(**kw):
     e = dict(BASE_ENV)
     e.update(kw)
     return e
+
+
+def restore(d, before, *paths):
+    """Put paths back to `before`, whether or not the commit under test (wrongly) landed."""
+    git(d, "checkout", before, "--", *paths)
+    if head(d) != before:
+        git(d, "commit", "-q", "--no-verify", "-m", "restore after a wrongly admitted commit")
 
 
 def path_without(*dirs):
@@ -340,6 +358,15 @@ if HAVE_RUSTFMT:
     check("…and a 4-space new file under it refuses", r.returncode != 0 and "four.rs" in r.stderr,
           r.stderr)
     git(d, "rm", "-q", "--cached", "rs/clean/src/two/four.rs")
+    (d / "rs/clean/src/two/four.rs").unlink()
+    before = head(d)
+    git(d, "rm", "-q", "rs/clean/src/two/.rustfmt.toml")
+    r = commit(d, "drop the 2-space config")
+    check("a DELETION-ONLY commit removing a rustfmt config that un-formats unchanged files "
+          "refuses (contract rescan runs with no staged regular file)",
+          r.returncode != 0 and head(d) == before and "two.rs" in r.stderr
+          and "formatter contract changed" in r.stderr, r.stderr)
+    restore(d, before, "rs/clean/src/two/.rustfmt.toml")
 
     # gitlink and stdin --check false-zero
     sub = TMP / "sub-src"
@@ -448,6 +475,54 @@ if HAVE_NODE and PRETTIER:
     git(d, "checkout", "HEAD", "--", "esm/.prettierrc.js")
     write(d, "esm/.prettierrc.js", "export default {\n  singleQuote: true,\n  printWidth: 100,\n};\n")
     git(d, "add", "esm/.prettierrc.js")
+    before = head(d)
+    git(d, "rm", "-q", "esm/.prettierrc.js")
+    r = commit(d, "drop the esm config")
+    check("a DELETION-ONLY commit removing a Prettier config that un-formats unchanged files refuses",
+          r.returncode != 0 and head(d) == before and "esm/src/ok.ts" in r.stderr, r.stderr)
+    restore(d, before, "esm/.prettierrc.js")
+
+    # explicit --config / --ignore-path (app/elohim-elements/elohim-core's script, verbatim shape)
+    write(d, "elem/core/src/new.ts", TS_CLEAN.replace("answer", "fresh"))
+    git(d, "add", "elem/core/src/new.ts")
+    r = commit(d, "elem clean")
+    check("GREEN: `--config ../.prettierrc.js --ignore-path ../.prettierignore` is modelled — a "
+          "single-quoted file formatted under the NAMED config passes (no `does not model` refusal)",
+          r.returncode == 0 and "does not model" not in r.stderr, r.stderr)
+    write(d, "elem/core/src/bad.ts", TS_CLEAN.replace("'yes'", '"yes"'))
+    git(d, "add", "elem/core/src/bad.ts")
+    r = commit(d, "elem bad")
+    check("RED: a double-quoted file refuses under the named config (the nearer decoy config is "
+          "not discovered) and the cure carries the package's flags",
+          r.returncode != 0 and "elem/core/src/bad.ts is a new file" in r.stderr
+          and "--config ../.prettierrc.js --ignore-path ../.prettierignore --write" in r.stderr,
+          r.stderr)
+    git(d, "rm", "-q", "--cached", "--ignore-unmatch", "elem/core/src/bad.ts")
+    if "bad.ts" in git(d, "ls-files", "elem/core/src").stdout:
+        git(d, "rm", "-q", "elem/core/src/bad.ts")
+        git(d, "commit", "-q", "--no-verify", "-m", "drop wrongly admitted bad.ts")
+    write(d, "elem/core/src/skipped.ts", TS_BAD)
+    git(d, "add", "elem/core/src/skipped.ts")
+    r = commit(d, "elem skipped")
+    check("a file the `--ignore-path` file ignores passes unformatted", r.returncode == 0, r.stderr)
+    write(d, "elem/core/src/default-ignored.ts", TS_BAD)
+    git(d, "add", "elem/core/src/default-ignored.ts")
+    r = commit(d, "elem default-ignored")
+    check("`--ignore-path` REPLACES the package's default .prettierignore (as the CLI does): a file "
+          "only the default ignore names is checked and refuses",
+          r.returncode != 0 and "default-ignored.ts" in r.stderr, r.stderr)
+    if "default-ignored.ts" in git(d, "ls-files", "elem/core/src").stdout:
+        git(d, "rm", "-q", "--cached", "elem/core/src/default-ignored.ts")
+        if "default-ignored.ts" in git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout:
+            git(d, "commit", "-q", "--no-verify", "-m", "drop wrongly admitted file")
+    before = head(d)
+    write(d, "elem/.prettierrc.js", "module.exports = {\n  singleQuote: false,\n};\n")
+    git(d, "add", "elem/.prettierrc.js")
+    r = commit(d, "flip the named config")
+    check("a staged change to the `--config` file un-formatting unchanged files refuses (rescan)",
+          r.returncode != 0 and "elem/core/src/ok.ts" in r.stderr
+          and "formatter contract changed" in r.stderr, r.stderr)
+    restore(d, before, "elem/.prettierrc.js")
 
     # merges: clean automatic merge runs pre-merge-commit; conflicted merge runs pre-commit
     git(d, "switch", "-q", "-c", "side")
@@ -518,6 +593,28 @@ if HAVE_NODE and PRETTIER:
           r.stderr)
 else:
     print("  ⚠ SKIP Prettier cases: node or an installed prettier is unavailable")
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+print("A missing formatter never discards what another formatter measured")
+if HAVE_RUSTFMT:
+    m = fixture("mixed-missing", prettier=False)
+    before = head(m)
+    write(m, "rs/clean/src/lib.rs", "pub mod absent_child;\n" + RS_BAD)
+    write(m, "esm/src/n.ts", TS_CLEAN)
+    git(m, "add", "rs/clean/src/lib.rs", "esm/src/n.ts")
+    r = commit(m, "mixed", env_with(EPR_META_ACK="1"))
+    check("RED→GREEN: Prettier absent + measured Rust drift — EPR_META_ACK=1 still refuses, naming "
+          "the Rust drift, and the Prettier file is reported unmeasured with its cure",
+          r.returncode != 0 and head(m) == before
+          and "rs/clean/src/lib.rs was rustfmt-formatted at HEAD" in r.stderr
+          and "pnpm install --frozen-lockfile" in r.stderr, r.stderr)
+    write(m, "rs/clean/src/lib.rs", "pub mod absent_child;\n" + RS_CLEAN + "// fine\n")
+    git(m, "add", "rs/clean/src/lib.rs")
+    r = commit(m, "mixed-ok", env_with(EPR_META_ACK="1"))
+    check("…and with the Rust file formatted, EPR_META_ACK=1 acknowledges only the unmeasured "
+          "Prettier file", r.returncode == 0 and head(m) != before, r.stderr)
+else:
+    print("  ⚠ SKIP mixed missing-tool case: rustup not on PATH")
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 print("Failure modes refuse; nothing degrades to success")
@@ -698,6 +795,70 @@ if HAVE_RUSTFMT and HAVE_NODE and PRETTIER:
     check("30 staged files: one Prettier worker, bounded git launches, under the 30 s ceiling",
           not v and stats.get("prettier_workers") == 1 and stats.get("git_calls", 99) <= 15
           and dt < 30, f"{dt:.2f}s {stats} {v}")
+
+print("Cost: a configuration rescan across many directories")
+if HAVE_NODE and PRETTIER:
+    c = fixture("rescan-cost")
+    for i in range(80):
+        write(c, f"cjs/src/d{i}/x{i}.ts", f"export const v{i} = 'x';\n")
+    git(c, "add", "-A")
+    git(c, "commit", "-q", "--no-verify", "-m", "eighty directories")
+    write(c, "package.json", json.dumps({"name": "root", "private": True}, indent=2) + "\n")
+    git(c, "add", "package.json")
+    gitc = epr_format.Git(c, env=BASE_ENV)
+    t0 = time.monotonic()
+    v, notes, stats = epr_meta_git.format_phase(c, git=gitc)
+    dt = time.monotonic() - t0
+    print(f"     root package.json over ~90 dirs: {dt:.2f}s, stats {stats}")
+    check("a root package.json change rescans every directory with bounded git launches "
+          "(one listing + one batch read per side, not one launch per directory)",
+          not v and gitc.calls <= 20, f"{dt:.2f}s git_calls={gitc.calls} {stats} {v}")
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════
+print("This repository's declared contracts resolve (worktree bytes)")
+wt = epr_format.DiskTree(REPO)
+core = "app/elohim-elements/elohim-core/src/epr-format-probe.ts"
+if (REPO / "app/elohim-elements/elohim-core/package.json").is_file():
+    try:
+        c_core = epr_format.contract_for(wt, core)
+    except epr_format.ContractError as e:
+        c_core = e
+    check("elohim-core's `--config ../.prettierrc.js --ignore-path ../.prettierignore` resolves "
+          "to a Prettier contract naming both files",
+          isinstance(c_core, epr_format.PrettierContract)
+          and c_core.config == "app/elohim-elements/.prettierrc.js"
+          and c_core.ignore_paths == ("app/elohim-elements/.prettierignore",), repr(c_core))
+lib = "app/elohim-library/projects/lamad-ui/src/epr-format-probe.ts"
+if (REPO / "app/elohim-library/package.json").is_file():
+    got = {rel: epr_format.contract_for(wt, rel) for rel in (
+        lib, "app/elohim-library/projects/elohim-service/src/x.ts",
+        "app/elohim-library/projects/html5-app-plugin/src/x.ts",
+        "app/elohim-library/projects/lamad-ui/src/x.html",
+        "app/elohim-library/projects/lamad-ui/src/x.spec.ts",
+        "app/elohim-library/projects/perseus-plugin/src/x.ts",
+        "app/elohim-library/src/x.ts")}
+    want_in = [lib, "app/elohim-library/projects/elohim-service/src/x.ts",
+               "app/elohim-library/projects/html5-app-plugin/src/x.ts",
+               "app/elohim-library/projects/lamad-ui/src/x.html"]
+    check("elohim-library's ESLint `prettier/prettier` scope is a declared Prettier contract "
+          "(lamad-ui, elohim-service, html5-app-plugin TS; lamad-ui HTML)",
+          all(isinstance(got[r], epr_format.PrettierContract) for r in want_in), repr(got))
+    check("…and what that ESLint scope ignores (spec files, perseus-plugin, the root src/) stays "
+          "outside", all(isinstance(got[r], epr_format.Outside) for r in got if r not in want_in),
+          repr(got))
+check("negated globs follow the Prettier CLI (`!` excludes)",
+      epr_format.glob_match(("src/**/*.ts", "!**/*.spec.ts"), "src/a/b.ts")
+      and not epr_format.glob_match(("src/**/*.ts", "!**/*.spec.ts"), "src/a/b.spec.ts"))
+pc = epr_format.parse_prettier_check(
+    'prettier --config=../c.js --ignore-path a --ignore-path b --check "src/**/*.ts"')
+check("`--flag=value` and repeated `--ignore-path` parse",
+      pc is not None and pc.config == "../c.js" and pc.ignore_paths == ("a", "b"), repr(pc))
+for bad in ('prettier --check --cache "src/**/*.ts"', 'prettier --check --config'):
+    try:
+        epr_format.parse_prettier_check(bad)
+        check(f"an unmodelled script refuses: {bad}", False)
+    except epr_format.ContractError:
+        check(f"an unmodelled script refuses: {bad}", True)
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"\n{_passed} checks passed, {len(_failures)} failed")

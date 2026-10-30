@@ -206,6 +206,14 @@ def format_phase(repo: Path, *, git: "epr_format.Git | None" = None,
     try:
         with epr_meta.parse_memo(), epr_format.StagedFormatter(repo, git, scratch=scratch) as sf:
             changes = epr_format.staged_changes(git, sf.head)
+            # Rescans come first: a commit that only DELETES a formatter configuration (a
+            # rustfmt.toml, a .prettierrc, an ignore file) stages no regular file at all, yet it
+            # can un-format files it never touched.
+            sf.prefetch_closure(changes)
+            rescans = sf.contract_rescans(changes)
+            if rescans:
+                sf.prefetch_closure(rescans)
+                changes = changes + rescans
             if not changes:
                 sf.verify_unchanged()
                 return verdicts, notices, stats
@@ -220,11 +228,6 @@ def format_phase(repo: Path, *, git: "epr_format.Git | None" = None,
                 refuse("ask", "Python tomllib is unavailable, so Cargo editions cannot be "
                               f"resolved. Cure: {epr_format.CURE_PYTHON}", "environment")
                 return verdicts, notices, stats
-            sf.prefetch_closure(changes)
-            rescans = sf.contract_rescans(changes)
-            if rescans:
-                sf.prefetch_closure(rescans)
-                changes = changes + rescans
             # The governance closure, from the index: every ancestor manifest + the registry.
             closure = [epr_format.POLICY_REGISTRY_REL]
             for c in changes:
@@ -253,9 +256,12 @@ def format_phase(repo: Path, *, git: "epr_format.Git | None" = None,
             if not selected:
                 sf.verify_unchanged()
                 return verdicts, notices, stats
+            # A missing formatter is a per-file `unmeasured` result (ask), so it never discards
+            # what the other formatter measured: Rust drift stays deny even when Prettier is
+            # absent, and EPR_META_ACK=1 acknowledges only the files that could not be checked.
             try:
                 results = sf.judge(selected)
-            except epr_format.MissingTool as e:
+            except epr_format.MissingTool as e:  # a parser absent before any measurement began
                 refuse("ask", f"{e} — {len(selected)} governed staged file(s) cannot be checked. "
                               f"Cure: {e.cure}", "missing-tool")
                 return verdicts, notices, stats
