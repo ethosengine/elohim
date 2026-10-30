@@ -8,7 +8,11 @@
   "content": {
     "slug": "elohim-host-landing",
     "entryPoint": "index.html",
-    "fallbackUrl": "https://alpha.elohim.host/"
+    "fallbackUrl": "https://alpha.elohim.host/",
+    "capabilities": [
+      "forms"
+    ],
+    "presents": true
   },
   "contentFormat": "html5-app",
   "sourcePath": "app/elohim-app/dist/elohim-app/browser",

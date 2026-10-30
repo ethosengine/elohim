@@ -27,3 +27,10 @@ elohim-views = { path = "../../crates/elohim-views" }
 # (no diesel, direct or transitive) is unchanged and still guarded by
 # `boundary_tests::no_transitive_diesel_in_dep_tree`.
 serde_json = "1"
+# Per-lens addition (folds/content_chrome.rs): the content-chrome facing reads an
+# html5-app record's framing declarations (entry, capabilities, themeHint,
+# presents) and its witness through the ONE parser and the ONE witness rule the
+# SDK owns (`Html5AppBody::from_json_str`, `witness_from_anchor`) instead of
+# re-deriving either. `lamad-types` is a wire-type crate with no DB edge; the
+# no-diesel boundary is still guarded by `boundary_tests::no_transitive_diesel_in_dep_tree`.
+lamad-types = { path = "../sdk/domains/lamad/types", features = ["json"] }

@@ -48,7 +48,10 @@ pub mod conductor_commitment_author; // Slice-2b — production CommitmentAuthor
 pub mod conductor_writes; // 2026-05-26-substrate-rea-replication-fix — facade for HTTP→conductor zome calls
 pub mod connectivity; // Phase 4 T6 — libp2p connected-peers snapshot helper
 pub mod constitutional_ratio_registry;
+pub mod content_chrome_facing; // Category C content-chrome facing loader (GET /api/v1/epr/{id}/chrome, behind ELOHIM_CONTENT_CHROME; the /apps shell island builder waits on the deferred peer-native shell)
 pub mod content_service;
+pub mod content_signals; // Content-address signal intake (POST /api/v1/epr/{id}/signals) — records undeclared-behaviour observations
+pub mod content_witness; // the chrome's witness reading: green once a non-author conductor holds the record valid (derived per read, never written)
 pub mod contest_backoff; // F-B throughput lever — hold back contest attempts that are PREDICTABLE repeat failures (bounded, always-expiring)
 pub mod contributor_reflexive_facing; // Wave 2 — "how the network sees a contributor" facing (folds in elohim-facings)
 pub mod courier_obey; // the adoption trigger's fast path: a courier-carried election, verified read-only, stamped once its bytes are held

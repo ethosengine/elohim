@@ -11,7 +11,7 @@ Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fol
 
 ## The boundary is the dependency graph, not a lint
 
-This crate depends on **`elohim-views` + `std` ONLY**. It has **no `diesel`, no `elohim-storage`**.
+This crate depends on **`elohim-views` + `std`** (plus per-lens wire-type crates with no DB edge: `serde_json` for the replication-commitment envelope, `lamad-types` for the content-chrome facing's html5-app parse and witness rule). It has **no `diesel`, no `elohim-storage`**.
 A fold that reaches for a `&mut SqliteConnection` (or writes `use diesel;`) **fails to compile** —
 the unresolved import IS the DB boundary (verified: `use diesel::prelude::*;` → `error[E0433]`).
 Do **not** add `diesel`, `elohim-storage`, or a DB-access dependency here. The impure loaders
@@ -26,6 +26,7 @@ Add `serde`/`chrono` only when a *moved* fold's own type genuinely needs it — 
 |------|-------|
 | `relation.rs` | `HolderRow` — the materialized `(hub, agent, region)` holder tuple the folds consume. |
 | `fold.rs` | Generic combinators: `bucket_by` (groups by key, drops `None`), `distinct_count_by`. |
+| `folds/content_chrome.rs` | The content-chrome facing: `fold_content_chrome` composes `build_felt_status` (holders), `fold_coupling_legs` (legs), attestations by subject (claims), stewardship (steward), and lamad-types' `Html5AppBody` (app lens), and `witness_reading` (green only when the anchor is present AND the loader found a non-author holder — `WitnessEvidence::Witnessed`; the anchor alone reads amber). Loader: `elohim-storage::services::content_chrome_facing`. |
 | `folds/resiliency.rs` | The resiliency facing's folds: `stewarding_hubs`, `intra_hub_peers`, `regional_distribution`, `floor_for_tier`, `build_felt_status` (+ the 10 `felt_status_tests`). |
 
 ## Adding a lens (the §11 recipe)

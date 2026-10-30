@@ -284,3 +284,46 @@ else process.exit(2);
     }
   } finally { rmSync(tmp, {recursive: true, force: true}); }
 });
+
+// The same hole one hop out: a sibling crate COPY'd flat to /app/<crate> carries its OWN relative
+// path deps, written for the repo layout. Each must resolve, from /app/<crate> and after any sed
+// rewrite of that crate's Cargo.toml, under some COPY destination — or cargo fails at resolve time
+// inside Docker while every native gate is green (elohim-facings' `../sdk/domains/lamad/types`
+// read /app/sdk/... when the crate was COPY'd to /sdk; the chrome-trust-edge port, 2026-10-29).
+test('every path dep of a flat-copied sibling crate resolves inside the Docker build context', () => {
+  const docker = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
+  // Only the dep-sources stage builds against these copies; later stages re-COPY sources only.
+  const stage = docker.split(/^FROM\s/m).find(s => /\bAS dep-sources\b/.test(s.split('\n')[0])) ?? '';
+  const logical = stage.replace(/\\\n/g, ' ').split('\n');
+  const copies = logical
+    .map(l => l.match(/^COPY\s+(?!--from)(\S+)\s+(\S+?)\/?\s*$/))
+    .filter(Boolean)
+    .map(([, src, dest]) => ({ src: normalize(src).replace(/\/$/, ''), dest: resolve('/app', dest) }));
+  const under = abs => copies.some(c => abs === c.dest || abs.startsWith(`${c.dest}/`));
+  // `sed … 's|path = "<old>"|path = "<new>"|' … <file>` rewrites, keyed by the file they edit.
+  const rewrites = [];
+  for (const line of logical.filter(l => /\bsed\b/.test(l))) {
+    for (const cmd of line.split('&&')) {
+      const files = cmd.trim().split(/\s+/).filter(t => /^[^'"|]*Cargo\.toml$/.test(t));
+      for (const m of cmd.matchAll(/s\|path = "([^"]+)"\|path = "([^"]+)"\|/g)) {
+        for (const file of files) rewrites.push({ file: resolve('/app', file), from: m[1], to: m[2] });
+      }
+    }
+  }
+  const unresolved = [];
+  for (const { src, dest } of copies) {
+    if (src === STORAGE || !existsSync(join(root, src, 'Cargo.toml'))) continue;
+    const cargo = readFileSync(join(root, src, 'Cargo.toml'), 'utf8');
+    for (const [, rel] of cargo.matchAll(/\bpath\s*=\s*"(\.\.\/[^"]+)"/g)) {
+      if (!existsSync(join(root, src, rel, 'Cargo.toml'))) continue;
+      const rw = rewrites.find(r => r.file === `${dest}/Cargo.toml` && r.from === rel);
+      const abs = resolve(dest, rw ? rw.to : rel);
+      if (!under(abs)) unresolved.push(`${src}: ${rel} -> ${abs}`);
+    }
+  }
+  assert.deepEqual(
+    unresolved,
+    [],
+    `sibling-crate path deps that resolve outside every COPY destination in the storage image: ${unresolved.join('; ')}`,
+  );
+});

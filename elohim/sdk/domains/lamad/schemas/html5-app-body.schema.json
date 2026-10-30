@@ -1,0 +1,65 @@
+{
+  "$id": "lamad:schema:body:html5-app",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Html5AppBody",
+  "description": "Body shape for the app-bundle formats — contentFormat 'html5-app' and 'spa-bundle' (a wrapper such as lamad's own record, which sets presents: true): what an interactive bundle's record declares about itself — where its bytes live, how to enter them, what the frame may do, and whether it presents other content inside its own trust surface. Parsed from ContentView.contentBody (a JSON string on the wire, a document in some projections). Source of truth: the contentBody of the existing Notarized (Category A) content record on the elohim DNA; the integrity zome treats contentBody as opaque, so this schema never moves a DNA hash. Rust parser: lamad_types::Html5AppBody (lenient ingest: a malformed field falls back to its default, an unknown capability is dropped, never granted).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "description": "The app id: the bundle's URL namespace, /apps/<slug>/<entryPoint>. Distinct from the record id and from the Holochain app id (hAppId)."
+    },
+    "entryPoint": {
+      "type": "string",
+      "minLength": 1,
+      "default": "index.html",
+      "description": "The bundle file a visit enters at, relative to the bundle root."
+    },
+    "fallbackUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Where the same work lives outside the protocol, offered as an 'open elsewhere' link. Never framed in its place."
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "../../../schemas/v1/enums/frame-capability.schema.json" },
+      "default": [],
+      "description": "What the frame may do beyond running its own scripts, as requested by the record. Scripts are always allowed and are never declared; whether the frame keeps its own origin is the chrome's decision from mode and isolation. Device capabilities (camera, microphone, geolocation) are only ever given by the person's own grant."
+    },
+    "sources": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(https|http|wss|ws)://(\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*)(:[0-9]{1,5})?$",
+        "description": "One origin: scheme://host[:port], no path, no trailing slash, no wildcard."
+      },
+      "default": [],
+      "description": "Origins the app may reach beyond its own (fetch, scripts, images, sockets), as the record declares them. Trustful content is observed against this list, not blocked: the chrome's web edge serves the content with a Report-Only policy naming these origins, and anything the content reaches outside them is reported to the peer as an undeclared-behaviour signal. Empty or absent means the app declares no outside origin."
+    },
+    "themeHint": {
+      "$ref": "#/$defs/Html5AppThemeHint"
+    },
+    "presents": {
+      "type": "boolean",
+      "default": false,
+      "description": "true when this bundle is a wrapper that presents other content inside its own trust surface and fulfils the chrome's claims for it (as lamad's content viewer does). Only inside a declared wrapper does the chrome come off."
+    }
+  },
+  "$defs": {
+    "Html5AppThemeHint": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The ambient theme the bundle wants the chrome to sit in. Absent colorScheme means auto.",
+      "properties": {
+        "colorScheme": { "type": "string", "enum": ["light", "dark"] },
+        "themeColor": { "type": "string", "description": "A CSS colour, as the entry HTML's theme-color would declare it." }
+      }
+    }
+  }
+}

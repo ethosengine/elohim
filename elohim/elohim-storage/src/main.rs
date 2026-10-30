@@ -1602,6 +1602,11 @@ async fn async_main(
 
         // Stash the registry in shared state for HTTP handlers.
         hc_registry_for_http = Some(registry.clone());
+        // The content chrome's witness reading asks this conductor — only with
+        // the content chrome on (ELOHIM_CONTENT_CHROME; off by default).
+        if elohim_storage::services::content_chrome_facing::content_chrome_enabled() {
+            elohim_storage::services::content_witness::register_conductor(registry.clone());
+        }
 
         // A missing or unreadable policy file must not take the conductor
         // signal subscribers down with it: everything below (heartbeat,
@@ -4431,6 +4436,13 @@ async fn async_main(
         .with_reconcile_kick(reconcile_kick_tx)
         // T17: race-fetch parameters (timeout, parallelism, self-CID).
         .with_fetch_config(&config);
+    // Content chrome (chrome-trust-edge): OFF unless ELOHIM_CONTENT_CHROME is
+    // switched on. Off, /manifest and the epr routes answer as before.
+    let content_chrome = elohim_storage::services::content_chrome_facing::content_chrome_enabled();
+    if content_chrome {
+        info!("content chrome ON (ELOHIM_CONTENT_CHROME): /api/v1/epr/{{id}}/chrome and /signals");
+    }
+    http_server = http_server.with_content_chrome(content_chrome);
 
     // Wire the content graph engine so the HTTP prerequisite-mastery gate
     // enforces via PREREQUISITE edges — the SAME shared gate the P2P paths use.
@@ -5925,6 +5937,14 @@ async fn async_main(
         // without it until then.
         // `command_tx` is `None` on a pure-iroh node; byte requests then go
         // over the iroh fetch leg (`NodeBytePresence::request`).
+        // The content chrome's witness reading asks ONE of these peers whether
+        // it holds a record this node authored and has no receipt for yet.
+        if let Some(peers) = reconcile_peers
+            .clone()
+            .filter(|_| elohim_storage::services::content_chrome_facing::content_chrome_enabled())
+        {
+            elohim_storage::services::content_witness::register_peers(peers);
+        }
         if let (Some(peers), Some(pool)) = (reconcile_peers.clone(), db_pool.clone()) {
             let bytes: Arc<dyn elohim_storage::services::courier_obey::BytePresence> =
                 Arc::new(elohim_storage::p2p::trigger_courier::NodeBytePresence {
