@@ -118,9 +118,11 @@ test("every direct path dep of storage is re-rooted by the Dockerfile's sed rewr
 
 // The same fixture exercises both scripts with fake Git/registry commands only.
 // Including it here makes the existing orchestrator test lane run the shell suite.
+// The suite runs ~30 closure derivations (32 s alone at load 5.7); under the
+// pre-push plate it passed 120 s, so the bound is a hang bound, not a speed bound.
 test('closure images: derivation, fail-closed oracle and nerdctl config-label builder contract', () => {
   const result = spawnSync('bash', ['scripts/ci/closure-image.test.sh'], {
-    cwd: root, encoding: 'utf8', timeout: 120000,
+    cwd: root, encoding: 'utf8', timeout: 600000,
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
