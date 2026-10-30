@@ -209,8 +209,25 @@ impl Run {
     }
 }
 
-pub fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
+/// An `epr` that reads a binary store of its own, inside the fixture's `.git`. Left to the
+/// environment, every spawned `epr` resolves the device's shared store and takes its 5 s lock,
+/// which a loaded gate host can hold longer than that: push 4 (2026-10-30) failed one claim on
+/// `lock-timeout`, and a recall read that lost the same race resolved no reader and rendered the
+/// recipe-default lens instead of the claimed one.
+#[allow(
+    dead_code,
+    reason = "shared by every integration test binary; each binary uses only some helpers"
+)]
+fn epr(root: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .env_remove("EPR_STORE")
+        .env("BIN_STORE", root.join(".git/test-bin-store"));
+    command
+}
+
+pub fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
+    let mut command = epr(root);
     command
         .args(["flow", "memory", "recall"])
         .args(args)
@@ -275,7 +292,7 @@ pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
     reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    let mut command = epr(root);
     command
         .args(["flow", "memory", "recall"])
         .args(args)
@@ -300,7 +317,7 @@ pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
     reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
-    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+    let out = epr(root)
         .args(["actor", "claim", "--as", claimed, "--session", session])
         .arg("--root")
         .arg(root)
@@ -345,7 +362,7 @@ pub fn begin_focused(root: &Path, about: &str) {
     reason = "shared by every integration test binary; each binary uses only some helpers"
 )]
 pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    let mut command = epr(root);
     command
         .args(["flow", "memory", "recall"])
         .args(args)
