@@ -350,7 +350,9 @@ describe('HttpTier — bounded reading', () => {
     expect(reads).toBeGreaterThan(70);
     expect(got.get(f.aCid.toString())).toEqual(f.a);
     expect(got.get(bigCid.toString())).toEqual(big);
-  });
+    // 300 KB over 70+ chunked reads: 2.8 s on a quiet host, 6.0 s beside a loaded gate (push
+    // 2026-10-30), past vitest's 5 s default. The bound is the assertion above, not the clock.
+  }, 30_000);
 
   it('gives up on an item that outgrows maxItemBytes, cancels the stream, and answers unreachable', async () => {
     const f = await fixture();
