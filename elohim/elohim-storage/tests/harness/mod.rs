@@ -652,6 +652,36 @@ fn fail_outbound(
 }
 
 // ---------------------------------------------------------------------------
+// connect — dial and wait until BOTH peers have registered the connection.
+// ---------------------------------------------------------------------------
+
+/// How long [`connect`] waits for each side to register the connection.
+pub const CONNECT_WAIT: Duration = Duration::from_secs(10);
+
+/// Dial `listener` from `dialer` and return only once both drivers have
+/// processed `ConnectionEstablished` for the other.
+///
+/// The two sides do not register the connection at the same instant: the
+/// dialer completes the upgrade first, and the listener's swarm reports its
+/// inbound connection on a later poll. Each driver's `select!` is `biased`
+/// towards commands, so a request issued from the listener side in that gap
+/// reaches `request_response::Behaviour::send_request` while the swarm still
+/// has no connection to the dialer. It then asks the swarm to dial the
+/// dialer by `PeerId` alone; the listener holds no address for it, the dial
+/// fails at once, and the request ends in `OutboundFailure::DialFailure` —
+/// the same tick in which the listener's `ConnectionEstablished` arrives.
+/// Waiting on both views closes that gap without any sleep.
+pub async fn connect(dialer: &TestNode, listener: &TestNode) {
+    dialer.dial(listener.addr()).await.expect("dial");
+    dialer
+        .wait_for_connection(&listener.peer_id(), CONNECT_WAIT)
+        .await;
+    listener
+        .wait_for_connection(&dialer.peer_id(), CONNECT_WAIT)
+        .await;
+}
+
+// ---------------------------------------------------------------------------
 // TestNode impl
 // ---------------------------------------------------------------------------
 
@@ -682,6 +712,12 @@ impl TestNode {
         rx.await.map_err(|_| "dial channel dropped".to_string())?
     }
 
+    /// Wait until THIS node's driver has seen `ConnectionEstablished` for
+    /// `peer`, or panic once `timeout` elapses.
+    ///
+    /// This is one side's view only. The dialer registers a connection before
+    /// the listener does, so a test that dials A→B and then sends a request
+    /// B→A must wait on B's view too — use [`connect`], which waits on both.
     pub async fn wait_for_connection(&self, peer: &PeerId, timeout: Duration) {
         let start = tokio::time::Instant::now();
         while start.elapsed() < timeout {
@@ -692,13 +728,20 @@ impl TestNode {
                 .await
                 .is_err()
             {
-                return;
+                panic!(
+                    "driver for {} stopped while waiting for {peer}",
+                    self.peer_id
+                );
             }
             if let Ok(true) = rx.await {
                 return;
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
+        panic!(
+            "{} saw no connection to {peer} within {timeout:?}",
+            self.peer_id
+        );
     }
 
     /// Look up a peer's identity in this node's `peer_identity_bindings` table.
