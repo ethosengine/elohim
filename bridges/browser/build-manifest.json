@@ -14,7 +14,9 @@
           "bridges/browser/**",
           "crates/elohim-sdk/**",
           "crates/elohim-views/**",
-          "crates/seam-contracts/**"
+          "crates/seam-contracts/**",
+          "crates/doorway-client/**",
+          "crates/elohim-storage-client/**"
         ],
         "buildProcess": []
       },
@@ -38,7 +40,9 @@
             "bridges/browser/**",
             "crates/elohim-sdk/**",
             "crates/elohim-views/**",
-            "crates/seam-contracts/**"
+            "crates/seam-contracts/**",
+            "crates/doorway-client/**",
+            "crates/elohim-storage-client/**"
           ],
           "buildProcess": []
         },
