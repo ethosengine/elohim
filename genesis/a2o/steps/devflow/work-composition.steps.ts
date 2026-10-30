@@ -129,16 +129,19 @@ Then('I can inspect baseline, authored claims and evidence availability', () => 
 Then('the board and burndown use one selected subject kind', () => {
   for (const r of receipts) assert.ok(Number(r.subjects) > 0);
 });
-Then('opening and refresh each capture of a repository-sized composition successfully within 60 seconds, the workspace proxy deadline', () => {
-  for (const r of receipts) {
-    const responses = r.captureResponses as { status: number; milliseconds: number }[];
-    assert.equal(responses.length, 2);
-    for (const response of responses) {
-      assert.equal(response.status, 200);
-      assert.ok(response.milliseconds < 60000);
+Then(
+  'opening and refresh each capture of a repository-sized composition successfully within 60 seconds, the workspace proxy deadline',
+  () => {
+    for (const r of receipts) {
+      const responses = r.captureResponses as { status: number; milliseconds: number }[];
+      assert.equal(responses.length, 2);
+      for (const response of responses) {
+        assert.equal(response.status, 200);
+        assert.ok(response.milliseconds < 60000);
+      }
     }
   }
-});
+);
 Then('offline retention includes the complete composition and sources', () => {
   for (const r of receipts)
     for (const key of [

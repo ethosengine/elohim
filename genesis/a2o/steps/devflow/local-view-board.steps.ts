@@ -41,15 +41,18 @@ Then(
       assert.equal(receipt[key], true, key);
   }
 );
-Then('interrupted, exhausted, corrupt and failed replacements preserve the previous usable copy', () => {
-  for (const key of [
-    'interruptedSavePreserved',
-    'storageExhaustionPreserved',
-    'corruptReplacementPreserved',
-    'failedRefreshPreserved',
-  ])
-    assert.equal(receipt[key], true, key);
-});
+Then(
+  'interrupted, exhausted, corrupt and failed replacements preserve the previous usable copy',
+  () => {
+    for (const key of [
+      'interruptedSavePreserved',
+      'storageExhaustionPreserved',
+      'corruptReplacementPreserved',
+      'failedRefreshPreserved',
+    ])
+      assert.equal(receipt[key], true, key);
+  }
+);
 Then(
   'viewing and reopening leave captured source files unchanged and create no workflow acts',
   () => {

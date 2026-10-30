@@ -226,10 +226,7 @@ pub trait EvidenceResources {
     /// The declared repository agent, read through this same boundary.
     fn repository_agent(&self) -> FlowResult<elohim_epr_rea::AgentRef> {
         let text = self.read_text(super::repository::DECLARATION)?;
-        super::repository::parse_repository_agent(
-            Path::new(super::repository::DECLARATION),
-            &text,
-        )
+        super::repository::parse_repository_agent(Path::new(super::repository::DECLARATION), &text)
     }
 }
 
