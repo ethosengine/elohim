@@ -134,7 +134,9 @@ seams:
       notary to route through.
     tracks: [T1]
     reach_tier: commons
-    registry_crates: []
+    # `elohim-sdk` is the portable app foundation: lifecycle contracts composed inward from
+    # an app manifest (routed 2026-10-29 with the g-native port).
+    registry_crates: [elohim-sdk]
     habits: []
     n_a_concerns: []
 
@@ -383,7 +385,10 @@ seams:
     # `gitoxide-core` (elohim/brit) is brit's external-Git switch and pull recovery: private Git
     # bridge state that elects no head and carries no Elohim authority. Routed 2026-10-24 when the
     # brit pin moved to 76ba95d8a0, whose registry arrived unrouted.
-    registry_crates: [did-bridge, k8s-bridge, jenkins-bridge, gitoxide-core]
+    # `browser-bridge` and `workspace-bridge` adapt the portable app lifecycle to a browser
+    # origin and to a workspace; routed 2026-10-29 when the g-native port brought their
+    # registries back from the 0ee5dfde8 rescue unrouted.
+    registry_crates: [did-bridge, k8s-bridge, jenkins-bridge, gitoxide-core, browser-bridge, workspace-bridge]
     habits: []
     n_a_concerns: []
 

@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 464,
+ "n_points_routed": 473,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -74,7 +74,9 @@
     "T1"
    ],
    "reach_tier": "commons",
-   "registry_crates": [],
+   "registry_crates": [
+    "elohim-sdk"
+   ],
    "habits": [],
    "n_a_concerns": []
   },
@@ -289,7 +291,9 @@
     "did-bridge",
     "k8s-bridge",
     "jenkins-bridge",
-    "gitoxide-core"
+    "gitoxide-core",
+    "browser-bridge",
+    "workspace-bridge"
    ],
    "habits": [],
    "n_a_concerns": []
@@ -434,9 +438,10 @@
   }
  },
  "counts": {
-  "unexamined": 158,
-  "variant": 88,
-  "conformant": 10
+  "unexamined": 142,
+  "conformant": 10,
+  "variant": 92,
+  "n-a": 12
  },
  "cells": [
   {
@@ -457,8 +462,28 @@
    "concern": "C0",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C0",
@@ -1480,14 +1505,21 @@
    "concern": "C0",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "conformant",
-   "reason": "7 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
    ],
    "reach_tier": "public",
    "points": [
+    {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
     {
      "crate": "jenkins-bridge",
      "point": "translate",
@@ -1536,6 +1568,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -1554,6 +1600,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "answered",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -2068,6 +2121,13 @@
     },
     {
      "crate": "elohim-epr-cli",
+     "point": "seam::classify::classify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/seam/classify.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
      "point": "integrate::integrate",
      "status": "answered",
      "verified": true,
@@ -2268,6 +2328,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/peer.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "view::project / view::save / view::reopen",
+     "status": "answered",
+     "verified": true,
+     "file": "src/view/mod.rs"
     },
     {
      "crate": "elohim-epr-lsp",
@@ -2499,8 +2566,28 @@
    "concern": "C1",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C1",
@@ -3642,6 +3729,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "answered",
@@ -3689,6 +3783,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -3714,6 +3822,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -4512,8 +4627,28 @@
    "concern": "C2",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C2",
@@ -5481,6 +5616,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "n-a",
@@ -5528,6 +5670,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -5553,6 +5709,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -6358,8 +6521,28 @@
    "concern": "C3",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.5
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C3",
@@ -7262,14 +7445,21 @@
    "concern": "C3",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "conformant",
-   "reason": "7 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
    ],
    "reach_tier": "public",
    "points": [
+    {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
     {
      "crate": "jenkins-bridge",
      "point": "translate",
@@ -7318,6 +7508,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -7343,6 +7547,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/unanswered.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "partial",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-device-runtime",
@@ -8120,8 +8331,28 @@
    "concern": "C4",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 5.0
+   "state": "conformant",
+   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C4",
@@ -9732,6 +9963,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "did-bridge",
      "point": "verify_resolved_subject",
      "status": "answered",
@@ -9842,6 +10080,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -9874,6 +10126,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/probe.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -10388,6 +10647,20 @@
     },
     {
      "crate": "elohim-epr-cli",
+     "point": "seam::classify::classify",
+     "status": "partial",
+     "verified": true,
+     "file": "src/seam/classify.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "seam::review::validate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/seam/review.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
      "point": "integrate::integrate",
      "status": "partial",
      "verified": true,
@@ -10574,6 +10847,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/peer.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "view::project / view::save / view::reopen",
+     "status": "answered",
+     "verified": true,
+     "file": "src/view/mod.rs"
     },
     {
      "crate": "elohim-epr-lsp",
@@ -10798,8 +11078,28 @@
    "concern": "C5",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C5",
@@ -11837,6 +12137,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "did-bridge",
      "point": "verify_resolved_subject",
      "status": "answered",
@@ -11919,6 +12226,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -11944,6 +12265,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/probe.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -12777,8 +13105,28 @@
    "concern": "C6a",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C6a",
@@ -13970,6 +14318,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "partial",
@@ -14017,6 +14372,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -14042,6 +14411,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "partial",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -14514,6 +14890,13 @@
     },
     {
      "crate": "elohim-epr-cli",
+     "point": "seam::classify::classify",
+     "status": "answered",
+     "verified": true,
+     "file": "src/seam/classify.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
      "point": "integrate::integrate",
      "status": "answered",
      "verified": true,
@@ -14616,6 +14999,13 @@
      "status": "partial",
      "verified": true,
      "file": "src/peer.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "view::project / view::save / view::reopen",
+     "status": "answered",
+     "verified": true,
+     "file": "src/view/mod.rs"
     },
     {
      "crate": "elohim-epr-lsp",
@@ -14840,8 +15230,28 @@
    "concern": "C6b",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C6b",
@@ -15865,6 +16275,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "answered",
@@ -15912,6 +16329,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -15920,7 +16351,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "variant",
-   "reason": "answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -15930,6 +16361,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "answered",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -16534,6 +16972,13 @@
      "file": "src/peer.rs"
     },
     {
+     "crate": "elohim-epr-cli",
+     "point": "view::project / view::save / view::reopen",
+     "status": "partial",
+     "verified": true,
+     "file": "src/view/mod.rs"
+    },
+    {
      "crate": "eprfs-core",
      "point": "canonical_tree_and_verified_closure",
      "status": "answered",
@@ -16749,8 +17194,28 @@
    "concern": "C7",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "conformant",
+   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C7",
@@ -17646,14 +18111,21 @@
    "concern": "C7",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "conformant",
-   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
    ],
    "reach_tier": "public",
    "points": [
+    {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
     {
      "crate": "did-bridge",
      "point": "assemble_deactivated_document",
@@ -17716,6 +18188,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -17734,6 +18220,13 @@
      "status": "partial",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "answered",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -18518,8 +19011,28 @@
    "concern": "C8",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 4.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C8",
@@ -19648,6 +20161,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "did-bridge",
      "point": "DidResolutionError",
      "status": "partial",
@@ -19702,6 +20222,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -19741,6 +20275,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/probe.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "answered",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-device-runtime",
@@ -20546,8 +21087,28 @@
    "concern": "C9",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -21396,6 +21957,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "did-bridge",
      "point": "IdentityHeadAnswer",
      "status": "answered",
@@ -21471,6 +22039,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -21489,6 +22071,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -22259,8 +22848,28 @@
    "concern": "C10",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C10",
@@ -23114,14 +23723,21 @@
    "concern": "C10",
    "seam": "S3.6",
    "plane": "bridges",
-   "state": "conformant",
-   "reason": "7 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T3",
     "T4"
    ],
    "reach_tier": "public",
    "points": [
+    {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
     {
      "crate": "jenkins-bridge",
      "point": "translate",
@@ -23170,6 +23786,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -23188,6 +23818,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "answered",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -24014,8 +24651,28 @@
    "concern": "C11",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 1.5
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C11",
@@ -24892,6 +25549,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "n-a",
@@ -24939,6 +25603,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -24957,6 +25635,13 @@
      "status": "partial",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -25727,8 +26412,28 @@
    "concern": "C12",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C12",
@@ -26884,13 +27589,20 @@
    "seam": "S3.6",
    "plane": "bridges",
    "state": "variant",
-   "reason": "documented waiver: status unbound",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T3",
     "T4"
    ],
    "reach_tier": "public",
    "points": [
+    {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
     {
      "crate": "did-bridge",
      "point": "IdentityHeadAnswer",
@@ -26960,6 +27672,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "partial",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -26978,6 +27704,13 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -27755,8 +28488,28 @@
    "concern": "C13",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 3.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C13",
@@ -28682,6 +29435,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "answered",
@@ -28729,6 +29489,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "n-a",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -28747,6 +29521,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-epr-rea",
@@ -29531,8 +30312,28 @@
    "concern": "C14",
    "seam": "S3.5",
    "plane": "control-truth",
-   "state": "unexamined",
-   "score": 2.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T1"
+   ],
+   "reach_tier": "commons",
+   "points": [
+    {
+     "crate": "elohim-sdk",
+     "point": "available_offline",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/mod.rs"
+    },
+    {
+     "crate": "elohim-sdk",
+     "point": "caught_up",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lifecycle/sync_demand.rs"
+    }
+   ]
   },
   {
    "concern": "C14",
@@ -30437,6 +31238,13 @@
    "reach_tier": "public",
    "points": [
     {
+     "crate": "browser-bridge",
+     "point": "origin",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
      "crate": "jenkins-bridge",
      "point": "translate",
      "status": "partial",
@@ -30484,6 +31292,20 @@
      "status": "partial",
      "verified": true,
      "file": "src/observe.rs"
+    },
+    {
+     "crate": "workspace-bridge",
+     "point": "from_che_endpoints",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "gitoxide-core",
+     "point": "recover",
+     "status": "partial",
+     "verified": false,
+     "file": "src/repository/switch/linux/mod.rs"
     }
    ]
   },
@@ -30502,6 +31324,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-seam-contracts",
+     "point": "insert",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/demand.rs"
     },
     {
      "crate": "elohim-device-runtime",
@@ -31744,7 +32573,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:c845de365b17b3e6c3f2cfe4c7568c3b",
+ "digest": "sha256:ec8493682ab234d2c90a1290f5715f84",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",
