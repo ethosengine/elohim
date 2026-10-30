@@ -14,7 +14,7 @@
 //!
 //! # When
 //!
-//! Only when the directory is far above what it holds: more than
+//! Only when [`RECLAIM_ENV`] is `on`, and the directory is far above what it holds: more than
 //! [`DEFAULT_MIN_DISK_BYTES`] on disk AND more than [`DEFAULT_MIN_RATIO`] times
 //! the live logical bytes. A healthy sled sits at roughly 1-2x its logical
 //! bytes (segment fragmentation plus the open log), so 4x is never normal
@@ -71,8 +71,10 @@ use tracing::{info, warn};
 use crate::error::StorageError;
 use crate::services::store_footprint;
 
-/// Environment switch. `off` (also `0`, `false`, `no`) disables the reclaim;
-/// anything else, or unset, leaves it on.
+/// Environment switch. The reclaim runs only when this is `on` (also `1`, `true`,
+/// `yes`); unset or anything else leaves it off. Off by default since 2026-10-29:
+/// review found crash- and concurrency-safety gaps in the swap that are still open,
+/// and the write-side cure (`DocStore::save_if_changed`) already stops new garbage.
 pub const RECLAIM_ENV: &str = "ELOHIM_SLED_RECLAIM";
 
 /// Page cache the sync sled is opened with for service.
@@ -136,9 +138,9 @@ impl ReclaimPolicy {
 }
 
 fn enabled_from(raw: Option<&str>) -> bool {
-    !matches!(
+    matches!(
         raw.map(|v| v.trim().to_ascii_lowercase()).as_deref(),
-        Some("off" | "0" | "false" | "no")
+        Some("on" | "1" | "true" | "yes")
     )
 }
 
@@ -503,7 +505,7 @@ pub fn open_sync_sled(
                 0,
                 0,
                 0,
-                format!("{RECLAIM_ENV}=off"),
+                format!("{RECLAIM_ENV} is not on"),
             ),
         ));
     }
@@ -978,10 +980,13 @@ mod tests {
         // Nothing above touched the sled: it is still there to reclaim.
         let (_db, r) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &policy()).unwrap();
         assert_eq!(r.outcome, ReclaimOutcome::Reclaimed, "{r:?}");
-        assert!(enabled_from(None));
+        assert!(!enabled_from(None), "off unless asked for");
+        assert!(!enabled_from(Some("")));
+        assert!(!enabled_from(Some("auto")));
         assert!(enabled_from(Some("on")));
+        assert!(enabled_from(Some(" ON ")));
+        assert!(enabled_from(Some("1")));
         assert!(!enabled_from(Some("off")));
-        assert!(!enabled_from(Some(" OFF ")));
         assert!(!enabled_from(Some("0")));
     }
 

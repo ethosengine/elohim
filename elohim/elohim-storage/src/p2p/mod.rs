@@ -3010,7 +3010,7 @@ impl P2PNode {
         // sled uses flock() which prevents multiple opens of the same path.
         // The open first returns disk an earlier build leaked (sled 0.34 keeps
         // overwritten blob values), bounded and before the HTTP listener;
-        // ELOHIM_SLED_RECLAIM=off skips it. See `sync::sled_reclaim`.
+        // It runs only with ELOHIM_SLED_RECLAIM=on (off by default). See `sync::sled_reclaim`.
         let sled_path = config.storage_dir.join("sync.sled");
         let sled_db = crate::sync::sled_reclaim::open_sync_sled_async(
             sled_path,
