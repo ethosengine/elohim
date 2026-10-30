@@ -1658,6 +1658,17 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
 
+    def test_an_override_whose_reread_is_still_pending_keeps_the_lease_for_the_next_claim(self):
+        # 2026-10-30, after a power loss: the view had not folded the override row yet, the
+        # pending verdict carried no device, and the reason formatter raised. The claim then
+        # released and every retry wrote a fresh lease and a fresh override, never converging.
+        self.views(view(), view(dev_integration=unconfirmed_a()), view(dev_integration=pending()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertEqual(reason, f"unconfirmed: {DEVICE_A} has not acknowledged yet — override on the record")
+        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        self.assertEqual(self.rows("override")[-1]["overrode"], DEVICE_A)
+
     def test_unconfirmed_age_reads_seconds_minutes_then_hours(self):
         fmt = _NS["steward_reason"]
         ages = [(119_999, "119s"), (120_000, "2m"), (7_199_999, "119m"), (7_200_000, "2h"), (9_000_000, "2h")]

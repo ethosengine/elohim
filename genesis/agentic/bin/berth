@@ -342,6 +342,11 @@ def steward_reason(verdict, now_ms, fence_after_s=None):
         return f"held by {verdict['device']}/{verdict['session']} since {_rfc3339(verdict['since'])}"
     if verdict.get("verdict") == "refused_by":
         return f"refused by {verdict['device']}"
+    # A pending verdict names who it waits on, not a device: the re-read right after an override
+    # row is written is pending until the view folds that row.
+    if verdict.get("verdict") == "pending":
+        waiting = (verdict.get("waiting_on") or ["another device"])[0]
+        return f"unconfirmed: {waiting} has not acknowledged yet"
     if verdict.get("fenced"):
         window = f" within {fence_after_s}s" if fence_after_s is not None else " recently"
         return f"self-demoted: no head from {verdict['device']}{window}"
