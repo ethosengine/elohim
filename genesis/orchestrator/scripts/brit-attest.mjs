@@ -104,7 +104,6 @@ export function expectedRefusal(stderr) {
 }
 
 const lastLine = text => String(text || '').trim().split('\n').filter(Boolean).pop() || '';
-const MISS = 'no build ref found for step=';
 
 /**
  * brit's verified read of the build note on `commit` for `step` (`build get`):
@@ -115,6 +114,11 @@ const MISS = 'no build ref found for step=';
  *                                                  not brit's (exit 1, non-JSON stdout, no spawn;
  *                                                  `code` is the spawn error's, ENOENT = no binary).
  * Exit 0 with no node is absent-or-unverifiable; stderr tells which. Never throws.
+ *
+ * Stream contract (build_cmd.rs on both lineages): stdout carries the node and nothing else; the
+ * miss line and `unverifiable:` go to stderr. Non-JSON stdout is therefore not brit's and is
+ * unreadable, as it is to delivery-series.mjs and the epr-cli walk — no reader tolerates a miss
+ * on stdout.
  *
  * Lineage note: the pinned 76ba95d8a0 prints a hit's `hardwareProfile` as a JSON OBJECT (observed
  * live); the verified-reads line (7e4a83115e) prints the signed STRING. `manifestCid`/`outputCid`
@@ -134,7 +138,7 @@ export function readBuildNote(step, commit, { buildRefBin, root, spawn = spawnSy
     return { state: 'unreadable', reason: lastLine(r.stderr) || r.error?.message || `exit ${r.status}`, ...(r.error?.code ? { code: r.error.code } : {}) };
   }
   const text = String(r.stdout || '').trim();
-  if (text && !text.startsWith(MISS)) {
+  if (text) {
     try {
       const node = JSON.parse(text);
       return node && typeof node === 'object' ? { state: 'verified', node } : { state: 'unreadable', reason: 'build get: not an object' };
@@ -328,6 +332,9 @@ export async function main(argv, { env = process.env } = {}) {
         const existing = readBuildNote(p.step, commit, { buildRefBin: bin, root: repo, env: childEnv, timeout: timeout() });
         if (existing.state === 'unreadable') {
           if (existing.code === 'ENOENT') { defer('brit-build-ref absent'); break; }
+          // A harvest projects a verdict the forge already holds, and the next harvest retries it
+          // for nothing, so a note this device could not read is never written over blind. The gate
+          // (gate-evidence.mjs recordEvidence) rules the other way for its own fresh verdict.
           defer(`${ref} on ${short} could not be read (${existing.reason}); ${p.step} not written`);
           continue;
         }

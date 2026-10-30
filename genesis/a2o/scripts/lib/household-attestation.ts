@@ -31,7 +31,9 @@
  * orchestrator reader (delivery-series.mjs delegates). `resolveWorkspaceIdentity` below is the
  * a2o-side port of that one rule, kept as a separate function only because this module must stay
  * node-builtins-only and must not import the orchestrator package; its test pins the same
- * streams, and a change to the rule lands in both places together.
+ * streams, and a change to the rule lands in both places together. `classifyPutRefusal` is the
+ * same kind of port of genesis/orchestrator/scripts/brit-attest.mjs `expectedRefusal` (brit's two
+ * expected `build put` refusals), with this module's hyphenated kinds; the two change together.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';

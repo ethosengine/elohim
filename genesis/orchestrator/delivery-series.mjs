@@ -52,6 +52,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { resolveBin, signerIdentity } from './gate-evidence.mjs';
+import { unverifiableNotes } from './scripts/brit-attest.mjs';
 
 const JENKINS = process.env.JENKINS || 'https://jenkins.ethosengine.com';
 const JOB = '/job/elohim-orchestrator/job/dev';
@@ -244,10 +245,10 @@ export function readAttestationSeries(
       throw new Error(`brit-build-ref build get --step ${n.step} --commit ${n.commit}: exit ${r.status ?? r.signal}: ${head || 'no stderr'}`);
     }
     if ((r.stdout ?? '').trim() === '') {
-      const refused = /^unverifiable: (\S+) (.*)$/m.exec(r.stderr ?? '');
+      const [refused] = unverifiableNotes(r.stderr);
       if (refused) {
         unverifiable += 1;
-        warn(`delivery-series: unverifiable ${n.ref} @ ${refused[1]}: ${refused[2]} — read as absent`);
+        warn(`delivery-series: unverifiable ${n.ref} @ ${refused.commit}: ${refused.reason} — read as absent`);
       } else {
         warn(`delivery-series: ${n.ref} @ ${n.commit} is listed but brit-build-ref reports no build ref — read as absent`);
       }

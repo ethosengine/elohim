@@ -302,7 +302,7 @@ test('simultaneous writers serialize get/compare/put and retry preserves existin
   const w = workspace();
   const bin = join(w.dir, 'slow-brit');
   const tree = w.git('rev-parse', `${w.sha}^{tree}`);
-  // The miss line on stdout (brit's older stream) still reads as absent.
+  // The miss line goes to stderr, as build_cmd.rs prints it on both lineages; stdout is the node.
   writeFileSync(bin, `#!/bin/sh
 step=; success=; prev=
 for a in "$@"; do
@@ -311,7 +311,7 @@ for a in "$@"; do
   prev=$a
 done
 if [ "$4" = get ]; then
-  if [ -f "${w.dir}/stored.$step" ]; then cat "${w.dir}/stored.$step"; else echo 'no build ref found for step=stub commit=stub'; fi
+  if [ -f "${w.dir}/stored.$step" ]; then cat "${w.dir}/stored.$step"; else echo 'no build ref found for step=stub commit=stub' >&2; fi
 else
   sleep 0.2
   printf '{"inputsHash":"%s","success":%s}\\n' '${tree}' "$success" > "${w.dir}/stored.$step"
@@ -407,6 +407,7 @@ case "$cmd" in
       unverifiable) echo "no build ref found for step=$step commit=$commit" >&2; echo "unverifiable: $SHA $REASON" >&2;;
       gitfail) echo "Error: git command failed: git notes --ref $ref list: fatal: not a notes commit" >&2; exit 1;;
       junk) echo bafystub;;
+      stdout-miss) echo "no build ref found for step=$step commit=$commit";;
     esac;;
   "build find")
     case "$FIND" in
@@ -527,6 +528,10 @@ test('readBuildNote reads the three answers of a verified get, a failed git read
   assert.equal(failed.state, 'unreadable');
   assert.match(failed.reason, /^Error: git command failed: git notes --ref refs\/notes\/brit\/build\/gate%3Ax list/);
   stub.set({ GET: 'junk' });
+  assert.deepEqual(readBuildNote('gate:x', 'HEAD', opts), { state: 'unreadable', reason: 'build get: not JSON' });
+  // brit prints the miss on stderr (build_cmd.rs, both lineages); on stdout it is not brit's output,
+  // and no reader (this one, delivery-series, the epr-cli walk) reads it as absent.
+  stub.set({ GET: 'stdout-miss' });
   assert.deepEqual(readBuildNote('gate:x', 'HEAD', opts), { state: 'unreadable', reason: 'build get: not JSON' });
   const absent = readBuildNote('gate:x', 'HEAD', { ...opts, buildRefBin: join(stub.dir, 'absent') });
   assert.equal(absent.state, 'unreadable');

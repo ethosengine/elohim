@@ -575,6 +575,10 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
   if (existing.state === 'unverifiable') {
     warn(`[gate] ${project.name} evidence: unverifiable note on ${ref} at ${sha}: ${existing.reason}; replacing it\n`);
   } else if (existing.state === 'unreadable') {
+    // The gate's rule is last run wins, named: the read above only names what the put replaces,
+    // and a verdict that cost a run is not withheld because the name could not be read (brit's own
+    // put still refuses a concurrent update). brit-attest.mjs defers the same state, because a
+    // harvest retries for free; the two rules are deliberate and named in both places.
     warn(`[gate] ${project.name} evidence: ${ref} at ${sha} could not be read (${existing.reason}); writing anyway\n`);
   } else if (existing.state === 'verified' && (existing.node.inputsHash !== key || existing.node.success !== success)) {
     const held = `${existing.node.success === true ? 'green' : 'red'}, signer ${String(existing.node.agentId || 'unsigned').slice(0, 12)}`;
