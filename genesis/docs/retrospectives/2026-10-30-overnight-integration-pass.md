@@ -76,3 +76,33 @@ M1, M2, M4 and M12 together would have prevented most of this pass's lost wall-c
 - Report progress on every long wait, and read the berth inbox on every wake.
 - Write commands in the shapes the allow rules already admit; record every pause.
 - A hold on a peer expires at 4 h of dev standing still unless renewed.
+
+## 6. Design sketch: a session stasis loop (steward request, 2026-10-30)
+
+The steward asked for a loop inside the session that notices when the session is stopped and keeps it moving. "Stopped" covers a permission prompt left unanswered for more than 3 minutes, someone waiting on us, or any other pain signal the lookout catches. The loop should adapt over time so the session stays in stasis.
+
+**One constraint shapes the design.** A stopped session cannot watch itself: while a prompt is open, the agent takes no turns. The watcher therefore runs outside the agent's turn. It can wake or notify the session, but it never acts in its place. **It never approves the session's own prompts.** That would be permission laundering. Approval stays with the steward. The loop shortens the wait and removes the cause next time.
+
+**Sensors.** Each is a measure with a bound, judged by `elohim_epr_rea::Bound` and written through `epr flow sense`. There is no private ledger.
+
+| Signal | Source that already exists | Bound to start |
+|---|---|---|
+| Prompt open | Claude Code `Notification` hook (permission or idle prompt) writes `stall-open@1` with time and command shape; `Stop`/`PostToolUse` closes it | 3 min |
+| Peer waiting | `berth inbox` unread notes addressed to the session; queued claims on a lease the session holds | 10 min unread, 30 min queued |
+| Dev standing still | dev head age vs queued landings (row 58) | 4 h |
+| Silent long wait | no user-visible output while a background gate runs | 30 min |
+| Gate pain | gate-live reds; run time past p90 | first red; 1.5×p90 |
+| Host pressure | ram-guard level, sheds | soft line |
+
+**Watcher.** A small loop owned by the device, not by one session. Two hosts would work: a supervised task beside `epr peer serve`, or the `ark` envelope. It reads the sensors every minute. A breach goes through a fixed ladder; it never improvises. Each rung is recorded:
+
+1. **Notify the steward.** A `PushNotification` names the stall: "shem waiting 3 min on approval for `<shape>`". The steward answers from their phone instead of finding it in the morning.
+2. **Release what others wait on.** When a stall passes 15 min and the session holds `dev-integration`, `alpha-fleet` or `mesh` while a peer queues, the watcher sends `berth say`. It releases the lease only when the steward's standing rule allows that, which makes the lane handoff of row 58 automatic.
+3. **Wake the session.** For peer notes or gate reds while the session is idle (not stuck on a prompt), it injects the event through the existing `gate-live-inject` path or a `ScheduleWakeup`, so the agent acts on its next turn.
+4. **Ratchet.** It counts every stall by its command shape. At shift close, the shapes seen twice or more become narrow allow-rule proposals (`generalize-permissions`). The steward accepts or rejects each one. The agent also keeps a "do instead" list (short single commands, `git -C`, Edit over heredocs). The ledger feeds it, so the next shift avoids the shapes that stalled.
+
+**Stasis measure.** `session-stall-minutes@1` per shift, with a declared ceiling. The `algedonic-designer` station adds sensors for pains this table misses. `delivery-stasis` reads the measure each round. Green means stall-minutes stay under the ceiling for two shifts running, one of them unattended.
+
+**What it must not do:** approve prompts; edit permissions itself; restart or kill another session's work; act on a peer note as if it were the steward's word. Notes stay untrusted, so the ladder only notifies and releases under standing rules.
+
+This is row 64 of the workspace-discipline cluster. It subsumes rows 58, 59 and 63 as its sensors and ratchet, so the four ship together.
