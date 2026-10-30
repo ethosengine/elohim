@@ -27,17 +27,28 @@ function git(cwd, ...args) {
   return r.stdout.trim();
 }
 
+const GOVERNED = ['pre-push', 'pre-commit', 'pre-merge-commit'];
+
 function installShims(root) {
   mkdirSync(join(root, '.husky/_'), { recursive: true });
-  writeFileSync(join(root, '.husky/_/h'), 'exec "$(dirname "$0")/../pre-push" "$@"\n');
-  writeFileSync(join(root, '.husky/_/pre-push'), '#!/bin/sh\n. "$(dirname "$0")/h"\n', { mode: 0o755 });
+  // Like husky's own `h`: run the tracked entrypoint named after the shim.
+  writeFileSync(join(root, '.husky/_/h'), 'exec "$(dirname "$0")/../$(basename "$0")" "$@"\n');
+  for (const hook of GOVERNED) {
+    writeFileSync(join(root, `.husky/_/${hook}`), '#!/bin/sh\n. "$(dirname "$0")/h"\n', { mode: 0o755 });
+  }
 }
 
 function assertHookRuns(worktree) {
-  // Exercise Git's real lookup without pushing or contacting any remote.
+  // Exercise Git's real lookup without pushing, committing or contacting any remote.
   const hook = spawnSync('git', ['hook', 'run', 'pre-push'], { cwd: worktree, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   assert.equal(hook.status, 23, hook.stderr);
   assert.ok(hook.stderr.includes(`gate ran in ${worktree}`), hook.stderr);
+  // The commit gate runs for a plain commit AND for a clean automatic merge.
+  for (const name of ['pre-commit', 'pre-merge-commit']) {
+    const run = spawnSync('git', ['hook', 'run', name], { cwd: worktree, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    assert.equal(run.status, 24, `${name}: ${run.stderr}`);
+    assert.ok(run.stderr.includes(`commit gate ran in ${worktree}`), `${name}: ${run.stderr}`);
+  }
 }
 
 function scratch(t) {
@@ -53,6 +64,9 @@ function scratch(t) {
   installShims(main);
   writeFileSync(join(main, '.husky/pre-push'), '#!/bin/sh\nexec bash "$(dirname "$0")/pre-push.bash" "$@"\n', { mode: 0o755 });
   writeFileSync(join(main, '.husky/pre-push.bash'), 'echo "gate ran in $PWD" >&2\nexit 23\n');
+  writeFileSync(join(main, '.husky/pre-commit'), '#!/bin/sh\necho "commit gate ran in $PWD" >&2\nexit 24\n', { mode: 0o755 });
+  // The tracked delegation, verbatim in shape: pre-merge-commit hands off to pre-commit.
+  writeFileSync(join(main, '.husky/pre-merge-commit'), '#!/bin/sh\nexec sh "$(dirname "$0")/pre-commit" "$@"\n', { mode: 0o755 });
   git(main, 'config', 'core.hooksPath', '.husky/_');
   const worktree = join(dir, 'wt');
   git(main, 'worktree', 'add', '-q', worktree);
@@ -115,7 +129,7 @@ test('an incomplete main shim directory is repaired from the worktree', (t) => {
 
 test('postStart before install uses tracked hooks when shims are missing or incomplete', (t) => {
   const { main, worktree } = scratch(t);
-  for (const missing of ['pre-push', 'h', 'all']) {
+  for (const missing of ['pre-push', 'pre-commit', 'pre-merge-commit', 'h', 'all']) {
     installShims(main);
     rmSync(join(main, '.husky/_', missing === 'all' ? '' : missing), { recursive: true });
     // Also catches the old helper reporting "already" for an absolute but broken path.
@@ -139,6 +153,21 @@ test('missing hook implementation and a non-executable entrypoint refuse loudly'
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /REFUSED.*pre-push/);
   assert.equal(git(main, 'config', '--get', 'core.hooksPath'), '.husky/_');
+});
+
+test('a missing or non-executable commit-gate entrypoint refuses loudly', (t) => {
+  for (const hook of ['pre-commit', 'pre-merge-commit']) {
+    const { main, worktree } = scratch(t);
+    chmodSync(join(main, `.husky/${hook}`), 0o644);
+    const mode = runScript(worktree);
+    assert.equal(mode.status, 1, `${hook} non-executable`);
+    assert.match(mode.stderr, new RegExp(`REFUSED.*${hook}.*pnpm run prepare`));
+    rmSync(join(main, `.husky/${hook}`));
+    const missing = runScript(worktree);
+    assert.equal(missing.status, 1, `${hook} missing`);
+    assert.match(missing.stderr, new RegExp(`REFUSED.*${hook}`));
+    assert.equal(git(main, 'config', '--get', 'core.hooksPath'), '.husky/_');
+  }
 });
 
 test('Git ownership failure is not reported as a successful non-checkout no-op', (t) => {

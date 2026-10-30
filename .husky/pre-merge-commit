@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# pre-merge-commit: git runs this (not pre-commit) for a merge that completes automatically.
+# A conflicted merge finished with `git commit` runs pre-commit; a fast-forward runs neither (it
+# creates no commit, and every commit it brings in was already checked where it was made).
+# Delegate, so the merged INDEX meets the same .epr-meta gate and formatting ratchet as any commit.
+exec sh "$(dirname "$0")/pre-commit" "$@"

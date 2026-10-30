@@ -36,6 +36,7 @@ policy-recipes:
       and carrying `name:` so a label reader can take the name from the key or the field. The
       declared name and the reported label agree at `default`; a second recipe is added here.
 rules:
+  - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: rs-loc-ceiling
     policy: source-file-loc-ceiling@1
   - id: governance-escalation-ladder

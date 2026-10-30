@@ -4,8 +4,13 @@ Post-edit lint check hook for Claude Code.
 Runs linters on edited files and checks test coverage.
 Only outputs if there are issues to minimize context usage.
 
-Supports: elohim-app (ESLint/Stylelint), doorway (clippy/rustfmt),
-          doorway-app (ESLint), sophia (ESLint)
+Supports: elohim-app (ESLint/Stylelint), doorway-app (ESLint), sophia (ESLint), and — for
+          ANY file in a declared formatter contract — the shared formatting check
+          (_lib/epr_format: pinned rustfmt for Cargo packages, the owning package's Prettier for
+          `format:check` globs). The formatting line is advisory here (worktree bytes); the
+          commit decision is made on the index by the pre-commit ratchet (commit-format-ratchet@1).
+          Clippy no longer runs on the edit path: a 60 s cargo run cannot fit this hook's 10 s
+          budget, and clippy stays the project gate's obligation.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -25,8 +30,45 @@ from pathlib import Path
 PROJECT = os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim')
 APP_DIR = os.path.join(PROJECT, 'app', 'elohim-app')
 DOORWAY_APP_DIR = os.path.join(PROJECT, 'doorway', 'doorway-app')
-DOORWAY_SERVICE_DIR = os.path.join(PROJECT, 'doorway', 'doorway-service')
 SOPHIA_DIR = os.path.join(PROJECT, 'sophia')
+
+
+_SCRIPTS = Path(__file__).resolve().parent.parent / 'scripts'
+if (_SCRIPTS / '_lib').is_dir() and str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+
+def repo_root_of(file_path: str) -> Path | None:
+    """The checkout (main or linked worktree) that owns `file_path`."""
+    here = Path(file_path).resolve().parent
+    for _ in range(40):
+        if (here / '.git').exists():
+            return here
+        if here.parent == here:
+            return None
+        here = here.parent
+    return None
+
+
+def format_advisory(file_path: str) -> str:
+    """One `[Format]` line for a file inside a formatter contract that is not formatted (or could
+    not be measured), via the SAME resolver the commit gate uses — on worktree bytes. '' when the
+    file is clean or outside every contract. Never raises."""
+    try:
+        from _lib import epr_format
+    except Exception:
+        return ''
+    root = repo_root_of(file_path)
+    if root is None:
+        return ''
+    res = epr_format.check_worktree_file(root, file_path)
+    if res is None or res.state in ('clean', 'ignored', 'outside'):
+        return ''
+    name = os.path.basename(file_path)
+    if res.state == 'drift':
+        return (f"[Format] {name}: not {res.formatter}-formatted — the pre-commit ratchet refuses "
+                f"this if the file is new or was formatted at HEAD. Fix: {res.cure}")
+    return f"[Format] {name}: formatting unmeasured — {res.reason}" + (f" Cure: {res.cure}" if res.cure else '')
 
 
 def project_root_exists(cwd: str) -> bool:
@@ -50,7 +92,7 @@ def detect_project(file_path: str) -> str | None:
     if '/sophia/' in file_path:
         return 'sophia'
     if '/doorway/' in file_path and file_path.endswith('.rs'):
-        return 'doorway'
+        return 'doorway'  # coverage signal only; formatting is the shared advisory
     return None
 
 
@@ -107,62 +149,6 @@ def run_stylelint(file_path: str) -> str:
             # Limit to 12 lines
             lines = output.split('\n')
             return '\n'.join(lines[:12])
-        return ''
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        return ''
-
-
-# ============================================================================
-# RUST LINTING (doorway)
-# ============================================================================
-
-def run_clippy_check(file_path: str) -> str:
-    """Run cargo clippy and filter output to the edited file."""
-    if not project_root_exists(DOORWAY_SERVICE_DIR):
-        return ''
-    try:
-        # CARGO_TARGET_DIR: never let a hook mint a legacy target/ inside the
-        # crate (the 30G-balloon trap); honor the session's pool slot if set.
-        env = {**os.environ, 'RUSTFLAGS': ''}
-        env.setdefault('CARGO_TARGET_DIR', '/tmp/claude-lint-check-clippy-target')
-        result = subprocess.run(
-            ['cargo', 'clippy', '--message-format=short', '--', '-W', 'clippy::all'],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=DOORWAY_SERVICE_DIR,
-            env=env
-        )
-        # Filter clippy output to lines mentioning the edited file (clippy
-        # paths are relative to the manifest dir, doorway-service)
-        rel_path = file_path.split('/doorway-service/')[-1] if '/doorway-service/' in file_path else ''
-        if not rel_path:
-            return ''
-
-        lines = (result.stdout + result.stderr).split('\n')
-        issues = []
-        for line in lines:
-            if rel_path in line and ('warning' in line.lower() or 'error' in line.lower()):
-                # Simplify the line
-                clean = line.strip()
-                if clean:
-                    issues.append(f"  {clean}")
-        return '\n'.join(issues[:12])
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        return ''
-
-def run_rustfmt_check(file_path: str) -> str:
-    """Check formatting with rustfmt."""
-    try:
-        result = subprocess.run(
-            ['rustfmt', '--check', file_path],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            cwd=DOORWAY_SERVICE_DIR
-        )
-        if result.returncode != 0:
-            return '  File needs formatting (run `rustfmt`)'
         return ''
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         return ''
@@ -378,9 +364,13 @@ def main():
         if not file_path:
             sys.exit(0)
 
+        # The shared formatting advisory runs for EVERY file, before the project routing below:
+        # most formatter contracts (eprfs, a2o, storage, ...) belong to no lint project here.
+        format_output = format_advisory(file_path)
+
         # Detect which project this file belongs to
         project = detect_project(file_path)
-        if not project:
+        if not project and not format_output:
             sys.exit(0)
 
         lint_output = ''
@@ -404,21 +394,13 @@ def main():
             if file_path.endswith('.ts') or file_path.endswith('.tsx'):
                 lint_output = run_eslint(file_path, cwd=SOPHIA_DIR)
 
-        elif project == 'doorway':
-            parts = []
-            clippy_output = run_clippy_check(file_path)
-            if clippy_output:
-                parts.append(clippy_output)
-            fmt_output = run_rustfmt_check(file_path)
-            if fmt_output:
-                parts.append(fmt_output)
-            lint_output = '\n'.join(parts)
-
         # Check coverage
-        coverage_output = get_coverage_signal(file_path, project)
+        coverage_output = get_coverage_signal(file_path, project) if project else ''
 
         # Combine outputs
         context_parts = []
+        if format_output:
+            context_parts.append(format_output)
         if lint_output:
             context_parts.append(f"[Lint] {basename}:\n{lint_output}")
         if typeguard_output:

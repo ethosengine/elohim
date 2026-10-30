@@ -7,7 +7,10 @@
 // `<the git common dir's parent>/.husky/_` — the main checkout's — from wherever `pnpm install`
 // ran. Missing/incomplete shims can be copied from this checkout after install. Before install
 // (including devfile postStart), use the main checkout's tracked .husky entrypoints directly.
-// Validate the pre-push chain before declaring success: a directory alone proves nothing.
+// Validate every governed hook chain before declaring success: a directory alone proves nothing.
+// The governed entrypoints are pre-push (the push gate), pre-commit (the .epr-meta compose gate and
+// the commit-time formatting ratchet) and pre-merge-commit (a clean automatic merge, delegated to
+// pre-commit). A shim directory missing any of them would silently skip that hook.
 //
 // So a push from a worktree runs the MAIN checkout's hook script (`.husky/_/h` runs
 // `<main>/.husky/pre-push`), with the worktree as its work tree: the hook's logic is whatever the
@@ -35,8 +38,13 @@ function usable(path, mode = constants.R_OK) {
   }
 }
 
+// Hooks whose tracked entrypoint in .husky/ must exist and be executable, and whose husky shim
+// must exist in .husky/_ before that directory may serve as core.hooksPath.
+const GOVERNED_HOOKS = ['pre-push', 'pre-commit', 'pre-merge-commit'];
+
 function shimsReady(dir) {
-  return usable(join(dir, 'pre-push'), constants.R_OK | constants.X_OK) && usable(join(dir, 'h'));
+  return GOVERNED_HOOKS.every((hook) => usable(join(dir, hook), constants.R_OK | constants.X_OK)) &&
+    usable(join(dir, 'h'));
 }
 
 function main(cwd) {
@@ -54,9 +62,10 @@ function main(cwd) {
   const hooks = join(dirname(common), '.husky');
   let target = join(hooks, '_');
   const local = join(top, '.husky', '_');
-  if (!usable(join(hooks, 'pre-push'), constants.R_OK | constants.X_OK) ||
-      !usable(join(hooks, 'pre-push.bash'))) {
-    throw new Error(`missing or non-executable pre-push entrypoint in ${hooks}; restore .husky/pre-push and .husky/pre-push.bash, then run pnpm run prepare`);
+  const broken = GOVERNED_HOOKS.filter((hook) => !usable(join(hooks, hook), constants.R_OK | constants.X_OK));
+  if (!usable(join(hooks, 'pre-push.bash'))) broken.push('pre-push.bash');
+  if (broken.length) {
+    throw new Error(`missing or non-executable ${broken.join(', ')} entrypoint in ${hooks}; restore the tracked .husky/${broken.length > 1 ? '{' + broken.join(',') + '}' : broken[0]}, then run pnpm run prepare`);
   }
   if (!shimsReady(target) && shimsReady(local) && local !== target) {
     cpSync(local, target, { recursive: true });
