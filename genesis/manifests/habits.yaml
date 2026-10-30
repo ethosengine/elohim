@@ -2283,10 +2283,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-10-29 (RED preserved; the readers precede the pin): brit main fast-forwarded 76ba95d8a0..7e4a83115e at ~22:50Z after the re-run turned `Tests pass` green (the restore-test red was a flake; i386 DNS environmental; cargo-deny-advisories still red, so no snapshot release and both devices build from source). The pin commit ef58a3e59 waits on feat/brit-daily-driver for the landing line; the reader fixes (fix/brit-readers-2026-10-29) land ahead of it so the first pin-moving push selected by the oracle reads notes the new way. Second pin-moving push: S2-1a, reconciled against the new main by workflow wf_18b0660e-ab0.
-    evidence-fingerprint: sha256:fd0642307683168c
-    evidence-bytes: 4746
-    evidence-entries: 7
+      DELTA 2026-10-30 (RED preserved; the first of the two pin-moving pushes landed): dev 370721d7f carries the gitlink move 76ba95d8a0 -> 7e4a83115e; the pin commit alone selected `brit` only and the attested read printed `attested: ethosengine/brit@7e4a83115ece Tests pass success` both on the line and in the pre-push (0 s). The second move (1750f673a, S2-1a reshaped to fixtures) waits on the operator's brit main push; no edge pod rolled for the pin (the orchestrator checkout never initializes submodules, so elohim-brit is pruned before propagateStaleness).
+    evidence-fingerprint: sha256:dc71385857235914
+    evidence-bytes: 5306
+    evidence-entries: 8
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
@@ -2379,10 +2379,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-29 (RED preserved; reuse is dark on shem): four 10-28/29 pushes from shem's prepared worktree printed `rakia unavailable — path-only selection` and `elohim-storage not reused: rakia oracle unavailable; reuse needs it` even with a green attestation for the identical closure (`evidence: hit green … commit a70838fad`), so each paid the full storage gate (1782 s). No `rakia` CLI is on PATH, and the pinned elohim/rakia (9db775b) builds only `compute-executor`; `rakia affected` exists in brit's CLI baseline but not as a binary here. Backlog gate-reuse-dark-without-rakia-cli.
-    evidence-fingerprint: sha256:07858776ff16824a
-    evidence-bytes: 9313
-    evidence-entries: 11
+      DELTA 2026-10-30 (RED preserved; the landing push paid once where it could): push 370721d7f (56 commits) reused the recorded verdicts of elohim-storage, doorway, steward-node, cargo-bridge and jenkins-bridge at push time (paths-scoped closures recorded on the line the day before; `GATE_EVIDENCE=reuse`), and re-ran the tree-scoped gates (eprfs 716 s, orchestrator 120 s, elohim-app 127 s, genesis-a2o 88 s …): ALL CLEAR in 1298 s. Two refusals before it: NO-SERVING-RECEIPT (cured by the epr-app-deliverability lane, 7/7, 135/135) and one ark test red from an ETXTBSY race in a test stub helper (the stub exec raced a sibling test's fork; test-only guard landed). Still red: the tree-scoped gates re-pay on every push because any hook-written ledger under .claude/data dirties the tree at record time.
+    evidence-fingerprint: sha256:ff035206bb04ceb1
+    evidence-bytes: 10118
+    evidence-entries: 12
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
