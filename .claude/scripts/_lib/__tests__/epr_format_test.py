@@ -524,6 +524,117 @@ if HAVE_NODE and PRETTIER:
           and "formatter contract changed" in r.stderr, r.stderr)
     restore(d, before, "elem/.prettierrc.js")
 
+    for deleted in (False, True):
+        p = fixture(f"explicit-config-rescan-{deleted}")
+        package = json.loads((p / "elem/core/package.json").read_text())
+        package["scripts"]["format:check"] = (
+            'prettier --config ../style.cjs --check "src/**/*.ts"')
+        write(p, "elem/core/package.json", json.dumps(package) + "\n")
+        write(p, "elem/style.cjs", "module.exports = { singleQuote: true };\n")
+        git(p, "add", "elem/core/package.json", "elem/style.cjs")
+        git(p, "commit", "-q", "--no-verify", "-m", "custom parent config baseline")
+        before = head(p)
+        if deleted:
+            git(p, "rm", "-q", "elem/style.cjs")
+        else:
+            write(p, "elem/style.cjs", "module.exports = { singleQuote: false };\n")
+            git(p, "add", "elem/style.cjs")
+        r = commit(p, "change only the named parent config")
+        check(f"explicit parent config with a custom name, deleted={deleted}: unchanged "
+              "governed files are rescanned and refuse",
+              r.returncode != 0 and head(p) == before and "elem/core/src/ok.ts" in r.stderr
+              and (deleted or "formatter contract changed" in r.stderr), r.stderr)
+
+    for ignore in (".prettierignore", "format-excludes"):
+        for deleted in (False, True):
+            p = fixture(f"explicit-ignore-rescan-{ignore}-{deleted}")
+            package = json.loads((p / "elem/core/package.json").read_text())
+            package["scripts"]["format:check"] = (
+                f'prettier --config ../.prettierrc.js --ignore-path ../{ignore} '
+                '--check "src/**/*.ts"')
+            write(p, "elem/core/package.json", json.dumps(package) + "\n")
+            write(p, f"elem/{ignore}", "**/ok.ts\n")
+            git(p, "add", "elem/core/package.json", f"elem/{ignore}")
+            git(p, "commit", "-q", "--no-verify", "-m", "parent ignore baseline")
+            if deleted:
+                git(p, "rm", "-q", f"elem/{ignore}")
+            else:
+                write(p, f"elem/{ignore}", "")
+                git(p, "add", f"elem/{ignore}")
+            with epr_format.StagedFormatter(p, epr_format.Git(p, env=BASE_ENV)) as sf:
+                changes = epr_format.staged_changes(sf.git, sf.head)
+                sf.prefetch_closure(changes)
+                rescans = sf.contract_rescans(changes)
+            check(f"explicit parent ignore {ignore}, deleted={deleted}: unchanged governed "
+                  "files are selected for rescan", "elem/core/src/ok.ts" in
+                  {c.path for c in rescans}, repr(rescans))
+
+    for adding in (False, True):
+        p = fixture(f"explicit-reference-{adding}")
+        package = json.loads((p / "elem/core/package.json").read_text())
+        scripts = ['prettier --check "src/**/*.ts"',
+                   'prettier --config ../style.cjs --check "src/**/*.ts"']
+        package["scripts"]["format:check"] = scripts[not adding]
+        write(p, "elem/core/package.json", json.dumps(package) + "\n")
+        write(p, "elem/style.cjs", "module.exports = { singleQuote: true };\n")
+        git(p, "add", "elem/core/package.json", "elem/style.cjs")
+        git(p, "commit", "-q", "--no-verify", "-m", "reference baseline")
+        package["scripts"]["format:check"] = scripts[adding]
+        write(p, "elem/core/package.json", json.dumps(package) + "\n")
+        write(p, "elem/style.cjs", "module.exports = { singleQuote: false };\n")
+        git(p, "add", "elem/core/package.json", "elem/style.cjs")
+        with epr_format.StagedFormatter(p, epr_format.Git(p, env=BASE_ENV)) as sf:
+            # Isolate dependency discovery from package.json's own syntactic rescan root.
+            changes = [c for c in epr_format.staged_changes(sf.git, sf.head)
+                       if c.path == "elem/style.cjs"]
+            sf.prefetch_closure(changes)
+            rescans = sf.contract_rescans(changes)
+        check(f"explicit reference added={adding}: dependencies are read from index AND base",
+              "elem/core/src/ok.ts" in {c.path for c in rescans}, repr(rescans))
+
+    for nearby in ('{broken json\n', '{"plugins": ["prettier-plugin-not-installed"]}\n'):
+        p = fixture("explicit-config-nearby-" + ("syntax" if "broken" in nearby else "plugin"))
+        write(p, "elem/core/src/.prettierrc", nearby)
+        git(p, "add", "elem/core/src/.prettierrc")
+        git(p, "commit", "-q", "--no-verify", "-m", "broken nearby config baseline")
+        write(p, "elem/core/src/new.ts", TS_CLEAN)
+        git(p, "add", "elem/core/src/new.ts")
+        r = commit(p, "explicit config bypasses nearby config")
+        check(f"an explicit --config ignores a broken nearby config ({nearby.strip()})",
+              r.returncode == 0, r.stderr)
+
+    p = fixture("explicit-config-plugin-parser")
+    package = json.loads((p / "elem/core/package.json").read_text())
+    package["scripts"]["format:check"] = (
+        'prettier --config ../.prettierrc.js --check "src/**/*.custom"')
+    write(p, "elem/core/package.json", json.dumps(package) + "\n")
+    write(p, "elem/.prettierrc.js", """module.exports = {
+  plugins: [{
+    languages: [{ name: 'custom', parsers: ['custom'], extensions: ['.custom'] }],
+    parsers: { custom: {
+      parse: (text) => text, astFormat: 'custom', locStart: () => 0,
+      locEnd: (text) => text.length,
+    } },
+    printers: { custom: { print: (path) => path.getValue().trim() + '\\n' } },
+  }],
+};
+""")
+    git(p, "add", "elem/core/package.json", "elem/.prettierrc.js")
+    git(p, "commit", "-q", "--no-verify", "-m", "explicit parser plugin baseline")
+    write(p, "elem/core/src/new.custom", "hello   \n")
+    git(p, "add", "elem/core/src/new.custom")
+    before = head(p)
+    r = commit(p)
+    check("parser inference uses plugins from the explicit config: an unformatted custom "
+          "extension refuses instead of being outside",
+          r.returncode != 0 and head(p) == before
+          and "elem/core/src/new.custom is a new file" in r.stderr, r.stderr)
+    write(p, "elem/core/src/new.custom", "hello\n")
+    git(p, "add", "elem/core/src/new.custom")
+    r = commit(p)
+    check("the custom extension passes once formatted with the explicit config's plugin",
+          r.returncode == 0, r.stderr)
+
     # merges: clean automatic merge runs pre-merge-commit; conflicted merge runs pre-commit
     git(d, "switch", "-q", "-c", "side")
     write(d, "esm/src/side.ts", TS_BAD)

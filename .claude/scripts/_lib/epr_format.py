@@ -1006,11 +1006,14 @@ class StagedFormatter:
     # contract-change rescan: an unchanged file whose committed contract moved is re-judged
     def contract_rescans(self, changes: list[Change]) -> list[Change]:
         changed = {c.path for c in changes}
+        touched = changed | set(self._deleted_paths())
+        if not touched:
+            return []
+        self._prime_listings()
         roots: set[tuple[str, str]] = set()
-        for c in changes + [Change(p, "D", None, "", "", None, "", False)
-                            for p in self._deleted_paths()]:
-            name = posixpath.basename(c.path)
-            d = posixpath.dirname(c.path)
+        for path in touched:
+            name = posixpath.basename(path)
+            d = posixpath.dirname(path)
             if name in RUST_CONFIG_NAMES or name == "Cargo.toml":
                 roots.add((d, "rust"))
             elif name in PRETTIER_CONFIG_NAMES or name in (".editorconfig", "package.json"):
@@ -1019,24 +1022,46 @@ class StagedFormatter:
                 pj = _json(self.index, join(d, "package.json")) or _json(self.base, join(d, "package.json"))
                 if isinstance(pj, dict) and (pj.get("scripts") or {}).get("format:check"):
                     roots.add((d, "prettier"))
+        # Explicit flags may name any file, including one outside the package's ancestry.
+        # Both sides matter when this commit adds, removes or redirects a reference.
+        for tree in (self.index, self.base):
+            targets = set()
+            for path in sorted(tree.known or ()):
+                if posixpath.basename(path) != "package.json" or "node_modules" in path.split("/"):
+                    continue
+                d = posixpath.dirname(path)
+                try:
+                    owner = _package_check(tree, d)
+                    if owner is None:
+                        continue
+                    check = owner[2]
+                    refs = {_package_path(tree, d, p, "--ignore-path")
+                            for p in check.ignore_paths or ()}
+                    if check.config:
+                        refs.add(_package_path(tree, d, check.config, "--config"))
+                except ContractError:
+                    continue  # an unmodelled contract is refused if one of its files is selected
+                targets.update(refs)
+                if refs & touched:
+                    roots.add((d, "prettier"))
+            tree.prefetch(targets)  # custom filenames also get one batch, never per-file reads
         if not roots:
             return []
         extra: dict[str, Change] = {}
-        for d, kind in sorted(roots):
-            listing = self.git.out("ls-files", "-s", "-z", "--", d or ".")
-            for rec in listing.split(b"\0"):
-                if not rec:
-                    continue
-                meta, path = rec.split(b"\t", 1)
-                mode, blob, _stage = meta.decode().split(" ")
-                rel = path.decode("utf-8", "surrogateescape")
-                if rel in changed or rel in extra or mode not in REGULAR_MODES:
-                    continue
-                if (kind == "rust") != rel.endswith(".rs"):
-                    continue
-                extra[rel] = Change(rel, "M", rel, mode, mode, blob, blob, False, True)
-        if extra:
-            self._prime_listings(extra)
+        listing = self.git.out("ls-files", "-s", "-z", "--",
+                               *sorted({d or "." for d, _kind in roots}))
+        for rec in listing.split(b"\0"):
+            if not rec:
+                continue
+            meta, path = rec.split(b"\t", 1)
+            mode, blob, _stage = meta.decode().split(" ")
+            rel = path.decode("utf-8", "surrogateescape")
+            if rel in changed or rel in extra or mode not in REGULAR_MODES:
+                continue
+            kind = "rust" if rel.endswith(".rs") else "prettier"
+            if not any((d, kind) in roots for d in ancestors(rel)):
+                continue
+            extra[rel] = Change(rel, "M", rel, mode, mode, blob, blob, False, True)
         out = []
         for rel, ch in extra.items():
             try:
@@ -1050,21 +1075,20 @@ class StagedFormatter:
                 out.append(ch)
         return out
 
-    def _prime_listings(self, extra: dict[str, Change]) -> None:
-        """Before a rescan computes two contracts for each of possibly thousands of files, list
-        each side once and fetch every closure file that exists in ONE `cat-file` per side —
-        otherwise each new directory costs its own git launch per side (a root package.json
-        change measured 3,436 launches and 155 s before this)."""
+    def _prime_listings(self) -> None:
+        """List each side once and batch its existing closure files, including all package
+        contracts for explicit reference discovery. Later rescans need no per-directory reads
+        (a root package.json change measured 3,436 launches and 155 s without batching)."""
         if self.index.known is None:
             raw = self.git.out("ls-files", "-z", "--full-name")
             self.index.know({p.decode("utf-8", "surrogateescape") for p in raw.split(b"\0") if p})
         if self.head and self.base.known is None:
             raw = self.git.out("ls-tree", "-r", "-z", "--name-only", "--full-tree", self.head)
             self.base.know({p.decode("utf-8", "surrogateescape") for p in raw.split(b"\0") if p})
-        dirs = dict.fromkeys(a for r in extra for a in ancestors(r))
-        want = [join(d, n) for d in dirs for n in self.CLOSURE_NAMES]
-        self.index.prefetch(want)
-        self.base.prefetch(want)
+        for tree in (self.index, self.base):
+            tree.prefetch(p for p in sorted(tree.known or ())
+                          if posixpath.basename(p) in self.CLOSURE_NAMES
+                          or p.endswith("/.epr-meta/manifest.md") or p == ".epr-meta/manifest.md")
 
     def _deleted_paths(self) -> list[str]:
         if not self.head:

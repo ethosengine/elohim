@@ -35,15 +35,23 @@ async function checkOne(item) {
   if (lib.error) return { id: item.id, state: 'missing', detail: lib.error };
   const { prettier, version } = lib;
   try {
-    const info = await prettier.getFileInfo(item.file, { ignorePath: item.ignorePaths });
+    // An explicit --config also governs parser inference: discovery here could otherwise load
+    // a nearby config (and its plugins) that the package's CLI command would never read.
+    const explicitConfig = item.config
+      ? ((await prettier.resolveConfig(item.file, { config: item.config, editorconfig: true })) ?? {})
+      : undefined;
+    const info = await prettier.getFileInfo(item.file, {
+      ignorePath: item.ignorePaths,
+      ...(item.config ? { resolveConfig: false, plugins: explicitConfig.plugins } : {}),
+    });
     if (info.ignored) return { id: item.id, state: 'ignored', version };
     if (!info.inferredParser) {
       return { id: item.id, state: 'outside', version, detail: 'Prettier infers no parser' };
     }
     // `config` is the package's `--config <file>` (the CLI then skips discovery but still merges
     // .editorconfig); without it Prettier discovers the nearest config, as the CLI does.
-    const opts = item.config ? { editorconfig: true, config: item.config } : { editorconfig: true };
-    const config = (await prettier.resolveConfig(item.file, opts)) ?? {};
+    const config =
+      explicitConfig ?? (await prettier.resolveConfig(item.file, { editorconfig: true })) ?? {};
     const configFile = item.config ?? (await prettier.resolveConfigFile(item.file));
     const source = await readFile(item.file, 'utf8');
     const ok = await prettier.check(source, { ...config, filepath: item.file });
