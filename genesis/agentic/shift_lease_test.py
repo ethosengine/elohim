@@ -24,6 +24,21 @@ import shift_state as state
 
 ROOT = Path(__file__).resolve().parents[2]
 BERTH = ROOT / 'genesis/agentic/bin/berth'
+
+# No device in these fixtures: berth binds a mooring to the host device's session envelope when
+# a device key exists, and the enclosing agent session's envelope would refuse every fixture
+# session (envelope-owner-mismatch). Point the key at a path that does not exist.
+_NO_DEVICE = tempfile.TemporaryDirectory(prefix='shift-lease-no-device-')
+_device_env = patch.dict(os.environ, {'ELOHIM_DEVICE_KEY_FILE': os.path.join(_NO_DEVICE.name, 'ed25519.seed')})
+
+
+def setUpModule():
+    _device_env.start()
+
+
+def tearDownModule():
+    _device_env.stop()
+    _NO_DEVICE.cleanup()
 Berth = runpy.run_path(str(BERTH), run_name='berth_fixture')['Berth']
 
 
@@ -414,6 +429,11 @@ class ReadinessCapacity(unittest.TestCase):
         agentic = self.root / 'genesis/agentic'
         (agentic / 'bin').mkdir(parents=True)
         shutil.copy2(BERTH, agentic / 'bin/berth')
+        # berth imports _lib.session at startup (resolved from the repo root it runs in).
+        scripts_lib = self.root / '.claude/scripts/_lib'
+        scripts_lib.mkdir(parents=True)
+        for name in ('__init__.py', 'session.py'):
+            shutil.copy2(ROOT / '.claude/scripts/_lib' / name, scripts_lib / name)
         policy = agentic / 'pool-policy.json'
         state.atomic(policy, {'berth': {'resources': {'cargo': 2, 'mesh': 1, 'disk-heavy': 1}}})
         self.store = self.root / 'berth'
