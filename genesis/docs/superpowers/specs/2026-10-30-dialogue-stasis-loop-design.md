@@ -43,6 +43,33 @@ and lets independently authorized work continue. It never approves on the human'
 behalf. Incident opening and harvesting follow the timing rules in Terms below,
 which also define Approach and Breach.
 
+### Purpose (steward, 2026-10-31)
+
+The steward's statement of what this family of artifacts is for: the skills, the
+harness, the epr algorithms and classifiers, and the agents. They "are designed to
+help steer the care and consideration of other working agents, integration plans,
+closing things 'left open' that should be reviewed and solved, and helping to sense
+and respond to the algedonic signals of development, which serve to align the
+session's behavior to human alignment concerns of finite time, resources, treating
+such attention as sacred, and elevating the quality and deeper value of cooperative
+sessions."
+
+Every slice is judged against that, not only against whether it is permitted:
+
+- **Attention is the scarce resource.** A resolution that spends the steward's
+  attention when a cheaper, authorized step exists is a worse resolution, even when
+  it is allowed. The ladder exists to spend the least capability and the least human
+  attention that actually resolves the stall.
+- **Cooperation is part of the work.** A session's choices weigh the other agents
+  working beside it: their leases, their builds, their integration trains. No
+  session wins by stopping another's work.
+- **Nothing is left open silently.** An unanswered question, an unreviewed finding,
+  a red that reached the session, an incident without a resolution: each is closed
+  with evidence or carried forward by name.
+- **Algedonic signals are listened to, not raised past.** Pain (a timeout, a stall,
+  a refused gate) is a signal to find and fix the cost, never to widen a limit to
+  make it go quiet.
+
 The retrospective cross-references used by this design are:
 
 | Row | Concern |
