@@ -438,3 +438,5 @@ just mesh stop
 
 A normal stop ends the owned processes while preserving household identities,
 databases, archive posture, and staged fixture for a later complete-state resume.
+
+<!-- closure-hit measurement 2026-10-31T19:51Z: a build-class edge wave whose image closures are unchanged; the oracle must answer hit, the build stages skip, nothing rolls -->
