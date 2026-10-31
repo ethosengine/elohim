@@ -134,7 +134,6 @@ just dev start                # isolated conductor + storage + doorway
 just dev shift start <contract.json> --runtime codex  # bounded Claude/Codex task; resume|status|stop <id>, recover; genesis/agentic/SHIFT.md
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
-just dev view elohim/elohim-storage/.epr-meta/idle-is-free.view.json  # private declared-view reader on loopback + a single-use launch link (builds the `local-view-only` node; app/scripts/local-view-launcher.sh); LOCAL_VIEW_RENEW=1 re-issues the link
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
 CONDUCTOR_ADMIN_PORT=39097 just dev conductor alpha  # join-alpha enrollment/resume pins an explicit admin port (1..65535); ordinary resumes retain the recorded .hc_ports port so existing storage/doorway pairing survives; export sourced private env assignments before launching
 STORAGE_HAPP_PATH=/absolute/path/to/app.happ just dev conductor alpha  # storage --happ-path in ordinary/release-channel launches; readable file required, unset keeps the storage default; HAPP_BUNDLE_PATH selects doorway provisioning only

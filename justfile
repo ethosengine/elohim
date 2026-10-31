@@ -357,9 +357,6 @@ dev action="status" profile="isolated" seed="false" build="false" *extra:
         esac
         exec "{{ app_dir }}/scripts/hc-start.sh" --conductor
         ;;
-      # Private declared-view reader: `just dev view <repo-relative declaration>`; nothing
-      # starts unless asked, and the reader binds loopback only (app/scripts/local-view-launcher.sh).
-      view) exec "{{ root }}/app/scripts/local-view-launcher.sh" "{{ profile }}" ;;
       app) cd "{{ app_dir }}"; exec pnpm start ;;
       package)
         package_app="{{ profile }}"
@@ -378,7 +375,7 @@ dev action="status" profile="isolated" seed="false" build="false" *extra:
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|package|view|shift|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
@@ -645,16 +642,6 @@ _gate-elohim-compute:
 
 _gate-elohim-epr:
     cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
-
-# Private projection serving; the native capture evaluator remains in eprfs.
-_gate-elohim-hub:
-    cargo fmt --manifest-path elohim/Cargo.toml -p elohim-hub --check
-    cargo clippy --manifest-path elohim/Cargo.toml -p elohim-hub --all-targets -- -D warnings
-    cargo test --manifest-path elohim/Cargo.toml -p elohim-hub
-    cargo build --manifest-path elohim/Cargo.toml -p elohim-hub --example local-view
-    node app/scripts/local-view-contract.mjs "$CARGO_TARGET_DIR/debug/examples/local-view"
-    node --test app/scripts/local-view-launcher.test.mjs
-    node --test elohim/sdk/schemas/tests/work-composition.test.mjs
 
 _gate-elohim-live-session:
     cd elohim && cargo fmt --check -p elohim-live-session && cargo clippy -p elohim-live-session --all-targets -- -D warnings && cargo test -p elohim-live-session --all-targets
