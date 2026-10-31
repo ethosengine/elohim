@@ -35,24 +35,26 @@ no delivery row. **To close:** give the delivery vocabulary a native home, so on
 fold and the delivery batch. Alternatively, derive the delivery row from the native consultation by
 its seq. A replay test must show one park per PermissionRequest across both streams.
 
-## D2: rung 0 at PreToolUse, a precondition for slice 11
+## D2: rung 0 at PreToolUse — adapter closed; native frontier remains
 
-Native rung 0 (`live.rs:249-298`) reshapes only when an open incident already exists with a matching
-effect class. PreToolUse usually runs before the PermissionRequest that opens one, so native rung 0
-rarely fires.
+**Adapter closed (2026-10-31, review M3, C1 "fix as proposed").** The previous path called only
+`classify` and built a learned-form deny itself, bypassing native's incident and once-per-class
+guards; a probe produced two denies with no incidents. `stasis_control.py` now routes PreToolUse
+through `epr session stasis decide --live --session … --event -`, using the same process-group
+budget (2 seconds) as PermissionRequest. It delivers native's deny message unchanged. Any other
+result, nonzero exit (including 3), or timeout emits nothing. The adapter-direct learned-form
+reshape is removed; ladder-off output remains byte-identical and shadow emits no rung-0 output.
 
-The ladder found the adapter's own PreToolUse path (`stasis_control.py:393-424`) emits the
-learned-form deny directly:
-- it never calls native `decide`;
-- it writes no consultation record;
-- it has **no once-per-effect-class-per-incident check**, so it can repeat a reshape.
+**Evidence:** `python3 -m unittest discover -s genesis/agentic -p 'stasis_*test.py'` passed 147
+tests, including no-allow, the off baseline, native-deny delivery followed by native `none`, two
+silent calls with an active learned form and native `none`, and process-group timeout cleanup.
+`python3 -m unittest discover -s .claude/hooks/tests -p 'test_dialogue_stasis_sense.py'` passed 51
+tests. The sense-hook replant changed no files; package projection verification passed 2,350 checks.
 
-That contradicts the spec's "one same-effect reshape per shape class". Today it carries no risk:
-the policy holds no learned forms, so the path cannot fire.
-
-**Precondition:** this must be closed before slice 11 (L1) promotes the first learned legible form.
-Route PreToolUse shape-class calls through native `decide`, which opens or attaches a procedural
-rung-0 incident keyed by effect class and enforces the once-per-class limit. Alternatively, keep the
-adapter path disabled until it does. **To close:** a fixture with one active learned form shows
-exactly one reshape per effect class per incident, across repeated PreToolUse calls and a restart,
-with a Refer on the second attempt.
+**Remaining frontier (safe):** native rung 0 still reshapes only when an open incident already
+exists with a matching effect class. PreToolUse usually precedes the PermissionRequest that opens
+one. Without an incident native returns `none`, and the adapter stays silent even with an active
+learned form. Opening or attaching a procedural rung-0 incident keyed by effect class remains
+native work for slice 11 (L1). Its completion fixture must prove one reshape per effect class per
+incident across repeated PreToolUse calls and restart, with a Refer on the second attempt. This
+change closes the adapter bypass, not that native frontier.

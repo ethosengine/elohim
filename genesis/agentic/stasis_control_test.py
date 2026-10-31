@@ -425,12 +425,15 @@ class ControlTest(unittest.TestCase):
 
     def test_decide_deadline_kills_descendants(self):
         self.env['NATIVE_HANG'] = 'decide'
-        self.assertEqual(self.request().stdout, '')
-        self.assertLess(self.elapsed, 2.2)
-        time.sleep(.5)
-        self.assertFalse((self.repo / 'escaped').exists())
+        for event in ['PermissionRequest', 'PreToolUse']:
+            with self.subTest(event=event):
+                self.assertEqual(self.invoke(event, tool_name='Bash',
+                                             tool_input={'command': 'git status'}).stdout, '')
+                self.assertLess(self.elapsed, 2.2)
+                time.sleep(.5)
+                self.assertFalse((self.repo / 'escaped').exists())
 
-    def test_rung_zero_only_audited_shape_and_never_ask_or_risk(self):
+    def learned_form_fixture(self):
         policy = json.loads(self.policy.read_text())
         effect = {'tool': 'Bash', 'command': 'git', 'subcommand': 'status', 'target': 'worktree'}
         policy['learnedForms'] = [{'name': 'git-C', 'tool': 'Bash', 'shape': 'cd <path> && git status',
@@ -438,17 +441,65 @@ class ControlTest(unittest.TestCase):
                                   'status': 'active', 'auditVerdict': 'approved',
                                   'auditRef': 'audit-1', 'rulingRef': 'ruling-1'}]
         self.policy.write_text(json.dumps(policy))
-        for concern, rule in [('risk', 'ask'), ('uncertain', 'unparseable'), ('shape', 'ask'), ('shape', 'none')]:
-            self.env['CLASSIFICATION'] = json.dumps({'classification': {
-                'concern': concern, 'ruleMatch': rule, 'effect': effect}})
-            out = self.invoke('PreToolUse', tool_name='Bash', tool_input={'command': 'cd app && git status'}).stdout
-            self.assertEqual(bool(out), concern == 'shape' and rule == 'none')
-            if out:
-                self.assertEqual(json.loads(out)['hookSpecificOutput']['permissionDecision'], 'deny')
-                self.assertIn('git-C', out)
-        policy['learnedForms'][0]['status'] = 'proposed'
-        self.policy.write_text(json.dumps(policy))
-        self.assertEqual(self.invoke('PreToolUse', tool_name='Bash', tool_input={'command': 'cd app && git status'}).stdout, '')
+        # M3: classify alone used to let the adapter build its own deny.
+        self.env['CLASSIFICATION'] = json.dumps({'classification': {
+            'concern': 'shape', 'ruleMatch': 'none', 'effect': effect}})
+
+    def shape_call(self):
+        return self.invoke('PreToolUse', tool_name='Bash',
+                           tool_input={'command': 'cd app && git status'})
+
+    def test_rung_zero_delivers_native_reshape_once(self):
+        self.learned_form_fixture()
+        message = 'Use native learned form git-C: git -C <path> status.\nRecheck permissions.'
+        self.env['DECISION'] = json.dumps({'effect': 'deny', 'message': message,
+                                         'shadow': False, 'policyCid': CID, 'incidentId': 's1:9'})
+        self.assertEqual(json.loads(self.shape_call().stdout), {'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
+            'permissionDecisionReason': message}})
+        # A fresh hook process must respect native's consumed allowance / Refer.
+        self.env['DECISION'] = json.dumps({'effect': 'none', 'refer': True, 'shadow': False})
+        self.assertEqual(self.shape_call().stdout, '')
+        calls = [json.loads(line) for line in (self.repo / 'calls').read_text().splitlines()]
+        self.assertEqual(calls, [['session', 'stasis', 'decide', '--live', '--session', 's1',
+                                 '--event', '-', '--journal-root', str(self.root)]] * 2)
+
+    def test_rung_zero_native_none_never_builds_learned_form_deny(self):
+        self.learned_form_fixture()
+        self.env['DECISION'] = json.dumps({'effect': 'none', 'shadow': False})
+        for _ in range(2):
+            self.assertEqual(self.shape_call().stdout, '')
+        calls = [json.loads(line) for line in (self.repo / 'calls').read_text().splitlines()]
+        self.assertEqual([call[2] for call in calls], ['decide', 'decide'])
+        self.assertFalse((self.directory / 'delivery.jsonl').exists())
+
+    def test_rung_zero_nonzero_inert_and_non_deny_never_allow(self):
+        self.learned_form_fixture()
+        for code in ['3', '1', '17']:
+            with self.subTest(code=code):
+                self.env['DECIDE_EXIT'] = code
+                self.assertEqual(self.shape_call().stdout, '')
+        self.env.pop('DECIDE_EXIT')
+        for answer in [{'effect': 'allow', 'message': 'proceed', 'shadow': False},
+                       {'effect': 'context', 'message': 'try'}, {'effect': 'none'}, {},
+                       {'effect': 'deny', 'message': 'reshape', 'shadow': True},
+                       {'effect': 'deny', 'message': 'reshape'},
+                       {'effect': 'deny', 'message': '', 'shadow': False},
+                       {'effect': 'deny', 'message': '  ', 'shadow': False},
+                       {'effect': 'deny', 'message': None, 'shadow': False},
+                       {'effect': 'deny', 'message': 'reshape', 'shadow': False,
+                        'inert': 'native refused'}]:
+            with self.subTest(answer=answer):
+                self.env['DECISION'] = json.dumps(answer)
+                self.assertEqual(self.shape_call().stdout, '')
+
+    def test_rung_zero_off_and_shadow_are_silent(self):
+        self.learned_form_fixture()
+        for ladder in ['off', 'shadow']:
+            with self.subTest(ladder=ladder):
+                self.env['STASIS_LADDER'] = ladder
+                self.assertEqual(self.shape_call().stdout, '')
+        self.assertFalse((self.repo / 'calls').exists())
 
     def test_guidance_is_per_reader_and_mismatch_never_consumes_it(self):
         self.guide()

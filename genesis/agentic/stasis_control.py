@@ -369,7 +369,7 @@ def live_hook(repo, root, payload, normalized):
     directory, reader = root / session, payload.get('agent_id') or 'main'
     started = time.monotonic()
     remaining = lambda: max(.001, 1.9 - (time.monotonic() - started))
-    if event == 'PermissionRequest':
+    if event in {'PermissionRequest', 'PreToolUse'}:
         # Native decide must still see missing/unpinned policies and record its inert reason.
         decision = native(repo, ['decide', '--live', '--session', session, '--event', '-',
                                  '--journal-root', str(root)], normalized, remaining())
@@ -377,6 +377,11 @@ def live_hook(repo, root, payload, normalized):
                 decision.get('shadow') is not False or decision.get('inert') or
                 not isinstance(decision.get('message'), str) or not decision['message'].strip()):
             return None
+        if event == 'PreToolUse':
+            # Native owns classification, incident correlation and the reshape allowance.
+            return json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse',
+                               'permissionDecision': 'deny',
+                               'permissionDecisionReason': decision['message']}})
         status = snapshot(repo, root, session, remaining())
         iid = normalized.get('correlation', {}).get('incidentId')
         # Native decide owns presence for this event. A later status can change
@@ -391,38 +396,6 @@ def live_hook(repo, root, payload, normalized):
                         policyCid=status['policyCid'])
         return json.dumps({'hookSpecificOutput': {'hookEventName': 'PermissionRequest',
                            'decision': {'behavior': 'deny', 'message': message}}})
-    if event == 'PreToolUse':
-        # The normal hot path has no learned forms and needs no native process.
-        try:
-            if not json.loads((Path(repo) / POLICY).read_text()).get('learnedForms'):
-                return None
-        except (OSError, ValueError, AttributeError):
-            return None
-        status = snapshot(repo, root, session, remaining())
-        forms = (status or {}).get('_policy', {}).get('learnedForms', [])
-        if not pinned(status) or not forms:
-            return None
-        # The native classifier owns risk/ask precedence over style. Raw input
-        # goes through stdin only and is never persisted by this transport.
-        inputs = payload.get('tool_input', {})
-        classified = native(repo, ['classify', '--corpus', '/dev/stdin'],
-                            {'tool': payload.get('tool_name'),
-                             'command': inputs.get('command')}, remaining())
-        classification = (classified or {}).get('classification', {})
-        if classification.get('concern') != 'shape' or classification.get('ruleMatch') != 'none':
-            return None
-        form = next((f for f in forms if f.get('tool') == payload.get('tool_name')
-                     and f.get('shape') == normalized.get('shape')
-                     and f.get('effectClass') == classification.get('effect')
-                     and f.get('status') == 'active' and f.get('auditVerdict') == 'approved'
-                     and f.get('auditRef') and f.get('rulingRef')
-                     and isinstance(f.get('name'), str) and isinstance(f.get('legibleForm'), str)), None)
-        if not form:
-            return None
-        return json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse',
-                           'permissionDecision': 'deny', 'permissionDecisionReason':
-                           f"Use learned legible form {form['name']}: {form['legibleForm']}. "
-                           'Submit it through the unchanged palette and permission checks.'}})
     if event not in {'PostToolUse', 'UserPromptSubmit', 'Stop'}:
         return None
     if event == 'Stop' and normalized.get('outcome') in {'accomplished', 'exception', 'question'}:
