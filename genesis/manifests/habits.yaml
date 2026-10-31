@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice 7 planting completed, still unwired): stasis-keeper and stasis-keeper-brief replanted outside the Codex sandbox into .claude, .codex and .agents; verify 2350 passed; settings.json unchanged.
-    evidence-fingerprint: sha256:64d23bb3fc1d15d2
-    evidence-bytes: 4265
-    evidence-entries: 9
+      DELTA 2026-10-31 (slice 8, still unwired): coordinator in shadow implements device daemon ownership, atomic journal claims, restart attachment, bounded headless consultations, budget enforcement, would-have effects and transcript comparison; 41 stasis_coordinator_test.py unittest tests pass with stub epr/keepers (no live model calls); not started on this device (only isolated temporary-store replay daemons). Native lifecycle schema and fold-wire reconciliation remain unverified; settings.json unchanged.
+    evidence-fingerprint: sha256:cbd7b3480655dbb8
+    evidence-bytes: 4774
+    evidence-entries: 10
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"

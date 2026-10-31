@@ -1,0 +1,946 @@
+#!/usr/bin/env python3
+"""Private device coordinator, slice 8: consultations are real, effects are shadow.
+
+Contract: dialogue-stasis-loop-design, Incident model and Native CLI contract.
+No native implementation imports. `once` and --keeper-cmd-override support replay.
+The override is an argv string (shlex, never a shell), not a permission bypass.
+
+Fold interface: snake_case Incident fields from the spec; opened_at uses wall
+and optional mono {bootId, uptimeSeconds}. A second --shift-current fold supplies
+the accounting window. Shift tokens sum budget_used.tokens; keeper seconds sum
+consultations' started_at..finished_at (or elapsed time up to deadline_at).
+Missing budget evidence is unmeasured and stops spending, never zero.
+
+Journal interface: camelCase envelopes, consultation phase start|complete|expired
+and claimSeq referencing the first start's seq. Skips are would-have records, not
+keeper calls. wouldHave carries effect, incidentId, rung and a dedup key. These
+are the lifecycle extensions described by the spec, pending schema reconciliation.
+No shadow event closes or advances a live incident. Journal replay, not state.json,
+owns claims; state.json remains a cache shared with the sensing hook.
+"""
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+import datetime as dt
+import fcntl
+import importlib.util
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shlex
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+
+REPO = Path(__file__).resolve().parents[3]
+SCHEMA_PATH = REPO / 'elohim/sdk/domains/elohim-agent/schemas/keeper-decision.schema.json'
+UNKNOWN = {'disposition': 'unknown', 'basis': {
+    'lastWitnessedAgeSeconds': None, 'rulingRef': None}}
+LIMITS = {'keeper_calls': 4, 'elapsed_s': 1800, 'tokens': 200000}
+SHIFT_LIMITS = {'elapsed_s': 7200, 'tokens': 2000000}
+# The spec has no per-call number: divide the incident ceiling among four rungs.
+CONSULTATION_SECONDS = LIMITS['elapsed_s'] / LIMITS['keeper_calls']
+
+
+def wall(value=None):
+    return dt.datetime.fromtimestamp(time.time() if value is None else value,
+                                     dt.timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+def timestamp(value):
+    if isinstance(value, dict):
+        value = value['wall']
+    return dt.datetime.fromisoformat(value.replace('Z', '+00:00')).timestamp()
+
+
+def clock():
+    return {'wall': wall(), 'bootId': Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+            'uptimeSeconds': float(Path('/proc/uptime').read_text().split()[0]),
+            'provenance': 'stasis-coordinator/linux-proc'}
+
+
+def seconds_since(value, now=None):
+    now = now or clock()
+    mono = value.get('mono', value) if isinstance(value, dict) else {}
+    if isinstance(mono, dict) and mono.get('bootId') == now['bootId']:
+        return max(0, now['uptimeSeconds'] - mono['uptimeSeconds'])
+    return max(0, timestamp(now) - timestamp(value))
+
+
+def number(value):
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+
+
+def load_json(path, default=None):
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return default
+
+
+def atomic_json(path, value):
+    fd, name = tempfile.mkstemp(prefix=path.name + '.', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(value, stream, separators=(',', ':'), allow_nan=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def segments(directory):
+    retained = sorted((p for p in directory.glob('events.*.jsonl')
+                       if p.name.split('.')[1].isdigit()),
+                      key=lambda p: int(p.name.split('.')[1]))
+    active = directory / 'events.jsonl'
+    return retained + ([active] if active.exists() else [])
+
+
+@contextmanager
+def locked(directory, write=False):
+    with (directory / 'journal.lock').open('a' if write else 'r') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
+        yield Journal(directory)
+
+
+class Journal:
+    """All access, including rotation and cache update, is under journal.lock."""
+
+    def __init__(self, directory):
+        self.directory = directory
+        self.events = []
+        for path in segments(directory):
+            with path.open() as stream:
+                for line in stream:
+                    if line.strip():
+                        self.events.append(json.loads(line))
+        self.state = load_json(directory / 'state.json', {})
+
+    @property
+    def seq(self):
+        return max((e['seq'] for e in self.events), default=0)
+
+    def append(self, kind, session, presence, **fields):
+        event = {'schemaVersion': 1, 'kind': kind, 'session': session,
+                 'agentId': 'stasis-coordinator', 'seq': max(self.seq + 1, self.state.get('nextSeq', 1)),
+                 'clock': clock(), 'presence': presence,
+                 'source': {'hookEvent': 'stasis-coordinator'}, **fields}
+        raw = (json.dumps(event, separators=(',', ':'), allow_nan=False) + '\n').encode()
+        path = self.directory / 'events.jsonl'
+        limit = max(1, int(os.environ.get('STASIS_SEGMENT_BYTES', 5 * 1024 * 1024)))
+        if path.exists() and path.stat().st_size:
+            # Preserve a complete but unterminated final JSON record after a crash.
+            with path.open('rb+') as stream:
+                stream.seek(-1, 2)
+                if stream.read(1) != b'\n':
+                    stream.write(b'\n')
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            if path.stat().st_size + len(raw) > limit:
+                indices = [int(p.name.split('.')[1]) for p in segments(self.directory)
+                           if p.name != 'events.jsonl']
+                index = max(self.state.get('nextSegment', 1), max(indices, default=0) + 1)
+                path.rename(self.directory / f'events.{index}.jsonl')
+                self.state['nextSegment'] = index + 1
+        with path.open('ab') as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        self.events.append(event)
+        self.state['nextSeq'] = event['seq'] + 1
+        atomic_json(self.directory / 'state.json', self.state)
+        return event
+
+    def claims(self, incident=None):
+        starts, results = {}, {}
+        for event in self.events:
+            if event['kind'] != 'consultation':
+                continue
+            cid = event.get('correlation', {}).get('incidentId')
+            c = event['consultation']
+            if incident is not None and cid != incident:
+                continue
+            key = (cid, c.get('rung'))
+            if c.get('phase') == 'start':
+                starts.setdefault(key, event)
+            elif c.get('phase') in {'complete', 'expired'}:
+                results.setdefault(key, event)
+        # Completions must identify the canonical claim, never a duplicate start.
+        results = {k: e for k, e in results.items() if k in starts and
+                   e['consultation'].get('claimSeq') == starts[k]['seq']}
+        return starts, results
+
+    def hypothetical(self, incident):
+        return [e['wouldHave'] for e in self.events if e['kind'] == 'would-have'
+                and e['wouldHave']['incidentId'] == incident]
+
+    def would(self, session, presence, incident, effect, rung, key=None, **details):
+        key = key or f'{effect}:{rung}'
+        if any(e['key'] == key for e in self.hypothetical(incident)):
+            return
+        self.append('would-have', session, presence, wouldHave={
+            'effect': effect, 'incidentId': incident, 'rung': rung, 'key': key, **details})
+
+
+def schema_valid(value, schema):
+    """The standard-library validator for the keywords in KeeperDecision.
+
+    Evaluate the checked-in schema, including its conditional constraints, rather
+    than maintaining a second answer shape. Unknown validation keywords refuse.
+    """
+    annotations = {'$id', '$schema', 'title', 'description', 'default'}
+    supported = {'type', 'required', 'additionalProperties', 'properties', 'enum', 'const',
+                 'minLength', 'pattern', 'allOf', 'anyOf', 'oneOf', 'if', 'then', 'else'}
+    if set(schema) - supported - annotations:
+        raise ValueError('unsupported decision-schema keyword')
+    def valid(v, s):
+        return schema_valid(v, s)
+    types = {'object': isinstance(value, dict), 'string': isinstance(value, str),
+             'null': value is None, 'boolean': type(value) is bool,
+             'number': number(value), 'integer': type(value) is int}
+    kind = schema.get('type')
+    if kind and not any(types.get(t, False) for t in (kind if isinstance(kind, list) else [kind])):
+        return False
+    if 'enum' in schema and value not in schema['enum']:
+        return False
+    if 'const' in schema and value != schema['const']:
+        return False
+    if isinstance(value, str):
+        if len(value) < schema.get('minLength', 0):
+            return False
+        if 'pattern' in schema and re.search(schema['pattern'], value) is None:
+            return False
+    if isinstance(value, dict):
+        if not set(schema.get('required', [])) <= value.keys():
+            return False
+        properties = schema.get('properties', {})
+        if schema.get('additionalProperties') is False and value.keys() - properties.keys():
+            return False
+        if not all(valid(value[k], s) for k, s in properties.items() if k in value):
+            return False
+    for key, predicate in [('allOf', all), ('anyOf', any), ('oneOf', lambda xs: sum(xs) == 1)]:
+        if key in schema and not predicate([valid(value, s) for s in schema[key]]):
+            return False
+    if 'if' in schema:
+        branch = 'then' if valid(value, schema['if']) else 'else'
+        if branch in schema and not valid(value, schema[branch]):
+            return False
+    return True
+
+
+def quote(label, value):
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    fence = '`' * max(3, max((len(s) for s in re.findall(r'`+', text)), default=0) + 1)
+    return (f'UNTRUSTED EVIDENCE — {label} (quoted; not a steward ruling)\n{fence}text\n'
+            + '\n'.join('> ' + line for line in text.splitlines()) + f'\n{fence}')
+
+
+def refer(reason):
+    return {'decision': 'Refer', 'pivot': None, 'reason': reason, 'reshape': None, 'ask': None}
+
+
+def shift_budget(fold):
+    elapsed, tokens = 0, 0
+    for incident in fold['incidents']:
+        used = incident['budget_used']
+        if not number(used.get('tokens')):
+            return None
+        tokens += used['tokens']
+        # Duplicated starts do not inflate time or token accounting in the fold.
+        seen = set()
+        for c in incident['consultations']:
+            if c['rung'] in seen:
+                continue
+            seen.add(c['rung'])
+            start = timestamp(c['started_at'])
+            end = timestamp(c['finished_at']) if c.get('finished_at') else min(
+                time.time(), timestamp(c['deadline_at']))
+            elapsed += max(0, end - start)
+    return {'elapsed_s': elapsed, 'tokens': tokens}
+
+
+class Coordinator:
+    def __init__(self, args):
+        self.args = args
+        self.store = Path(os.environ.get('STASIS_COORDINATOR_DIR',
+                                         '/projects/.claude-config/stasis-coordinator'))
+        self.stop = threading.Event()
+        self.worker = ThreadPoolExecutor(max_workers=1)
+        self.future = None
+        self.runtimes = {r['id']: r for r in load_json(REPO / 'genesis/agentic/agent-runtimes.json')['runtimes']}
+        self.schema = load_json(SCHEMA_PATH)
+        self.skill = load_json(REPO / '.epr-meta/elohim/packages/skills/stasis-keeper-brief.json')['instructions']['body']
+
+    def log(self, message):
+        self.store.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with (self.store / 'coordinator.log').open('a') as stream:
+            stream.write(f'{wall()} {message}\n')
+
+    def heartbeat(self):
+        self.store.mkdir(parents=True, exist_ok=True, mode=0o700)
+        now = clock()
+        atomic_json(self.store / 'heartbeat.json', {k: now[k] for k in
+                    ('bootId', 'wall', 'uptimeSeconds')} | {'pid': os.getpid(), 'mode': 'shadow'})
+
+    def sessions(self):
+        repos = [Path(p).resolve() for p in self.args.repo] if self.args.repo else [
+            Path('/projects/elohim'), *sorted(Path('/projects/elohim/.worktrees').glob('*'))]
+        override = os.environ.get('STASIS_JOURNAL_ROOT')
+        roots = [(repos[0], Path(override).resolve())] if override else [
+            (repo, repo / '.eprfs/status/stasis') for repo in repos]
+        seen = set()
+        for repo, root in roots:
+            for directory in sorted(root.glob('*')):
+                if (directory.is_dir() and not directory.is_symlink()
+                        and re.fullmatch(r'[A-Za-z0-9._-]+', directory.name)
+                        and directory.resolve() not in seen and segments(directory)):
+                    seen.add(directory.resolve())
+                    yield repo, root, directory
+
+    def fold(self, repo, root, session, current=False):
+        spec = importlib.util.spec_from_file_location('stasis_epr_client', REPO / '.claude/scripts/_lib/epr_client.py')
+        client = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(client)
+        binary, _ = client.resolve()
+        if not binary:
+            raise ValueError('epr unavailable')
+        command = [binary, 'session', 'stasis', 'fold', '--session', session,
+                   '--journal-root', str(root), '--json']
+        if current:
+            command.append('--shift-current')
+        result = subprocess.run(command, cwd=repo, capture_output=True, text=True,
+                                timeout=self.args.fold_timeout)
+        if result.returncode == 2:
+            return None
+        if result.returncode:
+            raise ValueError(f'fold exit {result.returncode}')
+        data = json.loads(result.stdout)
+        if not isinstance(data['incidents'], list):
+            raise ValueError('incidents must be a list')
+        return data
+
+    def tick(self):
+        self.heartbeat()
+        if os.environ.get('STASIS_LADDER') == 'off':
+            self.log('ladder off')
+            return
+        if self.future and self.future.done():
+            try:
+                self.future.result()
+            except Exception as exc:
+                self.log(f'keeper worker failed: {type(exc).__name__}')
+            self.future = None
+        for repo, root, directory in self.sessions():
+            if self.stop.is_set():
+                break
+            try:
+                with locked(directory) as journal:
+                    before = journal.seq
+                full = self.fold(repo, root, directory.name)
+                current = self.fold(repo, root, directory.name, True) if full is not None else None
+                if current is None:
+                    continue
+                budget = shift_budget(current)
+                with locked(directory, True) as journal:
+                    # Neither fold is authoritative after a concurrent writer appended.
+                    if journal.seq != before:
+                        continue
+                    session = journal.events[0]['session']
+                    presence = self.presence(full, journal)
+                    for incident in full['incidents']:
+                        self.advance(repo, journal, session, presence, incident, budget)
+            except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
+                self.log(f'{directory.name}: fold/session skipped ({type(exc).__name__}: {exc if isinstance(exc, ValueError) else "unavailable evidence"})')
+
+    def presence(self, fold, journal):
+        # Current witnessed presence belongs to the session, never just this incident.
+        latest = next((e for e in reversed(journal.events)
+                       if e['agentId'] != 'stasis-coordinator'), None)
+        presence = dict(latest['presence'] if latest else UNKNOWN)
+        basis = dict(presence['basis'])
+        age = basis.get('lastWitnessedAgeSeconds')
+        if age is not None and latest:
+            age += seconds_since(latest['clock'])
+            basis['lastWitnessedAgeSeconds'] = age
+        presence['basis'] = basis
+        if age is not None and age > 600:
+            presence['disposition'] = 'automated'
+        # A previously journaled Breach remains witnessed absence even after
+        # that dialog closes; only a later witnessed interaction clears it.
+        breach = next((e for e in reversed(journal.events) if e['kind'] == 'would-have'
+                       and e['wouldHave']['effect'] == 'presence-automated'), None)
+        if breach and (age is None or age >= seconds_since(breach['clock'])):
+            presence['disposition'] = 'automated'
+        # Breach evidence stays in the journal after its incident closes. A later
+        # witness resets it, but an away ruling (already folded by the observer) wins.
+        for incident in fold['incidents']:
+            displayed = any(e['kind'] == 'dialog-displayed' and
+                            e.get('correlation', {}).get('incidentId') == incident['id']
+                            for e in journal.events)
+            duration = seconds_since(incident['opened_at'])
+            unresolved = incident['state'] != 'Closed'
+            if displayed and unresolved and duration >= 300 and (age is None or age >= duration - 300):
+                presence['disposition'] = 'automated'
+        return presence
+
+    def advance(self, repo, journal, session, presence, incident, shift_used):
+        iid = incident['id']
+        if incident['state'] == 'Closed' and incident.get('closed_by') != 'parked':
+            return
+        if incident.get('question') == 'uncertain':
+            return
+        age = seconds_since(incident['opened_at'])
+        if presence['disposition'] != 'automated' and age < 180:
+            return
+        history = journal.hypothetical(iid)
+        if any(e['effect'] == 'incident-closure' or
+               (e['effect'] == 'incident-advancement' and e['rung'] == 5) for e in history):
+            return
+        starts, results = journal.claims(iid)
+        stage = 'Breach' if age >= 300 else 'Approach' if age >= 180 else 'Open'
+        would = lambda effect, rung, **kw: journal.would(session, presence, iid, effect, rung, **kw)
+        if stage == 'Breach' and presence['disposition'] == 'automated' and any(
+                e['kind'] == 'dialog-displayed' and e.get('correlation', {}).get('incidentId') == iid
+                for e in journal.events):
+            would('presence-automated', 0, reason='unanswered displayed dialog reached Breach')
+        would('regulator', 0, message='Apply palette and learned forms through unchanged permission checks.')
+        if presence['disposition'] == 'automated' and incident['stall_class'] == 'authorization':
+            would('deny/park', 0, message='Park; do not retry this effect by any tool or spelling.')
+        if incident['stall_class'] == 'question':
+            would('Stop-block', 0, message='Batch blocking asks when no independent work remains.')
+        rung = max(1, incident['rung'])
+        while rung <= 4:
+            key = (iid, rung)
+            if key in starts:
+                claim = starts[key]
+                result = results.get(key)
+                if not result:
+                    if seconds_since(claim['clock']) < claim['consultation']['timeoutSeconds']:
+                        return  # Attach, even when the original coordinator died.
+                    result = self.finish(journal, session, presence, claim,
+                                         refer('consultation deadline expired'), None, 'expired')
+                    self.effects(journal, session, presence, incident, result['consultation'], stage)
+                    return  # Re-fold the newly spent/unknown budget before another call.
+                answer = result['consultation']
+                self.effects(journal, session, presence, incident, answer, stage)
+                if answer['decision'] == 'Permit' and answer['pivot'] in {'park', 'reshape', 'proceed'}:
+                    return
+                rung += 1
+                continue
+            if any(e['effect'] == 'skip' and e['rung'] == rung for e in history):
+                rung += 1
+                continue
+            used = incident['budget_used']
+            unknown = any(not number(used.get(k)) for k in LIMITS) or shift_used is None
+            exhausted = not unknown and (any(used[k] >= v for k, v in LIMITS.items()) or
+                                        any(shift_used[k] >= v for k, v in SHIFT_LIMITS.items()))
+            if unknown or exhausted or age >= LIMITS['elapsed_s']:
+                self.human(journal, session, presence, iid, 'budget unmeasured' if unknown else 'budget exhausted')
+                return
+            runtime = self.runtimes.get(session['runtime'], {})
+            binding = runtime.get('capabilityBindings', {}).get(f'C{rung}')
+            invocation = runtime.get('keeperInvocation') or {}
+            reason = None
+            if not binding or not binding.get('model'):
+                reason = 'capability-unbound'
+            elif not self.args.keeper_cmd_override and (
+                    not self.invocation_probed(runtime, invocation, binding)):
+                reason = 'keeper invocation lacks read-only/nonprompting probe'
+            if reason:
+                would('skip', rung, reason=reason)
+                would('incident-advancement', rung + 1, reason=reason)
+                rung += 1
+                continue
+            if self.future is not None:
+                return
+            timeout = min(CONSULTATION_SECONDS, self.args.consultation_timeout,
+                          LIMITS['elapsed_s'] - max(age, used['elapsed_s']),
+                          SHIFT_LIMITS['elapsed_s'] - shift_used['elapsed_s'])
+            now = clock()
+            claim = journal.append('consultation', session, presence,
+                                   correlation={'incidentId': iid, 'confidence': 'high', 'method': 'none'},
+                                   consultation={'phase': 'start', 'rung': rung, 'level': f'C{rung}',
+                                       'binding': binding['model'], 'startedAt': now,
+                                       'deadlineAt': wall(time.time() + timeout), 'timeoutSeconds': timeout,
+                                       'claimedBy': {'pid': os.getpid(), 'bootId': now['bootId']}})
+            # tool/shape are optional in Incident; the opening event supplies the
+            # redacted evidence without expanding the native JSON dependency.
+            opening = next((e for e in journal.events if e['kind'] == 'permission-requested'
+                            and e.get('correlation', {}).get('incidentId') == iid), {})
+            incident = {**incident, 'tool': incident.get('tool', opening.get('tool')),
+                        'shape': incident.get('shape', opening.get('shape')),
+                        '_reshape_used': any(e.get('pivot') == 'reshape' for e in history) or any(
+                            c.get('decision') == 'Permit' and c.get('pivot') == 'reshape'
+                            for c in incident['consultations'])}
+            brief = self.brief(incident, presence, claim, binding, history, shift_used)
+            self.future = self.worker.submit(self.consult, repo, journal.directory, session,
+                                            presence, incident, claim, runtime, binding, brief, stage)
+            return
+        self.human(journal, session, presence, iid, 'ladder exhausted')
+
+    @staticmethod
+    def invocation_probed(runtime, invocation, binding):
+        if (invocation.get('status') != 'probed' or not invocation.get('evidence')
+                or not invocation.get('argv') or not invocation.get('stdin')):
+            return False
+        if runtime.get('id') == 'claude-code':
+            capabilities = runtime.get('harnessCapabilities', {})
+            required = ['restricted-has-no-bash', 'restricted-raises-no-permission-request',
+                        'restricted-ignores-project-hooks', 'hook-sees-keeper-env',
+                        f'model-binding[{binding["model"]}]']
+            return all(capabilities.get(k, {}).get('status') == 'yes' and
+                       capabilities[k].get('evidence') for k in required)
+        return True  # Other runtimes require their own probed invocation, never a declaration.
+
+    def human(self, journal, session, presence, iid, reason):
+        journal.would(session, presence, iid, 'incident-advancement', 5, reason=reason)
+        for effect in ('berth-note', 'PushNotification'):
+            journal.would(session, presence, iid, effect, 5, key=f'{effect}:Breach', stage='Breach')
+
+    def brief(self, incident, presence, claim, binding, history, shift_used):
+        c = claim['consultation']
+        trusted = {k: incident[k] for k in ('stall_class', 'concern_class')}
+        trusted.update(incident_id=incident['id'], presence=presence, rung=c['rung'], level=c['level'],
+                       effort=binding.get('effort', 'low'), deadline=c['deadlineAt'],
+                       coordinator_checks={'policy_cid_matches': None, 'standing_ruling': None},
+                       evidence={'denial': 'procedural-park' if incident['concern_class'] == 'shape' else 'uncertain',
+                                 'reshape_used': incident['_reshape_used'],
+                                 'stage': incident['state'], 'notification_history': history,
+                                 'remaining_incident': {k: max(0, v - incident['budget_used'][k]) for k, v in LIMITS.items()},
+                                 'remaining_shift': {k: max(0, v - shift_used[k]) for k, v in SHIFT_LIMITS.items()}})
+        # Strings from model/tool/peer sources are always fenced, including history.
+        trusted['evidence']['notification_history'] = [
+            {'effect': e['effect'], 'rung': e['rung']} for e in history]
+        evidence = {k: incident.get(k) for k in ('effect_class', 'tool', 'shape', 'consultations')}
+        return (self.skill + '\nReturn exactly one JSON object matching this schema:\n'
+                + json.dumps(self.schema) + '\nCOORDINATOR STATE\n' + json.dumps(trusted)
+                + '\n' + quote('incident and prior keeper/tool output', evidence))
+
+    def finish(self, journal, session, presence, claim, answer, tokens, phase='complete'):
+        c = claim['consultation']
+        return journal.append('consultation', session, presence, correlation=claim['correlation'],
+                              consultation={**c, **answer, 'phase': phase, 'claimSeq': claim['seq'],
+                                            'finishedAt': clock(), 'usage': {
+                                                'elapsedSeconds': seconds_since(claim['clock']),
+                                                'tokens': tokens}})
+
+    def effects(self, journal, session, presence, incident, answer, stage):
+        iid, rung, pivot = incident['id'], answer['rung'], answer['pivot']
+        if answer['decision'] == 'Refer':
+            if rung == 4:
+                self.human(journal, session, presence, iid, answer['reason'])
+                return
+            journal.would(session, presence, iid, 'incident-advancement', rung + 1, reason=answer['reason'])
+            return
+        journal.would(session, presence, iid, 'guidance', rung, pivot=pivot,
+                      message=answer['reason'], reshape=answer.get('reshape'), ask=answer.get('ask'),
+                      tool=incident.get('tool'), shape=incident.get('shape'))
+        if pivot in {'park', 'proceed'}:
+            journal.would(session, presence, iid, 'incident-closure', rung, closedBy='parked' if pivot == 'park' else 'proceeded')
+        elif pivot == 'reshape':
+            journal.would(session, presence, iid, 'incident-closure', rung,
+                          closedBy='reshaped', condition='only after successful same-effect attempt')
+        elif pivot == 'notify':
+            if stage != 'Open':
+                for effect in ('berth-note', 'PushNotification'):
+                    journal.would(session, presence, iid, effect, rung, key=f'{effect}:{stage}', stage=stage)
+
+    def consult(self, repo, directory, session, presence, incident, claim, runtime, binding, brief, stage):
+        tokens, phase = None, 'complete'
+        try:
+            with tempfile.TemporaryDirectory(prefix='keeper-', dir=self.store) as scratch:
+                scratch = Path(scratch)
+                settings, output = scratch / 'settings.json', scratch / 'answer.json'
+                atomic_json(settings, {'hooks': {}, 'permissions': {'allow': ['Read', 'Grep', 'Glob']}})
+                inv = runtime.get('keeperInvocation') or {}
+                codex = runtime.get('id') == 'codex'
+                substitutions = {'<file>': str(output if codex else settings),
+                                 '<bound>': binding['model'], '<dir>': str(repo)}
+                command = [substitutions.get(v, v) for v in inv.get('argv', [])]
+                if codex:
+                    command += ['--model', binding['model'], '-c', f'model_reasoning_effort="{binding.get("effort", "low")}"']
+                else:
+                    command += ['--output-format', 'json', '--effort', binding.get('effort', 'low')]
+                if self.args.keeper_cmd_override:
+                    command = shlex.split(self.args.keeper_cmd_override)
+                env = {**os.environ, **inv.get('env', {}), 'STASIS_KEEPER': '1'}
+                stdout, stderr, code = self.run_keeper(command, brief, env, repo, claim)
+                if code:
+                    answer = refer(f'keeper exit {code}')
+                    payload = None
+                else:
+                    payload = json.loads(output.read_text() if codex and output.exists() else stdout)
+                if isinstance(payload, dict) and 'result' in payload:
+                    usage = payload.get('usage', {})
+                    parts = [usage.get('input_tokens'), usage.get('output_tokens')]
+                    # Claude's cache input is separate from input_tokens.
+                    parts += [usage.get(k, 0) for k in ('cache_read_input_tokens', 'cache_creation_input_tokens')]
+                    if all(number(n) for n in parts):
+                        tokens = sum(parts)
+                    payload = json.loads(payload['result'])
+                elif codex:
+                    match = re.search(r'tokens used\s*([\d,]+)', stderr)
+                    if match:
+                        tokens = int(match[1].replace(',', ''))
+                if not code and not schema_valid(payload, self.schema):
+                    answer = refer('invalid keeper answer (schema)')
+                elif not code:
+                    answer = self.context_check(payload, incident, claim)
+        except TimeoutError:
+            answer, phase = refer('consultation deadline expired'), 'expired'
+        except InterruptedError:
+            # Keep the claim pending until its original deadline; never re-spend it.
+            return
+        except (OSError, ValueError, KeyError, TypeError):
+            answer = refer('invalid keeper answer or unavailable command')
+        with locked(directory, True) as journal:
+            starts, results = journal.claims(incident['id'])
+            key = (incident['id'], claim['consultation']['rung'])
+            if key not in results and starts.get(key, {}).get('seq') == claim['seq']:
+                result = self.finish(journal, session, presence, claim, answer, tokens, phase)
+                closed = any(e['seq'] > claim['seq'] and (e['kind'] == 'session-ended' or (
+                    e['kind'] == 'prompt-closed' and e.get('correlation', {}).get('incidentId') == incident['id']))
+                             for e in journal.events)
+                if not closed:
+                    self.effects(journal, session, presence, incident, result['consultation'], stage)
+
+    def context_check(self, answer, incident, claim):
+        rung = claim['consultation']['rung']
+        if (answer['ask'] is not None and rung != 4) or (
+                rung == 4 and answer['decision'] == 'Refer' and answer['ask'] is None):
+            return refer('invalid keeper answer (C4 ask contract)')
+        if answer['pivot'] == 'reshape':
+            if incident['stall_class'] != 'authorization' or incident['concern_class'] != 'shape':
+                return refer('authoritative or uncertain concern forbids same-effect reshape')
+            if incident['_reshape_used']:
+                return refer('reshape allowance already used')
+            if not legible_reshape(incident, answer['reshape']):
+                return refer('reshape changes tool/effect or uses an opaque command')
+        if answer['pivot'] == 'proceed':
+            return {**answer, 'pivot': 'park', 'reason': 'Standing ruling not independently validated; park. ' + answer['reason']}
+        return answer
+
+    def run_keeper(self, command, brief, env, repo, claim):
+        process = subprocess.Popen(command, cwd=repo, env=env, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, start_new_session=True)
+        deadline = time.monotonic() + max(0, claim['consultation']['timeoutSeconds'] - seconds_since(claim['clock']))
+        first = True
+        try:
+            while True:
+                if self.stop.is_set():
+                    raise InterruptedError
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError
+                try:
+                    out, err = process.communicate(brief if first else None, timeout=min(0.2, remaining))
+                    return out, err, process.returncode
+                except subprocess.TimeoutExpired:
+                    first = False
+        finally:
+            # Kill the whole keeper process group, including children retaining pipes.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+
+    def status(self):
+        try:
+            heartbeat = load_json(self.store / 'heartbeat.json')
+            age = seconds_since(heartbeat) if heartbeat else None
+            if heartbeat:
+                heartbeat['pid'], heartbeat['bootId']
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            heartbeat, age = None, None
+        pid = running_pid(self.store)
+        fresh = (heartbeat and pid == heartbeat['pid'] and heartbeat['bootId'] == clock()['bootId']
+                 and age <= 3 * self.args.tick)
+        print(f'stasis-coordinator: {"shadow" if fresh else "unknown"}; '
+              f'heartbeat age: {age if age is not None else "unknown"} seconds')
+        count, measured = 0, True
+        for repo, root, directory in self.sessions():
+            try:
+                with locked(directory) as journal:
+                    starts, results = journal.claims()
+                    pending = [key for key in starts if key not in results]
+                count += len(pending)
+                for iid, rung in pending:
+                    print(f'open claim: {directory.name} {iid} rung {rung}')
+                folded = self.fold(repo, root, directory.name, True)
+                if folded is None:
+                    measured = False
+                    continue
+                used = shift_budget(folded)
+                if used is None:
+                    measured = False
+                print(f'{directory.name} shift budget used: {json.dumps(used) if used is not None else "unknown"}')
+                for incident in folded['incidents']:
+                    print(f'{incident["id"]} budget used: {json.dumps(incident["budget_used"])}')
+            except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+                measured = False
+                print(f'{directory.name}: budget used: unknown')
+        print(f'open claims: {count}; budget evidence: {"read" if measured else "unknown"}')
+        return 0 if fresh else 1
+
+    def compare(self):
+        found = False
+        print('| guidance | what actually happened next | agree/diverge |')
+        print('| --- | --- | --- |')
+        for _, _, directory in self.sessions():
+            if directory.name != self.args.session:
+                continue
+            found = True
+            with locked(directory) as journal:
+                state = journal.state
+                guidance = [e for e in journal.events if e['kind'] == 'would-have'
+                            and e['wouldHave']['effect'] == 'guidance']
+            path = state.get('transcript_path')
+            if not path:
+                print('| transcript_path absent | unmeasured | unmeasured |')
+                continue
+            transcript_path = Path(path)
+            if not transcript_path.is_absolute():
+                print('| transcript_path must be absolute | unmeasured | unmeasured |')
+                continue
+            try:
+                calls = transcript_calls(transcript_path)
+            except (OSError, ValueError, KeyError, TypeError):
+                print('| transcript unavailable | unmeasured | unmeasured |')
+                continue
+            for index, event in enumerate(guidance):
+                g = event['wouldHave']
+                end = timestamp(guidance[index + 1]['clock']) if index + 1 < len(guidance) else math.inf
+                call = next((c for c in calls if timestamp(event['clock']) < c[0] < end), None)
+                outcome, actual = 'unmeasured', 'no following tool call'
+                if call:
+                    _, tool, inputs = call
+                    actual = tool + ' ' + json.dumps(inputs, ensure_ascii=False)
+                    target = g.get('reshape') or {'tool': g.get('tool'), 'shape': g.get('shape')}
+                    if target.get('tool') and target.get('shape'):
+                        shell_tools = {'Bash', 'exec_command', 'run_command'}
+                        same_tool = tool == target['tool'] or {tool, target['tool']} <= shell_tools
+                        match = same_tool and shape_matches(target['shape'], inputs)
+                        if g['pivot'] in {'reshape', 'proceed', 'park'}:
+                            agrees = not match if g['pivot'] == 'park' else match
+                            outcome = 'agree' if agrees else 'diverge'
+                print('| ' + ' | '.join(table_cell(x) for x in
+                                      (g['message'], actual, outcome)) + ' |')
+        return 0 if found else 2
+
+    def run(self, once=False):
+        self.store.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with (self.store / 'coordinator.pid').open('a+') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                self.log('already running')
+                return 1
+            lock.seek(0)
+            lock.truncate()
+            lock.write(str(os.getpid()))
+            lock.flush()
+            signal.signal(signal.SIGTERM, lambda *_: self.stop.set())
+            signal.signal(signal.SIGINT, lambda *_: self.stop.set())
+            self.log(f'START pid={os.getpid()} mode=shadow')
+            def pulse():
+                while not self.stop.wait(self.args.tick):
+                    self.heartbeat()
+            heartbeat_thread = threading.Thread(target=pulse, daemon=True)
+            heartbeat_thread.start()
+            try:
+                while not self.stop.is_set():
+                    self.tick()
+                    if once:
+                        # Replay one tick, waiting for its bounded consultation only.
+                        while self.future and not self.future.done() and not self.stop.wait(self.args.tick):
+                            self.heartbeat()
+                        if self.future:
+                            self.future.result()
+                        break
+                    self.stop.wait(self.args.tick)
+            finally:
+                self.stop.set()
+                heartbeat_thread.join()
+                self.worker.shutdown(wait=True)
+                self.log('STOP')
+        return 0
+
+
+def transcript_calls(path):
+    calls = []
+    with path.open() as stream:
+        for line in stream:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            when = record.get('timestamp')
+            if not when:
+                continue
+            for part in record.get('message', {}).get('content', []):
+                if isinstance(part, dict) and part.get('type') == 'tool_use':
+                    calls.append((timestamp(when), part['name'], part.get('input', {})))
+            payload = record.get('payload', {})
+            if record.get('type') == 'response_item' and payload.get('type') == 'function_call':
+                calls.append((timestamp(when), payload['name'], json.loads(payload.get('arguments', '{}'))))
+    return sorted(calls, key=lambda c: c[0])
+
+
+def shape_matches(shape, inputs):
+    if not isinstance(inputs, dict):
+        return False
+    command = inputs.get('command', inputs.get('cmd'))
+    if not isinstance(command, str):
+        return False
+    # Structural comparison only: placeholders are tokens, never executable text.
+    pattern = re.escape(shape)
+    pattern = re.sub(r'<(?:path|ref|url|num|glob|str)>', r'\\S+', pattern)
+    pattern = pattern.replace(r'\ ', r'\s+')
+    return re.fullmatch(pattern, command.strip()) is not None
+
+
+def legible_reshape(incident, proposed):
+    """Conservative structural check, never a shell evaluator or tool approval.
+
+    Accept one plain command preserving the folded executable/subcommand and
+    existing flags. Path placeholders stay advice; slice 9's unchanged palette
+    and permission checks still own any actual invocation.
+    """
+    if proposed['tool'] != incident.get('tool') or proposed['tool'] != 'Bash':
+        return False
+    source, target = incident.get('shape'), proposed['shape']
+    effect = incident['effect_class']
+    if not isinstance(source, str) or not isinstance(effect, list) or len(effect) < 2:
+        return False
+    # Reject shell execution syntax while allowing the contract's redacted tokens.
+    plain = re.sub(r'<(?:path|ref|url|num|glob|str)>', 'ARG', target)
+    if re.search(r'[;&|()<>`$\\\n\r]', plain):
+        return False
+    try:
+        words, original = shlex.split(target), shlex.split(source)
+    except ValueError:
+        return False
+    if words[:2] != effect[:2]:
+        return False
+    opaque = {'bash', 'sh', 'zsh', 'fish', 'eval', 'exec', 'source', 'env', 'xargs',
+              'python', 'python3', 'node', 'perl', 'ruby'}
+    if any(w.rsplit('/', 1)[-1] in opaque for w in words):
+        return False
+    # New flags or literal operands are not a legibility-only reshape.
+    return all(w in original for w in words[2:])
+
+
+def table_cell(value):
+    return re.sub(r'[\x00-\x1f\x7f]', ' ', str(value)).replace('|', '\\|')
+
+
+def running_pid(store):
+    try:
+        with (store / 'coordinator.pid').open() as stream:
+            try:
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return None
+            except BlockingIOError:
+                pid = int(stream.read().strip())
+                return pid if pid > 1 else None
+    except (OSError, ValueError):
+        return None
+
+
+def start(args, coordinator):
+    pid = running_pid(coordinator.store)
+    if pid:
+        print(f'stasis-coordinator: running (pid {pid})')
+        return 0
+    argv = [sys.executable, str(Path(__file__).resolve()), 'run', '--tick', str(args.tick),
+            '--fold-timeout', str(args.fold_timeout), '--consultation-timeout', str(args.consultation_timeout)]
+    for repo in args.repo:
+        argv += ['--repo', str(Path(repo).resolve())]
+    if args.keeper_cmd_override:
+        argv += ['--keeper-cmd-override', args.keeper_cmd_override]
+    first = os.fork()
+    if first == 0:
+        os.setsid()
+        if os.fork() != 0:
+            os._exit(0)
+        with open(os.devnull, 'r+') as null:
+            for fd in (0, 1, 2):
+                os.dup2(null.fileno(), fd)
+        os.execv(sys.executable, argv)
+    os.waitpid(first, 0)
+    until = time.monotonic() + 5
+    while time.monotonic() < until:
+        pid = running_pid(coordinator.store)
+        if pid:
+            print(f'stasis-coordinator: started (pid {pid})')
+            return 0
+        time.sleep(0.05)
+    print('stasis-coordinator: start failed; see coordinator.log', file=sys.stderr)
+    return 1
+
+
+def positive(value):
+    result = float(value)
+    if not math.isfinite(result) or result <= 0:
+        raise argparse.ArgumentTypeError('must be positive and finite')
+    return result
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if '--live' in argv:
+        print('live mode is slice 9', file=sys.stderr)
+        return 3
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=['start', 'stop', 'status', 'run', 'once', 'compare'])
+    parser.add_argument('--repo', action='append', default=[])
+    parser.add_argument('--tick', type=positive, default=15)
+    parser.add_argument('--fold-timeout', type=positive, default=10)
+    parser.add_argument('--consultation-timeout', type=positive, default=CONSULTATION_SECONDS,
+                        help='may shorten, never enlarge the budget-derived deadline')
+    parser.add_argument('--keeper-cmd-override', help='test stub argv; no shell interpretation')
+    parser.add_argument('--session')
+    args = parser.parse_args(argv)
+    if args.command == 'compare' and not args.session:
+        parser.error('compare requires --session')
+    c = Coordinator(args)
+    try:
+        if args.command == 'start':
+            return start(args, c)
+        if args.command == 'stop':
+            pid = running_pid(c.store)
+            if pid:
+                os.kill(pid, signal.SIGTERM)
+                print(f'stasis-coordinator: stop requested (pid {pid})')
+            else:
+                print('stasis-coordinator: not running')
+            return 0
+        if args.command == 'status':
+            return c.status()
+        if args.command == 'compare':
+            return c.compare()
+        return c.run(once=args.command == 'once')
+    finally:
+        c.stop.set()
+        c.worker.shutdown(wait=True)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+
