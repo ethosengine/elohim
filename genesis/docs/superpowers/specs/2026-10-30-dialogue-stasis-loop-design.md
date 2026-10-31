@@ -103,6 +103,14 @@ here `human:matthew`; the steward's rulings are `--kind ruling` notes. A
 declared scope covers the case at hand. Presence rulings select handling and
 grant no execution authority.
 
+An **importer** is a development team or tool that declares its own stations, stories and evidence providers while connecting to the shared evidence contract.
+
+The **objective's paths** are the paths declared in the session's claimed
+commitment as its deliverable scope. Valueflow placement names the commitment;
+absent one, use the paths the session's commits touched. **Clean** means no
+tracked modifications under those paths per `git status --porcelain`, excluding
+tooling ledgers (`.claude/data/`, `.eprfs/status/`).
+
 A **berth** is the device's shared lease and note channel
 (`genesis/agentic/bin/berth`). A berth note is written with `berth say`, read
 with `berth inbox`, and crosses to the steward's other devices through
@@ -825,12 +833,12 @@ an `outcome`:
 
 | `outcome` | Evidence the adapter requires | Loop response |
 |---|---|---|
-| `accomplished` | The declared station provider verifies the claimed commitment's deliverable and required evidence at the named revision. For a code delivery commitment this includes its required commit, clean objective paths and green gate evidence; for other stations use Valueflow placement. A `shift-marker` close must reference the same evidence. | No incident. The session may stop. |
+| `accomplished` | The declared station provider verifies the claimed commitment's deliverable and required evidence at the named revision. For a code delivery commitment this includes its required commit, clean objective paths (defined in Terms) and green gate evidence; for other stations use Valueflow placement. A `shift-marker` close must reference the same evidence. | No incident. The session may stop. |
 | `exception` | A pending human-rung ask, a batched parked ask, or a question the coordinator has already climbed to rung 5 | No new incident. The ask is surfaced once (Denial authority and human delivery). |
 | `question` | The turn ends in a question for the steward | The Automated path and questions rules apply. |
 | `stalled` | None of the above: the turn stopped with work unfinished and no ask | Open a `silence`-class incident at once. In automated presence, the Stop adapter blocks once with guidance naming the unmet commitment evidence or missing chain node and the next authorized step. In collaborative presence the coordinator harvests at Approach. |
 
-A claim of completion in the assistant's last message is never evidence by
+A claim of completion in the agent's last message is never evidence by
 itself; `accomplished` requires the observable evidence above, and when the
 evidence cannot be read the outcome is `stalled` with `confidence: low`, never
 `accomplished`. Blocking is bounded: at most one Stop block per stall, and a
@@ -999,8 +1007,11 @@ epr flow memory recall open --session <incident-recall-id> --purpose placement -
 
 Today the supported focused entry is the same `open --session ... --need ...`
 without `--purpose`; the only accepted purposes are `bootstrap` and `resume`,
-and `resume` requires `--habit`. The coordinator opens one bounded recall
-session for the incident and reuses it for subsequent briefs, retaining
+and `resume` requires `--habit`.
+
+Once the coordinator (slice 8) runs and the `placement` recall purpose exists:
+the coordinator opens one bounded recall session for the incident and reuses
+it for subsequent briefs, retaining
 receipts and cumulative cost. Each brief revalidates the relevant evidence
 within that budget and carries any omission forward. A further packet needs
 an explicit evidence question under the recall contract, rather than a fresh
@@ -1188,8 +1199,8 @@ grounds this in bounded, correctable feedback at each hop (§1), independent
 audit alongside threshold sensing, and deduplicated, budgeted escalation (§12).
 Those are design precedents, not a claim that its graduated machinery is live.
 
-**Trace harm in both directions.** From the identified source version, walk
-inbound cites, the reverse references that name its dependants, together with
+When slice 13 lands, **trace harm in both directions.** From the identified
+source version, walk inbound cites, the reverse references that name its dependants, together with
 recorded use edges. They locate specs built on it, gates derived from those
 specs, incidents decided on it and memories recalled from it. Each reached
 station re-verifies the particular claim that used the challenged evidence.
@@ -1243,7 +1254,8 @@ they do not themselves discharge the commitment or prove the repair.
 
 The proposed memory-harness reader lowers the source's recall weight while its
 evidenced correction is unresolved. **Amber** means repair or re-verification is
-pending; **green** means the required re-verification has passed. Trust lags
+pending; **green** requires the challenged source's own re-verification to pass,
+not another station's recovery. Trust lags
 repair: editing the source or acknowledging feedback does not restore its weight.
 This is a relevance adjustment with visible reasons, not erasure, punishment of
 the author or a change to permission policy. Correction evidence remains
