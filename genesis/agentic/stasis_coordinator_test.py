@@ -358,11 +358,11 @@ class CoordinatorTest(unittest.TestCase):
         self.assertIn('ladder off', (self.store / 'coordinator.log').read_text())
         self.assertFalse((self.base / 'fold-calls').exists())
 
-    def test_live_refuses_before_writing(self):
+    def test_live_without_pinned_status_remains_shadow(self):
         result = self.run_cmd(extra=['--live'])
-        self.assertEqual(result.returncode, 3)
-        self.assertEqual(result.stderr.strip(), 'live mode is slice 9')
-        self.assertFalse(self.store.exists())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('shadow; policy', (self.store / 'coordinator.log').read_text())
+        self.assertFalse((self.directory / 'delivery.jsonl').exists())
 
     def test_fold_errors_and_timeout_write_no_session_events(self):
         before = (self.directory / 'events.jsonl').read_bytes()

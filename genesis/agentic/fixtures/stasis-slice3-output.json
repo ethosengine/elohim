@@ -1,0 +1,83 @@
+{
+  "baselineCommit": "fd8b67bd07fbbf63a371a70cef2dc7bfb82f6a8a",
+  "steps": [
+    {
+      "event": "UserPromptSubmit",
+      "fields": {
+        "prompt": "Start"
+      },
+      "stdout": ""
+    },
+    {
+      "event": "PreToolUse",
+      "fields": {
+        "tool_name": "Bash",
+        "tool_use_id": "t1",
+        "tool_input": {
+          "command": "git status"
+        }
+      },
+      "stdout": ""
+    },
+    {
+      "event": "PermissionRequest",
+      "fields": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git status"
+        }
+      },
+      "stdout": ""
+    },
+    {
+      "event": "Notification",
+      "fields": {
+        "notification_type": "permission_prompt"
+      },
+      "stdout": ""
+    },
+    {
+      "event": "PostToolUse",
+      "fields": {
+        "tool_name": "Bash",
+        "tool_use_id": "t1",
+        "duration_ms": 0
+      },
+      "stdout": ""
+    },
+    {
+      "event": "PostToolUse",
+      "exceptions": 3,
+      "stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": \"harness exception: `fixture-hook` timed out (`2100` ms against `2000` ms) \\u00d73 since the last notice. Investigate and fix it now, or dispatch a subagent to.\"}}\n"
+    },
+    {
+      "event": "PreToolUse",
+      "stdout": ""
+    },
+    {
+      "event": "UserPromptSubmit",
+      "fields": {
+        "prompt": "status?"
+      },
+      "stdout": ""
+    },
+    {
+      "event": "Stop",
+      "fields": {
+        "last_assistant_message": "Done?"
+      },
+      "stdout": ""
+    },
+    {
+      "event": "Notification",
+      "fields": {
+        "notification_type": "idle_prompt"
+      },
+      "stdout": ""
+    },
+    {
+      "event": "SessionEnd",
+      "stdout": ""
+    }
+  ]
+}

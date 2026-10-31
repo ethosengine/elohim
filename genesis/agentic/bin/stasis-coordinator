@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Private device coordinator, slice 8: consultations are real, effects are shadow.
+"""Private device coordinator: shadow by default, pinned-policy delivery with --live.
 
 Contract: dialogue-stasis-loop-design, Incident model and Native CLI contract.
 No native implementation imports. `once` and --keeper-cmd-override support replay.
@@ -40,6 +40,8 @@ import time
 
 
 REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO / 'genesis/agentic'))
+import stasis_control as control
 SCHEMA_PATH = REPO / 'elohim/sdk/domains/elohim-agent/schemas/keeper-decision.schema.json'
 UNKNOWN = {'disposition': 'unknown', 'basis': {
     'lastWitnessedAgeSeconds': None, 'rulingRef': None}}
@@ -295,6 +297,8 @@ class Coordinator:
         self.runtimes = {r['id']: r for r in load_json(REPO / 'genesis/agentic/agent-runtimes.json')['runtimes']}
         self.schema = load_json(SCHEMA_PATH)
         self.skill = load_json(REPO / '.epr-meta/elohim/packages/skills/stasis-keeper-brief.json')['instructions']['body']
+        self.live_requested = getattr(args, 'live', False) or control.mode() == 'live'
+        self.modes = {}
 
     def log(self, message):
         self.store.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -305,7 +309,20 @@ class Coordinator:
         self.store.mkdir(parents=True, exist_ok=True, mode=0o700)
         now = clock()
         atomic_json(self.store / 'heartbeat.json', {k: now[k] for k in
-                    ('bootId', 'wall', 'uptimeSeconds')} | {'pid': os.getpid(), 'mode': 'shadow'})
+                    ('bootId', 'wall', 'uptimeSeconds')} | {'pid': os.getpid(),
+                    'mode': 'live' if 'live' in self.modes.values() else 'shadow'})
+
+    def activation(self, repo, root, session):
+        if not self.live_requested or control.mode() == 'off':
+            return None
+        status = control.snapshot(repo, root, session, min(2, self.args.fold_timeout))
+        state = 'live' if control.pinned(status) else 'shadow'
+        reason = (status or {}).get('policyState', 'status unavailable')
+        key = str(root / session)
+        if self.modes.get(key) != state:
+            self.log(f'{session}: {state}; policy {reason}')
+        self.modes[key] = state
+        return status if state == 'live' else None
 
     def sessions(self):
         repos = [Path(p).resolve() for p in self.args.repo] if self.args.repo else [
@@ -365,17 +382,57 @@ class Coordinator:
                 current = self.fold(repo, root, directory.name, True) if full is not None else None
                 if current is None:
                     continue
+                activation = self.activation(repo, root, directory.name)
                 budget = shift_budget(current)
                 with locked(directory, True) as journal:
                     # Neither fold is authoritative after a concurrent writer appended.
                     if journal.seq != before:
                         continue
                     session = journal.events[0]['session']
-                    presence = self.presence(full, journal)
-                    for incident in full['incidents']:
+                    journal.activation = activation
+                    journal.repo = repo
+                    presence = (control.presence(activation, directory.name) if activation
+                                else self.presence(full, journal))
+                    incidents = self.delivery_incidents(journal, full['incidents']) if activation else full['incidents']
+                    for incident in incidents:
                         self.advance(repo, journal, session, presence, incident, budget)
             except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
                 self.log(f'{directory.name}: fold/session skipped ({type(exc).__name__}: {exc if isinstance(exc, ValueError) else "unavailable evidence"})')
+
+    @staticmethod
+    def delivery_incidents(journal, incidents):
+        """Attach a failed procedural retry to its original budget and allowance.
+
+        Equality is the native effect tuple, never a Python permission matcher.
+        Opaque/unresolved effects cannot prove equivalence and get no reshape.
+        """
+        delivery = control.Delivery(journal.directory)
+        by_id = {i['id']: dict(i) for i in incidents}
+        retries = set()
+        for row in list(delivery.rows):
+            if row['kind'] != 'guidance' or row.get('pivot') != 'reshape':
+                continue
+            original = by_id.get(row['incidentId'])
+            effect = row.get('effectClass')
+            if not original or not effect or effect.get('target') == 'unresolved':
+                continue
+            for incident in incidents:
+                if (incident['id'] != original['id'] and incident['stallClass'] == 'authorization'
+                        and incident['effectClass'] == effect and timestamp(incident['openedAt']) >= row['at']):
+                    retries.add(incident['id'])
+                    delivery.add('reshape-failed', f"reshape-failed:{original['id']}",
+                                 incidentId=original['id'], retryIncident=incident['id'])
+                    delivery.add('park-state', f"retry-attached:{incident['id']}", incidentId=incident['id'],
+                                 state='withdrawn', reason=f"Ask and budget remain on {original['id']}")
+            original['_reshape_failed'] = any(r['kind'] == 'reshape-failed' and
+                                              r['incidentId'] == original['id'] for r in delivery.rows)
+        # Live park lifecycle is kept separate from v1's native event vocabulary.
+        for row in delivery.rows:
+            if row['kind'] == 'stall-closed' and row['incidentId'] in by_id:
+                i = by_id[row['incidentId']]
+                if i.get('closedBy') not in {'approved', 'answered', 'session-ended'}:
+                    i.update(state='Closed', closedBy='parked')
+        return [i for iid, i in by_id.items() if iid not in retries]
 
     def presence(self, fold, journal):
         # Current witnessed presence belongs to the session, never just this incident.
@@ -410,31 +467,54 @@ class Coordinator:
 
     def advance(self, repo, journal, session, presence, incident, shift_used):
         iid = incident['id']
+        activation = getattr(journal, 'activation', None)
+        live = bool(activation)
+        policy = activation['_policy'] if live else {}
+        limits = policy.get('budgets', {})
+        incident_limits = {'keeperCalls': limits.get('incidentKeeperCalls', LIMITS['keeperCalls']),
+                           'elapsedS': limits.get('incidentElapsedS', LIMITS['elapsedS']),
+                           'tokens': limits.get('incidentTokens', LIMITS['tokens'])}
+        shift_limits = {'seconds': limits.get('shiftKeeperS', SHIFT_LIMITS['seconds']),
+                        'tokens': limits.get('shiftTokens', SHIFT_LIMITS['tokens'])}
+        stall = policy.get('stall', {'limit': 300, 'thresholdPct': 60})
+        breach, approach = stall['limit'], stall['limit'] * stall['thresholdPct'] / 100
+        delivery = control.Delivery(journal.directory) if live else None
+        if live and any(r['kind'] == 'park-state' and r['incidentId'] == iid
+                        and r['state'] in {'answered', 'withdrawn', 'expired'} for r in delivery.rows):
+            return
         if incident['state'] == 'Closed' and incident.get('closedBy') != 'parked':
             return
         if incident.get('question') == 'uncertain':
             return
         age = seconds_since(incident['openedAt'])
-        if presence['disposition'] != 'automated' and age < 180:
+        if presence['disposition'] != 'automated' and age < approach:
             return
         history = journal.hypothetical(iid)
-        if any(e['effect'] == 'incident-closure' or
+        if not live and any(e['effect'] == 'incident-closure' or
                (e['effect'] == 'incident-advancement' and e['rung'] == 5) for e in history):
             return
         starts, results = journal.claims(iid)
-        stage = 'Breach' if age >= 300 else 'Approach' if age >= 180 else 'Open'
+        stage = 'Breach' if age >= breach else 'Approach' if age >= approach else 'Open'
+        if live and stage != 'Open':
+            self.alert(journal, session, iid, stage, incident['rung'],
+                       'Unresolved stasis; keep the effect parked pending steward guidance.', incident.get('agentId', 'main'))
+        if live and any(r['kind'] == 'human' and r['incidentId'] == iid for r in delivery.rows):
+            return
         would = lambda effect, rung, **kw: journal.would(session, presence, iid, effect, rung, **kw)
-        if stage == 'Breach' and presence['disposition'] == 'automated' and any(
+        if not live and stage == 'Breach' and presence['disposition'] == 'automated' and any(
                 e['kind'] == 'dialog-displayed' and e.get('correlation', {}).get('incidentId') == iid
                 for e in journal.events):
             would('presence-automated', 0, reason='unanswered displayed dialog reached Breach')
-        would('regulator', 0, message='Apply palette and learned forms through unchanged permission checks.')
-        if presence['disposition'] == 'automated' and incident['stallClass'] == 'authorization':
+        if not live:
+            would('regulator', 0, message='Apply palette and learned forms through unchanged permission checks.')
+        if not live and presence['disposition'] == 'automated' and incident['stallClass'] == 'authorization':
             would('deny/park', 0, message='Park; do not retry this effect by any tool or spelling.')
-        if incident['stallClass'] == 'question':
+        if not live and incident['stallClass'] == 'question':
             would('Stop-block', 0, message='Batch blocking asks when no independent work remains.')
         rung = max(1, incident['rung'])
         while rung <= 4:
+            if live and rung > 1 and presence['disposition'] != 'automated' and age < breach:
+                return
             key = (iid, rung)
             if key in starts:
                 claim = starts[key]
@@ -448,7 +528,9 @@ class Coordinator:
                     return  # Re-fold the newly spent/unknown budget before another call.
                 answer = result['consultation']
                 self.effects(journal, session, presence, incident, answer, stage)
-                if answer['decision'] == 'Permit' and answer['pivot'] in {'park', 'reshape', 'proceed'}:
+                if (answer['decision'] == 'Permit'
+                        and answer['pivot'] in ({'reshape', 'proceed'} if live else {'park', 'reshape', 'proceed'})
+                        and not (live and answer['pivot'] == 'reshape' and incident.get('_reshape_failed'))):
                     return
                 rung += 1
                 continue
@@ -456,8 +538,8 @@ class Coordinator:
                 rung += 1
                 continue
             used = incident['budgetUsed']
-            incident_unknown, incident_exhausted = budget_state(used, LIMITS, ('keeperSeconds',))
-            shift_unknown, shift_exhausted = budget_state(shift_used, SHIFT_LIMITS)
+            incident_unknown, incident_exhausted = budget_state(used, incident_limits, ('keeperSeconds',))
+            shift_unknown, shift_exhausted = budget_state(shift_used, shift_limits)
             unknown = bool(incident_unknown or shift_unknown)
             exhausted = bool(incident_exhausted or shift_exhausted)
             if unknown:
@@ -465,9 +547,10 @@ class Coordinator:
                       unknown={'incident': incident_unknown, 'shift': shift_unknown},
                       exhausted={'incident': incident_exhausted, 'shift': shift_exhausted},
                       incidentBudget=used, shiftBudget=shift_used)
-            if unknown or exhausted or age >= LIMITS['elapsedS']:
+            if unknown or exhausted or age >= incident_limits['elapsedS']:
                 self.human(journal, session, presence, iid,
-                           'budget unmeasured' if unknown and not exhausted else 'budget exhausted')
+                           'budget unmeasured' if unknown and not exhausted else 'budget exhausted',
+                           agent=incident.get('agentId', 'main'))
                 return
             runtime = self.runtimes.get(session['runtime'], {})
             binding = runtime.get('capabilityBindings', {}).get(f'C{rung}')
@@ -485,9 +568,9 @@ class Coordinator:
                 continue
             if self.future is not None:
                 return
-            timeout = min(CONSULTATION_SECONDS, self.args.consultation_timeout,
-                          LIMITS['elapsedS'] - max(age, used['elapsedS']),
-                          SHIFT_LIMITS['seconds'] - shift_used['seconds'])
+            timeout = min(incident_limits['elapsedS'] / 4, self.args.consultation_timeout,
+                          incident_limits['elapsedS'] - max(age, used['elapsedS']),
+                          shift_limits['seconds'] - shift_used['seconds'])
             now = clock()
             claim = journal.append('consultation', session, presence,
                                    correlation={'incidentId': iid, 'confidence': 'high', 'method': 'none'},
@@ -495,6 +578,9 @@ class Coordinator:
                                        'binding': binding['model'], 'startedAt': now,
                                        'deadlineAt': wall(time.time() + timeout), 'timeoutSeconds': timeout,
                                        'claimedBy': {'pid': os.getpid(), 'bootId': now['bootId']}})
+            if live:
+                delivery.add('claim', f"claim:{claim['seq']}", claimSeq=claim['seq'],
+                             incidentId=iid, policyCid=activation['policyCid'])
             # tool/shape are optional in Incident; the opening event supplies the
             # redacted evidence without expanding the native JSON dependency.
             opening = next((e for e in journal.events if e['kind'] == 'permission-requested'
@@ -504,11 +590,14 @@ class Coordinator:
                         '_reshape_used': any(e.get('pivot') == 'reshape' for e in history) or any(
                             c.get('decision') == 'Permit' and c.get('pivot') == 'reshape'
                             for c in incident['consultations'])}
+            if live:
+                incident['_reshape_used'] |= any(r['kind'] == 'guidance' and r.get('pivot') == 'reshape'
+                                                and r['incidentId'] == iid for r in delivery.rows)
             brief = self.brief(incident, presence, claim, binding, history, shift_used)
             self.future = self.worker.submit(self.consult, repo, journal.directory, session,
                                             presence, incident, claim, runtime, binding, brief, stage)
             return
-        self.human(journal, session, presence, iid, 'ladder exhausted')
+        self.human(journal, session, presence, iid, 'ladder exhausted', agent=incident.get('agentId', 'main'))
 
     @staticmethod
     def invocation_probed(runtime, invocation, binding):
@@ -524,10 +613,44 @@ class Coordinator:
                        capabilities[k].get('evidence') for k in required)
         return True  # Other runtimes require their own probed invocation, never a declaration.
 
-    def human(self, journal, session, presence, iid, reason):
+    def human(self, journal, session, presence, iid, reason, ask=None, agent='main'):
+        activation = getattr(journal, 'activation', None)
+        if activation:
+            delivery = control.Delivery(journal.directory)
+            message = ask or 'Resolve this parked step? Recommendation: keep it parked until fresh validation.'
+            cid = activation['policyCid']
+            delivery.park(iid, cid, agent, ask=message)
+            if ask:
+                delivery.add('park-detail', f'park-detail:{iid}', incidentId=iid, ask=message)
+            delivery.add('human', f'human:{iid}', incidentId=iid, policyCid=cid, reason=reason)
+            delivery.add('guidance', f'human-guidance:{iid}', incidentId=iid, policyCid=cid,
+                         agentId=agent, message=message, pivot='park')
+            self.alert(journal, session, iid, 'Breach', 5, message, agent)
+            return
         journal.would(session, presence, iid, 'incident-advancement', 5, reason=reason)
         for effect in ('berth-note', 'PushNotification'):
             journal.would(session, presence, iid, effect, 5, key=f'{effect}:Breach', stage='Breach')
+
+    def alert(self, journal, session, iid, stage, rung, message, agent='main'):
+        """One independent berth attempt and one in-session request per stage."""
+        delivery = control.Delivery(journal.directory)
+        cid = journal.activation['policyCid']
+        note = delivery.add('berth-note', f'berth-note:{iid}:{stage}', incidentId=iid,
+                            stage=stage, rung=rung, policyCid=cid, message=message)
+        if note:
+            # Claim before dispatch. A crash in between is unconfirmed, never resent.
+            code = None
+            try:
+                code, _ = control.bounded(
+                    [os.environ.get('STASIS_BERTH_BIN', str(REPO / 'genesis/agentic/bin/berth')),
+                     'say', '--session', session['session'],
+                     f'Stasis {iid} {stage}: {message}'], cwd=journal.repo, timeout=1)
+            except OSError:
+                pass
+            delivery.add('berth-result', f'berth-result:{iid}:{stage}', incidentId=iid,
+                         stage=stage, confirmed=code == 0)
+        delivery.add('PushNotification', f'PushNotification:{iid}:{stage}', incidentId=iid,
+                     policyCid=cid, agentId=agent, stage=stage, rung=rung, message=message)
 
     def brief(self, incident, presence, claim, binding, history, shift_used):
         c = claim['consultation']
@@ -558,6 +681,9 @@ class Coordinator:
 
     def effects(self, journal, session, presence, incident, answer, stage):
         iid, rung, pivot = incident['id'], answer['rung'], answer['pivot']
+        if getattr(journal, 'activation', None):
+            self.live_effects(journal, session, presence, incident, answer, stage)
+            return
         if answer['decision'] == 'Refer':
             if rung == 4:
                 self.human(journal, session, presence, iid, answer['reason'])
@@ -576,6 +702,42 @@ class Coordinator:
             if stage != 'Open':
                 for effect in ('berth-note', 'PushNotification'):
                     journal.would(session, presence, iid, effect, rung, key=f'{effect}:{stage}', stage=stage)
+
+    def live_effects(self, journal, session, presence, incident, answer, stage):
+        delivery = control.Delivery(journal.directory)
+        iid, rung, cid = incident['id'], answer['rung'], journal.activation['policyCid']
+        if not any(r['kind'] == 'claim' and r['claimSeq'] == answer.get('claimSeq')
+                   and r['policyCid'] == cid for r in delivery.rows):
+            return  # Never promote a shadow consultation or one under an old policy.
+        pivot, agent = answer['pivot'], incident.get('agentId', 'main')
+        if answer['decision'] == 'Refer':
+            if rung == 4:
+                self.human(journal, session, presence, iid, answer['reason'], answer.get('ask'), agent)
+            return
+        if pivot == 'reshape' and (incident['concernClass'] != 'shape' or incident['stallClass'] != 'authorization'):
+            return
+        if pivot == 'proceed':
+            pivot = 'park'  # No native scoped-ruling validator yet; keeper text is not authority.
+        message = answer['reason']
+        if pivot == 'reshape':
+            if any(r['kind'] == 'guidance' and r.get('pivot') == 'reshape' and r['incidentId'] == iid
+                   and r.get('rung') != rung for r in delivery.rows):
+                return
+            message += (f" One procedural reshape: {answer['reshape']['tool']} {answer['reshape']['shape']}. "
+                        'Use unchanged palette and permission checks; a second failure Refers.')
+        if pivot == 'park':
+            delivery.park(iid, cid, agent, summary=message)
+            message = control.PARK.format(iid) + ' ' + message
+            # v1 events cannot express a live parked closure. Record it in the
+            # delivery journal, never forge a human deny or an invalid v1 event.
+            if incident['stallClass'] == 'question':
+                delivery.add('stall-closed', f'stall-closed:{iid}', incidentId=iid,
+                             policyCid=cid, closedBy='parked')
+        delivery.add('guidance', f'guidance:{iid}:{rung}', incidentId=iid, policyCid=cid,
+                     rung=rung, agentId=agent, pivot=pivot, message=message,
+                     effectClass=incident['effectClass'])
+        if pivot == 'notify' and stage != 'Open':
+            self.alert(journal, session, iid, stage, rung, message, agent)
 
     def consult(self, repo, directory, session, presence, incident, claim, runtime, binding, brief, stage):
         tokens, phase = None, 'complete'
@@ -625,7 +787,9 @@ class Coordinator:
             return
         except (OSError, ValueError, KeyError, TypeError):
             answer = refer('invalid keeper answer or unavailable command')
+        activation = self.activation(repo, directory.parent, directory.name)
         with locked(directory, True) as journal:
+            journal.activation, journal.repo = activation, repo
             starts, results = journal.claims(incident['id'])
             key = (incident['id'], claim['consultation']['rung'])
             if key not in results and starts.get(key, {}).get('seq') == claim['seq']:
@@ -633,7 +797,9 @@ class Coordinator:
                 closed = any(e['seq'] > claim['seq'] and (e['kind'] == 'session-ended' or (
                     e['kind'] == 'prompt-closed' and e.get('correlation', {}).get('incidentId') == incident['id']))
                              for e in journal.events)
-                if not closed:
+                parked = any(e['kind'] == 'prompt-closed' and e.get('closedBy') == 'parked'
+                             and e.get('correlation', {}).get('incidentId') == incident['id'] for e in journal.events)
+                if not closed or (activation and parked):
                     self.effects(journal, session, presence, incident, result['consultation'], stage)
 
     def context_check(self, answer, incident, claim):
@@ -689,7 +855,7 @@ class Coordinator:
         pid = running_pid(self.store)
         fresh = (heartbeat and pid == heartbeat['pid'] and heartbeat['bootId'] == clock()['bootId']
                  and age <= 3 * self.args.tick)
-        print(f'stasis-coordinator: {"shadow" if fresh else "unknown"}; '
+        print(f'stasis-coordinator: {heartbeat.get("mode", "shadow") if fresh else "unknown"}; '
               f'heartbeat age: {age if age is not None else "unknown"} seconds')
         count, measured = 0, True
         for repo, root, directory in self.sessions():
@@ -777,7 +943,7 @@ class Coordinator:
             lock.flush()
             signal.signal(signal.SIGTERM, lambda *_: self.stop.set())
             signal.signal(signal.SIGINT, lambda *_: self.stop.set())
-            self.log(f'START pid={os.getpid()} mode=shadow')
+            self.log(f'START pid={os.getpid()} requested={"live" if self.live_requested else "shadow"}')
             def pulse():
                 while not self.stop.wait(self.args.tick):
                     self.heartbeat()
@@ -898,6 +1064,8 @@ def start(args, coordinator):
         argv += ['--repo', str(Path(repo).resolve())]
     if args.keeper_cmd_override:
         argv += ['--keeper-cmd-override', args.keeper_cmd_override]
+    if coordinator.live_requested:
+        argv.append('--live')
     first = os.fork()
     if first == 0:
         os.setsid()
@@ -908,7 +1076,7 @@ def start(args, coordinator):
                 os.dup2(null.fileno(), fd)
         os.execv(sys.executable, argv)
     os.waitpid(first, 0)
-    until = time.monotonic() + 5
+    until = time.monotonic() + args.start_wait
     while time.monotonic() < until:
         pid = running_pid(coordinator.store)
         if pid:
@@ -928,9 +1096,6 @@ def positive(value):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if '--live' in argv:
-        print('live mode is slice 9', file=sys.stderr)
-        return 3
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['start', 'stop', 'status', 'run', 'once', 'compare'])
     parser.add_argument('--repo', action='append', default=[])
@@ -940,6 +1105,8 @@ def main(argv=None):
                         help='may shorten, never enlarge the budget-derived deadline')
     parser.add_argument('--keeper-cmd-override', help='test stub argv; no shell interpretation')
     parser.add_argument('--session')
+    parser.add_argument('--live', action='store_true', help='deliver only under a native pinned-match policy status')
+    parser.add_argument('--start-wait', type=positive, default=5, help='bounded wait for the daemon flock')
     args = parser.parse_args(argv)
     if args.command == 'compare' and not args.session:
         parser.error('compare requires --session')

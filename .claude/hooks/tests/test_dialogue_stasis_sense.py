@@ -551,10 +551,13 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.assertEqual(pkg['source']['body'].encode(), HOOK.read_bytes())
         self.assertIsNone(pkg['registration'])
         registrations = pkg['metadata']['intendedRegistrations']
-        self.assertEqual(len(registrations), 10)
+        self.assertEqual(len(registrations), 12)
         self.assertEqual([r['matcher'] for r in registrations if r['event'] == 'Notification'],
                          ['permission_prompt', 'idle_prompt'])
-        self.assertTrue(all(not r['async'] and not r['asyncRewake'] for r in registrations))
+        wake = [r for r in registrations if r['asyncRewake']]
+        self.assertEqual(len(wake), 1)
+        self.assertEqual(wake[0]['event'], 'Stop')
+        self.assertTrue(wake[0]['async'])
         if jsonschema:
             jsonschema.validate(pkg, json.loads((REPO / 'elohim/sdk/domains/elohim-agent/schemas/hook-package.schema.json').read_text()))
 

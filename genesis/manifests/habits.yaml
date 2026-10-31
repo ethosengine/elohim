@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice 6 non-native, still unwired): initial S5 policy/schema match StasisPolicy::builtin and native shape IDs by source-parity tests; pin helper prepares only a steward ruling command and requires native eprfs cid (binary absent here; real helper exited 2, no ruling). S3* audit joins denials to transcript calls, compares native effects, reads windowed git history, labels the git-push/gh-api-merge ambiguity and shadow parks, and prepares a read-only Codex brief plus a dry-run verdict. 24 focused unittest tests OK with native/git stubs and no live model calls; 29 sensitive-file boundary assertions passed; package verifier Node entry point 2350 passed (pnpm blocked by read-only engine store); just gate seam-guidance-contracts passed with workspace TMPDIR. Native policy loading and live decide exit-3 CID enforcement remain the separate cargo leg; no activation claimed.
-    evidence-fingerprint: sha256:1250938a14ee925b
-    evidence-bytes: 7069
-    evidence-entries: 13
+      DELTA 2026-10-31 (slice 9, still unwired): pinned-only control transport adds bounded native deny calls, learned-form style gate, private delivery/park receipts, one Stop block per batch, capability-gated idle wake and sub-second SessionStart awareness; coordinator live mode falls back to shadow on unpinned status and preserves original budgets across failed reshape retries. Stub-only verification: all 123 Python stasis tests and 50 sensor tests OK, Node stasis-keeper test 1/1, package verify 2350 passed, hook/package/fixture byte-identical; no live model calls. Wiring is the 12-registration stasis-settings.patch.json; settings.json unchanged. Native pinned decide still emits none, learnedForms needs native schema acceptance, scoped proceed validation and parked-closure replay remain explicit seams; no live activation or complete live measures claimed.
+    evidence-fingerprint: sha256:8e7e181fc1eefa71
+    evidence-bytes: 7934
+    evidence-entries: 14
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
