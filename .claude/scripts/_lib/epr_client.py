@@ -46,6 +46,103 @@ from pathlib import Path
 # A hung evaluator must never hang an author's keystroke.
 _TIMEOUT_SECONDS = 10
 
+# `epr bin status` costs ~2.3 s on a loaded host (measured 2026-10-30, load 54), and every hook
+# that resolves the binary paid it on every call. That alone overran the 2 s and 3 s hook
+# timeouts: 201 cancelled hooks in one session. A resolved path is content-addressed, so a
+# cached one stays runnable. The TTL only bounds how long a newly landed pin goes unnoticed.
+# The cache is keyed on the launcher and BIN_STORE, never on the store's layout; it holds
+# positive answers only; it applies only to the real environment (env=None); and
+# EPR_CLIENT_CACHE_TTL=0 turns it off.
+_CACHE_TTL_SECONDS = 120
+
+
+def _cache_file() -> Path:
+    import tempfile
+    return Path(tempfile.gettempdir()) / f"epr-client-resolve-{os.getuid()}.json"
+
+
+def _cache_identity() -> dict:
+    launcher = shutil.which("epr")
+    return {"launcher": os.path.realpath(launcher) if launcher else None,
+            "binStore": os.environ.get("BIN_STORE", "")}
+
+
+def _cache_ttl() -> float:
+    try:
+        return float(os.environ.get("EPR_CLIENT_CACHE_TTL", _CACHE_TTL_SECONDS))
+    except ValueError:
+        return _CACHE_TTL_SECONDS
+
+
+# Past the TTL, the stale path is still served (it is content-addressed and checked executable)
+# while ONE detached refresher re-resolves it in the background. Without this, the first hook
+# after each expiry paid the full lookup (3.4 s measured) and overran a 2 s hook timeout, as did
+# every hook racing with it. A stale entry older than this bound is no longer served.
+_CACHE_MAX_STALE_SECONDS = 86400
+
+
+def _refresh_in_background() -> None:
+    import time
+    lock = _cache_file().with_name(_cache_file().name + ".refreshing")
+    try:
+        if lock.exists() and time.time() - lock.stat().st_mtime < 60:
+            return  # a refresher is already running
+        lock.write_text(str(os.getpid()))
+        lib = str(Path(__file__).resolve().parents[1])
+        subprocess.Popen(
+            [os.environ.get("PYTHON", "python3"), "-c",
+             "import sys; sys.path.insert(0, sys.argv[1]); from _lib import epr_client; "
+             "epr_client._refresh_now(); import os; os.unlink(sys.argv[2])", lib, str(lock)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception:  # noqa: BLE001 — a failed refresh leaves the stale entry until the next try
+        pass
+
+
+def _refresh_now() -> None:
+    """Re-resolve through `epr bin status` and rewrite the cache (the detached refresher)."""
+    os.environ["EPR_CLIENT_CACHE_TTL"] = "0"  # bypass the cache read in this one process
+    path, cid = resolve()
+    if path and cid:
+        os.environ.pop("EPR_CLIENT_CACHE_TTL", None)
+        _store_resolution(path, cid)
+
+
+def _cached_resolution() -> tuple[str, str] | None:
+    import time
+    ttl = _cache_ttl()
+    if ttl <= 0:
+        return None
+    try:
+        entry = json.loads(_cache_file().read_text())
+        path, cid = entry["path"], entry["cid"]
+        if entry.get("identity") != _cache_identity() or not os.access(path, os.X_OK):
+            return None
+        age = time.time() - entry["at"]
+        if age < ttl:
+            return path, cid
+        if age < _CACHE_MAX_STALE_SECONDS:
+            _refresh_in_background()
+            return path, cid
+    except Exception:  # noqa: BLE001 — a missing or torn cache is a miss, never an answer
+        pass
+    return None
+
+
+def _store_resolution(path: str, cid: str) -> None:
+    import time
+    if _cache_ttl() <= 0:
+        return
+    try:
+        target = _cache_file()
+        tmp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({"identity": _cache_identity(), "at": time.time(),
+                                   "path": path, "cid": cid}))
+        os.replace(tmp, target)
+    except Exception:  # noqa: BLE001 — failing to cache only costs the next caller a lookup
+        pass
+
 
 def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
     """Resolve one executable path/CID pair, never the stable launcher itself."""
@@ -54,6 +151,10 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         candidate = environment.get("EPR_BIN", "").strip()
         if candidate:
             return _candidate(candidate)
+        if env is None:
+            cached = _cached_resolution()
+            if cached:
+                return cached
         result = subprocess.run(
             ["epr", "bin", "status", "--tool", "epr", "--json"],
             env=dict(environment), capture_output=True, text=True, timeout=_TIMEOUT_SECONDS,
@@ -68,6 +169,8 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
         # A release is addressed bafkrei… (one binary, raw) or bafyrei… (a DAG-CBOR sums manifest:
         # epr with bin-launch); anything else is a legacy sha256 identity, an absence.
         if isinstance(path, str) and isinstance(cid, str) and cid.startswith(("bafkrei", "bafyrei")):
+            if env is None:
+                _store_resolution(path, cid)
             return path, cid
         return None, None
     except Exception:  # noqa: BLE001 — resolution is best-effort; absence is a valid answer
