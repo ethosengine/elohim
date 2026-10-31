@@ -19,6 +19,7 @@ from pathlib import Path
 # `.env.example`, public certificates, test fixtures, and identifiers named `private_key` as
 # secrets while still warning the editing agent to inspect the destination carefully.
 WARN_PATTERNS = [
+    r'(^|/)\.epr-meta/elohim/policies/dialogue-stasis-policy\.json$',  # S5: warn only
     r'\.env(?:\.[^/]+)?$',
     r'credentials\.json$',
     r'secrets?\.json$',

@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice 8 reconciliation, still unwired): coordinator reconciled with the native camelCase fold, object effectClass, selected-window keeper totals and canonical session-event journal contract; null costs stop claims, known lower bounds prove exhaustion and budget-unknown would-have notes retain unmeasured evidence. stasis_coordinator_test.py: 51 tests OK with stub epr/keepers, including jsonschema validation of every written event, consultation start/complete/expired, object shape matching and null-budget boundaries; no live native fold or model call.
-    evidence-fingerprint: sha256:33dd00033732467a
-    evidence-bytes: 6173
-    evidence-entries: 12
+      DELTA 2026-10-31 (slice 6 non-native, still unwired): initial S5 policy/schema match StasisPolicy::builtin and native shape IDs by source-parity tests; pin helper prepares only a steward ruling command and requires native eprfs cid (binary absent here; real helper exited 2, no ruling). S3* audit joins denials to transcript calls, compares native effects, reads windowed git history, labels the git-push/gh-api-merge ambiguity and shadow parks, and prepares a read-only Codex brief plus a dry-run verdict. 24 focused unittest tests OK with native/git stubs and no live model calls; 29 sensitive-file boundary assertions passed; package verifier Node entry point 2350 passed (pnpm blocked by read-only engine store); just gate seam-guidance-contracts passed with workspace TMPDIR. Native policy loading and live decide exit-3 CID enforcement remain the separate cargo leg; no activation claimed.
+    evidence-fingerprint: sha256:1250938a14ee925b
+    evidence-bytes: 7069
+    evidence-entries: 13
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
