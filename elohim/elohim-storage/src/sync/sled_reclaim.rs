@@ -28,7 +28,7 @@
 //! | name | meaning |
 //! |------|---------|
 //! | `<live>.reclaim-tmp` | the fresh copy being built. Verified once `<live>.reclaim-old` exists. |
-//! | `<live>.reclaim-old` | the original, kept until the fresh copy opens. |
+//! | `<live>.reclaim-old` | the original, complete only while `.reclaim-complete` is present. |
 //! | `<live>.reclaim-rejected` | a fresh copy that failed to open, being discarded. |
 //! | `<live>.reclaim-attempts` | unfinished-attempt count (a file). |
 //! | `<live>.reclaim-lock` | held (`flock`) for the whole open; never deleted. |
@@ -38,12 +38,17 @@
 //!
 //! - no live, old and tmp present: the crash fell between the renames, tmp is
 //!   verified, finish the swap (`tmp → live`);
-//! - no live, old present, no tmp: a rollback was interrupted, finish it
-//!   (`old → live`);
+//! - no live, old present, no tmp: finish an interrupted rollback (`old → live`)
+//!   only if old has its completeness marker;
 //! - tmp present beside live: the copy never reached the swap, delete it;
 //! - rejected present: delete it;
-//! - live and old present: open live; on success delete old, on failure roll
-//!   back (`live → rejected`, `old → live`).
+//! - live and old present: open live; on success delete old, on corruption roll
+//!   back only if old has its completeness marker (`live → rejected`, `old → live`).
+//!   Other open errors leave live in place. An unmarked old is stale and deleted.
+//!
+//! The marker is fsynced into the original after verification, before the first
+//! rename. Deleting old removes and fsyncs the marker first, so a partial deletion
+//! can never be mistaken for a complete original on the next boot.
 //!
 //! Every step moves toward exactly one intact sled at the live path, none
 //! deletes the only intact copy, and none is undone by a later rule, so a crash
@@ -58,9 +63,8 @@
 //!
 //! Deleting a discarded copy is never needed for an intact live sled, so a
 //! failure to delete one is logged and the boot serves without reclaiming
-//! until it is gone. Only a rename that cannot be made stops a boot: finishing
-//! an interrupted swap or rollback, or a rollback itself (which first frees
-//! the rejected name). The original is intact at its name in every such case.
+//! until it is gone. An open error without a safe rollback, or a rename that
+//! cannot be made, stops a boot. A rollback first frees the rejected name.
 //!
 //! An attempt is counted from the moment it starts reading the live trees,
 //! and the count is cleared only when a copy is promoted (or the sled turns
@@ -74,7 +78,7 @@
 //! everything before the swap (measuring, copying, verifying, fsyncing the
 //! copy) checks [`DEFAULT_BUDGET`] between entries and files. Past it the copy
 //! is discarded and the node serves from the original sled. A single file's
-//! fsync is not interruptible, so the overshoot is at most one file's.
+//! or directory's fsync is not interruptible, so the overshoot is at most one fsync.
 //!
 //! Outside the budget, by design: the directory walk that decides whether to
 //! try (a `stat` per file), the swap's two renames, opening the promoted copy,
@@ -128,6 +132,9 @@ const HEADROOM_FIXED_BYTES: u64 = 512 * 1024 * 1024;
 /// How often progress is logged while copying.
 const PROGRESS_EVERY: Duration = Duration::from_secs(5);
 
+/// Removed and fsynced before any original files can be deleted.
+const ORIGINAL_COMPLETE: &str = ".reclaim-complete";
+
 /// When and how a reclaim runs.
 #[derive(Debug, Clone)]
 pub struct ReclaimPolicy {
@@ -142,6 +149,8 @@ pub struct ReclaimPolicy {
     pub open: fn(&Path, u64) -> sled::Result<sled::Db>,
     /// Deletes a file or directory tree, a missing one included.
     pub remove: fn(&Path) -> io::Result<()>,
+    /// Fsyncs a copy directory within the attempt's deadline.
+    pub sync_dir: fn(&Path, Instant) -> io::Result<()>,
 }
 
 impl Default for ReclaimPolicy {
@@ -155,6 +164,7 @@ impl Default for ReclaimPolicy {
             free_space: |p| fs4::available_space(p),
             open: open_at,
             remove: remove_path,
+            sync_dir: |p, _| sync_dir(p),
         }
     }
 }
@@ -312,9 +322,24 @@ fn rename_synced(from: &Path, to: &Path, parent: &Path) -> io::Result<()> {
     sync_dir(parent)
 }
 
-/// fsync every file and directory under `root`, then `root` itself.
-/// `Ok(false)` when `deadline` passed first (checked between files).
-fn sync_tree(root: &Path, deadline: Instant) -> io::Result<bool> {
+fn mark_original_complete(original: &Path) -> io::Result<()> {
+    std::fs::File::create(original.join(ORIGINAL_COMPLETE))?.sync_all()?;
+    sync_dir(original)
+}
+
+fn remove_original(paths: &ReclaimPaths, remove: fn(&Path) -> io::Result<()>) -> io::Result<()> {
+    remove_path(&paths.old.join(ORIGINAL_COMPLETE))?;
+    sync_dir(&paths.old)?;
+    remove(&paths.old)
+}
+
+/// fsync every file and directory under `root`, including `root` itself.
+/// `Ok(false)` when `deadline` passed first (checked around directory fsyncs too).
+fn sync_tree(
+    root: &Path,
+    deadline: Instant,
+    sync_directory: fn(&Path, Instant) -> io::Result<()>,
+) -> io::Result<bool> {
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         for entry in std::fs::read_dir(&dir)? {
@@ -329,9 +354,15 @@ fn sync_tree(root: &Path, deadline: Instant) -> io::Result<bool> {
                 std::fs::File::open(&path)?.sync_all()?;
             }
         }
-        sync_dir(&dir)?;
+        if Instant::now() > deadline {
+            return Ok(false);
+        }
+        sync_directory(&dir, deadline)?;
+        if Instant::now() > deadline {
+            return Ok(false);
+        }
     }
-    Ok(true)
+    Ok(Instant::now() <= deadline)
 }
 
 /// Take `<live>.reclaim-lock` for the whole open. Refused, not awaited, when
@@ -358,7 +389,7 @@ fn lock_open(paths: &ReclaimPaths) -> Result<std::fs::File, StorageError> {
 /// most `live` and `old` remain (see the module docs for the rules). `old` is
 /// handled by [`open_live`], which must open `live` to decide.
 ///
-/// Errors only when an interrupted rename cannot be finished. A discarded
+/// Errors when an interrupted rename cannot be finished safely. A discarded
 /// copy that `remove` cannot delete is logged and left; the caller sees it
 /// still exists and does not reclaim this boot.
 pub fn recover_leftovers(
@@ -373,12 +404,18 @@ pub fn recover_leftovers(
                 "sync sled reclaim: finishing an interrupted swap (the copy was verified before the swap began)"
             );
             rename_synced(&paths.tmp, &paths.live, &parent)?;
-        } else {
+        } else if paths.old.join(ORIGINAL_COMPLETE).try_exists()? {
             warn!(
                 old = %paths.old.display(),
                 "sync sled reclaim: finishing an interrupted rollback to the original"
             );
             rename_synced(&paths.old, &paths.live, &parent)?;
+        } else {
+            return Err(io::Error::other(format!(
+                "{} is missing and {} has no completeness marker; not restoring a possibly partial original",
+                paths.live.display(),
+                paths.old.display()
+            )));
         }
     }
     for (path, what) in [
@@ -399,10 +436,6 @@ pub fn recover_leftovers(
     Ok(())
 }
 
-fn is_lock_contention(e: &sled::Error) -> bool {
-    e.to_string().contains("could not acquire lock")
-}
-
 /// How [`open_live`] found the live path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiveOpen {
@@ -411,13 +444,13 @@ pub enum LiveOpen {
     /// A reclaimed copy opened and replaces the original (deleted now, or by
     /// the next boot if that failed).
     Promoted,
-    /// The reclaimed copy did not open; the original is live again.
+    /// The reclaimed copy was corrupt; the complete original is live again.
     RolledBack,
 }
 
 /// Open `live` for service. When `old` sits beside it, `live` is a fresh
-/// reclaimed copy: delete `old` once `live` opens, or roll back to `old` if it
-/// does not.
+/// reclaimed copy: delete `old` once `live` opens, or roll back on corruption
+/// only while `old` still has its completeness marker.
 pub fn open_live(
     paths: &ReclaimPaths,
     cache_capacity: u64,
@@ -437,16 +470,30 @@ pub fn open_live(
     match (policy.open)(&paths.live, cache_capacity) {
         Ok(db) if !paths.old.exists() => Ok((db, LiveOpen::Plain)),
         Ok(db) => {
-            if let Err(e) = (policy.remove)(&paths.old) {
+            if let Err(e) = remove_original(paths, policy.remove) {
                 // Retried next boot by this same rule; the live copy serves.
                 warn!(old = %paths.old.display(), error = %e, "sync sled reclaim: could not delete the original yet");
             }
             Ok((db, LiveOpen::Promoted))
         }
-        Err(e) if paths.old.exists() && !is_lock_contention(&e) => {
+        Err(e) if paths.old.exists() => {
+            if !paths.old.join(ORIGINAL_COMPLETE).try_exists()? {
+                warn!(
+                    old = %paths.old.display(),
+                    error = %e,
+                    "sync sled reclaim: the original may be partially deleted; keeping live and discarding the stale original"
+                );
+                if let Err(e) = remove_original(paths, policy.remove) {
+                    warn!(old = %paths.old.display(), error = %e, "sync sled reclaim: could not delete the stale original yet");
+                }
+                return Err(open_err(e));
+            }
+            if !matches!(e, sled::Error::Corruption { .. }) {
+                return Err(open_err(e));
+            }
             warn!(
                 error = %e,
-                "sync sled reclaim: the reclaimed copy did not open; rolling back to the original"
+                "sync sled reclaim: the reclaimed copy is corrupt; rolling back to the complete original"
             );
             let parent = paths.parent();
             // A rename cannot replace a non-empty directory.
@@ -798,7 +845,7 @@ pub fn open_sync_sled(
             )
         }
     }
-    match sync_tree(&paths.tmp, deadline) {
+    match sync_tree(&paths.tmp, deadline, policy.sync_dir) {
         Ok(true) => {}
         Ok(false) => {
             return abort(
@@ -814,6 +861,20 @@ pub fn open_sync_sled(
                 format!("fsync of the copy failed: {e}"),
             )
         }
+    }
+    if let Err(e) = mark_original_complete(&paths.live) {
+        return abort(
+            db,
+            ReclaimOutcome::AbortedError,
+            format!("could not mark the original complete: {e}"),
+        );
+    }
+    if Instant::now() > deadline {
+        return abort(
+            db,
+            ReclaimOutcome::AbortedBudget,
+            "budget spent marking the original complete".into(),
+        );
     }
 
     // The swap. Close the original first so nothing writes to it mid-rename.
@@ -1197,14 +1258,116 @@ mod tests {
     }
 
     #[test]
-    fn a_copy_that_does_not_open_rolls_back_to_the_original() {
+    fn a_non_corruption_open_error_does_not_roll_back() {
         let dir = tempfile::tempdir().unwrap();
         let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
         marked_sled(&paths.old, "original");
+        mark_original_complete(&paths.old).unwrap();
         // A live path sled cannot open as a database.
         std::fs::write(&paths.live, b"not a sled").unwrap();
-        assert_eq!(served_marker(&paths.live), "original");
+        assert!(open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &off()).is_err());
+        assert_eq!(std::fs::read(&paths.live).unwrap(), b"not a sled");
+        assert!(paths.old.join(ORIGINAL_COMPLETE).is_file());
+        assert!(!paths.rejected.exists());
+        let db = open_at(&paths.old, SYNC_SLED_CACHE_BYTES).unwrap();
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+    }
+
+    #[test]
+    fn a_partial_original_is_not_restored_after_an_open_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.live, "intact-live");
+        std::fs::create_dir(&paths.old).unwrap();
+        std::fs::write(paths.old.join("remnant"), b"partially deleted").unwrap();
+        let failing = ReclaimPolicy {
+            open: |_, _| {
+                Err(sled::Error::Io(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "refused by the test",
+                )))
+            },
+            remove: |path| {
+                assert_eq!(path.file_name().unwrap(), "sync.sled.reclaim-old");
+                remove_path(path)
+            },
+            ..off()
+        };
+        let err = open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &failing).unwrap_err();
+        assert!(err.to_string().contains("refused by the test"));
         only_live_remains(&paths);
+        assert_eq!(served_marker(&paths.live), "intact-live");
+    }
+
+    #[test]
+    fn a_corrupt_copy_rolls_back_to_a_complete_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.old, "original");
+        mark_original_complete(&paths.old).unwrap();
+        std::fs::write(&paths.live, b"corrupt copy").unwrap();
+        let corrupt = ReclaimPolicy {
+            open: |path, cache| {
+                if path.is_file() {
+                    Err(sled::Error::Corruption { at: None, bt: () })
+                } else {
+                    open_at(path, cache)
+                }
+            },
+            ..off()
+        };
+        let (db, opened) = open_live(&paths, SYNC_SLED_CACHE_BYTES, &corrupt).unwrap();
+        assert_eq!(opened, LiveOpen::RolledBack);
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+        only_live_remains(&paths);
+    }
+
+    #[test]
+    fn a_partial_original_is_not_restored_even_on_corruption() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.live, "intact-live");
+        std::fs::create_dir(&paths.old).unwrap();
+        std::fs::write(paths.old.join("remnant"), b"partially deleted").unwrap();
+        let corrupt = ReclaimPolicy {
+            open: |_, _| Err(sled::Error::Corruption { at: None, bt: () }),
+            ..off()
+        };
+        assert!(open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &corrupt).is_err());
+        only_live_remains(&paths);
+        assert_eq!(served_marker(&paths.live), "intact-live");
+    }
+
+    #[test]
+    fn deleting_the_original_invalidates_its_marker_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.old, "original");
+        mark_original_complete(&paths.old).unwrap();
+        marked_sled(&paths.live, "verified-copy");
+        let partial_remove = ReclaimPolicy {
+            remove: |path| {
+                assert!(!path.join(ORIGINAL_COMPLETE).exists());
+                std::fs::remove_file(path.join("conf"))?;
+                Err(io::Error::other("deletion interrupted by the test"))
+            },
+            ..off()
+        };
+        let (db, opened) = open_live(&paths, SYNC_SLED_CACHE_BYTES, &partial_remove).unwrap();
+        assert_eq!(opened, LiveOpen::Promoted);
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"verified-copy");
+        assert!(paths.old.is_dir());
+        assert!(!paths.old.join(ORIGINAL_COMPLETE).exists());
+        assert!(!paths.old.join("conf").exists());
+        drop(db);
+
+        let failing = ReclaimPolicy {
+            open: |_, _| Err(sled::Error::Io(io::Error::other("I/O failure by the test"))),
+            ..off()
+        };
+        assert!(open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &failing).is_err());
+        only_live_remains(&paths);
+        assert_eq!(served_marker(&paths.live), "verified-copy");
     }
 
     #[test]
@@ -1213,6 +1376,7 @@ mod tests {
         let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
         // After `live → rejected`, before `old → live`.
         marked_sled(&paths.old, "original");
+        mark_original_complete(&paths.old).unwrap();
         std::fs::write(&paths.rejected, b"not a sled").unwrap();
         assert_eq!(served_marker(&paths.live), "original");
         only_live_remains(&paths);
@@ -1221,6 +1385,19 @@ mod tests {
         marked_sled(&paths.rejected, "bad-copy");
         assert_eq!(served_marker(&paths.live), "original");
         only_live_remains(&paths);
+    }
+
+    #[test]
+    fn a_partial_original_cannot_fill_a_missing_live_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        std::fs::create_dir(&paths.old).unwrap();
+        std::fs::write(paths.old.join("remnant"), b"partially deleted").unwrap();
+        marked_sled(&paths.rejected, "retained-copy");
+        assert!(recover_leftovers(&paths, remove_path).is_err());
+        assert!(!paths.live.exists());
+        assert!(paths.old.join("remnant").exists());
+        assert!(paths.rejected.is_dir());
     }
 
     #[test]
@@ -1329,7 +1506,7 @@ mod tests {
     /// original.
     fn refuse_the_promoted_copy(path: &Path, cache: u64) -> sled::Result<sled::Db> {
         if PROMOTED_OPENS.fetch_add(1, Ordering::SeqCst) % 3 == 1 {
-            return Err(sled::Error::Unsupported("refused by the test".into()));
+            return Err(sled::Error::Corruption { at: None, bt: () });
         }
         open_at(path, cache)
     }
@@ -1387,11 +1564,54 @@ mod tests {
         marked_sled(&copy, "copy");
         let spent = Instant::now() - Duration::from_secs(1);
         assert!(
-            !sync_tree(&copy, spent).unwrap(),
+            !sync_tree(&copy, spent, policy().sync_dir).unwrap(),
             "past the deadline it stops"
         );
         let ample = Instant::now() + Duration::from_secs(60);
-        assert!(sync_tree(&copy, ample).unwrap());
+        assert!(sync_tree(&copy, ample, policy().sync_dir).unwrap());
+    }
+
+    #[test]
+    fn a_deadline_during_the_final_directory_fsync_aborts_the_swap() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.live, "original");
+        std::fs::write(paths.live.join("original-only"), b"not copied by sled").unwrap();
+        let hurried = ReclaimPolicy {
+            min_ratio: 0,
+            budget: Duration::from_secs(2),
+            sync_dir: |path, deadline| {
+                sync_dir(path)?;
+                // The copy has only its root and an empty blobs directory,
+                // which is visited last by sync_tree.
+                if path.file_name().unwrap() == "blobs" {
+                    assert!(std::fs::read_dir(path)?.next().is_none());
+                    assert!(Instant::now() <= deadline);
+                    std::thread::sleep(
+                        deadline.saturating_duration_since(Instant::now())
+                            + Duration::from_millis(1),
+                    );
+                    std::fs::write(path.join("deadline-spent"), b"")?;
+                }
+                Ok(())
+            },
+            remove: |path| {
+                assert_eq!(path.file_name().unwrap(), "sync.sled.reclaim-tmp");
+                assert!(path.join("blobs/deadline-spent").exists());
+                remove_path(path)
+            },
+            ..policy()
+        };
+        let (db, report) = open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &hurried).unwrap();
+        assert_eq!(report.outcome, ReclaimOutcome::AbortedBudget, "{report:?}");
+        assert_eq!(report.detail, "budget spent fsyncing the copy");
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+        assert_eq!(
+            std::fs::read(paths.live.join("original-only")).unwrap(),
+            b"not copied by sled"
+        );
+        assert!(!paths.live.join(ORIGINAL_COMPLETE).exists());
+        only_live_remains(&paths);
     }
 
     #[test]
