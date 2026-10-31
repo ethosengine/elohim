@@ -49,7 +49,21 @@
         },
         "provider": { "type": "string", "minLength": 1 },
         "valid_from": { "type": "string", "minLength": 1 },
-        "valid_until": { "type": "string", "minLength": 1 }
+        "valid_until": { "type": "string", "minLength": 1 },
+        "renewal": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Present only on a RENEWED content commitment: a re-pin of a scope after this node's commitment for it was revoked is a NEW commitment by an explicit sequence (1 for the first renewal, then one more than the commitment it renews). An unrenewed commitment omits it and is sequence 0, so its payload, and so its cid, is unchanged. Without it, a scope re-pinned on the day its commitment was revoked would re-author the revoked entry byte for byte (validity is bucketed to the UTC day), and the projection keeps that cid revoked. Steward ruling 2026-10-29."
+        },
+        "supersedes": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The cid (entry hash) of the commitment this renewal renews. Present exactly when `renewal` is."
+        }
+      },
+      "dependentRequired": {
+        "renewal": ["supersedes"],
+        "supersedes": ["renewal"]
       }
     },
     {

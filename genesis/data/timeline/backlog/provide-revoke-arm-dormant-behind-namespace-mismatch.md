@@ -117,3 +117,25 @@ active.
 Parked, because the fourth needs a decision about what makes a renewed commitment a new one, and the arm has nothing
 to revoke on the household today. The defect it also found stands on dev regardless of the arm: a replayed commitment
 signal clears `revoked_at` (`db/mishpat_commitments.rs`, `upsert_with_anchor`).
+
+## 2026-10-29: renewal ruled, the four blockers fixed, built on `fix/provide-revoke-renewal`
+
+Steward ruling (Matthew): a renewed provide commitment is a NEW commitment by an explicit renewal sequence. Built
+on branch `fix/provide-revoke-renewal` (from `land/big-train`) in three commits, none on dev yet, none run against a
+conductor:
+
+1. The replay defect: `upsert_with_anchor` no longer clears `revoked_at`; the first revocation time stands.
+2. Renewal: identity is authored in elohim-storage (`build_content_payload`), not in a zome; the mishpat integrity
+   zome checks only `variant` and `bounds.reach_ceiling`, so no DNA hash moves. A provide for a scope whose lineage
+   head is revoked (or is itself a renewal) carries `renewal: n` and `supersedes: <cid>`; an unrenewed payload is
+   byte-identical to before, so nothing re-keys. Schema `replicates-content.schema.json` admits both keys.
+3. The arm, ported from `ff02b01f2`, off unless `ELOHIM_PROVIDE_REVOKE_ARM=dry-run|apply`, with the blockers fixed:
+   the evidence is re-checked by the client after the chain-gate and admission waits, immediately before the call
+   (`HcClient::call_zome_mishpat_guarded`); an unknown outcome (crash after the claim, or an error) is retried after
+   15 minutes with the same entry, at most 3 attempts, then reported on every pass (`RevokeSweep::stuck`); the
+   un-pin route and the arm submit through one protocol (`provide_reconcile::submit_revocation`) and one claim in
+   `mishpat_revocations`; a revocation that lands before its target also withdraws the coverage mirror.
+
+Still open: landing the branch, a `dry-run` pass on the household and then alpha (the census on 2026-10-13 found
+nothing to revoke), and the operator's per-network choice on option (3) for the duplicate rows, which the arm
+leaves alone. The un-pin route now revokes only when the scope has no other pin, the same rule as the arm.

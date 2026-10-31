@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Print a native byte CID and a STEWARD-only ruling command; never record it.
+
+eprfs cid is the raw-file verb (no --body or --short). EPRFS_BIN may select
+that binary. No Python CID implementation or hash-shaped substitute exists.
+See ../stasis-policy-operations.md for activation and audit boundaries.
+"""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+
+POLICY = '.epr-meta/elohim/policies/dialogue-stasis-policy.json'
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[3])
+    args = parser.parse_args()
+    repo = args.repo.resolve()
+    path = repo / POLICY
+    try:
+        before = path.read_bytes()
+        version = json.loads(before)['version']
+        # eprfs-agent is currently a library, not an installed CLI. Only invoke
+        # known file-CID syntax, never guess a mutation verb from a help string.
+        binary = os.environ.get('EPRFS_BIN') or shutil.which('eprfs')
+        if not binary:
+            raise ValueError('native CID tool unavailable; provision eprfs-cli, then run '
+                             f'EPRFS_BIN=/path/to/eprfs {sys.argv[0]} --repo {shlex.quote(str(repo))}; '
+                             f'the native command is: eprfs cid {POLICY}')
+        result = subprocess.run([binary, 'cid', str(path)], cwd=repo, text=True,
+                                capture_output=True, timeout=30, check=True)
+        cid = result.stdout.strip()
+        if not re.fullmatch(r'bafkrei[a-z2-7]{52}', cid):
+            raise ValueError('native tool did not return one raw sha2-256 CIDv1')
+        if path.read_bytes() != before:
+            raise ValueError('policy changed during CID calculation; rerun the helper')
+        reason = json.dumps({'purpose': 'dialogue-stasis-policy', 'policyPath': POLICY,
+                             'policyCid': cid, 'version': version}, separators=(',', ':'))
+        command = [os.environ.get('EPR_BIN', 'epr'), 'flow', 'note', '--kind', 'ruling',
+                   '--on', POLICY, '--reason', reason, '--root', str(repo)]
+        print(f'Policy CID: {cid}')
+        print('STEWARD runs this after reviewing these exact bytes (nothing recorded):')
+        print(shlex.join(command))
+        return 0
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        print(f'stasis-policy-pin: {exc}', file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

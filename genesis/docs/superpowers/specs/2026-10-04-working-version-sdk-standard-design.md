@@ -324,3 +324,61 @@ Each is a missing node, named and not designed here.
 undefined) and its one runnable seam, `dataplane/hub-carries-edit.feature`
 (`@concern:hub-carries-edit`, a check of the `dataplane-convergence` habit, born red). The vision
 feature's offline-edit and closed-laptop scenarios are this standard's acceptance.
+
+## 11. Shared source working versions — contract reconciliation, 2026-10-13
+
+This section extends the same working-version contract to native development. It is a design
+decision, not a claim that collaborative editing, private sync admission or offline persistence
+has shipped. The integration map is
+`genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`.
+
+**Branch birth.** The person's standing choice defaults new source branches to live, attributed
+proposals across their authorized devices. The birth receipt names the selected audience and
+agreement; an explicit device-private override keeps the branch on this device. This choice is
+the person's widening act applied at birth, never implicit admission of teammates, hubs or
+agents. Without a valid standing choice or enforceable admission, keep the branch device-private
+and show why. Changing the standing choice does not silently widen existing branches.
+
+**Branch agreement.** A branch's signed agreement, separate from its merged values, names who
+may propose, who may coedit, and whose acceptance incorporates proposals. Live visibility of
+attributed proposals does not imply acceptance. A human may explicitly admit other humans to
+coedit. Agents default to isolated attributed drafts offered for whole or partial acceptance.
+Explicit human-authorized branch terms may instead grant an agent bounded live coediting; machine
+presence or device enrollment never grants that authority implicitly. Team admission is a
+deliberate relationship act, not one grant per file. Branch sharing is bounded by the source's reach and does not publish a canonical head.
+
+**One change model, two adapters.** An editor adapter contributes text operations for live
+collaboration; a filesystem adapter captures saves, additions, deletions and renames from ordinary
+tools. Both feed the same SDK working version with actor and base-version provenance. They must
+deduplicate their own projected writes, preserve concurrent edits and surface conflicts rather
+than overwriting unseen local changes. Cursor and presence updates remain passing state. A save
+checkpoint is not a notary write, and no keystroke creates a DHT head. Binary and unsupported file
+changes are addressed replacements with explicit conflict handling, not text merges.
+
+**Durability before delivery.** Accepted local operations, branch audience choice, base version
+and pending proposals survive closing the editor or device with no network. Browser storage and
+native document storage implement the same SDK contract. Restart reopens the held working version;
+reconnection resumes delivery without duplicate acceptance. A visitor remains session-only and
+is told. A hosted person can prepare and fix locally; account signing waits for their key holder.
+
+**Materialized means UNBUILT.** Received source may land in an isolated worktree after admission
+and integrity checks; it does not authorize a build, hook, package install, test, preview or task.
+Watchers and IDE automation must not execute received files. A running development tree does not
+follow incoming edits unless its execution agreement explicitly allows that behavior. Snapshot
+selection and execution authorization are separate from editing and sync. Shared execution is a
+deferred capability, not a prerequisite for this collaboration contract.
+
+**Evidence scope.** Source inspection on 2026-10-13 found `AutomergeSync` in
+`elohim/sdk/storage-client-ts/src/sync.ts`, and the read-oriented, in-memory content watcher in
+`app/elohim-library/projects/elohim-service/src/angular/services/content-doc-sync.service.ts`.
+Neither proves durable collaborative source editing. `elohim/eprfs/eprfs-local/src/lib.rs`
+provides verified projection materialization, not a live editor/worktree bridge. Those are reuse
+seams; the adapters, admission enforcement, durable lifecycle and execution separation above need
+implementation and acceptance evidence. No new runtime test was run for this reconciliation.
+
+Acceptance adds: two authorized devices resume the same pending edits offline; device-private
+branches never enter discovery or sync; a teammate sees attributed proposals without acquiring
+acceptance authority; unauthorized agent proposals cannot mutate the accepted branch, while
+explicitly authorized bounded agent coediting follows the branch agreement; editor and filesystem
+updates converge without echo; received source remains unbuilt even with another worktree's
+watchers running. These tests extend §10 rather than replacing its local-first floor.

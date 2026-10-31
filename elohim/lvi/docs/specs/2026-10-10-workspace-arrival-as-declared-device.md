@@ -200,3 +200,35 @@ Until then this spec is the declaration the devfile does not make.
   `AgentPeerBinding` `workspace` archetype.
 - A per-workspace overlay for `pool-policy.json` (§3 names the row; the Berth is its home).
 - Making a carried contribution count as its own act (§6.3), or syncing `flows.jsonl`.
+
+## 9. Shared development arrival — reconciliation, 2026-10-13
+
+Keep four facts separate: key custody, granted authority, reachable peers, and device capacity.
+A Che URL, local conductor, larger machine or hosted session does not establish the others.
+Each device retains its own key; another authorized device witnesses the binding. Do not copy a
+human's conductor keystore to create another device.
+
+Developer roster binding is not dataplane enrollment. Identity join must also prove the relevant
+cell/DNA identity, admitted device or delegate, and authorized sync namespace before source travels.
+DNA parity is necessary but does not confer edit authority. Mishpat/device join and cell-qualified
+sync remain explicit gaps until their own evidence closes them. Neither §4's roster ceremony nor
+the six arrival checks proves the whole shared-development ceremony.
+
+The standing branch choice selects live attributed proposals among authorized own devices at
+birth, with a device-private override and private fallback if admission cannot be enforced.
+Branch agreement separately admits teammates, permits coediting and names acceptance authority.
+Agents default to isolated drafts; explicit human-approved terms may grant bounded live coediting.
+Machine presence alone never grants this. A hub or doorway adds admitted custody or transport,
+not an automatic reader/editor. Its loss preserves held source, changes and pending proposals.
+
+Follow `genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md` §11.
+Receive source into an isolated **UNBUILT** worktree, without watcher/task/hook execution. Build,
+test and preview require a selected snapshot and distinct execution authority. Shared execution
+is deferred. The integration map is
+`genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`.
+
+This changes the contract, not runtime completion. Existing developer enroll/authorize/bind and
+materializer source were inspected; identity-qualified live source sync and editor adapters were
+not runtime-tested. Acceptance must prove identity join plus DNA-qualified admission, offline
+reopening, private-branch exclusion, unauthorized proposal isolation, explicitly admitted coediting,
+and no execution on receipt before the wider arrival can be marked complete.

@@ -150,6 +150,49 @@ Record delivered revision, acceptance and household receipts, both runtime sessi
 exercised safeguard, elapsed time, operator interventions and remaining obligations
 in the owning sprint result. At deadline, stop and retain the unfinished frontier.
 
+## Dialogue stasis
+
+At kickoff, append a `shift-marker` event with `shift: {"id":"<shift-id>",
+"edge":"open"}` to the session's private stasis journal. Use the shared
+`journal.lock` and atomic sequence/state update; preserve the session incarnation,
+clock and presence envelope. An unattended launch also records the steward's
+authorized, expiring away ruling with
+`epr flow note --kind ruling --on <commitment> --reason <away-scope-and-expiry>`.
+Name the session, shift, authorization source and UTC expiry (within the frozen
+deadline); retain the returned ruling reference in presence evidence. Away selects
+handling only: it grants no execution authority and invents no human witness.
+
+Beside pre-dispatch authority checks, check every Bash call with the existing
+`genesis/agentic/palette.mjs` matcher. Do not attempt an unmatched command.
+Consult active learned rung-0 forms alongside that check; a proposed form is not
+active, and a learned form still passes the palette and unchanged permissions.
+Never retry an authoritatively denied effect through another tool or spelling.
+
+Before bailing or consulting any keeper about a question, research the governing
+spec/plan, trajectory, prior art, then findings, in that order. Models do not
+replace evidence. Proceed only with independently authorized, reversible,
+in-scope work. Seed permission wishlist entries from incident evidence in the
+existing journal: Redirect = approved alternative; Wishlist = convenience with
+a workaround; Blocker = progress actually stopped. Preserve the incident reference
+and consequence. Judge `stall` still means no measured delta over two or more
+iterations; dialogue silence does not redefine objective progress or turn a quiet
+build into a failed controller.
+
+At close (including interruption or deadline), read
+`epr session stasis status --shift-current` before appending the closing
+`shift-marker` with the same id and `edge: "close"`. Report
+`dialogue-blocked-seconds@1` against `dialogue-blocked-ceiling@1` (1800 s per
+shift), beside existing delivery evidence. Use the Dialogue stasis blocks in
+`genesis/docs/shifts/JOURNAL-TEMPLATE.md` and `SPRINT-RESULT-TEMPLATE.md` for
+class/presence breakdowns, resolving rungs, harness exceptions, ruling and markers.
+Missing or unfolded readings are unmeasured, never zero; keep pending edges and
+unavailable native status explicit rather than claiming closure evidence.
+
+Nothing in a running shift edits its own judge, frozen objective or stasis policy.
+L2 improvement proposals wait for the steward between shifts; proposing is not
+activation. `STASIS_LADDER=off` preserves observation while disabling intervention;
+`STASIS_SENSE=off` writes nothing, so detectable gaps remain unmeasured.
+
 ## Maintenance
 
 `just gate agentic-shift` exercises state, adapters, containment/recovery, objective

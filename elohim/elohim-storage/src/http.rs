@@ -17787,20 +17787,21 @@ impl HttpServer {
     /// DELETE /api/v1/pins/{id} — soft-delete a pin by marking it "removed".
     ///
     /// Un-pin IS real revocation (Slice-2b T10): after flipping the pin to
-    /// `removed`, if the pin carries a `commitment_cid` back-reference (the
-    /// `replicates-commons` offer the provide reconciler authored for it), this
-    /// authors a `revokes-commitment` targeting that CID through the conductor.
+    /// `removed`, if no pin of its scope is held any more, this authors a
+    /// `revokes-commitment` for each of this node's offers for the scope
+    /// (`provide_reconcile::unpin_revocations`): the live content rows of the
+    /// signing key, and the `commitment_cid` back-reference of ANY pin of the
+    /// scope whose offer has not projected yet. The back-reference sits on the
+    /// pin the reconciler authored for, which need not be the pin removed last.
     /// The revocation's projection (`mishpat_projection::parse_revokes_commitment`)
     /// sets `revoked_at` on the target row, so the prioritizer stops serving it
     /// and the bounds validator refuses it.
     ///
-    /// This is the AUTHORITATIVE un-pin revocation path (targets the pin's
-    /// `commitment_cid` directly). It is distinct from the reconciler's
-    /// stranded-row safety-net arm, which revokes a live commitment whose logical
-    /// key has left the desired set. Best-effort: a conductor failure must NOT
-    /// fail the un-pin — the next provide-reconcile tick's stranded-row arm is
-    /// the backstop. Prior accepted ProvideAnnounce events stand (no retroactive
-    /// change — the audit trail keeps which commitment was revoked).
+    /// Best-effort: a conductor failure must NOT fail the un-pin. The outcome
+    /// is recorded in `mishpat_revocations`, and the removed-pin arm, when it is
+    /// switched on, retries an unknown one. Prior accepted ProvideAnnounce
+    /// events stand (no retroactive change — the audit trail keeps which
+    /// commitment was revoked).
     async fn handle_remove_pin(&self, id_str: &str) -> Result<Response<Full<Bytes>>, StorageError> {
         let id: i32 = id_str
             .parse()
@@ -17808,51 +17809,74 @@ impl HttpServer {
 
         let mut conn = self.get_diesel_conn()?;
 
-        // Capture the notarized offer back-reference BEFORE flipping status so we
-        // can withdraw the commons offer (author a revokes-commitment). Indexed
-        // lookup by id — not a full-table scan.
-        let offer_cid: Option<String> = db::acquisition_pins::get_pin_by_id(&mut conn, id)
-            .map_err(|e| StorageError::Database(e.to_string()))?
-            .and_then(|p| p.commitment_cid);
-
         let rows = db::acquisition_pins::set_pin_status(&mut conn, id, "removed")
             .map_err(|e| StorageError::Database(e.to_string()))?;
 
         if rows == 0 {
             return Ok(response::not_found(&format!("pin {} not found", id)));
         }
+        // The pin as removed: its scope and the removal time the status flip
+        // just wrote, the evidence the revocation is claimed and signed with.
+        let removed_pin = db::acquisition_pins::get_pin_by_id(&mut conn, id)
+            .map_err(|e| StorageError::Database(e.to_string()))?;
         drop(conn);
 
-        // Withdraw the commons offer: author a revokes-commitment targeting the
-        // pin's commitment_cid. Best-effort — the provide reconciler's stranded-
-        // row revoke arm is the backstop if the conductor is unavailable here.
-        if let (Some(target_cid), Some(hc)) = (
-            offer_cid,
+        // Withdraw the scope's offers, through the same claim protocol as the
+        // reconciler's removed-pin arm (`provide_reconcile::submit_revocation`):
+        // one claim per target in `mishpat_revocations`, so the route and the
+        // arm never both revoke one row and a repeated DELETE submits nothing;
+        // the evidence (no pin of the scope is held) re-checked immediately
+        // before the call; an unknown outcome recorded so the arm, when
+        // switched on, retries it.
+        if let (Some(hc), Some(pool), Some(pin)) = (
             self.hc_registry.as_ref().and_then(|r| r.lamad_client()),
+            self.db_pool.clone(),
+            removed_pin,
         ) {
-            let signed_at = crate::db::models::current_timestamp();
-            let payload_json = crate::services::conductor_commitment_author::build_revoke_payload(
-                &target_cid,
-                &signed_at,
-            );
-            let input = crate::services::conductor_writes::CreateMishpatCommitmentInput {
-                action: "revokes-commitment".to_string(),
-                payload_json,
-                signed_at,
-            };
-            if let Err(e) = crate::chain_write_gate::as_writer(
-                crate::chain_write_gate::WriterKind::HttpAuthor,
-                crate::services::conductor_writes::call_create_commitment(&hc, input),
-            )
-            .await
-            {
-                tracing::warn!(
+            use crate::services::provide_reconcile::CommitmentRevoker;
+            let revoker = crate::services::conductor_commitment_author::ConductorRevoker::new(hc);
+            match revoker.revoke_authority().await {
+                None => tracing::warn!(
                     target: "elohim_storage::provide",
                     pin = id,
-                    target_cid = %target_cid,
-                    error = %e,
-                    "un-pin: revokes-commitment author failed; reconciler stranded-row arm will retry"
-                );
+                    "un-pin: no mishpat signing key established; the scope's offers are not revoked now (the removed-pin arm is the backstop when it is switched on)"
+                ),
+                Some(authority) => {
+                    let now = chrono::Utc::now();
+                    let plans = pool.get().map_err(|e| e.to_string()).and_then(|mut c| {
+                        crate::services::provide_reconcile::unpin_revocations(
+                            &mut c, &pin, &authority, now,
+                        )
+                    });
+                    match plans {
+                        Err(e) => tracing::warn!(
+                            target: "elohim_storage::provide",
+                            pin = id,
+                            error = %e,
+                            "un-pin: the scope's offers could not be read; not revoked now (the removed-pin arm is the backstop when it is switched on)"
+                        ),
+                        Ok(plans) => {
+                            for plan in &plans {
+                                let outcome =
+                                    crate::services::provide_reconcile::submit_revocation(
+                                        &pool,
+                                        &revoker,
+                                        plan,
+                                        crate::chain_write_gate::WriterKind::HttpAuthor,
+                                        chrono::Utc::now(),
+                                    )
+                                    .await;
+                                tracing::info!(
+                                    target: "elohim_storage::provide",
+                                    pin = id,
+                                    target_cid = %plan.cid,
+                                    outcome = ?outcome,
+                                    "un-pin: revokes-commitment"
+                                );
+                            }
+                        }
+                    }
+                }
             }
         }
 

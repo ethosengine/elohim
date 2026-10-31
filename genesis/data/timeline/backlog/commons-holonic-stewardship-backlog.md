@@ -134,3 +134,31 @@ wrong.
 **Identity-ontology note:** collective-stewarded credentials are the *correct* apex shape —
 community-conferred standing, not self-assertion. A **self-issued** credential is the drift the
 identity guard exists to catch.
+
+## 2026-10-13 — Social coding application of rows 32–38
+
+The shared contract is
+`genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`;
+its pending acceptance stories are
+`genesis/a2o/features/devflow/shared-working-versions.feature`. This is a scoped application
+of the existing rows, not another register or a claim that a coding charter is ratified.
+No pool-specific declaration-plus-probe pair has been verified by this design pass.
+
+- **32/35:** between branch-agreement proposal and policy in force, require human choice and
+  a comparable committed closure; probe two peers deriving the same amended charter head.
+- **33:** between frozen candidate and reviewer/decision selection, pin the rules before
+  identities are selected; a changed rule creates a new request, not retroactive permission.
+- **34:** between provision and facility draw, require the charter's carrying rule and window;
+  probe a crossing draw narrowing. Source artifacts are non-rival; compute and carrying cost are not.
+- **36:** between notice and restriction, require the member-agreed ladder and human arena;
+  probe second-rung handling and witnessed appeal. A failed code gate is not a sanction.
+- **37:** between promised shared capacity and dependable collaboration, require member-readable
+  condition plus deciding-body size/nesting; probe both without a mandatory monitoring dashboard.
+- **38:** between evidence and binding closure, require attested lineage diversity under the
+  charter's declared rule; more identical agents cannot create plurality or additional human votes.
+
+Across these rows, declare artifact rights and alienation held by nobody. Keep sensitive team
+working versions outside today's public pool membership/draw machinery unless an admissible
+private carrier exists. A member's elohim senses, drafts and carries evidence for that person;
+there is no pool-elohim, and admission, rule changes, votes, sanctions beyond notice, settlement
+and recognition remain human acts. No charter thresholds are selected by this addition.

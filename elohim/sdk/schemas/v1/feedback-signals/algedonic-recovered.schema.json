@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/algedonic-recovered",
+  "title": "AlgedonicRecoveredFeedbackSignal",
+  "description": "FeedbackSignal kind emitted when an open algedonic signal (approach and/or breach) has cleared: the stock stayed on the safe side of the reset line for the full dwell. Recovered is a transition of the algedonic latch, never an incident state. Emitted at most once per recovery; the latch keys are cleared by it, so a stock re-crossing the reset line during dwell cancels the recovery instead of emitting. standing_impact is fixed 'advisory' — the signal informs, it does not itself withdraw or restore standing. Canon: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (AlgedonicSignal and its latch) and genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md §3.",
+  "$comment": "Source of truth: DHT (FeedbackSignal entry); this file is the wire contract only.",
+  "type": "object",
+  "required": ["signal_kind", "target", "declarer", "evidence", "signed_at"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "algedonic-recovered"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID of the promise (Commitment) whose pain has cleared."
+    },
+    "declarer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CID or agent identifier of the agent that declared the original pain and now declares its recovery."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["stock", "limit", "bound_ref", "reset_pct", "crossed_back_at", "dwell_s", "cause_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "stock": {
+          "type": "number",
+          "description": "The measured stock level when recovery was confirmed."
+        },
+        "limit": {
+          "type": "number",
+          "description": "The declared bound."
+        },
+        "bound_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CID of the bounding commitment/manifest that declared the limit."
+        },
+        "reset_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The reset line as a percentage of the limit (limit x reset_pct / 100). Below it is safe for a ceiling bound; above it is safe for a floor bound."
+        },
+        "crossed_back_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$",
+          "description": "When the stock last crossed back to the safe side of the reset line and stayed there for the dwell."
+        },
+        "dwell_s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seconds the stock had to remain on the safe side before the latch reset."
+        },
+        "cause_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reference to the event that moved the stock back (for a dialogue stall, the incident's closing event)."
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "critical"],
+      "default": "warn"
+    },
+    "signed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$"
+    }
+  }
+}

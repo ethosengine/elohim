@@ -7,7 +7,14 @@ author's commit — Codex, Gemini, a human, or Claude driving git — not just C
 Usage: epr-meta-git-gate.py [--staged | --range A..B]
 Exit 0 = allow (advisories to stderr); 1 = block (deny, or ask without EPR_META_ACK=1).
 Bypass: EPR_META_ACK=1 downgrades ask->allow for THIS gate; git --no-verify skips ALL hooks.
-Fail-open by design (callers guard on `command -v python3`); absence never blocks a commit.
+
+--staged also runs the commit-time formatting ratchet (policy commit-format-ratchet@1, validator
+`epr:validator-staged-format`, engine _lib.epr_format via _lib.epr_meta_git.format_phase). That
+phase judges the INDEX, never the worktree, and is folded into the exit code separately from the
+two-host governance comparison: formatting drift is deny (EPR_META_ACK=1 does not waive it); a
+missing formatter or an unmeasurable file is ask with its install cure. In --staged mode an
+internal error refuses with a named cure instead of failing open — "we should never commit
+unlinted code" (steward ruling 2026-10-30). --range keeps its fail-open posture.
 
 Witnesses each changed file's decision to governance-findings.jsonl via the SAME
 _lib.epr_meta.witness helper the Claude PreToolUse resolver drives (runtime="git-gate") — one
@@ -15,6 +22,7 @@ governance ledger, every author. Re-derives the per-file verdict sequence `_lib.
 computes internally (same functions, same order) so each file's `path` is available alongside its
 Verdict for the witness `subject` — `run()`'s aggregate (exit_code, messages) return doesn't expose
 that pairing, and this module is a thin CLI (real logic stays in _lib.epr_meta_git, untouched)."""
+import json
 import os
 import sys
 from pathlib import Path
@@ -55,6 +63,24 @@ def _witness_file(root: Path, path: str, verdict, *, ack: bool, evaluator: dict 
                       refer=info["refer"], checks=[verdict.reason], evaluator=evaluator)
 
 
+def _witness_format(root: Path, path: str, verdict, *, ack: bool) -> None:
+    """Witness one formatting verdict with its git evidence (blob ids, tool, config identity)."""
+    try:
+        info = epr_meta.decision_for(verdict)
+        decision, refer = info["decision"], info["refer"]
+        if verdict.cls == "ask" and ack:
+            decision, refer = "permit", {"layer": "operator", "reason": "acked"}
+        checks = [verdict.reason]
+        if verdict.evidence:
+            checks.append("evidence: " + json.dumps(verdict.evidence, sort_keys=True, default=str))
+        epr_meta.witness(root, runtime="git-gate", gate="git-gate-format", subject=path,
+                         decision=decision, cls=verdict.cls, rule_id=verdict.rule_id,
+                         policy_ref=f"{epr_meta_git.FORMAT_GATE_RULE}@1", refer=refer,
+                         checks=checks)
+    except Exception:  # noqa: BLE001 — witnessing must never break the gate
+        pass
+
+
 def main(argv: list[str]) -> int:
     ack = os.environ.get("EPR_META_ACK") == "1"
     # Best-effort: no error if absent, no validation — the actor plane is advisory here.
@@ -69,6 +95,12 @@ def main(argv: list[str]) -> int:
         return 0  # unknown invocation -> fail-open
 
     root = epr_meta.find_repo_root(Path.cwd())
+    # The formatting phase reads the index first, before the governance phase's per-file reads.
+    fmt_verdicts, fmt_notices = [], []
+    if mode == "staged":
+        fmt_verdicts, fmt_notices, _stats = epr_meta_git.format_phase(root)
+        for path, v in fmt_verdicts:
+            _witness_format(root, path, v, ack=ack)
     verdicts_by_path: list[tuple[str, object]] = []
     native_by_path: list[tuple[str, dict | None]] = []
     for path, status in epr_meta_git.changed_files(mode, rng):
@@ -149,6 +181,16 @@ def main(argv: list[str]) -> int:
     if native_worst is not None:
         code = 1
 
+    # Formatting is folded in AFTER the native fold: a native permit never clears it.
+    fmt_code, fmt_msgs = epr_meta_git.decide([v for _, v in fmt_verdicts], ack=ack)
+    msgs.extend(fmt_notices)
+    msgs.extend(fmt_msgs)
+    if fmt_code:
+        code = 1
+        msgs.append("[.epr-meta] commit refused by the formatting ratchet (commit-format-ratchet@1). "
+                    "The INDEX is judged: format the named files, review, and `git add` them; "
+                    "nothing was rewritten or re-staged for you.")
+
     for m in msgs:
         print(m, file=sys.stderr)
     return code
@@ -159,6 +201,13 @@ if __name__ == "__main__":
         sys.exit(main(sys.argv[1:]))
     except SystemExit:
         raise
-    except Exception as e:  # fail-open: an internal error is NOT a block
-        print(f"epr-meta-git-gate internal error: {e}", file=sys.stderr)
-        sys.exit(0)
+    except Exception as e:  # noqa: BLE001
+        print(f"epr-meta-git-gate internal error: {type(e).__name__}: {e}", file=sys.stderr)
+        if "--staged" in sys.argv[1:]:
+            # Never commit unchecked: the formatting phase is part of --staged. Named cure.
+            print("epr-meta-git-gate: commit REFUSED because the gate could not complete. Cure: "
+                  "restore the tracked gate files (`git checkout -- .claude/scripts .husky`) and "
+                  "re-run; to commit anyway bypass all hooks with `git commit --no-verify`.",
+                  file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)  # --range (pre-push) keeps its fail-open posture

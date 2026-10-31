@@ -82,6 +82,11 @@
       "ref": "epr:validator-native-seam-guidance",
       "runtime": "rust",
       "why": "Single native advisory classifier over explicit owner-local declarations. Compatibility hosts report native unavailability without duplicating classification."
+    },
+    {
+      "ref": "epr:validator-staged-format",
+      "runtime": "python",
+      "why": "The commit-time formatting ratchet (commit-format-ratchet@1). It needs commit evidence only the staged git adapter has: the index blobs, their HEAD baselines and the committed formatter configuration, materialized by _lib.epr_format and measured with the pinned rustfmt and each package's own Prettier. Outside that adapter it is not applicable (never 'checked'); the native evaluator declares it elsewhere, and the git gate folds its exit outside the two-host decision comparison so a native permit never clears a formatting deny."
     }
   ]
 }

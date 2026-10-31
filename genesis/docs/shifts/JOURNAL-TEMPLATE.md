@@ -69,6 +69,28 @@ confidence: <low|medium|high>
 
 ---
 
+## Dialogue stasis
+
+Read `epr session stasis status --shift-current` before the closing marker.
+Absent, retained-away or unfolded evidence is **unmeasured**, never zero.
+
+- Shift/session: `<shift-id>` / `<session incarnation>`
+- Away ruling: **unmeasured** — `<reference, authorization source, scope, UTC expiry>`
+- `shift-marker` edges (same shift id): open **unmeasured** / close **unmeasured** — `<event references and timestamps>`
+- `dialogue-blocked-seconds@1`: **unmeasured** against `dialogue-blocked-ceiling@1` = **1800 s**; rail outcome **unmeasured**.
+
+| Blocked seconds by class / presence | Collaborative | Automated | Unknown |
+|---|---|---|---|
+| Authorization | unmeasured | unmeasured | unmeasured |
+| Question | unmeasured | unmeasured | unmeasured |
+| Silence | unmeasured | unmeasured | unmeasured |
+
+Use folded interval unions; overlapping classes must not inflate the shift total.
+
+- Incidents by resolving rung (0–5): **unmeasured** — `<counts, incident references; unresolved separately>`
+- `harness-exceptions@1`: **unmeasured** — `<counts by hook and evidence>`
+- Observation gaps / unavailable status / pending markers: `<evidence or unmeasured>`
+
 ## Permission wishlist (accumulated across iterations)
 
 - **Blocker:** `<pattern>` — reason: `<why needed>` — iterations: `<list>`

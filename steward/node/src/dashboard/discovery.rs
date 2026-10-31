@@ -14,7 +14,10 @@ use tokio::sync::mpsc;
     reason = "no caller references this mDNS service-type constant yet"
 )]
 pub const ELOHIM_NODE_SERVICE: &str = "_elohim-node._tcp.local.";
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "no caller references this mDNS service-type constant yet"
+)]
 pub const ELOHIM_APP_SERVICE: &str = "_elohim-app._tcp.local.";
 #[allow(dead_code)]
 pub const ELOHIM_DOORWAY_SERVICE: &str = "_elohim-doorway._tcp.local.";

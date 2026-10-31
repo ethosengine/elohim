@@ -1,0 +1,805 @@
+{
+  "$id": "elohim-agent:schema:session-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionEvent",
+  "description": "One private dialogue-stasis journal event. Source of truth: this schema for the version-1 journal vocabulary; genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md defines its handling contract. No DHT entry or replicated head is created.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "session",
+    "agentId",
+    "seq",
+    "clock",
+    "presence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "description": "Source of truth: this schema's version-1 journal event kinds. idle-prompt records Notification idle_prompt as silence evidence only; the native fold owns independent timing and any inferred dialog-close bound. It is neither a human presence witness nor proof of a stall.",
+      "enum": [
+        "permission-requested",
+        "dialog-displayed",
+        "prompt-closed",
+        "classifier-denied",
+        "turn-ended",
+        "idle-prompt",
+        "consultation",
+        "would-have",
+        "steward-ping",
+        "observation-gap",
+        "shift-marker",
+        "harness-exception",
+        "session-ended"
+      ]
+    },
+    "session": {
+      "description": "Session incarnation, following device-runtime SessionIdentity field names. Owner pid and start time are optional and nullable; when known, the pair guards against pid reuse and is not authentication.",
+      "type": "object",
+      "required": [
+        "runtime",
+        "session"
+      ],
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownerPid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "ownerStartTime": {
+          "description": "Linux process start time in clock ticks, encoded as decimal text like SessionIdentity to preserve u64 precision.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "agentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seq": {
+      "description": "Atomically assigned sequence number within this session incarnation.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "shift": {
+      "description": "The skill shift identified by a shift-marker event; its edges delimit the dialogue accounting window.",
+      "type": "object",
+      "required": [
+        "id",
+        "edge"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "edge": {
+          "description": "Source of truth: this schema's shift-marker edge vocabulary.",
+          "enum": [
+            "open",
+            "close"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "clock": {
+      "type": "object",
+      "required": [
+        "wall",
+        "bootId",
+        "uptimeSeconds",
+        "provenance"
+      ],
+      "properties": {
+        "wall": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bootId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uptimeSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "presence": {
+      "type": "object",
+      "required": [
+        "disposition",
+        "basis"
+      ],
+      "properties": {
+        "disposition": {
+          "description": "Source of truth: this schema's presence vocabulary. Derived from witnessed interaction, a Breach witnessing session-wide absence, or an expiring away ruling; never an execution grant.",
+          "enum": [
+            "collaborative",
+            "automated",
+            "unknown"
+          ]
+        },
+        "basis": {
+          "type": "object",
+          "required": [
+            "lastWitnessedAgeSeconds",
+            "rulingRef"
+          ],
+          "properties": {
+            "lastWitnessedAgeSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "rulingRef": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "description": "Source hook provenance. PermissionRequest has no tool-use id of its own; precedingToolUseId records a preceding PreToolUse only when correlation supports that match.",
+      "type": "object",
+      "required": [
+        "hookEvent"
+      ],
+      "properties": {
+        "hookEvent": {
+          "type": "string"
+        },
+        "promptId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolUseId": {
+          "description": "The source event's own tool-use id, where it has one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "precedingToolUseId": {
+          "description": "The preceding PreToolUse id used to correlate a PermissionRequest; null when no reliable match is available.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputDigest": {
+      "description": "SHA-256 of canonical tool_input JSON (sorted keys, compact separators); never raw arguments.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "durationMs": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "tool": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effectClass": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shape": {
+      "description": "Redacted structural description only; excludes raw tool arguments, secret values and private dialogue content.",
+      "type": "string"
+    },
+    "concernClass": {
+      "description": "Source of truth: this schema's journal concern vocabulary; classification rules belong to the pinned dialogue-stasis policy.",
+      "enum": [
+        "shape",
+        "risk",
+        "uncertain"
+      ]
+    },
+    "correlation": {
+      "type": "object",
+      "required": [
+        "incidentId",
+        "confidence",
+        "method"
+      ],
+      "properties": {
+        "incidentId": {
+          "description": "The correlated incident, or null when confidence is unknown and no incident can be established.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "confidence": {
+          "description": "Source of truth: this schema's correlation-confidence vocabulary; unknown is not a confirmed match.",
+          "enum": [
+            "high",
+            "low",
+            "unknown"
+          ]
+        },
+        "method": {
+          "description": "Source of truth: this schema's correlation-method vocabulary. The prompt-id plus preceding-PreToolUse method supports serial calls only; parallel batches or identical inputs require low confidence or an observation gap, never a guessed match.",
+          "enum": [
+            "prompt-id-preceding-pretooluse",
+            "tool-use-id",
+            "inferred-next-event",
+            "none"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "gap": {
+      "type": "object",
+      "required": [
+        "reason",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "question": {
+      "description": "Source of truth: this schema's question classification; uncertain never blocks.",
+      "enum": [
+        "yes",
+        "no",
+        "uncertain"
+      ]
+    },
+    "consultation": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "description": "Source of truth: the dialogue-stasis design's capability vocabulary, pending the slice-2 AgentPackage capabilityProfile schema.",
+          "enum": [
+            "C1",
+            "C2",
+            "C3",
+            "C4"
+          ]
+        },
+        "binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "description": "Source of truth: elohim/epr/src/verdict.rs Decision, restricted to the keeper's Permit/Refer authority. Permit is advice within existing authority, never approval of a prompt.",
+          "enum": [
+            "Permit",
+            "Refer"
+          ]
+        },
+        "pivot": {
+          "description": "Source of truth: this schema's operational-pivot vocabulary beneath the protocol Decision. null when a Refer carries no pivot.",
+          "enum": [
+            "reshape",
+            "park",
+            "proceed",
+            "notify",
+            null
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "enum": [
+            "start",
+            "complete",
+            "expired"
+          ]
+        },
+        "rung": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "claimedBy": {
+          "type": "object",
+          "required": [
+            "pid",
+            "bootId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "pid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "claimSeq": {
+          "description": "seq of the phase:start record this completion or expiry closes.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "startedAt": {
+          "type": "object",
+          "required": [
+            "wall",
+            "bootId",
+            "uptimeSeconds",
+            "provenance"
+          ],
+          "properties": {
+            "wall": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uptimeSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "finishedAt": {
+          "type": "object",
+          "required": [
+            "wall",
+            "bootId",
+            "uptimeSeconds",
+            "provenance"
+          ],
+          "properties": {
+            "wall": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uptimeSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "deadlineAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeoutSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usage": {
+          "description": "Measured cost of this consultation; null fields are unmeasured, never zero.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "elapsedSeconds",
+            "tokens"
+          ],
+          "properties": {
+            "elapsedSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "reshape": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "ask": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "A keeper consultation record. Source of truth: the dialogue-stasis spec's Incident model and slice 8. phase start is the coordinator's atomic claim of (incident, rung) under journal.lock; complete and expired are journalled against that claim by claimSeq, so a restart never spends a second keeper call. A record without phase is a complete consultation (legacy single-record form).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "start"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase",
+              "rung",
+              "level",
+              "binding",
+              "startedAt",
+              "deadlineAt",
+              "claimedBy"
+            ]
+          },
+          "else": {
+            "required": [
+              "level",
+              "binding",
+              "decision",
+              "pivot",
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "complete",
+                  "expired"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "claimSeq",
+              "finishedAt",
+              "usage"
+            ]
+          }
+        }
+      ]
+    },
+    "closedBy": {
+      "description": "Source of truth: this schema's close-attribution vocabulary. A human denial is inferred and must be labeled as such.",
+      "enum": [
+        "approved",
+        "denied-inferred",
+        "unknown"
+      ]
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "hookName",
+        "count"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "hook_cancelled",
+            "hook_error",
+            "stop_failure"
+          ]
+        },
+        "hookName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Redacted command, as with `shape`."
+        },
+        "durationMs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "timeoutMs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "baseline": {
+          "type": "boolean",
+          "description": "Historical exceptions read while establishing a transcript cursor; journalled without notification."
+        }
+      }
+    },
+    "wouldHave": {
+      "description": "Shadow operation: an effect the regulator or coordinator would have applied, recorded and never applied. key deduplicates repeats of one prospective effect.",
+      "type": "object",
+      "required": [
+        "effect",
+        "incidentId",
+        "rung",
+        "key"
+      ],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "incidentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rung": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 5
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "idle-prompt"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "properties": {
+              "hookEvent": {
+                "const": "Notification"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "shift-marker"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "prompt-closed"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "closedBy",
+          "correlation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "observation-gap"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "gap"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "turn-ended"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "question"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "consultation"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "consultation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "permission-requested",
+              "dialog-displayed"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "source",
+          "tool",
+          "correlation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "harness-exception"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "exception"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "would-have"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "wouldHave"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

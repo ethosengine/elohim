@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/dialogue-stasis-policy.schema.json",
+  "title": "Dialogue stasis S5 policy",
+  "description": "Source of truth: dialogue-stasis-loop-design Policy boundary and Budgets; initial values mirror StasisPolicy::builtin and Classifier. This is a local policy, not a DNA enum. Loading or validating it grants no authority: activation requires the steward's exact byte CID ruling. Bounds reuse epr-rea Bound; Approach is stall.limit * stall.thresholdPct / 100.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "never",
+    "budgets",
+    "collaborativeWindowS",
+    "stall",
+    "shiftCeiling",
+    "dwellS",
+    "ruleSet",
+    "promotionCriteria",
+    "rulingValidation"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "never": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "invariant"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^never-[a-z-]+$" },
+          "invariant": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incidentKeeperCalls",
+        "incidentElapsedS",
+        "incidentTokens",
+        "shiftKeeperS",
+        "shiftTokens"
+      ],
+      "properties": {
+        "incidentKeeperCalls": { "type": "integer", "minimum": 1 },
+        "incidentElapsedS": { "type": "number", "exclusiveMinimum": 0 },
+        "incidentTokens": { "type": "integer", "minimum": 1 },
+        "shiftKeeperS": { "type": "number", "exclusiveMinimum": 0 },
+        "shiftTokens": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "collaborativeWindowS": { "type": "number", "exclusiveMinimum": 0 },
+    "stall": { "$ref": "#/$defs/bound" },
+    "shiftCeiling": { "$ref": "#/$defs/bound" },
+    "dwellS": { "type": "integer", "minimum": 0 },
+    "ruleSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shapePatterns",
+        "riskRules",
+        "precedence",
+        "uncertainAs",
+        "nonAuthorizationConcern",
+        "effectNormalization"
+      ],
+      "properties": {
+        "shapePatterns": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["cd-compound", "heredoc", "bash-c", "multi-line"]
+          }
+        },
+        "riskRules": { "const": ["deny", "ask"] },
+        "precedence": { "const": ["deny", "ask", "allow"] },
+        "uncertainAs": { "const": "risk" },
+        "nonAuthorizationConcern": { "const": "uncertain" },
+        "effectNormalization": {
+          "const": "native-session-stasis-classifier-v1"
+        }
+      }
+    },
+    "promotionCriteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleanProceduralReshapeResolutions",
+        "sameEffectClass",
+        "trigger",
+        "activationRequires",
+        "standingRuling"
+      ],
+      "properties": {
+        "cleanProceduralReshapeResolutions": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "sameEffectClass": { "const": true },
+        "trigger": { "const": "propose" },
+        "activationRequires": {
+          "const": [
+            "completed-passing-other-family-audit",
+            "steward-standing-ruling"
+          ]
+        },
+        "standingRuling": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rulingValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "authority",
+        "unexpired",
+        "scopeCoversCase",
+        "policyPin",
+        "missingOrMismatchedPolicy"
+      ],
+      "properties": {
+        "kind": { "const": "ruling" },
+        "authority": { "const": "steward" },
+        "unexpired": { "const": true },
+        "scopeCoversCase": { "const": true },
+        "policyPin": { "const": "latest-steward-ruling-exact-cid" },
+        "missingOrMismatchedPolicy": { "const": "inert-live-exit-3" }
+      }
+    }
+  },
+  "$defs": {
+    "bound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit", "unit", "thresholdPct"],
+      "properties": {
+        "limit": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "const": "seconds" },
+        "thresholdPct": { "type": "number", "minimum": 1, "maximum": 100 }
+      }
+    }
+  }
+}

@@ -116,6 +116,7 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
     non-zero exit, or a run past the budget all return a single `bootstrap: skipped —
     <reason>` line.
     """
+    import signal
     import subprocess
     obs = _observation_module()
     binary = obs.resolve_bin() if obs else None
@@ -123,21 +124,31 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
         return ["bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"]
     session = obs.bootstrap_session_id(root, payload)
     try:
-        r = subprocess.run(
+        # Own process group, killed whole at the budget: `subprocess.run(timeout=)` kills only
+        # the child and then waits for pipe EOF, which a grandchild still holding stdout delays
+        # past the harness's 8 s hook timeout (measured 2026-10-30 at load 54: 9.6–11 s per
+        # prompt, every turn cancelled and shown to the steward as a red error).
+        proc = subprocess.Popen(
             [binary, "flow", "memory", "recall", "open",
              "--purpose", "bootstrap", "--lens", "simple",
              "--session", session, "--root", str(root)],
-            capture_output=True, text=True, timeout=TIMEOUT_S,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        return [f"bootstrap: skipped — recall open exceeded the {TIMEOUT_S}s budget"]
+        try:
+            stdout, stderr = proc.communicate(timeout=TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            return [f"bootstrap: skipped — recall open exceeded the {TIMEOUT_S}s budget"]
     except Exception as exc:  # noqa: BLE001 — a per-turn hook must never block or crash a turn
         return [f"bootstrap: skipped — {exc}"]
-    if r.returncode != 0:
-        reason_lines = (r.stderr or r.stdout or "").strip().splitlines()
-        reason = reason_lines[0] if reason_lines else f"exit {r.returncode}"
+    if proc.returncode != 0:
+        reason_lines = (stderr or stdout or "").strip().splitlines()
+        reason = reason_lines[0] if reason_lines else f"exit {proc.returncode}"
         return [f"bootstrap: skipped — {reason}"]
-    lines = r.stdout.splitlines()
+    lines = stdout.splitlines()
     if not lines:
         return ["bootstrap: skipped — empty rendering"]
     return lines[:RUN_PLANE_LINES]

@@ -163,6 +163,19 @@ check(
   false,
 );
 check('extra unknown field on root', { ...contentVariant, mystery_field: 'x' }, false);
+// A renewal: a re-pin after a revoke is a NEW commitment by an explicit
+// sequence, naming the revoked commitment it renews. Both fields together, or
+// neither (an unrenewed commitment carries no lineage).
+check(
+  'content variant renewal with its predecessor',
+  { ...contentVariant, renewal: 1, supersedes: 'uhCEkRevoked' },
+  true,
+);
+check('content variant renewal 0 is not written', { ...contentVariant, renewal: 0, supersedes: 'uhCEkRevoked' }, false);
+check('content variant renewal without a predecessor', { ...contentVariant, renewal: 1 }, false);
+check('content variant predecessor without a renewal', { ...contentVariant, supersedes: 'uhCEkRevoked' }, false);
+check('content variant empty predecessor', { ...contentVariant, renewal: 2, supersedes: '' }, false);
+check('capacity variant does not renew', { ...capacityVariant, renewal: 1, supersedes: 'uhCEkRevoked' }, false);
 
 if (failures.length > 0) {
   console.error('FAIL: replicates-content schema');
@@ -173,4 +186,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('PASS: replicates-content schema (18 cases)');
+console.log('PASS: replicates-content schema (24 cases)');

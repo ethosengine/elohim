@@ -489,6 +489,27 @@
       }
     },
     {
+      "citesContentCid": "bafyreicpvnj24dbcaxqfclqwrgkkw4l3bpehyteadossp3mecg3bmdnepy",
+      "citesContentSha256": "sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "commit-format-ratchet@1",
+        "title": "A commit never introduces formatting drift",
+        "summary": "A commit never introduces formatting drift",
+        "full_reasoning": "Steward ruling 2026-10-30: never commit unlinted code. The staged index is judged, not the worktree; format the named file, review it, and `git add` it.",
+        "binding": "constitutional",
+        "scope_json": "{\"scope\":{\"write\":\"*\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "operator-2026-10-30-matthew",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-staged-format\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreieg7zbdwvwgegmzx5c4kya5qhnema5ek6ky6r7pgutwmdyot6dvaq",
       "citesContentSha256": "sha256:86fe423b56c621999bf45c5601d81da4603a457958f47ef3527660f0e9f87504",
       "registry": "policies.yaml",

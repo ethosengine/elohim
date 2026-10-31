@@ -4,6 +4,39 @@
 **Status:** Draft — pending operator review
 **Author:** Matthew Dowell + Claude Opus 4.8
 
+## Collaboration before execution — reconciliation, 2026-10-13
+
+The shared source contract in
+`genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md` §11 and integration
+map `genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`
+separate receiving source from running it. The lifecycle below describes an explicitly requested
+runtime; following a branch must not implicitly warm or spawn one.
+
+The person's standing choice defaults new source branches to live attributed proposals among
+already authorized own devices, with a device-private override. Without valid admission the branch
+stays device-private. Its signed agreement separately controls team admission, coediting and
+proposal acceptance. Agents default to isolated drafts/worktrees; explicit human-authorized branch
+terms may grant bounded live coediting. Presence is never authorization. Editor text operations
+and filesystem saves adapt the SDK working version, not a second LVI collaboration store.
+
+Received bytes materialize **UNBUILT** in an isolated worktree using eprfs integrity checks.
+Receipt must not trigger a watcher, IDE task, repository hook, dependency install or preview.
+Executing worktrees are separate: moving a selected snapshot into execution requires distinct
+authorization. Shared execution remains deferred. The quota/admission model below applies when
+execution is requested. Local edits and pending proposals persist before delivery and survive
+restart offline; reaping a runtime is not the first moment edits become durable.
+
+Ownership remains: SDK working-version lifecycle; brit source identity/provenance; eprfs
+materialization; rakia build/check evidence; LVI runtime supervision; doorway generic hosting;
+Avodah agreement/evidence views. Avodah shows push requested with its pinned source, Husky/rakia
+running or refusing, acceptance, merge and observed earned reach as separate facts. Passing checks
+does not merge or confer reach. Later edits do not inherit an earlier snapshot's result.
+
+Source inspection on 2026-10-13 found verified materialization in
+`elohim/eprfs/eprfs-local/src/lib.rs`; this LVI directory contains docs, not the proposed runtime
+crates. The live editor/worktree bridge and Avodah gate-event view remain contracts to implement.
+No collaborative or runtime acceptance test ran in this reconciliation.
+
 ## Naming
 
 **lvi** (льви — Ukrainian for *lions*; Lviv is the city of the lion, Lev's city) is the

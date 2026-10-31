@@ -2,9 +2,14 @@
 """
 Load Project Context Hook
 
-Runs at session start to provide Claude with project schema knowledge.
-Loads schemas from file-relationships.json so Claude knows about
-ContentNode, PathMetadata, etc. without needing to read the model files.
+DELIVERY: SessionStart receives one hookSpecificOutput.additionalContext JSON
+wrapper. PROJECT CONTEXT serves age-labelled, cached headlines refreshed by a
+detached worker. BOOTSTRAP is rendered synchronously on every invocation through
+`epr flow memory recall open --purpose bootstrap --lens minimal`.
+
+The bootstrapping-head-is-recall-open contract permits only that native rendering
+or one honest `bootstrap: skipped — <reason>` line. Recall has its own five-second
+budget and process group; neither its output nor its session links are cached.
 
 Hook Type: SessionStart
 """
@@ -12,7 +17,7 @@ import json
 import sys
 import os
 
-RECALL_TIMEOUT_S = 6  # the measured budget the BOOTSTRAP block's `recall open` call must fit inside
+RECALL_TIMEOUT_S = 5  # foreground recall budget within the harness's 8-second hook timeout
 
 def load_relationships(project_dir: str) -> dict:
     """Load the file relationships configuration."""
@@ -148,8 +153,9 @@ def _epr_bootstrap_block(project_dir: str, data: dict) -> str:
     same "no epr binary resolved" absence line covers both cases without a separate check.
 
     Honest absence, never a fallback renderer: a missing binary, a non-zero exit, or a run past
-    the 6-second budget all return exactly one line, `bootstrap: skipped — <reason>`.
+    the 5-second budget all return exactly one line, `bootstrap: skipped — <reason>`.
     """
+    import signal
     import subprocess
     obs = _observation_module(project_dir)
     binary = obs.resolve_bin() if obs else None
@@ -157,21 +163,37 @@ def _epr_bootstrap_block(project_dir: str, data: dict) -> str:
         return "bootstrap: skipped — no epr binary resolved ($EPR_BIN or PATH)"
     session_id = obs.bootstrap_session_id(project_dir, data)
     try:
-        r = subprocess.run(
+        # Kill the whole group at the deadline: a grandchild holding a pipe must not
+        # stretch recall past the hook timeout (same shape as run-projection.py).
+        proc = subprocess.Popen(
             [binary, 'flow', 'memory', 'recall', 'open',
              '--purpose', 'bootstrap', '--lens', 'minimal',
              '--session', session_id, '--root', project_dir],
-            capture_output=True, text=True, timeout=RECALL_TIMEOUT_S,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        return f"bootstrap: skipped — recall open exceeded the {RECALL_TIMEOUT_S}s budget"
+        try:
+            stdout, stderr = proc.communicate(timeout=RECALL_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            # Reap without waiting on inherited pipe EOF or spending the remaining
+            # hook budget if the OS has not completed the kill yet.
+            proc.stdout.close()
+            proc.stderr.close()
+            try:
+                proc.wait(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                pass
+            return f"bootstrap: skipped — recall open exceeded the {RECALL_TIMEOUT_S}s budget"
     except Exception as exc:  # noqa: BLE001 — a SessionStart hook must never crash the session
         return f"bootstrap: skipped — {exc}"
-    if r.returncode != 0:
-        reason_lines = (r.stderr or r.stdout or "").strip().splitlines()
-        reason = reason_lines[0] if reason_lines else f"exit {r.returncode}"
+    if proc.returncode != 0:
+        reason_lines = (stderr or stdout or "").strip().splitlines()
+        reason = reason_lines[0] if reason_lines else f"exit {proc.returncode}"
         return f"bootstrap: skipped — {reason}"
-    return r.stdout.rstrip("\n")
+    return stdout.rstrip("\n") or "bootstrap: skipped — empty rendering"
 
 
 def get_saga_status(project_dir: str) -> str:
@@ -207,78 +229,162 @@ def seed_memory_injection_flag(session_id: str) -> None:
         pass
 
 
+def _render_context(project_dir: str) -> str:
+    """Render only project headlines for the detached, shared cache."""
+    context_parts = []
+
+    # Always-on memory budget (deterministic) — fetched UNCONDITIONALLY (before any
+    # schema/relationship gating) so every session opens knowing the state of the memory
+    # surface + what's testable, per genesis/docs/PLACEMENT.md.
+    budget = get_memory_budget(project_dir)
+    if budget:
+        context_parts.append(budget)
+        context_parts.append("")
+
+    # Resiliency-saga headline — the ten dataplane chapters' green/frontier state
+    # (genesis/a2o/features/dataplane/resiliency-saga/), joined from flows.jsonl +
+    # the (often-absent-locally) dataplane sprint-report. See saga-sync.sh to pull
+    # the report down and refresh the flow state.
+    saga = get_saga_status(project_dir)
+    if saga:
+        context_parts.append(saga)
+        context_parts.append("")
+
+    # Schema + sync-relationship data lives in .claude/file-relationships.json and is
+    # re-delivered at edit time by the sync-check hook; a one-line pointer replaces the
+    # ~2.5KB static dump every session paid before 2026-07-02.
+    relationships = load_relationships(project_dir)
+    if relationships:
+        context_parts.append(
+            "SYNC HOOKS ACTIVE: edit-time hooks surface related-file reminders from "
+            ".claude/file-relationships.json (schemas + sync rules; read it when you need the map)."
+        )
+        context_parts.append("")
+
+    # As before, a failed native headline pass must not replace the shared cache
+    # with only the static sync pointer.
+    return "\n".join(context_parts) if budget or saga else ""
+
+
+# Measured 2026-10-31 at load 28: headline 1.32 s + saga 0.19 s + recall 3.47 s;
+# the reported loaded run took 13.87 s against an 8 s hook timeout. Only project
+# headlines render off-path, single-flight, and land with their age. The cached path
+# measured 0.091–0.206 s; foreground recall now has a separate 5 s budget.
+# After the split, three live runs took 5.088 / 3.376 / 3.772 s (2026-10-31);
+# recall honestly skipped because the sandbox's /projects/elohim root was read-only.
+CONTEXT_TTL_S = 120
+CONTEXT_MAX_STALE_S = 86400
+
+
+def _context_cache_path(project_dir: str):
+    import hashlib
+    import tempfile
+    from pathlib import Path
+    # Retain the existing shared headline key; session-specific bootstrap caches
+    # are no longer read or written.
+    identity = [os.path.realpath(project_dir), None,
+                os.environ.get('EPR_BIN', ''), os.environ.get('BIN_STORE', '')]
+    key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:24]
+    return Path(tempfile.gettempdir()) / f"claude-project-context-{os.getuid()}-{key}.json"
+
+
+def _read_context_cache(cache):
+    import time
+    try:
+        entry = json.loads(cache.read_text())
+        age = time.time() - entry['at']
+        if 0 <= age < CONTEXT_MAX_STALE_S and isinstance(entry['context'], str) and entry['context']:
+            return entry['context'], age
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def _store_context_cache(cache, context: str) -> None:
+    import time
+    tmp = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(json.dumps({'at': time.time(), 'context': context}))
+        os.replace(tmp, cache)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _refresh_context(project_dir: str, cache) -> None:
+    import fcntl
+    try:
+        with cache.with_suffix('.lock').open('a') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return
+            entry = _read_context_cache(cache)
+            if entry and entry[1] < CONTEXT_TTL_S:
+                return
+            context = _render_context(project_dir)
+            if context:
+                _store_context_cache(cache, context)
+    except OSError:
+        pass  # the previous completed context survives a failed refresh
+
+
+def _cached_context(project_dir: str, identity: dict) -> str:
+    import subprocess
+    session_id = identity['session'] or ''
+    cache = _context_cache_path(project_dir)
+    entry = _read_context_cache(cache)
+    refreshing = not entry or entry[1] >= CONTEXT_TTL_S
+    state = 'refresh pending'
+    if refreshing:
+        # Detachment loses process ancestry. Carry the shared adapter's canonical identity
+        # and owner into the worker so binary pins still belong to THIS session.
+        env = dict(os.environ)
+        if session_id:
+            env['ELOHIM_SESSION_ID'] = session_id
+            env['ELOHIM_SESSION_OWNER_PID'] = str(identity['ownerPid'] or '')
+        try:
+            subprocess.Popen(
+                [sys.executable, os.path.abspath(__file__), '--refresh', project_dir,
+                 str(cache)], env=env,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError:
+            state = 'refresh unavailable'
+    if entry:
+        context, age = entry
+        pending = f'; {state}' if refreshing else ''
+        return f"PROJECT CONTEXT (last completed pass {int(age)}s ago{pending}):\n{context}"
+    return (f"PROJECT CONTEXT: {state} (no completed pass).\n"
+            "SYNC HOOKS: .claude/file-relationships.json carries schemas + sync rules.")
+
+
 def main():
     try:
-        # Read hook input from stdin
         data = json.load(sys.stdin)
-
-        # Get project directory
         project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim')
-
-        obs = _observation_module(project_dir)
-        session_id = obs.bootstrap_session_id(project_dir, data) if obs else ""
-        seed_memory_injection_flag(session_id)
-
-        context_parts = []
-
-        # Always-on memory budget (deterministic) — fetched UNCONDITIONALLY (before any
-        # schema/relationship gating) so every session opens knowing the state of the memory
-        # surface + what's testable, per genesis/docs/PLACEMENT.md.
-        budget = get_memory_budget(project_dir)
-        if budget:
-            context_parts.append(budget)
-            context_parts.append("")
-
-        # Resiliency-saga headline — the ten dataplane chapters' green/frontier state
-        # (genesis/a2o/features/dataplane/resiliency-saga/), joined from flows.jsonl +
-        # the (often-absent-locally) dataplane sprint-report. See saga-sync.sh to pull
-        # the report down and refresh the flow state.
-        saga = get_saga_status(project_dir)
-        if saga:
-            context_parts.append(saga)
-            context_parts.append("")
-
-        # Schema + sync-relationship data lives in .claude/file-relationships.json and is
-        # re-delivered at edit time by the sync-check hook; a one-line pointer replaces the
-        # ~2.5KB static dump every session paid before 2026-07-02.
-        relationships = load_relationships(project_dir)
-        if relationships:
-            context_parts.append(
-                "SYNC HOOKS ACTIVE: edit-time hooks surface related-file reminders from "
-                ".claude/file-relationships.json (schemas + sync rules; read it when you need the map)."
-            )
-            context_parts.append("")
-
-        # The bootstrap block: the `minimal` lens of `epr flow memory recall open --purpose
-        # bootstrap` (the bootstrapping head; see `.claude/hooks/.epr-meta`, rule
-        # `bootstrapping-head-is-recall-open`). This hook is SessionStart and SYNCHRONOUS
-        # (unlike run-projection.py's `--event session`, which is registered `async: true` and
-        # so is never relied on to land anything) — the ONE documented landing path for a
-        # SessionStart hook's output is the `hookSpecificOutput.additionalContext` JSON wrapper,
-        # so the BOOTSTRAP block is folded INTO that same wrapper below, never printed as a
-        # separate plain-text section. Always computed (context_parts is never empty once this
-        # is appended, even on the honest-absence `bootstrap: skipped` line) — no second
-        # orientation is derived here (no habits.yaml re-scan; see the retired
-        # `get_habits_status`, replaced by `_epr_bootstrap_block`).
-        bootstrap_block = _epr_bootstrap_block(project_dir, data)
-        context_parts.append("BOOTSTRAP:")
-        context_parts.append(bootstrap_block)
-
-        # Output context for Claude — one JSON hookSpecificOutput wrapper, always emitted (the
-        # bootstrap block above guarantees context_parts is never empty).
-        output = {
-            "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": "\n".join(context_parts)
-            }
-        }
-        print(json.dumps(output))
-
+        # The shared dependency-free adapter avoids a native session-id subprocess on the
+        # foreground path; its owner-bound result is also passed to the detached renderer.
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+        from pathlib import Path
+        from _lib.session import load_registry, resolve_fallback
+        identity = resolve_fallback(registry=load_registry(os.environ, Path(project_dir)))
+        seed_memory_injection_flag(identity['session'] or '')
+        context = _cached_context(project_dir, identity)
+        # BOOTSTRAP must land in this invocation, even when headline refresh is pending.
+        context += "\nBOOTSTRAP:\n" + _epr_bootstrap_block(project_dir, data)
+        print(json.dumps({'hookSpecificOutput': {'hookEventName': 'SessionStart',
+                                                'additionalContext': context}}))
     except json.JSONDecodeError:
         sys.exit(0)
     except Exception as e:
         print(f"load-project-context hook error: {e}", file=sys.stderr)
         sys.exit(1)
 
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 4 and sys.argv[1] == '--refresh':
+        from pathlib import Path
+        _refresh_context(sys.argv[2], Path(sys.argv[3]))
+    else:
+        main()

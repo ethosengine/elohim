@@ -426,3 +426,26 @@ shipped and how each is measured.
 
 What remains is not a question but a rate: the commitments stock still fills faster than it
 drains, and the equilibrium habit stays red until the drain is a habit rather than an event.
+
+## 2026-10-13 — Avodah carries the shared work ceremony
+
+The shared-working-versions design at
+`genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md`
+consumes this surface as an interactive process lens. Avodah captures authorized intent and
+projects native request, gate, review, consent, merge and reach records; it does not own a
+second approval queue or infer acceptance from production. A push request fixes its source
+snapshot, target and governing declarations. Gates execute against that isolated candidate;
+new edits to a live shared branch remain another candidate. Gate refusal blocks the requested
+operation, never sanctions its author. Success, technical review and human acceptance remain
+independent observations.
+
+Working branches may carry unbuilt source under an explicit follow/coedit agreement. Receiving
+source grants no execution or publication authority. Agents prepare proposals by default; an
+explicit human-authorized agreement may permit bounded live shared edits. Device enrollment
+does not confer collective membership or a vote: multiple devices and agents still represent
+one human. Rules, amendments and binding closure remain governed records; an editable EPR
+is not by itself permission to change a rule.
+
+Acceptance is specified, not delivered, in
+`genesis/a2o/features/devflow/shared-working-versions.feature` (`@wip`). Native event projection,
+immutable build isolation and collective closure still require implementation and receipts.

@@ -6,6 +6,7 @@ purpose: >
   Specs and plans — the authored design surface. Born-linked, decomposes to gaps,
   graduates to history; never parked. See the framing spec for the full law.
 rules:
+  - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: doc-frontmatter-at-birth
     class: deny
     when: { write: "*.md", new: true }

@@ -1104,3 +1104,31 @@ policies:
     retire-when: >
       when the compiler enforces reasoned suppressions across all source configurations
       and the permanent-scope gate has held through a full release cycle
+
+  # commit-format-ratchet — the pre-commit and pre-merge-commit hooks judge the STAGED INDEX with
+  # each project's own declared formatter: rustfmt under the pinned toolchain and the crate's
+  # edition, and Prettier for files an owning package's `format:check` script covers. A new file
+  # must be formatted; a file formatted at HEAD must stay formatted; a file already unformatted at
+  # HEAD may stay so (file-level debt, reported). A missing formatter refuses with its install
+  # cure (`ask`, so EPR_META_ACK=1 acknowledges it); drift is `deny`. The gate never rewrites or
+  # re-stages. Full ESLint, clippy and type checks remain the project gates' obligation. Engine:
+  # .claude/scripts/_lib/epr_format.py; formatting drift used to surface 40-90 minutes into
+  # pre-push, from merges and scripted conflict resolutions that no edit hook saw.
+  - id: commit-format-ratchet
+    version: 1
+    contentHash: sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e
+    title: A commit never introduces formatting drift
+    binding: constitutional
+    class: deny
+    scope: { write: "*" }
+    validator: epr:validator-staged-format
+    status: active
+    established_by: operator-2026-10-30-matthew
+    retire-when: >
+      when every formatter contract in the repository is held at zero debt by the owning
+      projects' own commit-time tooling for a full release cycle, so a staged index can no longer
+      reach `dev` unformatted except through `--no-verify` — the ratchet then has nothing left to
+      hold that the projects do not hold themselves
+    why: >
+      Steward ruling 2026-10-30: never commit unlinted code. The staged index is judged, not the
+      worktree; format the named file, review it, and `git add` it.

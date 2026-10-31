@@ -246,7 +246,10 @@ fn get_my_steward_tier(subject_id: &str) -> ExternResult<String> {
 /// TODO: Unused — intended for hierarchical device policy inheritance.
 /// Review whether stewardship needs parent/child policy merging and complete
 /// integration. Annotated `#[allow(dead_code)]` until that decision is made.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "unused until the policy-inheritance decision in the doc comment above is made"
+)]
 fn merge_policies(parent: &DevicePolicy, child: &DevicePolicy) -> DevicePolicy {
     // Parse JSON arrays
     let mut blocked_categories: Vec<String> =

@@ -1899,6 +1899,28 @@ pub async fn call_create_commitment(
         .await
 }
 
+/// [`call_create_commitment`] with a precondition the client evaluates after
+/// the chain write gate and admission waits, immediately before the call is
+/// offered (see [`HcClient::call_zome_mishpat_guarded`]).
+pub async fn call_create_commitment_guarded(
+    hc: &Arc<HcClient>,
+    input: CreateMishpatCommitmentInput,
+    precondition: &(dyn Fn() -> Result<(), String> + Send + Sync),
+) -> Result<Vec<u8>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&input).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode CreateMishpatCommitmentInput: {e}"
+        ))
+    })?;
+    hc.call_zome_mishpat_guarded(
+        MISHPAT_ZOME,
+        "create_commitment",
+        payload,
+        Some(precondition),
+    )
+    .await
+}
+
 /// Input for `create_commitment_state_link` — records a Commitment's lifecycle
 /// transition as a notarized `CommitmentByState` link in the Mishpat DNA.
 ///

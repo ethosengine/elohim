@@ -1935,6 +1935,21 @@ diesel::table! {
 // create_commitment post-commit signal. A NULL dht_anchor_hash means un-notarized.
 // Migration: 2026-06-09-000000_mishpat_commitments
 diesel::table! {
+    mishpat_revocations (target_cid) {
+        target_cid -> Text,
+        revoked_at -> Nullable<Text>,
+        issued_at -> Nullable<Text>,
+        issue_outcome -> Nullable<Text>,
+        signed_at -> Nullable<Text>,
+        attempts -> Integer,
+        last_attempt_at -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+// Migration: 2026-10-29-120000_mishpat_revocations (above).
+diesel::table! {
     mishpat_commitments (cid) {
         cid -> Text,
         action -> Text,
@@ -2142,6 +2157,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     manifests,
     mechanism_selection,
     mishpat_commitments,
+    mishpat_revocations,
     mutuality_audit_log,
     node_account,
     node_signin_sessions,

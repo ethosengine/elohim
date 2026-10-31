@@ -11,6 +11,7 @@ purpose: >
   data — and it slips past review at tier-naming, reading as a neutral capability level rather than the
   ontological claim it is).
 rules:
+  - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: sovereignty-ontology-guard
     policy: sovereignty-ontology-guard@5
   - id: ownership-ontology-guard

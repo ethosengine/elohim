@@ -46,7 +46,10 @@ struct DnaManifest {
 struct IntegritySection {
     network_seed: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "parsed so the manifest shape deserializes; no assertion reads it"
+    )]
     properties: Option<serde_yaml::Value>,
     #[serde(default)]
     #[allow(dead_code)]
@@ -103,8 +106,8 @@ fn holochain_root() -> PathBuf {
 
 fn load_dna_manifest(dir_name: &str) -> Result<DnaManifest> {
     let path = holochain_root().join("dna").join(dir_name).join("dna.yaml");
-    let text = std::fs::read_to_string(&path)
-        .with_context(|| format!("reading dna.yaml at {path:?}"))?;
+    let text =
+        std::fs::read_to_string(&path).with_context(|| format!("reading dna.yaml at {path:?}"))?;
     serde_yaml::from_str(&text).with_context(|| format!("parsing dna.yaml at {path:?}"))
 }
 
@@ -114,8 +117,8 @@ fn load_happ_manifest() -> Result<HappManifest> {
         .join("elohim")
         .join("workdir")
         .join("happ.yaml");
-    let text = std::fs::read_to_string(&path)
-        .with_context(|| format!("reading happ.yaml at {path:?}"))?;
+    let text =
+        std::fs::read_to_string(&path).with_context(|| format!("reading happ.yaml at {path:?}"))?;
     serde_yaml::from_str(&text).with_context(|| format!("parsing happ.yaml at {path:?}"))
 }
 
@@ -138,7 +141,8 @@ fn every_dna_manifest_is_version_0() -> Result<()> {
         if m.name != *name {
             bail!(
                 "dna/{dir}/dna.yaml name field must be {:?} (matches happ.yaml role), got {:?}",
-                name, m.name
+                name,
+                m.name
             );
         }
     }
@@ -210,12 +214,7 @@ fn happ_is_version_0_and_has_required_elohim_roles() -> Result<()> {
     let deferred_roles: Vec<&str> = h
         .roles
         .iter()
-        .filter(|r| {
-            r.provisioning
-                .as_ref()
-                .map(|p| p.deferred)
-                .unwrap_or(false)
-        })
+        .filter(|r| r.provisioning.as_ref().map(|p| p.deferred).unwrap_or(false))
         .map(|r| r.name.as_str())
         .collect();
     let expected_deferred: Vec<&str> = vec![];
@@ -240,7 +239,8 @@ fn every_role_has_clone_limit_zero() -> Result<()> {
         if cl != 0 {
             bail!(
                 "happ.yaml role {:?} clone_limit must be 0 (default-deny); got {}",
-                role.name, cl
+                role.name,
+                cl
             );
         }
     }
@@ -256,7 +256,10 @@ fn happ_role_seeds_match_dna_manifest_seeds() -> Result<()> {
         .map(|r| {
             (
                 r.name.as_str(),
-                r.dna.modifiers.as_ref().and_then(|m| m.network_seed.as_deref()),
+                r.dna
+                    .modifiers
+                    .as_ref()
+                    .and_then(|m| m.network_seed.as_deref()),
             )
         })
         .collect();
@@ -329,7 +332,12 @@ fn infrastructure_role_is_federation_native() -> Result<()> {
         .iter()
         .find(|r| r.name == "infrastructure")
         .ok_or_else(|| anyhow!("happ.yaml missing infrastructure role"))?;
-    if let Some(props) = role.dna.modifiers.as_ref().and_then(|m| m.properties.as_ref()) {
+    if let Some(props) = role
+        .dna
+        .modifiers
+        .as_ref()
+        .and_then(|m| m.properties.as_ref())
+    {
         if let serde_yaml::Value::Mapping(map) = props {
             let has_progenitor = map
                 .keys()

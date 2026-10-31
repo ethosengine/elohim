@@ -6,19 +6,39 @@
 # pure rule engine (.claude/scripts/_lib/epr_meta.py) that governs Claude's own Write/Edit at
 # author-time. No agent drives another; the shared substrate governs all equally.
 #
-# Bypass THIS gate only:  EPR_META_ACK=1 git commit …   (acknowledges ask-class; deny still blocks)
-# Bypass ALL hooks:       git commit --no-verify        (or HUSKY=0 git commit)
+# It also runs the commit-time formatting ratchet (policy commit-format-ratchet@1, steward ruling
+# 2026-10-30: "we should never commit unlinted code"): the STAGED INDEX — never the worktree — is
+# checked with each project's declared formatter (pinned rustfmt; the owning package's Prettier).
+# A new unformatted file, or a formatted file made unformatted, refuses; nothing is rewritten or
+# re-staged for you. Format the named file, review it, `git add` it, commit again.
+# .husky/pre-merge-commit delegates here, so a clean automatic merge is checked the same way.
 #
-# Honor HUSKY=0 — core.hooksPath points at .husky/ directly, so the husky shim that normally
-# handles this is not in the call path (identical to .husky/pre-push:23-25).
+# Bypass THIS gate's ask-class only:  EPR_META_ACK=1 git commit …  (a missing formatter, an
+#                                     unmeasurable file; formatting DRIFT and deny still block)
+# Bypass ALL hooks:                   git commit --no-verify        (or HUSKY=0 git commit)
+#
+# This file is POSIX sh despite the shebang: husky runs it as `sh -e .husky/pre-commit`.
+#
+# Honor HUSKY=0 — core.hooksPath may point at .husky/ directly, so the husky shim that normally
+# handles this is not in the call path (identical to .husky/pre-push).
 [ "${HUSKY-}" = "0" ] && exit 0
 
+# Anchor to the committing worktree. A linked worktree runs the MAIN checkout's copy of this file
+# (core.hooksPath is absolute, see .husky/hooks-path.mjs), but the gate it runs, and the index it
+# judges, are the committing worktree's.
+top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top" || true
+
 # Fail-open if python3 OR the gate script is absent — a degraded shell, or committing on a branch
-# that predates the gate (e.g. a feature branch checked out in another worktree), must NEVER be
-# blocked. The gate itself is also fail-open (an internal error exits 0), so a governance bug never
-# bricks a commit; the worst case is an ungoverned commit, never a blocked author.
+# that predates the gate (e.g. a feature branch checked out in another worktree), is not blocked
+# here. Say so out loud: an ungoverned commit must never look like a governed one.
 GATE=".claude/scripts/epr-meta-git-gate.py"
-if command -v python3 >/dev/null 2>&1 && [ -f "$GATE" ]; then
-  python3 "$GATE" --staged || exit 1
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "[pre-commit] WARNING: python3 is not on PATH — this commit is UNGOVERNED (no .epr-meta or formatting check). Cure: install the declared Python 3.11+ and PyYAML." >&2
+  exit 0
 fi
+if [ ! -f "$GATE" ]; then
+  echo "[pre-commit] WARNING: $GATE is absent in $(pwd) — this commit is UNGOVERNED. Cure: restore the tracked gate files and run \`pnpm run prepare\`." >&2
+  exit 0
+fi
+python3 "$GATE" --staged || exit 1
 exit 0

@@ -3,7 +3,10 @@
   "title": "AgentRuntimes",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "runtimes"],
+  "required": [
+    "version",
+    "runtimes"
+  ],
   "properties": {
     "version": {
       "const": 1
@@ -13,7 +16,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "comm", "sessionEnv"],
+        "required": [
+          "id",
+          "comm",
+          "sessionEnv"
+        ],
         "properties": {
           "id": {
             "type": "string"
@@ -38,6 +45,120 @@
               "type": "string"
             },
             "uniqueItems": true
+          },
+          "capabilityBindings": {
+            "description": "Lab-neutral capability level -> this runtime's model binding (dialogue-stasis spec, Capability vocabulary and bindings). A level absent here is unbound for this runtime.",
+            "type": "object",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^C[1-4]$": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "model"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "harnessCapabilities": {
+            "description": "Harness capabilities proven by stasis-probe reports; an id absent here reads unsupported.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "evidence"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "yes",
+                    "no",
+                    "unsupported"
+                  ]
+                },
+                "evidence": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cliVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "keeperInvocation": {
+            "description": "Headless, read-only, non-prompting keeper shape for the dialogue-stasis coordinator; null when the runtime has none.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status",
+                  "argv",
+                  "env"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "probed",
+                      "declared"
+                    ]
+                  },
+                  "argv": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "stdin": {
+                    "type": "boolean"
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "evidence": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "cliVersion": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            ]
           }
         }
       }

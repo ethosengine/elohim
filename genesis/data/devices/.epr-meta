@@ -11,6 +11,7 @@ purpose: >
   edgenode* resources must honor (validate-deployments.ts + the
   archetype-resource-alignment policy enforce conformance).
 rules:
+  - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: budgets-evidence-bound
     class: inject
     when: { write: "archetype-resource-budgets.json" }

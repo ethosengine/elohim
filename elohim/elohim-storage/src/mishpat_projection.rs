@@ -82,7 +82,10 @@ fn parse_reach(reach: &str) -> Option<Reach> {
 /// through every consumer (`signals.rs`, the reconciler, integration tests) for
 /// no real-world memory benefit.
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a short-lived parse result matched once by the signal handler; boxing the Upsert row would ripple through every consumer for no memory benefit"
+)]
 pub enum CommitmentProjection {
     /// Project a new commitment row into `mishpat_commitments`.
     Upsert(NewMishpatCommitment),
@@ -750,6 +753,18 @@ fn parse_replicates_commons(
                     .expect("json! object literal is always an object");
                 bounds_obj.insert("rate_per_minute".to_string(), serde_json::json!(rpm));
                 bounds_obj.insert("rate_per_hour".to_string(), serde_json::json!(rpm * 60));
+            }
+            // A renewal's lineage (its sequence and the cid it renews) rides
+            // beside the content's `reach`, which also has no column: the provide
+            // reconciler reads it to continue the sequence. An unrenewed
+            // commitment carries neither key, so its row is unchanged.
+            if let serde_json::Value::Object(bounds_obj) = &mut bounds {
+                if let Some(sequence) = payload.get("renewal").and_then(|v| v.as_u64()) {
+                    bounds_obj.insert("renewal".to_string(), serde_json::json!(sequence));
+                }
+                if let Some(predecessor) = payload.get("supersedes").and_then(|v| v.as_str()) {
+                    bounds_obj.insert("supersedes".to_string(), serde_json::json!(predecessor));
+                }
             }
             let bounds_json = bounds.to_string();
             let valid_from = payload
@@ -1657,6 +1672,43 @@ mod tests {
             bounds["rate_per_hour"], 3600,
             "rate_per_hour must be rate_per_minute * 60 so check 6 enforces"
         );
+    }
+
+    #[test]
+    fn a_renewed_commitment_projects_its_lineage() {
+        let mut payload: serde_json::Value =
+            serde_json::from_str(&replicates_commons_content_payload()).expect("json");
+        payload["renewal"] = serde_json::json!(2);
+        payload["supersedes"] = serde_json::json!("uhCEk-revoked");
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "replicates-commons",
+                &payload.to_string(),
+                "uhCEk-renewed",
+                "uhCkk-renewed-action",
+            )
+            .expect("a renewed content commitment parses"),
+        );
+        let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json).expect("bounds");
+        assert_eq!(bounds["renewal"], 2);
+        assert_eq!(bounds["supersedes"], "uhCEk-revoked");
+        assert_eq!(row.recipient, "epr:lamad-spa-head-cid");
+    }
+
+    #[test]
+    fn an_unrenewed_commitment_projects_no_lineage() {
+        let row = unwrap_upsert(
+            parse_commitment_payload(
+                "replicates-commons",
+                &replicates_commons_content_payload(),
+                "uhCEk-plain",
+                "uhCkk-plain-action",
+            )
+            .expect("parses"),
+        );
+        let bounds: serde_json::Value = serde_json::from_str(&row.bounds_json).expect("bounds");
+        assert!(bounds.get("renewal").is_none());
+        assert!(bounds.get("supersedes").is_none());
     }
 
     #[test]

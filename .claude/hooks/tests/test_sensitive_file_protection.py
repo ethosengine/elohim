@@ -28,6 +28,19 @@ def run(path: str, content: str) -> dict:
 
 def main() -> int:
     cases = [
+        (
+            "stasis policy only advises",
+            ".epr-meta/elohim/policies/dialogue-stasis-policy.json",
+            '{"version":1}',
+            "advise",
+        ),
+        (
+            "absolute stasis policy only advises",
+            "/repo/.epr-meta/elohim/policies/dialogue-stasis-policy.json",
+            '{"version":1}',
+            "advise",
+        ),
+        ("policy name elsewhere is clean", "fixtures/dialogue-stasis-policy.json", '{"version":1}', "silent"),
         ("private_key identifier is clean", "src/model.py", "private_key: str", "silent"),
         ("comment is clean", "README.md", "# private_key is supplied by the operator", "silent"),
         ("obvious test credential is clean", "tests/x.py", "api_key='test-api-key'", "silent"),

@@ -26,7 +26,10 @@ pub struct HostRouter {
     )]
     last_refresh: Arc<RwLock<Option<Instant>>>,
     /// NATS client for messaging (for future NATS-based routing)
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "`nats` is held for the future NATS-based routing its doc comment names; nothing reads it yet"
+    )]
     nats: Option<NatsClient>,
 }
 

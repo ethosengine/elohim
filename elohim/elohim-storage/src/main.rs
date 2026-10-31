@@ -2337,8 +2337,17 @@ async fn async_main(
                                 provide_pool.clone(),
                             ),
                         );
+                        // The removed-pin revoke arm's mode is read here, once
+                        // (ELOHIM_PROVIDE_REVOKE_ARM=off|dry-run|apply, default
+                        // off), logged, and carried by the reconciler itself.
                         let reconciler = std::sync::Arc::new(
-                            elohim_storage::services::provide_reconcile::ProvideReconciler::new(),
+                            elohim_storage::services::provide_reconcile::ProvideReconciler::from_revoke_env(
+                                std::env::var(
+                                    elohim_storage::services::provide_reconcile::REVOKE_ARM_ENV,
+                                )
+                                .ok()
+                                .as_deref(),
+                            ),
                         );
                         // Reach-aware provide-eligibility resolver (lamad pillar).
                         // Commons is openly providable; non-commons requires
@@ -2359,6 +2368,12 @@ async fn async_main(
                             loop {
                                 tokio::select! {
                                     _ = ticker.tick() => {
+                                        // Removed-pin revoke arm. It runs before,
+                                        // and apart from, the desired set: it
+                                        // reads pin state itself, so an empty or
+                                        // unreadable desired set neither feeds
+                                        // nor skips it. Does nothing when off.
+                                        reconciler.revoke_withdrawn(&provide_pool, &*author).await;
                                         // Derive desired set: active `item` pins
                                         // whose content is locally present AND
                                         // commons-reach (the caught-up proxy).
@@ -2384,7 +2399,9 @@ async fn async_main(
                                             // derive_desired matches sets against `p.head_ref` verbatim.
                                             // (Raw head_refs here made `present` empty for every pin,
                                             // so the author tick never fired for anything.)
-                                            let id_for = |h: &str| h.strip_prefix("epr:").unwrap_or(h).to_string();
+                                            let id_for = |h: &str| {
+                                                elohim_storage::services::provide_reconcile::scope_key(h).to_string()
+                                            };
                                             let bare_ids: Vec<String> =
                                                 pins.iter().map(|p| id_for(&p.head_ref)).collect();
                                             // Caught-up proxy: reach-agnostic local presence.

@@ -14,6 +14,15 @@ serde.workspace = true
 serde_json.workspace = true
 libc = "0.2"
 eprfs-core = { path = "../eprfs-core" }
+# `session_stasis`: the dialogue journal fold reuses the protocol `Decision` and the REA `Bound`.
+# Both resolve as sibling crates in the elohim-storage image's flattened layout (../../epr), the
+# same way `ark-core` does. epr-rea opts out of its filesystem sidecar, as elohim-storage does.
+elohim-epr = { path = "../../epr" }
+elohim-epr-rea = { path = "../../epr-rea", default-features = false }
+# Wall-clock arithmetic for journal intervals; serde for the JSON the fold prints.
+chrono = { version = "0.4", features = ["serde"] }
+# The journal's per-session flock (`journal.lock`), as a safe wrapper.
+rustix = { version = "1", features = ["fs"] }
 
 ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
 elohim-settings = { path = "../../elohim-settings" }
