@@ -66,9 +66,13 @@ Every slice is judged against that, not only against whether it is permitted:
 - **Nothing is left open silently.** An unanswered question, an unreviewed finding,
   a red that reached the session, an incident without a resolution: each is closed
   with evidence or carried forward by name.
-- **Algedonic signals are listened to, not raised past.** Pain (a timeout, a stall,
-  a refused gate) is a signal to find and fix the cost, never to widen a limit to
-  make it go quiet.
+- **Algedonic signals are listened to, not quieted.** Pain (a timeout, a stall, a
+  refused gate) is first a signal to find and fix the cost. Widening a limit is
+  avoided, because it can make the pain go quiet without paying the cost. A limit
+  is a carrying capacity, though, and rarely final. When widening is the right
+  call, it is made with care, and the judgement is recorded with its measurement
+  and reason (an `epr flow note --kind ruling` or `correction`), so it can be
+  revisited.
 
 The retrospective cross-references used by this design are:
 
@@ -1062,8 +1066,10 @@ The shared cause was `epr bin status` taking about 2.3 s per binary lookup in
   - Rate limit: once per key per 30 minutes, unless the count doubles.
   - It is context only. It never denies or blocks anything, and it never edits a
     hook's timeout on its own authority.
-  - A fix that raises a timeout hides the cost instead of paying it. The response
-    looks for the slow call first.
+  - Raising a timeout can hide the cost instead of paying it, so the response
+    looks for the slow call first. When the timeout itself is the wrong
+    carrying capacity, raising it is a recorded judgement: the measurement and
+    the reason go into a ruling or correction note, so it can be revisited.
 - **Measure.** `harness-exceptions@1`: the count per shift, by hook, under the
   unmeasured rule.
 
