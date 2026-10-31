@@ -1580,6 +1580,9 @@ measures:
       observation gaps must never become measured zero.
     env-sensitivity: [session, shift, class, presence]
     provenance: "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (journal contract; slices 3 and 5)"
+    probe:
+      run: "epr session stasis fold --shift-current --emit-count dialogue-blocked-seconds@1"
+      emits: count
     default-authority: observation
     status: active
     established_by: dialogue-stasis-loop-design-2026-10-30

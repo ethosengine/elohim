@@ -1315,11 +1315,15 @@ dependencies = [
 name = "elohim-device-runtime"
 version = "0.3.2"
 dependencies = [
+ "chrono",
  "elohim-ark-core",
+ "elohim-epr",
+ "elohim-epr-rea",
  "elohim-settings",
  "eprfs-core",
  "jsonschema",
  "libc",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",

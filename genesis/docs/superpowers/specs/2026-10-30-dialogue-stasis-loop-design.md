@@ -10,9 +10,9 @@ steward: human:matthew
 graduation-trigger: Two shifts, including one unattended shift, remain under the dialogue-blocked-seconds ceiling with a falling share of incidents reaching the human and zero independent-audit faults.
 cites:
   - genesis/docs/retrospectives/2026-10-30-overnight-integration-pass.md
-  - genesis/docs/superpowers/specs/2026-10-09-elohim-operator-loop-wedged-peer-design.md
-  - genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md
-  - genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
+  - "elohim-operator-loop-wedged-peer-design | The elohim-operator loop when a peer wedges | sha256:8329c39fe67980a6 | path: genesis/docs/superpowers/specs/2026-10-09-elohim-operator-loop-wedged-peer-design.md"
+  - "requisite-variety-guidestar-epr-family-composition | Requisite variety as the guidestar | sha256:e1cf9e52fbe95c11 | path: genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md"
+  - "algedonic-feedback-signal | Algedonic Feedback Signal | sha256:cf902beac8dd4aec | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md"
   - elohim/epr/src/algedonic.rs
   - elohim/epr/src/verdict.rs
   - elohim/epr-rea/src/model.rs
