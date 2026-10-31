@@ -137,6 +137,15 @@ COPY elohim/sdk/fixtures /elohim/sdk/fixtures
 # /bridges/did/schemas. Test-only (like the fixtures above) — the release build
 # never reads it, so the gap only surfaces at `cargo test --lib --bins`.
 COPY bridges/did/schemas /bridges/did/schemas
+# imagodei coordinator source — routes/human_binding.rs's "the fake is held to the
+# zome" test reads it at run time (CARGO_MANIFEST_DIR/../../elohim/holochain/dna/
+# imagodei/zomes/imagodei/src/lib.rs → /elohim/holochain/...) to check create_human
+# is still idempotent before trusting the hosted-provisioning fake. Test-only, like
+# the two above; without it every `cargo test --lib --bins` here fails with "cannot
+# read the imagodei coordinator ... No such file or directory" (edge #1767, #1769).
+# Copying it also makes the zome's coordinator a declared input of the doorway
+# closure, which is what the test asserts: when the zome changes, the fake re-earns.
+COPY elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs /elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs
 RUN cargo fmt --check
 RUN RUSTFLAGS="" cargo clippy -- -D warnings -W clippy::all
 RUN RUSTFLAGS="" cargo test --lib --bins
