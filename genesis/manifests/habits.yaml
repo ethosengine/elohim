@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice 10, still unwired): idle_prompt is journalled as private idle-prompt evidence without output, transcript scanning, presence witnessing or inferred closure; agentic-developer composes stasis additively with away/marker edges and the 1800 s rail, and both shift templates default absent readings to unmeasured. Sensor replay: 50 unittest tests OK; projector selftest: 79 passed; hook replant clean. Skill dry-run and real replant hit EROFS at .codex; scoped projection generated fixtures and Claude runtime, leaving .codex/.agents runtime refresh pending (package verify: 2348 passed, 4 stale-runtime failures). Slice 5 still needs native idle-prompt parsing and independent silence timing; slice 9 owns progress requests and live marker/45-minute rehearsal remains unverified. settings.json unchanged.
-    evidence-fingerprint: sha256:d9ad45c27ac491a0
-    evidence-bytes: 5599
-    evidence-entries: 11
+      DELTA 2026-10-31 (slice 8 reconciliation, still unwired): coordinator reconciled with the native camelCase fold, object effectClass, selected-window keeper totals and canonical session-event journal contract; null costs stop claims, known lower bounds prove exhaustion and budget-unknown would-have notes retain unmeasured evidence. stasis_coordinator_test.py: 51 tests OK with stub epr/keepers, including jsonschema validation of every written event, consultation start/complete/expired, object shape matching and null-budget boundaries; no live native fold or model call.
+    evidence-fingerprint: sha256:33dd00033732467a
+    evidence-bytes: 6173
+    evidence-entries: 12
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
