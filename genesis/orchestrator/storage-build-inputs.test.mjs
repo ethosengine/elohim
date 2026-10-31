@@ -127,6 +127,18 @@ test('closure images: derivation, fail-closed oracle and nerdctl config-label bu
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
+test('every rollout restart in the edge Jenkinsfile is earned by a pod-inputs fingerprint change', () => {
+  const edge = readFileSync(join(root, 'elohim/holochain/Jenkinsfile'), 'utf8');
+  const restarts = [...edge.matchAll(/kubectl rollout restart /g)].map(m => m.index);
+  assert.ok(restarts.length >= 3, `expected the generic, storage and doorway arms, got ${restarts.length}`);
+  for (const at of restarts) {
+    const before = edge.slice(Math.max(0, at - 900), at);
+    const guard = before.lastIndexOf('podInputsBefore && podInputsBefore == podInputsAfter');
+    assert.ok(guard >= 0, `restart at ${at} is not guarded by the fingerprint comparison`);
+    assert.match(before.slice(guard), /\} else \{/, `restart at ${at} sits outside the else arm of the comparison`);
+  }
+});
+
 test('closure reuse shares one decision across gates, release builds and pushes', () => {
   const edge = readFileSync(join(root, 'elohim/holochain/Jenkinsfile'), 'utf8');
   assert.match(edge, /def runQualityGates\(\) \{\s*decideImageClosures\(\)/);

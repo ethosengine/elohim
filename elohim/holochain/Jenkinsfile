@@ -828,12 +828,23 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
     // Pre-deploy: check for ingress hostname conflicts
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
 
+    // The restart is earned, not assumed: a closure hit renders the same image and
+    // the same pod template, so nothing a pod consumes moved and no pod rolls
+    // (same rule as the storage arm, 2026-09-22). Empty fingerprint = cannot
+    // judge → roll exactly as before.
+    def podInputsBefore = podInputsFingerprint(outputFile, namespace, 'all')
     sh "kubectl apply -f ${outputFile}"
     def resourceType = sh(
         script: "grep -q 'kind: StatefulSet' ${manifestTemplate} && echo 'statefulset' || echo 'deployment'",
         returnStdout: true
     ).trim()
-    sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
+    def podInputsAfter = podInputsFingerprint(outputFile, namespace, 'all')
+    if (podInputsBefore && podInputsBefore == podInputsAfter) {
+        echo "⏭️ ${resourceName}-${env}: pod template + config unchanged (${podInputsAfter}) — no restart"
+    } else {
+        echo "${resourceName}-${env}: pod inputs changed (${podInputsBefore ?: 'none'} -> ${podInputsAfter ?: 'unreadable'}) — restarting"
+        sh "kubectl rollout restart ${resourceType}/${resourceName}-${env} -n ${namespace}"
+    }
     waitForRolloutWithEvidence(resourceType, "${resourceName}-${env}", namespace, '600s')
 
     // Post-deploy: detect stale resources (advisory only)
@@ -2387,8 +2398,18 @@ def deployDoorwayManifest(String targetEnv, String envFile, List allHumans, Stri
     // Tolerates ONLY the known podmonitors RBAC drift (loudly) so the rollout wait
     // below still runs — a poisoned apply exit hid a real doorway-B outage in
     // edge #1306/#1308/#1309. Everything else still fails the deploy.
+    // Same rule as the storage arm: a doorway rolls only when something its pod
+    // consumes moved. On a closure hit the image and template are unchanged, so
+    // a dev wave that rebuilt nothing restarts nothing. Empty fingerprint → roll.
+    def podInputsBefore = podInputsFingerprint(outputFile, "elohim-${targetEnv}", 'all')
     sh "bash '${env.WORKSPACE}/scripts/ci/apply-doorway-manifest.sh' ${outputFile}"
-    sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
+    def podInputsAfter = podInputsFingerprint(outputFile, "elohim-${targetEnv}", 'all')
+    if (podInputsBefore && podInputsBefore == podInputsAfter) {
+        echo "⏭️ ${depName}: pod template + config unchanged (${podInputsAfter}) — no doorway restart"
+    } else {
+        echo "${depName}: pod inputs changed (${podInputsBefore ?: 'none'} -> ${podInputsAfter ?: 'unreadable'}) — restarting doorway"
+        sh "kubectl rollout restart deployment/${depName} -n elohim-${targetEnv}"
+    }
     waitForRolloutWithEvidence('deployment', depName, "elohim-${targetEnv}", '300s')
     recordWorkloadImage('DOORWAY', "deployment/${depName}", "elohim-${targetEnv}", versions)
 }
