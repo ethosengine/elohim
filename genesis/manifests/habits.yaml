@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice H, still unwired): harness capabilities declared from seven probe reports (20261030T143310Z through 20261030T163031Z): 39 ids yes, 0 no, 3 unsupported; per-id report/version provenance retained, Claude keeper probed (probe/20261030T145038Z), Codex keeper declared only. Hook capability findings are advisory. Verification: stasis_probe_test.py 16 OK; hook-package.test.mjs 16 passed; projector selftest 79 passed; package verify 2306 passed with 0 harness-capability-unsupported warnings. No agent-runtimes JSON schema exists in the searched schema/tooling directories.
-    evidence-fingerprint: sha256:fa2df78a8f0c6a40
-    evidence-bytes: 2802
-    evidence-entries: 6
+      DELTA 2026-10-31 (slice 4, still unwired): the shared algedonic latch in elohim/epr gains Recovered with recovery evidence, reset threshold, dwell and persisted keys (persist-then-commit, locked, fsynced; restart cannot complete a dwell; Floor via should_emit_sensed, legacy should_emit unchanged); three independent Codex review rounds; just gate elohim-epr 95 passed EXIT=0, rust-style PASS.
+    evidence-fingerprint: sha256:cb6c86299bba2bf8
+    evidence-bytes: 3196
+    evidence-entries: 7
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
