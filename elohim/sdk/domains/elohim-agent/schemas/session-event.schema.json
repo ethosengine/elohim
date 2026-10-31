@@ -18,13 +18,14 @@
       "const": 1
     },
     "kind": {
-      "description": "Source of truth: this schema's version-1 journal event kinds.",
+      "description": "Source of truth: this schema's version-1 journal event kinds. idle-prompt records Notification idle_prompt as silence evidence only; the native fold owns independent timing and any inferred dialog-close bound. It is neither a human presence witness nor proof of a stall.",
       "enum": [
         "permission-requested",
         "dialog-displayed",
         "prompt-closed",
         "classifier-denied",
         "turn-ended",
+        "idle-prompt",
         "consultation",
         "steward-ping",
         "observation-gap",
@@ -411,6 +412,32 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "idle-prompt"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "source"
+        ],
+        "properties": {
+          "source": {
+            "properties": {
+              "hookEvent": {
+                "const": "Notification"
+              }
+            }
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {

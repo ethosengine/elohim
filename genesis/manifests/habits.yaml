@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-31 (slice 8, still unwired): coordinator in shadow implements device daemon ownership, atomic journal claims, restart attachment, bounded headless consultations, budget enforcement, would-have effects and transcript comparison; 41 stasis_coordinator_test.py unittest tests pass with stub epr/keepers (no live model calls); not started on this device (only isolated temporary-store replay daemons). Native lifecycle schema and fold-wire reconciliation remain unverified; settings.json unchanged.
-    evidence-fingerprint: sha256:cbd7b3480655dbb8
-    evidence-bytes: 4774
-    evidence-entries: 10
+      DELTA 2026-10-31 (slice 10, still unwired): idle_prompt is journalled as private idle-prompt evidence without output, transcript scanning, presence witnessing or inferred closure; agentic-developer composes stasis additively with away/marker edges and the 1800 s rail, and both shift templates default absent readings to unmeasured. Sensor replay: 50 unittest tests OK; projector selftest: 79 passed; hook replant clean. Skill dry-run and real replant hit EROFS at .codex; scoped projection generated fixtures and Claude runtime, leaving .codex/.agents runtime refresh pending (package verify: 2348 passed, 4 stale-runtime failures). Slice 5 still needs native idle-prompt parsing and independent silence timing; slice 9 owns progress requests and live marker/45-minute rehearsal remains unverified. settings.json unchanged.
+    evidence-fingerprint: sha256:d9ad45c27ac491a0
+    evidence-bytes: 5599
+    evidence-entries: 11
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"

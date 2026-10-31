@@ -476,8 +476,6 @@ def main():
     session = payload.get("session_id")
     if not isinstance(session, str) or not session or session in {".", ".."} or not re.fullmatch(r"[A-Za-z0-9._-]+", session):
         return
-    if payload.get("hook_event_name") == "Notification" and payload.get("notification_type") == "idle_prompt":
-        return
     root = Path(os.environ.get("STASIS_JOURNAL_ROOT") or Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]) / ".eprfs/status/stasis")
     directory = root / session
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -486,9 +484,16 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX)
         j = Journal(directory, payload)
         try:
-            map_event(j)
-            transcript(j)
-            output = relay(j)
+            if payload.get("hook_event_name") == "Notification" and payload.get("notification_type") == "idle_prompt":
+                # Probe 20261030T162945Z: arrives ~60 s after Stop, never while
+                # a dialog is open. Evidence only: no witness, inferred close,
+                # transcript scan or relay. Slice 5's native fold owns silence
+                # timing independently of notifications; no Python timer.
+                j.append("idle-prompt")
+            else:
+                map_event(j)
+                transcript(j)
+                output = relay(j)
         except Exception:
             # Never persist the exception text: it can contain raw tool arguments.
             j.gap("adapter-error")

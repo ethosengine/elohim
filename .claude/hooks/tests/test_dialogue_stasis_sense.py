@@ -288,10 +288,61 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.invoke('Stop', env={'STASIS_SENSE': 'off'})
         self.assertFalse(self.journal.exists())
 
-    def test_idle_prompt_is_not_journalled(self):
+    def test_idle_prompt_is_journalled_without_output_or_transcript_scan(self):
         self.cancelled(3)
+        self.invoke('Notification', notification_type='idle_prompt', message='SECRET idle text')
+        self.assertEqual([e['kind'] for e in self.events()], ['idle-prompt'])
+        event = self.events()[0]
+        self.assertEqual(event['source']['hookEvent'], 'Notification')
+        self.assertEqual(event['presence'], {'disposition': 'unknown', 'basis': {
+            'lastWitnessedAgeSeconds': None, 'rulingRef': None}})
+        self.assertNotIn('SECRET', json.dumps(self.events()) + json.dumps(self.state()))
+        self.assertEqual(self.state()['transcripts'], {})
+        self.assertEqual(self.state()['exceptions'], {})
+
+    def test_idle_prompt_does_not_close_a_prompt_or_witness_presence(self):
+        self.invoke('UserPromptSubmit', prompt='Continue')
+        self.pre()
+        self.request()
+        before = self.state()
+        # A deny emits no close event; a later idle notification can reach this
+        # cached open prompt. Only the native fold may infer an upper bound.
         self.invoke('Notification', notification_type='idle_prompt')
-        self.assertFalse(self.journal.exists())
+        after = self.state()
+        self.assertEqual(after['presence'], before['presence'])
+        self.assertEqual(after['openPrompts'], before['openPrompts'])
+        self.assertEqual(after['activeCalls'], before['activeCalls'])
+        self.assertEqual(self.events('prompt-closed'), [])
+        self.assertEqual(self.events('turn-ended'), [])
+
+    def test_idle_prompt_keeps_turn_evidence_and_sequence(self):
+        self.invoke('Stop', last_assistant_message='Should I continue?')
+        self.invoke('Notification', notification_type='idle_prompt', transcript_path=None)
+        self.invoke('Notification', notification_type='idle_prompt', transcript_path=None)
+        self.assertEqual([e['kind'] for e in self.events()], ['turn-ended', 'idle-prompt', 'idle-prompt'])
+        self.assertEqual([e['seq'] for e in self.events()], [1, 2, 3])
+        self.assertEqual(self.events('turn-ended')[0]['question'], 'yes')
+        self.assertEqual(self.state()['nextSeq'], 4)
+
+    def test_idle_prompt_leaves_exception_notice_for_next_supported_hook(self):
+        self.invoke('PostToolUse')
+        self.cancelled(3)
+        before = self.state()['transcripts']
+        self.invoke('Notification', notification_type='idle_prompt')
+        self.assertEqual(self.state()['transcripts'], before)
+        self.assertEqual(self.events('harness-exception'), [])
+        self.assertIn('×3 since the last notice', self.context())
+        self.assertEqual(self.context(), '')
+
+    def test_idle_prompt_honors_sensing_and_keeper_filters(self):
+        for env in ({'STASIS_SENSE': 'off'}, {'STASIS_KEEPER': '1'}):
+            with self.subTest(env=env):
+                self.invoke('Notification', notification_type='idle_prompt', env=env)
+                self.assertFalse(self.journal.exists())
+
+    def test_idle_prompt_is_observed_with_ladder_off(self):
+        self.invoke('Notification', notification_type='idle_prompt', env={'STASIS_LADDER': 'off'})
+        self.assertEqual([e['kind'] for e in self.events()], ['idle-prompt'])
 
     def test_segment_rotation_preserves_order(self):
         for _ in range(5):
@@ -499,7 +550,11 @@ class DialogueStasisSenseTest(unittest.TestCase):
         pkg = json.loads((REPO / '.epr-meta/elohim/packages/hooks/dialogue-stasis-sense.json').read_text())
         self.assertEqual(pkg['source']['body'].encode(), HOOK.read_bytes())
         self.assertIsNone(pkg['registration'])
-        self.assertEqual(len(pkg['metadata']['intendedRegistrations']), 9)
+        registrations = pkg['metadata']['intendedRegistrations']
+        self.assertEqual(len(registrations), 10)
+        self.assertEqual([r['matcher'] for r in registrations if r['event'] == 'Notification'],
+                         ['permission_prompt', 'idle_prompt'])
+        self.assertTrue(all(not r['async'] and not r['asyncRewake'] for r in registrations))
         if jsonschema:
             jsonschema.validate(pkg, json.loads((REPO / 'elohim/sdk/domains/elohim-agent/schemas/hook-package.schema.json').read_text()))
 
