@@ -7,19 +7,12 @@ description = "Wire types for lamad (learning) domain coordinator functions"
 [dependencies]
 holo_hash = { version = "=0.7.0", features = ["encoding"] }
 serde = { version = "1", features = ["derive"] }
-# Lenient html5-app body ingest (`Html5AppBody::from_json_str` / `from_json_value`).
-# Optional so the content_store coordinator zome and other wire-type consumers do not
-# take a new dependency edge; readers of published bodies (doorway, storage, the
-# chrome producers) enable `json`.
-serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 rmp-serde = "1"
-serde_json = "1"
 
 [features]
 default = []
-json = ["dep:serde_json"]
 ts = ["dep:ts-rs"]
 
 [dependencies.ts-rs]

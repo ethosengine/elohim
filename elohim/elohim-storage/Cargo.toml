@@ -92,7 +92,7 @@ shefa-types = { path = "../sdk/domains/shefa/types" }
 # functions (CreateContentInput, UpdateContentInput, ContentOutput). Required
 # by services::conductor_writes for the content side of the substrate-correct
 # write path (Task 8c).
-lamad-types = { path = "../sdk/domains/lamad/types", features = ["json"] }
+lamad-types = { path = "../sdk/domains/lamad/types" }
 
 # Server-side rendering via V8 / deno_core (opt-in; most peer hardware can't sustain V8)
 elohim-render = { path = "../elohim-render", optional = true }

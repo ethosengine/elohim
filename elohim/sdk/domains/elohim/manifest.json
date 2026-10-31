@@ -70,38 +70,7 @@
       "standing_impact_allowed": ["consequential"],
       "debit_weight": 8,
       "decay_days": 60
-    },
-    "undeclared-behaviour": {
-      "description": "Content framed by the EPR chrome was observed doing something its record did not declare — today a browser Content-Security-Policy violation report against the content's origin. Keyed by content address. Evidence for the governing community's reviewers, not a verdict: no debit_weight is declared, so it carries no standing impact (care-class and compute-class stay isolated; a browser report is neither). Recorded by elohim-storage POST /api/v1/epr/{id}/signals as the elohim:undeclared-behaviour observation. Schema: elohim/sdk/schemas/v1/feedback-signals/undeclared-behaviour.schema.json.",
-      "target_kinds": ["content"],
-      "evidence_required": true,
-      "standing_impact_allowed": ["advisory"]
     }
   },
-  "observation_kinds": [
-    {
-      "kind": "elohim:undeclared-behaviour",
-      "namespace": "elohim/observations/elohim",
-      "schema": {
-        "signal_kind": "String",
-        "content_address": "Cid",
-        "record_id": "String?",
-        "directive": "String",
-        "blocked_uri": "String?",
-        "disposition": "String?",
-        "observed_at": "String",
-        "reported_by": "String",
-        "reported_via": "String",
-        "relayed_by": "String?",
-        "observed_origin": "String?",
-        "document_match": "bool?"
-      },
-      "retention_class": "attestation-feeding",
-      "reach": "community",
-      "diversity_threshold": null,
-      "graduates_to": null,
-      "graduation_window_seconds": null,
-      "graduation_policy": null
-    }
-  ]
+  "observation_kinds": []
 }

@@ -8,8 +8,7 @@
   "content": {
     "slug": "evolution-of-trust",
     "entryPoint": "index.html",
-    "fallbackUrl": "https://ncase.me/trust/",
-    "capabilities": []
+    "fallbackUrl": "https://ncase.me/trust/"
   },
   "contentFormat": "html5-app",
   "sourcePath": "docs/content/fct/evolution-of-trust",

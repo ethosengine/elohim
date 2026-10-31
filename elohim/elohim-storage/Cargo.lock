@@ -2569,7 +2569,6 @@ name = "elohim-facings"
 version = "0.1.0"
 dependencies = [
  "elohim-views",
- "lamad-types",
  "serde_json",
 ]
 
@@ -5353,7 +5352,6 @@ version = "0.1.0"
 dependencies = [
  "holo_hash",
  "serde",
- "serde_json",
 ]
 
 [[package]]

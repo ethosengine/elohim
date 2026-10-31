@@ -1,20 +1,16 @@
 #!/usr/bin/env node
 /**
- * Validates genesis seed JSON files against the protocol schema, and each seed's
- * body (`content`) against its format's `bodySchema` when the lamad manifest
- * declares one (manifest/content-formats.json — e.g. html5-app, epr-composite).
+ * Validates genesis seed JSON files against the protocol schema.
  * Exit code 0 = all valid, 1 = validation errors found.
  */
-import { readdir, readFile, realpath } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_DIR = resolve(__dirname, '../current');
 const SEED_DIR = resolve(__dirname, '../../../../genesis/data/lamad/content');
-const LAMAD_DIR = resolve(__dirname, '../../domains/lamad');
 
 async function loadJson(filepath) {
   return JSON.parse(await readFile(filepath, 'utf8'));
@@ -55,64 +51,6 @@ function resolveRefs(schema, schemaDir, idMap) {
   return result;
 }
 
-/**
- * One validator per content format whose lamad manifest entry declares a
- * `bodySchema`. Body schemas are domain schemas: their `$ref`s into the protocol
- * enums resolve through the same path -> $id map as the input schema. Formats are
- * checked (ajv-formats) because a body is authored data, not a projection.
- */
-async function loadBodyValidators(enumEntries, idMap) {
-  const manifest = await loadJson(join(LAMAD_DIR, 'manifest.json'));
-  let formats = manifest.vocabulary?.contentFormats || {};
-  if (typeof formats.$ref === 'string') {
-    formats = await loadJson(resolve(LAMAD_DIR, formats.$ref));
-  }
-  const ajv = new Ajv2020({ allErrors: true, strict: false });
-  addFormats(ajv);
-  // Domain schemas name the enums through `schemas/v1/...`; the protocol side loads
-  // them through the `schemas/current` symlink. Key the id map by real path too.
-  const bodyIdMap = new Map(idMap);
-  for (const { schema, absPath } of enumEntries) {
-    ajv.addSchema(schema);
-    if (schema.$id) bodyIdMap.set(await realpath(absPath), schema.$id);
-  }
-  const validators = new Map();
-  // Several formats may share one body schema (html5-app and spa-bundle share the
-  // app-bundle body): compile each schema once, keyed by its path, since Ajv
-  // refuses a second schema with the same $id.
-  const compiledByPath = new Map();
-  for (const [format, def] of Object.entries(formats)) {
-    const ref = def?.bodySchema?.$ref;
-    if (typeof ref !== 'string') continue;
-    // Same base as the lamad codegen's loadSchema(): relative to the domain dir.
-    const schemaPath = resolve(LAMAD_DIR, ref);
-    if (!compiledByPath.has(schemaPath)) {
-      const raw = await loadJson(schemaPath);
-      compiledByPath.set(
-        schemaPath,
-        ajv.compile(resolveRefs(raw, dirname(schemaPath), bodyIdMap)),
-      );
-    }
-    validators.set(format, compiledByPath.get(schemaPath));
-  }
-  return validators;
-}
-
-/** A seed's body: the `content` object, or a JSON-object string. Else null. */
-function seedBody(data) {
-  const body = data.content;
-  if (body && typeof body === 'object' && !Array.isArray(body)) return body;
-  if (typeof body === 'string') {
-    try {
-      const parsed = JSON.parse(body);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
-    } catch {
-      // not a JSON body
-    }
-  }
-  return null;
-}
-
 async function main() {
   const enumDir = join(SCHEMA_DIR, 'enums');
   const enumEntries = await loadEnumSchemas(enumDir);
@@ -134,8 +72,6 @@ async function main() {
   // Resolve relative-path $ref to $id URIs before compiling
   const inputSchema = resolveRefs(inputSchemaRaw, join(SCHEMA_DIR, 'inputs'), idMap);
   const validate = ajv.compile(inputSchema);
-  const bodyValidators = await loadBodyValidators(enumEntries, idMap);
-  let bodiesChecked = 0;
 
   let files;
   try {
@@ -158,27 +94,6 @@ async function main() {
       console.error(`PARSE ERROR: ${file}`);
       errors++;
       continue;
-    }
-
-    // Per-format body schema. Every keyword counts here: a body schema is the
-    // authoring contract for that format, so additionalProperties, pattern and
-    // uniqueItems failures are as real as a type error.
-    const validateBody = bodyValidators.get(data.contentFormat);
-    if (validateBody) {
-      bodiesChecked++;
-      const body = seedBody(data);
-      if (body === null || !validateBody(body)) {
-        console.error(`INVALID BODY (${data.contentFormat}): ${file}`);
-        if (body === null) {
-          console.error('  content is not a JSON object body');
-        } else {
-          for (const err of validateBody.errors) {
-            console.error(`  content${err.instancePath} ${err.message}`);
-          }
-        }
-        errors++;
-        continue;
-      }
     }
 
     if (!validate(data)) {
@@ -206,9 +121,6 @@ async function main() {
   }
 
   console.log(`\nSchema validation: ${valid} valid, ${errors} errors, ${files.length} total`);
-  console.log(
-    `Body schemas: ${bodiesChecked} seed bodies checked against ${bodyValidators.size} format body schema(s) (${[...bodyValidators.keys()].join(', ')})`,
-  );
 
   if (errorSummary.size > 0 && errors >= 50) {
     console.log(`\n(Showing first 50 errors. ${errors} total files with errors.)`);

@@ -6,9 +6,7 @@
 //!     Self-rows only: the observer is the explicit `X-Agent-Cid` header,
 //!     verbatim (401 without it; 403 if the body names another observer). The
 //!     kind must be manifest-declared and the payload must match its declared
-//!     field map (400); a kind a dedicated intake alone records
-//!     (`content_signals::INTAKE_ONLY_OBSERVATION_KINDS`) is refused (403).
-//!     The row is unsigned and the ack says so. See
+//!     field map (400). The row is unsigned and the ack says so. See
 //!     [`accept_observation`] and ruling R-A2 of the post-station-4 plan.
 //!   - `GET /api/v1/observations/stream?asOf&window&lens&kind` — the caller's
 //!     OWN lifestream (`ObservationStreamView`), rendered through the
@@ -294,12 +292,6 @@ pub async fn accept_observation(
     }
 
     let kind = intent.observation_kind.as_str();
-    if crate::services::content_signals::is_intake_only_observation_kind(kind) {
-        return Err(StorageError::Forbidden(format!(
-            "{kind} is recorded only by POST /api/v1/epr/{{id}}/signals, which stamps the \
-             path a report arrived by; it is not a self-row kind"
-        )));
-    }
     let decl = manager
         .kind_registry()
         .and_then(|registry| registry.get(kind))

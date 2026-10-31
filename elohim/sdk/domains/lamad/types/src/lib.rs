@@ -15,24 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // =============================================================================
-// html5-app body + EPR chrome vocabulary
-// =============================================================================
-
-/// Generated from the `_table` vocabulary schemas (frame-capability,
-/// page-info-section) by `pnpm run schema:codegen:rs` — never edit by hand.
-pub mod generated_vocab;
-/// The html5-app `contentBody` parser and the chrome's derived readings.
-pub mod html5_app;
-
-pub use generated_vocab::{
-    FrameCapability, PageInfoSection, FRAME_CAPABILITIES_TABLE_JSON, PAGE_INFO_SECTIONS_TABLE_JSON,
-};
-pub use html5_app::{
-    grant_storage_key, normalize_origin, witness_from_anchor, ColorScheme, Html5AppBody,
-    Html5AppThemeHint, Witness, DEFAULT_ENTRY_POINT, GRANT_STORAGE_KEY_PREFIX,
-};
-
-// =============================================================================
 // Content CRUD Types
 // =============================================================================
 

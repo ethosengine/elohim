@@ -23,10 +23,6 @@ export interface AuthDiscovery {
    */
   portal: string;
   /**
-   * Present (and true) only when the public name this request came in on declares a separate content origin; omitted otherwise — never false, never null. Clients derive that origin by the protocol's pairing rule, never from this document: the same scheme, `apps.` + the page's own host and port, derived from Host alone (as every doorway answering the name derives it). Wrappers frame raw content there. The document still names no foreign origin.
-   */
-  apps?: true;
-  /**
    * The auth endpoints this doorway serves. Every entry is an exact member of AUTH_OWNED_PATHS in doorway-service/src/server/http.rs; advertising a path that is not owned would answer with the SPA shell instead, which is the advertise/serve asymmetry this document must never introduce.
    */
   endpoints: {

@@ -6,10 +6,7 @@
   "description": "The full Foundations for Christians and Technology course as a browsable bundle: a Christian companion to the Center for Humane Technology's Foundations of Humane Technology — fourteen days, fifteen modules, five movements, walking the shape of the gospel from lament to commissioning. Ships with its verse appendix, bibliography, and the editable course document (.docx) beside the HTML.",
   "content": {
     "slug": "fct-course",
-    "entryPoint": "index.html",
-    "capabilities": [
-      "downloads"
-    ]
+    "entryPoint": "index.html"
   },
   "contentFormat": "html5-app",
   "entryPoint": "index.html",

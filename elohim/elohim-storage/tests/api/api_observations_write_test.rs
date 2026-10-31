@@ -135,45 +135,6 @@ async fn post_unknown_kind_is_400() {
     );
 }
 
-/// `elohim:undeclared-behaviour` is manifest-declared (the observation plane
-/// carries it and the signal intake validates against it) whether or not the
-/// content chrome is on — but its payload records the path a report arrived by,
-/// which only `POST /api/v1/epr/{id}/signals` can stamp. The self-row route
-/// refuses it, with a payload that would otherwise validate, and writes nothing.
-#[tokio::test]
-async fn post_intake_only_kind_is_403_even_with_a_valid_payload() {
-    let pool = test_pool();
-    let mut conn = pool.get().unwrap();
-    let registry = ObservationKindRegistry::embedded();
-    let payload = json!({
-        "signal_kind": "undeclared-behaviour",
-        "content_address": "bafkreiexample",
-        "directive": "connect-src",
-        "observed_at": "2026-10-29T00:00:00Z",
-        "reported_by": "browser",
-        "reported_via": "doorway",
-        "document_match": true,
-    });
-    registry
-        .validate_payload("elohim:undeclared-behaviour", &payload)
-        .expect("the forged payload is schema-valid, so only the intake rule refuses it");
-    let body = serde_json::to_vec(&json!({
-        "observationKind": "elohim:undeclared-behaviour",
-        "subjectCid": "bafkreiexample",
-        "subjectKind": "content",
-        "payloadJson": payload.to_string(),
-    }))
-    .unwrap();
-    let err = accept_observation(&manager(), &mut conn, Some("human-jessica"), &body, NOW)
-        .await
-        .unwrap_err();
-    let message = err.to_string();
-    assert_eq!(status_of(err), StatusCode::FORBIDDEN);
-    assert!(message.contains("/api/v1/epr/{id}/signals"), "{message}");
-    let count: i64 = observations::table.count().get_result(&mut conn).unwrap();
-    assert_eq!(count, 0, "a refused write must leave no row");
-}
-
 #[tokio::test]
 async fn post_payload_violating_declared_schema_is_400() {
     let pool = test_pool();
