@@ -154,7 +154,10 @@ impl BytePresence for NodeBytePresence {
 /// bounded-work: 3 peer requests, at most 64 entries per reply, 4 ID reads and
 /// 64 shared exact-record reads. Pending work stays on the existing trigger
 /// retry ladder and ordinary projection sweep; no anonymous hot-path work.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is a distinct borrowed handle the reconstruction reads; a one-use struct would only rename them"
+)]
 pub(crate) async fn reconstruct_bundle_hosting(
     peers: &dyn ReconcilePeers,
     hc: &Arc<crate::hc_client::HcClient>,
