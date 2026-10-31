@@ -17,6 +17,13 @@ use super::{Budgets, StasisPolicy, POLICY_ABSENT};
 /// Where the committed policy lives, relative to the checkout root.
 pub const POLICY_REL_PATH: &str = ".epr-meta/elohim/policies/dialogue-stasis-policy.json";
 
+/// The `purpose` an away ruling's reason carries: `{"purpose":"dialogue-stasis-away",
+/// "expiresAt":"<RFC 3339>"}`. A ruling without both is not an away ruling.
+pub const AWAY_PURPOSE: &str = "dialogue-stasis-away";
+
+/// The target kinds a learned form's effect may name (the classifier's `Target`, kebab-case).
+const TARGET_KINDS: [&str; 5] = ["remote", "worktree", "main-checkout", "other", "unresolved"];
+
 /// The `purpose` the steward's ruling reason carries (`genesis/agentic/bin/stasis-policy-pin`).
 pub const POLICY_PURPOSE: &str = "dialogue-stasis-policy";
 
@@ -104,7 +111,86 @@ pub struct LearnedForm {
     pub ruling_ref: Option<String>,
 }
 
+const EFFECT_KEYS: [&str; 5] = ["tool", "command", "subcommand", "target", "pathClass"];
+
 impl LearnedForm {
+    /// Check the entry against the policy schema: closed status, an object effect class naming a
+    /// tool with only known keys, and an approved audit, an audit ref and a ruling ref when active.
+    fn validate(&self) -> Result<(), String> {
+        let named = |v: &str| !v.trim().is_empty();
+        if !(named(&self.name)
+            && named(&self.tool)
+            && named(&self.shape)
+            && named(&self.legible_form))
+        {
+            return Err(format!("learned form `{}` has an empty field", self.name));
+        }
+        let effect = self
+            .effect_class
+            .as_object()
+            .filter(|o| {
+                o.get("tool")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(named)
+            })
+            .filter(|o| o.keys().all(|k| EFFECT_KEYS.contains(&k.as_str())))
+            .ok_or_else(|| {
+                format!(
+                    "learned form `{}`: effectClass is not a well-formed effect",
+                    self.name
+                )
+            })?;
+        // Typed values, not just known keys: `command: 42` or `target: "bogus"` is invalid.
+        let text_or_null = |k: &str| match effect.get(k) {
+            None | Some(serde_json::Value::Null) => true,
+            Some(serde_json::Value::String(t)) => named(t),
+            Some(_) => false,
+        };
+        let target_ok = match effect.get("target") {
+            None | Some(serde_json::Value::Null) => true,
+            Some(serde_json::Value::String(t)) => TARGET_KINDS.contains(&t.as_str()),
+            Some(_) => false,
+        };
+        if !(text_or_null("command")
+            && text_or_null("subcommand")
+            && text_or_null("pathClass")
+            && target_ok)
+        {
+            return Err(format!(
+                "learned form `{}`: effectClass has a mistyped command, subcommand, target or pathClass",
+                self.name
+            ));
+        }
+        if effect["tool"] != self.tool.as_str() {
+            return Err(format!(
+                "learned form `{}`: effectClass.tool differs from tool",
+                self.name
+            ));
+        }
+        if !matches!(self.status.as_str(), "proposed" | "active") {
+            return Err(format!(
+                "learned form `{}`: status must be proposed or active",
+                self.name
+            ));
+        }
+        if !matches!(
+            self.audit_verdict.as_deref(),
+            None | Some("approved" | "rejected")
+        ) {
+            return Err(format!(
+                "learned form `{}`: unknown auditVerdict",
+                self.name
+            ));
+        }
+        if self.status == "active" && !self.is_active() {
+            return Err(format!(
+                "learned form `{}` is active without an approved audit, auditRef and rulingRef",
+                self.name
+            ));
+        }
+        Ok(())
+    }
+
     /// Whether this form may be offered: active, audited approved, and ruled.
     pub fn is_active(&self) -> bool {
         let named = |v: &Option<String>| v.as_deref().is_some_and(|s| !s.trim().is_empty());
@@ -201,6 +287,9 @@ impl PolicyFile {
             || v.missing_or_mismatched_policy != "inert-live-exit-3"
         {
             return Err("rulingValidation departs from the spec".into());
+        }
+        for form in &self.learned_forms {
+            form.validate()?;
         }
         let b = &self.budgets;
         if b.incident_keeper_calls < 1
@@ -504,5 +593,45 @@ mod tests {
         assert_eq!(a.state_word(), "invalid");
         assert!(a.inert_reason().is_some());
         assert_eq!(a.policy, StasisPolicy::builtin());
+    }
+
+    #[test]
+    fn learned_forms_are_validated_strictly() {
+        let Some(bytes) = committed() else { return };
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let form = json!({"name": "f", "tool": "Bash", "shape": "ls\nls",
+            "effectClass": {"tool": "Bash", "command": "ls"}, "legibleForm": "ls <path>",
+            "status": "active", "auditVerdict": "approved", "auditRef": "a", "rulingRef": "r"});
+        let with = |f: &dyn Fn(&mut serde_json::Value)| {
+            let mut entry = form.clone();
+            f(&mut entry);
+            let mut p = v.clone();
+            p["learnedForms"] = json!([entry]);
+            parse_policy(&serde_json::to_vec(&p).unwrap())
+        };
+        assert!(with(&|_| {}).is_ok());
+        assert!(with(&|f| f["status"] = "maybe".into()).is_err());
+        assert!(with(&|f| f["effectClass"] = "Bash".into()).is_err());
+        assert!(with(&|f| f["effectClass"] = json!({"command": "ls"})).is_err());
+        assert!(with(&|f| f["effectClass"]["junk"] = 1.into()).is_err());
+        assert!(with(&|f| f["effectClass"]["command"] = 42.into()).is_err());
+        assert!(with(&|f| f["effectClass"]["subcommand"] = "".into()).is_err());
+        assert!(with(&|f| f["effectClass"]["target"] = "bogus".into()).is_err());
+        assert!(with(&|f| f["effectClass"]["target"] = 7.into()).is_err());
+        assert!(with(&|f| f["effectClass"]["pathClass"] = json!({})).is_err());
+        assert!(with(&|f| f["effectClass"]["target"] = "main-checkout".into()).is_ok());
+        assert!(with(&|f| f["effectClass"]["pathClass"] = serde_json::Value::Null).is_ok());
+        assert!(with(&|f| f["effectClass"]["tool"] = "Edit".into()).is_err());
+        assert!(with(&|f| f["auditVerdict"] = "rejected".into()).is_err());
+        assert!(with(&|f| f["auditVerdict"] = "perhaps".into()).is_err());
+        assert!(with(&|f| f["auditRef"] = "".into()).is_err());
+        assert!(with(&|f| f["rulingRef"] = serde_json::Value::Null).is_err());
+        assert!(with(&|f| f["legibleForm"] = " ".into()).is_err());
+        // A proposed form needs no audit yet.
+        assert!(with(&|f| {
+            f["status"] = "proposed".into();
+            f.as_object_mut().unwrap().remove("auditVerdict");
+        })
+        .is_ok());
     }
 }

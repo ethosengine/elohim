@@ -219,3 +219,23 @@ the delivery journal; the adapter records `native-park-fold-pending` instead
 of writing an invalid event or inventing a human denial. Native reconciliation
 must absorb that delivery lifecycle before blocked-time measures can claim
 complete live coverage.
+
+## Away rulings
+
+Automated presence can come from a steward's **away ruling**: an `epr flow note --kind ruling` whose
+reason is JSON naming BOTH the purpose and an expiry, for example
+`{"purpose":"dialogue-stasis-away","expiresAt":"2026-10-31T23:00:00Z"}`. The session's presence
+carries the ruling note's CID as its `rulingRef`. The native reader counts a ruling only when it is
+authored by a person steward of the collective, its `purpose` is exactly `dialogue-stasis-away`,
+and `expiresAt` is a parsable RFC 3339 time not yet passed. A ruling with no expiry, an unparsable
+one, another purpose, or a reference the sidecar cannot resolve is **not** away: the regulator
+never parks on an absence it cannot verify.
+
+## Live regulator records
+
+Records the live regulator writes carry `agentId: "stasis-regulator"`,
+`regulator: {"kind": "native-decide"}` (the coordinator writes `"coordinator"`) and the `policyCid`
+they were decided under. The fold counts such a record as live (and closes a parked stall) only
+when the regulator kind is known and `policyCid` equals the policy pinned at fold time; otherwise it
+folds as a shadow record. This binds provenance only as strongly as control over journal writes,
+the device trust boundary; it is not a signature.

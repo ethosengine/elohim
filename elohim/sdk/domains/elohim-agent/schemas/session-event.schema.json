@@ -234,6 +234,20 @@
         "uncertain"
       ]
     },
+    "regulator": {
+      "description": "Provenance of a LIVE regulator record: which component acted. Binds provenance only as strongly as control over journal writes (the device trust boundary); it is not a signature.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["native-decide", "coordinator"] }
+      },
+      "additionalProperties": false
+    },
+    "policyCid": {
+      "description": "The CID of the pinned policy a live regulator record was decided under. The fold counts a live act only while this equals the policy's current pinned CID.",
+      "type": "string",
+      "minLength": 1
+    },
     "correlation": {
       "type": "object",
       "required": [
@@ -368,6 +382,10 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 5
+        },
+        "live": {
+          "description": "True when the regulator acted for real (live decide). Only a live Permit/park closes the stall; a shadow record never closes anything.",
+          "type": "boolean"
         },
         "claimedBy": {
           "type": "object",

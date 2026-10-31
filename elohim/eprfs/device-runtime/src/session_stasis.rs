@@ -118,7 +118,8 @@ impl StasisPolicy {
 }
 
 /// An away ruling and when it lapses. The journal records only a ruling reference, so the caller
-/// supplies what it can resolve; a reference it cannot resolve stays in force (unverifiable).
+/// supplies what it can resolve; a reference it cannot resolve is NOT in force (unverifiable
+/// absence is never granted).
 #[derive(Debug, Clone)]
 pub struct AwayRuling {
     /// The ruling reference an event's presence basis names.
@@ -220,6 +221,8 @@ pub struct Consultation {
     pub expired: bool,
     /// Duplicate start records folded into this consultation.
     pub duplicate_starts: u32,
+    /// Recorded by a live regulator act; a shadow record never closes anything.
+    pub live: bool,
 }
 
 impl Consultation {
@@ -240,6 +243,7 @@ impl Consultation {
             tokens: None,
             expired: false,
             duplicate_starts: 0,
+            live: false,
         }
     }
 
@@ -389,6 +393,9 @@ pub struct FoldOptions<'a> {
     pub classifier: &'a Classifier,
     /// Away rulings the caller can resolve.
     pub rulings: &'a [AwayRuling],
+    /// The CID of the policy pinned right now. A `live` consultation counts only when its event
+    /// names this exact CID (and a known regulator kind); `None` counts none.
+    pub pinned_cid: Option<&'a str>,
 }
 
 impl<'a> FoldOptions<'a> {
@@ -408,6 +415,7 @@ impl<'a> FoldOptions<'a> {
             policy,
             classifier,
             rulings: &[],
+            pinned_cid: None,
         }
     }
 
@@ -420,6 +428,12 @@ impl<'a> FoldOptions<'a> {
     /// Add the rulings the caller can resolve.
     pub fn with_rulings(mut self, rulings: &'a [AwayRuling]) -> Self {
         self.rulings = rulings;
+        self
+    }
+
+    /// Add the currently pinned policy CID live records are checked against.
+    pub fn with_pinned_cid(mut self, cid: &'a str) -> Self {
+        self.pinned_cid = Some(cid);
         self
     }
 
@@ -751,6 +765,17 @@ impl Folder<'_> {
             return;
         };
         let Some(i) = self.lookup(&id, e) else { return };
+        // A record claims `live` only; it counts when a known regulator wrote it under the policy
+        // pinned NOW. Anything else folds as a shadow record. This binds provenance only as
+        // strongly as control over journal writes (the device trust boundary).
+        let live = c.live
+            && matches!(
+                e.regulator.as_deref(),
+                Some("native-decide" | "coordinator")
+            )
+            && e.policy_cid
+                .as_deref()
+                .is_some_and(|p| !p.is_empty() && self.o.pinned_cid == Some(p));
         let Some(rung) = c.rung.or(c.level.map(Level::rung)) else {
             self.gap("consultation-without-rung", e, Some(&id));
             return;
@@ -800,6 +825,7 @@ impl Folder<'_> {
                 slot.decision = c.decision.clone();
                 slot.pivot = c.pivot;
                 slot.reason = c.reason.clone();
+                slot.live = live;
                 slot.reported_elapsed_s = c.usage_elapsed_s;
                 slot.tokens = c.tokens;
                 slot.level = c.level.or(slot.level);
@@ -810,6 +836,15 @@ impl Folder<'_> {
                 // offer. A Refer moves the folded ladder to the next rung.
                 if matches!(c.decision, Some(Decision::Refer(_))) {
                     inc.rung = inc.rung.max((rung + 1).min(5));
+                }
+                // A LIVE park closes the dialogue stall (blocked seconds stop accruing); the park
+                // item keeps its own pending lifecycle. A shadow park closes nothing.
+                if live
+                    && matches!(c.decision, Some(Decision::Permit))
+                    && c.pivot == Some(Pivot::Park)
+                {
+                    let at = c.finished_at.clone().unwrap_or_else(|| e.moment());
+                    self.close(i, at, Some(ClosedBy::Parked));
                 }
             }
             Phase::Expire => {
@@ -1051,7 +1086,7 @@ pub fn effective_presence(
             rulings
                 .iter()
                 .find(|r| &r.id == id)
-                .is_none_or(|r| r.expires_at.is_none_or(|t| t > now))
+                .is_some_and(|r| r.expires_at.is_none_or(|t| t > now))
         });
     let limit = Duration::milliseconds((p.stall.limit * 1000.0) as i64);
     let absent = incidents.iter().any(|i| {
@@ -1996,9 +2031,10 @@ pub fn record_inert(
             "uptimeSeconds": clock.uptime_seconds,
             "provenance": "epr-session-stasis/linux-proc",
         },
+        // Carry the last event's disposition and away ruling: a gap record must not clear them.
         "presence": {
-            "disposition": "unknown",
-            "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": null},
+            "disposition": disposition_name(last.presence.disposition),
+            "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
         },
         "gap": {"reason": reason, "from": now, "to": now},
     });

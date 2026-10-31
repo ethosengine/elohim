@@ -788,8 +788,18 @@ fn an_away_ruling_and_the_collaborative_window_set_the_passive_disposition() {
     let mut away = ev(1, 0, "steward-ping", json!({}));
     away["presence"] = json!({"disposition": "automated", "basis": {"lastWitnessedAgeSeconds": 1.0, "rulingRef": "ruling-away-1"}});
     let parsed = Event::from_value(&away).unwrap();
+    // A reference nobody can resolve is not away (unverifiable absence is never granted)...
     assert_eq!(
-        effective_presence(&[parsed], &[], at(0), &p, &[]).disposition,
+        effective_presence(std::slice::from_ref(&parsed), &[], at(0), &p, &[]).disposition,
+        Disposition::Collaborative
+    );
+    // ...a resolved, unexpired ruling is.
+    let held = [AwayRuling {
+        id: "ruling-away-1".into(),
+        expires_at: None,
+    }];
+    assert_eq!(
+        effective_presence(&[parsed], &[], at(0), &p, &held).disposition,
         Disposition::Automated
     );
     assert_eq!(
@@ -1960,7 +1970,8 @@ fn an_unknown_outcome_is_refused_and_a_bare_turn_end_needs_question_or_outcome()
 
 #[test]
 fn live_regulator_records_validate_against_the_event_schema() {
-    use super::live::decide_live;
+    use super::live::{decide_live, LiveDecision};
+    use super::policy::{Pin, PolicyAssessment, PolicyFileRead};
 
     let dir = tempfile::tempdir().unwrap();
     let s = dir.path().join("s1");
@@ -1992,18 +2003,34 @@ fn live_regulator_records_validate_against_the_event_schema() {
         agent_id: "main".into(),
         incident_id: Some("s1:2".into()),
     };
-    let out = decide_live(
+    let recheck = || {
+        Ok(PolicyAssessment::assess(
+            Some(PolicyFileRead {
+                cid: "cid".into(),
+                parsed: Ok(policy.clone()),
+            }),
+            Pin::Cid("cid".into()),
+        ))
+    };
+    let ruling = AwayRuling {
+        id: "r".into(),
+        expires_at: None,
+    };
+    let out = match decide_live(
         dir.path(),
         "s1",
         &req,
         &c,
-        &policy,
-        "p",
-        "cid",
+        &recheck,
+        &[ruling],
         &clock,
         1 << 20,
     )
-    .unwrap();
+    .unwrap()
+    {
+        LiveDecision::Acted(o) => o,
+        LiveDecision::Inert(r) => panic!("{r}"),
+    };
     assert_eq!(out.effect, Effect::Deny);
 
     let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2027,4 +2054,121 @@ fn live_regulator_records_validate_against_the_event_schema() {
         "correlation": {"incidentId": "s1:2", "confidence": "high", "method": "none"},
         "consultation": {"rung": 0, "level": "C1", "binding": "b", "decision": "Refer", "pivot": null, "reason": "r"}});
     assert!(validator.is_valid(&refer));
+}
+
+// --- Ladder-review regressions: live park closes the stall (L6), away rulings (L5) ---------
+
+fn park_record(live: bool, regulator: Option<&str>, cid: Option<&str>) -> Value {
+    let mut c = json!({"rung": 0, "level": "C1", "binding": "b", "decision": "Permit",
+                       "pivot": "park", "reason": "parked"});
+    if live {
+        c["live"] = json!(true);
+    }
+    let mut e = consult(3, 100, "s1:2", c);
+    if let Some(kind) = regulator {
+        e["regulator"] = json!({"kind": kind});
+    }
+    if let Some(cid) = cid {
+        e["policyCid"] = json!(cid);
+    }
+    e
+}
+
+fn fold_pinned(events: &[Value], pinned: Option<&str>) -> SessionFold {
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let mut o = FoldOptions::new(at(600), Selection::All, true, &policy, &c);
+    if let Some(p) = pinned {
+        o = o.with_pinned_cid(p);
+    }
+    fold_session(&replay_of(events), &o)
+}
+
+#[test]
+fn a_live_park_closes_the_stall_and_a_shadow_park_does_not() {
+    let perm = || perm(2, 10, "ls -la\nls");
+    let live = fold_pinned(
+        &[
+            perm(),
+            park_record(true, Some("native-decide"), Some("cid-1")),
+        ],
+        Some("cid-1"),
+    );
+    let i = &live.incidents[0];
+    assert_eq!(i.closed_by, Some(ClosedBy::Parked));
+    // Blocked seconds stop at the park (t=100), not at the fold's now (t=600).
+    assert_eq!(blocked(&live), Some(90.0));
+    assert!(i.consultations[0].live);
+    // The coordinator's live completions count too.
+    let coordinator = fold_pinned(
+        &[
+            perm(),
+            park_record(true, Some("coordinator"), Some("cid-1")),
+        ],
+        Some("cid-1"),
+    );
+    assert_eq!(coordinator.incidents[0].closed_by, Some(ClosedBy::Parked));
+
+    // N2: a live claim counts only from a known regulator, under the policy pinned NOW.
+    for (reg, cid, pinned) in [
+        (None, Some("cid-1"), Some("cid-1")),           // no regulator
+        (Some("keeper"), Some("cid-1"), Some("cid-1")), // unknown regulator
+        (Some("native-decide"), None, Some("cid-1")),   // no policy CID
+        (Some("native-decide"), Some("cid-OLD"), Some("cid-1")), // policy since changed
+        (Some("native-decide"), Some("cid-1"), None),   // nothing pinned
+    ] {
+        let f = fold_pinned(&[perm(), park_record(true, reg, cid)], pinned);
+        assert_eq!(f.incidents[0].closed_by, None, "{reg:?} {cid:?} {pinned:?}");
+        assert!(!f.incidents[0].consultations[0].live);
+    }
+
+    let shadow = fold_pinned(&[perm(), park_record(false, None, None)], Some("cid-1"));
+    assert_eq!(shadow.incidents[0].closed_by, None);
+    assert_eq!(blocked(&shadow), Some(590.0));
+}
+
+#[test]
+fn an_unresolved_away_ruling_reference_is_not_away() {
+    // L5 at the fold: the reference names no resolvable ruling, so presence is not automated.
+    let mut e = ev(1, 0, "turn-ended", json!({"question": "no"}));
+    e["presence"] = json!({"disposition": "automated",
+                           "basis": {"lastWitnessedAgeSeconds": 0.0, "rulingRef": "ghost"}});
+    let f = run(&[e.clone()], 10, Selection::All);
+    assert_eq!(f.presence.disposition, Disposition::Collaborative);
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let rulings = [AwayRuling {
+        id: "ghost".into(),
+        expires_at: None,
+    }];
+    let resolved = fold_session(
+        &replay_of(&[e.clone()]),
+        &FoldOptions::new(at(10), Selection::All, true, &policy, &c).with_rulings(&rulings),
+    );
+    assert_eq!(resolved.presence.disposition, Disposition::Automated);
+    let expired = [AwayRuling {
+        id: "ghost".into(),
+        expires_at: Some(at(5)),
+    }];
+    let lapsed = fold_session(
+        &replay_of(&[e]),
+        &FoldOptions::new(at(10), Selection::All, true, &policy, &c).with_rulings(&expired),
+    );
+    assert_eq!(lapsed.presence.disposition, Disposition::Collaborative);
+}
+
+#[test]
+fn a_coordinator_shaped_live_completion_folds_as_live() {
+    // The coordinator's envelope: agentId stasis-coordinator, regulator {kind: coordinator},
+    // policyCid, and `live: true` inside the consultation.
+    let mut e = park_record(true, None, None);
+    e["agentId"] = json!("stasis-coordinator");
+    e["regulator"] = json!({"kind": "coordinator"});
+    e["policyCid"] = json!("cid-9");
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), e.clone()], Some("cid-9"));
+    assert!(f.incidents[0].consultations[0].live);
+    assert_eq!(f.incidents[0].closed_by, Some(ClosedBy::Parked));
+    // Under a different pinned policy it is shadow.
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), e], Some("cid-other"));
+    assert!(!f.incidents[0].consultations[0].live);
 }

@@ -296,6 +296,8 @@ pub struct ConsultationEvent {
     pub finished_at: Option<Moment>,
     /// Who holds the claim, as `pid@bootId`.
     pub claimed_by: Option<String>,
+    /// The regulator acted for real (live `decide`), not as a shadow record.
+    pub live: bool,
     /// Measured elapsed seconds; `None` is unmeasured.
     pub usage_elapsed_s: Option<f64>,
     /// Reported combined tokens; `None` is unmeasured.
@@ -375,6 +377,10 @@ pub struct Event {
     pub duration_ms: Option<f64>,
     /// Correlation.
     pub correlation: Option<Correlation>,
+    /// The regulator component that wrote this live record, when it names one.
+    pub regulator: Option<String>,
+    /// The policy CID a live regulator record was decided under.
+    pub policy_cid: Option<String>,
     /// Gap payload.
     pub gap: Option<GapNote>,
     /// Question classification.
@@ -528,6 +534,7 @@ fn parse_consultation(c: &Value) -> Parsed<ConsultationEvent> {
         timeout_seconds: c.get("timeoutSeconds").and_then(Value::as_f64),
         finished_at: clock_at(c.get("finishedAt"), "consultation.finishedAt")?,
         claimed_by,
+        live: c.get("live").and_then(Value::as_bool).unwrap_or(false),
         usage_elapsed_s: usage
             .and_then(|u| u.get("elapsedSeconds"))
             .and_then(Value::as_f64),
@@ -677,6 +684,11 @@ impl Event {
             shape: opt_str(v.get("shape")),
             duration_ms: v.get("durationMs").and_then(Value::as_f64),
             correlation,
+            regulator: v
+                .pointer("/regulator/kind")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            policy_cid: opt_str(v.get("policyCid")),
             gap,
             question,
             outcome,

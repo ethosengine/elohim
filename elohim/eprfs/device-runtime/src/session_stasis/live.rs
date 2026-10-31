@@ -22,9 +22,10 @@ use serde_json::{json, Value};
 use super::classify::{CallInput, Classifier, ConcernClass, StallClass};
 use super::event::{Disposition, Pivot};
 use super::journal::{self, StasisError};
+use super::policy::PolicyAssessment;
 use super::{
-    fold_session, ClockReading, DecideRequest, Effect, FoldOptions, Incident, IncidentState,
-    Selection, StasisPolicy,
+    fold_session, AwayRuling, ClockReading, DecideRequest, Effect, FoldOptions, Incident,
+    IncidentState, Selection,
 };
 
 /// What live `decide` prints once the policy is pinned-match.
@@ -52,16 +53,33 @@ pub struct LiveOutput {
     pub refer: bool,
 }
 
+/// A LIVE Permit consultation with `pivot`: shadow records, and live-claiming records that do not
+/// verify against the pinned policy, never count toward a park, a reshape allowance or a Refer.
 fn consultation_of(inc: &Incident, pivot: Pivot) -> Option<&super::Consultation> {
     inc.consultations
         .iter()
-        .find(|c| c.pivot == Some(pivot) && matches!(c.decision, Some(Decision::Permit)))
+        .find(|c| c.live && c.pivot == Some(pivot) && matches!(c.decision, Some(Decision::Permit)))
 }
+
+/// Any Permit consultation with `pivot`, live or not: a keeper's `proceed` is never live.
+fn recorded_pivot(inc: &Incident, pivot: Pivot) -> bool {
+    inc.consultations
+        .iter()
+        .any(|c| c.pivot == Some(pivot) && matches!(c.decision, Some(Decision::Permit)))
+}
+
+/// The fixed agent identity every live regulator record is written under.
+const REGULATOR_AGENT: &str = "stasis-regulator";
 
 struct Writer<'a> {
     dir: &'a std::path::Path,
     session: &'a str,
-    agent_id: &'a str,
+    /// The presence of the journal's last event, carried onto every record this writer appends:
+    /// the away ruling and disposition are read from the LAST event, so a regulator record must
+    /// not clear them. The witness age is not carried (this record witnesses nothing).
+    presence: Value,
+    /// The pinned policy CID these records are decided under.
+    policy_cid: String,
     runtime: String,
     owner_pid: Option<u32>,
     owner_start: Option<String>,
@@ -85,6 +103,7 @@ impl Writer<'_> {
         // A single-record completion (no `phase`): the regulator's act is decided in one write.
         let c = json!({
             "rung": 0,
+            "live": true,
             "level": "C1",
             "binding": "epr-session-stasis/regulator",
             "decision": decision,
@@ -100,7 +119,9 @@ impl Writer<'_> {
                 "ownerPid": self.owner_pid,
                 "ownerStartTime": self.owner_start,
             },
-            "agentId": self.agent_id,
+            "agentId": REGULATOR_AGENT,
+            "regulator": {"kind": "native-decide"},
+            "policyCid": self.policy_cid,
             "seq": seq,
             "clock": {
                 "wall": now,
@@ -108,10 +129,7 @@ impl Writer<'_> {
                 "uptimeSeconds": self.clock.uptime_seconds,
                 "provenance": "epr-session-stasis/linux-proc",
             },
-            "presence": {
-                "disposition": "unknown",
-                "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": null},
-            },
+            "presence": self.presence,
             "correlation": {"incidentId": incident, "confidence": "high", "method": "none"},
             "consultation": c,
         });
@@ -119,23 +137,49 @@ impl Writer<'_> {
     }
 }
 
-/// Decide under a pinned policy. `policy_label` and `policy_cid` describe the pin the caller
-/// verified; this function trusts neither to grant anything.
+/// The outcome of a live decision: an answer, or the reason the regulator stayed inert.
+#[derive(Debug, Clone)]
+pub enum LiveDecision {
+    /// The policy was pinned under the lock; this is the answer.
+    Acted(LiveOutput),
+    /// The policy no longer verified under the lock; nothing was written.
+    Inert(String),
+}
+
+/// Decide under a pinned policy. `recheck` re-reads the policy bytes and the pin AFTER this
+/// function holds the journal lock; the decision uses that assessment (its policy, label and CID),
+/// never one taken before the lock, and anything but a pinned match is inert.
+/// `rulings` are the away rulings the caller resolved from the flow sidecar; an unresolved
+/// reference counts as not away.
 #[allow(
     clippy::too_many_arguments,
-    reason = "The live decision needs the journal root, the request, the classifier, the verified policy and clock; bundling them would only rename the same inputs"
+    reason = "The live decision needs the journal root, the request, the classifier, the re-verification, the resolved rulings and clock; bundling them would only rename the same inputs"
 )]
 pub fn decide_live(
     root: &std::path::Path,
     session: &str,
     req: &DecideRequest,
     classifier: &Classifier,
-    policy: &StasisPolicy,
-    policy_label: &str,
-    policy_cid: &str,
+    recheck: &dyn Fn() -> Result<PolicyAssessment, StasisError>,
+    rulings: &[AwayRuling],
     clock: &ClockReading,
     segment_limit: u64,
-) -> Result<LiveOutput, StasisError> {
+) -> Result<LiveDecision, StasisError> {
+    let dir = root.join(session);
+    let _lock = if dir.is_dir() {
+        Some(journal::Lock::exclusive(&dir)?)
+    } else {
+        None
+    };
+    let assessment = recheck()?;
+    if let Some(reason) = assessment.inert_reason() {
+        return Ok(LiveDecision::Inert(reason));
+    }
+    let Some(policy_cid) = assessment.cid().map(str::to_owned) else {
+        return Ok(LiveDecision::Inert("policy CID unavailable".into()));
+    };
+    let policy = &assessment.policy;
+    let policy_label = assessment.label(true);
     let mut out = LiveOutput {
         effect: Effect::None,
         message: None,
@@ -143,27 +187,27 @@ pub fn decide_live(
         rung: 0,
         shadow: false,
         live: true,
-        policy: policy_label.to_owned(),
-        policy_cid: policy_cid.to_owned(),
+        policy: policy_label,
+        policy_cid: policy_cid.clone(),
         refer: false,
     };
-    let dir = root.join(session);
-    if !dir.is_dir() {
-        return Ok(out);
+    if _lock.is_none() {
+        return Ok(LiveDecision::Acted(out));
     }
-    let _lock = journal::Lock::exclusive(&dir)?;
     let replay = match journal::replay_unlocked(&dir, session) {
         Ok(r) => r,
-        Err(StasisError::NoJournal(_)) => return Ok(out),
+        Err(StasisError::NoJournal(_)) => return Ok(LiveDecision::Acted(out)),
         Err(e) => return Err(e),
     };
     let Some(last) = replay.events.last() else {
-        return Ok(out);
+        return Ok(LiveDecision::Acted(out));
     };
     let fold = fold_session(
         &replay,
         &FoldOptions::new(clock.wall, Selection::All, true, policy, classifier)
-            .with_clock(&clock.boot_id, clock.uptime_seconds),
+            .with_clock(&clock.boot_id, clock.uptime_seconds)
+            .with_rulings(rulings)
+            .with_pinned_cid(&policy_cid),
     );
     let by_id = req
         .incident_id
@@ -178,7 +222,14 @@ pub fn decide_live(
     let mut w = Writer {
         dir: &dir,
         session,
-        agent_id: &req.agent_id,
+        presence: json!({
+            "disposition": super::disposition_name(last.presence.disposition),
+            "basis": {
+                "lastWitnessedAgeSeconds": null,
+                "rulingRef": last.presence.ruling_ref,
+            },
+        }),
+        policy_cid: policy_cid.clone(),
         runtime: last.session.runtime.clone(),
         owner_pid: last.session.owner_pid,
         owner_start: last.session.owner_start_time.map(|t| t.to_string()),
@@ -193,17 +244,14 @@ pub fn decide_live(
         segment_limit,
     };
     let Some(inc) = incident else {
-        return Ok(out);
+        return Ok(LiveDecision::Acted(out));
     };
     out.incident_id = Some(inc.id.clone());
     out.rung = inc.rung;
     let mut parked = consultation_of(inc, Pivot::Park).is_some();
 
     // A keeper's `proceed` is never executed here: record the downgrade to park, once.
-    if inc.state != IncidentState::Closed
-        && !parked
-        && consultation_of(inc, Pivot::Proceed).is_some()
-    {
+    if inc.state != IncidentState::Closed && !parked && recorded_pivot(inc, Pivot::Proceed) {
         w.consult(
             &inc.id,
             "Permit",
@@ -214,7 +262,7 @@ pub fn decide_live(
         parked = true;
     }
     if inc.state == IncidentState::Closed {
-        return Ok(out);
+        return Ok(LiveDecision::Acted(out));
     }
 
     match req.hook.as_str() {
@@ -224,7 +272,7 @@ pub fn decide_live(
             {
                 // Collaborative (or unknown) presence: the dialog displays; the coordinator
                 // harvests at Approach and Breach.
-                return Ok(out);
+                return Ok(LiveDecision::Acted(out));
             }
             if !parked {
                 let shape = req.shape.as_deref().unwrap_or("-");
@@ -248,21 +296,27 @@ pub fn decide_live(
         }
         "PreToolUse" => {
             let (Some(tool), Some(shape)) = (req.tool.as_deref(), req.shape.as_deref()) else {
-                return Ok(out);
+                return Ok(LiveDecision::Acted(out));
             };
             let c = classifier.classify(StallClass::Authorization, tool, CallInput::Shape(shape));
             // Risk, uncertain and any ask/deny match never get a reshape.
-            if c.concern != ConcernClass::Shape || c.rule_match != "none" {
-                return Ok(out);
+            // Both the candidate AND the incident's recorded concern must be shape, with no
+            // ask/deny rule matching; risk and uncertain never get a reshape.
+            if inc.concern_class != ConcernClass::Shape
+                || c.concern != ConcernClass::Shape
+                || c.rule_match != "none"
+            {
+                return Ok(LiveDecision::Acted(out));
             }
             let effect = serde_json::to_value(&c.effect).unwrap_or(Value::Null);
-            if c.effect != inc.effect_class {
-                return Ok(out);
+            // Only a fully resolved, equal effect: an unresolved target or path never reshapes.
+            if !c.effect.same_effect(&inc.effect_class) {
+                return Ok(LiveDecision::Acted(out));
             }
             let Some(form) = policy.learned_forms.iter().find(|f| {
                 f.is_active() && f.tool == tool && f.shape == shape && f.effect_class == effect
             }) else {
-                return Ok(out);
+                return Ok(LiveDecision::Acted(out));
             };
             if consultation_of(inc, Pivot::Reshape).is_some() {
                 // The allowance is spent: Refer, once, instead of a second reshape.
@@ -282,7 +336,7 @@ pub fn decide_live(
                 }
                 out.refer = true;
                 out.rung = out.rung.max(1);
-                return Ok(out);
+                return Ok(LiveDecision::Acted(out));
             }
             w.consult(
                 &inc.id,
@@ -298,5 +352,5 @@ pub fn decide_live(
         }
         _ => {}
     }
-    Ok(out)
+    Ok(LiveDecision::Acted(out))
 }
