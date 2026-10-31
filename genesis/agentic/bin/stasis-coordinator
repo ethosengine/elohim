@@ -5,16 +5,16 @@ Contract: dialogue-stasis-loop-design, Incident model and Native CLI contract.
 No native implementation imports. `once` and --keeper-cmd-override support replay.
 The override is an argv string (shlex, never a shell), not a permission bypass.
 
-Fold interface: snake_case Incident fields from the spec; opened_at uses wall
-and optional mono {bootId, uptimeSeconds}. A second --shift-current fold supplies
-the accounting window. Shift tokens sum budget_used.tokens; keeper seconds sum
-consultations' started_at..finished_at (or elapsed time up to deadline_at).
+Fold interface: native camelCase Incident fields; openedAt carries wall,
+bootId and uptimeSeconds. A second --shift-current fold supplies the accounting
+window through measures.dialogue-blocked-seconds.readings[].keeper, including
+nullable seconds/tokens, known lower bounds and unmeasured counts.
 Missing budget evidence is unmeasured and stops spending, never zero.
 
 Journal interface: camelCase envelopes, consultation phase start|complete|expired
 and claimSeq referencing the first start's seq. Skips are would-have records, not
 keeper calls. wouldHave carries effect, incidentId, rung and a dedup key. These
-are the lifecycle extensions described by the spec, pending schema reconciliation.
+are the lifecycle records defined by session-event.schema.json.
 No shadow event closes or advances a live incident. Journal replay, not state.json,
 owns claims; state.json remains a cache shared with the sensing hook.
 """
@@ -43,10 +43,10 @@ REPO = Path(__file__).resolve().parents[3]
 SCHEMA_PATH = REPO / 'elohim/sdk/domains/elohim-agent/schemas/keeper-decision.schema.json'
 UNKNOWN = {'disposition': 'unknown', 'basis': {
     'lastWitnessedAgeSeconds': None, 'rulingRef': None}}
-LIMITS = {'keeper_calls': 4, 'elapsed_s': 1800, 'tokens': 200000}
-SHIFT_LIMITS = {'elapsed_s': 7200, 'tokens': 2000000}
+LIMITS = {'keeperCalls': 4, 'elapsedS': 1800, 'tokens': 200000}
+SHIFT_LIMITS = {'seconds': 7200, 'tokens': 2000000}
 # The spec has no per-call number: divide the incident ceiling among four rungs.
-CONSULTATION_SECONDS = LIMITS['elapsed_s'] / LIMITS['keeper_calls']
+CONSULTATION_SECONDS = LIMITS['elapsedS'] / LIMITS['keeperCalls']
 
 
 def wall(value=None):
@@ -68,7 +68,7 @@ def clock():
 
 def seconds_since(value, now=None):
     now = now or clock()
-    mono = value.get('mono', value) if isinstance(value, dict) else {}
+    mono = value if isinstance(value, dict) else {}
     if isinstance(mono, dict) and mono.get('bootId') == now['bootId']:
         return max(0, now['uptimeSeconds'] - mono['uptimeSeconds'])
     return max(0, timestamp(now) - timestamp(value))
@@ -255,23 +255,33 @@ def refer(reason):
 
 
 def shift_budget(fold):
-    elapsed, tokens = 0, 0
-    for incident in fold['incidents']:
-        used = incident['budget_used']
-        if not number(used.get('tokens')):
-            return None
-        tokens += used['tokens']
-        # Duplicated starts do not inflate time or token accounting in the fold.
-        seen = set()
-        for c in incident['consultations']:
-            if c['rung'] in seen:
-                continue
-            seen.add(c['rung'])
-            start = timestamp(c['started_at'])
-            end = timestamp(c['finished_at']) if c.get('finished_at') else min(
-                time.time(), timestamp(c['deadline_at']))
-            elapsed += max(0, end - start)
-    return {'elapsed_s': elapsed, 'tokens': tokens}
+    # The native fold attributes usage by window overlap. Incident lifetime
+    # totals and consultation clocks cannot reconstruct that attribution.
+    readings = fold.get('measures', {}).get('dialogue-blocked-seconds', {}).get('readings')
+    if not readings:
+        return None
+    keepers = [reading['keeper'] for reading in readings]
+    used = {}
+    for field in ('seconds', 'secondsKnown', 'secondsUnmeasured',
+                  'tokens', 'tokensKnown', 'tokensUnreported'):
+        values = [keeper.get(field) for keeper in keepers]
+        used[field] = sum(values) if all(number(value) for value in values) else None
+    return used
+
+
+def budget_state(used, limits, costs=()):
+    """Unknown totals prohibit spending; known lower bounds can prove exhaustion."""
+    used = used or {}
+    unknown = [field for field in dict.fromkeys((*limits, *costs))
+               if not number(used.get(field))]
+    exhausted = []
+    for field, limit in limits.items():
+        value = used.get(field)
+        if not number(value):
+            value = used.get(field + 'Known')
+        if number(value) and value >= limit:
+            exhausted.append(field)
+    return unknown, exhausted
 
 
 class Coordinator:
@@ -392,7 +402,7 @@ class Coordinator:
             displayed = any(e['kind'] == 'dialog-displayed' and
                             e.get('correlation', {}).get('incidentId') == incident['id']
                             for e in journal.events)
-            duration = seconds_since(incident['opened_at'])
+            duration = seconds_since(incident['openedAt'])
             unresolved = incident['state'] != 'Closed'
             if displayed and unresolved and duration >= 300 and (age is None or age >= duration - 300):
                 presence['disposition'] = 'automated'
@@ -400,11 +410,11 @@ class Coordinator:
 
     def advance(self, repo, journal, session, presence, incident, shift_used):
         iid = incident['id']
-        if incident['state'] == 'Closed' and incident.get('closed_by') != 'parked':
+        if incident['state'] == 'Closed' and incident.get('closedBy') != 'parked':
             return
         if incident.get('question') == 'uncertain':
             return
-        age = seconds_since(incident['opened_at'])
+        age = seconds_since(incident['openedAt'])
         if presence['disposition'] != 'automated' and age < 180:
             return
         history = journal.hypothetical(iid)
@@ -419,9 +429,9 @@ class Coordinator:
                 for e in journal.events):
             would('presence-automated', 0, reason='unanswered displayed dialog reached Breach')
         would('regulator', 0, message='Apply palette and learned forms through unchanged permission checks.')
-        if presence['disposition'] == 'automated' and incident['stall_class'] == 'authorization':
+        if presence['disposition'] == 'automated' and incident['stallClass'] == 'authorization':
             would('deny/park', 0, message='Park; do not retry this effect by any tool or spelling.')
-        if incident['stall_class'] == 'question':
+        if incident['stallClass'] == 'question':
             would('Stop-block', 0, message='Batch blocking asks when no independent work remains.')
         rung = max(1, incident['rung'])
         while rung <= 4:
@@ -445,12 +455,19 @@ class Coordinator:
             if any(e['effect'] == 'skip' and e['rung'] == rung for e in history):
                 rung += 1
                 continue
-            used = incident['budget_used']
-            unknown = any(not number(used.get(k)) for k in LIMITS) or shift_used is None
-            exhausted = not unknown and (any(used[k] >= v for k, v in LIMITS.items()) or
-                                        any(shift_used[k] >= v for k, v in SHIFT_LIMITS.items()))
-            if unknown or exhausted or age >= LIMITS['elapsed_s']:
-                self.human(journal, session, presence, iid, 'budget unmeasured' if unknown else 'budget exhausted')
+            used = incident['budgetUsed']
+            incident_unknown, incident_exhausted = budget_state(used, LIMITS, ('keeperSeconds',))
+            shift_unknown, shift_exhausted = budget_state(shift_used, SHIFT_LIMITS)
+            unknown = bool(incident_unknown or shift_unknown)
+            exhausted = bool(incident_exhausted or shift_exhausted)
+            if unknown:
+                would('budget-unknown', rung,
+                      unknown={'incident': incident_unknown, 'shift': shift_unknown},
+                      exhausted={'incident': incident_exhausted, 'shift': shift_exhausted},
+                      incidentBudget=used, shiftBudget=shift_used)
+            if unknown or exhausted or age >= LIMITS['elapsedS']:
+                self.human(journal, session, presence, iid,
+                           'budget unmeasured' if unknown and not exhausted else 'budget exhausted')
                 return
             runtime = self.runtimes.get(session['runtime'], {})
             binding = runtime.get('capabilityBindings', {}).get(f'C{rung}')
@@ -469,8 +486,8 @@ class Coordinator:
             if self.future is not None:
                 return
             timeout = min(CONSULTATION_SECONDS, self.args.consultation_timeout,
-                          LIMITS['elapsed_s'] - max(age, used['elapsed_s']),
-                          SHIFT_LIMITS['elapsed_s'] - shift_used['elapsed_s'])
+                          LIMITS['elapsedS'] - max(age, used['elapsedS']),
+                          SHIFT_LIMITS['seconds'] - shift_used['seconds'])
             now = clock()
             claim = journal.append('consultation', session, presence,
                                    correlation={'incidentId': iid, 'confidence': 'high', 'method': 'none'},
@@ -514,19 +531,19 @@ class Coordinator:
 
     def brief(self, incident, presence, claim, binding, history, shift_used):
         c = claim['consultation']
-        trusted = {k: incident[k] for k in ('stall_class', 'concern_class')}
+        trusted = {k: incident[k] for k in ('stallClass', 'concernClass')}
         trusted.update(incident_id=incident['id'], presence=presence, rung=c['rung'], level=c['level'],
                        effort=binding.get('effort', 'low'), deadline=c['deadlineAt'],
                        coordinator_checks={'policy_cid_matches': None, 'standing_ruling': None},
-                       evidence={'denial': 'procedural-park' if incident['concern_class'] == 'shape' else 'uncertain',
+                       evidence={'denial': 'procedural-park' if incident['concernClass'] == 'shape' else 'uncertain',
                                  'reshape_used': incident['_reshape_used'],
                                  'stage': incident['state'], 'notification_history': history,
-                                 'remaining_incident': {k: max(0, v - incident['budget_used'][k]) for k, v in LIMITS.items()},
+                                 'remaining_incident': {k: max(0, v - incident['budgetUsed'][k]) for k, v in LIMITS.items()},
                                  'remaining_shift': {k: max(0, v - shift_used[k]) for k, v in SHIFT_LIMITS.items()}})
         # Strings from model/tool/peer sources are always fenced, including history.
         trusted['evidence']['notification_history'] = [
             {'effect': e['effect'], 'rung': e['rung']} for e in history]
-        evidence = {k: incident.get(k) for k in ('effect_class', 'tool', 'shape', 'consultations')}
+        evidence = {k: incident.get(k) for k in ('effectClass', 'tool', 'shape', 'consultations')}
         return (self.skill + '\nReturn exactly one JSON object matching this schema:\n'
                 + json.dumps(self.schema) + '\nCOORDINATOR STATE\n' + json.dumps(trusted)
                 + '\n' + quote('incident and prior keeper/tool output', evidence))
@@ -590,7 +607,7 @@ class Coordinator:
                     parts = [usage.get('input_tokens'), usage.get('output_tokens')]
                     # Claude's cache input is separate from input_tokens.
                     parts += [usage.get(k, 0) for k in ('cache_read_input_tokens', 'cache_creation_input_tokens')]
-                    if all(number(n) for n in parts):
+                    if all(type(n) is int and n >= 0 for n in parts):
                         tokens = sum(parts)
                     payload = json.loads(payload['result'])
                 elif codex:
@@ -625,7 +642,7 @@ class Coordinator:
                 rung == 4 and answer['decision'] == 'Refer' and answer['ask'] is None):
             return refer('invalid keeper answer (C4 ask contract)')
         if answer['pivot'] == 'reshape':
-            if incident['stall_class'] != 'authorization' or incident['concern_class'] != 'shape':
+            if incident['stallClass'] != 'authorization' or incident['concernClass'] != 'shape':
                 return refer('authoritative or uncertain concern forbids same-effect reshape')
             if incident['_reshape_used']:
                 return refer('reshape allowance already used')
@@ -688,11 +705,13 @@ class Coordinator:
                     measured = False
                     continue
                 used = shift_budget(folded)
-                if used is None:
+                if budget_state(used, SHIFT_LIMITS)[0]:
                     measured = False
                 print(f'{directory.name} shift budget used: {json.dumps(used) if used is not None else "unknown"}')
                 for incident in folded['incidents']:
-                    print(f'{incident["id"]} budget used: {json.dumps(incident["budget_used"])}')
+                    if budget_state(incident['budgetUsed'], LIMITS, ('keeperSeconds',))[0]:
+                        measured = False
+                    print(f'{incident["id"]} budget used: {json.dumps(incident["budgetUsed"])}')
             except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
                 measured = False
                 print(f'{directory.name}: budget used: unknown')
@@ -822,12 +841,17 @@ def legible_reshape(incident, proposed):
     existing flags. Path placeholders stay advice; slice 9's unchanged palette
     and permission checks still own any actual invocation.
     """
-    if proposed['tool'] != incident.get('tool') or proposed['tool'] != 'Bash':
-        return False
     source, target = incident.get('shape'), proposed['shape']
-    effect = incident['effect_class']
-    if not isinstance(source, str) or not isinstance(effect, list) or len(effect) < 2:
+    effect = incident['effectClass']
+    if not isinstance(source, str) or not isinstance(effect, dict):
         return False
+    if proposed['tool'] != incident.get('tool', effect.get('tool')) or proposed['tool'] != 'Bash':
+        return False
+    if effect.get('tool') != proposed['tool'] or not isinstance(effect.get('command'), str):
+        return False
+    prefix = [effect['command']]
+    if effect.get('subcommand') is not None:
+        prefix.append(effect['subcommand'])
     # Reject shell execution syntax while allowing the contract's redacted tokens.
     plain = re.sub(r'<(?:path|ref|url|num|glob|str)>', 'ARG', target)
     if re.search(r'[;&|()<>`$\\\n\r]', plain):
@@ -836,14 +860,14 @@ def legible_reshape(incident, proposed):
         words, original = shlex.split(target), shlex.split(source)
     except ValueError:
         return False
-    if words[:2] != effect[:2]:
+    if words[:len(prefix)] != prefix or original[:len(prefix)] != prefix:
         return False
     opaque = {'bash', 'sh', 'zsh', 'fish', 'eval', 'exec', 'source', 'env', 'xargs',
               'python', 'python3', 'node', 'perl', 'ruby'}
     if any(w.rsplit('/', 1)[-1] in opaque for w in words):
         return False
     # New flags or literal operands are not a legibility-only reshape.
-    return all(w in original for w in words[2:])
+    return all(w in original for w in words[len(prefix):])
 
 
 def table_cell(value):
