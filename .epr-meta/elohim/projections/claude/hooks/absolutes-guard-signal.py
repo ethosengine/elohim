@@ -112,7 +112,9 @@ def main(argv: list[str] | None = None) -> int:
     repo = Path(pd).resolve()
     doc = Path(fp) if Path(fp).is_absolute() else repo / fp
     try:
-        rel = doc.resolve().relative_to(repo).as_posix()
+        doc = doc.resolve()
+        repo = absolutes.checkout_root(doc, repo)
+        rel = doc.relative_to(repo).as_posix()
     except (ValueError, OSError):
         return 0  # outside this repository — not a trust surface we govern
     if absolutes.surface_kind(rel) is None:
