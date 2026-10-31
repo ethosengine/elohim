@@ -16,11 +16,13 @@
 //!    content-store commitment, so `content_store_commitment_cid = None` →
 //!    `fulfills == []`; `bounded_by` is the new commitment CID).
 //!
-//! `revoke_commons` authors a `revokes-commitment` whose projection
+//! [`ConductorRevoker`] authors a `revokes-commitment` whose projection
 //! (`mishpat_projection::parse_revokes_commitment`) sets `revoked_at` on the
-//! target row — the stranded-row safety-net arm of the reconciler. The
-//! authoritative un-pin revocation lives in `http::handle_remove_pin` (T10),
-//! which targets the pin's `commitment_cid` directly.
+//! target row. Both submitters use it through
+//! `provide_reconcile::submit_revocation`: the un-pin route
+//! (`http::handle_remove_pin`, targeting the pin's `commitment_cid`) and the
+//! reconciler's removed-pin arm. A re-pin after a revocation authors a renewal
+//! (`build_content_payload_renewing`), never the revoked entry again.
 //!
 //! ## Idempotency
 //!
@@ -45,7 +47,8 @@ use crate::services::commitment_fetcher::ConductorCommitmentFetcher;
 use crate::services::conductor_writes::{self, CreateMishpatCommitmentInput};
 use crate::services::economic_event_emit_service::{self, EmitEconomicEventInput};
 use crate::services::provide_reconcile::{
-    CommitmentAuthor, ProvideAuthorRequest, ProvideRevokeRequest,
+    CommitmentAuthor, CommitmentRevoker, ProvideAuthorRequest, ProvideRenewal,
+    ProvideRevokeRequest, RevokeError, RevokePrecondition,
 };
 use crate::services::rate_history::DieselRateHistory;
 
@@ -114,7 +117,30 @@ pub fn build_content_payload(
     valid_until: &str,
     rate_per_minute: i64,
 ) -> String {
-    serde_json::json!({
+    build_content_payload_renewing(
+        provider,
+        head_ref,
+        reach,
+        valid_from,
+        valid_until,
+        rate_per_minute,
+        None,
+    )
+}
+
+/// [`build_content_payload`] for a provide that may renew a revoked
+/// commitment. With `renewal: None` the bytes are exactly
+/// [`build_content_payload`]'s, so an unrenewed commitment keeps its cid.
+pub fn build_content_payload_renewing(
+    provider: &str,
+    head_ref: &str,
+    reach: &str,
+    valid_from: &str,
+    valid_until: &str,
+    rate_per_minute: i64,
+    renewal: Option<&ProvideRenewal>,
+) -> String {
+    let mut payload = serde_json::json!({
         "action": "replicates-commons",
         "variant": "content",
         "head_ref": head_ref,
@@ -131,8 +157,20 @@ pub fn build_content_payload(
         "provider": provider,
         "valid_from": valid_from,
         "valid_until": valid_until,
-    })
-    .to_string()
+    });
+    // The lineage is added only to a renewal: an unrenewed payload keeps the
+    // exact keys (and so the cid) it has always had. The mishpat integrity zome
+    // checks only `variant` and `bounds.reach_ceiling` on this action and the
+    // coordinator reads named fields without refusing others, so these two keys
+    // move no DNA hash.
+    if let (Some(renewal), serde_json::Value::Object(fields)) = (renewal, &mut payload) {
+        fields.insert("renewal".to_string(), serde_json::json!(renewal.sequence));
+        fields.insert(
+            "supersedes".to_string(),
+            serde_json::json!(renewal.supersedes),
+        );
+    }
+    payload.to_string()
 }
 
 /// Build the ProvideAnnounce [`EmitEconomicEventInput`] for a content provide.
@@ -256,6 +294,88 @@ fn agent_provider_candidates(candidates: &[Option<&str>]) -> Vec<String> {
     out
 }
 
+/// May a client whose mishpat writes are authored by `signer` revoke the row
+/// `req` names? Only when the row's provider IS that signer: a revocation is
+/// the provider withdrawing its own offer, and this node signs as no one else.
+fn authorize_revoke(signer: Option<&str>, req: &ProvideRevokeRequest) -> Result<(), String> {
+    match signer {
+        Some(signer)
+            if crate::identity_namespace::is_agent_cid(signer) && signer == req.provider =>
+        {
+            Ok(())
+        }
+        _ => Err(format!(
+            "commitment {} is provided by {}, not by this conductor's mishpat cell agent; \
+             refusing to revoke it",
+            req.target_cid, req.provider
+        )),
+    }
+}
+
+/// Production [`CommitmentRevoker`]: a `revokes-commitment` through the local
+/// conductor's mishpat cell, signed by that cell's agent key. The HTTP un-pin
+/// route uses it directly; [`ConductorCommitmentAuthor`] delegates to it.
+pub struct ConductorRevoker {
+    hc: Arc<HcClient>,
+}
+
+impl ConductorRevoker {
+    pub fn new(hc: Arc<HcClient>) -> Self {
+        Self { hc }
+    }
+}
+
+#[async_trait]
+impl CommitmentRevoker for ConductorRevoker {
+    async fn revoke_authority(&self) -> Option<String> {
+        self.hc
+            .mishpat_agent_key_uhcak()
+            .filter(|key| crate::identity_namespace::is_agent_cid(key))
+    }
+
+    async fn revoke_commons(
+        &self,
+        req: &ProvideRevokeRequest,
+        precondition: &RevokePrecondition,
+    ) -> Result<(), RevokeError> {
+        // One client for the check and the call: the key compared here is the
+        // key of the cell the call writes on.
+        let hc = &self.hc;
+        authorize_revoke(hc.mishpat_agent_key_uhcak().as_deref(), req)
+            .map_err(RevokeError::Refused)?;
+        // The refusal reason, if the precondition refuses: then no call was
+        // offered, which the caller must be able to tell from a failed call.
+        let refusal: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+        let guarded = || {
+            precondition().inspect_err(|reason| {
+                if let Ok(mut slot) = refusal.lock() {
+                    *slot = Some(reason.clone());
+                }
+            })
+        };
+        // `signed_at` comes with the request (fixed by the first claim of this
+        // target), so every attempt carries the same entry.
+        let payload_json = build_revoke_payload(&req.target_cid, &req.signed_at);
+        let outcome = conductor_writes::call_create_commitment_guarded(
+            hc,
+            CreateMishpatCommitmentInput {
+                action: "revokes-commitment".to_string(),
+                payload_json,
+                signed_at: req.signed_at.clone(),
+            },
+            &guarded,
+        )
+        .await;
+        match outcome {
+            Ok(_) => Ok(()),
+            Err(e) => match refusal.lock().ok().and_then(|mut slot| slot.take()) {
+                Some(reason) => Err(RevokeError::Refused(reason)),
+                None => Err(RevokeError::Failed(e)),
+            },
+        }
+    }
+}
+
 /// Build the `revokes-commitment` payload (snake_case JSON) targeting an
 /// existing commitment CID. PURE for unit-testability.
 pub fn build_revoke_payload(target_cid: &str, signed_at: &str) -> String {
@@ -362,13 +482,14 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 
         // Step 1 — notarise the replicates-content Commitment. The content's own
         // reach (Stage B) rides the request; `reach_ceiling` stays commons.
-        let payload_json = build_content_payload(
+        let payload_json = build_content_payload_renewing(
             &provider,
             &req.head_ref,
             &req.reach,
             &valid_from,
             &valid_until,
             DEFAULT_RATE_PER_MINUTE,
+            req.renewal.as_ref(),
         );
         let new_cid = crate::chain_write_gate::as_writer(
             crate::chain_write_gate::WriterKind::Provide,
@@ -435,23 +556,24 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 
         Ok(new_cid)
     }
+}
 
-    async fn revoke_commons(&self, req: &ProvideRevokeRequest) -> Result<(), StorageError> {
-        let signed_at = chrono::Utc::now().to_rfc3339();
-        let payload_json = build_revoke_payload(&req.target_cid, &signed_at);
-        crate::chain_write_gate::as_writer(
-            crate::chain_write_gate::WriterKind::Provide,
-            conductor_writes::call_create_commitment(
-                &self.hc,
-                CreateMishpatCommitmentInput {
-                    action: "revokes-commitment".to_string(),
-                    payload_json,
-                    signed_at,
-                },
-            ),
-        )
-        .await?;
-        Ok(())
+#[async_trait]
+impl CommitmentRevoker for ConductorCommitmentAuthor {
+    async fn revoke_authority(&self) -> Option<String> {
+        ConductorRevoker::new(self.hc.clone())
+            .revoke_authority()
+            .await
+    }
+
+    async fn revoke_commons(
+        &self,
+        req: &ProvideRevokeRequest,
+        precondition: &RevokePrecondition,
+    ) -> Result<(), RevokeError> {
+        ConductorRevoker::new(self.hc.clone())
+            .revoke_commons(req, precondition)
+            .await
     }
 }
 
@@ -459,6 +581,25 @@ impl CommitmentAuthor for ConductorCommitmentAuthor {
 mod tests {
     use super::*;
     use serde_json::Value;
+
+    fn revoke_req(provider: &str) -> ProvideRevokeRequest {
+        ProvideRevokeRequest {
+            target_cid: "uhCEkTarget".to_string(),
+            head_ref: "epr:X".to_string(),
+            provider: provider.to_string(),
+            signed_at: "2026-10-13T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn only_the_signing_cell_agent_may_revoke_its_own_row() {
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkCell")).is_ok());
+        // A row another agent provides (a session key handed off by a doorway).
+        assert!(authorize_revoke(Some("uhCAkCell"), &revoke_req("uhCAkSession")).is_err());
+        // No mishpat cell, or a signer that is not an agent key.
+        assert!(authorize_revoke(None, &revoke_req("uhCAkCell")).is_err());
+        assert!(authorize_revoke(Some("12D3Koo"), &revoke_req("12D3Koo")).is_err());
+    }
 
     // -----------------------------------------------------------------------
     // build_content_payload — the wire contract. The conductor round-trip is
@@ -524,6 +665,104 @@ mod tests {
             ],
             "top-level keys must be exactly the contract set"
         );
+    }
+
+    /// The payload `build_content_payload` produced before renewals existed,
+    /// kept verbatim so a change to the live builder cannot silently re-key
+    /// every unrenewed commitment.
+    fn legacy_content_payload(
+        provider: &str,
+        head_ref: &str,
+        reach: &str,
+        valid_from: &str,
+        valid_until: &str,
+        rate_per_minute: i64,
+    ) -> String {
+        serde_json::json!({
+            "action": "replicates-commons",
+            "variant": "content",
+            "head_ref": head_ref,
+            "reach": reach,
+            "bounds": {
+                "rate_per_minute": rate_per_minute,
+                "reach_ceiling": "commons",
+                "epr_scope": [head_ref],
+            },
+            "provider": provider,
+            "valid_from": valid_from,
+            "valid_until": valid_until,
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn an_unrenewed_commitment_keeps_the_bytes_it_had_before_renewals() {
+        let args = (
+            "uhCAkSteward",
+            "epr:album-1",
+            "household",
+            "2026-10-29T00:00:00+00:00",
+            "2027-10-29T00:00:00+00:00",
+            60,
+        );
+        let legacy = legacy_content_payload(args.0, args.1, args.2, args.3, args.4, args.5);
+        assert_eq!(
+            build_content_payload(args.0, args.1, args.2, args.3, args.4, args.5),
+            legacy
+        );
+        assert_eq!(
+            build_content_payload_renewing(args.0, args.1, args.2, args.3, args.4, args.5, None),
+            legacy,
+            "renewal 0 must reproduce today's entry, so nothing re-keys"
+        );
+    }
+
+    #[test]
+    fn a_renewal_is_a_new_entry_that_names_its_predecessor() {
+        let same_day = |renewal: Option<&ProvideRenewal>| {
+            build_content_payload_renewing(
+                "uhCAkSteward",
+                "epr:album-1",
+                "commons",
+                "2026-10-29T00:00:00+00:00",
+                "2027-10-29T00:00:00+00:00",
+                60,
+                renewal,
+            )
+        };
+        let first = ProvideRenewal {
+            sequence: 1,
+            supersedes: "uhCEkRevokedToday".to_string(),
+        };
+        let original = same_day(None);
+        let renewed = same_day(Some(&first));
+        assert_ne!(
+            renewed, original,
+            "re-pinning on the day of the revocation must not re-author the revoked entry"
+        );
+        let v: Value = serde_json::from_str(&renewed).expect("json");
+        assert_eq!(v["renewal"], 1);
+        assert_eq!(v["supersedes"], "uhCEkRevokedToday");
+        // Everything the contract already carried is unchanged.
+        let o: Value = serde_json::from_str(&original).expect("json");
+        for key in [
+            "action",
+            "variant",
+            "head_ref",
+            "reach",
+            "bounds",
+            "provider",
+            "valid_from",
+            "valid_until",
+        ] {
+            assert_eq!(v[key], o[key], "{key} unchanged by a renewal");
+        }
+        // A second renewal of the same scope is a third distinct entry.
+        let second = ProvideRenewal {
+            sequence: 2,
+            supersedes: "uhCEkRenewedThenRevoked".to_string(),
+        };
+        assert_ne!(same_day(Some(&second)), renewed);
     }
 
     #[test]

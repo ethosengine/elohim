@@ -114,10 +114,7 @@ impl Bitswap {
     ) -> Self {
         let rr_config =
             RequestResponseConfig::default().with_request_timeout(config.request_timeout);
-        let inner = RequestResponse::new(
-            [(BitswapProtocol, ProtocolSupport::Full)],
-            rr_config,
-        );
+        let inner = RequestResponse::new([(BitswapProtocol, ProtocolSupport::Full)], rr_config);
         let (db_tx, db_rx) = start_db_thread(store, executor);
         Self {
             inner,
@@ -139,7 +136,10 @@ impl Bitswap {
     }
 
     /// Removes an address for a peer.
-    #[allow(deprecated)]
+    #[allow(
+        deprecated,
+        reason = "forwards to libp2p's deprecated remove_address until peer addresses move to the swarm"
+    )]
     pub fn remove_address(&mut self, peer_id: &PeerId, addr: &Multiaddr) {
         self.query_manager.remove_peer(peer_id);
         self.inner.remove_address(peer_id, addr);
@@ -286,9 +286,7 @@ impl Bitswap {
                         let cid = info.cid;
                         // Simplified: trust the data, verify at store layer
                         RECEIVED_BLOCK_BYTES.inc_by(len as u64);
-                        self.db_tx
-                            .unbounded_send(DbRequest::Insert(cid, data))
-                            .ok();
+                        self.db_tx.unbounded_send(DbRequest::Insert(cid, data)).ok();
                         self.query_manager
                             .inject_response(id, Response::Block(peer, true));
                     }
@@ -371,8 +369,7 @@ impl Bitswap {
 }
 
 impl NetworkBehaviour for Bitswap {
-    type ConnectionHandler =
-        <RequestResponse<BitswapCodec> as NetworkBehaviour>::ConnectionHandler;
+    type ConnectionHandler = <RequestResponse<BitswapCodec> as NetworkBehaviour>::ConnectionHandler;
     type ToSwarm = BitswapEvent;
 
     fn handle_established_inbound_connection(
@@ -474,8 +471,7 @@ impl NetworkBehaviour for Bitswap {
         event: <Self::ConnectionHandler as ConnectionHandler>::ToBehaviour,
     ) {
         tracing::trace!(?event, "on_connection_handler_event");
-        self.inner
-            .on_connection_handler_event(peer_id, conn, event);
+        self.inner.on_connection_handler_event(peer_id, conn, event);
     }
 
     fn poll(&mut self, cx: &mut Context) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
@@ -542,9 +538,7 @@ impl NetworkBehaviour for Bitswap {
                         }
                         let event = BitswapEvent::Complete(
                             id,
-                            res.map_err(|cid| {
-                                anyhow::anyhow!("block not found: {}", cid)
-                            }),
+                            res.map_err(|cid| anyhow::anyhow!("block not found: {}", cid)),
                         );
                         return Poll::Ready(ToSwarm::GenerateEvent(event));
                     }
@@ -598,9 +592,7 @@ impl NetworkBehaviour for Bitswap {
                 match event {
                     RequestResponseEvent::Message { peer, message } => match message {
                         RequestResponseMessage::Request {
-                            request,
-                            channel,
-                            ..
+                            request, channel, ..
                         } => self.inject_request(BitswapChannel::Bitswap(channel), request),
                         RequestResponseMessage::Response {
                             request_id,

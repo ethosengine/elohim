@@ -462,6 +462,28 @@
       ]
     },
     {
+      "id": "commit-format-ratchet",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreicpvnj24dbcaxqfclqwrgkkw4l3bpehyteadossp3mecg3bmdnepy",
+        "sha256Pin": "sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreicpvnj24dbcaxqfclqwrgkkw4l3bpehyteadossp3mecg3bmdnepy",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "destructive-git-requires-tier",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",

@@ -408,6 +408,21 @@
       "supersededBy": null
     },
     {
+      "id": "commit-format-ratchet",
+      "version": 1,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e",
+      "sha256Computed": "sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e",
+      "pinState": "verified",
+      "cid": "bafyreicpvnj24dbcaxqfclqwrgkkw4l3bpehyteadossp3mecg3bmdnepy",
+      "bodyBytes": 411,
+      "supersedes": [],
+      "supersededBy": null
+    },
+    {
       "id": "destructive-git-requires-tier",
       "version": 1,
       "registry": "policies.yaml",

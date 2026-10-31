@@ -479,3 +479,100 @@ collective counterparty; `reach-enforced-everywhere` (red) covers only step 5.
 7. **`recipient` holds the collective's ActionHash**, the notarized reference, never the `collective_cid` string — the same kind rule the 2026-10-08 census enforced on feedback members (a content address is not an action reference). Confirm against `Membership`'s own reference form before the slice.
 
 Spec corrections owed (not applied here): §3's "serving bytes emits a serve-blob event" (the fetcher records it); §3's integrity claim (only `delegates-compute` and the `replicates-commons` alias are checked); the stale `commitments.rs` line cites; the frontmatter `serves: recall-reaches-authority` (wrong habit; should name `custodial-authority-answerable` until the pool habit is born).
+
+## Social-coding application, 2026-10-13 — declarations before pooling
+
+The shared-working-versions/social-coding design applies this contract to an Ethosengine
+collaboration facility. This is a design application, **not** its charter, a ratification,
+or authorization to start the held pool slice above. Matthew's admitted personal devices
+are a different authority scope from that collective's pool. A branch's intended production
+reach does not make its current work public or place it in common custody.
+
+**Facility:** members' committed storage, sync bandwidth, serving capacity, and maintenance
+and review labor. Shared compilation/compute is a separate, deferred agreement. **Artifacts:**
+source, proposals, branch descriptions, published outputs, agreements and evidence. The
+facility can be depleted in a period; using an idea does not deplete that idea. Draw rules
+therefore govern scarce capacity and labor, not commit counts, keystrokes, attention or the
+right to read already-public artifacts. Contribution observations are REA evidence, never
+transferable tokens or voting weight.
+
+Each actual facility declares the following, and only a declaration **plus a runnable probe**
+establishes the corresponding function. A branch template may inherit the declarations;
+it cannot mint authority or relax a charter floor. Values below are member choices, not
+defaults that an implementer or model may set.
+
+| Q | Charter declaration for this facility | Acceptance probe | Existing gap home |
+|---|---|---|---|
+| Q1 | Purpose and locally fitting provision/appropriation lens | The charter's pinned lens resolves and applies to the proposed draw | Rows 33, 36 |
+| Q2 | Contribution/draw basis and the window it uses | Two fixture members provide 2:1 and draw 1:2; the excess draw is narrowed under their agreed rule, not an invented constant | Row 34 |
+| Q3 | Member-readable resource condition and bounds: freshness, availability, unreadables or independent custody as appropriate | An ordinary member reads the measure without a steward; unavailable sensing is Unmeasured, never a breach inferred from absence | Row 37 |
+| Q4 | At least three consequence rungs, notice first, agreed human authority for later rungs and a return path | A repeated violation receives exactly its declared second rung through that human process, not immediate exclusion | Row 36 |
+| Q5 | Which members may inspect which resource draws, at what reach | A permitted member reads the last N draws; an outsider cannot read a narrow-circle ledger | Rows 34, 37 |
+| Q6 | Human admission, withdrawal and future-access rules | A withdrawn member cannot obtain a new facility draw; already received bytes are not claimed erased | Rows 32, 35 |
+| Q7 | Explicit holdings: source scopes, byte ranges, services and exclusions | An out-of-scope draw refuses naming the resource boundary | Existing pool §2; rows 34, 37 |
+| Q8 | Member proposal, human decision, and deterministic closure for amendments | A member-proposed rule change closes and two peers derive the same charter head | Rows 32, 35 |
+| Q9 | Cheap local challenge arena, its reach and upward appeal | A challenge opens and closes with witnessed outcome inside the declared reach; appeal remains possible | Row 36 |
+| Q10 | Recognizing parent and authority it reserves | The parent's attestation resolves; a child rule cannot give itself wider recognition | Row 32 |
+| Q11 | Deciding-body ceiling or a nesting relationship supporting communication among its full membership | The body fits the declared condition or names the parent/nested decision scope | Row 37 |
+
+Policy and the requested scope are fixed **before** reviewers/decision participants are
+selected and evidence evaluated (row 33). Amendments may be frequent and inexpensive;
+they still have a human decision and a comparable committed closure. Changed terms reopen
+an affected active ceremony, rather than applying a new standard retroactively in secret.
+
+### Rights, judgment and the member's surface
+
+The charter states who holds **access, contribution, extraction, removal, management and
+exclusion** rights. Members hold the commons; alienation of management/exclusion rights is
+held by nobody. Extraction and departure terms must say which copies may be retained.
+Removal distinguishes future serving, a person's own artifacts, retained immutable history
+and protected counter-evidence; withdrawal cannot erase bytes already received or silently
+rewrite another author's record. This section does not assign a source license or ratify
+those member terms.
+
+Each member's elohim senses resource condition, reads its person's obligations, assembles
+evidence, drafts changes, carries outcomes and gives the first notice within standing
+mandates. Humans retain rule making/changing, admission/exclusion, votes, consequences
+beyond notice, settlement, recognition and acts staking standing. One person with many
+devices or agents has one human vote. A review agent is not a collective voter or judge;
+there is no pool-elohim. Models output proposals or evidence-backed outcomes, never their
+own authorization.
+
+Row 38 supplies the plurality declaration: lineage evidence and the cross-lineage condition
+for binding closure, chosen by the members. Model count, independently spawned reviewers,
+or number of doorways is not proof of that condition. A closure with insufficient evidence
+cannot claim binding standing. Its probe includes a single-lineage fixture. No numeric
+threshold is chosen by this document, and a member-lineage measure must not disclose a
+private membership roster.
+
+Avodah offers the member an intelligible project/commons reading **on demand**. Normal care
+is quiet; a notice surfaces a concrete choice when it belongs to the person. Resource
+draws and condition are observable at their declared reach; private activity, presence,
+attention and productivity rankings are not monitoring inputs. A failed build is evidence
+about a candidate, not a punishment of its author. A permission refusal enforces an
+existing boundary; it is not the notice-first consequence ladder.
+
+Doorway ingress is itself a governed facility: names, serving and hosted conductor capacity.
+Its authoritative policy is native charter/lens/ladder state read by the doorway, not an
+administrator-only configuration. The doorway has no member or monitoring seat merely
+because it carries a hosted person's session; that person retains their own standing.
+
+### Privacy and honest delivery state
+
+Section 3's public membership and compute-draw exposure still blocks sensitive collaboration
+from using those pool mechanisms unchanged. Own-device/private/team working stores must
+enforce their audience on discovery, listing, transfer, accounting and serving before being
+connected to that facility. A private tag on a public membership record does not establish
+the missing membrane. No pool receives a person's device-private exploration.
+
+The October 13 reading of the proposed social-coding pool found **0/11 pool-specific
+declaration-and-probe pairs verified**. Branch boundaries, freshness readings and existing
+membership code are useful partial foundations, not a ratified charter or new runtime
+proof. Q1–Q11, rights, alienation terms and plurality were undeclared for that particular
+pool. The declarations above are now the contract to satisfy; they remain unwired until
+member choices and actual probes exist. This is not a judgment about Ethosengine's informal
+practices and does not change any habit's status.
+
+Acceptance carrier: `genesis/a2o/features/devflow/shared-working-versions.feature`, explicitly `@wip`.
+The existing commons-holonic-stewardship backlog rows 32–38 hold the missing nodes. Do not
+create a second register or a pool-specific policy engine to make this view appear complete.

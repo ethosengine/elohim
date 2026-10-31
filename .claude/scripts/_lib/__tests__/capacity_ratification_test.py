@@ -96,6 +96,7 @@ for case in json.loads((FIXTURES / 'cases.json').read_text()):
                      patch.object(epr_meta_git, 'head_has_parent', return_value=True), \
                      patch.object(epr_meta_git, 'verdict_for', return_value=verdict), \
                      patch.object(git_gate.epr_client, 'govern', return_value=native), \
+                     patch.object(epr_meta_git, 'format_phase', return_value=([], [], {})), \
                      patch.object(git_gate, '_witness_file'), \
                      patch.dict(os.environ, {'EPR_META_ACK': ''}), \
                      contextlib.redirect_stderr(io.StringIO()):
