@@ -12,6 +12,7 @@
 pub mod classify;
 pub mod event;
 pub mod journal;
+pub mod live;
 pub mod policy;
 
 use std::collections::{BTreeMap, HashMap};
@@ -62,6 +63,8 @@ pub struct StasisPolicy {
     pub shift_ceiling: Bound,
     /// Latch dwell for dialogue keys, seconds.
     pub dwell_s: u64,
+    /// Learned legible forms the policy holds (L1 promotes them; none by default).
+    pub learned_forms: Vec<policy::LearnedForm>,
 }
 
 impl StasisPolicy {
@@ -82,6 +85,7 @@ impl StasisPolicy {
             shift_ceiling: Bound::new(1800.0, "seconds".into(), 100.0)
                 .expect("1800 s at 100% is a valid bound"),
             dwell_s: 300,
+            learned_forms: Vec::new(),
         }
     }
 
@@ -758,7 +762,12 @@ impl Folder<'_> {
                 .iter()
                 .position(|x| x.claim_seq == Some(cs))
         });
-        let found = by_claim.or_else(|| inc.consultations.iter().position(|x| x.rung == rung));
+        // Rung 0 is the regulator's own act: each record stands alone.
+        let found = by_claim.or_else(|| {
+            (rung > 0)
+                .then(|| inc.consultations.iter().position(|x| x.rung == rung))
+                .flatten()
+        });
         let pos = found.unwrap_or_else(|| {
             inc.consultations.push(Consultation::new(rung));
             inc.consultations.len() - 1

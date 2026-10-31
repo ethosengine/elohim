@@ -51,6 +51,8 @@ pub struct Ctx {
     pub stdin: Option<String>,
     /// `STASIS_LADDER`, when set; `live` selects live `decide` as `--live` does.
     pub ladder_env: Option<String>,
+    /// Test seam: the only steward the pin check accepts. `None` asks the collective natively.
+    pub steward_of_record: Option<String>,
 }
 
 impl Ctx {
@@ -71,6 +73,7 @@ impl Ctx {
                 .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".claude"))),
             stdin: None,
             ladder_env: std::env::var("STASIS_LADDER").ok(),
+            steward_of_record: None,
         }
     }
 }
@@ -211,16 +214,20 @@ fn classifier(f: &Flags, ctx: &Ctx) -> Classifier {
     )
 }
 
-/// The steward's latest ruling for the policy: the CID its reason names. A ruling counts only
-/// when it is a `--kind ruling` note on the policy path whose reason is JSON with the policy
-/// `purpose`, with a steward slot, and not authored under an `agent:` identity (a keeper's or
-/// peer's text is never the steward's word). The latest is by `occurred_at`, then append order,
-/// the order every flow reader uses. A latest ruling whose `policyCid` is unusable pins nothing
-/// that can match.
-fn pinned_cid(root: &Path) -> Pin {
+/// The steward's latest ruling for the policy: the CID its reason names.
+///
+/// Only the steward's word counts: a `--kind ruling` note on the policy path whose `steward:`
+/// slot names a steward of the repository's collective (the predicate `epr covenant` applies),
+/// authored by that same human (`actor` equals the slot, so an agent identity never qualifies).
+/// Order is `occurred_at` parsed as RFC 3339, then append order; any candidate ruling on the
+/// path with an unparsable `occurred_at` makes the pin unreadable. The NEWEST steward ruling
+/// decides: if its reason is not the pin JSON (`purpose`, a string `policyCid`) the pin is
+/// unreadable, never silently the older approval.
+fn pinned_cid(root: &Path, is_steward: &dyn Fn(&str) -> bool) -> Pin {
+    use chrono::DateTime;
     use elohim_epr_rea::{FlowStore, SidecarFlowStore};
 
-    use crate::flow::read::{is_note, note_view, OccurredAtKey};
+    use crate::flow::read::{is_note, note_view};
 
     if !root.join(".eprfs/status/flows.jsonl").exists() {
         return Pin::None;
@@ -229,7 +236,8 @@ fn pinned_cid(root: &Path) -> Pin {
         Ok(r) => r,
         Err(e) => return Pin::Unreadable(e.to_string()),
     };
-    let mut latest: Option<((OccurredAtKey, usize), String)> = None;
+    type Newest = Option<((DateTime<chrono::FixedOffset>, usize), Option<String>)>;
+    let mut newest: Newest = None;
     for (seq, (cid, record)) in records.iter().enumerate() {
         let elohim_epr_rea::FlowRecord::Event(event) = record else {
             continue;
@@ -238,27 +246,48 @@ fn pinned_cid(root: &Path) -> Pin {
             continue;
         }
         let view = note_view(cid, event);
-        let steward_authored = view.steward.is_some() && !view.actor.starts_with("agent:");
-        if view.kind != "run:ruling" || view.subject != POLICY_REL_PATH || !steward_authored {
+        if view.kind != "run:ruling" || view.subject != POLICY_REL_PATH {
             continue;
         }
-        let Some(reason) = view
+        let Ok(at) = DateTime::parse_from_rfc3339(&view.occurred_at) else {
+            return Pin::Unreadable(format!(
+                "a ruling on the policy has an unparsable occurred_at `{}`",
+                view.occurred_at
+            ));
+        };
+        let steward_authored = view
+            .steward
+            .as_deref()
+            .is_some_and(|s| view.actor == s && is_steward(s));
+        if !steward_authored {
+            continue;
+        }
+        let named = view
             .reason
             .as_deref()
             .and_then(|r| serde_json::from_str::<Value>(r).ok())
-        else {
-            continue;
-        };
-        if reason["purpose"] != POLICY_PURPOSE {
-            continue;
-        }
-        let named = reason["policyCid"].as_str().unwrap_or_default().to_owned();
-        let key = (OccurredAtKey::parse(&view.occurred_at), seq);
-        if latest.as_ref().is_none_or(|(held, _)| *held < key) {
-            latest = Some((key, named));
+            .filter(|r| r["purpose"] == POLICY_PURPOSE)
+            .and_then(|r| r["policyCid"].as_str().map(str::to_owned));
+        let key = (at, seq);
+        if newest.as_ref().is_none_or(|(held, _)| *held < key) {
+            newest = Some((key, named));
         }
     }
-    latest.map_or(Pin::None, |(_, cid)| Pin::Cid(cid))
+    match newest {
+        None => Pin::None,
+        Some((_, Some(cid))) => Pin::Cid(cid),
+        Some((_, None)) => {
+            Pin::Unreadable("the steward's newest ruling on the policy is malformed".into())
+        }
+    }
+}
+
+/// Whether `human` stands as a steward of this checkout's collective, natively.
+fn is_collective_steward(root: &Path, human: &str) -> bool {
+    matches!(
+        crate::flow::memory::steward_of_record_refusal(root, human),
+        Ok(None)
+    )
 }
 
 /// Read the policy file and the pin under the checkout root and assess them.
@@ -266,7 +295,10 @@ fn assess_policy(ctx: &Ctx) -> Result<PolicyAssessment, StasisError> {
     let root = project_root(&ctx.cwd).unwrap_or_else(|| ctx.cwd.clone());
     let file = read_policy_file(&root)?;
     let pin = if file.is_some() {
-        pinned_cid(&root)
+        match ctx.steward_of_record.as_deref() {
+            Some(only) => pinned_cid(&root, &|s| s == only),
+            None => pinned_cid(&root, &|s| is_collective_steward(&root, s)),
+        }
     } else {
         Pin::None
     };
@@ -428,8 +460,32 @@ pub fn run_with(
                 Err(e) => return fail(err, &e),
             };
             let live = flags.live || ctx.ladder_env.as_deref() == Some("live");
+            if live && ctx.ladder_env.as_deref() == Some("off") {
+                // The kill switch wins over --live: no decision, and nothing new is journaled.
+                line(
+                    out,
+                    &json!({"effect": "none", "shadow": false, "live": true, "ladder": "off"})
+                        .to_string(),
+                );
+                return ExitCode::SUCCESS;
+            }
             if live {
-                return decide_live(&assessment, session, &request, &root, ctx, out, err);
+                // The event was read after the first assessment; judge the policy as it stands now.
+                let assessment = match assess_policy(ctx) {
+                    Ok(a) => a,
+                    Err(e) => return fail(err, &e),
+                };
+                let classifier = classifier(&flags, ctx);
+                return decide_live(
+                    &assessment,
+                    session,
+                    &request,
+                    &root,
+                    &classifier,
+                    ctx,
+                    out,
+                    err,
+                );
             }
             let classifier = classifier(&flags, ctx);
             match session_stasis::decide_shadow(
@@ -506,14 +562,20 @@ pub fn run_with(
     }
 }
 
-/// Live `decide`: act only under a pinned policy. In this slice a matching pin still applies no
-/// effect (slice 9 wires effects), so the matched case answers `effect: none, live: true`.
-/// Anything else is inert: exit 3, the reason printed and journaled as an `observation-gap`.
+/// Live `decide`: act only under a pinned policy. A matching pin lets the regulator deny (park
+/// in automated presence, or offer an active learned legible form at rung 0) or do nothing; it
+/// never approves. Anything else is inert: exit 3, the reason printed and journaled as an
+/// `observation-gap`.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Live decide threads the verified policy, request, journal root, classifier and injected context unchanged from the dispatcher"
+)]
 fn decide_live(
     assessment: &PolicyAssessment,
     session: &str,
     request: &DecideRequest,
     root: &Path,
+    classifier: &Classifier,
     ctx: &Ctx,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -522,15 +584,23 @@ fn decide_live(
         let PolicyState::PinnedMatch { cid } = &assessment.state else {
             return ExitCode::from(1);
         };
-        let answer = json!({
-            "effect": "none",
-            "live": true,
-            "shadow": false,
-            "policy": assessment.label(true),
-            "policyCid": cid,
-        });
-        line(out, &answer.to_string());
-        return ExitCode::SUCCESS;
+        return match session_stasis::live::decide_live(
+            root,
+            session,
+            request,
+            classifier,
+            &assessment.policy,
+            &assessment.label(true),
+            cid,
+            &ctx.clock,
+            ctx.segment_limit,
+        ) {
+            Ok(answer) => {
+                line(out, &serde_json::to_string(&answer).unwrap_or_default());
+                ExitCode::SUCCESS
+            }
+            Err(e) => fail(err, &e),
+        };
     };
     if let Err(e) = session_stasis::record_inert(
         root,
@@ -636,6 +706,7 @@ mod tests {
             config_dir: None,
             stdin: None,
             ladder_env: None,
+            steward_of_record: Some("human:matthew".into()),
         }
     }
 
@@ -973,6 +1044,10 @@ mod tests {
         let reason = json!({"purpose": POLICY_PURPOSE, "policyPath": POLICY_REL_PATH,
                             "policyCid": named, "version": 1})
         .to_string();
+        rule_raw(dir, provider, "human:matthew", at, &reason);
+    }
+
+    fn rule_raw(dir: &Path, provider: &str, steward: &str, at: &str, reason: &str) {
         let event = FlowEvent {
             action: ReaVerb::Cite,
             provider: AgentRef(provider.into()),
@@ -990,7 +1065,7 @@ mod tests {
                 "run:ruling".into(),
                 POLICY_REL_PATH.into(),
                 format!("reason:{reason}"),
-                "steward:human:matthew".into(),
+                format!("steward:{steward}"),
             ],
             occurred_at: at.into(),
         };
@@ -1212,5 +1287,453 @@ mod tests {
         edited["dwellS"] = json!(60);
         let new_cid = write_policy(dir.path(), &edited);
         assert_eq!(state(&mut c), ("pinned-mismatch".into(), Some(new_cid)));
+    }
+
+    // ---- live effects under a pinned policy -------------------------------------------------
+
+    const SHAPE: &str = "cd <path> && ls";
+
+    /// One session with an OPEN authorization incident `s1:2` (a shape-class call), the human
+    /// last witnessed at t=0.
+    fn open_journal(dir: &Path, extra: &[Value]) -> PathBuf {
+        let root = dir.join("stasis");
+        let s = root.join("s1");
+        fs::create_dir_all(&s).unwrap();
+        let corr = json!({"incidentId": "s1:2", "confidence": "high", "method": "tool-use-id"});
+        let mut lines = vec![
+            event(
+                1,
+                0,
+                "shift-marker",
+                json!({"shift": {"id": "shift-7", "edge": "open"},
+                       "presence": {"disposition": "collaborative",
+                                    "basis": {"lastWitnessedAgeSeconds": 0.0, "rulingRef": null}}}),
+            ),
+            event(
+                2,
+                10,
+                "permission-requested",
+                json!({"tool": "Bash", "shape": SHAPE, "source": {"hookEvent": "PermissionRequest"},
+                       "correlation": corr}),
+            ),
+        ];
+        lines.extend(extra.iter().cloned());
+        fs::write(
+            s.join("events.jsonl"),
+            lines.iter().map(|l| format!("{l}\n")).collect::<String>(),
+        )
+        .unwrap();
+        root
+    }
+
+    fn settings(dir: &Path) -> String {
+        let p = dir.join("settings.json");
+        fs::write(&p, r#"{"permissions":{"ask":["Bash(git *rebase*)"]}}"#).unwrap();
+        p.to_str().unwrap().to_owned()
+    }
+
+    fn live(
+        root: &Path,
+        settings: &str,
+        hook: &str,
+        shape: &str,
+        c: &mut Ctx,
+    ) -> (ExitCode, Value) {
+        c.stdin = Some(
+            json!({"hook_event_name": hook, "tool_name": "Bash", "shape": shape,
+                   "correlation": {"incidentId": "s1:2"}})
+            .to_string(),
+        );
+        let (exit, out, _) = call(
+            &[
+                "decide",
+                "--live",
+                "--session",
+                "s1",
+                "--event",
+                "-",
+                "--settings",
+                settings,
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            c,
+        );
+        (exit, serde_json::from_str(&out).unwrap_or(Value::Null))
+    }
+
+    fn pinned_checkout(dir: &Path, policy: &Value) -> String {
+        checkout(dir);
+        let cid = write_policy(dir, policy);
+        rule(dir, "human:matthew", "2026-10-31T09:00:00Z", &cid);
+        cid
+    }
+
+    fn events_of(root: &Path) -> Vec<Value> {
+        fs::read_to_string(root.join("s1/events.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect()
+    }
+
+    fn at_automated(c: &mut Ctx) {
+        // 30 minutes after the last witness: past T_c, so automated presence.
+        c.clock.wall = Utc.with_ymd_and_hms(2026, 10, 31, 10, 30, 0).unwrap();
+    }
+
+    #[test]
+    fn automated_presence_parks_the_permission_request_and_journals_the_park() {
+        let dir = tempfile::tempdir().unwrap();
+        let cid = pinned_checkout(dir.path(), &policy_value());
+        let root = open_journal(dir.path(), &[]);
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        at_automated(&mut c);
+        let (exit, v) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(code(exit), code(ExitCode::SUCCESS));
+        assert_eq!(v["effect"], "deny");
+        assert_eq!(v["incidentId"], "s1:2");
+        assert_eq!(
+            (v["rung"].clone(), v["shadow"].clone(), v["live"].clone()),
+            (json!(0), json!(false), json!(true))
+        );
+        assert_eq!(v["policyCid"], json!(cid));
+        assert_eq!(
+            v["message"],
+            "parked as stasis `s1:2`. Do not retry this effect by any tool or spelling. Continue independent authorized work. Guidance will arrive."
+        );
+        let last = events_of(&root).pop().unwrap();
+        assert_eq!(last["kind"], "consultation");
+        assert_eq!(
+            (
+                last["consultation"]["pivot"].clone(),
+                last["consultation"]["decision"].clone()
+            ),
+            (json!("park"), json!("Permit"))
+        );
+        // The park shows in status as a pending park; a repeat denies again, writing nothing.
+        let n = events_of(&root).len();
+        let (_, again) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(again["effect"], "deny");
+        assert_eq!(events_of(&root).len(), n);
+        let (_, out, _) = call(
+            &[
+                "status",
+                "--json",
+                "--session",
+                "s1",
+                "--settings",
+                &st,
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            &mut c,
+        );
+        let status: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(status["sessions"][0]["pendingParks"], json!(["s1:2"]));
+    }
+
+    #[test]
+    fn collaborative_presence_does_nothing_and_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        pinned_checkout(dir.path(), &policy_value());
+        let root = open_journal(dir.path(), &[]);
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        let before = events_of(&root).len();
+        let (exit, v) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(code(exit), code(ExitCode::SUCCESS));
+        assert_eq!(
+            (v["effect"].clone(), v["message"].clone()),
+            (json!("none"), Value::Null)
+        );
+        assert_eq!(events_of(&root).len(), before);
+    }
+
+    #[test]
+    fn an_unpinned_policy_stays_inert_even_with_an_open_automated_incident() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        write_policy(dir.path(), &policy_value());
+        let root = open_journal(dir.path(), &[]);
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        at_automated(&mut c);
+        let (exit, v) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(code(exit), code(ExitCode::from(3)));
+        assert_eq!(v["inert"], true);
+        assert!(events_of(&root).iter().all(|e| e["kind"] != "consultation"));
+    }
+
+    fn learned_policy(c: &mut Ctx, dir: &Path, st: &str) -> Value {
+        // The effect the classifier derives for this call, as `classify` prints it.
+        let corpus = dir.join("corpus.jsonl");
+        fs::write(&corpus, "{\"tool\":\"Bash\",\"command\":\"cd a && ls\"}\n").unwrap();
+        let (_, out, _) = call(
+            &[
+                "classify",
+                "--corpus",
+                corpus.to_str().unwrap(),
+                "--settings",
+                st,
+            ],
+            c,
+        );
+        let effect = serde_json::from_str::<Value>(out.lines().next().unwrap()).unwrap()
+            ["classification"]["effect"]
+            .clone();
+        let mut p = policy_value();
+        p["learnedForms"] = json!([{
+            "name": "ls-in-dir", "tool": "Bash", "shape": SHAPE, "effectClass": effect,
+            "legibleForm": "ls <path>", "status": "active",
+            "auditVerdict": "approved", "auditRef": "audit-1", "rulingRef": "ruling-1"
+        }]);
+        p
+    }
+
+    #[test]
+    fn a_learned_form_reshapes_once_and_a_second_reshape_refers() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        // A shape call: no settings rule matches `cd ... && ls`.
+        let policy = learned_policy(&mut c, dir.path(), &st);
+        pinned_checkout(dir.path(), &policy);
+        let root = open_journal(dir.path(), &[]);
+        let (exit, v) = live(&root, &st, "PreToolUse", SHAPE, &mut c);
+        assert_eq!(code(exit), code(ExitCode::SUCCESS));
+        assert_eq!(v["effect"], "deny");
+        assert_eq!(
+            v["message"],
+            "use the legible form: ls <path> (same effect, passes the same permission checks)"
+        );
+        let last = events_of(&root).pop().unwrap();
+        assert_eq!(last["consultation"]["pivot"], "reshape");
+        // The allowance is spent: the next one Refers, journaled once.
+        let (_, second) = live(&root, &st, "PreToolUse", SHAPE, &mut c);
+        assert_eq!(
+            (second["effect"].clone(), second["refer"].clone()),
+            (json!("none"), json!(true))
+        );
+        let refers = |r: &Path| {
+            events_of(r)
+                .iter()
+                .filter(|e| e["consultation"]["decision"] == "Refer")
+                .count()
+        };
+        assert_eq!(refers(&root), 1);
+        let (_, third) = live(&root, &st, "PreToolUse", SHAPE, &mut c);
+        assert_eq!(third["refer"], true);
+        assert_eq!(refers(&root), 1);
+    }
+
+    #[test]
+    fn a_risk_call_with_a_learned_form_gets_no_reshape() {
+        let dir = tempfile::tempdir().unwrap();
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        let mut policy = learned_policy(&mut c, dir.path(), &st);
+        policy["learnedForms"][0]["shape"] = json!("git rebase main");
+        pinned_checkout(dir.path(), &policy);
+        let root = open_journal(dir.path(), &[]);
+        let before = events_of(&root).len();
+        let (_, v) = live(&root, &st, "PreToolUse", "git rebase main", &mut c);
+        assert_eq!(v["effect"], "none");
+        assert_eq!(events_of(&root).len(), before);
+        // An unaudited form is not active either.
+        let mut p2 = learned_policy(&mut c, dir.path(), &st);
+        p2["learnedForms"][0]["auditVerdict"] = json!("rejected");
+        write_policy(dir.path(), &p2);
+        let cid = elohim_device_runtime::session_stasis::policy::policy_cid(
+            &serde_json::to_vec_pretty(&p2).unwrap(),
+        );
+        rule(dir.path(), "human:matthew", "2026-10-31T09:40:00Z", &cid);
+        let (_, v) = live(&root, &st, "PreToolUse", SHAPE, &mut c);
+        assert_eq!(v["effect"], "none");
+    }
+
+    #[test]
+    fn a_keepers_proceed_is_recorded_and_downgraded_to_park() {
+        let dir = tempfile::tempdir().unwrap();
+        pinned_checkout(dir.path(), &policy_value());
+        let proceed = event(
+            3,
+            60,
+            "consultation",
+            json!({"correlation": {"incidentId": "s1:2", "confidence": "high", "method": "t"},
+                   "consultation": {"phase": "complete", "rung": 2, "level": "C2", "binding": "b",
+                                    "decision": "Permit", "pivot": "proceed", "reason": "r"}}),
+        );
+        let root = open_journal(dir.path(), &[proceed]);
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        let (_, v) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(v["effect"], "none"); // collaborative: nothing is delivered
+        let last = events_of(&root).pop().unwrap();
+        assert_eq!(last["consultation"]["pivot"], "park");
+        assert!(last["consultation"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("proceed downgraded to park"));
+        let n = events_of(&root).len();
+        let _ = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+        assert_eq!(events_of(&root).len(), n);
+    }
+
+    // ---- pin-check hardening (review of the slice-6 leg) -------------------------------------
+
+    fn state_of(dir: &Path, root: &Path, c: &mut Ctx) -> String {
+        let (_, out, _) = call(
+            &[
+                "status",
+                "--json",
+                "--session",
+                "s1",
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            c,
+        );
+        let _ = dir;
+        serde_json::from_str::<Value>(&out).unwrap()["policyState"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    #[test]
+    fn a_forged_or_mismatched_steward_never_pins() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        let cid = write_policy(dir.path(), &policy_value());
+        let reason = json!({"purpose": POLICY_PURPOSE, "policyCid": cid}).to_string();
+        // Well-formed, but it names a different steward than the steward of record.
+        rule_raw(
+            dir.path(),
+            "human:mallory",
+            "human:mallory",
+            "2026-10-31T09:00:00Z",
+            &reason,
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "unpinned");
+        // The steward slot is the steward's, but the acting identity is not.
+        rule_raw(
+            dir.path(),
+            "human:mallory",
+            "human:matthew",
+            "2026-10-31T09:01:00Z",
+            &reason,
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "unpinned");
+        // No steward slot at all is no steward.
+        rule_raw(
+            dir.path(),
+            "human:matthew",
+            "",
+            "2026-10-31T09:02:00Z",
+            &reason,
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "unpinned");
+        // The real steward, acting as themselves, pins.
+        rule_raw(
+            dir.path(),
+            "human:matthew",
+            "human:matthew",
+            "2026-10-31T09:03:00Z",
+            &reason,
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pinned-match");
+    }
+
+    #[test]
+    fn a_malformed_newest_ruling_makes_the_pin_unreadable_not_the_older_approval() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        let cid = write_policy(dir.path(), &policy_value());
+        rule(dir.path(), "human:matthew", "2026-10-31T09:00:00Z", &cid);
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pinned-match");
+        rule_raw(
+            dir.path(),
+            "human:matthew",
+            "human:matthew",
+            "2026-10-31T09:30:00Z",
+            "not json",
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pin-unreadable");
+        let (exit, out) = decide(&root, true, &mut c);
+        assert_eq!(code(exit), code(ExitCode::from(3)));
+        assert!(out.contains("unreadable"), "{out}");
+        // A well-formed newer ruling restores the pin.
+        rule(dir.path(), "human:matthew", "2026-10-31T09:45:00Z", &cid);
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pinned-match");
+    }
+
+    #[test]
+    fn timestamps_parse_as_rfc3339_and_ties_go_to_append_order() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        let cid = write_policy(dir.path(), &policy_value());
+        // Same instant: the later append wins, whichever way the offsets are spelled.
+        rule(dir.path(), "human:matthew", "2026-10-31T09:00:00Z", &cid);
+        rule(
+            dir.path(),
+            "human:matthew",
+            "2026-10-31T11:00:00+02:00",
+            "bafkreiOTHER",
+        );
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pinned-mismatch");
+        rule(dir.path(), "human:matthew", "2026-10-31T09:00:00Z", &cid);
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pinned-match");
+        // A timestamp that is not RFC 3339 cannot win lexically: it makes the pin unreadable.
+        rule(dir.path(), "human:matthew", "zzz", &cid);
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pin-unreadable");
+    }
+
+    #[test]
+    fn an_unreadable_flow_sidecar_is_inert_in_live() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        write_policy(dir.path(), &policy_value());
+        fs::create_dir_all(dir.path().join(".eprfs/status")).unwrap();
+        fs::write(dir.path().join(".eprfs/status/flows.jsonl"), "{ torn\n").unwrap();
+        assert_eq!(state_of(dir.path(), &root, &mut c), "pin-unreadable");
+        let (exit, _) = decide(&root, true, &mut c);
+        assert_eq!(code(exit), code(ExitCode::from(3)));
+    }
+
+    #[test]
+    fn the_ladder_off_kill_switch_beats_live_and_journals_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        checkout(dir.path());
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        let cid = write_policy(dir.path(), &policy_value());
+        rule(dir.path(), "human:matthew", "2026-10-31T09:00:00Z", &cid);
+        c.ladder_env = Some("off".into());
+        let before = fs::read_to_string(root.join("s1/events.jsonl")).unwrap();
+        let (exit, out) = decide(&root, true, &mut c);
+        assert_eq!(code(exit), code(ExitCode::SUCCESS));
+        let v: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(
+            (&v["effect"], &v["shadow"], &v["ladder"]),
+            (&json!("none"), &json!(false), &json!("off"))
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("s1/events.jsonl")).unwrap(),
+            before
+        );
+        // Even with no policy at all, off answers none rather than inert.
+        fs::remove_file(dir.path().join(POLICY_REL_PATH)).unwrap();
+        let (exit, _) = decide(&root, true, &mut c);
+        assert_eq!(code(exit), code(ExitCode::SUCCESS));
     }
 }

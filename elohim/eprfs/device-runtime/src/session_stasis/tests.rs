@@ -1955,3 +1955,76 @@ fn an_unknown_outcome_is_refused_and_a_bare_turn_end_needs_question_or_outcome()
     assert!(Event::from_value(&bare).is_err());
     assert!(Event::from_value(&ev(1, 0, "turn-ended", json!({"outcome": "stalled"}))).is_ok());
 }
+
+// --- Live effects: the records the regulator writes are schema-valid -----------------------
+
+#[test]
+fn live_regulator_records_validate_against_the_event_schema() {
+    use super::live::decide_live;
+
+    let dir = tempfile::tempdir().unwrap();
+    let s = dir.path().join("s1");
+    fs::create_dir_all(&s).unwrap();
+    let mut witnessed_open = ev(
+        1,
+        0,
+        "shift-marker",
+        json!({"shift": {"id": "x", "edge": "open"}}),
+    );
+    witnessed_open["presence"] = witnessed(0.0)["presence"].clone();
+    let lines = [witnessed_open, perm(2, 10, "cd <path> && ls")];
+    fs::write(
+        s.join("events.jsonl"),
+        lines.iter().map(|l| format!("{l}\n")).collect::<String>(),
+    )
+    .unwrap();
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let clock = ClockReading {
+        wall: at(1800),
+        boot_id: "boot-1".into(),
+        uptime_seconds: 3000.0,
+    };
+    let req = DecideRequest {
+        hook: "PermissionRequest".into(),
+        tool: Some("Bash".into()),
+        shape: Some("cd <path> && ls".into()),
+        agent_id: "main".into(),
+        incident_id: Some("s1:2".into()),
+    };
+    let out = decide_live(
+        dir.path(),
+        "s1",
+        &req,
+        &c,
+        &policy,
+        "p",
+        "cid",
+        &clock,
+        1 << 20,
+    )
+    .unwrap();
+    assert_eq!(out.effect, Effect::Deny);
+
+    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../sdk/domains/elohim-agent/schemas/session-event.schema.json");
+    let schema: Value = serde_json::from_str(&fs::read_to_string(schema_path).unwrap()).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let written: Vec<Value> = fs::read_to_string(s.join("events.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(written.len(), 3);
+    for v in &written {
+        assert!(validator.is_valid(v), "schema-valid: {v}");
+        Event::from_value(v).unwrap();
+    }
+    // A Refer record is schema-valid too (null pivot).
+    let refer = json!({"schemaVersion": 1, "kind": "consultation",
+        "session": {"runtime": "claude-code", "session": "s1"}, "agentId": "main", "seq": 9,
+        "clock": clk(1800), "presence": {"disposition": "unknown", "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": null}},
+        "correlation": {"incidentId": "s1:2", "confidence": "high", "method": "none"},
+        "consultation": {"rung": 0, "level": "C1", "binding": "b", "decision": "Refer", "pivot": null, "reason": "r"}});
+    assert!(validator.is_valid(&refer));
+}

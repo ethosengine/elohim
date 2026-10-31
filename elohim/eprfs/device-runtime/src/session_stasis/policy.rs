@@ -76,9 +76,52 @@ struct RulingValidationFile {
     missing_or_mismatched_policy: String,
 }
 
+/// A learned legible form: the same effect spelled in a way that passes the same permission
+/// checks. It takes effect only when `status` is `active` with an approved audit and a ruling.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LearnedForm {
+    /// Short name of the form.
+    pub name: String,
+    /// The tool it applies to.
+    pub tool: String,
+    /// The redacted shape it replaces.
+    pub shape: String,
+    /// The normalized effect tuple, as `classify` serializes it.
+    pub effect_class: serde_json::Value,
+    /// The more legible command shape to offer.
+    pub legible_form: String,
+    /// `proposed` or `active`.
+    pub status: String,
+    /// The other-family audit verdict.
+    #[serde(default)]
+    pub audit_verdict: Option<String>,
+    /// The audit's reference.
+    #[serde(default)]
+    pub audit_ref: Option<String>,
+    /// The steward's standing ruling reference.
+    #[serde(default)]
+    pub ruling_ref: Option<String>,
+}
+
+impl LearnedForm {
+    /// Whether this form may be offered: active, audited approved, and ruled.
+    pub fn is_active(&self) -> bool {
+        let named = |v: &Option<String>| v.as_deref().is_some_and(|s| !s.trim().is_empty());
+        self.status == "active"
+            && self.audit_verdict.as_deref() == Some("approved")
+            && named(&self.audit_ref)
+            && named(&self.ruling_ref)
+            && !self.name.trim().is_empty()
+            && !self.legible_form.trim().is_empty()
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PolicyFile {
+    #[serde(default)]
+    learned_forms: Vec<LearnedForm>,
     #[serde(default, rename = "$schema")]
     _schema: Option<String>,
     version: u32,
@@ -117,6 +160,12 @@ impl PolicyFile {
         }
         let r = &self.rule_set;
         let shapes = ["cd-compound", "heredoc", "bash-c", "multi-line"];
+        let mut seen = r.shape_patterns.clone();
+        seen.sort_unstable();
+        seen.dedup();
+        if seen.len() != r.shape_patterns.len() {
+            return Err("ruleSet.shapePatterns must be unique".into());
+        }
         if r.shape_patterns
             .iter()
             .any(|s| !shapes.contains(&s.as_str()))
@@ -169,6 +218,7 @@ impl PolicyFile {
             stall: self.stall.into_bound("stall")?,
             shift_ceiling: self.shift_ceiling.into_bound("shiftCeiling")?,
             dwell_s: self.dwell_s,
+            learned_forms: self.learned_forms,
         })
     }
 }
@@ -358,6 +408,8 @@ impl PolicyAssessment {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     /// The committed policy, when the crate is built inside the monorepo (the storage image's
@@ -375,10 +427,18 @@ mod tests {
 
     #[test]
     fn the_cid_is_the_raw_byte_address_the_pin_helper_prints() {
-        let cid = policy_cid(b"{}");
-        assert!(cid.starts_with("bafkrei") && cid.len() == 59, "{cid}");
-        assert_eq!(cid, policy_cid(b"{}"));
-        assert_ne!(cid, policy_cid(b"{} "));
+        // Fixed vectors derived independently of this crate: CIDv1, raw codec 0x55, sha2-256,
+        // base32 lower, i.e. exactly what `eprfs cid <file>` (BlobCid::compute_raw) prints.
+        assert_eq!(
+            policy_cid(b"{}"),
+            "bafkreicecnx2gvntm6fbcrvnc336qze6st5u7qq7457igegamd3bzkx7ri"
+        );
+        assert_eq!(
+            policy_cid(b"dialogue-stasis policy\n"),
+            "bafkreiduobmqykm463jbqosnocqopxqvwdmmpv6xggapqqasdktkfrsrsa"
+        );
+        assert_eq!(policy_cid(b"{}"), BlobCid::compute_raw(b"{}").to_string());
+        assert_ne!(policy_cid(b"{}"), policy_cid(b"{} "));
     }
 
     #[test]
@@ -394,6 +454,7 @@ mod tests {
         assert!(edit(&|v| v["budgets"]["surprise"] = 1.into()).is_err());
         assert!(edit(&|v| v["stall"]["unit"] = "minutes".into()).is_err());
         assert!(edit(&|v| v["ruleSet"]["uncertainAs"] = "shape".into()).is_err());
+        assert!(edit(&|v| v["ruleSet"]["shapePatterns"] = json!(["heredoc", "heredoc"])).is_err());
         assert!(edit(&|v| {
             v["never"].as_array_mut().unwrap().pop();
         })

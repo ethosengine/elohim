@@ -364,8 +364,9 @@
           ]
         },
         "rung": {
+          "description": "Rung 0 is the regulator's own act (a park, a reshape, a Refer); each rung-0 record folds as its own consultation.",
           "type": "integer",
-          "minimum": 1,
+          "minimum": 0,
           "maximum": 5
         },
         "claimedBy": {
