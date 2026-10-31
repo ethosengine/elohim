@@ -816,9 +816,12 @@ fn the_repository_seed_folds_with_no_refusal_and_every_later_line_is_sponsored_b
     assert!(parsed[1..]
         .iter()
         .all(|p| p.record.sponsor.as_deref() == Some("human:matthew")));
-    assert!(parsed
-        .iter()
-        .all(|p| p.signature == memory::LineSignature::Unsigned));
+    // The genesis seed is unsigned; an affiliation made since through `epr flow memory affiliate`
+    // carries its sponsor's device signature, which `parse_affiliation_line` already verified.
+    assert!(parsed.iter().all(|p| match &p.signature {
+        memory::LineSignature::Unsigned => true,
+        memory::LineSignature::Signed { signer, .. } => signer.starts_with("did:key:"),
+    }));
     assert_eq!(
         view["stewards"][1]["sponsorChain"][0]["member"],
         "human:matthew"

@@ -1,0 +1,642 @@
+#!/usr/bin/env python3
+"""
+stasis-probe — which Claude Code harness capabilities does the dialogue stasis loop
+actually have on this CLI version?
+
+Slice 1 of genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md.
+The design leans on hook facts read from the documentation; every adapter that ships
+later cites this report, and a capability the report does not prove stays `unsupported`.
+
+Headless only. Each probe runs `claude -p` in a scratch project created OUTSIDE any git
+checkout (so no repository hooks or ask rules leak in), whose settings register a
+recorder hook on every event; the probe then reads which events fired and with which
+fields. Capabilities that need a person at the keyboard (dialog timing, what a human deny
+emits, a channel deny-relay, Remote Control's push, asyncRewake waking an idle session)
+are listed as `interactive` for the steward-assisted probe.
+
+Usage:
+  stasis-probe [--out DIR] [--only ID[,ID...]] [--model ALIAS] [--strict]
+  stasis-probe --emit-capabilities REPORT.json [REPORT.json ...]
+
+--emit-capabilities reads existing reports without running probes or writing files.
+It prints the claude-code harnessCapabilities block, retaining the supplying report's
+stamp and CLI version for each id. An absent id remains unsupported to consumers.
+
+Writes <out>/<utc-stamp>/report.json (default out: <main checkout>/genesis/local-dev/
+dialogue-stasis/probe) and prints one line per capability:
+  yes | no | unknown | interactive   <id>   <evidence>
+Exit 0 once the probes ran; with --strict, exit 1 when any headless verdict is unknown.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+EVENTS = [
+    "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
+    "PermissionDenied", "PostToolUse", "PostToolUseFailure", "Notification",
+    "Stop", "SessionEnd",
+]
+MINIMAL_EVENTS = ["SessionStart", "Stop"]
+DENY_MARK = "STASIS-PROBE-DENY-7Q"
+MODEL_ALIASES = ["haiku", "sonnet", "opus", "fable"]
+INTERACTIVE = [
+    ("dialog-displayed-notification", "Notification permission_prompt fires ~6 s after a dialog shows"),
+    ("human-deny-emits-no-close-event", "a human deny emits no tool-close event for the denied call"),
+    ("idle-prompt-timing", "Notification idle_prompt fires ~60 s after a turn ends"),
+    ("channel-deny-relay", "an external process can deny an open dialog through a channel"),
+    ("remote-control-push-on-question", "Remote Control pushes an AskUserQuestion to the phone"),
+    ("async-rewake-wakes-idle", "an async+asyncRewake Stop hook exiting 2 wakes an idle session"),
+]
+
+RECORDER = r'''
+import json, os, sys, time
+event, label, out = sys.argv[1], sys.argv[2], sys.argv[3]
+raw = sys.stdin.read()
+try:
+    payload = json.loads(raw)
+except ValueError:
+    payload = {"_raw": raw[:2000]}
+def clip(v):
+    if isinstance(v, str):
+        return v[:500]
+    if isinstance(v, dict):
+        return {k: clip(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [clip(x) for x in v[:20]]
+    return v
+rec = {"t": time.time(), "event": event, "label": label,
+       "keeper_env": os.environ.get("STASIS_KEEPER"),
+       "keys": sorted(payload) if isinstance(payload, dict) else [],
+       "payload": clip(payload)}
+with open(out, "a") as f:
+    f.write(json.dumps(rec) + "\n")
+deny = os.environ.get("STASIS_PROBE_DENY")
+if event == "PermissionRequest" and deny:
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest",
+                      "decision": {"behavior": "deny", "message": deny}}}))
+'''
+
+
+def main_checkout():
+    out = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                         capture_output=True, text=True, cwd=Path(__file__).resolve().parent)
+    if out.returncode != 0:
+        return Path.cwd()
+    return Path(out.stdout.strip()).parent
+
+
+def settings(recorder, events_file, label, events, extra=None):
+    hook = lambda ev: [{"hooks": [{"type": "command", "timeout": 10,
+                                   "command": f"python3 {recorder} {ev} {label} {events_file}"}]}]
+    body = {"hooks": {ev: hook(ev) for ev in events},
+            "permissions": {"allow": ["Bash(echo *)"], "ask": ["Bash(touch *)"]}}
+    body.update(extra or {})
+    return body
+
+
+class Run:
+    """One scratch project and its recorded events."""
+
+    def __init__(self, root, name):
+        self.dir = Path(tempfile.mkdtemp(prefix=f"stasis-probe-{name}-"))
+        self.events_file = self.dir / "events.jsonl"
+        self.recorder = self.dir / "recorder.py"
+        self.recorder.write_text(RECORDER)
+        self.name = name
+        self.root = root
+
+    def project_settings(self, label="project", events=EVENTS):
+        (self.dir / ".claude").mkdir(exist_ok=True)
+        (self.dir / ".claude" / "settings.json").write_text(
+            json.dumps(settings(self.recorder, self.events_file, label, events), indent=1))
+
+    def explicit_settings(self, label="explicit", events=EVENTS):
+        path = self.dir / "explicit-settings.json"
+        path.write_text(json.dumps(settings(self.recorder, self.events_file, label, events), indent=1))
+        return path
+
+    def claude(self, args, prompt, env=None, timeout=240):
+        cmd = [shutil.which("claude") or "claude", "-p", "--no-session-persistence",
+               "--output-format", "json", *args, prompt]
+        started = time.time()
+        try:
+            proc = subprocess.run(cmd, cwd=self.dir, capture_output=True, text=True,
+                                  timeout=timeout, env={**os.environ, **(env or {})},
+                                  stdin=subprocess.DEVNULL)
+            rc, out, err = proc.returncode, proc.stdout, proc.stderr
+        except subprocess.TimeoutExpired:
+            rc, out, err = 124, "", "timeout"
+        try:
+            result = json.loads(out) if out.strip() else {}
+        except ValueError:
+            result = {"_unparsed": out[-2000:]}
+        (self.root / f"{self.name}.result.json").write_text(json.dumps(
+            {"cmd": cmd, "rc": rc, "seconds": round(time.time() - started, 1),
+             "stderr": err[-2000:], "result": result}, indent=1))
+        return rc, result
+
+    def events(self):
+        if not self.events_file.exists():
+            return []
+        return [json.loads(line) for line in self.events_file.read_text().splitlines() if line]
+
+    def keep(self):
+        if self.events_file.exists():
+            shutil.copy(self.events_file, self.root / f"{self.name}.events.jsonl")
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+
+def verdict(cond, evidence):
+    if cond is None:
+        return {"verdict": "unknown", "evidence": evidence}
+    return {"verdict": "yes" if cond else "no", "evidence": evidence}
+
+
+def probe_settings_accepted(root, model):
+    run = Run(root, "settings-accepted")
+    run.project_settings()
+    rc, _ = run.claude(["--model", model], "Reply with the single word OK.")
+    full = {e["event"] for e in run.events()}
+    run.keep()
+    out = {"settings-full-event-set-accepted": verdict(
+        "SessionStart" in full or "Stop" in full if rc == 0 else None,
+        f"rc={rc}; events fired: {sorted(full)}")}
+    if not full and rc == 0:
+        mini = Run(root, "settings-minimal")
+        mini.project_settings(events=MINIMAL_EVENTS)
+        mini.claude(["--model", model], "Reply with the single word OK.")
+        fired = {e["event"] for e in mini.events()}
+        mini.keep()
+        out["settings-minimal-event-set-accepted"] = verdict(
+            bool(fired), f"events fired: {sorted(fired)} (an unknown event name voids the whole file)")
+    return out
+
+
+def probe_permission(root, model, prompts_mode):
+    name = f"permission-{prompts_mode}"
+    run = Run(root, name)
+    run.project_settings()
+    prompt = ("Run exactly this bash command: touch probe-ask-marker.txt\n"
+              "Whatever happens, then run exactly this bash command: echo second-step\n"
+              "Finally reply with the exact text of any denial message you received, or NONE.")
+    rc, result = run.claude(["--model", model, "--permission-prompts", prompts_mode], prompt,
+                            env={"STASIS_PROBE_DENY": f"{DENY_MARK}: denied by the stasis probe"})
+    ev = run.events()
+    marker = (run.dir / "probe-ask-marker.txt").exists()  # before keep() removes the scratch dir
+    run.keep()
+    return judge_permission(prompts_mode, rc, result, ev, marker)
+
+
+def has(e, needle):
+    return needle in json.dumps(e["payload"].get("tool_input", {}))
+
+
+def judge_permission(mode, rc, result, ev, marker):
+    """Pure verdicts over one recorded permission run, kept apart so a fixture can test them."""
+    names = [e["event"] for e in ev]
+    text = str(result.get("result", ""))
+    ran = rc == 0
+    req_i = next((i for i, e in enumerate(ev) if e["event"] == "PermissionRequest"), None)
+    req = ev[req_i] if req_i is not None else None
+    touch_pre = next((i for i, e in enumerate(ev) if e["event"] == "PreToolUse" and has(e, "touch")), None)
+    echo_after = [e for e in ev[(req_i or 0) + 1:] if e["event"] == "PostToolUse" and has(e, "second-step")]
+    touch_closed = [e for e in ev if e["event"] in ("PostToolUse", "PostToolUseFailure") and has(e, "touch")]
+    want = {"prompt_id", "tool_name", "tool_input", "permission_mode", "session_id"}
+    req_keys = set(req["keys"]) if req else set()
+    posts = [e for e in ev if e["event"] == "PostToolUse"]
+    denials = result.get("permission_denials") or []
+    touch_denied = [d for d in denials if "touch" in json.dumps(d.get("tool_input", {}))]
+    return {
+        f"permission-request-on-ask-rule[{mode}]": verdict(
+            (req is not None and has(req, "touch")) if ran else None,
+            f"rc={rc}; PermissionRequest for touch at index {req_i}; events: {names}"),
+        f"deny-message-reaches-agent[{mode}]": verdict(
+            (DENY_MARK in text) if req else None, f"final text: {text[:200]!r}"),
+        f"deny-continues-turn[{mode}]": verdict(
+            (bool(echo_after) and not marker and not touch_closed) if req else None,
+            f"echo PostToolUse after the request: {len(echo_after)}; touch ran: {marker}; "
+            f"touch closed by a tool event: {len(touch_closed)}"),
+        f"pretooluse-before-permission[{mode}]": verdict(
+            (touch_pre is not None and touch_pre < req_i) if req_i is not None else None,
+            f"PreToolUse(touch) index {touch_pre}, PermissionRequest index {req_i}"),
+        f"permission-request-fields[{mode}]": verdict(
+            (want <= req_keys and "tool_use_id" not in req_keys) if req else None,
+            f"missing: {sorted(want - req_keys)}; tool_use_id present: {'tool_use_id' in req_keys}; keys: {sorted(req_keys)}"),
+        f"stop-fields[{mode}]": stop_fields(ev),
+        f"posttooluse-duration-ms[{mode}]": verdict(
+            all(isinstance(e["payload"].get("duration_ms"), (int, float)) for e in posts) if posts else None,
+            f"numeric duration_ms on {sum(isinstance(e['payload'].get('duration_ms'), (int, float)) for e in posts)} of {len(posts)} PostToolUse"),
+        f"result-permission-denials[{mode}]": verdict(
+            bool(touch_denied and touch_denied[0].get("tool_use_id")) if ran else None,
+            f"denials naming touch: {len(touch_denied)}; tool_use_id: {touch_denied[0].get('tool_use_id') if touch_denied else None}"),
+    }
+
+
+def probe_permission_control(root, model):
+    """Negative control: no hook decision. The deny marker must be absent, so a yes above is ours."""
+    run = Run(root, "permission-control")
+    run.project_settings()
+    prompt = ("Run exactly this bash command: touch probe-ask-marker.txt\n"
+              "Then reply with the exact text of any denial message you received, or NONE.")
+    rc, result = run.claude(["--model", model, "--permission-prompts", "none"], prompt)
+    ev = run.events()
+    marker = (run.dir / "probe-ask-marker.txt").exists()
+    run.keep()
+    text = str(result.get("result", ""))
+    asked = any(e["event"] == "PermissionRequest" for e in ev)
+    return {"control-no-hook-decision": verdict(
+        (asked and DENY_MARK not in text and not marker) if rc == 0 else None,
+        f"PermissionRequest fired: {asked}; marker in reply: {DENY_MARK in text}; touch ran: {marker}")}
+
+
+def stop_fields(ev):
+    stops = [e for e in ev if e["event"] == "Stop"]
+    if not stops:
+        return verdict(None, "no Stop event recorded")
+    keys = stops[-1]["keys"]
+    want = {"last_assistant_message", "background_tasks", "stop_hook_active", "session_id",
+            "transcript_path"}
+    return verdict(want <= set(keys), f"missing: {sorted(want - set(keys))}; keys: {keys}")
+
+
+def probe_models(root):
+    out = {}
+    for alias in MODEL_ALIASES:
+        run = Run(root, f"model-{alias}")
+        rc, result = run.claude(["--model", alias], "Reply with the single word OK.", timeout=300)
+        run.keep()
+        used = sorted((result.get("modelUsage") or {}).keys())
+        out[f"model-binding[{alias}]"] = verdict(
+            (rc == 0 and any(alias in m for m in used)) if rc in (0, 1) else None,
+            f"rc={rc}; modelUsage: {used}")
+    return out
+
+
+def probe_keeper_shape(root, model):
+    """The keeper invocation: --restricted, no prompts, read-only tools, explicit settings."""
+    run = Run(root, "keeper-restricted")
+    run.project_settings(label="project")
+    explicit = run.explicit_settings(label="explicit")
+    prompt = ("Run the bash command `echo keeper-bash-ran`. If you cannot run bash, reply NO-BASH. "
+              "Then read the file recorder.py in this directory and reply with its first word.")
+    rc, result = run.claude(["--restricted", "--permission-prompts", "none", "--tools", "Read,Grep,Glob",
+                             "--settings", str(explicit), "--model", model], prompt,
+                            env={"STASIS_KEEPER": "1"})
+    ev = run.events()
+    run.keep()
+    labels = {e["label"] for e in ev}
+    bash_pre = [e for e in ev if e["event"] == "PreToolUse" and e["payload"].get("tool_name") == "Bash"]
+    ran = rc == 0
+    return {
+        "restricted-ignores-project-hooks": verdict(
+            "project" not in labels if ran else None, f"labels seen: {sorted(labels)}"),
+        "restricted-keeps-explicit-settings-hooks": verdict(
+            "explicit" in labels if ran else None, f"labels seen: {sorted(labels)}"),
+        "restricted-has-no-bash": verdict(
+            not bash_pre if ran else None,
+            f"Bash PreToolUse: {len(bash_pre)}; text: {str(result.get('result', ''))[:160]!r}"),
+        "restricted-raises-no-permission-request": verdict(
+            not any(e["event"] == "PermissionRequest" for e in ev) if ran else None,
+            f"events: {sorted({e['event'] for e in ev})}"),
+        "hook-sees-keeper-env": verdict(
+            any(e["keeper_env"] == "1" for e in ev) if ev else None, "STASIS_KEEPER visible to hooks"),
+    }
+
+
+PROBE_AGENT = """---
+name: probe-effort
+description: Scratch agent that checks whether an effort frontmatter field reaches the subagent.
+tools: Bash
+model: haiku
+{field}: low
+---
+Run exactly this bash command: echo effort-probe
+Then reply DONE.
+"""
+
+
+def probe_agent_effort(root, model, field="effort"):
+    """Scratch-agent probe: does a `<field>: low` frontmatter line set the subagent's effort?
+
+    Hook payloads carry `effort.level`; a subagent's events carry its own `agent_id`. The field
+    is supported when the subagent's events read `low` while the parent's read something else.
+    """
+    run = Run(root, f"agent-{field}")
+    run.project_settings()
+    agents = run.dir / ".claude" / "agents"
+    agents.mkdir(parents=True, exist_ok=True)
+    (agents / "probe-effort.md").write_text(PROBE_AGENT.format(field=field))
+    rc, _ = run.claude(["--model", model],
+                       "Use the Agent tool with subagent_type probe-effort and wait for it to finish. "
+                       "Then reply with the single word OK.", timeout=300)
+    ev = run.events()
+    run.keep()
+    level = lambda e: (e["payload"].get("effort") or {}).get("level")
+    sub = {level(e) for e in ev if e["payload"].get("agent_id") and level(e)}
+    parent = {level(e) for e in ev if not e["payload"].get("agent_id") and level(e)}
+    ran = rc == 0 and bool(sub)
+    return {f"agent-frontmatter-{field}": verdict(
+        ("low" in sub and "low" not in parent) if ran else None,
+        f"rc={rc}; subagent effort levels {sorted(sub)}; parent {sorted(parent)}")}
+
+
+def probe_flags():
+    text = subprocess.run([shutil.which("claude") or "claude", "--help"], capture_output=True,
+                          text=True).stdout
+    return {f"cli-flag[{flag}]": verdict(flag in text, "present in `claude --help`")
+            for flag in ("--permission-prompts", "--restricted", "--tools", "--settings")}
+
+
+REWAKE = r'''
+import sys, time, pathlib
+mark = pathlib.Path(sys.argv[1])
+if mark.exists():
+    sys.exit(0)
+time.sleep(30)
+mark.write_text(str(time.time()))
+print("stasis-probe rewake: reply with the single word WOKE.", file=sys.stderr)
+sys.exit(2)
+'''
+
+STEPS = """\
+Steward-assisted probe (about 5 minutes). In a separate terminal:
+
+  cd {dir} && claude
+
+1. Type: run `touch first.txt` — a dialog opens (an ask rule). Wait about 70 s, then DENY it.
+2. Type: run `touch second.txt` — when the dialog opens, APPROVE it at once.
+3. Do nothing for about 90 s after the reply. The asyncRewake hook should wake the session
+   about 30 s after its turn ends, and it should reply WOKE without you typing.
+4. Optional, from your phone with Remote Control on: type `ask me a yes/no question with
+   AskUserQuestion`, step away from the terminal, and note whether a push arrives.
+5. Exit claude, then run:
+
+  {probe} --interactive-read {dir} --rc-push yes|no|skip --channel-relay skip
+"""
+
+
+ANSI = __import__("re").compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*(\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[=>]|\r")
+DRIVE_STEPS = [
+    {"wait": "Itrustthisfolder", "timeout": 40},
+    {"send": "\x1b[B"}, {"sleep": 0.5}, {"send": "\r"},
+    {"sleep": 8},                                  # let the input box settle after the trust dialog
+    {"send": "Run exactly this bash command and nothing else: touch first.txt"}, {"sleep": 1}, {"send": "\r"},
+    {"wait": "proceed\\?", "timeout": 90, "fresh": True},
+    {"sleep": 70}, {"send": "\x1b"},               # hold the first dialog ~70 s, then deny (Esc)
+    {"sleep": 50},
+    {"send": "Run exactly this bash command and nothing else: touch second.txt"}, {"sleep": 1}, {"send": "\r"},
+    {"wait": "proceed\\?", "timeout": 90, "fresh": True},
+    {"sleep": 2}, {"send": "\r"},                  # approve the second dialog (default option)
+    {"sleep": 110},                                # idle: asyncRewake at ~30 s, idle_prompt at ~60 s
+]
+
+
+def interactive_drive(scratch, log_path):
+    """Drive the steward-assisted steps under a pty: no person needed except for the phone checks.
+
+    It approves exactly one `touch` inside the scratch project and denies another; nothing outside
+    that throwaway directory is touched. The steward asked for this on 2026-10-30.
+    """
+    import fcntl
+    import pty
+    import select
+    import struct
+    import termios
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.chdir(scratch)
+        os.environ["TERM"] = "xterm-256color"
+        os.execvp("claude", ["claude"])
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 48, 160, 0, 0))
+    raw, t0 = bytearray(), time.time()
+    log = open(log_path, "w")
+
+    def pump(seconds):
+        end = time.time() + seconds
+        while time.time() < end:
+            ready, _, _ = select.select([fd], [], [], 0.2)
+            if ready:
+                try:
+                    chunk = os.read(fd, 65536)
+                except OSError:
+                    return
+                if not chunk:
+                    return
+                raw.extend(chunk)
+
+    for step in DRIVE_STEPS:
+        if "wait" in step:
+            start = len(raw) if step.get("fresh") else 0   # only text printed after this step
+            pat, deadline, hit = __import__("re").compile(step["wait"]), time.time() + step["timeout"], False
+            while time.time() < deadline and not hit:
+                pump(0.5)
+                hit = bool(pat.search(ANSI.sub("", raw[start:].decode("utf-8", "replace"))))
+            log.write(f"[{time.time() - t0:7.1f}s] wait {step['wait']!r}: {'HIT' if hit else 'TIMEOUT'}\n")
+        elif "send" in step:
+            os.write(fd, step["send"].encode())
+            log.write(f"[{time.time() - t0:7.1f}s] send {step['send']!r}\n")
+            pump(0.3)
+        else:
+            pump(step["sleep"])
+        log.flush()
+    for _ in range(2):
+        try:
+            os.write(fd, b"\x03")
+        except OSError:
+            break
+        pump(1)
+    try:
+        os.kill(pid, 9)
+    except ProcessLookupError:
+        pass
+
+
+def interactive_setup(root, quiet=False):
+    run = Run(root, "interactive")
+    body = settings(run.recorder, run.events_file, "interactive", EVENTS)
+    rewake = run.dir / "rewake.py"
+    rewake.write_text(REWAKE)
+    body["hooks"]["Stop"].append({"hooks": [{
+        "type": "command", "async": True, "asyncRewake": True, "timeout": 120,
+        "command": f"python3 {rewake} {run.dir / 'rewake.mark'}"}]})
+    (run.dir / ".claude").mkdir(exist_ok=True)
+    (run.dir / ".claude" / "settings.json").write_text(json.dumps(body, indent=1))
+    if not quiet:
+        print(STEPS.format(dir=run.dir, probe=Path(__file__).resolve()))
+    return run.dir
+
+
+def system_prompt(e):
+    """A UserPromptSubmit the runtime originated (a rewake, a task notification), not a person."""
+    return str(e["payload"].get("prompt", "")).lstrip().startswith("<task-notification>")
+
+
+def interactive_read(scratch, rc_push, channel_relay):
+    ev = [json.loads(line) for line in (scratch / "events.jsonl").read_text().splitlines() if line]
+    reqs = [i for i, e in enumerate(ev) if e["event"] == "PermissionRequest"]
+    notif = lambda kind: [e for e in ev if e["event"] == "Notification"
+                          and e["payload"].get("notification_type") == kind]
+    caps = {}
+    if reqs:
+        first = ev[reqs[0]]
+        shown = next((e for e in notif("permission_prompt") if e["t"] >= first["t"]), None)
+        caps["dialog-displayed-notification"] = verdict(
+            shown is not None, f"delay {round(shown['t'] - first['t'], 1)} s" if shown else "no permission_prompt")
+        window = ev[reqs[0] + 1:(reqs[1] if len(reqs) > 1 else None)]
+        closed = [e for e in window if e["event"] in ("PostToolUse", "PostToolUseFailure", "PermissionDenied")
+                  and "first.txt" in json.dumps(e["payload"].get("tool_input", {}))]
+        caps["human-deny-emits-no-close-event"] = verdict(
+            not closed and bool(window),
+            f"events after the denied dialog: {[e['event'] for e in window][:8]}; close events for first.txt: {len(closed)}")
+    if len(reqs) > 1:
+        req = ev[reqs[1]]
+        post = next((e for e in ev[reqs[1]:] if e["event"] == "PostToolUse"
+                     and "second.txt" in json.dumps(e["payload"].get("tool_input", {}))), None)
+        wait = (post["t"] - post["payload"].get("duration_ms", 0) / 1000 - req["t"]) if post else None
+        caps["approved-close-from-posttooluse"] = verdict(
+            post is not None, f"dialog wait ≈ {round(wait, 1)} s" if post else "no PostToolUse")
+    stops = [e for e in ev if e["event"] == "Stop"]
+    idle = notif("idle_prompt")
+    if stops and idle:
+        gap = min((i["t"] - s["t"] for s in stops for i in idle if i["t"] > s["t"]), default=None)
+        caps["idle-prompt-timing"] = verdict(gap is not None, f"idle_prompt {round(gap, 1)} s after Stop" if gap else "")
+    if reqs and idle:
+        first = ev[reqs[0]]
+        nxt = next((e["t"] for e in ev[reqs[0] + 1:] if e["event"] in ("UserPromptSubmit", "PostToolUse", "Stop")), None)
+        during = [i for i in idle if first["t"] < i["t"] < (nxt or float("inf"))]
+        caps["idle-prompt-silent-while-dialog-open"] = verdict(
+            not during, f"idle_prompt notifications while the first dialog was open: {len(during)}")
+    mark = scratch / "rewake.mark"
+    if mark.exists():
+        woke_at = float(mark.read_text())
+        human = lambda u: u["event"] == "UserPromptSubmit" and not system_prompt(u)
+        woke = [e for e in ev if e["t"] > woke_at and e["event"] in ("PreToolUse", "Stop")
+                and not any(human(u) and woke_at < u["t"] < e["t"] for u in ev)]
+        caps["async-rewake-wakes-idle"] = verdict(bool(woke), f"events after rewake: {[e['event'] for e in woke][:4]}")
+        rewake_ups = [u for u in ev if u["event"] == "UserPromptSubmit" and u["t"] > woke_at and system_prompt(u)]
+        caps["rewake-prompt-is-system-originated"] = verdict(
+            bool(rewake_ups), f"UserPromptSubmit after rewake starting with <task-notification>: {len(rewake_ups)}")
+    else:
+        caps["async-rewake-wakes-idle"] = verdict(None, "rewake hook never fired")
+    for cid, answer in (("remote-control-push-on-question", rc_push), ("channel-deny-relay", channel_relay)):
+        caps[cid] = verdict(None if answer == "skip" else answer == "yes", f"steward reported: {answer}")
+    return caps
+
+
+def harness_capabilities(reports):
+    """Merge probe evidence in stamp order; a skipped check cannot retract a yes."""
+    for report in reports:
+        if not isinstance(report, dict) or report.get("schema") != "stasis-probe/1":
+            raise ValueError("expected a stasis-probe/1 report")
+        stamp = report.get("stamp")
+        if not isinstance(stamp, str) or len(stamp) != 16:
+            raise ValueError("expected a UTC report stamp YYYYMMDDTHHMMSSZ")
+        time.strptime(stamp, "%Y%m%dT%H%M%SZ")
+        if not isinstance(report.get("capabilities"), dict):
+            raise ValueError("expected a capabilities map")
+    capabilities = {}
+    for report in sorted(reports, key=lambda report: report["stamp"]):
+        for cid, check in report["capabilities"].items():
+            if not isinstance(check, dict):
+                raise ValueError(f"expected a capability object for {cid}")
+            result = check.get("verdict")
+            status = result if result in ("yes", "no") else "unsupported"
+            # Unknown, interactive and missing verdicts supply no contrary evidence.
+            # A later measured no DOES retract a yes; absence from a partial run does not.
+            if capabilities.get(cid, {}).get("status") == "yes" and status == "unsupported":
+                continue
+            capabilities[cid] = {
+                "status": status,
+                "evidence": f"probe/{report['stamp']}",
+                "cliVersion": report.get("claudeVersion"),
+            }
+    return {"harnessCapabilities": dict(sorted(capabilities.items()))}
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--out", type=Path)
+    ap.add_argument("--only", default="", help="comma list: flags,settings,permission,models,keeper,effort")
+    ap.add_argument("--model", default="haiku", help="model for the behaviour probes")
+    ap.add_argument("--strict", action="store_true")
+    ap.add_argument("--emit-capabilities", type=Path, nargs="+", metavar="REPORT.json",
+                    help="emit claude-code harness capabilities from existing probe reports")
+    ap.add_argument("--interactive-setup", action="store_true",
+                    help="create a scratch project for the steward-assisted probe and print the steps")
+    ap.add_argument("--interactive-drive", action="store_true",
+                    help="set up, drive under a pty and read the interactive probe in one go")
+    ap.add_argument("--interactive-read", type=Path, metavar="DIR",
+                    help="read the events the steward-assisted probe recorded in DIR")
+    ap.add_argument("--rc-push", choices=["yes", "no", "skip"], default="skip")
+    ap.add_argument("--channel-relay", choices=["yes", "no", "skip"], default="skip")
+    args = ap.parse_args()
+
+    if args.emit_capabilities:
+        try:
+            reports = [json.loads(path.read_text()) for path in args.emit_capabilities]
+            print(json.dumps(harness_capabilities(reports), indent=2))
+        except (OSError, ValueError) as error:
+            ap.error(str(error))
+        return 0
+
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    root = (args.out or main_checkout() / "genesis/local-dev/dialogue-stasis/probe") / stamp
+    root.mkdir(parents=True, exist_ok=True)
+    if args.interactive_setup:
+        interactive_setup(root)
+        return 0
+    if args.interactive_drive:
+        scratch = interactive_setup(root, quiet=True)
+        interactive_drive(scratch, root / "interactive.drive.log")
+        args.interactive_read = scratch
+    if args.interactive_read:
+        caps = interactive_read(args.interactive_read, args.rc_push, args.channel_relay)
+        shutil.copy(args.interactive_read / "events.jsonl", root / "interactive.events.jsonl")
+        (root / "report.json").write_text(json.dumps(
+            {"schema": "stasis-probe/1", "stamp": stamp, "mode": "interactive", "capabilities": caps}, indent=1))
+        for cid, v in caps.items():
+            print(f"{v['verdict']:<12} {cid:<48} {v['evidence'][:150]}")
+        print(f"report: {root / 'report.json'}")
+        return 0
+    only = set(filter(None, args.only.split(",")))
+    want = lambda k: not only or k in only
+
+    version = subprocess.run([shutil.which("claude") or "claude", "--version"],
+                             capture_output=True, text=True).stdout.strip()
+    caps = {}
+    if want("flags"):
+        caps.update(probe_flags())
+    if want("settings"):
+        caps.update(probe_settings_accepted(root, args.model))
+    if want("permission"):
+        for mode in ("none", "host"):
+            caps.update(probe_permission(root, args.model, mode))
+        caps.update(probe_permission_control(root, args.model))
+    if want("keeper"):
+        caps.update(probe_keeper_shape(root, args.model))
+    if want("models"):
+        caps.update(probe_models(root))
+    if want("effort"):
+        caps.update(probe_agent_effort(root, args.model))
+    for cid, what in INTERACTIVE:
+        caps[cid] = {"verdict": "interactive", "evidence": what}
+
+    report = {"schema": "stasis-probe/1", "claudeVersion": version, "stamp": stamp,
+              "behaviourModel": args.model, "capabilities": caps}
+    (root / "report.json").write_text(json.dumps(report, indent=1))
+    for cid, v in caps.items():
+        print(f"{v['verdict']:<12} {cid:<48} {v['evidence'][:150]}")
+    print(f"report: {root / 'report.json'}  ({version})")
+    unknown = [c for c, v in caps.items() if v["verdict"] == "unknown"]
+    return 1 if args.strict and unknown else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

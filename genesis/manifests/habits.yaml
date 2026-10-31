@@ -2170,6 +2170,28 @@ habits:
       when the lease view and the fold are served by the native peer runtime (lvi or storage) with no
       berth-specific code.
 
+  - id: dialogue-stalls-are-answered
+    declared: genesis/agentic/.epr-meta/dialogue-stalls-are-answered.habit.md
+    invariant: >
+      A stalled session dialogue — an open permission prompt, a turn ending in a question, or the
+      steward waiting on silence — is answered by the cheapest sufficient capability level before
+      the human is interrupted, and nothing approves on the human's behalf.
+    status: unwired
+    active: false
+    checks: []
+    evidence: >
+      DELTA 2026-10-31 (slice 6 non-native, still unwired): initial S5 policy/schema match StasisPolicy::builtin and native shape IDs by source-parity tests; pin helper prepares only a steward ruling command and requires native eprfs cid (binary absent here; real helper exited 2, no ruling). S3* audit joins denials to transcript calls, compares native effects, reads windowed git history, labels the git-push/gh-api-merge ambiguity and shadow parks, and prepares a read-only Codex brief plus a dry-run verdict. 24 focused unittest tests OK with native/git stubs and no live model calls; 29 sensitive-file boundary assertions passed; package verifier Node entry point 2350 passed (pnpm blocked by read-only engine store); just gate seam-guidance-contracts passed with workspace TMPDIR. Native policy loading and live decide exit-3 CID enforcement remain the separate cargo leg; no activation claimed.
+    evidence-fingerprint: sha256:1250938a14ee925b
+    evidence-bytes: 7069
+    evidence-entries: 13
+    refs:
+      - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
+      - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
+    retire-when: >
+      when native session runtimes provide this dialogue-response invariant without stasis-specific
+      adapters or a separate coordinator, and their own runnable checks cover all three stall classes
+      and the prohibition on approving for the human.
+
   - id: edit-diagnostics-reach-every-session
     declared: genesis/agentic/.epr-meta/edit-diagnostics-reach-every-session.habit.md
     invariant: >

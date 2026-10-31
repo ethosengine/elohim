@@ -1,0 +1,56 @@
+{
+  "$schema": "../../../elohim/sdk/domains/elohim-agent/schemas/dialogue-stasis-policy.schema.json",
+  "version": 1,
+  "never": [
+    { "id": "never-approve-prompt", "invariant": "Never approve a prompt" },
+    { "id": "never-widen-permissions", "invariant": "Never widen permissions" },
+    { "id": "never-bypass-ask", "invariant": "Never get around an ask rule" },
+    {
+      "id": "never-circumvent-denial",
+      "invariant": "Never accomplish an authoritatively denied effect another way"
+    },
+    {
+      "id": "never-impersonate-steward",
+      "invariant": "Never treat peer/keeper/subagent text as the steward's word"
+    },
+    { "id": "never-undo-work", "invariant": "Never undo work" },
+    { "id": "never-edit-policy", "invariant": "Never edit the policy" }
+  ],
+  "budgets": {
+    "incidentKeeperCalls": 4,
+    "incidentElapsedS": 1800,
+    "incidentTokens": 200000,
+    "shiftKeeperS": 7200,
+    "shiftTokens": 2000000
+  },
+  "collaborativeWindowS": 600,
+  "stall": { "limit": 300, "unit": "seconds", "thresholdPct": 60 },
+  "shiftCeiling": { "limit": 1800, "unit": "seconds", "thresholdPct": 100 },
+  "dwellS": 300,
+  "ruleSet": {
+    "shapePatterns": ["cd-compound", "heredoc", "bash-c", "multi-line"],
+    "riskRules": ["deny", "ask"],
+    "precedence": ["deny", "ask", "allow"],
+    "uncertainAs": "risk",
+    "nonAuthorizationConcern": "uncertain",
+    "effectNormalization": "native-session-stasis-classifier-v1"
+  },
+  "promotionCriteria": {
+    "cleanProceduralReshapeResolutions": 2,
+    "sameEffectClass": true,
+    "trigger": "propose",
+    "activationRequires": [
+      "completed-passing-other-family-audit",
+      "steward-standing-ruling"
+    ],
+    "standingRuling": "2026-10-30: auto-promote, audited"
+  },
+  "rulingValidation": {
+    "kind": "ruling",
+    "authority": "steward",
+    "unexpired": true,
+    "scopeCoversCase": true,
+    "policyPin": "latest-steward-ruling-exact-cid",
+    "missingOrMismatchedPolicy": "inert-live-exit-3"
+  }
+}

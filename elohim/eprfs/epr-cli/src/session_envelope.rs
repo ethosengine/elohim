@@ -527,9 +527,15 @@ fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
 }
 /// Command entry point, including observed-owner collection through the explicit close path.
 pub fn run(args: &[String]) -> Result<ExitCode> {
+    // `epr session stasis ...` is the dialogue-stasis fold; it renders its own output and exits.
+    if args.first().map(String::as_str) == Some("stasis") {
+        return Ok(crate::session_stasis::run(&args[1..]));
+    }
     let verb = args.first().map(String::as_str).unwrap_or("help");
     if args.iter().any(|s| s == "--help") || verb == "help" {
-        println!("epr session id|open [--model MODEL]|show|close|gc [--json]");
+        println!(
+            "epr session id|open [--model MODEL]|show|close|gc [--json]|stasis fold|decide|status"
+        );
         return Ok(ExitCode::SUCCESS);
     }
     let mut model = None;

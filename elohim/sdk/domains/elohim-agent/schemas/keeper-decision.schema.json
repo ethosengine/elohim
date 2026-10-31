@@ -1,0 +1,148 @@
+{
+  "$id": "elohim-agent:schema:keeper-decision",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeeperDecision",
+  "description": "Source of truth: dialogue-stasis-loop-design, Terms, Pivots and Denial authority. Keeper use of the protocol Decision excludes Refuse. This validates the five-key answer only; trusted brief checks must enforce C4-only asks, denial authority, reshape allowance, and independently validated standing rulings. Permit is not tool permission.",
+  "type": "object",
+  "required": [
+    "decision",
+    "pivot",
+    "reason",
+    "reshape",
+    "ask"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": [
+        "Permit",
+        "Refer"
+      ]
+    },
+    "pivot": {
+      "enum": [
+        "reshape",
+        "park",
+        "proceed",
+        "notify",
+        null
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Explanation; cite the standing ruling id for proceed, or the parked summary, ask and recommendation."
+    },
+    "reshape": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "tool",
+            "shape"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "tool": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "shape": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S",
+              "description": "Redacted command pattern. Retain flags; omit secrets and argument values."
+            }
+          }
+        }
+      ]
+    },
+    "ask": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "description": "One-line ask with recommendation, only at C4 when decision is Refer or pivot is notify. Otherwise null; check the rung against the trusted brief."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pivot": {
+            "const": "reshape"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reshape": {
+            "type": "object"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "reshape": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "Permit"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "pivot": {
+            "enum": [
+              "reshape",
+              "park",
+              "proceed",
+              "notify"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ask": {
+            "type": "string"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "decision": {
+                "const": "Refer"
+              }
+            }
+          },
+          {
+            "properties": {
+              "pivot": {
+                "const": "notify"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

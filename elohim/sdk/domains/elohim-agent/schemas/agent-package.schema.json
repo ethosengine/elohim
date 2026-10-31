@@ -32,6 +32,20 @@
           "type": "object",
           "additionalProperties": true
         },
+        "capabilityProfile": {
+          "description": "Source of truth: AgentPackage capability vocabulary. Runtime model aliases are resolved through genesis/agentic/agent-runtimes.json.",
+          "type": "object",
+          "required": ["level"],
+          "properties": {
+            "level": { "enum": ["C1", "C2", "C3", "C4"] },
+            "effort": { "enum": ["low", "medium", "high", "xhigh"] },
+            "authority": {
+              "enum": ["read-only-nonprompting", "workspace-write", "governed-write"]
+            },
+            "independence": { "enum": ["same-family", "other-family"] }
+          },
+          "additionalProperties": false
+        },
         "capabilityRefs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }

@@ -54,15 +54,15 @@
       "additionalProperties": false
     },
     "registration": {
-      "type": ["object", "null"],
-      "properties": {
-        "event": { "type": "string", "minLength": 1 },
-        "matcher": { "type": ["string", "null"] },
-        "command": { "type": "string", "minLength": 1 },
-        "timeout": { "type": ["number", "null"] },
-        "type": { "type": "string" }
-      },
-      "additionalProperties": true
+      "oneOf": [
+        { "$ref": "#/$defs/registration" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/registration" }
+        },
+        { "type": "null" }
+      ]
     },
     "registrations": {
       "type": "object",
@@ -89,5 +89,20 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "registration": {
+      "type": "object",
+      "properties": {
+        "event": { "type": "string", "minLength": 1 },
+        "matcher": { "type": ["string", "null"] },
+        "command": { "type": "string", "minLength": 1 },
+        "timeout": { "type": ["number", "null"] },
+        "type": { "type": "string" },
+        "async": { "type": "boolean" },
+        "asyncRewake": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  }
 }
