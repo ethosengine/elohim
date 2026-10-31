@@ -3586,7 +3586,9 @@ pipeline {
         }
 
         stage('Cleanup') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            // A validate-only run skips the image builds, so build.env is absent and DOORWAY_TAG
+            // and STORAGE_TAG are unbound here (MissingPropertyException since 44f1b5576).
+            when { expression { env.PIPELINE_SKIPPED != 'true' && env.EDGE_VALIDATE_ONLY != 'true' } }
             steps {
                 container('builder') {
                     script {
