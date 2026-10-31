@@ -200,6 +200,11 @@
       },
       "additionalProperties": false
     },
+    "inputDigest": {
+      "description": "SHA-256 of canonical tool_input JSON (sorted keys, compact separators); never raw arguments.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "durationMs": {
       "type": [
         "number",
@@ -397,6 +402,10 @@
         "count": {
           "type": "integer",
           "minimum": 1
+        },
+        "baseline": {
+          "type": "boolean",
+          "description": "Historical exceptions read while establishing a transcript cursor; journalled without notification."
         }
       }
     }

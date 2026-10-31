@@ -2180,10 +2180,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-10-30 (interactive probe, still unwired): driven in-session under a pty with stasis-probe --interactive-drive (no person needed), reproduced twice (probe/20261030T162945Z, probe/20261030T163031Z): 7/7 yes. Findings: dialog-displayed fires 6.1–6.2 s after PermissionRequest; a human deny emits no event at all; idle_prompt fires 60.1–60.2 s after Stop and never while a dialog is open; asyncRewake wakes an idle session, and the wake arrives as a UserPromptSubmit beginning with <task-notification>, which the presence witness must exclude. Remote Control push and the channel deny-relay still need the steward.
-    evidence-fingerprint: sha256:ae4f07c2004ec672
-    evidence-bytes: 1467
-    evidence-entries: 3
+      DELTA 2026-10-31 (slice 3b baseline correction, still unwired): initial, lost and replaced transcript cursors journal historical exceptions as baseline without notifying; later notices and doubling exclude baseline counts. All 45 dialogue-stasis-sense unittest replay tests pass, including six new baseline regressions; scoped replant verifies clean.
+    evidence-fingerprint: sha256:c9d970070589a96a
+    evidence-bytes: 2208
+    evidence-entries: 5
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
