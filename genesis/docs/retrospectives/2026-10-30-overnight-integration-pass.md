@@ -79,6 +79,8 @@ M1, M2, M4 and M12 together would have prevented most of this pass's lost wall-c
 
 ## 6. Design sketch: a session stasis loop (steward request, 2026-10-30)
 
+> **Re-scoped later the same day.** The steward narrowed this loop to the session dialogue itself: an open permission prompt, a turn that ends in a question, and the steward waiting on a quiet agent. It became a lab-neutral hierarchy of concern: a deterministic rung, then capability levels C1 to C4, then the human. An independent coordinator runs it, and presence decides between the collaborative and automated paths. The design now lives in [the dialogue stasis loop spec](../superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md), which supersedes the sketch below. Peer lease demand (row 58), gate wait reporting (row 59) and host pressure (row 62) stay on their own rows. Only row 63, the pause ledger, folds into the loop, as its journal and its learning step.
+
 The steward asked for a loop inside the session that notices when the session is stopped and keeps it moving. "Stopped" covers a permission prompt left unanswered for more than 3 minutes, someone waiting on us, or any other pain signal the lookout catches. The loop should adapt over time so the session stays in stasis.
 
 **One constraint shapes the design.** A stopped session cannot watch itself: while a prompt is open, the agent takes no turns. The watcher therefore runs outside the agent's turn. It can wake or notify the session, but it never acts in its place. **It never approves the session's own prompts.** That would be permission laundering. Approval stays with the steward. The loop shortens the wait and removes the cause next time.
