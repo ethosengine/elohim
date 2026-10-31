@@ -47,11 +47,11 @@ The retrospective cross-references used by this design are:
 
 | Row | Concern |
 |---|---|
-| 58 | Dev-stall handoff when a peer waits on a lease. |
-| 59 | Waiting discipline and gate progress notes. |
-| 62 | Host RAM/load budget for gates. |
-| 63 | The pause ledger and allow-rule ratchet, which this loop absorbs. |
-| 64 | This dialogue stasis loop. |
+| 63 | Dev-stall handoff when a peer waits on a lease. |
+| 64 | Waiting discipline and gate progress notes. |
+| 67 | Host RAM/load budget for gates. |
+| 68 | The pause ledger and allow-rule ratchet, which this loop absorbs. |
+| 69 | This dialogue stasis loop. |
 
 ## Terms and reused primitives
 
@@ -1100,7 +1100,7 @@ and learning. Each slice lands separately when the steward asks to land it.
    table: permission-prompt notification timing, human-deny emissions, idle-prompt
    notification timing, asyncRewake waking an idle session, Remote Control push
    on `AskUserQuestion`, and channel deny-relay. Re-scope retrospective §6 and
-   rows 58, 59, 62, 63 and 64 when that branch is available.
+   rows 63, 64, 67, 68 and 69 when that branch is available.
 2. **Package tooling.**
    Read first: Current state → Agent packages; HookPackage registration.
    Migrate the single hook `registration` to an array,
@@ -1240,8 +1240,8 @@ that evidence instead of treating the binding table as permanent knowledge.
 
 ## Non-goals
 
-- Peer leases remain retrospective row 58.
-- Gate wait reporting remains row 59.
-- Host pressure remains row 62.
+- Peer leases remain retrospective row 63.
+- Gate wait reporting remains row 64.
+- Host pressure remains row 67.
 - Approving prompts or making decisions on the human's behalf is outside authority.
 - A protocol-native model-fit layer remains the frontier, outside this implementation.

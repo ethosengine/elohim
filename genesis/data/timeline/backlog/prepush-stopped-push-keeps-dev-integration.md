@@ -47,7 +47,17 @@ Why `berth release` fails at the hook's exit. Candidates: the release runs while
 is still being delivered and is itself terminated, or the release resolves a different session
 than the envelope session that claimed (the hook exports no `ELOHIM_SESSION_ID` on that path).
 
+2026-10-30, push 7 (9a5719006): the push SUCCEEDED (`370721d7f..9a5719006 -> dev`, 23:47Z,
+exit 0) and alpha-fleet and jenkins-dispatch were free afterwards, but dev-integration was
+still held by the pushing session, renewed 52 s after the push exited. So it is not only a
+TERM path: a clean exit can leave dev-integration, the one lease the next device needs.
+`berth release dev-integration` by hand freed it at once. That push's dev-integration lease
+had been released and re-claimed by hand before the push (to clear an override row), so the
+hook's own claim was a renewal of a lease it did not take; the release may skip a lease the
+hook did not claim itself.
+
 ## Done when
 
-A pre-push stopped by TERM (or INT) leaves no lease it took, proven by a test that sends the
+A pre-push that exits, on success or stopped by TERM (or INT), leaves no lease it holds, and
+says so; a lease the hook only renewed is released too or named as left held. A pre-push stopped by TERM (or INT) leaves no lease it took, proven by a test that sends the
 group signal mid-gate. Any release that fails says so without claiming a local release.
