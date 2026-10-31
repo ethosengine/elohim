@@ -846,6 +846,14 @@ second consecutive stall on the same unmet item Refers up the ladder instead of
 blocking again. `STASIS_LADDER=off` disables the block; observation continues.
 The turn-ended event gains an optional `outcome` field with this vocabulary.
 
+**Read-only completions (steward ruling, 2026-10-31).** A session that finished read-only work (an
+answered question, an analysis, a review) has no session commit, so under the table above it reads as
+`stalled`. The steward ruled to keep the accomplishment rule as written and confine its consequence:
+a `stalled` Stop is blocked only in **automated** presence. In collaborative or unknown presence a
+read-only stop is journalled as `stalled` (for the measures) and never blocked. Judging a
+no-commitment completion as `accomplished` waits for the station-provider evidence in Valueflow
+placement (slice 12).
+
 ### Denial authority and human delivery
 
 Authoritative denials include a human deny, a classifier deny, a call matching an

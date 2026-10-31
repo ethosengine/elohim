@@ -58,3 +58,14 @@ learned form. Opening or attaching a procedural rung-0 incident keyed by effect 
 native work for slice 11 (L1). Its completion fixture must prove one reshape per effect class per
 incident across repeated PreToolUse calls and restart, with a Refer on the second attempt. This
 change closes the adapter bypass, not that native frontier.
+
+## D3: the lock-ordering test relies on a fixed wait
+
+`a_policy_edited_while_decide_waits_for_the_lock_is_inert_with_the_post_edit_cid` (epr-cli
+`session_stasis.rs`) holds `journal.lock`, starts `decide --live` in a thread, waits 700 ms, edits the
+policy and releases. The fifth review asked for a deterministic hook. The keeper ladder parked it at C1:
+the blocking lock is taken before any policy read (`live.rs:161-171`), so there is no ordering defect,
+and a contended-lock hook would restructure the production lock path just to test it. A regression that
+read the policy before the lock would make the test flaky, not falsely green. **To close:** replace the
+fixed wait with a bounded poll until the worker is observably blocked on `journal.lock` (for example
+`/proc/<tid>/wchan` or a lock-holder probe), with no production change.
