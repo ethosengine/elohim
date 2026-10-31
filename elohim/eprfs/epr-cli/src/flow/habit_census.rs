@@ -14,6 +14,9 @@ fn frontmatter(path: &Path) -> FlowResult<String> {
         path: path.into(),
         source,
     })?;
+    frontmatter_text(path, &text)
+}
+fn frontmatter_text(path: &Path, text: &str) -> FlowResult<String> {
     let mut lines = text.lines();
     if lines.next() != Some("---") {
         return Err(invalid(path, "missing frontmatter"));
@@ -27,7 +30,35 @@ fn frontmatter(path: &Path) -> FlowResult<String> {
     }
     Err(invalid(path, "unterminated frontmatter"))
 }
-fn keep(path: &Path) -> bool {
+/// Validate the existing habit declaration against exact supplied source text.
+pub fn parse_habit(path: &Path, text: &str) -> FlowResult<HabitEntry> {
+    let declaration: Declaration =
+        serde_yaml::from_str(&frontmatter_text(path, text)?).map_err(|source| FlowError::Yaml {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    let habit = declaration.habit;
+    if declaration.version != 1
+        || declaration.invariant.trim().is_empty()
+        || declaration.retire_when.trim().is_empty()
+        || declaration.retire_when.trim().eq_ignore_ascii_case("never")
+        || path.file_name().unwrap() != format!("{}.habit.md", habit.id).as_str()
+        || !matches!(habit.status.as_str(), "green" | "red" | "unwired")
+        || (habit.status == "unwired" && !habit.checks.is_empty())
+        || (habit.status != "unwired"
+            && (habit.checks.is_empty() || habit.checks.iter().any(|s| s.trim().is_empty())))
+    {
+        return Err(invalid(
+            path,
+            "invalid habit version, identity, invariant, status/checks or retirement",
+        ));
+    }
+    Ok(habit)
+}
+
+/// Whether `path` is a habit declaration the census reads — shared with the history walk in
+/// [`super::habits`], so a path the census ignores is never derived from either.
+pub(super) fn keep(path: &Path) -> bool {
     path.parent()
         .and_then(Path::file_name)
         .is_some_and(|name| name == ".epr-meta")
@@ -148,27 +179,7 @@ pub(super) fn read(root: &Path) -> FlowResult<Option<Vec<HabitEntry>>> {
     let mut habits = Vec::new();
     for rel in paths {
         let path = root.join(&rel);
-        let declaration: Declaration =
-            serde_yaml::from_str(&frontmatter(&path)?).map_err(|source| FlowError::Yaml {
-                path: path.clone(),
-                source,
-            })?;
-        let mut habit = declaration.habit;
-        if declaration.version != 1
-            || declaration.invariant.trim().is_empty()
-            || declaration.retire_when.trim().is_empty()
-            || declaration.retire_when.trim().eq_ignore_ascii_case("never")
-            || path.file_name().unwrap() != format!("{}.habit.md", habit.id).as_str()
-            || !matches!(habit.status.as_str(), "green" | "red" | "unwired")
-            || (habit.status == "unwired" && !habit.checks.is_empty())
-            || (habit.status != "unwired"
-                && (habit.checks.is_empty() || habit.checks.iter().any(|s| s.trim().is_empty())))
-        {
-            return Err(invalid(
-                &path,
-                "invalid habit version, identity, invariant, status/checks or retirement",
-            ));
-        }
+        let mut habit = parse_habit(&path, &std::fs::read_to_string(&path)?)?;
         if !ids.insert(habit.id.clone()) {
             return Err(invalid(&path, "duplicate habit id"));
         }

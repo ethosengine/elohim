@@ -185,7 +185,13 @@ async fn sync_document(
             Vec::new()
         }
     };
-    if local_heads == remote.heads {
+    // Nothing to pull when every remote head is a change we hold: equal heads,
+    // or this node ahead of the peer. The old `==` test pulled in the second
+    // case on every round, asking with heads the peer does not know.
+    if !sync_manager
+        .needs_pull(PROJECTION_NAMESPACE, &remote.doc_id, &remote.heads)
+        .await
+    {
         return SettleOutcome::Ok;
     }
 
@@ -388,6 +394,85 @@ mod tests {
 
     fn a_peer() -> iroh::NodeId {
         iroh::SecretKey::generate(&mut rand::rngs::OsRng).public()
+    }
+
+    fn put(doc: &mut automerge::Automerge, key: &str, value: &str) -> Vec<String> {
+        use automerge::transaction::Transactable;
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, key, value)?;
+            Ok(())
+        })
+        .unwrap();
+        doc.get_heads().iter().map(|h| hex::encode(h.0)).collect()
+    }
+
+    fn listed(doc_id: &str, heads: Vec<String>) -> DocumentInfo {
+        DocumentInfo {
+            doc_id: doc_id.to_string(),
+            doc_type: "content".to_string(),
+            change_count: 1,
+            last_modified: 0,
+            heads,
+        }
+    }
+
+    /// A doc whose every remote head we hold settles without asking the peer,
+    /// including when we are ahead of it. A doc with a head we lack still asks;
+    /// the peer here has no address, so asking is what fails.
+    #[tokio::test]
+    async fn a_doc_whose_remote_heads_we_hold_is_not_pulled() {
+        let (sync, _temp) = empty_sync_manager().await;
+        let dir = tempfile::tempdir().unwrap();
+        let endpoint = crate::p2p_iroh::build_endpoint(&crate::p2p_iroh::IrohConfig {
+            blobs_dir: dir.path().join("blobs_iroh"),
+            secret_key_path: dir.path().join("iroh.key"),
+            relay_url: None,
+            use_n0_relays: false,
+            use_n0_discovery: false,
+            discovery_resolvers: vec![],
+        })
+        .await
+        .expect("endpoint binds");
+        let client = IrohSyncClient::new(&endpoint);
+        let unreachable = NodeAddr::new(a_peer());
+        let id = "node:iroh-ahead";
+
+        let mut doc = automerge::Automerge::new();
+        let peer_heads = put(&mut doc, "t", "base");
+        sync.apply_changes(PROJECTION_NAMESPACE, id, vec![doc.save()])
+            .await
+            .unwrap();
+        let mut ours = doc.clone();
+        put(&mut ours, "t", "ours");
+        sync.apply_changes(PROJECTION_NAMESPACE, id, vec![ours.save()])
+            .await
+            .unwrap();
+
+        let settle = |heads: Vec<String>| {
+            sync_document(
+                &client,
+                unreachable.clone(),
+                &sync,
+                None,
+                None,
+                listed(id, heads),
+            )
+        };
+        let ahead = tokio::time::timeout(Duration::from_secs(30), settle(peer_heads))
+            .await
+            .expect("no network wait");
+        assert_eq!(
+            ahead,
+            SettleOutcome::Ok,
+            "ahead of the peer: nothing to pull"
+        );
+
+        let theirs = put(&mut doc, "t", "theirs");
+        let behind = tokio::time::timeout(Duration::from_secs(30), settle(theirs))
+            .await
+            .expect("the failed dial returns");
+        assert_eq!(behind, SettleOutcome::Other, "a head we lack is asked for");
+        endpoint.close().await;
     }
 
     /// An iroh apply offers the content id to the head-adoption trigger exactly

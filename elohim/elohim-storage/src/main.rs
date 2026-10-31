@@ -3792,7 +3792,13 @@ async fn async_main(
             }
             None => {
                 let sync_sled_path = config.storage_dir.join("sync.sled");
-                let doc_store = match DocStore::at_path(&sync_sled_path).await {
+                let opened = elohim_storage::sync::sled_reclaim::open_sync_sled_async(
+                    sync_sled_path.clone(),
+                    elohim_storage::sync::sled_reclaim::SYNC_SLED_CACHE_BYTES,
+                    elohim_storage::sync::sled_reclaim::ReclaimPolicy::from_env(),
+                )
+                .await;
+                let doc_store = match opened.and_then(DocStore::from_db) {
                     Ok(store) => Arc::new(store),
                     Err(e) => {
                         error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
@@ -5052,6 +5058,25 @@ async fn async_main(
         if let Some(ref iroh_sync) = iroh_sync_manager {
             http_server = http_server.with_sync_manager(iroh_sync.clone());
             info!("Iroh sync manager wired to HTTP server — Sync API active (iroh)");
+        }
+    }
+
+    // The sync sled's live per-tree contents, beside the file-size reading of
+    // the same directory (store_footprint above). One owner per process: the
+    // libp2p node's SyncManager when it exists, else the iroh one (in Dual
+    // mode they are the same Arc).
+    {
+        #[cfg(feature = "p2p")]
+        let libp2p_sync: Option<Arc<elohim_storage::sync::SyncManager>> =
+            p2p_node.as_ref().map(|n| n.sync_manager().clone());
+        #[cfg(not(feature = "p2p"))]
+        let libp2p_sync: Option<Arc<elohim_storage::sync::SyncManager>> = None;
+        #[cfg(feature = "p2p-iroh")]
+        let sled_sync = libp2p_sync.or_else(|| iroh_sync_manager.clone());
+        #[cfg(not(feature = "p2p-iroh"))]
+        let sled_sync = libp2p_sync;
+        if let Some(sync) = sled_sync {
+            elohim_storage::sync::spawn_sled_tree_sampler(sync);
         }
     }
 
@@ -6735,13 +6760,12 @@ async fn async_main(
     }
 
     // Print stats before exit
-    if let Ok(stats) = blob_store.stats().await {
-        info!(
-            blobs = stats.total_blobs,
-            bytes = stats.total_bytes,
-            "Final storage stats"
-        );
-    }
+    let stats = blob_store.stats();
+    info!(
+        blobs = stats.total_blobs,
+        bytes = stats.total_bytes,
+        "Final storage stats"
+    );
 
     Ok(())
 }

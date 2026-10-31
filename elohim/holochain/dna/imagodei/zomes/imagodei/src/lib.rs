@@ -63,7 +63,10 @@ pub use submit_specialist_revocation::*;
 // future cross-DNA integrity work.
 //
 // TODO(M4 completion): if T17/T18 do not adopt this, delete the module.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "no caller in the M4 surface; kept as a tested decoder primitive for T17/T18, deleted if they do not adopt it (see the TODO above)"
+)]
 mod content_decode;
 
 // Identity key-lineage — chain-root over the KeyRotation version DAG +

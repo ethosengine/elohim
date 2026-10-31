@@ -702,11 +702,10 @@ pub async fn handle_hc_connect(
 // Federation identity-fork guard (Task 2.3, doorway-federation-failover)
 // -----------------------------------------------------------------------
 //
-// `AgentProvisioner::find_existing_app` folds `conductor_id` into the
-// deterministic app id (`generate_app_id`), so when a hosted user lands on
-// a doorway that is not their home doorway, this doorway can NEVER find
-// the sibling's existing install — every conductor it checks computes a
-// different app id than the one the sibling actually created. Left
+// `AgentProvisioner` answers from THIS doorway's own provisioning record
+// (and folds `conductor_id` into the deterministic app id), so when a
+// hosted user lands on a doorway that is not their home doorway, this
+// doorway has no record of the sibling's install and can NEVER find it. Left
 // unguarded, `auto_provision` silently mints a brand-new, empty hosted
 // identity for an already-hosted human. This guard converts that silent
 // fork into an honest refusal, with zero DHT dependency (it reads only the
@@ -968,10 +967,11 @@ fn installed_app_id_for_claim(
 /// The provisioner walks every current conductor looking for an existing
 /// app for this user (deterministic app_id) before installing a new one,
 /// so calling this for a stale mapping naturally re-binds the agent.
-// Response<Full<Bytes>> is the crate-wide HTTP-error-as-Err convention (see
-// e.g. the sibling `#[allow]` on `require_admin` in routes/admin_users.rs);
-// shrinking it here would ripple into every caller's `Err(resp) => return resp`.
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "Response<Full<Bytes>> is the crate-wide HTTP-error-as-Err convention; shrinking it \
+              here would ripple into every caller's Err(resp) => return resp"
+)]
 async fn auto_provision(
     state: &Arc<AppState>,
     registry: &Arc<crate::conductor::ConductorRegistry>,
@@ -1045,7 +1045,12 @@ async fn auto_provision(
         .with_app_id(state.args.installed_app_id.clone())
         .with_bundle_path(state.args.happ_bundle_path.clone());
 
-    let provisioned = match provisioner.provision_agent(&claims.identifier).await {
+    // The token was minted by THIS doorway (checked above) from the account row
+    // for exactly this identifier, so its agent key is that account's own.
+    let provisioned = match provisioner
+        .provision_agent_for_account(&claims.identifier, Some(&claims.agent_pub_key))
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             error!("Chaperone auto-provision failed: {}", e);

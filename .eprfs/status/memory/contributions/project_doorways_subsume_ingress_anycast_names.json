@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project-doorways-subsume-ingress-anycast-names",
   "claim": "Doorways are host-aware and stand anycast-style behind a name's DNS records, failing over for each other; the k8s ingress goes away — bites on any serving-edge design.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_doorways_subsume_ingress_anycast_names.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_doorways_subsume_ingress_anycast_names.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: e3b37899-a842-43df-9853-12981fc438ed."
   ],
   "sources": [
     {

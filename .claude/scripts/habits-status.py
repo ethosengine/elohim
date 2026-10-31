@@ -54,7 +54,7 @@ import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # The harnesses load this file by path, so its own directory is not on sys.path for them.
@@ -265,6 +265,89 @@ def habit_cost(habit: dict, bounds=None):
     if not parts:
         return "cost: not read (epr flow report unavailable)"
     return "cost: " + ", ".join(parts)
+
+
+# ----------------------------------------------------------------- RED MASS (habit progress)
+# The register's grain under red/green: how far each habit has moved toward green, what it cost,
+# what it returns (spec genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md).
+# Read from the NATIVE evaluator — `epr flow stocks --stock red-mass --json` — and never computed
+# here: one evaluator, so this script and the ledger cannot disagree about a habit's progress.
+RED_MASS_DAYS = 7
+_RED_MASS_TIMEOUT = 30
+
+
+def _read_red_mass_native(days: int = RED_MASS_DAYS, now=None):
+    """The red-mass stock over the last `days`, or None when the binary cannot read it (an older
+    binary refuses the stock name; git may be absent). Fail-open: `not read`, never zero."""
+    binary = _epr_bin()
+    if not binary:
+        return None
+    end = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    start = end - timedelta(days=days)
+    window = f"{start.isoformat().replace('+00:00', 'Z')}..{end.isoformat().replace('+00:00', 'Z')}"
+    try:
+        r = subprocess.run([binary, "flow", "stocks", "--window", window, "--per", "week",
+                            "--stock", "red-mass", "--json", "--root", str(_ROOT)],
+                           capture_output=True, text=True, timeout=_RED_MASS_TIMEOUT, cwd=str(_ROOT))
+        if r.returncode != 0:
+            return None
+        payload = json.loads(r.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    for stock in payload.get("stocks") or []:
+        if stock.get("stock") == "red-mass" and stock.get("habits") is not None:
+            return stock
+    return None
+
+
+READ_RED_MASS = _read_red_mass_native  # tests substitute a pure reader
+
+
+def red_mass_line(stock, days: int = RED_MASS_DAYS) -> str:
+    """One headline line from the red-mass stock. Pure: takes the native payload, returns text."""
+    if not isinstance(stock, dict) or not isinstance(stock.get("habits"), dict):
+        return ("  red mass: not read (epr flow stocks --stock red-mass unavailable — "
+                "an older binary, or no git history)")
+    h = stock["habits"]
+    m = stock.get("measures") or {}
+    verdict = (stock.get("verdict") or {}).get("verdict", "?").upper()
+    moved = ""
+    if m:
+        periods = days / 7.0
+        moved = (f" · drained {m.get('outflow', 0.0) * periods:.2f} · "
+                 f"filled {m.get('inflow', 0.0) * periods:.2f}")
+    returned = (f"{h.get('hoursReturnedPerWeek', 0.0):.2f} h/wk returned "
+                f"({h['hoursReturnedClaim']})" if h.get("hoursReturnedClaim") else "no time returned")
+    partly = sum(1 for r in h.get("rows") or []
+                 if r.get("state", {}).get("status") != "green"
+                 and (r.get("state", {}).get("composed") or {}).get("floor", 0) > 0)
+    return (f"  red mass {h.get('redMass', 0.0):.2f} of {h.get('nonGreen', 0)} not green"
+            f"{moved} · {partly} partly won · {h.get('hoursSpentInWindow', 0.0):.1f} h spent · "
+            f"{returned} ({days}d: {verdict})")
+
+
+def progress_part(row) -> str:
+    """`progress: …` for one habit's native row, or '' when there is none."""
+    if not isinstance(row, dict):
+        return ""
+    state = row.get("state") or {}
+    composed = state.get("composed") or {}
+    out = f"progress: {composed.get('floor', 0.0):.2f}"
+    if composed.get("overMeasured") is not None:
+        out += (f" ({composed['overMeasured']:.2f} on "
+                f"{composed.get('measured', 0)}/{composed.get('declared', 0)} measured)")
+    elif composed.get("declared", 0) == 0:
+        out += " (no parts — nothing to measure)"
+    else:
+        out += f" (0/{composed.get('declared', 0)} measured)"
+    spent = (row.get("spent") or {}).get("allTime", 0.0)
+    if spent:
+        out += f" · spent {spent:.1f} h"
+    if state.get("returnsHoursPerWeek"):
+        out += f" · returns {state['returnsHoursPerWeek']:.2f} h/wk"
+    if row.get("paybackWeeks") is not None:
+        out += f" · payback {row['paybackWeeks']:.1f} wk"
+    return out
 
 
 _DELTA_DATE = re.compile(r"^\s*DELTA (20\d{2}-\d{2}-\d{2})", re.M)
@@ -674,8 +757,13 @@ def headline(habits: dict) -> str:
         nm_lines = []
     body = ("\n".join(nm_lines) + "\n") if nm_lines else ""
     also_body = ("\n".join(also) + "\n") if also else ""
+    try:
+        mass = red_mass_line(READ_RED_MASS()) + "\n"
+    except Exception:  # noqa: BLE001 — session start never breaks on a reading
+        mass = red_mass_line(None) + "\n"
     return (
         f"HABITS ({len(arts)} declared in .epr-meta)  {counts} · active: {fence}\n"
+        f"{mass}"
         f"{body}"
         f"  {nxt}\n"
         f"{also_body}"
@@ -701,6 +789,12 @@ def full(habits: dict) -> str:
             lines.append(f"  every declared concern was measured ({view['run_label']})")
         lines.append("")
     observed = {r["id"]: r for r in (view["rows"] if view else [])}
+    try:
+        stock = READ_RED_MASS()
+    except Exception:  # noqa: BLE001
+        stock = None
+    lines.insert(2, red_mass_line(stock).strip())
+    progress = {r.get("id"): r for r in ((stock or {}).get("habits") or {}).get("rows") or []}
     for n in habits_of(habits):
         mark = {"green": "✅", "red": "🔴", "unwired": "▫️"}.get(n.get("status"), "?")
         act = "  [ACTIVE]" if n.get("active") else ""
@@ -721,6 +815,9 @@ def full(habits: dict) -> str:
         cost = habit_cost(n, bounds)
         if cost:
             lines.append(f"    {cost}")
+        made = progress_part(progress.get(n.get("id")))
+        if made:
+            lines.append(f"    {made}")
         if row:
             obs = (f"    observed_status: {row['observed']}"
                    f"  ·  last_measured: {row['age']}"

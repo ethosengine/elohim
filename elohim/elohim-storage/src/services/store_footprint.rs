@@ -179,6 +179,43 @@ pub fn walk(root: &Path, classify: fn(&Path) -> StoreClass) -> BTreeMap<StoreCla
     out
 }
 
+/// Live contents of one sled tree: what the tree holds now, as opposed to
+/// the bytes its files take (sled keeps superseded values on disk until it
+/// reclaims their segment, so the two can drift far apart).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SledTreeTotals {
+    /// Tree name, label-safe (`__sled__default` for the default tree).
+    pub tree: String,
+    pub entries: u64,
+    /// Sum of key and value lengths.
+    pub logical_bytes: u64,
+    /// Length of the largest value: one oversized document reads here.
+    pub largest_value_bytes: u64,
+}
+
+/// Walk every tree of an open sled database. Reads every live value, so
+/// it is O(live bytes) and synchronous: run it from `spawn_blocking` on a
+/// background interval, never on a request path.
+pub fn sled_trees(db: &sled::Db) -> Vec<SledTreeTotals> {
+    let mut out = Vec::new();
+    for name in db.tree_names() {
+        let Ok(tree) = db.open_tree(&name) else {
+            continue;
+        };
+        let mut totals = SledTreeTotals {
+            tree: label(&String::from_utf8_lossy(&name)),
+            ..SledTreeTotals::default()
+        };
+        for (key, value) in tree.iter().flatten() {
+            totals.entries += 1;
+            totals.logical_bytes += (key.len() + value.len()) as u64;
+            totals.largest_value_bytes = totals.largest_value_bytes.max(value.len() as u64);
+        }
+        out.push(totals);
+    }
+    out
+}
+
 /// Bucket labels for [`fold_known_holders`]: a shard known to be held by
 /// exactly 1–4 peers, or by five or more.
 pub const HOLDER_BUCKETS: [&str; 5] = ["1", "2", "3", "4", "5+"];
@@ -301,5 +338,31 @@ mod tests {
             .sum();
         assert_eq!(dht, 350);
         assert!(walk(&dir.path().join("absent"), classify_conductor).is_empty());
+    }
+
+    #[test]
+    fn the_sled_walk_counts_live_entries_per_tree() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = sled::open(dir.path()).expect("sled");
+        let docs = db.open_tree("documents").expect("tree");
+        docs.insert(b"a", vec![0u8; 10]).unwrap();
+        docs.insert(b"bb", vec![0u8; 100]).unwrap();
+        // An overwrite replaces the live value; it is not a second entry.
+        docs.insert(b"bb", vec![0u8; 40]).unwrap();
+        db.open_tree("kademlia_records").expect("tree");
+        let got = sled_trees(&db);
+        let documents = got
+            .iter()
+            .find(|t| t.tree == "documents")
+            .expect("documents");
+        assert_eq!(documents.entries, 2);
+        assert_eq!(documents.logical_bytes, 1 + 10 + 2 + 40);
+        assert_eq!(documents.largest_value_bytes, 40);
+        let kad = got
+            .iter()
+            .find(|t| t.tree == "kademlia_records")
+            .expect("kademlia_records");
+        assert_eq!((kad.entries, kad.logical_bytes), (0, 0));
+        assert!(got.iter().any(|t| t.tree == "__sled__default"));
     }
 }

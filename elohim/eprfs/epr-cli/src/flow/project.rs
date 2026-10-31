@@ -139,6 +139,11 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
     // repository's attention rather than of any one value chain.
     derive_wip_fence(root, &mut deriv)?;
 
+    // The habit plane: every red episode as a promise, every flip as its discharge, every move of
+    // a habit's red mass as an event — derived by the one function `stocks --stock red-mass`
+    // reads, so the ledger and the reading cannot disagree.
+    derive_habits(root, &mut deriv)?;
+
     // Dedupe against the existing sidecar, then append the new records.
     let sidecar = SidecarFlowStore::open(root)?;
     let mut store = sidecar.transaction()?;
@@ -755,6 +760,40 @@ fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
         cid,
         "commitment:wip-fence".to_string(),
     );
+    Ok(())
+}
+
+/// Stage the habit plane derived from the atoms' first-parent history.
+///
+/// A tree with no git history has no habit history to derive: that is absence, reported on
+/// stderr, never a failed projection — the other planes still project.
+fn derive_habits(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
+    let history = match super::habits::walk_history(root) {
+        Ok(history) => history,
+        Err(FlowError::Unavailable(why)) => {
+            eprintln!("project: habit history not derived — {why}");
+            return Ok(());
+        }
+        Err(other) => return Err(other),
+    };
+    for (id, standing) in &history.current {
+        deriv.label(&super::habits::habit_resource(id)?, standing.path.clone());
+    }
+    for (cid, commitment) in history.episodes {
+        let label = match commitment.resource_spec.classified_as.as_slice() {
+            [_, id, ..] => format!(
+                "commitment:habit:{id}@{}",
+                commitment.valid_from.as_deref().unwrap_or("?")
+            ),
+            _ => "commitment:habit".to_string(),
+        };
+        deriv.stage_record(FlowRecord::Commitment(commitment), cid, label);
+    }
+    for event in history.events {
+        let cid = atom_cid(&event)?;
+        let label = format!("event:{}", event.classified_as.join(":"));
+        deriv.stage_record(FlowRecord::Event(event), cid, label);
+    }
     Ok(())
 }
 

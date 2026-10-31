@@ -1,0 +1,37 @@
+{
+  "id": "native-seam-guidance",
+  "version": 1,
+  "artifact_type": "algorithm-content",
+  "governance": {
+    "owner": "governance-plane-single-evaluator",
+    "source": ".epr-meta/elohim/algorithms/seam-guidance.json",
+    "executor": "elohim/eprfs/epr-cli/src/seam/",
+    "checks": [
+      "just gate eprfs",
+      "node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs"
+    ],
+    "retire_when": "verified native EPR execution replaces this repository executor with the same evidence and private-review contract",
+    "authority_boundary": "Local authored method and usage policy, subject to repository governance; no new core kind, publication or peer authority.",
+    "native_executor": "epr govern seam"
+  },
+  "executor": "native-seam-v1",
+  "composition": [
+    "normalize",
+    "resolve",
+    "detect",
+    "verify-sources",
+    "bound-packet",
+    "agent-review",
+    "validate-review"
+  ],
+  "application": {
+    "mode": "advisory",
+    "review": "active-agent",
+    "maxCandidates": 3,
+    "packetBytes": 8192,
+    "deadlineMs": 2000,
+    "inference": "none",
+    "persistence": "none",
+    "contributions": "explicit-only"
+  }
+}

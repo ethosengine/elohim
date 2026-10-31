@@ -3008,16 +3008,16 @@ impl P2PNode {
 
         // Open sled database ONCE — shared between Kademlia store and DocStore.
         // sled uses flock() which prevents multiple opens of the same path.
+        // The open first returns disk an earlier build leaked (sled 0.34 keeps
+        // overwritten blob values), bounded and before the HTTP listener;
+        // It runs only with ELOHIM_SLED_RECLAIM=on (off by default). See `sync::sled_reclaim`.
         let sled_path = config.storage_dir.join("sync.sled");
-        if let Some(parent) = sled_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        let sled_db = sled::Config::new()
-            .path(&sled_path)
-            .cache_capacity(64 * 1024 * 1024)
-            .mode(sled::Mode::HighThroughput)
-            .open()
-            .map_err(|e| StorageError::Database(format!("Failed to open sync.sled: {}", e)))?;
+        let sled_db = crate::sync::sled_reclaim::open_sync_sled_async(
+            sled_path,
+            crate::sync::sled_reclaim::SYNC_SLED_CACHE_BYTES,
+            crate::sync::sled_reclaim::ReclaimPolicy::from_env(),
+        )
+        .await?;
 
         // Clone handle for the behaviour closure (sled::Db is Arc-based, clone is cheap)
         let kad_db = sled_db.clone();
@@ -8591,21 +8591,12 @@ impl P2PNode {
                 // `have_heads`, exactly as before — the heads are read at ISSUE
                 // time in `pump_sync_fetch_window`, so a doc that converged
                 // while it waited in the queue asks from where it actually is.
-                let mut divergent: Vec<String> = Vec::new();
-                for remote_doc in &documents {
-                    let diverged = match self
-                        .sync_manager
-                        .get_heads(&h_app_id, &remote_doc.doc_id)
-                        .await
-                    {
-                        Ok(local_heads) => local_heads != remote_doc.heads,
-                        // Document doesn't exist locally — request full sync.
-                        Err(_) => true,
-                    };
-                    if diverged {
-                        divergent.push(remote_doc.doc_id.clone());
-                    }
-                }
+                //
+                // A doc whose every remote head we already hold is not queued:
+                // equal heads, or this node ahead of the peer. Pulling there
+                // only asked the peer to repeat what we have, every round.
+                let divergent =
+                    sync_round::docs_to_pull(&self.sync_manager, &h_app_id, &documents).await;
                 if !divergent.is_empty() {
                     let window_size = sync_round::fetch_window(self.config.sync_fetch_window);
                     {
@@ -8673,9 +8664,15 @@ impl P2PNode {
                 heads,
                 ..
             } => {
-                // Compare with local heads and request changes if different
+                // Request changes only when the peer holds a head we lack:
+                // differing heads where we are AHEAD of the peer have nothing
+                // to pull (same predicate as the DocumentList arm).
+                let pull = self
+                    .sync_manager
+                    .needs_pull(&h_app_id, &doc_id, &heads)
+                    .await;
                 match self.sync_manager.get_heads(&h_app_id, &doc_id).await {
-                    Ok(local_heads) if local_heads != heads => {
+                    Ok(local_heads) if pull => {
                         let sync_request = SyncRequest::SyncChanges {
                             h_app_id: h_app_id.clone(),
                             doc_id: doc_id.clone(),

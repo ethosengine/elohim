@@ -72,6 +72,16 @@
       "ref": "epr:validator-rust-style-strict",
       "runtime": "rust",
       "why": "RS-GOV-04 syntax diagnostics from the shared native Rust style checker; strict scopes admit no unexplained suppressions."
+    },
+    {
+      "ref": "epr:validator-absolutes-guard",
+      "runtime": "python",
+      "why": "Absolute-promise guard over trust-surface prose (stories, specs, UI copy, the content chrome). Python owns it because its prose extraction (Markdown, Gherkin, Angular/Lit templates, UI string literals) and its enforcer-citation resolution against the repository tree are a repository-census concern; the lexicon lives in the shared frame atom frame-absolute-promise, so it graduates to `both` when the native frame host grows a word-bounded prose scan. Class `dispatch` (advisory), so a declared skip in Rust costs nothing enforceable."
+    },
+    {
+      "ref": "epr:validator-native-seam-guidance",
+      "runtime": "rust",
+      "why": "Single native advisory classifier over explicit owner-local declarations. Compatibility hosts report native unavailability without duplicating classification."
     }
   ]
 }

@@ -33,5 +33,6 @@ mod schema_contract_recovery_v2;
 mod serve_routing;
 mod ssr_direct;
 mod startup_wiring;
+mod sync_document_ids;
 #[cfg(not(feature = "graph-native"))]
 mod thin_build_smoke;

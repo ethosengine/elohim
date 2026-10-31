@@ -507,9 +507,15 @@ mod tests {
         // failed request.
         #[derive(serde::Deserialize)]
         enum OldSyncRequest {
-            #[allow(dead_code)]
+            #[allow(
+                dead_code,
+                reason = "the fields only give the decoder an older peer's wire shape; the test never reads them"
+            )]
             GetHeads { h_app_id: String, doc_id: String },
-            #[allow(dead_code)]
+            #[allow(
+                dead_code,
+                reason = "the fields only give the decoder an older peer's wire shape; the test never reads them"
+            )]
             ListDocuments {
                 h_app_id: String,
                 prefix: Option<String>,

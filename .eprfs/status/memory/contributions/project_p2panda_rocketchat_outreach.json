@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_p2panda_rocketchat_outreach",
   "claim": "Outreach to p2panda/Rocketchat community on shared history + P2P substrate.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_p2panda_rocketchat_outreach.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_p2panda_rocketchat_outreach.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: a6494031-71da-4712-88b3-4e865071b407."
   ],
   "sources": [
     {

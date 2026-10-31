@@ -264,22 +264,17 @@ async fn epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at() 
     );
 }
 
-use harness::{spawn_test_node, BatchOutcome};
+use harness::{connect, spawn_test_node, BatchOutcome, CONNECT_WAIT};
 use std::time::Duration;
 use tokio::time::timeout;
 
-const DIAL_SETTLE: Duration = Duration::from_millis(100);
-const CONNECT_WAIT: Duration = Duration::from_secs(10);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[tokio::test]
 async fn harness_two_nodes_connect() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
-    node_a.dial(node_b.addr()).await.expect("dial");
-    node_a
-        .wait_for_connection(&node_b.peer_id(), Duration::from_secs(5))
-        .await;
+    connect(&node_a, &node_b).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,11 +290,7 @@ async fn signed_atom_round_trips_and_verifies() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     let epr = node_a.author_test_atom("commons", b"hello from A").await;
     let cid = epr.envelope.cid.to_string();
@@ -346,11 +337,7 @@ async fn private_atom_not_served_to_anonymous_peer() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     // A authors a Private atom. B never registers A's identity, so from A's
     // view B is Anonymous.
@@ -387,11 +374,7 @@ async fn private_atom_not_cross_peer_servable_phase_2c() {
         .register_peer_identity(&node_b.peer_id(), &node_b.agent_pubkey())
         .await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     let epr = node_a.author_test_atom("private", b"steward-only").await;
     let cid = epr.envelope.cid.to_string();
@@ -427,11 +410,7 @@ async fn fetch_batch_preserves_slot_order_with_leak_free_denial() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     // Slot 0: a Commons atom on A — should be served.
     let public_epr = node_a.author_test_atom("commons", b"public slot").await;
@@ -478,11 +457,7 @@ async fn fetch_batch_rejects_oversized_request() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     // Construct MAX_BATCH_CIDS+1 CIDs. The length check runs before any parse,
     // so syntactically-valid stand-ins are sufficient.
@@ -536,11 +511,7 @@ async fn announce_with_tampered_payload_is_rejected() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
     let cid = epr.envelope.cid.to_string();
@@ -582,11 +553,7 @@ async fn announce_with_wrong_signature_length_is_rejected() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
     let cid = epr.envelope.cid.to_string();
@@ -638,11 +605,7 @@ async fn announce_with_tampered_signature_bytes_accepted_phase_2c_limitation() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
     epr.envelope.proof.signature[0] ^= 0x01;
@@ -687,11 +650,7 @@ async fn identity_handshake_populates_peer_identity_map_on_connect() {
     let node_a = spawn_test_node("a").await;
     let node_b = spawn_test_node("b").await;
 
-    node_a.dial(node_b.addr()).await.expect("dial");
-    tokio::time::sleep(DIAL_SETTLE).await;
-    node_a
-        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
-        .await;
+    connect(&node_a, &node_b).await;
 
     // Wait for the handshake to complete and the DB rows to be written.
     tokio::time::sleep(HANDSHAKE_SETTLE).await;

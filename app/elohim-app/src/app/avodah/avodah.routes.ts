@@ -21,6 +21,12 @@ export const AVODAH_ROUTES: Routes = [
       ),
     children: [
       {
+        path: 'views/:viewId',
+        loadComponent: async () =>
+          import('./declared-views/declared-view.component').then(m => m.DeclaredViewComponent),
+        data: { title: 'Avodah — Declared local view' },
+      },
+      {
         path: '',
         loadComponent: async () =>
           import('./components/avodah-home/avodah-home.component').then(m => m.AvodahHomeComponent),

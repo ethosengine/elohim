@@ -613,8 +613,10 @@ spec:
         storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
-            # Fixed at creation (volumeClaimTemplates are immutable): the live size is deployments.json storageDataSize, grown by scripts/ci/grow-conductor-pvc.sh.
-            storage: 20Gi
+            # The human's real size: deployments.json storageDataSize, default 20Gi.
+            # grow-conductor-pvc.sh raises the live claim to it before the apply;
+            # the changed template then takes the orphan-delete + reapply path.
+            storage: STORAGE_DATA_SIZE_PLACEHOLDER
 ---
 # Headless service for StatefulSet DNS-based peer discovery
 # Pod gets stable DNS name: RESOURCE_PREFIX_PLACEHOLDER-0.RESOURCE_PREFIX_PLACEHOLDER-headless.NAMESPACE_PLACEHOLDER.svc.cluster.local

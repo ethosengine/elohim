@@ -74,9 +74,73 @@ pub struct HealthResponse {
     /// Whether zome discovery has completed (zome_configs populated)
     #[serde(rename = "discoveryComplete")]
     pub discovery_complete: bool,
+    /// Whether this doorway can provision a hosted person right now. Reported
+    /// here and on `doorway_provisioning_ready`; it does NOT change the probe's
+    /// HTTP status — a doorway that cannot provision still serves everyone it
+    /// already hosts, and failing readiness would take those people down too.
+    pub provisioning: ProvisioningHealth,
     /// Error message if conductor not connected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+/// Hosted-provisioning readiness.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProvisioningHealth {
+    /// The intent store is available and nothing is refused on the store
+    /// verdict: it is `not_wiped`, or the store gate is off.
+    pub ready: bool,
+    /// `DOORWAY_PROVISIONING_STORE_GATE`: whether the store verdict may refuse,
+    /// and whether attaching an existing Human to a registration needs
+    /// evidence (`IDENTITY_RECOVERY_REFUSED`). Off (the default), the verdict
+    /// below is observed, never enforced, and an existing Human is re-attached.
+    pub store_gate: bool,
+    /// `unknown` | `not_wiped` | `wiped`. `unknown` = the store was empty at
+    /// boot and some conductor has not yet answered what it hosts; it settles
+    /// by itself. `wiped` needs an operator.
+    pub store_verdict: &'static str,
+    /// Pool conductors that have not answered what they host since boot.
+    pub conductors_unwalked: Vec<String>,
+    /// The provisioning intent log can be read and written. `false` refuses
+    /// hosted provisioning (`PROVISIONING_NOT_READY`).
+    pub intent_store_available: bool,
+    /// The store gate is on, and this doorway's records were empty at startup
+    /// while its conductors already host apps and no account row proved
+    /// otherwise; a person with no record is answered
+    /// `PROVISIONING_UNRESOLVED` until an operator runs
+    /// `POST /admin/provisioning/recover`.
+    pub recovery_required: bool,
+}
+
+impl ProvisioningHealth {
+    pub fn of(state: &AppState) -> Self {
+        match &state.conductor_registry {
+            Some(registry) => {
+                let intent_store_available = registry.intents().available();
+                let store_gate = registry.store_gate();
+                let state = registry.store_state();
+                let not_wiped = state.verdict == crate::conductor::StoreVerdict::NotWiped;
+                Self {
+                    ready: intent_store_available && (not_wiped || !store_gate),
+                    store_gate,
+                    store_verdict: state.verdict.as_str(),
+                    conductors_unwalked: state.unwalked,
+                    intent_store_available,
+                    recovery_required: registry.recovery_required(),
+                }
+            }
+            // No conductor pool: nothing is provisioned, nothing is refused.
+            None => Self {
+                ready: true,
+                store_gate: false,
+                store_verdict: crate::conductor::StoreVerdict::NotWiped.as_str(),
+                conductors_unwalked: Vec::new(),
+                intent_store_available: true,
+                recovery_required: false,
+            },
+        }
+    }
 }
 
 /// P2P network health from elohim-storage sidecar
@@ -758,6 +822,7 @@ fn build_health_response(state: &AppState) -> HealthResponse {
             status
         },
         registration_open,
+        provisioning: ProvisioningHealth::of(state),
         version: env!("CARGO_PKG_VERSION"),
         uptime,
         cache_enabled,

@@ -25,6 +25,8 @@ peer = ["dep:eprfs-peer", "dep:tokio"]
 lsp = ["dep:elohim-epr-lsp", "dep:tokio"]
 
 [dependencies]
+# Declared-view wire types (`epr view`): TS derivations of the captured projection shapes.
+ts-rs = { version = "10.1", features = ["serde-json-impl"] }
 ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
 elohim-device-runtime = { path = "../device-runtime" }
 # `epr lsp`: the multiplexer, its attribution and its daemon.

@@ -110,7 +110,10 @@ fn builtin_name(specifier: &str) -> Option<&str> {
 // (`ModuleLoaderError` is a large enum owned by deno_core); this helper feeds
 // that signature directly, so boxing it would just force an unbox at the call
 // site. Allow the large-err lint here rather than diverge from the trait's type.
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "the Err type is dictated by the ModuleLoader trait's resolve signature, which this helper feeds directly; boxing it would only force an unbox at the call site"
+)]
 fn builtin_specifier(name: &str) -> Result<ModuleSpecifier, ModuleLoaderError> {
     ModuleSpecifier::parse(&format!("{BUILTIN_SCHEME}:{name}")).map_err(|e| {
         JsErrorBox::generic(format!(

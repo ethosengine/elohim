@@ -99,7 +99,10 @@ use crate::services::{response, Services};
 use std::sync::Arc;
 
 /// Handle all `/api/v1/*` requests by dispatching to domain controllers
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the single dispatch entry takes the parsed request parts and each shared service handle as separate parameters"
+)]
 pub async fn handle_api_request(
     req: Request<Incoming>,
     method: Method,

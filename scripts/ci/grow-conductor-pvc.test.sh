@@ -14,6 +14,7 @@
 #   f. the stub's df answers nothing                         → "answered nothing", exit 0
 #   g. 10Gi request vs 20Gi declared, class cannot expand    → GROW-REFUSED (64-bit bytes)
 #   h. the container is not running, exec fails              → the exec error is named, exit 0
+#   j. the class cannot be read (Forbidden)                  → no GROW-REFUSED; the claim is patched, refquota named
 set -euo pipefail
 
 # No git: the deploy container may run this beside the script it covers.
@@ -41,7 +42,11 @@ case "$1 $2" in
   "get pod")
     cat "$SCENARIO/pod" 2>/dev/null ;;
   "get storageclass")
+    [ -f "$SCENARIO/class-forbidden" ] && { echo 'Error from server (Forbidden): storageclasses.storage.k8s.io is forbidden' >&2; exit 1; }
     echo false ;;
+  "patch pvc")
+    echo "$*" >> "$SCENARIO/patch.log"
+    echo "persistentvolumeclaim/x patched" ;;
   "exec "*)
     echo "$*" >> "$SCENARIO/exec.log"
     if [ -f "$SCENARIO/exec-fails" ]; then cat "$SCENARIO/exec-fails" >&2; exit 1; fi
@@ -166,5 +171,20 @@ OUT="$(bash "$SCRIPT" "$STORE_CLAIM" "$NS" 80Gi storage 2>&1)"
 set -e
 grep -q "STORAGE-PVC-GROW-REFUSED" <<<"$OUT" || fail "i: no STORAGE-PVC-GROW-REFUSED: $OUT"
 echo "i ok"
+
+# j. the deployer cannot read the storageclass (edge #1757, 2026-10-29)
+scenario forbidden
+touch "$SCENARIO/class-forbidden"
+printf 'elohim-adam-alpha-0\tdata=%s \n' "$STORE_CLAIM" > "$SCENARIO/pods"
+set +e
+OUT="$(bash "$SCRIPT" "$STORE_CLAIM" "$NS" 80Gi storage 2>&1)"
+CODE=$?
+set -e
+[ "$CODE" -eq 0 ] || fail "j: exit $CODE"
+grep -q "GROW-REFUSED" <<<"$OUT" && fail "j: an unreadable class was reported as refusing: $OUT"
+grep -q "not readable from here" <<<"$OUT" || fail "j: the unread class is not named: $OUT"
+grep -q '"storage":"80Gi"' "$SCENARIO/patch.log" || fail "j: the claim was not patched: $(cat "$SCENARIO/patch.log" 2>/dev/null)"
+grep -q "refquota=80Gi" <<<"$OUT" || fail "j: the shem refquota step is not named: $OUT"
+echo "j ok"
 
 echo "grow-conductor-pvc.test.sh: all scenarios pass"

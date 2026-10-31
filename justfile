@@ -320,10 +320,17 @@ test target="changed" scope="":
     esac
 
 # Manage the single-peer local stack. Safe default: status.
-dev action="status" profile="isolated" seed="false" build="false":
+dev action="status" profile="isolated" seed="false" build="false" *extra:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
+      shift)
+        shift_args=("{{ profile }}")
+        [[ "{{ profile }}" == "isolated" ]] && shift_args=(status)
+        [[ "{{ seed }}" != "false" ]] && shift_args+=("{{ seed }}")
+        [[ "{{ build }}" != "false" ]] && shift_args+=("{{ build }}")
+        exec python3 "{{ root }}/genesis/agentic/shift.py" "${shift_args[@]}" {{extra}}
+        ;;
       start)
         args=()
         [[ "{{ seed }}" == "true" ]] && args+=(--seed)
@@ -368,7 +375,7 @@ dev action="status" profile="isolated" seed="false" build="false":
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|package|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
@@ -466,9 +473,13 @@ mesh action="status" *args="":
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
-seed action="validate" profile="local" scope="content" limit="":
+seed action="validate" profile="local" scope="content" limit="" ids="":
     #!/usr/bin/env bash
     set -euo pipefail
+    seed_ids={{quote(ids)}}
+    if [[ -n "$seed_ids" && ( "{{ action }}" != apply || "{{ scope }}" != content ) ]]; then
+      echo "seed IDs require apply content" >&2; exit 2
+    fi
     cd "{{ seeder_dir }}"
     export CONDUCTOR_URLS="${CONDUCTOR_URLS:-ws://localhost:4445}"
     case "{{ profile }}" in
@@ -510,6 +521,9 @@ seed action="validate" profile="local" scope="content" limit="":
         case "{{ scope }}" in
           content)
             args=()
+            if [[ -n "$seed_ids" ]]; then
+              args+=(--content-only "--ids=$seed_ids")
+            fi
             if [[ -n "{{ limit }}" ]]; then
               [[ "{{ limit }}" =~ ^[0-9]+$ ]] || { echo "seed limit must be a positive integer" >&2; exit 2; }
               args+=(--limit "{{ limit }}")
@@ -636,6 +650,12 @@ _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
     cd elohim && cargo test -p elohim-ark-core --doc
 
+# Real ark/namespace fault injection is required; absent containment primitives refuse.
+_gate-agentic-shift:
+    node --test genesis/agentic/objective-schema.test.mjs genesis/agentic/readiness.test.mjs genesis/agentic/seed-target.test.mjs
+    python3 -m unittest discover -s genesis/agentic -p 'shift*_test.py'
+    python3 -m unittest genesis.agentic.berth_test
+
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package
 # that cannot be imported proves the tests, not the package.
@@ -652,6 +672,12 @@ _gate-eprfs:
       if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
       cd elohim/eprfs && cargo clippy "$@" --all-targets -- -D warnings
     @just _eprfs-ingest-around test
+
+# Native seam guidance's non-Rust contracts: the declaration and method schemas hold every
+# declaration the opt-in binding names, and the hook adapter stays private and fails visibly.
+_gate-seam-guidance-contracts:
+    node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs
+    python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py
 
 # Build epr and bin-launch at HEAD in the eprfs gate's slot and ingest the build. Pre-push runs
 # this (`gate-runner.mjs --target eprfs --recipe _eprfs-deliver`) when the gate was satisfied by
@@ -773,6 +799,7 @@ _gate-dna-extern-lints:
 
 _gate-schema-validate:
     pnpm run schema:validate
+    node --test elohim/sdk/schemas/tests/work-composition.test.mjs
 
 _gate-schema-codegen:
     pnpm run schema:codegen:ts -- --verify

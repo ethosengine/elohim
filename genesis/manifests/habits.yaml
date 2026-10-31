@@ -114,9 +114,9 @@ habits:
       - "a2o @device-declared-target (genesis/a2o/features/devflow/device-declared-target.feature, @concern:dataplane-convergence) — offline private declaration, projection replay, pinned-session notice and committed-base recovery; slice M"
     evidence: >
       DELTA 2026-10-25-M-review-4 (RED preserved): boot and adoption now share owner-aware declaration discovery; a headless default rereads its base under the writer lock; prompt notices prefer the runtime payload over ownerless inherited declarations; renderer EPR_BIN requires an absolute executable-file path. The external-projection regression invokes the lane CLI with --pin A and proves B is refused, then freshly applied through the real config vehicle after unpinning; restoring the old watcher applies B despite A (exit 101). Restoring the stale headless-base code fails both native and CLI adapter regressions (exit 101); restoring the old hook fails the shared native runtime-boundary fixture, and restoring the old renderer fails EPR_BIN=epr. Seven notice tests, 18 adapted renderer tests, 21 manifest contracts, four CLI adapter tests and package fidelity pass. Gate exits and sandbox restrictions: genesis/a2o/reports/recovery/device-runtime-m/report.md. No commit, push, live-device/store write or habit-status change.
-    evidence-fingerprint: sha256:6f96f27c71d56132
-    evidence-bytes: 268941
-    evidence-entries: 176
+    evidence-fingerprint: sha256:8536205b8528a1a5
+    evidence-bytes: 278564
+    evidence-entries: 180
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -304,6 +304,20 @@ habits:
     refs:
       - "genesis/data/timeline/backlog/http-reach-enforcement-gap.md"
       - "memory: project_reach_enum_drift_reconciliation (3 vocabularies — unify, but not as a precondition for enforcement)"
+    rea:
+      composition: sum
+      budget:                     # 4 h per part short of target at 2026-10-22: 4 unwired planes
+        hours: 16
+        threshold_pct: 85
+      parts:                      # the invariant's five egress planes; HTTP is the one wired today
+        - part: reach-enforced-http
+          reading: 3/3
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114938Z-80db9208 (24/24 steps on dev 80db9208b; DELTA 2026-10-18)
+        - part: crdt-sync-plane
+        - part: shard-plane
+        - part: dht-plane
+        - part: doorway-plane
     retire-when: >
       when every egress plane derives authorization from one shared verifier it cannot bypass
       by construction — so a NEW plane is enforced the moment it exists, rather than after
@@ -400,10 +414,10 @@ habits:
       - "epr flow stocks --window <START..END> --per week --stock commitments --check --root /projects/elohim (exit 0 = every declared stock draining; fail-closed: refusals exit non-zero, never green-on-nothing)"
       - "a2o @concern:dev-system-equilibrium (genesis/a2o/features/devflow/run-plane.feature — 4 scenarios: filling exits non-zero, drain>=inflow exits zero, an unmeasurable window refuses rather than reporting equilibrium, and the @regression guard that a discharge counts as outflow and never as inflow. WIRED 2026-09-11: steps/devflow/run-plane.steps.ts drives them through the real `epr flow` CLI over a throwaway git fixture repo (mint instant = artifact commit date, discharge instant = HEAD commit provenance); runs in the mesh and default profiles, and scoped: `cd genesis/a2o && npx cucumber-js --config '' --require-module tsx --require steps/devflow/epr-cli.guard.ts --require steps/devflow/run-plane.steps.ts features/devflow/run-plane.feature --tags 'not @wip'` → 8 scenarios passed (these 4 + the 4 @concern:run-plane-note write-leg scenarios). The 4 @concern:run-plane-projection emitter scenarios stay @wip (they need scratch registers the run-projection.py emitter cannot yet be pointed at). Where `epr` is absent (the genesis CI image) the @requires:epr-cli guard reports SKIPPED, never a false red — not measured, not green.)"
     evidence: >
-      DELTA 2026-10-16 (RED preserved; window unmeasurable): at origin/dev@42941449e, `epr flow stocks --window 2026-09-21..2026-10-16 --per week --stock commitments --check --root .` exited 1 with `verdict: REFUSED` because no commitment events of this unit fall inside the window; this is absence, not a drained stock, and red holds.
-    evidence-fingerprint: sha256:19555f3738a63c85
-    evidence-bytes: 42273
-    evidence-entries: 50
+      DELTA 2026-10-28 (rescue contracts restored; RED preserved): ported the shared-working-version, daily-life and portable-lifecycle contracts from 0ee5dfde8, retaining current placement/manifest-needs authority. Work-composition schema checks pass (2 tests, exit 0) and existing manifest checks pass (15, exit 0); work-composition Cucumber dry-run resolves all 16 steps (exit 0), without native execution. The epic's fresh-context manifesto review returned READY in one round (0 correctness, 0 interpretability, 1 optional wording preference); features await this shift's blind-reader pass. Runtime proof and stock-drain acceptance remain owed.
+    evidence-fingerprint: sha256:ba8311ea43ab7d17
+    evidence-bytes: 44367
+    evidence-entries: 52
     guard: >
       Regression risks: (1) the outflow classifier keys on `fulfills` — a new
       discharge path that forgets the field silently under-drains (the level
@@ -631,15 +645,15 @@ habits:
     active: false
     checks:
       - "Native seam guidance: just gate eprfs; cargo test -p elohim-epr-cli --test seam_guidance (use the manifest cargo target). Eight acceptance tests include a 28-case labeled corpus, Claude/Codex equivalence, source/algorithm/application freshness, review validation, boundaries and privacy. GREEN 2026-10-12."
-      - "node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs; python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py; pnpm run elohim-agent:packages:verify — schema, registration preservation, adapter privacy/degradation and projection fidelity. GREEN 2026-10-12."
+      - "just gate seam-guidance-contracts (node --test elohim/sdk/domains/elohim-agent/scripts/seam-guidance.test.mjs; python3 elohim/sdk/domains/elohim-agent/tests/seam_hook_test.py) — declaration and method schemas for the five declarations the opt-in binding names, the binding list, cited needles, and adapter privacy/degradation; node --test elohim/sdk/domains/elohim-agent/scripts/hook-package.test.mjs — read-only registration verification; pnpm run elohim-agent:packages:verify — projection fidelity. GREEN 2026-10-28."
       - "python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py — 11 assertions, GREEN 2026-08-12. Validator ACCOUNTING against the shared scope registry (no implemented validator undeclared; each host implements exactly its declared share), WIRING (both live decision surfaces call the native evaluator), and ATTRIBUTION (both hosts name themselves by content address; the ledger stamps an evaluator on every decision; a dispute record names both builds)."
       - "cargo test -p elohim-epr-cli --test governance_parity_vectors — the Rust half of the correspondence theorem over governance-parity-vectors.json, run against the COMPOSED evaluator (library + ElohimRepositoryValidators). GREEN at 12/12, 0 skips. The Python half (python3 .claude/scripts/_lib/__tests__/test_governance_parity.py) is GREEN at 12/12 / 52 assertions. Both hosts now derive the same verdict from the same corpus — correspondence, which is necessary and NOT sufficient for this habit."
       - "cargo test -p elohim-epr-cli --test live_manifest_integrity — the native integrity layer over the LIVE corpus (43 manifests), guarding against an over-strict check that would false-block every write under a subtree. GREEN."
     evidence: >
-      DELTA 2026-10-16 — `python3 .claude/scripts/_lib/__tests__/validator_registry_parity_test.py` reports `11 validator-accounting assertions passed ✅`; the Python leg holds, cargo legs were not run and remain unmeasured this run. Habit status remains green.
-    evidence-fingerprint: sha256:fadf3283edc24b97
-    evidence-bytes: 10784
-    evidence-entries: 5
+      DELTA 2026-10-28b — Seam guidance is opt-in. The root binding is withdrawn: with no `.epr-meta` cascade binding the validator, `epr govern seam` reports `enabled: false` with an empty packet and the hook wrappers stay silent; ordinary governed writes never run the classifier. The two composition sections and the binding to enable moved to `.epr-meta/composition.md`, and the declarations cite that file, so the root manifest is unchanged on this branch and no longer marks every crate touched for RS-GOV-04. The second check now names suites that exist: `just gate seam-guidance-contracts` (4 node tests, 6 python tests, EXIT=0); `hook-package.test.mjs` 5/5 on origin/dev e67c6cef8, where port/a-small landed it; `pnpm run elohim-agent:packages:verify` 2,252 assertions EXIT=0. Habit status remains green.
+    evidence-fingerprint: sha256:9967d35d20ea4214
+    evidence-bytes: 13068
+    evidence-entries: 8
     guard: >
       Risk 1 — "parity" achieved by deleting the divergent validators rather
       than by unifying the evaluators. That would make the check green and the
@@ -1151,15 +1165,29 @@ habits:
       - "a2o @concern:hosted-compute-contracted (genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature — @act:i; household lane is the authority: `just test mesh features/auth/hosted-human/07-hosted-by-a-household.feature` for the API-side scenarios and `just test mesh-browser features/auth/hosted-human/07-hosted-by-a-household.feature` for the two @browser-only ones. The story creates and removes its own human.)"
       - "a2o @concern:humans-served (genesis/a2o/features/dataplane/doorway-humans-served.feature — @act:i; needs `just mesh prologue` to have cast the hosted humans: `just test mesh features/dataplane/doorway-humans-served.feature`. The count is doorway-local and substrate-derived; a federation-wide aggregate is a different number and is not this check.)"
     evidence: >
-      DELTA 2026-10-18 (RED preserved; both checks measured on the household, dev 80db9208b): 07-hosted-by-a-household 0/3 (sprint-report-household-20261018T114946Z-80db9208) — every account creation was refused `Conductor conductor-0 at capacity (17/14)`: the household archive carries 16–17 hosted agents on matthew's conductor against the 14 ceiling (`just mesh status`: "hosted matthew: REFUSED 16 agent(s), over the operator ceiling 14"; "hosted jessica: REFUSED 1 agent(s) on a member's conductor"), i.e. story-created humans that registered and never closed. doorway-humans-served 0/4 (…114956Z): humansServed=14 while only 3 registrants hold a live hosted-cell commitment read from a non-doorway peer (the invariant's disagreement, wider than 09-12's 14 vs 13); beta reports 1 where none is owed; the re-cast of prologue-hosted-1 failed. Cure order: (1) a household verb that reconciles hosted agents against live commitments and closes the agents no promise names, so the ceiling counts living promises; (2) re-run both lanes. Red holds.
-    evidence-fingerprint: sha256:8f89176f4f316ed8
-    evidence-bytes: 12613
-    evidence-entries: 9
+      DELTA 2026-10-22 (operator delegated the declaration choices): `rea.budget` 8 h at 85 % (4 h per part short of target: hosted-compute-contracted, humans-served). It binds the next red episode; the open one keeps the bound it was minted with. Status unchanged.
+    evidence-fingerprint: sha256:2689857dd90e1e18
+    evidence-bytes: 12874
+    evidence-entries: 10
     refs:
       - "genesis/docs/superpowers/plans/2026-09-10-doorway-federation-three-reds-to-green-plan.md (D2, D3, Tasks 13, 13b, 13c, 15, 16, 17c)"
       - "doorway/doorway-service/src/routes/hosted_cell.rs · elohim/elohim-storage/src/api/compute_grants.rs · elohim/elohim-storage/src/services/commitment_read_fallback.rs"
       - "genesis/data/timeline/backlog/arch-scale-risk-backlog.md row 7 (786 MB conductor heap per hosted human)"
       - "genesis/data/timeline/backlog/doorway-hosted-cell-grant-minted-before-row-insert-2026-09-11.md · commitment-read-fallback-created-at-is-projection-time-2026-09-11.md"
+    rea:
+      composition: sum
+      budget:                     # 4 h per part short of target at 2026-10-22: 2 parts
+        hours: 8
+        threshold_pct: 85
+      parts:
+        - part: hosted-compute-contracted
+          reading: 0/3
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114946Z-80db9208 (every registration refused at conductor capacity 17/14; DELTA 2026-10-18)
+        - part: humans-served
+          reading: 0/4
+          at: 2026-10-18
+          evidence: sprint-report-household-20261018T114956Z-80db9208 (humansServed=14 vs 3 live promises; DELTA 2026-10-18)
     retire-when: >
       when hosted provisioning is itself a substrate act — the pool peer mints the promise as part
       of installing the cell and the doorway only relays it — so a hosted cell without a notarized
@@ -1350,10 +1378,12 @@ habits:
       - "a2o @concern:idle-is-free (genesis/a2o/features/dataplane/household-at-rest.feature — @act:i, the household lane: `just test mesh features/dataplane/household-at-rest.feature`). Two snapshots 300 s apart on a settled household with nobody acting: each storage peer's conductor calls (admission permits released) at most 6 a minute, no permit refused, and the three conductors together at most 10 CPU seconds a minute. The budgets are the target, not a reading."
       - "store growth, per DNA, read from a STOPPED conductor (`app/elohim-app/scripts/conductor-store-sniff.py <data-root> --json`, folded as `dna-actions-per-day@1`, `wal-main-ratio@1`, `subject-anchor-links@1`) and rendered by `epr flow report --bound <id>` for each of `dna-actions-per-day-ceiling@1`, `wal-main-ratio-ceiling@1` and `subject-anchor-links-ceiling@1`: lamad at most 5,000 actions a day per peer at idle, WAL no larger than its database, at most 100 attestation links on one subject anchor. Fleet: the conductor's integrated-ops series is a proxy for the first; nothing on the fleet reports WAL or anchor size."
     evidence: >
-      DELTA 2026-10-14b (RED preserved; the CPU leg is attributed for the first time, and it is higher than recorded). Household on the pin (hc-fork-96bcd2bee215-proof, direct launch), production gossip cadence, conductors and storage restarted 19:53Z, nobody acting; profiler `perf` from the distro repo (the container has full capabilities). CPU, process total from /proc (the lane's own source), eight consecutive 300 s windows from 40 min to 88 min after the restart: 101.2, 71.1, 72.2, 87.7, 51.6, 52.5, 86.0, 71.4 CPU s/min for the three conductors (clean 40-min window 57.9), peaks about every 15 min, budget 10; not the 20.5-21.1 of 2026-10-13 at the same uptime, and why it differs is not established (matthew's conductor hosts 115 agents). WHERE IT GOES: two thirds of conductor CPU is sqlite on `sqlx-sqlite-worker` threads, which exit with their pooled connection (idle_timeout 30 s, min 0), so per-thread accounting and statement time both missed it; the sqlite cost is SQLCipher page work on cache misses (HMAC-SHA512 and AES-CBC per 4-KB page, plus ZFS copies; about 7,400 page reads a second on matthew; 2 MiB page cache per connection). Page reads by statement (uprobes on `sqlite3VdbeExec` and `sqlcipher_page_cipher`, 60 s per conductor): jessica `UPDATE ChainOpPublish SET last_publish_time` 37% and its COMMITs 35%; matthew that UPDATE 19%, COMMIT 18%, the receiving side's `LimboChainOp WHERE hash IN (...)` 27%; james the gossip since-scan 50%, LimboChainOp 22%. The conductor's own `hc_conductor_workflow_duration` agrees: `publish_dht_ops_consumer` 13.0 wall-s/min against 2.1 for integration, the next largest. So the perpetual republish (`conductor-residual-cpu-full-chain-read-and-perpetual-republish` item 4, receipts never complete on three peers) is the largest measured consumer on both the sending and receiving side. Cure designed, not built (Codex, read-only): bounded per-op republish backoff with `receipts_complete` untouched; capping required receipts at reachable authorities rejected as unsafe. NOT DONE, operator: the no-build A/B (`tuning_params.min_publish_interval` 24 h in the three household conductor configs) was refused as a shared-resource edit. Evidence: `genesis/a2o/reports/recovery/idle-cpu-20261014/README.md`.
-    evidence-fingerprint: sha256:7363506b0ff6d7c3
-    evidence-bytes: 61578
-    evidence-entries: 31
+      DELTA 2026-10-28 (rescue Avodah client port; status unchanged): restored the declared board, evidence comparison, captured sources and explicit offline retention from 0ee5dfde8; 4 focused Vitest files / 8 tests pass (exit 0), targeted ESLint has no errors (exit 0). App-wide tsc exits 2 on existing cross-workspace diagnostics; browser verification is unavailable under the container sandbox. Native reader/launcher delivery, owner binding and contract regeneration remain separate work; no runtime acceptance claimed. local-view-board.feature requires this shift's blind-reader pass.
+
+      2026-10-29, fleet store growth at rest (sync.sled): every alpha storage pod's `sync.sled` grew about 1.1 GB/h while the corpus stayed flat (matthew 14.9 to 29.6 GB between 10-28 06:40Z and 10-29 00:40Z, `elohim_node_store_bytes{store="sync_sled"}`). Loki shows the writer: `node:manifesto` was applied once a minute on every pod from an off-fleet iroh peer (`e84ec663…`). That peer cannot name our heads, so it answers each round with the full history (34 MB), all of it already held. Each apply rewrote the 17.5 MB doc, and sled 0.34 keeps the superseded blob file: the file count grew by about 47 an hour at about 17.5 MB a file. Cure on `fix/storage-sled-bounded` (`5c4fb85d5`, `389899f8d`, `014b876bf`, `c956510b0`): `SyncManager::apply_changes` skips the write when the heads equal the stored heads and no orphan is queued, and `elohim_sync_doc_writes_total{outcome}` counts written and unchanged applies. `just gate elohim-storage` exited 0 on `c956510b0` (4796 lib tests). Its footprint test reproduced the retention before the cure: ten no-op redeliveries of a 2.6 MB doc grew the sled from 2.6 to 29 MB. Not yet deployed. Open: the off-fleet peer's heads never converge with ours, existing garbage is not reclaimed, and the Kademlia trees have no TTL or byte cap.
+    evidence-fingerprint: sha256:2f1f74d6a0ca954c
+    evidence-bytes: 63440
+    evidence-entries: 32
     refs:
       - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — what unbounded per-call cost did to the fleet"
       - "genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md"
@@ -1480,23 +1510,10 @@ habits:
       - "cargo test --features 'p2p p2p-iroh' --lib -- retention release_ledger holds blob_arrivals shard_service a_forgotten_blob (elohim/elohim-storage)"
       - "fleet read: elohim_node_holds_bytes{store=blobs,reason} per alpha peer, own_unnamed falling at 64 blobs per pass for bytes older than a day and unrecorded naming what nobody can account for, beside elohim_release_retention_releases{standing}, elohim_release_retention_blobs_held{reason} and elohim_node_store_bytes{store=blobs|blobs_iroh|cache}"
     evidence: >
-      DELTA 2026-10-07b (status red -> GREEN; the fleet read completes check 3). Read from Prometheus at
-      04:23Z, 33 minutes after the roll: the blob store fell by exactly the bytes the holds pass released,
-      one gauge step after each pass, on every peer — matthew 1,297 MB -> 492 MB (own_unnamed 238 -> 6
-      blobs over five passes of 64, 64, 64, 40; 984 MB released), adam 841 -> 353 MB (134 -> 6; 487 MB),
-      jessica 331 -> 294 MB (75 -> 7; 36.6 MB), james -36.6 MB, susan, eve and gertrude -33.5 MB each
-      (their eight bundles, all gone at the second pass). matthew's and adam's iroh stores fell with it
-      (-265 MB each at 04:16Z: the BLAKE3 alias computed from the bytes before the delete). kept_release
-      and served did not move on any peer (matthew and jessica keep 9 releases, 50.9 MB; the others one);
-      release_retention_failures_total 0 everywhere. Doorway alpha answered 200 on /, /version.json and
-      /db/content/elohim-host-landing at 04:07Z, 04:10Z and 04:23Z, through matthew's second to fifth
-      passes. What is left on the fleet is what the rule keeps: kept releases, served bundles, pledged
-      bytes, and the unrecorded (matthew 88 MB, adam 84 MB) that nothing deletes. The two scenarios are
-      green on the household (DELTA 2026-10-06b), the unit checks pass (87 lib tests under both
-      transports), and the fleet gauges read as the rule predicts: green. Retire-when stands as written.
-    evidence-fingerprint: sha256:737aa694781b6180
-    evidence-bytes: 7183
-    evidence-entries: 4
+      DELTA 2026-10-28 (portable-app foundation re-landed from rescue snapshot 0ee5dfde8; status unchanged): bounded demand leases (elohim-seam-contracts 0.1.2), Rust/TypeScript lifecycle contracts, ts-rs App*.ts regenerated by `cargo test export_bindings` (byte-identical to the snapshot), app-* schemas moved to the 2020-12 dialect, and the browser/workspace bridges. Gates: app-lifecycle-contracts, elohim-sdk, seam-contracts, browser-bridge, workspace-bridge and schema-validate EXIT=0; storage-client-ts red only on the http-tier large-leaf timeout under host load (passes alone, 15/15). Live residency enforcement and durable continuation remain future work.
+    evidence-fingerprint: sha256:743eb9da844d03a1
+    evidence-bytes: 7843
+    evidence-entries: 5
     first_move: >
       Keep reading what is let go. matthew's recentlyLetGo on GET /admin/adoption names the 232
       blobs (984 MB) that read own_unnamed on 2026-10-07; the ledger gap had named 449 MB of
@@ -2288,10 +2305,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-10-29 (RED preserved; the readers precede the pin): brit main fast-forwarded 76ba95d8a0..7e4a83115e at ~22:50Z after the re-run turned `Tests pass` green (the restore-test red was a flake; i386 DNS environmental; cargo-deny-advisories still red, so no snapshot release and both devices build from source). The pin commit ef58a3e59 waits on feat/brit-daily-driver for the landing line; the reader fixes (fix/brit-readers-2026-10-29) land ahead of it so the first pin-moving push selected by the oracle reads notes the new way. Second pin-moving push: S2-1a, reconciled against the new main by workflow wf_18b0660e-ab0.
-    evidence-fingerprint: sha256:fd0642307683168c
-    evidence-bytes: 4746
-    evidence-entries: 7
+      DELTA 2026-10-30 (RED preserved; the first of the two pin-moving pushes landed): dev 370721d7f carries the gitlink move 76ba95d8a0 -> 7e4a83115e; the pin commit alone selected `brit` only and the attested read printed `attested: ethosengine/brit@7e4a83115ece Tests pass success` both on the line and in the pre-push (0 s). The second move (1750f673a, S2-1a reshaped to fixtures) waits on the operator's brit main push; no edge pod rolled for the pin (the orchestrator checkout never initializes submodules, so elohim-brit is pruned before propagateStaleness).
+    evidence-fingerprint: sha256:dc71385857235914
+    evidence-bytes: 5306
+    evidence-entries: 8
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
@@ -2325,14 +2342,41 @@ habits:
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
       DELTA 2026-10-29e (ACTIVE, RED preserved; fix round on the rebased fix/brit-readers-2026-10-29, now exactly 8 over the landing head e8e0d1344): readBuildNote no longer tolerates a miss line on stdout — build_cmd.rs prints it on stderr on every lineage this tree can read (76ba95d8a0 is the only commit touching it), so stdout is the node or unreadable, as delivery-series.mjs and the epr-cli walk already held; the slow-brit fixture prints the miss where brit does. delivery-series imports `unverifiableNotes` from brit-attest.mjs instead of matching the line itself; household-attestation.ts names `classifyPutRefusal` as its deliberate port of `expectedRefusal`. The unreadable-note asymmetry stands and is now named at both sites: brit-attest defers (a harvest retries for free, nothing is written over what was not read), recordEvidence writes anyway (the gate's rule is last run wins, named; the read only names what the put replaces; brit's put still refuses a concurrent update). A would-not-verify refusal stays counted and not deferred (identical bytes refuse again; the cure is the device's signer, not a harvest retry). Node: brit-attest 23 (+1 real-binary skip), delivery-series 34, gate-evidence 63, gate-runner 50, serving-receipt 35, brit-helper 6, collect-stage 5, household-attestation 35, all green; Rust still uncompiled.
-    evidence-fingerprint: sha256:c5fa62e8710573a4
-    evidence-bytes: 39240
-    evidence-entries: 35
+    evidence-fingerprint: sha256:3a4ae0b062ee254d
+    evidence-bytes: 39858
+    evidence-entries: 36
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
       - "genesis/data/timeline/backlog/fleet-standing-celldisabled-one-third-party-cell.md (why every roll costs hours)"
       - "genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (change-class delivery vehicles)"
+    rea:
+      composition: sum
+      budget:                     # 4 h per part short of target at 2026-10-22: 4 parts
+        hours: 16
+        threshold_pct: 85
+      parts:
+        - part: station-2-window  # restart → app ready; a lower-is-better time gauge
+          unit: s
+          baseline: 43
+          target: 12              # the conductor's own cell join (~10 s) plus one 2 s presence cadence
+          reading: 10
+          at: 2026-10-18
+          evidence: cucumber-mesh-20261018T132741Z-3a0ad3b8, …133049Z-3a0ad3b8, …133316Z-6e260987 (10.0 / 6.9 / 9.6 s; DELTA 2026-10-18)
+          per_week: 4             # a floor: fleet rolls only; household lane restarts are uncounted
+          per_week_evidence: "[build:edge] commits on origin/dev first-parent, 2026-10-08..15 and 2026-10-15..22: 4 each"
+        - part: push-delivers-within-budget
+          reading: 4/4
+          at: 2026-10-18
+          evidence: cucumber-mesh-20261018T133316Z-6e260987 (household, 50/50 steps; DELTA 2026-10-18)
+        - part: delivery-series
+        - part: budget-arithmetic
+          reading: pass
+          at: 2026-10-16
+          evidence: node --test genesis/orchestrator/pipeline-budget.test.mjs pass 1 exit 0 at origin/dev@42941449e (DELTA 2026-10-16)
+        - part: measurement-liveness
+        - part: no-op-rolls
+        - part: ledger
     retire-when: >
       upgrades propagate peer to peer by change class without a CI fleet roll, so a push's delivery
       no longer waits on a serial pipeline chain. The orchestrator then only builds and publishes,
@@ -2357,10 +2401,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-29 (GREEN preserved; every gate states its expected cost): landed on dev at f8dc1991b (228a80b2f) — gate-tap samples the child tree every 5 s and gate-runner threads cpu_s / throttled_s / rss_peak_bytes / memory_high_events / io_full_pct_max into each gate-cycle row's env slots and the attestation's output JSON (untapped, reused and deferred runs stay unmeasured, never zero); gate-cost reads the union of the main ledger and every worktree sidecar in ledger order, de-duplicated by CID, so the p90 GATE_DEFER reads is no older than the newest run. Evidence: `just gate orchestrator` 202/202 with evidence recorded (bafyreigrcsgswnp…) on the branch; the pre-push onto dev passed every selected gate. Owed: the first cycle row on dev carrying all five slots (the next push's gate writes it).
-    evidence-fingerprint: sha256:f2f71d1033719a47
-    evidence-bytes: 8719
-    evidence-entries: 10
+      DELTA 2026-10-30 (RED preserved; the landing push paid once where it could): push 370721d7f (56 commits) reused the recorded verdicts of elohim-storage, doorway, steward-node, cargo-bridge and jenkins-bridge at push time (paths-scoped closures recorded on the line the day before; `GATE_EVIDENCE=reuse`), and re-ran the tree-scoped gates (eprfs 716 s, orchestrator 120 s, elohim-app 127 s, genesis-a2o 88 s …): ALL CLEAR in 1298 s. Two refusals before it: NO-SERVING-RECEIPT (cured by the epr-app-deliverability lane, 7/7, 135/135) and one ark test red from an ETXTBSY race in a test stub helper (the stub exec raced a sibling test's fork; test-only guard landed). Still red: the tree-scoped gates re-pay on every push because any hook-written ledger under .claude/data dirties the tree at record time.
+    evidence-fingerprint: sha256:ff035206bb04ceb1
+    evidence-bytes: 10118
+    evidence-entries: 12
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

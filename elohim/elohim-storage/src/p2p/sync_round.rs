@@ -202,6 +202,29 @@ pub fn fetch_window(configured: Option<usize>) -> usize {
     }
 }
 
+/// The documents of a peer's `DocumentList` page worth a `SyncChanges` pull:
+/// those holding a head this node lacks ([`crate::sync::SyncManager::needs_pull`]).
+///
+/// A doc whose every remote head we already hold is skipped, whether our
+/// heads equal the peer's or run ahead of them. The old `local != remote`
+/// test pulled in the second case on every round. Order is the page's.
+pub async fn docs_to_pull(
+    sync_manager: &crate::sync::SyncManager,
+    h_app_id: &str,
+    documents: &[crate::p2p::sync_protocol::DocumentInfo],
+) -> Vec<String> {
+    let mut out = Vec::new();
+    for remote in documents {
+        if sync_manager
+            .needs_pull(h_app_id, &remote.doc_id, &remote.heads)
+            .await
+        {
+            out.push(remote.doc_id.clone());
+        }
+    }
+    out
+}
+
 /// How one issued `SyncChanges` request ended, from the scheduler's point of view.
 ///
 /// Only [`SettleOutcome::Io`] earns a re-queue: it is the transport refusing to
@@ -450,6 +473,78 @@ pub fn announce_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- docs_to_pull (redundant-pull skip) ----
+
+    fn info(doc_id: &str, heads: Vec<String>) -> crate::p2p::sync_protocol::DocumentInfo {
+        crate::p2p::sync_protocol::DocumentInfo {
+            doc_id: doc_id.to_string(),
+            doc_type: "content".to_string(),
+            change_count: 1,
+            last_modified: 0,
+            heads,
+        }
+    }
+
+    fn put(doc: &mut automerge::Automerge, key: &str, value: &str) -> Vec<String> {
+        use automerge::transaction::Transactable;
+        doc.transact::<_, _, automerge::AutomergeError>(|tx| {
+            tx.put(automerge::ROOT, key, value)?;
+            Ok(())
+        })
+        .unwrap();
+        doc.get_heads().iter().map(|h| hex::encode(h.0)).collect()
+    }
+
+    /// The libp2p diverged check pulls only the docs holding a head we lack:
+    /// not the equal one, and not the one where we are ahead of the peer.
+    #[tokio::test]
+    async fn only_docs_with_a_remote_head_we_lack_are_pulled() {
+        use std::sync::Arc;
+        let dir = tempfile::tempdir().unwrap();
+        let store = crate::sync::DocStore::at_path(dir.path().join("sync.sled"))
+            .await
+            .unwrap();
+        let sync = crate::sync::SyncManager::new(
+            Arc::new(store),
+            Arc::new(crate::sync::StreamTracker::new()),
+        );
+        let ns = "elohim";
+
+        let mut equal = automerge::Automerge::new();
+        let equal_heads = put(&mut equal, "t", "same");
+        sync.apply_changes(ns, "node:equal", vec![equal.save()])
+            .await
+            .unwrap();
+
+        let mut ahead = automerge::Automerge::new();
+        let peer_heads = put(&mut ahead, "t", "base");
+        sync.apply_changes(ns, "node:ahead", vec![ahead.save()])
+            .await
+            .unwrap();
+        put(&mut ahead, "t", "ours");
+        sync.apply_changes(ns, "node:ahead", vec![ahead.save()])
+            .await
+            .unwrap();
+
+        let mut behind = automerge::Automerge::new();
+        put(&mut behind, "t", "base");
+        sync.apply_changes(ns, "node:behind", vec![behind.save()])
+            .await
+            .unwrap();
+        let newer = put(&mut behind, "t", "theirs");
+
+        let page = vec![
+            info("node:equal", equal_heads),
+            info("node:ahead", peer_heads),
+            info("node:behind", newer),
+            info("node:absent", vec!["ab".repeat(32)]),
+        ];
+        assert_eq!(
+            docs_to_pull(&sync, ns, &page).await,
+            vec!["node:behind".to_string(), "node:absent".to_string()]
+        );
+    }
 
     // ---- FetchWindow (bounded sync-fetch window) ----
 

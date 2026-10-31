@@ -1,0 +1,5 @@
+# The manifest gate runner supplies the native pool slot and toolchain.
+gate:
+    cargo fmt -- --check
+    cargo clippy --locked --all-targets -- -D warnings
+    cargo test --locked 

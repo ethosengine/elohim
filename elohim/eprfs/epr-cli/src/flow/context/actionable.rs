@@ -566,6 +566,12 @@ mod tests {
         let mut a = assertion("gap#1");
         a.commitments.push(CommitmentEvidence {
             commitment: "c".into(),
+            attribution: crate::flow::acceptance::AttributionEligibility {
+                eligible: false,
+                actor_claim: None,
+                witness: None,
+                issues: vec![],
+            },
             fulfillments: vec![],
             technical_reviews: vec![],
             acceptance_records: vec![],

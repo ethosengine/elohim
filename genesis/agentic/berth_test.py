@@ -38,6 +38,43 @@ CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
                     "mesh": {"daemon": True}}}
 
 
+_PROXY_KEYS = ("ELOHIM_SHIFT_BERTH_ADDRESS", "ELOHIM_SHIFT_BERTH_TOKEN")
+_saved_proxy_env = {}
+
+
+def setUpModule():
+    # These fixtures exercise their own BERTH_DIR, including direct main() calls.
+    # A gate worker's guardian proxy belongs to the enclosing workload instead.
+    _saved_proxy_env.clear()
+    for key in _PROXY_KEYS:
+        if key in os.environ:
+            _saved_proxy_env[key] = os.environ.pop(key)
+
+
+def tearDownModule():
+    for key in _PROXY_KEYS:
+        os.environ.pop(key, None)
+    os.environ.update(_saved_proxy_env)
+
+
+def guest_uid_unavailable_reason():
+    if os.geteuid() != 0:
+        return "needs root to drop to the stage guest uid"
+    for kind in ("uid", "gid"):
+        rows = Path(f"/proc/self/{kind}_map").read_text().splitlines()
+        if not any(int(start) <= 65534 < int(start) + int(count)
+                   for start, _outside, count in (row.split() for row in rows)):
+            return f"stage guest {kind} 65534 is not mapped in this user namespace"
+    setgroups = Path("/proc/self/setgroups")
+    if setgroups.exists() and setgroups.read_text().strip() != "allow":
+        return "this user namespace denies setgroups required for the stage guest"
+    status = Path("/proc/self/status").read_text().splitlines()
+    caps = int(next(row.split()[1] for row in status if row.startswith("CapEff:")), 16)
+    if caps & ((1 << 6) | (1 << 7)) != ((1 << 6) | (1 << 7)):
+        return "needs CAP_SETGID and CAP_SETUID to drop to the stage guest uid"
+    return None
+
+
 class HoldFoldAndReapTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -1621,6 +1658,17 @@ class StewardClaimTest(unittest.TestCase):
         self.assertIsNone(self.berth.who("dev-integration"))
         self.assertEqual(self.rows("release")[-1]["resource"], "dev-integration")
 
+    def test_an_override_whose_reread_is_still_pending_keeps_the_lease_for_the_next_claim(self):
+        # 2026-10-30, after a power loss: the view had not folded the override row yet, the
+        # pending verdict carried no device, and the reason formatter raised. The claim then
+        # released and every retry wrote a fresh lease and a fresh override, never converging.
+        self.views(view(), view(dev_integration=unconfirmed_a()), view(dev_integration=pending()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertEqual(reason, f"unconfirmed: {DEVICE_A} has not acknowledged yet — override on the record")
+        self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
+        self.assertEqual(self.rows("override")[-1]["overrode"], DEVICE_A)
+
     def test_unconfirmed_age_reads_seconds_minutes_then_hours(self):
         fmt = _NS["steward_reason"]
         ages = [(119_999, "119s"), (120_000, "2m"), (7_199_999, "119m"), (7_200_000, "2h"), (9_000_000, "2h")]
@@ -2031,8 +2079,10 @@ class StoreUnavailableTest(unittest.TestCase):
         return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), *args], env=e,
                               capture_output=True, text=True, timeout=30, preexec_fn=preexec, cwd="/")
 
-    @unittest.skipUnless(os.geteuid() == 0, "needs root to drop to the stage guest uid")
     def test_guest_uid_meeting_the_hosts_root_owned_lock_exits_4_and_names_the_path(self):
+        reason = guest_uid_unavailable_reason()
+        if reason:
+            self.skipTest(reason)
         def as_guest():
             os.setgroups([])
             os.setgid(65534)

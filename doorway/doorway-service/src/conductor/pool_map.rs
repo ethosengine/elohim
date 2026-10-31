@@ -76,8 +76,9 @@ pub const MAX_AGENTS_PER_CONDUCTOR_ENV: &str = "DOORWAY_MAX_AGENTS_PER_CONDUCTOR
 ///
 /// A value of `0` is honored, not clamped: it is the operator's explicit
 /// "provision no new hosted agents on any conductor" freeze. Existing hosted
-/// agents are unaffected — `AgentProvisioner::provision_agent` short-circuits
-/// on `find_existing_app` BEFORE the capacity check, so a cap at or below the
+/// agents are unaffected — `AgentProvisioner::provision_agent` settles a person
+/// it holds a record (or an account mapping) for on THAT conductor, and only the
+/// offer of a NEW person reaches the capacity check, so a cap at or below the
 /// current population stops growth without evicting or locking out anyone.
 pub fn parse_max_agents_per_conductor(raw: Option<&str>) -> usize {
     match raw.map(str::trim) {
@@ -203,9 +204,10 @@ impl ConductorPoolMap {
     /// which surfaces as `503 SERVICE_UNAVAILABLE` on the registration path
     /// (`auth_routes`) and `500` with the same message on
     /// `POST /admin/hosted-users`. Already-hosted agents are unaffected:
-    /// `provision_agent` returns early from `find_existing_app` before the
-    /// capacity check, so lowering the cap to the current population stops
-    /// growth without evicting or locking out an existing hosted human.
+    /// `provision_agent` settles a person it holds a record (or an account
+    /// mapping) for before any capacity check — only a NEW person's offer is
+    /// checked — so lowering the cap to the current population stops growth
+    /// without evicting or locking out an existing hosted human.
     pub fn has_capacity(&self, conductor_id: &str) -> bool {
         self.agent_count(conductor_id) < self.max_agents_per_conductor
     }

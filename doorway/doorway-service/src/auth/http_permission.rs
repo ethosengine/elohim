@@ -127,7 +127,11 @@ pub(crate) fn is_operator_actuator(method: &hyper::Method, path: &str) -> bool {
         | (&Method::DELETE, "/admin/federation/peers")
         | (&Method::POST, "/admin/federation/peers/refresh")
         | (&Method::POST, "/admin/steward-peers/refresh")
-        | (&Method::POST, "/admin/ssr-bundle/refresh") => true,
+        | (&Method::POST, "/admin/ssr-bundle/refresh")
+        // Rebuilds provisioning records and agent mappings from the conductors.
+        // Its handler checks the admin credential too; this keeps it behind the
+        // one gate every other mutating actuator passes.
+        | (&Method::POST, "/admin/provisioning/recover") => true,
         (&Method::DELETE, p) => p.starts_with("/admin/hosted-users/"),
         (&Method::POST, p) => p.starts_with("/admin/graduation/force/"),
         _ => false,
@@ -364,7 +368,7 @@ mod tests {
         );
     }
 
-    const ACTUATORS: [(&str, &str); 8] = [
+    const ACTUATORS: [(&str, &str); 9] = [
         ("POST", "/admin/hosted-users"),
         ("DELETE", "/admin/hosted-users/uhCAkagent"),
         ("POST", "/admin/graduation/force/uhCAkagent"),
@@ -373,6 +377,7 @@ mod tests {
         ("POST", "/admin/federation/peers/refresh"),
         ("POST", "/admin/steward-peers/refresh"),
         ("POST", "/admin/ssr-bundle/refresh"),
+        ("POST", "/admin/provisioning/recover"),
     ];
 
     fn actuator_req(method: &str, path: &str) -> hyper::http::request::Builder {
@@ -380,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn actuator_predicate_names_exactly_the_eight_and_no_reads() {
+    fn actuator_predicate_names_exactly_the_nine_and_no_reads() {
         for (m, p) in ACTUATORS {
             let method = hyper::Method::from_bytes(m.as_bytes()).unwrap();
             assert!(is_operator_actuator(&method, p), "{m} {p} must be gated");
@@ -395,6 +400,7 @@ mod tests {
             ("POST", "/admin/cache/warm"),
             ("PUT", "/admin/dev/shed"),
             ("GET", "/admin/steward-peers/refresh"),
+            ("GET", "/admin/provisioning/recover"),
         ] {
             let method = hyper::Method::from_bytes(m.as_bytes()).unwrap();
             assert!(

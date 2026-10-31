@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "dna-hash-blind-to-coordinator-zomes",
   "claim": "Holochain DNA hash covers only integrity zomes + modifiers — coordinator-only changes need the update_coordinators hot-swap path, not reinstall",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_dna_hash_blind_to_coordinator_zomes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_dna_hash_blind_to_coordinator_zomes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 22183d22-e97a-41cd-b6ae-863ea1b29ce9."
   ],
   "sources": [
     {

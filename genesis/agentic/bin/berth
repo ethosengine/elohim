@@ -342,6 +342,11 @@ def steward_reason(verdict, now_ms, fence_after_s=None):
         return f"held by {verdict['device']}/{verdict['session']} since {_rfc3339(verdict['since'])}"
     if verdict.get("verdict") == "refused_by":
         return f"refused by {verdict['device']}"
+    # A pending verdict names who it waits on, not a device: the re-read right after an override
+    # row is written is pending until the view folds that row.
+    if verdict.get("verdict") == "pending":
+        waiting = (verdict.get("waiting_on") or ["another device"])[0]
+        return f"unconfirmed: {waiting} has not acknowledged yet"
     if verdict.get("fenced"):
         window = f" within {fence_after_s}s" if fence_after_s is not None else " recently"
         return f"self-demoted: no head from {verdict['device']}{window}"
@@ -1914,6 +1919,19 @@ def main(argv):
     """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
     BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
     so, rather than dying with a traceback the wrapper would propagate."""
+    if any(name in os.environ for name in ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')):
+        # A contained shift cannot interpret host PID incarnations through its
+        # private /proc. Only its authenticated host guardian may inspect leases.
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+        try:
+            from shift_lease import proxy_request
+            result = proxy_request(list(argv[1:]))
+        except (ImportError, OSError, ValueError, TypeError) as error:
+            print(f"berth: shift lease REFUSED — proxy unavailable: {error}", file=sys.stderr)
+            return 3
+        sys.stdout.write(result['stdout'])
+        sys.stderr.write(result['stderr'])
+        return result['exit']
     store = store_dir()
     try:
         return _main(argv)

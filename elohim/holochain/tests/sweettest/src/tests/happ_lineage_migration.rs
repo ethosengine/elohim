@@ -190,7 +190,10 @@ struct ExportHeldInput {
 /// bare string, `Held(agent)` a single-key map.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum CarrySource {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors the zome-side CarrySource::Own variant so the serde shape matches; the tests construct only Held"
+    )]
     Own,
     Held(AgentPubKey),
 }

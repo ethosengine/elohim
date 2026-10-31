@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_epr_meta_compose_gate",
   "claim": "PreToolUse gate on Edit/Write via cascading .epr-meta manifests; governed dirs need frontmatter; malformed → ask.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_epr_meta_compose_gate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_epr_meta_compose_gate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: da119ac8-d62b-4bca-83df-818d9e4fd563."
   ],
   "sources": [
     {

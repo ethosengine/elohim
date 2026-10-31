@@ -411,7 +411,11 @@ spec:
         storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
-            storage: 20Gi
+            # Adam's real size: deployments.json storageDataSize (80Gi since the
+            # operator's 2026-10-29 resize, with the shem dataset's refquota raised
+            # to match). grow-conductor-pvc.sh raises the live claim before the apply;
+            # it never shrinks one.
+            storage: STORAGE_DATA_SIZE_PLACEHOLDER
 ---
 # Headless service for StatefulSet DNS-based peer discovery
 # Pod gets stable DNS name: RESOURCE_PREFIX_PLACEHOLDER-0.RESOURCE_PREFIX_PLACEHOLDER-headless.NAMESPACE_PLACEHOLDER.svc.cluster.local

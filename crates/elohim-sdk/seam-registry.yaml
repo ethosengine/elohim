@@ -1,0 +1,150 @@
+seamRegistryVersion: 1
+crate: elohim-sdk
+crateRoot: crates/elohim-sdk
+seamLocus: Portable app foundation; operational contracts without runtime delivery claims.
+decisionPoints:
+  - name: available_offline
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lifecycle/mod.rs
+      modulePath: elohim_sdk::lifecycle::available_offline
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Computed operational readiness, no new truth record.
+      - id: C1
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C2
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C3
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C4
+        status: answered
+        justification: Unknown code/data verification never becomes true.
+      - id: C5
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6a
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6b
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C7
+        status: answered
+        justification: Pinned/running flags cannot replace verified code AND data.
+      - id: C8
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C9
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C10
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C11
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C12
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C13
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C14
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+    contractTests:
+      - path: crates/elohim-sdk/tests/app_lifecycle.rs
+        testName: offline_requires_verified_code_and_data
+        kind: unit
+  - name: caught_up
+    kind: verdict-fn
+    sourceLocation:
+      file: src/lifecycle/sync_demand.rs
+      modulePath: elohim_sdk::lifecycle::SyncDemandQueue::caught_up
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Reads fixed targets and observed positions; no sync transport or
+          persistence.
+      - id: C1
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C2
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C3
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C4
+        status: answered
+        justification: Unknown ends, missing local positions and differing epochs never
+          mean caught-up.
+      - id: C5
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C6a
+        status: answered
+        justification: Targets fixed at request and bounded at insertion; later arrivals
+          do not extend refresh.
+      - id: C6b
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C7
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C8
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C9
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C10
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C11
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C12
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C13
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+      - id: C14
+        status: n-a
+        justification: This operational predicate has no authority, publication, network
+          or identity effects in this concern.
+    contractTests:
+      - path: crates/elohim-sdk/tests/app_lifecycle.rs
+        testName: fixed_targets_preserve_unknown_epoch_and_large_positions
+        kind: unit

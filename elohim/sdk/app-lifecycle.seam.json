@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "portable-app-lifecycle-reuse",
+  "responsibility": "Portable app contracts compose lower-level demand leases, peer-hosted execution, storage custody and existing sessions. Foundation interfaces are implemented; live runtime migration is planned.",
+  "owner": ["crates/elohim-sdk/src/lifecycle/*", "crates/elohim-views/src/app_lifecycle.rs", "elohim/sdk/*", "crates/seam-contracts/src/demand.rs"],
+  "allowedConsumers": ["app/*", "steward/*", "doorway/*", "bridges/*", "elohim/elohim-hub/*"],
+  "authoritativeContracts": [
+    {"path": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md", "needle": "## Four delivery stages", "status": "planned"},
+    {"path": "elohim/sdk/.epr-meta", "needle": "A Che adapter must not\ntunnel a loopback-only SDK route or spoof its caller.", "status": "contract"}
+  ],
+  "reusableInterfaces": [
+    {"path": "crates/elohim-sdk/src/lifecycle/mod.rs", "needle": "pub trait AppRuntime: Send + Sync", "status": "implemented"},
+    {"path": "crates/seam-contracts/src/demand.rs", "needle": "pub struct DemandLeases<K, T>", "status": "implemented"},
+    {"path": "elohim/sdk/storage-client-ts/src/app-lifecycle.ts", "needle": "export interface AppRuntime", "status": "implemented"}
+  ],
+  "detection": ["ensureInstance(", "ensure_instance(", "AppObservationJournal", "SyncDemandQueue", "DemandLeases"],
+  "composition": ["ensureInstance(", "ensure_instance("],
+  "exclusions": ["*/tests/*", "*.spec.ts", "*.test.ts"],
+  "appliesTo": ["*.rs", "*.ts", "*.tsx"]
+}

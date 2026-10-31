@@ -12,6 +12,7 @@ use super::{body_cid_of_file, confine_under, rel_to_root, FlowError, FlowResult}
 #[derive(Debug, Default, Clone)]
 pub struct AcceptanceOptions {
     pub appoint: Option<String>,
+    pub bind_actor: Option<String>,
     pub purpose: Option<String>,
     pub appointment: Option<String>,
     pub fulfillment: Option<String>,
@@ -75,22 +76,190 @@ fn actor_identity(root: &Path, id: &Cid) -> FlowResult<String> {
         .ok_or_else(|| refused("actor claim is not registered"))
 }
 
+/// Native eligibility projection. It resolves exact local claims, never peer qualification.
+#[derive(Debug, serde::Serialize)]
+pub struct AttributionEligibility {
+    pub eligible: bool,
+    pub actor_claim: Option<String>,
+    pub witness: Option<String>,
+    pub issues: Vec<String>,
+}
+
+pub fn attribution_eligibility(
+    root: &(impl EvidenceResources + ?Sized),
+    records: &[(Cid, FlowRecord)],
+    target: &Cid,
+) -> AttributionEligibility {
+    match implementer_attribution(root, records, target) {
+        Ok((actor, witness)) => AttributionEligibility {
+            eligible: true,
+            actor_claim: Some(actor.to_string()),
+            witness: witness.map(|cid| cid.to_string()),
+            issues: vec![],
+        },
+        Err(error) => AttributionEligibility {
+            eligible: false,
+            actor_claim: None,
+            witness: None,
+            issues: vec![error.to_string()],
+        },
+    }
+}
+
+/// Exact original pin or one explicit additive binding; no name matching or newest-wins.
+/// Session rollover does not rewrite a historical claim that was current at admission.
+fn implementer_attribution(
+    root: &(impl EvidenceResources + ?Sized),
+    records: &[(Cid, FlowRecord)],
+    target: &Cid,
+) -> FlowResult<(Cid, Option<Cid>)> {
+    let promise = commitment(records, target)?;
+    let pins: Vec<_> = promise
+        .resource_spec
+        .classified_as
+        .iter()
+        .filter_map(|s| s.strip_prefix("actor-claim:"))
+        .collect();
+    if pins.len() > 1 {
+        return Err(refused("duplicate implementer actor-claim:"));
+    }
+    let bindings: Vec<_> = records
+        .iter()
+        .filter_map(|(id, record)| match record {
+            FlowRecord::Event(event)
+                if event.resource == *target && slot(event, "bind-actor:").is_some() =>
+            {
+                Some((*id, event))
+            }
+            _ => None,
+        })
+        .collect();
+    // Do not filter invalid purported authority away, even when a direct pin exists.
+    for (_, binding) in &bindings {
+        validate_binding(root, records, binding)?;
+    }
+    if let Some(pin) = pins.first() {
+        let actor = cid(pin)?;
+        if root.actor_identity(&actor)? != promise.provider.0 {
+            return Err(refused(
+                "implementer actor claim differs from original provider",
+            ));
+        }
+        return Ok((actor, None));
+    }
+    match bindings.as_slice() {
+        [] => Err(refused("implementer has no exact registered actor claim; an explicit --bind-actor ruling is required")),
+        [(witness, binding)] => Ok((cid(required(binding, "bind-actor:")?)?, Some(*witness))),
+        _ => Err(refused("conflicting attribution witnesses; one exact binding ruling is required")),
+    }
+}
+
+fn validate_binding(
+    root: &(impl EvidenceResources + ?Sized),
+    records: &[(Cid, FlowRecord)],
+    binding: &FlowEvent,
+) -> FlowResult<()> {
+    validate_note_shape(binding)?;
+    if binding.classified_as.first().map(String::as_str) != Some("run:ruling")
+        || [
+            "appoint:",
+            "purpose:",
+            "appointment:",
+            "fulfillment:",
+            "review:",
+            "report-path:",
+            "report-cid:",
+            "supersedes:",
+            "implementer-binding:",
+            "verdict:",
+            "closes:",
+            "switched-to:",
+            "measure:",
+        ]
+        .iter()
+        .any(|prefix| slot(binding, prefix).is_some())
+        || binding.process.is_some()
+        || !matches!(&binding.quantity, elohim_epr_rea::Magnitude::Count { value, unit }
+            if *value == 1.0 && unit == "run-note")
+    {
+        return Err(refused(
+            "actor binding must be an attribution-only non-discharging ruling",
+        ));
+    }
+    if required(binding, "reason:")?.trim().is_empty()
+        || binding.receiver != root.repository_agent()?
+        || binding.in_scope_of != super::repository::scope_of(&root.repository_agent()?)?
+    {
+        return Err(refused(
+            "actor binding needs an authored reason and the original repository note scope",
+        ));
+    }
+    let promise = commitment(records, &binding.resource)?;
+    if promise
+        .resource_spec
+        .classified_as
+        .iter()
+        .any(|s| s.starts_with("actor-claim:"))
+    {
+        return Err(refused(
+            "actor binding cannot override an original actor-claim pin",
+        ));
+    }
+    let actor = cid(required(binding, "bind-actor:")?)?;
+    if cid(required(binding, "actor-claim:")?)? != actor
+        || root.actor_identity(&actor)? != promise.provider.0
+        || binding.provider.0 != promise.provider.0
+        || cid(required(binding, "scope-cid:")?)? != promise.in_scope_of
+    {
+        return Err(refused(
+            "actor binding author, original provider, claim or scope differs",
+        ));
+    }
+    Ok(())
+}
+
+/// Explicit evidence boundary shared by repository commands and immutable views.
+/// Missing resources remain errors; implementations must never fetch implicitly.
+pub trait EvidenceResources {
+    fn read_text(&self, path: &str) -> FlowResult<String>;
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String>;
+    /// The declared repository agent, read through this same boundary.
+    fn repository_agent(&self) -> FlowResult<elohim_epr_rea::AgentRef> {
+        let text = self.read_text(super::repository::DECLARATION)?;
+        super::repository::parse_repository_agent(Path::new(super::repository::DECLARATION), &text)
+    }
+}
+
+impl EvidenceResources for Path {
+    fn read_text(&self, path: &str) -> FlowResult<String> {
+        let root = std::fs::canonicalize(self)?;
+        let path = confine_under(&root, &root.join(path))?;
+        Ok(std::fs::read_to_string(path)?)
+    }
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
+        actor_identity(self, id)
+    }
+}
+
+impl EvidenceResources for std::path::PathBuf {
+    fn read_text(&self, path: &str) -> FlowResult<String> {
+        self.as_path().read_text(path)
+    }
+    fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
+        self.as_path().actor_identity(id)
+    }
+}
+
 fn independent_actor(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     target: &Cid,
     actor: &Cid,
 ) -> FlowResult<String> {
     let promise = commitment(records, target)?;
-    let implementer = promise
-        .resource_spec
-        .classified_as
-        .iter()
-        .find_map(|s| s.strip_prefix("actor-claim:"))
-        .ok_or_else(|| refused("implementer has no exact registered actor claim"))?;
-    let implementer = cid(implementer)?;
-    let identity = actor_identity(root, actor)?;
-    let implementer_identity = actor_identity(root, &implementer)?;
+    let (implementer, _) = implementer_attribution(root, records, target)?;
+    let identity = root.actor_identity(actor)?;
+    let implementer_identity = root.actor_identity(&implementer)?;
     if implementer_identity != promise.provider.0
         || implementer == *actor
         || identity == promise.provider.0
@@ -118,6 +287,12 @@ struct Evidence {
     cid: String,
 }
 
+/// Explicit byte dependencies of an acceptance report; discovery does not validate acceptance.
+pub fn report_dependencies(text: &str) -> FlowResult<Vec<String>> {
+    let report: Report = serde_json::from_str(text)?;
+    Ok(report.evidence.into_iter().map(|e| e.path).collect())
+}
+
 fn pinned_file(root: &Path, path: &str, pin: Option<&str>) -> FlowResult<(String, Cid)> {
     let root = std::fs::canonicalize(root)?;
     let path = confine_under(&root, &root.join(path))?;
@@ -135,13 +310,16 @@ fn pinned_file(root: &Path, path: &str, pin: Option<&str>) -> FlowResult<(String
 }
 
 fn validate_report(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     path: &str,
     pin: &str,
     fulfillment_resource: &Cid,
 ) -> FlowResult<()> {
-    let (path, _) = pinned_file(root, path, Some(pin))?;
-    let report: Report = serde_json::from_str(&std::fs::read_to_string(root.join(path))?)?;
+    let text = root.read_text(path)?;
+    if super::body_cid(&text) != cid(pin)? {
+        return Err(refused(format!("evidence changed: {path}")));
+    }
+    let report: Report = serde_json::from_str(&text)?;
     if [&report.intent, &report.revision, &report.environment]
         .iter()
         .any(|s| s.trim().is_empty())
@@ -165,7 +343,9 @@ fn validate_report(
         return Err(refused("report evidence must pin the fulfillment resource"));
     }
     for evidence in report.evidence {
-        pinned_file(root, &evidence.path, Some(&evidence.cid))?;
+        if super::body_cid(&root.read_text(&evidence.path)?) != cid(&evidence.cid)? {
+            return Err(refused(format!("evidence changed: {}", evidence.path)));
+        }
     }
     Ok(())
 }
@@ -185,12 +365,28 @@ impl AcceptanceOptions {
             || self.review.is_some()
             || self.report.is_some()
             || self.supersedes.is_some();
+        if let Some(actor) = &self.bind_actor {
+            if kind != "run:ruling" || has_acceptance || self.appoint.is_some() {
+                return Err(refused(
+                    "--bind-actor belongs only to an attribution-only ruling",
+                ));
+            }
+            cid(actor)?;
+            return Ok(vec![
+                format!("bind-actor:{actor}"),
+                format!("scope-cid:{}", commitment(records, target)?.in_scope_of),
+            ]);
+        }
         if let Some(actor) = &self.appoint {
             if kind != "run:ruling" || has_acceptance {
                 return Err(refused("--appoint belongs only to a ruling"));
             }
             independent_actor(root, records, target, &cid(actor)?)?;
-            return Ok(vec![format!("appoint:{actor}")]);
+            let mut slots = vec![format!("appoint:{actor}")];
+            if let (_, Some(witness)) = implementer_attribution(root, records, target)? {
+                slots.push(format!("implementer-binding:{witness}"));
+            }
+            return Ok(slots);
         }
         if !has_acceptance {
             return Ok(vec![]);
@@ -234,6 +430,13 @@ impl AcceptanceOptions {
 fn validate_note_shape(current: &FlowEvent) -> FlowResult<()> {
     for prefix in [
         "appoint:",
+        "bind-actor:",
+        "implementer-binding:",
+        "reason:",
+        "steward:",
+        "source:",
+        "closes:",
+        "switched-to:",
         "purpose:",
         "appointment:",
         "fulfillment:",
@@ -268,16 +471,41 @@ fn validate_note_shape(current: &FlowEvent) -> FlowResult<()> {
 /// Immutable authority/link checks, separate from artifact availability. A lost
 /// report invalidates current acceptance, not its explicit supersession history.
 pub fn validate_structure(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     current: &FlowEvent,
 ) -> FlowResult<()> {
     validate_note_shape(current)?;
+    if slot(current, "bind-actor:").is_some() {
+        validate_binding(root, records, current)?;
+        let current_id = FlowRecord::Event(current.clone()).cid()?;
+        for (id, record) in records {
+            if let FlowRecord::Event(other) = record {
+                if other.resource == current.resource && slot(other, "bind-actor:").is_some() {
+                    validate_binding(root, records, other)?;
+                    if *id != current_id {
+                        return Err(refused("conflicting attribution witnesses; one exact binding ruling is required"));
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
     if let Some(actor) = slot(current, "appoint:") {
         if current.classified_as.first().map(String::as_str) != Some("run:ruling") {
             return Err(refused("appointment is not a ruling"));
         }
         let identity = independent_actor(root, records, &current.resource, &cid(actor)?)?;
+        let (_, witness) = implementer_attribution(root, records, &current.resource)?;
+        match (witness, slot(current, "implementer-binding:")) {
+            (Some(expected), Some(pin)) if cid(pin)? == expected => {}
+            (None, None) => {}
+            _ => {
+                return Err(refused(
+                    "appointment must pin its exact implementer-binding witness",
+                ))
+            }
+        }
         if identity == current.provider.0 || slot(current, "actor-claim:") == Some(actor) {
             return Err(refused("acceptor cannot appoint itself"));
         }
@@ -343,12 +571,12 @@ pub fn validate_structure(
 
 /// Recheck the same evidence on admission and reconciliation. Never infer fitness from fields.
 pub fn validate_record(
-    root: &Path,
+    root: &(impl EvidenceResources + ?Sized),
     records: &[(Cid, FlowRecord)],
     current: &FlowEvent,
 ) -> FlowResult<()> {
     validate_structure(root, records, current)?;
-    if slot(current, "appoint:").is_some() {
+    if slot(current, "appoint:").is_some() || slot(current, "bind-actor:").is_some() {
         return Ok(());
     }
     let fulfillment = event(records, &cid(required(current, "fulfillment:")?)?)?;

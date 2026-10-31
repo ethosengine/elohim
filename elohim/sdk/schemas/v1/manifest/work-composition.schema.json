@@ -1,0 +1,224 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "appManifest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-]{1,256}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "view": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+          },
+          "role": {
+            "enum": [
+              "focus",
+              "work",
+              "support"
+            ]
+          },
+          "conditionField": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "claimPrefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "titlePrefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "view",
+          "role"
+        ]
+      }
+    },
+    "links": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "targetField": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "from",
+          "field",
+          "to",
+          "targetField",
+          "label"
+        ]
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "titleField": {
+          "const": "$title"
+        },
+        "statusField": {
+          "const": "$status"
+        },
+        "columns": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "value",
+              "label"
+            ]
+          }
+        },
+        "terminalValues": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "readings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "reconciliationReading": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "titleField",
+        "statusField",
+        "columns",
+        "terminalValues",
+        "readings",
+        "reconciliationReading"
+      ]
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_files": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "max_files",
+        "max_bytes",
+        "max_depth"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "purpose",
+    "groups",
+    "links",
+    "presentation",
+    "bounds"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:work-composition",
+  "title": "Read-only work composition"
+}

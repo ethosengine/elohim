@@ -25,6 +25,8 @@
  */
 
 // Types
+export * from './app-lifecycle.js';
+
 export {
   StorageConfig,
   StorageError,

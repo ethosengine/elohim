@@ -26,7 +26,10 @@ pub struct AddrUpdate {
 
 /// A publish target. Implemented per concrete sink; dispatched through
 /// [`ActiveSink`] so a heterogeneous, composed set can be driven uniformly.
-#[allow(async_fn_in_trait)]
+#[allow(
+    async_fn_in_trait,
+    reason = "Sink is dispatched through the ActiveSink enum rather than as a public generic bound, per its doc comment"
+)]
 pub trait Sink {
     /// Stable short name for logging.
     fn name(&self) -> &'static str;

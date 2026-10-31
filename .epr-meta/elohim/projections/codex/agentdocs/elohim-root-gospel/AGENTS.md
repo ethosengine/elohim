@@ -131,6 +131,7 @@ just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
 just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped); REFUSES before launch when the prologue's hosted-human roster is missing or older than the doorway archive (a cold start drops the archive and the roster with it — without this the lane fails as sixteen opaque `Invalid credentials` 401s); MESH_ALLOW_NO_PROLOGUE=1 for a lane that casts nobody
 just dev start                # isolated conductor + storage + doorway
+just dev shift start <contract.json> --runtime codex  # bounded Claude/Codex task; resume|status|stop <id>, recover; genesis/agentic/SHIFT.md
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
@@ -171,6 +172,7 @@ just mesh recovery <warm|cold> <peer> [--label k=v]  # single warm/cold recovery
 just mesh recovery-matrix     # recovery scenario library × warm/cold shapes × runs (MESH_PEER_TRANSPORTS in hc-mesh.sh + hc-mesh-recovery.sh)
 just seed validate            # non-writing schema validation
 just seed apply mesh content  # seed the household mesh THIS host owns (env from hc-mesh.sh mesh_seed_env)
+just seed apply mesh content '' '<logical-id>'  # target canonical content; skips deployment bindings and projections
 just look page <url>          # eyes-first render
 just status habits
 just status device            # has this workspace ARRIVED as its human's device: six ok/REFUSED lines (epr binary · device key · roster bound · embed model · fold attested · berth moored), each REFUSED naming its cure; exit 1 on any

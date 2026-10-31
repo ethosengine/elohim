@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:app-instance-answer",
+  "title": "AppInstanceAnswer",
+  "description": "Source of truth: peer runtime operational state (Category C). Specializes the shared Answer envelope; observed absence and unreachable remain distinct.",
+  "oneOf": [
+    {
+      "title": "AnswerPresent",
+      "description": "The answer arrived and carries a value. Takes no `reason`: 'why is it there' is not a question a boundary answers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "const": "present"
+        },
+        "value": {
+          "$ref": "app-instance.schema.json"
+        }
+      }
+    },
+    {
+      "title": "AnswerAbsent",
+      "description": "The answer arrived and reports the value does not exist. A POSITIVE claim — absence was observed — so its only legal reason is `observed_absent`, and it never carries a value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "const": "absent"
+        },
+        "reason": {
+          "const": "observed_absent"
+        }
+      }
+    },
+    {
+      "title": "AnswerUnreachable",
+      "description": "No answer arrived; nothing is established in either direction. Always carries a reason — a non-present answer with no reason is exactly the unreadable gauge C8 forbids — and never a value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "const": "unreachable"
+        },
+        "reason": {
+          "enum": [
+            "timeout",
+            "transport_error",
+            "refused",
+            "unverifiable",
+            "not_yet_delivered"
+          ]
+        }
+      }
+    }
+  ],
+  "_vocabulary": {
+    "$comment": "The two enum schemas this envelope's `state` and `reason` are drawn from. Referenced here rather than by $ref inside the branches because each branch pins a single const/subset — the enums remain the single source of truth for the full vocabulary, and elohim-storage's schema_contract test asserts the branches stay a partition of them.",
+    "state": "../enums/answer-state.schema.json",
+    "reason": "../enums/answer-reason.schema.json"
+  }
+}

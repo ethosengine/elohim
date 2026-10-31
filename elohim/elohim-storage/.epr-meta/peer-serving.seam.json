@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "peer-native-serving",
+  "responsibility": "Peer-native serving belongs in storage/runtime producers; doorway projects the same capability for browsers. A text match cannot prove exclusive implementation.",
+  "owner": ["elohim/elohim-storage/*", "steward/*"],
+  "allowedConsumers": ["doorway/*"],
+  "authoritativeContracts": [
+    {
+      "path": ".epr-meta/composition.md",
+      "needle": "Do not make doorway the sole owner of drafts, publication or app execution.",
+      "status": "contract"
+    }
+  ],
+  "reusableInterfaces": [
+    {
+      "path": "elohim/elohim-storage/src/http_blob_router.rs",
+      "needle": "pub struct ChooseInputs<'a> {",
+      "status": "implemented"
+    },
+    {
+      "path": "elohim/elohim-storage/src/content_server.rs",
+      "needle": "pub struct ContentServerConfig {",
+      "status": "implemented"
+    }
+  ],
+  "detection": [
+    "serve_peer_blob",
+    "register_content_server",
+    "peer_native_serve",
+    "ChooseInputs"
+  ],
+  "composition": ["storage_client.", "ChooseInputs"],
+  "exclusions": ["*/tests/*"],
+  "appliesTo": ["doorway/*.rs", "elohim/elohim-storage/*.rs", "steward/*.rs"]
+}

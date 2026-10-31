@@ -33,7 +33,7 @@
 //! against a ceiling only fires once the damage is visible.
 
 use cid::Cid;
-use elohim_epr::measure::{ClaimKind, Confidence, Interval, MeasureKind, Period, Quantity};
+use elohim_epr::measure::{Confidence, Interval, MeasureKind, Period, Quantity};
 use elohim_epr::witness::{Magnitude, ReaVerb};
 
 use crate::model::FlowEvent;
@@ -184,7 +184,10 @@ impl Stock {
             value: self.inflow.value - self.outflow.value,
             kind,
             confidence: Confidence::from_reasoned(
-                weaker(self.inflow.confidence.claim, self.outflow.confidence.claim),
+                self.inflow
+                    .confidence
+                    .claim
+                    .weaker(self.outflow.confidence.claim),
                 net,
                 compose_basis("net change", &self.inflow, &self.outflow),
             ),
@@ -252,23 +255,6 @@ pub fn respite_response(
     divide(problem_growth, response, "respite/response")
 }
 
-fn weaker(a: ClaimKind, b: ClaimKind) -> ClaimKind {
-    fn rank(c: ClaimKind) -> u8 {
-        match c {
-            ClaimKind::Witnessed => 0,
-            ClaimKind::InstrumentMeasured => 1,
-            ClaimKind::Estimated => 2,
-            ClaimKind::Modelled => 3,
-            ClaimKind::Imputed => 4,
-        }
-    }
-    if rank(a) >= rank(b) {
-        a
-    } else {
-        b
-    }
-}
-
 /// Compose a derived quantity's basis from its inputs' own grounding.
 ///
 /// Spec Q11 says `fold::with_uncertainty` DESTROYS basis, replacing every input's grounding
@@ -281,6 +267,30 @@ fn compose_basis(op: &str, a: &Quantity, b: &Quantity) -> String {
         "{op} of [{}] and [{}]",
         a.confidence.basis, b.confidence.basis
     )
+}
+
+/// `level / rate` — how many of the rate's periods the level covers.
+///
+/// The arithmetic [`Stock::turnover_time`] runs on its own outflow, offered for any level and
+/// any rate a caller measured apart: hours spent over hours returned per week is a PAYBACK in
+/// weeks, a buffer over a draw rate is its coverage. Typed rather than open-ended — anything but
+/// a `Level` over a `Rate` is refused, because the other quotients `MeasureKind::divide` admits
+/// (a rate over a rate) are indices with their own names, not times.
+///
+/// Every honest-absence rule of `turnover_time` carries over unchanged: a rate whose band admits
+/// zero returns NaN with an unknown interval rather than `+∞`, the claim is the weaker operand's,
+/// and the result's period survives only in its `basis` (spec Q15).
+pub fn coverage_time(level: &Quantity, rate: &Quantity) -> Result<Quantity, StockError> {
+    if level.kind != MeasureKind::Level {
+        return Err(StockError::LevelIsNotALevel(level.kind));
+    }
+    if rate.kind.period().is_none() {
+        return Err(StockError::FlowIsNotARate {
+            side: "rate",
+            kind: rate.kind,
+        });
+    }
+    divide(level, rate, "coverage time")
 }
 
 fn divide(num: &Quantity, den: &Quantity, op: &str) -> Result<Quantity, StockError> {
@@ -321,7 +331,7 @@ fn divide(num: &Quantity, den: &Quantity, op: &str) -> Result<Quantity, StockErr
         value,
         kind,
         confidence: Confidence::from_reasoned(
-            weaker(num.confidence.claim, den.confidence.claim),
+            num.confidence.claim.weaker(den.confidence.claim),
             outcome,
             compose_basis(op, num, den),
         ),
@@ -437,13 +447,15 @@ pub fn stock_over_window_within(
         }
     }
 
+    // The basis names a QUANTITY in the unit, not a number of events: a stock whose events carry
+    // fractions (a red mass drained by 0.25) would otherwise read "0.25 consume events".
     let rate = |count: f64, what: &str| Quantity {
         value: count / window.periods,
         kind: MeasureKind::Rate { per: window.per },
         confidence: Confidence::witnessed(
             Interval::exact(count / window.periods),
             format!(
-                "{count} {what} events on {unit} witnessed in the flow log over {}",
+                "{count} {unit} {what}d by events witnessed in the flow log over {}",
                 window.label()
             ),
         ),

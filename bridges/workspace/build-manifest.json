@@ -1,0 +1,68 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "workspace-bridge",
+  "manualOnly": true,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
+  "description": "Portable app foundation contract gates; no deployment claim",
+  "steps": {
+    "gate-contract": {
+      "description": "Verify owning native contract boundary",
+      "inputs": {
+        "sources": [
+          "bridges/workspace/**",
+          "crates/elohim-sdk/**",
+          "crates/elohim-views/**",
+          "crates/seam-contracts/**",
+          "crates/doorway-client/**",
+          "crates/elohim-storage-client/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Contract Gate",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "workspace-bridge": {
+        "dir": "bridges/workspace",
+        "inputs": {
+          "sources": [
+            "bridges/workspace/**",
+            "crates/elohim-sdk/**",
+            "crates/elohim-views/**",
+            "crates/seam-contracts/**",
+            "crates/doorway-client/**",
+            "crates/elohim-storage-client/**"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "bridges/workspace",
+            "profile": "dev",
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
+          }
+        },
+        "steps": [
+          "gate-contract"
+        ]
+      }
+    }
+  },
+  "deployment": {}
+}

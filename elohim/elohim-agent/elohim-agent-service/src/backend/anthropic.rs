@@ -223,7 +223,10 @@ struct TextDelta {
 #[derive(Debug, Deserialize)]
 struct SseMessageDelta {
     delta: MessageDeltaBody,
-    #[allow(dead_code)] // Needed for serde, may be used for cost tracking later
+    #[allow(
+        dead_code,
+        reason = "needed for the wire shape of the SSE message_delta event; may be used for cost tracking later"
+    )]
     usage: Option<DeltaUsage>,
 }
 

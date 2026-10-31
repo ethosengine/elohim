@@ -780,7 +780,11 @@ mod tests {
         let frames = load_frames(&repo_root()).expect("every atom parses strictly");
         assert_eq!(
             frames.keys().cloned().collect::<Vec<_>>(),
-            vec![OWNERSHIP.to_string(), SOVEREIGNTY.to_string()]
+            vec![
+                "epr:validator-absolutes-guard".to_string(),
+                OWNERSHIP.to_string(),
+                SOVEREIGNTY.to_string()
+            ]
         );
         for (validator, (atom, _)) in &frames {
             assert_eq!(&atom.validator, validator);

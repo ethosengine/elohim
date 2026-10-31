@@ -241,7 +241,10 @@ pub struct ContentListOptions {
     pub offset: u32,
 }
 
-#[allow(dead_code)] // Used by serde default
+#[allow(
+    dead_code,
+    reason = "referenced only by the serde default attribute naming default_limit, which the lint does not count as a use"
+)]
 fn default_limit() -> u32 {
     100
 }

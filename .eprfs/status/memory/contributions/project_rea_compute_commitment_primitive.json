@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "rea-compute-commitment-primitive",
   "claim": "One primitive for bounded authority delegation: Mishpat::Commitment + delegates-compute action, on-chain revocation; displaces X-API-Key grants.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_rea_compute_commitment_primitive.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_rea_compute_commitment_primitive.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 0c3107ea-a896-4db5-ae15-c9e1d7921552."
   ],
   "sources": [
     {

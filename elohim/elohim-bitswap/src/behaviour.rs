@@ -129,7 +129,10 @@ impl Bitswap {
     }
 
     /// Adds an address for a peer.
-    #[allow(deprecated)]
+    #[allow(
+        deprecated,
+        reason = "libp2p-request-response 0.27 deprecates RequestResponse::add_address in favour of Swarm::add_peer_address; this behaviour has no Swarm handle to call it on"
+    )]
     pub fn add_address(&mut self, peer_id: &PeerId, addr: Multiaddr) {
         self.query_manager.add_peer(peer_id);
         self.inner.add_address(peer_id, addr);

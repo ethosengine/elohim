@@ -54,6 +54,25 @@ export default function () {
       format: ['progress'],
     },
     default: { ...base, paths: ['features/**/*.feature'] },
+    'work-composition': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/work-composition.steps.ts'],
+      paths: ['features/devflow/work-composition.feature'],
+      format: ['progress'],
+    },
+    'local-view-board': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/local-view-board.steps.ts'],
+      paths: ['features/devflow/local-view-board.feature'],
+      format: ['progress'],
+    },
+    'app-lifecycle': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/portable-app-lifecycle.steps.ts'],
+      paths: ['features/devflow/portable-app-lifecycle.feature'],
+      tags: '@lifecycle-contract and not @wip',
+      format: ['progress'],
+    },
     // The real-workspace half uses existing peer daemons; local scenarios keep their own fixtures.
     'devices-share-one-berth': {
       requireModule: ['tsx'],
@@ -65,6 +84,12 @@ export default function () {
       format: ['progress'],
     },
     // Isolated native fixtures: no deployed environment or global E2E hooks.
+    'declared-views': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/declared-local-views.steps.ts'],
+      paths: ['features/devflow/declared-local-views.feature'],
+      format: ['progress'],
+    },
     ceremony: {
       requireModule: ['tsx'],
       require: ['steps/devflow/ceremony-reconciliation.steps.ts'],

@@ -48,7 +48,10 @@ impl StepType {
 // ─── StepOutcome ─────────────────────────────────────────────────────────────
 
 /// What a step executor returns to the interpreter after executing.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "boxing the Terminate payload is a Phase 3+ optimization; the GateDecision is small enough today and inlining keeps the trait signature simpler"
+)]
 pub enum StepOutcome {
     /// The DAG should continue walking edges to find the next step or terminal.
     Continue,

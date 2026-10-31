@@ -4,14 +4,15 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:integrator@claude-fable-5-1",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_trust_as_performance_primitive",
   "claim": "Security and performance COMPOSE: trusted peer edges run fast while commons browsing stays witnessed-safe.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_trust_as_performance_primitive.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+    "Imported verbatim from .claude/memory/project_trust_as_performance_primitive.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
+    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: c87b3bc9-e95e-42be-bb11-a094d8c482c6."
   ],
   "sources": [
     {

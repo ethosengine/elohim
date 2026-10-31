@@ -61,6 +61,9 @@ fn declared_elsewhere(repo_root: &Path) -> HashSet<String> {
 impl ValidatorProvider for ElohimRepositoryValidators {
     fn evaluate(&self, request: &ValidatorRequest<'_>) -> ValidatorOutcome {
         let detail = match request.reference {
+            "epr:validator-native-seam-guidance" => {
+                return crate::seam::classify::classify(request)
+            }
             "epr:validator-rust-style-strict" => {
                 let Some(content) = request.write.content.as_deref() else {
                     return ValidatorOutcome::Unavailable;

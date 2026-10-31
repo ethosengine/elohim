@@ -23,6 +23,72 @@ const rootOnly =
     ? "bootstrap needs root to grant guest report ownership"
     : false;
 
+// Namespace UID 0 alone cannot chown to or run as the real stage guest.
+function mapsGuest(mapping) {
+  return mapping
+    .trim()
+    .split("\n")
+    .some((row) => {
+      const fields = row.trim().split(/\s+/).map(Number);
+      if (fields.length !== 3 || !fields.every(Number.isSafeInteger)) return false;
+      const [inside, outside, count] = fields;
+      return (
+        inside >= 0 && outside >= 0 && count > 0 &&
+        65534 >= inside && 65534 - inside < count
+      );
+    });
+}
+
+function guestPrerequisite(readProc) {
+  const missing = ["uid_map", "gid_map"].filter((name) => !mapsGuest(readProc(name)));
+  if (missing.length) {
+    return `guest ownership prerequisite unavailable: guest ID 65534 is not mapped in ${missing.map((name) => `/proc/self/${name}`).join(" and ")}`;
+  }
+  if (readProc("setgroups").trim() !== "allow") {
+    return "guest ownership prerequisite unavailable: /proc/self/setgroups must allow setpriv --clear-groups";
+  }
+  return false;
+}
+
+const guestOnly =
+  rootOnly || guestPrerequisite((name) => readFileSync(`/proc/self/${name}`, "utf8"));
+
+const fullMap = "         0          0 4294967295\n";
+const singleMap = "         0          0          1\n";
+const prerequisites = (uid, gid, setgroups = "allow\n") =>
+  guestPrerequisite((name) => ({ uid_map: uid, gid_map: gid, setgroups })[name]);
+
+test("guest prerequisite accepts full and multiple namespace-local mappings", () => {
+  assert.equal(prerequisites(fullMap, fullMap), false);
+  assert.equal(prerequisites("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"), false);
+});
+
+test("guest prerequisite names single-ID and separately missing UID/GID mappings", () => {
+  assert.match(prerequisites(singleMap, singleMap), /uid_map.*gid_map/);
+  assert.match(prerequisites(singleMap, fullMap), /uid_map/);
+  assert.doesNotMatch(prerequisites(singleMap, fullMap), /gid_map/);
+  assert.match(prerequisites(fullMap, singleMap), /gid_map/);
+  assert.doesNotMatch(prerequisites(fullMap, singleMap), /uid_map/);
+});
+
+test("guest mapping uses the inside column and inclusive-start exclusive-end bounds", () => {
+  for (const mapping of ["65534 42 1", "65533 42 2", "0 42 65535"]) {
+    assert.equal(mapsGuest(mapping), true, mapping);
+  }
+  for (const mapping of [
+    "0 65534 1", "65535 42 1", "65533 42 1", "65534 42 0", "0 0 65534",
+    "", "invalid", "65534 -1 1", "65534 0 1.5", "65534 0 1 2",
+  ]) {
+    assert.equal(mapsGuest(mapping), false, mapping);
+  }
+});
+
+test("guest prerequisite preserves the clear-groups permission boundary", () => {
+  assert.match(prerequisites(fullMap, fullMap, "deny\n"), /setgroups.*setpriv --clear-groups/);
+  assert.match(prerequisites(fullMap, fullMap, ""), /setgroups/);
+  assert.equal(prerequisites(fullMap, fullMap, "allow\n"), false);
+});
+
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "compute-bootstrap-"));
   chmodSync(root, 0o755);
@@ -156,7 +222,7 @@ noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED}))
 
 test(
   "bootstrap resumes identities, isolates ports, scrubs credentials and preserves immutable checkout",
-  { skip: rootOnly },
+  { skip: guestOnly },
   (t) => {
     const f = fixture(t);
     f.env.COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256 = "d".repeat(64);
@@ -195,7 +261,7 @@ test(
 
 test(
   "new image commit gets another checkout without replacing earlier task source",
-  { skip: rootOnly },
+  { skip: guestOnly },
   (t) => {
     const f = fixture(t);
     assert.equal(f.run().status, 0);
@@ -244,7 +310,7 @@ test(
 
 test(
   "grant bootstrap refusal prevents both private and legacy worker startup",
-  { skip: rootOnly },
+  { skip: guestOnly },
   (t) => {
     const f = fixture(t);
     f.env.FIXTURE_GRANT_REFUSE = "1";
@@ -258,7 +324,7 @@ test(
 
 test(
   "wrapper exposes only the no-cast health feature and restores the same owned topology",
-  { skip: rootOnly },
+  { skip: guestOnly },
   (t) => {
     const f = fixture(t);
     const started = f.run();
@@ -297,7 +363,7 @@ test(
 
 test(
   "bootstrap and resume work with only SETUID SETGID CHOWN capabilities",
-  { skip: rootOnly },
+  { skip: guestOnly },
   (t) => {
     const f = fixture(t);
     const run = () =>

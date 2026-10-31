@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "browser-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+description = "Minimal browser-origin adapter over peer-owned app lifecycle contracts"
+publish = false
+
+[dependencies]
+elohim-sdk = { path = "../../crates/elohim-sdk", version = "0.1.0", default-features = false }
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

@@ -2,9 +2,9 @@
 
 # Concern x Seam Matrix
 
-**16 concern classes x 16 seams = 256 cells** — conformant 17 · variant 78 · n-a 3 · unexamined 158.
+**16 concern classes x 16 seams = 256 cells** — conformant 10 · variant 92 · n-a 12 · unexamined 142.
 
-Digest `sha256:2c4f9714fe939b11caf36b85eceaba50`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
+Digest `sha256:ec8493682ab234d2c90a1290f5715f84`. Rows come from the two canon homes at their lineage tips; columns from `.claude/epr-meta/seam-catalog.yaml` (atlas §3 grouped by §7 planes + governing/meta + bridges); cells are derived from every `seam-registry.yaml` by the census. Participation track and reach tier are cell attributes, not axes.
 
 State vocabulary: `conformant` = every citing point answered **and** cites a contract test that exists and contains the named fn · `variant` = a documented waiver (status partial/unbound) **or** an answered point with no verified test · `unexamined` = nobody has looked · `n-a` = declared inapplicable with justification.
 
@@ -55,22 +55,22 @@ State vocabulary: `conformant` = every citing point answered **and** cites a con
 
 | Class | S3.1 | S3.4 | S3.5 | S3.7 | S3.12 | S3.14 | S3.2 | S3.3 | S3.10 | S3.11 | S3.13 | S3.15 | S3.8 | S3.9 | S3.6 | SGOV |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **C0** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ✓ | ✓ | ~ |
-| **C1** | · | · | · | · | ~ | · | · | ~ | ~ | · | · | - | · | ✓ | ✓ | ~ |
-| **C2** | · | · | · | · | · | · | · | ~ | ~ | · | · | - | · | ✓ | - | ✓ |
-| **C3** | · | · | · | · | · | · | · | ✓ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
-| **C4** | · | · | · | · | ~ | · | · | ~ | ~ | · | · | ✓ | · | ~ | ~ | ~ |
-| **C5** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
-| **C6a** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
-| **C6b** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ✓ |
-| **C7** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
-| **C8** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
-| **C9** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
-| **C10** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ✓ |
-| **C11** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
-| **C12** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
-| **C13** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ✓ | ✓ | ~ |
-| **C14** | · | · | · | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ✓ |
+| **C0** | · | · | ✓ | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C1** | · | · | - | · | ~ | · | · | ~ | ~ | · | · | ✓ | · | ~ | ✓ | ~ |
+| **C2** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
+| **C3** | · | · | - | · | · | · | · | ✓ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C4** | · | · | ✓ | · | ~ | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C5** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C6a** | · | · | ✓ | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C6b** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C7** | · | · | ✓ | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C8** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C9** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
+| **C10** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C11** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C12** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
+| **C13** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ✓ | ~ |
+| **C14** | · | · | - | · | · | · | · | ~ | ~ | · | · | ~ | · | ~ | ~ | ~ |
 
 Legend: `✓` conformant · `~` variant · `·` unexamined · `-` n-a
 
@@ -102,148 +102,164 @@ Rank = recurrence x severity x rung-proximity (severity: silent-corruption 2.0, 
 | # | Class | Seam | Score | Recurrence | Severity | Rung proximity |
 |---|---|---|---|---|---|---|
 | 1 | C2 | `S3.12` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 2 | C5 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 3 | C8 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 4 | C0 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 5 | C13 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 6 | C7 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 7 | C3 | `S3.12` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 8 | C10 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 9 | C12 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 10 | C14 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 11 | C6a | `S3.12` | 12.0 | 4 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 12 | C6b | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 13 | C9 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
-| 14 | C2 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 15 | C2 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 16 | C4 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 17 | C4 | `S3.4` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 18 | C11 | `S3.12` | 9.0 | 3 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
-| 19 | C1 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 20 | C1 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 21 | C5 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 22 | C5 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 23 | C8 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 24 | C8 | `S3.4` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 25 | C0 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 26 | C0 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 27 | C13 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 28 | C13 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 29 | C7 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
-| 30 | C7 | `S3.4` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (operator-runtime-surface green) |
-| 31 | C2 | `S3.1` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 32 | C2 | `S3.13` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 33 | C2 | `S3.14` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 34 | C2 | `S3.2` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 35 | C2 | `S3.5` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 36 | C2 | `S3.7` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 37 | C2 | `S3.8` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
-| 38 | C3 | `S3.11` | 5.0 | 5 | 1.0 (loud-fail) | 1.0 (notary-authority green) |
-| 39 | C3 | `S3.4` | 5.0 | 5 | 1.0 (loud-fail) | 1.0 (operator-runtime-surface green) |
-| 40 | C4 | `S3.1` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
+| 2 | C2 | `S3.4` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 3 | C4 | `S3.4` | 30.0 | 5 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 4 | C1 | `S3.4` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 5 | C5 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 6 | C5 | `S3.4` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 7 | C8 | `S3.12` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 8 | C8 | `S3.4` | 24.0 | 4 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 9 | C0 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 10 | C0 | `S3.4` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 11 | C13 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 12 | C13 | `S3.4` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 13 | C7 | `S3.12` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 14 | C7 | `S3.4` | 18.0 | 3 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 15 | C3 | `S3.12` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 16 | C3 | `S3.4` | 15.0 | 5 | 1.0 (loud-fail) | 3.0 (operator-runtime-surface red) |
+| 17 | C10 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 18 | C10 | `S3.4` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 19 | C12 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 20 | C12 | `S3.4` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 21 | C14 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 22 | C14 | `S3.4` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 23 | C6a | `S3.12` | 12.0 | 4 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 24 | C6a | `S3.4` | 12.0 | 4 | 1.0 (loud-fail) | 3.0 (operator-runtime-surface red) |
+| 25 | C6b | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 26 | C6b | `S3.4` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 27 | C9 | `S3.12` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (identity-cross-signed red) |
+| 28 | C9 | `S3.4` | 12.0 | 2 | 2.0 (silent-corruption) | 3.0 (operator-runtime-surface red) |
+| 29 | C2 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 30 | C4 | `S3.11` | 10.0 | 5 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 31 | C11 | `S3.12` | 9.0 | 3 | 1.0 (loud-fail) | 3.0 (identity-cross-signed red) |
+| 32 | C11 | `S3.4` | 9.0 | 3 | 1.0 (loud-fail) | 3.0 (operator-runtime-surface red) |
+| 33 | C1 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 34 | C5 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 35 | C8 | `S3.11` | 8.0 | 4 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 36 | C0 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 37 | C13 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 38 | C7 | `S3.11` | 6.0 | 3 | 2.0 (silent-corruption) | 1.0 (notary-authority green) |
+| 39 | C2 | `S3.1` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
+| 40 | C2 | `S3.13` | 5.0 | 5 | 2.0 (silent-corruption) | 0.5 (no linked habits article) |
 
 ## Examined cells
 
 | Class | Seam | State | Why | Points |
 |---|---|---|---|---|
-| C0 | `S3.10` | variant | answered but NO verified contract test: compute_local_admission, compute_task | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C0 | `S3.15` | variant | answered but NO verified contract test: Task::validate | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::Task::validate` |
+| C0 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: compute_local_admission, compute_task | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
+| C0 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C0 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C0 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C0 | `S3.9` | conformant | 13 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
-| C0 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Composition::fold`, `elohim-epr-rea::scope::Scopes::contains`, `elohim-epr-rea::stock::Within::admits` |
+| C0 | `S3.5` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C0 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C0 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::PendingAsks::admit` |
+| C0 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::Composition::fold`, `elohim-epr-rea::scope::Scopes::contains` |
 | C1 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: adopt_peer_with_provenance, verify_carried_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
 | C1 | `S3.12` | variant | documented waiver: status unbound | `elohim-node::ConsensusManager::request_consensus`, `elohim-node::ConsensusOutcome` |
-| C1 | `S3.15` | n-a | 2 point(s) declare n-a with justification | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
+| C1 | `S3.15` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C1 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C1 | `S3.6` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C1 | `S3.9` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
-| C1 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-cli::note::resolve_target`, `elohim-epr-cli::stocks::equilibrium_verdict` |
+| C1 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C1 | `S3.6` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C1 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::issue` |
+| C1 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ExternalClaim::new / ExternalClaim::read` |
 | C10 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C10 | `S3.15` | variant | documented waiver: status partial; answered but NO verified contract test: Task::validate | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::Task::validate` |
+| C10 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C10 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal`, `elohim-ark-core::AuthenticatedCandidateContent` |
-| C10 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C10 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
-| C10 | `SGOV` | conformant | 13 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-cli::note::NoteKind`, `elohim-epr-cli::stocks::classify_record` |
+| C10 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C10 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C10 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `doorway::is_content_patch` |
+| C10 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ExternalClaim::new / ExternalClaim::read`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by` |
 | C11 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C11 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `elohim-node::AdmissionController::evaluate`, `elohim-node::AdmissionDecision` |
+| C11 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C11 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C11 | `S3.6` | variant | documented waiver: status partial | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C11 | `S3.9` | variant | documented waiver: status partial | `doorway::discovery_verdict`, `doorway::is_diagnostic_probe`, `doorway::is_head_declare_write`, `doorway::ShellOutcome` |
-| C11 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-cli::acceptance::validate_record`, `elohim-epr-cli::reconciliation::reconcile` |
+| C11 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C11 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C11 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::PendingAsks::admit` |
+| C11 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-device-runtime::path-invalid` |
 | C12 | `S3.10` | variant | documented waiver: status partial/unbound; answered but NO verified contract test: compute_local_admission | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C12 | `S3.15` | variant | documented waiver: status partial/unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::run` |
+| C12 | `S3.15` | variant | documented waiver: status partial/unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C12 | `S3.3` | variant | documented waiver: status partial/unbound | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C12 | `S3.6` | variant | documented waiver: status unbound | `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::assemble_deactivated_document`, `k8s-bridge::render_envelope` |
-| C12 | `S3.9` | variant | documented waiver: status partial | `doorway::should_serve_response`, `doorway::op_gate_capability`, `doorway::StorageServingStatus`, `doorway::read_class` |
-| C12 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-cli::acceptance::validate_record`, `elohim-epr-cli::reconciliation::reconcile`, `elohim-epr-cli::concerns::concerns` |
+| C12 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C12 | `S3.6` | variant | documented waiver: status partial/unbound | `browser-bridge::origin`, `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::assemble_deactivated_document` |
+| C12 | `S3.9` | variant | documented waiver: status partial/unbound | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::issue` |
+| C12 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ActorClaim::new / parse_participant_ref / parse_agent_ref`, `elohim-device-runtime::path-invalid` |
 | C13 | `S3.10` | variant | documented waiver: status partial/unbound | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C13 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::run` |
+| C13 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C13 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C13 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C13 | `S3.9` | conformant | 5 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
-| C13 | `SGOV` | variant | documented waiver: status partial/unbound | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-cli::stocks::equilibrium_verdict`, `elohim-epr-cli::acceptance::validate_record` |
+| C13 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C13 | `S3.6` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C13 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::decide` |
+| C13 | `SGOV` | variant | documented waiver: status partial/unbound; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ExternalClaim::new / ExternalClaim::read`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by` |
 | C14 | `S3.10` | variant | documented waiver: status partial/unbound | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C14 | `S3.15` | variant | documented waiver: status unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
+| C14 | `S3.15` | variant | documented waiver: status partial/unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C14 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C14 | `S3.6` | variant | documented waiver: status partial | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C14 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
-| C14 | `SGOV` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-cli::note::NoteKind`, `elohim-epr-cli::stocks::equilibrium_verdict`, `elohim-epr-cli::acceptance::validate_record` |
+| C14 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C14 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C14 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::decide` |
+| C14 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-device-runtime::path-invalid`, `elohim-device-runtime::invalid-cid` |
 | C2 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: verify_carried_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C2 | `S3.15` | n-a | 2 point(s) declare n-a with justification | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
+| C2 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C2 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C2 | `S3.6` | n-a | 4 point(s) declare n-a with justification | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C2 | `S3.9` | conformant | 7 point(s) answered with a cited contract test that exists and contains the named fn | `doorway::discovery_verdict`, `doorway::is_diagnostic_probe`, `doorway::is_head_declare_write`, `doorway::StorageServingStatus` |
-| C2 | `SGOV` | conformant | 11 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-rea::ActorStore::current_for` |
+| C2 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C2 | `S3.6` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C2 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `doorway::is_content_patch` |
+| C2 | `SGOV` | variant | answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append` |
 | C3 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C3 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
-| C3 | `S3.3` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate` |
-| C3 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C3 | `S3.9` | variant | documented waiver: status partial | `doorway::UpstreamBreakers::would_shed`, `doorway::StorageServingStatus`, `doorway::ServingHealth`, `doorway::read_class` |
-| C3 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-cli::claim::claim / note::note / fulfill::fulfill_on`, `elohim-epr-cli::acceptance::validate_record`, `elohim-epr-cli::reconciliation::reconcile` |
-| C4 | `S3.10` | variant | answered but NO verified contract test: LocalResolve, get_canonical_election_evidence, resolve_canonical_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
+| C3 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
+| C3 | `S3.3` | conformant | 9 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate` |
+| C3 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C3 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C3 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::settle` |
+| C3 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::Unanswered`, `elohim-seam-contracts::insert`, `elohim-device-runtime::path-invalid` |
+| C4 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: LocalResolve, get_canonical_election_evidence, resolve_canonical_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
 | C4 | `S3.12` | variant | documented waiver: status partial | `elohim-node::ConsensusManager::request_consensus`, `elohim-node::ConsensusOutcome` |
-| C4 | `S3.15` | conformant | 3 point(s) answered with a cited contract test that exists and contains the named fn | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `elohim-node::AdmissionDecision` |
+| C4 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C4 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate` |
-| C4 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::DidResolutionError`, `did-bridge::DidResolutionResult`, `did-bridge::DidWebResolver::resolve` |
-| C4 | `S3.9` | variant | documented waiver: status partial | `doorway::decide_reconcile`, `doorway::ReconcileDecision`, `doorway::adoption_targets`, `doorway::fetch_projections_with_fallback` |
-| C4 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::Bound::breached_by / Bound::approached_by`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-rea::Composition::fold` |
+| C4 | `S3.5` | conformant | 2 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C4 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `did-bridge::verify_resolved_subject`, `did-bridge::DidResolutionError`, `did-bridge::DidResolutionResult` |
+| C4 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::settle` |
+| C4 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::Unanswered`, `elohim-seam-contracts::ProbeAnswer`, `elohim-seam-contracts::insert` |
 | C5 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: compute_local_admission, verify_carried_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C5 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
+| C5 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C5 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C5 | `S3.6` | variant | documented waiver: status partial | `did-bridge::verify_resolved_subject`, `did-bridge::derive_did_web_url`, `did-bridge::DidWebResolver::resolve`, `did-bridge::ElohimResolver::resolve` |
-| C5 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
-| C5 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-cli::note::resolve_attribution`, `elohim-epr-cli::govern::actor_stamp` |
+| C5 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C5 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `did-bridge::verify_resolved_subject`, `did-bridge::derive_did_web_url`, `did-bridge::DidWebResolver::resolve` |
+| C5 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::issue` |
+| C5 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::ProbeAnswer`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ExternalClaim::new / ExternalClaim::read` |
 | C6a | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: adopt_peer_with_provenance, get_canonical_election_evidence, resolve_canonical_election | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C6a | `S3.15` | variant | documented waiver: status partial; answered but NO verified contract test: Retention::expired | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::Task::validate`, `rakia-executor::Retention::expired` |
+| C6a | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C6a | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::same_cause_key`, `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle` |
-| C6a | `S3.6` | variant | documented waiver: status partial | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C6a | `S3.9` | variant | documented waiver: status partial | `doorway::K2Store::put_at (MemK2Store)`, `doorway::decide_shell_serve`, `doorway::StorageServingStatus`, `doorway::read_class` |
-| C6a | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-rea::scope::Scopes::contains` |
+| C6a | `S3.5` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C6a | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C6a | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::PendingAsks::admit` |
+| C6a | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append` |
 | C6b | `S3.10` | variant | documented waiver: status partial | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C6b | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::run` |
+| C6b | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C6b | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C6b | `S3.6` | variant | documented waiver: status partial | `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation`, `k8s-bridge::ObserveRefusal` |
-| C6b | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::TransportManifestStore::accept_at` |
-| C6b | `SGOV` | conformant | 12 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-seam-contracts::verdict`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-epr-cli::claim::claim / note::note / fulfill::fulfill_on`, `elohim-epr-cli::note::resolve_target` |
+| C6b | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C6b | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `jenkins-bridge::translate`, `jenkins-bridge::drift`, `jenkins-bridge::require_active` |
+| C6b | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::settle` |
+| C6b | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::SidecarFlowTransaction::append / SidecarActorTransaction::append`, `elohim-device-runtime::path-invalid` |
 | C7 | `S3.10` | variant | documented waiver: status partial | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C7 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `rakia-executor::Retention::expired` |
+| C7 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C7 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::classify_readiness_outcome`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal` |
-| C7 | `S3.6` | conformant | 6 point(s) answered with a cited contract test that exists and contains the named fn | `did-bridge::assemble_deactivated_document`, `did-bridge::MethodRegistry::resolve`, `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict` |
-| C7 | `S3.9` | variant | documented waiver: status partial | `doorway::classify_dispatch`, `doorway::select_route`, `doorway::Disposition`, `doorway::epr_should_serve_ssr` |
-| C7 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::fold::bound_evidence`, `elohim-epr-cli::stocks::classify_record`, `elohim-epr-cli::acceptance::validate_record` |
+| C7 | `S3.5` | conformant | 1 point(s) answered with a cited contract test that exists and contains the named fn | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C7 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `did-bridge::assemble_deactivated_document`, `did-bridge::MethodRegistry::resolve`, `jenkins-bridge::translate` |
+| C7 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `doorway::is_content_patch` |
+| C7 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::fold::bound_evidence`, `elohim-device-runtime::path-invalid` |
 | C8 | `S3.10` | variant | documented waiver: status partial/unbound | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C8 | `S3.15` | variant | documented waiver: status unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `elohim-node::AdmissionController::evaluate`, `elohim-node::DeferReason` |
+| C8 | `S3.15` | variant | documented waiver: status unbound | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::verify_historical_device_binding` |
 | C8 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::same_cause_key`, `elohim-ark-core::verdict`, `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate` |
-| C8 | `S3.6` | variant | documented waiver: status partial | `did-bridge::DidResolutionError`, `k8s-bridge::render_envelope`, `k8s-bridge::drift_verdict`, `k8s-bridge::fold_observation` |
-| C8 | `S3.9` | variant | documented waiver: status partial/unbound | `doorway::SsrFallbackReason`, `doorway::decide_shell_serve`, `doorway::ShellProvenance`, `doorway::StorageServingStatus` |
-| C8 | `SGOV` | variant | documented waiver: status partial/unbound | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-epr-cli::stocks::equilibrium_verdict`, `elohim-epr-cli::stocks::RefusalReason` |
+| C8 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C8 | `S3.6` | variant | documented waiver: status partial | `browser-bridge::origin`, `did-bridge::DidResolutionError`, `jenkins-bridge::translate`, `jenkins-bridge::drift` |
+| C8 | `S3.9` | variant | documented waiver: status partial/unbound | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `elohim-consent-grant::issue` |
+| C8 | `SGOV` | variant | documented waiver: status partial/unbound; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::select_arbitrated_winner`, `elohim-seam-contracts::verdict`, `elohim-seam-contracts::Unanswered`, `elohim-seam-contracts::ProbeAnswer` |
 | C9 | `S3.10` | variant | documented waiver: status partial; answered but NO verified contract test: compute_task | `elohim-storage::authenticated_ordered_head_projection`, `elohim-storage::project_epr_current_terms_update`, `elohim-storage::recover_before_mint`, `elohim-storage::refresh_by_id` |
-| C9 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create` |
+| C9 | `S3.15` | variant | documented waiver: status partial | `mishpat::get_commitment_record`, `mishpat::is_commitment_create`, `mishpat::authorize`, `mishpat::binding_stands` |
 | C9 | `S3.3` | variant | documented waiver: status partial | `elohim-ark-core::readiness_failure_lifecycle`, `elohim-ark-core::authenticate_candidate`, `elohim-ark-core::CandidateRefusal`, `elohim-ark-core::AuthenticatedCandidateContent` |
-| C9 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::controller_from_head`, `did-bridge::assemble_deactivated_document` |
-| C9 | `S3.9` | variant | documented waiver: status partial | `doorway::StorageServingStatus`, `doorway::read_class`, `doorway::should_stock`, `doorway::blob_should_stock` |
-| C9 | `SGOV` | variant | documented waiver: status partial | `elohim-seam-contracts::verdict`, `elohim-epr-rea::ActorClaim::new / parse_agent_ref`, `elohim-epr-cli::acceptance::validate_record`, `elohim-epr-cli::reconciliation::reconcile` |
+| C9 | `S3.5` | n-a | 2 point(s) declare n-a with justification | `elohim-sdk::available_offline`, `elohim-sdk::caught_up` |
+| C9 | `S3.6` | conformant | 4 point(s) answered with a cited contract test that exists and contains the named fn | `browser-bridge::origin`, `did-bridge::IdentityHeadAnswer`, `did-bridge::ElohimResolver::resolve`, `did-bridge::controller_from_head` |
+| C9 | `S3.9` | variant | documented waiver: status partial | `elohim-consent-grant::admit_request`, `elohim-consent-grant::admit_redemption`, `elohim-consent-grant::ConsentRecord::agree`, `doorway::is_content_patch` |
+| C9 | `SGOV` | variant | documented waiver: status partial; answered but NO verified contract test: binary-unusable, bootstrap-dirty, bootstrap-pool-unavailable | `elohim-seam-contracts::verdict`, `elohim-seam-contracts::insert`, `elohim-epr-rea::ActorClaim::new / parse_participant_ref / parse_agent_ref`, `elohim-device-runtime::path-invalid` |
 
 ## Axis notes
 

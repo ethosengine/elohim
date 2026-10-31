@@ -1,0 +1,27 @@
+---
+epr-meta-version: 1
+id: application-lifecycle-composition
+purpose: >
+  Application UX and framework bindings compose the shared SDK, storage, publication
+  and serving contracts. This manifest routes reusable lifecycle work to its producer;
+  it does not replace domain manifests or claim implemented working-version support.
+---
+
+# app — compose shared application capabilities
+
+Use the [root lifecycle map](../.epr-meta/composition.md#application-lifecycle--authoritative-homes-and-composition)
+and [SDK authority](../elohim/sdk/.epr-meta) before planning persistence, collaboration
+or publication. Apps own domain actions and UX; domain app manifests declare their
+choices. Shared client libraries bind SDK capabilities to their framework. Author
+common draft persistence, offline recovery and lifecycle semantics in the SDK;
+authorized peer sync in storage; publication authority in DNA; peer serving in the
+hub; web2 accommodation in doorway. Existing misplaced code is migration work,
+not precedent for a second implementation in another app.
+
+A sprint names the authoritative producer and its consumer journey. Its proof includes
+the applicable offline/resume, authorized-sharing and publication transitions from the
+existing working-version standard. Display device-only, copy freshness and publication
+states separately. Draft standards are not shipped capabilities: a screen must not
+promise private drafts or shared editing before the underlying paths enforce them.
+These are review obligations, not an automatic import or dependency gate. More specific
+manifests retain their local rules; this manifest does not terminate their cascade.
