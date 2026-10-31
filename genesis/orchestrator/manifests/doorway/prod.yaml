@@ -129,7 +129,6 @@ spec:
         environment: prod
         app.kubernetes.io/name: doorway
         app.kubernetes.io/instance: doorway-prod
-        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
         app.kubernetes.io/component: gateway
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins

@@ -173,7 +173,6 @@ spec:
         environment: alpha
         app.kubernetes.io/name: doorway
         app.kubernetes.io/instance: doorway-alpha
-        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
         app.kubernetes.io/component: gateway
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins

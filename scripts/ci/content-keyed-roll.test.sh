@@ -328,6 +328,13 @@ for f in _edgenode-consolidated.template.yaml adam-firstman.yaml _edgenode-condu
   awk '/^  template:/{t=1} /^[^ ]/{t=0} t && /DEPLOY_VERSION_PLACEHOLDER|restartedAt:/ && !/^[[:space:]]*#/' \
     "${REPO_ROOT}/genesis/orchestrator/manifests/humans/${f}" | grep -q . && fail "${f}: commit-varying value inside the pod template"
 done
+# The doorway deployments carried the same git-SHA label inside .spec.template until
+# 2026-10-31 (edge #1771: both closures hit, every storage and conductor arm held, and
+# the two doorways still rolled because their pod inputs moved on every commit).
+for f in alpha.yaml alpha-b.yaml staging.yaml staging-read.yaml prod.yaml; do
+  awk '/^  template:/{t=1} /^[^ ]/{t=0} t && /DEPLOY_VERSION_PLACEHOLDER|restartedAt:/ && !/^[[:space:]]*#/' \
+    "${REPO_ROOT}/genesis/orchestrator/manifests/doorway/${f}" | grep -q . && fail "doorway/${f}: commit-varying value inside the pod template"
+done
 pass "Jenkinsfile + manifests wiring"
 
 echo "ALL PASS"
