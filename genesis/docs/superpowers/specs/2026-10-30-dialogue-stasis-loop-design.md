@@ -760,6 +760,38 @@ The regulator validates a keeper's cited ruling before delivering `proceed`,
 as specified in the pivot table; a failed validation becomes `park`.
 `question: uncertain` never blocks.
 
+### Legitimate stops (steward ruling, 2026-10-31)
+
+The steward's declared purpose for this loop (covenant clause `declaresPurpose`,
+session 4ec0c39f) is that a session stops only for one of two reasons:
+
+1. **Goal accomplished, with evidence.** The objective's deliverable is
+   committed, lints and tests pass for the projects it touched, and nothing
+   failing or blocking is committed, so it is ready to integrate or push. In his
+   words: "like delivering slice 1, passing lints and tests, no failing or
+   blocking code committed ready to integrate or push."
+2. **A true exception.** The remaining step is one only the steward can take:
+   a decision, a ruling, a credential or an identity act. It reaches him as the
+   human rung's prepared ask.
+
+Every other stop is a stall. At Stop, the adapter classifies the turn's end with
+an `outcome`:
+
+| `outcome` | Evidence the adapter requires | Loop response |
+|---|---|---|
+| `accomplished` | HEAD carries a commit made in this session, the worktree is clean for the objective's paths, and the newest gate run for that commit (the gate-tap run log, or a recorded green attestation) is green, or an explicit `shift-marker` close cites that evidence | No incident. The session may stop. |
+| `exception` | A pending human-rung ask, a batched parked ask, or a question the coordinator has already climbed to rung 5 | No new incident. The ask is surfaced once (Denial authority and human delivery). |
+| `question` | The turn ends in a question for the steward | The Automated path and questions rules apply. |
+| `stalled` | None of the above: the turn stopped with work unfinished and no ask | Open a `silence`-class incident at once. In automated presence, the Stop adapter blocks once with guidance naming what is unmet (failing gate, uncommitted work, open incident) and the next authorized step. In collaborative presence the coordinator harvests at Approach. |
+
+A claim of completion in the assistant's last message is never evidence by
+itself; `accomplished` requires the observable evidence above, and when the
+evidence cannot be read the outcome is `stalled` with `confidence: low`, never
+`accomplished`. Blocking is bounded: at most one Stop block per stall, and a
+second consecutive stall on the same unmet item Refers up the ladder instead of
+blocking again. `STASIS_LADDER=off` disables the block; observation continues.
+The turn-ended event gains an optional `outcome` field with this vocabulary.
+
 ### Denial authority and human delivery
 
 Authoritative denials include a human deny, a classifier deny, a call matching an
