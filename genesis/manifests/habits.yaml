@@ -941,10 +941,10 @@ habits:
       - "focused TypeScript tests: `pnpm --dir genesis/a2o exec tsx --test scripts/__tests__/runtime-performance.test.ts` — the local runtime-performance CLI emits the canonical `CheckWitness`-shaped report, validates declared cohort/threshold inputs, and compares only valid samples without treating missing data as zero."
       - "focused TypeScript tests: `pnpm --dir genesis/a2o exec tsx --test scripts/__tests__/performance-prometheus.test.ts` — Prometheus/runtime counters distinguish sampled CPU/resource observations from actual call counters and make timeout, cancellation, missing series, and invalid windows non-green rather than silently successful."
     evidence: >
-      DELTA 2026-10-16 (RED preserved; focused tests pass): at origin/dev@42941449e, `pnpm --dir genesis/a2o exec tsx --test scripts/__tests__/runtime-performance.test.ts` reported 48 tests and `ℹ fail 0`, exit 0; red holds on the live-capture leg, which was not run today.
-    evidence-fingerprint: sha256:4942c1cedccf15f0
-    evidence-bytes: 20362
-    evidence-entries: 3
+      DELTA 2026-10-31 (RED preserved; synchronous bootstrap contract restored): only project headlines retain detached, single-flight, age-labelled caching; each SessionStart renders the native minimal bootstrap lens in the foreground with a 5 s process-group budget and honest skipped reasons. Bootstrap projection: 16 passed with a writable copy of the installed native binary (the fixture modifies its copied executable); context regressions: 8 tests OK, including inherited-pipe timeout and per-invocation recall across cached headlines. Memory-ceremony Python discovery: ran 205 tests, FAILED (failures=6, errors=1, skipped=3); read-only device state and hard-coded /tmp cache/flag paths prevent a green whole-suite verdict in this sandbox. Memory coherence: 10 assertions passed; package verification: 2296 passed via the direct Node runner. Three requested live invocations with CLAUDE_PROJECT_DIR=/projects/elohim took 5.088 / 3.376 / 3.772 s, all exit 0 with bootstrap honestly skipped because that root is read-only. These timings prove the measured refusal path stays below 5.5 s, not successful live recall or the habit's instrumentation acceptance.
+    evidence-fingerprint: sha256:b333963daef0695a
+    evidence-bytes: 22413
+    evidence-entries: 5
     refs:
       - "genesis/a2o/scripts/runtime-performance-governance.md — guarantee matrix and explicit seam-registration gap"
       - "genesis/a2o/features/deployment/runtime-performance-report.feature — source-backed operator story; @wip until a live A2O lane owns it"
