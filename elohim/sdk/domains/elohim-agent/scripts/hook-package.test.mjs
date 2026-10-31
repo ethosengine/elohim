@@ -7,6 +7,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import {
   hookPackageFromSource,
   projectHook,
+  reportHookCapabilityWarnings,
   registrationFromSettings,
   registrationsCoherent,
   registrationsFromSettings,
@@ -210,4 +211,85 @@ test('hook schema accepts object, non-empty array and null in each registration 
       assert.equal(validate(pkg), false, `${slot}: ${JSON.stringify(value)}`);
     }
   }
+});
+
+const harnessRequirements = [
+  [{ event: 'Notification', matcher: 'permission_prompt' }, 'dialog-displayed-notification'],
+  [{ event: 'Notification', matcher: 'idle_prompt' }, 'idle-prompt-timing'],
+  [{ event: 'Stop', async: true, asyncRewake: true }, 'async-rewake-wakes-idle'],
+];
+
+function harnessWarnings(pkg, runtimes = []) {
+  const warnings = [];
+  const before = structuredClone(pkg);
+  reportHookCapabilityWarnings(pkg, { runtimes }, (warning) => warnings.push(warning));
+  assert.deepEqual(pkg, before, 'capability warnings must not mutate packages');
+  return warnings;
+}
+
+test('mapped hook events warn for no, unsupported and absent evidence, but not yes', () => {
+  for (const [registration, capability] of harnessRequirements) {
+    const pkg = importFixture({});
+    pkg.registration = registration;
+    for (const status of ['yes', 'no', 'unsupported', undefined]) {
+      const warnings = harnessWarnings(pkg, [{ id: 'claude-code', harnessCapabilities:
+        status ? { [capability]: { status, evidence: 'probe/20261030T163031Z', cliVersion: null } } : {},
+      }]);
+      assert.equal(warnings.length, status === 'yes' ? 0 : 1, `${capability}: ${status}`);
+      if (warnings.length) {
+        assert.equal(warnings[0],
+          `WARN: harness-capability-unsupported: synthetic-dialogue-stasis runtime=claude-code capability=${capability} status=${status ?? 'unsupported'}`);
+      }
+    }
+    assert.equal(harnessWarnings(pkg).length, 1, 'missing runtime means unsupported');
+    assert.equal(harnessWarnings(pkg, [{ id: 'claude-code' }]).length, 1,
+      'missing harnessCapabilities means unsupported');
+  }
+});
+
+test('unwired intended registrations warn, and duplicate declarations warn only once', () => {
+  const pkg = importFixture({});
+  pkg.metadata.intendedRegistrations = harnessRequirements.map(([registration]) => registration);
+  assert.equal(harnessWarnings(pkg).length, 3);
+  pkg.registration = pkg.metadata.intendedRegistrations;
+  pkg.registrations = { claude: pkg.registration };
+  assert.equal(harnessWarnings(pkg).length, 3);
+});
+
+test('runtime registration maps use each runtime table independently', () => {
+  const pkg = importFixture({});
+  pkg.metadata.runtimeTargets.push('codex');
+  pkg.projections.codex = { path: fixturePath };
+  pkg.registrations = { claude: null, codex: harnessRequirements.map(([registration]) => registration) };
+  const claude = { id: 'claude-code', harnessCapabilities: Object.fromEntries(
+    harnessRequirements.map(([, capability]) => [capability, { status: 'yes' }]),
+  ) };
+  const warnings = harnessWarnings(pkg, [claude, { id: 'codex', harnessCapabilities: {} }]);
+  assert.equal(warnings.length, 3);
+  for (const warning of warnings) assert.match(warning, /runtime=codex /);
+  assert.deepEqual(harnessWarnings(pkg, [claude, { ...claude, id: 'codex' }]), []);
+});
+
+test('notification matchers conservatively include broad and combined subscriptions', () => {
+  const pkg = importFixture({});
+  for (const matcher of [null, '', '*', '.*', '^(permission_prompt|idle_prompt)$', '[']) {
+    pkg.registration = { event: 'Notification', matcher };
+    assert.equal(harnessWarnings(pkg).length, 2, String(matcher));
+  }
+  for (const registration of [
+    { event: 'Notification', matcher: 'auth_success' },
+    { event: 'Stop', async: true, asyncRewake: false },
+    { event: 'Stop' },
+    { event: 'PostToolUse', asyncRewake: true },
+  ]) {
+    pkg.registration = registration;
+    assert.deepEqual(harnessWarnings(pkg), []);
+  }
+  assert.deepEqual(harnessWarnings({ kind: 'AgentPackage' }), []);
+});
+
+test('unsupported hook capability is advisory and registration verification still passes', async () => {
+  const pkg = importFixture(fixtureSettings);
+  assert.equal(harnessWarnings(pkg).length, 1);
+  assert.deepEqual(await verify(pkg, { settings: fixtureSettings }), { failures: [], findings: [] });
 });

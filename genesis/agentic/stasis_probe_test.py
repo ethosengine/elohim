@@ -3,13 +3,19 @@ reviewer showed could read as a false `yes` read as `no` or `unknown` instead.
 
 Run: python3 -m unittest genesis.agentic.stasis_probe_test
 """
+import json
+import os
 import runpy
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 _NS = runpy.run_path(str(Path(__file__).parent / "bin/stasis-probe"))
 judge = _NS["judge_permission"]
 MARK = _NS["DENY_MARK"]
+emit = _NS["harness_capabilities"]
 
 REQ_KEYS = ["cwd", "hook_event_name", "permission_mode", "prompt_id", "session_id",
             "tool_input", "tool_name", "transcript_path"]
@@ -82,6 +88,87 @@ class JudgePermission(unittest.TestCase):
 
     def test_a_failed_run_is_unknown_not_no(self):
         self.assertEqual(verdicts(good_run(), rc=1)["permission-request-on-ask-rule"], "unknown")
+
+
+def report(stamp, checks, version=None):
+    return {"schema": "stasis-probe/1", "stamp": stamp, "claudeVersion": version,
+            "capabilities": {cid: {"verdict": value, "evidence": "fixture"}
+                             for cid, value in checks.items()}}
+
+
+class EmitCapabilities(unittest.TestCase):
+    def test_verdict_mapping_and_report_provenance(self):
+        source = report("20261030T143310Z", {
+            "proven": "yes", "disproved": "no", "unmeasured": "unknown",
+            "needs-human": "interactive", "missing": None,
+        }, "2.1.314 (Claude Code)")
+        del source["capabilities"]["missing"]["verdict"]
+        caps = emit([source])["harnessCapabilities"]
+        self.assertEqual({cid: row["status"] for cid, row in caps.items()}, {
+            "proven": "yes", "disproved": "no", "unmeasured": "unsupported",
+            "needs-human": "unsupported", "missing": "unsupported",
+        })
+        for row in caps.values():
+            self.assertEqual(row["evidence"], "probe/20261030T143310Z")
+            self.assertEqual(row["cliVersion"], source["claudeVersion"])
+
+    def test_newest_stamp_wins_independent_of_argument_order(self):
+        older = report("20261030T143310Z", {"retracted": "yes", "confirmed": "no"}, "old")
+        newer = report("20261030T163031Z", {"retracted": "no", "confirmed": "yes"}, "new")
+        self.assertEqual(emit([newer, older]), emit([older, newer]))
+        caps = emit([newer, older])["harnessCapabilities"]
+        self.assertEqual(caps["retracted"], {
+            "status": "no", "evidence": "probe/20261030T163031Z", "cliVersion": "new"})
+        self.assertEqual(caps["confirmed"]["status"], "yes")
+
+    def test_unexercised_checks_never_replace_a_yes_or_its_provenance(self):
+        older = report("20261030T143310Z", {"proven": "yes"}, "old")
+        for value in ("unknown", "interactive", None):
+            with self.subTest(value=value):
+                later = report("20261030T163031Z", {"proven": value})
+                self.assertEqual(emit([later, older]), emit([older]))
+        self.assertEqual(emit([older, report("20261030T163031Z", {})]), emit([older]))
+
+    def test_latest_unknown_does_not_resurrect_a_retracted_yes(self):
+        reports = [report("20261030T143310Z", {"cap": "yes"}),
+                   report("20261030T145038Z", {"cap": "no"}),
+                   report("20261030T163031Z", {"cap": "unknown"})]
+        self.assertEqual(emit(reports)["harnessCapabilities"]["cap"], {
+            "status": "unsupported", "evidence": "probe/20261030T163031Z", "cliVersion": None})
+
+    def test_partial_interactive_report_keeps_headless_evidence_and_null_version(self):
+        headless = report("20261030T143310Z", {"keeper": "yes", "dialog": "interactive"}, "old")
+        interactive = report("20261030T163031Z", {"dialog": "yes"})
+        del interactive["claudeVersion"]
+        caps = emit([headless, interactive])["harnessCapabilities"]
+        self.assertEqual(caps["keeper"]["evidence"], "probe/20261030T143310Z")
+        self.assertEqual(caps["dialog"], {
+            "status": "yes", "evidence": "probe/20261030T163031Z", "cliVersion": None})
+        self.assertEqual(caps.get("never-probed", {}).get("status", "unsupported"), "unsupported")
+
+    def test_invalid_reports_are_rejected(self):
+        source = report("20261030T143310Z", {"cap": "yes"})
+        for invalid in ({**source, "schema": "unrelated/1"}, {**source, "stamp": "yesterday"},
+                        {**source, "capabilities": []}, {**source, "capabilities": {"cap": "yes"}}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                emit([invalid])
+
+    def test_cli_emits_only_json_without_running_a_probe_or_creating_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = [report("20261030T143310Z", {"keeper": "yes"}, "old"),
+                       report("20261030T163031Z", {"dialog": "yes"})]
+            paths = [root / f"report-{i}.json" for i in range(len(sources))]
+            for path, source in zip(paths, sources):
+                path.write_text(json.dumps(source))
+            result = subprocess.run([
+                sys.executable, str(Path(__file__).parent / "bin/stasis-probe"),
+                "--out", str(root / "unused"), "--emit-capabilities", *map(str, paths),
+            ], capture_output=True, text=True, env={**os.environ, "PATH": ""})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stderr, "")
+            self.assertEqual(json.loads(result.stdout), emit(sources))
+            self.assertFalse((root / "unused").exists())
 
 
 if __name__ == "__main__":

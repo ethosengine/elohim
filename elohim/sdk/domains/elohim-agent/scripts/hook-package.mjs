@@ -185,6 +185,51 @@ export function projectHook(pkg) {
   return pkg.source.body;
 }
 
+function requiredHarnessCapabilities(registration) {
+  if (registration?.event === 'Stop' && registration.asyncRewake === true) {
+    return ['async-rewake-wakes-idle'];
+  }
+  if (registration?.event !== 'Notification') return [];
+  const notifications = [
+    ['permission_prompt', 'dialog-displayed-notification'],
+    ['idle_prompt', 'idle-prompt-timing'],
+  ];
+  const matcher = registration.matcher;
+  if (!matcher || matcher === '*') return notifications.map(([, capability]) => capability);
+  try {
+    const pattern = new RegExp(matcher);
+    return notifications.filter(([event]) => pattern.test(event)).map(([, capability]) => capability);
+  } catch {
+    // An uninterpretable matcher cannot establish that either notification is excluded.
+    return notifications.map(([, capability]) => capability);
+  }
+}
+
+// Advisory only, like capability-unbound for agents. A runtime's support must
+// come from its own table, never from another runtime sharing the hook bytes.
+export function reportHookCapabilityWarnings(pkg, agentRuntimes, warn = console.warn) {
+  if (pkg.kind !== HOOK_KIND) return;
+  for (const runtime of Object.keys(pkg.projections)) {
+    const runtimeId = runtime === 'claude' ? 'claude-code' : runtime;
+    const capabilities = agentRuntimes?.runtimes?.find((entry) => entry.id === runtimeId)
+      ?.harnessCapabilities ?? {};
+    const registrations = [
+      ...normalizedRegistrations(runtime === 'claude' ? pkg.registration : null),
+      ...normalizedRegistrations(pkg.registrations?.[runtime]),
+      ...normalizedRegistrations(pkg.metadata.intendedRegistrations),
+    ];
+    const required = new Set(registrations.flatMap(requiredHarnessCapabilities));
+    for (const capability of required) {
+      const status = capabilities[capability]?.status ?? 'unsupported';
+      if (status !== 'yes') {
+        warn(
+          `WARN: harness-capability-unsupported: ${pkg.metadata.id} runtime=${runtimeId} capability=${capability} status=${status}`,
+        );
+      }
+    }
+  }
+}
+
 // Hook-specific verify assertions (rules 1-2). The byte-identity of the
 // projected fixture/runtime file is proved by the shared verifyProjectionFixture
 // / verifyRuntimeProjectionIfPresent in the main file (they compare

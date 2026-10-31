@@ -16,6 +16,11 @@ are listed as `interactive` for the steward-assisted probe.
 
 Usage:
   stasis-probe [--out DIR] [--only ID[,ID...]] [--model ALIAS] [--strict]
+  stasis-probe --emit-capabilities REPORT.json [REPORT.json ...]
+
+--emit-capabilities reads existing reports without running probes or writing files.
+It prints the claude-code harnessCapabilities block, retaining the supplying report's
+stamp and CLI version for each id. An absent id remains unsupported to consumers.
 
 Writes <out>/<utc-stamp>/report.json (default out: <main checkout>/genesis/local-dev/
 dialogue-stasis/probe) and prints one line per capability:
@@ -525,12 +530,44 @@ def interactive_read(scratch, rc_push, channel_relay):
     return caps
 
 
+def harness_capabilities(reports):
+    """Merge probe evidence in stamp order; a skipped check cannot retract a yes."""
+    for report in reports:
+        if not isinstance(report, dict) or report.get("schema") != "stasis-probe/1":
+            raise ValueError("expected a stasis-probe/1 report")
+        stamp = report.get("stamp")
+        if not isinstance(stamp, str) or len(stamp) != 16:
+            raise ValueError("expected a UTC report stamp YYYYMMDDTHHMMSSZ")
+        time.strptime(stamp, "%Y%m%dT%H%M%SZ")
+        if not isinstance(report.get("capabilities"), dict):
+            raise ValueError("expected a capabilities map")
+    capabilities = {}
+    for report in sorted(reports, key=lambda report: report["stamp"]):
+        for cid, check in report["capabilities"].items():
+            if not isinstance(check, dict):
+                raise ValueError(f"expected a capability object for {cid}")
+            result = check.get("verdict")
+            status = result if result in ("yes", "no") else "unsupported"
+            # Unknown, interactive and missing verdicts supply no contrary evidence.
+            # A later measured no DOES retract a yes; absence from a partial run does not.
+            if capabilities.get(cid, {}).get("status") == "yes" and status == "unsupported":
+                continue
+            capabilities[cid] = {
+                "status": status,
+                "evidence": f"probe/{report['stamp']}",
+                "cliVersion": report.get("claudeVersion"),
+            }
+    return {"harnessCapabilities": dict(sorted(capabilities.items()))}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", type=Path)
     ap.add_argument("--only", default="", help="comma list: flags,settings,permission,models,keeper,effort")
     ap.add_argument("--model", default="haiku", help="model for the behaviour probes")
     ap.add_argument("--strict", action="store_true")
+    ap.add_argument("--emit-capabilities", type=Path, nargs="+", metavar="REPORT.json",
+                    help="emit claude-code harness capabilities from existing probe reports")
     ap.add_argument("--interactive-setup", action="store_true",
                     help="create a scratch project for the steward-assisted probe and print the steps")
     ap.add_argument("--interactive-drive", action="store_true",
@@ -540,6 +577,14 @@ def main():
     ap.add_argument("--rc-push", choices=["yes", "no", "skip"], default="skip")
     ap.add_argument("--channel-relay", choices=["yes", "no", "skip"], default="skip")
     args = ap.parse_args()
+
+    if args.emit_capabilities:
+        try:
+            reports = [json.loads(path.read_text()) for path in args.emit_capabilities]
+            print(json.dumps(harness_capabilities(reports), indent=2))
+        except (OSError, ValueError) as error:
+            ap.error(str(error))
+        return 0
 
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     root = (args.out or main_checkout() / "genesis/local-dev/dialogue-stasis/probe") / stamp

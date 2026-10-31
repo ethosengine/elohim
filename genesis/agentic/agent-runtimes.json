@@ -3,6 +3,240 @@
   "runtimes": [
     {
       "id": "claude-code",
+      "harnessCapabilities": {
+        "agent-frontmatter-effort": {
+          "status": "yes",
+          "evidence": "probe/20261030T155306Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "approved-close-from-posttooluse": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "async-rewake-wakes-idle": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "channel-deny-relay": {
+          "status": "unsupported",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "cli-flag[--permission-prompts]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "cli-flag[--restricted]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "cli-flag[--settings]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "cli-flag[--tools]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "control-no-hook-decision": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "deny-continues-turn[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "deny-continues-turn[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "deny-message-reaches-agent[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "deny-message-reaches-agent[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "dialog-displayed-notification": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "hook-sees-keeper-env": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "human-deny-emits": {
+          "status": "unsupported",
+          "evidence": "probe/20261030T143544Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "human-deny-emits-no-close-event": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "idle-prompt-silent-while-dialog-open": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "idle-prompt-timing": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "model-binding[fable]": {
+          "status": "yes",
+          "evidence": "probe/20261030T143544Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "model-binding[haiku]": {
+          "status": "yes",
+          "evidence": "probe/20261030T143544Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "model-binding[opus]": {
+          "status": "yes",
+          "evidence": "probe/20261030T143544Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "model-binding[sonnet]": {
+          "status": "yes",
+          "evidence": "probe/20261030T143544Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "permission-request-fields[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "permission-request-fields[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "permission-request-on-ask-rule[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "permission-request-on-ask-rule[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "posttooluse-duration-ms[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "posttooluse-duration-ms[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "pretooluse-before-permission[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "pretooluse-before-permission[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "remote-control-push-on-question": {
+          "status": "unsupported",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "restricted-has-no-bash": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "restricted-ignores-project-hooks": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "restricted-keeps-explicit-settings-hooks": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "restricted-raises-no-permission-request": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "result-permission-denials[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "result-permission-denials[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "rewake-prompt-is-system-originated": {
+          "status": "yes",
+          "evidence": "probe/20261030T163031Z",
+          "cliVersion": null
+        },
+        "settings-full-event-set-accepted": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "stop-fields[host]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        },
+        "stop-fields[none]": {
+          "status": "yes",
+          "evidence": "probe/20261030T145038Z",
+          "cliVersion": "2.1.314 (Claude Code)"
+        }
+      },
+      "keeperInvocation": {
+        "status": "probed",
+        "argv": [
+          "claude",
+          "-p",
+          "--restricted",
+          "--permission-prompts",
+          "none",
+          "--tools",
+          "Read,Grep,Glob",
+          "--settings",
+          "<file>",
+          "--model",
+          "<bound>"
+        ],
+        "stdin": true,
+        "env": {
+          "STASIS_KEEPER": "1"
+        },
+        "evidence": "probe/20261030T145038Z",
+        "cliVersion": "2.1.314 (Claude Code)"
+      },
       "comm": ["claude"],
       "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"],
       "modelEnv": [],
@@ -15,6 +249,27 @@
     },
     {
       "id": "codex",
+      "harnessCapabilities": {},
+      "keeperInvocation": {
+        "status": "declared",
+        "argv": [
+          "codex",
+          "exec",
+          "--sandbox",
+          "read-only",
+          "-C",
+          "<dir>",
+          "-o",
+          "<file>",
+          "-"
+        ],
+        "stdin": true,
+        "env": {
+          "STASIS_KEEPER": "1"
+        },
+        "evidence": null,
+        "cliVersion": null
+      },
       "comm": ["codex"],
       "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
       "modelEnv": [],
@@ -25,6 +280,8 @@
     },
     {
       "id": "gemini",
+      "harnessCapabilities": {},
+      "keeperInvocation": null,
       "comm": ["gemini"],
       "sessionEnv": [],
       "modelEnv": [],
@@ -32,6 +289,8 @@
     },
     {
       "id": "antigravity",
+      "harnessCapabilities": {},
+      "keeperInvocation": null,
       "comm": ["antigravity"],
       "sessionEnv": [],
       "modelEnv": [],

@@ -9,6 +9,7 @@ import {
   HOOK_KIND,
   hookPackageFromSource,
   projectHook,
+  reportHookCapabilityWarnings,
   verifyHookPackage,
 } from './hook-package.mjs';
 import {
@@ -1842,6 +1843,7 @@ async function runVerify() {
 
   for (const pkg of packageFixtures) {
     reportCapabilityWarnings(pkg);
+    reportHookCapabilityWarnings(pkg, AGENT_RUNTIMES);
     await verifyPackage(pkg, validators, settings, packageFixtures, qualityBounds);
   }
   reportQualityAdvisories(packageFixtures, qualityBounds);
