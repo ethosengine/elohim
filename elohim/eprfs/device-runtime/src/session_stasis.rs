@@ -2055,13 +2055,16 @@ pub fn status(fold: &SessionFold, now: DateTime<Utc>) -> Value {
                    "budgetExhausted": i.budget_exhausted})
         })
         .collect();
-    // A park is a recorded Permit/park consultation; shadow never closes the stall on it.
+    // A pending park is a LIVE Permit/park consultation, validated by the fold's own predicate
+    // (exact regulator pairing, policy pinned now). A shadow or unverified park is not pending.
     let parks: Vec<&str> = fold
         .incidents
         .iter()
         .filter(|i| {
             i.consultations.iter().any(|c| {
-                c.pivot == Some(Pivot::Park) && matches!(c.decision, Some(Decision::Permit))
+                c.live
+                    && c.pivot == Some(Pivot::Park)
+                    && matches!(c.decision, Some(Decision::Permit))
             })
         })
         .map(|i| i.id.as_str())

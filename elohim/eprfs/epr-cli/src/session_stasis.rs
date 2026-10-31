@@ -2252,7 +2252,11 @@ mod tests {
                 (r.0, r.1)
             })
         };
-        // Give the decision time to pass its first read and block on the lock.
+        // TIMING ASSUMPTION: 700 ms is far longer than the worker needs to start, read the
+        // policy once and block on `journal.lock`. If a regression read the policy BEFORE the
+        // lock only, this test would turn flaky (the edit lands before the first read), not
+        // falsely green. It should become a bounded poll until the worker is observably
+        // blocked on the lock (backlog).
         std::thread::sleep(std::time::Duration::from_millis(700));
         let mut edited = policy_value();
         edited["dwellS"] = json!(60);
@@ -2306,5 +2310,73 @@ mod tests {
         assert_eq!(run(None)["effect"], "deny");
         // Re-read after the lock finds it expired: not away, nothing parked.
         assert_eq!(run(Some(later))["effect"], "none");
+    }
+
+    fn live_as(root: &Path, st: &str, hook: &str, agent: &str, corr: bool, c: &mut Ctx) -> Value {
+        let mut ev = json!({"hook_event_name": hook, "tool_name": "Bash", "shape": SHAPE,
+                            "agent_id": agent});
+        if corr {
+            ev["correlation"] = json!({"incidentId": "s1:2"});
+        }
+        c.stdin = Some(ev.to_string());
+        let (_, out, _) = call(
+            &[
+                "decide",
+                "--live",
+                "--session",
+                "s1",
+                "--event",
+                "-",
+                "--settings",
+                st,
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            c,
+        );
+        serde_json::from_str(&out).unwrap_or(Value::Null)
+    }
+
+    #[test]
+    fn another_agents_incident_is_never_acted_on() {
+        // P2: the incident belongs to agent `main`; agent B gets no reshape from it, whether it
+        // names the incident or relies on the newest-open fallback, and `main` is unaffected.
+        let dir = tempfile::tempdir().unwrap();
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        let policy = learned_policy(&mut c, dir.path(), &st);
+        pinned_checkout(dir.path(), &policy);
+        let root = open_journal(dir.path(), &[]);
+        let before = events_of(&root).len();
+        for corr in [true, false] {
+            let v = live_as(&root, &st, "PreToolUse", "agent-b", corr, &mut c);
+            assert_eq!(v["effect"], "none", "corr={corr}: {v}");
+        }
+        assert_eq!(
+            events_of(&root).len(),
+            before,
+            "nothing written for agent B"
+        );
+        // The owner still gets its reshape: B did not consume the allowance.
+        let v = live_as(&root, &st, "PreToolUse", "main", false, &mut c);
+        assert_eq!(v["effect"], "deny", "{v}");
+    }
+
+    #[test]
+    fn an_unsupported_hook_kind_writes_nothing_not_even_a_proceed_downgrade() {
+        // P3: a live proceed in automated presence would downgrade at PermissionRequest; at any
+        // other hook the regulator writes nothing.
+        for hook in ["Stop", "PostToolUse", "UserPromptSubmit", "SessionStart"] {
+            let dir = tempfile::tempdir().unwrap();
+            let cid = pinned_checkout(dir.path(), &policy_value());
+            let root = open_journal(dir.path(), &[proceed_record(true, &cid)]);
+            let st = settings(dir.path());
+            let mut c = ctx(dir.path());
+            at_automated(&mut c);
+            let before = events_of(&root).len();
+            let v = live_as(&root, &st, hook, "main", true, &mut c);
+            assert_eq!(v["effect"], "none", "{hook}: {v}");
+            assert_eq!(events_of(&root).len(), before, "{hook} wrote");
+        }
     }
 }

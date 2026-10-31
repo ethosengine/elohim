@@ -206,15 +206,18 @@ pub fn decide_live(
             .with_rulings(rulings)
             .with_pinned_cid(&policy_cid),
     );
-    let by_id = req
-        .incident_id
-        .as_deref()
-        .and_then(|id| fold.incidents.iter().find(|i| i.id == id));
+    // Only the requesting agent's own incident can be acted on: another agent's stall is neither
+    // parked, nor reshaped, nor does it lose its reshape allowance to this request.
+    let by_id = req.incident_id.as_deref().and_then(|id| {
+        fold.incidents
+            .iter()
+            .find(|i| i.id == id && i.agent_id == req.agent_id)
+    });
     let incident = by_id.or_else(|| {
         fold.incidents
             .iter()
             .rev()
-            .find(|i| i.state != IncidentState::Closed)
+            .find(|i| i.state != IncidentState::Closed && i.agent_id == req.agent_id)
     });
     let mut w = Writer {
         dir: &dir,
@@ -240,6 +243,10 @@ pub fn decide_live(
         clock,
         segment_limit,
     };
+    // Only the hooks the regulator acts at may cause ANY write, the proceed downgrade included.
+    if !matches!(req.hook.as_str(), "PermissionRequest" | "PreToolUse") {
+        return Ok(LiveDecision::Acted(out));
+    }
     let Some(inc) = incident else {
         return Ok(LiveDecision::Acted(out));
     };

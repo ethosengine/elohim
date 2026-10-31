@@ -1348,7 +1348,20 @@ fn status_is_read_only_and_never_reports_the_coordinator_green() {
         2,
         "shadow parks do not close"
     );
-    assert_eq!(s["pendingParks"], json!(["s1:2"]));
+    // P4: a shadow park is not a pending park...
+    assert_eq!(s["pendingParks"], json!([]));
+    // ...nor is a live claim from a non-regulator agent or under an old policy; only a verified
+    // live park is.
+    let mut forged = park_record(true, Some("native-decide"), Some("cid-1"));
+    forged["agentId"] = json!("main");
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), forged], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!([]));
+    let stale = park_record(true, Some("native-decide"), Some("cid-OLD"));
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), stale], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!([]));
+    let good = park_record(true, Some("native-decide"), Some("cid-1"));
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), good], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!(["s1:2"]));
     assert_eq!(s["coordinator"]["state"], "unknown");
     assert_eq!(s["policy"], POLICY_ABSENT);
 }
