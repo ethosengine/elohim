@@ -320,7 +320,7 @@ test target="changed" scope="":
     esac
 
 # Manage the single-peer local stack. Safe default: status.
-dev action="status" profile="isolated" seed="false" build="false" *extra:
+dev action="status" profile="isolated" seed="false" build="false" *extra="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
