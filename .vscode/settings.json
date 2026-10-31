@@ -8,5 +8,10 @@
     }
   ],
   "github.gitAuthentication": false,
-  "git.terminalAuthentication": false
+  "git.terminalAuthentication": false,
+  "search.followSymlinks": false,
+  "search.exclude": {
+    ".worktrees/**": true,
+    ".cargo-pool/**": true
+  }
 }

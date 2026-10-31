@@ -32,17 +32,29 @@ steward_all_worktrees "$DRY" >/dev/null 2>&1 || true
 # Sample slot watermarks — HWM rises monotonically across sessions; feeds
 # `cargo-pool estimate` so it can ground predictions in observed peaks
 # rather than hardcoded 10G/3G.
-if [ "$DRY" != "1" ]; then
-  record_all_slot_watermarks >/dev/null 2>&1 || true
-fi
-
+#
 # Policy enforcement at session end — the deterministic eviction pass
 # (pool-policy.json: stale incrementals/hashes, dispositions, LRU budget).
 # Guarded inside enforce_pool: active families, live PIDs, and flock'd
 # slots are never touched, so a concurrent session's build is safe.
 # Escape hatch: CARGO_TARGET_POOL_NO_ENFORCE=1.
-if [ "$DRY" != "1" ] && [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
-  enforce_pool 1 1 >/dev/null 2>&1 || true
+#
+# Both walk the whole pool: 549–624 s per run measured 2026-10-30 at load 40–54,
+# against this Stop hook's 15 s timeout, so the harness cancelled the hook (17
+# times in one session) and killed enforcement mid-pass on every turn. They now
+# run DETACHED and single-flight: a second Stop while one pass is running skips.
+if [ "$DRY" != "1" ]; then
+  setsid bash -c '
+    exec 9>"$1" || exit 0
+    flock -n 9 || exit 0
+    # shellcheck disable=SC1091
+    source "$2/pool-lib.sh"
+    pool_init
+    record_all_slot_watermarks >/dev/null 2>&1 || true
+    if [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
+      enforce_pool 1 1 >/dev/null 2>&1 || true
+    fi
+  ' _ "$POOL_ROOT/.postflight.lock" "$SCRIPT_DIR" </dev/null >/dev/null 2>&1 &
 fi
 
 # Legacy opt-in cold-slot GC (superseded by enforce; kept for operators who
