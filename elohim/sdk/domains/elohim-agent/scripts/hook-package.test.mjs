@@ -4,7 +4,14 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { projectHook, verifyHookPackage } from './hook-package.mjs';
+import {
+  hookPackageFromSource,
+  projectHook,
+  registrationFromSettings,
+  registrationsCoherent,
+  registrationsFromSettings,
+  verifyHookPackage,
+} from './hook-package.mjs';
 
 const root = fileURLToPath(new URL('../../../../../', import.meta.url));
 const readJson = async (path) => JSON.parse(await readFile(resolve(root, path), 'utf8'));
@@ -99,4 +106,108 @@ test('missing runtime records, mismatched targets and divergent legacy aliases r
   const alias = structuredClone(native);
   alias.registration.timeout += 1;
   assert((await verify(alias)).failures.some((message) => message.includes('legacy Claude')));
+});
+
+const fixturePath = '.claude/hooks/synthetic-dialogue-stasis.py';
+const fixtureCommand = `python3 ${fixturePath}`;
+const fixtureBody = '#!/usr/bin/env python3\n"""Synthetic registration fixture."""\n';
+const fixtureSettings = {
+  hooks: {
+    PostToolUse: [{ hooks: [{ type: 'command', command: fixtureCommand, timeout: 5 }] }],
+    Stop: [{ hooks: [{ type: 'command', command: fixtureCommand, timeout: 120, async: true, asyncRewake: true }] }],
+  },
+};
+const importFixture = (config) => hookPackageFromSource(resolve(root, fixturePath), fixtureBody, config, {
+  repoRoot: root,
+  governance: {},
+});
+
+test('all matching registrations are captured in settings order, including async flags', () => {
+  const config = structuredClone(fixtureSettings);
+  config.hooks.PostToolUse.push({ matcher: 'Bash', hooks: [
+    { command: 'echo unrelated' },
+    { command: fixtureCommand, async: false, asyncRewake: false },
+  ] });
+  const matches = registrationsFromSettings(config, fixturePath);
+  assert.deepEqual(matches.map(({ event, matcher }) => [event, matcher]), [
+    ['PostToolUse', null], ['PostToolUse', 'Bash'], ['Stop', null],
+  ]);
+  assert.deepEqual(matches.map(({ async, asyncRewake }) => [async, asyncRewake]), [
+    [undefined, undefined], [false, false], [true, true],
+  ]);
+  assert.deepEqual(registrationFromSettings(config, fixturePath), matches[0]);
+  assert.equal(registrationsFromSettings(config, '.claude/hooks/absent.py'), null);
+  assert.equal(registrationFromSettings({}, fixturePath), null);
+  assert.equal(importFixture({}).registration, null);
+});
+
+test('a two-registration package is coherent in either order for each runtime', async () => {
+  const pkg = importFixture(fixtureSettings);
+  assert.equal(pkg.registration.length, 2);
+  assert.equal(pkg.metadata.event, 'PostToolUse');
+  pkg.metadata.runtimeTargets.push('codex');
+  pkg.projections.codex = { path: fixturePath };
+  pkg.registrations = {
+    claude: [...pkg.registration].reverse(),
+    codex: [...pkg.registration].reverse(),
+  };
+  assert.deepEqual(await verify(pkg, { settings: fixtureSettings, codexSettings: fixtureSettings }), {
+    failures: [], findings: [],
+  });
+  assert.equal(registrationsCoherent(pkg.registration, pkg.registration.slice(0, 1)), false);
+  assert.equal(registrationsCoherent(null, pkg.registration), false);
+  assert.equal(registrationsCoherent(null, null), true);
+});
+
+test('drift in either registration fails, including the SECOND registration', async () => {
+  const pkg = importFixture(fixtureSettings);
+  for (const event of ['PostToolUse', 'Stop']) {
+    const config = structuredClone(fixtureSettings);
+    config.hooks[event][0].hooks[0].timeout += 1;
+    const result = await verify(pkg, { settings: config });
+    assert.equal(result.failures.length, 1, event);
+    assert.match(result.failures[0], /recorded claude registration/);
+    assert.equal(result.findings[0].assertionClass, 'registration-drift');
+  }
+});
+
+test('async and asyncRewake differences in the second registration fail', async () => {
+  const pkg = importFixture(fixtureSettings);
+  for (const flag of ['async', 'asyncRewake']) {
+    const config = structuredClone(fixtureSettings);
+    config.hooks.Stop[0].hooks[0][flag] = false;
+    const result = await verify(pkg, { settings: config });
+    assert.equal(result.failures.length, 1, flag);
+    assert.equal(result.findings[0].assertionClass, 'registration-drift');
+  }
+});
+
+test('a legacy single-object recording retains its bytes and matches one live entry', async () => {
+  const config = { hooks: { PostToolUse: fixtureSettings.hooks.PostToolUse } };
+  const pkg = importFixture(config);
+  const legacy = { event: 'PostToolUse', matcher: null, command: fixtureCommand, timeout: 5, type: 'command' };
+  assert.equal(JSON.stringify(pkg.registration), JSON.stringify(legacy));
+  assert.deepEqual(await verify(pkg, { settings: config }), { failures: [], findings: [] });
+  assert(registrationsCoherent(legacy, [{ ...legacy, async: false, asyncRewake: false }]));
+  assert(registrationsCoherent([legacy], legacy));
+});
+
+test('hook schema accepts object, non-empty array and null in each registration slot', async () => {
+  const schema = await readJson('elohim/sdk/domains/elohim-agent/schemas/hook-package.schema.json');
+  const validate = new Ajv2020({ allErrors: true }).compile(schema);
+  const fixture = importFixture(fixtureSettings);
+  for (const value of [fixture.registration[0], fixture.registration, null]) {
+    const pkg = structuredClone(native);
+    pkg.registration = value;
+    pkg.registrations = { claude: value, codex: value };
+    assert(validate(pkg), JSON.stringify(validate.errors));
+  }
+  for (const value of [[], [null], { async: 'true' }, [{ asyncRewake: 1 }]]) {
+    for (const slot of ['registration', 'claude', 'codex']) {
+      const pkg = structuredClone(native);
+      if (slot === 'registration') pkg.registration = value;
+      else pkg.registrations[slot] = value;
+      assert.equal(validate(pkg), false, `${slot}: ${JSON.stringify(value)}`);
+    }
+  }
 });

@@ -70,6 +70,7 @@ const SETTINGS_PATH = resolve(REPO_ROOT, '.claude/settings.json');
 // package-quality.mjs for which rows are read and why staleness is not ported.
 const MEASURES_PATH = resolve(REPO_ROOT, '.claude/epr-meta/measures.yaml');
 const ANTIGRAVITY_RUNTIME = 'antigravity';
+const AGENT_RUNTIMES = await readJson(resolve(REPO_ROOT, 'genesis/agentic/agent-runtimes.json'));
 
 const args = process.argv.slice(2);
 const command = args.find((arg) => !arg.startsWith('-')) ?? 'verify';
@@ -663,6 +664,41 @@ function projectCodex(pkg) {
   return projectMarkdownSurface(pkg, 'codex');
 }
 
+function capabilityBinding(pkg, runtime) {
+  const runtimeId = runtime === 'claude' ? 'claude-code' : runtime;
+  return AGENT_RUNTIMES.runtimes.find((entry) => entry.id === runtimeId)
+    ?.capabilityBindings?.[pkg.metadata.capabilityProfile?.level];
+}
+
+function agentModelFrontmatter(pkg, runtime) {
+  const profile = pkg.metadata.capabilityProfile;
+  if (!profile) {
+    const model = pkg.metadata.modelHints?.claudeModel;
+    return model ? { model } : {};
+  }
+  const binding = capabilityBinding(pkg, runtime);
+  if (!binding?.model) return {};
+  const fields = { model: binding.model };
+  // Explicit package effort wins; the runtime binding supplies its default.
+  const effort = profile.effort ?? binding.effort;
+  if (effort) fields[runtime === 'claude' ? 'effort' : 'model_reasoning_effort'] = effort;
+  return fields;
+}
+
+function reportCapabilityWarnings(pkg, warn = console.warn) {
+  if (pkg.kind !== 'AgentPackage' || !pkg.metadata.capabilityProfile) return;
+  // There is no per-runtime projection-notes surface. Keep advisories in verify
+  // output only, without adding runtime frontmatter or lodging a failure.
+  for (const runtime of Object.keys(pkg.projections)) {
+    if (!capabilityBinding(pkg, runtime)?.model) {
+      const runtimeId = runtime === 'claude' ? 'claude-code' : runtime;
+      warn(
+        `WARN: capability-unbound: ${pkg.metadata.id} runtime=${runtimeId} level=${pkg.metadata.capabilityProfile.level}`,
+      );
+    }
+  }
+}
+
 // Generated Claude frontmatter for a package-master (FLIPPED) skill/agent.
 // Origin is preserved (metadata.sourceRuntime stays 'claude' — "born from
 // Claude"); authority is flipped (metadata.master: 'package'). The governance
@@ -694,7 +730,7 @@ function claudeFrontmatterFromPackage(pkg) {
     // mcp-less agents. This is what lifts the v1 mcp-less STOP rule.
     const mcpServers = pkg.metadata.mcpServers ?? [];
     if (mcpServers.length) frontmatter.mcpServers = mcpServers;
-    if (modelHints.claudeModel) frontmatter.model = modelHints.claudeModel;
+    Object.assign(frontmatter, agentModelFrontmatter(pkg, 'claude'));
     if (modelHints.claudeColor) frontmatter.color = modelHints.claudeColor;
   }
   frontmatter.metadata = metadata;
@@ -723,8 +759,7 @@ function codexFrontmatterFromPackage(pkg, runtime = 'codex') {
   // `color` on either path — keep it claude-only.
   if (pkg.kind === 'AgentPackage') {
     const toolRefs = pkg.metadata.toolRefs ?? [];
-    const claudeModel = pkg.metadata.modelHints?.claudeModel;
-    if (claudeModel) frontmatter.model = claudeModel;
+    Object.assign(frontmatter, agentModelFrontmatter(pkg, runtime));
     if (toolRefs.length) frontmatter.tools = toolRefs.join(', ');
   }
   if (governance?.eprRef) frontmatter.governance = governance.eprRef;
@@ -751,6 +786,16 @@ function projectMarkdownSurface(pkg, runtime) {
     frontmatter = `${projection.frontmatterRaw}\n`;
   } else {
     frontmatter = stringifyYaml(projection.frontmatter);
+  }
+  if (
+    pkg.kind === 'AgentPackage' &&
+    pkg.metadata.capabilityProfile &&
+    pkg.metadata.master !== 'package'
+  ) {
+    // A profile also overrides stored/imported frontmatter, including stale
+    // model hints on native packages. Preserve all unrelated raw YAML bytes.
+    frontmatter = frontmatter.replace(/^(?:model|effort|model_reasoning_effort):[^\n]*(?:\n|$)/gm, '');
+    frontmatter += stringifyYaml(agentModelFrontmatter(pkg, runtime));
   }
   return `---\n${frontmatter}---\n${pkg.instructions.body}`;
 }
@@ -1487,8 +1532,8 @@ async function verifyPackage(pkg, validators, settings, packageCatalog, qualityB
       `${pkg.metadata.id} generated .claude tools contract round-trip (flip preserves toolRefs)`,
     );
     assert(
-      genClaude.model === pkg.metadata.modelHints?.claudeModel,
-      `${pkg.metadata.id} generated .claude model contract round-trip (flip preserves claudeModel)`,
+      genClaude.model === agentModelFrontmatter(pkg, 'claude').model,
+      `${pkg.metadata.id} generated .claude model contract round-trip`,
     );
     assert(
       genClaude.color === pkg.metadata.modelHints?.claudeColor,
@@ -1500,8 +1545,8 @@ async function verifyPackage(pkg, validators, settings, packageCatalog, qualityB
       `${pkg.metadata.id} generated .codex tools contract round-trip (flip preserves toolRefs)`,
     );
     assert(
-      genCodex.model === pkg.metadata.modelHints?.claudeModel,
-      `${pkg.metadata.id} generated .codex model contract round-trip (flip preserves claudeModel)`,
+      genCodex.model === agentModelFrontmatter(pkg, 'codex').model,
+      `${pkg.metadata.id} generated .codex model contract round-trip`,
     );
   }
 
@@ -1796,6 +1841,7 @@ async function runVerify() {
   }
 
   for (const pkg of packageFixtures) {
+    reportCapabilityWarnings(pkg);
     await verifyPackage(pkg, validators, settings, packageFixtures, qualityBounds);
   }
   reportQualityAdvisories(packageFixtures, qualityBounds);
@@ -2051,6 +2097,124 @@ async function runSelfTest() {
     assert(
       !/\ncolor:/.test(flippedAgentCodex),
       'selftest(d): flipped agent .codex omits color (claude-only field)',
+    );
+
+    // (d2) Capability profiles are test-only packages. Exercise both generated
+    // and stored frontmatter; no existing package adopts a profile here.
+    const profiledAgent = structuredClone(flippedAgent);
+    profiledAgent.metadata.capabilityProfile = {
+      level: 'C2',
+      effort: 'low',
+      authority: 'read-only-nonprompting',
+      independence: 'same-family',
+    };
+    const validators = await loadValidators();
+    assert(validators.agent(profiledAgent), 'selftest(d2): full capability profile validates');
+    for (const profile of [
+      { level: 'C1' },
+      { level: 'C4', authority: 'governed-write', independence: 'other-family' },
+      { level: 'C3', authority: 'workspace-write' },
+    ]) {
+      const fixture = structuredClone(profiledAgent);
+      fixture.metadata.capabilityProfile = profile;
+      assert(
+        validators.agent(fixture),
+        `selftest(d2): optional profile dimensions validate ${JSON.stringify(profile)}`,
+      );
+    }
+    for (const profile of [
+      {},
+      { level: 'C5' },
+      { level: 'C2', effort: 'max' },
+      { level: 'C2', authority: 'unrestricted' },
+      { level: 'C2', independence: 'any' },
+      { level: 'C2', extra: true },
+    ]) {
+      const fixture = structuredClone(profiledAgent);
+      fixture.metadata.capabilityProfile = profile;
+      assert(
+        !validators.agent(fixture),
+        `selftest(d2): invalid profile rejected ${JSON.stringify(profile)}`,
+      );
+    }
+    for (const authority of ['package', 'source', 'native']) {
+      const fixture = structuredClone(profiledAgent);
+      if (authority !== 'package') delete fixture.metadata.master;
+      if (authority === 'native') fixture.metadata.sourceRuntime = 'elohim-agent';
+      fixture.projections.claude.frontmatterRaw =
+        'name: synthetic-agent-flip\nmodel: stale\neffort: high\ncolor: pink';
+      fixture.projections.codex.frontmatter = { model: 'stale', model_reasoning_effort: 'low' };
+      const claude = projectClaude(fixture);
+      assert(
+        claude.includes('\nmodel: sonnet\neffort: low\n') &&
+          !claude.includes('model: stale') &&
+          (claude.match(/^model:/gm) ?? []).length === 1,
+        `selftest(d2): ${authority} C2/low projects Claude sonnet/low, overriding stale hints`,
+      );
+      for (const [level, effort] of [['C3', 'high'], ['C4', 'xhigh']]) {
+        fixture.metadata.capabilityProfile = { level };
+        const codex = projectCodex(fixture);
+        assert(
+          codex.includes(`\nmodel: gpt-6-astra\nmodel_reasoning_effort: ${effort}\n`) &&
+            (codex.match(/^model:/gm) ?? []).length === 1,
+          `selftest(d2): ${authority} Codex ${level} resolves model and default effort`,
+        );
+      }
+      fixture.metadata.capabilityProfile = { level: 'C3', effort: 'medium' };
+      assert(
+        projectCodex(fixture).includes('model_reasoning_effort: medium\n'),
+        `selftest(d2): ${authority} explicit effort overrides the binding default`,
+      );
+      for (const level of ['C1', 'C2']) {
+        fixture.metadata.capabilityProfile = { level, effort: 'low' };
+        assert(
+          !/^(model|model_reasoning_effort):/m.test(projectCodex(fixture)),
+          `selftest(d2): ${authority} unbound Codex ${level} omits stale model and effort`,
+        );
+      }
+    }
+    for (const [level, model] of [
+      ['C1', 'haiku'], ['C2', 'sonnet'], ['C3', 'opus'], ['C4', 'fable'],
+    ]) {
+      profiledAgent.metadata.capabilityProfile = { level, effort: 'low' };
+      assert(
+        projectClaude(profiledAgent).includes(`\nmodel: ${model}\neffort: low\n`),
+        `selftest(d2): Claude ${level} resolves to ${model}`,
+      );
+    }
+    // Probe the generic backend in memory; this does not declare a Gemini agent ABI.
+    const unbound = structuredClone(profiledAgent);
+    unbound.projections = { gemini: { path: 'synthetic.md', frontmatter: { model: 'stale' } } };
+    const warnings = [];
+    const failuresBeforeWarning = failures;
+    reportCapabilityWarnings(unbound, (message) => warnings.push(message));
+    assert(
+      !/^model:/m.test(projectMarkdownSurface(unbound, 'gemini')) &&
+        warnings.length === 1 &&
+        warnings[0] ===
+          'WARN: capability-unbound: synthetic-agent-flip runtime=gemini level=C4' &&
+        failures === failuresBeforeWarning,
+      'selftest(d2): unbound Gemini omits model and emits a named verify warning without failure',
+    );
+    const boundWarnings = [];
+    reportCapabilityWarnings(profiledAgent, (message) => boundWarnings.push(message));
+    reportCapabilityWarnings(flippedAgent, (message) => boundWarnings.push(message));
+    assert(
+      boundWarnings.length === 0,
+      'selftest(d2): bound and legacy packages emit no capability warning',
+    );
+    assert(
+      projectClaude(flippedAgent) === flippedAgentClaude &&
+        projectCodex(flippedAgent) === flippedAgentCodex,
+      'selftest(d2): capability projection leaves the legacy package bytes unchanged',
+    );
+    const legacyRaw = structuredClone(flippedAgent);
+    delete legacyRaw.metadata.master;
+    legacyRaw.projections.claude.frontmatterRaw =
+      'name: synthetic-agent-flip\nmodel: haiku # preserved comment\ncolor: pink';
+    assert(
+      projectClaude(legacyRaw) === `---\n${legacyRaw.projections.claude.frontmatterRaw}\n---\n${agentBody}`,
+      'selftest(d2): no profile preserves raw source frontmatter byte for byte',
     );
 
     // (e) Agent-doc plant is BYTE-IDENTITY under the FLIP: import copies the

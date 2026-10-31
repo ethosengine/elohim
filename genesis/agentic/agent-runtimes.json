@@ -5,25 +5,37 @@
       "id": "claude-code",
       "comm": ["claude"],
       "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"],
-      "modelEnv": []
+      "modelEnv": [],
+      "capabilityBindings": {
+        "C1": { "model": "haiku" },
+        "C2": { "model": "sonnet" },
+        "C3": { "model": "opus" },
+        "C4": { "model": "fable" }
+      }
     },
     {
       "id": "codex",
       "comm": ["codex"],
       "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
-      "modelEnv": []
+      "modelEnv": [],
+      "capabilityBindings": {
+        "C3": { "model": "gpt-6-astra", "effort": "high" },
+        "C4": { "model": "gpt-6-astra", "effort": "xhigh" }
+      }
     },
     {
       "id": "gemini",
       "comm": ["gemini"],
       "sessionEnv": [],
-      "modelEnv": []
+      "modelEnv": [],
+      "capabilityBindings": {}
     },
     {
       "id": "antigravity",
       "comm": ["antigravity"],
       "sessionEnv": [],
-      "modelEnv": []
+      "modelEnv": [],
+      "capabilityBindings": {}
     }
   ]
 }

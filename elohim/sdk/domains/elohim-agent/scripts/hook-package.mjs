@@ -27,6 +27,7 @@
 //      by `eprfs-agent`, recorded read-only, and not recomputed here.
 
 import { basename, relative } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 export const HOOK_KIND = 'HookPackage';
 
@@ -46,16 +47,17 @@ export function firstDocstringLine(rawBytes) {
   return null;
 }
 
-// Scan settings.json `hooks.<Event>[].hooks[]` for the entry whose command
+// Scan settings.json `hooks.<Event>[].hooks[]` for every entry whose command
 // references `<hookRelPath>` (the `.claude/hooks/<name>.py`), and return the
-// reconstructable registration fragment. Returns null when the hook is
-// UNREGISTERED — an unregistered hook is inert by design, and the package
+// reconstructable registration fragments in settings order. Returns null when
+// the hook is UNREGISTERED — an unregistered hook is inert by design, and the package
 // records that fact (registration: null) rather than inventing wiring.
 //
 // READ-ONLY: this only reads settings; nothing here writes it.
-export function registrationFromSettings(settings, hookRelPath) {
+export function registrationsFromSettings(settings, hookRelPath) {
   const hooks = settings?.hooks;
   if (!hooks || typeof hooks !== 'object') return null;
+  const registrations = [];
   // Match by the repo-relative hook path appearing in the command string; the
   // command uses `$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py`, so the relative
   // path is a stable substring regardless of the env-var prefix.
@@ -77,12 +79,20 @@ export function registrationFromSettings(settings, hookRelPath) {
             timeout: typeof entry.timeout === 'number' ? entry.timeout : null,
           };
           if (entry.type) reg.type = entry.type;
-          return reg;
+          // Omit absent flags so legacy single-entry packages retain their bytes.
+          if (typeof entry.async === 'boolean') reg.async = entry.async;
+          if (typeof entry.asyncRewake === 'boolean') reg.asyncRewake = entry.asyncRewake;
+          registrations.push(reg);
         }
       }
     }
   }
-  return null;
+  return registrations.length ? registrations : null;
+}
+
+// Compatibility API: existing callers still receive only the first match.
+export function registrationFromSettings(settings, hookRelPath) {
+  return registrationsFromSettings(settings, hookRelPath)?.[0] ?? null;
 }
 
 // Normalize a registration for a stable deep-equal (key order independent).
@@ -94,11 +104,28 @@ function normalizeRegistration(reg) {
     command: reg.command ?? null,
     timeout: typeof reg.timeout === 'number' ? reg.timeout : null,
     type: reg.type ?? null,
+    async: reg.async ?? false,
+    asyncRewake: reg.asyncRewake ?? false,
   };
 }
 
+function normalizedRegistrations(registrations) {
+  const list = registrations == null
+    ? []
+    : Array.isArray(registrations) ? registrations : [registrations];
+  return list.map(normalizeRegistration).sort((a, b) => {
+    for (const key of ['event', 'matcher', 'command']) {
+      const order = (a?.[key] ?? '').localeCompare(b?.[key] ?? '');
+      if (order) return order;
+    }
+    // Duplicate commands can have different timeouts/flags; keep their comparison
+    // independent of settings order without losing duplicate registrations.
+    return JSON.stringify(a).localeCompare(JSON.stringify(b));
+  });
+}
+
 export function registrationsCoherent(a, b) {
-  return JSON.stringify(normalizeRegistration(a)) === JSON.stringify(normalizeRegistration(b));
+  return isDeepStrictEqual(normalizedRegistrations(a), normalizedRegistrations(b));
 }
 
 // Import a hook from its executable source. The body is copied VERBATIM (rule 1);
@@ -107,7 +134,9 @@ export function hookPackageFromSource(sourcePath, rawBytes, settings, { repoRoot
   const id = basename(sourcePath, '.py');
   const relPath = relative(repoRoot, sourcePath);
   const description = firstDocstringLine(rawBytes) ?? id;
-  const registration = registrationFromSettings(settings, relPath);
+  const registrations = registrationsFromSettings(settings, relPath);
+  const first = registrations?.[0];
+  const registration = registrations?.length === 1 ? first : registrations;
 
   return {
     apiVersion: 'elohim-agent/v1alpha1',
@@ -120,8 +149,8 @@ export function hookPackageFromSource(sourcePath, rawBytes, settings, { repoRoot
       sourceRuntime: 'claude', // origin: born as a Claude Code hook
       runtimeTargets: ['claude'],
       // Wiring facets mirrored from the live registration (null when inert).
-      event: registration?.event ?? null,
-      matcher: registration?.matcher ?? null,
+      event: first?.event ?? null,
+      matcher: first?.matcher ?? null,
       interpreter: 'python3',
       language: 'python',
       assetRefs: [],
@@ -186,7 +215,7 @@ export async function verifyHookPackage(pkg, { assert, settings, codexSettings, 
   }
   for (const [runtime, projection] of Object.entries(pkg.projections)) {
     const config = runtime === 'claude' ? settings : codexSettings;
-    const live = registrationFromSettings(config, projection.path);
+    const live = registrationsFromSettings(config, projection.path);
     const recorded =
       pkg.registrations?.[runtime] ?? (runtime === 'claude' ? pkg.registration : null);
     assert(
