@@ -673,7 +673,18 @@ class Coordinator:
 
     def finish(self, journal, session, presence, claim, answer, tokens, phase='complete'):
         c = claim['consultation']
-        return journal.append('consultation', session, presence, correlation=claim['correlation'],
+        activation = getattr(journal, 'activation', None)
+        provenance = {}
+        if activation and any(r['kind'] == 'claim' and r['claimSeq'] == claim['seq']
+                              and r['policyCid'] == activation['policyCid']
+                              for r in control.Delivery(journal.directory).rows):
+            provenance = {'regulator': {'kind': 'coordinator'},
+                          'policyCid': activation['policyCid']}
+            answer = {**answer, 'live': True}
+            if answer['decision'] == 'Permit' and answer['pivot'] == 'proceed':
+                answer['pivot'] = 'park'  # Persist the same downgrade as live_effects.
+        return journal.append('consultation', session, presence, **provenance,
+                              correlation=claim['correlation'],
                               consultation={**c, **answer, 'phase': phase, 'claimSeq': claim['seq'],
                                             'finishedAt': clock(), 'usage': {
                                                 'elapsedSeconds': seconds_since(claim['clock']),

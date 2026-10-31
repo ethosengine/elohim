@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 
 import jsonschema
@@ -209,6 +210,31 @@ class CoordinatorTest(unittest.TestCase):
         return [e['consultation'] for e in self.events() if e['kind'] == 'consultation'
                 and e['consultation']['phase'] != 'start']
 
+    def finish_claim(self, activation=None, delivery_claims=(), answer=None, phase='complete'):
+        subject = coordinator.Coordinator(SimpleNamespace(live=False))
+        self.addCleanup(subject.worker.shutdown)
+        with coordinator.locked(self.directory, True) as journal:
+            journal.activation = activation
+            opening = journal.events[0]
+            now = coordinator.clock()
+            claim = journal.append('consultation', opening['session'], self.presence,
+                                   correlation=opening['correlation'], consultation={
+                                       'phase': 'start', 'rung': 1, 'level': 'C1', 'binding': 'fixture',
+                                       'startedAt': now, 'deadlineAt': coordinator.wall(time.time() + 2),
+                                       'timeoutSeconds': 2,
+                                       'claimedBy': {'pid': os.getpid(), 'bootId': now['bootId']}})
+            delivery = coordinator.control.Delivery(self.directory)
+            for index, overrides in enumerate(delivery_claims):
+                fields = {'claimSeq': claim['seq'], 'policyCid': 'bafkreipinnedfixture',
+                          'incidentId': self.incident['id'], **overrides}
+                kind = fields.pop('kind', 'claim')
+                delivery.add(kind, f"claim:{claim['seq']}:{index}", **fields)
+            result = subject.finish(journal, opening['session'], self.presence, claim,
+                                    self.answer if answer is None else answer,
+                                    None if phase == 'expired' else 35, phase)
+        self.assertEqual(self.events()[-1], result)
+        return result
+
     def would(self):
         return [e['wouldHave'] for e in self.events() if e['kind'] == 'would-have']
 
@@ -236,12 +262,60 @@ class CoordinatorTest(unittest.TestCase):
         self.assertEqual(len(self.calls()), 1)
         self.assertEqual(self.calls()[0]['env'], '1')
         self.assertEqual(self.completions()[0]['usage']['tokens'], 35)
+        for event in self.events():
+            if event['kind'] == 'consultation':
+                self.assertNotIn('live', event['consultation'])
+                self.assertNotIn('regulator', event)
+                self.assertNotIn('policyCid', event)
         self.assertEqual({e['kind'] for e in self.events()[1:]}, {'would-have', 'consultation'})
         self.assertTrue({'deny/park', 'guidance', 'incident-closure'} <= {e['effect'] for e in self.would()})
         state = json.loads((self.directory / 'state.json').read_text())
         self.assertEqual(state['sentinel'], 'preserve')
         self.assertEqual(state['transcripts'], {'existing': {'offset': 4}})
         self.assertEqual(state['nextSeq'], self.events()[-1]['seq'] + 1)
+
+    def test_live_park_completion_records_policy_and_coordinator(self):
+        event = self.finish_claim({'policyCid': 'bafkreipinnedfixture'}, [{}])
+        self.assertEqual(event['agentId'], 'stasis-coordinator')
+        self.assertEqual(event['regulator'], {'kind': 'coordinator'})
+        self.assertEqual(event['policyCid'], 'bafkreipinnedfixture')
+        self.assertIs(event['consultation']['live'], True)
+        self.assertEqual(event['consultation']['pivot'], 'park')
+
+    def test_live_proceed_is_recorded_as_park_before_effects(self):
+        answer = {**self.answer, 'pivot': 'proceed'}
+        event = self.finish_claim({'policyCid': 'bafkreipinnedfixture'}, [{}], answer)
+        self.assertEqual(event['consultation']['decision'], 'Permit')
+        self.assertEqual(event['consultation']['pivot'], 'park')
+        self.assertIs(event['consultation']['live'], True)
+        self.assertEqual(event['regulator'], {'kind': 'coordinator'})
+        self.assertEqual(event['policyCid'], 'bafkreipinnedfixture')
+        self.assertEqual(answer['pivot'], 'proceed')
+
+    def test_live_refer_and_expiry_also_record_provenance(self):
+        for phase in ('complete', 'expired'):
+            with self.subTest(phase=phase):
+                event = self.finish_claim({'policyCid': 'bafkreipinnedfixture'}, [{}],
+                                          coordinator.refer('keeper unavailable'), phase)
+                self.assertEqual(event['consultation']['phase'], phase)
+                self.assertEqual(event['consultation']['decision'], 'Refer')
+                self.assertIsNone(event['consultation']['pivot'])
+                self.assertIs(event['consultation']['live'], True)
+                self.assertEqual(event['regulator'], {'kind': 'coordinator'})
+                self.assertEqual(event['policyCid'], 'bafkreipinnedfixture')
+
+    def test_completion_needs_activation_and_one_matching_delivery_claim(self):
+        pin = {'policyCid': 'bafkreipinnedfixture'}
+        for activation, rows in ((None, [{}]), (pin, []),
+                                 (pin, [{'kind': 'guidance'}]),
+                                 (pin, [{'claimSeq': 0}]),
+                                 (pin, [{'policyCid': 'old-policy'}]),
+                                 (pin, [{'claimSeq': 0}, {'policyCid': 'old-policy'}])):
+            with self.subTest(activation=activation, rows=rows):
+                event = self.finish_claim(activation, rows)
+                self.assertNotIn('live', event['consultation'])
+                self.assertNotIn('regulator', event)
+                self.assertNotIn('policyCid', event)
 
     def test_every_written_event_validates_against_canonical_schema(self):
         phases = set()

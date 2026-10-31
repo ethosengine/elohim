@@ -379,9 +379,10 @@ def live_hook(repo, root, payload, normalized):
             return None
         status = snapshot(repo, root, session, remaining())
         iid = normalized.get('correlation', {}).get('incidentId')
+        # Native decide owns presence for this event. A later status can change
+        # after the act closes its stall; it only revalidates the policy pin here.
         if (not pinned(status) or decision.get('policyCid') != status['policyCid'] or
-                decision.get('incidentId') != iid or not iid or
-                presence(status, session)['disposition'] != 'automated'):
+                decision.get('incidentId') != iid or not iid):
             return None
         message = PARK.format(iid)
         with delivery_lock(directory) as journal:

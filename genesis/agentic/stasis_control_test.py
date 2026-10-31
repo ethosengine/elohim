@@ -386,7 +386,21 @@ class ControlTest(unittest.TestCase):
                 if disposition == 'automated':
                     s['sessions'][0]['presence'].update(lastWitnessedAgeSeconds=0, rulingRef='away-ruling')
                 self.statusfile.write_text(json.dumps(s))
+                self.env['DECISION'] = json.dumps({
+                    'effect': 'deny' if disposition == 'automated' else 'none',
+                    'message': 'park', 'shadow': False, 'policyCid': CID})
                 self.assertEqual(bool(self.request().stdout), disposition == 'automated')
+
+    def test_native_deny_survives_later_presence_change(self):
+        for disposition in ['collaborative', 'unknown']:
+            with self.subTest(disposition=disposition):
+                self.statusfile.write_text(json.dumps(status(disposition)))
+                result = self.request()
+                self.assertTrue(result.stdout, 'native event-specific deny was suppressed')
+                out = json.loads(result.stdout)['hookSpecificOutput']
+                self.assertEqual(out['decision']['behavior'], 'deny')
+        self.assertEqual(len(self.rows('park')), 2)
+        self.assertEqual(len(self.rows('stall-closed')), 2)
 
     def test_inert_missing_mismatched_nonzero_and_non_deny(self):
         for code in ['3', '1', '17']:
@@ -400,7 +414,11 @@ class ControlTest(unittest.TestCase):
         for answer in [{'effect': 'none'}, {'effect': 'context', 'message': 'try'},
                        {'effect': 'deny', 'message': 'park', 'shadow': True},
                        {'effect': 'deny', 'message': '', 'shadow': False},
-                       {'effect': 'deny', 'message': 'park', 'shadow': False, 'policyCid': 'wrong'}]:
+                       {'effect': 'deny', 'message': 'park', 'shadow': False, 'policyCid': 'wrong'},
+                       {'effect': 'deny', 'message': 'park', 'shadow': False, 'policyCid': CID,
+                        'incidentId': 'another-event'},
+                       {'effect': 'deny', 'message': 'park', 'shadow': False, 'policyCid': CID,
+                        'inert': 'native refused'}]:
             self.env['DECISION'] = json.dumps(answer)
             self.assertEqual(self.request().stdout, '')
         self.assertFalse((self.directory / 'delivery.jsonl').exists())
