@@ -23,7 +23,7 @@
 //!
 //! # Crash safety
 //!
-//! Four sibling names, `<live>` being the service path (`sync.sled`):
+//! Five sibling names, `<live>` being the service path (`sync.sled`):
 //!
 //! | name | meaning |
 //! |------|---------|
@@ -31,6 +31,7 @@
 //! | `<live>.reclaim-old` | the original, kept until the fresh copy opens. |
 //! | `<live>.reclaim-rejected` | a fresh copy that failed to open, being discarded. |
 //! | `<live>.reclaim-attempts` | unfinished-attempt count (a file). |
+//! | `<live>.reclaim-lock` | held (`flock`) for the whole open; never deleted. |
 //!
 //! The swap is two renames, `live → old` then `tmp → live`, and the first only
 //! happens after the copy verified. So on boot ([`recover_leftovers`]):
@@ -46,18 +47,44 @@
 //!
 //! Every step moves toward exactly one intact sled at the live path, none
 //! deletes the only intact copy, and none is undone by a later rule, so a crash
-//! anywhere resolves in one boot. An attempt that never finishes (killed, out of
-//! memory, out of time) is counted; after [`DEFAULT_MAX_UNFINISHED_ATTEMPTS`]
-//! the node stops trying and says so, rather than paying the cost every boot.
+//! anywhere resolves in one boot. The live path is never opened (which would
+//! create an empty database) while it is missing beside an original.
+//!
+//! Those rules assume one opener at a time: a second boot reading the names
+//! mid-swap would see a missing live path or a copy it takes for garbage. So
+//! the whole open, recovery through swap, holds an exclusive lock on
+//! `<live>.reclaim-lock`, and a second opener is refused rather than queued
+//! (it could not open the sled the first one serves anyway).
+//!
+//! Deleting a discarded copy is never needed for an intact live sled, so a
+//! failure to delete one is logged and the boot serves without reclaiming
+//! until it is gone. Only a rename that cannot be made stops a boot: finishing
+//! an interrupted swap or rollback, or a rollback itself (which first frees
+//! the rejected name). The original is intact at its name in every such case.
+//!
+//! An attempt is counted from the moment it starts reading the live trees,
+//! and the count is cleared only when a copy is promoted (or the sled turns
+//! out not to need one). A reclaim that is killed, runs out of time or memory,
+//! or rolls back stays counted; after [`DEFAULT_MAX_UNFINISHED_ATTEMPTS`] the
+//! node stops trying and says so, rather than paying the cost every boot.
 //!
 //! # Bounds
 //!
 //! The readiness probe waits 120 s and this runs before the HTTP listener, so
-//! the whole attempt is bounded by [`DEFAULT_BUDGET`]. Past it the copy is
-//! discarded and the node serves from the original sled. Progress is logged
-//! every few seconds. Free space under the needed headroom refuses before any
-//! write. A panic inside sled's export/import (it panics on I/O errors) is
-//! caught and treated as an aborted attempt.
+//! everything before the swap (measuring, copying, verifying, fsyncing the
+//! copy) checks [`DEFAULT_BUDGET`] between entries and files. Past it the copy
+//! is discarded and the node serves from the original sled. A single file's
+//! fsync is not interruptible, so the overshoot is at most one file's.
+//!
+//! Outside the budget, by design: the directory walk that decides whether to
+//! try (a `stat` per file), the swap's two renames, opening the promoted copy,
+//! and deleting the original or a discarded copy. Each is either cheap or
+//! resumed where it stopped by the boot rules (a deletion interrupted midway
+//! has removed what it removed), so none can repeat its whole cost forever.
+//!
+//! Progress is logged every few seconds. Free space under the needed headroom
+//! refuses before any write. A panic inside sled's export/import (it panics on
+//! I/O errors) is caught and treated as an aborted attempt.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -111,6 +138,10 @@ pub struct ReclaimPolicy {
     pub max_unfinished_attempts: u32,
     /// Available bytes on the filesystem holding a path.
     pub free_space: fn(&Path) -> io::Result<u64>,
+    /// Opens the live path for service ([`open_at`]).
+    pub open: fn(&Path, u64) -> sled::Result<sled::Db>,
+    /// Deletes a file or directory tree, a missing one included.
+    pub remove: fn(&Path) -> io::Result<()>,
 }
 
 impl Default for ReclaimPolicy {
@@ -122,6 +153,8 @@ impl Default for ReclaimPolicy {
             budget: DEFAULT_BUDGET,
             max_unfinished_attempts: DEFAULT_MAX_UNFINISHED_ATTEMPTS,
             free_space: |p| fs4::available_space(p),
+            open: open_at,
+            remove: remove_path,
         }
     }
 }
@@ -216,6 +249,7 @@ pub struct ReclaimPaths {
     pub old: PathBuf,
     pub rejected: PathBuf,
     pub attempts: PathBuf,
+    pub lock: PathBuf,
 }
 
 impl ReclaimPaths {
@@ -231,6 +265,7 @@ impl ReclaimPaths {
             old: sibling("reclaim-old"),
             rejected: sibling("reclaim-rejected"),
             attempts: sibling("reclaim-attempts"),
+            lock: sibling("reclaim-lock"),
         }
     }
 
@@ -278,10 +313,14 @@ fn rename_synced(from: &Path, to: &Path, parent: &Path) -> io::Result<()> {
 }
 
 /// fsync every file and directory under `root`, then `root` itself.
-fn sync_tree(root: &Path) -> io::Result<()> {
+/// `Ok(false)` when `deadline` passed first (checked between files).
+fn sync_tree(root: &Path, deadline: Instant) -> io::Result<bool> {
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         for entry in std::fs::read_dir(&dir)? {
+            if Instant::now() > deadline {
+                return Ok(false);
+            }
             let path = entry?.path();
             let meta = std::fs::symlink_metadata(&path)?;
             if meta.is_dir() {
@@ -292,13 +331,40 @@ fn sync_tree(root: &Path) -> io::Result<()> {
         }
         sync_dir(&dir)?;
     }
-    Ok(())
+    Ok(true)
+}
+
+/// Take `<live>.reclaim-lock` for the whole open. Refused, not awaited, when
+/// another process holds it.
+fn lock_open(paths: &ReclaimPaths) -> Result<std::fs::File, StorageError> {
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&paths.lock)?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(std::fs::TryLockError::WouldBlock) => Err(StorageError::Database(format!(
+            "another process is opening {} (it holds {}); not touching it",
+            paths.live.display(),
+            paths.lock.display()
+        ))),
+        Err(std::fs::TryLockError::Error(e)) => Err(e.into()),
+    }
 }
 
 /// Resolve whatever an interrupted reclaim left beside `paths.live`, so at
 /// most `live` and `old` remain (see the module docs for the rules). `old` is
 /// handled by [`open_live`], which must open `live` to decide.
-pub fn recover_leftovers(paths: &ReclaimPaths) -> io::Result<()> {
+///
+/// Errors only when an interrupted rename cannot be finished. A discarded
+/// copy that `remove` cannot delete is logged and left; the caller sees it
+/// still exists and does not reclaim this boot.
+pub fn recover_leftovers(
+    paths: &ReclaimPaths,
+    remove: fn(&Path) -> io::Result<()>,
+) -> io::Result<()> {
     let parent = paths.parent();
     if !paths.live.exists() && paths.old.exists() {
         if paths.tmp.exists() {
@@ -315,15 +381,20 @@ pub fn recover_leftovers(paths: &ReclaimPaths) -> io::Result<()> {
             rename_synced(&paths.old, &paths.live, &parent)?;
         }
     }
-    if paths.tmp.exists() {
-        warn!(
-            tmp = %paths.tmp.display(),
-            "sync sled reclaim: discarding a copy that never reached the swap"
-        );
-        remove_path(&paths.tmp)?;
-    }
-    if paths.rejected.exists() {
-        remove_path(&paths.rejected)?;
+    for (path, what) in [
+        (&paths.tmp, "a copy that never reached the swap"),
+        (&paths.rejected, "a copy that did not open"),
+    ] {
+        if path.exists() {
+            warn!(path = %path.display(), "sync sled reclaim: discarding {what}");
+            if let Err(e) = remove(path) {
+                warn!(
+                    path = %path.display(),
+                    error = %e,
+                    "sync sled reclaim: could not delete it; serving the live sled without reclaiming"
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -332,21 +403,45 @@ fn is_lock_contention(e: &sled::Error) -> bool {
     e.to_string().contains("could not acquire lock")
 }
 
+/// How [`open_live`] found the live path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiveOpen {
+    /// No original beside it.
+    Plain,
+    /// A reclaimed copy opened and replaces the original (deleted now, or by
+    /// the next boot if that failed).
+    Promoted,
+    /// The reclaimed copy did not open; the original is live again.
+    RolledBack,
+}
+
 /// Open `live` for service. When `old` sits beside it, `live` is a fresh
 /// reclaimed copy: delete `old` once `live` opens, or roll back to `old` if it
 /// does not.
-pub fn open_live(paths: &ReclaimPaths, cache_capacity: u64) -> Result<sled::Db, StorageError> {
+pub fn open_live(
+    paths: &ReclaimPaths,
+    cache_capacity: u64,
+    policy: &ReclaimPolicy,
+) -> Result<(sled::Db, LiveOpen), StorageError> {
     let open_err =
         |e: sled::Error| StorageError::Database(format!("Failed to open sync.sled: {e}"));
-    match open_at(&paths.live, cache_capacity) {
+    if !paths.live.exists() && paths.old.exists() {
+        // Opening would create an empty database here, and the rule below
+        // would then delete the original as superseded.
+        return Err(StorageError::Database(format!(
+            "{} is missing beside {}; the reclaim leftovers are unresolved",
+            paths.live.display(),
+            paths.old.display()
+        )));
+    }
+    match (policy.open)(&paths.live, cache_capacity) {
+        Ok(db) if !paths.old.exists() => Ok((db, LiveOpen::Plain)),
         Ok(db) => {
-            if paths.old.exists() {
-                if let Err(e) = remove_path(&paths.old) {
-                    // Retried next boot by this same rule; the live copy serves.
-                    warn!(old = %paths.old.display(), error = %e, "sync sled reclaim: could not delete the original yet");
-                }
+            if let Err(e) = (policy.remove)(&paths.old) {
+                // Retried next boot by this same rule; the live copy serves.
+                warn!(old = %paths.old.display(), error = %e, "sync sled reclaim: could not delete the original yet");
             }
-            Ok(db)
+            Ok((db, LiveOpen::Promoted))
         }
         Err(e) if paths.old.exists() && !is_lock_contention(&e) => {
             warn!(
@@ -354,10 +449,15 @@ pub fn open_live(paths: &ReclaimPaths, cache_capacity: u64) -> Result<sled::Db, 
                 "sync sled reclaim: the reclaimed copy did not open; rolling back to the original"
             );
             let parent = paths.parent();
+            // A rename cannot replace a non-empty directory.
+            (policy.remove)(&paths.rejected)?;
             rename_synced(&paths.live, &paths.rejected, &parent)?;
             rename_synced(&paths.old, &paths.live, &parent)?;
-            remove_path(&paths.rejected)?;
-            open_at(&paths.live, cache_capacity).map_err(open_err)
+            if let Err(e) = (policy.remove)(&paths.rejected) {
+                warn!(rejected = %paths.rejected.display(), error = %e, "sync sled reclaim: could not delete the rejected copy; next boot will");
+            }
+            let db = (policy.open)(&paths.live, cache_capacity).map_err(open_err)?;
+            Ok((db, LiveOpen::RolledBack))
         }
         Err(e) => Err(open_err(e)),
     }
@@ -424,6 +524,15 @@ fn write_attempts(path: &Path, n: u32) -> io::Result<()> {
     std::fs::File::open(path)?.sync_all()
 }
 
+/// Put the count back to `n` (a refusal is not an attempt).
+fn restore_attempts(paths: &ReclaimPaths, n: u32) {
+    if n == 0 {
+        clear_attempts(paths);
+    } else if let Err(e) = write_attempts(&paths.attempts, n) {
+        warn!(error = %e, "sync sled reclaim: could not restore the attempt count");
+    }
+}
+
 fn clear_attempts(paths: &ReclaimPaths) {
     if paths.attempts.exists() {
         if let Err(e) = remove_path(&paths.attempts) {
@@ -480,8 +589,10 @@ pub fn open_sync_sled(
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    recover_leftovers(&paths)?;
-    let db = open_live(&paths, cache_capacity)?;
+    // Held to the end of this function; the served sled holds its own lock.
+    let _lock = lock_open(&paths)?;
+    recover_leftovers(&paths, policy.remove)?;
+    let (db, _) = open_live(&paths, cache_capacity, policy)?;
     let report = |outcome: ReclaimOutcome,
                   disk_before: u64,
                   disk_after: u64,
@@ -521,6 +632,57 @@ pub fn open_sync_sled(
                 disk_before,
                 0,
                 "under the size floor".into(),
+            ),
+        ));
+    }
+
+    if let Some(left) = [&paths.tmp, &paths.old, &paths.rejected]
+        .into_iter()
+        .find(|p| p.exists())
+    {
+        return Ok((
+            db,
+            report(
+                ReclaimOutcome::AbortedError,
+                disk_before,
+                disk_before,
+                0,
+                format!(
+                    "{} could not be deleted; not reclaiming until it is",
+                    left.display()
+                ),
+            ),
+        ));
+    }
+
+    let unfinished = read_attempts(&paths.attempts);
+    if unfinished >= policy.max_unfinished_attempts {
+        return Ok((
+            db,
+            report(
+                ReclaimOutcome::RefusedAttempts,
+                disk_before,
+                disk_before,
+                0,
+                format!(
+                    "{unfinished} earlier attempts never finished; delete {} to try again",
+                    paths.attempts.display()
+                ),
+            ),
+        ));
+    }
+
+    // From here an attempt is in flight: count it until it finishes.
+    if let Err(e) = write_attempts(&paths.attempts, unfinished + 1) {
+        // Without the count a crash mid-attempt could repeat every boot.
+        return Ok((
+            db,
+            report(
+                ReclaimOutcome::AbortedError,
+                disk_before,
+                disk_before,
+                0,
+                format!("could not record the attempt: {e}"),
             ),
         ));
     }
@@ -568,28 +730,12 @@ pub fn open_sync_sled(
         ));
     }
 
-    let unfinished = read_attempts(&paths.attempts);
-    if unfinished >= policy.max_unfinished_attempts {
-        return Ok((
-            db,
-            report(
-                ReclaimOutcome::RefusedAttempts,
-                disk_before,
-                disk_before,
-                logical,
-                format!(
-                    "{unfinished} earlier attempts never finished; delete {} to try again",
-                    paths.attempts.display()
-                ),
-            ),
-        ));
-    }
-
     let needed = logical
         .saturating_mul(2)
         .saturating_add(HEADROOM_FIXED_BYTES);
     let available = (policy.free_space)(&paths.parent()).unwrap_or(0);
     if available < needed {
+        restore_attempts(&paths, unfinished);
         return Ok((
             db,
             report(
@@ -602,20 +748,6 @@ pub fn open_sync_sled(
         ));
     }
 
-    // From here an attempt is in flight: count it until it finishes.
-    if let Err(e) = write_attempts(&paths.attempts, unfinished + 1) {
-        // Without the count a crash mid-copy could repeat every boot.
-        return Ok((
-            db,
-            report(
-                ReclaimOutcome::AbortedError,
-                disk_before,
-                disk_before,
-                logical,
-                format!("could not record the attempt: {e}"),
-            ),
-        ));
-    }
     info!(
         disk_before,
         logical,
@@ -627,7 +759,7 @@ pub fn open_sync_sled(
                  outcome: ReclaimOutcome,
                  detail: String|
      -> Result<(sled::Db, ReclaimReport), StorageError> {
-        if let Err(e) = remove_path(&paths.tmp) {
+        if let Err(e) = (policy.remove)(&paths.tmp) {
             warn!(error = %e, "sync sled reclaim: could not delete the discarded copy; next boot will");
         }
         Ok((
@@ -666,12 +798,22 @@ pub fn open_sync_sled(
             )
         }
     }
-    if let Err(e) = sync_tree(&paths.tmp) {
-        return abort(
-            db,
-            ReclaimOutcome::AbortedError,
-            format!("fsync of the copy failed: {e}"),
-        );
+    match sync_tree(&paths.tmp, deadline) {
+        Ok(true) => {}
+        Ok(false) => {
+            return abort(
+                db,
+                ReclaimOutcome::AbortedBudget,
+                "budget spent fsyncing the copy".into(),
+            )
+        }
+        Err(e) => {
+            return abort(
+                db,
+                ReclaimOutcome::AbortedError,
+                format!("fsync of the copy failed: {e}"),
+            )
+        }
     }
 
     // The swap. Close the original first so nothing writes to it mid-rename.
@@ -679,48 +821,41 @@ pub fn open_sync_sled(
     let parent = paths.parent();
     let swapped = rename_synced(&paths.live, &paths.old, &parent)
         .and_then(|()| rename_synced(&paths.tmp, &paths.live, &parent));
-    if let Err(e) = swapped {
+    let swap_err = swapped.err();
+    if let Some(e) = &swap_err {
         // Resolve whichever rename failed by the boot rules, then serve.
         warn!(error = %e, "sync sled reclaim: the swap failed; resolving it");
-        recover_leftovers(&paths)?;
-        let db = open_live(&paths, cache_capacity)?;
-        let disk_after = dir_bytes(&paths.live);
-        return Ok((
-            db,
-            report(
-                ReclaimOutcome::AbortedError,
-                disk_before,
-                disk_after,
-                logical,
-                format!("swap failed: {e}"),
-            ),
-        ));
+        recover_leftovers(&paths, policy.remove)?;
     }
-    let db = open_live(&paths, cache_capacity)?;
+    let (db, opened) = open_live(&paths, cache_capacity, policy)?;
     let disk_after = dir_bytes(&paths.live);
-    if paths.old.exists() {
-        // open_live rolled back: the original is live again.
-        return Ok((
-            db,
-            report(
-                ReclaimOutcome::AbortedError,
-                disk_before,
-                disk_after,
-                logical,
-                "the reclaimed copy did not open; rolled back".into(),
-            ),
-        ));
+    // Which copy serves decides the outcome, not which names remain: a
+    // rollback leaves no original beside live either.
+    let (outcome, detail) = match (opened, &swap_err) {
+        (LiveOpen::RolledBack, _) => (
+            ReclaimOutcome::AbortedError,
+            "the reclaimed copy did not open; rolled back".to_string(),
+        ),
+        // Only the first rename can fail and leave the original live.
+        (LiveOpen::Plain, Some(e)) => (
+            ReclaimOutcome::AbortedError,
+            format!("swap failed: {e}; serving the original"),
+        ),
+        (LiveOpen::Promoted | LiveOpen::Plain, None) => {
+            (ReclaimOutcome::Reclaimed, "swapped".to_string())
+        }
+        (LiveOpen::Promoted, Some(e)) => (
+            ReclaimOutcome::Reclaimed,
+            format!("swapped after finishing a failed rename: {e}"),
+        ),
+    };
+    if outcome == ReclaimOutcome::Reclaimed {
+        clear_attempts(&paths);
     }
-    clear_attempts(&paths);
+    // Otherwise the attempt stays counted.
     Ok((
         db,
-        report(
-            ReclaimOutcome::Reclaimed,
-            disk_before,
-            disk_after,
-            logical,
-            "swapped".into(),
-        ),
+        report(outcome, disk_before, disk_after, logical, detail),
     ))
 }
 
@@ -1102,14 +1237,171 @@ mod tests {
         only_live_remains(&paths);
     }
 
+    /// Hold `<live>.reclaim-lock` the way another booting process would.
+    fn hold_lock(paths: &ReclaimPaths) -> std::fs::File {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&paths.lock)
+            .unwrap();
+        file.try_lock().unwrap();
+        file
+    }
+
+    #[test]
+    fn a_second_opener_is_refused_while_one_holds_the_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.live, "original");
+        // Another boot is mid-reclaim: its copy sits beside the original.
+        marked_sled(&paths.tmp, "copy-in-progress");
+        let held = hold_lock(&paths);
+        let second = open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &policy());
+        assert!(second.is_err(), "the second opener is refused");
+        assert!(paths.tmp.is_dir(), "the other boot's copy is not touched");
+        drop(held);
+        assert_eq!(served_marker(&paths.live), "original");
+        only_live_remains(&paths);
+    }
+
+    #[test]
+    fn the_live_path_is_never_created_beside_an_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        // Mid-swap: `live → old` done, the copy not yet renamed in.
+        marked_sled(&paths.old, "original");
+        assert!(open_live(&paths, SYNC_SLED_CACHE_BYTES, &off()).is_err());
+        assert!(!paths.live.exists(), "no empty database at the live path");
+        let db = open_at(&paths.old, SYNC_SLED_CACHE_BYTES).unwrap();
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+    }
+
+    /// A remover that cannot delete the copies a reclaim discards.
+    fn stuck_remove(path: &Path) -> io::Result<()> {
+        let name = path.to_string_lossy();
+        if name.ends_with("reclaim-tmp") || name.ends_with("reclaim-rejected") {
+            return Err(io::Error::other("refused by the test"));
+        }
+        remove_path(path)
+    }
+
+    #[test]
+    fn a_leftover_that_cannot_be_deleted_does_not_stop_the_boot() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        marked_sled(&paths.live, "original");
+        marked_sled(&paths.tmp, "partial-copy");
+        std::fs::write(&paths.rejected, b"not a sled").unwrap();
+
+        let disabled = ReclaimPolicy {
+            remove: stuck_remove,
+            ..off()
+        };
+        let (db, r) = open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &disabled)
+            .expect("the switch serves the intact original");
+        assert_eq!(r.outcome, ReclaimOutcome::Disabled);
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+        drop(db);
+
+        let enabled = ReclaimPolicy {
+            remove: stuck_remove,
+            ..policy()
+        };
+        let (db, r) = open_sync_sled(&paths.live, SYNC_SLED_CACHE_BYTES, &enabled)
+            .expect("an undeletable leftover never stops the boot");
+        assert_eq!(r.outcome, ReclaimOutcome::AbortedError, "{r:?}");
+        assert!(r.detail.contains("reclaim-"), "the log names it: {r:?}");
+        assert_eq!(db.get(b"who").unwrap().unwrap().as_ref(), b"original");
+        assert!(!paths.attempts.exists(), "nothing was attempted");
+        drop(db);
+
+        // Once the leftovers can go, they go.
+        assert_eq!(served_marker(&paths.live), "original");
+        only_live_remains(&paths);
+    }
+
+    static PROMOTED_OPENS: AtomicU64 = AtomicU64::new(0);
+
+    /// Every boot opens the live path three times on a failed promotion:
+    /// the original, the promoted copy (refused here), the rolled-back
+    /// original.
+    fn refuse_the_promoted_copy(path: &Path, cache: u64) -> sled::Result<sled::Db> {
+        if PROMOTED_OPENS.fetch_add(1, Ordering::SeqCst) % 3 == 1 {
+            return Err(sled::Error::Unsupported("refused by the test".into()));
+        }
+        open_at(path, cache)
+    }
+
+    #[tokio::test]
+    async fn a_rolled_back_reclaim_is_not_reported_as_reclaimed() {
+        let dir = tempfile::tempdir().unwrap();
+        let live = dir.path().join("sync.sled");
+        leaky_sled(&live).await;
+        let before = {
+            let (db, _) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &off()).unwrap();
+            contents(&db)
+        };
+        let paths = ReclaimPaths::new(&live);
+        let failing = ReclaimPolicy {
+            open: refuse_the_promoted_copy,
+            ..policy()
+        };
+        for attempt in 1..=DEFAULT_MAX_UNFINISHED_ATTEMPTS {
+            let (db, r) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &failing).unwrap();
+            assert_eq!(r.outcome, ReclaimOutcome::AbortedError, "{r:?}");
+            assert_eq!(contents(&db), before, "the original serves");
+            assert_eq!(read_attempts(&paths.attempts), attempt, "still unfinished");
+            drop(db);
+            only_live_remains(&paths);
+        }
+        let (_db, r) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &failing).unwrap();
+        assert_eq!(r.outcome, ReclaimOutcome::RefusedAttempts, "{r:?}");
+    }
+
+    #[tokio::test]
+    async fn a_budget_abort_counts_as_an_unfinished_attempt() {
+        let dir = tempfile::tempdir().unwrap();
+        let live = dir.path().join("sync.sled");
+        leaky_sled(&live).await;
+        let paths = ReclaimPaths::new(&live);
+        let hurried = ReclaimPolicy {
+            budget: Duration::ZERO,
+            ..policy()
+        };
+        for attempt in 1..=DEFAULT_MAX_UNFINISHED_ATTEMPTS {
+            let (db, r) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &hurried).unwrap();
+            assert_eq!(r.outcome, ReclaimOutcome::AbortedBudget, "{r:?}");
+            assert_eq!(read_attempts(&paths.attempts), attempt);
+            drop(db);
+        }
+        let (_db, r) = open_sync_sled(&live, SYNC_SLED_CACHE_BYTES, &hurried).unwrap();
+        assert_eq!(r.outcome, ReclaimOutcome::RefusedAttempts, "{r:?}");
+    }
+
+    #[test]
+    fn the_fsync_of_the_copy_stops_at_the_deadline() {
+        let dir = tempfile::tempdir().unwrap();
+        let copy = dir.path().join("copy");
+        marked_sled(&copy, "copy");
+        let spent = Instant::now() - Duration::from_secs(1);
+        assert!(
+            !sync_tree(&copy, spent).unwrap(),
+            "past the deadline it stops"
+        );
+        let ample = Instant::now() + Duration::from_secs(60);
+        assert!(sync_tree(&copy, ample).unwrap());
+    }
+
     #[test]
     fn recovery_is_idempotent() {
         let dir = tempfile::tempdir().unwrap();
         let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
         marked_sled(&paths.old, "original");
         marked_sled(&paths.tmp, "verified-copy");
-        recover_leftovers(&paths).unwrap();
-        recover_leftovers(&paths).unwrap();
+        recover_leftovers(&paths, remove_path).unwrap();
+        recover_leftovers(&paths, remove_path).unwrap();
         assert_eq!(served_marker(&paths.live), "verified-copy");
         assert_eq!(served_marker(&paths.live), "verified-copy");
         only_live_remains(&paths);
