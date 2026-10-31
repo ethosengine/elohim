@@ -2023,7 +2023,7 @@ fn live_regulator_records_validate_against_the_event_schema() {
         &c,
         &recheck,
         &[ruling],
-        &clock,
+        &|| clock.clone(),
         1 << 20,
     )
     .unwrap()
@@ -2067,6 +2067,11 @@ fn park_record(live: bool, regulator: Option<&str>, cid: Option<&str>) -> Value 
     let mut e = consult(3, 100, "s1:2", c);
     if let Some(kind) = regulator {
         e["regulator"] = json!({"kind": kind});
+        e["agentId"] = json!(if kind == "coordinator" {
+            "stasis-coordinator"
+        } else {
+            "stasis-regulator"
+        });
     }
     if let Some(cid) = cid {
         e["policyCid"] = json!(cid);
@@ -2119,6 +2124,20 @@ fn a_live_park_closes_the_stall_and_a_shadow_park_does_not() {
     ] {
         let f = fold_pinned(&[perm(), park_record(true, reg, cid)], pinned);
         assert_eq!(f.incidents[0].closed_by, None, "{reg:?} {cid:?} {pinned:?}");
+        assert!(!f.incidents[0].consultations[0].live);
+    }
+
+    // M1: the agent id and regulator kind must be paired exactly.
+    for (agent, kind) in [
+        ("main", "native-decide"),
+        ("main", "coordinator"),
+        ("stasis-regulator", "coordinator"),
+        ("stasis-coordinator", "native-decide"),
+    ] {
+        let mut e = park_record(true, Some(kind), Some("cid-1"));
+        e["agentId"] = json!(agent);
+        let f = fold_pinned(&[perm(), e], Some("cid-1"));
+        assert_eq!(f.incidents[0].closed_by, None, "{agent} {kind}");
         assert!(!f.incidents[0].consultations[0].live);
     }
 

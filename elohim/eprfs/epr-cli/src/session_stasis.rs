@@ -43,6 +43,9 @@ pub struct Ctx {
     pub cwd: PathBuf,
     /// The clock the fold reads open intervals against.
     pub clock: ClockReading,
+    /// Re-reads the clock after the journal lock is held (the system clock in production);
+    /// `None` reuses `clock`, which fixtures that run on a fake clock want.
+    pub reclock: Option<fn() -> ClockReading>,
     /// Journal segment rotation size.
     pub segment_limit: u64,
     /// `STASIS_JOURNAL_ROOT`, when set.
@@ -63,6 +66,7 @@ impl Ctx {
         Self {
             cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             clock: ClockReading::system(),
+            reclock: Some(ClockReading::system),
             segment_limit: std::env::var("STASIS_SEGMENT_BYTES")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -658,7 +662,7 @@ fn decide_live(
             classifier,
             &|| assess_policy(ctx),
             &checkout_away_rulings(ctx),
-            &ctx.clock,
+            &|| ctx.reclock.map_or_else(|| ctx.clock.clone(), |f| f()),
             ctx.segment_limit,
         );
         match answer {
@@ -789,6 +793,7 @@ mod tests {
                 boot_id: "b".into(),
                 uptime_seconds: 5.0,
             },
+            reclock: None,
             segment_limit: 5 << 20,
             journal_root_env: None,
             config_dir: None,
@@ -1805,32 +1810,73 @@ mod tests {
         assert_eq!(v["inert"], true);
     }
 
-    #[test]
-    fn a_keepers_proceed_is_recorded_and_downgraded_to_park() {
-        let dir = tempfile::tempdir().unwrap();
-        pinned_checkout(dir.path(), &policy_value());
-        let proceed = event(
+    /// A keeper `proceed` record: the coordinator's live shape, or a shadow one.
+    fn proceed_record(live: bool, cid: &str) -> Value {
+        let mut c = json!({"phase": "complete", "rung": 2, "level": "C2", "binding": "b",
+                           "decision": "Permit", "pivot": "proceed", "reason": "r"});
+        let mut e = event(
             3,
             60,
             "consultation",
-            json!({"correlation": {"incidentId": "s1:2", "confidence": "high", "method": "t"},
-                   "consultation": {"phase": "complete", "rung": 2, "level": "C2", "binding": "b",
-                                    "decision": "Permit", "pivot": "proceed", "reason": "r"}}),
+            json!({"correlation": {"incidentId": "s1:2", "confidence": "high", "method": "t"}}),
         );
-        let root = open_journal(dir.path(), &[proceed]);
-        let st = settings(dir.path());
-        let mut c = ctx(dir.path());
-        let (_, v) = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
-        assert_eq!(v["effect"], "none"); // collaborative: nothing is delivered
-        let last = events_of(&root).pop().unwrap();
-        assert_eq!(last["consultation"]["pivot"], "park");
-        assert!(last["consultation"]["reason"]
-            .as_str()
-            .unwrap()
-            .contains("proceed downgraded to park"));
-        let n = events_of(&root).len();
-        let _ = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
-        assert_eq!(events_of(&root).len(), n);
+        if live {
+            c["live"] = json!(true);
+            e["agentId"] = json!("stasis-coordinator");
+            e["regulator"] = json!({"kind": "coordinator"});
+            e["policyCid"] = json!(cid);
+        }
+        e["consultation"] = c;
+        // Keep the away basis: the last event decides presence.
+        e["presence"] = collaborative();
+        e
+    }
+
+    #[test]
+    fn a_live_proceed_is_downgraded_to_park_only_in_automated_presence() {
+        // M2: a shadow proceed never reaches the downgrade; a live one needs automated presence.
+        for (live_proceed, automated, writes) in [
+            (false, false, false),
+            (false, true, false),
+            (true, false, false),
+            (true, true, true),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let cid = pinned_checkout(dir.path(), &policy_value());
+            let root = open_journal(dir.path(), &[proceed_record(live_proceed, &cid)]);
+            let st = settings(dir.path());
+            let mut c = ctx(dir.path());
+            if automated {
+                at_automated(&mut c);
+            }
+            let before = events_of(&root).len();
+            let _ = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+            let added = events_of(&root).len() - before;
+            // Automated + live proceed: exactly one park (the downgrade), then the deny rides it.
+            let expect = usize::from(writes);
+            let parks = events_of(&root)
+                .iter()
+                .filter(|e| e["consultation"]["pivot"] == "park")
+                .count();
+            if live_proceed && automated {
+                assert_eq!((added, parks), (1, 1), "live proceed, automated");
+                let last = events_of(&root).pop().unwrap();
+                assert!(last["consultation"]["reason"]
+                    .as_str()
+                    .unwrap()
+                    .contains("proceed downgraded to park"));
+            } else if automated {
+                // A shadow proceed in automated presence: the ordinary park, not a downgrade.
+                assert_eq!(added, 1, "shadow proceed, automated");
+                let last = events_of(&root).pop().unwrap();
+                assert!(!last["consultation"]["reason"]
+                    .as_str()
+                    .unwrap()
+                    .contains("proceed downgraded"));
+            } else {
+                assert_eq!((added, expect), (0, 0), "{live_proceed} collaborative");
+            }
+        }
     }
 
     // ---- pin-check hardening (review of the slice-6 leg) -------------------------------------
@@ -2189,75 +2235,76 @@ mod tests {
     }
 
     #[test]
-    fn a_policy_edited_after_the_first_read_is_inert_under_the_lock() {
-        // L2: the decision re-verifies the bytes under the journal lock, via `recheck`.
-        use elohim_device_runtime::session_stasis::{
-            live::{decide_live, LiveDecision},
-            policy::{Pin, PolicyAssessment, PolicyFileRead},
-            StasisPolicy,
-        };
+    fn a_policy_edited_while_decide_waits_for_the_lock_is_inert_with_the_post_edit_cid() {
+        // M5: the test holds journal.lock, starts `decide --live`, edits the policy, releases
+        // the lock; the decision re-verifies under the lock and is inert on the NEW bytes.
+        use elohim_device_runtime::session_stasis::journal::Lock;
         let dir = tempfile::tempdir().unwrap();
+        let old_cid = pinned_checkout(dir.path(), &policy_value());
         let root = open_journal(dir.path(), &[]);
         let st = settings(dir.path());
-        let c = ctx(dir.path());
-        let classifier = classifier(
-            &Flags {
-                settings: vec![st.into()],
-                ..Flags::default()
-            },
-            &c,
-        );
-        let req = DecideRequest::from_json(&json!({
-            "hook_event_name": "PermissionRequest", "tool_name": "Bash", "shape": SHAPE,
-            "correlation": {"incidentId": "s1:2"}
-        }))
-        .unwrap();
-        let read = |cid: &str| PolicyFileRead {
-            cid: cid.into(),
-            parsed: Ok(StasisPolicy::builtin()),
+        let held = Lock::exclusive(&root.join("s1")).unwrap();
+        let handle = {
+            let (root, st, cwd) = (root.clone(), st.clone(), dir.path().to_path_buf());
+            std::thread::spawn(move || {
+                let mut c = ctx(&cwd);
+                let r = live(&root, &st, "PermissionRequest", SHAPE, &mut c);
+                (r.0, r.1)
+            })
         };
-        // Now the file reads as different bytes than the ruling names.
-        let edited = || {
-            Ok(PolicyAssessment::assess(
-                Some(read("bafkreiEDITED")),
-                Pin::Cid("bafkreiPINNED".into()),
-            ))
-        };
+        // Give the decision time to pass its first read and block on the lock.
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        let mut edited = policy_value();
+        edited["dwellS"] = json!(60);
+        let new_cid = write_policy(dir.path(), &edited);
+        assert_ne!(new_cid, old_cid);
         let before = events_of(&root).len();
-        let answer = decide_live(
-            &root,
-            "s1",
-            &req,
-            &classifier,
-            &edited,
-            &[],
-            &c.clock,
-            1 << 20,
-        )
-        .unwrap();
-        assert!(matches!(answer, LiveDecision::Inert(r) if r.contains("bafkreiEDITED")));
-        assert_eq!(events_of(&root).len(), before);
-        // A pin that still holds is labelled with the CID verified under the lock.
-        let held = || {
-            Ok(PolicyAssessment::assess(
-                Some(read("bafkreiX")),
-                Pin::Cid("bafkreiX".into()),
-            ))
-        };
-        match decide_live(
-            &root,
-            "s1",
-            &req,
-            &classifier,
-            &held,
-            &[],
-            &c.clock,
-            1 << 20,
-        )
-        .unwrap()
-        {
-            LiveDecision::Acted(a) => assert_eq!(a.policy_cid, "bafkreiX"),
-            LiveDecision::Inert(r) => panic!("{r}"),
+        drop(held);
+        let (exit, v) = handle.join().unwrap();
+        assert_eq!(code(exit), code(ExitCode::from(3)));
+        assert_eq!(v["inert"], true);
+        assert!(v["reason"].as_str().unwrap().contains(&new_cid), "{v}");
+        assert!(events_of(&root).iter().all(|e| e["kind"] != "consultation"));
+        // Only the inert gap was added.
+        assert!(events_of(&root).len() <= before + 1);
+    }
+
+    fn later() -> ClockReading {
+        ClockReading {
+            wall: Utc.with_ymd_and_hms(2026, 10, 31, 10, 8, 0).unwrap(),
+            boot_id: "b".into(),
+            uptime_seconds: 8.0,
         }
+    }
+
+    #[test]
+    fn a_ruling_that_expires_before_the_lock_is_acquired_is_not_away() {
+        // M4: the clock is re-read after the lock; the ruling is valid at process start (10:05)
+        // but expired at the decision (10:08), when the human is still within T_c.
+        let dir = tempfile::tempdir().unwrap();
+        let ruling = away_ruling(
+            dir.path(),
+            "human:matthew",
+            r#"{"purpose":"dialogue-stasis-away","expiresAt":"2026-10-31T10:06:00Z"}"#,
+        );
+        let run = |reclock: Option<fn() -> ClockReading>| {
+            let dir_ = tempfile::tempdir().unwrap();
+            let r = away_ruling(
+                dir_.path(),
+                "human:matthew",
+                r#"{"purpose":"dialogue-stasis-away","expiresAt":"2026-10-31T10:06:00Z"}"#,
+            );
+            pinned_checkout(dir_.path(), &policy_value());
+            let st = settings(dir_.path());
+            let root = open_journal_shaped(dir_.path(), &[], SHAPE, away(&r));
+            let mut c = ctx(dir_.path());
+            c.reclock = reclock;
+            live(&root, &st, "PermissionRequest", SHAPE, &mut c).1
+        };
+        let _ = ruling;
+        // Same clock throughout: the ruling holds, so the call is parked.
+        assert_eq!(run(None)["effect"], "deny");
+        // Re-read after the lock finds it expired: not away, nothing parked.
+        assert_eq!(run(Some(later))["effect"], "none");
     }
 }

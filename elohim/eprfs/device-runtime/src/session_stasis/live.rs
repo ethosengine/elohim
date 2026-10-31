@@ -61,13 +61,6 @@ fn consultation_of(inc: &Incident, pivot: Pivot) -> Option<&super::Consultation>
         .find(|c| c.live && c.pivot == Some(pivot) && matches!(c.decision, Some(Decision::Permit)))
 }
 
-/// Any Permit consultation with `pivot`, live or not: a keeper's `proceed` is never live.
-fn recorded_pivot(inc: &Incident, pivot: Pivot) -> bool {
-    inc.consultations
-        .iter()
-        .any(|c| c.pivot == Some(pivot) && matches!(c.decision, Some(Decision::Permit)))
-}
-
 /// The fixed agent identity every live regulator record is written under.
 const REGULATOR_AGENT: &str = "stasis-regulator";
 
@@ -162,7 +155,7 @@ pub fn decide_live(
     classifier: &Classifier,
     recheck: &dyn Fn() -> Result<PolicyAssessment, StasisError>,
     rulings: &[AwayRuling],
-    clock: &ClockReading,
+    reclock: &dyn Fn() -> ClockReading,
     segment_limit: u64,
 ) -> Result<LiveDecision, StasisError> {
     let dir = root.join(session);
@@ -171,6 +164,10 @@ pub fn decide_live(
     } else {
         None
     };
+    // The clock is read AFTER the lock is held, so away-ruling expiry and presence are judged at
+    // the moment of the decision, not at process start.
+    let clock_now = reclock();
+    let clock = &clock_now;
     let assessment = recheck()?;
     if let Some(reason) = assessment.inert_reason() {
         return Ok(LiveDecision::Inert(reason));
@@ -250,8 +247,14 @@ pub fn decide_live(
     out.rung = inc.rung;
     let mut parked = consultation_of(inc, Pivot::Park).is_some();
 
-    // A keeper's `proceed` is never executed here: record the downgrade to park, once.
-    if inc.state != IncidentState::Closed && !parked && recorded_pivot(inc, Pivot::Proceed) {
+    // A keeper's `proceed` is never executed here. A LIVE proceed (the coordinator's) is
+    // recorded as downgraded to park, once, and only in automated presence: in collaborative or
+    // unknown presence nothing is written. A shadow proceed never reaches this.
+    if inc.state != IncidentState::Closed
+        && fold.presence.disposition == Disposition::Automated
+        && !parked
+        && consultation_of(inc, Pivot::Proceed).is_some()
+    {
         w.consult(
             &inc.id,
             "Permit",

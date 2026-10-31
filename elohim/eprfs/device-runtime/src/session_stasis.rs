@@ -770,8 +770,9 @@ impl Folder<'_> {
         // strongly as control over journal writes (the device trust boundary).
         let live = c.live
             && matches!(
-                e.regulator.as_deref(),
-                Some("native-decide" | "coordinator")
+                (e.agent_id.as_str(), e.regulator.as_deref()),
+                ("stasis-regulator", Some("native-decide"))
+                    | ("stasis-coordinator", Some("coordinator"))
             )
             && e.policy_cid
                 .as_deref()
