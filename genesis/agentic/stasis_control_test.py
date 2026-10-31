@@ -109,6 +109,256 @@ class ControlTest(unittest.TestCase):
             journal.add(kind, kind + reader, incidentId='s1:1', policyCid=CID, agentId=reader,
                         message='Continue independent authorized work.')
 
+    def fixture_git(self, *args, input=None, author_time=None):
+        # Plumbing builds disposable fixtures without add/commit/checkout commands.
+        env = {k: v for k, v in self.env.items() if not k.startswith('GIT_')}
+        env.update(GIT_AUTHOR_NAME='Fixture', GIT_AUTHOR_EMAIL='fixture@example.invalid',
+                   GIT_COMMITTER_NAME='Fixture', GIT_COMMITTER_EMAIL='fixture@example.invalid',
+                   GIT_AUTHOR_DATE=f'{author_time or int(time.time()) + 2} +0000',
+                   GIT_COMMITTER_DATE=f'{int(time.time()) + 2} +0000')
+        result = subprocess.run(['git', *args], cwd=self.checkout, env=env, input=input,
+                                text=True, capture_output=True, check=True)
+        return result.stdout.strip()
+
+    def completion_fixture(self, author_time=None):
+        self.checkout = self.repo / 'session-checkout'
+        self.checkout.mkdir()
+        self.fixture_git('init', '-q')
+        (self.checkout / 'work.py').write_text('done\n')
+        blob = self.fixture_git('hash-object', '-w', '--stdin', input='done\n')
+        tree = self.fixture_git('mktree', input=f'100644 blob {blob}\twork.py\n')
+        self.invoke('UserPromptSubmit', prompt='status?')  # First journal event precedes commit.
+        self.head = self.fixture_git('commit-tree', tree, input='fixture\n', author_time=author_time)
+        self.fixture_git('update-ref', 'HEAD', self.head)
+        self.fixture_git('read-tree', self.head)
+        self.gatefile = self.write_gate()
+
+    def write_gate(self, exit=0, name='first', at='2026-10-31T00:00:00Z',
+                   sha=None, closed=True, deferred=False):
+        runs = self.checkout / '.eprfs/status/gate-live/runs'
+        runs.mkdir(parents=True, exist_ok=True)
+        rows = [{'kind': 'run-open', 'at': at, 'candidate': {'sha': sha or self.head}},
+                {'kind': 'gate-verdict', 'project': 'fixture', 'verdict': {'exit': exit, 'deferred': deferred}}]
+        if closed:
+            rows.append({'kind': 'run-close', 'outcome': 'passed' if exit == 0 else 'failed'})
+        path = runs / (name + '.jsonl')
+        path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+        return path
+
+    def stop_events(self, kind='turn-ended'):
+        events = [json.loads(line) for line in (self.directory / 'events.jsonl').read_text().splitlines()]
+        for event in events:
+            base.EVENT_VALIDATOR.validate(event)
+        return [event for event in events if event['kind'] == kind]
+
+    def stop(self, message='Done.', **fields):
+        return self.invoke('Stop', cwd=str(self.checkout), last_assistant_message=message, **fields)
+
+    def test_accomplished_real_checkout_in_shadow_and_live(self):
+        self.completion_fixture()
+        for ladder in ['shadow', 'live']:
+            self.env['STASIS_LADDER'] = ladder
+            self.assertEqual(self.stop().stdout, '')
+            event = self.stop_events()[-1]
+            self.assertEqual(event['outcome'], 'accomplished')
+            self.assertEqual(event['correlation']['confidence'], 'high')
+            self.assertLess(self.elapsed, 3)
+
+    def test_dirty_files_block_once_then_refer_across_hook_restarts(self):
+        self.completion_fixture()
+        (self.checkout / 'work.py').write_text('unfinished\n')
+        first = json.loads(self.stop().stdout)
+        self.assertEqual(first['decision'], 'block')
+        self.assertIn('uncommitted: 1 files: work.py', first['reason'])
+        self.assertIn('Next authorized step', first['reason'])
+        self.assertEqual(self.stop(stop_hook_active=True).stdout, '')
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(len(self.rows('Stop-block')), 1)
+        self.assertTrue(all(e['outcome'] == 'stalled' for e in self.stop_events()))
+        self.assertTrue(all(e['wouldHave']['effect'] == 'Refer' for e in self.stop_events('would-have')))
+        self.assertEqual(self.stop_events('would-have')[-1]['wouldHave']['incidentId'],
+                         f"s1:{self.stop_events()[-1]['seq']}")
+
+    def test_shadow_dirty_only_journals_and_collaborative_does_not_block(self):
+        self.completion_fixture()
+        (self.checkout / 'work.py').write_text('unfinished\n')
+        for ladder, disposition in [('shadow', 'automated'), ('live', 'collaborative'), ('live', 'unknown')]:
+            self.env['STASIS_LADDER'] = ladder
+            self.statusfile.write_text(json.dumps(status(disposition)))
+            self.assertEqual(self.stop().stdout, '')
+            self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+        self.assertFalse(self.rows('Stop-block'))
+
+    def test_newest_red_gate_vetoes_older_green_and_names_project(self):
+        self.completion_fixture()
+        self.write_gate(exit=1, name='newer', at='2026-10-31T00:01:00Z')
+        self.assertIn('gate: red on fixture', self.stop().stdout)
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+
+    def test_linked_checkout_uses_common_gate_root_and_own_dirty_files(self):
+        self.completion_fixture()
+        main = self.checkout
+        linked = self.repo / 'linked-checkout'
+        linked.mkdir()
+        admin = main / '.git/worktrees/fixture'
+        admin.mkdir(parents=True)
+        # Linked-worktree metadata fixture, without a checkout command.
+        (linked / '.git').write_text(f'gitdir: {admin}\n')
+        (admin / 'commondir').write_text('../..\n')
+        (admin / 'gitdir').write_text(str(linked / '.git') + '\n')
+        (admin / 'HEAD').write_text(self.head + '\n')
+        (admin / 'index').write_bytes((main / '.git/index').read_bytes())
+        (linked / 'work.py').write_bytes((main / 'work.py').read_bytes())
+        self.checkout = linked
+        self.assertEqual(self.fixture_git('rev-parse', '--show-toplevel'), str(linked))
+        (main / 'work.py').write_text('other session work\n')
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'accomplished')
+        (linked / 'work.py').write_text('this session work\n')
+        self.assertIn('work.py', self.stop().stdout)
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+
+    def test_newest_unfinished_deferred_or_wrong_head_is_not_green(self):
+        self.completion_fixture()
+        self.env['STASIS_LADDER'] = 'shadow'
+        for options in [{'closed': False}, {'deferred': True}]:
+            self.write_gate(name='newer', at='2026-10-31T00:01:00Z', **options)
+            self.stop()
+            self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+        (self.gatefile.parent / 'newer.jsonl').unlink()
+        self.write_gate(sha='0' * 40)
+        self.stop()
+        self.assertIn('no run for', self.stop_events()[-1]['stallReason'])
+
+    def test_unreadable_gate_never_accomplished(self):
+        self.completion_fixture()
+        self.gatefile.unlink()
+        self.gatefile.mkdir()  # EISDIR is deterministic even under root.
+        self.stop()
+        event = self.stop_events()[-1]
+        self.assertEqual(event['outcome'], 'stalled')
+        self.assertEqual(event['correlation']['confidence'], 'low')
+        self.assertIn('gate: unreadable', event['stallReason'])
+
+    def test_missing_session_commit_is_stalled_even_when_clean_and_green(self):
+        self.completion_fixture(author_time=1_700_000_000)
+        self.stop()
+        self.assertIn('no session commit', self.stop_events()[-1]['stallReason'])
+
+    def test_recorded_commit_is_evidence_but_prose_is_not(self):
+        self.completion_fixture(author_time=1_700_000_000)
+        spec = importlib.util.spec_from_file_location('stop_sensor', HOOK)
+        sensor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sensor)
+        with control.delivery_lock(self.directory):
+            journal = sensor.Journal(self.directory, {'session_id': 's1'})
+            journal.append('would-have', wouldHave={'effect': 'commit-observed', 'incidentId': None,
+                           'rung': None, 'key': 'commit-observed', 'commit': self.head})
+            journal.save()
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'accomplished')
+
+    def test_question_and_pending_human_ask_pass_through(self):
+        self.completion_fixture()
+        (self.checkout / 'work.py').write_text('unfinished\n')
+        self.assertEqual(self.stop('Which option?').stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'question')
+        with control.delivery_lock(self.directory) as delivery:
+            delivery.park('s1:human', CID)
+            delivery.add('human', 'human:s1:human', incidentId='s1:human', policyCid=CID)
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'exception')
+
+    def test_rung_five_question_passes_through(self):
+        self.completion_fixture()
+        self.stop('Which option?')
+        previous = self.stop_events()[-1]
+        spec = importlib.util.spec_from_file_location('stop_sensor', HOOK)
+        sensor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sensor)
+        with control.delivery_lock(self.directory):
+            journal = sensor.Journal(self.directory, {'session_id': 's1'})
+            journal.append('would-have', wouldHave={'effect': 'incident-advancement',
+                           'incidentId': f"s1:{previous['seq']}", 'rung': 5, 'key': 'rung5'})
+            journal.save()
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'exception')
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'exception')
+        self.invoke('UserPromptSubmit', prompt='Use the first option.')
+        (self.checkout / 'work.py').write_text('still unfinished\n')
+        self.stop()
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+
+    def test_stop_git_budget_is_shared_and_timeout_is_low_confidence(self):
+        self.completion_fixture()
+        calls = []
+        def slow_git(args, **kwargs):
+            calls.append(kwargs['timeout'])
+            time.sleep(.3)
+            if 'rev-parse' in args:
+                return 0, f'{self.checkout}\n{self.checkout / ".git"}\n{self.head}\n'
+            return None, ''
+        started = time.monotonic()
+        with patch.object(control, 'bounded', side_effect=slow_git):
+            reasons, low = control.checkout_evidence(str(self.checkout), [], {'wall': '2026-10-31T00:00:00Z'})
+        self.assertTrue(low)
+        self.assertIn('git: unavailable', reasons[-1])
+        self.assertLess(calls[1], calls[0] - .25)
+        self.assertLess(time.monotonic() - started, 1)
+
+    def test_tooling_ledgers_ignored_but_renaming_work_into_them_is_dirty(self):
+        self.completion_fixture()
+        for path in ['.claude/data/fixture.json', '.eprfs/status/fixture.json']:
+            target = self.checkout / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('original\n')
+            blob = self.fixture_git('hash-object', '-w', '--stdin', input='original\n')
+            self.fixture_git('update-index', '--add', '--cacheinfo', f'100644,{blob},{path}')
+        tree = self.fixture_git('write-tree')
+        self.head = self.fixture_git('commit-tree', tree, '-p', self.head, input='ledger fixtures\n')
+        self.fixture_git('update-ref', 'HEAD', self.head)
+        self.write_gate()
+        for path in ['.claude/data/fixture.json', '.eprfs/status/fixture.json']:
+            (self.checkout / path).write_text('changed\n')
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'accomplished')
+        self.fixture_git('mv', 'work.py', '.claude/data/work.py')
+        self.assertIn('work.py', self.stop().stdout)
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
+
+    def test_head_can_carry_ancestor_session_commit(self):
+        self.completion_fixture()
+        tree = self.fixture_git('rev-parse', 'HEAD^{tree}')
+        self.head = self.fixture_git('commit-tree', tree, '-p', self.head, input='older author time\n',
+                                     author_time=1_700_000_000)
+        self.fixture_git('update-ref', 'HEAD', self.head)
+        self.write_gate()
+        self.assertEqual(self.stop().stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'accomplished')
+
+    def test_git_failure_real_stop_path_times_out_low(self):
+        self.completion_fixture()
+        bin_dir = self.repo / 'slow-bin'
+        bin_dir.mkdir()
+        git = bin_dir / 'git'
+        git.write_text('#!/usr/bin/env python3\nimport time\ntime.sleep(10)\n')
+        git.chmod(0o700)
+        self.env['PATH'] = str(bin_dir) + os.pathsep + self.env['PATH']
+        self.stop()
+        event = self.stop_events()[-1]
+        self.assertEqual(event['outcome'], 'stalled')
+        self.assertEqual(event['correlation']['confidence'], 'low')
+        self.assertIn('git: unavailable', event['stallReason'])
+        self.assertLess(self.elapsed, 3)
+
+    def test_stop_status_timeout_fits_registered_timeout(self):
+        self.completion_fixture()
+        (self.checkout / 'work.py').write_text('unfinished\n')
+        self.env['NATIVE_HANG'] = 'status'
+        self.assertEqual(self.stop().stdout, '')
+        self.assertLess(self.elapsed, 3)
+
     def test_automated_fixed_deny_and_separate_park_lifecycle(self):
         result = self.request()
         out = json.loads(result.stdout)['hookSpecificOutput']
@@ -124,8 +374,10 @@ class ControlTest(unittest.TestCase):
         with control.delivery_lock(self.directory) as journal:
             journal.add('park-state', 'answer:s1:1', incidentId='s1:1', state='answered')
             self.assertFalse(journal.pending())
-        # An answer is not an execution grant and never causes an automatic call.
-        self.assertEqual(self.invoke('Stop', last_assistant_message='Done.').stdout, '')
+        # Answering retires the ask, but supplies no completion evidence or execution grant.
+        result = self.invoke('Stop', last_assistant_message='Done.')
+        self.assertEqual(json.loads(result.stdout)['decision'], 'block')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
 
     def test_collaborative_unknown_and_away_use_native_presence(self):
         for disposition in ['collaborative', 'unknown', 'automated']:
@@ -207,7 +459,8 @@ class ControlTest(unittest.TestCase):
         self.request()
         self.assertEqual(self.invoke('Stop', stop_hook_active=True, last_assistant_message='Done.').stdout, '')
         self.assertEqual(self.invoke('Stop').stdout, '')  # uncertain question never blocks
-        self.assertTrue(self.invoke('Stop', last_assistant_message='Done.').stdout)
+        self.assertEqual(self.invoke('Stop', last_assistant_message='Done.').stdout, '')
+        self.assertEqual(self.stop_events()[-1]['outcome'], 'exception')
 
     def test_answer_closes_only_exact_park_and_never_authorizes_it(self):
         self.request()
@@ -352,12 +605,11 @@ class LiveCoordinatorTest(unittest.TestCase):
         self.run_cmd()
         self.assertEqual(len(self.delivery('berth-note')), 1)
         payload = {'session_id': 's1', 'hook_event_name': 'Stop', 'last_assistant_message': 'Independent work done.'}
-        for expected in [True, False]:
+        # A prepared human-rung ask is now a legitimate exception, never a Stop block.
+        for expected in [False, False]:
             result = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(payload), text=True,
                                     capture_output=True, env={**self.env, 'CLAUDE_PROJECT_DIR': str(ROOT)})
             self.assertEqual(bool(result.stdout), expected)
-            if expected:
-                self.assertIn('ONE AskUserQuestion', result.stdout)
 
     def test_collaborative_fake_clock_180_and_300_seconds(self):
         args = type('Args', (), {'repo': [str(ROOT)], 'live': True, 'tick': .2,

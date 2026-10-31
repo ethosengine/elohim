@@ -346,7 +346,9 @@ def map_event(j):
     elif event == "Stop":
         message = p.get("last_assistant_message")
         question = "uncertain" if not isinstance(message, str) or not message.strip() else "yes" if "?" in message else "no"
-        recorded = j.append("turn-ended", question=question)
+        import stasis_control as control
+        recorded = (j.append("turn-ended", question=question) if control.mode() == "off"
+                    else control.stop_event(j, question))
         calls.clear()
         return recorded
     elif event == "UserPromptSubmit":

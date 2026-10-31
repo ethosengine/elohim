@@ -10,13 +10,17 @@ Retire this transport when the native journal owns delivery and its receipts.
 """
 
 from contextlib import contextmanager
+import datetime as dt
 import fcntl
+import hashlib
 import importlib.util
+from itertools import islice
 import json
 import os
 from pathlib import Path
 import re
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -101,12 +105,12 @@ def presence(status, session):
 
 
 @contextmanager
-def delivery_lock(directory):
+def delivery_lock(directory, read_limit=None):
     with (directory / 'journal.lock').open('a') as lock:
         # Hook delivery must not wait behind a coordinator's bounded berth write.
         # The coordinator already owns the lock and uses Delivery directly.
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        yield Delivery(directory)
+        yield Delivery(directory, read_limit=read_limit)
 
 
 class Delivery:
@@ -115,11 +119,12 @@ class Delivery:
     At most once is intentional: death after claim is unconfirmed delivery, never
     a second alert or Stop block. No acknowledgement creates execution authority.
     """
-    def __init__(self, directory):
+    def __init__(self, directory, read_limit=None):
         self.path = directory / 'delivery.jsonl'
         self.rows = []
         if self.path.exists():
-            for raw in self.path.read_text().splitlines():
+            raw_text = self.path.read_text() if read_limit is None else read_evidence(self.path, read_limit)
+            for raw in raw_text.splitlines():
                 self.rows.append(json.loads(raw))  # corruption fails open, never replay
 
     def add(self, kind, key, **fields):
@@ -173,6 +178,187 @@ def question_answered(payload):
             and payload.get('tool_name') == 'AskUserQuestion' and not payload.get('is_error')
             and isinstance(response, dict) and not response.get('is_error')
             and isinstance(response.get('answers'), dict) and bool(response['answers']))
+
+
+def read_evidence(path, limit=2 * 1024 * 1024):
+    """Only bounded regular files; a broken log is missing proof, never green."""
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError('non-regular evidence')
+        raw = stream.read(limit + 1)
+    if len(raw) > limit:
+        raise ValueError('evidence exceeds read budget')
+    return raw.decode('utf-8')
+
+
+def stop_history(journal):
+    remaining, events = 2 * 1024 * 1024, []
+    for path in journal.segments() + ([journal.path] if journal.path.exists() else []):
+        raw = read_evidence(path, remaining)
+        remaining -= len(raw.encode())
+        events.extend(json.loads(line) for line in raw.splitlines() if line.strip())
+    return events
+
+
+def gate_reason(common, head):
+    """Read gate-live's shared worktree root and final exit verdicts, not RED hints.
+
+    gate-live.mjs: liveRoot/openRun/closeRun; gate-runner.mjs: gate-verdict.
+    A newer incomplete/deferred run vetoes an older green for the same HEAD.
+    """
+    directory = Path(common).parent / '.eprfs/status/gate-live/runs'
+    candidates, remaining = [], 2 * 1024 * 1024
+    deadline = time.monotonic() + .15
+    paths = list(islice(directory.iterdir(), 129))
+    if len(paths) > 128:
+        raise ValueError('gate evidence exceeds read budget')
+    for path in paths:
+        if time.monotonic() >= deadline:
+            raise ValueError('gate evidence exceeds time budget')
+        if path.suffix != '.jsonl':
+            continue
+        # Read every retained log: unreadable evidence cannot hide a newer red.
+        raw = read_evidence(path, remaining)
+        remaining -= len(raw.encode())
+        rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
+        opened = rows[0]
+        if opened['kind'] != 'run-open':
+            raise ValueError('missing run-open')
+        if opened['candidate']['sha'] == head:
+            at = dt.datetime.fromisoformat(opened['at'].replace('Z', '+00:00')).timestamp()
+            candidates.append((at, path.stat().st_mtime_ns, path.name, rows))
+    if not candidates:
+        return 'gate: no run for ' + head[:12]
+    rows = max(candidates, key=lambda item: item[:3])[3]
+    verdicts = [r for r in rows if r['kind'] == 'gate-verdict']
+    red = sorted({r['project'] for r in verdicts if r['verdict']['exit'] != 0})
+    if red:
+        return 'gate: red on ' + ', '.join(red)
+    if any(r['verdict'].get('deferred') or r.get('status') == 'Unanswered' for r in verdicts):
+        return 'gate: deferred or unanswered'
+    closed = rows[-1]
+    if closed['kind'] != 'run-close':
+        return 'gate: unfinished on ' + head[:12]
+    if closed['outcome'] not in {'passed', 'gates-passed'}:
+        return 'gate: ' + closed['outcome'] + ' on ' + head[:12]
+    if closed.get('deferred', 0):
+        return 'gate: deferred projects'
+    if not verdicts:
+        return 'gate: no project verdicts'
+    return None
+
+
+def checkout_evidence(cwd, events, now):
+    """All git children share one <1 s budget and never refresh the index."""
+    reasons, low = [], False
+    deadline = time.monotonic() + .85
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    env['GIT_OPTIONAL_LOCKS'] = '0'
+
+    def git(*args):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError()
+        code, out = bounded(['git', *args], cwd=cwd, timeout=remaining, env=env)
+        if code != 0:
+            raise ValueError('git evidence unavailable')
+        return out
+
+    try:
+        if not isinstance(cwd, str) or not Path(cwd).is_absolute():
+            raise ValueError('payload cwd absent')
+        top, common, head = git('rev-parse', '--path-format=absolute', '--show-toplevel',
+                                '--git-common-dir', 'HEAD').splitlines()
+        history = git('log', '-256', '--format=%H %at', 'HEAD').splitlines()
+        first = events[0]['clock']['wall'] if events else now['wall']
+        since = dt.datetime.fromisoformat(first.replace('Z', '+00:00')).timestamp()
+        # Structured journal evidence only; never mine assistant prose for a SHA.
+        recorded = {e.get('wouldHave', {}).get('commit') for e in events}
+        if not any(int(line.split()[1]) >= since or line.split()[0] in recorded for line in history):
+            reasons.append('commit: no session commit in HEAD history')
+            low = len(history) == 256
+        # -z avoids quoting ambiguity; both sides of a rename must be tooling paths.
+        entries = git('-C', top, 'status', '--porcelain=v1', '-z', '--untracked-files=no').split('\0')
+        dirty, index = [], 0
+        while index < len(entries) and entries[index]:
+            entry = entries[index]
+            paths = [entry[3:]]
+            index += 1
+            if 'R' in entry[:2] or 'C' in entry[:2]:
+                paths.append(entries[index])
+                index += 1
+            dirty.extend(p for p in paths if not p.startswith(('.claude/data/', '.eprfs/status/')))
+        if dirty:
+            names = sorted(set(dirty))
+            reasons.append(f'uncommitted: {len(names)} files: ' + ', '.join(names))
+        try:
+            reason = gate_reason(common, head)
+            if reason:
+                reasons.append(reason)
+        except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+            reasons.append('gate: unreadable evidence')
+            low = True
+    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError, TimeoutError):
+        reasons.append('git: unavailable evidence within 0.85 s budget (payload cwd)')
+        low = True
+    return reasons, low
+
+
+def stop_event(journal, question):
+    """Observe before acting. The native fold alone opens/closes incidents."""
+    events, reasons, low = [], [], False
+    outcome = None
+    try:
+        events = stop_history(journal)
+        delivery = Delivery(journal.directory, read_limit=2 * 1024 * 1024)
+        pending = [r for r in delivery.pending() if r.get('agentId', 'main') == journal.agent]
+        human = {r['incidentId'] for r in delivery.rows if r['kind'] == 'human'}
+        batched = {i for r in delivery.rows if r['kind'] == 'batch' for i in r['incidents']}
+        # A fresh turn, answer or closure retires a previously escalated question.
+        questions = set()
+        witness = journal.state.get('presence', {}).get('lastWitnessWall')
+        for e in events:
+            if e.get('agentId') == journal.agent:
+                if e['kind'] == 'turn-ended' and e.get('outcome') != 'exception':
+                    questions.clear()
+                    answered = (witness and dt.datetime.fromisoformat(witness.replace('Z', '+00:00'))
+                                > dt.datetime.fromisoformat(e['clock']['wall'].replace('Z', '+00:00')))
+                    if not answered and (e.get('outcome') == 'question' or e.get('question') == 'yes'):
+                        questions.add(f"{journal.payload['session_id']}:{e['seq']}")
+                elif e['kind'] in {'tool-completed', 'steward-ping', 'session-ended'}:
+                    questions.clear()
+        rung5 = any(e.get('wouldHave', {}).get('effect') == 'incident-advancement'
+                    and e['wouldHave'].get('rung') == 5
+                    and e['wouldHave'].get('incidentId') in questions for e in events)
+        if any(r['incidentId'] in human | batched for r in pending) or rung5:
+            outcome = 'exception'
+        elif question == 'yes':
+            outcome = 'question'
+        else:
+            reasons, low = checkout_evidence(journal.payload.get('cwd'), events, journal.now)
+            reasons.extend('open incident ' + r['incidentId'] for r in pending)
+            outcome = 'stalled' if reasons else 'accomplished'
+    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+        outcome, reasons, low = 'stalled', ['journal: unreadable stop evidence'], True
+    fields = {'question': question, 'outcome': outcome,
+              'correlation': {'incidentId': None, 'confidence': 'low' if low else 'high', 'method': 'none'}}
+    if outcome == 'stalled':
+        fields['stallReason'] = '; '.join(reasons)
+    recorded = journal.append('turn-ended', **fields)
+    previous = next((e for e in reversed(events) if isinstance(e, dict) and e.get('kind') == 'turn-ended'
+                     and e.get('agentId') == journal.agent), {})
+    if outcome == 'stalled' and previous.get('stallReason') == recorded['stallReason']:
+        key = stall_key(journal.agent, recorded)
+        journal.append('would-have', wouldHave={
+            'effect': 'Refer', 'incidentId': f"{journal.payload['session_id']}:{recorded['seq']}",
+            'rung': 1, 'key': key, 'reason': recorded['stallReason']})
+        return {**recorded, '_repeatStall': True}
+    return recorded
+
+
+def stall_key(reader, event):
+    return 'Stop-stall:' + reader + ':' + hashlib.sha256(event['stallReason'].encode()).hexdigest()
 
 
 def live_hook(repo, root, payload, normalized):
@@ -238,14 +424,20 @@ def live_hook(repo, root, payload, normalized):
                            'Submit it through the unchanged palette and permission checks.'}})
     if event not in {'PostToolUse', 'UserPromptSubmit', 'Stop'}:
         return None
-    with delivery_lock(directory) as journal:
-        if not journal.news(reader) and not journal.pending():
+    if event == 'Stop' and normalized.get('outcome') in {'accomplished', 'exception', 'question'}:
+        return None
+    if event == 'Stop' and normalized.get('_repeatStall'):
+        return None
+    stop_limit = 2 * 1024 * 1024 if event == 'Stop' else None
+    with delivery_lock(directory, read_limit=stop_limit) as journal:
+        if (normalized.get('outcome') != 'stalled'
+                and not journal.news(reader) and not journal.pending()):
             return None
-    status = snapshot(repo, root, session, remaining())
+    status = snapshot(repo, root, session, min(.65, remaining()) if event == 'Stop' else remaining())
     if not pinned(status):
         return None
     cid = status['policyCid']
-    with delivery_lock(directory) as journal:
+    with delivery_lock(directory, read_limit=stop_limit) as journal:
         if question_answered(payload):
             questions = json.dumps((payload.get('tool_input') or {}).get('questions', []))
             for park in journal.pending():
@@ -257,12 +449,28 @@ def live_hook(repo, root, payload, normalized):
         if event == 'Stop':
             if payload.get('stop_hook_active') or normalized.get('question') == 'uncertain':
                 return None
-            # Stop is the harness evidence that this turn has no work left. Never
-            # consume a new batch on the continuation caused by our own block.
+            if normalized.get('outcome') == 'stalled':
+                if presence(status, session)['disposition'] != 'automated':
+                    return None
+            # Prefer the existing parked-ask batch when unfinished work is parked.
+            # Never consume a new batch on our own block's continuation.
             batch = [r for r in journal.pending() if r['agentId'] == reader and r['policyCid'] == cid]
             batched = {i for r in journal.rows if r['kind'] == 'batch' for i in r['incidents']}
             if not batch or all(r['incidentId'] in batched for r in batch):
-                return None
+                if normalized.get('outcome') != 'stalled':
+                    return None
+                key = stall_key(reader, normalized)
+                if not journal.add('Stop-block', key, reader=reader, policyCid=cid,
+                                   incidentId=f"{session}:{normalized['seq']}",
+                                   stallReason=normalized['stallReason']):
+                    return None
+                message = ('Unfinished work: ' + normalized['stallReason'] + '. '
+                           'Next authorized step: inspect the named files or gate evidence, '
+                           'finish the already authorized work and run its owning gates; '
+                           'commit only if already authorized. If a step requires the steward, '
+                           'prepare that ask. Never retry a denied effect or alter another session\'s work. '
+                           'This is the single Stop block for these unmet items.')
+                return json.dumps({'decision': 'block', 'reason': message})
             ids = [r['incidentId'] for r in batch]
             journal.add('batch', 'batch:' + ':'.join(ids), incidents=ids, reader=reader)
             message = ('Surface every parked item below as ONE AskUserQuestion now. '
