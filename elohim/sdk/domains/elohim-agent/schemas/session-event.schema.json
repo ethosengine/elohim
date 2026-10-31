@@ -27,6 +27,7 @@
         "turn-ended",
         "idle-prompt",
         "consultation",
+        "would-have",
         "steward-ping",
         "observation-gap",
         "shift-marker",
@@ -307,13 +308,6 @@
     },
     "consultation": {
       "type": "object",
-      "required": [
-        "level",
-        "binding",
-        "decision",
-        "pivot",
-        "reason"
-      ],
       "properties": {
         "level": {
           "description": "Source of truth: the dialogue-stasis design's capability vocabulary, pending the slice-2 AgentPackage capabilityProfile schema.",
@@ -336,20 +330,214 @@
           ]
         },
         "pivot": {
-          "description": "Source of truth: this schema's operational-pivot vocabulary beneath the protocol Decision.",
+          "description": "Source of truth: this schema's operational-pivot vocabulary beneath the protocol Decision. null when a Refer carries no pivot.",
           "enum": [
             "reshape",
             "park",
             "proceed",
-            "notify"
+            "notify",
+            null
           ]
         },
         "reason": {
           "type": "string",
           "minLength": 1
+        },
+        "phase": {
+          "enum": [
+            "start",
+            "complete",
+            "expired"
+          ]
+        },
+        "rung": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "claimedBy": {
+          "type": "object",
+          "required": [
+            "pid",
+            "bootId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "pid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "claimSeq": {
+          "description": "seq of the phase:start record this completion or expiry closes.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "startedAt": {
+          "type": "object",
+          "required": [
+            "wall",
+            "bootId",
+            "uptimeSeconds",
+            "provenance"
+          ],
+          "properties": {
+            "wall": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uptimeSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "finishedAt": {
+          "type": "object",
+          "required": [
+            "wall",
+            "bootId",
+            "uptimeSeconds",
+            "provenance"
+          ],
+          "properties": {
+            "wall": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "bootId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uptimeSeconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "provenance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "deadlineAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeoutSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "usage": {
+          "description": "Measured cost of this consultation; null fields are unmeasured, never zero.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "elapsedSeconds",
+            "tokens"
+          ],
+          "properties": {
+            "elapsedSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "reshape": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "ask": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A keeper consultation record. Source of truth: the dialogue-stasis spec's Incident model and slice 8. phase start is the coordinator's atomic claim of (incident, rung) under journal.lock; complete and expired are journalled against that claim by claimSeq, so a restart never spends a second keeper call. A record without phase is a complete consultation (legacy single-record form).",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "const": "start"
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase",
+              "rung",
+              "level",
+              "binding",
+              "startedAt",
+              "deadlineAt",
+              "claimedBy"
+            ]
+          },
+          "else": {
+            "required": [
+              "level",
+              "binding",
+              "decision",
+              "pivot",
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "complete",
+                  "expired"
+                ]
+              }
+            },
+            "required": [
+              "phase"
+            ]
+          },
+          "then": {
+            "required": [
+              "claimSeq",
+              "finishedAt",
+              "usage"
+            ]
+          }
+        }
+      ]
     },
     "closedBy": {
       "description": "Source of truth: this schema's close-attribution vocabulary. A human denial is inferred and must be labeled as such.",
@@ -409,6 +597,41 @@
           "description": "Historical exceptions read while establishing a transcript cursor; journalled without notification."
         }
       }
+    },
+    "wouldHave": {
+      "description": "Shadow operation: an effect the regulator or coordinator would have applied, recorded and never applied. key deduplicates repeats of one prospective effect.",
+      "type": "object",
+      "required": [
+        "effect",
+        "incidentId",
+        "rung",
+        "key"
+      ],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "incidentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rung": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 5
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
     }
   },
   "allOf": [
@@ -560,6 +783,20 @@
       "then": {
         "required": [
           "exception"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "would-have"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "wouldHave"
         ]
       }
     }
