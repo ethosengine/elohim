@@ -1486,7 +1486,92 @@ measures:
     default-authority: observation
     established_by: sense-organ-2026-10-22
 
+  - id: dialogue-blocked-seconds
+    version: 1
+    family: dialogue-stasis
+    unit: seconds
+    procedure: >
+      `epr session stasis fold` folds `.eprfs/status/stasis/<session>/events.jsonl` into the
+      duration of the union of blocked intervals per session and shift, by class
+      authorization|question|silence and by presence collaborative|automated|unknown. Overlaps
+      and duplicate events do not double-count waiting; an intercepted permission request
+      without a displayed dialog is not authorization waiting. Recovery never subtracts time
+      already spent. The shift total is the union across classes and presence, not a sum of
+      overlapping class totals. UNMEASURED until the fold exists; missing readings and
+      observation gaps must never become measured zero.
+    env-sensitivity: [session, shift, class, presence]
+    provenance: "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (journal contract; slices 3 and 5)"
+    default-authority: observation
+    status: active
+    established_by: dialogue-stasis-loop-design-2026-10-30
+    why: >
+      The steward's prompt releases, unanswered questions and silence pings expose elapsed
+      dialogue waiting that the CI rails do not measure. Active declares the measure contract;
+      no emitter or reading exists yet.
+
+  - id: ladder-resolution
+    version: 1
+    family: dialogue-stasis
+    unit: level
+    procedure: >
+      `epr session stasis fold` folds `.eprfs/status/stasis/<session>/events.jsonl` into the
+      level that resolved each incident, tagged by level, binding, concern class and presence.
+      Retain rung 0 and human resolutions as well as C1|C2|C3|C4 consultations; unresolved
+      incidents are not successful resolutions and skipped unbound levels are not successes.
+      UNMEASURED until the fold exists; a missing reading is never zero.
+    env-sensitivity: [level, binding, concern-class, presence]
+    provenance: "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (capability vocabulary and frontier; slice 5)"
+    default-authority: observation
+    status: active
+    established_by: dialogue-stasis-loop-design-2026-10-30
+    why: >
+      Records which declared capability binding resolves which kind of dialogue stall, providing
+      evidence for later model-fit work without building that layer now. Active declares the
+      measure contract; no emitter or reading exists yet.
+
+  - id: harness-exceptions
+    version: 1
+    family: dialogue-stasis
+    unit: count
+    procedure: >
+      Count of harness exceptions that reached the session in a shift: transcript `attachment`
+      entries of type `hook_cancelled` (timed out), hook errors and `StopFailure` records, read
+      by the dialogue-stasis adapter from the bytes appended since its transcript cursor and
+      journaled as coalesced `harness-exception` events. Folded per shift and by hook by
+      `epr session stasis fold`. UNMEASURED until the slice-3b relay exists; an absent
+      transcript is an observation gap, never zero.
+    env-sensitivity: [session, shift, hook]
+    provenance: "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (Harness exceptions; steward ruling 2026-10-30)"
+    default-authority: observation
+    status: active
+    established_by: dialogue-stasis-loop-design-2026-10-30
+    why: >
+      Steward ruling 2026-10-30: any exception that reaches the session triggers an immediate agent
+      response to investigate and fix. This design session recorded 201 cancelled hooks in ~2.5 h
+      with no sensor. Active declares the measure contract; no emitter or reading exists yet.
+
 lenses:
+  - id: dialogue-blocked-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [dialogue-blocked-seconds@1]
+    context: session-shift
+    hard: 1800
+    compare: above
+    concern: dialogue-stalls-are-answered
+    retire-when: >
+      when native session runtimes own the dialogue-response invariant and its runnable checks
+      without stasis-specific adapters or a separate coordinator, retiring the owning habit
+    status: active
+    established_by: dialogue-stasis-loop-design-2026-10-30
+    why: >
+      A starting bound of 1800 seconds of blocked dialogue per shift: thirty minutes allows
+      several 3–5 minute harvest windows while bounding accumulated waiting. Evaluate the shift's
+      union total, not one class or presence subtotal. This is a starting policy bound, not a
+      measured baseline. No fold exists yet, so the reading remains unmeasured (skipped), never
+      zero. Keeper dispatch waits for slice 7.
+
   - id: resource-limit-raise-recurrence
     version: 1
     compare: at-or-above
