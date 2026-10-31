@@ -306,6 +306,19 @@
         "uncertain"
       ]
     },
+    "outcome": {
+      "description": "Source of truth: dialogue-stasis-loop-design, Legitimate stops (steward ruling, 2026-10-31). How the adapter classified a turn's end from observable evidence. stalled opens a silence-class incident; accomplished and exception open none; question follows the question path. Absent keeps the question-only behavior.",
+      "enum": [
+        "accomplished",
+        "exception",
+        "question",
+        "stalled"
+      ]
+    },
+    "stallReason": {
+      "description": "What the adapter found unmet when it classified a turn end as stalled (a failing gate, uncommitted work, an open incident). Redacted free text.",
+      "type": "string"
+    },
     "consultation": {
       "type": "object",
       "properties": {
@@ -725,8 +738,17 @@
         ]
       },
       "then": {
-        "required": [
-          "question"
+        "anyOf": [
+          {
+            "required": [
+              "question"
+            ]
+          },
+          {
+            "required": [
+              "outcome"
+            ]
+          }
         ]
       }
     },

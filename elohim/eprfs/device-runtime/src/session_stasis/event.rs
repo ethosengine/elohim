@@ -136,6 +136,19 @@ pub enum Question {
     Uncertain,
 }
 
+/// How the adapter classified a turn's end (steward ruling, Legitimate stops).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopOutcome {
+    /// Goal accomplished with observable evidence; opens nothing.
+    Accomplished,
+    /// A true exception only the steward can resolve; the human rung's ask carries it.
+    Exception,
+    /// The turn ends in a question for the steward.
+    Question,
+    /// Work stopped unfinished with no ask: a stall.
+    Stalled,
+}
+
 /// How a prompt closed, as written in the journal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CloseAttribution {
@@ -366,6 +379,10 @@ pub struct Event {
     pub gap: Option<GapNote>,
     /// Question classification.
     pub question: Option<Question>,
+    /// Turn-end outcome, when the adapter supplied one.
+    pub outcome: Option<StopOutcome>,
+    /// What the adapter found unmet, when it classified the stop as stalled.
+    pub stall_reason: Option<String>,
     /// Consultation payload.
     pub consultation: Option<ConsultationEvent>,
     /// Close attribution.
@@ -592,6 +609,18 @@ impl Event {
             Some("uncertain") => Some(Question::Uncertain),
             Some(other) => return Err(format!("unknown question class {other}")),
         };
+        let outcome = match v.get("outcome").and_then(Value::as_str) {
+            None => None,
+            Some("accomplished") => Some(StopOutcome::Accomplished),
+            Some("exception") => Some(StopOutcome::Exception),
+            Some("question") => Some(StopOutcome::Question),
+            Some("stalled") => Some(StopOutcome::Stalled),
+            Some(other) => return Err(format!("unknown outcome {other}")),
+        };
+        let stall_reason = v
+            .get("stallReason")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
         let closed_by = match v.get("closedBy").and_then(Value::as_str) {
             None => None,
             Some("approved") => Some(CloseAttribution::Approved),
@@ -650,6 +679,8 @@ impl Event {
             correlation,
             gap,
             question,
+            outcome,
+            stall_reason,
             consultation,
             closed_by,
             exception,
@@ -669,7 +700,10 @@ impl Event {
                 "closedBy and correlation",
             )?,
             EventKind::ObservationGap => need(event.gap.is_some(), "gap")?,
-            EventKind::TurnEnded => need(event.question.is_some(), "question")?,
+            EventKind::TurnEnded => need(
+                event.question.is_some() || event.outcome.is_some(),
+                "question or outcome",
+            )?,
             EventKind::Consultation => need(event.consultation.is_some(), "consultation")?,
             EventKind::WouldHave => need(event.would_have.is_some(), "wouldHave")?,
             EventKind::HarnessException => need(event.exception.is_some(), "exception")?,

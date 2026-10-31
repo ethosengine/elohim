@@ -1151,7 +1151,7 @@ fn fold_root_reads_all_sessions_and_reports_no_journal() {
         ],
     );
     let (report, folds) = fold_root(dir.path(), None, &o).unwrap();
-    assert_eq!((folds.len(), report.policy), (1, POLICY_ABSENT));
+    assert_eq!((folds.len(), report.policy.as_str()), (1, POLICY_ABSENT));
     assert_eq!(report.measures["dialogue-blocked-seconds"]["value"], 40.0);
     assert!(
         report.measures["dialogue-blocked-seconds"]["byClass"]["authorization"]
@@ -1845,4 +1845,113 @@ fn shadow_decide_without_a_journal_exits_clean_with_an_unmeasured_marker() {
         (json!("none"), json!(true), json!(true))
     );
     assert!(!dir.path().join("ghost").exists());
+}
+
+// --- Legitimate stops: turn-ended `outcome` ------------------------------------------------
+
+fn stop_incidents(events: &[Value]) -> Vec<(StallClass, Option<String>)> {
+    run(events, 600, Selection::All)
+        .incidents
+        .iter()
+        .map(|i| (i.stall_class, i.stall_reason.clone()))
+        .collect()
+}
+
+#[test]
+fn accomplished_and_exception_stops_open_no_incident() {
+    for outcome in ["accomplished", "exception"] {
+        let events = [ev(1, 0, "turn-ended", json!({"outcome": outcome}))];
+        assert!(stop_incidents(&events).is_empty(), "{outcome}");
+        // Even a legacy `question: yes` beside the outcome does not open one: the outcome decides.
+        let both = [ev(
+            1,
+            0,
+            "turn-ended",
+            json!({"outcome": outcome, "question": "yes"}),
+        )];
+        assert!(stop_incidents(&both).is_empty(), "{outcome} with question");
+    }
+}
+
+#[test]
+fn a_stalled_stop_opens_a_silence_incident_at_once_with_its_reason() {
+    let events = [ev(
+        1,
+        0,
+        "turn-ended",
+        json!({"outcome": "stalled", "stallReason": "gate red; worktree dirty"}),
+    )];
+    assert_eq!(
+        stop_incidents(&events),
+        [(StallClass::Silence, Some("gate red; worktree dirty".into()))]
+    );
+    let f = run(&events, 90, Selection::All);
+    assert_eq!(f.incidents[0].state, IncidentState::Open);
+    assert_eq!(blocked(&f), Some(90.0));
+    let v = serde_json::to_value(&f.incidents[0]).unwrap();
+    assert_eq!(v["stallReason"], "gate red; worktree dirty");
+    // A stalled stop with no reason serializes no field and still opens the incident.
+    let bare = [ev(1, 0, "turn-ended", json!({"outcome": "stalled"}))];
+    assert_eq!(stop_incidents(&bare), [(StallClass::Silence, None)]);
+    let v = serde_json::to_value(&run(&bare, 90, Selection::All).incidents[0]).unwrap();
+    assert!(v.get("stallReason").is_none());
+}
+
+#[test]
+fn a_question_outcome_follows_the_question_path_and_a_later_stop_closes_it() {
+    let events = [
+        ev(1, 0, "turn-ended", json!({"outcome": "question"})),
+        ev(2, 100, "turn-ended", json!({"outcome": "accomplished"})),
+    ];
+    let f = run(&events, 200, Selection::All);
+    assert_eq!(f.incidents.len(), 1);
+    assert_eq!(f.incidents[0].stall_class, StallClass::Question);
+    assert_eq!(f.incidents[0].closed_by, Some(ClosedBy::Withdrawn));
+}
+
+#[test]
+fn a_missing_outcome_keeps_the_question_behavior_exactly() {
+    let yes = [ev(1, 0, "turn-ended", json!({"question": "yes"}))];
+    assert_eq!(stop_incidents(&yes), [(StallClass::Question, None)]);
+    for q in ["no", "uncertain"] {
+        assert!(stop_incidents(&[ev(1, 0, "turn-ended", json!({"question": q}))]).is_empty());
+    }
+    // The legacy event serializes no new incident field.
+    let v = serde_json::to_value(&run(&yes, 60, Selection::All).incidents[0]).unwrap();
+    assert!(v.get("stallReason").is_none());
+}
+
+#[test]
+fn stops_are_counted_by_outcome_with_legacy_ends_unclassified() {
+    let events = [
+        ev(1, 0, "turn-ended", json!({"outcome": "accomplished"})),
+        ev(2, 10, "turn-ended", json!({"outcome": "accomplished"})),
+        ev(3, 20, "turn-ended", json!({"outcome": "exception"})),
+        ev(4, 30, "turn-ended", json!({"outcome": "question"})),
+        ev(5, 40, "turn-ended", json!({"outcome": "stalled"})),
+        ev(6, 50, "turn-ended", json!({"question": "no"})),
+    ];
+    let f = run(&events, 100, Selection::All);
+    assert_eq!(
+        f.stops,
+        StopCounts {
+            accomplished: 2,
+            exception: 1,
+            question: 1,
+            stalled: 1,
+            unclassified: 1
+        }
+    );
+    let s = status(&f, at(100));
+    assert_eq!(s["stops"]["accomplished"], 2);
+    assert_eq!(s["stops"]["unclassified"], 1);
+}
+
+#[test]
+fn an_unknown_outcome_is_refused_and_a_bare_turn_end_needs_question_or_outcome() {
+    let bad = ev(1, 0, "turn-ended", json!({"outcome": "gave-up"}));
+    assert!(Event::from_value(&bad).is_err());
+    let bare = ev(1, 0, "turn-ended", json!({}));
+    assert!(Event::from_value(&bare).is_err());
+    assert!(Event::from_value(&ev(1, 0, "turn-ended", json!({"outcome": "stalled"}))).is_ok());
 }
