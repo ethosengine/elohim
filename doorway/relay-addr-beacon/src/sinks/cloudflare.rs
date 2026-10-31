@@ -670,7 +670,10 @@ impl CloudflareSink {
     /// covers BOTH lanes since the 2026-07-28 apex clobber); this remains the
     /// shared-lane-only seam the shared-lane test suite isolates against.
     /// A true no-op (`Ok(())`, zero network calls) with no shared config.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "only the shared-lane tests call this seam; production takes verify_freshness, which covers both lanes"
+    )]
     pub async fn publish_shared_only(&self, update: &AddrUpdate) -> Result<()> {
         let gates = self.shared_serving.lock().await;
         if self.shared.is_empty() {

@@ -236,7 +236,10 @@ struct MessageDeltaBody {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)] // Wire type for serde deserialization
+#[allow(
+    dead_code,
+    reason = "serde wire type: its fields are filled by deserialization and nothing reads them yet"
+)]
 struct DeltaUsage {
     output_tokens: u32,
 }

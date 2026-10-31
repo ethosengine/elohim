@@ -1,6 +1,9 @@
 //! epr view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::imagodei::*;
 #[allow(unused_imports)]
 use crate::infrastructure::*;
@@ -14,7 +17,10 @@ use ts_rs::TS;
 /// kind-specific requirements are enforced by the validator (EprService::ingest).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprCouplingView {
     pub knowledge: Option<String>,
     pub value: Option<String>,
@@ -24,7 +30,10 @@ pub struct EprCouplingView {
 /// Detached Ed25519 proof on the EPR canonical bytes.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprSignatureView {
     /// CIDv1 base32 of the signer's Agent EPR.
     pub signer: String,
@@ -37,7 +46,10 @@ pub struct EprSignatureView {
 /// CIDs are CIDv1 base32 strings. `issuedAt` is an RFC3339 date-time string.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprEnvelopeView {
     pub cid: String,
     pub kind: String,
@@ -56,7 +68,10 @@ pub struct EprEnvelopeView {
 /// Full HTTP view for GET /api/v1/epr/:cid. Payload is hex-encoded.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprView {
     pub envelope: EprEnvelopeView,
     /// Hex-encoded payload bytes.
@@ -69,7 +84,10 @@ pub struct EprView {
 /// Error detail for a failed verify stage.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprVerifyErrorView {
     pub stage: String,
     pub message: String,
@@ -78,7 +96,10 @@ pub struct EprVerifyErrorView {
 /// Verify response for GET /api/v1/epr/:cid/verify.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprVerifyView {
     pub cid: String,
     pub verified: bool,
@@ -90,7 +111,10 @@ pub struct EprVerifyView {
 /// Paged list response for GET /api/v1/epr. Items are envelope-only (no payload).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprListView {
     pub items: Vec<EprEnvelopeView>,
     /// Opaque cursor for next page; null when exhausted.
@@ -100,7 +124,10 @@ pub struct EprListView {
 /// Input body for POST /api/v1/epr.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprPublishInput {
     pub envelope: EprEnvelopeView,
     /// Hex-encoded payload bytes.
@@ -121,7 +148,10 @@ pub struct EprPublishInput {
 /// Field shape matches `elohim/sdk/schemas/v1/economic-events/republish-epr.schema.json`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct RepublishEprEventView {
     pub action: String,
     pub performer: String,
@@ -141,7 +171,10 @@ pub struct RepublishEprEventView {
 /// Category C — operational (DHT query, reconstructed per request).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprProvidersView {
     /// CIDv1 base32 of the queried atom.
     pub cid: String,
@@ -156,7 +189,10 @@ pub struct EprProvidersView {
 /// Category C — wire view only, no DHT entry type, no new table.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprNavRef {
     /// CIDv1 base32 of the referenced atom.
     pub cid: String,
@@ -186,7 +222,10 @@ pub struct EprNavRef {
 ///   disclosure of which relationship types were consulted.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprNavContextView {
     /// CIDv1 base32 of the focal atom.
     pub cid: String,
@@ -225,7 +264,10 @@ pub struct EprNavContextView {
 /// does NOT advertise 4-of-4 leg coverage (charter Slice 1 owns `process`).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
 pub struct EprRawView {
     /// CIDv1 base32 of the focal atom.
     pub cid: String,

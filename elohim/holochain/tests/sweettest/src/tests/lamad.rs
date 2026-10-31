@@ -338,7 +338,10 @@ enum BatchResolvePhase {
 /// Mirrors `content_store::BatchResolveFailure`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BatchResolveFailure {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test reads this field"
+    )]
     reason: BatchFailureReason,
     #[allow(dead_code)]
     phase: BatchResolvePhase,
