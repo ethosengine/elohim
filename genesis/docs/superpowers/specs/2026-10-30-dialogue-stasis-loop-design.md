@@ -562,8 +562,9 @@ boundary. Their processes carry `STASIS_KEEPER=1` in the environment. A hook
 process inherits the environment of the runtime process that spawned it, so
 the adapter reads `os.environ` to ignore keeper events. The reported
 `hook-sees-keeper-env` probe check verified this inheritance. A keeper opens no
-incident and never recurses into the ladder. The coordinator's only writes are
-the journal and berth notes; guidance
+incident and never recurses into the ladder. The coordinator's writes are
+the journal, berth notes and, in slice 12, private receipts through the bounded
+recall executor (Valueflow placement below); guidance
 and notification requests are delivered through session hooks.
 
 ### Classification
@@ -665,6 +666,9 @@ Incident {
   stall_class: authorization | question | silence
   concern_class: shape | risk | uncertain
   effect_class: normalized tuple
+  station: declared station id and class | null       // slice 12
+  commitment: claimed commitment CID | null           // slice 12
+  placement: bounded evidence block | unmeasured      // slice 12
   opened_at: { wall, mono }
   presence_at_open
   state: Open | Approach | Breach | Pending | Closed
@@ -796,11 +800,13 @@ as specified in the pivot table; a failed validation becomes `park`.
 The steward's declared purpose for this loop (covenant clause `declaresPurpose`,
 session 4ec0c39f) is that a session stops only for one of two reasons:
 
-1. **Goal accomplished, with evidence.** The objective's deliverable is
-   committed, lints and tests pass for the projects it touched, and nothing
-   failing or blocking is committed, so it is ready to integrate or push. In his
-   words: "like delivering slice 1, passing lints and tests, no failing or
-   blocking code committed ready to integrate or push."
+1. **Goal accomplished, with evidence.** The deliverable meets the verify
+   evidence of the commitment the session claimed. The steward's code example
+   was "like delivering slice 1, passing lints and tests, no failing or
+   blocking code committed ready to integrate or push." Valueflow placement
+   below makes this station-specific: commit and gate evidence apply when the
+   claimed commitment requires them; specs, stories and habits have their own
+   declared evidence providers.
 2. **A true exception.** The remaining step is one only the steward can take:
    a decision, a ruling, a credential or an identity act. It reaches him as the
    human rung's prepared ask.
@@ -810,10 +816,10 @@ an `outcome`:
 
 | `outcome` | Evidence the adapter requires | Loop response |
 |---|---|---|
-| `accomplished` | HEAD carries a commit made in this session, the worktree is clean for the objective's paths, and the newest gate run for that commit (the gate-tap run log, or a recorded green attestation) is green, or an explicit `shift-marker` close cites that evidence | No incident. The session may stop. |
+| `accomplished` | The declared station provider verifies the claimed commitment's deliverable and required evidence at the named revision. For a code delivery commitment this includes its required commit, clean objective paths and green gate evidence; for other stations use Valueflow placement. A `shift-marker` close must reference the same evidence. | No incident. The session may stop. |
 | `exception` | A pending human-rung ask, a batched parked ask, or a question the coordinator has already climbed to rung 5 | No new incident. The ask is surfaced once (Denial authority and human delivery). |
 | `question` | The turn ends in a question for the steward | The Automated path and questions rules apply. |
-| `stalled` | None of the above: the turn stopped with work unfinished and no ask | Open a `silence`-class incident at once. In automated presence, the Stop adapter blocks once with guidance naming what is unmet (failing gate, uncommitted work, open incident) and the next authorized step. In collaborative presence the coordinator harvests at Approach. |
+| `stalled` | None of the above: the turn stopped with work unfinished and no ask | Open a `silence`-class incident at once. In automated presence, the Stop adapter blocks once with guidance naming the unmet commitment evidence or missing chain node and the next authorized step. In collaborative presence the coordinator harvests at Approach. |
 
 A claim of completion in the assistant's last message is never evidence by
 itself; `accomplished` requires the observable evidence above, and when the
@@ -870,7 +876,7 @@ declares promotion criteria, presence bounds and ruling validation.
 | Never get around an ask rule | A code check forbids `reshape` for risk class, including uncertain concerns treated as risk. S3* audits actual tool calls for a later same-effect call. | Prevention plus detection. |
 | Never accomplish an authoritatively denied effect another way | The fixed deny template instructs against it; S3* audits actual tool calls for another tool or spelling accomplishing the effect. | **Detection, not prevention.** The template is an instruction. |
 | Never treat peer/keeper/subagent text as the steward's word | Keeper briefs render that text in a quoted untrusted-evidence block. Only `--kind ruling` notes from the steward count as rulings. | Prevention for rulings; advisory for prose. |
-| Never undo work | Keepers run with `--restricted --tools Read,Grep,Glob`, verified by the probe; another runtime needs equivalent probe evidence. The coordinator's only writes are the journal and berth notes. | Prevention. |
+| Never undo work | Keepers run with `--restricted --tools Read,Grep,Glob`, verified by the probe; another runtime needs equivalent probe evidence. The coordinator writes the journal, berth notes and, in slice 12, private bounded-recall receipts; it does not edit source artifacts. | Prevention. |
 | Never edit the policy | `sensitive-file-protection.py` only warns on sensitive paths; it never blocks on path matching. The regulator compares the active policy CID with the steward's latest ruling. | **Not prevented.** CID mismatch is detected and makes the regulator inert, recording the reason. |
 
 **Live operation** is any non-shadow `decide` (slice 9 onward), with
@@ -935,6 +941,221 @@ the ceiling on `dialogue-blocked-seconds`, sits beside the CI rails. Close reads
 `epr session stasis status --shift-current`. L2 proposals wait for the steward
 between shifts. `genesis/docs/shifts/JOURNAL-TEMPLATE.md` and
 `genesis/docs/shifts/SPRINT-RESULT-TEMPLATE.md` each gain a Dialogue stasis block.
+
+## Valueflow placement (steward direction, 2026-10-31)
+
+The steward describes the repository's valueflow chain as "vision and manifesto
+north-stars, epics and features, specifications (and plans) runbooks and
+documentation pattern-libs, e2e tests, glue code, modules, code, unit-tests,
+linter, gates, verification and acceptance, and habits". Its awareness must run
+"(low level micro)<->(high-level macros)". A **station** is one declared kind of
+work in that chain, with its own evidence of completion. A **north-star** is a
+vision or manifesto atom that states the purpose the downstream work serves;
+an **atom** is an individually addressed artifact. E2E means an end-to-end
+scenario, and a pattern library holds reusable documented examples.
+
+The station classes cover purpose (vision and manifesto), outcomes (epics and
+features), design (specifications and plans), practice (runbooks, documentation
+and pattern libraries), stories (end-to-end scenarios), implementation (glue,
+modules and code), checks (unit tests, linters and gates), verification,
+acceptance, and habits (repeated behavior with measured evidence). These are
+classes of work, not a mandatory directory layout or a requirement to visit
+every station on every task. Authored links can branch and converge. Following
+them upward explains purpose; following the corresponding downstream links
+shows how that purpose reaches implementation and proof.
+
+**Avodah**, the protocol's work domain, accounts for contributions across that
+chain. The valueflow verbs describe its loop: intend names the desired outcome;
+claim takes a commitment; produce supplies its artifact; verify tests the claim
+against evidence; fulfil discharges it; rule records an authorized judgment;
+ratchet preserves an evidenced improvement in the next baseline. These are
+semantic acts, not seven identically named CLI subcommands (see Existing
+capabilities and frontier below). A development story begins in an intent tied
+upward to purpose and resolves through its claimed work and proof. A keeper
+helps the session find its next authorized step in this loop.
+
+### Passive placement
+
+At incident open, and when preparing every keeper brief, the coordinator asks
+the substrate where the work sits. The session does not have to reconstruct
+its context for each rung. **Placement** is this bounded account of the work's
+station, claimed commitment, purpose chain and neighbouring concerns.
+
+The intended entry is the following **FRONTIER: placement recall purpose**;
+`--purpose placement` does not exist today:
+
+```text
+epr flow memory recall open --session <incident-recall-id> --purpose placement --need "<effect class; touched paths; claimed commitment CID if known>"
+```
+
+Today the supported focused entry is the same `open --session ... --need ...`
+without `--purpose`; the only accepted purposes are `bootstrap` and `resume`,
+and `resume` requires `--habit`. The coordinator opens one bounded recall
+session for the incident and reuses it for subsequent briefs, retaining
+receipts and cumulative cost. Each brief revalidates the relevant evidence
+within that budget and carries any omission forward. A further packet needs
+an explicit evidence question under the recall contract, rather than a fresh
+budget at each rung.
+
+The need combines the incident's normalized effect class, touched paths and
+the session's actual claim, when available. `epr flow context <path|cid> --json`
+and `epr flow ledger <path|cid> --json` supply local claim and evidence records.
+A nearby claim is a candidate until its session attribution is established;
+multiple claims stay ambiguous. The proposed provider walks the cites graph,
+the directed references between addressed artifacts, upward from the touched
+atoms through their specification, feature, epic and north-star where those
+links exist. It preserves edge provenance, current bytes and stale or missing
+edges. A link to a related document is not by itself proof of an ancestry role.
+An unlinked code path needs an authored relation to its owning story or spec.
+Discovery may suggest that relation but does not establish it.
+
+The recall composition already names scope, discover, filter, group, select,
+read and judge. Read declared source routes first; use semantic search
+(similarity of embedded text vectors) or lexical search (matching terms)
+when they are insufficient. Both routes exist over the native fold, the
+derived search index. Semantic ranking uses the pinned
+`sentence-transformers/all-MiniLM-L6-v2` model, including model and tokenizer
+byte CIDs, through `recall-semantic-index.json` and its model manifest.
+Lexical ranking uses SQLite FTS5 full-text search with BM25 relevance ordering
+over the same chunks; it does not run an embedder. The focused first screen's
+`rrf-v1` fusion combines local discovery and semantic ranks for ordering only;
+lexical is separately selectable, not a third producer in that recipe today.
+Candidates retain method and freshness evidence; read their current source
+bytes before treating them as neighbours of the work.
+
+The proposed `placement` block contains:
+
+| Field | Meaning |
+|---|---|
+| `station` | Declared station id and protocol class, or null with an unmeasured reason. |
+| `commitment` | The session's claimed commitment CID and claim provenance, or null. |
+| `upwardChain` | Bounded paths and CIDs for reached atoms, with their declared roles, connecting edges and edge health; branching is retained. Missing steps are named. |
+| `nearestNeighbours` | Bounded candidate paths/CIDs, discovery route, method, freshness and source-verification state. A neighbour is not an ancestor. |
+| `confidence` | `high`, `low` or `unknown`, with the evidence and omissions that justify it; not a probability inferred from a similarity score. |
+| `recall` | Private receipt reference, pinned recall-contract CID and usage, so later briefs can reuse the same accounting. |
+
+Budgets come from `.epr-meta/elohim/algorithms/recall-contract.json`, not from
+a second stasis allowance. That artifact owns routes, composition, per-packet
+limits, cumulative accounting and fitness checks; its CID is pinned in each
+receipt. Compliance with its byte budget does not establish answer fitness.
+Its evaluation requires an independent reader, and the pinned model manifest
+names `recall-bank-reach@1` as its fitness measure. External shell or connector
+reads remain outside recall enforcement and must be accounted separately.
+
+Receipts and continuations remain **Private (B)** at
+`.eprfs/status/recall/<incident-recall-id>/`, under `CLAUDE.md`'s Bounded recall
+contract. They are not imported, projected, witnessed or feedback targets.
+The placement view is reconstructable local state; its captured incident
+context stays in the private journal. It adds zero replicated heads at birth
+or at one year, no DHT entry, zome call, network projection or HTTP route.
+One device can read its held sources without a doorway, peer or pool; an
+unavailable index leaves the source routes usable and the missing route named.
+Another device adds only evidence that has separately been admitted to it.
+There is no new shared working document or publication act in placement.
+
+Placement is good-faith evidence to reduce the session's and keepers' mental
+load. It is never authority: the never-list's prohibition on treating
+peer/keeper text as the steward's word still governs. Similarity, confidence
+and a purpose link grant no permission or acceptance. Unknown placement reads
+**unmeasured**, with the missing evidence named; a chain, station or claim is
+not invented to complete the display. Raw recall context stays device-local;
+only declared outcome attribution enters measures, under the existing P2P
+boundary. Exporting a private claim's identity requires its own disclosure
+basis, not merely that a measure has a commitment field.
+
+### Completion, broken links and contribution
+
+**Accomplished is relative to the claimed commitment.** A station's
+**evidence provider** is a declared reader that evaluates the commitment's
+required proof at the artifact revision being delivered. Its result names
+the commitment, artifact/revision, evidence references and provenance, and
+reports `passed`, `failed` or `unmeasured` with a reason. The Stop adapter
+reads the session's claim and consumes that result before an incident exists;
+a missing provider or unreadable evidence stays unmeasured and follows the
+existing low-confidence `stalled` path. Incomplete ancestry alone does not
+override valid commitment evidence. A passing result supports `accomplished`
+for the claimed work, not its parent epic or north-star; recording fulfilment
+or a ruling remains a separate valueflow act.
+Where acceptance is part of the commitment, technical verification alone
+does not satisfy it.
+
+The gate-live run log (fed by gate-tap), or the applicable green attestation,
+is the default code-station provider. It must match the commitment's required
+gate and revision. A spec station instead requires its declared blind-reader
+review, an independent reader given the document without the author's context,
+plus sealed, verified cites at that revision. A story station uses its passing
+scenario; a habit station uses the evidence its habit atom declares. A commit
+is required when the commitment calls for one, rather than as a universal
+condition for a spec review or an importer-defined station. Slice 12 replaces
+the earlier code-only accomplishment predicate on that basis.
+
+**A stall names where the chain broke.** For example: "between spec and gate:
+the gate the spec names doesn't exist." Preserve the story-graph maintainer's
+shape: `chain / between A→C / missing node B: <assertion + probe> / current state`.
+The coordinator supplies the two known endpoints, the missing assertion and
+the probe that would establish it. If discovery was incomplete, say that the
+gate could not be located within the budget; absence from a search result
+does not prove nonexistence. Minting or repairing that node remains authorized
+development work, outside the read-only placement provider.
+
+**Attention is attributed to work.** Incidents and `ladder-resolution@1` gain
+`station` and `commitment`, preserving unknown values. Resolution evidence
+retains the claim provenance, placement basis and measured time/usage, so
+avodah can account for attention spent per station without crediting a guessed
+claim or double-counting the existing interval union. This is contribution
+accounting with provenance, not a new grant of economic or decision authority.
+The SessionStart projection adds one line, for example
+`work: commitment <cid> · station design/<spec-station-id>`; missing parts
+read `unmeasured` with a short reason. Producing that line from the session's
+claim is slice-12 work, not current `report placement` behavior.
+
+### Bring your own development stories
+
+**BYO** means the importer brings their own stories, stations and tools. The
+steward asks that they "stay faithful to at least the elohim protocol native
+vision and system, without flattening the diversity they bring". The shared
+contract is the station classes above, the valueflow verbs, content-addressed
+cites upward to vision atoms, the evidence contract, the existing never-list,
+and the accomplished-or-true-exception stop rule. Local vocabulary and workflow
+may differ while retaining those connections and boundaries.
+
+The importer declares the following in its applicable `.epr-meta`. These are
+the **FRONTIER: station-evidence bindings** contract, not accepted manifest
+keys today; schema names and validation land in slice 12.
+
+| Minimal declaration | What the loop reads |
+|---|---|
+| Station id, protocol class and covered paths/atom references | Which station owns the claimed work; overlapping or absent coverage is reported, not guessed. |
+| Story/intent reference and upward cite relations | How the local development story serves the importer’s outcomes and the protocol-native vision atoms. |
+| Evidence-provider binding for each station class used | A named, versioned local reader and its evidence-input contract, required checks and result shape. |
+| Gate, scenario, blind-reader, habit or acceptance-probe references, as applicable | Which proof the commitment requires, its revision/freshness conditions, and how to recognize failed or unmeasured evidence. |
+
+Bindings select already-authorized readers; discovery of a declaration does
+not authorize executing its command text. This is the same separation as
+lab-neutral `capabilityBindings`: protocol roles are shared, local providers
+are declared. The importer need not adopt this repository's directory tree,
+Jenkins jobs, gate runner or story vocabulary. Its provider must still supply
+the claimed evidence and preserve the policy boundary; a binding cannot turn
+keeper advice into steward authority.
+
+### Existing capabilities and frontier
+
+The following is grounded in the CLI help and `elohim/eprfs/epr-cli/src/flow/`
+(`mod.rs`, `claim.rs`, `context.rs`, `edges.rs`, `cites.rs`, `placement.rs`,
+and `memory/recall/`). Availability of a route does not prove that this
+device holds a current semantic fold or a usable model.
+
+| Capability | Existing command or named frontier |
+|---|---|
+| Bounded recall | `epr flow memory recall open --session <id> --need <text>`; `search --session <id> --need <text> --search-scope <dir> --name <glob> --query <term>`; `source --session <id> --need <text> --path <path>`; `read --session <id> --need <text> --path <path> --lines <start>:<end>`. `search`/`source` also accept exact `--tag` filters for the local provider. |
+| Native neighbours and fusion | `epr flow memory recall search --session <id> --need <text> --provider semantic` or `--provider lexical`; `epr flow memory index status` reads fold state. First-screen local/semantic fusion is already implemented; no separate fusion verb is needed. |
+| Claims and proof records | `epr flow project`, `epr flow claim --on <intent-cid\|gap-id\|path> --session <id>`, `epr flow context <path\|cid> --json`, `epr flow ledger <path\|cid> --json`, `epr flow fulfill --on <commitment-cid> --report <path> --status DONE`, and `epr flow note --on <commitment-cid> --kind verdict\|ruling ...` exist. `fulfill` is the CLI spelling. `intend`, `produce`, `verify`, `fulfil`, `rule` and `ratchet` are not standalone `epr flow` verbs; this slice composes the existing records rather than inventing aliases. |
+| Cites and graph evidence | `epr flow cites seal <doc>` and `epr flow cites verify <doc>` maintain/check citations; `epr flow walk <path> --json` and `context` expose scoped flow and edge evidence. `edges.rs` merges doc cites and sidecar dependency edges. There is no `epr flow cites graph` command or typed incident-to-north-star walk today. |
+| Placement and substrate reports | `epr flow report placement --ledger --json` reads document lifecycle and gap-station roll-ups; `epr flow report placement --focus <subject> --brief` reads subject focus; `epr flow report scope --docs --json` reads environment requirements. These are inputs, not the incident placement block. `epr flow report --headline` has no current-commitment/station line. |
+| **FRONTIER: placement recall purpose** | Extend `epr flow memory recall open --session <id> --purpose placement --need <text>` to seed the incident-specific bounded packet; today's purpose validation refuses `placement`. |
+| **FRONTIER: incident placement view** | Proposed new verb `epr flow placement --session <id> --incident <id> --json`, backed by the coordinator's provider: resolve session claims, traverse typed upward relations within recall bounds, retain neighbours and return the placement block. Reuse the existing graph and recall executor. |
+| **FRONTIER: station-evidence bindings and stop evidence** | Add the `.epr-meta` contract and evidence-provider registry, with the code provider as default for code stations and importer providers selected by declared class. Wire the Stop adapter; no additional CLI verb is required for registry dispatch. |
+| **FRONTIER: placement attribution and status** | Add station/commitment fields and provenance to incidents and resolution measures, private receipt handling in briefs, and the SessionStart work line. Extend the session-status projection; the existing report names do not imply this behavior. |
 
 ## Journal contract and measures
 
@@ -1112,8 +1333,10 @@ AlgedonicSignal and its latch. The 1800 s ceiling is cumulative blocked time
 across all of a shift's incidents, distinct from the per-incident 300 s Breach bound.
 
 `ladder-resolution@1` records which rung resolved each incident, tagged by level,
-binding, concern class and presence. The later `dialogue-stasis-health@1` measure
-feeds the loop's health lens. All follow the unmeasured rule in Terms.
+binding, concern class and presence. Slice 12 adds station and claimed commitment,
+with provenance and unknown handling under Valueflow placement. The later
+`dialogue-stasis-health@1` measure feeds the loop's health lens. All follow the
+unmeasured rule in Terms.
 Slice 1 declares only the first two measures and the blocked-time ceiling, with
 no keeper dispatch until slice 7.
 
@@ -1265,6 +1488,22 @@ and learning. Each slice lands separately when the steward asks to land it.
     defined in Terms.
 11. **L1 and L2.** Add audited automatic promotion, advisory routing, and
     proposal-only loop improvement with separate steward activation.
+12. **Valueflow placement.**
+    Read first: Valueflow placement (steward direction, 2026-10-31);
+    `CLAUDE.md` → Bounded recall;
+    `.epr-meta/elohim/algorithms/recall-contract.json`;
+    `epr flow --help`, `epr flow memory recall --help`,
+    `epr flow cites --help` and `epr flow report`'s placement/scope contracts.
+    Add the coordinator's bounded placement provider at incident open and in
+    every keeper brief, including the named recall-purpose and placement-view
+    frontiers. Add an `accomplished` evidence-provider registry, with the
+    gate-live run log as the default code provider and spec/story/habit evidence
+    selected by the claimed commitment. Add station and commitment fields to
+    incidents and `ladder-resolution`, retaining provenance and unmeasured
+    values, and project the SessionStart work line. Define and validate the
+    BYO `.epr-meta` station-evidence bindings and honour an importer-declared
+    provider within existing execution authority. Update the coordinator's
+    write boundary for private recall receipts without adding source writes.
 
 ## Verification
 
@@ -1280,6 +1519,7 @@ and learning. Each slice lands separately when the steward asks to land it.
 | 8 | <ul><li>Concurrent writers claim one consultation atomically under Journal locking.</li><li>A claimed consultation survives restart without another keeper call; duplicate events attach to that claim.</li><li>A dead coordinator reads unknown.</li><li>Shadow guidance is compared with actual actions.</li></ul> |
 | 9 | <ul><li>Collaborative timing follows the Incident model and harvesting contract; tests verify the Breach-precedence and away-ruling rules in Presence disposition.</li><li>Automated harvesting begins when the incident opens; handling parks, climbs rungs 1–4 and reaches rung 5, with one berth note and one `PushNotification` request per incident per reached stage, plus one batched `AskUserQuestion`.</li><li>Risk and uncertain concerns never receive a same-effect reshape; shape concerns get only one across tools and restarts, and a second failure Refers.</li><li>`proceed` requires a valid, unexpired, scoped steward ruling; any failed validation downgrades to `park`.</li><li>Fixtures exercise the park item's separate lifecycle and later-execution requirements in Pivots.</li><li>A missing policy and a CID mismatch both satisfy the inert live-operation contract in Policy boundary and learning.</li><li>Both controls satisfy Kill switches, including continued measures with only the ladder disabled and detectable observation gaps with sensing disabled.</li></ul> |
 | 10–11 | <ul><li>A 45-minute fixture wait yields one progress request.</li><li>Skill kickoff and close write the `shift-marker` edges defined in Terms.</li><li>A second clean resolution of the same effect class proposes a rung 0 entry; it takes effect only after a completed, passing other-family audit, and a missing or failed audit leaves it proposed.</li><li>A seeded health breach produces one patch proposal and no activation.</li></ul> |
+| 12 | <ul><li>A code-station fixture is accomplished by green gate evidence for its claimed commitment and required revision; an unrelated green run does not satisfy it.</li><li>A spec-station fixture is accomplished by a passing blind-reader result plus sealed, verified cites for the delivered revision; removing either makes it unmeasured or failed, and it does not require a code gate.</li><li>A stall fixture names the known endpoints and missing node: “between spec and gate: the gate the spec names doesn't exist”, with the assertion and probe needed to repair the chain.</li><li>Missing or ambiguous claim/ancestry evidence yields unmeasured placement, named omissions and an honest SessionStart line; no station or commitment is fabricated. Briefs reuse private recall receipts and cumulative budgets.</li><li>An importer-declared station provider is honoured for its class and required proof, with station/commitment provenance retained on the incident and resolution measure. A binding supplies no execution permission, and a private receipt is not exported.</li></ul> |
 
 The habit `dialogue-stalls-are-answered` turns green only after two shifts below
 the blocked-time ceiling, one unattended, with a falling rung 5 share and
