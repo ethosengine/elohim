@@ -92,6 +92,46 @@ pub fn element_script_path() -> String {
 /// unlike the content-addressed [`element_script_path`] (immutable).
 pub const STABLE_ELEMENT_PATH: &str = "/chrome/omni-element.js";
 
+/// The v1 element: page info, the content frame built from `data-frame-src`,
+/// per-record grants under `elohim-grants:<contentAddress>`, and the generated
+/// chrome vocabulary spliced in by `build.rs` from
+/// `src/generated/chrome-vocabulary.json`.
+///
+/// It is a SECOND served asset at its own content address, not a replacement
+/// for [`ELEMENT_JS`]: a producer chooses it only when its content-chrome
+/// switch is on (the v1 content shell, [`render_content_shell`], loads it).
+/// With every switch off, no page references it, and [`ELEMENT_JS`], its hash
+/// and the stable alias stay what every medium loads today.
+pub const ELEMENT_V1_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/omni-element-v1.js"));
+
+/// The v1 element's bare lowercase-hex `sha256`, computed once on first use.
+fn element_v1_js_hash_cell() -> &'static str {
+    static HASH: OnceLock<String> = OnceLock::new();
+    HASH.get_or_init(|| format!("{:x}", Sha256::digest(ELEMENT_V1_JS.as_bytes())))
+}
+
+/// The v1 element bytes the `/chrome/` route serves at
+/// [`element_v1_script_path`].
+#[must_use]
+pub fn element_v1_js_bytes() -> &'static [u8] {
+    ELEMENT_V1_JS.as_bytes()
+}
+
+/// The v1 element's content address — bare lowercase-hex `sha256` of
+/// [`ELEMENT_V1_JS`].
+#[must_use]
+pub fn element_v1_js_hash() -> &'static str {
+    element_v1_js_hash_cell()
+}
+
+/// The content-addressed URL path of the v1 element. It shares the
+/// `/chrome/omni-element.<sha256hex>.js` family with [`element_script_path`];
+/// the hash alone tells the two apart. There is no stable alias for v1.
+#[must_use]
+pub fn element_v1_script_path() -> String {
+    format!("/chrome/omni-element.{}.js", element_v1_js_hash())
+}
+
 /// Escape a JSON string so it can be embedded safely inside an HTML
 /// `<script type="application/json">…</script>` island without the JSON being
 /// able to break out of the script element.
@@ -144,10 +184,9 @@ fn html_escape(raw: &str) -> String {
 /// [`ChromeContext`]; this renderer adds nothing medium-specific, and equal
 /// input yields byte-identical output.
 ///
-/// Dormant until a producer's content-chrome switch is on: no route calls it by
-/// default, and the served element ([`ELEMENT_JS`]) does not yet build the
-/// frame from `data-frame-src` (that element change is deferred; see
-/// `genesis/data/timeline/backlog/2026-10-29-content-chrome-element-and-app-port.md`).
+/// It loads the v1 element ([`ELEMENT_V1_JS`]), the one that builds the frame
+/// from `data-frame-src`. Dormant until a producer's content-chrome switch is
+/// on: no route calls it by default.
 #[must_use]
 pub fn render_content_shell(ctx: &ChromeContext) -> String {
     let frame = ctx.content.as_ref().map(|c| &c.frame);
@@ -181,12 +220,50 @@ pub fn render_content_shell(ctx: &ChromeContext) -> String {
         ftitle = html_escape(frame_title),
         noscript = noscript,
     );
-    // The island is pre-escaped strictly (every `<`, `>`, `&`, U+2028, U+2029
-    // as a `\u` escape), so no `</script`, `<!--` or `<script` token can form
-    // whatever a title holds; `inject_element`'s own escape then finds nothing
-    // to rewrite. Islands of today's producers keep `escape_json_for_script`
-    // unchanged until the element lands (see the backlog named above).
-    inject_element(&html, &escape_json_strict(&ctx.to_json()))
+    inject_element_v1(&html, &ctx.to_json())
+}
+
+/// Inject the v1 element into a finalized HTML document: the same splice as
+/// [`inject_element`], but the island is escaped strictly (every `<`, `>`, `&`,
+/// U+2028 and U+2029 as a `\u` escape, so no `</script`, `<!--` or `<script`
+/// token can form and the parsed value is unchanged) and the loader points at
+/// [`element_v1_script_path`].
+///
+/// Pre-v1 islands keep [`escape_json_for_script`] byte for byte, because every
+/// page that mounts the chrome today is built from them.
+#[must_use]
+pub fn inject_element_v1(html: &str, context_json: &str) -> String {
+    splice_before_body_close(
+        html,
+        &element_snippet(&escape_json_strict(context_json), &element_v1_script_path()),
+    )
+}
+
+fn element_snippet(escaped_json: &str, src: &str) -> String {
+    format!(
+        "<script type=\"application/json\" id=\"{id}\">{json}</script>\
+         <script src=\"{src}\" defer></script>",
+        id = CONTEXT_SCRIPT_ID,
+        json = escaped_json,
+        src = src,
+    )
+}
+
+/// Insert `snippet` before the LAST `</body>` (case-insensitively) so a
+/// `</body>` appearing earlier inside a string/comment doesn't misplace the
+/// splice; append defensively when there is none (the element still
+/// self-mounts).
+fn splice_before_body_close(html: &str, snippet: &str) -> String {
+    let mut out = String::with_capacity(html.len() + snippet.len());
+    if let Some(idx) = find_last_body_close(html) {
+        out.push_str(&html[..idx]);
+        out.push_str(snippet);
+        out.push_str(&html[idx..]);
+    } else {
+        out.push_str(html);
+        out.push_str(snippet);
+    }
+    out
 }
 
 /// Inject the runtime omnibar element into a finalized SSR HTML document.
@@ -204,30 +281,13 @@ pub fn render_content_shell(ctx: &ChromeContext) -> String {
 /// mounted), so a double-inject is harmless.
 #[must_use]
 pub fn inject_element(html: &str, context_json: &str) -> String {
-    let escaped = escape_json_for_script(context_json);
-    let snippet = format!(
-        "<script type=\"application/json\" id=\"{id}\">{json}</script>\
-         <script src=\"{src}\" defer></script>",
-        id = CONTEXT_SCRIPT_ID,
-        json = escaped,
-        src = element_script_path(),
-    );
-
-    // Insert before the LAST `</body>` (case-insensitively) so a `</body>`
-    // appearing earlier inside a string/comment doesn't misplace the splice.
-    if let Some(idx) = find_last_body_close(html) {
-        let mut out = String::with_capacity(html.len() + snippet.len());
-        out.push_str(&html[..idx]);
-        out.push_str(&snippet);
-        out.push_str(&html[idx..]);
-        out
-    } else {
-        // No </body>: append defensively. The element still self-mounts.
-        let mut out = String::with_capacity(html.len() + snippet.len());
-        out.push_str(html);
-        out.push_str(&snippet);
-        out
-    }
+    splice_before_body_close(
+        html,
+        &element_snippet(
+            &escape_json_for_script(context_json),
+            &element_script_path(),
+        ),
+    )
 }
 
 /// Byte index of the last `</body>` (ASCII case-insensitive) in `html`, or
@@ -886,7 +946,7 @@ mod tests {
                 html.contains(&format!("\"medium\":\"{medium}\"")),
                 "{medium}"
             );
-            assert!(html.contains(&element_script_path()), "{medium}");
+            assert!(html.contains(&element_v1_script_path()), "{medium}");
             assert_eq!(html.matches("</body>").count(), 1, "{medium}");
         }
     }
@@ -1064,5 +1124,425 @@ mod tests {
             v1.to_json(),
             r#"{"slug":"abc","authenticated":false,"version":1,"viewer":{"kind":"visitor"},"medium":"peer-native"}"#
         );
+    }
+}
+
+/// The v1 element's source contract — the snapshot's JS-asserting tests,
+/// pinned against [`ELEMENT_V1_JS`]. The pre-v1 element keeps its own tests in
+/// `tests` above, unchanged.
+#[cfg(test)]
+mod v1_element_tests {
+    use super::*;
+
+    #[test]
+    fn v1_hash_matches_its_bytes_and_path() {
+        let expected = format!("{:x}", Sha256::digest(ELEMENT_V1_JS.as_bytes()));
+        assert_eq!(element_v1_js_hash(), expected);
+        assert_eq!(element_v1_js_bytes(), ELEMENT_V1_JS.as_bytes());
+        assert_eq!(
+            element_v1_script_path(),
+            format!("/chrome/omni-element.{expected}.js")
+        );
+    }
+
+    #[test]
+    fn v1_is_a_second_asset_not_a_replacement() {
+        // Two distinct content addresses; the stable alias still names the
+        // pre-v1 element only, and the pre-v1 bytes carry no v1 marker.
+        assert_ne!(element_v1_js_hash(), element_js_hash());
+        assert_ne!(element_v1_script_path(), element_script_path());
+        assert_ne!(element_v1_script_path(), STABLE_ELEMENT_PATH);
+        assert!(!ELEMENT_JS.contains("content-app-frame"));
+        assert!(!ELEMENT_JS.contains("pageInfoSections"));
+    }
+
+    #[test]
+    fn content_shell_loads_the_v1_element_and_inject_keeps_pre_v1() {
+        let ctx = ChromeContext {
+            slug: "s".into(),
+            ..Default::default()
+        };
+        let shell = render_content_shell(&ctx);
+        assert!(shell.contains(&element_v1_script_path()), "{shell}");
+        assert!(!shell.contains(&element_script_path()), "{shell}");
+        let pre = inject_element("<body></body>", &ctx.to_json());
+        assert!(pre.contains(&element_script_path()), "{pre}");
+        assert!(!pre.contains(&element_v1_script_path()), "{pre}");
+    }
+
+    #[test]
+    fn script_is_self_contained_and_bounded() {
+        // The element is render + theme + behavior in one file: larger than the
+        // enhance-only script, but still a single small asset. The bounds catch
+        // accidental bloat, not a hard limit.
+        let len = ELEMENT_V1_JS.len();
+        assert!(len > 3000, "element unexpectedly small: {len} bytes");
+        assert!(len < 120_000, "element unexpectedly large: {len} bytes");
+    }
+
+    #[test]
+    fn element_carries_the_self_mount_and_context_contract() {
+        // The element MUST self-mount (#elohim-omni), read an inline context
+        // island OR fetch the content node, and resolve the landing slug. These
+        // string anchors guard the contract sibling tasks depend on.
+        assert!(
+            ELEMENT_V1_JS.contains("elohim-omni"),
+            "missing omni container id"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains(CONTEXT_SCRIPT_ID),
+            "missing inline-context island id"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("/db/content/"),
+            "missing content-node fetch fallback"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("elohim-host-landing"),
+            "missing landing-slug resolution"
+        );
+        // Behavior contract (absorbed from omni-enhance.js).
+        assert!(
+            ELEMENT_V1_JS.contains("elohim-theme-changed"),
+            "missing theme-changed event"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("/api/v1/resilience/"),
+            "missing lazy resilience fetch"
+        );
+    }
+
+    #[test]
+    fn resilience_mapper_speaks_the_snapshot_contract() {
+        // Structural contract gate for the resilience mapper. The element
+        // once shipped reading phantom fields (data.glyph/standing/reach —
+        // never in any ResilienceSnapshotView) so the fetch succeeded forever
+        // while the mapper matched nothing and the card stayed neutral. This
+        // list mirrors `resilience-snapshot-view.schema.json` `properties`
+        // (source of truth; storage's schema_contract.rs guards struct↔schema
+        // — keep this list in sync when the mapper's reads change; the
+        // durable fix is compiling the element against the generated TS view,
+        // tracked in the omni contract backlog item).
+        for field in [
+            "protectionStatus",
+            "feltStatus",
+            "headline",
+            "reassurance",
+            "coverageShortfall",
+            "stewardingCollectives",
+            "commitmentBackedCollectives",
+            "diversityScore",
+            "distributionState",
+            "floor",
+            "hasHouseholds",
+        ] {
+            assert!(
+                ELEMENT_V1_JS.contains(field),
+                "element no longer reads wire field `{field}` — update this list with the mapper"
+            );
+        }
+        // The phantom accessors must never come back.
+        for phantom in ["data.glyph", "data.standing", "data.reach"] {
+            assert!(
+                !ELEMENT_V1_JS.contains(phantom),
+                "phantom wire accessor `{phantom}` reintroduced — not in any schema"
+            );
+        }
+        // The household felt-status feed (spec §11) is the primary fetch.
+        assert!(
+            ELEMENT_V1_JS.contains("/household"),
+            "resilience fetch no longer targets the /household felt-status variant"
+        );
+    }
+
+    #[test]
+    fn claims_mapper_speaks_the_epr_projection_contracts() {
+        // Structural contract gate for the backing-claims section — the client
+        // leg of the two Category-C EPR projections. Sibling of
+        // `resilience_mapper_speaks_the_snapshot_contract`: the element reads a
+        // wire shape it does not compile against, so the field names are pinned
+        // here against their schemas.
+
+        // Both projections are fetched (parallel legs, independent failure).
+        assert!(
+            ELEMENT_V1_JS.contains("/nav-context"),
+            "missing lazy EPR nav-context fetch"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("/api/v1/epr/"),
+            "claims fetch must target the EPR projection routes"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("Promise.all"),
+            "the two projections must be fetched in parallel, not chained"
+        );
+
+        // epr-nav-context-view.schema.json properties the mapper reads.
+        for field in ["prev", "next", "partOf", "related", "resilienceTier"] {
+            assert!(
+                ELEMENT_V1_JS.contains(field),
+                "element no longer reads EprNavContextView field `{field}`"
+            );
+        }
+        // epr-raw-view.schema.json properties the mapper reads (the three
+        // coupling legs — story/value/governance — plus reverse part-of).
+        for field in [
+            "coupling",
+            "knowledge",
+            "value",
+            "governance",
+            "reversePartOf",
+        ] {
+            assert!(
+                ELEMENT_V1_JS.contains(field),
+                "element no longer reads EprRawView field `{field}`"
+            );
+        }
+        // Neither projection carries these — a phantom read here is the exact
+        // shape of the resilience-mapper regression.
+        for phantom in ["nav.claims", "raw.legs", "raw.partOf", "nav.coupling"] {
+            assert!(
+                !ELEMENT_V1_JS.contains(phantom),
+                "phantom EPR projection accessor `{phantom}` — not in any schema"
+            );
+        }
+
+        // Links target the universal EPR address (doorway §12.1), routed
+        // through the href allowlist like every other element-built href.
+        assert!(
+            ELEMENT_V1_JS.contains("'/epr/' + e"),
+            "claim links must target the universal /epr/{{cid}} address"
+        );
+    }
+
+    #[test]
+    fn claims_section_is_tri_state_and_lives_in_page_info() {
+        // The DOM still testifies the section's state — "loading" -> "applied" |
+        // "unmatched" — so a probe can tell "no claims recorded" from "the fetch
+        // never ran". The standalone claims button left the bar: claims are a
+        // page-info row now, which says so honestly when there are none.
+        assert!(
+            ELEMENT_V1_JS.contains("data-omni-claims-loaded"),
+            "missing the tri-state claims marker attribute"
+        );
+        for state in ["'loading'", "'applied'", "'unmatched'"] {
+            assert!(
+                ELEMENT_V1_JS.contains(state),
+                "claims marker must be able to settle to {state}"
+            );
+        }
+        assert!(
+            ELEMENT_V1_JS.contains("data-omni-claims-count"),
+            "missing the rendered-claims count attestation"
+        );
+        assert!(
+            !ELEMENT_V1_JS.contains("claims-toggle"),
+            "the standalone claims button must not return to the bar"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("No claims recorded yet"),
+            "the Claims row must say plainly when nothing is recorded"
+        );
+    }
+
+    #[test]
+    fn source_declares_the_page_info_hooks_and_row_order() {
+        for hook in [
+            "data-omni-action=\"page-info\"",
+            "data-testid=\"page-info\"",
+            "popover=\"manual\"",
+            "showPopover",
+            "data-page-info-row",
+            "data-page-info-card",
+            "data-page-info-back",
+            "data-page-info-epr-link",
+            "data-page-info-cap-toggle",
+            "aria-expanded",
+            "data-witness",
+        ] {
+            assert!(ELEMENT_V1_JS.contains(hook), "page info lost hook `{hook}`");
+        }
+        // Row names (the a2o glue reads them) come from the generated vocabulary,
+        // in the schema's display order.
+        let vocab: serde_json::Value =
+            serde_json::from_str(include_str!("generated/chrome-vocabulary.json")).unwrap();
+        let rows: Vec<&str> = vocab["pageInfoSections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["value"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                "source",
+                "delivery",
+                "holders",
+                "steward",
+                "claims",
+                "permissions",
+                "yours"
+            ]
+        );
+        // Yours is gated on the island's `authenticated`.
+        assert!(ELEMENT_V1_JS.contains("isSignedIn(MODEL.ctx)"));
+        // Every card's EPR link is relative and carries the delivery.
+        assert!(ELEMENT_V1_JS.contains("'/epr/' + rid"));
+        assert!(ELEMENT_V1_JS.contains("'via=' + via") && ELEMENT_V1_JS.contains("'peer=' + peer"));
+        // Escape closes and returns focus to the trust mark.
+        assert!(ELEMENT_V1_JS.contains("evt.key === 'Escape'"));
+        assert!(ELEMENT_V1_JS.contains("closePageInfo(true)"));
+    }
+
+    #[test]
+    fn source_declares_a_frame_with_no_sandbox_escape() {
+        assert!(ELEMENT_V1_JS.contains("iframe[data-testid=\""));
+        assert!(ELEMENT_V1_JS.contains("content-app-frame"));
+        assert!(ELEMENT_V1_JS.contains("elohim-content-frame"));
+        // Trustful base and the trustless profile are pinned verbatim.
+        assert!(ELEMENT_V1_JS.contains("ORIGIN_SEPARATING"));
+        assert!(ELEMENT_V1_JS.contains("'allow-same-origin'"));
+        assert!(ELEMENT_V1_JS.contains("['allow-scripts']"));
+        // The island carries `content`; it is read without widening the
+        // ChromeContext accessor list (producer owns that field).
+        assert!(ELEMENT_V1_JS.contains("island['content']"));
+        // Behaviour (denials, trustless profile, lone surrogates, href guards) is
+        // proven by tests/frame-attributes.test.mjs, run below under node.
+        // Never a way out of the sandbox, in any spelling.
+        for banned in ["allow-top-navigation", "allow-popups-to-escape-sandbox"] {
+            assert!(
+                !ELEMENT_V1_JS.contains(banned),
+                "frame sandbox must never carry `{banned}`"
+            );
+        }
+        // Sandbox is set before src so the first navigation already carries it.
+        let s = ELEMENT_V1_JS.find("ifr.setAttribute('sandbox'").unwrap();
+        let u = ELEMENT_V1_JS.find("ifr.setAttribute('src'").unwrap();
+        assert!(s < u);
+    }
+
+    #[test]
+    fn source_declares_the_user_agent_preference_queries() {
+        for q in [
+            "prefers-reduced-motion: no-preference",
+            "prefers-reduced-transparency",
+            "forced-colors: active",
+            "pointer: coarse",
+        ] {
+            assert!(ELEMENT_V1_JS.contains(q), "missing media query `{q}`");
+        }
+    }
+
+    /// Runs the pure frame-attribute tests under node when it is on PATH (it is
+    /// in the dev container and CI's node images); skipped loudly otherwise.
+    #[test]
+    fn frame_attribute_function_passes_its_node_tests() {
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/frame-attributes.test.mjs"
+        );
+        match std::process::Command::new("node")
+            .arg("--test")
+            .arg(dir)
+            .output()
+        {
+            Ok(out) => assert!(
+                out.status.success(),
+                "node tests failed:\n{}\n{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            ),
+            Err(e) => {
+                eprintln!("SKIPPED: node not available ({e}); frame-attributes tests not run")
+            }
+        }
+    }
+
+    #[test]
+    fn nav_slots_are_client_resolved_not_deferred() {
+        // The mutual-deferral bug: the doorway left nav "to the element's own
+        // client-side resolution" while the element hard-nulled navBack /
+        // navForward because "the doorway supplies those" — so nav never
+        // rendered from either side. The element now owns the resolution.
+        assert!(
+            ELEMENT_V1_JS.contains("data-omni-nav-slot"),
+            "missing the nav insertion slots the fetched nav-context fills"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("fillNavSlot"),
+            "missing the client-side nav resolver"
+        );
+        assert!(
+            !ELEMENT_V1_JS.contains("the doorway supplies those"),
+            "the stale mutual-deferral comment is back — nav is client-resolved"
+        );
+        // An island-supplied nav target still wins (the slot is only filled
+        // when empty) — the element resolves what was LEFT to it, it does not
+        // override a producer that spoke.
+        assert!(
+            ELEMENT_V1_JS.contains("if (!slot || slot.firstChild) return false;"),
+            "an island-authored nav slot must never be overwritten"
+        );
+    }
+
+    #[test]
+    fn element_carries_the_css_injection_and_href_guards() {
+        // The token-value CSS-injection guard and the href scheme allowlist are
+        // load-bearing XSS guards baked into the served JS. These string anchors
+        // ensure a refactor cannot silently drop them (the JS has no in-tree
+        // engine test; the behavioral proof lives in elohim-render's Rust twin).
+        assert!(
+            ELEMENT_V1_JS.contains("isSafeTokenValue"),
+            "missing CSS-value allowlist guard"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("safeHref"),
+            "missing href scheme allowlist guard"
+        );
+        // The token guard must reject the structural break-out / active-content
+        // chars and fall back to the base palette.
+        assert!(
+            ELEMENT_V1_JS.contains("[;{}<@]"),
+            "token guard must deny the structural break-out chars"
+        );
+        assert!(
+            ELEMENT_V1_JS.contains("expression"),
+            "token guard must deny expression("
+        );
+    }
+
+    // ── vocabulary splice ───────────────────────────────────────────────────
+
+    #[test]
+    fn element_carries_the_spliced_generated_vocabulary() {
+        assert!(
+            !ELEMENT_V1_JS.contains("__CHROME_VOCABULARY__"),
+            "the vocabulary placeholder must be replaced at build time"
+        );
+        assert!(ELEMENT_V1_JS.contains("\"frameCapabilities\""));
+        assert!(ELEMENT_V1_JS.contains("\"pageInfoSections\""));
+        // The hand-written JS table is gone: the labels live only in the
+        // spliced JSON, never as a `name: '…'` literal in the source.
+        assert!(!include_str!("omni-element-v1.js").contains("Submit forms"));
+    }
+
+    // ── escaping ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn hostile_title_round_trips_through_the_island() {
+        let hostile = "</script><!-- <script> & \u{2028} \"q\" ' <img onerror=x>";
+        let ctx = ChromeContext {
+            slug: "s".into(),
+            title: Some(hostile.into()),
+            ..Default::default()
+        };
+        let out = inject_element_v1("<html><body></body></html>", &ctx.to_json());
+        let start =
+            out.find("id=\"elohim-omni-context\">").unwrap() + "id=\"elohim-omni-context\">".len();
+        let end = start + out[start..].find("</script>").unwrap();
+        let island = &out[start..end];
+        assert!(!island.contains('<') && !island.contains('>') && !island.contains('&'));
+        let v: serde_json::Value = serde_json::from_str(island).expect("island is valid JSON");
+        assert_eq!(v["title"], hostile);
     }
 }
