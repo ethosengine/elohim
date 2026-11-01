@@ -331,7 +331,8 @@ pub fn decide_live(
             if consultation_of(inc, Pivot::Reshape).is_some() {
                 // The allowance is spent: Refer, once, instead of a second reshape.
                 let referred = inc.consultations.iter().any(|x| {
-                    matches!(x.decision, Some(Decision::Refer(_)))
+                    x.live
+                        && matches!(x.decision, Some(Decision::Refer(_)))
                         && x.reason
                             .as_deref()
                             .is_some_and(|r| r.starts_with("reshape allowance"))

@@ -2379,4 +2379,51 @@ mod tests {
             assert_eq!(events_of(&root).len(), before, "{hook} wrote");
         }
     }
+
+    #[test]
+    fn a_stale_policy_refer_does_not_suppress_the_current_live_refer() {
+        // A Refer written under an OLD pin folds as non-live; once the reshape allowance is spent
+        // it must not stand in for the Refer under the current pin.
+        let dir = tempfile::tempdir().unwrap();
+        let st = settings(dir.path());
+        let mut c = ctx(dir.path());
+        let policy = learned_policy(&mut c, dir.path(), &st);
+        let cid = pinned_checkout(dir.path(), &policy);
+        let root = open_journal(dir.path(), &[]);
+        let first = live(&root, &st, "PreToolUse", SHAPE, &mut c).1;
+        assert_eq!(first["effect"], "deny", "{first}");
+        // A regulator Refer from before a policy change (stale CID), appended to the journal.
+        let seq = events_of(&root).len() as u64 + 1;
+        let mut stale = event(
+            seq,
+            30,
+            "consultation",
+            json!({"correlation": {"incidentId": "s1:2", "confidence": "high", "method": "none"},
+                   "consultation": {"rung": 0, "live": true, "level": "C1", "binding": "b",
+                                    "decision": "Refer", "pivot": null,
+                                    "reason": "reshape allowance already used for this incident; referring up the ladder"}}),
+        );
+        stale["agentId"] = json!("stasis-regulator");
+        stale["regulator"] = json!({"kind": "native-decide"});
+        stale["policyCid"] = json!("bafkreiOLDPOLICY");
+        let path = root.join("s1/events.jsonl");
+        let mut body = fs::read_to_string(&path).unwrap();
+        body.push_str(&format!("{stale}\n"));
+        fs::write(&path, body).unwrap();
+        let refers = |r: &Path, only_current: bool| {
+            events_of(r)
+                .iter()
+                .filter(|e| e["consultation"]["decision"] == "Refer")
+                .filter(|e| !only_current || e["policyCid"] == json!(cid))
+                .count()
+        };
+        assert_eq!(refers(&root, true), 0);
+        let second = live(&root, &st, "PreToolUse", SHAPE, &mut c).1;
+        assert_eq!(second["refer"], true, "{second}");
+        // The current-pin Refer was journaled despite the stale one.
+        assert_eq!(refers(&root, true), 1);
+        // And it is journaled once.
+        let _ = live(&root, &st, "PreToolUse", SHAPE, &mut c);
+        assert_eq!(refers(&root, true), 1);
+    }
 }
