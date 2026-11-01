@@ -46,6 +46,39 @@ Everything below is NOT ported. Each part changes bytes on an existing serving r
 works together with a part that does. A switch cannot make any of them dormant without keeping
 the old path alive beside the new one.
 
+## Stage 2 (2026-11-01, branch `port/chrome-element`, queued behind `land/chrome-2`)
+
+Steps 1 and 2 are ported, still dormant by default:
+
+- **The element, as a second asset.** `src/omni-element.js` and `ELEMENT_JS` are unchanged,
+  so `element_js_hash`, the stable alias and every page served today keep their bytes. The
+  snapshot's element is `src/omni-element-v1.js`. `build.rs` splices the generated vocabulary
+  into it, producing `ELEMENT_V1_JS` with `element_v1_js_hash` / `element_v1_script_path`
+  (same `/chrome/omni-element.<hash>.js` family, its own hash, no stable alias).
+  `render_content_shell` now loads v1 through `inject_element_v1`, which uses the strict
+  island escape. The snapshot's JS-asserting tests run against v1 in `mod v1_element_tests`,
+  and `tests/frame-attributes.test.mjs` (40 node tests) runs from `cargo test`. The pre-v1
+  tests, including `chrome_context_speaks_the_producer_contract`, still pin `ELEMENT_JS`.
+- **The escape.** The pre-v1 `escape_json_for_script` (`<\!--`) is kept byte for byte,
+  because every pre-v1 island is built with it. Its `<!--` corruption ends when a producer
+  moves to v1 (`inject_element_v1` and the strict escape). `hostile_title_round_trips_through_the_island`
+  pins the v1 path.
+- **elohim-render.** `src/chrome/omnibar.rs` is deleted. Nothing called
+  `render_omnibar_markup`, `render_omnibar_style`, `ChromeInput` or its `html_escape`.
+- **Storage's /apps shell.** `src/apps_chrome.rs` is restored. `handle_apps_get`,
+  `resolve_app_record`, `render_app_shell`, the `/_elohim/shell/apps/` arm, the
+  `content_checks` hash (recorded, not enforced) and `manifest_with_peer_identity` all sit
+  behind `HttpServer::content_chrome`. So does storage serving the v1 element
+  (`chrome_asset_response`). With the switch off, `serve_apps_get` is exactly
+  `handle_app_request` for every Fetch-Metadata kind, the shell path is not routed, the v1
+  address is a 404, nothing is hashed, and `/manifest` is exactly `build_manifest()`. Each is
+  a unit test.
+
+Still open from steps 1–2: the doorway does not serve the v1 address yet (that is step 3; the
+doorway's `/chrome/` route matches only `element_script_path()`). The comment in
+`elohim/sdk/schemas/scripts/codegen-ts.mjs` that names `omni-element.js` as the splice target
+should say `omni-element-v1.js`. The elohim-hub README debt row (step 7) still applies.
+
 ## Exact plan, in landing order
 
 ### 1. The element (elohim-chrome-asset)
