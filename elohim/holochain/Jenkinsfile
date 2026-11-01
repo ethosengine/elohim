@@ -789,7 +789,7 @@ def observeEnabledComputeWorker() {
     sh "rm -rf '${env.WORKSPACE}/compute-worker-evidence' '${env.WORKSPACE}/rollout-evidence'"
     def worker = readJSON(file: 'genesis/orchestrator/data/adam-compute-worker.json')
     if (worker.enabled != true) { return }
-    def adam = resolveHumanAssignments('distributed', '').find { it.name == 'adam' }
+    def adam = resolveHumanAssignments('distributed', '', ['adam']).find { it.name == 'adam' }
     if (adam == null) { error('Enabled compute worker has no active Adam assignment') }
     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE', message: 'Existing compute worker activation unproven — see compute-worker-evidence') {
         withEnv(['COMPUTE_WORKER_STARTUP_SECS=5']) {
@@ -893,13 +893,15 @@ def getHumanRegistry() {
  * Resolve deployment strategy to concrete human-environment assignments.
  * Returns list of maps with both identity and topology fields.
  */
-def resolveHumanAssignments(String strategy, String customAssignments) {
+def resolveHumanAssignments(String strategy, String customAssignments, List only = null) {
     // Filter suspended humans from the registry. cleanupOrphanedHumans (later in
     // this file) will scale their StatefulSets to 0 because they no longer
     // appear in allHumans. See genesis/orchestrator/data/deployments.json
     // $suspendedComment for the per-human reason. To re-enable a human,
     // remove "suspended": true from their deployments.json record.
-    def registry = getHumanRegistry().findAll { !it.suspended }
+    // `only` resolves just the named humans: a caller that needs one assignment (the compute
+    // worker's adam) must not fail on another human the strategy table has no row for.
+    def registry = getHumanRegistry().findAll { !it.suspended && (only == null || only.contains(it.name)) }
     def assignments = [:]
 
     switch (strategy) {
