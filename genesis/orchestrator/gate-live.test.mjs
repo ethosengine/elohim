@@ -72,6 +72,7 @@ test('exports only the public run-log functions', () => {
     'harvest',
     'liveRoot',
     'openRun',
+    'outlook',
     'readRun',
     'requestStop',
     'resolveSession',

@@ -392,6 +392,8 @@ leg_red() {
   PREGATE_FAILED="$PREGATE_FAILED $leg"
   if [ -n "$GATE_LIVE_RUN" ]; then
     node genesis/orchestrator/gate-live.mjs red --run "$GATE_LIVE_RUN" --project "$leg" --message "$*" >/dev/null 2>&1 || true
+    # Once per run: what letting the push continue will cost, and how to stop it.
+    node genesis/orchestrator/gate-live.mjs outlook --run "$GATE_LIVE_RUN" --remaining "${PROJECTS-}" >/dev/null 2>&1 || true
   fi
   if [ "$GATE_ON_RED_MODE" = stop ]; then
     echo "[pre-push] GATE_ON_RED=stop — the push stops at its first red." >&2
@@ -1206,6 +1208,8 @@ INDEX=0
 
 NOT_RUN=""
 STOP_REASON=""
+# shellcheck disable=SC2206 # PROJECTS is a word list of manifest keys
+PROJECT_LIST=($PROJECTS)
 for PROJECT in $PROJECTS; do
   INDEX=$((INDEX + 1))
   if [ -z "$STOP_REASON" ] && gate_stop_requested; then
@@ -1230,6 +1234,10 @@ for PROJECT in $PROJECTS; do
   if [ $GATE_EXIT -ne 0 ]; then
     echo "$PROJECT: FAILED (${PROJECT_ELAPSED}s)"
     FAILED="$FAILED $PROJECT"
+    if [ -n "$GATE_LIVE_RUN" ]; then
+      node genesis/orchestrator/gate-live.mjs outlook --run "$GATE_LIVE_RUN" \
+        --remaining "${PROJECT_LIST[*]:$INDEX}" >/dev/null 2>&1 || true
+    fi
   else
     echo "$PROJECT: PASSED (${PROJECT_ELAPSED}s)"
   fi

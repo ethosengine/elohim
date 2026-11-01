@@ -12,7 +12,7 @@ import {
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
-import { closeRun, formatHarvest, harvest, openRun, appendEvent } from './gate-live.mjs';
+import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
 
 function scratch(t) {
   const dir = mkdtempSync(join(tmpdir(), 'gate-preflight-'));
@@ -189,4 +189,21 @@ test('harvest names recurring reds, late cheap reds and time spent after the fir
   const lines = formatHarvest(result);
   assert.match(lines[0], /QoL slice/);
   assert.ok(lines.some(line => line.includes('preflight/element-dists red in 2 of the last 2 runs')), lines.join('\n'));
+});
+
+test('the first red carries what continuing costs and the stop command, once per run; a red shows its cure', async (t) => {
+  const root = scratch(t);
+  assert.equal(spawnSync('git', ['-C', root, 'init', '--quiet']).status, 0);
+  const { path } = openRun({ root, sha: 'a'.repeat(40), target: 'refs/heads/dev' });
+  const rows = [{ project: 'eprfs', kind: 'pre-push', exit: 'ok', value: 3000 }];
+  const first = await outlook(path, ['eprfs', 'brand-new'], { root, rows });
+  assert.equal(first.kind, 'outlook');
+  assert.equal(first.total_s, 3120, 'an unknown gate counts as two minutes');
+  const line = formatEvent(first);
+  assert.match(line, /2 gate\(s\) still to run, ~52 min \(eprfs ~50m, brand-new ~\?\)/);
+  assert.ok(line.includes(`gate-live.mjs stop --run ${path}`), line);
+  assert.equal(await outlook(path, ['eprfs'], { root, rows }), undefined, 'one decision per run');
+  assert.match(formatEvent({ kind: 'outlook', remaining: [] }), /no gate left to run/);
+  const red = formatEvent({ kind: 'failure', project: 'preflight', failure: { class: 'element-dists', excerpt: ['unbuilt: elohim-core', 'cure: pnpm --filter elohim-core run build'] } });
+  assert.match(red, /RED preflight element-dists — unbuilt: elohim-core · cure: pnpm --filter elohim-core run build/);
 });

@@ -352,7 +352,17 @@ export function formatEvent(raw) {
       const prefix = ['[gate-live] RED', event.project, failureClass, file, test, by]
         .filter((part) => part !== undefined && part !== null && part !== '')
         .join(' ');
-      return `${prefix} — ${(lines[0] ?? '').slice(0, 160)}`;
+      const cure = lines.find((line) => /^cure: /.test(line.trim()));
+      return `${prefix} — ${(lines[0] ?? '').slice(0, 160)}${cure ? ` · ${cure.trim().slice(0, 160)}` : ''}`;
+    }
+    case 'outlook': {
+      const remaining = Array.isArray(event.remaining) ? event.remaining : [];
+      const stop = event.stop ? ` — to stop and fix now: ${event.stop}` : '';
+      if (!remaining.length) return `[gate-live] no gate left to run after this red; the verdict is close`;
+      const parts = remaining.slice(0, 4)
+        .map((gate) => `${gate.project} ${gate.p90_s == null ? '~?' : `~${Math.max(1, Math.round(gate.p90_s / 60))}m`}`);
+      const more = remaining.length > 4 ? ` +${remaining.length - 4}` : '';
+      return `[gate-live] the push keeps reporting: ${remaining.length} gate(s) still to run, ~${Math.max(1, Math.round((event.total_s ?? 0) / 60))} min (${parts.join(', ')}${more})${stop}`;
     }
     case 'detail': {
       const detail = lines.find((line) => line.includes('panicked at'))
@@ -451,7 +461,7 @@ export async function follow({
 // What an agent hears without asking: every red, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'detail', 'step-failed', 'stop-request', 'run-close'].includes(event.kind);
+    return ['failure', 'detail', 'step-failed', 'outlook', 'stop-request', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict
@@ -515,6 +525,37 @@ export function stopRequested(path) {
     return parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-request');
   } catch {
     return false;
+  }
+}
+
+/**
+ * After a run's first red, what continuing costs: the gates still to run with their recorded p90,
+ * and the exact stop command. Once per run, so the agent gets one decision, not a stream of them.
+ * The push itself continues (operator ruling 2026-11-01): the agent weighs signal against cost.
+ */
+export async function outlook(path, remaining, { root = process.cwd(), rows } = {}) {
+  try {
+    if (parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'outlook')) return undefined;
+    // Loaded on demand: the live channel's other verbs never depend on the cost ledger's reader.
+    const { costOf, readCycleUnion } = await import('./gate-cost.mjs');
+    let ledger = rows;
+    if (ledger === undefined) {
+      try {
+        const union = readCycleUnion(root);
+        ledger = union.readableLedgers ? union.rows : [];
+      } catch { ledger = []; }
+    }
+    const gates = remaining.map((project) => ({
+      project, p90_s: costOf(ledger, { project: { name: project }, subjectFallback: null }).p90,
+    }));
+    return appendEvent(path, {
+      kind: 'outlook',
+      remaining: gates,
+      total_s: gates.reduce((sum, gate) => sum + (gate.p90_s ?? 120), 0),
+      stop: `node genesis/orchestrator/gate-live.mjs stop --run ${path}`,
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -613,6 +654,7 @@ const USAGE = `Usage:
   node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
   node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R]
   node gate-live.mjs stopped --run PATH                         (exit 0 when a stop was requested)
+  node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
 `;
 
@@ -629,6 +671,7 @@ function parseArguments(argv) {
     stop: ['run', 'session', 'latest', 'reason'],
     stopped: ['run'],
     harvest: ['last'],
+    outlook: ['run', 'remaining'],
   };
   if (!Object.hasOwn(allowed, verb)) throw new Error('unknown verb');
 
@@ -659,6 +702,7 @@ function parseArguments(argv) {
     stop: [],
     stopped: ['run'],
     harvest: [],
+    outlook: ['run'],
   };
   if (required[verb].some((name) => !Object.hasOwn(options, name))) {
     throw new Error('missing required option');
@@ -787,6 +831,11 @@ async function main(argv) {
         process.stdout.write(`stop requested: ${path}\n`);
         return 0;
       }
+      case 'outlook':
+        if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
+          throw new Error(`could not append an outlook to ${options.run}`);
+        }
+        return 0;
       case 'stopped':
         return stopRequested(resolve(root, options.run)) ? 0 : 1;
       case 'harvest':
@@ -805,7 +854,7 @@ async function main(argv) {
   } catch (error) {
     const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ');
     process.stderr.write(`[gate-live] ${message}\n`);
-    if (['open', 'event', 'close', 'unseen', 'red', 'harvest'].includes(verb)) return 0;
+    if (['open', 'event', 'close', 'unseen', 'red', 'harvest', 'outlook'].includes(verb)) return 0;
     return verb === 'follow' ? 3 : 1;
   }
 }

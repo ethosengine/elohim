@@ -20,7 +20,7 @@ import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { readSet } from './gate-input-audit.mjs';
-import { appendEvent, closeRun, formatHarvest, harvest, openRun, resolveSession, stopRequested } from './gate-live.mjs';
+import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
 import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
 
@@ -678,11 +678,16 @@ if (isMain) {
     }
   }
   const notRun = [];
-  for (const project of orderByCost(projects)) {
+  const ordered = orderByCost(projects);
+  if (failed && process.env.GATE_LIVE_RUN) await outlook(process.env.GATE_LIVE_RUN, ordered.map(p => p.name), { root: ROOT });
+  for (const [index, project] of ordered.entries()) {
     if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) stopping = 'stop requested on the live run';
     if (stopping) { notRun.push(project.name); continue; }
     const status = runProject(project, false, false, {});
     failed |= status;
+    if (status !== 0 && process.env.GATE_LIVE_RUN) {
+      await outlook(process.env.GATE_LIVE_RUN, ordered.slice(index + 1).map(p => p.name), { root: ROOT });
+    }
     if (status !== 0 && policy.mode === 'stop') stopping = `${project.name} red under GATE_ON_RED=stop (${policy.from})`;
   }
   // A gate that did not run is not a pass: a stopped run never exits 0.
