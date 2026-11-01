@@ -5,7 +5,7 @@
 //! `elohim-chrome-asset` crate (deps: `sha2`, `serde`, `serde_json` — no V8)
 //! — so serving the static element does NOT require compiling V8.
 //! `elohim-render` hard-depends on `deno_core` (the SSR-splice renderers in
-//! `omnibar.rs` / `theme.rs`), so the served-asset accessors were lifted out to
+//! `theme.rs`), so the served-asset accessors were lifted out to
 //! keep the doorway's and the storage sidecar's `/chrome/` route off the V8
 //! path. See `elohim-chrome-asset` for the implementation and rationale.
 //!
