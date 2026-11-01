@@ -692,6 +692,7 @@ fn a_stale_cleanup_bound_to_an_older_generation_cannot_release_a_reclaim() {
 
 #[test]
 fn berth_release_rejects_a_stale_generation_before_deleting_or_recording() {
+    // gate-reads: genesis/agentic/bin/berth
     let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let berth = repo.join("genesis/agentic/bin/berth");
     let script = r#"
@@ -762,6 +763,7 @@ with tempfile.TemporaryDirectory() as directory:
 
 #[test]
 fn forced_release_preserves_the_callers_newer_generation_in_producer_and_replay() {
+    // gate-reads: genesis/agentic/bin/berth
     let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let berth = repo.join("genesis/agentic/bin/berth");
     let script = r#"

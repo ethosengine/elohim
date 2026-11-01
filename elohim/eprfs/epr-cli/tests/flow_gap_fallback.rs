@@ -202,6 +202,7 @@ const IGNORE_INVARIANTS: [(&str, bool); 3] = [
 
 #[test]
 fn the_relocated_store_is_tracked_and_every_other_sidecar_is_not() {
+    // gate-reads: .gitignore
     let Some(repo) = Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(3) else {
         eprintln!("SKIP: could not resolve the repository root from CARGO_MANIFEST_DIR");
         return;

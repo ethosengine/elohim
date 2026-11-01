@@ -983,6 +983,9 @@ mod tests {
 
     #[test]
     fn live_root_policy_resolves_as_a_pinned_nonblocking_advisory() {
+        // gate-reads: .epr-meta/manifest.md
+        // gate-reads: .claude/epr-meta/policies.yaml
+        // gate-reads: elohim/sdk/schemas/v1/registries/governance-validators.json
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../..")
             .canonicalize()
@@ -1029,6 +1032,7 @@ mod tests {
     }
 
     fn guard_outcome(reference: &str, prior: Option<&str>, content: &str) -> ValidatorOutcome {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let root = live_root();
         let rule = dummy_rule();
         let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");
@@ -1136,6 +1140,7 @@ mod tests {
 
     #[test]
     fn ownership_reference_resolves_in_the_native_provider() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let root = live_root();
         let rule = dummy_rule();
         let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");

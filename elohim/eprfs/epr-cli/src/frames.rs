@@ -728,6 +728,7 @@ mod tests {
     }
 
     fn frame(validator: &str) -> (LoadedFrame, FrameOntology) {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let (loaded, (ontology, _)) =
             frame_for(&repo_root(), validator).expect("the live atoms load");
         (loaded, ontology)
@@ -777,6 +778,8 @@ mod tests {
 
     #[test]
     fn every_atom_in_dir_parses_strict() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
+        // gate-reads: elohim/sdk/schemas/v1/frames/frame-ontology.json
         let frames = load_frames(&repo_root()).expect("every atom parses strictly");
         assert_eq!(
             frames.keys().cloned().collect::<Vec<_>>(),
@@ -804,6 +807,7 @@ mod tests {
 
     #[test]
     fn atom_cid_matches_registry_row_recipe() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let root = repo_root();
         let frames = load_frames(&root).unwrap();
         for (validator, file, pin) in [
@@ -898,6 +902,8 @@ mod tests {
 
     #[test]
     fn marker_legitimate_is_silent() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let content = "sovereignty-frame: adversary\nNation-states promise digital sovereignty.";
         let classification = classify_as(SOVEREIGNTY, None, content).unwrap();
         assert_eq!(classification.verdict, FrameVerdict::Legitimate);
@@ -921,6 +927,7 @@ mod tests {
 
     #[test]
     fn marker_apex_is_drift_confidence_1() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let content = "sovereignty-frame: apex\nWe are self-sovereign.";
         let classification = classify_as(SOVEREIGNTY, None, content).unwrap();
         assert_eq!(classification.verdict, FrameVerdict::Drift);
@@ -1084,6 +1091,7 @@ mod tests {
     /// other `minLength` / `minimum` constraints refuse the same way.
     #[test]
     fn m1_uppercase_phrase_is_refused() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let dir = fixture_with_sovereignty_atom(|raw| {
             raw["recall_signal"]["phrases"][0] = json!("Self-Sovereign");
         });
@@ -1124,6 +1132,7 @@ mod tests {
     /// is, so the carried evidence names it by content address, beside `classificationCid`.
     #[test]
     fn w2_evidence_carries_ontology_ref() {
+        // gate-reads: elohim/sdk/schemas/v1/frames
         let root = repo_root();
         let raw = read_json(&root.join(FRAMES_DIR).join(ONTOLOGY_FILE)).unwrap();
         let recipe = atom_cid(&raw).unwrap();

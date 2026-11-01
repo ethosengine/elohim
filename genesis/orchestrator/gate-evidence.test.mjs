@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { dirname } from 'node:path';
 import { nativeGateState } from './gate-source-state.mjs';
 import { COST_FIELDS } from './gate-cycle.mjs';
 import {
@@ -512,6 +513,103 @@ test('tree scope changes the key when any repository file changes', t => {
   assert.equal(first.result.line, 'miss; closure scope tree (unresolved reads)');
   assert.notEqual(inspect({ commit: 'changed-file', tree: 'tree2' }).result.key, first.result.key);
   assert.equal(inspect({ commit: 'same-bytes', tree: 'tree1' }).result.key, first.result.key);
+});
+
+test('equal trees under different commits share a closure key', async function equal_trees_share_a_closure_key(t) {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-eq-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of [
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_PREFIX',
+    'GIT_COMMON_DIR',
+    'GATE_COMMIT',
+  ]) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author',
+    GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer',
+    GIT_COMMITTER_EMAIL: 'committer@example.test',
+    GIT_AUTHOR_DATE: '2026-10-31T12:00:00Z',
+    GIT_COMMITTER_DATE: '2026-10-31T12:00:00Z',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  assert.equal(git('init').status, 0);
+  mkdirSync(join(root, 'fixture', 'src'), { recursive: true });
+  mkdirSync(join(root, 'genesis', 'orchestrator'), { recursive: true });
+  writeFileSync(join(root, 'fixture', 'build-manifest.json'), JSON.stringify({
+    steps: { s: { inputs: { sources: ['fixture/src/**'] } } },
+  }));
+  writeFileSync(join(root, 'fixture', 'justfile'), 'gate:\n  true\n');
+  writeFileSync(join(root, 'genesis', 'orchestrator', 'run-local-gate.sh'), '#!/bin/sh\n');
+  writeFileSync(join(root, 'fixture', 'Cargo.toml'), '[package]\nname="fixture"\nversion="0.1.0"\n');
+  writeFileSync(join(root, 'fixture', 'src', 'lib.rs'),
+    'const X: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../data.json"));\n');
+  writeFileSync(join(root, 'data.json'), '{"v":1}\n');
+  git('add', '.');
+  assert.equal(git('commit', '-m', 'R').status, 0);
+  writeFileSync(join(root, 'fixture', 'note'), 'A\n');
+  git('add', '.');
+  assert.equal(git('commit', '-m', 'A').status, 0);
+  const a = git('rev-parse', 'HEAD').stdout.trim();
+  const aTree = git('rev-parse', 'HEAD^{tree}').stdout.trim();
+  const b = git('commit-tree', aTree, '-p', a, '-m', 'other').stdout.trim();
+  writeFileSync(join(root, 'data.json'), '{"v":2}\n');
+  git('add', '.');
+  assert.equal(git('commit', '-m', 'C').status, 0);
+  const c = git('rev-parse', 'HEAD').stdout.trim();
+
+  const brit = join(root, 'brit');
+  const buildRef = join(root, 'brit-build-ref');
+  writeFileSync(brit,
+    `#!/bin/sh\nprintf '{"fingerprints":[{"step":"%s","fingerprint":"%s"}]}' "$5" "$(git -C '${root}' rev-parse "$7^{tree}")"\n`);
+  writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
+  chmodSync(brit, 0o755);
+  chmodSync(buildRef, 0o755);
+  const env = {
+    ...cleanEnv,
+    BRIT_BIN: brit,
+    BRIT_BUILD_REF_BIN: buildRef,
+    PATH: cleanEnv.PATH || '',
+  };
+  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, {
+    ...opts,
+    env: { ...cleanEnv, ...(opts?.env || {}) },
+  });
+  const projects = [
+    {
+      name: 'fixture-tree',
+      dir: 'fixture',
+      manifestPath: 'fixture/build-manifest.json',
+      steps: ['s'],
+      run: { kind: 'just', recipe: 'gate' },
+    },
+    {
+      name: 'fixture-paths',
+      dir: 'fixture',
+      manifestPath: 'fixture/build-manifest.json',
+      steps: ['s'],
+      run: { kind: 'just', recipe: 'gate', cargo: { workspace: 'fixture' } },
+    },
+  ];
+  for (const gateProject of projects) {
+    const at = commit => gateEvidence(gateProject, { root, commit, env, spawn: isoSpawn });
+    const resultA = at(a);
+    const resultB = at(b);
+    const resultC = at(c);
+    assert.equal(resultA.key, resultB.key);
+    assert.equal(resultA.material, resultB.material);
+    assert.ok(!resultA.material.includes(a));
+    assert.ok(!resultA.material.includes(b));
+    if (gateProject.run.cargo) assert.match(resultA.line, /closure scope paths \(1 reads\)/);
+    assert.notEqual(resultC.key, resultA.key);
+  }
 });
 
 test('non-Rust projects and Cargo steps without covered Rust files get unknown tree scope', t => {

@@ -236,6 +236,7 @@ fn corpus() -> TempDir {
 }
 
 fn repo_root() -> Option<std::path::PathBuf> {
+    // gate-reads: .claude/scripts/memory-kit/placement-audit.py
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(3)

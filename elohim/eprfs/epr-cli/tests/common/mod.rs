@@ -38,6 +38,7 @@ pub fn repo_root() -> PathBuf {
 /// A hand-written fixture contract would let the real one drift (a budget renamed, a stage added)
 /// while these tests stayed green about an algorithm nobody runs.
 pub fn live_contract() -> Value {
+    // gate-reads: .epr-meta/elohim/algorithms/recall-contract.json
     let raw = std::fs::read(repo_root().join(recall::CONTRACT_REL)).expect("live contract");
     serde_json::from_slice(&raw).expect("contract parses")
 }

@@ -216,3 +216,146 @@ decisionPoints:
   - path: genesis/orchestrator/gate-evidence.test.mjs
     testName: reuse_selector_requires_the_oracle
     kind: unit
+- name: changeClass
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-change-class.mjs, modulePath: changeClass }
+  summary: Classify a candidate from its integration-base diff without allowing candidate gate bytes to judge themselves.
+  concernIds:
+  - { id: C0, status: n-a, justification: Local git reads only. }
+  - { id: C1, status: answered, justification: Governance paths re-execute the merge-base judge and rename pairs are both visible. }
+  - { id: C2, status: n-a, justification: No event ordering. }
+  - { id: C3, status: answered, justification: An absent merge base fails closed with a fetch cure. }
+  - { id: C4, status: answered, justification: Unreadable input is governance. }
+  - { id: C5, status: answered, justification: Every reader re-derives class from the diff. }
+  - { id: C6a, status: answered, justification: The git read set is bounded. }
+  - { id: C6b, status: answered, justification: Equal inputs return equal classifications. }
+  - { id: C7, status: n-a, justification: No discovery surface. }
+  - { id: C8, status: answered, justification: Why names the first path at the top class. }
+  - { id: C9, status: n-a, justification: No identity lineage. }
+  - { id: C10, status: answered, justification: Pool policy parse failure is governance. }
+  - { id: C11, status: n-a, justification: No work queue. }
+  - { id: C12, status: n-a, justification: No capability grant. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: n-a, justification: Classification does not diagnose a failed gate. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-change-class.test.mjs, testName: classifier_change_is_governance, kind: unit }
+  - { path: genesis/orchestrator/gate-change-class.test.mjs, testName: governance_covers_the_runner_import_closure, kind: unit }
+- name: CHANGE_CLASSES
+  kind: reason-outcome-enum
+  sourceLocation: { file: gate-change-class.mjs, modulePath: CHANGE_CLASSES }
+  summary: Frozen strictness order and effects for landing changes.
+  concernIds:
+  - { id: C0, status: n-a, justification: No network cost. }
+  - { id: C1, status: answered, justification: Governance and higher classes break inheritance. }
+  - { id: C2, status: n-a, justification: No ordering of events. }
+  - { id: C3, status: n-a, justification: Pure enum. }
+  - { id: C4, status: n-a, justification: Pure enum. }
+  - { id: C5, status: answered, justification: Consumers use the frozen order. }
+  - { id: C6a, status: n-a, justification: Constant-size enum. }
+  - { id: C6b, status: answered, justification: Frozen values are stable. }
+  - { id: C7, status: n-a, justification: No discovery. }
+  - { id: C8, status: answered, justification: CLASS_EFFECTS names every outcome. }
+  - { id: C9, status: n-a, justification: No identity. }
+  - { id: C10, status: answered, justification: Unknown values fail closed at the picker. }
+  - { id: C11, status: n-a, justification: No queue. }
+  - { id: C12, status: n-a, justification: No authority grant. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: n-a, justification: No diagnostic capsule. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-change-class.test.mjs, testName: flags_union_not_top_class, kind: unit }
+- name: pickLandingBase
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-landing-base.mjs, modulePath: pickLandingBase }
+  summary: Pick a locally reachable landing chain from validated intent rows and base pointers.
+  concernIds:
+  - { id: C0, status: answered, justification: Head cost is bounded by the cap. }
+  - { id: C1, status: answered, justification: The walk never chains behind governance or higher. }
+  - { id: C2, status: answered, justification: Base pointers and the windowed tiebreak define order. }
+  - { id: C3, status: answered, justification: Breaks retain a reachable base and reason. }
+  - { id: C4, status: answered, justification: Unreadable queue and absent bytes are explicit. }
+  - { id: C5, status: answered, justification: Local git re-derives reachability and refs. }
+  - { id: C6a, status: answered, justification: Chains cap at four. }
+  - { id: C6b, status: answered, justification: Duplicate intent CIDs fold once. }
+  - { id: C7, status: n-a, justification: No discovery promise. }
+  - { id: C8, status: answered, justification: Every break is printed. }
+  - { id: C9, status: n-a, justification: Device identity is authority input not lineage. }
+  - { id: C10, status: answered, justification: Malformed sibling rows are excluded. }
+  - { id: C11, status: answered, justification: Cap bounds queue work. }
+  - { id: C12, status: answered, justification: Advisory entries cannot act for the announcer. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: partial, justification: Dismiss capsule construction is delegated to dismissTargets. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-landing-base.test.mjs, testName: chain_follows_base_pointers, kind: unit }
+  - { path: genesis/orchestrator/gate-landing-base.test.mjs, testName: fork_tiebreak_is_order_free, kind: unit }
+  - { path: genesis/orchestrator/gate-landing-base.test.mjs, testName: never_chains_behind_governance, kind: unit }
+- name: phaseLVerdict
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-landing-base.mjs, modulePath: phaseLVerdict }
+  summary: Separate commit movement from equal-tree evidence reuse at landing.
+  concernIds:
+  - { id: C0, status: n-a, justification: Constant-time local comparison. }
+  - { id: C1, status: n-a, justification: Does not judge gate bytes. }
+  - { id: C2, status: n-a, justification: No event order. }
+  - { id: C3, status: answered, justification: Every comparison has a verdict. }
+  - { id: C4, status: n-a, justification: OIDs are caller-validated. }
+  - { id: C5, status: answered, justification: Caller supplies locally read git OIDs. }
+  - { id: C6a, status: answered, justification: Constant work. }
+  - { id: C6b, status: answered, justification: Pure comparison. }
+  - { id: C7, status: n-a, justification: No discovery. }
+  - { id: C8, status: answered, justification: Verdict names ff same-tree or moved. }
+  - { id: C9, status: n-a, justification: No identity. }
+  - { id: C10, status: n-a, justification: No stored format. }
+  - { id: C11, status: n-a, justification: No queue. }
+  - { id: C12, status: n-a, justification: No authority. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: n-a, justification: No failure diagnosis. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-landing-base.test.mjs, testName: phase_l_compares_commit_then_tree, kind: unit }
+  - { path: genesis/orchestrator/gate-evidence.test.mjs, testName: equal_trees_share_a_closure_key, kind: unit }
+- name: dismissTargets
+  kind: verdict-fn
+  sourceLocation: { file: gate-landing-base.mjs, modulePath: dismissTargets }
+  summary: Dismiss the complete predicted chain with a shell-safe diagnostic capsule.
+  concernIds:
+  - { id: C0, status: n-a, justification: Pure bounded formatting. }
+  - { id: C1, status: n-a, justification: Does not judge itself. }
+  - { id: C2, status: n-a, justification: No event order. }
+  - { id: C3, status: answered, justification: Non-diagnostic inputs return no targets. }
+  - { id: C4, status: n-a, justification: Inputs are explicit. }
+  - { id: C5, status: answered, justification: Caller supplies measured red and green outcomes. }
+  - { id: C6a, status: answered, justification: Work is linear in the capped chain. }
+  - { id: C6b, status: answered, justification: Pure output. }
+  - { id: C7, status: n-a, justification: No discovery. }
+  - { id: C8, status: answered, justification: Capsule names the evidence. }
+  - { id: C9, status: n-a, justification: No identity lineage. }
+  - { id: C10, status: answered, justification: Capsule keys and string encoding are fixed. }
+  - { id: C11, status: n-a, justification: No queue. }
+  - { id: C12, status: answered, justification: Caller applies raiser-device authority. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: answered, justification: Whole chain and six evidence fields are retained. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-landing-base.test.mjs, testName: dismiss_targets_whole_chain, kind: unit }
+- name: changeIdFor
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-change-id.mjs, modulePath: changeIdFor }
+  summary: Mint stable change lineage from the final stripped commit message and git identity material.
+  concernIds:
+  - { id: C0, status: n-a, justification: Local hash only. }
+  - { id: C1, status: answered, justification: Minting is confined to the commit-message path. }
+  - { id: C2, status: n-a, justification: No event order. }
+  - { id: C3, status: answered, justification: Git failures skip without refusing the commit. }
+  - { id: C4, status: answered, justification: Malformed trailers are reported and untouched. }
+  - { id: C5, status: answered, justification: Tree and identities are read from git at commit time. }
+  - { id: C6a, status: answered, justification: Fixed git calls and one hash. }
+  - { id: C6b, status: answered, justification: Existing trailers are never reminted. }
+  - { id: C7, status: n-a, justification: No discovery. }
+  - { id: C8, status: answered, justification: Every skip has a reason. }
+  - { id: C9, status: answered, justification: Change-Id survives commit OID rekeys. }
+  - { id: C10, status: answered, justification: Trailer grammar is centralized. }
+  - { id: C11, status: n-a, justification: No queue. }
+  - { id: C12, status: n-a, justification: No authority grant. }
+  - { id: C13, status: n-a, justification: No social tier. }
+  - { id: C14, status: n-a, justification: No gate failure diagnosis. }
+  contractTests:
+  - { path: genesis/orchestrator/gate-change-id.test.mjs, testName: stamp_mints_once_over_final_message, kind: unit }
+  - { path: genesis/orchestrator/gate-change-id.test.mjs, testName: amend_and_rebase_keep_one_trailer, kind: unit }
