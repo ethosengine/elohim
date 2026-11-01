@@ -57,6 +57,25 @@
     "stall": { "$ref": "#/$defs/bound" },
     "shiftCeiling": { "$ref": "#/$defs/bound" },
     "dwellS": { "type": "integer", "minimum": 0 },
+    "learnedForms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "tool", "shape", "effectClass", "legibleForm", "status"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "tool": { "type": "string", "minLength": 1 },
+          "shape": { "type": "string", "minLength": 1 },
+          "effectClass": { "type": "object" },
+          "legibleForm": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["proposed", "active"] },
+          "auditVerdict": { "enum": ["approved", "rejected"] },
+          "auditRef": { "type": "string" },
+          "rulingRef": { "type": "string" }
+        }
+      }
+    },
     "ruleSet": {
       "type": "object",
       "additionalProperties": false,

@@ -257,6 +257,18 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.assertNotIn('SECRET', json.dumps(self.events()) + json.dumps(self.state()))
         self.assertTrue(all('concernClass' not in e and 'effectClass' not in e for e in self.events()))
 
+    def test_stop_outcome_uses_evidence_and_ladder_off_keeps_legacy_event(self):
+        self.invoke('Stop', last_assistant_message='Everything is accomplished.')
+        event = self.events('turn-ended')[-1]
+        self.assertEqual(event['outcome'], 'stalled')
+        self.assertEqual(event['correlation']['confidence'], 'low')
+        self.assertIn('payload cwd', event['stallReason'])
+        self.invoke('Stop', last_assistant_message='Which option?')
+        self.assertEqual(self.events('turn-ended')[-1]['outcome'], 'question')
+        self.invoke('Stop', last_assistant_message='Done.', env={'STASIS_LADDER': 'off'})
+        self.assertNotIn('outcome', self.events('turn-ended')[-1])
+        self.assertNotIn('stallReason', self.events('turn-ended')[-1])
+
     def test_sequence_discontinuity_is_explicit(self):
         self.invoke('Stop')
         state = self.state()
@@ -348,8 +360,10 @@ class DialogueStasisSenseTest(unittest.TestCase):
         for _ in range(5):
             self.invoke('Stop', env={'STASIS_SEGMENT_BYTES': '900'})
         self.assertGreater(len(list(self.directory.glob('events.*.jsonl'))), 1)
-        self.assertEqual([e['seq'] for e in self.events()], list(range(1, 6)))
-        self.assertEqual(self.state()['nextSeq'], 6)
+        self.assertEqual(len(self.events('turn-ended')), 5)
+        self.assertEqual(len(self.events('would-have')), 4)
+        self.assertEqual([e['seq'] for e in self.events()], list(range(1, 10)))
+        self.assertEqual(self.state()['nextSeq'], 10)
 
     def test_retention_emits_gap_before_unknown_reference_closes(self):
         self.pre()
@@ -366,7 +380,9 @@ class DialogueStasisSenseTest(unittest.TestCase):
     def test_concurrent_invocations_allocate_unique_sequences(self):
         with ThreadPoolExecutor(max_workers=6) as pool:
             list(pool.map(lambda _: self.invoke('Stop'), range(12)))
-        self.assertEqual([e['seq'] for e in self.events()], list(range(1, 13)))
+        self.assertEqual(len(self.events('turn-ended')), 12)
+        self.assertEqual(len(self.events('would-have')), 11)
+        self.assertEqual([e['seq'] for e in self.events()], list(range(1, 24)))
 
     def test_three_cancellations_coalesce_and_notice_once(self):
         self.invoke('PostToolUse')
@@ -551,10 +567,13 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.assertEqual(pkg['source']['body'].encode(), HOOK.read_bytes())
         self.assertIsNone(pkg['registration'])
         registrations = pkg['metadata']['intendedRegistrations']
-        self.assertEqual(len(registrations), 10)
+        self.assertEqual(len(registrations), 12)
         self.assertEqual([r['matcher'] for r in registrations if r['event'] == 'Notification'],
                          ['permission_prompt', 'idle_prompt'])
-        self.assertTrue(all(not r['async'] and not r['asyncRewake'] for r in registrations))
+        wake = [r for r in registrations if r['asyncRewake']]
+        self.assertEqual(len(wake), 1)
+        self.assertEqual(wake[0]['event'], 'Stop')
+        self.assertTrue(wake[0]['async'])
         if jsonschema:
             jsonschema.validate(pkg, json.loads((REPO / 'elohim/sdk/domains/elohim-agent/schemas/hook-package.schema.json').read_text()))
 

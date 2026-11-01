@@ -60,6 +60,15 @@ _SURFACES: tuple[tuple[str, tuple[str, ...], str], ...] = (
 _NOT_SURFACE = re.compile(r"(\.spec\.|\.test\.|\.stories\.|/__tests__/|/node_modules/|/dist/)")
 
 
+def checkout_root(doc: Path, fallback: Path) -> Path:
+    """The edited file's nearest checkout (.git directory or worktree file), else fallback."""
+    for parent in doc.resolve().parents:
+        git = parent / ".git"
+        if git.is_dir() or git.is_file():
+            return parent
+    return fallback.resolve()
+
+
 def surface_kind(rel: str) -> str | None:
     """The prose kind of a repo-relative path on a trust surface, or None."""
     rel = rel.replace("\\", "/")

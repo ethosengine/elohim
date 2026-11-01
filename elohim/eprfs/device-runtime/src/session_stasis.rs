@@ -12,6 +12,8 @@
 pub mod classify;
 pub mod event;
 pub mod journal;
+pub mod live;
+pub mod policy;
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -19,13 +21,13 @@ use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use elohim_epr::algedonic::{Hysteresis, LatchConfig, LatchSense};
 use elohim_epr::verdict::Decision;
 use elohim_epr_rea::Bound;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 
 use self::classify::{CallInput, Classifier, ConcernClass, EffectClass, StallClass};
 use self::event::{
     elapsed, CloseAttribution, Confidence, ConsultationEvent, Disposition, Event, EventKind, Level,
-    Moment, Phase, Pivot, Presence, Question,
+    Moment, Phase, Pivot, Presence, Question, StopOutcome,
 };
 use self::journal::{Replay, StasisError};
 
@@ -33,8 +35,8 @@ use self::journal::{Replay, StasisError};
 pub const POLICY_ABSENT: &str = "absent (defaults, shadow)";
 
 /// Starting budget bounds (policy `budgets`), not measured baselines.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Budgets {
     /// Keeper calls per incident.
     pub incident_keeper_calls: u32,
@@ -49,7 +51,7 @@ pub struct Budgets {
 }
 
 /// The built-in policy defaults (every value the Budgets section names).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StasisPolicy {
     /// Budget bounds.
     pub budgets: Budgets,
@@ -61,6 +63,8 @@ pub struct StasisPolicy {
     pub shift_ceiling: Bound,
     /// Latch dwell for dialogue keys, seconds.
     pub dwell_s: u64,
+    /// Learned legible forms the policy holds (L1 promotes them; none by default).
+    pub learned_forms: Vec<policy::LearnedForm>,
 }
 
 impl StasisPolicy {
@@ -81,6 +85,7 @@ impl StasisPolicy {
             shift_ceiling: Bound::new(1800.0, "seconds".into(), 100.0)
                 .expect("1800 s at 100% is a valid bound"),
             dwell_s: 300,
+            learned_forms: Vec::new(),
         }
     }
 
@@ -113,7 +118,8 @@ impl StasisPolicy {
 }
 
 /// An away ruling and when it lapses. The journal records only a ruling reference, so the caller
-/// supplies what it can resolve; a reference it cannot resolve stays in force (unverifiable).
+/// supplies what it can resolve; a reference it cannot resolve is NOT in force (unverifiable
+/// absence is never granted).
 #[derive(Debug, Clone)]
 pub struct AwayRuling {
     /// The ruling reference an event's presence basis names.
@@ -215,6 +221,8 @@ pub struct Consultation {
     pub expired: bool,
     /// Duplicate start records folded into this consultation.
     pub duplicate_starts: u32,
+    /// Recorded by a live regulator act; a shadow record never closes anything.
+    pub live: bool,
 }
 
 impl Consultation {
@@ -235,6 +243,7 @@ impl Consultation {
             tokens: None,
             expired: false,
             duplicate_starts: 0,
+            live: false,
         }
     }
 
@@ -322,6 +331,9 @@ pub struct Incident {
     pub budget_used: BudgetUsed,
     /// Per-incident bounds reached.
     pub budget_exhausted: Vec<String>,
+    /// What the adapter found unmet at a stalled stop, when it supplied one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stall_reason: Option<String>,
     #[serde(skip)]
     closed_moment: Option<Moment>,
     #[serde(skip)]
@@ -381,6 +393,9 @@ pub struct FoldOptions<'a> {
     pub classifier: &'a Classifier,
     /// Away rulings the caller can resolve.
     pub rulings: &'a [AwayRuling],
+    /// The CID of the policy pinned right now. A `live` consultation counts only when its event
+    /// names this exact CID (and a known regulator kind); `None` counts none.
+    pub pinned_cid: Option<&'a str>,
 }
 
 impl<'a> FoldOptions<'a> {
@@ -400,6 +415,7 @@ impl<'a> FoldOptions<'a> {
             policy,
             classifier,
             rulings: &[],
+            pinned_cid: None,
         }
     }
 
@@ -412,6 +428,12 @@ impl<'a> FoldOptions<'a> {
     /// Add the rulings the caller can resolve.
     pub fn with_rulings(mut self, rulings: &'a [AwayRuling]) -> Self {
         self.rulings = rulings;
+        self
+    }
+
+    /// Add the currently pinned policy CID live records are checked against.
+    pub fn with_pinned_cid(mut self, cid: &'a str) -> Self {
+        self.pinned_cid = Some(cid);
         self
     }
 
@@ -560,6 +582,8 @@ pub struct SessionFold {
     pub last_event: Option<DateTime<Utc>>,
     /// Whether `session-ended` was seen.
     pub ended: bool,
+    /// How this session's turns ended.
+    pub stops: StopCounts,
 }
 
 fn parse_seq(id: &str) -> Option<u64> {
@@ -577,6 +601,35 @@ struct Folder<'a> {
     exceptions: Vec<(DateTime<Utc>, String, u64, bool)>,
     would_keys: Vec<String>,
     classifier_denied: usize,
+    stops: StopCounts,
+}
+
+/// How the session's turns ended, by the adapter's `outcome`. Stopping is meant to be the
+/// exception, so the habit reads these. `unclassified` counts turn ends that carried no
+/// `outcome` (legacy question-only events): evidence that was not classified, not a zero.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StopCounts {
+    /// Goal accomplished with evidence.
+    pub accomplished: u64,
+    /// A true exception for the steward.
+    pub exception: u64,
+    /// Ended in a question.
+    pub question: u64,
+    /// Stopped unfinished with no ask.
+    pub stalled: u64,
+    /// Turn ends with no `outcome`.
+    pub unclassified: u64,
+}
+
+impl StopCounts {
+    fn add(&mut self, o: Self) {
+        self.accomplished += o.accomplished;
+        self.exception += o.exception;
+        self.question += o.question;
+        self.stalled += o.stalled;
+        self.unclassified += o.unclassified;
+    }
 }
 
 impl Folder<'_> {
@@ -660,6 +713,7 @@ impl Folder<'_> {
             end_unmeasured: false,
             budget_used: BudgetUsed::default(),
             budget_exhausted: vec![],
+            stall_reason: None,
             closed_moment: None,
             dialog_seen: false,
             reshape_offered: false,
@@ -711,6 +765,18 @@ impl Folder<'_> {
             return;
         };
         let Some(i) = self.lookup(&id, e) else { return };
+        // A record claims `live` only; it counts when a known regulator wrote it under the policy
+        // pinned NOW. Anything else folds as a shadow record. This binds provenance only as
+        // strongly as control over journal writes (the device trust boundary).
+        let live = c.live
+            && matches!(
+                (e.agent_id.as_str(), e.regulator.as_deref()),
+                ("stasis-regulator", Some("native-decide"))
+                    | ("stasis-coordinator", Some("coordinator"))
+            )
+            && e.policy_cid
+                .as_deref()
+                .is_some_and(|p| !p.is_empty() && self.o.pinned_cid == Some(p));
         let Some(rung) = c.rung.or(c.level.map(Level::rung)) else {
             self.gap("consultation-without-rung", e, Some(&id));
             return;
@@ -722,7 +788,12 @@ impl Folder<'_> {
                 .iter()
                 .position(|x| x.claim_seq == Some(cs))
         });
-        let found = by_claim.or_else(|| inc.consultations.iter().position(|x| x.rung == rung));
+        // Rung 0 is the regulator's own act: each record stands alone.
+        let found = by_claim.or_else(|| {
+            (rung > 0)
+                .then(|| inc.consultations.iter().position(|x| x.rung == rung))
+                .flatten()
+        });
         let pos = found.unwrap_or_else(|| {
             inc.consultations.push(Consultation::new(rung));
             inc.consultations.len() - 1
@@ -755,6 +826,7 @@ impl Folder<'_> {
                 slot.decision = c.decision.clone();
                 slot.pivot = c.pivot;
                 slot.reason = c.reason.clone();
+                slot.live = live;
                 slot.reported_elapsed_s = c.usage_elapsed_s;
                 slot.tokens = c.tokens;
                 slot.level = c.level.or(slot.level);
@@ -765,6 +837,15 @@ impl Folder<'_> {
                 // offer. A Refer moves the folded ladder to the next rung.
                 if matches!(c.decision, Some(Decision::Refer(_))) {
                     inc.rung = inc.rung.max((rung + 1).min(5));
+                }
+                // A LIVE park closes the dialogue stall (blocked seconds stop accruing); the park
+                // item keeps its own pending lifecycle. A shadow park closes nothing.
+                if live
+                    && matches!(c.decision, Some(Decision::Permit))
+                    && c.pivot == Some(Pivot::Park)
+                {
+                    let at = c.finished_at.clone().unwrap_or_else(|| e.moment());
+                    self.close(i, at, Some(ClosedBy::Parked));
                 }
             }
             Phase::Expire => {
@@ -865,12 +946,29 @@ impl Folder<'_> {
                 for i in self.open_where(StallClass::Silence, &e.agent_id) {
                     self.close(i, e.moment(), Some(ClosedBy::Answered));
                 }
-                if e.question == Some(Question::Yes) {
-                    self.open(
-                        e,
-                        format!("{}:{}", self.session, e.seq),
-                        StallClass::Question,
-                    );
+                let id = format!("{}:{}", self.session, e.seq);
+                // An `outcome` decides; without one the question classification keeps today's
+                // behaviour exactly.
+                match e.outcome {
+                    Some(StopOutcome::Accomplished) => self.stops.accomplished += 1,
+                    Some(StopOutcome::Exception) => self.stops.exception += 1,
+                    Some(StopOutcome::Question) => {
+                        self.stops.question += 1;
+                        self.open(e, id, StallClass::Question);
+                    }
+                    Some(StopOutcome::Stalled) => {
+                        self.stops.stalled += 1;
+                        self.open(e, id.clone(), StallClass::Silence);
+                        if let Some(&i) = self.by_id.get(&id) {
+                            self.incidents[i].stall_reason.clone_from(&e.stall_reason);
+                        }
+                    }
+                    None => {
+                        self.stops.unclassified += 1;
+                        if e.question == Some(Question::Yes) {
+                            self.open(e, id, StallClass::Question);
+                        }
+                    }
                 }
             }
             EventKind::StewardPing => {
@@ -989,7 +1087,7 @@ pub fn effective_presence(
             rulings
                 .iter()
                 .find(|r| &r.id == id)
-                .is_none_or(|r| r.expires_at.is_none_or(|t| t > now))
+                .is_some_and(|r| r.expires_at.is_none_or(|t| t > now))
         });
     let limit = Duration::milliseconds((p.stall.limit * 1000.0) as i64);
     let absent = incidents.iter().any(|i| {
@@ -1256,6 +1354,7 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
         exceptions: vec![],
         would_keys: vec![],
         classifier_denied: 0,
+        stops: StopCounts::default(),
     };
     for e in &replay.events {
         f.event(e);
@@ -1468,6 +1567,7 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
         presence,
         last_event,
         ended: ended.is_some(),
+        stops: f.stops,
     }
 }
 
@@ -1481,8 +1581,9 @@ impl Level {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FoldReport {
-    /// Policy state: [`POLICY_ABSENT`] until slice 6.
-    pub policy: &'static str,
+    /// Policy state: [`POLICY_ABSENT`] from [`report`]; the caller replaces it with the
+    /// assessed label (`policy::PolicyAssessment::label`).
+    pub policy: String,
     /// Always `shadow` in this slice: nothing the fold reports was executed.
     pub mode: &'static str,
     /// Incidents overlapping the selected windows.
@@ -1495,6 +1596,8 @@ pub struct FoldReport {
     pub shifts: Vec<String>,
     /// Folded sessions.
     pub sessions: Vec<String>,
+    /// How the folded sessions' turns ended.
+    pub stops: StopCounts,
 }
 
 /// Fold every named session under `root` (or all of them) and assemble the report.
@@ -1584,7 +1687,7 @@ pub fn report(folds: &[SessionFold], policy: &StasisPolicy) -> FoldReport {
         "harness-exceptions": harness_value,
     });
     FoldReport {
-        policy: POLICY_ABSENT,
+        policy: POLICY_ABSENT.to_owned(),
         mode: "shadow",
         incidents: folds
             .iter()
@@ -1594,6 +1697,10 @@ pub fn report(folds: &[SessionFold], policy: &StasisPolicy) -> FoldReport {
         gaps: folds.iter().flat_map(|f| f.gaps.iter().cloned()).collect(),
         shifts: ids,
         sessions: folds.iter().map(|f| f.session.clone()).collect(),
+        stops: folds.iter().fold(StopCounts::default(), |mut a, f| {
+            a.add(f.stops);
+            a
+        }),
     }
 }
 
@@ -1669,7 +1776,7 @@ pub struct DecideOutput {
     /// Always true in this slice.
     pub shadow: bool,
     /// Policy state.
-    pub policy: &'static str,
+    pub policy: String,
     /// True when no journal existed to fold or record into.
     pub unmeasured: bool,
 }
@@ -1769,7 +1876,7 @@ pub fn decide_shadow(
         incident_id: req.incident_id.clone(),
         rung: 0,
         shadow: true,
-        policy: POLICY_ABSENT,
+        policy: POLICY_ABSENT.to_owned(),
         unmeasured: true,
     };
     let dir = root.join(session);
@@ -1869,6 +1976,73 @@ pub fn decide_shadow(
     Ok(out)
 }
 
+/// Live `decide` found the regulator unable to act (policy absent, unparsable, or not pinned to
+/// the steward's latest ruling). Record why as an `observation-gap` so the inertness is visible,
+/// never silent, and execute nothing. Returns whether a record was appended: a session with no
+/// journal has nowhere to write, and a repeat of the session's last gap reason is not appended
+/// again (the adapter calls `decide` on every hook).
+pub fn record_inert(
+    root: &std::path::Path,
+    session: &str,
+    agent_id: &str,
+    reason: &str,
+    clock: &ClockReading,
+    segment_limit: u64,
+) -> Result<bool, StasisError> {
+    let dir = root.join(session);
+    if !dir.is_dir() {
+        return Ok(false);
+    }
+    let _lock = journal::Lock::exclusive(&dir)?;
+    let replay = match journal::replay_unlocked(&dir, session) {
+        Ok(r) => r,
+        Err(StasisError::NoJournal(_)) => return Ok(false),
+        Err(e) => return Err(e),
+    };
+    let Some(last) = replay.events.last() else {
+        return Ok(false);
+    };
+    if last.kind == EventKind::ObservationGap
+        && last.gap.as_ref().is_some_and(|g| g.reason == reason)
+    {
+        return Ok(false);
+    }
+    let seq = replay
+        .events
+        .iter()
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(last.seq)
+        + 1;
+    let now = clock.wall.to_rfc3339_opts(SecondsFormat::Millis, true);
+    let event = json!({
+        "schemaVersion": 1,
+        "kind": "observation-gap",
+        "session": {
+            "runtime": last.session.runtime,
+            "session": session,
+            "ownerPid": last.session.owner_pid,
+            "ownerStartTime": last.session.owner_start_time.map(|t| t.to_string()),
+        },
+        "agentId": agent_id,
+        "seq": seq,
+        "clock": {
+            "wall": now,
+            "bootId": clock.boot_id,
+            "uptimeSeconds": clock.uptime_seconds,
+            "provenance": "epr-session-stasis/linux-proc",
+        },
+        // Carry the last event's disposition and away ruling: a gap record must not clear them.
+        "presence": {
+            "disposition": disposition_name(last.presence.disposition),
+            "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
+        },
+        "gap": {"reason": reason, "from": now, "to": now},
+    });
+    journal::append_locked(&dir, &event, seq, segment_limit)?;
+    Ok(true)
+}
+
 /// Read-only status for one session.
 pub fn status(fold: &SessionFold, now: DateTime<Utc>) -> Value {
     let open: Vec<Value> = fold
@@ -1881,13 +2055,16 @@ pub fn status(fold: &SessionFold, now: DateTime<Utc>) -> Value {
                    "budgetExhausted": i.budget_exhausted})
         })
         .collect();
-    // A park is a recorded Permit/park consultation; shadow never closes the stall on it.
+    // A pending park is a LIVE Permit/park consultation, validated by the fold's own predicate
+    // (exact regulator pairing, policy pinned now). A shadow or unverified park is not pending.
     let parks: Vec<&str> = fold
         .incidents
         .iter()
         .filter(|i| {
             i.consultations.iter().any(|c| {
-                c.pivot == Some(Pivot::Park) && matches!(c.decision, Some(Decision::Permit))
+                c.live
+                    && c.pivot == Some(Pivot::Park)
+                    && matches!(c.decision, Some(Decision::Permit))
             })
         })
         .map(|i| i.id.as_str())
@@ -1903,6 +2080,7 @@ pub fn status(fold: &SessionFold, now: DateTime<Utc>) -> Value {
         // absent heartbeat reads unknown, never green.
         "coordinator": {"state": "unknown", "heartbeatAgeSeconds": null},
         "policy": POLICY_ABSENT,
+        "stops": fold.stops,
     })
 }
 

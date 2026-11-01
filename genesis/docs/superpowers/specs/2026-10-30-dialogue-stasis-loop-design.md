@@ -23,6 +23,15 @@ cites:
   - elohim/sdk/domains/elohim-agent/schemas/session-event.schema.json
   - genesis/agentic/.epr-meta/dialogue-stalls-are-answered.habit.md
   - .claude/epr-meta/measures.yaml
+  - "sense-respond-governance-classifier | Grounds bidirectional, auditable feedback and bounded escalation without treating graduated classifier machinery as live. | sha256:c716a519ee6cc953 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
+  - "epr-meta-kinship-lineage-reconciliation | Grounds provenance-bearing lineage, named missing edges and restoration judgments that preserve history without deriving authority from relatedness. | sha256:adb7385729b94c24 | path: genesis/docs/superpowers/specs/2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md"
+  - "elohim-protocol-manifesto | Supplies the restorative-justice purpose for repairing measured harm and rebuilding trust after re-verification. | sha256:21e5057f62b72ed3 | path: genesis/docs/content/elohim-protocol/manifesto.md"
+  - genesis/docs/content/elohim-protocol/social_medium/community_moderator/README.md
+  - elohim/eprfs/epr-cli/src/flow/memory/mod.rs
+  - elohim/eprfs/epr-cli/src/flow/memory/guide.rs
+  - elohim/eprfs/epr-cli/src/flow/cites.rs
+  - elohim/eprfs/epr-cli/src/flow/edges.rs
+  - elohim/eprfs/epr-cli/src/flow/note.rs
 ---
 
 # Dialogue stasis loop
@@ -43,6 +52,37 @@ and lets independently authorized work continue. It never approves on the human'
 behalf. Incident opening and harvesting follow the timing rules in Terms below,
 which also define Approach and Breach.
 
+### Purpose (steward, 2026-10-31)
+
+The steward's statement of what this family of artifacts is for: the skills, the
+harness, the epr algorithms and classifiers, and the agents. They "are designed to
+help steer the care and consideration of other working agents, integration plans,
+closing things 'left open' that should be reviewed and solved, and helping to sense
+and respond to the algedonic signals of development, which serve to align the
+session's behavior to human alignment concerns of finite time, resources, treating
+such attention as sacred, and elevating the quality and deeper value of cooperative
+sessions."
+
+Every slice is judged against that, not only against whether it is permitted:
+
+- **Attention is the scarce resource.** A resolution that spends the steward's
+  attention when a cheaper, authorized step exists is a worse resolution, even when
+  it is allowed. The ladder exists to spend the least capability and the least human
+  attention that actually resolves the stall.
+- **Cooperation is part of the work.** A session's choices weigh the other agents
+  working beside it: their leases, their builds, their integration trains. No
+  session wins by stopping another's work.
+- **Nothing is left open silently.** An unanswered question, an unreviewed finding,
+  a red that reached the session, an incident without a resolution: each is closed
+  with evidence or carried forward by name.
+- **Algedonic signals are listened to, not quieted.** Pain (a timeout, a stall, a
+  refused gate) is first a signal to find and fix the cost. Widening a limit is
+  avoided, because it can make the pain go quiet without paying the cost. A limit
+  is a carrying capacity, though, and rarely final. When widening is the right
+  call, it is made with care, and the judgement is recorded with its measurement
+  and reason (an `epr flow note --kind ruling` or `correction`), so it can be
+  revisited.
+
 The retrospective cross-references used by this design are:
 
 | Row | Concern |
@@ -62,6 +102,14 @@ here `human:matthew`; the steward's rulings are `--kind ruling` notes. A
 **standing ruling** is a steward `--kind ruling` note that is unexpired and whose
 declared scope covers the case at hand. Presence rulings select handling and
 grant no execution authority.
+
+An **importer** is a development team or tool that declares its own stations, stories and evidence providers while connecting to the shared evidence contract.
+
+The **objective's paths** are the paths declared in the session's claimed
+commitment as its deliverable scope. Valueflow placement names the commitment;
+absent one, use the paths the session's commits touched. **Clean** means no
+tracked modifications under those paths per `git status --porcelain`, excluding
+tooling ledgers (`.claude/data/`, `.eprfs/status/`).
 
 A **berth** is the device's shared lease and note channel
 (`genesis/agentic/bin/berth`). A berth note is written with `berth say`, read
@@ -531,8 +579,9 @@ boundary. Their processes carry `STASIS_KEEPER=1` in the environment. A hook
 process inherits the environment of the runtime process that spawned it, so
 the adapter reads `os.environ` to ignore keeper events. The reported
 `hook-sees-keeper-env` probe check verified this inheritance. A keeper opens no
-incident and never recurses into the ladder. The coordinator's only writes are
-the journal and berth notes; guidance
+incident and never recurses into the ladder. The coordinator's writes are
+the journal, berth notes and, in slice 12, private receipts through the bounded
+recall executor (Valueflow placement below); guidance
 and notification requests are delivered through session hooks.
 
 ### Classification
@@ -634,6 +683,9 @@ Incident {
   stall_class: authorization | question | silence
   concern_class: shape | risk | uncertain
   effect_class: normalized tuple
+  station: declared station id and class | null       // slice 12
+  commitment: claimed commitment CID | null           // slice 12
+  placement: bounded evidence block | unmeasured      // slice 12
   opened_at: { wall, mono }
   presence_at_open
   state: Open | Approach | Breach | Pending | Closed
@@ -760,6 +812,48 @@ The regulator validates a keeper's cited ruling before delivering `proceed`,
 as specified in the pivot table; a failed validation becomes `park`.
 `question: uncertain` never blocks.
 
+### Legitimate stops (steward ruling, 2026-10-31)
+
+The steward's declared purpose for this loop (covenant clause `declaresPurpose`,
+session 4ec0c39f) is that a session stops only for one of two reasons:
+
+1. **Goal accomplished, with evidence.** The deliverable meets the verify
+   evidence of the commitment the session claimed. The steward's code example
+   was "like delivering slice 1, passing lints and tests, no failing or
+   blocking code committed ready to integrate or push." Valueflow placement
+   below makes this station-specific: commit and gate evidence apply when the
+   claimed commitment requires them; specs, stories and habits have their own
+   declared evidence providers.
+2. **A true exception.** The remaining step is one only the steward can take:
+   a decision, a ruling, a credential or an identity act. It reaches him as the
+   human rung's prepared ask.
+
+Every other stop is a stall. At Stop, the adapter classifies the turn's end with
+an `outcome`:
+
+| `outcome` | Evidence the adapter requires | Loop response |
+|---|---|---|
+| `accomplished` | The declared station provider verifies the claimed commitment's deliverable and required evidence at the named revision. For a code delivery commitment this includes its required commit, clean objective paths (defined in Terms) and green gate evidence; for other stations use Valueflow placement. A `shift-marker` close must reference the same evidence. | No incident. The session may stop. |
+| `exception` | A pending human-rung ask, a batched parked ask, or a question the coordinator has already climbed to rung 5 | No new incident. The ask is surfaced once (Denial authority and human delivery). |
+| `question` | The turn ends in a question for the steward | The Automated path and questions rules apply. |
+| `stalled` | None of the above: the turn stopped with work unfinished and no ask | Open a `silence`-class incident at once. In automated presence, the Stop adapter blocks once with guidance naming the unmet commitment evidence or missing chain node and the next authorized step. In collaborative presence the coordinator harvests at Approach. |
+
+A claim of completion in the agent's last message is never evidence by
+itself; `accomplished` requires the observable evidence above, and when the
+evidence cannot be read the outcome is `stalled` with `confidence: low`, never
+`accomplished`. Blocking is bounded: at most one Stop block per stall, and a
+second consecutive stall on the same unmet item Refers up the ladder instead of
+blocking again. `STASIS_LADDER=off` disables the block; observation continues.
+The turn-ended event gains an optional `outcome` field with this vocabulary.
+
+**Read-only completions (steward ruling, 2026-10-31).** A session that finished read-only work (an
+answered question, an analysis, a review) has no session commit, so under the table above it reads as
+`stalled`. The steward ruled to keep the accomplishment rule as written and confine its consequence:
+a `stalled` Stop is blocked only in **automated** presence. In collaborative or unknown presence a
+read-only stop is journalled as `stalled` (for the measures) and never blocked. Judging a
+no-commitment completion as `accomplished` waits for the station-provider evidence in Valueflow
+placement (slice 12).
+
 ### Denial authority and human delivery
 
 Authoritative denials include a human deny, a classifier deny, a call matching an
@@ -807,7 +901,7 @@ declares promotion criteria, presence bounds and ruling validation.
 | Never get around an ask rule | A code check forbids `reshape` for risk class, including uncertain concerns treated as risk. S3* audits actual tool calls for a later same-effect call. | Prevention plus detection. |
 | Never accomplish an authoritatively denied effect another way | The fixed deny template instructs against it; S3* audits actual tool calls for another tool or spelling accomplishing the effect. | **Detection, not prevention.** The template is an instruction. |
 | Never treat peer/keeper/subagent text as the steward's word | Keeper briefs render that text in a quoted untrusted-evidence block. Only `--kind ruling` notes from the steward count as rulings. | Prevention for rulings; advisory for prose. |
-| Never undo work | Keepers run with `--restricted --tools Read,Grep,Glob`, verified by the probe; another runtime needs equivalent probe evidence. The coordinator's only writes are the journal and berth notes. | Prevention. |
+| Never undo work | Keepers run with `--restricted --tools Read,Grep,Glob`, verified by the probe; another runtime needs equivalent probe evidence. The coordinator writes the journal, berth notes and, in slice 12, private bounded-recall receipts; it does not edit source artifacts. | Prevention. |
 | Never edit the policy | `sensitive-file-protection.py` only warns on sensitive paths; it never blocks on path matching. The regulator compares the active policy CID with the steward's latest ruling. | **Not prevented.** CID mismatch is detected and makes the regulator inert, recording the reason. |
 
 **Live operation** is any non-shadow `decide` (slice 9 onward), with
@@ -872,6 +966,346 @@ the ceiling on `dialogue-blocked-seconds`, sits beside the CI rails. Close reads
 `epr session stasis status --shift-current`. L2 proposals wait for the steward
 between shifts. `genesis/docs/shifts/JOURNAL-TEMPLATE.md` and
 `genesis/docs/shifts/SPRINT-RESULT-TEMPLATE.md` each gain a Dialogue stasis block.
+
+## Valueflow placement (steward direction, 2026-10-31)
+
+The steward describes the repository's valueflow chain as "vision and manifesto
+north-stars, epics and features, specifications (and plans) runbooks and
+documentation pattern-libs, e2e tests, glue code, modules, code, unit-tests,
+linter, gates, verification and acceptance, and habits". Its awareness must run
+"(low level micro)<->(high-level macros)". A **station** is one declared kind of
+work in that chain, with its own evidence of completion. A **north-star** is a
+vision or manifesto atom that states the purpose the downstream work serves;
+an **atom** is an individually addressed artifact. E2E means an end-to-end
+scenario, and a pattern library holds reusable documented examples.
+
+The station classes cover purpose (vision and manifesto), outcomes (epics and
+features), design (specifications and plans), practice (runbooks, documentation
+and pattern libraries), stories (end-to-end scenarios), implementation (glue,
+modules and code), checks (unit tests, linters and gates), verification,
+acceptance, and habits (repeated behavior with measured evidence). These are
+classes of work, not a mandatory directory layout or a requirement to visit
+every station on every task. Authored links can branch and converge. Following
+them upward explains purpose; following the corresponding downstream links
+shows how that purpose reaches implementation and proof.
+
+**Avodah**, the protocol's work domain, accounts for contributions across that
+chain. The valueflow verbs describe its loop: intend names the desired outcome;
+claim takes a commitment; produce supplies its artifact; verify tests the claim
+against evidence; fulfil discharges it; rule records an authorized judgment;
+ratchet preserves an evidenced improvement in the next baseline. These are
+semantic acts, not seven identically named CLI subcommands (see Existing
+capabilities and frontier below). A development story begins in an intent tied
+upward to purpose and resolves through its claimed work and proof. A keeper
+helps the session find its next authorized step in this loop.
+
+### Passive placement
+
+At incident open, and when preparing every keeper brief, the coordinator asks
+the substrate where the work sits. The session does not have to reconstruct
+its context for each rung. **Placement** is this bounded account of the work's
+station, claimed commitment, purpose chain and neighbouring concerns.
+
+The intended entry is the following **FRONTIER: placement recall purpose**;
+`--purpose placement` does not exist today:
+
+```text
+epr flow memory recall open --session <incident-recall-id> --purpose placement --need "<effect class; touched paths; claimed commitment CID if known>"
+```
+
+Today the supported focused entry is the same `open --session ... --need ...`
+without `--purpose`; the only accepted purposes are `bootstrap` and `resume`,
+and `resume` requires `--habit`.
+
+Once the coordinator (slice 8) runs and the `placement` recall purpose exists:
+the coordinator opens one bounded recall session for the incident and reuses
+it for subsequent briefs, retaining
+receipts and cumulative cost. Each brief revalidates the relevant evidence
+within that budget and carries any omission forward. A further packet needs
+an explicit evidence question under the recall contract, rather than a fresh
+budget at each rung.
+
+The need combines the incident's normalized effect class, touched paths and
+the session's actual claim, when available. `epr flow context <path|cid> --json`
+and `epr flow ledger <path|cid> --json` supply local claim and evidence records.
+A nearby claim is a candidate until its session attribution is established;
+multiple claims stay ambiguous. The proposed provider walks the cites graph,
+the directed references between addressed artifacts, upward from the touched
+atoms through their specification, feature, epic and north-star where those
+links exist. It preserves edge provenance, current bytes and stale or missing
+edges. A link to a related document is not by itself proof of an ancestry role.
+An unlinked code path needs an authored relation to its owning story or spec.
+Discovery may suggest that relation but does not establish it.
+
+The recall composition already names scope, discover, filter, group, select,
+read and judge. Read declared source routes first; use semantic search
+(similarity of embedded text vectors) or lexical search (matching terms)
+when they are insufficient. Both routes exist over the native fold, the
+derived search index. Semantic ranking uses the pinned
+`sentence-transformers/all-MiniLM-L6-v2` model, including model and tokenizer
+byte CIDs, through `recall-semantic-index.json` and its model manifest.
+Lexical ranking uses SQLite FTS5 full-text search with BM25 relevance ordering
+over the same chunks; it does not run an embedder. The focused first screen's
+`rrf-v1` fusion combines local discovery and semantic ranks for ordering only;
+lexical is separately selectable, not a third producer in that recipe today.
+Candidates retain method and freshness evidence; read their current source
+bytes before treating them as neighbours of the work.
+
+The proposed `placement` block contains:
+
+| Field | Meaning |
+|---|---|
+| `station` | Declared station id and protocol class, or null with an unmeasured reason. |
+| `commitment` | The session's claimed commitment CID and claim provenance, or null. |
+| `upwardChain` | Bounded paths and CIDs for reached atoms, with their declared roles, connecting edges and edge health; branching is retained. Missing steps are named. |
+| `nearestNeighbours` | Bounded candidate paths/CIDs, discovery route, method, freshness and source-verification state. A neighbour is not an ancestor. |
+| `confidence` | `high`, `low` or `unknown`, with the evidence and omissions that justify it; not a probability inferred from a similarity score. |
+| `recall` | Private receipt reference, pinned recall-contract CID and usage, so later briefs can reuse the same accounting. |
+
+Budgets come from `.epr-meta/elohim/algorithms/recall-contract.json`, not from
+a second stasis allowance. That artifact owns routes, composition, per-packet
+limits, cumulative accounting and fitness checks; its CID is pinned in each
+receipt. Compliance with its byte budget does not establish answer fitness.
+Its evaluation requires an independent reader, and the pinned model manifest
+names `recall-bank-reach@1` as its fitness measure. External shell or connector
+reads remain outside recall enforcement and must be accounted separately.
+
+Receipts and continuations remain **Private (B)** at
+`.eprfs/status/recall/<incident-recall-id>/`, under `CLAUDE.md`'s Bounded recall
+contract. They are not imported, projected, witnessed or feedback targets.
+The placement view is reconstructable local state; its captured incident
+context stays in the private journal. It adds zero replicated heads at birth
+or at one year, no DHT entry, zome call, network projection or HTTP route.
+One device can read its held sources without a doorway, peer or pool; an
+unavailable index leaves the source routes usable and the missing route named.
+Another device adds only evidence that has separately been admitted to it.
+There is no new shared working document or publication act in placement.
+
+Placement is good-faith evidence to reduce the session's and keepers' mental
+load. It is never authority: the never-list's prohibition on treating
+peer/keeper text as the steward's word still governs. Similarity, confidence
+and a purpose link grant no permission or acceptance. Unknown placement reads
+**unmeasured**, with the missing evidence named; a chain, station or claim is
+not invented to complete the display. Raw recall context stays device-local;
+only declared outcome attribution enters measures, under the existing P2P
+boundary. Exporting a private claim's identity requires its own disclosure
+basis, not merely that a measure has a commitment field.
+
+### Completion, broken links and contribution
+
+**Accomplished is relative to the claimed commitment.** A station's
+**evidence provider** is a declared reader that evaluates the commitment's
+required proof at the artifact revision being delivered. Its result names
+the commitment, artifact/revision, evidence references and provenance, and
+reports `passed`, `failed` or `unmeasured` with a reason. The Stop adapter
+reads the session's claim and consumes that result before an incident exists;
+a missing provider or unreadable evidence stays unmeasured and follows the
+existing low-confidence `stalled` path. Incomplete ancestry alone does not
+override valid commitment evidence. A passing result supports `accomplished`
+for the claimed work, not its parent epic or north-star; recording fulfilment
+or a ruling remains a separate valueflow act.
+Where acceptance is part of the commitment, technical verification alone
+does not satisfy it.
+
+The gate-live run log (fed by gate-tap), or the applicable green attestation,
+is the default code-station provider. It must match the commitment's required
+gate and revision. A spec station instead requires its declared blind-reader
+review, an independent reader given the document without the author's context,
+plus sealed, verified cites at that revision. A story station uses its passing
+scenario; a habit station uses the evidence its habit atom declares. A commit
+is required when the commitment calls for one, rather than as a universal
+condition for a spec review or an importer-defined station. Slice 12 replaces
+the earlier code-only accomplishment predicate on that basis.
+
+**A stall names where the chain broke.** For example: "between spec and gate:
+the gate the spec names doesn't exist." Preserve the story-graph maintainer's
+shape: `chain / between A→C / missing node B: <assertion + probe> / current state`.
+The coordinator supplies the two known endpoints, the missing assertion and
+the probe that would establish it. If discovery was incomplete, say that the
+gate could not be located within the budget; absence from a search result
+does not prove nonexistence. Minting or repairing that node remains authorized
+development work, outside the read-only placement provider.
+
+**Attention is attributed to work.** Incidents and `ladder-resolution@1` gain
+`station` and `commitment`, preserving unknown values. Resolution evidence
+retains the claim provenance, placement basis and measured time/usage, so
+avodah can account for attention spent per station without crediting a guessed
+claim or double-counting the existing interval union. This is contribution
+accounting with provenance, not a new grant of economic or decision authority.
+The SessionStart projection adds one line, for example
+`work: commitment <cid> · station design/<spec-station-id>`; missing parts
+read `unmeasured` with a short reason. Producing that line from the session's
+claim is slice-12 work, not current `report placement` behavior.
+
+### Bring your own development stories
+
+**BYO** means the importer brings their own stories, stations and tools. The
+steward asks that they "stay faithful to at least the elohim protocol native
+vision and system, without flattening the diversity they bring". The shared
+contract is the station classes above, the valueflow verbs, content-addressed
+cites upward to vision atoms, the evidence contract, the existing never-list,
+and the accomplished-or-true-exception stop rule. Local vocabulary and workflow
+may differ while retaining those connections and boundaries.
+
+The importer declares the following in its applicable `.epr-meta`. These are
+the **FRONTIER: station-evidence bindings** contract, not accepted manifest
+keys today; schema names and validation land in slice 12.
+
+| Minimal declaration | What the loop reads |
+|---|---|
+| Station id, protocol class and covered paths/atom references | Which station owns the claimed work; overlapping or absent coverage is reported, not guessed. |
+| Story/intent reference and upward cite relations | How the local development story serves the importer’s outcomes and the protocol-native vision atoms. |
+| Evidence-provider binding for each station class used | A named, versioned local reader and its evidence-input contract, required checks and result shape. |
+| Gate, scenario, blind-reader, habit or acceptance-probe references, as applicable | Which proof the commitment requires, its revision/freshness conditions, and how to recognize failed or unmeasured evidence. |
+
+Bindings select already-authorized readers; discovery of a declaration does
+not authorize executing its command text. This is the same separation as
+lab-neutral `capabilityBindings`: protocol roles are shared, local providers
+are declared. The importer need not adopt this repository's directory tree,
+Jenkins jobs, gate runner or story vocabulary. Its provider must still supply
+the claimed evidence and preserve the policy boundary; a binding cannot turn
+keeper advice into steward authority.
+
+### Existing capabilities and frontier
+
+The following is grounded in the CLI help and `elohim/eprfs/epr-cli/src/flow/`
+(`mod.rs`, `claim.rs`, `context.rs`, `edges.rs`, `cites.rs`, `placement.rs`,
+and `memory/recall/`). Availability of a route does not prove that this
+device holds a current semantic fold or a usable model.
+
+| Capability | Existing command or named frontier |
+|---|---|
+| Bounded recall | `epr flow memory recall open --session <id> --need <text>`; `search --session <id> --need <text> --search-scope <dir> --name <glob> --query <term>`; `source --session <id> --need <text> --path <path>`; `read --session <id> --need <text> --path <path> --lines <start>:<end>`. `search`/`source` also accept exact `--tag` filters for the local provider. |
+| Native neighbours and fusion | `epr flow memory recall search --session <id> --need <text> --provider semantic` or `--provider lexical`; `epr flow memory index status` reads fold state. First-screen local/semantic fusion is already implemented; no separate fusion verb is needed. |
+| Claims and proof records | `epr flow project`, `epr flow claim --on <intent-cid\|gap-id\|path> --session <id>`, `epr flow context <path\|cid> --json`, `epr flow ledger <path\|cid> --json`, `epr flow fulfill --on <commitment-cid> --report <path> --status DONE`, and `epr flow note --on <commitment-cid> --kind verdict\|ruling ...` exist. `fulfill` is the CLI spelling. `intend`, `produce`, `verify`, `fulfil`, `rule` and `ratchet` are not standalone `epr flow` verbs; this slice composes the existing records rather than inventing aliases. |
+| Cites and graph evidence | `epr flow cites seal <doc>` and `epr flow cites verify <doc>` maintain/check citations; `epr flow walk <path> --json` and `context` expose scoped flow and edge evidence. `edges.rs` merges doc cites and sidecar dependency edges. There is no `epr flow cites graph` command or typed incident-to-north-star walk today. |
+| Placement and substrate reports | `epr flow report placement --ledger --json` reads document lifecycle and gap-station roll-ups; `epr flow report placement --focus <subject> --brief` reads subject focus; `epr flow report scope --docs --json` reads environment requirements. These are inputs, not the incident placement block. `epr flow report --headline` has no current-commitment/station line. |
+| **FRONTIER: placement recall purpose** | Extend `epr flow memory recall open --session <id> --purpose placement --need <text>` to seed the incident-specific bounded packet; today's purpose validation refuses `placement`. |
+| **FRONTIER: incident placement view** | Proposed new verb `epr flow placement --session <id> --incident <id> --json`, backed by the coordinator's provider: resolve session claims, traverse typed upward relations within recall bounds, retain neighbours and return the placement block. Reuse the existing graph and recall executor. |
+| **FRONTIER: station-evidence bindings and stop evidence** | Add the `.epr-meta` contract and evidence-provider registry, with the code provider as default for code stations and importer providers selected by declared class. Wire the Stop adapter; no additional CLI verb is required for registry dispatch. |
+| **FRONTIER: placement attribution and status** | Add station/commitment fields and provenance to incidents and resolution measures, private receipt handling in briefs, and the SessionStart work line. Extend the session-status projection; the existing report names do not imply this behavior. |
+
+### Bad fruit, restoration and coupled responsibility (steward direction, 2026-10-31)
+
+The steward's direction, verbatim:
+
+> "our vsm primitives or such, if some poisoned context shows bad-fruit in the chain somewhere.. the algedonic signals, and formal feedback systems should hopefully help feedback through the chain for this system to follow our self-healing restorative protocol."
+
+> "the citations are informed, so restoration actions required, can happen every where that damage occurred for the scale of its harm. Power coupled with responsibility.. everywhere."
+
+**Fruit is judged downstream; responsibility is traced upstream.** Bad fruit
+means an evidenced harmful result: an S3* independent-audit fault, an overturned
+`proceed`, a steward correction, a red result downstream of an `accomplished`
+claim, or a keeper misled by quoted text. It opens an inquiry into the evidence
+used, rather than treating every cited source as faulty. Slice 12's placement
+records retain the cites walked, memories recalled and neighbours matched,
+including the source version, edge provenance and what actually informed the
+decision. Matching a neighbour alone establishes neither reliance nor harm.
+The signal travels back along those recorded edges to locate the entry point.
+The [sense-and-respond classifier](./2026-07-15-sense-respond-governance-classifier-design.md)
+grounds this in bounded, correctable feedback at each hop (§1), independent
+audit alongside threshold sensing, and deduplicated, budgeted escalation (§12).
+Those are design precedents, not a claim that its graduated machinery is live.
+
+When slice 13 lands, **trace harm in both directions.** From the identified
+source version, walk inbound cites, the reverse references that name its dependants, together with
+recorded use edges. They locate specs built on it, gates derived from those
+specs, incidents decided on it and memories recalled from it. Each reached
+station re-verifies the particular claim that used the challenged evidence.
+The restoration set is exactly this measured reach, bounded by the first
+station on each branch that re-verifies clean; other affected branches continue.
+A clean boundary proves the downstream claim independently of the challenged
+premise, rather than merely repeating the gate derived from it. A separate
+recorded dependence beyond that boundary still belongs to its own affected path.
+Unrelated neighbours are outside the set. Missing edges, unavailable sources
+and budget-limited reads stay named as unmeasured work, not clean boundaries or
+permission to scan the whole corpus. The
+[kinship and reconciliation design](./2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md)
+supplies the distinction: lineage carries provenance, similarity suggests
+candidates, and relatedness does not grant authority (§§3–4). A correction
+preserves the old evidence and records the judgment on its replacement.
+
+**Restore in proportion to the harm, at the affected station.** Reuse its
+declared evidence provider and required revision:
+
+| Affected station | Restoration owed |
+|---|---|
+| Specification | A fresh blind-reader re-reads the affected claim and its grounding. |
+| Gate or other check | Re-run the relevant gate after checking whether its premise or assertion also needs an authorized repair. |
+| Incident decision | Reopen the affected incident and re-judge the decision against corrected evidence and currently applicable authority. Preserve its earlier decision. |
+| Habit | Re-verify the evidence the habit atom declares; an earlier green claim is not its own proof. |
+| Unsettled authority or harm | Reconcile with the steward only what authorized repair and re-verification cannot settle; name the remaining decision and evidence. |
+
+Reach is power: a widely cited atom owes re-verification across its measured
+affected reach. Authority used is power too: a Permit at C4 owes a review of its
+scope and effects; a `proceed` under a ruling owes a check of that ruling's
+applicability and the action taken; an `accomplished` claim owes renewed proof
+for its commitment. The duty grows with the reach, harm and authority actually
+used, rather than the number of complaints. The existing ladder and budgets
+reserve steward attention for what the authorized lower stations cannot settle.
+Discovery grants no repair authority. Keepers and the placement provider stay
+read-only; authorized working sessions perform source edits and gate runs,
+while the coordinator records and dispatches within its existing write boundary.
+
+**Restorative, not punitive.** The
+[manifesto](../../content/elohim-protocol/manifesto.md)'s cultural translation
+matrix names Indigenous restorative justice for modern conflict resolution;
+its Values Alignment Over Rules Enforcement principle emphasizes restoration
+and growth.
+The [community moderator guidance](../../content/elohim-protocol/social_medium/community_moderator/README.md)
+calls for "restoration over punishment wherever possible". Here that means a
+correction note on the source, governed memory feedback on the challenged bytes,
+and a record of each restoration against both source and affected node. The
+record joins the triggering event, original source version, affected revision,
+action, actor, authority used and re-verification evidence. Notes annotate;
+they do not themselves discharge the commitment or prove the repair.
+
+The proposed memory-harness reader lowers the source's recall weight while its
+evidenced correction is unresolved. **Amber** means repair or re-verification is
+pending; **green** requires the challenged source's own re-verification to pass,
+not another station's recovery. Trust lags
+repair: editing the source or acknowledging feedback does not restore its weight.
+This is a relevance adjustment with visible reasons, not erasure, punishment of
+the author or a change to permission policy. Correction evidence remains
+available; complaint volume alone does not determine weight. Private recall
+receipts remain excluded from feedback targets by the Bounded recall contract.
+
+**Use the existing algedonic channel.** Bad fruit at a station is an Approach
+or Breach on that station's declared bound, with measured stock, limit and bound
+reference. A signal without those inputs stays unmeasured; this slice does not
+invent a threshold from the prose. S3* findings feed that same channel. Recovery
+uses slice 4's Recovered transition: evidenced re-verification supplies the cause,
+then the station's stock must satisfy its reset line and dwell. A correction note,
+a source edit or a closed prompt alone cannot satisfy that evidence contract.
+
+One restoration incident is keyed by the original source version and triggering
+event. Repeated detection, converging paths and restart reuse it; affected
+incidents are reopened and linked to that case, not counted as fresh restoration
+cases. A repair's new source version retains this link. The trace uses the
+existing recall and incident budgets; exhaustion leaves a resumable, named
+remainder. Poisoned text stays quoted, untrusted evidence under the never-list.
+Propagation stops at each evidenced clean boundary, without a cascade beyond
+the measured reach. Captured use edges and restoration context inherit the
+private journal boundary; the reach view is reconstructable from those records.
+This adds zero replicated heads at birth or one year, no DHT entry or zome call,
+and no network projection. Memory feedback retains its existing locality
+checks. The restoration writer keeps private context out of broader source/node
+notes; the general note command does not establish that disclosure boundary.
+
+The command boundary is grounded in the current
+[memory dispatcher](../../../../elohim/eprfs/epr-cli/src/flow/memory/mod.rs),
+[input guide](../../../../elohim/eprfs/epr-cli/src/flow/memory/guide.rs),
+[cite dispatcher](../../../../elohim/eprfs/epr-cli/src/flow/cites.rs),
+[edge index](../../../../elohim/eprfs/epr-cli/src/flow/edges.rs) and
+[note writer](../../../../elohim/eprfs/epr-cli/src/flow/note.rs):
+
+| Capability | Existing command or exact proposed FRONTIER command |
+|---|---|
+| Governed memory feedback exists | `epr flow memory feedback --input <feedback.json> --session <registered-session-id> --json`. The strict request has `version: 1`, pinned `collective` and `target` FileRefs (`path`, raw-byte `cid`), `kind`, `passage` and `reason`. Kinds are `stale-source`, `misleading-projection`, `omitted-contradiction` and `poor-selection`; passage must occur in the pinned target bytes. `epr flow memory pin --input <path> --json` supplies the FileRef. Feedback checks session standing and locality and records a correction; it does not alter recall ranking or establish recovery. |
+| Source/node correction notes exist | `epr flow note --on <path-or-known-atom-cid> --kind correction --reason "<event, source, affected node, harm and evidence>" --session <id>`. Each invocation targets one node; an authorized writer can record corresponding notes on source and affected node, retaining their shared provenance. An arbitrary, unrecorded CID is refused. Typed pairing and restoration completion are still the frontier below. |
+| **FRONTIER: inbound cite query** | Proposed `epr flow cites inbound <doc> --json`. `EdgeIndex::incoming` already reads who depends on a path, but `cites.rs` exposes no inbound, reverse or cited-by verb. Expose that reader with edge provenance and health; doc cites alone do not discover private incident or memory use edges. |
+| **FRONTIER: restoration orchestration** | Proposed `epr session stasis restore --session <id> --source <source-cid> --event <event-id> --json`. Join the reverse cite reader to recorded placement/use edges, deduplicate the source/event case, dispatch authorized station repairs, retain paired source/node evidence and reopen affected decisions. Reuse slice 12's providers and slice 4's latch; provider dispatch and evidenced recovery belong to this command's coordinator contract, not additional channels or source-write authority. |
+| **FRONTIER: feedback-aware recall weight** | Proposed `epr flow memory recall search --session <id> --need <text> --feedback-aware`. The new flag makes the recall reader consume admissible, evidenced feedback and linked re-verification across its selected ranking routes, exposing amber/green and the weight reason. Placement uses this mode once implemented. The existing feedback writer supplies the challenge, not this ranking behavior. |
 
 ## Journal contract and measures
 
@@ -1003,8 +1437,10 @@ The shared cause was `epr bin status` taking about 2.3 s per binary lookup in
   - Rate limit: once per key per 30 minutes, unless the count doubles.
   - It is context only. It never denies or blocks anything, and it never edits a
     hook's timeout on its own authority.
-  - A fix that raises a timeout hides the cost instead of paying it. The response
-    looks for the slow call first.
+  - Raising a timeout can hide the cost instead of paying it, so the response
+    looks for the slow call first. When the timeout itself is the wrong
+    carrying capacity, raising it is a recorded judgement: the measurement and
+    the reason go into a ruling or correction note, so it can be revisited.
 - **Measure.** `harness-exceptions@1`: the count per shift, by hook, under the
   unmeasured rule.
 
@@ -1047,8 +1483,10 @@ AlgedonicSignal and its latch. The 1800 s ceiling is cumulative blocked time
 across all of a shift's incidents, distinct from the per-incident 300 s Breach bound.
 
 `ladder-resolution@1` records which rung resolved each incident, tagged by level,
-binding, concern class and presence. The later `dialogue-stasis-health@1` measure
-feeds the loop's health lens. All follow the unmeasured rule in Terms.
+binding, concern class and presence. Slice 12 adds station and claimed commitment,
+with provenance and unknown handling under Valueflow placement. The later
+`dialogue-stasis-health@1` measure feeds the loop's health lens. All follow the
+unmeasured rule in Terms.
 Slice 1 declares only the first two measures and the blocked-time ceiling, with
 no keeper dispatch until slice 7.
 
@@ -1200,6 +1638,39 @@ and learning. Each slice lands separately when the steward asks to land it.
     defined in Terms.
 11. **L1 and L2.** Add audited automatic promotion, advisory routing, and
     proposal-only loop improvement with separate steward activation.
+12. **Valueflow placement.**
+    Read first: Valueflow placement (steward direction, 2026-10-31);
+    `CLAUDE.md` → Bounded recall;
+    `.epr-meta/elohim/algorithms/recall-contract.json`;
+    `epr flow --help`, `epr flow memory recall --help`,
+    `epr flow cites --help` and `epr flow report`'s placement/scope contracts.
+    Add the coordinator's bounded placement provider at incident open and in
+    every keeper brief, including the named recall-purpose and placement-view
+    frontiers. Add an `accomplished` evidence-provider registry, with the
+    gate-live run log as the default code provider and spec/story/habit evidence
+    selected by the claimed commitment. Add station and commitment fields to
+    incidents and `ladder-resolution`, retaining provenance and unmeasured
+    values, and project the SessionStart work line. Define and validate the
+    BYO `.epr-meta` station-evidence bindings and honour an importer-declared
+    provider within existing execution authority. Update the coordinator's
+    write boundary for private recall receipts without adding source writes.
+13. **Bad fruit, restoration and coupled responsibility.**
+    Depends on slice 12's placement/use evidence and station providers, and
+    slice 4's recovery latch. Read first: the subsection of the same name at
+    the end of Valueflow placement, including its cited precedents and checked
+    command contracts. Retain source versions and actual evidence use at each
+    placement. Expose the proposed inbound-cite command and implement the
+    restoration command's bounded trace in both directions, one case per
+    source/event across restarts, with branch-local clean boundaries and named
+    unmeasured remainders. Dispatch proportional repairs through existing
+    authority, including reopened incident judgments and habit re-verification.
+    Join source/node correction records and governed memory feedback to action,
+    authority and proof; implement the proposed feedback-aware recall mode so
+    trust remains amber after repair until re-verification. Bind station harm
+    readings to Approach/Breach and evidenced recovery to the shared Recovered
+    latch. Preserve quoted-evidence handling, private receipt exclusions and
+    the coordinator's source-write boundary. Steward reconciliation receives
+    only the remainder that authorized repair cannot settle.
 
 ## Verification
 
@@ -1215,6 +1686,8 @@ and learning. Each slice lands separately when the steward asks to land it.
 | 8 | <ul><li>Concurrent writers claim one consultation atomically under Journal locking.</li><li>A claimed consultation survives restart without another keeper call; duplicate events attach to that claim.</li><li>A dead coordinator reads unknown.</li><li>Shadow guidance is compared with actual actions.</li></ul> |
 | 9 | <ul><li>Collaborative timing follows the Incident model and harvesting contract; tests verify the Breach-precedence and away-ruling rules in Presence disposition.</li><li>Automated harvesting begins when the incident opens; handling parks, climbs rungs 1–4 and reaches rung 5, with one berth note and one `PushNotification` request per incident per reached stage, plus one batched `AskUserQuestion`.</li><li>Risk and uncertain concerns never receive a same-effect reshape; shape concerns get only one across tools and restarts, and a second failure Refers.</li><li>`proceed` requires a valid, unexpired, scoped steward ruling; any failed validation downgrades to `park`.</li><li>Fixtures exercise the park item's separate lifecycle and later-execution requirements in Pivots.</li><li>A missing policy and a CID mismatch both satisfy the inert live-operation contract in Policy boundary and learning.</li><li>Both controls satisfy Kill switches, including continued measures with only the ladder disabled and detectable observation gaps with sensing disabled.</li></ul> |
 | 10–11 | <ul><li>A 45-minute fixture wait yields one progress request.</li><li>Skill kickoff and close write the `shift-marker` edges defined in Terms.</li><li>A second clean resolution of the same effect class proposes a rung 0 entry; it takes effect only after a completed, passing other-family audit, and a missing or failed audit leaves it proposed.</li><li>A seeded health breach produces one patch proposal and no activation.</li></ul> |
+| 12 | <ul><li>A code-station fixture is accomplished by green gate evidence for its claimed commitment and required revision; an unrelated green run does not satisfy it.</li><li>A spec-station fixture is accomplished by a passing blind-reader result plus sealed, verified cites for the delivered revision; removing either makes it unmeasured or failed, and it does not require a code gate.</li><li>A stall fixture names the known endpoints and missing node: “between spec and gate: the gate the spec names doesn't exist”, with the assertion and probe needed to repair the chain.</li><li>Missing or ambiguous claim/ancestry evidence yields unmeasured placement, named omissions and an honest SessionStart line; no station or commitment is fabricated. Briefs reuse private recall receipts and cumulative budgets.</li><li>An importer-declared station provider is honoured for its class and required proof, with station/commitment provenance retained on the incident and resolution measure. A binding supplies no execution permission, and a private receipt is not exported.</li></ul> |
+| 13 | <ul><li>Five trigger fixtures cover an S3* fault, overturned `proceed`, steward correction, downstream red after `accomplished`, and a keeper misled by quoted text. Each traces actual source use upstream and emits Approach/Breach on the affected station's bound; missing stock or binding stays unmeasured.</li><li>A branching graph fixture reaches the affected spec, derived gate, decided incident and recalled memory through versioned cite/use edges. An unrelated neighbour stays outside the set. Independent re-verification stops only its clean branch; another red branch and a separately recorded downstream dependence continue. A gate repeating the poisoned premise does not prove a clean boundary.</li><li>Converging paths, cycles, duplicate detections and restart produce one restoration case per original source/event, including after the source gains a repaired version. Missing edges and exhausted budgets leave a named resumable remainder without widening the measured reach or restarting the budget.</li><li>Station fixtures require a fresh spec blind-reader, the relevant gate rerun after premise review, reopening and re-judging an incident, and re-verifying a habit's declared evidence. Permit-at-C4, ruling-backed `proceed` and `accomplished` fixtures each re-check the scope, effects or commitment proof their authority used; a wider affected reach adds the corresponding duties.</li><li>Each repair has joined source/node records with event, versions, action, actor, authority and proof. Existing feedback accepts an allowed pinned target and matching passage, and refuses a mismatched passage or private recall receipt. The proposed ranking mode lowers weight on evidenced feedback, keeps correction evidence readable, ignores complaint volume as authority, and remains amber after a source edit alone.</li><li>Fake-clock fixtures keep Recovered absent after a note, edit or prompt close alone. Passing station re-verification plus the reset line and dwell emits Recovered; a new fault during dwell cancels recovery. Green recall weight requires the challenged source's own re-verification, not another station's recovery. Remaining affected branches keep the restoration case open.</li><li>Quoted poison cannot validate as a ruling. Authorized lower-station repairs proceed without a steward prompt; unresolved authority is presented once with its evidence under the existing delivery budgets. Keepers do not write sources, and broader correction records do not expose private use edges or recall receipts.</li></ul> |
 
 The habit `dialogue-stalls-are-answered` turns green only after two shifts below
 the blocked-time ceiling, one unattended, with a falling rung 5 share and

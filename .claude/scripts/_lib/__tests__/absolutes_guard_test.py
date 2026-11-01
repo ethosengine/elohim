@@ -18,8 +18,13 @@ The mirror of `sovereignty_guard_test.py` for absolute promises on trust surface
 
 Run: python3 .claude/scripts/_lib/__tests__/absolutes_guard_test.py   (no pytest in this repo)
 """
+import json
+import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from _lib import absolutes  # noqa: E402
@@ -150,6 +155,58 @@ check("validator quiet off-surface",
 check("unreadable prior surfaces (advisory fails toward surfacing)",
       GUARD({"content": "It is guaranteed.\n", "is_new": False,
              "path": str(REPO / "genesis/docs/specs/zz-missing-absolutes.md")}) is not None, True)
+
+# PRE resolves both the surface and its enforcers/atoms in the edited checkout, even when
+# CLAUDE_PROJECT_DIR names the main checkout and the worktree uses a .git file.
+with tempfile.TemporaryDirectory(prefix="absolutes-pre-") as tmp:
+    main = Path(tmp) / "repo"
+    (main / ".git").mkdir(parents=True)
+    worktree = main / ".worktrees/wt"
+    worktree.mkdir(parents=True)
+    (worktree / ".git").write_text("gitdir: ../../.git/worktrees/wt\n")
+    with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(main)}):
+        for root in [main, worktree]:
+            doc = root / "genesis/docs/x.md"
+            doc.parent.mkdir(parents=True)
+            doc.write_text("We decline to widen a limit.\n")
+            write = {"path": str(doc), "content": "We promise never to widen a limit.\n",
+                     "is_new": False}
+            check(f"PRE {root.name} resolves the checkout", em.find_repo_root(doc), root)
+            check(f"POST {root.name} resolves the checkout", absolutes.checkout_root(doc, main),
+                  root)
+            check(f"PRE {root.name} resolves the surface", em._repo_rel(str(doc)),
+                  "genesis/docs/x.md")
+            verdict = GUARD(write)
+            check(f"PRE {root.name} detects the edit",
+                  verdict.evidence["netNew"] if verdict else None, 1)
+            check(f"PRE {root.name} off-surface is quiet",
+                  GUARD({**write, "path": str(root / "docs/x.md")}), None)
+
+        enforcer = worktree / "tests/local.py"
+        enforcer.parent.mkdir()
+        enforcer.write_text("# worktree enforcer\n")
+        check("PRE resolves the worktree-local citation",
+              GUARD({**write, "content": "It is never shared (enforced: tests/local.py).\n"}),
+              None)
+        (main / "main-only.py").write_text("# main-checkout enforcer\n")
+        check("PRE does not resolve a main-only citation",
+              GUARD({**write, "content": "It is never shared (enforced: main-only.py).\n"})
+              is not None, True)
+        for root in [main, worktree]:
+            shutil.copytree(REPO / frame_atoms.FRAMES_REL, root / frame_atoms.FRAMES_REL)
+        atom_path = worktree / frame_atoms.FRAMES_REL / "frame-absolute-promise.json"
+        atom = json.loads(atom_path.read_text())
+        atom["recall_signal"]["phrases"] = ["immutable"]
+        atom_path.write_text(json.dumps(atom))
+        verdict = GUARD({**write, "content": "The limit is immutable.\n"})
+        check("PRE prefers the worktree's frame atom",
+              verdict.evidence["frameRef"] if verdict else None, frame_atoms.frame_ref(atom))
+
+        # Simulate a git-free filesystem: the sandbox's temp directory may itself be in a repo.
+        with patch.object(Path, "is_dir", return_value=False), \
+                patch.object(Path, "is_file", return_value=False):
+            check("POST falls back to the project dir without a git ancestor",
+                  absolutes.checkout_root(doc, main), main)
 
 # ── 4b. removing an adjacent citation is net-new ──────────────────────────────────────────────
 _CITE = "(enforced: .claude/scripts/_lib/absolutes.py)"
