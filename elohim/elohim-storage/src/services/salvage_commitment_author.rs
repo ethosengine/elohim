@@ -340,7 +340,10 @@ fn build_salvage_candidates(
 /// transport id that could never join `humans.agent_pub_key =
 /// rea_commitments.provider`. This is the salvage half of the CID-hardening the
 /// provide loop (`conductor_commitment_author`) already applies.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is a distinct input of one salvage tick (identity, author, switch, replica target); a one-use struct would only rename them"
+)]
 pub fn run_salvage_pass(
     conn: &mut diesel::SqliteConnection,
     self_cid: &str,

@@ -5,7 +5,10 @@
     reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
 )]
 use crate::imagodei::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::infrastructure::*;
 #[allow(unused_imports)]
 use crate::lamad::*;
