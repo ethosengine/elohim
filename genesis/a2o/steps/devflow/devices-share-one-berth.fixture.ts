@@ -42,6 +42,13 @@ export interface Outcome {
   stderr: string;
   ms: number;
 }
+export interface TrackedLine {
+  at: number;
+  text: string;
+}
+export interface TrackedOutcome extends Outcome {
+  lines: TrackedLine[];
+}
 export interface Device {
   label: Label;
   dir: string;
@@ -54,9 +61,18 @@ export interface Device {
   port: number;
   daemon?: ChildProcess;
   daemonStarts: number;
+  policy?: string;
+  extraEnv?: Record<string, string>;
+}
+export interface HouseholdOptions {
+  prefix?: string;
+  seed?: (seedDir: string) => void;
+  policy?: Partial<Record<Label, string>>;
+  deviceEnv?: (base: string) => Record<string, string>;
 }
 export interface Fixture {
   base: string;
+  seed: string;
   origin: string;
   baseSha: string;
   devices: Record<Label, Device>;
@@ -83,6 +99,7 @@ export function env(d: Device, extra: Record<string, string> = {}): NodeJS.Proce
     CLAUDE_CONFIG_DIR: join(d.dir, 'claude-config'),
     CLAUDE_PROJECT_DIR: repository,
     EPR_BIN: EPR,
+    ...d.extraEnv,
     ...extra,
   };
 }
@@ -122,6 +139,43 @@ export function run(
   });
 }
 
+/** Spawn a process group and retain its interleaved, timestamped output for orchestration steps. */
+export function spawnTracked(
+  argv: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+): { child: ChildProcess; outcome: Promise<TrackedOutcome> } {
+  const started = Date.now();
+  const child = spawn(argv[0], argv.slice(1), {
+    cwd: options.cwd,
+    env: options.env,
+    detached: true,
+  });
+  let stdout = '';
+  let stderr = '';
+  const lines: TrackedLine[] = [];
+  const pending: Record<'stdout' | 'stderr', string> = { stdout: '', stderr: '' };
+  const collect = (stream: 'stdout' | 'stderr', chunk: Buffer | string) => {
+    const text = String(chunk);
+    if (stream === 'stdout') stdout += text;
+    else stderr += text;
+    const parts = `${pending[stream]}${text}`.split('\n');
+    pending[stream] = parts.pop() ?? '';
+    for (const line of parts) lines.push({ at: Date.now(), text: line });
+  };
+  child.stdout?.on('data', chunk => collect('stdout', chunk));
+  child.stderr?.on('data', chunk => collect('stderr', chunk));
+  const outcome = new Promise<TrackedOutcome>(done => {
+    child.on('close', status => {
+      for (const stream of ['stdout', 'stderr'] as const) {
+        if (pending[stream]) lines.push({ at: Date.now(), text: pending[stream] });
+      }
+      lines.sort((a, b) => a.at - b.at);
+      done({ status, stdout, stderr, ms: Date.now() - started, lines });
+    });
+  });
+  return { child, outcome };
+}
+
 export function must(o: Outcome, what: string): Outcome {
   assert.equal(o.status, 0, `${what} exited ${o.status}\n${o.stdout}\n${o.stderr}`);
   return o;
@@ -144,7 +198,14 @@ export function berth(
   args: string[],
   extra: Record<string, string> = {}
 ): Promise<Outcome> {
-  return run([...berthArgv(d), ...args], { cwd: d.repo, env: env(d, extra) });
+  // berth prepares a session envelope through `epr session`, which needs the session declared in
+  // the environment (no registered runtime runs the fixture's sessions).
+  const at = args.indexOf('--session');
+  const declared: Record<string, string> =
+    at >= 0
+      ? { ELOHIM_SESSION_ID: args[at + 1] ?? '', ELOHIM_SESSION_OWNER_PID: String(process.pid) }
+      : {};
+  return run([...berthArgv(d), ...args], { cwd: d.repo, env: env(d, { ...declared, ...extra }) });
 }
 
 export function git(cwd: string, args: string[], extra: NodeJS.ProcessEnv = {}): Outcome {
@@ -156,7 +217,7 @@ export function git(cwd: string, args: string[], extra: NodeJS.ProcessEnv = {}):
 
 /** `epr peer leases --json` on device `d`: its standing, its channel store and its lease view. */
 export function leases(d: Device): Record<string, unknown> {
-  return eprJson(d, ['peer', 'leases', '--json', '--root', d.repo, '--policy', POLICY]);
+  return eprJson(d, ['peer', 'leases', '--json', '--root', d.repo, '--policy', d.policy ?? POLICY]);
 }
 
 export function verdict(d: Device, resource: string): Record<string, unknown> | undefined {
@@ -216,7 +277,7 @@ export function startDaemon(f: Fixture, d: Device): void {
       '--peer',
       `${peer.node}@127.0.0.1:${peer.port}`,
       '--policy',
-      POLICY,
+      d.policy ?? POLICY,
     ],
     { cwd: d.repo, env: env(d), stdio: ['ignore', log, log] }
   );
@@ -375,9 +436,15 @@ export function makeDevice(
     mkdirSync(join(dir, sub), { recursive: true });
   must(git(dir, ['clone', '-q', '-b', 'dev', origin, repo]), 'clone');
   // berth folds into the flow store of the checkout it lives in: the one this device's daemon serves.
+  // A real device's checkout always has one; `epr peer leases` refuses a checkout without it
+  // ("nothing of this device's channel is here", 22b004f65), so the device starts with an empty one.
+  mkdirSync(join(repo, '.eprfs/status'), { recursive: true });
+  writeFileSync(join(repo, '.eprfs/status/flows.jsonl'), '');
   mkdirSync(join(repo, '.claude'), { recursive: true });
   symlinkSync(join(repository, '.claude/hooks'), join(repo, '.claude/hooks'));
   symlinkSync(join(repository, '.claude/epr-meta'), join(repo, '.claude/epr-meta'));
+  // berth imports its session resolver from .claude/scripts/_lib.
+  symlinkSync(join(repository, '.claude/scripts'), join(repo, '.claude/scripts'));
   // The real pre-push hook, as this checkout's own hook (no git config is changed).
   copyFileSync(join(repository, '.husky/pre-push.bash'), join(repo, '.git/hooks/pre-push'));
   chmodSync(join(repo, '.git/hooks/pre-push'), 0o755);
@@ -391,9 +458,14 @@ export function makeDevice(
   };
 }
 
-/** Both devices: checkouts, keys, the roster ceremony and running daemons. */
-export async function household(): Promise<Fixture> {
-  const base = mkdtempSync(join(tmpdir(), 'devices-share-one-berth-'));
+/** Seed the repository shared by both devices, without creating keys or starting daemons. */
+export function seedRepository(opts: HouseholdOptions = {}): {
+  base: string;
+  seed: string;
+  origin: string;
+  baseSha: string;
+} {
+  const base = mkdtempSync(join(tmpdir(), opts.prefix ?? 'devices-share-one-berth-'));
   // The repository both devices integrate on: a bare origin whose dev holds berth.
   const seed = join(base, 'seed');
   const origin = join(base, 'origin.git');
@@ -403,8 +475,15 @@ export async function household(): Promise<Fixture> {
     join(seed, '.epr-meta/repository.yaml'),
     'version: 1\nagent: repo:ethosengine/elohim\n'
   );
+  // A session envelope (berth moor → epr session prepare-berth) pins the governed recall contract.
+  mkdirSync(join(seed, '.epr-meta/elohim/algorithms'), { recursive: true });
+  copyFileSync(
+    join(repository, '.epr-meta/elohim/algorithms/recall-contract.json'),
+    join(seed, '.epr-meta/elohim/algorithms/recall-contract.json')
+  );
   writeFileSync(join(seed, 'README.md'), '# devices-share-one-berth fixture\n');
   writeFileSync(join(seed, '.gitignore'), '.claude/\n.eprfs/status/flows.jsonl\n');
+  mkdirSync(join(seed, 'genesis/orchestrator/manifests/runtime'), { recursive: true });
   copyFileSync(
     join(repository, 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json'),
     join(seed, 'genesis/orchestrator/manifests/runtime/workspace-device.manifest.json')
@@ -433,12 +512,19 @@ export async function household(): Promise<Fixture> {
     join(seed, 'genesis/orchestrator/ci-ignore.mjs')
   );
   writeFileSync(join(seed, '.ci-ignore'), '.eprfs/status/participants/\n');
+  opts.seed?.(seed);
   must(git(base, ['init', '-q', '--bare', origin]), 'init origin');
   must(git(seed, ['init', '-q', '-b', 'dev']), 'init seed');
   must(git(seed, ['add', '-A']), 'add');
   must(git(seed, ['commit', '-q', '-m', 'fixture']), 'commit');
   must(git(seed, ['push', '-q', origin, 'dev']), 'seed origin');
   const baseSha = must(git(seed, ['rev-parse', 'HEAD']), 'rev-parse').stdout.trim();
+  return { base, seed, origin, baseSha };
+}
+
+/** Both devices: checkouts, keys, the roster ceremony and running daemons. */
+export async function household(opts: HouseholdOptions = {}): Promise<Fixture> {
+  const { base, seed, origin, baseSha } = seedRepository(opts);
 
   // Two devices, X first on the roster; each mints its own keys on first use.
   const x = { ...makeDevice(base, 'x', origin), label: 'A' as Label, did: '', node: '', port: 0 };
@@ -497,8 +583,13 @@ export async function household(): Promise<Fixture> {
   const [a, b] = x.did < y.did ? [x, y] : [y, x];
   a.label = 'A';
   b.label = 'B';
+  for (const d of [a, b]) {
+    d.policy = opts.policy?.[d.label];
+    d.extraEnv = opts.deviceEnv?.(base);
+  }
   const f: Fixture = {
     base,
+    seed,
     origin,
     baseSha,
     devices: { A: a, B: b },

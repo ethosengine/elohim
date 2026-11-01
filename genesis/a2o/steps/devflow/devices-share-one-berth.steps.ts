@@ -115,6 +115,8 @@ Given("matthew's roster admits both devices", function () {
 
 Given(
   'session {string} is moored on device A and session {string} is moored on device B',
+  // Each moor prepares a session envelope through `epr session` (seconds, not milliseconds).
+  { timeout: 30_000 },
   async function (onA: string, onB: string) {
     const f = state(this);
     must(
@@ -570,6 +572,8 @@ function clockOffset(time: string): number {
 
 When(
   'session {string} on device {word} claims {string}, stamped {string} by device {word}',
+  // A claim prepares a session envelope through `epr session` (seconds, not milliseconds).
+  { timeout: 30_000 },
   async function (session: string, label: Label, resource: string, time: string, stamper: Label) {
     const f = state(this);
     assert.equal(label, stamper);
@@ -590,11 +594,18 @@ When(
           '--session',
           session,
         ],
-        { cwd: d.repo, env: env(d) }
+        {
+          cwd: d.repo,
+          // berth prepares this session's envelope through `epr session`.
+          env: env(d, {
+            ELOHIM_SESSION_ID: session,
+            ELOHIM_SESSION_OWNER_PID: String(process.pid),
+          }),
+        }
       ),
     };
     // The claim is written (pre-check, then the lease) before the next step brings the link back.
-    await waitFor(`${label}'s claim is written`, 5000, () =>
+    await waitFor(`${label}'s claim is written`, 20_000, () =>
       ledger(d).some(r => r.kind === 'claim' && r.session === session && r.resource === resource)
     );
     const row = ledger(d)
@@ -692,7 +703,14 @@ Then('the berth status on device A and on device B names the same holder', async
     otherDeviceBlock(theirs, winner.did).join('\n'),
     new RegExp(`dev-integration {2}held by ${winner.did}/${SESSIONS[w]} since `)
   );
-  assert.match(theirs, /\n {4}dev-integration free/, theirs);
+  // The loser's own lease list names the same holder, marked as another device's lease.
+  assert.match(
+    theirs,
+    new RegExp(
+      String.raw`\n {4}dev-integration held by ${winner.did}/${SESSIONS[w]} since \S+ \(another device\)`
+    ),
+    theirs
+  );
 });
 
 // ---------------------------------------------------------------- a retired device
