@@ -880,9 +880,10 @@ async function main() {
   }
 
   // --- Part 2b: the chrome element's vocabulary (one vocabulary, no hand copy) ---
-  // elohim-chrome-asset splices this JSON into omni-element.js (include_str + a
-  // placeholder replace), so the element's capability table and page-info labels are
-  // projections of the same schemas the TS tables come from.
+  // elohim-chrome-asset's build.rs splices this JSON into the v1 element,
+  // omni-element-v1.js (a placeholder replace into OUT_DIR), so the element's capability
+  // table and page-info labels are projections of the same schemas the TS tables come
+  // from. The pre-v1 omni-element.js is baked verbatim (include_str!) and is not spliced.
   const chromeVocab = await generateChromeVocabulary();
 
   if (VERIFY) {
