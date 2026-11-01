@@ -45,17 +45,17 @@ slice text yet and take shape as the sprints settle. Nothing here is a new regis
 | 2 | **Build execution** | Jenkinsfiles, imperative (edge 195 KB at the CPS cliff); local gates via `run-local-gate.sh` | `rakia build` executes a manifest's steps; a Jenkinsfile stage is `sh 'rakia build <step>'` | rakia Stage 1 sprint 5 | push-delivers-within-budget | pending |
 | 3 | **Change detection and selection** | `rakia affected` / `plan` / `ci` / `baseline` (binary installed); brit/gix change detection; baselines as git notes-refs | Unchanged: this is already native; the orchestrator's already-built filter keys on closures (S3b) | design S3b | push-delivers-within-budget | wired |
 | 4 | **Closure-keyed artifacts** | tonight: `closure-<key16>` tags + config labels on storage/doorway images, `harbor-oracle.sh` hit/miss | DNA pack keyed and re-tagged (S2c); app bundle keyed; one derivation per step | design S1a, S2c | push-delivers-within-budget | S1a landing |
-| 5 | **Artifact custody** (Harbor, Nexus) | Harbor by tag with `imagePullPolicy: Always`; cargo `elohim` registry on Nexus (`elohim-epr`, `epr-rea`, eprfs family 0.3.1; pre-push version-collision precheck) | Harbor and Nexus behind rakia `Registry::has_artifact` by digest; the bundle carrier (≤1 MiB CIDv1 chunks named by a manifest entry) as dataplane custody for images, crates and packages — source of truth per the design §3 minted #3: class B2, identity = the artifact digest, closure tag a secondary index, `node_registry` `CustodianAssignment` the existing entry type for custody once it leaves Harbor | design A7b/S3a; rakia executor spec §4.2 | sprint-lands-each-closure-once | pending |
+| 5 | **Artifact custody** (Harbor, Nexus) | Harbor by tag with `imagePullPolicy: Always`; cargo `elohim` registry on Nexus (`elohim-epr`, `epr-rea`, eprfs family 0.3.1; pre-push version-collision precheck) | Harbor and Nexus behind rakia `Registry::has_artifact` by digest; the bundle carrier (≤1 MiB CIDv1 chunks named by a manifest entry) as dataplane custody for images, crates and packages — source of truth per the design §3 minted #3: class B2, identity = the artifact digest, closure tag a secondary index, `node_registry` `CustodianAssignment` the existing entry type for custody once it leaves Harbor | design A7b/S3a; rakia executor spec §4.2 | sprint-lands-each-closure-once | pending · next sprint: the elohim-native store, acceptance I1–I7 (§5) |
 | 6 | **Attestation** | brit local `recordEvidence` (private notes, never pushed); Jenkins `brit-helper.sh attest` wired but inert | One writer per device at harvest time: brit `ci:<pipeline>` notes from Jenkins's archived graph, `inputs_hash` = closure, `output_cid` = digest; the inert Jenkins arm deleted | design S2d' | push-delivers-within-budget | pending |
 | 7 | **Evidence reuse across devices** | A8 sibling verdict (`gate-runner.mjs:463-486`), closure keys equal on both devices (D4); live two-device receipt owed; `GATE_EVIDENCE=reuse` 5,757 s → 56 s locally | First `independence: sibling` row on a real push; eprfs/orchestrator keys hit after the corpus split | design S2a, S2b | push-gate-pays-once | S2a next |
-| 8 | **Carried gates** (peer runs the job) | `just measure` rung H on jessica (12–15 s guest work); rakia executor source on the pin, unbuilt; `ark task run` never run here | A gate neither device paid is claimed by the device whose own ram-guard/io-guard lines admit it, run under `ark task run` in its envelope, verdict folded back; requester waits 0 s when no carrier is present | design S3a; measure-runs-on-a-peer rung A | sprint-lands-each-closure-once, measure-runs-on-a-peer | pending |
-| 9 | **Landing** (GitHub's role) | pre-push claims `dev-integration` before gates and holds it through them (p90 3,321 s); GitHub ref is the CAS | Phase V gates holding nothing; Phase L holds the lease for a 600 s CAS window; intents are atoms; a silent sibling is overridden by rule; GitHub keeps only the final compare-and-swap | design S1b (A9) | sprint-lands-each-closure-once | morning handoff |
+| 8 | **Carried gates** (peer runs the job) | `just measure` rung H on jessica (12–15 s guest work); rakia executor source on the pin, unbuilt; `ark task run` never run here | A gate neither device paid is claimed by the device whose own ram-guard/io-guard lines admit it, run under `ark task run` in its envelope, verdict folded back; requester waits 0 s when no carrier is present | design S3a; measure-runs-on-a-peer rung A | sprint-lands-each-closure-once, measure-runs-on-a-peer | pending · §5 (requests and offers) |
+| 9 | **Landing** (GitHub's role) | pre-push claims `dev-integration` before gates and holds it through them (p90 3,321 s); GitHub ref is the CAS | Phase V gates holding nothing; Phase L holds the lease for a 600 s CAS window; intents are atoms; a silent sibling is overridden by rule; GitHub keeps only the final compare-and-swap | design S1b (A9) | sprint-lands-each-closure-once | morning handoff · landing-queue sprint in flight: S1 (`epr flow intend`, `epr peer intents`) and S2 (decision modules) landing 2026-11-01 |
 | 10 | **Jenkins's role** | the only dispatcher, builder, deployer and (nominal) attester | Witness and one builder among many: dispatches, builds what no device carried, never judges policy, never reads a lease | design §2; steward-space A10 (deferred until `runtime-death-witnessed` is green) | push-delivers-within-budget | in motion |
 | 11 | **Tool distribution** (brit, epr, launchers) | device bin store: `brit` on PATH is `bin-launch` → content-addressed release (head `bafyreiai7…`); `epr device arrive` reinstalls launchers from `current` (R1) | Releases published to and admitted from the dataplane, not GitHub; auto-update exercised on both devices | restart-to-connected R1/R2; backlog "brit handoff" | workspace-device-arrival | distribution native, publication pending |
 | 12 | **Device arrival and the daemon** | `just status device` nine lines; `epr peer serve` not yet supervised; a Che restart cost six manual steps (2026-10-25) | `epr device arrive` is one step to latest and connected; the daemon is an ark `processes[]` child, death-witnessed, relay-independent | steward-space A4; restart-to-connected R3/R4 | workspace-device-arrival, devices-share-one-berth | in motion |
 | 13 | **Onboarding a second principal** | roster rows travel by git; `epr actor device enroll \| authorize \| bind`; only `human:matthew` is real, every other human a fixture | Fork an lvi workspace → enrol → the device's head folds on the steward space → its verdicts count as an independent lineage at `trusted` | lvi `DevspaceSeed`; steward-space S2 (collective space, `binds-signer`) | workspace-device-arrival | pending |
 | 14 | **Dispatch at community reach** | eprfs-peer over iroh inside one steward's grant | claim / dispatch / result over storage's libp2p swarm for closures already attested at `trusted`; `rakia-peer` crate | rakia Stage 2 (Canopy) | — | pending |
-| 15 | **Compute as contribution** | berth leases as ephemeral observations; `delegates-compute` mishpat commitment exists for a second principal | A carried gate is a `Commitment{Produce}` with the carrier's envelope as its bound; recognized through the same REA events as content; stewarded, never free-riding in either direction | design §3 minted 5; rakia Stage 3 (shefa) | — | pending |
+| 15 | **Compute as contribution** | berth leases as ephemeral observations; `delegates-compute` mishpat commitment exists for a second principal | A carried gate is a `Commitment{Produce}` with the carrier's envelope as its bound; recognized through the same REA events as content; stewarded, never free-riding in either direction | design §3 minted 5; rakia Stage 3 (shefa) | — | pending · §5 (requests and offers) |
 | 16 | **Capacity read natively** | tonight: cost vector on every cycle row, ledger union, berth fold and reap, the stage-wallclock sensor alive | Each device's carrying-capacity vector declared once in its ark RuntimeManifest and read by dispatch; `Envelope::demand` beside `bound` | design S1c, S4 | push-gate-pays-once, conductor-capacity-represented | S1c landing |
 
 ## 2. Ease of operation — the moments, and what each should cost
@@ -72,7 +72,7 @@ slice text yet and take shape as the sprints settle. Nothing here is a new regis
 ## 3. Sequence
 
 1. Sprint 1 (in flight): rows 4, 16 (α, γ landing tonight); row 9 (β) handed to the morning.
-2. Sprint 2: rows 7 (S2a receipt), 4 (S2c DNA), 6 (S2d' attestation on the device), 12 (A4 supervised daemon).
+2. Sprint 2 (re-ranked 2026-11-01, §5): first the hit-rate preconditions (reuse that holds), then row 5's store design pass with I1–I7 as its acceptance tests and its first slice between two of this person's workspaces; rows 7 (S2a receipt), 4 (S2c DNA), 6 (S2d' attestation on the device) and 12 (A4 supervised daemon) ride beside it.
 3. Sprint 3: rows 7 (S2b corpus split), 3 (S3b), 8 (S3a the carry), 5 (A7b bundle custody as the carry's carrier).
 4. Sprint 4: rows 16 (S4 demand), 11 (brit off GitHub), 13 (second principal).
 5. Rakia Stage 1 sprint 5–6 (rows 2, 6) run beside sprints 2–3: `rakia build` is what lets a Jenkinsfile stage become one line.
@@ -86,3 +86,55 @@ slice text yet and take shape as the sprints settle. Nothing here is a new regis
 - Row 13: the acceptor set for a second principal's first verdict (D5's three gaps: `binds-signer`, signer admission, signature verification).
 - Row 15: the REA event shape for a carried gate when the carrier and requester are the same principal (today) vs two (later).
 - Hardware: the media PC (Ryzen 5, 16 GB, no TLC drive yet) can carry one storage gate at a time once the pool has a drive; until then it is a sibling-verdict peer. The laptop likewise. Neither is a Jenkins agent.
+
+## 5. Reconciliation 2026-11-01 — the store's gaps and sccache's traps
+
+> **Operator direction (2026-11-01).** The next sprint fills the artifact store's gaps and is
+> positioned so the failures that made sccache a blocker cannot recur: "we want to avoid the bugs that
+> caused sccache to become a blocker to our development when we implement our store." The ranked rows
+> live in [the workspace-discipline cluster](epr:arch-workspace-discipline-backlog), rows 71–77.
+
+**What this sprint makes shareable.** The landing-queue sprint (row 9) makes *verdicts* shareable and
+the landing order safe. It does not move *bytes*. Moving bytes between workspaces is row 5: the
+elohim-native store (whole derivation keyed by gate closure, a brit `build put --output <bafkrei>`
+record, bytes in the eprfs tier store, reach under a `custody-blob` pledge born `self`, REA
+Produce/Use/Consume). It is not sccache with another backend.
+
+**sccache's failures as acceptance criteria for row 5** (sources: [sccache-garage-harden](epr:sccache-garage-harden), the CI anti-patterns museum row 5):
+
+| # | Invariant | The sccache failure it closes |
+|---|---|---|
+| I1 | A cache fault is never build output: every draw ends `hit(verified bytes)`, `miss` or `unavailable(why)`; bytes are CID-checked on read and only a hit reaches the consumer | an S3 404 fed into rustc's stdin probe as null bytes ("unclosed delimiter") |
+| I2 | Empty is cold, never broken: no sentinel or init object exists | a bucket wipe removed `.sccache_check` and *caused* the symptom |
+| I3 | Poison cannot persist: one key class (closure → output CID through a signed record); a bad record is superseded | probe entries survived `SCCACHE_RECACHE`; heals were a key DELETE or a full repave |
+| I4 | The store is always optional: absent, slow, uncredentialed or emptied means build locally and print why | `RUSTC_WRAPPER` set on binary presence; a dead Garage key and the 2026-08-23 metadata loss failed builds |
+| I5 | No wrapper on the compile path: artifact grain sits above rustc | ~1.7% of compiles failed to spawn the wrapper (ENOENT) under parallel load |
+| I6 | A hit names its signer and closure; reach widens only on converging independent derivations | a CID proves the bytes, not that they are a correct build — sccache had no answer |
+| I7 | Every draw is a flow event; hit rate and fetch-vs-rebuild time are measured | failures were invisible (optimistic success) and re-diagnosed each time |
+
+Tests owed before slice 1: wipe the store, corrupt one blob, kill a fetch midway, revoke the
+credential. Each must give byte-identical output and a printed reason.
+
+**Gaps to close first** (the arc's own critics, plan `pasted-content-id-3a40-are-some-virtual-nova`
+§ Staged): the custody pledge does not reach the tier store; the Mishpat `Commitment` payload is
+confused with the elohim-DNA REA `Commitment`; slice 1's first act PUTs to a server the device may
+not run (a local-first refusal); brit signer, `computed_by` and `agent_cid` are unjoined namespaces;
+the 454 MB storage binary exceeds the 64 MiB frame and the tier door has no `serve-blob` Use writer.
+Also A7b: a sibling's commit objects are absent from the local odb.
+
+**Hit-rate preconditions** (a fast store with a near-zero hit rate is still slow): no gate writes a
+tracked file (the eprfs gate appends to `.claude/data/architecture-findings.jsonl` today); one
+`// gate-reads:` must not mask a walk in the same function; undeclared inputs refuse in seconds; eprfs
+leaves tree scope (12 unresolved reads after S1). Cluster rows 73, 76 and 74.
+
+**Requests and offers (rows 8 and 15).** A landing intent is already a ValueFlows `Intent` its
+pusher fulfils; `just measure` sends a stage to a named provider under a grant. A market adds a job
+published as a provider-less Intent, capacity offered as Intents, a match as a `Commitment`, and
+completion as Produce plus Use, with the result's reach widening as independent derivations
+converge (I6). Trust prices it: own devices reuse cheaply, a stranger's output pays a re-derivation
+premium. Shefa's requests and offers are the home. Cluster row 77, after row 5 holds.
+
+**Throughput.** Above 64 MB, elohim-storage already erasure-codes blobs (RS 4+3) and `blob_swarm`
+spreads shard fetches across holders, so committed holders add their upload for large derivations
+and any four of seven shards rebuild (the slow peer is skipped). Compile-unit objects gain nothing
+from sharding; between two workspaces on one cluster, locality and hashing dominate.

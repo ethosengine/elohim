@@ -8,7 +8,7 @@ habits: [push-delivers-within-budget, sprint-lands-each-closure-once, push-gate-
 cites:
   - "closure-keyed-landing-plane-design | the design this handoff executes: §5 is the sprint brief, §10 the fix-in-flight list, §11 the frontier | sha256:9156f36238a93744 | path: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
   - genesis/research/integration-capacity-grounding-2026-10-29.md
-  - "native-dev-tooling-over-peers-plan | the concern table and sequence the next sessions continue from | sha256:ee8d1c37411b1f46 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
+  - "native-dev-tooling-over-peers-plan | the concern table and sequence the next sessions continue from | sha256:b4bf54d75dbf84b8 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
   - genesis/data/timeline/backlog/agent-presence-listens-to-the-space-by-default.md
   - genesis/data/timeline/backlog/ci-compute-worker-test-reds-when-grant-expires.md
 ---
