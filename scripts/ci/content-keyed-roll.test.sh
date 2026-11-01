@@ -41,6 +41,21 @@ echo 'fn main(){}' > elohim/elohim-storage/src/main.rs
 echo 'a' > crates/a/lib.rs
 echo 'build' > scripts/ci/build-storage-image.sh
 echo 'doorway' > doorway/main.rs
+# The closure digest also reads the edge manifest's step inputs, the edge
+# Jenkinsfile's recipe helpers and its own scripts from the repo it digests.
+mkdir -p elohim/holochain
+cat > elohim/holochain/build-manifest.json <<'EOF'
+{"steps":{"cargo-build-storage":{"inputs":{"sources":["elohim/elohim-storage/src"]}}}}
+EOF
+cat > elohim/holochain/Jenkinsfile <<'EOF'
+def runQualityGates() {
+    sh 'true'
+}
+def runStorageStageBody() {
+    sh 'bash scripts/ci/build-storage-image.sh'
+}
+EOF
+cp "${CI}/closure-input-digest.sh" "${CI}/harbor-oracle.sh" "${CI}/storage-input-digest.sh" scripts/ci/
 git add -A
 git update-index --add --cacheinfo "160000,$(printf '1%.0s' $(seq 40)),elohim/holochain-conductor"
 git update-index --add --cacheinfo "160000,$(printf '2%.0s' $(seq 40)),elohim/rakia"
