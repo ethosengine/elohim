@@ -69,3 +69,14 @@ and a contended-lock hook would restructure the production lock path just to tes
 read the policy before the lock would make the test flaky, not falsely green. **To close:** replace the
 fixed wait with a bounded poll until the worker is observably blocked on `journal.lock` (for example
 `/proc/<tid>/wchan` or a lock-holder probe), with no production change.
+
+## D4: two stasis Python tests failed once under load
+
+On 2026-11-01, after merging dev 1e347ab73 into the branch (e8a1467a3), one run of
+`python3 -m unittest discover -s genesis/agentic -p 'stasis_*test.py'` at host load about 30 reported
+`FAILED (failures=2)`. Three reruns at loads 24-29 passed (147 tests). The failing test names were not
+captured. The likely candidates are the timing-bounded tests: the 2-second process-group decide budget
+and the Stop-path timing fixtures. **To close:** on the next failure, capture the names with
+`python3 -m unittest discover … 2>&1 | grep -E '^(FAIL|ERROR):'`, then make those tests independent of
+host load: derive their budgets from a fake clock rather than wall time, or widen only the fixture's
+measured margin, with the reason recorded.
