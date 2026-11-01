@@ -2140,7 +2140,8 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        sh "rm -f '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report-peer-stage.json'"
+                        // Only this build's lane snapshots may enter the published result.
+                        sh "rm -f '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report-peer-stage.json' '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report-api.json' '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report-browser.json' '${env.WORKSPACE}/genesis/a2o/reports/cucumber-report.json'"
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
 
                         // Same dev admin key as the doorway pod's Secret (see helper).
@@ -2255,6 +2256,10 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             sh "bash '${env.WORKSPACE}/genesis/scripts/ci/sprint-report-browser.sh' '${env.BUILD_TAG}'"
                         }
 
+                        def featureSummary = sh(script: "'${env.WORKSPACE}/genesis/a2o/node_modules/.bin/tsx' '${env.WORKSPACE}/genesis/a2o/scripts/jenkins-feature-summary.ts'", returnStdout: true).trim()
+                        currentBuild.description = ((currentBuild.description ?: '') + ' · ' + featureSummary).trim()
+                        echo "Feature evidence: ${featureSummary}"
+
                         // Archive reports — includes per-feature screenshot subdirs
                         // when the browser stage produced any.
                         archiveArtifacts(
@@ -2283,6 +2288,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             fileExists('genesis/a2o/reports/cucumber-report-peer-stage.json')) {
                             cucumber([
                                 reportTitle: 'A2O E2E Reports',
+                                classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
                                 fileIncludePattern: 'cucumber-report-*.json',
                                 jsonReportDirectory: 'genesis/a2o/reports',
                                 buildStatus: 'UNSTABLE',

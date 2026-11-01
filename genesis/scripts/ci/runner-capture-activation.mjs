@@ -399,6 +399,28 @@ export async function captureDiagnostics({
   ];
   // Detached services write files, so container stdout alone can hide the failed station.
   const meshTail = `const fs = require('node:fs');
+// Diagnose checkout refusal without printing config, credentials, or repository contents.
+const cp = require('node:child_process');
+function checkoutProbe(root, label) {
+ const rows = [];
+ for (const part of ['', '.git', '.git/HEAD', '.git/objects', '.git/refs']) {
+  try {
+   const st = fs.lstatSync(root + (part ? '/' + part : ''));
+   rows.push({ path: part || '.', kind: st.isSymbolicLink() ? 'symlink' : st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other', mode: (st.mode & 4095).toString(8), uid: st.uid, gid: st.gid, size: st.size });
+   if (st.isSymbolicLink()) break;
+  } catch (error) { rows.push({ path: part || '.', error: error.code || 'unavailable' }); }
+ }
+ let head = null, gitExit = null;
+ if (!rows.some(row => row.kind === 'symlink')) {
+  try {
+   const value = cp.execFileSync('git', ['--no-optional-locks', '--git-dir=' + root + '/.git', 'rev-parse', '--verify', 'HEAD'], { encoding: 'utf8', timeout: 1000, maxBuffer: 4096, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+   if (/^[a-f0-9]{40,64}$/.test(value)) head = value;
+   gitExit = 0;
+  } catch (error) { gitExit = error.status ?? error.code ?? 'unavailable'; }
+ }
+ console.log('checkout-observation ' + JSON.stringify({ label, root, uid: process.getuid(), paths: rows, head, gitExit }));
+ return head;
+}
 const paths = ['logs/start.log','logs/mongod.log','logs/doorway.log','logs/doorway-b.log','logs/doorway-c.log','logs/matthew.log','logs/jessica.log','logs/james.log','conductors/.sandbox_log','conductors/.sandbox_run_log','conductors/.sandbox_run_log.matthew','conductors/.sandbox_run_log.jessica','conductors/.sandbox_run_log.james'];
 for (const path of paths) {
  console.log('--- ' + path);
@@ -449,6 +471,9 @@ for (const peer of ['matthew','jessica','james']) {
   for (const name of names.sort()) observe(directory + '/' + name, true);
  } catch (error) { console.log('identity-observation ' + JSON.stringify({ path: directory, ...(error.code === 'ENOENT' ? { missing: true } : { unavailable: true }) })); }
 }
+// Keep checkout observations after log tails so the bounded artifact retains them.
+const imageHead = checkoutProbe('/opt/compute/repo', 'image');
+if (imageHead) checkoutProbe('/var/lib/compute/repos/' + imageHead, 'persistent');
 console.log('recovery-proof ' + JSON.stringify((${readRecoveryProof.toString()})()));
 (${inspectProviderBootstrap.toString()})().then(result => console.log('provider-observation ' + JSON.stringify(result)), () => console.log('provider-observation unavailable'));`;
   reads.push([

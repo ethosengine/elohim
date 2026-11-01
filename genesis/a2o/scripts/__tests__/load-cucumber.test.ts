@@ -6,7 +6,114 @@ import { loadCucumber } from '../lib/load-cucumber.js';
 
 const fixture = readFileSync(new URL('./fixtures/cucumber-mixed.json', import.meta.url), 'utf8');
 
+const peerFeature = 'features/peer.feature';
+const peerScenario = 'peer responds';
+
 void describe('loadCucumber', () => {
+  void it('counts a failed step cleanup hook', () => {
+    const [result] = loadCucumber(
+      JSON.stringify([
+        {
+          uri: peerFeature,
+          elements: [
+            {
+              type: 'scenario',
+              name: peerScenario,
+              steps: [
+                {
+                  name: 'responds',
+                  result: { status: 'passed' },
+                  after: [{ result: { status: 'failed', error_message: 'cleanup failed' } }],
+                },
+              ],
+            },
+          ],
+        },
+      ])
+    );
+    assert.equal(result.status, 'failed');
+    assert.equal(result.failureMessage, 'cleanup failed');
+  });
+
+  void it('does not treat inline hidden hooks as executed Gherkin steps', () => {
+    const [result] = loadCucumber(
+      JSON.stringify([
+        {
+          uri: peerFeature,
+          elements: [
+            {
+              type: 'scenario',
+              name: 'empty scenario',
+              steps: [{ hidden: true, result: { status: 'passed' } }],
+            },
+          ],
+        },
+      ])
+    );
+    assert.equal(result.status, 'undefined');
+  });
+
+  for (const hook of ['before', 'after']) {
+    void it(`preserves a failed ${hook} hook despite passing steps`, () => {
+      const [result] = loadCucumber(
+        JSON.stringify([
+          {
+            uri: peerFeature,
+            elements: [
+              {
+                type: 'scenario',
+                name: peerScenario,
+                steps: [{ name: 'responds', result: { status: 'passed' } }],
+                [hook]: [{ result: { status: 'failed', error_message: 'fixture unavailable' } }],
+              },
+            ],
+          },
+        ])
+      );
+      assert.equal(result.status, 'failed');
+      assert.equal(result.failureMessage, 'fixture unavailable');
+    });
+  }
+
+  for (const status of ['ambiguous', 'unknown', undefined]) {
+    void it(`does not turn ${String(status)} step outcomes into a pass`, () => {
+      const [result] = loadCucumber(
+        JSON.stringify([
+          {
+            uri: peerFeature,
+            elements: [
+              {
+                type: 'scenario',
+                name: peerScenario,
+                steps: [{ name: 'responds', result: { status } }],
+              },
+            ],
+          },
+        ])
+      );
+      assert.equal(result.status, status === 'ambiguous' ? 'failed' : 'undefined');
+    });
+  }
+
+  void it('does not infer execution from passing hooks on an empty scenario', () => {
+    const [result] = loadCucumber(
+      JSON.stringify([
+        {
+          uri: peerFeature,
+          elements: [
+            {
+              type: 'scenario',
+              name: peerScenario,
+              steps: [],
+              before: [{ result: { status: 'passed' } }],
+            },
+          ],
+        },
+      ])
+    );
+    assert.equal(result.status, 'undefined');
+  });
+
   void it('parses all scenarios with feature URI', () => {
     const results = loadCucumber(fixture);
     assert.equal(results.length, 3);

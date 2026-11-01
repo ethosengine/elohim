@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
+  cpSync,
   chmodSync,
   statSync,
   symlinkSync,
@@ -20,6 +21,70 @@ import {
   readPersistedLogs,
   verifyDeclaration,
 } from "./runner-capture-activation.mjs";
+
+test("checkout diagnostics distinguish a valid image from missing persisted Git metadata", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "checkout-observation-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = join(root, "image"),
+    copies = join(root, "repos");
+  mkdirSync(source);
+  const git = (...args) =>
+    execFileSync("git", ["-C", source, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q");
+  git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "--allow-empty",
+    "-qm",
+    "fixture",
+  );
+  const head = git("rev-parse", "HEAD");
+  git("config", "http.extraHeader", "private-test-header");
+  const persisted = join(copies, head);
+  cpSync(source, persisted, { recursive: true });
+  rmSync(join(persisted, ".git/HEAD"));
+  let script;
+  await captureDiagnostics({
+    root,
+    workload: "adam",
+    namespace: "alpha",
+    env: {},
+    execute(_cmd, args) {
+      if (args.includes("exec")) script = args.at(-1);
+      return "";
+    },
+  });
+  const output = execFileSync(
+    process.execPath,
+    [
+      "-e",
+      script
+        .replaceAll("/opt/compute/repo", source)
+        .replaceAll("/var/lib/compute/repos/", copies + "/")
+        .replaceAll("/var/lib/compute/mesh/", join(root, "mesh") + "/"),
+    ],
+    { encoding: "utf8" },
+  );
+  assert(!output.includes("private-test-header"));
+  const rows = output
+    .split("\n")
+    .filter((line) => line.startsWith("checkout-observation "))
+    .map((line) => JSON.parse(line.slice("checkout-observation ".length)));
+  assert.equal(rows[0].head, head);
+  assert.equal(rows[0].gitExit, 0);
+  assert.equal(rows[1].head, null);
+  assert.notEqual(rows[1].gitExit, 0);
+  assert.equal(
+    rows[1].paths.find((path) => path.path === ".git/HEAD").error,
+    "ENOENT",
+  );
+  assert.equal(existsSync(join(persisted, ".git/HEAD")), false);
+});
 // Namespace UID 0 does not imply that Node can set a child's UID/GID to 65534.
 function mapsGuest(mapping) {
   return mapping
