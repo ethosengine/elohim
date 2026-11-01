@@ -1,12 +1,17 @@
 import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { resolve, dirname } from 'path';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'url';
 import {
   parseCommitTags,
   parseSkipCi,
   parseConductorOptions,
   CONDUCTOR_FEATURE_PRESETS,
+  parseChangeId,
 } from './commit-tag-parser.mjs';
 import { loadPipelineRegistry } from './pipeline-registry.mjs';
 
@@ -126,5 +131,73 @@ describe('parseSkipCi', () => {
 
   test('no tag returns false', () => {
     assert.strictEqual(parseSkipCi('regular commit'), false);
+  });
+});
+
+describe('changeId', () => {
+  const id = `I${'a'.repeat(40)}`;
+
+  test('reads the trailer', () => {
+    assert.deepStrictEqual(parseChangeId(`subject\n\nChange-Id: ${id}\n`), {
+      id,
+      why: null,
+    });
+  });
+
+  test('ignores a body mention', () => {
+    assert.equal(parseChangeId(`subject\n\nChange-Id: ${id}\n\nbody tail`).id, null);
+  });
+
+  test('ignores the subject', () => {
+    assert.equal(parseChangeId(`Change-Id: ${id}`).id, null);
+  });
+
+  test('two distinct trailers null with why', () => {
+    assert.deepStrictEqual(
+      parseChangeId(`s\n\nChange-Id: ${id}\nChange-Id: I${'b'.repeat(40)}`),
+      { id: null, why: '2 Change-Id trailers' }
+    );
+  });
+
+  test('malformed value null with why', () => {
+    assert.deepStrictEqual(parseChangeId('s\n\nChange-Id: nope'), {
+      id: null,
+      why: 'malformed Change-Id: nope',
+    });
+  });
+
+  test('lowercase key accepted', () => {
+    assert.equal(parseChangeId(`s\n\nchange-id: ${id}`).id, id);
+  });
+
+  test('crlf handled', () => {
+    assert.equal(parseChangeId(`s\r\n\r\nChange-Id: ${id}\r\n`).id, id);
+  });
+
+  test('stops at scissors', () => {
+    assert.equal(
+      parseChangeId(`s\n# ------------------------ >8 ------------------------\n\nChange-Id: ${id}`).id,
+      null
+    );
+  });
+
+  test('cli reads message by file and exits 0', t => {
+    const dir = mkdtempSync(join(tmpdir(), 'change-id-parser-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const file = join(dir, 'msg');
+    writeFileSync(file, `s\n\nChange-Id: ${id}\n`);
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(
+      process.execPath,
+      [join(__dirname, 'commit-tag-parser.mjs'), 'change-id', file],
+      { encoding: 'utf8', env }
+    );
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, `${id}\n`, JSON.stringify({
+      status: result.status,
+      stderr: result.stderr,
+      error: result.error?.message,
+    }));
   });
 });

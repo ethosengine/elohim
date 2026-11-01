@@ -5,12 +5,16 @@
  * Exports:
  *   parseCommitTags(commitMsg, registry) → string[]
  *   parseSkipCi(commitMsg) → boolean
+ *   parseChangeId(commitMsg) → { id: string|null, why: string|null }
+ *   changeId(commitMsg) → string|null
  *   parseConductorOptions(commitMsg) → object
  *   BUILD_TAG_ALIASES
  *   CONDUCTOR_FEATURE_PRESETS
  */
 
 import { nonManualPipelines } from './pipeline-registry.mjs';
+
+export const CHANGE_ID_RE = /^I[0-9a-f]{40}$/;
 
 export const BUILD_TAG_ALIASES = {
   edge: 'elohim-edge',
@@ -141,6 +145,34 @@ export function parseSkipCi(commitMsg) {
   return /\[(skip ci|ci skip|no ci)\]/i.test(commitMsg);
 }
 
+export function parseChangeId(commitMsg) {
+  const scissors = '# ------------------------ >8 ------------------------';
+  const text = String(commitMsg ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split(scissors, 1)[0];
+  const paragraphs = text
+    .split('\n')
+    .filter(line => !/^\s*#/.test(line))
+    .join('\n')
+    .trim()
+    .split(/\n\s*\n/);
+  const block = paragraphs.length > 1 ? paragraphs.at(-1) : '';
+  const values = block
+    .split('\n')
+    .map(line => line.match(/^change-id:\s*(\S+)\s*$/i)?.[1])
+    .filter(Boolean);
+  if (values.length === 0) return { id: null, why: 'no Change-Id trailer' };
+  const malformed = values.find(value => !CHANGE_ID_RE.test(value));
+  if (malformed) return { id: null, why: `malformed Change-Id: ${malformed}` };
+  const distinct = [...new Set(values)];
+  if (distinct.length >= 2) return { id: null, why: `${distinct.length} Change-Id trailers` };
+  return { id: distinct[0], why: null };
+}
+
+export function changeId(commitMsg) {
+  return parseChangeId(commitMsg).id;
+}
+
 /**
  * CLI: emit [conductor:…] options as JSON for the orchestrator Jenkinsfile.
  *
@@ -157,8 +189,13 @@ if (process.argv[1] && process.argv[1].endsWith('commit-tag-parser.mjs')) {
     const { readFileSync } = await import('node:fs');
     const msg = msgFile ? readFileSync(msgFile, 'utf8') : '';
     process.stdout.write(JSON.stringify(parseConductorOptions(msg)));
+  } else if (command === 'change-id') {
+    const { readFileSync } = await import('node:fs');
+    const parsed = parseChangeId(msgFile ? readFileSync(msgFile, 'utf8') : '');
+    if (parsed.id) process.stdout.write(`${parsed.id}\n`);
+    else process.stderr.write(`[change-id] ${parsed.why}\n`);
   } else if (command) {
-    process.stderr.write(`unknown command '${command}' — expected 'conductor-opts'\n`);
+    process.stderr.write(`unknown command '${command}' — expected 'conductor-opts' or 'change-id'\n`);
     process.exit(2);
   }
 }
