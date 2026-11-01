@@ -50,7 +50,7 @@ test('element dists: only the element packages a selected project imports, unles
   const root = scratch(t);
   for (const name of ['elohim-core', 'unimported-element']) {
     put(root, `app/elohim-elements/${name}/package.json`, JSON.stringify({
-      exports: { './register': { import: './dist/register.js' }, './tokens.scss': './src/tokens.scss' },
+      exports: { './register': { import: './dist/register.js' }, './tokens.scss': './src/tokens.scss', './styles.css': './dist/styles.css' },
     }));
   }
   put(root, 'app/elohim-app/package.json', JSON.stringify({ dependencies: { 'elohim-core': 'workspace:*' } }));
@@ -64,7 +64,7 @@ test('element dists: only the element packages a selected project imports, unles
   assert.doesNotMatch(red.why, /unimported-element/, 'an element no selected gate imports is never required');
   assert.match(red.cure, /--filter elohim-core/);
   put(root, 'app/elohim-elements/elohim-core/dist/register.js');
-  assert.equal(checkElementDists({ root, projects: [app] }).level, 'ok');
+  assert.equal(checkElementDists({ root, projects: [app] }).level, 'ok', 'a declared CSS asset with no build step is never required');
 });
 
 test('storage-client dist refuses for genesis-a2o, warns for app gates; a missing sophia UMD only warns', (t) => {

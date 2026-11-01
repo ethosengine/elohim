@@ -104,7 +104,7 @@ export function elementDepsOf(root, project) {
 }
 
 /**
- * Every `exports[*].import` under dist/ of each element package a selected project depends on
+ * Every JS `exports[*].import` under dist/ of each element package a selected project depends on
  * (elohim-app on 11-01: `Could not resolve "elohim-core/register"`; storybook on 10-31:
  * `elohim-qahal/register`). An element no selected gate imports is never required.
  */
@@ -116,7 +116,10 @@ export function checkElementDists({ root, projects }) {
     const manifest = readJson(join(root, ELEMENTS_DIR, name, 'package.json'));
     for (const target of Object.values(manifest?.exports || {})) {
       const file = typeof target === 'string' ? target : target?.import;
-      if (typeof file !== 'string' || !file.startsWith('./dist/')) continue;
+      // JS module exports only: an unresolvable import is what failed the app and storybook builds.
+      // A declared asset (elohim-core's ./dist/styles.css) may have no build step at all, and
+      // refusing on it would block a push whose gates pass.
+      if (typeof file !== 'string' || !/^\.\/dist\/.+\.m?js$/.test(file)) continue;
       if (!existsSync(join(root, ELEMENTS_DIR, name, file))) { missing.push(name); break; }
     }
   }
