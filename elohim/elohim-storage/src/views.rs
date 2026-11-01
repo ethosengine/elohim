@@ -178,7 +178,10 @@ pub struct ObservationReportView {
 }
 
 #[cfg(test)]
-#[allow(clippy::items_after_test_module)]
+#[allow(
+    clippy::items_after_test_module,
+    reason = "the elohim_views re-exports and the content-graph View conversions follow this test module, beside the federation types it tests"
+)]
 mod federation_canonical_tests {
     use super::*;
 
