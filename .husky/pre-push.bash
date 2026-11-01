@@ -150,6 +150,7 @@ done
 HOOK_ON_EXIT=""
 HOOK_OWNER_PID=$BASHPID
 hook_on_exit() {
+  HOOK_EXIT_RC=$? # the hook's exit status, read by handlers that report how the push ended
   # A renewer can exit before resetting its inherited traps; only this shell owns the claims.
   [ "$BASHPID" = "$HOOK_OWNER_PID" ] || return 0
   local handler
@@ -332,8 +333,88 @@ if [ -n "$BERTH_TARGETS" ]; then
 fi
 # ── Berth: claims taken ───────────────────────────────────────────
 
+# The object this push is judged by (the dev ref's sha, else the last ref's) and its targets, read
+# before any check so the live run can open first; GATE_COMMIT below is derived the same way.
+LIVE_SHA=""
+LIVE_DEV_SHA=""
+LIVE_TARGETS=""
+for PUSH_LINE in "${PUSH_LINES[@]}"; do
+  read -r _ L_SHA L_REF _ <<<"$PUSH_LINE"
+  [ "$L_SHA" = "$ZERO_SHA" ] && continue
+  LIVE_TARGETS="${LIVE_TARGETS:+$LIVE_TARGETS }$L_REF"
+  LIVE_SHA="$L_SHA"
+  [ "$L_REF" = refs/heads/dev ] && LIVE_DEV_SHA="$L_SHA"
+done
+LIVE_SHA="${LIVE_DEV_SHA:-$LIVE_SHA}"
+
+# Live gate events: every red this push raises — a check below, the preflight, or a line a gate
+# prints — is appended to a run log on this device as it happens, so the session that started the
+# push hears it at its next tool call (`gate-live-inject`) or wakes on it (`gate-live.mjs follow`,
+# Monitor-shaped) while the rest of the push keeps reporting. Opened before the first check, so a
+# seconds-cheap red is live in seconds. Nothing here decides the push; exit statuses do. The run
+# closes by how the hook ends: passed, failed, or interrupted on a signal, never passed by default.
+# Spec: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
+# The close handler is registered before the run opens, so a signal during `open` cannot leave
+# a run with no close; it does nothing while no run is open.
+GATE_LIVE_RUN=""
+gate_live_close_on_exit() {
+  [ -n "$GATE_LIVE_RUN" ] || return 0
+  local outcome=failed
+  case "${HOOK_EXIT_RC:-1}" in
+    0) outcome=passed ;;
+    129 | 130 | 143) outcome=interrupted ;;
+  esac
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" >/dev/null 2>&1
+  # The integrator's harvest: recurring and late cheap reds across this device's recent runs.
+  [ "$outcome" = interrupted ] || node genesis/orchestrator/gate-live.mjs harvest --last 10 2>/dev/null
+  return 0
+}
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_live_close_on_exit"
+GATE_LIVE_RUN=$(node genesis/orchestrator/gate-live.mjs open --sha "$LIVE_SHA" --target "$LIVE_TARGETS" 2>/dev/null) || GATE_LIVE_RUN=""
+if [ -n "$GATE_LIVE_RUN" ]; then
+  export GATE_LIVE_RUN
+  echo "  Live failures: node genesis/orchestrator/gate-live.mjs follow --run $GATE_LIVE_RUN"
+  echo "  Stop after the running gate: node genesis/orchestrator/gate-live.mjs stop --run $GATE_LIVE_RUN"
+  echo ""
+fi
+# ── Live run open
+
+# A red from a check is recorded and live at once; whether the push then stops is the
+# integrator's call (`gate-live.mjs stop`) or the declared policy: GATE_ON_RED=continue|stop,
+# default from genesis/agentic/pool-policy.json gate_on_red. Under continue every later check
+# and gate still runs and reports, and the push is refused at the end.
+GATE_ON_RED_MODE=$(node genesis/orchestrator/gate-preflight.mjs --on-red 2>/dev/null || echo continue)
+PREGATE_FAILED=""
+leg_red() {
+  local leg="$1"
+  shift
+  echo "[pre-push] RED $leg: $*" >&2
+  PREGATE_FAILED="$PREGATE_FAILED $leg"
+  if [ -n "$GATE_LIVE_RUN" ]; then
+    node genesis/orchestrator/gate-live.mjs red --run "$GATE_LIVE_RUN" --project "$leg" --message "$*" >/dev/null 2>&1 || true
+  fi
+  if [ "$GATE_ON_RED_MODE" = stop ]; then
+    echo "[pre-push] GATE_ON_RED=stop — the push stops at its first red." >&2
+    exit 1
+  fi
+  return 0
+}
+gate_stop_requested() {
+  [ -n "$GATE_LIVE_RUN" ] && node genesis/orchestrator/gate-live.mjs stopped --run "$GATE_LIVE_RUN" >/dev/null 2>&1
+}
+# Every early pass below goes through here: a red an earlier check recorded still refuses.
+pass_or_refuse() {
+  if [ -n "$PREGATE_FAILED" ]; then
+    echo "[pre-push] REFUSED: red before the gates:$PREGATE_FAILED (above)." >&2
+    exit 1
+  fi
+  exit 0
+}
+# ── Red recorder end
+
 CHANGED=""
 UNFILTERED_CHANGED=""
+CHANGE_UNREADABLE=""
 GATE_NARROW_BASE=ok
 PUSH_TARGETS=""
 LAST_LOCAL_SHA=""
@@ -361,19 +442,25 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   fi
   if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
     echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
-    exit 1
+    leg_red rust-style "the style reach gate refused $REMOTE_REF (above)"
   fi
 
-  # Determine what changed
+  # Determine what changed. A new branch, or a remote tip this clone has never fetched, is read
+  # against its merge base with origin/dev: the whole branch, of the object being pushed. A range
+  # that cannot be read at all refuses below; an unreadable diff never reads as "nothing changed".
   if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then
-    # New branch - check recent commits against remote
-    # HEAD~10 is a heuristic for detection, never a real narrowing base.
     GATE_NARROW_BASE=none
-    NEW_CHANGED=$(git diff --name-only HEAD~10 HEAD 2>/dev/null || echo "")
+    if ! NEW_CHANGED=$(git diff --name-only "origin/dev...$LOCAL_SHA" 2>/dev/null); then
+      CHANGE_UNREADABLE="$CHANGE_UNREADABLE $REMOTE_REF"
+      NEW_CHANGED=""
+    fi
   else
     if ! NEW_CHANGED=$(git diff --name-only "$REMOTE_SHA" "$LOCAL_SHA" 2>/dev/null); then
       GATE_NARROW_BASE=none
-      NEW_CHANGED=""
+      if ! NEW_CHANGED=$(git diff --name-only "origin/dev...$LOCAL_SHA" 2>/dev/null); then
+        CHANGE_UNREADABLE="$CHANGE_UNREADABLE $REMOTE_REF"
+        NEW_CHANGED=""
+      fi
     fi
   fi
 
@@ -416,10 +503,16 @@ else
   unset GATE_EVIDENCE_RECORD
 fi
 
-# Nothing changed — let it through
-if [ -z "$CHANGED" ]; then
-  exit 0
+if [ -n "$CHANGE_UNREADABLE" ]; then
+  echo "[pre-push] REFUSED: could not read what changed for${CHANGE_UNREADABLE} (neither the remote tip nor origin/dev...<pushed sha> diffs). Run: git fetch origin" >&2
+  exit 1
 fi
+
+# Nothing changed — let it through (a style refusal still refuses)
+if [ -z "$CHANGED" ]; then
+  pass_or_refuse
+fi
+
 
 # ── Elohim-agent package projection freshness ────────────────────
 #
@@ -457,9 +550,10 @@ if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/a
       echo "!!   pnpm run elohim-agent:packages:import    (runtime -> package import)"
       echo "!!============================================================!!"
       echo ""
-      exit 1
+      leg_red package-projections "projection drift; pnpm run elohim-agent:packages:project"
+    else
+      echo "[pre-push] elohim-agent package projections ✓"
     fi
-    echo "[pre-push] elohim-agent package projections ✓"
   fi
 fi
 
@@ -483,6 +577,7 @@ fi
 if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
   if command -v python3 >/dev/null 2>&1; then
     hook_tests_ran=0
+    hook_tests_red=0
     for hook_test in .claude/hooks/tests/test_*.py; do
       [ -f "$hook_test" ] || continue
       hook_tests_ran=1
@@ -498,7 +593,8 @@ if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
         echo "!! boundary stays declared; do not push a red boundary test."
         echo "!!============================================================!!"
         echo ""
-        exit 1
+        leg_red hook-boundary-tests "$hook_test failed"
+        hook_tests_red=1
       fi
     done
     # A glob that matches nothing must not print a success line — a renamed or deleted
@@ -507,9 +603,10 @@ if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
     if [ "$hook_tests_ran" -eq 0 ]; then
       echo "[pre-push] ERROR: .claude/hooks changed but no boundary tests were found."
       echo "  Expected at least one .claude/hooks/tests/test_*.py"
-      exit 1
+      leg_red hook-boundary-tests "no boundary tests found"
+    elif [ "$hook_tests_red" -eq 0 ]; then
+      echo "[pre-push] Claude hook boundary tests ✓"
     fi
-    echo "[pre-push] Claude hook boundary tests ✓"
   fi
 fi
 
@@ -537,9 +634,10 @@ if echo "$CHANGED" | grep -qE "\.habit\.md$|(^|/)\.epr-meta(/|$)|^genesis/manife
     if ! python3 .claude/scripts/habits-project.py --check; then
       echo "[pre-push] ERROR: genesis/manifests/habits.yaml is stale, or the habit census is invalid."
       echo "  Run: python3 .claude/scripts/habits-project.py && git add genesis/manifests/habits.yaml"
-      exit 1
+      leg_red habit-register "habits.yaml stale or census invalid; python3 .claude/scripts/habits-project.py"
+    else
+      echo "[pre-push] habit register freshness ✓"
     fi
-    echo "[pre-push] habit register freshness ✓"
   fi
 fi
 
@@ -613,16 +711,16 @@ if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
       echo "!! Re-run one for its output:  python3 <path>"
       echo "!!============================================================!!"
       echo ""
-      exit 1
-    fi
+      leg_red agentic-library-harnesses "$(printf '%s ' $lib_failed)"
     # A glob that matches nothing must not print a success line — same guard, same reason as the
     # hook-boundary leg above.
-    if [ "$lib_tests_ran" -eq 0 ]; then
+    elif [ "$lib_tests_ran" -eq 0 ]; then
       echo "[pre-push] ERROR: .claude/scripts changed but no library harnesses were found."
       echo "  Expected at least one .claude/scripts/_lib/__tests__/*_test.py"
-      exit 1
+      leg_red agentic-library-harnesses "no library harnesses found"
+    else
+      echo "[pre-push] agentic-library harnesses ✓ ($lib_tests_ran green)"
     fi
-    echo "[pre-push] agentic-library harnesses ✓ ($lib_tests_ran green)"
   fi
 fi
 
@@ -642,7 +740,7 @@ if command -v node >/dev/null 2>&1 && [ -f genesis/orchestrator/ci-ignore.mjs ];
   fi
   if [ -z "$CHANGED" ]; then
     echo "[pre-push] All changes are .ci-ignore'd (docs/agents/CI-only) — skipping gates."
-    exit 0
+    pass_or_refuse
   fi
 fi
 
@@ -665,144 +763,8 @@ AGENT_MANIFEST_SCOPE_REMAINDER=$(
 if [ -z "$AGENT_MANIFEST_SCOPE_REMAINDER" ] &&
    printf '%s\n' "$CHANGED" | grep -qE '^elohim/sdk/domains/elohim-agent/|^elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs$'; then
   echo "[pre-push] elohim-agent manifest/schema-only changes — running focused gate."
-  pnpm run elohim-agent:test || exit 1
-  exit 0
-fi
-
-# ── Humans/Presences Schema Validation + Freshness ───────────────
-#
-# When genesis/data/humans/ or genesis/data/presences/ markdown changes,
-# validate schemas and ensure the generated humans.json / presences.json
-# artifacts are fresh relative to their markdown sources.
-if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; then
-  echo "[pre-push] Validating humans and presences schemas..."
-  (cd genesis/seeder && pnpm run validate:humans) || exit 1
-  (cd genesis/seeder && pnpm run validate:presences) || exit 1
-
-  echo "[pre-push] Regenerating humans.json / presences.json from markdown sources..."
-  (cd genesis/seeder && pnpm run build:data) || exit 1
-
-  if ! git diff --quiet -- genesis/data/humans/humans.json genesis/data/presences/presences.json 2>/dev/null; then
-    echo "[pre-push] ERROR: humans.json or presences.json is stale relative to markdown sources."
-    echo "  Re-run '(cd genesis/seeder && pnpm run build:data)' and stage the changes before pushing."
-    exit 1
-  fi
-  echo "[pre-push] humans/presences validation ✓"
-fi
-
-# ── CID-addressed artifact freshness (source .md ↔ generated CID twin) ──
-#
-# The seeder's cid-artifact-integrity guard lives in genesis/seeder, but the edit that
-# BREAKS it is a source .md under genesis/docs/content/elohim-protocol — which selects the
-# elohim-storybook gate project, never `genesis`. So the deterministic-floor guard existed
-# and CI (elohim-genesis #1522) was the first observer: manifesto.json's blobHash/blobCid
-# dangled while seven manifesto.md commits shipped. Key the freshness check to the SOURCE
-# side, not the generator's directory. Pure node+tsx (~0.6s) → PVC-EXEMPT BY OMISSION.
-if echo "$CHANGED" | grep -qE "^genesis/docs/content/elohim-protocol/|^genesis/data/lamad/content/"; then
-  echo "[pre-push] Verifying CID-addressed artifacts are fresh relative to their source .md..."
-  if ! (cd genesis/seeder && pnpm run sync:cid-artifacts:check); then
-    echo "[pre-push] ERROR: a CID-addressed artifact drifted from its source .md — /blob/<hash> would 404."
-    echo "  Run: (cd genesis/seeder && pnpm run sync:cid-artifacts) and stage the regenerated JSON."
-    exit 1
-  fi
-  echo "[pre-push] CID-artifact freshness ✓"
-fi
-
-# ── Device Archetype Validation ──────────────────────────────────
-#
-# When device archetype markdown files change, validate frontmatter
-# against devices.schema.json and regenerate devices.json.
-if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
-  echo "[pre-push] Validating device archetypes..."
-  (cd genesis/seeder && pnpm run validate:devices) || exit 1
-
-  echo "[pre-push] Regenerating devices.json from markdown sources..."
-  (cd genesis/seeder && pnpm run generate:devices) || exit 1
-
-  if ! git diff --quiet -- genesis/data/devices/devices.json 2>/dev/null; then
-    echo "[pre-push] ERROR: devices.json is stale relative to markdown sources."
-    echo "  Re-run 'pnpm --filter holochain-seeder run generate:devices' and stage the changes before pushing."
-    exit 1
-  fi
-  echo "[pre-push] device archetype validation ✓"
-fi
-
-# ── Deployment ↔ Archetype Resource-Conformance Validation ───────
-#
-# When deployments.json, a per-human manifest, the archetype budget floor, or
-# the validator itself changes, run validate:deployments — cross-refs (humanId,
-# deviceArchetype) AND resource conformance: every consolidated human's effective
-# conductor resources meet its deviceArchetype floor (archetype-resource-budgets.json),
-# and explicit-manifest humans (adam) match their declared edgenode* budget.
-# Closes the drift that silently under-provisioned adam vs its family-node-base
-# archetype-mate (backlog archetype-resource-conformance-validation-gap) — the
-# validator existed but was never gated (seeder-validate-deployments-stale-validator).
-if echo "$CHANGED" | grep -qE "genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/humans/|genesis/data/devices/archetype-resource-budgets\.json|genesis/seeder/src/validate-deployments\.ts"; then
-  echo "[pre-push] Validating deployments ↔ archetype resource conformance..."
-  (cd genesis/seeder && pnpm run validate:deployments) || exit 1
-  echo "[pre-push] deployments resource-conformance ✓"
-fi
-
-# Runtime-manifest pin/render conformance. 2026-09-05: every active human is
-# pinned, so Unpinned is now REFUSE (exit 65), alongside CID/resource drift.
-# Use the same pool resolver as native gate.projects; no prebuilt binary needed.
-if echo "$CHANGED" | grep -qE "bridges/k8s/|elohim/ark/core/|genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/runtime/|genesis/data/devices/archetype-resource-budgets\.json|scripts/ci/conductor-split-budget\.sh"; then
-  echo "[pre-push] Verifying runtime manifest pins and rendered resources..."
-  (
-    k8s_repo_root="$(git rev-parse --show-toplevel)"
-    source "$k8s_repo_root/genesis/agentic/bin/pool-lib.sh"
-    k8s_pool_family="$(detect_family "$k8s_repo_root")"
-    export CARGO_TARGET_DIR="$(slot_path "$k8s_pool_family" k8s-bridge dev)"
-    export CARGO_BUILD_JOBS=2 RUSTFLAGS="" RUSTC_WRAPPER=""
-    cargo run -q --manifest-path bridges/k8s/Cargo.toml --bin k8s-bridge -- verify --deployments genesis/orchestrator/data/deployments.json --manifests-dir genesis/orchestrator/manifests/runtime
-  ) || exit 1
-  echo "[pre-push] runtime manifest pin/render conformance ✓"
-fi
-
-
-# ── Account Package Schema Validation ────────────────────────────
-#
-# When account packages or their source data change, validate the
-# generated JSON against account-package.schema.json. Catches field
-# drift (e.g. missing relationshipType) before it reaches CI/deploy.
-if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/humans/|genesis/seeder/src/account-package\.ts"; then
-  echo "[pre-push] Validating account packages against schema..."
-  (cd genesis/seeder && pnpm run validate:account-packages) || exit 1
-  echo "[pre-push] account-packages validation ✓"
-fi
-
-# ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
-#
-# When any .epr-meta manifest or the generated .ci-ignore changes, ensure .ci-ignore is
-# fresh relative to the root .epr-meta manifest ci-trigger leg. Fail-open if python3 is
-# absent (degraded shell) — same posture as the node-guarded blocks above.
-if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
-  if command -v python3 >/dev/null 2>&1; then
-    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta manifest ci-trigger leg..."
-    if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
-      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta manifest."
-      echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
-      exit 1
-    fi
-    echo "[pre-push] .ci-ignore freshness ✓"
-  fi
-fi
-
-# ── .epr-meta compose-gate (author-time rule evaluation over the push range) ──
-#
-# The commit-time gate (.husky/pre-commit) is the primary; this is the backstop for commits made
-# with --no-verify at commit time but pushed normally. Same pure engine (_lib/epr_meta.py) over the
-# push range instead of the staged set. Pure-python (~ms), so it is PVC-EXEMPT BY OMISSION: never in
-# HEAVY_GATES and never deferrable. Fail-open if python3 OR
-# the gate script is absent (a branch predating the gate must never be blocked).
-if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.py ]; then
-  RANGE_BASE=$(git merge-base origin/dev HEAD 2>/dev/null || echo "HEAD~1")
-  if ! python3 .claude/scripts/epr-meta-git-gate.py --range "${RANGE_BASE}..HEAD"; then
-    echo "[pre-push] ERROR: .epr-meta compose-gate rejected a change in this push range."
-    echo "  Acknowledge (ask-class): EPR_META_ACK=1 git push   |   bypass all: git push --no-verify"
-    exit 1
-  fi
-  echo "[pre-push] .epr-meta compose-gate ✓"
+  pnpm run elohim-agent:test || leg_red elohim-agent-test "pnpm run elohim-agent:test failed"
+  pass_or_refuse
 fi
 
 # ── Project Detection (manifest-driven) ──────────────────────────
@@ -820,7 +782,8 @@ if command -v node >/dev/null 2>&1; then
   # or an unregistered gate project blocks every push), so the reason must be
   # visible. Swallowing it would trade the old "Unknown project" abort for a
   # silent one.
-  PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names | tr '\n' ' ')
+  # Cheapest first (recorded p90): a red that takes seconds to find never waits behind an hour.
+  PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names --order cost | tr '\n' ' ')
   [ $? -eq 0 ] || { echo "[pre-push] manifest gate selection failed (see error above)"; exit 1; }
 else
   echo "[pre-push] node unavailable — manifest gate selection skipped (CI backstop)."
@@ -830,6 +793,182 @@ fi
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 
+# ── Preflight (seconds) ──────────────────────────────────────────
+# The careless misses that have each cost a long gate run: an uninitialised submodule, an
+# unbuilt workspace dist, a Rust read the gate key cannot name, a dirty closure that will record
+# no evidence. One line per check, each REFUSED/WARN naming its cure, every REFUSED live at once.
+# gate-runner runs the same checks for a standalone `just gate`; GATE_PREFLIGHT_DONE skips them
+# per gate here. Run on the selection before the PVC and sweettest filters (a superset) and before
+# the slower legs below, so its reds are live first. cargo-deny bans lives here now, and is not
+# optional: there is no switch that skips this block.
+if [ -n "$PROJECTS" ]; then
+  # shellcheck disable=SC2086 # PROJECTS is a word list of manifest keys
+  if ! node genesis/orchestrator/gate-preflight.mjs --projects $PROJECTS; then
+    leg_red preflight "a seconds check refused (above); its cure is printed beside it"
+  fi
+fi
+export GATE_PREFLIGHT_DONE=1
+
+# ── Humans/Presences Schema Validation + Freshness ───────────────
+#
+# When genesis/data/humans/ or genesis/data/presences/ markdown changes,
+# validate schemas and ensure the generated humans.json / presences.json
+# artifacts are fresh relative to their markdown sources.
+if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; then
+  echo "[pre-push] Validating humans and presences schemas..."
+  humans_red=""
+  (cd genesis/seeder && pnpm run validate:humans) || humans_red="validate:humans"
+  (cd genesis/seeder && pnpm run validate:presences) || humans_red="$humans_red validate:presences"
+
+  echo "[pre-push] Regenerating humans.json / presences.json from markdown sources..."
+  (cd genesis/seeder && pnpm run build:data) || humans_red="$humans_red build:data"
+
+  if ! git diff --quiet -- genesis/data/humans/humans.json genesis/data/presences/presences.json 2>/dev/null; then
+    echo "[pre-push] ERROR: humans.json or presences.json is stale relative to markdown sources."
+    echo "  Re-run '(cd genesis/seeder && pnpm run build:data)' and stage the changes before pushing."
+    humans_red="$humans_red stale-json"
+  fi
+  if [ -n "$humans_red" ]; then
+    leg_red humans-presences "$humans_red"
+  else
+    echo "[pre-push] humans/presences validation ✓"
+  fi
+fi
+
+# ── CID-addressed artifact freshness (source .md ↔ generated CID twin) ──
+#
+# The seeder's cid-artifact-integrity guard lives in genesis/seeder, but the edit that
+# BREAKS it is a source .md under genesis/docs/content/elohim-protocol — which selects the
+# elohim-storybook gate project, never `genesis`. So the deterministic-floor guard existed
+# and CI (elohim-genesis #1522) was the first observer: manifesto.json's blobHash/blobCid
+# dangled while seven manifesto.md commits shipped. Key the freshness check to the SOURCE
+# side, not the generator's directory. Pure node+tsx (~0.6s) → PVC-EXEMPT BY OMISSION.
+if echo "$CHANGED" | grep -qE "^genesis/docs/content/elohim-protocol/|^genesis/data/lamad/content/"; then
+  echo "[pre-push] Verifying CID-addressed artifacts are fresh relative to their source .md..."
+  if ! (cd genesis/seeder && pnpm run sync:cid-artifacts:check); then
+    echo "[pre-push] ERROR: a CID-addressed artifact drifted from its source .md — /blob/<hash> would 404."
+    echo "  Run: (cd genesis/seeder && pnpm run sync:cid-artifacts) and stage the regenerated JSON."
+    leg_red cid-artifacts "a CID twin drifted from its source .md; (cd genesis/seeder && pnpm run sync:cid-artifacts)"
+  else
+    echo "[pre-push] CID-artifact freshness ✓"
+  fi
+fi
+
+# ── Device Archetype Validation ──────────────────────────────────
+#
+# When device archetype markdown files change, validate frontmatter
+# against devices.schema.json and regenerate devices.json.
+if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
+  echo "[pre-push] Validating device archetypes..."
+  devices_red=""
+  (cd genesis/seeder && pnpm run validate:devices) || devices_red="validate:devices"
+
+  echo "[pre-push] Regenerating devices.json from markdown sources..."
+  (cd genesis/seeder && pnpm run generate:devices) || devices_red="$devices_red generate:devices"
+
+  if ! git diff --quiet -- genesis/data/devices/devices.json 2>/dev/null; then
+    echo "[pre-push] ERROR: devices.json is stale relative to markdown sources."
+    echo "  Re-run 'pnpm --filter holochain-seeder run generate:devices' and stage the changes before pushing."
+    devices_red="$devices_red stale-json"
+  fi
+  if [ -n "$devices_red" ]; then
+    leg_red device-archetypes "$devices_red"
+  else
+    echo "[pre-push] device archetype validation ✓"
+  fi
+fi
+
+# ── Deployment ↔ Archetype Resource-Conformance Validation ───────
+#
+# When deployments.json, a per-human manifest, the archetype budget floor, or
+# the validator itself changes, run validate:deployments — cross-refs (humanId,
+# deviceArchetype) AND resource conformance: every consolidated human's effective
+# conductor resources meet its deviceArchetype floor (archetype-resource-budgets.json),
+# and explicit-manifest humans (adam) match their declared edgenode* budget.
+# Closes the drift that silently under-provisioned adam vs its family-node-base
+# archetype-mate (backlog archetype-resource-conformance-validation-gap) — the
+# validator existed but was never gated (seeder-validate-deployments-stale-validator).
+if echo "$CHANGED" | grep -qE "genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/humans/|genesis/data/devices/archetype-resource-budgets\.json|genesis/seeder/src/validate-deployments\.ts"; then
+  echo "[pre-push] Validating deployments ↔ archetype resource conformance..."
+  if (cd genesis/seeder && pnpm run validate:deployments); then
+    echo "[pre-push] deployments resource-conformance ✓"
+  else
+    leg_red deployments-conformance "pnpm run validate:deployments failed"
+  fi
+fi
+
+# Runtime-manifest pin/render conformance. 2026-09-05: every active human is
+# pinned, so Unpinned is now REFUSE (exit 65), alongside CID/resource drift.
+# Use the same pool resolver as native gate.projects; no prebuilt binary needed.
+if echo "$CHANGED" | grep -qE "bridges/k8s/|elohim/ark/core/|genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/runtime/|genesis/data/devices/archetype-resource-budgets\.json|scripts/ci/conductor-split-budget\.sh"; then
+  echo "[pre-push] Verifying runtime manifest pins and rendered resources..."
+  if (
+    k8s_repo_root="$(git rev-parse --show-toplevel)"
+    source "$k8s_repo_root/genesis/agentic/bin/pool-lib.sh"
+    k8s_pool_family="$(detect_family "$k8s_repo_root")"
+    export CARGO_TARGET_DIR="$(slot_path "$k8s_pool_family" k8s-bridge dev)"
+    export CARGO_BUILD_JOBS=2 RUSTFLAGS="" RUSTC_WRAPPER=""
+    cargo run -q --manifest-path bridges/k8s/Cargo.toml --bin k8s-bridge -- verify --deployments genesis/orchestrator/data/deployments.json --manifests-dir genesis/orchestrator/manifests/runtime
+  ); then
+    echo "[pre-push] runtime manifest pin/render conformance ✓"
+  else
+    leg_red runtime-manifest-pins "k8s-bridge verify refused (above)"
+  fi
+fi
+
+
+# ── Account Package Schema Validation ────────────────────────────
+#
+# When account packages or their source data change, validate the
+# generated JSON against account-package.schema.json. Catches field
+# drift (e.g. missing relationshipType) before it reaches CI/deploy.
+if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/humans/|genesis/seeder/src/account-package\.ts"; then
+  echo "[pre-push] Validating account packages against schema..."
+  if (cd genesis/seeder && pnpm run validate:account-packages); then
+    echo "[pre-push] account-packages validation ✓"
+  else
+    leg_red account-packages "pnpm run validate:account-packages failed"
+  fi
+fi
+
+# ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
+#
+# When any .epr-meta manifest or the generated .ci-ignore changes, ensure .ci-ignore is
+# fresh relative to the root .epr-meta manifest ci-trigger leg. Fail-open if python3 is
+# absent (degraded shell) — same posture as the node-guarded blocks above.
+if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
+  if command -v python3 >/dev/null 2>&1; then
+    echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta manifest ci-trigger leg..."
+    if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
+      echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta manifest."
+      echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
+      leg_red ci-ignore-freshness ".ci-ignore stale; python3 .claude/scripts/ci-ignore-projector.py"
+    else
+      echo "[pre-push] .ci-ignore freshness ✓"
+    fi
+  fi
+fi
+
+# ── .epr-meta compose-gate (author-time rule evaluation over the push range) ──
+#
+# The commit-time gate (.husky/pre-commit) is the primary; this is the backstop for commits made
+# with --no-verify at commit time but pushed normally. Same pure engine (_lib/epr_meta.py) over the
+# push range instead of the staged set. Pure-python (~ms), so it is PVC-EXEMPT BY OMISSION: never in
+# HEAVY_GATES and never deferrable. Fail-open if python3 OR
+# the gate script is absent (a branch predating the gate must never be blocked).
+if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.py ]; then
+  # The pushed object, not the checkout's HEAD: HEAD can differ (an explicit sha push) or move mid-push.
+  RANGE_HEAD="${GATE_COMMIT:-HEAD}"
+  RANGE_BASE=$(git merge-base origin/dev "$RANGE_HEAD" 2>/dev/null || echo "$RANGE_HEAD~1")
+  if ! python3 .claude/scripts/epr-meta-git-gate.py --range "${RANGE_BASE}..${RANGE_HEAD}"; then
+    echo "[pre-push] ERROR: .epr-meta compose-gate rejected a change in this push range."
+    echo "  Acknowledge (ask-class): EPR_META_ACK=1 git push   |   bypass all: git push --no-verify"
+    leg_red epr-meta-compose "the compose-gate rejected a change in this push range"
+  else
+    echo "[pre-push] .epr-meta compose-gate ✓"
+  fi
+fi
+
 # ── T2 receipt (mandatory for serving paths) ───────────────────────
 # The receipt script owns policy: serving paths require a complete current-source
 # household proof; other dataplane paths warn unless T2_RECEIPT=strict.
@@ -837,12 +976,14 @@ PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 # refusal or an unreadable gate can never become a successful push here.
 T2_LIST=$(mktemp)
 printf '%s\n' "$CHANGED" > "$T2_LIST"
+T2_STATUS=0
 if [ "${T2_RECEIPT-}" = "strict" ]; then
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --strict || { rm -f "$T2_LIST"; exit 1; }
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --strict || T2_STATUS=$?
 else
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" || { rm -f "$T2_LIST"; exit 1; }
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" || T2_STATUS=$?
 fi
 rm -f "$T2_LIST"
+[ "$T2_STATUS" -eq 0 ] || leg_red t2-receipt "household serving receipt refused (exit $T2_STATUS, above)"
 
 # ── Project filter ────────────────────────────────────────────────
 # Projects are stable manifest keys; the shared runner resolves directories.
@@ -885,7 +1026,7 @@ fi
 
 # No project source changes — let it through
 if [ -z "$PROJECTS" ]; then
-  exit 0
+  pass_or_refuse
 fi
 
 # ── PVC-pressure strategy (policy-driven) ─────────────────────────
@@ -956,7 +1097,7 @@ fi
 # Re-check: pressure deferral may have emptied the project list.
 if [ -z "$PROJECTS" ]; then
   echo "[pre-push] all detected gates deferred — push allowed (CI backstop)."
-  exit 0
+  pass_or_refuse
 fi
 
 # Resource Guard — pause rust-analyzer during manifest-declared gates.
@@ -1058,34 +1199,25 @@ echo "============================================"
 echo "  Projects: $DISPLAY_LIST"
 echo ""
 
-# Live gate events: every failure-level line a gate prints is appended to a run log on this
-# device as it prints, so the session that started the push can begin on the first red while
-# later gates still run (`gate-live.mjs follow`, Monitor-shaped). Nothing here decides the push;
-# the gates' exit statuses below do. A kill closes the run as interrupted, never passed.
-# Spec: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
-# The close handler is registered before the run opens, so a signal during `open` cannot leave
-# a run with no close; it does nothing while no run is open.
-GATE_LIVE_RUN=""
-gate_live_close_interrupted() {
-  [ -n "$GATE_LIVE_RUN" ] || return 0
-  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome interrupted >/dev/null 2>&1
-  return 0
-}
-HOOK_ON_EXIT="$HOOK_ON_EXIT gate_live_close_interrupted"
-GATE_LIVE_RUN=$(node genesis/orchestrator/gate-live.mjs open --sha "$GATE_COMMIT" --target "$GATE_PUSH_TARGETS" 2>/dev/null) || GATE_LIVE_RUN=""
-if [ -n "$GATE_LIVE_RUN" ]; then
-  export GATE_LIVE_RUN
-  echo "  Live failures: node genesis/orchestrator/gate-live.mjs follow --run $GATE_LIVE_RUN"
-  echo ""
-fi
-
 TOTAL_START=$(date +%s)
 FAILED=""
 RESULTS=""
 INDEX=0
 
+NOT_RUN=""
+STOP_REASON=""
 for PROJECT in $PROJECTS; do
   INDEX=$((INDEX + 1))
+  if [ -z "$STOP_REASON" ] && gate_stop_requested; then
+    STOP_REASON="stop requested on the live run"
+  fi
+  if [ -z "$STOP_REASON" ] && [ "$GATE_ON_RED_MODE" = stop ] && [ -n "$FAILED$PREGATE_FAILED" ]; then
+    STOP_REASON="GATE_ON_RED=stop after a red"
+  fi
+  if [ -n "$STOP_REASON" ]; then
+    NOT_RUN="$NOT_RUN $PROJECT"
+    continue
+  fi
   PROJECT_START=$(date +%s)
 
   # Declares what kind of run this is for the gate-cycle observation (gate-cycle.mjs).
@@ -1108,6 +1240,11 @@ done
 
 TOTAL_END=$(date +%s)
 TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
+if [ -n "$NOT_RUN" ]; then
+  echo "[pre-push] stopped: $STOP_REASON; not run:$NOT_RUN"
+  FAILED="$FAILED${FAILED:+ }stopped"
+fi
+FAILED="$FAILED$PREGATE_FAILED"
 
 # Trim leading space from FAILED
 FAILED=$(echo "$FAILED" | sed 's/^ //')
@@ -1135,18 +1272,6 @@ echo "============================================"
 echo "  PRE-PUSH GATE: ALL CLEAR (${TOTAL_ELAPSED}s)"
 echo "============================================"
 echo ""
-
-# ── cargo-deny bans check ────────────────────────────────────────
-# Enforces the elohim-views/elohim-sdk boundary — see deny.toml for rules.
-if command -v cargo-deny >/dev/null 2>&1; then
-  echo ""
-  echo "── cargo deny check bans (elohim workspace) ───────────────────"
-  if ! (cd "$(git rev-parse --show-toplevel)" && cargo deny --manifest-path elohim/Cargo.toml check bans 2>&1 | tail -20); then
-    echo "✗ cargo-deny failed — boundary violation. See deny.toml for rules."
-    exit 1
-  fi
-  echo "── end cargo deny check ───────────────────────────────────────"
-fi
 
 # ── Household head: land the pushed epr ─────────────────────────────
 # A gate makes an epr build available in the device store. Only a clean, green commit actually

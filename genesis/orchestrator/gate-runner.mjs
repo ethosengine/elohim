@@ -20,7 +20,8 @@ import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { readSet } from './gate-input-audit.mjs';
-import { appendEvent } from './gate-live.mjs';
+import { appendEvent, closeRun, formatHarvest, harvest, openRun, resolveSession, stopRequested } from './gate-live.mjs';
+import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
@@ -569,8 +570,30 @@ function cargoEnvOf(childEnv) {
   }
 }
 
+/**
+ * Cheapest first, so a red that takes seconds to find is not queued behind an hour of compile.
+ * Key: an attested gate is 0 s (a forge read); otherwise this workspace's recorded p90; a gate
+ * with no recorded run sorts as two minutes. Stable for equal keys: the walker's order stands.
+ */
+export function orderByCost(projects, { root = ROOT, rows } = {}) {
+  if (projects.length < 2) return projects;
+  let ledger = rows;
+  if (ledger === undefined) {
+    try {
+      const union = readCycleUnion(root);
+      ledger = union.readableLedgers ? union.rows : [];
+    } catch { ledger = []; }
+  }
+  const key = project => project.run?.kind === 'attested'
+    ? 0 : (costOf(ledger, { project, subjectFallback: null }).p90 ?? 120);
+  return projects.map((project, index) => ({ project, index, cost: key(project) }))
+    .sort((a, b) => a.cost - b.cost || a.index - b.index)
+    .map(entry => entry.project);
+}
+
 function usage() {
-  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names] [--recipe <name>]');
+  console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names [--order cost]] [--recipe <name>]');
+  console.error('  env: GATE_ON_RED=continue|stop (default from pool-policy.json gate_on_red) · GATE_PREFLIGHT=off · GATE_PREFLIGHT_DONE=1 (pre-push ran it)');
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a rakia binary every mode is path-only) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
 }
 
@@ -583,6 +606,7 @@ if (isMain) {
   const namesOnly = args.includes('--names');
   const registry = loadGateRegistry(ROOT);
   let projects;
+  let changedFiles = null;
 
   if (args.includes('--list')) {
     for (const project of registry.values()) {
@@ -593,8 +617,8 @@ if (isMain) {
     }
     process.exit(0);
   } else if (args.includes('--changed-file-list')) {
-    const files = readFileSync(0, 'utf8').split('\n').map(value => value.trim()).filter(Boolean);
-    projects = projectsForChanges(ROOT, files);
+    changedFiles = readFileSync(0, 'utf8').split('\n').map(value => value.trim()).filter(Boolean);
+    projects = projectsForChanges(ROOT, changedFiles);
   } else {
     const index = args.indexOf('--target');
     if (index < 0 || !args[index + 1]) {
@@ -615,7 +639,60 @@ if (isMain) {
     console.error('gate-runner: --recipe takes one recipe name and exactly one --target project');
     process.exit(2);
   }
+  const orderIndex = args.indexOf('--order');
+  if (orderIndex >= 0 && args[orderIndex + 1] === 'cost') projects = orderByCost(projects);
+  if (namesOnly || printOnly || recipe) {
+    let failed = 0;
+    for (const project of projects) failed |= runProject(project, printOnly, namesOnly, { recipe });
+    process.exit(failed ? 1 : 0);
+  }
+
+  // A standalone `just gate` opens its own live run so its reds reach the session the way a
+  // push's do; under pre-push the hook's run is inherited.
+  let ownRun = null;
+  if (!process.env.GATE_LIVE_RUN) {
+    try {
+      const head = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim() || null;
+      ownRun = openRun({ root: ROOT, sha: head, target: 'just gate', session: resolveSession() }).path;
+      process.env.GATE_LIVE_RUN = ownRun;
+      // A signal or an uncaught error still closes the run this process opened, never leaving it open.
+      const interrupted = code => () => { closeRun(ownRun, 'interrupted'); process.exit(code); };
+      process.once('SIGINT', interrupted(130));
+      process.once('SIGTERM', interrupted(143));
+      process.once('SIGHUP', interrupted(129));
+      process.once('uncaughtException', error => { console.error(error); closeRun(ownRun, 'failed'); process.exit(1); });
+      process.stdout.write(`[gate] live failures: node genesis/orchestrator/gate-live.mjs follow --run ${ownRun}\n`);
+    } catch { ownRun = null; }
+  }
+  const policy = onRedPolicy({ root: ROOT });
   let failed = 0;
-  for (const project of projects) failed |= runProject(project, printOnly, namesOnly, { recipe });
+  let stopping = null;
+  if (process.env.GATE_PREFLIGHT !== 'off' && process.env.GATE_PREFLIGHT_DONE !== '1') {
+    const rows = runPreflight({ root: ROOT, projects, registry, changed: changedFiles, onRow: row => {
+      process.stdout.write(`${formatRow(row)}\n`);
+      emitLive([row]);
+    } });
+    if (rows.some(row => row.level === 'REFUSED')) {
+      failed = 1;
+      if (policy.mode === 'stop') stopping = `preflight red under GATE_ON_RED=stop (${policy.from})`;
+    }
+  }
+  const notRun = [];
+  for (const project of orderByCost(projects)) {
+    if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) stopping = 'stop requested on the live run';
+    if (stopping) { notRun.push(project.name); continue; }
+    const status = runProject(project, false, false, {});
+    failed |= status;
+    if (status !== 0 && policy.mode === 'stop') stopping = `${project.name} red under GATE_ON_RED=stop (${policy.from})`;
+  }
+  // A gate that did not run is not a pass: a stopped run never exits 0.
+  if (notRun.length) {
+    process.stdout.write(`[gate] stopped: ${stopping}; not run: ${notRun.join(' ')}\n`);
+    failed = 1;
+  }
+  if (ownRun) {
+    closeRun(ownRun, failed ? 'failed' : 'passed');
+    for (const line of formatHarvest(harvest({ root: ROOT, last: 10 }))) process.stdout.write(`${line}\n`);
+  }
   process.exit(failed ? 1 : 0);
 }

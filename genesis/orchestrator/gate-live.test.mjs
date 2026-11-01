@@ -68,10 +68,14 @@ test('exports only the public run-log functions', () => {
     'findRun',
     'follow',
     'formatEvent',
+    'formatHarvest',
+    'harvest',
     'liveRoot',
     'openRun',
     'readRun',
+    'requestStop',
     'resolveSession',
+    'stopRequested',
     'unseen',
   ]);
 });

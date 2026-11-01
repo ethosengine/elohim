@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { auditProject, globCovers, readSet } from './gate-input-audit.mjs';
+import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
 const root = '/fixture';
@@ -337,7 +338,8 @@ test('REAL eprfs declares the whole-repository governance walk and requires tree
   }
 });
 
-for (const name of ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr']) {
+// One list with the preflight that runs this same assertion before the gates (gate-preflight.mjs).
+for (const name of NAMED_READ_SET_PROJECTS) {
   test(`REAL ${name} read set has no unresolved reads or repository-wide path`, () => {
     const result = realReadSet(name);
     assert.deepEqual(result.unresolved, []);
