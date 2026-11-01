@@ -1203,15 +1203,18 @@ pub(crate) enum SignalSubjectResolution {
 /// Resolve the record a signal names and decide whether the intake may name it.
 ///
 /// Nothing about the record — its content address included — leaves this
-/// function until two reach checks pass (each refusal is a 403 naming a reach,
+/// function until two reach checks pass, in this order (each refusal is a 403,
 /// never the address):
-/// 1. its reach is no narrower than the observation it would become
+/// 1. the caller may read it: the SAME reach gate `GET /api/v1/epr/{id}/chrome`
+///    and `GET /db/content/{id}` apply (`content_reach_gate::reach_refusal`), so
+///    an anonymous browser report reaches only commons/public content, and a
+///    caller without standing learns no more than the read route would tell it;
+/// 2. its reach is no narrower than the observation it would become
 ///    (`content_signals::UNDECLARED_BEHAVIOUR_REACH`): the observation plane
 ///    carries the subject's content address at that reach, so recording a
-///    narrower record would widen its address past its own reach — whoever asks;
-/// 2. the caller may read it: the SAME reach gate `GET /api/v1/epr/{id}/chrome`
-///    and `GET /db/content/{id}` apply (`content_reach_gate::reach_refusal`), so
-///    an anonymous browser report reaches only commons/public content.
+///    narrower record would widen its address past its own reach. Only a caller
+///    who may already read the record reaches this check, so naming the record's
+///    reach here discloses nothing new.
 ///
 /// An unknown `:id` and a record with no content address are both 404.
 pub(crate) fn resolve_signal_subject(
@@ -1231,6 +1234,16 @@ pub(crate) fn resolve_signal_subject(
     let Some(record) = facing::resolve_record(conn, ctx, id)? else {
         return Ok(no_address());
     };
+    if let Some(refused) = super::content_reach_gate::reach_refusal(
+        conn,
+        ctx,
+        &record.id,
+        &record.reach,
+        agent_cid,
+        None,
+    ) {
+        return Ok(SignalSubjectResolution::Answer(refused));
+    }
     if reach_level_index(&record.reach) > reach_level_index(signals::UNDECLARED_BEHAVIOUR_REACH) {
         return Ok(SignalSubjectResolution::Answer(response::forbidden(
             &serde_json::json!({
@@ -1244,16 +1257,6 @@ pub(crate) fn resolve_signal_subject(
                 ),
             }),
         )));
-    }
-    if let Some(refused) = super::content_reach_gate::reach_refusal(
-        conn,
-        ctx,
-        &record.id,
-        &record.reach,
-        agent_cid,
-        None,
-    ) {
-        return Ok(SignalSubjectResolution::Answer(refused));
     }
     let Some(address) = record
         .blob_hash
@@ -1540,8 +1543,12 @@ mod signal_subject_tests {
         ));
     }
 
+    /// A caller without standing meets the read route's own refusal first, so the
+    /// intake tells it nothing about the record that `GET /db/content/{id}`
+    /// would not (the intake check is an egress site; `tests/reach/egress_census.rs`).
     #[tokio::test]
-    async fn a_record_narrower_than_the_observation_is_refused_whoever_asks() {
+    async fn a_record_narrower_than_the_observation_is_refused_without_disclosing_it_to_a_caller_without_standing(
+    ) {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         insert(&mut conn, "a-will", "private", HEX);
@@ -1550,7 +1557,11 @@ mod signal_subject_tests {
             let (status, body) =
                 answer_of(resolve_signal_subject(&mut conn, &ctx, "a-will", caller).unwrap()).await;
             assert_eq!(status, StatusCode::FORBIDDEN, "{caller:?}: {body}");
-            assert!(body.contains("Reach narrower than the signal"), "{body}");
+            assert!(
+                !body.contains("Reach narrower than the signal"),
+                "{caller:?}: {body}"
+            );
+            assert!(!body.contains("this record's reach"), "{caller:?}: {body}");
             assert!(!body.contains("bafkrei") && !body.contains(HEX), "{body}");
         }
     }

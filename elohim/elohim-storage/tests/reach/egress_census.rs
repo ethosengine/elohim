@@ -33,6 +33,12 @@ const LEGACY_SITES: &[LegacySite] = &[
         pending: Some(("http_epr_api.rs", "P10")),
     },
     LegacySite {
+        path: "api/epr.rs",
+        needle: "reach_level_index(",
+        maximum: 2,
+        pending: Some(("http_epr_api.rs", "P10")),
+    },
+    LegacySite {
         path: "epr_atom_service.rs",
         needle: "reach_gate_allows(",
         maximum: 2,
