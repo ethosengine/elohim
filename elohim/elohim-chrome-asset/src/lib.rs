@@ -102,6 +102,9 @@ pub const STABLE_ELEMENT_PATH: &str = "/chrome/omni-element.js";
 /// switch is on (the v1 content shell, [`render_content_shell`], loads it).
 /// With every switch off, no page references it, and [`ELEMENT_JS`], its hash
 /// and the stable alias stay what every medium loads today.
+// The OUT_DIR file is build.rs's splice of exactly these two sources:
+// gate-reads: elohim/elohim-chrome-asset/src/omni-element-v1.js
+// gate-reads: elohim/elohim-chrome-asset/src/generated/chrome-vocabulary.json
 pub const ELEMENT_V1_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/omni-element-v1.js"));
 
 /// The v1 element's bare lowercase-hex `sha256`, computed once on first use.

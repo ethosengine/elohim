@@ -13,6 +13,8 @@ use std::{env, fs, path::PathBuf};
 const PLACEHOLDER: &str = "/*__CHROME_VOCABULARY__*/null";
 
 fn main() {
+    // gate-reads: elohim/elohim-chrome-asset/src/omni-element-v1.js
+    // gate-reads: elohim/elohim-chrome-asset/src/generated/chrome-vocabulary.json
     let dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("manifest dir"));
     let js_path = dir.join("src/omni-element-v1.js");
     let vocab_path = dir.join("src/generated/chrome-vocabulary.json");
