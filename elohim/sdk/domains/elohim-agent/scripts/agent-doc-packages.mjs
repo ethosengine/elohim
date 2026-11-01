@@ -172,11 +172,11 @@ export function codexAgentDocPreamble(pkg) {
 This is Codex's root gospel. The gospel body below the horizontal rule is the
 SAME text as \`${nativePath}\`, projected verbatim from the \`${pkg.metadata.id}\`
 package — the two cannot drift. THIS preamble is the codex-localized governance
-contract: what Claude Code already receives from edit-time hooks but this repo
-has not yet projected into Codex's current project-hook ABI. Read it first.
-Until \`epr doctor\` reports the Codex hook projection present and the runtime
-trusts it, this binds you *morally* where it cannot bind you *mechanically*, and
-it names the gates that bind you mechanically regardless of harness.
+contract. Read it first. Inspect \`epr doctor\` and the active runtime adapters;
+configured hooks alone do not prove trusted execution or complete tool coverage.
+This binds you *morally* wherever an adapter cannot bind you *mechanically*, and
+names the gates that bind you mechanically regardless of harness. The shared
+"Session discipline and commit attribution" section applies to this session too.
 
 ## 1. First contact: inspect before changing
 
@@ -214,16 +214,18 @@ doubt, do not edit the projection — edit the package or the source.
 ## 3. The \`.epr-meta\` compose-gate binds you morally
 
 Claude enforces directory-local governance at edit time via a PreToolUse hook.
-Current Codex supports project-local lifecycle hooks, but this repo has not yet
-projected the shared definitions to \`.codex/hooks.json\`; until that projection
-is present and trusted, the SAME rules bind you by contract instead of by
-mechanism. Before writing a file, honor the nearest \`.epr-meta\` ancestor
+Codex has project lifecycle hooks in \`.codex/hooks.json\`, with partial adapter
+coverage. Check registration, runtime trust and the actual invocation separately;
+an unsupported shell invocation is unmeasured, not a clean governance verdict.
+The SAME rules bind you by contract wherever mechanical coverage is absent.
+Before writing a file, honor the nearest \`.epr-meta\` ancestor
 (the cascade: closest manifest wins, root \`/.epr-meta/manifest.md\` is the base):
 a \`specs/\` doc requires lifecycle frontmatter; \`elohim/\` carries an
 interface-first-reuse advisory (reuse the existing trait/type before adding a
 parallel one); code directories may carry YAGNI/over-engineering guards. A
-manifest that would DENY a Claude edit should stop you too — you just won't get
-a prompt. Treat a missing prompt as your own responsibility, not permission.
+manifest that would DENY a Claude edit should stop you too, whether or not the
+adapter emits a prompt. Treat a missing prompt as your own responsibility,
+not permission.
 
 ## 4. Gates that bind Codex mechanically (harness-independent)
 

@@ -534,7 +534,7 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     let verb = args.first().map(String::as_str).unwrap_or("help");
     if args.iter().any(|s| s == "--help") || verb == "help" {
         println!(
-            "epr session id|open [--model MODEL]|show|close|gc [--json]|stasis fold|decide|status"
+            "epr session id|open [--model MODEL]|show|commit-trailers|close|gc [--json]|stasis fold|decide|status"
         );
         return Ok(ExitCode::SUCCESS);
     }
@@ -572,6 +572,25 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     // same shared lifecycle flock. All owner and seal decisions stay in this lookup.
     if verb == "validate" {
         device_scoped_binding(&explicit_session.map(Ok).unwrap_or_else(current_id)?)?;
+        return Ok(ExitCode::SUCCESS);
+    }
+    if verb == "commit-trailers" {
+        let identity = session::resolve();
+        let registry = session::registry();
+        if registry.runtimes.is_empty() {
+            return Err("session attribution unmeasured: runtime registry unavailable".into());
+        }
+        if matches!(
+            identity.source,
+            session::Source::None | session::Source::TtyLeader
+        ) {
+            println!("{}", json!({"status": "not-applicable", "trailers": []}));
+            return Ok(ExitCode::SUCCESS);
+        }
+        let record = device_scoped_binding(&current_id()?)?
+            .ok_or("session attribution unmeasured: no mounted envelope")?;
+        let trailers = crate::session_attribution::decorate(&record, &registry)?;
+        println!("{}", json!({"status": "measured", "trailers": trailers}));
         return Ok(ExitCode::SUCCESS);
     }
     let value = if verb == "open" {

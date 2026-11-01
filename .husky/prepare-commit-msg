@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Passive decoration, independent of the agent harness. The native session supplies facts.
+[ "${HUSKY-}" = "0" ] && exit 0
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+if command -v python3 >/dev/null 2>&1 && [ -f "$top/genesis/agentic/commit-attribution.py" ]; then
+  python3 "$top/genesis/agentic/commit-attribution.py" "$@"
+else
+  echo '[commit-attribution] UNMEASURED: native Git adapter unavailable.' >&2
+fi

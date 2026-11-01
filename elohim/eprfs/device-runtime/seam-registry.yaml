@@ -3407,3 +3407,24 @@ decisionPoints:
     testName: offline_chain_replay_and_base_recovery
     kind: integration
     mirrorRisk: false
+
+- name: commit_attribution::trailers
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/commit_attribution.rs
+    modulePath: elohim_device_runtime::commit_attribution
+  summary: Derives commit presentation from an owner-validated live session and declared runtime conventions; unknown model/runtime and control-character injection are unmeasured, never guessed. The CLI validates ownership; Git alone parses and appends trailers.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Ephemeral C view over existing private session context; no new DHT record, head, identity store or transport.
+  - id: C1
+    status: answered
+    justification: Presentation claims participation only; no actor authority, acceptance or permission is minted. Unavailable attribution does not block human work.
+  contractTests:
+  - path: elohim/eprfs/device-runtime/tests/envelope.rs
+    testName: commit_decoration_declines_unknown_closed_and_injectable_context
+    kind: integration
+  - path: genesis/agentic/session_envelope_test.py
+    testName: test_commit_decoration_uses_mounted_model_and_session_without_claiming_authority
+    kind: integration

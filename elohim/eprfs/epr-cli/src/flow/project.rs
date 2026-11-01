@@ -667,7 +667,9 @@ fn normalize_co_author(raw: &str) -> Option<String> {
     }
     let name = &raw[..open];
     match email.as_str() {
-        "noreply@anthropic.com" => Some(format!("agent:{}", name_slug(name)?)),
+        "noreply@anthropic.com" | "noreply@openai.com" => {
+            Some(format!("agent:{}", name_slug(name)?))
+        }
         "noreply@ethosengine.com" => Some(format!("collective:{}", name_slug(name)?)),
         // An unrecognised domain is a person we decline to classify, addressed by the only
         // identifier the trailer actually established.
@@ -1198,7 +1200,7 @@ mod tests {
     #[test]
     fn normalize_co_author_maps_trailers_to_vocabulary_and_declines_the_rest() {
         let cases: &[(&str, Option<&str>)] = &[
-            // The two known domains name their collaborators by slug.
+            // Known agent and collective addresses name collaborators by slug.
             (
                 "Claude Fable 5 <noreply@anthropic.com>",
                 Some("agent:claude-fable-5"),
@@ -1207,6 +1209,16 @@ mod tests {
                 "Claude Opus 4.6 <noreply@anthropic.com>",
                 Some("agent:claude-opus-4-6"),
             ),
+            (
+                "gpt-6 (Codex) <noreply@openai.com>",
+                Some("agent:gpt-6-codex"),
+            ),
+            (
+                "OpenAI person <person@openai.com>",
+                Some("person@openai.com"),
+            ),
+            ("<noreply@openai.com>", None),
+            ("!!! <noreply@openai.com>", None),
             (
                 "ethosengine <noreply@ethosengine.com>",
                 Some("collective:ethosengine"),

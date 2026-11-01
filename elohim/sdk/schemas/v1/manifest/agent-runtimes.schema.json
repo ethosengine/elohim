@@ -46,6 +46,34 @@
             },
             "uniqueItems": true
           },
+          "modelSource": {
+            "description": "Implemented read-only adapter for the current session's model metadata; absence uses mounted model context.",
+            "enum": [
+              "codex-state-v5"
+            ]
+          },
+          "commitAttribution": {
+            "description": "Git presentation conventions for participation claims, never actor authority.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "email",
+              "sessionTrailer"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "minLength": 1
+              },
+              "modelSuffix": {
+                "type": "string"
+              },
+              "sessionTrailer": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]+$"
+              }
+            }
+          },
           "capabilityBindings": {
             "description": "Lab-neutral capability level -> this runtime's model binding (dialogue-stasis spec, Capability vocabulary and bindings). A level absent here is unbound for this runtime.",
             "type": "object",

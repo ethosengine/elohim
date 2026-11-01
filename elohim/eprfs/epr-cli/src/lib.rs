@@ -39,5 +39,6 @@ pub use report::{Finding, FindingStatus, Report};
 pub use elohim_device_runtime::session;
 pub mod bin;
 
+pub mod session_attribution;
 pub mod session_envelope;
 pub mod session_stasis;

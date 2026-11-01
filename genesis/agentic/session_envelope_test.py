@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -585,6 +586,71 @@ rules:
 
 
 class EnvelopeTest(unittest.TestCase):
+    def test_commit_decoration_uses_mounted_model_and_session_without_claiming_authority(self):
+        for runtime, suffix, address, key in [('codex', ' (Codex)', 'openai', 'Codex-Session'),
+                                              ('claude', '', 'anthropic', 'Claude-Session')]:
+            with self.subTest(runtime=runtime), tempfile.TemporaryDirectory(prefix='commit-decoration-') as base:
+                f = Fixture(base); f.setup()
+                opened = f.epr('session', 'open', '--model', 'fixture-model', '--json', runtime=runtime)
+                if runtime == 'codex':
+                    # Private, exact-thread metadata; never read the host's Codex store.
+                    model_home = f.base / 'codex-model'
+                    model_home.mkdir()
+                    with sqlite3.connect(model_home / 'state_5.sqlite') as db:
+                        db.execute('CREATE TABLE threads(id TEXT PRIMARY KEY, model TEXT)')
+                        db.execute('INSERT INTO threads VALUES (?, ?)', (opened['identity']['session'], 'fixture-model'))
+                    original_env = f.env
+                    f.env = lambda runtime='claude': {**original_env(runtime), 'CODEX_HOME': str(model_home)}
+                result = f.epr('session', 'commit-trailers', '--json', runtime=runtime)
+                assert result == {'status': 'measured', 'trailers': [
+                    ['Co-Authored-By', f'fixture-model{suffix} <noreply@{address}.com>'],
+                    [key, opened['identity']['session']]]}, result
+                assert f.epr('actor', 'current', '--session', opened['identity']['session'],
+                             '--json', runtime=runtime)['claim'] is None
+                # Exercise the actual Git entrypoint and native reader, not a Python runtime map.
+                hooks = f.root / '.hooks'
+                hooks.mkdir()
+                shutil.copy2(REPO / '.husky/prepare-commit-msg', hooks / 'prepare-commit-msg')
+                (hooks / 'prepare-commit-msg').chmod(0o755)
+                (f.root / 'genesis/agentic/commit-attribution.py').symlink_to(REPO / 'genesis/agentic/commit-attribution.py')
+                f.run(['git', 'config', 'core.hooksPath', str(hooks)], native=False)
+                git = shutil.which('git')
+                assert git is not None
+                body = 'empty handoff [skip ci]\n\nCo-Authored-By: Existing <existing@example.test>\n'
+                f.run([git, 'commit', '--allow-empty', '-qm', body], runtime=runtime)
+                trailers = f.run(['git', 'show', '-s', '--format=%(trailers)'], native=False)
+                assert 'Existing <existing@example.test>' in trailers, trailers
+                assert trailers.count(f'{key}: {opened["identity"]["session"]}') == 1, trailers
+                assert f'Co-Authored-By: fixture-model{suffix} <noreply@{address}.com>' in trailers, trailers
+                # Reusing the message must preserve contributors and not duplicate our decoration.
+                f.run([git, 'commit', '--allow-empty', '-q', '-C', 'HEAD'], runtime=runtime)
+                assert f.run(['git', 'show', '-s', '--format=%(trailers)'], native=False) == trailers
+                if runtime == 'codex':
+                    with sqlite3.connect(model_home / 'state_5.sqlite') as db:
+                        db.execute('UPDATE threads SET model=? WHERE id=?', ('fixture-next-model', opened['identity']['session']))
+                    f.run([git, 'commit', '--allow-empty', '-qm', 'model changed'], runtime=runtime)
+                    changed = f.run(['git', 'show', '-s', '--format=%(trailers)'], native=False)
+                    assert 'fixture-next-model (Codex)' in changed and 'fixture-model (Codex)' not in changed, changed
+
+    def test_commit_decoration_missing_model_is_unmeasured_not_invented(self):
+        with tempfile.TemporaryDirectory(prefix='commit-unmeasured-') as base:
+            f = Fixture(base); f.setup()
+            original_env = f.env
+            f.env = lambda runtime='claude': {**original_env(runtime), 'CODEX_HOME': str(f.base / 'missing-codex-model')}
+            f.epr('session', 'open', '--model', 'stale-mounted-model', '--json', runtime='codex')
+            message = f.root / 'message'
+            message.write_text('unchanged message\n')
+            result = subprocess.run([sys.executable, str(REPO / 'genesis/agentic/commit-attribution.py'), str(message)],
+                                    cwd=f.root, env=f.env('codex'), capture_output=True, text=True, timeout=15)
+            assert result.returncode == 0, result
+            assert 'UNMEASURED' in result.stderr and 'model' in result.stderr, result
+            assert message.read_text() == 'unchanged message\n'
+            registry = f.base / 'no-agent-runtimes.json'
+            registry.write_text(json.dumps({'runtimes': [{'id': 'unused-runtime', 'comm': ['unused-runtime'], 'sessionEnv': []}]}))
+            result = json.loads(f.run([BINARY, 'session', 'commit-trailers', '--json'],
+                                     extra_env={'EPR_AGENT_RUNTIMES': str(registry)}))
+            assert result == {'status': 'not-applicable', 'trailers': []}, result
+
     def test_two_runtimes_close_and_dead_owner_is_collected(self):
         with tempfile.TemporaryDirectory(prefix='envelope-') as base:
             f=Fixture(base); f.setup(); f.acquire(); f.joined(); f.close_claude(); f.claude_closed(); f.collect(); f.all_closed()
@@ -631,7 +697,7 @@ class EnvelopeTest(unittest.TestCase):
             before=path.read_bytes()
             stat=f.base/'proc/4101/stat'
             stat.write_text(stat.read_text().removesuffix('77')+'78')
-            for args in [('session','open'), ('session','show'), ('session','close'),
+            for args in [('session','open'), ('session','show'), ('session','commit-trailers'), ('session','close'),
                          ('session','validate','--session',f.id('claude')),
                          ('flow','claim','--on','envelope#1'),
                          ('covenant','record'), ('actor','claim','--as','agent:reader@haiku')]:

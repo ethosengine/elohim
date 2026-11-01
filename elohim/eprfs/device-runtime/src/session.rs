@@ -60,6 +60,25 @@ pub struct Runtime {
     /// Verified model exports, in preference order; empty means unknown.
     #[serde(default)]
     pub model_env: Vec<String>,
+    /// Versioned runtime metadata adapter for live model observation, when implemented.
+    #[serde(default)]
+    pub model_source: Option<String>,
+    /// Declared commit attribution convention; absence is unsupported, never guessed.
+    #[serde(default)]
+    pub commit_attribution: Option<CommitAttribution>,
+}
+
+/// Presentation conventions for claimed participation, never identity or authority.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitAttribution {
+    /// Public no-reply address used for this runtime's model attribution.
+    pub email: String,
+    /// Runtime decoration appended to the mounted model name.
+    #[serde(default)]
+    pub model_suffix: String,
+    /// Git trailer key carrying the native session identifier.
+    pub session_trailer: String,
 }
 
 struct Process {
