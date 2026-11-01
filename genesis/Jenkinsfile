@@ -2288,6 +2288,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             fileExists('genesis/a2o/reports/cucumber-report-peer-stage.json')) {
                             cucumber([
                                 reportTitle: 'A2O E2E Reports',
+                                classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
                                 fileIncludePattern: 'cucumber-report-*.json',
                                 jsonReportDirectory: 'genesis/a2o/reports',
                                 buildStatus: 'UNSTABLE',
