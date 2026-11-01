@@ -48,7 +48,7 @@ test('node_modules: required only by a non-cargo gate', (t) => {
 
 test('element dists: only the element packages a selected project imports, unless its prebuild builds them', (t) => {
   const root = scratch(t);
-  for (const name of ['elohim-core', 'elohim-shefa']) {
+  for (const name of ['elohim-core', 'unimported-element']) {
     put(root, `app/elohim-elements/${name}/package.json`, JSON.stringify({
       exports: { './register': { import: './dist/register.js' }, './tokens.scss': './src/tokens.scss' },
     }));
@@ -61,7 +61,7 @@ test('element dists: only the element packages a selected project imports, unles
   const red = checkElementDists({ root, projects: [app] });
   assert.equal(red.level, 'REFUSED');
   assert.match(red.why, /elohim-core/);
-  assert.doesNotMatch(red.why, /elohim-shefa/, 'an element no selected gate imports is never required');
+  assert.doesNotMatch(red.why, /unimported-element/, 'an element no selected gate imports is never required');
   assert.match(red.cure, /--filter elohim-core/);
   put(root, 'app/elohim-elements/elohim-core/dist/register.js');
   assert.equal(checkElementDists({ root, projects: [app] }).level, 'ok');
