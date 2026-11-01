@@ -392,6 +392,8 @@ class Berth:
         self._obs_injected = obs is not None
         self._lock_depth = {}
         self._pending_folds = []  # (kind, row) queued by record(); flushed once no berth lock is held
+        self.override_wait = None
+        self._withdrawing = False
         self.pid_alive = pid_alive  # injectable: tests model liveness and incarnation
         self.pid_start = pid_start_time
 
@@ -1179,6 +1181,7 @@ class Berth:
         A steward record that cannot reach the device's channel store refuses a claim, and leaves a
         renew held but returns ok=None: kept here, not confirmed to the other devices.
         Raises BerthUsage for a mis-stated claim (unknown class, override without --ttl)."""
+        self.override_wait = None
         reason = self.claim_preflight(resource, ttl_s, klass, override)
         if reason:
             return False, None, reason
@@ -1598,10 +1601,14 @@ class Berth:
                     lease["effective"] = effective
             self._write_leases(leases)
 
+    def _override_row(self, resource, session, claimed_at):
+        return next((row for row in reversed(self.ledger(0))
+                     if row.get("kind") == "override" and row.get("resource") == resource
+                     and row.get("session") == session and row.get("claimed_at") == claimed_at
+                     and row.get("overrode")), None)
+
     def _has_offline_override(self, resource, session, claimed_at):
-        return any(row.get("kind") == "override" and row.get("resource") == resource
-                   and row.get("session") == session and row.get("claimed_at") == claimed_at
-                   and row.get("overrode") for row in self.ledger(0))
+        return self._override_row(resource, session, claimed_at) is not None
 
     def _settle_steward(self, resource, session, lease, offline_ok, renewal=False):
         """The lease is written (it crosses on this device's next head); read the view until it leaves
@@ -1640,8 +1647,8 @@ class Berth:
                 fence_after_s = max(0, int(lease["ttl_s"]) - self.fence_margin_s)
                 self._mark_effective(resource, session, False)
             reason = steward_reason(verdict, self._view_now(view), fence_after_s)
-            if (offline_ok and not verdict.get("fenced")
-                    and not self._has_offline_override(resource, session, lease.get("claimed_at"))):
+            override_row = self._override_row(resource, session, lease.get("claimed_at"))
+            if offline_ok and not verdict.get("fenced") and not override_row:
                 self.record("override", resource=resource, session=session, holder=session,
                             claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
                             last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
@@ -1651,13 +1658,71 @@ class Berth:
                     self._release(resource, session, reason=f"steward: {failed[0]}",
                                   expected_claimed_at=lease.get("claimed_at"))
                     return False, None, failed[0]
-                delayed, delayed_err = self.peer_leases()
+                deadline2 = self.now() + self.confirm_wait_s + 1
+                while True:
+                    delayed, delayed_err = self.peer_leases(
+                        timeout=min(PEER_TIMEOUT_S, deadline2 - self.now()))
+                    delayed_verdict = (delayed or {}).get(resource)
+                    delayed_kind = (delayed_verdict.get("verdict")
+                                    if isinstance(delayed_verdict, dict) else None)
+                    left = deadline2 - self.now()
+                    if (delayed_kind == "pending" and delayed_verdict.get("session") == session
+                            and left > 0):
+                        self.sleep(min(POLL_S, left))
+                        continue
+                    break
                 delayed_verdict = (delayed or {}).get(resource)
                 if delayed_err:
                     reason = f"override on the record, but {delayed_err}"
-                elif isinstance(delayed_verdict, dict):
-                    reason = steward_reason(delayed_verdict, self._view_now(delayed))
-                return False, None, f"{reason} — override on the record"
+                    self.override_wait = {"override_at_ms": None,
+                                          "claimed_at": lease.get("claimed_at")}
+                elif (isinstance(delayed_verdict, dict)
+                      and delayed_verdict.get("verdict") == "effective"
+                      and delayed_verdict.get("session") == session):
+                    self._mark_effective(resource, session)
+                    return True, lease, f"claimed; override on the record — {reason}"
+                elif (isinstance(delayed_verdict, dict)
+                      and delayed_verdict.get("verdict") in ("held_by", "refused_by")):
+                    delayed_reason = steward_reason(delayed_verdict, self._view_now(delayed))
+                    self._release(resource, session, reason=f"steward: {delayed_reason}",
+                                  expected_claimed_at=lease.get("claimed_at"))
+                    return False, None, delayed_reason
+                else:
+                    if isinstance(delayed_verdict, dict):
+                        reason = steward_reason(delayed_verdict, self._view_now(delayed))
+                    self.override_wait = {
+                        "override_at_ms": (delayed_verdict.get("override_at")
+                                           if isinstance(delayed_verdict, dict) else None),
+                        "claimed_at": lease.get("claimed_at"),
+                    }
+                reason = f"{reason} — override on the record"
+                if (view or {}).get("serving") is False:
+                    reason = f"{reason}\n{DAEMON_DOWN_LINE}"
+                return False, None, reason
+            if override_row and not verdict.get("fenced"):
+                current_seen = verdict.get("last_seen")
+                overridden_seen = override_row.get("last_seen")
+                if (not self._withdrawing and isinstance(current_seen, (int, float))
+                        and (not isinstance(overridden_seen, (int, float))
+                             or current_seen > overridden_seen)):
+                    device = verdict.get("device") or override_row.get("overrode")
+                    self._release(resource, session,
+                                  reason=f"steward: {device} is back: override withdrawn",
+                                  expected_claimed_at=lease.get("claimed_at"))
+                    self._withdrawing = True
+                    try:
+                        ok, reclaimed, reclaimed_reason = self.claim(
+                            resource, session, note=lease.get("note"), ttl_s=lease.get("ttl_s"),
+                            klass=lease.get("class"), offline_ok=False)
+                    finally:
+                        self._withdrawing = False
+                    if ok:
+                        reclaimed_reason = (f"claimed; {device} is back: override withdrawn, "
+                                            "effective on acknowledgement")
+                    return ok, reclaimed, reclaimed_reason
+                self.override_wait = {"override_at_ms": verdict.get("override_at"),
+                                      "claimed_at": lease.get("claimed_at")}
+                reason = f"{reason} — override on the record"
         else:
             waiting = (verdict.get("waiting_on") or ["another device"])[0]
             reason = f"unconfirmed: {waiting} did not acknowledge within {self.confirm_wait_s}s"
@@ -2124,6 +2189,9 @@ def _main(argv):
             return 0
         if lease is None:
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
+            if b.override_wait:
+                print(f"  override_at_ms={b.override_wait['override_at_ms'] or ''} "
+                      f"claimed_at={b.override_wait['claimed_at']}", file=sys.stderr)
             return 3
         print(f"{res}: REFUSED — {reason}. Ask them, or wait; `berth say --to {getattr(lease, 'get', lambda k: None)('holder') if isinstance(lease, dict) else '<holder>'} …`",
               file=sys.stderr)

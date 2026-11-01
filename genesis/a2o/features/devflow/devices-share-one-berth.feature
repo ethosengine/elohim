@@ -5,15 +5,13 @@ Feature: Devices share one berth — a shared resource is held once across all o
   So that these things hold:
     - between admitted devices, a landing on dev from one workspace never runs while a landing from
       the other is in flight; and a push that would start a build, or a deploy to the test fleet,
-      also waits while the other side has claimed a build or deploy it is watching. A landing with
-      no build tag may go ahead while a deploy is being watched, because it starts no build and
-      reaches no fleet. A build or deploy that no session watches is protected only while its push
-      lasts.
+      is also stopped while the other side has claimed a build or deploy it is watching.
     - why it matters: a collision would deploy one side's unfinished work over the other's test, or leave a merge
       to untangle by hand.
     - a silent workspace is never read as an idle one.
-    - the one declared exception is a session that deliberately overrides a silent device; it leaves
-      a named record that binds that device from the moment the record reaches it until the
+    - the declared exceptions are a session that deliberately overrides a silent device, and the
+      pre-push hook, which overrides by rule and covers exactly one silent device; each leaves a
+      named record that binds that device from the moment the record reaches it until the
       overriding lease ends.
 
   The words this story uses, so it can be read cold.
@@ -55,9 +53,13 @@ Feature: Devices share one berth — a shared resource is held once across all o
     claims named "lane:" followed by a lane name, which declare who is working on a piece of work.
     Lane claims use the same mechanism as the other three; the real-workspace scenario uses one.
     Not tested here either: a landing with no build tag proceeding while a deploy is watched, an
-    unwatched build being protected only while its push lasts, a lease running out at its time limit,
-    the pre-push hook's BERTH_OFFLINE_OK setting, and the hook never overriding on its own; all are
-    described in this story but no scenario exercises them.
+    unwatched build or deploy not being protected at all, a lease running out at its time limit, the
+    pre-push hook's wait for its override to take effect and its landing afterwards (the hook's own
+    tests prove those), an override that is not yet in effect because the silence is recent (the
+    claim exiting 3 until it takes effect; berth's own tests prove it), a revoked device that is left to wait landing once its override takes
+    effect, because revocation does not withdraw repository access, and both devices overriding
+    during the same break in the link; all are described in this story but no scenario exercises
+    them.
   - A RUN NAME is a name chosen once for one cross-workspace test run and given to both halves.
     It is a label, not a coordination record. The lane named for this run is "lane:t8-receipt-"
     followed by that run name.
@@ -77,7 +79,7 @@ Feature: Devices share one berth — a shared resource is held once across all o
   - The two peer daemons talk over their own LINK: directly to each other, or through a relay that
     forwards only encrypted traffic it cannot read. The real peer daemon uses iroh QUIC, a transport
     that encrypts traffic between the two devices even when our relay, "relay.alpha.elohim.host",
-    forwards it. The relay clause below relies on that transport guarantee; this scenario does not
+    forwards it. The relay step of the real-workspace scenario relies on that guarantee; it does not
     inspect relay packets or determine whether the exchange took a direct or relayed path.
   - "epr peer status" prints one line per other device: its last head, how old that head is, how many
     records were folded from it, and how many of its connections were refused.
@@ -112,11 +114,21 @@ Feature: Devices share one berth — a shared resource is held once across all o
     TIE-BREAK settles them the same way on both devices: the earlier claim time wins; on equal times,
     the device whose signing key sorts lower wins. Each claim carries the claim time its own device
     stamped on it, and both devices compare those same recorded values, never their own clocks.
-  - A session may take a lease refused as "unconfirmed" anyway with "--offline-ok"; it never overrides
-    a "held by" refusal. The claim still waits its 10 seconds first. An agent session may do so on its
-    own judgment. The safeguard is the OVERRIDE record it writes: the named record that the silent
-    device's absence was deliberately overridden, shown in "berth status" with the overriding device
-    and session. The record reaches the other device when it is back, and from then on that device's
+  - A session may override a refusal that reads "unconfirmed" with "--offline-ok"; it never overrides
+    a "held by" refusal. The claim still waits its 10 seconds first, then writes the OVERRIDE record:
+    the named record that the silent device's absence was deliberately overridden, shown in "berth
+    status" with the overriding device and session. The override takes effect once the silent
+    device's last head is older than the lease time plus two margins: the CLOCK MARGIN (30 seconds,
+    the difference allowed between two devices' clocks) and the FENCE MARGIN (30 seconds, how long
+    before its lease ends a holder whose renewals no other device has acknowledged stops counting
+    itself as the holder). A holder RENEWS a lease by claiming it again before its time limit runs
+    out; the pre-push hook renews every third of its lease. With a 60-second lease, for example, an
+    override takes effect once the silent device's last head is 120 seconds old. A device silent
+    longer than that already is overridden at once, and the claim exits 0; otherwise the claim exits
+    3 with the reason line ending "— override on the record" and the time it takes effect, and a later
+    claim by the same session takes the lease then, without writing a second record. An agent session
+    may override on its own judgment; the pre-push hook does so by rule for "dev-integration" and
+    waits for the override to take effect before landing. The record reaches the other device when it is back, and from then on that device's
     berth refuses its own sessions on that resource, naming the overriding device and session, until
     the overriding lease is released or runs out. The berth cannot stop a revoked device that chooses
     to override; revocation only means its peers no longer acknowledge or count it. And if both
@@ -128,15 +140,20 @@ Feature: Devices share one berth — a shared resource is held once across all o
 
   - A BUILD TAG is a marker in a commit message, such as "[build:edge]" or "[build:app]", that asks
     the shared build server to build when the commit reaches dev; "[build:edge]" also deploys to the
-    test fleet. The PRE-PUSH HOOK runs the repository's checks before a push. For a push to dev it
-    first claims "dev-integration", then "alpha-fleet" when a pushed commit carries "[build:edge]",
-    and "jenkins-dispatch" when a pushed commit carries any build tag. A refusal stops the push before
-    any check runs, and the hook releases whatever it had claimed. The hook holds its claims only for
-    the push itself; a session that watches a build or a deploy through to the end takes its own
-    explicit claim on that resource for as long as it watches, and a build or deploy that no session
-    watches is protected only while its push lasts. The hook never overrides on its own; a pushing
-    session that sets BERTH_OFFLINE_OK=1 makes each of its claims an explicit "--offline-ok", with the
-    same unconfirmed-only scope and the same override record.
+    test fleet. The PRE-PUSH HOOK runs the repository's checks before a push. A push's LANDING is
+    what follows its checks: the transfer to dev and the moment it is read back. For a push to dev
+    the hook claims "dev-integration" for its landing only: a lease of 600 seconds, held by the hook's own
+    session on behalf of the pushing session and released once the transfer is read back from the
+    repository. At its landing it also checks that no other holder holds "alpha-fleet" (when a pushed
+    commit carries "[build:edge]") or "jenkins-dispatch" (any build tag); it claims neither. A refusal
+    stops the push at its landing, after its checks; the checks it paid are recorded, so the next push
+    reuses them. A session that watches a build or a deploy through to the end takes its own explicit
+    claim on that resource for as long as it watches. A landing with no build tag may go ahead while
+    a deploy is being watched, because it starts no build and reaches no fleet; a build or deploy that
+    no session watches is not protected at all. The hook always claims with "--offline-ok": when
+    the other device is silent it writes the override, waits until the override takes effect (at most
+    the lease time plus the clock and fence margins, 660 seconds) and then lands. That covers exactly
+    one silent device; with two, the push is refused.
 
   Tags
 
@@ -177,15 +194,16 @@ Feature: Devices share one berth — a shared resource is held once across all o
 
     Scenario Outline: A push that would land, build or deploy is stopped while the other device holds what it needs
       Given session "claude-1" on device A holds the steward-scoped resource <resource> because <held_because>
+      And device B has folded the head from device A that carries that lease
       When session "codex-1" on device B pushes to dev commits that carry <build_tag>
-      Then the pre-push hook stops the push before any check runs
+      Then the pre-push hook stops the push at its landing, after its checks
       And it prints the reason line "held by" device A and session "claude-1" for <resource>
       And no commit from device B reaches dev
       And device B holds none of "dev-integration", "alpha-fleet" or "jenkins-dispatch" afterwards
 
       Examples:
         | resource           | held_because                                                  | build_tag      |
-        | "dev-integration"  | "its own push to dev is running its checks"                   | "no build tag" |
+        | "dev-integration"  | "its own push to dev is at its landing"                       | "no build tag" |
         | "alpha-fleet"      | "it claimed it explicitly to watch a deploy through to the end" | "[build:edge]" |
         | "jenkins-dispatch" | "it claimed it explicitly to watch a build through to the end"  | "[build:app]"  |
 
@@ -202,8 +220,8 @@ Feature: Devices share one berth — a shared resource is held once across all o
     Scenario: An override taken while the other device is silent binds that device until the lease ends
       Given no session on either device holds "dev-integration"
       And device A's peer daemon stops, and the last head device B folded from A is 3 minutes old
-      When session "codex-1" on device B, on its own judgment, claims "dev-integration" with "--offline-ok"
-      Then the claim waits 10 seconds for device A's acknowledgement, then takes the lease anyway and exits 0
+      When session "codex-1" on device B, on its own judgment, claims "dev-integration" with "--offline-ok" and a 60-second lease
+      Then the claim waits 10 seconds for device A's acknowledgement and exits 0, its override already in effect
       And device B's berth records an override naming device B and session "codex-1"
       When device A's peer daemon starts again and folds device B's next head
       Then device A's berth status shows B's lease on "dev-integration" marked as an override of A's silence, naming device B and session "codex-1"
@@ -236,7 +254,9 @@ Feature: Devices share one berth — a shared resource is held once across all o
       And a claim by "claude-1" on "alpha-fleet" on device A exits 0 at once, with no other admitted device to wait for
       And device A drops device B's connections and refuses new ones exactly as it refuses a stranger's
       And "epr peer status" on device A counts the refused connections from device B
-      And a push to dev from session "codex-1" on device B is refused with the reason line "unconfirmed:" naming device A, because A no longer acknowledges B
+      And a push to dev from session "codex-1" on device B reaches its landing, where its claim on "dev-integration" is refused with the reason line "unconfirmed:" naming device A
+      And that push writes one override record and waits for the override to take effect
+      And when the test interrupts that wait, no commit from device B reaches dev and device B gives "dev-integration" back
       And device A's next push to dev is not blocked, and it carries the Contest row to the repository
       And device A's peer daemon was never restarted, so the sessions moored on A and the leases they hold were not interrupted
 

@@ -23,13 +23,15 @@
  * command (a stale binary once passed a smoke by luck).
  */
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
 import {
   berth,
+  berthArgv,
   checkEpr,
   claimedAt,
   DEV,
@@ -50,8 +52,11 @@ import {
   otherDeviceBlock,
   peerStatus,
   refusalLine,
+  repository,
   ROSTER,
   run,
+  runSync,
+  spawnTracked,
   startDaemon,
   STEWARD,
   stopDaemon,
@@ -68,6 +73,20 @@ const fixtures = new WeakMap<object, Fixture>();
 // runner is slow. "At once" stays well under the 10-second confirm wait it is contrasted with.
 const AT_ONCE_MS = 5000;
 const ACK_BOUND_MS = 30_000;
+
+// The resource the last "holds the steward-scoped resource" Given claimed on device A.
+const heldByA = new WeakMap<object, string>();
+
+// The pre-push hook's landing agent holds dev-integration under its own session, `pre-push-…`.
+function hookHolds(d: Device): boolean {
+  const who = JSON.parse(
+    must(runSync([...berthArgv(d), 'who', DEV], { env: env(d) }), 'berth who').stdout
+  ) as unknown;
+  let rows: { holder?: string }[] = [];
+  if (Array.isArray(who)) rows = who as { holder?: string }[];
+  else if (who) rows = [who as { holder?: string }];
+  return rows.some(row => String(row.holder ?? '').startsWith('pre-push-'));
+}
 
 function state(world: object): Fixture {
   const f = fixtures.get(world);
@@ -164,10 +183,11 @@ Given(
   { timeout: 30_000 },
   async function (session: string, resource: string, because: string) {
     const { A } = state(this).devices;
-    // A push holds dev-integration exactly as the pre-push hook claims it; a watcher claims its own.
+    heldByA.set(this, resource);
+    // A landing holds dev-integration exactly as the pre-push hook claims it; a watcher claims its own.
     const args =
       resource === DEV
-        ? ['--class', 'verify', '--ttl', '1800', '--note', 'pre-push to dev']
+        ? ['--class', 'verify', '--ttl', '600', '--offline-ok', '--note', 'pre-push to dev']
         : ['--ttl', '3600', '--note', because];
     must(
       await berth(A, ['claim', resource, '--session', session, ...args]),
@@ -181,8 +201,9 @@ Given(
   { timeout: 30_000 },
   async function () {
     const { A, B } = state(this).devices;
-    await waitFor("B's view holds A's dev-integration lease", 20_000, () => {
-      const v = verdict(B, DEV);
+    const resource = heldByA.get(this) ?? DEV;
+    await waitFor(`B's view holds A's ${resource} lease`, 20_000, () => {
+      const v = verdict(B, resource);
       return v?.verdict === 'held_by' && v.device === A.did;
     });
   }
@@ -207,11 +228,19 @@ When(
 );
 
 When(
-  'session {string} on device {word}, on its own judgment, claims {string} with {string}',
-  { timeout: 30_000 },
-  async function (session: string, label: Label, resource: string, flag: string) {
+  'session {string} on device {word}, on its own judgment, claims {string} with {string} and a {int}-second lease',
+  { timeout: 45_000 },
+  async function (session: string, label: Label, resource: string, flag: string, ttl: number) {
     const f = state(this);
-    f.last = await berth(f.devices[label], ['claim', resource, '--session', session, flag]);
+    f.last = await berth(f.devices[label], [
+      'claim',
+      resource,
+      '--session',
+      session,
+      flag,
+      '--ttl',
+      String(ttl),
+    ]);
   }
 );
 
@@ -311,8 +340,10 @@ When(
       tag === 'no build tag'
         ? 'feat: a change from device B'
         : `feat: a change from device B ${tag}`;
-    writeFileSync(join(B.repo, 'change.txt'), `${message}\n`);
-    must(git(B.repo, ['add', 'change.txt']), 'add');
+    // A path the fixture's .ci-ignore lists: the hook skips every gate and goes straight to its landing.
+    mkdirSync(join(B.repo, 'notes'), { recursive: true });
+    writeFileSync(join(B.repo, 'notes/change.txt'), `${message}\n`);
+    must(git(B.repo, ['add', 'notes/change.txt']), 'add');
     must(git(B.repo, ['commit', '-q', '-m', message]), 'commit');
     // The push runs the checkout's real pre-push hook, as session `session` of device B.
     f.push = await run(['git', 'push', 'origin', 'HEAD:dev'], {
@@ -322,14 +353,17 @@ When(
   }
 );
 
-Then('the pre-push hook stops the push before any check runs', function () {
+Then('the pre-push hook stops the push at its landing, after its checks', function () {
   const o = state(this).push;
   assert.ok(o);
   const out = `${o.stdout}\n${o.stderr}`;
   assert.notEqual(o.status, 0, out);
-  assert.match(out, /\[pre-push\] REFUSED: this push needs /, out);
-  // The first check after the claims is the Rust style reach gate; it never started.
-  assert.doesNotMatch(out, /rust-style|Rust style|PRE-PUSH GATE/, out);
+  // The checks ran first (here: every path is .ci-ignore'd, so they pass at once), then the landing.
+  const checked = o.stdout.indexOf("[pre-push] All changes are .ci-ignore'd");
+  const refused = o.stdout.search(
+    /\[pre-push\] REFUSED: (this push needs dev-integration|\S+ is held by a watcher)/
+  );
+  assert.ok(checked >= 0 && refused > checked, out);
 });
 
 Then(
@@ -361,6 +395,8 @@ Then(
       const v = view[resource] as Record<string, unknown> | undefined;
       assert.ok(!v || v.verdict === 'held_by', `B's view: ${resource} ${JSON.stringify(v)}`);
     }
+    // Nor does the hook's own landing session: a refused landing gives its lease back.
+    assert.equal(hookHolds(B), false, "B's landing agent still holds dev-integration");
   }
 );
 
@@ -437,18 +473,18 @@ Then(
 // ---------------------------------------------------------------- an override of a silent device
 
 Then(
-  "the claim waits {int} seconds for device A's acknowledgement, then takes the lease anyway and exits {int}",
+  "the claim waits {int} seconds for device A's acknowledgement and exits {int}, its override already in effect",
   function (seconds: number, code: number) {
     const f = state(this);
     const o = f.last;
     assert.ok(o);
     assert.equal(o.status, code, `${o.stdout}\n${o.stderr}`);
     assert.ok(o.ms >= seconds * 1000 - 500 && o.ms <= seconds * 2000, `took ${o.ms} ms`);
-    assert.match(o.stdout, /dev-integration: claimed over a silent device by codex-1/);
+    assert.match(o.stdout, /^dev-integration: claimed by codex-1 /m);
     assert.match(
       o.stdout,
       new RegExp(
-        String.raw`unconfirmed: ${f.devices.A.did} last seen \d+[smh] ago — override on the record`
+        String.raw`override on the record — unconfirmed: ${f.devices.A.did} last seen \d+[smh] ago`
       )
     );
   }
@@ -853,21 +889,85 @@ Then(
   }
 );
 
+interface RetiredPush {
+  child: ReturnType<typeof spawnTracked>['child'];
+  outcome: ReturnType<typeof spawnTracked>['outcome'];
+  out: () => string;
+  before: string;
+  overridesBefore: number;
+}
+const retiredPushes = new WeakMap<object, RetiredPush>();
+
+function overridesOn(f: Fixture): number {
+  const { A, B } = f.devices;
+  return ledger(B).filter(r => r.kind === 'override' && r.resource === DEV && r.overrode === A.did)
+    .length;
+}
+
 Then(
-  'a push to dev from session {string} on device B is refused with the reason line "unconfirmed:" naming device A, because A no longer acknowledges B',
-  { timeout: 60_000 },
-  async function (session: string) {
+  'a push to dev from session {string} on device B reaches its landing, where its claim on {string} is refused with the reason line "unconfirmed:" naming device A',
+  { timeout: 120_000 },
+  async function (session: string, resource: string) {
     const f = state(this);
     const { A, B } = f.devices;
-    writeFileSync(join(B.repo, 'change.txt'), 'a change from a retired device\n');
-    must(git(B.repo, ['add', 'change.txt']), 'add');
+    assert.equal(resource, DEV);
+    const before = must(git(f.origin, ['rev-parse', 'dev']), 'rev-parse dev').stdout.trim();
+    mkdirSync(join(B.repo, 'notes'), { recursive: true });
+    writeFileSync(join(B.repo, 'notes/change.txt'), 'a change from a retired device\n');
+    must(git(B.repo, ['add', 'notes/change.txt']), 'add');
     must(git(B.repo, ['commit', '-q', '-m', 'feat: a change from device B']), 'commit');
-    const o = await run(['git', 'push', 'origin', 'HEAD:dev'], {
+    const overridesBefore = overridesOn(f);
+    // Its own process group, so the test can stop the whole push the way a terminal would.
+    const { child, outcome } = spawnTracked(['git', 'push', 'origin', 'HEAD:dev'], {
       cwd: B.repo,
       env: env(B, { ELOHIM_SESSION_ID: session, ELOHIM_SESSION_OWNER_PID: String(process.pid) }),
     });
-    assert.notEqual(o.status, 0);
-    assert.match(refusalLine(o, DEV), new RegExp(`REFUSED — unconfirmed: ${A.did} last seen `));
+    let text = '';
+    child.stdout?.on('data', chunk => (text += String(chunk)));
+    child.stderr?.on('data', chunk => (text += String(chunk)));
+    retiredPushes.set(this, { child, outcome, out: () => text, before, overridesBefore });
+    const refusal = new RegExp(
+      String.raw`^${DEV}: REFUSED — unconfirmed: ${A.did}\b.* — override on the record$`,
+      'm'
+    );
+    await waitFor("the landing's refusal line", 90_000, () => refusal.test(text));
+    // The refusal came at the landing: every check before it had already passed.
+    assert.ok(text.indexOf("[pre-push] All changes are .ci-ignore'd") < text.search(refusal), text);
+  }
+);
+
+Then(
+  'that push writes one override record and waits for the override to take effect',
+  { timeout: 60_000 },
+  async function () {
+    const f = state(this);
+    const p = retiredPushes.get(this);
+    assert.ok(p, 'the push step did not run');
+    const { MARKERS } = (await import(
+      pathToFileURL(join(repository, 'genesis/orchestrator/gate-landing-markers.mjs')).href
+    )) as { MARKERS: Record<string, { re: RegExp }> };
+    const waiting = new RegExp(MARKERS.overrideWait.re.source, 'm');
+    await waitFor('the hook waiting for its override', 30_000, () => waiting.test(p.out()));
+    assert.equal(overridesOn(f), p.overridesBefore + 1, 'exactly one override row from this push');
+  }
+);
+
+Then(
+  'when the test interrupts that wait, no commit from device B reaches dev and device B gives {string} back',
+  { timeout: 60_000 },
+  async function (resource: string) {
+    const f = state(this);
+    const p = retiredPushes.get(this);
+    assert.ok(p?.child.pid, 'the push step did not run');
+    assert.equal(resource, DEV);
+    process.kill(-p.child.pid, 'SIGTERM');
+    await p.outcome;
+    assert.match(p.out(), /\[pre-push\] interrupted at the landing \(TERM\); nothing was pushed/);
+    const dev = must(git(f.origin, ['rev-parse', 'dev']), 'rev-parse dev').stdout.trim();
+    assert.equal(dev, p.before, 'nothing reached dev');
+    // The landing agent outlives the hook and gives the lease back.
+    const { B } = f.devices;
+    await waitFor("B's landing agent releasing dev-integration", 20_000, () => !hookHolds(B));
   }
 );
 
@@ -879,16 +979,30 @@ Then(
     const { A } = f.devices;
     must(git(A.repo, ['add', ROSTER]), 'add roster');
     must(git(A.repo, ['commit', '-q', '-m', 'roster: retire device B']), 'commit');
+    const sha = must(git(A.repo, ['rev-parse', 'HEAD']), 'rev-parse').stdout.trim();
     const o = await run(['git', 'push', 'origin', 'HEAD:dev'], {
       cwd: A.repo,
       env: env(A, { ELOHIM_SESSION_ID: 'claude-1', ELOHIM_SESSION_OWNER_PID: String(process.pid) }),
     });
-    assert.equal(o.status, 0, `${o.stdout}\n${o.stderr}`);
-    assert.match(`${o.stdout}\n${o.stderr}`, new RegExp(`${DEV}: claimed by claude-1`));
+    const out = `${o.stdout}\n${o.stderr}`;
+    assert.equal(o.status, 0, out);
+    // The landing is held by the hook's own session, on behalf of the pushing one (S4-6).
+    assert.match(
+      out,
+      /\[pre-push\] Phase L: dev-integration claimed in \d+s by pre-push-\S+ for claude-1 /,
+      out
+    );
     const carried = must(git(f.origin, ['show', `dev:${ROSTER}`]), 'show roster on dev').stdout;
     assert.match(carried, /"kind":"contest"/);
-    // The push held dev-integration only while it ran.
-    assert.equal(holds(A, DEV, 'claude-1'), false);
+    // Held only for the landing: the agent releases once the transfer is read back.
+    // The agent releases, unmoors, then writes its one settle line: wait for the line itself.
+    const landed = new RegExp(
+      String.raw`settle ${sha} landed dev=${sha.slice(0, 12)} held=\d+s released=ok$`,
+      'm'
+    );
+    const settleLog = join(A.repo, '.git/landing/settle.log');
+    await waitFor("A's settle line", 20_000, () => landed.test(readFileSync(settleLog, 'utf8')));
+    assert.equal(hookHolds(A), false, "A's landing agent still holds dev-integration");
   }
 );
 

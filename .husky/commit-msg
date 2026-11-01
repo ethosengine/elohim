@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Mint one Change-Id trailer per change (gate-change-id.mjs, Gerrit recipe); amend and rebase keep it.
+[ "${HUSKY-}" = "0" ] && exit 0
+stamp="$(dirname "$0")/../genesis/orchestrator/gate-change-id.mjs"
+if ! command -v node >/dev/null 2>&1 || [ ! -f "$stamp" ]; then
+  echo "[commit-msg] no Change-Id minted ($stamp or node missing): this commit has no chain position; cure: git commit --amend --no-edit once it exists" >&2
+  exit 0
+fi
+node "$stamp" stamp "$1" || echo "[commit-msg] no Change-Id minted (stamp exited $?): no chain position; cure: git commit --amend --no-edit" >&2
+exit 0

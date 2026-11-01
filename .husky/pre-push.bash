@@ -114,39 +114,40 @@ done
 
 # ── Berth: integration claims ─────────────────────────────────────
 #
-# A push to dev or main lands on the branch every device of this person integrates on, so it holds
-# the steward-scoped `dev-integration` through berth for the life of the push (class verify, ttl
-# 1800 s, renewed every 600 s while the gates run — a steward lease with no ttl would bind until
-# released, and an unrenewed one would lapse under a long landing). A pushed commit carrying
-# `[build:edge]` (or a tag list naming edge, or `[build:all]`) also needs `alpha-fleet`, since it
-# deploys to the test fleet; any `[build:*]` tag also needs `jenkins-dispatch`. Spec
-# 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5. Every pushed commit's message is read
-# ("a pushed commit"), so this can claim more than the orchestrator dispatches, which reads only the
-# tip's message: a tag quoted in an earlier commit's prose still claims. Over-claiming is the safe
-# side. The messages are matched with here-strings, never a pipe: under pipefail an early-exiting
-# `grep -q` on more than a pipe buffer of messages read as "no tag" (SIGPIPE).
+# A push to dev or main lands on the branch every device of this person integrates on. It holds the
+# steward-scoped `dev-integration` through berth for its LANDING only (Phase L below): the CAS
+# window after the gates, never while they run. The gates' verdicts are keyed on the pushed
+# closure, so a refusal at the landing loses no check; the next push reuses them. Spec
+# 2026-10-23-workspaces-cooperate-as-devices-design.md §3.5; the closure-keyed landing plane
+# 2026-10-29, lane β.
 #
-#   berth exit 0  held for this push, and released on exit with the generation token returned by
-#                 claim; a claim that only RENEWED a lease this session already held (a session
-#                 watching a deploy) is left to that session, never released here
-#   berth exit 3  the push is refused before any check runs; berth's reason line is printed as is
-#   berth exit 4  no session resolvable: moor a hook-owned holder and retry; refuse if still unleased
-#   berth exit 1  only for berth's own "renewed here, but …" line (a renew of a lease this session
-#                 held, whose record did not reach the channel: still held, earlier terms); any
-#                 other exit 1 is an error and refuses the push
+# The lease is claimed by a LANDING AGENT (phase_l_agent), forked at the landing in its own process
+# group with its own hook session (class verify, ttl 600 s, renewed every ttl/3, always
+# `--offline-ok`). It is that session's envelope owner from birth until it releases: the release
+# comes after `git push` has transmitted, when this hook has exited, and a session envelope honours
+# only its own live owner (berth facets never transfer), so no other process could release it. The
+# pushing session's own lease is never taken: when that session already holds `dev-integration`,
+# the hook renews it as that session and leaves it held.
 #
-# A workspace that is one of its steward's devices but has no `epr` binary is refused every push
-# to dev (berth: "no `epr` binary to read the steward lease view …"): an unreadable view is never a
-# free resource. The cure is the one berth names — build `epr` or set EPR_BIN.
+# `--offline-ok` is the rule: when one other device is silent, berth writes the override on the
+# record and the agent waits until it takes effect (at most ttl + max_skew_s + fence_margin_s,
+# 660 s) before landing. That covers exactly one silent device; with two the push is refused.
 #
-# The hook never overrides a silent device on its own: BERTH_OFFLINE_OK=1, set by the pushing
-# session, makes each claim an explicit `--offline-ok` (it overrides `unconfirmed` only, never
-# `held by`, and leaves an override record). A checkout with no berth refuses integration pushes.
-# HUSKY=0 still bypasses the whole hook.
+# A pushed commit carrying `[build:edge]` (or a tag list naming edge, or `[build:all]`) deploys to
+# the test fleet, and any `[build:*]` tag dispatches CI. At its landing the hook checks that no
+# other holder holds `alpha-fleet` / `jenkins-dispatch` (berth owner-check); it claims neither, so a
+# session that watches such a build claims it itself. Every pushed commit's message is read, so
+# this checks more than the orchestrator dispatches; over-checking is the safe side. The messages
+# are matched with here-strings, never a pipe: under pipefail an early-exiting `grep -q` on more
+# than a pipe buffer of messages read as "no tag" (SIGPIPE).
+#
+# A workspace that is one of its steward's devices but has no `epr` binary is refused every push to
+# dev before any gate runs: the lease view would be unreadable at the landing, and an unreadable
+# view is never a free resource. A checkout with no berth refuses integration pushes. HUSKY=0
+# still bypasses the whole hook.
 #
 # core.hooksPath is absolute (.husky/hooks-path.mjs), so a push from a linked worktree runs the MAIN
-# checkout's copy of this script against the worktree: until the main checkout carries this block,
-# such a push claims nothing. The hook on dev governs pushes to dev.
+# checkout's copy of this script against the worktree: the hook on dev governs pushes to dev.
 HOOK_ON_EXIT=""
 HOOK_OWNER_PID=$BASHPID
 hook_on_exit() {
@@ -163,81 +164,7 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
-BERTH_HELD=""
-BERTH_KEPT="" # leases this session already held: renewed while the gates run, never released
-declare -A BERTH_CLAIMED_AT=()
-BERTH_HOOK_SESSION=""
-berth_moor_hook() {
-  local principal
-  principal=$(git config user.email || git config user.name || id -un) || return 1
-  BERTH_HOOK_SESSION="pre-push-${HOOK_OWNER_PID}-${EPOCHREALTIME//./}-$RANDOM"
-  # Declare the same P1 owner to berth and native envelope validation; the parent is unchanged.
-  export ELOHIM_SESSION_ID="$BERTH_HOOK_SESSION" ELOHIM_SESSION_OWNER_PID="$HOOK_OWNER_PID"
-  "$BERTH_BIN" moor --session "$BERTH_HOOK_SESSION" --pid "$HOOK_OWNER_PID" \
-    --runtime git-hook --principal "$principal" --task "pre-push to${BERTH_TARGETS}"
-}
-berth_release_claims() {
-  local res claimed_at
-  # Only a claim whose generation reached this caller can be released. An interrupted claim stays
-  # bounded by its ttl instead of letting this cleanup guess at a later generation of the session.
-  for res in $BERTH_HELD; do
-    claimed_at="${BERTH_CLAIMED_AT[$res]-}"
-    [ -n "$claimed_at" ] || continue
-    "$BERTH_BIN" release "$res" --expected-claimed-at "$claimed_at" >/dev/null 2>&1 ||
-      echo "[pre-push] berth: $res released here, but did not reach the channel — run: berth release $res" >&2
-  done
-  BERTH_HELD=""
-  BERTH_CLAIMED_AT=()
-  if [ -n "$BERTH_HOOK_SESSION" ]; then
-    "$BERTH_BIN" unmoor --session "$BERTH_HOOK_SESSION" >/dev/null 2>&1 ||
-      echo "[pre-push] berth: hook mooring cleanup failed — run: berth unmoor --session $BERTH_HOOK_SESSION" >&2
-  fi
-}
-HOOK_ON_EXIT="$HOOK_ON_EXIT berth_release_claims"
-
-# While the gates run, every lease this push needs (taken or already held) is renewed every ttl/3 by a background loop, so a
-# long landing never outlives its lease (the other devices read a lease past since + ttl as dead).
-# A renew whose record did not cross prints berth's line and keeps going; a renew refused outright
-# prints berth's line and stops the push (at the end of the gate step then running). The loop is
-# stopped with its subprocess group on every exit, before releasing the claims, so nothing
-# renews a lease after the push gave it back.
-BERTH_TTL_S="${BERTH_PREPUSH_TTL_S:-1800}"
-BERTH_HOOK_PID=$$
-BERTH_RENEW_PID=""
-berth_renew_loop() {
-  local interval=$((BERTH_TTL_S / 3)) sleeper="" res out rc
-  [ "$interval" -ge 1 ] || interval=1
-  set +m # descendants share this renewer's process group
-  trap - EXIT INT HUP
-  # A sleeper forked but not yet exec'd still runs this trap's handler, swallows the group TERM and
-  # then sleeps the full interval under `wait`; KILL cannot be caught in that window.
-  trap 'trap "" TERM; [ -z "$sleeper" ] || kill -KILL "$sleeper" 2>/dev/null; kill -TERM -- "-$BASHPID" 2>/dev/null; wait; exit 0' TERM
-  while :; do
-    sleep "$interval" </dev/null >/dev/null 2>&1 &
-    sleeper=$!
-    wait "$sleeper"
-    sleeper=""
-    for res in $BERTH_HELD $BERTH_KEPT; do
-      out=$("$BERTH_BIN" claim "$res" "${BERTH_FLAGS[@]}" 2>&1)
-      rc=$?
-      [ "$rc" -eq 0 ] && continue
-      [ -n "$out" ] && printf '%s\n' "$out" >&2
-      if [ "$rc" -eq 1 ] && grep -q "^$res: renewed here, but " <<<"$out"; then
-        continue
-      fi
-      echo "[pre-push] REFUSED: renewing $res while the gates ran was refused (above). The push stops." >&2
-      kill -TERM "$BERTH_HOOK_PID" 2>/dev/null
-      exit 0
-    done
-  done
-}
-berth_stop_renewing() {
-  [ -n "$BERTH_RENEW_PID" ] || return 0
-  kill -TERM -- "-$BERTH_RENEW_PID" 2>/dev/null
-  wait "$BERTH_RENEW_PID" 2>/dev/null
-  BERTH_RENEW_PID=""
-}
-HOOK_ON_EXIT="berth_stop_renewing $HOOK_ON_EXIT"
+BERTH_TTL_S="${BERTH_PREPUSH_TTL_S:-600}"
 
 BERTH_TARGETS=""
 BERTH_MESSAGES=""
@@ -256,81 +183,547 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   fi
 done
 
+BERTH_WATCHED=""
 if [ -n "$BERTH_TARGETS" ]; then
   if [ ! -x "$BERTH_BIN" ]; then
     echo "[pre-push] REFUSED: this push needs dev-integration; restore executable $BERTH_BIN."
     exit 1
   fi
+  # berth's own `no epr` rule, before any gate: a device's lease view is read through epr.
+  BERTH_DEVICE_KEY="${ELOHIM_DEVICE_KEY_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/elohim/device/ed25519.seed}"
+  BERTH_EPR="${EPR_BIN:-$(command -v epr || true)}"
+  if [ -f "$BERTH_DEVICE_KEY" ] && [ ! -x "$BERTH_EPR" ]; then
+    echo "[pre-push] REFUSED: epr is required before any gate — run: epr device arrive, or set EPR_BIN=<path>"
+    exit 1
+  fi
   # The orchestrator's own tag grammar (genesis/orchestrator/commit-tag-parser.mjs): [build:a,b-c].
-  BERTH_NEEDS="dev-integration"
   if grep -qiE '\[build:([a-z,-]*,)?(edge|all)(,[a-z,-]*)?\]' <<<"$BERTH_MESSAGES"; then
-    BERTH_NEEDS="$BERTH_NEEDS alpha-fleet"
+    BERTH_WATCHED="$BERTH_WATCHED alpha-fleet"
   fi
   if grep -qiE '\[build:[a-z,-]+\]' <<<"$BERTH_MESSAGES"; then
-    BERTH_NEEDS="$BERTH_NEEDS jenkins-dispatch"
-  fi
-  BERTH_FLAGS=(--class verify --ttl "$BERTH_TTL_S" --note "pre-push to${BERTH_TARGETS}")
-  [ "${BERTH_OFFLINE_OK-}" = "1" ] && BERTH_FLAGS+=(--offline-ok)
-  for BERTH_RES in $BERTH_NEEDS; do
-    BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
-    BERTH_RC=$?
-    if [ "$BERTH_RC" -eq 4 ] && [ "$BERTH_RES" = dev-integration ]; then
-      [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
-      if ! berth_moor_hook; then
-        echo "[pre-push] REFUSED: could not moor a hook holder; repair berth's session/store error above, or push from a moored session."
-        exit 1
-      fi
-      BERTH_OUT=$("$BERTH_BIN" claim "$BERTH_RES" "${BERTH_FLAGS[@]}" 2>&1)
-      BERTH_RC=$?
-    fi
-    [ -n "$BERTH_OUT" ] && printf '%s\n' "$BERTH_OUT" >&2
-    case "$BERTH_RC" in
-      0)
-        # A renew is a lease this session already held (it watches that build or deploy, or an
-        # earlier push of it was killed): not this push's to give back, but the gates still need it.
-        if grep -q "^$BERTH_RES: renewed" <<<"$BERTH_OUT"; then
-          BERTH_KEPT="$BERTH_KEPT $BERTH_RES"
-        else
-          BERTH_HELD="$BERTH_HELD $BERTH_RES"
-          if [[ "$BERTH_OUT" =~ (^|[[:space:]])claimed_at=([0-9]+([.][0-9]+)?)($|[[:space:]]) ]]; then
-            BERTH_CLAIMED_AT["$BERTH_RES"]="${BASH_REMATCH[2]}"
-          fi
-        fi
-        ;;
-      1)
-        if grep -q "^$BERTH_RES: renewed here, but " <<<"$BERTH_OUT"; then
-          # A renew whose record did not cross: the lease is still held, on its earlier terms.
-          echo "[pre-push] berth: $BERTH_RES is held, but the other devices see its earlier terms (above)."
-        else
-          echo "[pre-push] REFUSED: berth claim $BERTH_RES failed (exit 1, above). Bypass all gates: HUSKY=0 git push"
-          BERTH_HELD="$BERTH_HELD $BERTH_RES" # it may have written its lease before failing
-          exit 1
-        fi
-        ;;
-      3)
-        echo "[pre-push] REFUSED: this push needs $BERTH_RES (reason above). Nothing was pushed."
-        exit 1
-        ;;
-      4)
-        echo "[pre-push] REFUSED: this push needs $BERTH_RES; repair berth's session/store error above, or push from a moored session."
-        exit 1
-        ;;
-      *)
-        echo "[pre-push] REFUSED: berth claim $BERTH_RES exited $BERTH_RC (above). Bypass all gates: HUSKY=0 git push"
-        BERTH_HELD="$BERTH_HELD $BERTH_RES" # it may have written its lease before failing
-        exit 1
-        ;;
-    esac
-  done
-  if [ -n "$BERTH_HELD$BERTH_KEPT" ]; then
-    # Bash establishes the group before running the subshell; no setsid startup race.
-    set -m
-    berth_renew_loop </dev/null &
-    BERTH_RENEW_PID=$!
-    set +m
+    BERTH_WATCHED="$BERTH_WATCHED jenkins-dispatch"
   fi
 fi
 # ── Berth: claims taken ───────────────────────────────────────────
+
+# ── Phase L: land in the CAS window ───────────────────────────────
+#
+# Every successful exit of this hook from here on goes through hook_pass. For a push to dev/main
+# it then:
+#   1. claims dev-integration through the landing agent (or renews the pushing session's own lease
+#      and leaves it held);
+#   2. checks that no watcher holds alpha-fleet / jenkins-dispatch;
+#   3. fetches the remote's tip and lands only as a fast-forward of it, judged on commit ancestry.
+#      A moved tip releases the lease, rebases the candidate in place, re-gates it and refuses
+#      "push again": one round, never a loop;
+#   4. hands the landing to the agent, which waits for the real `git push` to finish, reads the
+#      remote back, releases by generation token and appends one line to
+#      <git-common-dir>/landing/settle.log.
+# The parent talks to the agent through a FIFO (`land <sha> <push pid> <target>` or
+# `release <why>`; EOF before `land` means release now) and reads a status file the agent appends
+# (`say`/`berth` lines to print, then `held <claimed_at> <claim s>` or `refused <rc>`).
+PHASE_L_REMOTE="${1:-origin}"
+PHASE_L_STARTED=""
+PHASE_L_DONE=""
+PHASE_L_SIGNAL=""
+PHASE_L_KEPT=""
+PHASE_L_DIR=""
+PHASE_L_AGENT=""
+PHASE_L_FD=""
+PHASE_L_LOG=""
+PHASE_L_CONSUMED=0
+PHASE_L_FINAL=""
+PHASE_L_HELD_AT=""
+PHASE_L_BASE=""
+PHASE_L_LAND_SHA=""
+PHASE_L_LAND_TARGET=""
+
+phase_l_refuse() {
+  echo "$1"
+  PHASE_L_DONE=refused
+  exit 1
+}
+
+phase_l_nap() {
+  sleep "$1" </dev/null >/dev/null 2>&1 &
+  wait "$!"
+}
+
+# max_skew_s fence_margin_s confirm_wait_s from the steward channel policy (berth's own defaults).
+phase_l_channel() {
+  node -e '
+    let c = {};
+    try { c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).berth.channel || {}; } catch {}
+    const n = (v, d) => (Number.isInteger(v) && v >= 0 ? v : d);
+    console.log(n(c.max_skew_s, 30), n(c.fence_margin_s, 30), n(c.confirm_wait_s, 10));
+  ' "$HOOK_WORK_TREE/genesis/agentic/pool-policy.json" 2>/dev/null || echo "30 30 10"
+}
+
+phase_l_rfc3339() {
+  date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# ---- the landing agent (runs detached; stdout/stderr go to settle.log) ----
+
+phase_l_agent_say() { # kind, text (one status line per text line)
+  local kind=$1 line
+  while IFS= read -r line; do
+    [ -n "$line" ] && printf '%s %s\n' "$kind" "$line" >>"$PHASE_L_STATUS"
+  done <<<"$2"
+}
+
+phase_l_agent_claim() {
+  PHASE_L_OUT=$("$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
+    --note "pre-push to${BERTH_TARGETS} for $PHASE_L_FOR" 2>&1)
+}
+
+phase_l_agent_token() {
+  if [[ "$PHASE_L_OUT" =~ claimed_at=([0-9]+([.][0-9]+)?) ]]; then
+    PHASE_L_CA="${BASH_REMATCH[1]}"
+  fi
+}
+
+phase_l_agent_overridden() {
+  [[ "$PHASE_L_OUT" == *"— override on the record"* ]]
+}
+
+# One renew. 0 = still held (a new generation is recorded), 1 = refused outright.
+phase_l_agent_renew() {
+  local rc
+  phase_l_agent_claim
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    phase_l_agent_token
+    return 0
+  fi
+  if { [ "$rc" -eq 3 ] && phase_l_agent_overridden; } ||
+     { [ "$rc" -eq 1 ] && [[ "$PHASE_L_OUT" == "dev-integration: renewed here, but "* ]]; }; then
+    return 0
+  fi
+  phase_l_agent_say berth "$PHASE_L_OUT"
+  phase_l_agent_say say "[pre-push] REFUSED: renewing dev-integration while it waited to land was refused (above). The push stops."
+  printf 'lost renew refused\n' >>"$PHASE_L_STATUS"
+  return 1
+}
+
+# Wait one step for the parent: 0 = nothing came, 2 = it asked or went away (PHASE_L_WHY set).
+phase_l_agent_listen() {
+  local line rc=0
+  read -r -t "$1" -u "$PHASE_L_IN" line || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    case "$line" in
+      land\ *) read -r _ PHASE_L_SHA PHASE_L_PUSH PHASE_L_TARGET <<<"$line"; return 2 ;;
+      release\ *) PHASE_L_WHY="${line#release }"; return 2 ;;
+    esac
+    return 0
+  fi
+  # A timeout is above 128; EOF (every writer closed: the hook is gone) is 1.
+  if [ "$rc" -le 128 ]; then
+    PHASE_L_WHY="hook gone"
+    return 2
+  fi
+  [ -z "$PHASE_L_WHY" ] || return 2
+  return 0
+}
+
+# berth refused the claim with an override on the record: wait until it takes effect, renewing,
+# then re-claim (R-K). 0 = held, 2 = the parent asked or went away, else berth's refusal.
+phase_l_agent_override_wait() {
+  local start now until_s deadline next ms="" rc step
+  start=$(date +%s)
+  [[ "$PHASE_L_OUT" =~ override_at_ms=([0-9]+) ]] && ms="${BASH_REMATCH[1]}"
+  phase_l_agent_token
+  until_s=$((start + PHASE_L_MAX))
+  if [ -n "$ms" ] && [ $((ms / 1000)) -lt "$until_s" ]; then
+    until_s=$((ms / 1000))
+  fi
+  [ "$until_s" -ge "$start" ] || until_s=$start
+  deadline=$((start + PHASE_L_MAX + 2 * (PHASE_L_CW + 1) + 2))
+  phase_l_agent_say berth "$PHASE_L_OUT"
+  phase_l_agent_say say "[pre-push] Phase L: override on the record; effective at $(phase_l_rfc3339 "$until_s") — waiting $((until_s - start))s"
+  if [[ "$PHASE_L_OUT" == *"epr peer serve"* ]]; then
+    phase_l_agent_say say "[pre-push] Phase L: this device's peer daemon is down — run: epr peer serve"
+  fi
+  next=$((start + PHASE_L_INTERVAL))
+  while :; do
+    now=$(date +%s)
+    if [ "$now" -ge "$until_s" ]; then
+      if [ $((now + PHASE_L_CW + 1)) -gt "$deadline" ]; then
+        PHASE_L_OUT="[pre-push] REFUSED: the override did not take effect within $((now - start))s (one silent sibling is covered; two are not). Nothing was pushed."
+        return 3
+      fi
+      phase_l_agent_claim
+      rc=$?
+      if [ "$rc" -eq 0 ]; then
+        phase_l_agent_token
+        return 0
+      fi
+      phase_l_agent_overridden || return "$rc"
+      phase_l_agent_token
+      until_s=$((now + 2))
+      continue
+    fi
+    step=$((until_s - now))
+    [ "$step" -le 5 ] || step=5
+    phase_l_agent_listen "$step"
+    [ $? -eq 2 ] && return 2
+    if [ "$(date +%s)" -ge "$next" ]; then
+      phase_l_agent_renew || return 3
+      next=$(($(date +%s) + PHASE_L_INTERVAL))
+    fi
+  done
+}
+
+phase_l_agent_end() { # what happened (the settle line's middle)
+  local out released=ok
+  if [ -n "$PHASE_L_CA" ]; then
+    out=$("$BERTH_BIN" release dev-integration --session "$ELOHIM_SESSION_ID" \
+      --expected-claimed-at "$PHASE_L_CA" 2>&1) || released="failed:${out//$'\n'/ }"
+  fi
+  "$BERTH_BIN" unmoor --session "$ELOHIM_SESSION_ID" >/dev/null 2>&1
+  printf '%s %s held=%ss released=%s\n' "$(phase_l_rfc3339 "$(date +%s)")" "$1" \
+    "$(($(date +%s) - ${PHASE_L_HELD_FROM:-$(date +%s)}))" "$released"
+  # Before a hand-over the hook still reads the verdict from this directory and removes it itself.
+  [ -z "$PHASE_L_SHA" ] || rm -rf "$PHASE_L_AGENT_DIR"
+}
+
+phase_l_agent() { # dir, session, for whom
+  local rc principal out now remote result
+  PHASE_L_AGENT_DIR=$1
+  PHASE_L_STATUS="$1/status"
+  PHASE_L_FOR=$3
+  PHASE_L_CA=""
+  PHASE_L_WHY=""
+  PHASE_L_SHA=""
+  PHASE_L_HELD_FROM=""
+  trap - EXIT
+  trap '' INT HUP
+  trap 'PHASE_L_WHY=terminated' TERM
+  # The parent's own end of the FIFO is not ours to hold: EOF must mean the parent is gone.
+  exec {PHASE_L_FD}>&-
+  exec {PHASE_L_IN}<"$1/fifo"
+  # This process is the envelope owner of the session it holds the lease with (see Berth block).
+  export ELOHIM_SESSION_ID="$2" ELOHIM_SESSION_OWNER_PID="$BASHPID"
+  read -r PHASE_L_SKEW PHASE_L_MARGIN PHASE_L_CW <<<"$(phase_l_channel)"
+  PHASE_L_MAX="${BERTH_PREPUSH_OVERRIDE_MAX_S:-$((BERTH_TTL_S + PHASE_L_SKEW + PHASE_L_MARGIN))}"
+  PHASE_L_INTERVAL=$((BERTH_TTL_S / 3))
+  [ "$PHASE_L_INTERVAL" -ge 1 ] || PHASE_L_INTERVAL=1
+  principal=$(git config user.email || git config user.name || id -un)
+  # $BASHPID inside $(…) would name the substitution's subshell, not this agent.
+  if ! out=$("$BERTH_BIN" moor --session "$2" --pid "$ELOHIM_SESSION_OWNER_PID" --runtime git-hook \
+      --principal "$principal" --task "landing for $3" 2>&1); then
+    phase_l_agent_say berth "$out"
+    printf 'refused 4\n' >>"$PHASE_L_STATUS"
+    phase_l_agent_end "refused moor"
+    return
+  fi
+  now=$(date +%s)
+  phase_l_agent_claim
+  rc=$?
+  if [ "$rc" -eq 3 ] && phase_l_agent_overridden; then
+    phase_l_agent_override_wait
+    rc=$?
+    if [ "$rc" -eq 2 ]; then
+      printf 'refused 130\n' >>"$PHASE_L_STATUS"
+      phase_l_agent_end "release ${PHASE_L_WHY} (during the override wait)"
+      return
+    fi
+  fi
+  if [ "$rc" -ne 0 ]; then
+    phase_l_agent_say berth "$PHASE_L_OUT"
+    printf 'refused %s\n' "$rc" >>"$PHASE_L_STATUS"
+    phase_l_agent_end "refused claim rc=$rc"
+    return
+  fi
+  phase_l_agent_token
+  phase_l_agent_say berth "$PHASE_L_OUT"
+  PHASE_L_HELD_FROM=$(date +%s)
+  printf 'held %s %s\n' "$PHASE_L_CA" "$((PHASE_L_HELD_FROM - now))" >>"$PHASE_L_STATUS"
+  # Held: renew while the parent checks, until it hands the landing over or lets go.
+  local next=$((PHASE_L_HELD_FROM + PHASE_L_INTERVAL))
+  while :; do
+    phase_l_agent_listen 1
+    [ $? -eq 2 ] && break
+    if [ "$(date +%s)" -ge "$next" ]; then
+      phase_l_agent_renew || { PHASE_L_WHY="renew refused"; break; }
+      next=$(($(date +%s) + PHASE_L_INTERVAL))
+    fi
+  done
+  if [ -z "$PHASE_L_SHA" ]; then
+    phase_l_agent_end "release ${PHASE_L_WHY}"
+    return
+  fi
+  # Handed over: wait for the real `git push` to finish (bounded at an hour), still renewing.
+  local stop=$(($(date +%s) + 3600))
+  while kill -0 "$PHASE_L_PUSH" 2>/dev/null && [ "$(date +%s)" -lt "$stop" ] && [ -z "$PHASE_L_WHY" ]; do
+    sleep 0.5
+    if [ "$(date +%s)" -ge "$next" ]; then
+      phase_l_agent_renew || break
+      next=$(($(date +%s) + PHASE_L_INTERVAL))
+    fi
+  done
+  remote=$(timeout 30 git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null | cut -f1)
+  if { [ "$PHASE_L_SHA" = none ] && [ -z "$remote" ]; } || [ "$remote" = "$PHASE_L_SHA" ]; then
+    result=landed
+  else
+    result=did-not-land
+  fi
+  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12}"
+}
+
+# ---- the hook's side ----
+
+phase_l_await() { # print the agent's lines until its verdict; PHASE_L_FINAL = that verdict
+  local lines i alive bound
+  bound=$(($(date +%s) + BERTH_TTL_S + 2 * (PHASE_L_CW + 1) + 120))
+  while :; do
+    alive=1
+    kill -0 "$PHASE_L_AGENT" 2>/dev/null || alive=""
+    mapfile -t lines <"$PHASE_L_DIR/status" 2>/dev/null || lines=()
+    for ((i = PHASE_L_CONSUMED; i < ${#lines[@]}; i++)); do
+      PHASE_L_CONSUMED=$((i + 1))
+      case "${lines[i]}" in
+        say\ *) printf '%s\n' "${lines[i]#say }" ;;
+        berth\ *) printf '%s\n' "${lines[i]#berth }" >&2 ;;
+        *) PHASE_L_FINAL="${lines[i]}"; return 0 ;;
+      esac
+    done
+    [ -n "$alive" ] || { PHASE_L_FINAL="refused agent-exited"; return 0; }
+    [ "$(date +%s)" -lt "$bound" ] || { PHASE_L_FINAL="refused no-verdict"; return 0; }
+    phase_l_nap 0.2
+  done
+}
+
+phase_l_reap() {
+  local i
+  for ((i = 0; i < 150; i++)); do
+    kill -0 "$PHASE_L_AGENT" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  echo "[pre-push] Phase L: the landing agent did not finish releasing within 15s; see $PHASE_L_LOG" >&2
+}
+
+phase_l_release_now() { # why
+  [ -n "$PHASE_L_AGENT" ] || return 0
+  printf 'release %s\n' "$1" >&"$PHASE_L_FD" 2>/dev/null
+  phase_l_reap
+  PHASE_L_AGENT=""
+}
+
+phase_l_claim() {
+  local show kept whom out rc session
+  # The pushing session's own lease: renewed as that session and left held.
+  show=$("$BERTH_BIN" session-show 2>/dev/null) || show=""
+  read -r kept whom < <(node -e '
+    let j = {};
+    try { j = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch {}
+    const held = j && j.leases && j.leases["dev-integration"] ? 1 : 0;
+    console.log(held, (j && j.mooring && j.mooring.session) || "-");
+  ' <<<"$show" 2>/dev/null || echo "0 -")
+  if [ "${kept:-0}" = 1 ]; then
+    out=$("$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
+      --note "pre-push to${BERTH_TARGETS}" 2>&1)
+    rc=$?
+    [ -n "$out" ] && printf '%s\n' "$out" >&2
+    if [ "$rc" -eq 0 ] || { [ "$rc" -eq 1 ] && grep -q '^dev-integration: renewed here, but ' <<<"$out"; }; then
+      PHASE_L_KEPT=1
+      echo "[pre-push] Phase L: dev-integration claimed by this session already (renewed); it stays held after the push — release it when done: berth release dev-integration"
+      return 0
+    fi
+    phase_l_refuse "[pre-push] REFUSED: this push needs dev-integration (reason above). Your gates are recorded; push again when it is free."
+  fi
+  [ "${whom:--}" != - ] || whom=$(git config user.email || git config user.name || id -un)
+  if ! PHASE_L_DIR=$(mktemp -d) || ! mkfifo "$PHASE_L_DIR/fifo" || ! : >"$PHASE_L_DIR/status"; then
+    phase_l_refuse "[pre-push] REFUSED: could not prepare the landing agent's channel (mktemp/mkfifo). Your gates are recorded."
+  fi
+  exec {PHASE_L_FD}<>"$PHASE_L_DIR/fifo"
+  session="pre-push-${HOOK_OWNER_PID}-${EPOCHREALTIME//./}-$RANDOM"
+  set -m
+  phase_l_agent "$PHASE_L_DIR" "$session" "$whom" </dev/null >>"$PHASE_L_LOG" 2>&1 &
+  PHASE_L_AGENT=$!
+  set +m
+  phase_l_await
+  case "$PHASE_L_FINAL" in
+    held\ *)
+      local claim_s
+      read -r _ _ claim_s <<<"$PHASE_L_FINAL"
+      PHASE_L_HELD_AT=$(date +%s)
+      echo "[pre-push] Phase L: dev-integration claimed in ${claim_s}s by $session for $whom (ttl ${BERTH_TTL_S}s)"
+      ;;
+    "refused 3")
+      phase_l_refuse "[pre-push] REFUSED: this push needs dev-integration (reason above). Your gates are recorded; push again when it is free."
+      ;;
+    "refused 4")
+      phase_l_refuse "[pre-push] REFUSED: the landing agent could not moor its session (above); repair berth's session/store error. Your gates are recorded."
+      ;;
+    *)
+      phase_l_refuse "[pre-push] REFUSED: berth claim dev-integration failed (${PHASE_L_FINAL#refused }, above). Your gates are recorded. Bypass all gates: HUSKY=0 git push"
+      ;;
+  esac
+}
+
+phase_l_owner_checks() {
+  local res out rc
+  for res in $BERTH_WATCHED; do
+    out=$("$BERTH_BIN" owner-check "$res" --action "push to dev" 2>&1)
+    rc=$?
+    [ -n "$out" ] && printf '%s\n' "$out" >&2
+    case "$rc" in
+      0) ;;
+      3) phase_l_refuse "[pre-push] REFUSED: $res is held by a watcher (above); dev-integration is released. Nothing was pushed." ;;
+      *) phase_l_refuse "[pre-push] REFUSED: berth owner-check $res exited $rc (above); repair berth's session/store error. dev-integration is released. Nothing was pushed." ;;
+    esac
+  done
+}
+
+phase_l_fetch_base() { # target, the base git sent
+  local err
+  if err=$(timeout 60 git -c gc.auto=0 -c maintenance.auto=false fetch --quiet --no-tags \
+      --no-recurse-submodules "$PHASE_L_REMOTE" "refs/heads/$1" 2>&1) &&
+     PHASE_L_BASE=$(git rev-parse --verify -q FETCH_HEAD); then
+    return 0
+  fi
+  echo "[pre-push] Phase L: $PHASE_L_REMOTE unreadable (${err//$'\n'/ }); landing on the base git sent — the server's fast-forward check is the last word"
+  PHASE_L_BASE=$2
+}
+
+phase_l_moved() { # target, pushed sha, the base git sent
+  local new=$PHASE_L_BASE head upstream out files p rc tmp reused=0 ran=0 failed=""
+  [ "$1" = dev ] ||
+    phase_l_refuse "[pre-push] REFUSED: $1 moved to ${new:0:12} since this push was prepared; rebase onto it and push again"
+  phase_l_release_now moved
+  head=$(git rev-parse HEAD)
+  [ "$head" = "$2" ] ||
+    phase_l_refuse "[pre-push] REFUSED: dev moved to ${new:0:12}; ${2:0:12} is not checked out here — rebase it onto ${new:0:12} and push again"
+  # git refreshes the base it sends from the remote's advertisement, so it may already be the moved
+  # tip: rebase from where the candidate actually forked.
+  upstream=$3
+  if [ "$upstream" = "$ZERO_SHA" ] || ! git merge-base --is-ancestor "$upstream" HEAD 2>/dev/null; then
+    upstream=$(git merge-base "$new" HEAD)
+  fi
+  echo "[pre-push] Phase L: dev moved ${upstream:0:12} → ${new:0:12}; released dev-integration, rebasing in place"
+  if ! out=$(git rebase --autostash --onto "$new" "$upstream" 2>&1); then
+    printf '%s\n' "$out"
+    files=$(git diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ')
+    git rebase --abort >/dev/null 2>&1
+    phase_l_refuse "[pre-push] REFUSED: dev moved to ${new:0:12} and ${2:0:12} does not rebase onto it cleanly (${files:-conflicts above}); rebase by hand and push again"
+  fi
+  head=$(git rev-parse HEAD)
+  export GATE_COMMIT="$head"
+  unset GATE_EVIDENCE_RECORD
+  [ -z "${GATE_CHANGED_FILES-}" ] || git diff --name-only "$new" HEAD >"$GATE_CHANGED_FILES"
+  export GATE_NARROW_BASE=ok
+  tmp=$(mktemp)
+  for p in ${PROJECTS-}; do
+    (cd "$HOOK_WORK_TREE" && GATE_RUN_KIND=pre-push node genesis/orchestrator/gate-runner.mjs --target "$p") 2>&1 |
+      tee "$tmp"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+      failed="$failed $p"
+    elif grep -q 'reused' "$tmp"; then
+      reused=$((reused + 1))
+    else
+      ran=$((ran + 1))
+    fi
+  done
+  rm -f "$tmp"
+  if [ -n "$failed" ]; then
+    phase_l_refuse "[pre-push] REFUSED: candidate rebased to ${head:0:12} is red on the moved base:$failed"
+  fi
+  echo "[pre-push] Phase L: rebased to ${head:0:12} on ${new:0:12}: $reused reused, $ran ran"
+  echo "[pre-push] REFUSED: candidate moved to $head; push again"
+  PHASE_L_DONE=moved
+  exit 1
+}
+
+phase_l_push_pid() {
+  if [ -n "${PHASE_L_PUSH_PID-}" ]; then
+    echo "$PHASE_L_PUSH_PID"
+    return
+  fi
+  # git → husky's `_/pre-push` sh → `sh -e .husky/pre-push` → exec bash: $PPID exits with the hook.
+  local pid=$PPID i
+  for ((i = 0; i < 8; i++)); do
+    [ -r "/proc/$pid/comm" ] || break
+    if [ "$(cat "/proc/$pid/comm")" = git ]; then
+      echo "$pid"
+      return
+    fi
+    pid=$(awk '/^PPid:/ {print $2}' "/proc/$pid/status" 2>/dev/null)
+    [ -n "$pid" ] && [ "$pid" != 0 ] || break
+  done
+  echo "[pre-push] Phase L: no git ancestor found; the landing agent waits on $PPID" >&2
+  echo "$PPID"
+}
+
+phase_l_handoff() {
+  if [ -n "$PHASE_L_KEPT" ]; then
+    PHASE_L_DONE=kept
+    echo "[pre-push] Phase L: landing ${PHASE_L_LAND_SHA:0:12} on ${PHASE_L_BASE:0:12} as a fast-forward; dev-integration stays held by this session"
+    return 0
+  fi
+  if grep -q '^lost ' "$PHASE_L_DIR/status" 2>/dev/null; then
+    phase_l_await
+    phase_l_refuse "[pre-push] REFUSED: dev-integration was lost while this push waited to land (above). Your gates are recorded; push again."
+  fi
+  printf 'land %s %s %s\n' "${PHASE_L_LAND_SHA:-none}" "$(phase_l_push_pid)" "$PHASE_L_LAND_TARGET" >&"$PHASE_L_FD"
+  PHASE_L_DONE=handed
+  echo "[pre-push] Phase L: dev-integration held $(($(date +%s) - PHASE_L_HELD_AT))s"
+  echo "[pre-push] Phase L: landing ${PHASE_L_LAND_SHA:0:12} on ${PHASE_L_BASE:0:12} as a fast-forward; the landing agent releases dev-integration after the transfer (log: $PHASE_L_LOG)"
+}
+
+hook_pass() {
+  [ -n "$BERTH_TARGETS" ] || exit 0
+  local line local_sha remote_ref remote_sha target rc
+  PHASE_L_STARTED=1
+  trap 'PHASE_L_SIGNAL=INT; exit 130' INT
+  trap 'PHASE_L_SIGNAL=TERM; exit 143' TERM
+  trap 'PHASE_L_SIGNAL=HUP; exit 129' HUP
+  PHASE_L_LOG="$(git rev-parse --path-format=absolute --git-common-dir)/landing/settle.log"
+  mkdir -p "$(dirname "$PHASE_L_LOG")" ||
+    phase_l_refuse "[pre-push] REFUSED: cannot create $(dirname "$PHASE_L_LOG"). Your gates are recorded."
+  read -r _ _ PHASE_L_CW <<<"$(phase_l_channel)"
+  echo "[pre-push] Phase L: claiming dev-integration (ttl ${BERTH_TTL_S}s)"
+  phase_l_claim
+  phase_l_owner_checks
+  for line in "${PUSH_LINES[@]}"; do
+    read -r _ local_sha remote_ref remote_sha <<<"$line"
+    case "$remote_ref" in
+      refs/heads/dev | refs/heads/main) ;;
+      *) continue ;;
+    esac
+    target=${remote_ref#refs/heads/}
+    if [ -z "$PHASE_L_LAND_TARGET" ] || [ "$target" = dev ]; then
+      PHASE_L_LAND_TARGET=$target
+      PHASE_L_LAND_SHA=$local_sha
+      [ "$local_sha" != "$ZERO_SHA" ] || PHASE_L_LAND_SHA=none
+    fi
+    phase_l_fetch_base "$target" "$remote_sha"
+    [ "$local_sha" != "$ZERO_SHA" ] && [ "$PHASE_L_BASE" != "$ZERO_SHA" ] || continue
+    # Fast-forward is judged on commit oids (R-D). Only a definite "not an ancestor" is a move;
+    # an unknown base leaves the verdict to the server.
+    git merge-base --is-ancestor "$PHASE_L_BASE" "$local_sha" 2>/dev/null
+    rc=$?
+    [ "$rc" -ne 1 ] || phase_l_moved "$target" "$local_sha" "$remote_sha"
+  done
+  phase_l_handoff
+  exit 0
+}
+
+phase_l_on_exit() {
+  [ -n "$PHASE_L_STARTED" ] || return 0
+  if [ -n "$PHASE_L_AGENT" ] && [ "$PHASE_L_DONE" != handed ]; then
+    phase_l_release_now "${PHASE_L_DONE:-${PHASE_L_SIGNAL:-exit}}"
+  fi
+  if [ -z "$PHASE_L_DONE" ]; then
+    echo "[pre-push] interrupted at the landing (${PHASE_L_SIGNAL:-exit}); nothing was pushed — resume: git push $PHASE_L_REMOTE HEAD:dev" >&2
+  fi
+  if [ -n "$PHASE_L_DIR" ] && [ "$PHASE_L_DONE" != handed ]; then
+    rm -rf "$PHASE_L_DIR"
+  fi
+}
+HOOK_ON_EXIT="phase_l_on_exit $HOOK_ON_EXIT"
+# ── Phase L: end ──────────────────────────────────────────────────
 
 CHANGED=""
 UNFILTERED_CHANGED=""
@@ -399,6 +792,8 @@ export GATE_CHANGED_FILES GATE_NARROW_BASE
 # do not include dev, preserve the former last-ref behavior for the ordinary union gate.
 GATE_COMMIT="${DEV_LOCAL_SHA:-$LAST_LOCAL_SHA}"
 export GATE_COMMIT
+# R-I: every gate may stand on this workspace's own green evidence for the same closure.
+export GATE_EVIDENCE="${GATE_EVIDENCE:-reuse}"
 GATE_PUSH_TARGETS="${PUSH_TARGETS# }"
 GATE_PUSH_BRANCHES=""
 for GATE_PUSH_TARGET in $GATE_PUSH_TARGETS; do
@@ -418,7 +813,7 @@ fi
 
 # Nothing changed — let it through
 if [ -z "$CHANGED" ]; then
-  exit 0
+  hook_pass
 fi
 
 # ── Elohim-agent package projection freshness ────────────────────
@@ -642,7 +1037,7 @@ if command -v node >/dev/null 2>&1 && [ -f genesis/orchestrator/ci-ignore.mjs ];
   fi
   if [ -z "$CHANGED" ]; then
     echo "[pre-push] All changes are .ci-ignore'd (docs/agents/CI-only) — skipping gates."
-    exit 0
+    hook_pass
   fi
 fi
 
@@ -666,7 +1061,7 @@ if [ -z "$AGENT_MANIFEST_SCOPE_REMAINDER" ] &&
    printf '%s\n' "$CHANGED" | grep -qE '^elohim/sdk/domains/elohim-agent/|^elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs$'; then
   echo "[pre-push] elohim-agent manifest/schema-only changes — running focused gate."
   pnpm run elohim-agent:test || exit 1
-  exit 0
+  hook_pass
 fi
 
 # ── Humans/Presences Schema Validation + Freshness ───────────────
@@ -885,7 +1280,7 @@ fi
 
 # No project source changes — let it through
 if [ -z "$PROJECTS" ]; then
-  exit 0
+  hook_pass
 fi
 
 # ── PVC-pressure strategy (policy-driven) ─────────────────────────
@@ -956,7 +1351,7 @@ fi
 # Re-check: pressure deferral may have emptied the project list.
 if [ -z "$PROJECTS" ]; then
   echo "[pre-push] all detected gates deferred — push allowed (CI backstop)."
-  exit 0
+  hook_pass
 fi
 
 # Resource Guard — pause rust-analyzer during manifest-declared gates.
@@ -1219,4 +1614,4 @@ fi
 # Stage 1a: advisory brit checks (never fail the push).
 brit_advisory
 
-exit 0
+hook_pass

@@ -9,8 +9,9 @@
 // (including devfile postStart), use the main checkout's tracked .husky entrypoints directly.
 // Validate every governed hook chain before declaring success: a directory alone proves nothing.
 // The governed entrypoints are pre-push (the push gate), pre-commit (the .epr-meta compose gate and
-// the commit-time formatting ratchet) and pre-merge-commit (a clean automatic merge, delegated to
-// pre-commit). A shim directory missing any of them would silently skip that hook.
+// the commit-time formatting ratchet), pre-merge-commit (a clean automatic merge, delegated to
+// pre-commit), and commit-msg (the Change-Id shim). A shim directory missing any of them would
+// silently skip that hook.
 //
 // So a push from a worktree runs the MAIN checkout's hook script (`.husky/_/h` runs
 // `<main>/.husky/pre-push`), with the worktree as its work tree: the hook's logic is whatever the
@@ -40,7 +41,7 @@ function usable(path, mode = constants.R_OK) {
 
 // Hooks whose tracked entrypoint in .husky/ must exist and be executable, and whose husky shim
 // must exist in .husky/_ before that directory may serve as core.hooksPath.
-const GOVERNED_HOOKS = ['pre-push', 'pre-commit', 'pre-merge-commit'];
+const GOVERNED_HOOKS = ['pre-push', 'pre-commit', 'pre-merge-commit', 'commit-msg'];
 
 function shimsReady(dir) {
   return GOVERNED_HOOKS.every((hook) => usable(join(dir, hook), constants.R_OK | constants.X_OK)) &&

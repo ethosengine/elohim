@@ -1669,6 +1669,148 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
         self.assertEqual(self.rows("override")[-1]["overrode"], DEVICE_A)
 
+    def test_offline_ok_returns_claimed_when_the_delayed_reread_is_effective(self):
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=pending()), view(dev_integration=effective()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertTrue(ok, reason)
+        self.assertTrue(reason.startswith("claimed; override on the record — unconfirmed:"), reason)
+        self.assertEqual(len(self.rows("override")), 1)
+        self.assertTrue(self.berth.who("dev-integration")["effective"])
+
+        # The CLI keeps the ordinary claim headline and puts the override explanation below it.
+        self.berth = Berth(os.path.join(self.directory.name, "cli-berth"),
+                           now=lambda: self.clock[0], obs=self.obs, policy_path=str(self.policy))
+        self.berth.epr = str(self.epr)
+        self.berth.sleep = self.sleep
+        self.berth.moor("codex-1")
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=pending()), view(dev_integration=effective()))
+        out, err = io.StringIO(), io.StringIO()
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {
+                "Berth": lambda: self.berth,
+                "resolve_session_identity": lambda: {"session": "codex-1", "ownerPid": None},
+        }), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(["berth", "claim", "dev-integration", "--offline-ok", "--ttl", "60"])
+        self.assertEqual(code, 0, err.getvalue())
+        lines = out.getvalue().splitlines()
+        self.assertRegex(lines[0], r"^dev-integration: claimed by codex-1 .* claimed_at=")
+        self.assertTrue(lines[1].startswith("  override on the record — unconfirmed:"), lines)
+
+    def test_offline_ok_wait_names_override_at_and_the_generation(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        out, err = io.StringIO(), io.StringIO()
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {
+                "Berth": lambda: self.berth,
+                "resolve_session_identity": lambda: {"session": "codex-1", "ownerPid": None},
+        }), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(["berth", "claim", "dev-integration", "--offline-ok", "--ttl", "60"])
+        local = self.berth.who("dev-integration")
+        self.assertEqual(self.berth.override_wait,
+                         {"override_at_ms": override_at, "claimed_at": local["claimed_at"]})
+        self.assertEqual(code, 3, err.getvalue())
+        self.assertEqual(err.getvalue().splitlines()[-1],
+                         f"  override_at_ms={override_at} claimed_at={local['claimed_at']}")
+
+    def test_an_override_whose_reread_is_held_by_releases_and_refuses(self):
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=held_by_a()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertEqual(reason, f"held by {DEVICE_A}/claude-1 since 2026-10-23T15:28:09Z")
+        release = self.rows("release")[-1]
+        self.assertEqual(release["claimed_at"], self.rows("override")[-1]["claimed_at"])
+        self.assertIsNone(self.berth.who("dev-integration"))
+
+    def test_a_reclaim_before_override_at_writes_no_second_override_and_says_so(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=60)[0])
+        generation = self.berth.who("dev-integration")["claimed_at"]
+        self.views(view(dev_integration=unconfirmed_a(override_at=override_at)),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertTrue(reason.endswith("— override on the record"), reason)
+        self.assertEqual(len(self.rows("override")), 1)
+        self.assertEqual(self.berth.who("dev-integration")["claimed_at"], generation)
+        self.assertEqual(self.berth.override_wait,
+                         {"override_at_ms": override_at, "claimed_at": generation})
+
+    def test_a_reclaim_at_override_at_is_effective_and_keeps_the_generation(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=60)[0])
+        generation = self.berth.who("dev-integration")["claimed_at"]
+        self.views(view(dev_integration=effective()), view(dev_integration=effective()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertTrue(ok, reason)
+        self.assertEqual(reason, "renewed")
+        self.assertEqual(lease["claimed_at"], generation)
+        self.assertEqual(self.berth.who("dev-integration")["claimed_at"], generation)
+
+    def test_a_returning_sibling_withdraws_the_override_and_claims_on_acknowledgement(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=60)[0])
+        old_generation = self.berth.who("dev-integration")["claimed_at"]
+        self.clock[0] += 0.001
+        returned = unconfirmed_a(last_seen=NOW_MS - 1_000)
+        self.views(view(dev_integration=returned), view(dev_integration=returned),
+                   view(), view(dev_integration=effective()))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertTrue(ok, reason)
+        self.assertIn(f"{DEVICE_A} is back: override withdrawn", reason)
+        self.assertNotEqual(lease["claimed_at"], old_generation)
+        withdrawn = [row for row in self.rows("release")
+                     if "override withdrawn" in (row.get("reason") or "")]
+        self.assertEqual(len(withdrawn), 1)
+        self.assertEqual(withdrawn[0]["claimed_at"], old_generation)
+
+        # A later unconfirmed renewal can refuse, but cannot withdraw the old generation twice.
+        self.views(view(dev_integration=returned), view(dev_integration=returned))
+        ok, _, reason, _ = self.claim(offline_ok=False, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertTrue(reason.startswith("unconfirmed:"), reason)
+        self.assertEqual(len([row for row in self.rows("release")
+                             if "override withdrawn" in (row.get("reason") or "")]), 1)
+
+    def test_override_wait_with_this_devices_daemon_down_names_epr_peer_serve(self):
+        override_at = NOW_MS + 120_000
+        down = view(dev_integration=unconfirmed_a(), serving=False)
+        delayed = view(dev_integration=unconfirmed_a(override_at=override_at), serving=False)
+        self.views(view(), down, delayed)
+        ok, _, first_reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIn(_NS["DAEMON_DOWN_LINE"], first_reason)
+        self.views(delayed, delayed)
+        ok, _, reclaim_reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIn(_NS["DAEMON_DOWN_LINE"], reclaim_reason)
+        self.assertTrue(reclaim_reason.splitlines()[0].endswith("— override on the record"))
+
+    def test_a_fenced_reclaim_gets_no_override_suffix(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=120)[0])
+        fenced = unconfirmed_a(fenced=True)
+        self.views(view(dev_integration=effective()), view(dev_integration=fenced))
+        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=120)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertNotIn("override on the record", reason)
+        self.assertIsNone(self.berth.override_wait)
+
     def test_unconfirmed_age_reads_seconds_minutes_then_hours(self):
         fmt = _NS["steward_reason"]
         ages = [(119_999, "119s"), (120_000, "2m"), (7_199_999, "119m"), (7_200_000, "2h"), (9_000_000, "2h")]

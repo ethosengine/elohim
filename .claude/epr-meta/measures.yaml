@@ -1332,6 +1332,28 @@ measures:
     default-authority: observation
     established_by: steward-space-a8-2026-10-27
     why: "a sibling gate can be paid once per identical closure without turning sibling evidence into quorum"
+  - id: dev-landing
+    version: 1
+    family: landing
+    unit: events
+    procedure: >
+      One row per landing act on the steward's integration branch, written by `epr flow intend` and
+      its arms: value 1, subject = the change's Change-Id, reason = the kind, resource = the intent
+      CID. `raise` stays on the device (env at, change, tree, dseq, chain_len, predicted_base and the
+      session). `intent` is the crossing Cite written once the candidate is verified (env adds base,
+      class, closure as <project>=<key> per project, supersedes, verified_at and gate_s). `landed`
+      is written only after the remote accepted the ref, by observation (env landed_as=ff|moved,
+      regated_s, tip, commit). `withdraw` and `dismiss` close an intent (dismiss carries the capsule
+      key_predicted, key_dev, project, chain, heads, now). A landed, withdraw or dismiss row counts
+      only when its device is the device whose Cite announced the intent; from any other device it
+      is advisory. Crosses only among one steward's admitted devices: ordering and reuse evidence,
+      never a vote.
+    provenance: closure-keyed landing-plane design 2026-10-29 lane β; steward-space landing-plane design A9/S1b; landing queue sprint 2026-10-31 (R-E, K1, K4)
+    status: active
+    env-sensitivity: [change, tree, base, class, closure, device, dseq, session, chain_len, predicted_base, verified_at, gate_s, landed_as, regated_s, moved]
+    default-authority: observation
+    established_by: closure-keyed-landing-plane-2026-10-29
+    why: "the queue's order, its predicted base and whether predicting paid are read from each device's own flow store, not a queue server"
   - id: operator-claims-unobserved
     version: 1
     family: operator-effect

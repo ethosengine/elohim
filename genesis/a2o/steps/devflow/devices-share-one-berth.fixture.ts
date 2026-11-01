@@ -511,7 +511,7 @@ export function seedRepository(opts: HouseholdOptions = {}): {
     join(repository, 'genesis/orchestrator/ci-ignore.mjs'),
     join(seed, 'genesis/orchestrator/ci-ignore.mjs')
   );
-  writeFileSync(join(seed, '.ci-ignore'), '.eprfs/status/participants/\n');
+  writeFileSync(join(seed, '.ci-ignore'), '.eprfs/status/participants/\nnotes/\n');
   opts.seed?.(seed);
   must(git(base, ['init', '-q', '--bare', origin]), 'init origin');
   must(git(seed, ['init', '-q', '-b', 'dev']), 'init seed');

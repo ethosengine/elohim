@@ -2185,18 +2185,20 @@ habits:
     invariant: >
       A steward-scoped berth claim made on one of the steward's devices is effective only after every
       other admitted device's current head is folded. Otherwise it is refused naming the holder, or
-      `unconfirmed` naming the silent device. A push to `dev` from one device is refused while another
-      device holds `dev-integration`.
+      `unconfirmed` naming the silent device. A push to `dev` from one device is refused at its landing,
+      after its checks, while another device holds `dev-integration`; a landing holds it only for its CAS
+      window (ttl 600 s, through the hook's own landing agent), and `--offline-ok` by rule covers exactly
+      one silent sibling — a second silent sibling refuses.
     status: green
     active: false
     checks:
-      - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && pnpm exec cucumber-js --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
+      - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped at its landing while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override in effect at once after a long silence that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && EPR_BIN=<the pinned epr, not the launcher> pnpm exec cucumber-js --profile devices-share-one-berth --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-10-29 (status unchanged; landing line integ/2026-10-29-landing): A4-B1/R1/S1 landed 2026-10-28 via land1 (b01b1c90c) without a line here; their proof is the A4-H stations in genesis/a2o/features/devflow/steward-space (ebf044eb5), all `@wip` until the receipts script `genesis/local-dev/steward-space/a4-receipts.sh` exists. The A3 lease-generation release (d6ad4024b) rides this line with the sensors bound (150a7a6a4) ahead of it; `a68d761a9` (a second 60 s bound on the same advisory) is dropped as its duplicate.
-    evidence-fingerprint: sha256:12cd6b283d9ea5e8
-    evidence-bytes: 21307
-    evidence-entries: 24
+      DELTA 2026-11-01 (S4 L2a, GREEN preserved): the pre-push claim moved to the landing — the hook's own landing agent (a process that owns its hook session's envelope from birth, so it can release after `git push` has exited; ruling S4-2) claims dev-integration after the checks (class verify, ttl 600, renewed every 200 s, `--offline-ok` by rule), owner-checks alpha-fleet/jenkins-dispatch instead of claiming them, lands only as a fast-forward of the fetched tip (a moved tip is released, rebased in place, re-gated and refused "push again"), and releases by generation token once the transfer is read back (`<git-common-dir>/landing/settle.log`). The override covers exactly one silent sibling and two refuse (R-C); berth now polls the delayed verdict, releases on a delayed held_by, names override_at in a token line and withdraws an override when the sibling is back. A revoked device left waiting lands after its override: observed in a test run whose interrupt missed, B's push waited 653 s and landed — the declared limit. In-container run 10/10 passed EXIT=0 (8 min 50 s, s4-berth-suite-4.log, real berth, epr and two daemons, the hook's landing agent under real session envelopes); prepush-berth + prepush-landing 27/27 ×3; berth_test 137 OK. Blind-reader 3 rounds (r1 REVISE 1/4/3, r2 REVISE 2/4/4, r3 READY 0/4/6), closed by the author's judgment.
+    evidence-fingerprint: sha256:fa1903a19a50e22d
+    evidence-bytes: 22669
+    evidence-entries: 25
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"

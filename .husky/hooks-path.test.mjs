@@ -27,7 +27,7 @@ function git(cwd, ...args) {
   return r.stdout.trim();
 }
 
-const GOVERNED = ['pre-push', 'pre-commit', 'pre-merge-commit'];
+const GOVERNED = ['pre-push', 'pre-commit', 'pre-merge-commit', 'commit-msg'];
 
 function installShims(root) {
   mkdirSync(join(root, '.husky/_'), { recursive: true });
@@ -49,6 +49,16 @@ function assertHookRuns(worktree) {
     assert.equal(run.status, 24, `${name}: ${run.stderr}`);
     assert.ok(run.stderr.includes(`commit gate ran in ${worktree}`), `${name}: ${run.stderr}`);
   }
+  const message = join(worktree, 'commit-message');
+  writeFileSync(message, 'subject\n');
+  const commitMsg = spawnSync('git', ['hook', 'run', 'commit-msg', '--', message], {
+    cwd: worktree,
+    env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  assert.equal(commitMsg.status, 25, commitMsg.stderr);
+  assert.ok(commitMsg.stderr.includes(`message gate ran in ${worktree}`), commitMsg.stderr);
 }
 
 function scratch(t) {
@@ -67,6 +77,7 @@ function scratch(t) {
   writeFileSync(join(main, '.husky/pre-commit'), '#!/bin/sh\necho "commit gate ran in $PWD" >&2\nexit 24\n', { mode: 0o755 });
   // The tracked delegation, verbatim in shape: pre-merge-commit hands off to pre-commit.
   writeFileSync(join(main, '.husky/pre-merge-commit'), '#!/bin/sh\nexec sh "$(dirname "$0")/pre-commit" "$@"\n', { mode: 0o755 });
+  writeFileSync(join(main, '.husky/commit-msg'), '#!/bin/sh\necho "message gate ran in $PWD" >&2\nexit 25\n', { mode: 0o755 });
   git(main, 'config', 'core.hooksPath', '.husky/_');
   const worktree = join(dir, 'wt');
   git(main, 'worktree', 'add', '-q', worktree);
@@ -129,7 +140,7 @@ test('an incomplete main shim directory is repaired from the worktree', (t) => {
 
 test('postStart before install uses tracked hooks when shims are missing or incomplete', (t) => {
   const { main, worktree } = scratch(t);
-  for (const missing of ['pre-push', 'pre-commit', 'pre-merge-commit', 'h', 'all']) {
+  for (const missing of ['pre-push', 'pre-commit', 'pre-merge-commit', 'commit-msg', 'h', 'all']) {
     installShims(main);
     rmSync(join(main, '.husky/_', missing === 'all' ? '' : missing), { recursive: true });
     // Also catches the old helper reporting "already" for an absolute but broken path.
@@ -168,6 +179,19 @@ test('a missing or non-executable commit-gate entrypoint refuses loudly', (t) =>
     assert.match(missing.stderr, new RegExp(`REFUSED.*${hook}`));
     assert.equal(git(main, 'config', '--get', 'core.hooksPath'), '.husky/_');
   }
+});
+
+test('a_missing_commit_msg_entrypoint_refuses_loudly', (t) => {
+  const { main, worktree } = scratch(t);
+  chmodSync(join(main, '.husky/commit-msg'), 0o644);
+  const mode = runScript(worktree);
+  assert.equal(mode.status, 1, 'commit-msg non-executable');
+  assert.match(mode.stderr, /REFUSED.*commit-msg.*pnpm run prepare/);
+  rmSync(join(main, '.husky/commit-msg'));
+  const missing = runScript(worktree);
+  assert.equal(missing.status, 1, 'commit-msg missing');
+  assert.match(missing.stderr, /REFUSED.*commit-msg/);
+  assert.equal(git(main, 'config', '--get', 'core.hooksPath'), '.husky/_');
 });
 
 test('Git ownership failure is not reported as a successful non-checkout no-op', (t) => {

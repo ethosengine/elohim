@@ -72,6 +72,7 @@ if [[ "$rustflags" != "__inherit__" ]]; then
   export RUSTFLAGS="$rustflags"
 fi
 export RUSTC_WRAPPER=""
+export GIT_CEILING_DIRECTORIES="/tmp:/var/tmp${GIT_CEILING_DIRECTORIES:+:$GIT_CEILING_DIRECTORIES}"
 
 # Manifest-declared `run.cargo.env`, serialized as JSON by gate-runner.mjs into ONE
 # variable rather than added to the positional contract (which is fixed at four cargo
