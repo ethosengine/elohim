@@ -1228,6 +1228,8 @@ for PROJECT in $PROJECTS; do
     continue
   fi
   PROJECT_START=$(date +%s)
+  # The gates after this one: the tap's first red mid-gate reports what continuing costs.
+  export GATE_REMAINING="${PROJECT_LIST[*]:$INDEX}"
 
   # Declares what kind of run this is for the gate-cycle observation (gate-cycle.mjs).
   GATE_RUN_KIND=pre-push node genesis/orchestrator/gate-runner.mjs --target "$PROJECT"

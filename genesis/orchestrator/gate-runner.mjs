@@ -179,6 +179,13 @@ export function gateChildEnv(project, baseEnv, root = ROOT) {
   // (eprfs flow_acceptance: "pathspec 'scope.md' did not match", 11 tests, 2026-09-11).
   // Gates run inside the checkout, so git discovers it from cwd — drop the hook's pins.
   for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX']) delete childEnv[k];
+  // `git -c key=value push` reaches every child git through GIT_CONFIG_PARAMETERS (and
+  // GIT_CONFIG_COUNT/KEY_n/VALUE_n): 2026-11-01, a push with `-c core.hooksPath=…` ran the pre-push
+  // hook inside build-compute-worker's fixture repo, whose own `git push` then failed. Config scoped
+  // to the push never applies to the temp repositories a gate creates.
+  for (const k of Object.keys(childEnv)) {
+    if (k === 'GIT_CONFIG_PARAMETERS' || k === 'GIT_CONFIG_COUNT' || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(k)) delete childEnv[k];
+  }
   if (declared && Object.keys(declared).length > 0) {
     childEnv.GATE_CARGO_ENV = JSON.stringify(declared);
   } else {
@@ -683,6 +690,10 @@ if (isMain) {
   for (const [index, project] of ordered.entries()) {
     if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) stopping = 'stop requested on the live run';
     if (stopping) { notRun.push(project.name); continue; }
+    // Unless pre-push already set it, the gates after this one, for the tap's mid-gate outlook.
+    if (ownRun || process.env.GATE_PREFLIGHT_DONE !== '1') {
+      process.env.GATE_REMAINING = ordered.slice(index + 1).map(p => p.name).join(' ');
+    }
     const status = runProject(project, false, false, {});
     failed |= status;
     if (status !== 0 && process.env.GATE_LIVE_RUN) {
