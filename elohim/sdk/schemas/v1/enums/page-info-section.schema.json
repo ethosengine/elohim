@@ -1,0 +1,31 @@
+{
+  "$id": "epr:schema:enum:page-info-section",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PageInfoSection",
+  "description": "The sections of a record's page info, in display order. One id names both the chrome's page-info row and card (data-page-info-row / data-page-info-card) and the matching section of the governing EPR page, so every card's link ends at /epr/<recordId>#<section>. `yours` appears only for a signed-in viewer; `delivery` and `permissions` only when there is a content object to deliver and frame. Source of truth: this schema (vocabulary only, Category C) — it stores nothing.",
+  "_source": {
+    "category": "C",
+    "layer": "vocabulary",
+    "owner": "elohim/sdk",
+    "notarized": false,
+    "rationale": "Section ids are written by both the chrome and the EPR page; one vocabulary keeps the two from drifting"
+  },
+  "type": "string",
+  "enum": ["source", "delivery", "holders", "steward", "claims", "permissions", "yours"],
+  "oneOf": [
+    { "const": "source", "x-label": "Source" },
+    { "const": "delivery", "x-label": "Delivery" },
+    { "const": "holders", "x-label": "Holders" },
+    { "const": "steward", "x-label": "Steward" },
+    { "const": "claims", "x-label": "Claims" },
+    { "const": "permissions", "x-label": "Permissions" },
+    { "const": "yours", "x-label": "Yours" }
+  ],
+  "_table": {
+    "constant": "PAGE_INFO_SECTIONS",
+    "rustType": "PageInfoSection",
+    "annotations": {
+      "x-label": { "ts": "label", "rs": "label" }
+    }
+  }
+}

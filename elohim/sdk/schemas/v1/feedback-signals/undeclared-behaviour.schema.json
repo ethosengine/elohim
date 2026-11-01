@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:feedback-signal/undeclared-behaviour",
+  "title": "UndeclaredBehaviourFeedbackSignal",
+  "description": "FeedbackSignal kind recorded when content framed by the EPR chrome is observed doing something its record did not declare — today, a browser Content-Security-Policy violation report (Reporting API `csp-violation`, or the legacy `application/csp-report` body) raised against the content's origin. Keyed by the content address, never by a host or a doorway: the same bytes are the same subject through every doorway and on every peer. Source of truth: the recording storage peer's observation log (observation_kind `undeclared-behaviour`, subject = the content address); the SQL `observations` row is its projection, and the observation plane carries it to other peers — the recording route never fans out. It is evidence for the governing community's reviewers, not a verdict: it carries no standing impact and debits no one (care-class and compute-class signals stay isolated; a browser report is neither). Extending via signal_kind vocabulary per project_signal_kind_extensible_protocol_class; no new DHT entry type. Recorded by `POST /api/v1/epr/{id}/signals` (elohim-storage `services::content_signals`), the one route a doorway relays browser reports to.",
+  "type": "object",
+  "required": ["signal_kind", "content_address", "directive", "observed_at", "reported_by", "reported_via"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_kind": {
+      "type": "string",
+      "const": "undeclared-behaviour"
+    },
+    "content_address": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The CIDv1 (bafkrei…) of the bundle whose behaviour was observed — the signal's subject."
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The EPR record the content address was served under, when the recording peer holds it."
+    },
+    "directive": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "The policy directive the behaviour fell outside (the CSP effective directive, e.g. `frame-ancestors`, `script-src-elem`, `connect-src`)."
+    },
+    "blocked_uri": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "What the content reached for, reduced to scheme, host and path (query and fragment are dropped so a report cannot carry tokens), or a CSP keyword such as `inline` / `eval`. Absent when the report named nothing."
+    },
+    "disposition": {
+      "type": "string",
+      "enum": ["enforce", "report"],
+      "description": "Whether the browser blocked the behaviour (`enforce`) or only reported it (`report`)."
+    },
+    "observed_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "RFC 3339 time the recording peer received the report."
+    },
+    "reported_via": {
+      "type": "string",
+      "enum": ["direct", "doorway"],
+      "description": "How the report reached the recording peer: straight from the browser to the peer's own content origin (direct), or relayed by a doorway (doorway, see relayed_by). An observation fact, never a refusal."
+    },
+    "relayed_by": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "The relaying doorway's federation id (X-Elohim-Relayed-By). Absent for a direct report."
+    },
+    "observed_origin": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "The origin the browser sent with the report (Origin, else the Referer's origin) — as the relaying doorway observed it (X-Elohim-Observed-Origin), or as the recording peer saw it on a direct report. Absent when the browser sent neither."
+    },
+    "document_match": {
+      "type": "boolean",
+      "description": "Whether the report's document (documentURL / document-uri) names this content: a relaying doorway's own check (X-Elohim-Document-Match), or the recording peer's check on a direct report. false is RECORDED, never refused — the gates weigh it. Absent when the report named no document."
+    },
+    "reported_by": {
+      "type": "string",
+      "enum": ["browser", "chrome", "inspector"],
+      "description": "Who observed the behaviour: the person's browser (a CSP / Reporting API report), the EPR chrome element, or a dispatched inspection agent. A relaying doorway is never the reporter."
+    }
+  }
+}

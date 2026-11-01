@@ -1310,6 +1310,41 @@ habits:
       that point "served only under standing" is a statement about a component that is no longer in
       the path, and the fold has graduated from a projection surface to the person's own runtime.
 
+  - id: content-chrome-trust-edge
+    declared: elohim/elohim-chrome-asset/.epr-meta/content-chrome-trust-edge.habit.md
+    invariant: >
+      When EPR content reaches a person through a browser, the chrome loads first and the content
+      loads inside it, in an origin apart from the chrome and the person's sign-in, by default. A
+      quiet chip opens a minimal omnibar, whose trust mark opens page info. Page info's readings are
+      Source, Delivery, Holders, Steward, Claims, Permissions, plus Yours when signed in. They come
+      from the content-chrome facing, which is folded from the p2p dataplane and the holons that
+      govern the content; nothing is read from a doorway's own configuration. Every card ends at the
+      content's EPR page, carrying the delivery path that reached the person. The frame is given
+      what the record declares, within what its gates admitted, as the person grants it, and nothing
+      undeclared; undeclared behaviour raises a signal against the content's address. The witness
+      reads amber while the DHT has not yet anchored the record and green once it has; it is derived
+      and is not written, and delivery does not wait for it. The same content reads the same
+      through any doorway, and on the person's own peer with no doorway at all. The chrome comes off
+      only inside a wrapper whose record declares that it presents content and fulfils these claims.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:content-chrome-trust-edge (genesis/a2o/features/protocol/content-chrome-trust-edge.feature — @act:i @requires:owned-substrate, household lane: `just test mesh features/protocol/content-chrome-trust-edge.feature` against binaries built from the tree under test (`just mesh build doorway` and `just mesh build storage` first). Nine scenarios: page info and its EPR links, content isolated from the chrome and sign-in, amber then green, declared capabilities only, the wrapper-only exception, the signed-in Yours reading, the undeclared-behaviour signal, plural delivery across both doorways, and the person's own peer with every doorway gone. A run with undefined, pending or skipped steps discharges nothing.)"
+      - "a2o Station 5 of genesis/a2o/features/dataplane/epr-app-deliverability.feature (the returning visitor whose apps worker is installed still lands in the chrome; navigation preload). Shared with epr-app-deliverability's own register; it is listed here because the chrome's load-first clause depends on it."
+      - "unit: elohim/elohim-chrome-asset cargo tests plus node tests including tests/validate-island.mjs (the island validates against elohim/sdk/schemas/v1/views/chrome-context.schema.json); elohim/elohim-facings folds::content_chrome; the doorway's apps.rs routing tests; storage's apps_chrome.rs origin-pair tests."
+    evidence: >
+      DELTA 2026-10-29 (RED preserved; port, no household measure): the snapshot of wt-sw-preload (47ba8da76) is being ported to dev in layers on port/chrome-trust-edge, dormant by default. Landed: the SDK schemas and codegen, lamad-types' html5-app body parser and vocabulary, the elohim-views facing structs, the elohim-facings content_chrome fold, storage's GET /api/v1/epr/{id}/chrome and POST /api/v1/epr/{id}/signals behind ELOHIM_CONTENT_CHROME (off unless 1/true/yes/on), and elohim-chrome-asset's v1 context types and render_content_shell (pre-v1 islands byte-identical). Deferred with exact plans: the coordinator extern get_record_witness_facts (backlog record-witness-coordinator-extern; until it lands the witness reads amber), and the element, storage's peer-native /apps shell, the doorway apps origin and CSP relay, the apps worker, the Angular surfaces and this habit's story (backlog content-chrome-element-and-app-port). The story file named in checks is not on dev yet, so the first check cannot run. NO status change.
+    evidence-fingerprint: sha256:81c6503591d984e8
+    evidence-bytes: 3352
+    evidence-entries: 2
+    refs:
+      - "genesis/docs/superpowers/specs/2026-10-14-content-apps-wear-chrome-design.md (Decided 2026-10-15: page info, authority from the dataplane, trustful and trustless modes, the public-name apps origin, plural delivery, the VSM reading)"
+      - "genesis/data/timeline/backlog/2026-10-15-projection-inspection-load-from-a-holding-peer.md (the System 3* audit past the projection; later work)"
+    retire-when: >
+      when the person's own client — a native protocol browser or the peer-native shell on their own
+      device — is how most people reach EPR content, and web2 doorways carry only residual traffic,
+      so the chrome's browser-edge contract is a compatibility surface rather than the trust edge.
+
   - id: attention-witnessed-privately
     declared: elohim/elohim-storage/.epr-meta/attention-witnessed-privately.habit.md
     invariant: >

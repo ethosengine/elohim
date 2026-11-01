@@ -6,7 +6,8 @@
   "description": "The Elohim Protocol's learning platform — served as doorway's root web surface.",
   "content": {
     "slug": "lamad",
-    "entryPoint": "index.html"
+    "entryPoint": "index.html",
+    "presents": true
   },
   "contentFormat": "spa-bundle",
   "tags": [

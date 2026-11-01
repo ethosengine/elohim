@@ -38,7 +38,14 @@ use sha2::{Digest, Sha256};
 use std::sync::OnceLock;
 
 mod context;
-pub use context::{ChromeContext, NavLink, ReceiptLink};
+pub mod policy;
+pub use context::{
+    CheckedBy, ChromeContext, ChromeMedium, ChromeTheme, ContentDelivery, ContentFrame,
+    ContentIsland, DeliveryCheck, DeliveryHop, DeliveryTransport, HolderReading, HopReporter,
+    Isolation, IsolationBoundary, NavLink, ReceiptLink, ThemeHint, TrustMode, Viewer, ViewerKind,
+    WitnessState, CHROME_CONTEXT_VERSION,
+};
+pub use policy::{content_policy, ContentPolicy, REPORT_ENDPOINT_NAME};
 
 /// The hand-written, self-contained vanilla element script, baked at compile
 /// time. Self-mounts, acquires EPR context, renders + themes + wires behavior.
@@ -99,6 +106,87 @@ pub const STABLE_ELEMENT_PATH: &str = "/chrome/omni-element.js";
 #[must_use]
 pub fn escape_json_for_script(context_json: &str) -> String {
     context_json.replace("</", "<\\/").replace("<!--", "<\\!--")
+}
+
+/// Strict JSON-in-script escape for the v1 content shell's island: every `<`,
+/// `>` and `&` becomes a `\u` escape (equivalent inside a JSON string, the only
+/// place JSON can carry them), as do the JS-hostile U+2028 and U+2029. The
+/// parsed value is unchanged.
+fn escape_json_strict(context_json: &str) -> String {
+    let mut out = String::with_capacity(context_json.len());
+    for c in context_json.chars() {
+        match c {
+            '<' => out.push_str("\\u003c"),
+            '>' => out.push_str("\\u003e"),
+            '&' => out.push_str("\\u0026"),
+            '\u{2028}' => out.push_str("\\u2028"),
+            '\u{2029}' => out.push_str("\\u2029"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+fn html_escape(raw: &str) -> String {
+    raw.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
+/// Render the content shell: the document every medium serves around a
+/// record's bytes. It contains NO navigation bar and NO static iframe — only
+/// `<main id="elohim-content-frame">` (sized to fill the viewport; the chip
+/// floats over it), a `<noscript>` link to `content.frame.src`, the context
+/// island and the element script. The chrome creates the iframe after it
+/// mounts. Producers (doorway, storage peer, desktop) fill the
+/// [`ChromeContext`]; this renderer adds nothing medium-specific, and equal
+/// input yields byte-identical output.
+///
+/// Dormant until a producer's content-chrome switch is on: no route calls it by
+/// default, and the served element ([`ELEMENT_JS`]) does not yet build the
+/// frame from `data-frame-src` (that element change is deferred; see
+/// `genesis/data/timeline/backlog/2026-10-29-content-chrome-element-and-app-port.md`).
+#[must_use]
+pub fn render_content_shell(ctx: &ChromeContext) -> String {
+    let frame = ctx.content.as_ref().map(|c| &c.frame);
+    let src = frame.map_or("", |f| f.src.as_str());
+    let title = ctx
+        .title
+        .as_deref()
+        .or(frame.map(|f| f.title.as_str()))
+        .unwrap_or(ctx.slug.as_str());
+    let frame_title = frame.map_or(title, |f| f.title.as_str());
+    let noscript = if src.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<noscript><a href=\"{}\">{}</a></noscript>",
+            html_escape(src),
+            html_escape(frame_title)
+        )
+    };
+    let html = format!(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
+         <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
+         <title>{title}</title>\
+         <style>html,body{{margin:0;height:100%}}\
+         #elohim-content-frame{{display:block;margin:0;width:100%;height:100vh;height:100dvh}}</style>\
+         </head><body>\
+         <main id=\"elohim-content-frame\" data-frame-src=\"{src}\" data-frame-title=\"{ftitle}\">{noscript}</main>\
+         </body></html>",
+        title = html_escape(title),
+        src = html_escape(src),
+        ftitle = html_escape(frame_title),
+        noscript = noscript,
+    );
+    // The island is pre-escaped strictly (every `<`, `>`, `&`, U+2028, U+2029
+    // as a `\u` escape), so no `</script`, `<!--` or `<script` token can form
+    // whatever a title holds; `inject_element`'s own escape then finds nothing
+    // to rewrite. Islands of today's producers keep `escape_json_for_script`
+    // unchanged until the element lands (see the backlog named above).
+    inject_element(&html, &escape_json_strict(&ctx.to_json()))
 }
 
 /// Inject the runtime omnibar element into a finalized SSR HTML document.
@@ -491,7 +579,7 @@ mod tests {
             slug: "s".to_string(),
             authenticated: true,
             title: Some("t".to_string()),
-            theme: Some("dark".to_string()),
+            theme: Some("dark".into()),
             build_marker: Some("m".to_string()),
             env_tier: Some("staging".to_string()),
             show_env: Some(true),
@@ -510,6 +598,10 @@ mod tests {
                 sentence: None,
                 label: None,
             }),
+            // The v1 fields (version, viewer, medium, readingsBase, content)
+            // stay None: the element served today reads only the pre-v1 set,
+            // and a pre-v1 producer must still serialize exactly that set.
+            ..Default::default()
         };
         let v = serde_json::to_value(&full).expect("ChromeContext serializes");
         let obj = v.as_object().expect("ChromeContext serializes to a map");
@@ -657,5 +749,320 @@ mod tests {
         let twice = inject_element(&once, "{}");
         assert_eq!(twice.matches("</body>").count(), 1);
         assert_eq!(twice.matches("id=\"elohim-omni-context\"").count(), 2);
+    }
+
+    // ── render_content_shell ────────────────────────────────────────────────
+
+    fn sample_content(boundary: IsolationBoundary, path: Vec<DeliveryHop>) -> ContentIsland {
+        ContentIsland {
+            record_id: "evolution-of-trust".into(),
+            content_address: "sha256-0123abcd".into(),
+            format: "html5-app".into(),
+            entry: "index.html".into(),
+            mode: TrustMode::Trustful,
+            reach: Some("commons".into()),
+            witness: WitnessState::Amber,
+            capabilities: vec!["forms".into(), "popups".into()],
+            holders: Some(HolderReading {
+                holders: 3,
+                target: 3,
+                headline: Some("Held by 3 of 3 households".into()),
+                as_of: Some("2026-10-15T12:00:00Z".into()),
+            }),
+            frame: ContentFrame {
+                src: "/apps/evolution-of-trust/index.html?a=1&b=<2>".into(),
+                title: "The Evolution of Trust".into(),
+            },
+            isolation: Isolation {
+                boundary,
+                content_origin: None,
+            },
+            delivery: ContentDelivery {
+                path,
+                checked: None,
+                receipt: None,
+            },
+        }
+    }
+
+    fn contexts_for_each_medium() -> Vec<(&'static str, ChromeContext)> {
+        let web2 = {
+            let mut c = ChromeContext::v1(
+                "evolution-of-trust",
+                ViewerKind::Visitor,
+                ChromeMedium::Web2Doorway,
+            );
+            c.title = Some("The Evolution of Trust".into());
+            // The object form of `theme` (schema `$defs/themeHint`).
+            c.theme = Some(
+                ThemeHint {
+                    color_scheme: Some("dark".into()),
+                    theme_color: Some("#1b1d1f".into()),
+                    tokens: None,
+                }
+                .into(),
+            );
+            let mut content = sample_content(
+                IsolationBoundary::OriginPair,
+                vec![
+                    DeliveryHop::Doorway {
+                        name: "alpha.elohim.host".into(),
+                        id: "alpha-A".into(),
+                        did: Some("did:web:alpha.elohim.host".into()),
+                        reported_by: HopReporter::Doorway,
+                    },
+                    DeliveryHop::Holder {
+                        peer: "uhCAkpeerkey".into(),
+                        transport: Some(DeliveryTransport::Iroh),
+                        reported_by: HopReporter::Doorway,
+                    },
+                ],
+            );
+            content.isolation.content_origin = Some("https://apps.alpha.elohim.host".into());
+            content.delivery.checked = Some(DeliveryCheck {
+                by: CheckedBy::Worker,
+                against: "sha256-0123abcd".into(),
+            });
+            content.delivery.receipt = Some("/api/v1/receipt/evolution-of-trust".into());
+            c.content = Some(content);
+            c
+        };
+        let peer = {
+            let mut c = ChromeContext::v1(
+                "evolution-of-trust",
+                ViewerKind::DeviceAgent,
+                ChromeMedium::PeerNative,
+            );
+            let mut content = sample_content(
+                IsolationBoundary::OriginPair,
+                vec![DeliveryHop::SelfPeer {
+                    reported_by: HopReporter::SelfPeer,
+                }],
+            );
+            content.holders = None;
+            content.witness = WitnessState::Green;
+            c.content = Some(content);
+            c
+        };
+        let desktop = {
+            let mut c = ChromeContext::v1(
+                "evolution-of-trust",
+                ViewerKind::HostedSession,
+                ChromeMedium::Desktop,
+            );
+            c.readings_base = Some("http://127.0.0.1:8090".into());
+            c.theme = Some("dark".into());
+            c.content = Some(sample_content(
+                IsolationBoundary::SchemePerRecord,
+                vec![DeliveryHop::SelfPeer {
+                    reported_by: HopReporter::SelfPeer,
+                }],
+            ));
+            c
+        };
+        vec![
+            ("web2-doorway", web2),
+            ("peer-native", peer),
+            ("desktop", desktop),
+        ]
+    }
+
+    #[test]
+    fn content_shell_renders_for_each_medium() {
+        for (medium, ctx) in contexts_for_each_medium() {
+            let html = render_content_shell(&ctx);
+            assert!(html.starts_with("<!doctype html>"), "{medium}");
+            assert!(
+                html.contains("<main id=\"elohim-content-frame\""),
+                "{medium}"
+            );
+            assert!(
+                !html.contains("<iframe"),
+                "{medium}: the shell holds no iframe"
+            );
+            assert!(!html.contains("<nav"), "{medium}: no nav bar");
+            assert!(html.contains("<noscript><a href=\"/apps/evolution-of-trust/index.html?a=1&amp;b=&lt;2&gt;\">The Evolution of Trust</a></noscript>"), "{medium}: {html}");
+            assert!(
+                html.contains(&format!("\"medium\":\"{medium}\"")),
+                "{medium}"
+            );
+            assert!(html.contains(&element_script_path()), "{medium}");
+            assert_eq!(html.matches("</body>").count(), 1, "{medium}");
+        }
+    }
+
+    #[test]
+    fn content_shell_is_byte_stable_for_equal_input() {
+        for (_, ctx) in contexts_for_each_medium() {
+            assert_eq!(
+                render_content_shell(&ctx),
+                render_content_shell(&ctx.clone())
+            );
+        }
+    }
+
+    #[test]
+    fn content_shell_escapes_hostile_titles() {
+        let mut ctx = ChromeContext::v1("x", ViewerKind::Visitor, ChromeMedium::PeerNative);
+        ctx.title = Some("</title><script>alert(1)</script>".into());
+        let html = render_content_shell(&ctx);
+        assert!(!html.contains("<script>alert(1)"));
+        assert!(html.contains("&lt;/title&gt;"));
+        // The island still parses, to the same title.
+        let start =
+            html.find("id=\"elohim-omni-context\">").unwrap() + "id=\"elohim-omni-context\">".len();
+        let end = start + html[start..].find("</script>").unwrap();
+        let island: serde_json::Value = serde_json::from_str(&html[start..end]).unwrap();
+        assert_eq!(island["title"], "</title><script>alert(1)</script>");
+    }
+
+    // ── schema contract ─────────────────────────────────────────────────────
+
+    /// Validate serialized contexts against chrome-context.schema.json (ajv, via
+    /// node; skipped loudly when node is unavailable).
+    fn validate_against_schema(
+        cases: &[(String, serde_json::Value)],
+    ) -> Option<Vec<(String, bool, String)>> {
+        use std::io::Write;
+        let input = serde_json::Value::Array(
+            cases
+                .iter()
+                .map(|(n, v)| serde_json::json!({ "name": n, "value": v }))
+                .collect(),
+        );
+        let script = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/validate-island.mjs");
+        let mut child = match std::process::Command::new("node")
+            .arg(script)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("SKIPPED: node not available ({e}); schema-contract not run");
+                return None;
+            }
+        };
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(
+            out.status.success(),
+            "validator failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let res: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        Some(
+            res.as_array()
+                .unwrap()
+                .iter()
+                .map(|r| {
+                    (
+                        r["name"].as_str().unwrap().to_string(),
+                        r["valid"].as_bool().unwrap(),
+                        r["errors"].to_string(),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn serialized_contexts_satisfy_the_chrome_context_schema() {
+        let mut cases: Vec<(String, serde_json::Value)> = contexts_for_each_medium()
+            .into_iter()
+            .map(|(m, c)| (format!("valid:{m}"), serde_json::to_value(&c).unwrap()))
+            .collect();
+        // A v1 context with no content (landing page, EPR page).
+        cases.push((
+            "valid:no-content".into(),
+            serde_json::to_value(ChromeContext::v1(
+                "elohim-host-landing",
+                ViewerKind::Visitor,
+                ChromeMedium::Web2Doorway,
+            ))
+            .unwrap(),
+        ));
+        // The invalid ones the schema must reject (each differs by one fact).
+        let good = serde_json::to_value(&contexts_for_each_medium()[0].1).unwrap();
+        let mutate = |f: &dyn Fn(&mut serde_json::Value)| {
+            let mut v = good.clone();
+            f(&mut v);
+            v
+        };
+        cases.push((
+            "invalid:pre-v1".into(),
+            serde_json::to_value(ChromeContext {
+                slug: "a".into(),
+                ..Default::default()
+            })
+            .unwrap(),
+        ));
+        cases.push((
+            "invalid:unknown-capability".into(),
+            mutate(&|v| v["content"]["capabilities"] = serde_json::json!(["teleport"])),
+        ));
+        cases.push((
+            "invalid:missing-address".into(),
+            mutate(&|v| {
+                v["content"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("contentAddress");
+            }),
+        ));
+        cases.push((
+            "invalid:bad-mode".into(),
+            mutate(&|v| v["content"]["mode"] = serde_json::json!("banana")),
+        ));
+        cases.push((
+            "invalid:extra-field".into(),
+            mutate(&|v| v["content"]["surprise"] = serde_json::json!(1)),
+        ));
+        cases.push((
+            "invalid:empty-path".into(),
+            mutate(&|v| v["content"]["delivery"]["path"] = serde_json::json!([])),
+        ));
+        cases.push((
+            "invalid:null-holders-key-missing".into(),
+            mutate(&|v| {
+                v["content"].as_object_mut().unwrap().remove("holders");
+            }),
+        ));
+        let Some(results) = validate_against_schema(&cases) else {
+            return;
+        };
+        for (name, valid, errors) in results {
+            let want = name.starts_with("valid:");
+            assert_eq!(valid, want, "{name}: errors {errors}");
+        }
+    }
+
+    #[test]
+    fn unknown_holders_serialize_as_null_not_absent() {
+        let ctx = &contexts_for_each_medium()[1].1;
+        let v = serde_json::to_value(ctx).unwrap();
+        assert!(v["content"]["holders"].is_null());
+        assert!(v["content"].as_object().unwrap().contains_key("holders"));
+    }
+
+    #[test]
+    fn pre_v1_contexts_stay_byte_stable() {
+        let ctx = ChromeContext {
+            slug: "abc".into(),
+            authenticated: true,
+            ..Default::default()
+        };
+        assert_eq!(ctx.to_json(), r#"{"slug":"abc","authenticated":true}"#);
+        let v1 = ChromeContext::v1("abc", ViewerKind::Visitor, ChromeMedium::PeerNative);
+        assert_eq!(
+            v1.to_json(),
+            r#"{"slug":"abc","authenticated":false,"version":1,"viewer":{"kind":"visitor"},"medium":"peer-native"}"#
+        );
     }
 }

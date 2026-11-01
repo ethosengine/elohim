@@ -29,7 +29,7 @@
 <epr:vocab#verdictClosure> a rdfs:Datatype ;
   rdfs:comment "Posture of an axis VERDICT layer toward absence: closed = absence of a permit is a refusal." .
 
-# =============== vocabularies (61) ===============
+# =============== vocabularies (65) ===============
 
 <epr:schema:enum:aggregation-lane> a skos:ConceptScheme ;
   skos:prefLabel "AggregationLane" ;
@@ -113,6 +113,22 @@
   skos:inScheme <epr:schema:enum:answer-state> ;
   skos:prefLabel "unreachable" ;
   skos:notation "unreachable" .
+
+<epr:schema:enum:app-sync-urgency> a skos:ConceptScheme ;
+  skos:prefLabel "AppSyncUrgency" ;
+  dct:description "Source of truth: SDK app synchronization demand contract (operational Category C). Scheduling urgency grants no authority and cannot override power admission." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:app-sync-urgency#background>, <epr:schema:enum:app-sync-urgency#foreground> .
+
+<epr:schema:enum:app-sync-urgency#background> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:app-sync-urgency> ;
+  skos:prefLabel "background" ;
+  skos:notation "background" .
+
+<epr:schema:enum:app-sync-urgency#foreground> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:app-sync-urgency> ;
+  skos:prefLabel "foreground" ;
+  skos:notation "foreground" .
 
 <epr:schema:enum:capacity-model> a skos:ConceptScheme ;
   skos:prefLabel "CapacityModel" ;
@@ -1307,6 +1323,52 @@
   skos:prefLabel "agent" ;
   skos:notation "agent" .
 
+<epr:schema:enum:frame-capability> a skos:ConceptScheme ;
+  skos:prefLabel "FrameCapability" ;
+  dct:description "What content framed by the EPR chrome may be given beyond running its own scripts. A record declares the capabilities it requests (html5-app contentBody.capabilities); the chrome gives the declared set within the standing ceiling, as the person narrows or grants it. Scripts are never a capability: a trustful frame always runs scripts, and whether it also keeps its own origin (allow-same-origin) is decided by the chrome from mode and isolation, never declared here. Each value carries three annotations the generators project into the chrome's table and the doorway's Permissions-Policy ceiling: x-sandbox (the iframe sandbox token it adds, or null), x-allow (the Permissions-Policy feature it enables in the iframe allow attribute, or null), x-device (true when it reaches the person's device and so is only ever given by the person's own grant). Source of truth: this schema (vocabulary only, Category C) — it stores nothing and is not notarized; the declared set lives in the html5-app record's contentBody, which the integrity zome treats as opaque, so this vocabulary never moves a DNA hash." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:frame-capability#forms>, <epr:schema:enum:frame-capability#popups>, <epr:schema:enum:frame-capability#downloads>, <epr:schema:enum:frame-capability#fullscreen>, <epr:schema:enum:frame-capability#clipboard-write>, <epr:schema:enum:frame-capability#camera>, <epr:schema:enum:frame-capability#microphone>, <epr:schema:enum:frame-capability#geolocation> .
+
+<epr:schema:enum:frame-capability#forms> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "forms" ;
+  skos:notation "forms" .
+
+<epr:schema:enum:frame-capability#popups> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "popups" ;
+  skos:notation "popups" .
+
+<epr:schema:enum:frame-capability#downloads> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "downloads" ;
+  skos:notation "downloads" .
+
+<epr:schema:enum:frame-capability#fullscreen> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "fullscreen" ;
+  skos:notation "fullscreen" .
+
+<epr:schema:enum:frame-capability#clipboard-write> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "clipboard-write" ;
+  skos:notation "clipboard-write" .
+
+<epr:schema:enum:frame-capability#camera> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "camera" ;
+  skos:notation "camera" .
+
+<epr:schema:enum:frame-capability#microphone> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "microphone" ;
+  skos:notation "microphone" .
+
+<epr:schema:enum:frame-capability#geolocation> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:frame-capability> ;
+  skos:prefLabel "geolocation" ;
+  skos:notation "geolocation" .
+
 <epr:schema:enum:fungibility> a skos:ConceptScheme ;
   skos:prefLabel "Fungibility" ;
   dct:description "Whether units are interchangeable. fungible=kWh, non-fungible=land parcel, class-fungible=Grade A eggs." ;
@@ -1633,6 +1695,47 @@
   skos:inScheme <epr:schema:enum:osm-element-type> ;
   skos:prefLabel "relation" ;
   skos:notation "relation" .
+
+<epr:schema:enum:page-info-section> a skos:ConceptScheme ;
+  skos:prefLabel "PageInfoSection" ;
+  dct:description "The sections of a record's page info, in display order. One id names both the chrome's page-info row and card (data-page-info-row / data-page-info-card) and the matching section of the governing EPR page, so every card's link ends at /epr/<recordId>#<section>. `yours` appears only for a signed-in viewer; `delivery` and `permissions` only when there is a content object to deliver and frame. Source of truth: this schema (vocabulary only, Category C) — it stores nothing." ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:page-info-section#source>, <epr:schema:enum:page-info-section#delivery>, <epr:schema:enum:page-info-section#holders>, <epr:schema:enum:page-info-section#steward>, <epr:schema:enum:page-info-section#claims>, <epr:schema:enum:page-info-section#permissions>, <epr:schema:enum:page-info-section#yours> .
+
+<epr:schema:enum:page-info-section#source> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "source" ;
+  skos:notation "source" .
+
+<epr:schema:enum:page-info-section#delivery> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "delivery" ;
+  skos:notation "delivery" .
+
+<epr:schema:enum:page-info-section#holders> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "holders" ;
+  skos:notation "holders" .
+
+<epr:schema:enum:page-info-section#steward> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "steward" ;
+  skos:notation "steward" .
+
+<epr:schema:enum:page-info-section#claims> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "claims" ;
+  skos:notation "claims" .
+
+<epr:schema:enum:page-info-section#permissions> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "permissions" ;
+  skos:notation "permissions" .
+
+<epr:schema:enum:page-info-section#yours> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:page-info-section> ;
+  skos:prefLabel "yours" ;
+  skos:notation "yours" .
 
 <epr:schema:enum:param-fallback> a skos:ConceptScheme ;
   skos:prefLabel "ParamFallback" ;
@@ -2303,6 +2406,31 @@
   skos:prefLabel "PeerNativeMember" ;
   skos:notation "PeerNativeMember" .
 
+<epr:schema:enum:session-source> a skos:ConceptScheme ;
+  skos:prefLabel "SessionSource" ;
+  <epr:vocab#ordered> false ;
+  skos:hasTopConcept <epr:schema:enum:session-source#declared>, <epr:schema:enum:session-source#runtimeAncestor>, <epr:schema:enum:session-source#ttyLeader>, <epr:schema:enum:session-source#none> .
+
+<epr:schema:enum:session-source#declared> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-source> ;
+  skos:prefLabel "declared" ;
+  skos:notation "declared" .
+
+<epr:schema:enum:session-source#runtimeAncestor> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-source> ;
+  skos:prefLabel "runtimeAncestor" ;
+  skos:notation "runtimeAncestor" .
+
+<epr:schema:enum:session-source#ttyLeader> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-source> ;
+  skos:prefLabel "ttyLeader" ;
+  skos:notation "ttyLeader" .
+
+<epr:schema:enum:session-source#none> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:session-source> ;
+  skos:prefLabel "none" ;
+  skos:notation "none" .
+
 <epr:schema:enum:share-allocation-form> a skos:ConceptScheme ;
   skos:prefLabel "ShareAllocationForm" ;
   dct:description "Source of truth: Cat-A CollabAgreement DHT entry's share_allocation_json.form field in imagodei DNA (DNA-notarized). Category C — wire-shape vocabulary. Form of share-routing function. Per spec §6.1. M1 only supports declared." ;
@@ -2570,4 +2698,4 @@
   <epr:vocab#orthogonalTo> "retention (the temporal half of the same disclosure gradient — not yet carded)" ;
   <epr:vocab#verdictClosure> "closed" .
 
-# 61 vocabularies · 428 concepts · 2 axes
+# 65 vocabularies · 449 concepts · 2 axes
