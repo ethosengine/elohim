@@ -136,6 +136,19 @@ pub enum Question {
     Uncertain,
 }
 
+/// How the adapter classified a turn's end (steward ruling, Legitimate stops).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopOutcome {
+    /// Goal accomplished with observable evidence; opens nothing.
+    Accomplished,
+    /// A true exception only the steward can resolve; the human rung's ask carries it.
+    Exception,
+    /// The turn ends in a question for the steward.
+    Question,
+    /// Work stopped unfinished with no ask: a stall.
+    Stalled,
+}
+
 /// How a prompt closed, as written in the journal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CloseAttribution {
@@ -283,6 +296,8 @@ pub struct ConsultationEvent {
     pub finished_at: Option<Moment>,
     /// Who holds the claim, as `pid@bootId`.
     pub claimed_by: Option<String>,
+    /// The regulator acted for real (live `decide`), not as a shadow record.
+    pub live: bool,
     /// Measured elapsed seconds; `None` is unmeasured.
     pub usage_elapsed_s: Option<f64>,
     /// Reported combined tokens; `None` is unmeasured.
@@ -362,10 +377,18 @@ pub struct Event {
     pub duration_ms: Option<f64>,
     /// Correlation.
     pub correlation: Option<Correlation>,
+    /// The regulator component that wrote this live record, when it names one.
+    pub regulator: Option<String>,
+    /// The policy CID a live regulator record was decided under.
+    pub policy_cid: Option<String>,
     /// Gap payload.
     pub gap: Option<GapNote>,
     /// Question classification.
     pub question: Option<Question>,
+    /// Turn-end outcome, when the adapter supplied one.
+    pub outcome: Option<StopOutcome>,
+    /// What the adapter found unmet, when it classified the stop as stalled.
+    pub stall_reason: Option<String>,
     /// Consultation payload.
     pub consultation: Option<ConsultationEvent>,
     /// Close attribution.
@@ -511,6 +534,7 @@ fn parse_consultation(c: &Value) -> Parsed<ConsultationEvent> {
         timeout_seconds: c.get("timeoutSeconds").and_then(Value::as_f64),
         finished_at: clock_at(c.get("finishedAt"), "consultation.finishedAt")?,
         claimed_by,
+        live: c.get("live").and_then(Value::as_bool).unwrap_or(false),
         usage_elapsed_s: usage
             .and_then(|u| u.get("elapsedSeconds"))
             .and_then(Value::as_f64),
@@ -592,6 +616,18 @@ impl Event {
             Some("uncertain") => Some(Question::Uncertain),
             Some(other) => return Err(format!("unknown question class {other}")),
         };
+        let outcome = match v.get("outcome").and_then(Value::as_str) {
+            None => None,
+            Some("accomplished") => Some(StopOutcome::Accomplished),
+            Some("exception") => Some(StopOutcome::Exception),
+            Some("question") => Some(StopOutcome::Question),
+            Some("stalled") => Some(StopOutcome::Stalled),
+            Some(other) => return Err(format!("unknown outcome {other}")),
+        };
+        let stall_reason = v
+            .get("stallReason")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
         let closed_by = match v.get("closedBy").and_then(Value::as_str) {
             None => None,
             Some("approved") => Some(CloseAttribution::Approved),
@@ -648,8 +684,15 @@ impl Event {
             shape: opt_str(v.get("shape")),
             duration_ms: v.get("durationMs").and_then(Value::as_f64),
             correlation,
+            regulator: v
+                .pointer("/regulator/kind")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            policy_cid: opt_str(v.get("policyCid")),
             gap,
             question,
+            outcome,
+            stall_reason,
             consultation,
             closed_by,
             exception,
@@ -669,7 +712,10 @@ impl Event {
                 "closedBy and correlation",
             )?,
             EventKind::ObservationGap => need(event.gap.is_some(), "gap")?,
-            EventKind::TurnEnded => need(event.question.is_some(), "question")?,
+            EventKind::TurnEnded => need(
+                event.question.is_some() || event.outcome.is_some(),
+                "question or outcome",
+            )?,
             EventKind::Consultation => need(event.consultation.is_some(), "consultation")?,
             EventKind::WouldHave => need(event.would_have.is_some(), "wouldHave")?,
             EventKind::HarnessException => need(event.exception.is_some(), "exception")?,

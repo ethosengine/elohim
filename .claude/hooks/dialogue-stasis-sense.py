@@ -4,7 +4,7 @@ import sys
 if os.environ.get("STASIS_KEEPER") == "1" or os.environ.get("STASIS_SENSE") == "off":
     sys.exit(0)
 
-"""Private, observe-only dialogue journal and context-only harness exception relay.
+"""Private dialogue sensor, bounded control transport and harness context relay.
 
 Evidence: probe/20261030T162945Z and probe/20261030T163031Z establish serial
 permission correlation, inferred denial, delayed dialog notifications and the
@@ -318,6 +318,7 @@ def map_event(j):
         opens.append(j.open_record(recorded))
         if not reliable:
             j.gap("ambiguous-permission-correlation")
+        return recorded
     elif event == "Notification" and p.get("notification_type") == "permission_prompt":
         candidates = [o for o in opens if not prompt or o["promptId"] == prompt]
         opened = candidates[0] if len(candidates) == 1 else None
@@ -345,8 +346,11 @@ def map_event(j):
     elif event == "Stop":
         message = p.get("last_assistant_message")
         question = "uncertain" if not isinstance(message, str) or not message.strip() else "yes" if "?" in message else "no"
-        j.append("turn-ended", question=question)
+        import stasis_control as control
+        recorded = (j.append("turn-ended", question=question) if control.mode() == "off"
+                    else control.stop_event(j, question))
         calls.clear()
+        return recorded
     elif event == "UserPromptSubmit":
         text = p.get("prompt")
         if isinstance(text, str) and not text.startswith("<task-notification>"):
@@ -477,11 +481,21 @@ def main():
     if not isinstance(session, str) or not session or session in {".", ".."} or not re.fullmatch(r"[A-Za-z0-9._-]+", session):
         return
     root = Path(os.environ.get("STASIS_JOURNAL_ROOT") or Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2]) / ".eprfs/status/stasis")
+    repo = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
+    # Package-owned hook; host-local transport is shared with the coordinator.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "genesis/agentic"))
+    import stasis_control as control
+    if payload.get("hook_event_name") == "SessionStart":
+        print(control.session_start(repo, root, session))
+        return
+    if "--rewake" in sys.argv:
+        # This registration must never journal a second Stop.
+        raise SystemExit(control.rewake(repo, root, payload))
     directory = root / session
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    output = None
+    output, normalized = None, None
     with (directory / "journal.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if control.mode() == "live" else 0))
         j = Journal(directory, payload)
         try:
             if payload.get("hook_event_name") == "Notification" and payload.get("notification_type") == "idle_prompt":
@@ -491,7 +505,18 @@ def main():
                 # timing independently of notifications; no Python timer.
                 j.append("idle-prompt")
             else:
-                map_event(j)
+                if control.mode() == "live" and control.question_answered(payload):
+                    j.witness()
+                normalized = map_event(j)
+                if normalized is None:
+                    normalized = {"hookEvent": payload.get("hook_event_name"), "agentId": j.agent,
+                                  "tool": payload.get("tool_name"),
+                                  "shape": shape((payload.get("tool_input") or {}).get("command"))}
+                if payload.get("hook_event_name") == "Stop":
+                    j.state["stasisStop"] = {"seq": normalized["seq"],
+                        "messageDigest": hashlib.sha256(str(payload.get("last_assistant_message")).encode()).hexdigest()}
+                elif payload.get("hook_event_name") in {"PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionEnd"}:
+                    j.state.pop("stasisStop", None)
                 transcript(j)
                 output = relay(j)
         except Exception:
@@ -499,6 +524,30 @@ def main():
             j.gap("adapter-error")
         finally:
             j.save()
+    # Native decide may append to events.jsonl: never call it while holding
+    # journal.lock. An inert result cannot deliver pending control context.
+    try:
+        action = control.live_hook(repo, root, payload, normalized or {})
+        if action:
+            if payload.get("hook_event_name") == "PermissionRequest":
+                iid = normalized["correlation"]["incidentId"]
+                with (directory / "journal.lock").open("a") as lock:
+                    fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if control.mode() == "live" else 0))
+                    j = Journal(directory, payload)
+                    j.gap("native-park-fold-pending")
+                    j.state["openPrompts"][j.agent] = [o for o in j.state["openPrompts"].get(j.agent, []) if o["incidentId"] != iid]
+                    j.save()
+            if output and payload.get("hook_event_name") in {"PostToolUse", "UserPromptSubmit"}:
+                event = payload["hook_event_name"]
+                if event == "UserPromptSubmit":
+                    action = output + "\n" + action
+                else:
+                    old = json.loads(output)["hookSpecificOutput"]["additionalContext"]
+                    current = json.loads(action)["hookSpecificOutput"]["additionalContext"]
+                    action = control.context(event, old + "\n" + current)
+            output = action
+    except Exception:
+        pass
     if output:
         print(output)
 

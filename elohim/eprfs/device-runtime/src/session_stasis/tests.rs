@@ -788,8 +788,18 @@ fn an_away_ruling_and_the_collaborative_window_set_the_passive_disposition() {
     let mut away = ev(1, 0, "steward-ping", json!({}));
     away["presence"] = json!({"disposition": "automated", "basis": {"lastWitnessedAgeSeconds": 1.0, "rulingRef": "ruling-away-1"}});
     let parsed = Event::from_value(&away).unwrap();
+    // A reference nobody can resolve is not away (unverifiable absence is never granted)...
     assert_eq!(
-        effective_presence(&[parsed], &[], at(0), &p, &[]).disposition,
+        effective_presence(std::slice::from_ref(&parsed), &[], at(0), &p, &[]).disposition,
+        Disposition::Collaborative
+    );
+    // ...a resolved, unexpired ruling is.
+    let held = [AwayRuling {
+        id: "ruling-away-1".into(),
+        expires_at: None,
+    }];
+    assert_eq!(
+        effective_presence(&[parsed], &[], at(0), &p, &held).disposition,
         Disposition::Automated
     );
     assert_eq!(
@@ -1151,7 +1161,7 @@ fn fold_root_reads_all_sessions_and_reports_no_journal() {
         ],
     );
     let (report, folds) = fold_root(dir.path(), None, &o).unwrap();
-    assert_eq!((folds.len(), report.policy), (1, POLICY_ABSENT));
+    assert_eq!((folds.len(), report.policy.as_str()), (1, POLICY_ABSENT));
     assert_eq!(report.measures["dialogue-blocked-seconds"]["value"], 40.0);
     assert!(
         report.measures["dialogue-blocked-seconds"]["byClass"]["authorization"]
@@ -1338,7 +1348,20 @@ fn status_is_read_only_and_never_reports_the_coordinator_green() {
         2,
         "shadow parks do not close"
     );
-    assert_eq!(s["pendingParks"], json!(["s1:2"]));
+    // P4: a shadow park is not a pending park...
+    assert_eq!(s["pendingParks"], json!([]));
+    // ...nor is a live claim from a non-regulator agent or under an old policy; only a verified
+    // live park is.
+    let mut forged = park_record(true, Some("native-decide"), Some("cid-1"));
+    forged["agentId"] = json!("main");
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), forged], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!([]));
+    let stale = park_record(true, Some("native-decide"), Some("cid-OLD"));
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), stale], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!([]));
+    let good = park_record(true, Some("native-decide"), Some("cid-1"));
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), good], Some("cid-1"));
+    assert_eq!(status(&f, at(100))["pendingParks"], json!(["s1:2"]));
     assert_eq!(s["coordinator"]["state"], "unknown");
     assert_eq!(s["policy"], POLICY_ABSENT);
 }
@@ -1845,4 +1868,339 @@ fn shadow_decide_without_a_journal_exits_clean_with_an_unmeasured_marker() {
         (json!("none"), json!(true), json!(true))
     );
     assert!(!dir.path().join("ghost").exists());
+}
+
+// --- Legitimate stops: turn-ended `outcome` ------------------------------------------------
+
+fn stop_incidents(events: &[Value]) -> Vec<(StallClass, Option<String>)> {
+    run(events, 600, Selection::All)
+        .incidents
+        .iter()
+        .map(|i| (i.stall_class, i.stall_reason.clone()))
+        .collect()
+}
+
+#[test]
+fn accomplished_and_exception_stops_open_no_incident() {
+    for outcome in ["accomplished", "exception"] {
+        let events = [ev(1, 0, "turn-ended", json!({"outcome": outcome}))];
+        assert!(stop_incidents(&events).is_empty(), "{outcome}");
+        // Even a legacy `question: yes` beside the outcome does not open one: the outcome decides.
+        let both = [ev(
+            1,
+            0,
+            "turn-ended",
+            json!({"outcome": outcome, "question": "yes"}),
+        )];
+        assert!(stop_incidents(&both).is_empty(), "{outcome} with question");
+    }
+}
+
+#[test]
+fn a_stalled_stop_opens_a_silence_incident_at_once_with_its_reason() {
+    let events = [ev(
+        1,
+        0,
+        "turn-ended",
+        json!({"outcome": "stalled", "stallReason": "gate red; worktree dirty"}),
+    )];
+    assert_eq!(
+        stop_incidents(&events),
+        [(StallClass::Silence, Some("gate red; worktree dirty".into()))]
+    );
+    let f = run(&events, 90, Selection::All);
+    assert_eq!(f.incidents[0].state, IncidentState::Open);
+    assert_eq!(blocked(&f), Some(90.0));
+    let v = serde_json::to_value(&f.incidents[0]).unwrap();
+    assert_eq!(v["stallReason"], "gate red; worktree dirty");
+    // A stalled stop with no reason serializes no field and still opens the incident.
+    let bare = [ev(1, 0, "turn-ended", json!({"outcome": "stalled"}))];
+    assert_eq!(stop_incidents(&bare), [(StallClass::Silence, None)]);
+    let v = serde_json::to_value(&run(&bare, 90, Selection::All).incidents[0]).unwrap();
+    assert!(v.get("stallReason").is_none());
+}
+
+#[test]
+fn a_question_outcome_follows_the_question_path_and_a_later_stop_closes_it() {
+    let events = [
+        ev(1, 0, "turn-ended", json!({"outcome": "question"})),
+        ev(2, 100, "turn-ended", json!({"outcome": "accomplished"})),
+    ];
+    let f = run(&events, 200, Selection::All);
+    assert_eq!(f.incidents.len(), 1);
+    assert_eq!(f.incidents[0].stall_class, StallClass::Question);
+    assert_eq!(f.incidents[0].closed_by, Some(ClosedBy::Withdrawn));
+}
+
+#[test]
+fn a_missing_outcome_keeps_the_question_behavior_exactly() {
+    let yes = [ev(1, 0, "turn-ended", json!({"question": "yes"}))];
+    assert_eq!(stop_incidents(&yes), [(StallClass::Question, None)]);
+    for q in ["no", "uncertain"] {
+        assert!(stop_incidents(&[ev(1, 0, "turn-ended", json!({"question": q}))]).is_empty());
+    }
+    // The legacy event serializes no new incident field.
+    let v = serde_json::to_value(&run(&yes, 60, Selection::All).incidents[0]).unwrap();
+    assert!(v.get("stallReason").is_none());
+}
+
+#[test]
+fn stops_are_counted_by_outcome_with_legacy_ends_unclassified() {
+    let events = [
+        ev(1, 0, "turn-ended", json!({"outcome": "accomplished"})),
+        ev(2, 10, "turn-ended", json!({"outcome": "accomplished"})),
+        ev(3, 20, "turn-ended", json!({"outcome": "exception"})),
+        ev(4, 30, "turn-ended", json!({"outcome": "question"})),
+        ev(5, 40, "turn-ended", json!({"outcome": "stalled"})),
+        ev(6, 50, "turn-ended", json!({"question": "no"})),
+    ];
+    let f = run(&events, 100, Selection::All);
+    assert_eq!(
+        f.stops,
+        StopCounts {
+            accomplished: 2,
+            exception: 1,
+            question: 1,
+            stalled: 1,
+            unclassified: 1
+        }
+    );
+    let s = status(&f, at(100));
+    assert_eq!(s["stops"]["accomplished"], 2);
+    assert_eq!(s["stops"]["unclassified"], 1);
+}
+
+#[test]
+fn an_unknown_outcome_is_refused_and_a_bare_turn_end_needs_question_or_outcome() {
+    let bad = ev(1, 0, "turn-ended", json!({"outcome": "gave-up"}));
+    assert!(Event::from_value(&bad).is_err());
+    let bare = ev(1, 0, "turn-ended", json!({}));
+    assert!(Event::from_value(&bare).is_err());
+    assert!(Event::from_value(&ev(1, 0, "turn-ended", json!({"outcome": "stalled"}))).is_ok());
+}
+
+// --- Live effects: the records the regulator writes are schema-valid -----------------------
+
+#[test]
+fn live_regulator_records_validate_against_the_event_schema() {
+    use super::live::{decide_live, LiveDecision};
+    use super::policy::{Pin, PolicyAssessment, PolicyFileRead};
+
+    let dir = tempfile::tempdir().unwrap();
+    let s = dir.path().join("s1");
+    fs::create_dir_all(&s).unwrap();
+    let mut witnessed_open = ev(
+        1,
+        0,
+        "shift-marker",
+        json!({"shift": {"id": "x", "edge": "open"}}),
+    );
+    witnessed_open["presence"] = witnessed(0.0)["presence"].clone();
+    let lines = [witnessed_open, perm(2, 10, "cd <path> && ls")];
+    fs::write(
+        s.join("events.jsonl"),
+        lines.iter().map(|l| format!("{l}\n")).collect::<String>(),
+    )
+    .unwrap();
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let clock = ClockReading {
+        wall: at(1800),
+        boot_id: "boot-1".into(),
+        uptime_seconds: 3000.0,
+    };
+    let req = DecideRequest {
+        hook: "PermissionRequest".into(),
+        tool: Some("Bash".into()),
+        shape: Some("cd <path> && ls".into()),
+        agent_id: "main".into(),
+        incident_id: Some("s1:2".into()),
+    };
+    let recheck = || {
+        Ok(PolicyAssessment::assess(
+            Some(PolicyFileRead {
+                cid: "cid".into(),
+                parsed: Ok(policy.clone()),
+            }),
+            Pin::Cid("cid".into()),
+        ))
+    };
+    let ruling = AwayRuling {
+        id: "r".into(),
+        expires_at: None,
+    };
+    let out = match decide_live(
+        dir.path(),
+        "s1",
+        &req,
+        &c,
+        &recheck,
+        &[ruling],
+        &|| clock.clone(),
+        1 << 20,
+    )
+    .unwrap()
+    {
+        LiveDecision::Acted(o) => o,
+        LiveDecision::Inert(r) => panic!("{r}"),
+    };
+    assert_eq!(out.effect, Effect::Deny);
+
+    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../sdk/domains/elohim-agent/schemas/session-event.schema.json");
+    let schema: Value = serde_json::from_str(&fs::read_to_string(schema_path).unwrap()).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let written: Vec<Value> = fs::read_to_string(s.join("events.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(written.len(), 3);
+    for v in &written {
+        assert!(validator.is_valid(v), "schema-valid: {v}");
+        Event::from_value(v).unwrap();
+    }
+    // A Refer record is schema-valid too (null pivot).
+    let refer = json!({"schemaVersion": 1, "kind": "consultation",
+        "session": {"runtime": "claude-code", "session": "s1"}, "agentId": "main", "seq": 9,
+        "clock": clk(1800), "presence": {"disposition": "unknown", "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": null}},
+        "correlation": {"incidentId": "s1:2", "confidence": "high", "method": "none"},
+        "consultation": {"rung": 0, "level": "C1", "binding": "b", "decision": "Refer", "pivot": null, "reason": "r"}});
+    assert!(validator.is_valid(&refer));
+}
+
+// --- Ladder-review regressions: live park closes the stall (L6), away rulings (L5) ---------
+
+fn park_record(live: bool, regulator: Option<&str>, cid: Option<&str>) -> Value {
+    let mut c = json!({"rung": 0, "level": "C1", "binding": "b", "decision": "Permit",
+                       "pivot": "park", "reason": "parked"});
+    if live {
+        c["live"] = json!(true);
+    }
+    let mut e = consult(3, 100, "s1:2", c);
+    if let Some(kind) = regulator {
+        e["regulator"] = json!({"kind": kind});
+        e["agentId"] = json!(if kind == "coordinator" {
+            "stasis-coordinator"
+        } else {
+            "stasis-regulator"
+        });
+    }
+    if let Some(cid) = cid {
+        e["policyCid"] = json!(cid);
+    }
+    e
+}
+
+fn fold_pinned(events: &[Value], pinned: Option<&str>) -> SessionFold {
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let mut o = FoldOptions::new(at(600), Selection::All, true, &policy, &c);
+    if let Some(p) = pinned {
+        o = o.with_pinned_cid(p);
+    }
+    fold_session(&replay_of(events), &o)
+}
+
+#[test]
+fn a_live_park_closes_the_stall_and_a_shadow_park_does_not() {
+    let perm = || perm(2, 10, "ls -la\nls");
+    let live = fold_pinned(
+        &[
+            perm(),
+            park_record(true, Some("native-decide"), Some("cid-1")),
+        ],
+        Some("cid-1"),
+    );
+    let i = &live.incidents[0];
+    assert_eq!(i.closed_by, Some(ClosedBy::Parked));
+    // Blocked seconds stop at the park (t=100), not at the fold's now (t=600).
+    assert_eq!(blocked(&live), Some(90.0));
+    assert!(i.consultations[0].live);
+    // The coordinator's live completions count too.
+    let coordinator = fold_pinned(
+        &[
+            perm(),
+            park_record(true, Some("coordinator"), Some("cid-1")),
+        ],
+        Some("cid-1"),
+    );
+    assert_eq!(coordinator.incidents[0].closed_by, Some(ClosedBy::Parked));
+
+    // N2: a live claim counts only from a known regulator, under the policy pinned NOW.
+    for (reg, cid, pinned) in [
+        (None, Some("cid-1"), Some("cid-1")),           // no regulator
+        (Some("keeper"), Some("cid-1"), Some("cid-1")), // unknown regulator
+        (Some("native-decide"), None, Some("cid-1")),   // no policy CID
+        (Some("native-decide"), Some("cid-OLD"), Some("cid-1")), // policy since changed
+        (Some("native-decide"), Some("cid-1"), None),   // nothing pinned
+    ] {
+        let f = fold_pinned(&[perm(), park_record(true, reg, cid)], pinned);
+        assert_eq!(f.incidents[0].closed_by, None, "{reg:?} {cid:?} {pinned:?}");
+        assert!(!f.incidents[0].consultations[0].live);
+    }
+
+    // M1: the agent id and regulator kind must be paired exactly.
+    for (agent, kind) in [
+        ("main", "native-decide"),
+        ("main", "coordinator"),
+        ("stasis-regulator", "coordinator"),
+        ("stasis-coordinator", "native-decide"),
+    ] {
+        let mut e = park_record(true, Some(kind), Some("cid-1"));
+        e["agentId"] = json!(agent);
+        let f = fold_pinned(&[perm(), e], Some("cid-1"));
+        assert_eq!(f.incidents[0].closed_by, None, "{agent} {kind}");
+        assert!(!f.incidents[0].consultations[0].live);
+    }
+
+    let shadow = fold_pinned(&[perm(), park_record(false, None, None)], Some("cid-1"));
+    assert_eq!(shadow.incidents[0].closed_by, None);
+    assert_eq!(blocked(&shadow), Some(590.0));
+}
+
+#[test]
+fn an_unresolved_away_ruling_reference_is_not_away() {
+    // L5 at the fold: the reference names no resolvable ruling, so presence is not automated.
+    let mut e = ev(1, 0, "turn-ended", json!({"question": "no"}));
+    e["presence"] = json!({"disposition": "automated",
+                           "basis": {"lastWitnessedAgeSeconds": 0.0, "rulingRef": "ghost"}});
+    let f = run(&[e.clone()], 10, Selection::All);
+    assert_eq!(f.presence.disposition, Disposition::Collaborative);
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+    let rulings = [AwayRuling {
+        id: "ghost".into(),
+        expires_at: None,
+    }];
+    let resolved = fold_session(
+        &replay_of(&[e.clone()]),
+        &FoldOptions::new(at(10), Selection::All, true, &policy, &c).with_rulings(&rulings),
+    );
+    assert_eq!(resolved.presence.disposition, Disposition::Automated);
+    let expired = [AwayRuling {
+        id: "ghost".into(),
+        expires_at: Some(at(5)),
+    }];
+    let lapsed = fold_session(
+        &replay_of(&[e]),
+        &FoldOptions::new(at(10), Selection::All, true, &policy, &c).with_rulings(&expired),
+    );
+    assert_eq!(lapsed.presence.disposition, Disposition::Collaborative);
+}
+
+#[test]
+fn a_coordinator_shaped_live_completion_folds_as_live() {
+    // The coordinator's envelope: agentId stasis-coordinator, regulator {kind: coordinator},
+    // policyCid, and `live: true` inside the consultation.
+    let mut e = park_record(true, None, None);
+    e["agentId"] = json!("stasis-coordinator");
+    e["regulator"] = json!({"kind": "coordinator"});
+    e["policyCid"] = json!("cid-9");
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), e.clone()], Some("cid-9"));
+    assert!(f.incidents[0].consultations[0].live);
+    assert_eq!(f.incidents[0].closed_by, Some(ClosedBy::Parked));
+    // Under a different pinned policy it is shadow.
+    let f = fold_pinned(&[perm(2, 10, "ls -la\nls"), e], Some("cid-other"));
+    assert!(!f.incidents[0].consultations[0].live);
 }

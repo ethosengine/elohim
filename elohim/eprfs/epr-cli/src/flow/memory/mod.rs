@@ -39,6 +39,34 @@ pub fn steward_of_record_refusal(root: &Path, human: &str) -> FlowResult<Option<
     Ok(import::steward_refusal(&governance, human))
 }
 
+/// Why `human` cannot stand as a PERSON steward of record: not an active non-fixture Steward
+/// ([`steward_of_record_refusal`]), or not a person at all. An agent holding the Steward role
+/// authors; it does not stand for the steward's word.
+pub fn person_steward_refusal(root: &Path, human: &str) -> FlowResult<Option<String>> {
+    let governance = Reader::new(root)?.collective()?;
+    if let Some(reason) = import::steward_refusal(&governance, human) {
+        return Ok(Some(reason));
+    }
+    let kind = governance.affiliation_of(human).map(|(_, a)| a.member_kind);
+    Ok(person_refusal(human, kind))
+}
+
+/// The person test, apart from the governance read: a `human:` participant whose affiliation
+/// says `Person`. An absent affiliation is not a person.
+pub fn person_refusal(
+    human: &str,
+    kind: Option<eprfs_agent::memory::MemberKind>,
+) -> Option<String> {
+    use eprfs_agent::memory::MemberKind;
+    if human.starts_with("human:") && kind == Some(MemberKind::Person) {
+        None
+    } else {
+        Some(format!(
+            "{human} is not a person (member kind {kind:?}); only a person can stand as steward of record"
+        ))
+    }
+}
+
 fn refused(message: impl Into<String>) -> FlowError {
     FlowError::InvalidArguments(format!("collective memory: {}", message.into()))
 }

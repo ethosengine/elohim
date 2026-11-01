@@ -47,7 +47,8 @@ def forbidden(source):
 
 class NoAllowTests(unittest.TestCase):
     def test_actuators_have_no_permission_allow_construction(self):
-        for path in ['.claude/hooks/dialogue-stasis-sense.py', 'genesis/agentic/bin/stasis-coordinator']:
+        for path in ['.claude/hooks/dialogue-stasis-sense.py', 'genesis/agentic/bin/stasis-coordinator',
+                     'genesis/agentic/stasis_control.py']:
             with self.subTest(path=path):
                 self.assertEqual(forbidden((ROOT / path).read_text()), [])
 

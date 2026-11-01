@@ -160,9 +160,12 @@ At kickoff, append a `shift-marker` event with `shift: {"id":"<shift-id>",
 `journal.lock` and atomic sequence/state update; preserve the session incarnation,
 clock and presence envelope. An unattended launch also records the steward's
 authorized, expiring away ruling with
-`epr flow note --kind ruling --on <commitment> --reason <away-scope-and-expiry>`.
-Name the session, shift, authorization source and UTC expiry (within the frozen
-deadline); retain the returned ruling reference in presence evidence. Away selects
+`epr flow note --kind ruling --on <commitment> --reason '{"purpose":"dialogue-stasis-away","expiresAt":"<UTC RFC 3339>",...}'`,
+written from a session claimed by the steward (the native reader counts only a person steward's
+ruling with that exact purpose and a parsable, unexpired `expiresAt`; see
+`genesis/agentic/stasis-policy-operations.md`, Away rulings). Name the session, shift and
+authorization source in the JSON too, with the expiry inside the frozen deadline; retain the
+returned ruling reference in presence evidence. Away selects
 handling only: it grants no execution authority and invents no human witness.
 
 Beside pre-dispatch authority checks, check every Bash call with the existing

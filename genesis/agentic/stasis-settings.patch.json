@@ -1,0 +1,187 @@
+[
+  {
+    "op": "add",
+    "path": "/hooks/Notification",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PermissionDenied",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PermissionRequest",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PostToolUseFailure",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/hooks/SessionEnd",
+    "value": []
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PermissionRequest/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/Notification/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ],
+      "matcher": "permission_prompt"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/Notification/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ],
+      "matcher": "idle_prompt"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PreToolUse/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PostToolUse/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PostToolUseFailure/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/PermissionDenied/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/Stop/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/UserPromptSubmit/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/SessionEnd/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 3
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/Stop/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\" --rewake",
+          "timeout": 1870,
+          "async": true,
+          "asyncRewake": true
+        }
+      ]
+    }
+  },
+  {
+    "op": "add",
+    "path": "/hooks/SessionStart/-",
+    "value": {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+          "timeout": 1
+        }
+      ]
+    }
+  }
+]

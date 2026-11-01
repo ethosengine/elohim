@@ -67,6 +67,7 @@ class AbsolutesGuardSignalCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.project = self.tmp / "project"
         (self.project / ".claude" / "data").mkdir(parents=True)
+        (self.project / ".git").mkdir()
         (self.project / "genesis/a2o/features/protocol").mkdir(parents=True)
         (self.project / "genesis/docs/specs").mkdir(parents=True)
         (self.project / "tests").mkdir()
@@ -95,6 +96,7 @@ class AbsolutesGuardSignalCase(unittest.TestCase):
 
     def edit(self, rel: str, before: str, old: str, new: str) -> subprocess.CompletedProcess:
         path = self.project / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(before.replace(old, new, 1))
         return self.run_hook({"tool_name": "Edit", "tool_input": {
             "file_path": str(path), "old_string": old, "new_string": new}})
@@ -146,6 +148,65 @@ class AbsolutesGuardSignalCase(unittest.TestCase):
         r = self.edit("genesis/docs/specs/s.md", before, "# Spec\n", "# Spec\n\nKept forever.\n")
         self.assertIn('"forever"', self.message(r))
         self.assertEqual(len(self.ledger()), 1)
+
+    def worktree(self) -> Path:
+        root = self.project / ".worktrees/wt"
+        root.mkdir(parents=True)
+        (root / ".git").write_text("gitdir: ../../.git/worktrees/wt\n")
+        return root
+
+    def test_main_checkout_edit_adds_absolute(self):
+        r = self.edit("genesis/docs/x.md", "We decline to widen a limit.\n",
+                      "decline", "promise never")
+        self.assertIn('L1 "never"', self.message(r))
+        self.assertIn("landed in genesis/docs/x.md:", self.message(r))
+        self.assertEqual(self.ledger()[0]["net_new"], 1)
+
+    def test_worktree_edit_adds_absolute_in_its_own_checkout(self):
+        root = self.worktree()
+        r = self.edit(".worktrees/wt/genesis/docs/x.md", "We decline to widen a limit.\n",
+                      "decline", "promise never")
+        self.assertIn('L1 "never"', self.message(r))
+        self.assertIn("landed in genesis/docs/x.md:", self.message(r))
+        rows = [json.loads(line) for line in (root / LEDGER_REL).read_text().splitlines()]
+        self.assertEqual(rows[0]["path"], "genesis/docs/x.md")
+        self.assertEqual(rows[0]["net_new"], 1)
+        self.assertEqual(self.ledger(), [], "landing belongs to the edited checkout")
+        notes = self.notes()
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0][notes[0].index("--root") + 1], str(root))
+
+    def test_non_surface_edits_are_quiet_in_both_checkouts(self):
+        self.worktree()
+        for rel in ["docs/x.md", ".worktrees/wt/docs/x.md"]:
+            with self.subTest(rel=rel):
+                r = self.edit(rel, "We decline to widen a limit.\n", "decline", "promise never")
+                self.assertEqual(self.message(r), "")
+        self.assertEqual(self.notes(), [])
+
+    def test_worktree_citations_resolve_in_its_own_checkout(self):
+        root = self.worktree()
+        (root / "tests").mkdir()
+        (root / "tests/local.py").write_text("# checkout-local enforcer\n")
+        before = "It is private (enforced: tests/local.py).\n"
+        r = self.edit(".worktrees/wt/genesis/docs/x.md", before, "private", "never shared")
+        self.assertEqual(self.message(r), "")
+        before = "It is private (enforced: tests/consent_test.py).\n"
+        r = self.edit(".worktrees/wt/genesis/docs/x.md", before, "private", "never shared")
+        self.assertIn("does not resolve", self.message(r), "main checkout enforcer is absent here")
+
+    def test_worktree_prefers_its_own_frame_atoms(self):
+        root = self.worktree()
+        frames_rel = "elohim/sdk/schemas/v1/frames"
+        for checkout in [self.project, root]:
+            shutil.copytree(HOOKS.parents[1] / frames_rel, checkout / frames_rel)
+        atom_path = root / frames_rel / "frame-absolute-promise.json"
+        atom = json.loads(atom_path.read_text())
+        atom["recall_signal"]["phrases"] = ["immutable"]
+        atom_path.write_text(json.dumps(atom))
+        r = self.edit(".worktrees/wt/genesis/docs/x.md", "The limit is fixed.\n",
+                      "fixed", "immutable")
+        self.assertIn('L1 "immutable"', self.message(r))
 
     # 3 ─────────────────────────────────────────────────────────────────────────────────────────
     def test_resolving_citation_exempts_and_a_dangling_one_is_named(self):
