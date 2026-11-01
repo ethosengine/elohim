@@ -207,3 +207,17 @@ test('the first red carries what continuing costs and the stop command, once per
   const red = formatEvent({ kind: 'failure', project: 'preflight', failure: { class: 'element-dists', excerpt: ['unbuilt: elohim-core', 'cure: pnpm --filter elohim-core run build'] } });
   assert.match(red, /RED preflight element-dists — unbuilt: elohim-core · cure: pnpm --filter elohim-core run build/);
 });
+
+test('harvest ignores failure-shaped lines from a gate whose verdict was green', (t) => {
+  const root = scratch(t);
+  assert.equal(spawnSync('git', ['-C', root, 'init', '--quiet']).status, 0);
+  let clock = Date.parse('2026-11-01T10:00:00Z');
+  const now = () => new Date(clock);
+  const { path } = openRun({ root, sha: 'c'.repeat(40), target: 'refs/heads/x', now });
+  clock += 20 * 60 * 1000;
+  appendEvent(path, { kind: 'failure', project: 'orchestrator', failure: { class: 'test', excerpt: ['mesh: REFUSED — expected by the test'] } }, { now });
+  appendEvent(path, { kind: 'gate-verdict', project: 'orchestrator', verdict: { exit: 0, seconds: 1100 } }, { now });
+  clock += 60 * 60 * 1000;
+  closeRun(path, 'failed', { now });
+  assert.deepEqual(harvest({ root, last: 10 }).slices, []);
+});

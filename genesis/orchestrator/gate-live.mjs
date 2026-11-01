@@ -589,7 +589,12 @@ export function harvest({ root = process.cwd(), last = 10 } = {}) {
     for (const event of events.filter((e) => e.kind === 'gate-verdict' && e.verdict)) {
       seconds.set(event.project, Number(event.verdict.seconds) || 0);
     }
-    const reds = events.filter((event) => event.kind === 'failure').map((event) => {
+    // A failure-shaped line inside a gate whose verdict was green (a test named "…REFUSED…", a
+    // logged refusal the test expects) is noise, not a red: only reds from red or unfinished gates
+    // and from pre-gate checks count.
+    const green = new Set(events.filter((e) => e.kind === 'gate-verdict' && e.verdict && e.verdict.exit === 0)
+      .map((e) => e.project));
+    const reds = events.filter((event) => event.kind === 'failure' && !green.has(event.project)).map((event) => {
       const failure = event.failure && typeof event.failure === 'object' ? event.failure : event;
       return { project: event.project ?? 'unknown', cls: failure.class ?? 'unknown', at: at(event), first: String(excerptLines(failure.excerpt)[0] ?? '').slice(0, 120) };
     });
