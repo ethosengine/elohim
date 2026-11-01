@@ -208,3 +208,11 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
 });
+
+test("the hook is one brace group that exits inside it, so an edit during a push cannot reach the run", () => {
+  // Bash reads a script as it executes; a same-inode rewrite mid-push (2026-11-01: 6352 s of green
+  // gates, then `syntax error near unexpected token )`) is harmless only when everything already parsed.
+  const body = HOOK.split("\n").filter((line) => line.trim() && !line.trim().startsWith("#"));
+  assert.equal(body[0], "{", "the first executable line opens the group");
+  assert.deepEqual(body.slice(-2), ["exit 0", "}"], "the group ends with exit inside it");
+});

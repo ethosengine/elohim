@@ -20,6 +20,11 @@
 # with a loud DEFERRED-BY-PVC banner naming each one, instead of cold-building
 # tens of GB mid-push and starving the volume. FORCE_HEAVY_GATES=1 overrides.
 #
+# The whole hook is one brace group, read in full before any of it runs. Bash otherwise reads a
+# script from disk as it executes, so an edit to this file during a push — another session in the
+# shared main tree, or the pushing session itself — lands its later lines at stale byte offsets:
+# 2026-11-01, a 6352 s run with every gate PASSED died at `syntax error near unexpected token )`.
+{
 # Honor HUSKY=0 — git config core.hooksPath points at .husky/ directly,
 # so the husky shim (which normally handles this) is not in the call path.
 [ "${HUSKY-}" = "0" ] && { echo "pre-push: HUSKY=0 — skipping all gates"; exit 0; }
@@ -1353,3 +1358,4 @@ fi
 brit_advisory
 
 exit 0
+}
