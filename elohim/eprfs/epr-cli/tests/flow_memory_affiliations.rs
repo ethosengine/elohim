@@ -847,6 +847,8 @@ fn the_repository_collective_reads_with_its_stewards_and_its_registry_terms_veri
 
 #[test]
 fn registry_terms_outside_the_catalogs_vocabulary_are_reported() {
+    // gate-reads: genesis/data/collectives/collectives.json
+    // gate-reads: genesis/data/collectives/collectives.schema.json
     let dir = fixture();
     let root = dir.path();
     for file in [

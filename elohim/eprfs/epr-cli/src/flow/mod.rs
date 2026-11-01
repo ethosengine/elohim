@@ -21,6 +21,7 @@ pub mod gaps;
 pub mod governor;
 mod habit_census;
 pub mod habits;
+pub mod intend;
 pub mod ledger;
 pub mod measures;
 pub mod memory;
@@ -119,9 +120,10 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 19] = [
+const SUBCOMMANDS: [&str; 20] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
-    "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense", "habit",
+    "intend", "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense",
+    "habit",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -246,6 +248,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "reseal" => run_reseal(&args[1..]),
         "hold" => run_hold(&args[1..]),
         "claim" => run_claim(&args[1..]),
+        "intend" => run_intend(&args[1..]),
         "context" => run_context(&args[1..]),
         "ledger" => run_ledger(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
@@ -610,6 +613,204 @@ fn run_claim(args: &[String]) -> FlowResult<ExitCode> {
             brief: brief.as_deref(),
             serves: serves.as_deref(),
             supersede: rest.iter().any(|a| a == "--supersede"),
+            actor: &actor,
+        },
+    )?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow intend` — author one landing-queue act.
+fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--change" | "--tree" | "--base" | "--class" | "--closure" | "--predicted-base"
+            | "--chain-len" | "--supersedes" | "--session" | "--verified" | "--gate-s"
+            | "--land" | "--tip" | "--commit" | "--landed-as" | "--regated-s" | "--withdraw"
+            | "--why" | "--dismiss" | "--capsule" | "--measures" | "--as" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown intend argument `{other}`{}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--change",
+                            "--tree",
+                            "--base",
+                            "--class",
+                            "--closure",
+                            "--predicted-base",
+                            "--chain-len",
+                            "--supersedes",
+                            "--session",
+                            "--verified",
+                            "--gate-s",
+                            "--land",
+                            "--tip",
+                            "--commit",
+                            "--landed-as",
+                            "--regated-s",
+                            "--withdraw",
+                            "--why",
+                            "--dismiss",
+                            "--capsule",
+                            "--measures",
+                            "--as"
+                        ]
+                    )
+                )))
+            }
+        }
+    }
+    let parse_u64 = |flag: &str| -> FlowResult<Option<u64>> {
+        take_opt(&rest, flag)?.map_or(Ok(None), |raw| {
+            raw.parse::<u64>().map(Some).map_err(|_| {
+                FlowError::InvalidArguments(format!("{flag} needs a nonnegative integer"))
+            })
+        })
+    };
+    let explicit_modes = ["--verified", "--land", "--withdraw", "--dismiss"]
+        .into_iter()
+        .filter(|flag| rest.iter().any(|arg| arg == flag))
+        .count();
+    let raise = rest.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "--change"
+                | "--tree"
+                | "--base"
+                | "--class"
+                | "--closure"
+                | "--predicted-base"
+                | "--chain-len"
+                | "--supersedes"
+        )
+    });
+    if explicit_modes + usize::from(raise) != 1 {
+        return Err(FlowError::InvalidArguments(
+            "intend needs exactly one mode: raise flags, --verified, --land, --withdraw or --dismiss"
+                .to_string(),
+        ));
+    }
+    let (mode_name, mode_flags): (&str, &[&str]) = if raise {
+        (
+            "raise",
+            &[
+                "--change",
+                "--tree",
+                "--base",
+                "--class",
+                "--closure",
+                "--predicted-base",
+                "--chain-len",
+                "--supersedes",
+                "--session",
+                "--measures",
+                "--as",
+            ],
+        )
+    } else if rest.iter().any(|arg| arg == "--verified") {
+        (
+            "verified",
+            &["--verified", "--gate-s", "--measures", "--as"],
+        )
+    } else if rest.iter().any(|arg| arg == "--land") {
+        (
+            "land",
+            &[
+                "--land",
+                "--tip",
+                "--commit",
+                "--landed-as",
+                "--regated-s",
+                "--measures",
+                "--as",
+            ],
+        )
+    } else if rest.iter().any(|arg| arg == "--withdraw") {
+        ("withdraw", &["--withdraw", "--why", "--measures", "--as"])
+    } else {
+        ("dismiss", &["--dismiss", "--capsule", "--measures", "--as"])
+    };
+    for flag in rest.iter().step_by(2) {
+        if !mode_flags.contains(&flag.as_str()) {
+            return Err(FlowError::InvalidArguments(format!(
+                "{flag} is not valid in intend {mode_name} mode"
+            )));
+        }
+    }
+    let closures = take_opts_all(&rest, "--closure")?;
+    let capsules = take_opts_all(&rest, "--capsule")?;
+    let session = resolve_session(take_opt(&rest, "--session")?);
+    let change = take_opt(&rest, "--change")?;
+    let tree = take_opt(&rest, "--tree")?;
+    let base = take_opt(&rest, "--base")?;
+    let class = take_opt(&rest, "--class")?;
+    let predicted_base = take_opt(&rest, "--predicted-base")?;
+    let supersedes = take_opt(&rest, "--supersedes")?;
+    let verified_intent = take_opt(&rest, "--verified")?;
+    let land_intent = take_opt(&rest, "--land")?;
+    let tip = take_opt(&rest, "--tip")?;
+    let commit = take_opt(&rest, "--commit")?;
+    let landed_as = take_opt(&rest, "--landed-as")?;
+    let withdraw_intent = take_opt(&rest, "--withdraw")?;
+    let why = take_opt(&rest, "--why")?;
+    let dismiss_intent = take_opt(&rest, "--dismiss")?;
+    fn need<'a>(value: Option<&'a str>, flag: &str) -> FlowResult<&'a str> {
+        value.ok_or_else(|| FlowError::InvalidArguments(format!("intend needs {flag} <value>")))
+    }
+    let mode = if raise {
+        intend::IntendMode::Raise(intend::RaiseRequest {
+            change: need(change.as_deref(), "--change")?,
+            tree: need(tree.as_deref(), "--tree")?,
+            base: need(base.as_deref(), "--base")?,
+            class: need(class.as_deref(), "--class")?,
+            closures: &closures,
+            predicted_base: predicted_base.as_deref(),
+            chain_len: parse_u64("--chain-len")?,
+            supersedes: supersedes.as_deref(),
+            session: session.as_deref(),
+        })
+    } else if let Some(intent) = verified_intent.as_deref() {
+        intend::IntendMode::Verified(intend::VerifiedRequest {
+            intent,
+            gate_s: parse_u64("--gate-s")?,
+        })
+    } else if let Some(intent) = land_intent.as_deref() {
+        intend::IntendMode::Land(intend::LandRequest {
+            intent,
+            tip: need(tip.as_deref(), "--tip")?,
+            commit: need(commit.as_deref(), "--commit")?,
+            landed_as: need(landed_as.as_deref(), "--landed-as")?,
+            regated_s: parse_u64("--regated-s")?,
+        })
+    } else if let Some(intent) = withdraw_intent.as_deref() {
+        intend::IntendMode::Withdraw(intend::WithdrawRequest {
+            intent,
+            why: why.as_deref(),
+        })
+    } else {
+        intend::IntendMode::Dismiss(intend::DismissRequest {
+            intent: need(dismiss_intent.as_deref(), "--dismiss")?,
+            capsule: &capsules,
+        })
+    };
+    let measures = take_opt(&rest, "--measures")?.map(PathBuf::from);
+    let actor = note::NoteActor {
+        as_ref: take_opt(&rest, "--as")?,
+        session: session.clone(),
+    };
+    let outcome = intend::intend(
+        &opts.root,
+        &intend::IntendRequest {
+            mode,
+            measures: measures.as_deref(),
             actor: &actor,
         },
     )?;
@@ -1687,6 +1888,14 @@ fn usage() -> String {
      [--serves <habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
      (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \
      intent is refused by name unless --supersede)\n  \
+     | intend --change <I…> --tree <oid> --base <oid> --class <0|low|channel|governance|high> \
+     [--closure <project>=<key>]... [--predicted-base <oid>] [--chain-len N] \
+     [--supersedes <cid>] [--session <id>] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
+     | intend --verified <intent-cid> [--gate-s N] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
+     | intend --land <intent-cid> --tip <sha> --commit <oid> --landed-as ff|moved \
+     [--regated-s N] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
+     | intend --withdraw <intent-cid> [--why <text>] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
+     | intend --dismiss <intent-cid> --capsule <k=v>... [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
      | fulfill <report.json> [--dry-run] [--surface-prefix genesis/a2o] [--json] [--root DIR]\n  \
      | fulfill --on <commitment-cid|gap-id> --report <path> --status DONE|DONE_WITH_CONCERNS \
      [--commit <sha>]... [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \

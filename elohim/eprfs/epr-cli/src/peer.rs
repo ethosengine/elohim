@@ -25,7 +25,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use elohim_epr_rea::{FlowEvent, FlowStore, ParticipantRow};
+use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
     steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
@@ -38,6 +38,9 @@ use crate::actor::{
     channel_standing, steward_lineage, ActorError, ChannelStanding, StewardLineage,
 };
 use crate::device_key::{self, DeviceKey};
+use crate::flow::intend::{
+    own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
+};
 
 /// Where the crossing allow-list is read from, under the checkout.
 pub const POLICY_REL: &str = "genesis/agentic/pool-policy.json";
@@ -98,7 +101,9 @@ pub fn usage() -> String {
      held_by, read from the flow store and the head table; exits non-zero only when it cannot \
      be computed)\n  \
      | verdicts --project P --closure K [--root DIR] [--handle H] [--json] \
-     (completed gate verdicts folded from admitted sibling devices only)>"
+     (completed gate verdicts folded from admitted sibling devices only)\n  \
+     | intents [--all] [--root DIR] [--handle H] [--policy PATH] [--json] \
+     (landing intents from this device and admitted siblings, read from the serve-recorded store)>"
         .to_string()
 }
 
@@ -114,12 +119,13 @@ pub fn run(args: &[String]) -> PeerResult<ExitCode> {
         Some("status") => status(&Options::parse(&args[1..])?),
         Some("leases") => leases(&Options::parse(&args[1..])?),
         Some("verdicts") => verdicts(&Options::parse(&args[1..])?),
+        Some("intents") => intents(&Options::parse(&args[1..])?),
         Some(other) => Err(PeerCliError::InvalidArguments(format!(
             "unknown peer verb `{other}`{}\n{}",
             crate::hint::did_you_mean(
                 other,
                 "epr peer",
-                &["id", "serve", "status", "leases", "verdicts"],
+                &["id", "serve", "status", "leases", "verdicts", "intents"],
             ),
             usage()
         ))),
@@ -138,6 +144,7 @@ pub struct Options {
     pub project: Option<String>,
     pub closure: Option<String>,
     pub json: bool,
+    pub all: bool,
     /// Validate the serve start floor without taking the lock, binding, or writing.
     pub check: bool,
 }
@@ -151,9 +158,11 @@ impl Options {
         let mut i = 0;
         while i < args.len() {
             let flag = args[i].as_str();
-            if matches!(flag, "--json" | "--check") {
+            if matches!(flag, "--json" | "--check" | "--all") {
                 if flag == "--json" {
                     options.json = true;
+                } else if flag == "--all" {
+                    options.all = true;
                 } else {
                     options.check = true;
                 }
@@ -1258,6 +1267,536 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
                 row.seconds,
                 row.commit
             );
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LandingIntent {
+    intent: String,
+    change: String,
+    tree: String,
+    base: String,
+    class: String,
+    closures: std::collections::BTreeMap<String, String>,
+    raised_at: Option<u64>,
+    dseq: Option<u64>,
+    device: Option<String>,
+    own: bool,
+    announcer: Option<String>,
+    device_folded_at: Option<u64>,
+    chain_len: Option<u64>,
+    predicted_base: Option<String>,
+    verified_at: Option<u64>,
+    moved: Option<bool>,
+    regated_s: Option<u64>,
+    session: Option<String>,
+    state: String,
+    supersedes: Option<String>,
+    verified: bool,
+    store_index: Option<u64>,
+    settled: Vec<SettlingRow>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SettlingRow {
+    kind: String,
+    dseq: u64,
+    landed_as: Option<String>,
+    regated_s: Option<u64>,
+    tip: Option<String>,
+    commit: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Advisory {
+    intent: String,
+    via: String,
+    kind: String,
+    why: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LandingIntentOutput {
+    standing: String,
+    device: Option<String>,
+    store: Option<String>,
+    intents: Vec<LandingIntent>,
+    advisory: Vec<Advisory>,
+    error: Option<String>,
+    now: u64,
+    max_skew_s: u64,
+    siblings_read: bool,
+    siblings_why: Option<String>,
+    unjoined: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    why: Option<String>,
+}
+
+/// `epr peer intents`: the local projection of own atoms and admitted crossing events.
+fn intents(options: &Options) -> PeerResult<ExitCode> {
+    let table = HeadTable::load(&peer_dir()?)?;
+    let root = table
+        .store
+        .as_ref()
+        .map_or_else(|| options.root.clone(), |place| place.root.clone());
+    if let Some(place) = table.store.as_ref() {
+        require_recorded_flow_log(&place.log)?;
+    }
+    let policy = options.policy.clone().unwrap_or_else(|| {
+        table.rules.as_ref().map_or_else(
+            || options.root.join(POLICY_REL),
+            |state| state.policy.clone(),
+        )
+    });
+    let settlement = StewardScope::from_policy_file(&policy)?.settlement();
+    let now = unix_ms();
+    let standing = standing(&root, options.handle.as_deref())?;
+    let (standing_word, me, admission, why) = match standing {
+        Standing::Device(boxed) => {
+            let (device, admission) = *boxed;
+            let did = device.key.did_key();
+            if !admission.admits_device(&did) {
+                (
+                    "not_a_device".to_string(),
+                    None,
+                    None,
+                    Some(
+                        "no PeerEndpoint row names this device's peer (run: epr actor device endpoint)"
+                            .to_string(),
+                    ),
+                )
+            } else {
+                ("device".to_string(), Some(did), Some(admission), None)
+            }
+        }
+        Standing::NotADevice(why) => ("not_a_device".to_string(), None, None, Some(why)),
+        Standing::Revoked(did) => {
+            return Err(PeerCliError::InvalidArguments(format!(
+                "{did} is revoked: this device's binding is contested"
+            )))
+        }
+    };
+    let log = root.join(".eprfs/status/flows.jsonl");
+    match std::fs::metadata(&log) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let error = (standing_word == "device").then(|| {
+                format!(
+                    "this device has no flow store at {}; the first epr flow intend creates it",
+                    root.display()
+                )
+            });
+            return render_intents(
+                options,
+                LandingIntentOutput {
+                    standing: standing_word,
+                    device: me,
+                    store: None,
+                    intents: Vec::new(),
+                    advisory: Vec::new(),
+                    error,
+                    now,
+                    max_skew_s: settlement.max_skew_s,
+                    siblings_read: false,
+                    siblings_why: None,
+                    unjoined: 0,
+                    why,
+                },
+            );
+        }
+        Ok(metadata) if metadata.is_file() => {}
+        Ok(_) => {
+            return Err(PeerCliError::InvalidArguments(format!(
+                "the flow store `{}` is not a regular file",
+                log.display()
+            )))
+        }
+        Err(error) => {
+            return Err(PeerCliError::InvalidArguments(format!(
+                "the flow store `{}` is unreadable ({error})",
+                log.display()
+            )))
+        }
+    }
+    let store = elohim_epr_rea::SidecarFlowStore::open(&root)
+        .map_err(|error| PeerCliError::Peer(PeerError::FlowStore(error)))?;
+    let records = store
+        .records()
+        .map_err(|error| PeerCliError::Peer(PeerError::FlowStore(error)))?;
+    let mut rows: std::collections::BTreeMap<(String, String), LandingIntent> =
+        std::collections::BTreeMap::new();
+    for (index, (cid, record)) in records.iter().enumerate() {
+        let FlowRecord::Intent(atom) = record else {
+            continue;
+        };
+        let slots = &atom.resource_spec.classified_as;
+        if slots.first().map(String::as_str) != Some(INTENT_TAG) {
+            continue;
+        }
+        let Some(row) = intent_from_atom(cid, slots, index, me.as_deref(), &records) else {
+            continue;
+        };
+        rows.insert(
+            (announcer_key(row.announcer.as_deref()), cid.to_string()),
+            row,
+        );
+    }
+
+    let mut events = Vec::new();
+    for (_, record) in &records {
+        let FlowRecord::Event(event) = record else {
+            continue;
+        };
+        if one_slot(event, MEASURE_SLOT) != Some(LANDING_MEASURE) {
+            continue;
+        }
+        let Some(kind) = one_slot(event, KIND_SLOT) else {
+            continue;
+        };
+        if kind != "raise" && !KINDS.contains(&kind) {
+            continue;
+        }
+        let via = via_device(event).map(str::to_string);
+        if let Some(writer) = via.as_deref() {
+            if admission
+                .as_ref()
+                .is_none_or(|allowed| !allowed.admits_device(writer))
+                || me.as_deref() == Some(writer)
+            {
+                continue;
+            }
+        }
+        events.push((event, via));
+    }
+
+    for (event, via) in &events {
+        let kind = one_slot(event, KIND_SLOT).unwrap_or_default();
+        if kind == "raise" || kind == "intent" {
+            join_announcement(&mut rows, event, via.as_deref(), me.as_deref(), &table);
+        }
+    }
+
+    let mut advisory = Vec::new();
+    let mut unjoined = 0_u64;
+    for (event, via) in events {
+        let kind = one_slot(event, KIND_SLOT).unwrap_or_default();
+        if !matches!(kind, "landed" | "withdraw" | "dismiss") {
+            continue;
+        }
+        let writer = via.or_else(|| me.clone());
+        let key = (announcer_key(writer.as_deref()), event.resource.to_string());
+        if let Some(row) = rows.get_mut(&key) {
+            apply_settlement(row, event, kind);
+            continue;
+        }
+        let joined = rows
+            .values()
+            .any(|row| row.intent == event.resource.to_string());
+        if joined {
+            advisory.push(Advisory {
+                intent: event.resource.to_string(),
+                via: writer.unwrap_or_else(|| "local".to_string()),
+                kind: kind.to_string(),
+                why: "not the announcing device".to_string(),
+            });
+        } else {
+            unjoined = unjoined.saturating_add(1);
+        }
+    }
+
+    let successors: Vec<(String, String)> = rows
+        .values()
+        .filter_map(|row| {
+            Some((
+                announcer_key(row.announcer.as_deref()),
+                row.supersedes.clone()?,
+            ))
+        })
+        .collect();
+    for (announcer, prior) in successors {
+        if let Some(row) = rows.get_mut(&(announcer, prior)) {
+            if row.state == "live" {
+                row.state = "superseded".to_string();
+            }
+        }
+    }
+    let mut intents: Vec<_> = rows
+        .into_values()
+        .filter(|row| options.all || row.state == "live")
+        .collect();
+    for row in &mut intents {
+        row.settled
+            .sort_by(|left, right| (left.dseq, &left.kind).cmp(&(right.dseq, &right.kind)));
+    }
+    intents.sort_by(|left, right| {
+        (
+            left.device.as_deref().unwrap_or_default(),
+            left.dseq.or(left.store_index).unwrap_or(u64::MAX),
+            left.intent.as_str(),
+        )
+            .cmp(&(
+                right.device.as_deref().unwrap_or_default(),
+                right.dseq.or(right.store_index).unwrap_or(u64::MAX),
+                right.intent.as_str(),
+            ))
+    });
+    advisory.sort_by(|left, right| {
+        (&left.intent, &left.via, &left.kind).cmp(&(&right.intent, &right.via, &right.kind))
+    });
+    let siblings_read = standing_word == "device" && table.store.is_some();
+    let siblings_why = (!siblings_read).then(|| {
+        if standing_word == "device" {
+            "no epr peer serve has recorded a channel store on this device; no sibling intent can have folded here"
+                .to_string()
+        } else {
+            "this workspace is not an admitted device; only own records are read".to_string()
+        }
+    });
+    render_intents(
+        options,
+        LandingIntentOutput {
+            standing: standing_word,
+            device: me,
+            store: Some(
+                std::fs::canonicalize(&root)
+                    .unwrap_or(root)
+                    .display()
+                    .to_string(),
+            ),
+            intents,
+            advisory,
+            error: None,
+            now,
+            max_skew_s: settlement.max_skew_s,
+            siblings_read,
+            siblings_why,
+            unjoined,
+            why,
+        },
+    )
+}
+
+fn require_recorded_flow_log(log: &Path) -> PeerResult<()> {
+    match std::fs::metadata(log) {
+        Ok(metadata) if metadata.is_file() => Ok(()),
+        Ok(_) => Err(PeerCliError::InvalidArguments(format!(
+            "the channel store `{}` that epr peer serve recorded is not a regular file; restart epr peer serve on this device's checkout",
+            log.display()
+        ))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Err(PeerCliError::InvalidArguments(format!(
+                "the channel store `{}` that epr peer serve recorded is gone; restart epr peer serve on this device's checkout",
+                log.display()
+            )))
+        }
+        Err(error) => Err(PeerCliError::InvalidArguments(format!(
+            "the channel store `{}` that epr peer serve recorded is unreadable ({error})",
+            log.display()
+        ))),
+    }
+}
+
+fn intent_from_atom(
+    cid: &cid::Cid,
+    slots: &[String],
+    index: usize,
+    me: Option<&str>,
+    records: &[(cid::Cid, FlowRecord)],
+) -> Option<LandingIntent> {
+    let closures = slots
+        .iter()
+        .filter_map(|value| value.strip_prefix("closure:")?.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect();
+    Some(LandingIntent {
+        intent: cid.to_string(),
+        change: slots.get(1)?.clone(),
+        tree: one_value(slots, "tree:")?.to_string(),
+        base: one_value(slots, "base:")?.to_string(),
+        class: one_value(slots, "class:")?.to_string(),
+        closures,
+        raised_at: None,
+        dseq: None,
+        device: me.map(str::to_string),
+        own: true,
+        announcer: me.map(str::to_string),
+        device_folded_at: None,
+        chain_len: None,
+        predicted_base: None,
+        verified_at: None,
+        moved: None,
+        regated_s: None,
+        session: None,
+        state: match own_state(records, cid) {
+            crate::flow::intend::OwnState::Landed => "landed",
+            crate::flow::intend::OwnState::Withdrawn | crate::flow::intend::OwnState::Dismissed => {
+                "withdrawn"
+            }
+            crate::flow::intend::OwnState::Superseded => "superseded",
+            crate::flow::intend::OwnState::Live => "live",
+        }
+        .to_string(),
+        supersedes: one_value(slots, "supersedes:").map(str::to_string),
+        verified: false,
+        store_index: u64::try_from(index).ok(),
+        settled: Vec::new(),
+    })
+}
+
+fn join_announcement(
+    rows: &mut std::collections::BTreeMap<(String, String), LandingIntent>,
+    event: &FlowEvent,
+    via: Option<&str>,
+    me: Option<&str>,
+    table: &HeadTable,
+) {
+    let env = landing_env(event);
+    let writer = via.or(me);
+    let key = (announcer_key(writer), event.resource.to_string());
+    if let Some(row) = rows.get_mut(&key) {
+        apply_announcement(row, &env, one_slot(event, KIND_SLOT) == Some("intent"));
+        return;
+    }
+    if one_slot(event, KIND_SLOT) != Some("intent") {
+        return;
+    }
+    let Some(change) = env.get("change") else {
+        return;
+    };
+    let writer_owned = writer.map(str::to_string);
+    let mut row = LandingIntent {
+        intent: event.resource.to_string(),
+        change: (*change).to_string(),
+        tree: env.get("tree").copied().unwrap_or_default().to_string(),
+        base: env.get("base").copied().unwrap_or_default().to_string(),
+        class: env.get("class").copied().unwrap_or_default().to_string(),
+        closures: parse_joined_closures(env.get("closure").copied().unwrap_or_default()),
+        raised_at: None,
+        dseq: None,
+        device: writer_owned.clone(),
+        own: via.is_none(),
+        announcer: writer_owned,
+        device_folded_at: via.and_then(|did| table.devices.get(did).map(|head| head.folded_at)),
+        chain_len: None,
+        predicted_base: None,
+        verified_at: None,
+        moved: None,
+        regated_s: None,
+        session: None,
+        state: "live".to_string(),
+        supersedes: env.get("supersedes").map(|value| (*value).to_string()),
+        verified: true,
+        store_index: None,
+        settled: Vec::new(),
+    };
+    apply_announcement(&mut row, &env, true);
+    rows.insert(key, row);
+}
+
+fn apply_announcement(
+    row: &mut LandingIntent,
+    env: &std::collections::BTreeMap<&str, &str>,
+    verified: bool,
+) {
+    row.raised_at = env.get("at").and_then(|value| unix_slot_ms(value));
+    row.dseq = env.get("dseq").and_then(|value| value.parse().ok());
+    row.chain_len = env.get("chain_len").and_then(|value| value.parse().ok());
+    row.predicted_base = env.get("predicted_base").map(|value| (*value).to_string());
+    row.session = env.get("session").map(|value| (*value).to_string());
+    if verified {
+        row.verified = true;
+        row.verified_at = env.get("verified_at").and_then(|value| unix_slot_ms(value));
+    }
+}
+
+fn apply_settlement(row: &mut LandingIntent, event: &FlowEvent, kind: &str) {
+    let env = landing_env(event);
+    let landed_as = env.get("landed_as").map(|value| (*value).to_string());
+    let regated_s = env.get("regated_s").and_then(|value| value.parse().ok());
+    row.settled.push(SettlingRow {
+        kind: kind.to_string(),
+        dseq: env
+            .get("dseq")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0),
+        landed_as: landed_as.clone(),
+        regated_s,
+        tip: env.get("tip").map(|value| (*value).to_string()),
+        commit: env.get("commit").map(|value| (*value).to_string()),
+    });
+    match kind {
+        "landed" => {
+            row.state = "landed".to_string();
+            row.moved = landed_as.as_deref().map(|value| value == "moved");
+            row.regated_s = regated_s;
+        }
+        "withdraw" | "dismiss" if row.state != "landed" => {
+            row.state = "withdrawn".to_string();
+        }
+        _ => {}
+    }
+}
+
+fn landing_env(event: &FlowEvent) -> std::collections::BTreeMap<&str, &str> {
+    slots(event)
+        .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
+        .collect()
+}
+
+fn one_value<'a>(slots: &'a [String], prefix: &str) -> Option<&'a str> {
+    let mut values = slots.iter().filter_map(|value| value.strip_prefix(prefix));
+    let first = values.next()?;
+    values.next().is_none().then_some(first)
+}
+
+fn announcer_key(value: Option<&str>) -> String {
+    value.unwrap_or("local").to_string()
+}
+
+fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<ExitCode> {
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(ExitCode::SUCCESS);
+    }
+    if let Some(error) = &output.error {
+        println!("{error}");
+    } else if output.intents.is_empty() {
+        println!("no live landing intent");
+    } else {
+        for row in &output.intents {
+            println!(
+                "{}  {}  base {} → tree {}  {}  {}  {}",
+                short(&row.intent),
+                row.change.chars().take(9).collect::<String>(),
+                row.base.chars().take(9).collect::<String>(),
+                row.tree.chars().take(9).collect::<String>(),
+                row.class,
+                if row.verified {
+                    "verified"
+                } else {
+                    "unverified"
+                },
+                row.device
+                    .as_deref()
+                    .map_or_else(|| "here".to_string(), short)
+            );
+        }
+        for row in &output.advisory {
+            println!(
+                "  advisory: {} by {} (not the announcing device) — ignored",
+                row.kind,
+                short(&row.via)
+            );
+        }
+    }
+    if !output.siblings_read {
+        if let Some(why) = &output.siblings_why {
+            println!("siblings not read: {why}");
         }
     }
     Ok(ExitCode::SUCCESS)

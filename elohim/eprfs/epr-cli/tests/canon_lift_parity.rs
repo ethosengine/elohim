@@ -39,6 +39,13 @@ const FIXTURE_REL: &str = "elohim/epr/tests/vectors/concern_canon_row_c0.json";
 const FIXTURE_ROW: (&str, u64) = ("c0-plane-location", 1);
 
 fn repo_root() -> Option<PathBuf> {
+    // gate-reads: .claude/epr-meta/policies.yaml
+    // gate-reads: .claude/epr-meta/concerns.yaml
+    // gate-reads: .claude/epr-meta/generated/canon-lift/canon-atoms.json
+    // gate-reads: .claude/epr-meta/generated/canon-lift/declared-heads.json
+    // gate-reads: .claude/epr-meta/generated/canon-lift/precedent-standing.json
+    // gate-reads: .claude/epr-meta/generated/canon-lift/canon-lift.md
+    // gate-reads: elohim/epr/tests/vectors/concern_canon_row_c0.json
     let mut dir: &Path = Path::new(env!("CARGO_MANIFEST_DIR"));
     for _ in 0..8 {
         if dir.join(POLICIES_REL).is_file() && dir.join(CONCERNS_REL).is_file() {

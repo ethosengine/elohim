@@ -17,8 +17,8 @@ use elohim_epr_cli::actor::{
 };
 use elohim_epr_cli::device_key::{self, DeviceKey};
 use elohim_epr_rea::{
-    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ParticipantRow, ReaVerb,
-    SidecarFlowStore, SidecarRoster,
+    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Intent, Magnitude, ParticipantRow,
+    ReaVerb, ResourceSpec, SidecarFlowStore, SidecarRoster,
 };
 use eprfs_peer::{
     project_channel, via_device, CrossingAllowList, DeviceHead, HeadTable, PeerConfig, PeerDaemon,
@@ -870,6 +870,96 @@ fn gate_verdict_record(
     event
 }
 
+fn landing_record(
+    kind: &str,
+    intent: &str,
+    change: &str,
+    env: &[(&str, &str)],
+    via: Option<&str>,
+) -> FlowEvent {
+    let mut event = claim("landing");
+    event.action = match kind {
+        "landed" => ReaVerb::Produce,
+        "dismiss" => ReaVerb::Dismiss,
+        _ => ReaVerb::Cite,
+    };
+    event.resource = intent.parse().unwrap();
+    event.quantity = Magnitude::Count {
+        value: 1.0,
+        unit: "dev-landing".into(),
+    };
+    event.classified_as = vec![
+        format!("dev-landing:{kind}"),
+        change.into(),
+        format!("reason:{kind}"),
+        "measure:dev-landing@1".into(),
+        "value:1".into(),
+        "unit:landings".into(),
+    ];
+    event
+        .classified_as
+        .extend(env.iter().map(|(key, value)| format!("env:{key}={value}")));
+    if let Some(device) = via {
+        event.classified_as.push(format!("via:{device}"));
+    }
+    event
+}
+
+fn intent_atom(
+    root: &Path,
+    change: &str,
+    tree: &str,
+    base: &str,
+    closures: &[(&str, &str)],
+    class: &str,
+    supersedes: Option<&str>,
+) -> String {
+    let mut slots = vec![
+        "dev-landing:intent".into(),
+        change.into(),
+        format!("tree:{tree}"),
+        format!("base:{base}"),
+        format!("class:{class}"),
+    ];
+    slots.extend(
+        closures
+            .iter()
+            .map(|(project, closure)| format!("closure:{project}={closure}")),
+    );
+    if let Some(prior) = supersedes {
+        slots.push(format!("supersedes:{prior}"));
+    }
+    let atom = FlowRecord::Intent(Intent {
+        action: ReaVerb::Produce,
+        resource_spec: ResourceSpec {
+            classified_as: slots,
+            quantity: None,
+        },
+        in_scope_of: elohim_epr_cli::flow::repository_scope(root).unwrap(),
+        raised_by: AgentRef("human:fixture".into()),
+    });
+    let cid = atom.cid().unwrap();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    store.append(atom).unwrap();
+    store
+        .append(FlowRecord::Event(landing_record(
+            "raise",
+            &cid.to_string(),
+            change,
+            &[
+                ("at", "1792769289.123"),
+                ("chain_len", "0"),
+                ("change", change),
+                ("dseq", "1"),
+                ("predicted_base", "dev"),
+                ("tree", tree),
+            ],
+            None,
+        )))
+        .unwrap();
+    cid.to_string()
+}
+
 fn steward_policy(dir: &Path) -> PathBuf {
     let policy = dir.join("steward-policy.json");
     std::fs::write(
@@ -1232,4 +1322,503 @@ fn peer_leases_is_effective_at_once_for_a_steward_with_one_device() {
         serde_json::json!({"verdict": "effective", "session": "claude-1"}),
         "{view}"
     );
+}
+
+const LANDING_CHANGE: &str = "I0123456789abcdef0123456789abcdef01234567";
+const LANDING_TREE: &str = "0123456789abcdef0123456789abcdef01234567";
+const LANDING_BASE: &str = "1123456789abcdef0123456789abcdef01234567";
+
+fn tree_listing(root: &Path) -> Vec<PathBuf> {
+    fn visit(root: &Path, at: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(at) else {
+            return;
+        };
+        let mut entries: Vec<_> = entries.map(Result::unwrap).collect();
+        entries.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in entries {
+            let path = entry.path();
+            out.push(path.strip_prefix(root).unwrap().to_path_buf());
+            if path.is_dir() {
+                visit(root, &path, out);
+            }
+        }
+    }
+    let mut paths = Vec::new();
+    visit(root, root, &mut paths);
+    paths
+}
+
+fn save_served_table(device: &Device, root: &Path, sibling: Option<(&str, u64)>) {
+    let mut table = HeadTable {
+        store: Some(StorePlace {
+            root: root.canonicalize().unwrap(),
+            log: root.join(".eprfs/status/flows.jsonl"),
+        }),
+        ..HeadTable::default()
+    };
+    if let Some((did, folded_at)) = sibling {
+        table.devices.insert(
+            did.to_string(),
+            DeviceHead {
+                seq: 1,
+                root: project_channel(
+                    &SidecarFlowStore::open(root).unwrap(),
+                    &CrossingAllowList::new([(
+                        "dev-landing@1",
+                        ["intent", "landed", "withdraw", "dismiss"],
+                    )]),
+                )
+                .unwrap()
+                .root()
+                .clone(),
+                at: folded_at - 1,
+                folded: Default::default(),
+                folded_at,
+                events_folded: 1,
+                nack: Default::default(),
+            },
+        );
+    }
+    table.save(&device.peer_dir()).unwrap();
+}
+
+fn intents_output(device: &Device, root: &Path, policy: &Path, all: bool) -> Output {
+    let before = tree_listing(root);
+    let mut args = vec![
+        "peer",
+        "intents",
+        "--json",
+        "--root",
+        root.to_str().unwrap(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ];
+    if all {
+        args.push("--all");
+    }
+    let output = device.epr(&args);
+    assert_eq!(
+        tree_listing(root),
+        before,
+        "peer intents changed the root tree"
+    );
+    output
+}
+
+fn intents_json(device: &Device, root: &Path, policy: &Path, all: bool) -> serde_json::Value {
+    let output = intents_output(device, root, policy, all);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn announcement(intent: &str, via: Option<&str>, dseq: &str) -> FlowEvent {
+    landing_record(
+        "intent",
+        intent,
+        LANDING_CHANGE,
+        &[
+            ("at", "1792769289.123"),
+            ("base", LANDING_BASE),
+            ("chain_len", "2"),
+            ("change", LANDING_CHANGE),
+            ("class", "low"),
+            ("closure", "eprfs=abcdef"),
+            ("dseq", dseq),
+            ("predicted_base", LANDING_BASE),
+            ("tree", LANDING_TREE),
+            ("verified_at", "1792769290.456"),
+        ],
+        via,
+    )
+}
+
+#[test]
+fn peer_intents_joins_own_atoms_and_sibling_cites_by_intent_cid() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let own = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[("eprfs", "abcdef")],
+        "low",
+        None,
+    );
+    let sibling = atom_cid(&"sibling-intent".to_string()).unwrap().to_string();
+    let stranger = Device::new(&keys, "stranger-intent");
+    let stranger_intent = atom_cid(&"stranger-intent".to_string())
+        .unwrap()
+        .to_string();
+    append(
+        b.checkout.path(),
+        [
+            announcement(&own, None, "1"),
+            announcement(&sibling, Some(&a.key.did_key()), "7"),
+            announcement(&stranger_intent, Some(&stranger.key.did_key()), "9"),
+        ],
+    );
+    save_served_table(
+        &b,
+        b.checkout.path(),
+        Some((&a.key.did_key(), 1_792_769_291_000)),
+    );
+    let view = intents_json(&b, b.checkout.path(), &policy, false);
+    let rows = view["intents"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{view}");
+    let own_row = rows.iter().find(|row| row["intent"] == own).unwrap();
+    assert_eq!(own_row["own"], true);
+    assert_eq!(own_row["verified"], true);
+    assert_eq!(own_row["raisedAt"], 1_792_769_289_123u64);
+    assert_eq!(own_row["verifiedAt"], 1_792_769_290_456u64);
+    assert_eq!(own_row["dseq"], 1);
+    let sibling_row = rows.iter().find(|row| row["intent"] == sibling).unwrap();
+    assert_eq!(sibling_row["own"], false);
+    assert_eq!(sibling_row["announcer"], a.key.did_key());
+    assert_eq!(sibling_row["deviceFoldedAt"], 1_792_769_291_000u64);
+    assert!(!view.to_string().contains(&stranger_intent));
+}
+
+#[test]
+fn peer_intents_counts_a_settling_row_only_from_the_announcing_device() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let own = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    let sibling = atom_cid(&"sibling-authority".to_string())
+        .unwrap()
+        .to_string();
+    append(
+        b.checkout.path(),
+        [
+            announcement(&sibling, Some(&a.key.did_key()), "4"),
+            landing_record(
+                "withdraw",
+                &own,
+                LANDING_CHANGE,
+                &[("dseq", "5")],
+                Some(&a.key.did_key()),
+            ),
+            landing_record("withdraw", &own, LANDING_CHANGE, &[("dseq", "6")], None),
+            landing_record(
+                "landed",
+                &sibling,
+                LANDING_CHANGE,
+                &[("dseq", "7"), ("landed_as", "ff")],
+                Some(&a.key.did_key()),
+            ),
+            landing_record(
+                "landed",
+                &sibling,
+                LANDING_CHANGE,
+                &[("dseq", "8"), ("landed_as", "moved")],
+                None,
+            ),
+        ],
+    );
+    save_served_table(&b, b.checkout.path(), Some((&a.key.did_key(), 50)));
+    let view = intents_json(&b, b.checkout.path(), &policy, true);
+    assert_eq!(
+        view["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["intent"] == own)
+            .unwrap()["state"],
+        "withdrawn"
+    );
+    assert_eq!(
+        view["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["intent"] == sibling)
+            .unwrap()["state"],
+        "landed"
+    );
+    assert_eq!(view["advisory"].as_array().unwrap().len(), 2, "{view}");
+    assert!(view["advisory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["intent"] == own && row["kind"] == "withdraw"));
+    assert!(view["advisory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["intent"] == sibling && row["kind"] == "landed"));
+}
+
+#[test]
+fn peer_intents_never_orders_by_fold_position() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let left = checkout();
+    let right = checkout();
+    let roster_rel = format!(".eprfs/status/participants/{HANDLE}.jsonl");
+    for root in [left.path(), right.path()] {
+        std::fs::create_dir_all(root.join(".eprfs/status/participants")).unwrap();
+        std::fs::copy(b.checkout.path().join(&roster_rel), root.join(&roster_rel)).unwrap();
+    }
+    let sibling = atom_cid(&"fold-order".to_string()).unwrap().to_string();
+    let events = [
+        announcement(&sibling, Some(&a.key.did_key()), "41"),
+        landing_record(
+            "withdraw",
+            &sibling,
+            LANDING_CHANGE,
+            &[("dseq", "43")],
+            Some(&a.key.did_key()),
+        ),
+        landing_record(
+            "landed",
+            &sibling,
+            LANDING_CHANGE,
+            &[("dseq", "42"), ("landed_as", "ff")],
+            Some(&a.key.did_key()),
+        ),
+        landing_record("dismiss", &sibling, LANDING_CHANGE, &[("dseq", "44")], None),
+    ];
+    append(left.path(), events.clone());
+    append(right.path(), events.into_iter().rev());
+    save_served_table(&b, left.path(), Some((&a.key.did_key(), 100)));
+    let one = intents_json(&b, left.path(), &policy, true);
+    save_served_table(&b, right.path(), Some((&a.key.did_key(), 100)));
+    let two = intents_json(&b, right.path(), &policy, true);
+    assert_eq!(one["intents"], two["intents"]);
+    assert_eq!(one["advisory"], two["advisory"]);
+    let row = one["intents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["intent"] == sibling)
+        .unwrap();
+    assert_eq!(row["dseq"], 41);
+    assert_eq!(row["settled"][0]["dseq"], 42);
+}
+
+#[test]
+fn peer_intents_reads_the_served_store_from_a_linked_worktree() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    let served = checkout();
+    let cid = intent_atom(
+        served.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    save_served_table(&b, served.path(), None);
+    let view = intents_json(&b, b.checkout.path(), &policy, false);
+    assert_eq!(view["intents"][0]["intent"], cid);
+    assert_eq!(
+        view["store"],
+        served.path().canonicalize().unwrap().to_str().unwrap()
+    );
+}
+
+#[test]
+fn peer_intents_refuses_a_gone_store_and_creates_nothing() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    let missing = b.checkout.path().join("gone/flows.jsonl");
+    HeadTable {
+        store: Some(StorePlace {
+            root: b.checkout.path().to_path_buf(),
+            log: missing.clone(),
+        }),
+        ..HeadTable::default()
+    }
+    .save(&b.peer_dir())
+    .unwrap();
+    let output = intents_output(&b, b.checkout.path(), &policy, false);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains(missing.to_str().unwrap()));
+    assert!(!missing.exists());
+}
+
+#[test]
+fn peer_intents_on_a_device_without_a_flow_store_refuses_and_creates_nothing() {
+    let (keys, _a, b) = household();
+    let view = intents_json(&b, b.checkout.path(), &steward_policy(keys.path()), false);
+    assert_eq!(view["store"], serde_json::Value::Null);
+    assert_eq!(view["intents"], serde_json::json!([]));
+    assert!(view["error"]
+        .as_str()
+        .unwrap()
+        .contains("has no flow store at"));
+    assert!(!b.checkout.path().join(".eprfs/status/flows.jsonl").exists());
+}
+
+#[test]
+fn peer_intents_on_a_non_device_without_a_flow_store_is_empty() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "not-device-empty");
+    let view = intents_json(
+        &device,
+        device.checkout.path(),
+        &steward_policy(keys.path()),
+        false,
+    );
+    assert_eq!(view["standing"], "not_a_device");
+    assert_eq!(view["intents"], serde_json::json!([]));
+    assert_eq!(view["error"], serde_json::Value::Null);
+}
+
+#[test]
+fn peer_intents_without_a_served_store_reports_siblings_not_read() {
+    let (keys, _a, b) = household();
+    let cid = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    let view = intents_json(&b, b.checkout.path(), &steward_policy(keys.path()), false);
+    assert_eq!(view["intents"][0]["intent"], cid);
+    assert_eq!(view["siblingsRead"], false);
+    assert!(view["siblingsWhy"]
+        .as_str()
+        .unwrap()
+        .contains("no epr peer serve"));
+}
+
+#[test]
+fn peer_intents_supersession_leaves_only_the_re_raise_live() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    let prior = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    let successor = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        Some(&prior),
+    );
+    save_served_table(&b, b.checkout.path(), None);
+    let live = intents_json(&b, b.checkout.path(), &policy, false);
+    assert_eq!(live["intents"].as_array().unwrap().len(), 1);
+    assert_eq!(live["intents"][0]["intent"], successor);
+    let all = intents_json(&b, b.checkout.path(), &policy, true);
+    assert_eq!(
+        all["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["intent"] == prior)
+            .unwrap()["state"],
+        "superseded"
+    );
+}
+
+#[test]
+fn peer_intents_successor_of_a_withdrawn_intent_is_live() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    let prior = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    append(
+        b.checkout.path(),
+        [landing_record(
+            "withdraw",
+            &prior,
+            LANDING_CHANGE,
+            &[("dseq", "2")],
+            None,
+        )],
+    );
+    let successor = intent_atom(
+        b.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        Some(&prior),
+    );
+    save_served_table(&b, b.checkout.path(), None);
+    let all = intents_json(&b, b.checkout.path(), &policy, true);
+    assert_eq!(
+        all["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["intent"] == prior)
+            .unwrap()["state"],
+        "withdrawn"
+    );
+    assert_eq!(
+        all["intents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["intent"] == successor)
+            .unwrap()["state"],
+        "live"
+    );
+}
+
+#[test]
+fn peer_intents_on_a_non_device_lists_own_intents_only() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "not-device-own");
+    let own = intent_atom(
+        device.checkout.path(),
+        LANDING_CHANGE,
+        LANDING_TREE,
+        LANDING_BASE,
+        &[],
+        "low",
+        None,
+    );
+    let sibling = atom_cid(&"not-device-sibling".to_string())
+        .unwrap()
+        .to_string();
+    append(
+        device.checkout.path(),
+        [announcement(&sibling, Some("did:key:unread"), "8")],
+    );
+    let view = intents_json(
+        &device,
+        device.checkout.path(),
+        &steward_policy(keys.path()),
+        false,
+    );
+    assert_eq!(view["intents"].as_array().unwrap().len(), 1);
+    assert_eq!(view["intents"][0]["intent"], own);
+    assert_eq!(view["intents"][0]["own"], true);
 }

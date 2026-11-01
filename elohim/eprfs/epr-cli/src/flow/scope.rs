@@ -1771,6 +1771,7 @@ mod tests {
 
     #[test]
     fn deployment_scope_and_renderer_serialize_without_lost_updates() {
+        // gate-reads: genesis/orchestrator/runtime-declaration-render.mjs
         use std::{
             io::Read,
             os::unix::fs::PermissionsExt,

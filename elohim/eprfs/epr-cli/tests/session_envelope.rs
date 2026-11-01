@@ -1,5 +1,6 @@
 //! The shipped CLI and hooks share the a2o fixture, including real flow claims and closure.
 fn run_fixture_stage(base: &std::path::Path, stage: &str) {
+    // gate-reads: genesis/agentic/session_envelope_test.py
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let result = std::process::Command::new("python3")
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
@@ -17,6 +18,7 @@ fn run_fixture_stage(base: &std::path::Path, stage: &str) {
 
 #[test]
 fn runtime_child_resumes_without_inheriting_authority() {
+    // gate-reads: genesis/agentic/session_envelope_test.py
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let result = std::process::Command::new("python3")
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
@@ -34,6 +36,7 @@ fn runtime_child_resumes_without_inheriting_authority() {
 
 #[test]
 fn session_envelope_native_facets_and_hook_pin_regressions() {
+    // gate-reads: genesis/agentic/session_envelope_test.py
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let result = std::process::Command::new("python3")
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
@@ -50,6 +53,8 @@ fn session_envelope_native_facets_and_hook_pin_regressions() {
 
 #[test]
 fn native_session_views_match_the_wire_schema() {
+    // gate-reads: elohim/sdk/schemas/v1/views
+    // gate-reads: elohim/sdk/schemas/v1/views
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let fixture = tempfile::tempdir().unwrap();
     for stage in [

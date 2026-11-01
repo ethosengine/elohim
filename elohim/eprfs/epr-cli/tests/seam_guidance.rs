@@ -160,6 +160,7 @@ fn reviews_bind_exact_proposal_declarations_contracts_and_citations() {
 
 #[test]
 fn invalid_declarations_boundaries_and_nearest_rule() {
+    // gate-reads: elohim/sdk/working-version.seam.json
     let dir = fixture();
     put(dir.path(), DECLARATIONS[0], "{}");
     let report = classify(dir.path(), "app/x.ts", "indexedDB.open('draft');\n");
