@@ -16,7 +16,7 @@ import { existsSync, readFileSync, readdirSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
-import { appendEvent, liveRoot } from './gate-live.mjs';
+import { appendEvent, liveRoot, outlook } from './gate-live.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -173,9 +173,21 @@ function main() {
   }
   const { project, run, dir, command, args } = parsed;
   const label = attributor({ run, dir });
+  // The first red inside a gate carries the decision with it, mid-gate: the rest of this gate and
+  // every gate after it (GATE_REMAINING, set by the hook and gate-runner) with their recorded cost.
+  // outlook() is once per run, so a run whose first red came earlier adds nothing here.
+  let outlooked = false;
   const recognizer = createRecognizer({
     project,
-    emit: event => { if (run) appendEvent(run, label(event)); },
+    emit: event => {
+      if (!run) return;
+      appendEvent(run, label(event));
+      if (!outlooked && event.kind === 'failure' && process.env.GATE_REMAINING !== undefined) {
+        outlooked = true;
+        const remaining = [project, ...process.env.GATE_REMAINING.split(/\s+/).filter(Boolean)];
+        outlook(run, remaining, { root: process.cwd() }).catch(() => { /* fail-open */ });
+      }
+    },
   });
   const child = spawn(command, args, {
     stdio: ['inherit', 'pipe', 'pipe'],

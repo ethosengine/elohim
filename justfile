@@ -579,12 +579,25 @@ status view="all":
       ci) node "{{ root }}/genesis/orchestrator/preview.mjs" origin/dev ;;
       seed) cd "{{ seeder_dir }}"; exec pnpm exec tsx src/stats.ts ;;
       ram) exec python3 "{{ root }}/genesis/agentic/bin/ram-guard" status ;;
+      # gates: the integrator's harvest — reds recurring across this device's recent pushes, cheap
+      # reds that arrived late, time run after a first red — then the seconds preflight for what this
+      # branch would select. Habit careless-reds-cost-seconds (genesis/orchestrator/.epr-meta).
+      gates)
+        node "{{ root }}/genesis/orchestrator/gate-live.mjs" harvest --last 20
+        base="$(git -C "{{ root }}" merge-base HEAD origin/dev 2>/dev/null || echo HEAD)"
+        changed="$(mktemp)"; trap 'rm -f "$changed"' EXIT
+        git -C "{{ root }}" diff --name-only "$base" > "$changed"
+        projects="$(node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --changed-file-list --names --order cost < "$changed" | xargs)"
+        if [ -n "$projects" ]; then
+          echo "[gate] would run, cheapest first: $projects"
+          GATE_CHANGED_FILES="$changed" node "{{ root }}/genesis/orchestrator/gate-preflight.mjs" --projects $projects
+        fi ;;
       # device: has this workspace ARRIVED as one of its human's devices — six ok/REFUSED lines
       # (epr binary · device key · roster bound · embed model · fold attested · berth moored), each
       # REFUSED naming its fix; exit 1 on any REFUSED. Spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md
       device) exec "${EPR_BIN:-epr}" device status --root "{{ root }}" ;;
       all) runtime; python3 "{{ root }}/genesis/agentic/bin/ram-guard" status --brief || true; "${EPR_BIN:-epr}" device status --root "{{ root }}" || true; python3 "{{ root }}/.claude/scripts/habits-status.py" ;;
-      *) echo "status view must be all|runtime|habits|saga|ci|seed|ram|device" >&2; exit 2 ;;
+      *) echo "status view must be all|runtime|habits|saga|ci|seed|ram|gates|device" >&2; exit 2 ;;
     esac
 
 # Generate or verify derived interfaces. Safe default: verify.

@@ -49,12 +49,14 @@ recipes:
     edges: []
 "#;
 
-/// A commit message whose trailer block names three collaborators — deliberately NOT in sorted
+/// A commit message whose trailer block names four collaborators — deliberately NOT in sorted
 /// order, so the sorting the slots get is proven rather than coincidental.
 const PLURAL_MESSAGE: &str = "author the plural doc
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 Co-Authored-By: ethosengine <noreply@ethosengine.com>
+Co-Authored-By: gpt-6 (Codex) <noreply@openai.com>
+Codex-Session: fixture-codex-session
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 ";
 
@@ -125,7 +127,7 @@ fn co_authors_of(event: &FlowEvent) -> Vec<String> {
         .collect()
 }
 
-/// One commit whose message names three collaborators, then a second that names none — so both
+/// One commit whose message names four collaborators, then a second that names none — so both
 /// arms are observed in one history rather than in two fixtures that might differ elsewhere.
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
@@ -167,6 +169,7 @@ fn a_plural_commit_credits_every_collaborator_sorted_and_deduped_while_a_solo_on
         vec![
             "co-author:agent:claude-fable-5".to_string(),
             "co-author:agent:claude-opus-4-6".to_string(),
+            "co-author:agent:gpt-6-codex".to_string(),
             "co-author:collective:ethosengine".to_string(),
         ],
         "the roster is sorted, not in the order the author typed it — the slot list is part of \

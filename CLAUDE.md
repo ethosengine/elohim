@@ -237,6 +237,45 @@ The app runs in four modes with different content loading paths:
 
 ## Development Workflow
 
+### Session discipline and commit attribution (every runtime)
+
+An agent's attention belongs to purpose, vision, governance and trust. Routine session and
+model attribution is supplied by the mounted native context, not remembered and retyped for
+every act. All runtimes share this developer discipline; a harness does not own a separate
+rulebook or grant an exception to the constitutional floor.
+
+Git's `prepare-commit-msg` hook asks `epr session commit-trailers --json` for decoration and
+uses Git's trailer parser to append it idempotently, preserving other contributors. Runtime
+conventions live in `genesis/agentic/agent-runtimes.json`. Codex reads only its own thread's
+model from its declared private metadata adapter; no conversation text is read. Other runtimes
+use mounted model context until they declare an implemented observation adapter. The normal
+commit path includes empty handoffs and merges. Codex emits `Co-Authored-By: <actual model>
+(Codex) <noreply@openai.com>` and `Codex-Session: <native session id>`; Claude emits its actual
+model at `<noreply@anthropic.com>` and `Claude-Session`. These are participation claims, never
+verified identity, review independence, acceptance or publication authority.
+
+Missing model metadata, unsupported runtime conventions, or stale ownership produce an explicit
+`UNMEASURED` warning without inventing attribution. Diagnose that exception before publishing;
+do not treat silence from disabled hooks as proof. A gate bypass or CI suppression does not
+waive attribution. Never amend or force-push shared history to repair an omission: coordinate an
+append-only correction with its integrator. A mailbox label is not a native session identifier.
+
+When native context needs repair, inspect `epr session id` and `epr session show --json`.
+Open a missing envelope from the intended checkout with `epr session open --model <actual model>`;
+register the acting role through `epr actor claim --as agent:<role>@<actual-model-id> --session <id>`.
+Use the session on attributed acts so native records can pin its claim; a typed `--as` alone
+names a provider without pinning a registered claim. After a runtime restart, inspect liveness:
+`epr session gc --json` seals only proven-dead owners, then `epr session open` admits a successor.
+Successors preserve history and require their own claims; never hand-edit ownership or bypass
+a live owner's refusal. Establish process ownership before recovery: a shared runtime daemon
+hosts other sessions, so coordinate its shutdown with those participants.
+
+Failures and coverage gaps are evidence for runtime adaptation. Keep the observed act,
+runtime/session, applicable rule and verification result distinct from inability to observe.
+Use the existing native journal/fold/sense and algedonic machinery when a declared measure and
+emitter exist. Absent coverage is **unmeasured**, never zero violations or compliance. Do not
+invent a private scorecard, a second identity store, or an authority penalty from a trailer.
+
 ### Persistent workspace work
 
 Che workspace restarts erase `/tmp`. Keep work in progress, helper scripts, checkpoints, and resumable campaign state under `genesis/local-dev/<campaign>/`, never `/tmp`. Keep Git worktrees under `/projects/elohim/.worktrees/`. Store required durable proof receipts under `genesis/a2o/reports/recovery/` and operator runbooks under `genesis/docs/superpowers/sprints/`. `/tmp` is only for disposable scratch that can be regenerated; never make it the only copy of uncommitted work or evidence. After a restart, resume existing conductor databases and keystores in place; do not reset or recast identities.

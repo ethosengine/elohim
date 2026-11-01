@@ -3,11 +3,11 @@
 This is Codex's root gospel. The gospel body below the horizontal rule is the
 SAME text as `CLAUDE.md`, projected verbatim from the `elohim-root-gospel`
 package — the two cannot drift. THIS preamble is the codex-localized governance
-contract: what Claude Code already receives from edit-time hooks but this repo
-has not yet projected into Codex's current project-hook ABI. Read it first.
-Until `epr doctor` reports the Codex hook projection present and the runtime
-trusts it, this binds you *morally* where it cannot bind you *mechanically*, and
-it names the gates that bind you mechanically regardless of harness.
+contract. Read it first. Inspect `epr doctor` and the active runtime adapters;
+configured hooks alone do not prove trusted execution or complete tool coverage.
+This binds you *morally* wherever an adapter cannot bind you *mechanically*, and
+names the gates that bind you mechanically regardless of harness. The shared
+"Session discipline and commit attribution" section applies to this session too.
 
 ## 1. First contact: inspect before changing
 
@@ -45,16 +45,18 @@ doubt, do not edit the projection — edit the package or the source.
 ## 3. The `.epr-meta` compose-gate binds you morally
 
 Claude enforces directory-local governance at edit time via a PreToolUse hook.
-Current Codex supports project-local lifecycle hooks, but this repo has not yet
-projected the shared definitions to `.codex/hooks.json`; until that projection
-is present and trusted, the SAME rules bind you by contract instead of by
-mechanism. Before writing a file, honor the nearest `.epr-meta` ancestor
+Codex has project lifecycle hooks in `.codex/hooks.json`, with partial adapter
+coverage. Check registration, runtime trust and the actual invocation separately;
+an unsupported shell invocation is unmeasured, not a clean governance verdict.
+The SAME rules bind you by contract wherever mechanical coverage is absent.
+Before writing a file, honor the nearest `.epr-meta` ancestor
 (the cascade: closest manifest wins, root `/.epr-meta/manifest.md` is the base):
 a `specs/` doc requires lifecycle frontmatter; `elohim/` carries an
 interface-first-reuse advisory (reuse the existing trait/type before adding a
 parallel one); code directories may carry YAGNI/over-engineering guards. A
-manifest that would DENY a Claude edit should stop you too — you just won't get
-a prompt. Treat a missing prompt as your own responsibility, not permission.
+manifest that would DENY a Claude edit should stop you too, whether or not the
+adapter emits a prompt. Treat a missing prompt as your own responsibility,
+not permission.
 
 ## 4. Gates that bind Codex mechanically (harness-independent)
 
@@ -321,6 +323,45 @@ The app runs in four modes with different content loading paths:
 **Cluster ops are operator-owned**: never run `kubectl` (read or write) from the dev environment. "Clean up X resource" / "fix the live ingress" means make the repo manifests in `genesis/manifests/` (and orchestrator manifests) coherent so the next pipeline reconciles — the repo is the cleanup surface, the live cluster is the operator's. Read cluster state via Jenkins MCP or in-repo manifests, not `kubectl get`.
 
 ## Development Workflow
+
+### Session discipline and commit attribution (every runtime)
+
+An agent's attention belongs to purpose, vision, governance and trust. Routine session and
+model attribution is supplied by the mounted native context, not remembered and retyped for
+every act. All runtimes share this developer discipline; a harness does not own a separate
+rulebook or grant an exception to the constitutional floor.
+
+Git's `prepare-commit-msg` hook asks `epr session commit-trailers --json` for decoration and
+uses Git's trailer parser to append it idempotently, preserving other contributors. Runtime
+conventions live in `genesis/agentic/agent-runtimes.json`. Codex reads only its own thread's
+model from its declared private metadata adapter; no conversation text is read. Other runtimes
+use mounted model context until they declare an implemented observation adapter. The normal
+commit path includes empty handoffs and merges. Codex emits `Co-Authored-By: <actual model>
+(Codex) <noreply@openai.com>` and `Codex-Session: <native session id>`; Claude emits its actual
+model at `<noreply@anthropic.com>` and `Claude-Session`. These are participation claims, never
+verified identity, review independence, acceptance or publication authority.
+
+Missing model metadata, unsupported runtime conventions, or stale ownership produce an explicit
+`UNMEASURED` warning without inventing attribution. Diagnose that exception before publishing;
+do not treat silence from disabled hooks as proof. A gate bypass or CI suppression does not
+waive attribution. Never amend or force-push shared history to repair an omission: coordinate an
+append-only correction with its integrator. A mailbox label is not a native session identifier.
+
+When native context needs repair, inspect `epr session id` and `epr session show --json`.
+Open a missing envelope from the intended checkout with `epr session open --model <actual model>`;
+register the acting role through `epr actor claim --as agent:<role>@<actual-model-id> --session <id>`.
+Use the session on attributed acts so native records can pin its claim; a typed `--as` alone
+names a provider without pinning a registered claim. After a runtime restart, inspect liveness:
+`epr session gc --json` seals only proven-dead owners, then `epr session open` admits a successor.
+Successors preserve history and require their own claims; never hand-edit ownership or bypass
+a live owner's refusal. Establish process ownership before recovery: a shared runtime daemon
+hosts other sessions, so coordinate its shutdown with those participants.
+
+Failures and coverage gaps are evidence for runtime adaptation. Keep the observed act,
+runtime/session, applicable rule and verification result distinct from inability to observe.
+Use the existing native journal/fold/sense and algedonic machinery when a declared measure and
+emitter exist. Absent coverage is **unmeasured**, never zero violations or compliance. Do not
+invent a private scorecard, a second identity store, or an authority penalty from a trailer.
 
 ### Persistent workspace work
 

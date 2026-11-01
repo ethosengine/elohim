@@ -654,8 +654,9 @@ decisionPoints:
       modulePath: elohim_epr_cli::flow::project
       line: 604
     summary: >
-      Per-value admission of a `Co-Authored-By` trailer into projection vocabulary: the two
-      known domains name collaborators by slug (`agent:` / `collective:`), an unknown domain is
+      Per-value admission of a `Co-Authored-By` trailer into projection vocabulary: the
+      known Anthropic/OpenAI agent and ethosengine collective addresses name collaborators by
+      slug (`agent:` / `collective:`), an unknown domain is
       declined-but-addressed as its own lowercased email, junk drops its own slot and nothing
       else. Heuristic vocabulary by declaration — never identity resolution, which belongs to
       graduation (ContributorPresence, DID bridge) and is unreachable by string-matching a
@@ -2050,4 +2051,22 @@ decisionPoints:
         kind: integration
       - path: elohim/eprfs/epr-cli/src/view/mod.rs
         testName: concurrent_content_and_membership_changes_refuse
+        kind: unit
+
+  - name: session_attribution::codex_model
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/session_attribution.rs
+      modulePath: elohim_epr_cli::session_attribution
+    summary: Read-only adapter for the declared Codex state-v5 metadata contract; reads only the owner-validated session's indexed model, never transcript text, never another thread. Missing schema/root/model is unmeasured, not a fallback to a guessed model.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral C presentation over private runtime metadata; no new identity store, network head or DHT type. Only model presentation crosses into an authored Git trailer.
+      - id: C1
+        status: answered
+        justification: The session facade validates ownership before reading; model labels confer no identity or permission. SQLite is opened read-only, with bounded busy wait and an exact primary-key query.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/src/session_attribution.rs
+        testName: model_metadata_is_exact_session_read_only_and_tracks_changes
         kind: unit

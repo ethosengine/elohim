@@ -26,7 +26,9 @@ function slice(startMarker, endMarker) {
 }
 // The trap prelude: HOOK_ON_EXIT, hook_on_exit and the trap lines.
 const PRELUDE = slice('HOOK_ON_EXIT=""\n', 'BERTH_BIN="$HOOK_WORK_TREE');
-const OPEN_BLOCK = slice("# Live gate events:", "TOTAL_START=");
+const OPEN_BLOCK = slice("# Live gate events:", "# ── Live run open");
+// The red recorder, the stop probe and the early-pass refusal that follow the open.
+const RED_BLOCK = slice("# A red from a check is recorded", "# ── Red recorder end");
 const CLOSE_BLOCK = slice(
   "# The run describes the gate loop",
   'if [ -n "$FAILED" ]; then\n  echo "====',
@@ -58,7 +60,7 @@ const env = () => ({
 });
 
 const script = (...parts) =>
-  `set -o pipefail\nGATE_COMMIT=${SHA}\nGATE_PUSH_TARGETS=${TARGET}\n${parts.join("\n")}\n`;
+  `set -o pipefail\nGATE_COMMIT=${SHA}\nGATE_PUSH_TARGETS=${TARGET}\nLIVE_SHA=${SHA}\nLIVE_TARGETS=${TARGET}\n${parts.join("\n")}\n`;
 
 function runsOf(dir) {
   const runs = join(dir, ".eprfs/status/gate-live/runs");
@@ -153,4 +155,69 @@ test("live_run_broken_cli_never_blocks_the_push", (t) => {
   assert.ok(!r.stdout.includes("Live failures:"), r.stdout);
   assert.ok(r.stdout.includes("REACHED"));
   assert.equal(runsOf(dir).length, 0);
+});
+
+for (const [label, code, outcome] of [["exit_0_closes_passed", 0, "passed"], ["exit_1_closes_failed", 1, "failed"]]) {
+  test(`live_run_${label}_by_the_hook_exit_status`, (t) => {
+    const dir = fixture(t);
+    const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, `exit ${code}`)],
+      { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+    assert.equal(r.status, code, r.stdout + r.stderr);
+    const events = eventsOf(runsOf(dir)[0]);
+    assert.equal(events.at(-1).kind, "run-close");
+    assert.equal(events.at(-1).outcome, outcome);
+    assert.ok(r.stdout.includes("[harvest]"), `the close prints the integrator's harvest: ${r.stdout}`);
+  });
+}
+
+test("a pre-gate red is live at once, the push continues, and an early pass still refuses", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'leg_red habit-register "habits.yaml stale"', "echo AFTER-RED", "pass_or_refuse")],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("AFTER-RED"), "continue: the next check still runs");
+  assert.ok(r.stderr.includes("red before the gates: habit-register"), r.stderr);
+  const events = eventsOf(runsOf(dir)[0]);
+  const red = events.find((e) => e.kind === "failure");
+  assert.equal(red.project, "habit-register");
+  assert.equal(red.failure.excerpt[0], "habits.yaml stale");
+  assert.equal(events.at(-1).outcome, "failed");
+});
+
+test("GATE_ON_RED=stop ends the push at its first pre-gate red", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('stop\\n');\n");
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'leg_red t2-receipt "refused"', "echo AFTER-RED")],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.ok(!r.stdout.includes("AFTER-RED"));
+  assert.equal(eventsOf(runsOf(dir)[0]).at(-1).outcome, "failed");
+});
+
+test("a stop requested on the live run is seen by the hook's probe", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'gate_stop_requested && echo STOP-BEFORE || echo NO-STOP-BEFORE',
+    'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" --reason "integrator" >/dev/null',
+    'gate_stop_requested && echo STOP-AFTER || echo NO-STOP-AFTER')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
+});
+
+test("the hook is one brace group that exits inside it, so an edit during a push cannot reach the run", () => {
+  // Bash reads a script as it executes; a same-inode rewrite mid-push (2026-11-01: 6352 s of green
+  // gates, then `syntax error near unexpected token )`) is harmless only when everything already parsed.
+  const body = HOOK.split("\n").filter((line) => line.trim() && !line.trim().startsWith("#"));
+  assert.equal(body[0], "{", "the first executable line opens the group");
+  // The last pass is the landing (Phase L, landing queue S4): hook_pass ends in an exit on every
+  // path, so the group still exits inside itself.
+  assert.deepEqual(body.slice(-2), ["hook_pass", "}"], "the group ends with the landing inside it");
+  const pass = HOOK.slice(HOOK.indexOf("\nhook_pass() {"), HOOK.indexOf("\n}\n", HOOK.indexOf("\nhook_pass() {")));
+  assert.match(pass, /\[ -n "\$BERTH_TARGETS" \] \|\| exit 0/, "a push with no dev/main ref exits at once");
+  assert.match(pass, /\n  exit 0$/, "hook_pass ends in exit");
 });
