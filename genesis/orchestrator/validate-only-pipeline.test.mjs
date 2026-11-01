@@ -114,6 +114,7 @@ function assertEdgeStageContract(text) {
     "Checkout",
     "Package Compute Worker",
     "Dataplane Validation",
+    "Observe Compute Worker",
     "Cleanup",
   ]);
 
@@ -695,4 +696,22 @@ describe("Dataplane Validation runs beside app and genesis (Lane C3)", () => {
       /validationOwed: \(result\.description \?: ''\)\.toString\(\)\.contains\('Dataplane Validation: owed by sibling run'\)/,
     );
   });
+});
+
+// Worker readiness must be observable without rolling the fleet being measured.
+test("validate-only observes the current worker with a short read-only capture", () => {
+  const body = staticStages(edge).get("Observe Compute Worker");
+  assert.match(body, /branch 'dev'/);
+  assert.match(body, /!isGateOnly\(\) && isValidateOnly\(\)/);
+  assert.match(body, /EDGE_PACKAGE_REQUESTED != 'true'/);
+  assert.match(body, /observeEnabledComputeWorker\(\)/);
+  assert.match(body, /compute-worker-evidence\/\*\*,rollout-evidence\/\*\*/);
+  const helper = topLevelDef(edge, "observeEnabledComputeWorker");
+  assert.match(helper, /COMPUTE_WORKER_STARTUP_SECS=5/);
+  assert.match(helper, /runner-capture-activation\.mjs/);
+  assert.match(helper, /stageResult: 'UNSTABLE'/);
+  assert.doesNotMatch(
+    helper,
+    /deployHuman|deployDoorway|kubectl|render-compute/,
+  );
 });

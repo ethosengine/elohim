@@ -12,6 +12,9 @@ export interface ScenarioResult {
 
 interface CucumberStep {
   name: string;
+  hidden?: boolean;
+  before?: CucumberStep[];
+  after?: CucumberStep[];
   result?: { status: string; duration?: number; error_message?: string };
 }
 
@@ -23,6 +26,8 @@ interface CucumberElement {
   name: string;
   type: string;
   steps?: CucumberStep[];
+  before?: CucumberStep[];
+  after?: CucumberStep[];
   tags?: CucumberTag[];
 }
 
@@ -34,10 +39,25 @@ interface CucumberFeature {
 
 const STATUS_PRIORITY: ScenarioStatus[] = ['failed', 'undefined', 'pending', 'skipped', 'passed'];
 
+function withHooks(steps: CucumberStep[]): CucumberStep[] {
+  return steps.flatMap(step => [
+    ...withHooks(step.before ?? []),
+    step,
+    ...withHooks(step.after ?? []),
+  ]);
+}
+
 function aggregateStatus(steps: CucumberStep[]): ScenarioStatus {
-  const seen = new Set(steps.map(s => (s.result?.status ?? 'undefined') as ScenarioStatus));
+  const seen = new Set(
+    steps.map(s => {
+      const status = s.result?.status;
+      // Ambiguous bindings are a Cucumber execution failure, not a passing step.
+      if (status === 'ambiguous') return 'failed';
+      return STATUS_PRIORITY.includes(status as ScenarioStatus) ? status : 'undefined';
+    })
+  );
   for (const s of STATUS_PRIORITY) if (seen.has(s)) return s;
-  return 'passed';
+  return 'undefined';
 }
 
 export function loadCucumber(json: string): ScenarioResult[] {
@@ -48,8 +68,13 @@ export function loadCucumber(json: string): ScenarioResult[] {
     for (const el of feature.elements ?? []) {
       if (el.type !== 'scenario') continue;
       const steps = el.steps ?? [];
-      const status = aggregateStatus(steps);
-      const failed = steps.find(s => s.result?.status === 'failed');
+      const outcomes = withHooks([...(el.before ?? []), ...steps, ...(el.after ?? [])]);
+      // Hooks can fail even when every Gherkin step passes. Conversely, passing
+      // hooks cannot establish that an empty scenario exercised anything.
+      const status = aggregateStatus(
+        steps.some(step => !step.hidden) ? outcomes : [...outcomes, { name: 'missing steps' }]
+      );
+      const failed = outcomes.find(s => ['failed', 'ambiguous'].includes(s.result?.status ?? ''));
       const tags = (el.tags ?? []).map(t => t.name);
       results.push({
         name: el.name,
