@@ -504,6 +504,7 @@ mod tests {
     /// The committed policy, when the crate is built inside the monorepo (the storage image's
     /// flattened layout has no `.epr-meta` tree).
     fn committed() -> Option<Vec<u8>> {
+        // gate-reads: .epr-meta/elohim/policies/dialogue-stasis-policy.json
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         std::fs::read(root.join(POLICY_REL_PATH)).ok()
     }
