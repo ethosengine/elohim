@@ -1245,6 +1245,31 @@ def runAdamAuthorityProof() {
 
 // Whole-worker snapshot after verified Adam completion; lifetime peak is not stage peak.
 // Called outside the parent submission's credential scope; no dependency install needed.
+// Report what cucumber-js reports. A skipped step (a held @requires lane, an @wip hold) is not a
+// failure natively, but the plugin's default counts it as one: genesis #1722 published 3/151
+// features and 21/593 scenarios passed from 10 failed steps beside 7099 skipped. Pending and
+// undefined stay failing, as cucumber-js strict mode treats them; the lane classification names
+// what was held. Its own def, so the E2E stage's script body stays under the CPS method cap.
+def publishA2oCucumber(String featureSummary) {
+    def report = [
+        reportTitle: 'A2O E2E Reports',
+        classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
+        fileIncludePattern: 'cucumber-report-*.json',
+        jsonReportDirectory: 'genesis/a2o/reports',
+        buildStatus: 'UNSTABLE',
+        sortingMethod: 'ALPHABETICAL',
+        trendsLimit: 10
+    ]
+    try {
+        cucumber(report + [skippedAsNotFailingStatus: true])
+    } catch (IllegalArgumentException unsupported) {
+        // A plugin older than jenkinsci/cucumber-reports-plugin#413 has no such option; publish
+        // as before rather than lose the report.
+        echo "cucumber: skippedAsNotFailingStatus unsupported (${unsupported.message}); skipped steps count as failing in this report"
+        cucumber(report)
+    }
+}
+
 def captureAdamAfterPeerStage(Map peerStageConfig) {
     def worker = readJSON(file: 'genesis/orchestrator/data/adam-compute-worker.json')
     if (worker.enabled != true || worker.performer != peerStageConfig.provider) { return }
@@ -2286,15 +2311,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         if (fileExists('genesis/a2o/reports/cucumber-report-api.json') ||
                             fileExists('genesis/a2o/reports/cucumber-report-browser.json') ||
                             fileExists('genesis/a2o/reports/cucumber-report-peer-stage.json')) {
-                            cucumber([
-                                reportTitle: 'A2O E2E Reports',
-                                classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
-                                fileIncludePattern: 'cucumber-report-*.json',
-                                jsonReportDirectory: 'genesis/a2o/reports',
-                                buildStatus: 'UNSTABLE',
-                                sortingMethod: 'ALPHABETICAL',
-                                trendsLimit: 10
-                            ])
+                            publishA2oCucumber(featureSummary)
                         }
                     }
                 }
