@@ -310,6 +310,65 @@ fn native_fixed_candidate_and_identity() {
 }
 
 #[test]
+fn native_method_identity_changes_with_each_declared_execution_input() {
+    let mut fixture = Fixture::new("plain");
+    let original = fixture.request.clone();
+    let baseline = result(
+        fixture
+            .command("identity-baseline")
+            .output()
+            .expect("baseline"),
+    );
+    for (label, request) in [
+        ("argv", {
+            let mut value = original.clone();
+            value["child"]["argv"]
+                .as_array_mut()
+                .expect("argv")
+                .push(json!("--test-threads=1"));
+            value
+        }),
+        ("env", {
+            let mut value = original.clone();
+            value["child"]["env"]["DECLARED_VALUE"] = json!("new explicit value");
+            value
+        }),
+        ("outputs", {
+            let mut value = original.clone();
+            value["outputs"] = json!(["answer", "started"]);
+            value
+        }),
+    ] {
+        fixture.request = request;
+        let changed = result(
+            fixture
+                .command(label)
+                .output()
+                .expect("changed declaration"),
+        );
+        assert_eq!(changed["key"]["input"], baseline["key"]["input"]);
+        assert_ne!(
+            changed["key"]["method"], baseline["key"]["method"],
+            "{label}"
+        );
+        assert!(changed["record"].is_null());
+        assert_eq!(changed["hit"], false);
+    }
+    // Linux permits trailing data in an ELF executable. Change its actual bytes,
+    // keep its behavior, and explicitly pin the new digest rather than a pathname.
+    fixture.request = original;
+    let mut bytes = fs::read(&fixture.artifact).expect("executable");
+    bytes.extend_from_slice(b"distinct pinned artifact");
+    fs::write(&fixture.artifact, &bytes).expect("new artifact bytes");
+    fixture.request["child"]["artifact"]["pinned"]["sha256"] =
+        json!(hex::encode(Sha256::digest(&bytes)));
+    let changed = result(fixture.command("artifact").output().expect("new artifact"));
+    assert_eq!(changed["key"]["input"], baseline["key"]["input"]);
+    assert_ne!(changed["key"]["method"], baseline["key"]["method"]);
+    assert!(changed["record"].is_null());
+}
+
+#[test]
 fn native_preflight_refusals_spawn_nothing() {
     let mut f = Fixture::new("plain");
     let good = f.request.clone();

@@ -45,3 +45,12 @@ test puts a clause under `victim/x` and asserts `list --session victim` does not
 ## Done when
 
 `brit-build-ref covenant list --session victim` never returns a clause put under any other label.
+
+## Native-storage ownership
+
+The native source capture, durable restore and fixed-candidate execution progression
+is owned by the [daily-driver backlog's native-storage section](brit-daily-driver-handoff-2026-10-27.md#native-storage-source-to-explicit-execution-2026-11-02).
+Its scoped measurements and ordered successor stations live there, with runnable
+commands in the owning sprint result. This covenant/session-segment bug remains
+open: local source execution does not repair ref encoding, clause verification or
+session authority, and its evidence must not be read as closure of this note.

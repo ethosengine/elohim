@@ -131,7 +131,88 @@ Each win also emits a ValueFlows event beside its record (produce, use, deliver-
 the principal with agent provenance per the spec's A5. Each artifact carries its upstream contribution
 edges (spec §5.7 guidestar).
 
-## Later, not this sprint
+## Native storage: source to explicit execution (2026-11-02)
+
+This section owns the native-storage progression retained in the operator's
+[source-loop plan](../../../docs/superpowers/plans/2026-11-02-brit-native-source-loop.md).
+It complements the social/evidence work above. A local filesystem working copy
+remains editable; an explicitly selected candidate has a canonical Tree v1 CID
+and complete private custody. Capturing or restoring it publishes nothing and
+executes no hooks. An explicit `brit build run` delegates the fixed whole tree and
+original task specification to Ark's existing admission and supervisor. Its local
+outcome is neither an acceptance decision nor a reusable build attestation.
+
+The captured source, output and executable boundaries retain the 64 MiB object
+and 1 GiB expanded closure caps. EPRFS owns filesystem capture/restore and canonical
+storage; Brit consumes released 0.3.3 registry interfaces; Ark owns execution.
+No sibling dependency override or competing collaboration model is introduced.
+
+Measured evidence and frontier:
+
+- Capture `a64aa39627170cc7a91de3207ebc3bed30b34da8` and durability
+  `34fb6a57db18c36d23c3fbde5d7e1244b731dd04` are committed. The continuation
+  release gate and publication succeeded before consumer work. Retained capture,
+  restore and storage tests exercise representation, observed races, bounded
+  objects, sync failures, process interruption and residue; they do not claim an
+  atomic snapshot of an independently changing source.
+- Native-task parent `76554ccafc510e2a63226733fe2a0eacdc6f94e9` binds Brit
+  `4730ba4b6b29365e3e9161853d85c0f45994e572`. Current review identified one
+  late-interruption coverage gap; the repaired Ark CLI suite passed 21 unit,
+  15 smoke and 8 native integration tests in the retained continuation evidence.
+- The frozen primary oracle at 20:54Z returned **0**: installed Brit ignored
+  `ARK_BIN`. Acceptance-story repairs that transport choice and adds an empty-PATH
+  regression, local Cucumber stations and independent declaration-identity checks.
+  The fixed oracle binary remains stale until the host's post-story build pair;
+  a focused scratch binary does not establish a frozen oracle success.
+- Acceptance-story measured **6 local scenarios / 28 steps**, **8 ordinary Brit
+  journeys plus 1 explicit real-Ark journey**, and **45 Ark CLI tests** (21 unit,
+  15 smoke, 9 native), all passing. New-step ESLint and strict TypeScript, scoped
+  Brit Clippy and Rust suppression policy pass. An earlier full a2o typecheck
+  failed on installed storage-client declarations; the verification addendum below
+  supersedes that blocker. No whole-owner green is inferred. Exact commands,
+  binary/source hashes and retained failed attempts are
+  indexed in `acceptance-story-evidence.json` in the current shift directory.
+- [The owning sprint result](../../../docs/superpowers/sprints/2026-11-02-brit-native-source-loop-result.md)
+  carries exact runnable commands, current focused results and the fresh-runtime
+  successor journey. Raw current logs live under
+  `.claude/shifts/brit-c1-20261102/`; predecessor evidence remains immutable in
+  `.claude/shifts/brit-native-loop-20261102/`.
+- Broader `shared-working-versions.feature` stories remain `@wip`. Local proof
+  establishes no Avodah editor, peer freshness, shared-edit authority, publication
+  or independent acceptance. Final owner gates, stable frozen measurements and
+  appointed acceptance remain pending. Upstream licensing remains blocked by the
+  operator's decision. The daily-driver habit stays red.
+
+Verification addendum from the continuation's independent acceptance-story review:
+the host's ignored dependency artifact rebuild passed in 17.517 seconds, followed
+by full `pnpm run typecheck` in `genesis/a2o`, exit 0 in 40.877 seconds
+(`a2o-storage-client-rebuild-20261102T210627Z.json`). No source, configuration or
+lockfile repair was needed. Preserve the earlier failed logs; final owner gates
+remain required. The same review identifies an unresolved Windows regression in
+published EPRFS 0.3.3 `DirectoryStorage`: directory synchronization opens an
+unsupported handle, and deduplicated writes sync a read-only handle. Existing
+Windows `snapshot seal` fails with Access Denied before Linux-only restore
+(`windows-storage-diagnosis-20261102T205356Z.json`, CI job 125528586847).
+The required station between durable custody and cross-platform snapshot
+compatibility is a verified Windows namespace-durability implementation plus
+passing create/new/repeated/concurrent-put and existing shared-tree tests, followed
+by a new immutable release and consumer upgrade. It remains unresolved; Linux
+success cannot clear it, and the separate licensing refusal remains in force.
+
+Successor stations are explicit and ordered:
+
+1. **Root-pinned peer hydration:** fetch the complete requested closure through an
+   explicitly selected serving store, never advertise the whole private store.
+2. **Large-file custody and cache lifecycle:** account for retention and eviction
+   without raising the existing 16 MiB peer frame size.
+3. **Native working contexts/history:** use existing EPR/REA records and keep
+   Automerge as the shared working-version direction.
+4. **Publication and availability:** require actual standing, publication authority
+   and peer-held bytes rather than infer them from a successful local capture.
+5. **Git/LFS interoperability and reusable builds:** bridge the same source identity
+   and complete execution closures before allowing evidence reuse.
+
+## Later social/evidence work
 
 - **Review and discussion objects** as op DAGs (Radicle COBs) at S2, held by the collective's members, never on the lamad `Content` valve.
 - **Derived data as pure functions of CIDs** (Scion): blame, attribution and folds that any peer computes and verifies.

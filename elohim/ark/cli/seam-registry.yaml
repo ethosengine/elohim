@@ -28,6 +28,7 @@ decisionPoints:
   - {id: C14, status: partial, justification: 'Failed run directories and immutable output objects remain inspectable; no atomic snapshot or malicious mutate-restore detection claim.'}
   contractTests:
   - {path: elohim/ark/cli/tests/native_task.rs, testName: native_fixed_candidate_and_identity, kind: integration}
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_method_identity_changes_with_each_declared_execution_input, kind: integration}
   - {path: elohim/ark/cli/tests/native_task.rs, testName: native_preflight_refusals_spawn_nothing, kind: integration}
   - {path: elohim/ark/cli/tests/native_task.rs, testName: native_mutation_missing_output_and_descendants_refuse, kind: integration}
   - {path: elohim/ark/cli/src/task_native/tests.rs, testName: native_interrupt_before_answer_is_unanswered, kind: unit}
