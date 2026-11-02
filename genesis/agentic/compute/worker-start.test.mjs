@@ -139,7 +139,13 @@ function fixture(t) {
   writeFileSync(join(image, "elohim.happ"), "fixture-only");
   writeFileSync(
     join(image, "grant-bootstrap.mjs"),
-    `if (process.env.FIXTURE_GRANT_REFUSE === '1') process.exit(23);\n`,
+    `import fs from 'node:fs';
+const attempts = process.env.COMPUTE_STATE_ROOT + '/grant-attempts';
+const n = (fs.existsSync(attempts) ? Number(fs.readFileSync(attempts, 'utf8')) : 0) + 1;
+fs.writeFileSync(attempts, String(n));
+if (process.env.FIXTURE_GRANT_REFUSE === '1') process.exit(23);
+if (n <= Number(process.env.FIXTURE_GRANT_TEMPFAIL || 0)) process.exit(75);
+`,
   );
   writeFileSync(join(source, ".gitignore"), "genesis/a2o/reports/\n");
   writeFileSync(
@@ -453,6 +459,48 @@ test(
     assert.equal(existsSync(join(f.state, "worker-starts")), false);
     f.env.MESH_RESET = "1";
     assert.match(f.run().stderr, /MESH_RESET is forbidden/);
+  },
+);
+
+test(
+  "a temporary grant refusal is retried in place without restarting the mesh; a permanent one is not",
+  { skip: guestOnly },
+  (t) => {
+    const attempts = (f) =>
+      Number(readFileSync(join(f.state, "grant-attempts"), "utf8"));
+    const meshCommands = (f) =>
+      readFileSync(join(f.state, "mesh/events"), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => l.split(" ", 1)[0]);
+    // Two timeouts, then issuance: one mesh start, three grant attempts, the worker starts.
+    let f = fixture(t);
+    f.env.FIXTURE_GRANT_TEMPFAIL = "2";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "0";
+    let run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(attempts(f), 3);
+    assert.deepEqual(meshCommands(f), ["start", "wait"]);
+    assert.match(
+      run.stderr,
+      /temporary refusal; retrying the identical request/,
+    );
+    assert.equal(existsSync(join(f.state, "worker-starts")), true);
+    // A deadline already spent ends the boot with the temporary code and no worker.
+    f = fixture(t);
+    f.env.FIXTURE_GRANT_TEMPFAIL = "5";
+    f.env.COMPUTE_GRANT_RETRY_SECS = "0";
+    run = f.run();
+    assert.equal(run.status, 75);
+    assert.equal(attempts(f), 1);
+    assert.equal(existsSync(join(f.state, "worker-starts")), false);
+    // A permanent refusal is never retried.
+    f = fixture(t);
+    f.env.FIXTURE_GRANT_REFUSE = "1";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "0";
+    run = f.run();
+    assert.equal(run.status, 23);
+    assert.equal(attempts(f), 1);
   },
 );
 

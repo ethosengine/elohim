@@ -172,5 +172,16 @@ export COMPUTE_STATE_ROOT="$state"
 export COMPUTE_SOURCE_COMMIT="$commit"
 echo "provider bootstrap ready: repoRoot=$repo justBin=$image/mesh-just.sh"
 cd "$repo"
-node "$image/grant-bootstrap.mjs"
+# Issuing the grant on a freshly started conductor can time out: admission stays saturated for a
+# while after a restart. Exiting would restart the container and the whole mesh, recreating that
+# slow conductor, so a temporary refusal (exit 75: timeout, unreachable, 502/503/504) is retried
+# in place. Issuance is content-addressed, so the identical request is safe to repeat. Bounded
+# by COMPUTE_GRANT_RETRY_SECS (default 900); every other refusal ends the boot as before.
+grant_deadline=$((SECONDS + ${COMPUTE_GRANT_RETRY_SECS:-900}))
+until node "$image/grant-bootstrap.mjs"; do
+  grant_status=$?
+  if [[ "$grant_status" -ne 75 || "$SECONDS" -ge "$grant_deadline" ]]; then exit "$grant_status"; fi
+  echo "provider grant bootstrap: temporary refusal; retrying the identical request in ${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}s" >&2
+  sleep "${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}"
+done
 exec node "$image/worker.mjs"

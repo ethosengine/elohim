@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   bootstrapGrant,
   validateGrantDeclaration,
+  grantRefusalExitCode,
+  TEMPORARY_GRANT_EXIT,
 } from "./grant-bootstrap.mjs";
 const provider = "uhCAk" + "a".repeat(48);
 const recipient = "uhCAk" + "b".repeat(48);
@@ -373,4 +375,32 @@ test("health refusal cancels its unread body without waiting on cancellation", a
   assert.equal(diagnostics[0].category, "health-http-refused");
   assert.equal(diagnostics[0].outcome, "not-submitted");
   assert.deepEqual(f.receipts, []);
+});
+
+test("only a timed-out, unreachable or 502/503/504 grant request is a temporary refusal", () => {
+  for (const diagnostic of [
+    { category: "request-timeout", httpStatus: null },
+    { category: "connection-failed", httpStatus: null },
+    { category: "native-unavailable", httpStatus: 503 },
+    { category: "native-unavailable", httpStatus: 502 },
+    { category: "native-unavailable", httpStatus: 504 },
+  ])
+    assert.equal(
+      grantRefusalExitCode(diagnostic),
+      TEMPORARY_GRANT_EXIT,
+      JSON.stringify(diagnostic),
+    );
+  for (const diagnostic of [
+    null,
+    { category: "declaration-refused", httpStatus: null },
+    { category: "provider-identity-refused", httpStatus: null },
+    { category: "native-refused", httpStatus: 403 },
+    { category: "native-response-invalid", httpStatus: 200 },
+    { category: "body-limit", httpStatus: 200 },
+  ])
+    assert.equal(
+      grantRefusalExitCode(diagnostic),
+      2,
+      JSON.stringify(diagnostic),
+    );
 });

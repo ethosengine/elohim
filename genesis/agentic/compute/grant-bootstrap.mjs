@@ -166,6 +166,20 @@ async function boundedBody(response, signal) {
   }
 }
 
+// A refusal the worker may safely repeat: issuance is content-addressed (storage reuses an
+// existing commitment for identical content), so a timed-out or unreachable first attempt is
+// re-run as the same request. Exit 75 (EX_TEMPFAIL) tells worker-start.sh to retry in place
+// rather than restart the container and its whole mesh. Every other refusal stays 2.
+export const TEMPORARY_GRANT_EXIT = 75;
+export function grantRefusalExitCode(diagnostic) {
+  if (!diagnostic) return 2;
+  if (["request-timeout", "connection-failed"].includes(diagnostic.category))
+    return TEMPORARY_GRANT_EXIT;
+  if ([502, 503, 504].includes(diagnostic.httpStatus))
+    return TEMPORARY_GRANT_EXIT;
+  return 2;
+}
+
 export async function bootstrapGrant(options = {}) {
   // Existing read-only transports may deliberately stop before issuance.
   if (!options.observe)
@@ -342,8 +356,10 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
+  let lastDiagnostic = null;
   bootstrapGrant({
     observe: (diagnostic) => {
+      lastDiagnostic = diagnostic;
       process.stderr.write(
         "provider grant diagnostic: " + JSON.stringify(diagnostic) + "\n",
       );
@@ -359,7 +375,7 @@ if (
       process.stderr.write(
         "REFUSED provider grant bootstrap: verify approved declaration, provider identity and native grant availability\n",
       );
-      process.exitCode = 2;
+      process.exitCode = grantRefusalExitCode(lastDiagnostic);
     },
   );
 }
