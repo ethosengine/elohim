@@ -251,6 +251,22 @@ printf changed-by-later-authorized-operation > "${credential_file[0]}"
 printf '{"later":"closure"}' > "$MESH_DIR/matthew/closed-chain-fence/closed-cells.json"
 unset MESH_CONTINUE_INITIALIZATION_STATE_SHA256 MESH_CONTINUE_INITIALIZATION_LOG_SHA256
 initialization_continuation_ready
+# A volume that drops empty directories (adam, edge #1787) loses both consumed markers but
+# keeps their seals: the ready check restores exactly those empty markers and still proves.
+rmdir "$MESH_DIR/initialization-continuation/consumed" "$MESH_DIR/initialization-continuation/resume-existing/consumed"
+initialization_continuation_ready 2> "$tmp/restore.err"
+[ -d "$MESH_DIR/initialization-continuation/consumed" ] && [ -d "$MESH_DIR/initialization-continuation/resume-existing/consumed" ]
+grep -q 'restored the empty consumed marker its sealed completion proves (initialization-continuation)' "$tmp/restore.err"
+grep -q 'restored the empty consumed marker its sealed completion proves (initialization-continuation/resume-existing)' "$tmp/restore.err"
+initialization_continuation_ready 2> "$tmp/restore-again.err"
+[ ! -s "$tmp/restore-again.err" ]
+# A marker that is not an empty directory is never replaced.
+rmdir "$MESH_DIR/initialization-continuation/resume-existing/consumed"
+printf x > "$MESH_DIR/initialization-continuation/resume-existing/consumed"
+refuses initialization_continuation_ready
+rm "$MESH_DIR/initialization-continuation/resume-existing/consumed"
+mkdir "$MESH_DIR/initialization-continuation/resume-existing/consumed"
+echo 'ok a sealed completion restores its lost empty consumed markers; anything else at that path still refuses'
 rm "$MESH_DIR/initialization-continuation/resume-existing/complete"
 refuses initialization_continuation_ready
 echo 'ok reviewed second attempt preserves original evidence, refuses drift/replay, and requires both seals'

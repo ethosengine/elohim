@@ -1237,10 +1237,26 @@ initialization_continuation_ready() {
   [ -z "${MESH_CONTINUE_INITIALIZATION_LOG_SHA256:-}" ] ||
     [ "$MESH_CONTINUE_INITIALIZATION_LOG_SHA256" = "$digest" ] || return 1
   cmp -s "$dir/apps-before.jsonl" "$dir/apps-after.jsonl" || return 1
+  restore_sealed_consumed_marker "$dir" || return 1
   if [ -e "$dir/resume-existing" ] || [ -L "$dir/resume-existing" ]; then
     [ -s "$dir/resume-existing/complete" ] && [ ! -L "$dir/resume-existing/complete" ] || return 1
+    restore_sealed_consumed_marker "$dir/resume-existing" || return 1
     initialization_existing_state proof || return 1
   fi
+}
+
+# `consumed` is an EMPTY marker made before a continuation runs (start: mkdir …/consumed), and
+# `complete` is sealed only after that run succeeds — so a verified seal proves the marker
+# existed. A volume that drops empty directories loses the marker but not the proof (adam's
+# compute state, edge #1787: initialization-continuation/consumed missing beside a valid seal,
+# on the same volume that lost a checkout's empty .git/refs). Recreate only that empty marker,
+# only beside a non-empty, non-symlink seal; anything else at that path still refuses below.
+restore_sealed_consumed_marker() {
+  local attempt="$1"
+  [ -s "$attempt/complete" ] && [ ! -L "$attempt/complete" ] || return 0
+  [ -e "$attempt/consumed" ] || [ -L "$attempt/consumed" ] && return 0
+  mkdir -m 700 "$attempt/consumed" || return 1
+  echo "initialization continuation: restored the empty consumed marker its sealed completion proves (${attempt#"$MESH_DIR"/})" >&2
 }
 
 initialization_continuation_check() {
