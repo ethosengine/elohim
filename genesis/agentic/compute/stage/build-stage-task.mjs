@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { run } from "../common.mjs";
-import { MESH_PROFILE_TAGS } from "../../../a2o/cucumber.mjs";
+import { MESH_PROFILE_TAGS } from "../../../a2o/mesh-profile.mjs";
 // S3.0 — the honest artifact: the requester's own SUT identity rides in the stage so the
 // provider can refuse a drifted tree before running anything. Import style mirrors
 // genesis/orchestrator/scripts/serving-receipt.mjs:17-23 (Node's native TS type-stripping,

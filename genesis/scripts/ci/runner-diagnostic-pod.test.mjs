@@ -89,30 +89,41 @@ test("authority proof installs existing dependencies and binds its credential on
   );
   assert.match(call, /runAdamAuthorityProof\(\)/);
 });
-test("submission remains on parent and poststage capture follows credential closure", () => {
+test("submission remains on parent; adam's activation is captured before submission and after credential closure", () => {
   const e2e = pipeline.slice(
     pipeline.indexOf("if (peerStageFeature) {"),
     pipeline.indexOf("// Always run API-level tests"),
   );
   assert.match(e2e, /runner-stage\.mjs/);
   assert(!e2e.includes("withAdamDiagnosticPod"));
-  // Close timeout, withEnv and withCredentials before entering the capture helper.
+  // The pre-stage capture proves the source commit adam runs and happens before any credential.
   assert.match(
     e2e,
-    /runner-stage\.mjs'"\s*\}\s*\}\s*\}\s*captureAdamAfterPeerStage\(peerStageConfig\)/,
+    /def peerStageSourceCommit = captureAdamForPeerStage\(peerStageConfig, 'compute-worker-for-stage'\)\s*withCredentials/,
   );
-  const capture = helper("captureAdamAfterPeerStage");
+  assert.match(e2e, /RUNNER_STAGE_SOURCE_COMMIT=\$\{peerStageSourceCommit\}/);
+  // Close timeout, withEnv and withCredentials before entering the post-stage capture helper.
+  assert.match(
+    e2e,
+    /runner-stage\.mjs'"\s*\}\s*\}\s*\}\s*captureAdamForPeerStage\(peerStageConfig, 'compute-worker-after-stage'\)/,
+  );
+  const capture = helper("captureAdamForPeerStage");
   assert.match(capture, /withAdamDiagnosticPod \{/);
   assert(
     !/withCredentials|install-substrate|runner-prepare|pnpm/.test(capture),
   );
   assert.match(
     capture,
-    /artifacts: 'compute-worker-after-stage\/\*\*\/activation.json', allowEmptyArchive: false/,
+    /artifacts: "\$\{output\}\/\*\*\/activation.json", allowEmptyArchive: false/,
   );
   assert.match(
     capture,
-    /finally \{\s*archiveArtifacts\(artifacts: 'compute-worker-after-stage\/\*\*\/status.txt,rollout-evidence\/\*\*'/,
+    /finally \{\s*archiveArtifacts\(artifacts: "\$\{output\}\/\*\*\/status.txt,rollout-evidence\/\*\*"/,
+  );
+  // The helper refuses an activation that does not prove a pinned 40-hex source commit.
+  assert.match(
+    capture,
+    /Adam activation did not prove its pinned source commit/,
   );
 });
 

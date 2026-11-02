@@ -30,12 +30,10 @@
 //
 // A stage that owns its own report sets these so exactly one JSON is written
 // per run. Unset (local dev, `just test`, ad-hoc runs) the paths are unchanged.
+import { MESH_PROFILE_TAGS } from './mesh-profile.mjs';
+
 const jsonReportPath = process.env.CUCUMBER_JSON_REPORT || 'reports/cucumber-report.json';
 const htmlReportPath = process.env.CUCUMBER_HTML_REPORT || 'reports/cucumber-report.html';
-
-// Shared with the peer-stage builder so its pinned scenario inventory is exactly the set the
-// mesh profile selects. This is plain configuration data; importing it does not load Cucumber.
-export const MESH_PROFILE_TAGS = '@e2e and not @wip and not @browser and not @browser-only';
 
 const base = {
   requireModule: ['tsx'],
