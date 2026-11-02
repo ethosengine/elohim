@@ -34,6 +34,8 @@ pub mod walk;
 
 #[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod whole_tree_tests;
 
 pub use address::{BlobCid, BlobLink, EprRef, ProjectionId};
 pub use attestation::{AttestationDraft, AttestationKind};
@@ -113,6 +115,7 @@ mod boundary {
         ("tree.rs", include_str!("tree.rs")),
         ("view_decl.rs", include_str!("view_decl.rs")),
         ("walk.rs", include_str!("walk.rs")),
+        ("whole_tree_tests.rs", include_str!("whole_tree_tests.rs")),
     ];
 
     /// The exact set eprfs-core may name, read from its own manifest. An exact set, not a

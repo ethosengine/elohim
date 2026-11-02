@@ -409,6 +409,10 @@ def run(repo: Path, publish: bool) -> None:
     index_base = registry_base(repo)
     download = download_base(index_base)
     env = os.environ.copy()
+    # Developer setup permits the existing Nexus npm token for Cargo publishing.
+    # Keep credentials in the child environment; an explicit Cargo token wins.
+    if not env.get("CARGO_REGISTRIES_ELOHIM_TOKEN") and env.get("NPM_TOKEN"):
+        env["CARGO_REGISTRIES_ELOHIM_TOKEN"] = "Bearer " + env["NPM_TOKEN"]
     env.update(
         RUSTFLAGS="",
         RUSTC_WRAPPER="",

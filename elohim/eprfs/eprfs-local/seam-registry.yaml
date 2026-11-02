@@ -7,6 +7,95 @@ seamLocus: >
   checks the complete closure before fresh-target Linux promotion. Host and trusted
   parent limits remain explicit; neither operation establishes release authority.
 decisionPoints:
+  - name: capture_tree
+    kind: state-transition
+    sourceLocation:
+      file: src/capture.rs
+      modulePath: eprfs_local::capture_tree
+    summary: >
+      Validate literal selections and disjoint roots, read through pinned Linux descriptors with bounded stability checks, then retain and verify a canonical private tree.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Private local content custody; no reach or head election.
+      - id: C1
+        status: n-a
+        justification: No candidate is elected or accepted.
+      - id: C2
+        status: n-a
+        justification: No mutable authoritative head or ordering clock is written.
+      - id: C3
+        status: answered
+        justification: A bounded attempt returns a result or refusal without retrying unstable input.
+      - id: C4
+        status: partial
+        justification: Tree absence and corruption stay distinct; filesystem errors retain their path, while selection refusals use explanatory strings.
+      - id: C5
+        status: answered
+        justification: Canonical Tree v1 closure and raw leaves are verified locally; this confers no authority.
+      - id: C6a
+        status: partial
+        justification: TreeLimits bound work and retained closure; filesystem or storage syscall duration is not deadline bounded.
+      - id: C6b
+        status: answered
+        justification: Canonical immutable objects and explicit verified writes preserve identical roots across repeated operations.
+      - id: C7
+        status: answered
+        justification: The API names only private byte identity, and explicitly declines publication and crash-durability claims.
+      - id: C8
+        status: partial
+        justification: Errors and selected-scope reports expose outcomes; durable labeled telemetry belongs to the caller.
+      - id: C9
+        status: n-a
+        justification: No actor identity or key lineage is interpreted.
+      - id: C10
+        status: answered
+        justification: Existing Tree v1 and BlobCid codecs remain unchanged; no alternative wire format is added.
+      - id: C11
+        status: partial
+        justification: Per-operation budgets refuse excess work; this local API does not schedule concurrent callers.
+      - id: C12
+        status: n-a
+        justification: Explicit local selection does not authorize publication, remote access, or execution.
+      - id: C13
+        status: n-a
+        justification: No authority tier or scaffold is introduced.
+      - id: C14
+        status: partial
+        justification: Errors propagate with context; interrupted immutable object writes can leave residue, with durable custody tracked by the next sprint station.
+    contractTests:
+      - path: elohim/eprfs/eprfs-local/tests/filesystem_capture.rs
+        testName: captures_without_git_and_keeps_candidate_a_after_source_becomes_b
+        kind: integration
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: selection_refusals_leave_store_absent
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: observed_open_read_and_ancestor_races_refuse_without_store_mutation
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: concurrent_captures_keep_identical_roots
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: object_and_expanded_closure_limits_refuse_before_writes
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: representation_is_canonical_and_hardlink_names_remain_distinct
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: prepared_write_propagates_failure_and_cancellation_without_touching_prior_objects
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: exactly_one_object_limit_is_accepted_by_bounded_source_reads
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
+        testName: relative_roots_remain_bound_when_process_cwd_changes
+        kind: unit
+    notes: >
+      Private (B) native working material; no DHT entry, coordinator, signal, HTTP route,
+      peer transport or head-plane items (zero at one year). All network stages retain
+      byte verification and confinement. The worst local holder sees selected bytes and
+      names; nothing is indexed or served outside the device by this operation.
   - name: restore_exact_tree
     kind: state-transition
     sourceLocation:

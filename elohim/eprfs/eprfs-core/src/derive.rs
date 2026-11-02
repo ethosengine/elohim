@@ -8,8 +8,9 @@
 //!
 //! This module carries the types and the ports. The functions that build a projected root
 //! (`walk_spine`, `project_view`) and the look-up-else-compute driver (`derive_or_reuse`) are the
-//! slice-4 follow-on named in the C4 report; [`ProjectedRoot`] has no public constructor until
-//! `project_view` lands, so a caller cannot key on an unprojected root.
+//! slice-4 follow-on named in the C4 report. [`ProjectedRoot::verify_whole_tree`] is the narrow
+//! identity projection for a verified whole tree; it cannot stand in for `project_view` on a
+//! narrower declared view.
 
 use std::collections::BTreeMap;
 
@@ -70,14 +71,42 @@ impl MethodDescriptor {
     }
 }
 
-/// A view-projected input root. Built only by `project_view` (C14), so a caller cannot key on an
-/// unprojected root; it decodes from a record, where it was projected by the record's writer.
+/// A view-projected input root. A whole tree has an identity projection, available through
+/// [`Self::verify_whole_tree`]. Narrower projections await `project_view` (C14).
+/// Deserialization retains the existing record wire contract; a decoded value is a writer's
+/// claim, not evidence that this reader verified a closure.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ProjectedRoot(BlobCid);
 
 impl ProjectedRoot {
     pub fn cid(&self) -> &BlobCid {
         &self.0
+    }
+
+    /// Verify an entire Tree v1 closure before using its root as a projected key.
+    /// Refuse empty/narrow views before fetching: their projection is NOT the original root.
+    /// Opaque external boundaries cannot form a complete native input. This establishes byte
+    /// identity only; it neither authorizes execution nor creates reusable derivation evidence.
+    /// The storage adapter remains responsible for bounded fetch allocation and duration.
+    pub async fn verify_whole_tree<S: EprfsStorage + ?Sized>(
+        storage: &S,
+        root: &BlobCid,
+        view: &View,
+        policy: crate::FetchPolicy,
+        limits: &crate::TreeLimits,
+    ) -> crate::tree::TreeResult<Self> {
+        if view != &View::whole() {
+            return Err(crate::TreeError::InvalidView(
+                "whole-tree projection requires the whole view".into(),
+            ));
+        }
+        let verified = crate::load_verified_tree(storage, root, policy, limits).await?;
+        if !verified.external_paths.is_empty() {
+            return Err(crate::TreeError::InvalidView(
+                "whole-tree projection cannot include external boundaries".into(),
+            ));
+        }
+        Ok(Self(root.clone()))
     }
 }
 
