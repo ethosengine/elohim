@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // One opt-in peer stage. Run with genesis/a2o/node_modules/.bin/tsx.
 // RUNNER_STAGE_FEATURE names one feature; RUNNER_STAGE_CONFIG names a reviewed JSON file:
-// {provider, runnerGrant, repoRoot, nodeBin, justBin, writablePaths, runtimeImage,
+// {provider, runnerGrant, repoRoot, nodeBin, justBin, runtimeImage,
 //  cpuMillis, memoryBytes, timeoutSeconds}. Resources must match the provider's real slice.
 // Paths describe the provider's checkout/tools. Secrets stay in ADMIN_KEY / RUNNER_JWT.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -16,7 +17,6 @@ import {
   execute as nameArtifact,
   jsonCid,
 } from "../../agentic/compute/cid-executor.mjs";
-import { buildStageTask } from "../../agentic/compute/stage/build-stage-task.mjs";
 import {
   decodeFramedReport,
   formatStageVerdict,
@@ -51,17 +51,8 @@ export function validateConfig(config, feature) {
     /^sha256:[0-9a-f]{64}$/.test(config.runtimeImage),
     "provider runtimeImage must be a pinned sha256 digest",
   );
-  insist(
-    Array.isArray(config.writablePaths) && config.writablePaths.length > 0,
-    "declare provider writablePaths",
-  );
   // The builder renders these paths into a shell template: refuse shell syntax at this boundary.
-  for (const path of [
-    config.repoRoot,
-    config.nodeBin,
-    config.justBin,
-    ...config.writablePaths,
-  ])
+  for (const path of [config.repoRoot, config.nodeBin, config.justBin])
     insist(
       typeof path === "string" &&
         isAbsolute(path) &&
@@ -78,6 +69,68 @@ export function validateConfig(config, feature) {
     "stage timeout exceeds the bounded CI hour",
   );
   return config;
+}
+
+export async function loadPinnedStageBuilder({ root, sourceCommit }) {
+  insist(
+    /^[0-9a-f]{40}$/.test(sourceCommit || ""),
+    "Adam activation must name one full pinned source commit",
+  );
+  const checkout = await mkdtemp(join(tmpdir(), "peer-stage-source-"));
+  try {
+    await exec("git", [
+      "-c",
+      "safe.directory=*",
+      "-C",
+      root,
+      "worktree",
+      "add",
+      "--detach",
+      checkout,
+      sourceCommit,
+    ]);
+    const builderPath = join(
+      checkout,
+      "genesis/agentic/compute/stage/build-stage-task.mjs",
+    );
+    const module = await import(
+      `${pathToFileURL(builderPath).href}?sourceCommit=${sourceCommit}`
+    );
+    return {
+      build: module.buildStageTask,
+      sourceRepoRoot: checkout,
+      cleanup: async () => {
+        await exec("git", [
+          "-c",
+          "safe.directory=*",
+          "-C",
+          root,
+          "worktree",
+          "remove",
+          "--force",
+          checkout,
+        ]);
+        await rm(checkout, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    try {
+      await exec("git", [
+        "-c",
+        "safe.directory=*",
+        "-C",
+        root,
+        "worktree",
+        "remove",
+        "--force",
+        checkout,
+      ]);
+    } catch {
+      // The add may have failed before registration; filesystem cleanup still applies.
+    }
+    await rm(checkout, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 export function verifyGrant(grant, config, requester) {
@@ -204,17 +257,24 @@ export async function verifyCompletion({
     "report is empty, duplicated, or has steps without outcomes",
   );
   const result = stageVerdict(framed.doc, stage);
-  insist(result.verdict !== "skip" || result.notMeasured, result.reason || "stage verdict refused");
+  insist(
+    result.verdict !== "skip" || result.notMeasured,
+    result.reason || "stage verdict refused",
+  );
   insist(!result.reason || result.notMeasured, result.reason);
   if (result.verdict === "pass") {
-    const measuredNames = new Set(result.scenarios.map((scenario) => scenario.name));
+    const measuredNames = new Set(
+      result.scenarios.map((scenario) => scenario.name),
+    );
     insist(
       scenarios
         .filter((scenario) => measuredNames.has(scenario.name))
         .every((scenario) =>
-          [...scenario.steps, ...(scenario.before || []), ...(scenario.after || [])].every(
-            (step) => step.result?.status === "passed",
-          ),
+          [
+            ...scenario.steps,
+            ...(scenario.before || []),
+            ...(scenario.after || []),
+          ].every((step) => step.result?.status === "passed"),
         ),
       "passing report contains unfinished steps or failed hooks",
     );
@@ -235,7 +295,8 @@ export async function runStage({
   env = process.env,
   root = resolve(import.meta.dirname, "../../.."),
   callRunner = runner,
-  build = buildStageTask,
+  build,
+  loadBuilder = loadPinnedStageBuilder,
   ensure,
 } = {}) {
   const report = join(
@@ -247,6 +308,11 @@ export async function runStage({
   const config = validateConfig(
     JSON.parse(await readFile(env.RUNNER_STAGE_CONFIG, "utf8")),
     env.RUNNER_STAGE_FEATURE,
+  );
+  const sourceCommit = env.RUNNER_STAGE_SOURCE_COMMIT;
+  insist(
+    /^[0-9a-f]{40}$/.test(sourceCommit || ""),
+    "Adam activation did not provide a pinned source commit",
   );
   const out = join(root, "genesis/a2o/reports/peer-stage-ci");
   await mkdir(out, { recursive: true });
@@ -284,19 +350,31 @@ export async function runStage({
     await call(["grant-status", config.runnerGrant]),
     config,
   );
-  const built = await build({
-    ...config,
-    feature: env.RUNNER_STAGE_FEATURE,
-    requester,
-    out,
-    sourceRepoRoot: root,
-    a2oDir: join(root, "genesis/a2o"),
-    execute: nameArtifact,
-    executor: "cid-executor",
-    probeRun: false,
-    // Provider runtime controls its own fixture/capability environment. CI never invents one.
-    env,
-  });
+  const pinned = build
+    ? { build, sourceRepoRoot: root, cleanup: async () => {} }
+    : await loadBuilder({ root, sourceCommit });
+  let built;
+  try {
+    const providerRepoRoot = join(config.repoRoot, sourceCommit);
+    built = await pinned.build({
+      ...config,
+      feature: env.RUNNER_STAGE_FEATURE,
+      requester,
+      out,
+      repoRoot: providerRepoRoot,
+      sourceRepoRoot: pinned.sourceRepoRoot,
+      a2oDir: join(pinned.sourceRepoRoot, "genesis/a2o"),
+      execute: nameArtifact,
+      executor: "cid-executor",
+      probeRun: false,
+      writablePaths: [join(providerRepoRoot, "genesis/a2o/reports")],
+      // The runner contributes no SUT override. Its builder and template both come from the
+      // source commit proven by Adam's running activation receipt.
+      env: {},
+    });
+  } finally {
+    await pinned.cleanup();
+  }
   insist(
     built.sut && built.sut !== "sha256:e3b0c44298fc1c14",
     "requester could not identify its source under test",

@@ -218,11 +218,12 @@ const pod = {
   restartCount: 0,
   image: "registry/worker@sha256:" + "a".repeat(64),
 };
+const sourceCommit = "b".repeat(40);
 const activation = {
   provider,
   recipient,
   state: "active",
-  worker: { podUid: pod.uid, ...pod },
+  worker: { podUid: pod.uid, ...pod, sourceCommit },
 };
 test("verified timestamps explicitly describe bootstrap observation, not fresh native state", () => {
   const result = verifyDeclaration(
@@ -289,6 +290,7 @@ for (const mode of [
       JSON.stringify({
         enabled: true,
         image: pod.image,
+        sourceCommit,
         performer: provider,
         runnerGrant: config,
       }),
@@ -323,6 +325,7 @@ for (const mode of [
       if (cmd === "bash") {
         assert.equal(options.env.COMPUTE_WORKER_PROVIDER, provider);
         assert.equal(options.env.COMPUTE_WORKER_IMAGE, pod.image);
+        assert.equal(options.env.COMPUTE_WORKER_SOURCE_COMMIT, sourceCommit);
         const refusal = {
           "bootstrap-timeout":
             "startup budget 900s exhausted: worker bootstrap or grant receipt unavailable",

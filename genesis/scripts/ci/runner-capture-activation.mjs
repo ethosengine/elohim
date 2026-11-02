@@ -89,6 +89,7 @@ export function captureActivation({
       COMPUTE_WORKER_IMAGE: worker.image,
       COMPUTE_WORKER_CPU_MILLIS: String(worker.slice?.cpuMillis || ""),
       COMPUTE_WORKER_MEMORY_BYTES: String(worker.slice?.memoryBytes || ""),
+      COMPUTE_WORKER_SOURCE_COMMIT: worker.sourceCommit || "",
       COMPUTE_WORKER_STARTUP_SECS:
         env.COMPUTE_WORKER_STARTUP_SECS ||
         String(worker.startupBudgetSeconds || 900),
@@ -136,6 +137,7 @@ export function captureActivation({
       },
     );
     const activation = JSON.parse(readFileSync(artifact));
+    assert.equal(activation.worker?.sourceCommit, worker.sourceCommit);
     rmSync(artifact, { force: true }); // Never leave the weaker intermediate artifact on refusal.
     const selected =
       '{.metadata.uid}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].containerID}{"\\n"}{.status.containerStatuses[?(@.name=="compute-worker")].restartCount}{"\\n"}{.spec.containers[?(@.name=="compute-worker")].image}{"\\n"}{.spec.containers[?(@.name=="compute-worker")].env[?(@.name=="COMPUTE_RUNNER_GRANT_JSON")].value}';

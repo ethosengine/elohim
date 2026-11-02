@@ -35,6 +35,7 @@ const grant = {
   scope: "measure-stage",
   grantActionHash: "grant",
 };
+const sourceCommit = "c".repeat(40);
 
 async function fixture(stepStatus = "passed", heldStatus = null) {
   const outcomes = [
@@ -133,7 +134,7 @@ test("explicit provider configuration refuses missing pins, traversal and shell-
     { runnerGrant: null },
     { runtimeImage: "latest" },
     { repoRoot: "/tmp/'oops" },
-    { writablePaths: [] },
+    { justBin: "relative/just" },
   ])
     assert.throws(() => validateConfig({ ...config, ...change }, feature));
   assert.throws(() => validateConfig(config, "features/../../secret.feature"));
@@ -245,9 +246,11 @@ test("submission, authenticated reread, and publication preserve real failed out
   await writeFile(configPath, JSON.stringify(config));
   let f = await fixture("failed");
   const calls = [];
-  const build = async ({ out, sourceRepoRoot, repoRoot }) => {
+  const build = async ({ out, sourceRepoRoot, repoRoot, env, writablePaths }) => {
     assert.equal(sourceRepoRoot, root);
-    assert.equal(repoRoot, config.repoRoot);
+    assert.equal(repoRoot, join(config.repoRoot, sourceCommit));
+    assert.deepEqual(env, {});
+    assert.deepEqual(writablePaths, [join(repoRoot, "genesis/a2o/reports")]);
     const taskPath = join(out, "task.json"),
       stagePath = join(out, "stage.json");
     await writeFile(taskPath, JSON.stringify(f.envelope));
@@ -258,6 +261,18 @@ test("submission, authenticated reread, and publication preserve real failed out
       runnerPath: "runner.sh",
       dnaPath: "example.feature",
       sut: "sha256:1234567890abcdef",
+    };
+  };
+  let pinCleanup = 0;
+  const loadBuilder = async ({ root: builderRoot, sourceCommit: pin }) => {
+    assert.equal(builderRoot, root);
+    assert.equal(pin, sourceCommit);
+    return {
+      build,
+      sourceRepoRoot: root,
+      cleanup: async () => {
+        pinCleanup++;
+      },
     };
   };
   let withdrawn = false;
@@ -279,15 +294,18 @@ test("submission, authenticated reread, and publication preserve real failed out
   };
   const options = {
     root,
-    build,
+    loadBuilder,
     callRunner,
     env: {
       RUNNER_STAGE_CONFIG: configPath,
       RUNNER_STAGE_FEATURE: feature,
+      RUNNER_STAGE_SOURCE_COMMIT: sourceCommit,
       RUNNER_JWT: "test-only",
+      E2E_DNA_HASH: "runner-must-not-select-the-sut",
     },
   };
   assert.equal(await runStage(options), 1);
+  assert.equal(pinCleanup, 1);
   assert.deepEqual(calls, ["grant-status", "submit", "poll", "grant-status"]);
   const report = JSON.parse(
     await readFile(
@@ -298,6 +316,7 @@ test("submission, authenticated reread, and publication preserve real failed out
   f = await fixture("skipped");
   calls.length = 0;
   assert.equal(await runStage(options), 0, "held-only evidence must not make Jenkins FAILURE");
+  assert.equal(pinCleanup, 2);
   assert.deepEqual(calls, ["grant-status", "submit", "poll", "grant-status"]);
   const verdict = JSON.parse(
     await readFile(join(root, "genesis/a2o/reports/peer-stage-ci/verdict.json"), "utf8"),

@@ -79,6 +79,8 @@ echo "provider bootstrap: source $commit; persistent mesh $state/mesh; sequentia
 mesh_run() {
   env -i HOME="$state/private-home" TMPDIR="$state/tmp" PATH=/usr/local/bin:/usr/bin:/bin \
     COMPUTE_IMAGE_ROOT="$image" COMPUTE_STATE_ROOT="$state" \
+    MESH_API_KEY_ADMIN=provider-private-mesh-fixture \
+    MESH_COMPUTE_LOCAL_TOKEN=provider-private-mesh-fixture-local-only \
     MESH_CONTINUE_INITIALIZATION_LOG_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
     MESH_CONTINUE_INITIALIZATION_STATE_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256:-}" \
     bash "$here/mesh-env.sh" bash "$mesh_script" "$@" 9>&-
@@ -87,7 +89,8 @@ mesh_run start
 mesh_run wait --timeout 900
 reports="$repo/genesis/a2o/reports"
 [[ ! -L "$reports" ]] || refuse 'reports cannot be a symlink'
-# Only the report subtree and the declared runtime-config files are guest writable.
+# The report subtree is the guest's only persistent write grant. Stage reports themselves are
+# redirected to executor scratch, but `just test mesh` still emits its scoped config/summary here.
 if [[ ! -d "$reports" ]]; then
   mkdir -p "$reports"
   chmod 755 "$reports"
@@ -107,7 +110,7 @@ for peer in matthew jessica james; do
   path="$directory/runtime-config.toml"
   [[ -f "$path" && ! -L "$path" ]] || refuse "missing owned runtime config for $peer"
   chmod 755 "$directory"
-  chmod 606 "$path"
+  chmod 644 "$path"
 done
 if [[ -f "$state/mesh/household-fixture.json" ]]; then
   chmod 644 "$state/mesh/household-fixture.json"
@@ -115,6 +118,8 @@ fi
 printf '%s\n' "$commit" > "$state/mesh/.provider-mesh-ready"
 chmod 644 "$state/mesh/.provider-mesh-ready"
 export COMPUTE_WORKER_ROOT="$state/worker"
+export COMPUTE_STATE_ROOT="$state"
+export COMPUTE_SOURCE_COMMIT="$commit"
 echo "provider bootstrap ready: repoRoot=$repo justBin=$image/mesh-just.sh"
 cd "$repo"
 node "$image/grant-bootstrap.mjs"

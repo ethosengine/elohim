@@ -5,7 +5,8 @@
 # Usage: capture-compute-worker-grant.sh <statefulset> <namespace> [output-root]
 # Public inputs: COMPUTE_WORKER_ENABLED, COMPUTE_WORKER_GRANT_ENABLED,
 # COMPUTE_WORKER_PROVIDER, COMPUTE_WORKER_RECIPIENT, COMPUTE_WORKER_IMAGE,
-# COMPUTE_WORKER_CPU_MILLIS, COMPUTE_WORKER_MEMORY_BYTES (declared slice).
+# COMPUTE_WORKER_CPU_MILLIS, COMPUTE_WORKER_MEMORY_BYTES (declared slice), and
+# COMPUTE_WORKER_SOURCE_COMMIT (the immutable checkout embedded in the running image).
 # COMPUTE_WORKER_STARTUP_SECS defaults to the private mesh's 900-second startup
 # budget; overrides may shorten it, never exceed it. Disabled workers spend none.
 set -euo pipefail
@@ -30,11 +31,13 @@ recipient="${COMPUTE_WORKER_RECIPIENT:-}"
 image="${COMPUTE_WORKER_IMAGE:-}"
 cpu="${COMPUTE_WORKER_CPU_MILLIS:-}"
 memory="${COMPUTE_WORKER_MEMORY_BYTES:-}"
+source_commit="${COMPUTE_WORKER_SOURCE_COMMIT:-}"
 budget="${COMPUTE_WORKER_STARTUP_SECS:-900}"
 [[ "${COMPUTE_WORKER_GRANT_ENABLED:-false}" == true ]] || refuse 'enabled worker has no enabled runner grant declaration'
 [[ "$provider" =~ ^uhCAk[A-Za-z0-9_-]{48}$ && "$recipient" =~ ^uhCAk[A-Za-z0-9_-]{48}$ && "$provider" != "$recipient" ]] || refuse 'approved provider/recipient binding is invalid'
 [[ "$image" =~ ^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$ ]] || refuse 'worker image must be digest pinned'
 [[ "$cpu" =~ ^[1-9][0-9]{0,15}$ && "$memory" =~ ^[1-9][0-9]{0,15}$ ]] || refuse 'declared worker slice must have finite positive CPU and memory bounds'
+[[ "$source_commit" =~ ^[a-f0-9]{40}$ ]] || refuse 'worker source commit must be a full immutable git commit'
 [[ "$budget" =~ ^[1-9][0-9]{0,2}$ && "$budget" -le 900 ]] || refuse 'startup budget must be 1..900 seconds'
 pod="$workload-0"
 pending="$(mktemp "$directory/.activation.XXXXXX")"
@@ -56,11 +59,11 @@ while remaining; do
     # proves activation. The read runs in the worker's existing pinned Node runtime.
     if timeout --signal=KILL "${left}s" kubectl --request-timeout="${left}s" \
       exec -i "$pod" -n "$namespace" -c compute-worker -- /usr/local/bin/node - \
-      "$provider" "$recipient" "$image" "$namespace" "$pod" "$uid" "$container_id" "$restarts" "$cpu" "$memory" \
+      "$provider" "$recipient" "$image" "$namespace" "$pod" "$uid" "$container_id" "$restarts" "$cpu" "$memory" "$source_commit" \
       > "$pending" 2>/dev/null <<'NODE'
 const fs = require('node:fs');
 const pathModule = require('node:path');
-const [provider, recipient, image, namespace, pod, podUid, containerId, restartCount, declaredCpu, declaredMemory] = process.argv.slice(2);
+const [provider, recipient, image, namespace, pod, podUid, containerId, restartCount, declaredCpu, declaredMemory, sourceCommit] = process.argv.slice(2);
 const invalid = () => { process.exitCode = 65; };
 // Observation mirrors rakia-executor::runtime::capacity: resolve the visible
 // cgroup-v2 path (mount fallback for namespaced paths), then take finite minima
@@ -134,7 +137,8 @@ try {
   if (declaration?.enabled !== true || declaration.provider !== provider ||
       declaration.recipient !== recipient || declaration.stewardOfRecord !== 'human:matthew' ||
       declaration.fixtureProvider !== 'adam' || process.env.COMPUTE_PERFORMER !== provider ||
-      process.env.COMPUTE_RUNTIME_IMAGE !== image.split('@')[1]) process.exit(65);
+      process.env.COMPUTE_RUNTIME_IMAGE !== image.split('@')[1] ||
+      process.env.COMPUTE_SOURCE_COMMIT !== sourceCommit) process.exit(65);
   const path = '/var/lib/compute/runner-grant.json';
   const stat = fs.lstatSync(path);
   if (!stat.isFile() || stat.size > 16384) process.exit(65);
@@ -155,7 +159,7 @@ try {
     provider: receipt.provider, recipient: receipt.recipient, state: receipt.state,
     grantCid: receipt.grantCid, grantActionHash: receipt.grantActionHash,
     consentActionHash: receipt.consentActionHash,
-    worker: { state: 'running', command: '/opt/compute/worker.mjs', image,
+    worker: { state: 'running', command: '/opt/compute/worker.mjs', image, sourceCommit,
       namespace, pod, podUid, containerId, restartCount: Number(restartCount) },
     capacity,
   }, null, 2));

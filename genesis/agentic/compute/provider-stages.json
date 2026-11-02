@@ -1,0 +1,5 @@
+{
+  "features": [
+    "features/dataplane/peer-mesh.feature"
+  ]
+}

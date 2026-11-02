@@ -15,6 +15,7 @@ const script = fileURLToPath(
 const provider = `uhCAk${"p".repeat(48)}`;
 const recipient = `uhCAk${"r".repeat(48)}`;
 const image = `harbor.example/worker@sha256:${"a".repeat(64)}`;
+const sourceCommit = "b".repeat(40);
 const receipt = {
   declarationProvenance: "operator-approved-config",
   stewardOfRecord: "human:matthew",
@@ -114,6 +115,7 @@ if (args.includes('get')) {
       token:'SECRET-CONFIG-SENTINEL'}),
     COMPUTE_PERFORMER: process.env.COMPUTE_WORKER_PROVIDER,
     COMPUTE_RUNTIME_IMAGE: process.env.COMPUTE_WORKER_IMAGE.split('@')[1],
+    COMPUTE_SOURCE_COMMIT: process.env.COMPUTE_WORKER_SOURCE_COMMIT,
     ELOHIM_COMPUTE_LOCAL_TOKEN: 'SECRET-ENV-SENTINEL'};
   const result = spawnSync(process.execPath, ['--require', process.env.FIXTURE+'/preload.cjs', '-', ...args.slice(i+2)],
     {input:fs.readFileSync(0), env});
@@ -133,6 +135,7 @@ if (args.includes('get')) {
     COMPUTE_WORKER_IMAGE: image,
     COMPUTE_WORKER_CPU_MILLIS: "8000",
     COMPUTE_WORKER_MEMORY_BYTES: "25769803776",
+    COMPUTE_WORKER_SOURCE_COMMIT: sourceCommit,
     // Healthy probes spawn several processes; allow parallel CI contention.
     // Only deadline-refusal cases deliberately use the one-second budget.
     COMPUTE_WORKER_STARTUP_SECS: "10",
@@ -166,6 +169,7 @@ if (args.includes('get')) {
             "0",
             "8000",
             "25769803776",
+            sourceCommit,
           ],
           env: {
             ...env,
@@ -179,6 +183,7 @@ if (args.includes('get')) {
             }),
             COMPUTE_PERFORMER: provider,
             COMPUTE_RUNTIME_IMAGE: image.split("@")[1],
+            COMPUTE_SOURCE_COMMIT: sourceCommit,
           },
           exit: (code) => {
             exited = code;
@@ -215,6 +220,7 @@ test("captures only validated public grant fields and the running worker incarna
   assert.equal(captured.worker.state, "running");
   assert.equal(captured.worker.command, "/opt/compute/worker.mjs");
   assert.equal(captured.worker.image, image);
+  assert.equal(captured.worker.sourceCommit, sourceCommit);
   assert.equal(captured.worker.containerId, "containerd://original");
   assert.equal(captured.worker.restartCount, 0);
   assert.equal(captured.capacity.effectiveCpuMillis, 8000);

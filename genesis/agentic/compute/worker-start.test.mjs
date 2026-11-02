@@ -99,6 +99,7 @@ function fixture(t) {
   mkdirSync(join(image, "mesh-bin"), { recursive: true });
   mkdirSync(join(source, "app/elohim-app/scripts"), { recursive: true });
   mkdirSync(join(source, "genesis/a2o"), { recursive: true });
+  mkdirSync(join(source, "genesis/agentic/compute"), { recursive: true });
   for (const name of [
     "elohim-storage",
     "doorway",
@@ -117,6 +118,10 @@ function fixture(t) {
     `if (process.env.FIXTURE_GRANT_REFUSE === '1') process.exit(23);\n`,
   );
   writeFileSync(join(source, ".gitignore"), "genesis/a2o/reports/\n");
+  writeFileSync(
+    join(source, "genesis/agentic/compute/provider-stages.json"),
+    JSON.stringify({ features: ["features/dataplane/peer-mesh.feature"] }),
+  );
   writeFileSync(join(source, "justfile"), "fixture:\n    true\n");
   writeFileSync(
     join(source, "app/elohim-app/scripts/hc-mesh.sh"),
@@ -153,14 +158,21 @@ console.log('fixture worker invoked');
 console.log(JSON.stringify({args:process.argv.slice(2), mesh:process.env.MESH_DIR,
 storage:process.env.MESH_STORAGE_BASE_PORT, conductor:process.env.MESH_CONDUCTOR_BASE_PORT,
 alpha:process.env.E2E_DOORWAY_ALPHA,beta:process.env.E2E_DOORWAY_B,
-noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED}));
+noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED,
+admin:process.env.MESH_API_KEY_ADMIN,token:process.env.MESH_COMPUTE_LOCAL_TOKEN}));
 `,
     { mode: 0o755 },
   );
   const git = (...args) =>
     execFileSync("git", ["-C", source, ...args], { encoding: "utf8" }).trim();
   git("init", "-q");
-  git("add", "justfile", ".gitignore", "app/elohim-app/scripts/hc-mesh.sh");
+  git(
+    "add",
+    "justfile",
+    ".gitignore",
+    "app/elohim-app/scripts/hc-mesh.sh",
+    "genesis/agentic/compute/provider-stages.json",
+  );
   git(
     "-c",
     "user.name=Fixture",
@@ -205,6 +217,8 @@ noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED}))
     COMPUTE_STATE_ROOT: state,
     COMPUTE_JUST_BIN: just,
     PROVIDER_TEST_TOKEN: "must-not-reach-mesh",
+    MESH_API_KEY_ADMIN: "must-not-reach-guest",
+    MESH_COMPUTE_LOCAL_TOKEN: "must-not-reach-guest",
   };
   const run = () => spawnSync("bash", [bootstrap], { env, encoding: "utf8" });
   return {
@@ -242,7 +256,7 @@ test(
     assert.equal(statSync(join(f.repo, "genesis/a2o/reports")).uid, 65534);
     assert.equal(
       statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o777,
-      0o606,
+      0o644,
     );
     assert.match(
       readFileSync(join(f.state, "mesh/events"), "utf8"),
@@ -399,6 +413,12 @@ test(
     assert.equal(seen.beta, "http://localhost:18889");
     assert.equal(seen.noPrologue, "1");
     assert.equal(seen.fenced, "1");
+    assert.equal(seen.admin, undefined);
+    assert.equal(seen.token, undefined);
+    assert.equal(
+      statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o002,
+      0,
+    );
     assert.match(
       run.stderr,
       /sequential worker admission and executor deadline/,
@@ -408,7 +428,12 @@ test(
       ["test", "mesh", "features/auth/login.feature"],
       ["test", "mesh", "@e2e"],
     ])
-      assert.equal(invoke(args).status, 2);
+      {
+        const refused = invoke(args);
+        assert.equal(refused.status, 2);
+        if (args[0] === "test")
+          assert.match(refused.stderr, /provider-stages\.json/);
+      }
   },
 );
 
