@@ -11,7 +11,8 @@ mkdir -p "$T/bin" "$T/repo/scripts/ci" "$T/repo/elohim/holochain" \
 export FIXTURE="$T" CALLS="$T/calls"
 export PATH="$T/bin:$PATH"
 cp "$ROOT/scripts/ci/closure-input-digest.sh" "$ROOT/scripts/ci/storage-input-digest.sh" \
-    "$ROOT/scripts/ci/harbor-oracle.sh" "$ROOT/scripts/ci/build-storage-image.sh" "$T/repo/scripts/ci/"
+    "$ROOT/scripts/ci/harbor-oracle.sh" "$ROOT/scripts/ci/build-storage-image.sh" \
+    "$ROOT/scripts/ci/build-doorway-app-image.sh" "$T/repo/scripts/ci/"
 cat > "$T/bin/git" <<'JS'
 #!/usr/bin/env node
 const fs = require('node:fs'), crypto = require('node:crypto');
@@ -108,13 +109,18 @@ cat > "$T/bin/nerdctl" <<'STUB'
 #!/usr/bin/env bash
 printf 'nerdctl %s\n' "$*" >> "$CALLS"
 STUB
+cat > "$T/bin/pnpm" <<'STUB'
+#!/usr/bin/env bash
+printf 'pnpm %s\n' "$*" >> "$CALLS"
+STUB
 cat > "$T/bin/rustc" <<'STUB'
 #!/usr/bin/env bash
 echo 'rustc fixture'
 STUB
 chmod +x "$T/bin/"*
+mkdir -p "$T/repo/doorway/doorway-app/dist/doorway-app/browser" "$T/repo/workspace/package"
 cat > "$T/repo/elohim/holochain/build-manifest.json" <<'JSON'
-{"steps":{"cargo-build-storage":{"inputs":{"sources":["declared/**"]}},"cargo-build-doorway":{"inputs":{"sources":["declared/**"]}}}}
+{"steps":{"cargo-build-storage":{"inputs":{"sources":["declared/**"]}},"cargo-build-doorway":{"inputs":{"sources":["declared/**"]}},"build-doorway-app":{"inputs":{"sources":["doorway/doorway-app/**","workspace/package/**","pnpm-lock.yaml"],"buildProcess":["scripts/ci/build-doorway-app-image.sh","scripts/ci/closure-input-digest.sh","scripts/ci/harbor-oracle.sh","elohim/holochain/Jenkinsfile"]}}}}
 JSON
 cat > "$T/repo/elohim/holochain/Jenkinsfile" <<'GROOVY'
 def runQualityGates() {
@@ -129,11 +135,19 @@ def buildStorageImage() {
 def runDoorwayStageBody() {
     sh "bash scripts/ci/build-storage-image.sh build-doorway"
 }
+def runDoorwayAppStageBody() {
+    sh "bash scripts/ci/build-doorway-app-image.sh"
+}
 GROOVY
 printf 'bash scripts/ci/nested.sh\n' > "$T/repo/scripts/ci/gate.sh"
 printf 'true\n' > "$T/repo/scripts/ci/nested.sh"
 printf 'COPY source/ /app/\nCOPY --from=builder /app/bin /bin\n' > "$T/repo/elohim/elohim-storage/Dockerfile"
 printf 'COPY ["source/", "/app/"]\n' > "$T/repo/doorway/doorway-service/Dockerfile"
+printf 'FROM nginx:alpine\nCOPY nginx.conf /etc/nginx/conf.d/default.conf\nCOPY dist/doorway-app/browser /usr/share/nginx/html\n' > "$T/repo/doorway/doorway-app/Dockerfile"
+printf 'server {}\n' > "$T/repo/doorway/doorway-app/nginx.conf"
+printf '{"name":"doorway-app"}\n' > "$T/repo/doorway/doorway-app/package.json"
+printf '{"name":"workspace-package"}\n' > "$T/repo/workspace/package/package.json"
+printf 'lockfileVersion: 9\n' > "$T/repo/pnpm-lock.yaml"
 printf 'source\n' > "$T/repo/source/value"
 printf 'declared\n' > "$T/repo/declared/value"
 cd "$T/repo"
@@ -158,6 +172,21 @@ for step in build-storage build-doorway; do
     [ ! -s "$T/dirty-out" ] || fail 'dirty closure printed a key'
     echo "PASS: $step stable closure, material, COPY/declared inputs, recipes, Jenkinsfile, derivation, conductor pin, dirty refusal"
 done
+[ "$(key build-doorway-app)" = "$(key build-doorway-app)" ] || fail 'doorway app identical inputs changed key'
+app_baseline="$(key build-doorway-app)"
+printf 'storage-only\n' > elohim/elohim-storage/unrelated
+[ "$app_baseline" = "$(key build-doorway-app)" ] || fail 'storage-only source moved doorway app key'
+printf 'doorway-service-only\n' > doorway/doorway-service/unrelated
+[ "$app_baseline" = "$(key build-doorway-app)" ] || fail 'doorway-service-only source moved doorway app key'
+for input in doorway/doorway-app/package.json workspace/package/package.json pnpm-lock.yaml; do
+    cp "$input" "$T/saved"
+    printf '\n# mutation\n' >> "$input"
+    [ "$app_baseline" != "$(key build-doorway-app)" ] || fail "$input not keyed for build-doorway-app"
+    cp "$T/saved" "$input"
+done
+if DIRTY=1 key build-doorway-app > "$T/dirty-app-out" 2>/dev/null; then fail 'dirty doorway app closure accepted'; fi
+[ ! -s "$T/dirty-app-out" ] || fail 'dirty doorway app closure printed a key'
+echo 'PASS: build-doorway-app ignores storage/doorway-service and keys app, workspace dependency, lockfile and dirty refusal'
 [ "$(key build-storage)" = "$(bash scripts/ci/storage-input-digest.sh)" ] || fail 'wrapper differs'
 # Uncloned path inside a gitlink resolves to the superproject pin.
 printf 'COPY vendor/fork/schema/ /schema\n' >> elohim/elohim-storage/Dockerfile
@@ -199,5 +228,15 @@ for step in build-storage build-doorway; do
     if grep -Eq 'nerdctl.*(push|tag|load)|buildctl.* build |annotation[.]|type=oci' "$CALLS"; then fail 'builder published, aliased or used an OCI archive'; fi
     echo "PASS: $step closure cache bust, nerdctl build and config labels; no archive, push or alias"
 done
+export DOORWAY_APP_TAG="closure-${KEY:7:16}" DOORWAY_APP_CLOSURE="$KEY" DOORWAY_APP_CLOSURE_MATERIAL="$KEY"
+: > "$CALLS"
+bash scripts/ci/build-doorway-app-image.sh > /dev/null
+for expected in 'pnpm install --frozen-lockfile --filter doorway-app...' 'pnpm --filter doorway-app build' \
+    "--label elohim.host/closure=$KEY" "--label elohim.host/closure-material=$KEY" \
+    "--label org.opencontainers.image.revision=$GIT_COMMIT_HASH" \
+    "-t doorway-app:closure-${KEY:7:16}" '-f Dockerfile .'; do
+    grep -Fq -- "$expected" "$CALLS" || fail "build-doorway-app missing $expected"
+done
+echo 'PASS: build-doorway-app workspace build, closure labels and content tag'
 [ ! -e "$T/secret-in-argv" ] || fail 'secret appeared in curl argv'
 echo 'PASS: closure-image suite (no network, real git or cargo)'

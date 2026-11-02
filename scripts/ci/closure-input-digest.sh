@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# closure-input-digest.sh <build-storage|build-doorway> [--material]
+# closure-input-digest.sh <build-storage|build-doorway|build-doorway-app> [--material]
 # Run at repo root. stdout: sha256:<hex>, or its canonical material list.
 # Exit 0: complete clean closure; exit 1: cannot judge (no key); exit 2: usage.
 # HEAD oids describe tracked inputs; dirty inputs refuse. Untracked generated
@@ -11,7 +11,8 @@ STEP="${1:-}"
 case "$STEP" in
     build-storage) DOCKERFILE=elohim/elohim-storage/Dockerfile ;;
     build-doorway) DOCKERFILE=doorway/doorway-service/Dockerfile ;;
-    *) echo 'usage: closure-input-digest.sh <build-storage|build-doorway> [--material]' >&2; exit 2 ;;
+    build-doorway-app) DOCKERFILE=doorway/doorway-app/Dockerfile ;;
+    *) echo 'usage: closure-input-digest.sh <build-storage|build-doorway|build-doorway-app> [--material]' >&2; exit 2 ;;
 esac
 [ "$#" -le 2 ] && { [ "$#" -eq 1 ] || [ "$2" = --material ]; } || exit 2
 die() { echo "closure-input-digest: $*" >&2; exit 1; }
@@ -26,9 +27,12 @@ const fs = require('node:fs');
 const step = process.argv[2], dockerfile = process.argv[3];
 const manifest = 'elohim/holochain/build-manifest.json';
 const jenkins = 'elohim/holochain/Jenkinsfile';
+const doorwayApp = step === 'build-doorway-app';
 const sources = new Set([manifest, jenkins, dockerfile,
-  'scripts/ci/build-storage-image.sh', 'scripts/ci/closure-input-digest.sh',
-  'scripts/ci/harbor-oracle.sh', 'scripts/ci/storage-input-digest.sh', 'elohim/holochain-conductor']);
+  'scripts/ci/closure-input-digest.sh', 'scripts/ci/harbor-oracle.sh']);
+if (doorwayApp) sources.add('scripts/ci/build-doorway-app-image.sh');
+else for (const source of ['scripts/ci/build-storage-image.sh',
+  'scripts/ci/storage-input-digest.sh', 'elohim/holochain-conductor']) sources.add(source);
 for (const path of ['.dockerignore', `${dockerfile}.dockerignore`]) if (fs.existsSync(path)) sources.add(path);
 function add(source) {
   source = source.replace(/^\.\//, '').replace(/\/\*\*$/, '').replace(/\/$/, '');
@@ -36,7 +40,8 @@ function add(source) {
     throw Error(`unsupported input: ${source}`);
   sources.add(source);
 }
-const inputs = JSON.parse(fs.readFileSync(manifest)).steps[`cargo-${step}`].inputs;
+const manifestStep = doorwayApp ? step : `cargo-${step}`;
+const inputs = JSON.parse(fs.readFileSync(manifest)).steps[manifestStep].inputs;
 for (const source of [...inputs.sources, ...(inputs.buildProcess || [])]) add(source);
 const docker = fs.readFileSync(dockerfile, 'utf8').replace(/\\\r?\n/g, ' ');
 let copies = 0;
@@ -46,12 +51,23 @@ for (const line of docker.split('\n')) {
   const args = copy[1].replace(/--[\w-]+=\S+\s*/g, '').trim();
   const parts = args.startsWith('[') ? JSON.parse(args) : args.split(/\s+/);
   if (parts.length < 2) throw Error('unparsed COPY');
-  parts.slice(0, -1).forEach(add); copies++;
+  parts.slice(0, -1).forEach(source => {
+    if (doorwayApp) {
+      // dist/ is the derived Angular output. The tracked app + workspace
+      // closure produces it; only tracked sources from the thin image context
+      // belong in the key.
+      if (source === 'dist' || source.startsWith('dist/')) return;
+      add(`doorway/doorway-app/${source}`);
+    } else add(source);
+  });
+  copies++;
 }
 if (!copies) throw Error('no COPY sources');
 const jenkinsText = fs.readFileSync(jenkins, 'utf8');
 const defs = new Map([...jenkinsText.matchAll(/^def (\w+)\([^\n]*\) \{\n([\s\S]*?)^\}/gm)].map(m => [m[1], m[2]]));
-const helpers = ['runQualityGates', step === 'build-storage' ? 'runStorageStageBody' : 'runDoorwayStageBody'];
+const helpers = doorwayApp
+  ? ['runDoorwayAppStageBody']
+  : ['runQualityGates', step === 'build-storage' ? 'runStorageStageBody' : 'runDoorwayStageBody'];
 const seenHelpers = new Set(), recipeTexts = [];
 while (helpers.length) {
   const name = helpers.pop();

@@ -149,11 +149,58 @@ test('closure reuse shares one decision across gates, release builds and pushes'
     assert.ok(edge.includes(`pushClosureImage('${kind}', 'elohim-${title.toLowerCase()}')`));
     assert.ok(edge.includes(`${kind}_CLOSURE_MATERIAL=`));
   }
+  assert.ok(edge.includes("closurePresent('DOORWAY_APP', 'Build Doorway App')"));
+  assert.ok(edge.includes("pushClosureImage('DOORWAY_APP', 'doorway-app')"));
   assert.match(edge, /if \(closurePresent\(kind, "Push \$\{imageName\}"\)\) \{[\s\S]*?return/);
   assert.doesNotMatch(edge, /push-harbor-(tracked|untracked)\.sh' elohim-(doorway|storage)/);
+  assert.doesNotMatch(edge, /push-harbor-untracked\.sh' doorway-app/);
   assert.doesNotMatch(edge, /scripts\/ci\/push-harbor-dev-latest-aliases\.sh/);
   assert.match(edge, /def doorwayTag = "closure-\$\{doorwayKey\.substring\(7, 23\)\}"/);
   assert.match(edge, /def storageTag = "closure-\$\{storageKey\.substring\(7, 23\)\}"/);
+  assert.match(edge, /def doorwayAppTag = doorwayAppKey \? "closure-\$\{doorwayAppKey\.substring\(7, 23\)\}" : doorwayAppFallbackTag/);
+  assert.match(edge, /def doorwayAppKey = closureKey\('build-doorway-app', true\)/);
+});
+
+test('doorway-app closure follows every workspace dependency used by its build', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'elohim/holochain/build-manifest.json'), 'utf8'));
+  const sources = manifest.steps['build-doorway-app'].inputs.sources;
+  const packages = new Map();
+  const workspaceDirs = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+    .split('\n')
+    .map(line => line.match(/^\s*-\s+(.+?)\s*$/)?.[1]?.replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+  for (const dir of workspaceDirs) {
+    const path = join(root, dir, 'package.json');
+    if (!existsSync(path)) continue;
+    const json = JSON.parse(readFileSync(path, 'utf8'));
+    if (json.name) packages.set(json.name, {dir, json});
+  }
+  const pending = ['doorway-app', 'elohim-core', 'elohim-imagodei'];
+  const closure = new Set();
+  while (pending.length) {
+    const name = pending.pop();
+    if (closure.has(name)) continue;
+    const pkg = packages.get(name);
+    assert.ok(pkg, `workspace package ${name} was not found`);
+    closure.add(name);
+    for (const group of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+      for (const [dep, version] of Object.entries(pkg.json[group] ?? {})) {
+        if (String(version).startsWith('workspace:')) pending.push(dep);
+      }
+    }
+  }
+  const expected = [...closure].map(name => `${packages.get(name).dir}/**`).sort();
+  for (const source of expected) assert.ok(sources.includes(source), `missing doorway-app workspace input ${source}`);
+  for (const source of [
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'package.json',
+    '.npmrc',
+    'patches/@angular__build@22.1.0.patch',
+    'app/elohim-elements/custom-elements-manifest.config.mjs',
+  ]) {
+    assert.ok(sources.includes(source), `missing doorway-app build input ${source}`);
+  }
 });
 
 test('held storage readiness is sampled once; only changed inputs wait for rollout', () => {
@@ -191,7 +238,8 @@ test('deploy readers receive the selected closure and preserve unselected images
   assert.match(writer, /selected \? \(env\.getProperty\(key\) \?: ''\) : ''/);
   assert.equal((edge.match(/^\s+writeDeploymentVersions\(/gm) ?? []).length, 4);
   assert.match(edge, /def storageInputs = versions.STORAGE_CLOSURE \?: ''/);
-  assert.match(edge, /def pushClosureImage[^\n]+\{\s*if \(!shouldRunStep\("cargo-build-\$\{kind.toLowerCase\(\)\}"\)\) return/);
+  assert.match(edge, /def pushClosureImage[^\n]+\{\s*def step = kind == 'DOORWAY_APP' \? 'build-doorway-app' : "cargo-build-\$\{kind.toLowerCase\(\)\}"/);
+  assert.match(edge, /if \(!shouldRunStep\(step\) && !fallback\) return/);
 });
 
 
@@ -204,6 +252,16 @@ test('each closure recipe change selects both edge build steps through the insta
     const edge = result.pipelines.find(p => p.name === 'elohim-edge');
     assert.ok(edge, JSON.stringify(result));
     for (const name of ['cargo-build-storage', 'cargo-build-doorway']) assert.ok(edge.steps.some(step => step.name === name));
+  }
+});
+
+test('doorway-app closure recipe and real inputs select its manifest step', () => {
+  const content = JSON.parse(readFileSync(join(root, 'elohim/holochain/build-manifest.json'), 'utf8'));
+  for (const path of ['scripts/ci/build-doorway-app-image.sh', 'scripts/ci/closure-input-digest.sh', 'scripts/ci/harbor-oracle.sh', 'doorway/doorway-app/src/main.ts', 'pnpm-lock.yaml']) {
+    const result = walkGraph([{content}], [path]);
+    const edge = result.pipelines.find(p => p.name === 'elohim-edge');
+    assert.ok(edge, JSON.stringify(result));
+    assert.ok(edge.steps.some(step => step.name === 'build-doorway-app'), path);
   }
 });
 
