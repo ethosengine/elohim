@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkStorageClientDist, checkSubmodules, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
+  checkArk, checkCargoDeny, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -233,4 +233,22 @@ test('ark: required only by agentic-shift, satisfied by ARK_BIN, PATH or the dev
   assert.equal(checkArk({ projects: [shift], env: { ARK_BIN: '/x/ark' }, executable: p => p === '/x/ark' }).level, 'ok');
   assert.equal(checkArk({ projects: [shift], env: { PATH: '/a:/b' }, executable: p => p === '/b/ark' }).level, 'ok');
   assert.equal(checkArk({ projects: [shift], env: {}, executable: p => p.endsWith('/dev/debug/ark') }).level, 'ok');
+});
+
+test('workspace dists: a gate whose package.json names @elohim/epr needs its dist', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'preflight-wsdist-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'app/x'), { recursive: true });
+  writeFileSync(join(root, 'app/x/package.json'), JSON.stringify({ dependencies: { '@elohim/epr': 'workspace:*' } }));
+  mkdirSync(join(root, 'tools/y'), { recursive: true });
+  writeFileSync(join(root, 'tools/y/package.json'), JSON.stringify({ dependencies: {} }));
+  const app = { name: 'x', dir: 'app/x' };
+  const other = { name: 'y', dir: 'tools/y' };
+  assert.equal(checkWorkspaceDists({ root, projects: [other] }), null);
+  const refused = checkWorkspaceDists({ root, projects: [app] });
+  assert.equal(refused.level, 'REFUSED');
+  assert.equal(refused.cure, 'pnpm --filter @elohim/epr run build');
+  mkdirSync(join(root, 'elohim/sdk/epr-ts/dist'), { recursive: true });
+  writeFileSync(join(root, 'elohim/sdk/epr-ts/dist/index.js'), '');
+  assert.equal(checkWorkspaceDists({ root, projects: [app] }).level, 'ok');
 });

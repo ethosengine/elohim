@@ -157,6 +157,32 @@ export function checkArk({ projects, env = process.env, executable = isExecutabl
     'just gate elohim-ark');
 }
 
+/** Workspace libraries a gate imports from a built dist/ (nothing builds them before lint). */
+export const WORKSPACE_DISTS = [
+  { name: '@elohim/epr', dist: 'elohim/sdk/epr-ts/dist/index.js' },
+];
+
+function dependsOn(root, project, name) {
+  const pkg = readJson(join(root, project.dir, 'package.json'));
+  return ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
+    .some(map => pkg?.[map] && Object.hasOwn(pkg[map], name));
+}
+
+/**
+ * A selected gate's own package.json names a workspace library whose dist/ is absent: its lint
+ * and tests cannot resolve the import (elohim-app, 2026-11-02: `Failed to resolve import
+ * "@elohim/epr"`, and type-aware lint misreading every call into it).
+ */
+export function checkWorkspaceDists({ root, projects }) {
+  const missing = WORKSPACE_DISTS.filter(lib =>
+    projects.some(project => dependsOn(root, project, lib.name)) && !existsSync(join(root, lib.dist)));
+  const needed = WORKSPACE_DISTS.some(lib => projects.some(project => dependsOn(root, project, lib.name)));
+  if (!needed) return null;
+  if (!missing.length) return row('workspace-dists', 'ok');
+  return row('workspace-dists', 'REFUSED', `unbuilt workspace librar${missing.length > 1 ? 'ies' : 'y'} a selected gate imports: ${missing.map(lib => lib.name).join(' ')}`,
+    `pnpm ${missing.map(lib => `--filter ${lib.name}`).join(' ')} run build`);
+}
+
 export function checkSophiaUmd({ root, projects }) {
   if (!projects.some(p => p.name === 'elohim-app')) return null;
   if (SOPHIA_UMD.some(path => existsSync(join(root, path)))) return row('sophia-umd', 'ok');
@@ -265,6 +291,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkNodeModules({ root, projects })),
     ...timed(() => checkElementDists({ root, projects })),
     ...timed(() => checkStorageClientDist({ root, projects })),
+    ...timed(() => checkWorkspaceDists({ root, projects })),
     ...timed(() => checkSophiaUmd({ root, projects })),
     ...timed(() => checkArk({ projects, env })),
     ...timed(() => checkCargoDeny({ root, projects, spawn })),
