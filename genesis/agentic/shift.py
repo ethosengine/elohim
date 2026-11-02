@@ -13,17 +13,18 @@ import subprocess
 import sys
 import time
 
-from shift_ops import execute, validate_steps
+from shift_ops import execute, require_completion, validate_steps
 from shift_inputs import normalize_inputs, verify_inputs
-from shift_lease import resources
+from shift_lease import host_session, lease_budget, resources
 from shift_runtime import command, completed, session_from
 from shift_state import (Refused, alive, atomic, authority, check_clock, digest, finite_number, home, incarnation,
                          load, lock, native_context, read, revision, run, signal_handle,
-                         timestamp, under)
-from shift_supervisor import contained, controller, guardian, lease, namespace_init, spawn_owned
+                         timestamp, under, validate_mode)
+from shift_supervisor import (ReadinessProxy, contained, controller, guardian, lease,
+                              namespace_init, spawn_owned)
 
 
-def bounded(argv, root, timeout, log, text=None, *, env=None, check=None):
+def bounded(argv, root, timeout, log, text=None, *, env=None, check=None, delegation=None):
     if not finite_number(timeout) or timeout <= 0:
         raise Refused('readiness operation has no finite remaining time')
     expires = time.monotonic() + timeout
@@ -36,12 +37,16 @@ def bounded(argv, root, timeout, log, text=None, *, env=None, check=None):
             raise Refused(f'readiness operation exceeded remaining time: {log}')
         return left
     remaining()  # Never spawn after a stop, revocation or original deadline.
-    with open(log, 'wb', buffering=0) as output:
+    proxy = ReadinessProxy(*delegation) if delegation is not None else contextlib.nullcontext()
+    with proxy as delegated, open(log, 'wb', buffering=0) as output:
         process = spawn_owned(contained(argv), cwd=root, stdin=subprocess.PIPE,
-                              stdout=output, stderr=subprocess.STDOUT, env={**os.environ, **(env or {})})
+                              stdout=output, stderr=subprocess.STDOUT,
+                              env={**os.environ, **(env or {}), **(delegated.environment if delegated else {})})
         try:
             pending_input = text.encode() if text else None
             while True:
+                if delegated:
+                    delegated.poll(process)
                 try:
                     process.communicate(pending_input, timeout=min(0.2, remaining()))
                 except subprocess.TimeoutExpired:
@@ -79,6 +84,12 @@ def preflight(spec, directory, *, checks=None):
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     checks = checks or directory / 'readiness'
     checks.mkdir(parents=True, exist_ok=True)
+    with host_session(spec, checks):
+        return preflight_execution(spec, directory, checks, remaining)
+
+
+def preflight_execution(spec, directory, checks, remaining):
+    root = Path(spec['worktree'])
     measurement_resource = spec.get('measurement_resource')
     required_resources = set(resources(measurement_resource))
     for step in spec['steps']:
@@ -112,11 +123,13 @@ def preflight(spec, directory, *, checks=None):
     lease(spec, measurement_resource)
     def measurement_remaining():
         left = remaining()
-        return min(left, 1800 - (time.monotonic() - measurement_started)) if 'mesh' in resources(measurement_resource) else left
+        budget = lease_budget(measurement_resource)
+        return min(left, budget - (time.monotonic() - measurement_started)) if budget is not None else left
     try:
         bounded(['node', 'genesis/agentic/readiness.mjs', '--objective', str(directory / 'objective.json'),
                  '--worktree', str(root), '--deadline', spec['deadline'], '--preserve-observers'],
-                root, measurement_remaining(), checks / 'baseline.json', env=environment, check=measurement_remaining)
+                root, measurement_remaining(), checks / 'baseline.json', env=environment,
+                check=measurement_remaining, delegation=(spec, measurement_resource, measurement_started))
     finally:
         lease(spec, measurement_resource, release=True)
     baseline = read(checks / 'baseline.json')
@@ -195,8 +208,7 @@ def start(path, runtime):
     # These exact generated observer ledgers are operational state, never a source-clean
     # exemption selected by an agent. Pin their exact set into the frozen contract.
     spec['observer_paths'] = read(Path(__file__).with_name('shift-observer-paths.json'))
-    if spec.get('mode') not in {'delivery', 'rehearsal'}:
-        raise Refused('declare delivery or rehearsal mode')
+    validate_mode(spec)
     if spec['mode'] == 'rehearsal' and any(s['kind'] not in {'agent', 'measure', 'gate'} for s in spec['steps']):
         raise Refused('rehearsal cannot fulfill, publish, or touch the household')
     validate_steps(spec)
@@ -301,11 +313,9 @@ def resume(directory, runtime=None):
     with lock(directory / 'execution.lock', blocking=False) as ownership:
         with lock(directory / 'state.lock'):
             contract, state = load(directory)
-            if state['phase'] in {'complete', 'rehearsal-complete'}:
+            if state['phase'] in {'complete', 'local-complete', 'rehearsal-complete'}:
                 # Re-read acceptance even when a cached checkpoint says done.
-                if contract['mode'] == 'delivery':
-                    from shift_ops import require_delivery_evidence
-                    require_delivery_evidence(directory, contract, revision(contract['worktree']), published=True)
+                require_completion(directory, contract, revision(contract['worktree']))
                 return {'shift': contract['id'], 'phase': state['phase']}
             if runtime:
                 state['runtime'] = runtime

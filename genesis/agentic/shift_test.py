@@ -16,6 +16,7 @@ import shift_ops as ops
 import shift_runtime as runtime
 import shift_state as state
 import shift_supervisor as supervisor
+import shift as launcher
 
 
 def iso(seconds):
@@ -257,6 +258,154 @@ class ContractFixture(unittest.TestCase):
         evidence.write_text('failed')
         with self.assertRaisesRegex(state.Refused, 'changed receipt evidence'):
             ops.receipts(self.directory, self.contract)
+
+    def local_delivery_evidence(self):
+        # Private native records are excluded just as in an actual checkout.
+        (self.root / '.gitignore').write_text('.claude/\n.eprfs/\n')
+        subprocess.run(['git', '-C', str(self.root), 'add', '.gitignore'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Fixture', '-c',
+                        'user.email=fixture@example.invalid', 'commit', '-qm', 'native store'], check=True)
+        delivered = state.revision(self.root)
+        self.contract['mode'] = 'local-delivery'
+        self.contract['steps'] = [
+            {'id': 'owner-gate', 'kind': 'gate', 'project': 'elohim-storage'},
+            {'id': 'measure-a', 'kind': 'measure', 'objective': True, 'readonly': True},
+            {'id': 'measure-b', 'kind': 'measure', 'objective': True, 'readonly': True},
+        ]
+        self.contract['objective']['target'] = {'predicate': '==', 'value': 1,
+                                                'stability': {'consecutive': 2}}
+        state.atomic(self.directory / 'objective.json', self.contract['objective'])
+        self.contract['objective_sha256'] = state.digest(self.directory / 'objective.json')
+        self.freeze()
+        for offset, step in enumerate(self.contract['steps']):
+            receipt = {'operation': step['id'], 'kind': step['kind'], 'project': step.get('project'),
+                       'contract_sha256': state.digest(self.directory / 'contract.json'),
+                       'attempt': 1, 'exit': 0, 'revision': delivered, 'clean': True,
+                       'finished': time.time() + offset, 'evidence': []}
+            if step['kind'] == 'measure':
+                receipt.update(objective=True, measurement=1)
+            state.atomic(ops.op_dir(self.directory, step) / 'receipt-1.json', receipt)
+        state.atomic(self.directory / 'accepted.json', {'intent': self.contract['intent'], 'revision': delivered})
+        native = self.root / '.eprfs/status'
+        native.mkdir(parents=True)
+        (native / 'flows.jsonl').write_text(json.dumps({'cid': 'accepted', 'record': {
+            'classifiedAs': ['verdict:approved', 'report-path:.claude/shifts/test-shift/accepted.json']}})+'\n')
+        return delivered, ({}, {'acceptance': 'accepted', 'issues': [], 'acceptance_records': ['accepted']})
+
+    def test_local_delivery_completes_without_fleet_and_resume_revalidates_acceptance(self):
+        delivered, native = self.local_delivery_evidence()
+        with patch.object(state, 'native_context', return_value=native):
+            phase = ops.require_completion(self.directory, self.contract, delivered)
+            self.assertEqual(phase, 'local-complete')
+            state.checkpoint(self.directory, phase=phase)
+            self.assertEqual(launcher.resume(self.directory)['phase'], 'local-complete')
+        rejected = ({}, {'acceptance': 'contested', 'issues': []})
+        with patch.object(state, 'native_context', return_value=rejected):
+            with self.assertRaisesRegex(state.Refused, 'current native acceptance'):
+                launcher.resume(self.directory)
+
+    def test_local_delivery_requires_current_clean_revision_and_pinned_acceptance(self):
+        delivered, native = self.local_delivery_evidence()
+        with patch.object(state, 'native_context', return_value=native):
+            (self.root / 'uncommitted').write_text('later source')
+            with self.assertRaisesRegex(state.Refused, 'exact clean committed revision'):
+                ops.require_completion(self.directory, self.contract, delivered)
+            (self.root / 'uncommitted').unlink()
+            with self.assertRaisesRegex(state.Refused, 'exact clean committed revision'):
+                ops.require_completion(self.directory, self.contract, 'another-revision')
+            report = self.directory / 'accepted.json'
+            state.atomic(report, {'intent': self.contract['intent'], 'revision': 'earlier-revision'})
+            with self.assertRaisesRegex(state.Refused, 'exact delivered revision'):
+                ops.require_completion(self.directory, self.contract, delivered)
+
+    def test_local_delivery_requires_owner_gates_and_consecutive_current_measurements(self):
+        delivered, native = self.local_delivery_evidence()
+        with patch.object(state, 'native_context', return_value=native):
+            for name, field, value, message in [
+                    ('owner-gate', 'revision', 'old', 'gate receipts'),
+                    ('owner-gate', 'clean', False, 'gate receipts'),
+                    ('owner-gate', 'exit', 1, 'gate receipts'),
+                    ('measure-b', 'revision', 'old', 'consecutive measurements'),
+                    ('measure-b', 'measurement', 0, 'consecutive measurements'),
+                    ('measure-b', 'exit', 1, 'consecutive measurements')]:
+                with self.subTest(name=name, field=field):
+                    path = self.directory / 'operations' / name / 'receipt-1.json'
+                    original = path.read_bytes()
+                    receipt = state.read(path)
+                    receipt[field] = value
+                    state.atomic(path, receipt)
+                    with self.assertRaisesRegex(state.Refused, message):
+                        ops.require_completion(self.directory, self.contract, delivered)
+                    path.write_bytes(original)
+            gate = self.directory / 'operations/owner-gate/receipt-1.json'
+            gate.unlink()
+            with self.assertRaisesRegex(state.Refused, 'gate receipts'):
+                ops.require_completion(self.directory, self.contract, delivered)
+
+    def test_local_delivery_refuses_dirty_source_beneath_a_pinned_gitlink(self):
+        source = self.directory / 'dependency-source'
+        subprocess.run(['git', 'init', '-q', str(source)], check=True)
+        (source / 'code.txt').write_text('accepted source')
+        subprocess.run(['git', '-C', str(source), 'add', 'code.txt'], check=True)
+        subprocess.run(['git', '-C', str(source), '-c', 'user.name=Fixture', '-c',
+                        'user.email=fixture@example.invalid', 'commit', '-qm', 'dependency'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'protocol.file.allow=always',
+                        'submodule', 'add', '-q', str(source), 'dependency'], check=True)
+        subprocess.run(['git', '-C', str(self.root), '-c', 'user.name=Fixture', '-c',
+                        'user.email=fixture@example.invalid', 'commit', '-qm', 'pinned dependency'], check=True)
+        delivered, native = self.local_delivery_evidence()
+        with patch.object(state, 'native_context', return_value=native):
+            self.assertEqual(ops.require_completion(self.directory, self.contract, delivered), 'local-complete')
+            (self.root / 'dependency/code.txt').write_text('uncommitted dependency source')
+            # Preserve the existing operational dirty-submodule allowance elsewhere.
+            self.assertTrue(ops.clean(self.root, self.contract))
+            with self.assertRaisesRegex(state.Refused, 'exact clean committed revision'):
+                ops.require_completion(self.directory, self.contract, delivered)
+
+    def test_local_mode_cannot_claim_publication_or_silently_weaken_delivery(self):
+        delivered, native = self.local_delivery_evidence()
+        with patch.object(state, 'native_context', return_value=native):
+            with self.assertRaisesRegex(state.Refused, 'cannot establish publication'):
+                ops.require_delivery_evidence(self.directory, self.contract, delivered, published=True)
+            with patch.object(ops, 'receipts', return_value=[{'kind': 'gate', 'exit': 0, 'clean': True,
+                                                           'revision': delivered, 'project': 'elohim-storage'}]):
+                with self.assertRaisesRegex(state.Refused, 'household receipt'):
+                    ops.require_completion(self.directory, {**self.contract, 'mode': 'delivery'}, delivered)
+
+    def test_local_mode_refuses_forbidden_steps_on_recovery_and_dispatch(self):
+        self.contract['mode'] = 'local-delivery'
+        for kind in ['household', 'lifecycle', 'land', 'push', 'ci']:
+            step = {'id': 'forbidden', 'kind': kind, 'argv': ['true']}
+            with self.subTest(kind=kind):
+                self.contract['steps'] = [step]
+                self.freeze()
+                with self.assertRaisesRegex(state.Refused, 'cannot publish or touch'):
+                    state.load(self.directory)
+                self.contract['steps'] = [{'id': 'local', 'kind': 'agent', 'prompt': 'fixture'}]
+                self.freeze()
+                with self.assertRaisesRegex(state.Refused, 'cannot publish or touch'):
+                    ops.prepare(self.directory, self.contract, self.checkpoint, step)
+                with self.assertRaisesRegex(state.Refused, 'cannot publish or touch'):
+                    ops.host_argv(self.directory, self.contract, self.checkpoint, step)
+
+    def test_missing_unknown_or_mismatched_mode_cannot_resume_as_complete(self):
+        for mode in [None, '', 'skip-evidence', [], {}]:
+            with self.subTest(mode=mode):
+                self.contract['mode'] = mode
+                self.freeze()
+                with self.assertRaisesRegex(state.Refused, 'declare delivery'):
+                    state.load(self.directory)
+        self.contract.pop('mode')
+        self.freeze()
+        with self.assertRaisesRegex(state.Refused, 'declare delivery'):
+            state.load(self.directory)
+        self.contract['mode'] = 'local-delivery'
+        self.freeze()
+        checkpoint = state.read(self.directory / 'checkpoint.json')
+        checkpoint['phase'] = 'complete'
+        state.atomic(self.directory / 'checkpoint.json', checkpoint)
+        with self.assertRaisesRegex(state.Refused, 'differs from frozen delivery mode'):
+            launcher.resume(self.directory)
 
 
 if __name__ == '__main__':
