@@ -12,7 +12,9 @@ import { resolve, relative, sep } from 'path';
 export function discoverManifests(rootDir) {
   const root = resolve(rootDir);
   const found = [];
-  const skipped = new Set(['.claude', '.git', '.superpowers', '.worktrees', 'node_modules']);
+  // local-dev holds retained runtime state and disposable repository copies,
+  // not project declarations (the root ignore contract reserves **/local-dev/).
+  const skipped = new Set(['.claude', '.git', '.superpowers', '.worktrees', 'node_modules', 'local-dev']);
 
   function visit(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
