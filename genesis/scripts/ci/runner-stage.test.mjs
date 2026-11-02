@@ -36,7 +36,12 @@ const grant = {
   grantActionHash: "grant",
 };
 
-async function fixture(stepStatus = "passed") {
+async function fixture(stepStatus = "passed", heldStatus = null) {
+  const outcomes = [
+    ["Real outcome", stepStatus],
+    ...(heldStatus ? [["Held outcome", heldStatus]] : []),
+  ];
+  const expectedTests = outcomes.map(([name]) => name === "Real outcome" ? "example" : "held");
   const envelope = {
     provider: "provider",
     requester: "runner",
@@ -44,27 +49,25 @@ async function fixture(stepStatus = "passed") {
     binary: { cid: "binary" },
     dna: { cid: "dna" },
     runtimeImage: config.runtimeImage,
-    expectedTests: ["example"],
+    expectedTests,
     taskKind: "feedback_signal",
     retention: { maxAgeSeconds: 60 },
   };
   const stage = {
     feature,
     concern: "example",
-    scenarioNames: ["Real outcome"],
+    scenarioNames: outcomes.map(([name]) => name),
   };
   const doc = [
     {
       uri: feature,
-      elements: [
-        {
+      elements: outcomes.map(([name, status]) => ({
           type: "scenario",
-          name: "Real outcome",
+          name,
           steps: [
-            { name: "the real observation", result: { status: stepStatus } },
+            { name: "the real observation", result: { status } },
           ],
-        },
-      ],
+        })),
     },
   ];
   const stdout = Buffer.from(
@@ -78,9 +81,9 @@ async function fixture(stepStatus = "passed") {
     taskCid,
     requestAction: "request",
     grantAction: "grant",
-    status: stepStatus === "passed" ? "passed" : "failed",
-    exitCode: stepStatus === "passed" ? 0 : 101,
-    observedTests: ["example"],
+    status: ["passed", "skipped"].includes(stepStatus) ? "passed" : "failed",
+    exitCode: ["passed", "skipped"].includes(stepStatus) ? 0 : 101,
+    observedTests: expectedTests,
     logs: [
       ["stdout.log", stdout],
       ["stderr.log", stderr],
@@ -136,13 +139,22 @@ test("explicit provider configuration refuses missing pins, traversal and shell-
   assert.throws(() => validateConfig(config, "features/../../secret.feature"));
 });
 
-test("actual failed and skipped steps cannot become green receipts", async () => {
+test("verdict preserves strict failures while an all-held report stays not measured", async () => {
   assert.equal((await verifyCompletion(await fixture())).verdict, "pass");
-  for (const status of ["failed", "skipped", "pending", "undefined"])
-    assert.equal(
-      (await verifyCompletion(await fixture(status))).verdict,
-      "fail",
-    );
+  assert.equal((await verifyCompletion(await fixture("failed"))).verdict, "fail");
+  const held = await verifyCompletion(await fixture("skipped"));
+  assert.equal(held.verdict, "skip");
+  assert.equal(held.notMeasured, true);
+  assert.equal(held.held, 1);
+  const mixed = await verifyCompletion(await fixture("passed", "skipped"));
+  assert.equal(mixed.verdict, "pass");
+  assert.equal(mixed.scenarios.length, 1);
+  assert.equal(mixed.held, 1);
+  for (const status of ["pending", "undefined"]) {
+    const result = await verifyCompletion(await fixture(status));
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.scenarios[0].status, status);
+  }
 });
 
 test("wrong request, forged receipts, changed logs, missing inventory and premature completion refuse", async () => {
@@ -231,7 +243,7 @@ test("submission, authenticated reread, and publication preserve real failed out
   t.after(() => rm(root, { recursive: true, force: true }));
   const configPath = join(root, "provider.json");
   await writeFile(configPath, JSON.stringify(config));
-  const f = await fixture("failed");
+  let f = await fixture("failed");
   const calls = [];
   const build = async ({ out, sourceRepoRoot, repoRoot }) => {
     assert.equal(sourceRepoRoot, root);
@@ -283,6 +295,17 @@ test("submission, authenticated reread, and publication preserve real failed out
     ),
   );
   assert.equal(report[0].elements[0].steps[0].result.status, "failed");
+  f = await fixture("skipped");
+  calls.length = 0;
+  assert.equal(await runStage(options), 0, "held-only evidence must not make Jenkins FAILURE");
+  assert.deepEqual(calls, ["grant-status", "submit", "poll", "grant-status"]);
+  const verdict = JSON.parse(
+    await readFile(join(root, "genesis/a2o/reports/peer-stage-ci/verdict.json"), "utf8"),
+  );
+  assert.equal(verdict.verdict, "skip");
+  assert.equal(verdict.summary, "skip (0 measured, 1 held) — held, not measured");
+  assert.equal(verdict.held, 1);
+  assert.deepEqual(verdict.scenarios, []);
   withdrawn = true;
   await assert.rejects(runStage(options), /active measure-stage grant/);
   await assert.rejects(

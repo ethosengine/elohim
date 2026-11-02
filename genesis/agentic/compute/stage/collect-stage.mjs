@@ -93,25 +93,55 @@ export function stageVerdict(reportDoc, stage) {
   const inventoryOk =
     declared.size === seen.size && [...declared].every((name) => seen.has(name));
 
-  const scenarios = matching.map((r) => ({
-    name: r.name,
-    status: r.status === "passed" ? "passed" : "failed",
-    surface: r.feature,
-    durationMs: Math.round(r.durationMs ?? 0),
-  }));
-
   if (!inventoryOk) {
     return {
       verdict: "fail",
-      scenarios,
+      scenarios: [],
+      held: stage.heldScenarioNames?.length ?? 0,
+      heldScenarios: [...(stage.heldScenarioNames ?? [])],
       reason: `report scenario inventory for ${stage.feature} does not match the pinned declaration (declared ${[...declared].sort().join(", ")}; saw ${[...seen].sort().join(", ")})`,
     };
   }
+
+  const heldScenarios = [
+    ...(stage.heldScenarioNames ?? []),
+    ...matching.filter((r) => r.status === "skipped").map((r) => r.name),
+  ];
+  const scenarios = matching
+    .filter((r) => r.status !== "skipped")
+    .map((r) => ({
+      name: r.name,
+      status: r.status,
+      surface: r.feature,
+      durationMs: Math.round(r.durationMs ?? 0),
+    }));
+  const held = heldScenarios.length;
+
+  if (matching.length === 0 && declared.size > 0) {
+    return {
+      verdict: "skip",
+      scenarios,
+      held,
+      heldScenarios,
+      reason: "report named no scenarios for this feature",
+    };
+  }
   if (scenarios.length === 0) {
-    return { verdict: "skip", scenarios, reason: "report named no scenarios for this feature" };
+    return {
+      verdict: "skip",
+      scenarios,
+      held,
+      heldScenarios,
+      notMeasured: true,
+      reason: "every selected scenario was held — not measured",
+    };
   }
   const failed = scenarios.some((s) => s.status !== "passed");
-  return { verdict: failed ? "fail" : "pass", scenarios };
+  return { verdict: failed ? "fail" : "pass", scenarios, held, heldScenarios };
+}
+
+export function formatStageVerdict({ verdict, scenarios = [], held = 0, notMeasured = false }) {
+  return `${verdict} (${scenarios.length} measured, ${held} held)${notMeasured ? " — held, not measured" : ""}`;
 }
 
 // Accepts BOTH runner shapes in play: household-attestation's `Runner` passes `cwd` as a
@@ -288,7 +318,14 @@ export async function collectStageEvidence({
   const reportSha256 = createHash("sha256").update(framed.buffer).digest("hex");
 
   // (3) the verdict — reads the decoded report, never receipt.status.
-  const { verdict, scenarios, reason: verdictReason } = stageVerdict(framed.doc, stage);
+  const {
+    verdict,
+    scenarios,
+    held,
+    heldScenarios,
+    notMeasured,
+    reason: verdictReason,
+  } = stageVerdict(framed.doc, stage);
 
   // (4) durable copy: genesis/a2o/reports/peer-stage/<date>/<key(ref)>/ — every terminal
   // verdict (skip/fail/pass alike) leaves one here; only the brit put, the gap fulfil and the
@@ -313,6 +350,8 @@ export async function collectStageEvidence({
     reach: "trusted",
     moored: resolveMooring(env),
     scenarios,
+    held,
+    heldScenarios,
     peer: {
       rung,
       provider: status.provider,
@@ -388,6 +427,9 @@ export async function collectStageEvidence({
     stage,
     verdict,
     scenarios,
+    held,
+    heldScenarios,
+    notMeasured,
     durableDir,
     reportRelDir,
     cwd,
@@ -402,6 +444,9 @@ export async function collectStageEvidence({
   entry.evidence = {
     done: true,
     verdict,
+    held,
+    heldScenarios,
+    notMeasured,
     verdictReason,
     report: reportRelDir,
     durable: durableDir,

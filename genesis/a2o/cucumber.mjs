@@ -33,6 +33,10 @@
 const jsonReportPath = process.env.CUCUMBER_JSON_REPORT || 'reports/cucumber-report.json';
 const htmlReportPath = process.env.CUCUMBER_HTML_REPORT || 'reports/cucumber-report.html';
 
+// Shared with the peer-stage builder so its pinned scenario inventory is exactly the set the
+// mesh profile selects. This is plain configuration data; importing it does not load Cucumber.
+export const MESH_PROFILE_TAGS = '@e2e and not @wip and not @browser and not @browser-only';
+
 const base = {
   requireModule: ['tsx'],
   // Step, hook and helper files live at `steps/*.ts` and `steps/<domain>/*.ts`. The glob is
@@ -173,7 +177,7 @@ export default function () {
       ...base,
       paths: ['features/**/*.feature'],
       worldParameters: { env: 'mesh' },
-      tags: '@e2e and not @wip and not @browser and not @browser-only',
+      tags: MESH_PROFILE_TAGS,
     },
     // Act I, THE PORTAL. The browser half of the household lane, split out only
     // because it needs a real browser (`E2E_DEVICE_MODE=playwright`) — the

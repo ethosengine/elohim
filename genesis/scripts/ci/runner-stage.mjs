@@ -19,6 +19,7 @@ import {
 import { buildStageTask } from "../../agentic/compute/stage/build-stage-task.mjs";
 import {
   decodeFramedReport,
+  formatStageVerdict,
   stageVerdict,
 } from "../../agentic/compute/stage/collect-stage.mjs";
 
@@ -176,11 +177,11 @@ export async function verifyCompletion({
   insist(
     framed &&
       Array.isArray(framed.doc) &&
-      framed.doc.length === 1 &&
-      framed.doc[0].uri === stage.feature,
+      ((framed.doc.length === 1 && framed.doc[0].uri === stage.feature) ||
+        (framed.doc.length === 0 && stage.scenarioNames.length === 0)),
     "report must name exactly the pinned feature",
   );
-  const scenarios = (framed.doc[0].elements || []).filter(
+  const scenarios = (framed.doc[0]?.elements || []).filter(
     (e) => e.type === "scenario",
   );
   insist(
@@ -203,15 +204,18 @@ export async function verifyCompletion({
     "report is empty, duplicated, or has steps without outcomes",
   );
   const result = stageVerdict(framed.doc, stage);
-  insist(result.verdict !== "skip", result.reason || "stage verdict refused");
-  insist(!result.reason, result.reason);
+  insist(result.verdict !== "skip" || result.notMeasured, result.reason || "stage verdict refused");
+  insist(!result.reason || result.notMeasured, result.reason);
   if (result.verdict === "pass") {
+    const measuredNames = new Set(result.scenarios.map((scenario) => scenario.name));
     insist(
-      scenarios.every((s) =>
-        [...s.steps, ...(s.before || []), ...(s.after || [])].every(
-          (step) => step.result?.status === "passed",
+      scenarios
+        .filter((scenario) => measuredNames.has(scenario.name))
+        .every((scenario) =>
+          [...scenario.steps, ...(scenario.before || []), ...(scenario.after || [])].every(
+            (step) => step.result?.status === "passed",
+          ),
         ),
-      ),
       "passing report contains unfinished steps or failed hooks",
     );
     insist(
@@ -355,12 +359,19 @@ export async function runStage({
   await writeFile(
     join(out, "verdict.json"),
     JSON.stringify(
-      { verdict: result.verdict, scenarios: result.scenarios },
+      {
+        verdict: result.verdict,
+        summary: formatStageVerdict(result),
+        scenarios: result.scenarios,
+        held: result.held,
+        heldScenarios: result.heldScenarios,
+      },
       null,
       2,
     ),
   );
-  return result.verdict === "pass" ? 0 : 1;
+  process.stdout.write(`Peer stage: ${formatStageVerdict(result)}\n`);
+  return result.verdict === "fail" ? 1 : 0;
 }
 
 if (
