@@ -1885,9 +1885,9 @@ fn usage() -> String {
      (the FORWARD read — claims, fulfilments and notes oldest first, rendered as markdown a \
      status section is pasted from rather than retyped)\n  \
      | claim --on <intent-cid|gap-id|path> [--as agent:<role>@<model>] [--brief <path>] \
-     [--serves <habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
-     (--serves is checked against genesis/manifests/habits.yaml; a standing claim on the same \
-     intent is refused by name unless --supersede)\n  \
+     [--serves <habit-id|gitlink-path#habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
+     (--serves checks the local declaration or the explicitly named committed gitlink's pinned \
+     declaration; a standing claim on the same intent is refused by name unless --supersede)\n  \
      | intend --change <I…> --tree <oid> --base <oid> --class <0|low|channel|governance|high> \
      [--closure <project>=<key>]... [--predicted-base <oid>] [--chain-len N] \
      [--supersedes <cid>] [--session <id>] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \

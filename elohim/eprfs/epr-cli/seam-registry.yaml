@@ -47,6 +47,36 @@ seamLocus: >
   above as pending.
 
 decisionPoints:
+  - name: registers::claim_habit
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/flow/registers.rs
+      modulePath: elohim_epr_cli::flow::registers
+    summary: >
+      Resolve an explicit gitlink-path#habit-id for a parent-local claim against
+      the parent's committed gitlink and the owner's exact declaration bytes.
+      This is local provenance on the existing REA commitment, never an imported
+      habit census, repository authority, independent acceptance or publication.
+    concernIds:
+      - {id: C0, status: answered, justification: "Local authored commitment metadata (private B); derived lookup adds no DHT entry, coordinator, signal or recurring head."}
+      - {id: C1, status: answered, justification: "A declared habit does not appoint an acceptor or establish standing; native actor and acceptance checks remain unchanged."}
+      - {id: C2, status: answered, justification: "Parent HEAD gitlink pins the owner revision; staged pin changes, owner HEAD skew and changed declaration evidence refuse."}
+      - {id: C3, status: answered, justification: "Missing owner bytes refuse with a diagnosis; restoring the declared local pin permits retry without remote service or new authority."}
+      - {id: C4, status: answered, justification: "Unknown, ambiguous, unavailable and stale declarations refuse before append; none is treated as an empty successful lookup."}
+      - {id: C5, status: answered, justification: "Pins exact owner identity and declaration bytes as raw CIDs; their possession supplies provenance only, not acceptance."}
+      - {id: C6a, status: answered, justification: "Explicit owner only; bounded Git output, candidate count and declaration size, bounded subprocess time, no repository-wide recursive census."}
+      - {id: C6b, status: answered, justification: "Existing commitment content addressing and append transaction preserve replay idempotence; failed resolution leaves sidecar unchanged."}
+      - {id: C7, status: answered, justification: "Only qualified references opt into one committed gitlink; ordinary ids retain repository-local behavior."}
+      - {id: C8, status: partial, justification: "CLI emits each refusal and returns pinned provenance on success; typed aggregate decision counters remain outside this local command."}
+      - {id: C9, status: answered, justification: "Uses existing repository.yaml agent declaration; provider and actor claim retain their original namespace and binding."}
+      - {id: C10, status: answered, justification: "Malformed qualifiers and unsupported path forms refuse; no reinterpretation of unqualified habit ids."}
+      - {id: C11, status: answered, justification: "Oversized candidate output or declaration bytes decline with an error rather than buffering without limit."}
+      - {id: C12, status: answered, justification: "Explicit selector consents only to reading the named local owner's evidence; it grants no action authority over that owner."}
+      - {id: C13, status: n-a, justification: "No social tier, reach grant or publication gate is added; existing local attribution scaffold remains unchanged."}
+      - {id: C14, status: partial, justification: "Unexpected Git/I/O/parse failures retain named CLI errors and no append; no new cross-node residual reporting is introduced."}
+    contractTests:
+      - {path: elohim/eprfs/epr-cli/tests/flow_claim_habit.rs, testName: qualified_claim_preserves_parent_intent_actor_and_replay, kind: integration}
+      - {path: elohim/eprfs/epr-cli/tests/flow_claim_habit.rs, testName: unsafe_unknown_ambiguous_and_stale_owners_refuse_without_append, kind: integration}
   - name: seam::classify::classify
     kind: pure-decision-predicate
     sourceLocation:
