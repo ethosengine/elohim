@@ -24,6 +24,9 @@ nix = { workspace = true }
 # eprfs tree, its derivation looked up in brit through eprfs-core's `DerivationIndex`
 # (src/brit_index.rs), and its answer the `PendingStatus` channel of seam-contracts.
 eprfs-core = { path = "../../eprfs/eprfs-core" }
+eprfs-local = { path = "../../eprfs/eprfs-local" }
+eprfs-host = { path = "../../eprfs/eprfs-host" }
+eprfs-storage = { path = "../../eprfs/eprfs-storage" }
 elohim-placement-core = { path = "../../placement/core" }
 elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde"] }
 async-trait = { workspace = true }
