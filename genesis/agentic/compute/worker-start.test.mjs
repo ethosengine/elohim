@@ -8,6 +8,7 @@ import {
   readFileSync,
   chmodSync,
   existsSync,
+  readdirSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -30,17 +31,23 @@ function mapsGuest(mapping) {
     .split("\n")
     .some((row) => {
       const fields = row.trim().split(/\s+/).map(Number);
-      if (fields.length !== 3 || !fields.every(Number.isSafeInteger)) return false;
+      if (fields.length !== 3 || !fields.every(Number.isSafeInteger))
+        return false;
       const [inside, outside, count] = fields;
       return (
-        inside >= 0 && outside >= 0 && count > 0 &&
-        65534 >= inside && 65534 - inside < count
+        inside >= 0 &&
+        outside >= 0 &&
+        count > 0 &&
+        65534 >= inside &&
+        65534 - inside < count
       );
     });
 }
 
 function guestPrerequisite(readProc) {
-  const missing = ["uid_map", "gid_map"].filter((name) => !mapsGuest(readProc(name)));
+  const missing = ["uid_map", "gid_map"].filter(
+    (name) => !mapsGuest(readProc(name)),
+  );
   if (missing.length) {
     return `guest ownership prerequisite unavailable: guest ID 65534 is not mapped in ${missing.map((name) => `/proc/self/${name}`).join(" and ")}`;
   }
@@ -51,16 +58,22 @@ function guestPrerequisite(readProc) {
 }
 
 const guestOnly =
-  rootOnly || guestPrerequisite((name) => readFileSync(`/proc/self/${name}`, "utf8"));
+  rootOnly ||
+  guestPrerequisite((name) => readFileSync(`/proc/self/${name}`, "utf8"));
 
 const fullMap = "         0          0 4294967295\n";
 const singleMap = "         0          0          1\n";
 const prerequisites = (uid, gid, setgroups = "allow\n") =>
-  guestPrerequisite((name) => ({ uid_map: uid, gid_map: gid, setgroups })[name]);
+  guestPrerequisite(
+    (name) => ({ uid_map: uid, gid_map: gid, setgroups })[name],
+  );
 
 test("guest prerequisite accepts full and multiple namespace-local mappings", () => {
   assert.equal(prerequisites(fullMap, fullMap), false);
-  assert.equal(prerequisites("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"), false);
+  assert.equal(
+    prerequisites("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"),
+    false,
+  );
 });
 
 test("guest prerequisite names single-ID and separately missing UID/GID mappings", () => {
@@ -76,15 +89,26 @@ test("guest mapping uses the inside column and inclusive-start exclusive-end bou
     assert.equal(mapsGuest(mapping), true, mapping);
   }
   for (const mapping of [
-    "0 65534 1", "65535 42 1", "65533 42 1", "65534 42 0", "0 0 65534",
-    "", "invalid", "65534 -1 1", "65534 0 1.5", "65534 0 1 2",
+    "0 65534 1",
+    "65535 42 1",
+    "65533 42 1",
+    "65534 42 0",
+    "0 0 65534",
+    "",
+    "invalid",
+    "65534 -1 1",
+    "65534 0 1.5",
+    "65534 0 1 2",
   ]) {
     assert.equal(mapsGuest(mapping), false, mapping);
   }
 });
 
 test("guest prerequisite preserves the clear-groups permission boundary", () => {
-  assert.match(prerequisites(fullMap, fullMap, "deny\n"), /setgroups.*setpriv --clear-groups/);
+  assert.match(
+    prerequisites(fullMap, fullMap, "deny\n"),
+    /setgroups.*setpriv --clear-groups/,
+  );
   assert.match(prerequisites(fullMap, fullMap, ""), /setgroups/);
   assert.equal(prerequisites(fullMap, fullMap, "allow\n"), false);
 });
@@ -243,6 +267,21 @@ test(
     f.env.COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256 = "e".repeat(64);
     let run = f.run();
     assert.equal(run.status, 0, run.stderr);
+    const adminSecretPath = join(f.state, "private-home/mesh-api-key-admin");
+    const computeSecretPath = join(
+      f.state,
+      "private-home/mesh-compute-local-token",
+    );
+    const firstSecrets = [adminSecretPath, computeSecretPath].map((path) => {
+      const metadata = statSync(path);
+      assert.equal(metadata.isFile(), true);
+      assert.equal(metadata.uid, 0);
+      assert.equal(metadata.gid, 0);
+      assert.equal(metadata.mode & 0o777, 0o600);
+      const value = readFileSync(path, "utf8").trim();
+      assert.ok(value.length >= 32);
+      return value;
+    });
     assert.equal(
       readFileSync(join(f.state, "mesh/continuation-digest"), "utf8"),
       "d".repeat(64),
@@ -265,11 +304,55 @@ test(
     writeFileSync(key, "identity-kept-across-restart");
     run = f.run();
     assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(
+      [adminSecretPath, computeSecretPath].map((path) =>
+        readFileSync(path, "utf8").trim(),
+      ),
+      firstSecrets,
+    );
     assert.equal(readFileSync(key, "utf8"), "identity-kept-across-restart");
     writeFileSync(join(f.repo, "justfile"), "modified source\n");
     run = f.run();
     assert.equal(run.status, 2);
     assert.match(run.stderr, /modified tracked source/);
+  },
+);
+
+test(
+  "bootstrap refuses provider secret paths with unsafe types or modes",
+  { skip: rootOnly },
+  (t) => {
+    for (const unsafe of ["directory", "wrong-mode"]) {
+      const f = fixture(t);
+      const privateHome = join(f.state, "private-home");
+      mkdirSync(privateHome, { recursive: true, mode: 0o700 });
+      const path = join(privateHome, "mesh-api-key-admin");
+      if (unsafe === "directory") mkdirSync(path);
+      else writeFileSync(path, "x".repeat(44), { mode: 0o644 });
+      const run = f.run();
+      assert.equal(run.status, 2, `${unsafe}: ${run.stderr}`);
+      assert.match(
+        run.stderr,
+        /regular file owned by root:root with mode 0600/,
+      );
+    }
+  },
+);
+
+test(
+  "an existing mesh takes generated secrets at its ordinary start, with no restart arms",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    mkdirSync(join(f.state, "mesh"), { recursive: true });
+    const run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    const commands = readFileSync(join(f.state, "mesh/events"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => line.split(" ", 1)[0]);
+    // A pod start launches every mesh process afresh, so start + wait is the whole migration.
+    assert.deepEqual(commands, ["start", "wait"]);
   },
 );
 
@@ -415,6 +498,14 @@ test(
     assert.equal(seen.fenced, "1");
     assert.equal(seen.admin, undefined);
     assert.equal(seen.token, undefined);
+    for (const name of ["mesh-api-key-admin", "mesh-compute-local-token"]) {
+      const secret = readFileSync(
+        join(f.state, "private-home", name),
+        "utf8",
+      ).trim();
+      assert.doesNotMatch(run.stdout, new RegExp(secret));
+      assert.doesNotMatch(run.stderr, new RegExp(secret));
+    }
     assert.equal(
       statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o002,
       0,
@@ -427,15 +518,23 @@ test(
       ["mesh", "stop"],
       ["test", "mesh", "features/auth/login.feature"],
       ["test", "mesh", "@e2e"],
-    ])
-      {
-        const refused = invoke(args);
-        assert.equal(refused.status, 2);
-        if (args[0] === "test")
-          assert.match(refused.stderr, /provider-stages\.json/);
-      }
+    ]) {
+      const refused = invoke(args);
+      assert.equal(refused.status, 2);
+      if (args[0] === "test")
+        assert.match(refused.stderr, /provider-stages\.json/);
+    }
   },
 );
+
+test("provider fixture literals are absent from compute shell scripts", () => {
+  const shell = readdirSync(here)
+    .filter((name) => name.endsWith(".sh"))
+    .map((name) => readFileSync(join(here, name), "utf8"))
+    .join("\n");
+  assert.doesNotMatch(shell, /provider-private-mesh-fixture/);
+  assert.doesNotMatch(shell, /provider-private-mesh-fixture-local-only/);
+});
 
 test(
   "bootstrap and resume work with only SETUID SETGID CHOWN capabilities",

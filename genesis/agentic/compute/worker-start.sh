@@ -16,9 +16,40 @@ umask 077
 mkdir -p "$state/repos" "$state/private-home" "$state/tmp"
 chmod 755 "$state" "$state/repos"
 chmod 700 "$state/private-home" "$state/tmp"
+[[ "$(stat -c '%u:%g:%a' "$state/private-home")" == 0:0:700 ]] ||
+  refuse 'private-home must be owned by root:root with mode 0700'
 # Only one bootstrap/worker may own this state, including across restarts of the entrypoint.
 exec 9>"$state/worker.lock"
 flock -n 9 || refuse 'another worker owns this provider state'
+load_or_create_secret() { # <root-only-file> <output-variable>
+  local path="$1" output="$2" directory temporary metadata value
+  directory="$(dirname -- "$path")"
+  if [[ -e "$path" || -L "$path" ]]; then
+    metadata="$(stat -c '%F:%u:%g:%a' -- "$path" 2>/dev/null)" ||
+      refuse "cannot inspect provider secret $path"
+    [[ "$metadata" == 'regular file:0:0:600' ]] ||
+      refuse "provider secret must be a regular file owned by root:root with mode 0600: $path"
+  else
+    temporary="$(mktemp "$directory/.mesh-secret.XXXXXX")" ||
+      refuse "cannot create provider secret beside $path"
+    if ! head -c 32 /dev/urandom | base64 > "$temporary"; then
+      rm -f -- "$temporary"
+      refuse "cryptographic secret generation failed for $path"
+    fi
+    chmod 600 "$temporary"
+    chown 0:0 "$temporary"
+    mv -T -- "$temporary" "$path"
+  fi
+  IFS= read -r value < "$path" || refuse "provider secret is unreadable: $path"
+  [[ ${#value} -ge 32 ]] || refuse "provider secret is shorter than 32 characters: $path"
+  printf -v "$output" '%s' "$value"
+}
+# Both values are read only from each process's environment at launch (doorway config.rs:175/339,
+# storage compute_tasks.rs:19); nothing persists them except storage's root-only restart capture,
+# which `start` rewrites. A pod start launches every mesh process afresh, so a generated value
+# takes effect with no migration and the repository-known fixture literals are retired.
+load_or_create_secret "$state/private-home/mesh-api-key-admin" mesh_api_key_admin
+load_or_create_secret "$state/private-home/mesh-compute-local-token" mesh_compute_local_token
 for binary in elohim-storage doorway holochain hc iroh-relay relay-addr-beacon; do
   [[ -x "$image/mesh-bin/$binary" ]] || refuse "missing pinned image binary $binary"
 done
@@ -77,13 +108,32 @@ mesh_script="$repo/app/elohim-app/scripts/hc-mesh.sh"
 echo "provider bootstrap: source $commit; persistent mesh $state/mesh; sequential worker admission"
 # Do not leak the outer provider API token into captured mesh process environments.
 mesh_run() {
-  env -i HOME="$state/private-home" TMPDIR="$state/tmp" PATH=/usr/local/bin:/usr/bin:/bin \
-    COMPUTE_IMAGE_ROOT="$image" COMPUTE_STATE_ROOT="$state" \
-    MESH_API_KEY_ADMIN=provider-private-mesh-fixture \
-    MESH_COMPUTE_LOCAL_TOKEN=provider-private-mesh-fixture-local-only \
-    MESH_CONTINUE_INITIALIZATION_LOG_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
-    MESH_CONTINUE_INITIALIZATION_STATE_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256:-}" \
-    bash "$here/mesh-env.sh" bash "$mesh_script" "$@" 9>&-
+  PROVIDER_MESH_ADMIN_SECRET="$mesh_api_key_admin" \
+  PROVIDER_MESH_COMPUTE_SECRET="$mesh_compute_local_token" \
+  PROVIDER_MESH_CONTINUE_LOG="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
+  PROVIDER_MESH_CONTINUE_STATE="${COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256:-}" \
+  python3 - "$state" "$image" "$here/mesh-env.sh" "$mesh_script" "$@" 9>&- <<'PY'
+import os
+import sys
+
+state, image, mesh_env, mesh_script, *arguments = sys.argv[1:]
+environment = {
+    "HOME": f"{state}/private-home",
+    "TMPDIR": f"{state}/tmp",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "COMPUTE_IMAGE_ROOT": image,
+    "COMPUTE_STATE_ROOT": state,
+    "MESH_API_KEY_ADMIN": os.environ["PROVIDER_MESH_ADMIN_SECRET"],
+    "MESH_COMPUTE_LOCAL_TOKEN": os.environ["PROVIDER_MESH_COMPUTE_SECRET"],
+    "MESH_CONTINUE_INITIALIZATION_LOG_SHA256": os.environ["PROVIDER_MESH_CONTINUE_LOG"],
+    "MESH_CONTINUE_INITIALIZATION_STATE_SHA256": os.environ["PROVIDER_MESH_CONTINUE_STATE"],
+}
+environment["MESH_DOORWAY_ENV_SET"] = "\n".join((
+    f"API_KEY_ADMIN={environment['MESH_API_KEY_ADMIN']}",
+    f"POOL_COMPUTE_TOKEN={environment['MESH_COMPUTE_LOCAL_TOKEN']}",
+))
+os.execve("/bin/bash", ["bash", mesh_env, "bash", mesh_script, *arguments], environment)
+PY
 }
 mesh_run start
 mesh_run wait --timeout 900
