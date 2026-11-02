@@ -415,16 +415,25 @@ export function unavailableRequiredCaps(tags: string[]): string[] {
 
 // Keyed on `<uri>::<scenario>` (composite) so two scenarios that share the same `Scenario:` text in
 // different feature files do NOT overwrite each other in the reduced-scope report.
-let _skipped = new Map<string, { scenario: string; caps: string[] }>();
+let _skipped = new Map<string, { scenario: string; caps: string[]; reason?: string }>();
 
 /** Record that a scenario was held because <caps> are unavailable. `uri` (the feature-file path)
  * disambiguates same-named scenarios across files; pass scenario.pickle.uri at the call site. */
-export function noteSubstrateSkip(scenario: string, caps: string[], uri = ''): void {
-  _skipped.set(`${uri}::${scenario}`, { scenario, caps: [...caps] });
+export function noteSubstrateSkip(
+  scenario: string,
+  caps: string[],
+  uri = '',
+  reason?: string
+): void {
+  _skipped.set(`${uri}::${scenario}`, { scenario, caps: [...caps], ...(reason ? { reason } : {}) });
 }
 
 /** Snapshot of scenarios held this run by substrate-cap gating (sorted by name, copy). */
-export function substrateSkippedScenarios(): { scenario: string; caps: string[] }[] {
+export function substrateSkippedScenarios(): {
+  scenario: string;
+  caps: string[];
+  reason?: string;
+}[] {
   return [..._skipped.values()].sort((a, b) => a.scenario.localeCompare(b.scenario));
 }
 

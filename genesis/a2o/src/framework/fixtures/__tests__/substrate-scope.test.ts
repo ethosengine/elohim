@@ -230,6 +230,17 @@ void describe('substrate skip tracking', () => {
     resetSubstrateSkips();
     assert.deepEqual(substrateSkippedScenarios(), []);
   });
+  void it('retains the attached hold reason in the reduced-scope ledger', () => {
+    noteSubstrateSkip(
+      'household process scenario',
+      [OWNED],
+      'features/x.feature',
+      'household-only'
+    );
+    assert.deepEqual(substrateSkippedScenarios(), [
+      { scenario: 'household process scenario', caps: [OWNED], reason: 'household-only' },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------

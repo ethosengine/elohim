@@ -74,6 +74,7 @@ import {
 import { isSpaRoutingNoise } from '../src/framework/utils/console-filters.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { E2EWorld } from '../src/framework/world.js';
+import { householdOnlyHoldReason } from '../scripts/lib/household-only.js';
 
 setWorldConstructor(E2EWorld);
 
@@ -741,12 +742,13 @@ Before(function (this: E2EWorld, scenario) {
   const tags = scenario.pickle.tags.map(t => t.name);
   const missing = unavailableRequiredCaps(tags);
   if (missing.length > 0) {
-    noteSubstrateSkip(scenario.pickle.name, missing, scenario.pickle.uri);
+    const householdReason = householdOnlyHoldReason(scenario.pickle.uri, missing);
+    const reason =
+      householdReason ?? `requires unavailable ${missing.join(', ')} — skipped, not failed.`;
+    noteSubstrateSkip(scenario.pickle.name, missing, scenario.pickle.uri, reason);
+    this.attach(reason, 'text/plain');
     // eslint-disable-next-line no-console
-    console.log(
-      `  ⏭️  HELD (substrate): "${scenario.pickle.name}" requires unavailable ` +
-        `${missing.join(', ')} — skipped, not failed.`
-    );
+    console.log(`  ⏭️  HELD (substrate): "${scenario.pickle.name}" ${reason}`);
     return 'skipped';
   }
   return undefined;

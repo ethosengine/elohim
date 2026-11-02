@@ -1,0 +1,86 @@
+[
+  {
+    "feature": "features/dataplane/accountable-correction.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/dataplane/content-sync.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/doorway-apex-transition.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/dataplane/doorway-node-identity.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/doorway-sibling-reader.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/dataplane/epr-app-channel-isolation.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/epr-app-deliverability.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/name-routing.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/dataplane/notary-authority.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/resiliency-saga/11-pull-queue-retires.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/dataplane/served-shell-boots.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/delivery/happ-coordinator-delivery.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/doorway/native-epr-projection.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/doorway/peer-conductor-connection-resilience.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/federation/name-routing.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/federation/peer-loss-failover.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/federation/peer-recovery.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/resilience/app-blob-heal-on-read.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/resilience/chaos-peer-churn.feature",
+    "kind": "proc-read"
+  },
+  {
+    "feature": "features/resilience/conductor-validation-spin.feature",
+    "kind": "processControl"
+  },
+  {
+    "feature": "features/resilience/peer-byteplane-reconstruction.feature",
+    "kind": "processControl"
+  }
+]

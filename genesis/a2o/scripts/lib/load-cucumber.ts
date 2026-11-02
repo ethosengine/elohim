@@ -8,6 +8,12 @@ export interface ScenarioResult {
   durationMs?: number;
   failureMessage?: string;
   tags: string[];
+  attachments: string[];
+}
+
+interface CucumberEmbedding {
+  data: string;
+  mime_type: string;
 }
 
 interface CucumberStep {
@@ -16,6 +22,7 @@ interface CucumberStep {
   before?: CucumberStep[];
   after?: CucumberStep[];
   result?: { status: string; duration?: number; error_message?: string };
+  embeddings?: CucumberEmbedding[];
 }
 
 interface CucumberTag {
@@ -76,6 +83,11 @@ export function loadCucumber(json: string): ScenarioResult[] {
       );
       const failed = outcomes.find(s => ['failed', 'ambiguous'].includes(s.result?.status ?? ''));
       const tags = (el.tags ?? []).map(t => t.name);
+      const attachments = outcomes.flatMap(step =>
+        (step.embeddings ?? [])
+          .filter(embedding => embedding.mime_type.startsWith('text/'))
+          .map(embedding => Buffer.from(embedding.data, 'base64').toString('utf8'))
+      );
       results.push({
         name: el.name,
         feature: feature.uri,
@@ -84,6 +96,7 @@ export function loadCucumber(json: string): ScenarioResult[] {
           steps.reduce((total, step) => total + (step.result?.duration ?? 0), 0) / 1_000_000,
         failureMessage: failed?.result?.error_message,
         tags,
+        attachments,
       });
     }
   }

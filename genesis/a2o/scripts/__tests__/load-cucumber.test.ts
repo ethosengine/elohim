@@ -121,6 +121,36 @@ void describe('loadCucumber', () => {
     assert.equal(results[0].feature, 'features/lms/learning-journey.feature');
   });
 
+  void it('decodes text attachments from Cucumber embeddings', () => {
+    const attachment = 'household-only — not measured here';
+    const [result] = loadCucumber(
+      JSON.stringify([
+        {
+          uri: peerFeature,
+          elements: [
+            {
+              type: 'scenario',
+              name: peerScenario,
+              before: [
+                {
+                  result: { status: 'skipped' },
+                  embeddings: [
+                    {
+                      data: Buffer.from(attachment).toString('base64'),
+                      mime_type: 'text/plain',
+                    },
+                  ],
+                },
+              ],
+              steps: [{ name: 'responds', result: { status: 'skipped' } }],
+            },
+          ],
+        },
+      ])
+    );
+    assert.deepEqual(result.attachments, [attachment]);
+  });
+
   void it('classifies passed scenario', () => {
     const [passed] = loadCucumber(fixture);
     assert.equal(passed.status, 'passed');

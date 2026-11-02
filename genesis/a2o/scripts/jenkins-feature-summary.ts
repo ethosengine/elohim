@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { loadCucumber } from './lib/load-cucumber.js';
+import { HOUSEHOLD_ONLY_HOLD_REASON } from './lib/household-only.js';
 
 const LANES = ['api', 'browser', 'peer-stage'] as const;
 
@@ -16,7 +17,12 @@ export function featureSummary(read: (lane: string) => string | undefined): stri
       if (!scenarios.length) return `${lane}: not measured (empty report)`;
       const count = (status: string) =>
         scenarios.filter(scenario => scenario.status === status).length;
-      return `${lane}: ${count('passed')}/${scenarios.length} scenarios passed, ${count('failed')} failed, ${count('skipped')} skipped, ${count('pending') + count('undefined')} pending/undefined`;
+      const householdOnly = scenarios.filter(
+        scenario =>
+          scenario.status === 'skipped' && scenario.attachments.includes(HOUSEHOLD_ONLY_HOLD_REASON)
+      ).length;
+      const householdLabel = householdOnly > 0 ? ` (${householdOnly} household-only)` : '';
+      return `${lane}: ${count('passed')}/${scenarios.length} scenarios passed, ${count('failed')} failed, ${count('skipped')} skipped${householdLabel}, ${count('pending') + count('undefined')} pending/undefined`;
     } catch {
       return `${lane}: not measured (unreadable report)`;
     }

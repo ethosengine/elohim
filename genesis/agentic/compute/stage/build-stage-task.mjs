@@ -15,6 +15,7 @@
  *     [--writable <path>]... [--repo-root <path>] [--cpu-millis N] [--memory-bytes N]
  *     [--timeout-seconds N]
  *   build-stage-task.mjs check-delegable --feature <path> [--mesh-dir <dir>]
+ *   build-stage-task.mjs list-household-only
  */
 import { chmod, copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -171,6 +172,22 @@ async function listStepModules(dir) {
   return found;
 }
 
+async function listFeatureFiles(dir, a2oDir) {
+  const found = [];
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...(await listFeatureFiles(full, a2oDir)));
+    else if (entry.name.endsWith(".feature")) found.push(relative(a2oDir, full));
+  }
+  return found;
+}
+
 /**
  * Returns { delegable, kind, headline, evidence: [{file, line, kind, what}], fixtureWritable }.
  * `feature` is relative to genesis/a2o (or absolute); `meshDir` roots fixtureWritable.
@@ -216,6 +233,26 @@ export async function assessDelegability({
         ? `${featureRel} reads household processes' /proc (another UID's environ/exe) — not delegatable to a guest; run it locally`
         : null;
   return { delegable: kind === null, kind, headline, evidence, fixtureWritable };
+}
+
+/**
+ * The checked-in Jenkins/runtime inventory is a projection of this assessment, never a hand list.
+ * Only processControl and proc-read refusals are household-only; other future refusal kinds must
+ * make their own presentation decision.
+ */
+export async function listHouseholdOnlyFeatures({ a2oDir = A2O_DIR } = {}) {
+  const features = await listFeatureFiles(join(a2oDir, "features"), a2oDir);
+  const classified = await Promise.all(
+    features.map(async (feature) => {
+      const result = await assessDelegability({ feature, a2oDir });
+      return ["processControl", "proc-read"].includes(result.kind)
+        ? { feature, kind: result.kind }
+        : null;
+    }),
+  );
+  return classified
+    .filter(Boolean)
+    .sort((a, b) => a.feature.localeCompare(b.feature));
 }
 
 /**
@@ -473,6 +510,11 @@ function intArg(value) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  // Emits the generated inventory consumed by a2o's hold hook and Jenkins summary.
+  if (argv[0] === "list-household-only") {
+    console.log(JSON.stringify(await listHouseholdOnlyFeatures(), null, 2));
+    return;
+  }
   // `check-delegable --feature <f> [--mesh-dir <d>]`: measure.sh's pre-submit refusal. Prints
   // the assessment as JSON on stdout; exit 3 when the guest cannot run the feature.
   if (argv[0] === "check-delegable") {

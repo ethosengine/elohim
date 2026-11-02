@@ -11,6 +11,7 @@ import {
   A2O_DIR,
   assessDelegability,
   buildStageTask,
+  listHouseholdOnlyFeatures,
   parseFeatureConcern,
   parseScenarioNames,
   probeRunParser,
@@ -473,6 +474,15 @@ test("assessDelegability: process-owning and /proc-reading lanes refuse; read-on
     assert.equal(result.delegable, true, feature);
     assert.deepEqual(result.fixtureWritable, []);
   }
+});
+
+test("checked-in household-only inventory is the delegability classifier's exact projection", async () => {
+  const projected = JSON.parse(
+    await readFile(join(dirname(new URL(import.meta.url).pathname), "household-only-features.json"), "utf8"),
+  );
+  assert.deepEqual(projected, await listHouseholdOnlyFeatures());
+  assert.ok(projected.some((entry) => entry.kind === "processControl"));
+  assert.ok(projected.some((entry) => entry.kind === "proc-read"));
 });
 
 test("buildStageTask refuses a process-owning feature before writing anything", async (t) => {
