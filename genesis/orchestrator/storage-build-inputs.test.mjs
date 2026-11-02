@@ -151,14 +151,45 @@ test('closure reuse shares one decision across gates, release builds and pushes'
   }
   assert.ok(edge.includes("closurePresent('DOORWAY_APP', 'Build Doorway App')"));
   assert.ok(edge.includes("pushClosureImage('DOORWAY_APP', 'doorway-app')"));
+  assert.ok(edge.includes("closurePresent('AGENT_SDK', 'Build Agent SDK')"));
+  assert.ok(edge.includes("pushClosureImage('AGENT_SDK', 'elohim-agent-sdk')"));
   assert.match(edge, /if \(closurePresent\(kind, "Push \$\{imageName\}"\)\) \{[\s\S]*?return/);
   assert.doesNotMatch(edge, /push-harbor-(tracked|untracked)\.sh' elohim-(doorway|storage)/);
   assert.doesNotMatch(edge, /push-harbor-untracked\.sh' doorway-app/);
+  assert.doesNotMatch(edge, /push-harbor-untracked\.sh' elohim-agent-sdk/);
   assert.doesNotMatch(edge, /scripts\/ci\/push-harbor-dev-latest-aliases\.sh/);
   assert.match(edge, /def doorwayTag = "closure-\$\{doorwayKey\.substring\(7, 23\)\}"/);
   assert.match(edge, /def storageTag = "closure-\$\{storageKey\.substring\(7, 23\)\}"/);
   assert.match(edge, /def doorwayAppTag = doorwayAppKey \? "closure-\$\{doorwayAppKey\.substring\(7, 23\)\}" : doorwayAppFallbackTag/);
   assert.match(edge, /def doorwayAppKey = closureKey\('build-doorway-app', true\)/);
+  assert.match(edge, /def agentSdkTag = agentSdkKey \? "closure-\$\{agentSdkKey\.substring\(7, 23\)\}" : agentSdkFallbackTag/);
+  assert.match(edge, /def agentSdkKey = closureKey\('build-agent-sdk', true\)/);
+  assert.equal((edge.match(/AGENT_SDK_TAG_PLACEHOLDER/g) ?? []).length, 3);
+  assert.ok(edge.includes('s/AGENT_SDK_TAG_PLACEHOLDER/${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}/g'));
+  assert.equal((edge.match(/s\|AGENT_SDK_TAG_PLACEHOLDER\|\$\{versions\.AGENT_SDK_TAG \?: versions\.EDGENODE_TAG\}\|g/g) ?? []).length, 2);
+});
+
+test('agent-sdk closure is exactly its standalone Docker context and build process', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'elohim/holochain/build-manifest.json'), 'utf8'));
+  const step = manifest.steps['build-agent-sdk'];
+  assert.deepEqual(step.inputs.sources, ['elohim/elohim-agent/elohim-agent-sdk/**']);
+  assert.deepEqual(step.inputs.buildProcess, [
+    'elohim/holochain/Jenkinsfile',
+    'scripts/ci/build-agent-sdk-image.sh',
+    'scripts/ci/closure-input-digest.sh',
+    'scripts/ci/harbor-oracle.sh',
+  ]);
+  const sdk = join(root, 'elohim/elohim-agent/elohim-agent-sdk');
+  const docker = readFileSync(join(sdk, 'Dockerfile'), 'utf8');
+  const copied = [...docker.matchAll(/^COPY\s+(?!--from)(.+)$/gm)]
+    .flatMap(m => m[1].trim().split(/\s+/).filter(p => !p.startsWith('--')).slice(0, -1));
+  for (const source of copied) assert.ok(existsSync(join(sdk, source)), `agent-sdk Docker COPY source is absent: ${source}`);
+  const pkg = JSON.parse(readFileSync(join(sdk, 'package.json'), 'utf8'));
+  for (const group of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+    for (const [name, version] of Object.entries(pkg[group] ?? {})) {
+      assert.doesNotMatch(String(version), /^(workspace:|file:|link:)/, `${name} reaches outside the standalone Docker context`);
+    }
+  }
 });
 
 test('doorway-app closure follows every workspace dependency used by its build', () => {
@@ -238,7 +269,7 @@ test('deploy readers receive the selected closure and preserve unselected images
   assert.match(writer, /selected \? \(env\.getProperty\(key\) \?: ''\) : ''/);
   assert.equal((edge.match(/^\s+writeDeploymentVersions\(/gm) ?? []).length, 4);
   assert.match(edge, /def storageInputs = versions.STORAGE_CLOSURE \?: ''/);
-  assert.match(edge, /def pushClosureImage[^\n]+\{\s*def step = kind == 'DOORWAY_APP' \? 'build-doorway-app' : "cargo-build-\$\{kind.toLowerCase\(\)\}"/);
+  assert.match(edge, /def pushClosureImage[^\n]+\{\s*def step = kind == 'DOORWAY_APP' \? 'build-doorway-app' : kind == 'AGENT_SDK' \? 'build-agent-sdk' : "cargo-build-\$\{kind.toLowerCase\(\)\}"/);
   assert.match(edge, /if \(!shouldRunStep\(step\) && !fallback\) return/);
 });
 
@@ -262,6 +293,16 @@ test('doorway-app closure recipe and real inputs select its manifest step', () =
     const edge = result.pipelines.find(p => p.name === 'elohim-edge');
     assert.ok(edge, JSON.stringify(result));
     assert.ok(edge.steps.some(step => step.name === 'build-doorway-app'), path);
+  }
+});
+
+test('agent-sdk closure recipe and real inputs select its manifest step', () => {
+  const content = JSON.parse(readFileSync(join(root, 'elohim/holochain/build-manifest.json'), 'utf8'));
+  for (const path of ['scripts/ci/build-agent-sdk-image.sh', 'scripts/ci/closure-input-digest.sh', 'scripts/ci/harbor-oracle.sh', 'elohim/elohim-agent/elohim-agent-sdk/src/server.ts', 'elohim/elohim-agent/elohim-agent-sdk/package.json']) {
+    const result = walkGraph([{content}], [path]);
+    const edge = result.pipelines.find(p => p.name === 'elohim-edge');
+    assert.ok(edge, JSON.stringify(result));
+    assert.ok(edge.steps.some(step => step.name === 'build-agent-sdk'), path);
   }
 });
 

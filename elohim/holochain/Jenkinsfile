@@ -75,7 +75,10 @@ def setupEdgeVersion() {
     def doorwayAppKey = closureKey('build-doorway-app', true)
     def doorwayAppTag = doorwayAppKey ? "closure-${doorwayAppKey.substring(7, 23)}" : doorwayAppFallbackTag
     env.DOORWAY_APP_CLOSURE_FALLBACK = doorwayAppKey ? 'false' : 'true'
-    def agentSdkTag = computeTag(versionMap['AGENT_SDK_VERSION'] ?: '0.1.0')
+    def agentSdkFallbackTag = computeTag(versionMap['AGENT_SDK_VERSION'] ?: '0.1.0')
+    def agentSdkKey = closureKey('build-agent-sdk', true)
+    def agentSdkTag = agentSdkKey ? "closure-${agentSdkKey.substring(7, 23)}" : agentSdkFallbackTag
+    env.AGENT_SDK_CLOSURE_FALLBACK = agentSdkKey ? 'false' : 'true'
     // hApp is built by DNA pipeline — use floating tag, not commit-specific
     def happTag = getHappFloatingTag()
 
@@ -95,6 +98,9 @@ DOORWAY_CLOSURE_MATERIAL=${doorwayKey}
 DOORWAY_APP_CLOSURE=${doorwayAppKey}
 DOORWAY_APP_CLOSURE_MATERIAL=${doorwayAppKey}
 DOORWAY_APP_CLOSURE_FALLBACK=${env.DOORWAY_APP_CLOSURE_FALLBACK}
+AGENT_SDK_CLOSURE=${agentSdkKey}
+AGENT_SDK_CLOSURE_MATERIAL=${agentSdkKey}
+AGENT_SDK_CLOSURE_FALLBACK=${env.AGENT_SDK_CLOSURE_FALLBACK}
 HAPP_INSTALLER_TAG=${happInstallerTag}
 DOORWAY_APP_TAG=${doorwayAppTag}
 AGENT_SDK_TAG=${agentSdkTag}
@@ -148,6 +154,9 @@ def withBuildVars(props, Closure body) {
         "DOORWAY_APP_CLOSURE=${props.DOORWAY_APP_CLOSURE ?: ''}",
         "DOORWAY_APP_CLOSURE_MATERIAL=${props.DOORWAY_APP_CLOSURE_MATERIAL ?: ''}",
         "DOORWAY_APP_CLOSURE_FALLBACK=${props.DOORWAY_APP_CLOSURE_FALLBACK ?: 'false'}",
+        "AGENT_SDK_CLOSURE=${props.AGENT_SDK_CLOSURE ?: ''}",
+        "AGENT_SDK_CLOSURE_MATERIAL=${props.AGENT_SDK_CLOSURE_MATERIAL ?: ''}",
+        "AGENT_SDK_CLOSURE_FALLBACK=${props.AGENT_SDK_CLOSURE_FALLBACK ?: 'false'}",
         "HAPP_INSTALLER_TAG=${props.HAPP_INSTALLER_TAG ?: props.IMAGE_TAG ?: ''}",
         "DOORWAY_APP_TAG=${props.DOORWAY_APP_TAG ?: props.IMAGE_TAG ?: ''}",
         "AGENT_SDK_TAG=${props.AGENT_SDK_TAG ?: props.IMAGE_TAG ?: ''}",
@@ -451,10 +460,10 @@ def checkEdgeNodeHealth(String url) {
 def decideImageClosures() {
     def props = loadBuildVars()
     withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
-        ['STORAGE': 'elohim-storage', 'DOORWAY': 'elohim-doorway', 'DOORWAY_APP': 'doorway-app'].each { kind, repo ->
+        ['STORAGE': 'elohim-storage', 'DOORWAY': 'elohim-doorway', 'DOORWAY_APP': 'doorway-app', 'AGENT_SDK': 'elohim-agent-sdk'].each { kind, repo ->
             def key = props["${kind}_CLOSURE"]
             if (!(key ==~ /sha256:[a-f0-9]{64}/)) {
-                if (kind != 'DOORWAY_APP') error("Missing ${kind} closure")
+                if (!(kind in ['DOORWAY_APP', 'AGENT_SDK'])) error("Missing ${kind} closure")
                 env.setProperty("${kind}_CLOSURE_HIT", 'false')
                 env.setProperty("${kind}_CLOSURE", '')
                 echo "${kind} closure unjudged: using commit-tag fallback"
@@ -492,10 +501,18 @@ def runDoorwayAppStageBody() {
     }
 }
 
+def runAgentSdkStageBody() {
+    if (closurePresent('AGENT_SDK', 'Build Agent SDK')) return
+    withBuildVars(loadBuildVars()) {
+        echo "Building Elohim Agent SDK sidecar: ${AGENT_SDK_TAG}"
+        sh "bash '${env.WORKSPACE}/scripts/ci/build-agent-sdk-image.sh'"
+    }
+}
+
 // Closure images have exactly one tag. Never feed them to commit/dev-latest push helpers.
 def pushClosureImage(String kind, String imageName) {
-    def step = kind == 'DOORWAY_APP' ? 'build-doorway-app' : "cargo-build-${kind.toLowerCase()}"
-    def fallback = kind == 'DOORWAY_APP' && env.DOORWAY_APP_CLOSURE_FALLBACK == 'true'
+    def step = kind == 'DOORWAY_APP' ? 'build-doorway-app' : kind == 'AGENT_SDK' ? 'build-agent-sdk' : "cargo-build-${kind.toLowerCase()}"
+    def fallback = kind in ['DOORWAY_APP', 'AGENT_SDK'] && env.getProperty("${kind}_CLOSURE_FALLBACK") == 'true'
     if (!shouldRunStep(step) && !fallback) return
     if (closurePresent(kind, "Push ${imageName}")) {
         env.IMAGES_PUSHED = 'true'
@@ -511,7 +528,7 @@ def pushClosureImage(String kind, String imageName) {
 }
 
 def pushOtherDevAliases() {
-    ['elohim-edgenode', 'elohim-happ-installer', 'elohim-agent-sdk'].each { imageName ->
+    ['elohim-edgenode', 'elohim-happ-installer'].each { imageName ->
         def local = "${imageName}:${env.IMAGE_TAG}"
         if (sh(script: "nerdctl -n k8s.io image inspect '${local}' >/dev/null 2>&1", returnStatus: true) == 0) {
             def remote = "harbor.ethosengine.com/ethosengine/${imageName}:dev-latest"
@@ -3056,26 +3073,9 @@ pipeline {
             steps {
                 container('builder') {
                     script {
-                        def props = loadBuildVars()
+                        runAgentSdkStageBody()
 
-                        withBuildVars(props) {
-                            echo "Building Elohim Agent SDK sidecar: ${AGENT_SDK_TAG}"
-
-                            sh """#!/bin/bash
-                                set -euo pipefail
-
-                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                                cd elohim/elohim-agent/elohim-agent-sdk
-
-                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                                    nerdctl -n k8s.io build \\
-                                    -t elohim-agent-sdk:${IMAGE_TAG} \\
-                                    -f Dockerfile .
-
-                                nerdctl -n k8s.io tag elohim-agent-sdk:${IMAGE_TAG} elohim-agent-sdk:${GIT_COMMIT_HASH}
-                            """
-
+                        withBuildVars(loadBuildVars()) {
                             // Beacon build (scripts/ci); UNSTABLE-isolated so it can't abort critical delivery.
                             catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                                 sh "bash '${env.WORKSPACE}/scripts/ci/build-relay-addr-beacon.sh'"
@@ -3247,7 +3247,7 @@ pipeline {
 
                                 pushClosureImage('DOORWAY_APP', 'doorway-app')
 
-                                sh "bash '${env.WORKSPACE}/scripts/ci/push-harbor-untracked.sh' elohim-agent-sdk elohim-agent-sdk '${AGENT_SDK_TAG}' 'Agent SDK'"
+                                pushClosureImage('AGENT_SDK', 'elohim-agent-sdk')
 
                                 // Relay Addr Beacon push+alias — scripts/ci/push-relay-addr-beacon.sh
                                 sh "bash '${env.WORKSPACE}/scripts/ci/push-relay-addr-beacon.sh'"

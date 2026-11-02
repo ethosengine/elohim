@@ -173,6 +173,31 @@
         "function": "runDoorwayAppStageBody"
       }
     },
+    "build-agent-sdk": {
+      "description": "Build the Elohim Agent SDK constitutional-reasoning sidecar image",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-agent/elohim-agent-sdk/**"
+        ],
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile",
+          "scripts/ci/build-agent-sdk-image.sh",
+          "scripts/ci/closure-input-digest.sh",
+          "scripts/ci/harbor-oracle.sh"
+        ]
+      },
+      "outputs": {
+        "artifacts": [
+          "elohim-agent-sdk-image"
+        ],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Agent SDK",
+        "function": "runAgentSdkStageBody"
+      }
+    },
     "sdk-feature-matrix": {
       "description": "Run elohim-sdk tests across its advertised feature sets, plus fmt and clippy",
       "inputs": {
@@ -254,7 +279,8 @@
       },
       "depends": [
         "build-edge-image",
-        "build-doorway-app"
+        "build-doorway-app",
+        "build-agent-sdk"
       ],
       "executor": {
         "stage": "Deploy Edge Node - Alpha",

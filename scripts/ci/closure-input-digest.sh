@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# closure-input-digest.sh <build-storage|build-doorway|build-doorway-app> [--material]
+# closure-input-digest.sh <build-storage|build-doorway|build-doorway-app|build-agent-sdk> [--material]
 # Run at repo root. stdout: sha256:<hex>, or its canonical material list.
 # Exit 0: complete clean closure; exit 1: cannot judge (no key); exit 2: usage.
 # HEAD oids describe tracked inputs; dirty inputs refuse. Untracked generated
@@ -12,7 +12,8 @@ case "$STEP" in
     build-storage) DOCKERFILE=elohim/elohim-storage/Dockerfile ;;
     build-doorway) DOCKERFILE=doorway/doorway-service/Dockerfile ;;
     build-doorway-app) DOCKERFILE=doorway/doorway-app/Dockerfile ;;
-    *) echo 'usage: closure-input-digest.sh <build-storage|build-doorway|build-doorway-app> [--material]' >&2; exit 2 ;;
+    build-agent-sdk) DOCKERFILE=elohim/elohim-agent/elohim-agent-sdk/Dockerfile ;;
+    *) echo 'usage: closure-input-digest.sh <build-storage|build-doorway|build-doorway-app|build-agent-sdk> [--material]' >&2; exit 2 ;;
 esac
 [ "$#" -le 2 ] && { [ "$#" -eq 1 ] || [ "$2" = --material ]; } || exit 2
 die() { echo "closure-input-digest: $*" >&2; exit 1; }
@@ -28,9 +29,12 @@ const step = process.argv[2], dockerfile = process.argv[3];
 const manifest = 'elohim/holochain/build-manifest.json';
 const jenkins = 'elohim/holochain/Jenkinsfile';
 const doorwayApp = step === 'build-doorway-app';
+const agentSdk = step === 'build-agent-sdk';
+const standaloneImage = doorwayApp || agentSdk;
 const sources = new Set([manifest, jenkins, dockerfile,
   'scripts/ci/closure-input-digest.sh', 'scripts/ci/harbor-oracle.sh']);
 if (doorwayApp) sources.add('scripts/ci/build-doorway-app-image.sh');
+else if (agentSdk) sources.add('scripts/ci/build-agent-sdk-image.sh');
 else for (const source of ['scripts/ci/build-storage-image.sh',
   'scripts/ci/storage-input-digest.sh', 'elohim/holochain-conductor']) sources.add(source);
 for (const path of ['.dockerignore', `${dockerfile}.dockerignore`]) if (fs.existsSync(path)) sources.add(path);
@@ -40,7 +44,7 @@ function add(source) {
     throw Error(`unsupported input: ${source}`);
   sources.add(source);
 }
-const manifestStep = doorwayApp ? step : `cargo-${step}`;
+const manifestStep = standaloneImage ? step : `cargo-${step}`;
 const inputs = JSON.parse(fs.readFileSync(manifest)).steps[manifestStep].inputs;
 for (const source of [...inputs.sources, ...(inputs.buildProcess || [])]) add(source);
 const docker = fs.readFileSync(dockerfile, 'utf8').replace(/\\\r?\n/g, ' ');
@@ -58,15 +62,16 @@ for (const line of docker.split('\n')) {
       // belong in the key.
       if (source === 'dist' || source.startsWith('dist/')) return;
       add(`doorway/doorway-app/${source}`);
-    } else add(source);
+    } else if (agentSdk) add(`elohim/elohim-agent/elohim-agent-sdk/${source}`);
+    else add(source);
   });
   copies++;
 }
 if (!copies) throw Error('no COPY sources');
 const jenkinsText = fs.readFileSync(jenkins, 'utf8');
 const defs = new Map([...jenkinsText.matchAll(/^def (\w+)\([^\n]*\) \{\n([\s\S]*?)^\}/gm)].map(m => [m[1], m[2]]));
-const helpers = doorwayApp
-  ? ['runDoorwayAppStageBody']
+const helpers = doorwayApp ? ['runDoorwayAppStageBody']
+  : agentSdk ? ['runAgentSdkStageBody']
   : ['runQualityGates', step === 'build-storage' ? 'runStorageStageBody' : 'runDoorwayStageBody'];
 const seenHelpers = new Set(), recipeTexts = [];
 while (helpers.length) {
