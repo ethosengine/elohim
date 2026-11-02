@@ -492,9 +492,11 @@ Matthew is the declared accountable steward; Adam is a fixture provider. This de
 does not claim a separately notarized Matthew-to-Adam relationship.
 
 The G2 declaration permits `measure-stage` at commons reach, four runs/hour, from
-**2026-10-29 13:15:00 UTC through 2026-11-05 13:15:00 UTC**. The first window
-(2026-10-22 04:54:39 to 2026-10-29 04:54:39 UTC) expired unrenewed; Matthew approved this
-replacement on 2026-10-29 with identical parties and bounds. Its task scope is `*` because
+**2026-11-02 16:00:00 UTC through 2026-11-09 16:00:00 UTC**. The first window
+(2026-10-22 04:54:39 to 2026-10-29 04:54:39 UTC) expired unrenewed; Matthew approved a
+replacement on 2026-10-29 (window through 2026-11-05 13:15:00 UTC) and, on 2026-11-02, this
+one with identical parties and bounds, deployed with the worker image that fixed the pinned
+checkout (answer: "Approve the renewal"). Its task scope is `*` because
 each stage has a fresh nonce/CID; the enabled Jenkins profile separately fixes the
 three-scenario `features/dataplane/peer-mesh.feature` lane. The profile remains disabled
 until CI captures the actual native grant action hash and live worker evidence.
