@@ -3,6 +3,8 @@ import { test } from 'node:test';
 
 import { featureSummary } from '../jenkins-feature-summary.js';
 
+const PEER_STAGE = 'peer-stage';
+
 void test('preserves separate lane results and missing evidence', () => {
   const report = JSON.stringify([
     {
@@ -40,7 +42,7 @@ void test('peer-stage reports held scenarios as not measured and counts mixed he
     },
   ]);
   assert.equal(
-    featureSummary(lane => (lane === 'peer-stage' ? allHeld : undefined)),
+    featureSummary(lane => (lane === PEER_STAGE ? allHeld : undefined)),
     'api: not measured (no report) | browser: not measured (no report) | peer-stage: held, not measured (1 held)'
   );
 
@@ -54,7 +56,7 @@ void test('peer-stage reports held scenarios as not measured and counts mixed he
     },
   ]);
   assert.equal(
-    featureSummary(lane => (lane === 'peer-stage' ? mixed : undefined)),
+    featureSummary(lane => (lane === PEER_STAGE ? mixed : undefined)),
     'api: not measured (no report) | browser: not measured (no report) | peer-stage: 1/1 measured scenarios passed, 0 failed, 1 held, 0 pending/undefined'
   );
 
@@ -66,7 +68,7 @@ void test('peer-stage reports held scenarios as not measured and counts mixed he
   });
   assert.equal(
     featureSummary(
-      lane => (lane === 'peer-stage' ? mixed : undefined),
+      lane => (lane === PEER_STAGE ? mixed : undefined),
       () => verdict
     ),
     'api: not measured (no report) | browser: not measured (no report) | peer-stage: pass (1 measured, 2 held)'

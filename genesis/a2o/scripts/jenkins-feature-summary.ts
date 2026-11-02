@@ -4,7 +4,8 @@ import { pathToFileURL } from 'node:url';
 
 import { loadCucumber } from './lib/load-cucumber.js';
 
-const LANES = ['api', 'browser', 'peer-stage'] as const;
+const PEER_STAGE = 'peer-stage';
+const LANES = ['api', 'browser', PEER_STAGE] as const;
 
 interface PeerStageVerdict {
   verdict: 'pass' | 'fail' | 'skip';
@@ -20,7 +21,7 @@ export function featureSummary(
 ): string {
   return LANES.map(lane => {
     try {
-      if (lane === 'peer-stage') {
+      if (lane === PEER_STAGE) {
         const verdictBytes = readPeerVerdict();
         if (verdictBytes !== undefined) {
           const verdict = JSON.parse(verdictBytes) as PeerStageVerdict;
@@ -39,7 +40,7 @@ export function featureSummary(
       if (!scenarios.length) return `${lane}: not measured (empty report)`;
       const count = (status: string) =>
         scenarios.filter(scenario => scenario.status === status).length;
-      if (lane === 'peer-stage') {
+      if (lane === PEER_STAGE) {
         const held = count('skipped');
         const measured = scenarios.length - held;
         if (measured === 0) return `${lane}: held, not measured (${held} held)`;
