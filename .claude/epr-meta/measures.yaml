@@ -1701,18 +1701,21 @@ measures:
     family: delivery
     unit: builds
     procedure: >
-      Over the newest ten completed elohim-edge dev builds that ran Dataplane Validation (an
-      `[edge:validate-only]` run counts; NOT_BUILT and builds that never reached the stage do
-      not), count the builds whose console (Jenkins `consoleText` or MCP `searchBuildLog`) holds
-      a served-shell-boots failure on the apex: a line starting
-      `AssertionError [ERR_ASSERTION]: elohim.host: GET https://elohim.host/ returned 5` or
-      `AssertionError [ERR_ASSERTION]: elohim.host: the app threw while starting at
-      https://elohim.host/` (the step `a visitor asks peer {string} for the page at {string}` in
-      genesis/a2o/steps/dataplane.steps.ts, which already rides catch-up before it asserts).
-      Fold the count on subject `elohim.host` with `--env job=elohim-edge --env first_build=<n>
-      --env last_build=<n>`. When no qualifying console can be read, fold nothing: the reading
-      is UNMEASURED. A ledger row's cumulative `seen` spans its own build range, not the newest
-      ten, so it is never a substitute reading here (the ledger counts stay provenance only).
+      Over the newest ten completed elohim-edge dev builds whose console shows
+      `scripts/ci/verify-served-shell.sh https://elohim.host …` ran (an `[edge:validate-only]` run
+      counts; a build where that check did not run is excluded, never read as a pass), count the
+      builds that did NOT print `✓ [<slug>] https://elohim.host/ boots at head …`: the script
+      prints `✗ [<slug>] …` and exits 2 when the apex declares no head, cannot serve its index or
+      the shell does not boot. Also count a build whose console holds an a2o served-shell-boots
+      assertion on the apex (leading whitespace allowed): `AssertionError [ERR_ASSERTION]:
+      elohim.host: GET https://elohim.host/ returned 5…` or `… the app threw while starting at
+      https://elohim.host/` (genesis/a2o/steps/dataplane.steps.ts) — the form the 2026-10-22
+      reds took (edge #1697 matches twice). Fold the count on subject `.` with `--env
+      job=elohim-edge --env host=elohim.host --env first_build=<n> --env last_build=<n>`. When no
+      qualifying console can be read, fold nothing: the reading is UNMEASURED. A ledger row's
+      cumulative `seen` spans its own build range, not the newest ten, so it is never a
+      substitute reading here (the ledger counts stay provenance only).
+    env-sensitivity: [job, host, first_build, last_build]
     provenance: "Historical, as minted 2026-10-28 — .claude/data/ci-findings.jsonl (ts 2026-10-22): fp 16b82ec09dc5 `elohim.host: the app threw while starting … navigation returned 503` seen 8, fp 45e72bbbd9a9 `GET https://elohim.host/ returned 503 … handed no page at all` seen 7, both elohim-edge builds 1677–1697, status open, no concern; fp 5994059e5a38 the same after a transient catching-up shed, seen 1 (#1689); .claude/data/ci-cursor.json elohim-edge recent 15 = 5 FAILURE + 1 ABORTED + 6 UNSTABLE + 3 SUCCESS at mint. Not a current fleet reading."
     default-authority: observation
     status: active
@@ -2738,7 +2741,8 @@ lenses:
     binding: binding-local
     class: measure
     consumes: [edge-apex-root-unserved@1]
-    subject: elohim.host
+    subject: .
+    env: { job: elohim-edge, host: elohim.host }
     compare: at-or-above
     context: edge-dataplane-validation
     soft: 1
