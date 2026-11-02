@@ -294,6 +294,57 @@ test(
 );
 
 test(
+  "a persistent checkout that lost git's empty directories is restored, then still verified",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    // The image snapshot is a detached shallow checkout: refs/heads and refs/tags are empty.
+    const branch = f.git("symbolic-ref", "--short", "HEAD");
+    f.git("checkout", "-q", "--detach");
+    f.git("update-ref", "-d", `refs/heads/${branch}`);
+    let run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    // adam's copy, edge #1784: .git/refs gone, so git saw no repository at all.
+    rmSync(join(f.repo, ".git/refs"), { recursive: true, force: true });
+    run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stderr, /restored empty git directory \.git\/refs\b/);
+    assert.match(run.stderr, /restored empty git directory \.git\/refs\/heads/);
+    assert.equal(
+      statSync(join(f.repo, ".git/refs")).mode & 0o777,
+      statSync(join(f.source, ".git/refs")).mode & 0o777,
+    );
+    // Nothing is restored on a whole checkout, so a clean restart stays quiet.
+    run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.doesNotMatch(run.stderr, /restored empty git directory/);
+    // Restoring directories never stands in for content: lost objects still refuse.
+    const starts = () => readFileSync(join(f.state, "worker-starts"), "utf8");
+    const before = starts();
+    rmSync(join(f.repo, ".git/objects"), { recursive: true, force: true });
+    run = f.run();
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /pinned checkout is not a readable git checkout/);
+    assert.equal(starts(), before);
+  },
+);
+
+test(
+  "a pinned checkout is never resolved through a parent repository",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    assert.equal(f.run().status, 0);
+    // A repository above the state root must not answer for a checkout without .git.
+    execFileSync("git", ["init", "-q", f.root]);
+    rmSync(join(f.repo, ".git"), { recursive: true, force: true });
+    const run = f.run();
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /pinned checkout has no git directory/);
+  },
+);
+
+test(
   "readiness failure and reset request cannot start the worker",
   { skip: rootOnly },
   (t) => {

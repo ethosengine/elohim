@@ -49,8 +49,26 @@ if [[ ! -e "$repo" ]]; then
 fi
 [[ -d "$repo" && ! -L "$repo" ]] || refuse 'pinned checkout must be a physical directory'
 [[ "$(cat "$repo/.compute-source-commit")" == "$commit" ]] || refuse 'pinned checkout marker mismatch'
-[[ "$(git -C "$repo" rev-parse --verify HEAD)" == "$commit" ]] || refuse 'pinned checkout HEAD mismatch'
-[[ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ]] || refuse 'pinned checkout has modified tracked source; refusing to overwrite it'
+[[ -d "$repo/.git" && ! -L "$repo/.git" ]] || refuse 'pinned checkout has no git directory'
+# A copy can lose directories that hold nothing: a detached shallow checkout keeps
+# refs/heads and refs/tags empty, and git refuses a .git without refs/. Restore only
+# the directories the image has and the copy lacks, with the image's modes. No file is
+# written; the HEAD and clean-tree checks below still decide whether this is the pin.
+while IFS= read -r -d '' rel; do
+  [[ -e "$repo/.git/$rel" || -L "$repo/.git/$rel" ]] && continue
+  mkdir -- "$repo/.git/$rel"
+  chmod --reference="$source_repo/.git/$rel" -- "$repo/.git/$rel"
+  echo "provider bootstrap: restored empty git directory .git/${rel#./} in the pinned checkout" >&2
+done < <(cd "$source_repo/.git" && find . -mindepth 1 -type d -print0)
+# Name the git directory, so a damaged checkout is never resolved through a parent.
+pinned_git=(git --git-dir="$repo/.git" --work-tree="$repo")
+head="$("${pinned_git[@]}" rev-parse --verify --end-of-options 'HEAD^{commit}' 2>&1)" ||
+  refuse "pinned checkout is not a readable git checkout: ${head##*$'\n'}"
+[[ "$head" == "$commit" ]] || refuse 'pinned checkout HEAD mismatch'
+# A failing status prints nothing on stdout; read its exit before its silence.
+tracked="$("${pinned_git[@]}" status --porcelain --untracked-files=no 2>&1)" ||
+  refuse "pinned checkout status is unreadable: ${tracked##*$'\n'}"
+[[ -z "$tracked" ]] || refuse 'pinned checkout has modified tracked source; refusing to overwrite it'
 # Discovery pointer only. Stage profiles use repos/<commit> so an upgrade never retargets a task.
 [[ ! -e "$state/repo" || -L "$state/repo" ]] || refuse 'legacy repo directory needs operator migration; will not overwrite it'
 ln -sfn "repos/$commit" "$state/repo"
