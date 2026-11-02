@@ -136,6 +136,22 @@ test("approval must name Matthew, Adam, active fixed bounds and separate actors"
     assert.throws(() => validateGrantDeclaration(c, now));
   }
 });
+test("an expired or not-yet-open window names its date and the steward's cure", () => {
+  const expired = declaration();
+  expired.grant.validUntil = new Date(now - 1000).toISOString();
+  assert.throws(
+    () => validateGrantDeclaration(expired, now),
+    /runner grant expired at .*no automatic renewal.*steward of record approves a replacement window/,
+  );
+  const early = declaration();
+  early.grant.validFrom = new Date(now + 3600_000).toISOString();
+  assert.throws(
+    () => validateGrantDeclaration(early, now),
+    /runner grant not yet valid: its window opens at /,
+  );
+  // An active window still passes the named checks and reaches the general ones.
+  assert.doesNotThrow(() => validateGrantDeclaration(declaration(), now));
+});
 test("remote adapter, missing token and wrong performer refuse without grant calls", async () => {
   for (const edit of [
     (env) => (env.COMPUTE_API_URL = "https://public.example"),

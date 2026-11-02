@@ -34,6 +34,16 @@ export function validateGrantDeclaration(config, now = Date.now()) {
   const stamps = ["issuedAt", "validFrom", "validUntil"].map((k) =>
     Date.parse(grant[k]),
   );
+  // Name the two refusals a steward acts on, before the general shape check: a window that
+  // has closed (there is no automatic renewal) and one that has not opened yet.
+  insist(
+    !Number.isFinite(stamps[2]) || stamps[2] > now,
+    `runner grant expired at ${grant.validUntil}: no automatic renewal — the steward of record approves a replacement window (genesis/agentic/compute/operations.md)`,
+  );
+  insist(
+    !Number.isFinite(stamps[1]) || stamps[1] <= now,
+    `runner grant not yet valid: its window opens at ${grant.validFrom}`,
+  );
   insist(
     stamps.every(Number.isFinite) &&
       stamps[0] <= now &&
