@@ -41,6 +41,19 @@ each fetched handle must pass CID and byte verification before its entry is writ
 `verify_projection` checks file drift only. The separate `restore_exact_tree`
 checks the complete closure, then stages and promotes to a NEW destination on
 Linux with no-replace semantics. It refuses external boundaries and unsupported
-host semantics. Its parent must be trusted against concurrent hostile mutation;
-power-loss durability and replacing an existing checkout are not claimed.
-The additive 0.1.2 API is under qualification; publication is a separate proof.
+host semantics. Its parent must be trusted against concurrent hostile mutation.
+The stage root is created private (0700). Files are synced after mode application;
+directories are synced bottom-up before no-replace promotion, and the same opened
+parent is synced afterward. Any required sync failure returns an error. Errors
+after staging expose `ExactRestoreError::residue()` with the retained location and
+whether promotion occurred. Failures and unwinding never delete that stage; process
+death may leave a `.eprfs-restore-*` sibling for caller inspection. No restore runs
+hooks or executables, replaces an existing checkout, or grants cleanup authority.
+
+`capture_tree` verifies the canonical closure before and after storing it through
+`DirectoryStorage`; a successful result includes synchronized object custody and
+`published: false`. Both native lanes cap objects at 64 MiB and expanded closures at
+1 GiB. Actual persistence depends on the filesystem/device honoring `sync_all`;
+the tests inject I/O failures and process interruption, not physical power loss.
+Version 0.3.3 preserves Tree v1 wire bytes and existing error-enum variants;
+publication and native acceptance remain separate proofs.

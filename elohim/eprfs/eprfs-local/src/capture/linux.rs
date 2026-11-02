@@ -571,15 +571,9 @@ pub(super) async fn capture(
     // including pending-frontier bounds that depend on canonical directory shape.
     prepared.write(&MemoryStorage::default()).await?;
     recheck()?;
-    let storage = match DirectoryStorage::create(&store) {
-        Ok(storage) => storage,
-        Err(eprfs_core::EprfsError::Io { source, .. })
-            if source.kind() == std::io::ErrorKind::AlreadyExists =>
-        {
-            DirectoryStorage::open(&store)?
-        }
-        Err(error) => return Err(error.into()),
-    };
+    // create handles competing creators and synchronizes the root's parent;
+    // falling back to a read-only open would lose that durability obligation.
+    let storage = DirectoryStorage::create(&store)?;
     prepared.write(&storage).await?;
     Ok(prepared.report)
 }

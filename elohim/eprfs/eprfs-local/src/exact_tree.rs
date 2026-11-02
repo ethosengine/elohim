@@ -4,8 +4,10 @@
 //! We reject symlinked ancestors at entry and use a parent directory descriptor for
 //! no-replace promotion, but stage construction is path based. A hostile process
 //! able to rename that parent or alter its children is outside this lane's threat
-//! boundary. Promotion is atomic on supported Linux filesystems; power-loss
-//! durability is not claimed because this lane does not fsync files and parents.
+//! boundary. Files and directories are synchronized before no-replace promotion,
+//! followed by the destination parent. Success relies on the filesystem honoring
+//! sync_all. A failure retains staging (or the promoted destination) for inspection;
+//! it never rolls back or executes restored content.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -31,6 +33,30 @@ pub enum ExactRestoreError {
     },
 }
 
+/// Context retained inside an existing [`ExactRestoreError::Io`] error, preserving
+/// exhaustive matching on that enum. A stage exists even if its bytes are partial.
+/// If promoted is true, the destination exists but its parent sync failed;
+/// neither durable success nor rollback is claimed.
+#[derive(Debug, thiserror::Error)]
+#[error("exact restore incomplete; retained at {retained_path} (promoted: {promoted}): {source}", retained_path = .retained_path.display())]
+pub struct RestoreResidue {
+    pub retained_path: PathBuf,
+    pub promoted: bool,
+    #[source]
+    pub source: Box<ExactRestoreError>,
+}
+
+impl ExactRestoreError {
+    /// Retained stage/destination after a failed restore. Preflight failures
+    /// have no residue because they precede staging.
+    pub fn residue(&self) -> Option<&RestoreResidue> {
+        match self {
+            Self::Io { source, .. } => source.get_ref()?.downcast_ref(),
+            _ => None,
+        }
+    }
+}
+
 impl From<eprfs_core::tree::TreeError> for ExactRestoreError {
     fn from(error: eprfs_core::tree::TreeError) -> Self {
         Self::Tree(Box::new(error))
@@ -50,6 +76,10 @@ pub struct ExactRestoreReport {
 /// Verify the entire closure and restore it into a new, absent destination.
 /// External entries make a complete exact filesystem restore impossible and
 /// are refused. Storage CID integrity proves bytes, not authority for the root.
+/// Success includes file, directory and destination-parent synchronization.
+/// Failure after staging exposes a path through [`ExactRestoreError::residue`].
+/// Abrupt process death can leave a `.eprfs-restore-*` sibling; callers must inspect
+/// it, never automatically treat it as complete or delete it on retry.
 pub async fn restore_exact_tree<S: EprfsStorage>(
     storage: &S,
     root: &BlobCid,
@@ -58,12 +88,17 @@ pub async fn restore_exact_tree<S: EprfsStorage>(
     limits: &TreeLimits,
     host: &HostProfile,
 ) -> RestoreResult<ExactRestoreReport> {
-    let destination = destination.as_ref();
+    let destination = std::path::absolute(destination.as_ref())
+        .map_err(|source| io_error(destination.as_ref(), source))?;
     preflight_host(host)?;
-    let parent = preflight_destination(destination)?;
-    let verified = load_verified_tree(storage, root, fetch_policy, limits).await?;
-    preflight_tree(&verified, limits)?;
-    stage_and_promote(&verified, destination, &parent, || Ok(()))
+    let parent = preflight_destination(&destination)?;
+    // Callers may tighten, but never raise, the native object/closure ceilings.
+    let mut limits = *limits;
+    limits.max_node_bytes = limits.max_node_bytes.min(64 * 1024 * 1024);
+    limits.max_total_bytes = limits.max_total_bytes.min(1024 * 1024 * 1024);
+    let verified = load_verified_tree(storage, root, fetch_policy, &limits).await?;
+    preflight_tree(&verified, &limits)?;
+    stage_and_promote(&verified, &destination, &parent, || Ok(()))
 }
 
 #[cfg(target_os = "linux")]
@@ -136,6 +171,15 @@ fn preflight_destination(destination: &Path) -> RestoreResult<PathBuf> {
 }
 
 fn preflight_tree(tree: &VerifiedTree, limits: &TreeLimits) -> RestoreResult<()> {
+    if tree
+        .leaves
+        .values()
+        .any(|bytes| bytes.len() > 64 * 1024 * 1024)
+    {
+        return Err(ExactRestoreError::Refused(
+            "restore object byte budget exceeded".into(),
+        ));
+    }
     if !tree.external_paths.is_empty() {
         return Err(ExactRestoreError::Refused(format!(
             "tree has {} external boundaries; complete exact filesystem restore is unavailable",
@@ -212,21 +256,90 @@ fn stage_and_promote(
     parent: &Path,
     before_promote: impl FnOnce() -> RestoreResult<()>,
 ) -> RestoreResult<ExactRestoreReport> {
-    let stage = tempfile::Builder::new()
-        .prefix(".eprfs-restore-")
+    stage_and_promote_with_hook(
+        tree,
+        destination,
+        parent,
+        before_promote,
+        &mut |_, _| Ok(()),
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestoreStep {
+    SyncStageParent,
+    WriteFile,
+    SyncFile,
+    SyncDirectory,
+    Promote,
+    SyncDestinationParent,
+}
+
+fn stage_and_promote_with_hook(
+    tree: &VerifiedTree,
+    destination: &Path,
+    parent: &Path,
+    before_promote: impl FnOnce() -> RestoreResult<()>,
+    hook: &mut impl FnMut(RestoreStep, &Path) -> RestoreResult<()>,
+) -> RestoreResult<ExactRestoreReport> {
+    let parent_fd = std::fs::File::open(parent).map_err(|source| io_error(parent, source))?;
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(".eprfs-restore-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let stage = builder
         .tempdir_in(parent)
-        .map_err(|source| io_error(parent, source))?;
-    let mut report = ExactRestoreReport::default();
-    write_node(tree, tree.root_node(), stage.path(), &mut report)?;
-    // TempDir's private root mode (0700) is retained at the destination.
-    // Tree entries do not encode root-directory mode, and keeping it private
-    // avoids exposing staged private content before promotion.
-    before_promote()?;
-    promote_no_replace(stage.path(), destination, parent)?;
-    // The old temporary pathname no longer exists after promotion. Retire the
-    // cleanup guard so it cannot act on a future occupant of that pathname.
-    let _old_stage_path = stage.keep();
-    Ok(report)
+        .map_err(|source| io_error(parent, source))?
+        .keep();
+    // Retire cleanup immediately: an error, panic, or interruption must not
+    // silently erase uncertain bytes. The private root remains mode 0700.
+    let mut promoted = false;
+    let result = (|| {
+        sync_file(&parent_fd, parent, RestoreStep::SyncStageParent, hook)?;
+        let mut report = ExactRestoreReport::default();
+        write_node(tree, tree.root_node(), &stage, &mut report, hook)?;
+        before_promote()?;
+        hook(RestoreStep::Promote, destination)?;
+        promote_no_replace(&stage, destination, &parent_fd)?;
+        promoted = true;
+        sync_file(&parent_fd, parent, RestoreStep::SyncDestinationParent, hook)?;
+        Ok(report)
+    })();
+    result.map_err(|source| {
+        let kind = match &source {
+            ExactRestoreError::Io { source, .. } => source.kind(),
+            _ => std::io::ErrorKind::Other,
+        };
+        let retained_path = if promoted {
+            destination.to_path_buf()
+        } else {
+            stage
+        };
+        io_error(
+            &retained_path,
+            std::io::Error::new(
+                kind,
+                RestoreResidue {
+                    retained_path: retained_path.clone(),
+                    promoted,
+                    source: Box::new(source),
+                },
+            ),
+        )
+    })
+}
+
+fn sync_file(
+    file: &std::fs::File,
+    path: &Path,
+    step: RestoreStep,
+    hook: &mut impl FnMut(RestoreStep, &Path) -> RestoreResult<()>,
+) -> RestoreResult<()> {
+    hook(step, path)?;
+    file.sync_all().map_err(|source| io_error(path, source))
 }
 
 #[cfg(unix)]
@@ -235,6 +348,7 @@ fn write_node(
     node: &eprfs_core::tree::TreeNode,
     directory: &Path,
     report: &mut ExactRestoreReport,
+    hook: &mut impl FnMut(RestoreStep, &Path) -> RestoreResult<()>,
 ) -> RestoreResult<()> {
     use std::os::unix::ffi::OsStrExt;
     for entry in &node.entries {
@@ -244,6 +358,7 @@ fn write_node(
                 let bytes = tree.leaf(blob.as_blob_cid()).ok_or_else(|| {
                     ExactRestoreError::Refused("verified file leaf missing".into())
                 })?;
+                hook(RestoreStep::WriteFile, &path)?;
                 let mut file = std::fs::OpenOptions::new()
                     .write(true)
                     .create_new(true)
@@ -252,6 +367,7 @@ fn write_node(
                 std::io::Write::write_all(&mut file, bytes)
                     .map_err(|source| io_error(&path, source))?;
                 set_mode(&path, if *executable { 0o755 } else { 0o644 })?;
+                sync_file(&file, &path, RestoreStep::SyncFile, hook)?;
                 report.files += 1;
                 report.bytes_written += bytes.len();
             }
@@ -260,8 +376,8 @@ fn write_node(
                 let child = tree.nodes.get(link.as_blob_cid()).ok_or_else(|| {
                     ExactRestoreError::Refused("verified directory missing".into())
                 })?;
-                write_node(tree, child, &path, report)?;
                 set_mode(&path, 0o755)?;
+                write_node(tree, child, &path, report, hook)?;
                 report.directories += 1;
             }
             TreeEntryKind::Symlink { target } => {
@@ -277,7 +393,10 @@ fn write_node(
             }
         }
     }
-    Ok(())
+    // Bottom-up directory sync persists names, symlinks and child directories.
+    // Never open/follow a symlink target just to synchronize it.
+    let dir = std::fs::File::open(directory).map_err(|source| io_error(directory, source))?;
+    sync_file(&dir, directory, RestoreStep::SyncDirectory, hook)
 }
 
 #[cfg(not(unix))]
@@ -286,6 +405,7 @@ fn write_node(
     _node: &eprfs_core::tree::TreeNode,
     _directory: &Path,
     _report: &mut ExactRestoreReport,
+    _hook: &mut impl FnMut(RestoreStep, &Path) -> RestoreResult<()>,
 ) -> RestoreResult<()> {
     Err(ExactRestoreError::Refused(
         "native byte paths unavailable".into(),
@@ -293,21 +413,24 @@ fn write_node(
 }
 
 #[cfg(target_os = "linux")]
-fn promote_no_replace(stage: &Path, destination: &Path, parent: &Path) -> RestoreResult<()> {
+fn promote_no_replace(stage: &Path, destination: &Path, dir: &std::fs::File) -> RestoreResult<()> {
     use rustix::fs::{renameat_with, RenameFlags};
-    let dir = std::fs::File::open(parent).map_err(|source| io_error(parent, source))?;
     let from = stage
         .file_name()
         .ok_or_else(|| ExactRestoreError::Refused("stage has no name".into()))?;
     let to = destination
         .file_name()
         .ok_or_else(|| ExactRestoreError::Refused("destination has no name".into()))?;
-    renameat_with(&dir, from, &dir, to, RenameFlags::NOREPLACE)
+    renameat_with(dir, from, dir, to, RenameFlags::NOREPLACE)
         .map_err(|error| io_error(destination, std::io::Error::from(error)))
 }
 
 #[cfg(not(target_os = "linux"))]
-fn promote_no_replace(_stage: &Path, _destination: &Path, _parent: &Path) -> RestoreResult<()> {
+fn promote_no_replace(
+    _stage: &Path,
+    _destination: &Path,
+    _parent: &std::fs::File,
+) -> RestoreResult<()> {
     Err(ExactRestoreError::Refused(
         "Linux no-replace rename unavailable".into(),
     ))
@@ -337,7 +460,7 @@ mod tests {
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::PermissionsExt;
 
-    async fn fixture() -> (MemoryStorage, BlobCid) {
+    pub(super) async fn fixture() -> (MemoryStorage, BlobCid) {
         let store = MemoryStorage::default();
         let limits = TreeLimits::default();
         let file = b"\0binary\xff\n";
@@ -493,7 +616,12 @@ mod tests {
         .unwrap_err();
         assert!(error.to_string().contains("injected interruption"));
         assert!(!destination.exists());
-        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 0);
+        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 1);
+        let residue = error
+            .residue()
+            .expect("interruption must report staging residue");
+        assert!(!residue.promoted);
+        assert!(residue.retained_path.join("deep").is_dir());
     }
 
     #[tokio::test]
@@ -546,12 +674,16 @@ mod tests {
             Ok(())
         })
         .unwrap_err();
-        assert!(matches!(error, ExactRestoreError::Io { .. }));
+        assert!(!error.residue().unwrap().promoted);
+        let ExactRestoreError::Io { source, .. } = &error else {
+            panic!("promotion conflict must retain its I/O error kind");
+        };
+        assert_eq!(source.kind(), std::io::ErrorKind::AlreadyExists);
         assert_eq!(
             std::fs::read(destination.join("owner")).unwrap(),
             b"other writer"
         );
-        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 1);
+        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 2);
     }
 
     #[tokio::test]
@@ -599,3 +731,6 @@ mod tests {
         assert!(error.to_string().contains("symlink target"));
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+mod durability_tests;

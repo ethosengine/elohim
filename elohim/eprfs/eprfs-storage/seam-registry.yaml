@@ -14,7 +14,10 @@ decisionPoints:
     summary: >
       Open or explicitly create a private flat local content store; verify raw
       or DAG-CBOR bytes against a caller-supplied CID before storing or serving.
-      Refuse symlink, public, and corrupt objects. Never infer release standing.
+      Refuse symlink, public, and corrupt objects. Synchronize the verified object,
+      root and parent before successful puts, including existing/concurrent objects.
+      Synchronize root and parent on create, including a competing creator.
+      Never infer release standing.
     concernIds:
       - id: C0
         status: answered
@@ -36,10 +39,10 @@ decisionPoints:
         justification: Bytes are rehashed on fetch and put, but no signature, lineage, or standing is checked.
       - id: C6a
         status: partial
-        justification: Directory reads and writes cap each object at 64 MiB by default, with a caller-configurable bound; filesystem I/O duration and concurrent trusted-path replacement are not bounded here.
+        justification: Directory reads and writes cap each object at 64 MiB; callers may tighten the bound. Filesystem I/O duration and hostile trusted-path replacement are not bounded here.
       - id: C6b
         status: answered
-        justification: Repeated puts of the same valid CID are idempotent and no-clobber; corrupt existing bytes are refused.
+        justification: Repeated and competing puts verify and synchronize the actual retained inode and containing directories; corrupt existing bytes are refused without clobbering.
       - id: C7
         status: partial
         justification: Local possession is checked but no peer-delivery or availability guarantee follows.
@@ -63,8 +66,23 @@ decisionPoints:
         justification: No authority tier or release fallback is added.
       - id: C14
         status: partial
-        justification: Every refusal returns Result; durable witness recording belongs to the caller.
+        justification: Write and sync errors propagate, retaining and naming incomplete temporary objects where present; abrupt process death cannot return context and durable witness recording belongs to the caller.
     contractTests:
+      - path: elohim/eprfs/eprfs-storage/src/durability_tests.rs
+        testName: new_and_existing_root_sync_failures_refuse_and_preserve_root
+        kind: unit
+      - path: elohim/eprfs/eprfs-storage/src/durability_tests.rs
+        testName: new_existing_and_concurrent_objects_sync_the_actual_inode_before_directories
+        kind: unit
+      - path: elohim/eprfs/eprfs-storage/src/durability_tests.rs
+        testName: every_object_write_sync_and_promotion_failure_refuses_without_losing_candidates
+        kind: unit
+      - path: elohim/eprfs/eprfs-storage/src/durability_tests.rs
+        testName: losing_writer_cannot_succeed_when_winner_sync_fails
+        kind: unit
+      - path: elohim/eprfs/eprfs-storage/src/durability_tests.rs
+        testName: process_interruption_retains_objects_and_allows_verified_retry
+        kind: integration
       - path: elohim/eprfs/eprfs-storage/src/lib.rs
         testName: directory_store_verifies_raw_and_dag_cbor_and_never_clobbers_corruption
         kind: unit
@@ -85,3 +103,6 @@ decisionPoints:
       This adapter creates no DHT entry, coordinator, route, or release linkage;
       expected head-plane cost is zero at seed and one year. Directory ancestry
       is caller-owned and trusted against concurrent local path replacement.
+      Success relies on the filesystem honoring sync_all; reads do not establish
+      durable custody. The worst holder sees selected bytes and names locally;
+      this adapter creates no remote index or cross-identity join.

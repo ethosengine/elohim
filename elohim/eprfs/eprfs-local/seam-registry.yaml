@@ -41,7 +41,7 @@ decisionPoints:
         justification: Canonical immutable objects and explicit verified writes preserve identical roots across repeated operations.
       - id: C7
         status: answered
-        justification: The API names only private byte identity, and explicitly declines publication and crash-durability claims.
+        justification: Success verifies the complete closure after synchronized DirectoryStorage writes; filesystem sync semantics bound durability, and publication is never claimed.
       - id: C8
         status: partial
         justification: Errors and selected-scope reports expose outcomes; durable labeled telemetry belongs to the caller.
@@ -62,10 +62,13 @@ decisionPoints:
         justification: No authority tier or scaffold is introduced.
       - id: C14
         status: partial
-        justification: Errors propagate with context; interrupted immutable object writes can leave residue, with durable custody tracked by the next sprint station.
+        justification: Errors propagate with context; failed writes may retain unreferenced objects or reported temporary files, and abrupt process death cannot return a witness.
     contractTests:
       - path: elohim/eprfs/eprfs-local/tests/filesystem_capture.rs
         testName: captures_without_git_and_keeps_candidate_a_after_source_becomes_b
+        kind: integration
+      - path: elohim/eprfs/eprfs-local/tests/filesystem_capture.rs
+        testName: durable_capture_restore_recapture_keeps_the_tree_v1_golden
         kind: integration
       - path: elohim/eprfs/eprfs-local/src/capture/tests.rs
         testName: selection_refusals_leave_store_absent
@@ -103,8 +106,9 @@ decisionPoints:
       modulePath: eprfs_local::restore_exact_tree
     summary: >
       Verify the complete private tree closure, reject external and host-inexpressible
-      entries, then stage in a trusted same-filesystem parent and atomically promote
-      to an absent destination with Linux RENAME_NOREPLACE. This does not elect a head.
+      entries, then synchronize private staging before Linux RENAME_NOREPLACE and
+      synchronize the destination parent. Failures retain staging or the promoted
+      destination with typed residue context. This does not elect a head.
     concernIds:
       - id: C0
         status: answered
@@ -117,16 +121,16 @@ decisionPoints:
         justification: No version ordering or authoritative pointer is changed.
       - id: C3
         status: answered
-        justification: The path has explicit preflight, verified closure, private staging, and no-replace promotion states; failures before promotion leave the destination absent.
+        justification: Bounded explicit attempts return success or error; pre-promotion failures retain staging and post-promotion sync failures retain the destination. No automatic retry or cleanup obscures uncertain effects.
       - id: C4
         status: partial
-        justification: Tree failures, local refusals, and I/O failures are typed, but individual host refusals remain strings.
+        justification: Tree failures, local refusals and I/O failures remain typed; residue() distinguishes retained staging from a promoted but unconfirmed destination. Individual host refusals remain strings.
       - id: C5
         status: partial
         justification: The receiver verifies all fetched bytes and names before writing; standing, signatures, and head election are outside this local projection.
       - id: C6a
         status: partial
-        justification: TreeLimits bound decoded nodes, closure depth, entry count, and retained bytes, but EprfsStorage fetch can allocate a single unbounded response before the limit is checked; no deadline is imposed.
+        justification: TreeLimits and native ceilings bound work to 64 MiB objects and 1 GiB expanded closure; generic EprfsStorage fetch can allocate before the check, and syscalls have no deadline.
       - id: C6b
         status: answered
         justification: A new destination alone is admitted; Linux no-replace promotion refuses a concurrent occupant instead of overwriting it.
@@ -150,11 +154,23 @@ decisionPoints:
         justification: Restoring private bytes does not authorize publication, execution, or peer action.
       - id: C13
         status: partial
-        justification: Linux native same-filesystem promotion is required; cross-platform atomicity and crash durability are not claimed.
+        justification: Linux native same-filesystem promotion and successful filesystem syncs are required; no cross-platform fallback or publication standing is claimed.
       - id: C14
         status: partial
-        justification: Refusal leaves the destination absent and errors carry reasons, but no durable witness is recorded for interrupted or crash recovery.
+        justification: Returned errors identify retained staging or destination and the underlying failure; abrupt death leaves residue without a returned witness, and no power-loss fault-injection hardware is exercised.
     contractTests:
+      - path: elohim/eprfs/eprfs-local/src/exact_tree/durability_tests.rs
+        testName: every_write_sync_and_promotion_failure_reports_retained_location
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree/durability_tests.rs
+        testName: sync_order_is_file_then_bottom_up_directories_then_promotion_then_parent
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/src/exact_tree/durability_tests.rs
+        testName: process_interruption_preserves_stage_or_promoted_tree
+        kind: integration
+      - path: elohim/eprfs/eprfs-local/tests/filesystem_capture.rs
+        testName: restore_preserves_executable_content_without_executing_it
+        kind: integration
       - path: elohim/eprfs/eprfs-local/src/exact_tree.rs
         testName: restores_nested_raw_bytes_executable_mode_non_utf8_names_and_symlink_target
         kind: unit
@@ -183,7 +199,40 @@ decisionPoints:
       The destination parent must be owned/trusted against concurrent mutation;
       path-based staging is not an adversarial race containment boundary. The
       implementation rejects symlinked ancestors and uses an opened parent fd
-      for final promotion. No fsync durability guarantee is made.
+      for final promotion and parent sync. Files are synced after mode application;
+      directories are synced bottom-up including literal symlink entries, without
+      following targets. Retained stages are private 0700 directories and are never
+      silently deleted on failure. Filesystem/device honesty about sync remains required.
+  - name: RestoreResidue
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/exact_tree.rs
+      modulePath: eprfs_local::RestoreResidue
+    summary: Retained location and promotion state for an incomplete exact restore, carried inside the existing I/O error variant.
+    concernIds:
+      - { id: C0, status: answered, justification: Private local custody failure context; no reach or authority decision. }
+      - { id: C1, status: n-a, justification: No candidate election or acceptance. }
+      - { id: C2, status: n-a, justification: No authoritative head or ordering clock. }
+      - { id: C3, status: partial, justification: Callers can inspect residue and retry with a fresh destination; this API performs no automatic recovery or cleanup. }
+      - { id: C4, status: answered, justification: Preflight has no residue; incomplete staging and unconfirmed promoted destination are distinguished. }
+      - { id: C5, status: answered, justification: The context reports observed local effects and never confers success or acceptance. }
+      - { id: C6a, status: answered, justification: One retained path and one nested failure per restore attempt. }
+      - { id: C6b, status: answered, justification: Inspecting the context has no side effect and retries never consume prior residue. }
+      - { id: C7, status: answered, justification: A post-promotion sync error names the destination rather than a nonexistent stage. }
+      - { id: C8, status: partial, justification: Typed promotion state and source error are available; no labeled metrics are emitted. }
+      - { id: C9, status: n-a, justification: No actor identity is interpreted. }
+      - { id: C10, status: answered, justification: Additive residue accessor preserves existing error enum variants and exhaustive consumers; no Tree v1 wire change. }
+      - { id: C11, status: n-a, justification: Error context schedules no work or queue. }
+      - { id: C12, status: n-a, justification: It grants no cleanup or execution permission. }
+      - { id: C13, status: n-a, justification: No authority tier is introduced. }
+      - { id: C14, status: partial, justification: Ordinary failures retain their underlying source and location; process death cannot return context and requires caller inspection of the stage prefix. }
+    contractTests:
+      - path: elohim/eprfs/eprfs-local/src/exact_tree/durability_tests.rs
+        testName: every_write_sync_and_promotion_failure_reports_retained_location
+        kind: unit
+      - path: elohim/eprfs/eprfs-local/tests/filesystem_capture.rs
+        testName: restore_error_enum_remains_exhaustively_matchable
+        kind: integration
   - name: fetch_verified_blob
     kind: verdict-fn
     sourceLocation:

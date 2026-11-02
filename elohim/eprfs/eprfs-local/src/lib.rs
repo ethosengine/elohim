@@ -12,7 +12,7 @@ mod verify;
 pub use verify::{has_drift, verify_projection, EntryDrift};
 
 mod exact_tree;
-pub use exact_tree::{restore_exact_tree, ExactRestoreError, ExactRestoreReport};
+pub use exact_tree::{restore_exact_tree, ExactRestoreError, ExactRestoreReport, RestoreResidue};
 
 mod capture;
 pub use capture::{capture_tree, CaptureError, CaptureReport, MAX_CAPTURE_OBJECT_BYTES};

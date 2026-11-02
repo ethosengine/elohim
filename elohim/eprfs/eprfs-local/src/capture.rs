@@ -8,10 +8,10 @@
 //! shares a filesystem timestamp tick. This is not an atomic snapshot of a
 //! changing filesystem: a writer can still change it after the last check.
 //!
-//! This first capture lane verifies the retained closure but does NOT yet claim
-//! crash durability: DirectoryStorage's directory-sync protocol is a separate
-//! custody obligation. A failed/cancelled write can leave verified, unreferenced
-//! objects; it never deletes prior candidates or writes a mutable root pointer.
+//! Success includes synchronized DirectoryStorage custody and a second complete
+//! closure verification. Durability relies on the filesystem honoring sync_all.
+//! A failed/cancelled write can leave unreferenced objects or incomplete staging;
+//! it never deletes prior candidates or writes a mutable root pointer.
 
 use std::path::{Path, PathBuf};
 
@@ -73,15 +73,16 @@ pub struct CaptureReport {
 }
 
 /// Capture explicit relative regular files and literal symlinks into a private
-/// store, returning only after local verification of the entire Tree v1 closure.
+/// store, returning only after synchronized custody and local verification of
+/// the entire Tree v1 closure.
 /// The store may already exist or be a new directory in an existing trusted parent.
 /// Neither source nor store may contain the other, including directory aliases.
 /// Selections reject dot/parent/empty components, metadata (`.git`, `.eprfs`,
 /// `.brit`), glob syntax, duplicate/ancestor names, directories and special files.
 /// Distinct hardlink names are valid; byte names and executable bits are preserved.
 ///
-/// No power-loss durability is claimed by this phase. Storage failures may retain
-/// partial immutable objects. The source and prior objects are never removed.
+/// Required sync failures return errors, never a successful report. Failures may
+/// retain partial immutable objects. The source and prior objects are never removed.
 pub async fn capture_tree(
     source: impl AsRef<Path>,
     store: impl AsRef<Path>,
