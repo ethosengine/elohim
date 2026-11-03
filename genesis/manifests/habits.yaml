@@ -2470,10 +2470,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-03b (status unchanged; the tree-scoped gate becomes path-scoped): 6cba5805a takes eprfs off whole-tree keying. A new `**/<basename>` read form (keyed by every match's blob at the commit, with a :(glob) dirt check) replaces the governance walk's `.`, and its 12 data-derived test reads are declared. eprfs is 0 unresolved / 218 paths and is in NAMED_READ_SET_PROJECTS. Measured in the shared tree: 120 dirty paths under paths scope against 193 under tree scope, and no .claude/data ledger dirties it any more. gate-input-audit 45/45, gate-evidence 65/65 (the commit message's 66 is a miscount), cargo-affected 20/20, gate-preflight 17/17. Not yet observed: a recorded eprfs verdict being reused on a later push. That is this delta's proof, owed on the batch push.
-    evidence-fingerprint: sha256:1c4987bf8fc6fe80
-    evidence-bytes: 11517
-    evidence-entries: 14
+      DELTA 2026-11-03c (status unchanged; the reuse is now measured, not projected): in a clean worktree at bb4772d67, `GATE_EVIDENCE=reuse just gate eprfs` ran green in 35m32s and recorded bafyreihg73…. The next run answered `evidence: hit green … closure scope paths (218 reads)` and finished in 22 s, even though the first run had rewritten tracked .claude/data/architecture-findings.jsonl (gate-cycle's ceiling finding, now outside eprfs's closure). c7e417ce5 enrols 13 more cargo gates whose recipes run only cargo over their own crates. Still red: gate-cycle writes a tracked ledger, and the rakia oracle drops dependents while sibling worktrees exist (rakia PR #3).
+    evidence-fingerprint: sha256:17869ee31d86aef3
+    evidence-bytes: 12189
+    evidence-entries: 15
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
