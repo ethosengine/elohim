@@ -20,6 +20,7 @@ import {
   captureDiagnostics,
   readPersistedLogs,
   verifyDeclaration,
+  classifyMeshRequestErrors,
 } from "./runner-capture-activation.mjs";
 
 test("checkout diagnostics distinguish a valid image from missing persisted Git metadata", async (t) => {
@@ -812,4 +813,40 @@ test("persisted identity inventory emits bounded hashes without key or credentia
     row("initialization-continuation/apps-before.jsonl").sha256,
     /^[a-f0-9]{64}$/,
   );
+});
+
+test("mesh request errors leave the pod as peer, time and category only", () => {
+  const logs = {
+    "/m/logs/matthew.log": [
+      '{"timestamp":"2026-11-03T13:43:48.1Z","level":"ERROR","fields":{"message":"Request error","error":"Conductor error: SqliteError { code: 5, message: \\"database is locked\\" } private-request-body"}}',
+      '{"timestamp":"2026-11-03T13:44:00.0Z","level":"INFO","fields":{"message":"GET /health"}}',
+      '{"timestamp":"2026-11-03T13:44:10.0Z","level":"ERROR","fields":{"message":"Request error","error":"Conductor error: Guest(\\"private-zome-detail\\")"}}',
+    ].join("\n"),
+    "/m/logs/jessica.log":
+      '{"timestamp":"2026-11-03T13:40:00.0Z","level":"ERROR","fields":{"message":"Request error","error":"opaque private-detail"}}',
+  };
+  const result = classifyMeshRequestErrors("/m/", (path) => logs[path] ?? null);
+  assert.deepEqual(result, {
+    kind: "mesh-request-error-observation",
+    requestErrorCount: 3,
+    logsUnavailable: 1,
+    recent: [
+      {
+        peer: "jessica",
+        at: "2026-11-03T13:40:00.0Z",
+        category: "request-error-unclassified",
+      },
+      {
+        peer: "matthew",
+        at: "2026-11-03T13:43:48.1Z",
+        category: "conductor-database-locked",
+      },
+      {
+        peer: "matthew",
+        at: "2026-11-03T13:44:10.0Z",
+        category: "zome-refused",
+      },
+    ],
+  });
+  assert(!JSON.stringify(result).includes("private"));
 });

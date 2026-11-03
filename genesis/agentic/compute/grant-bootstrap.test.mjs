@@ -180,6 +180,11 @@ test("normal attempt emits bounded native categories without extra POST or secre
       "conductor-error",
     ],
     [
+      500,
+      'Error: Conductor error: SqliteError { code: 5, message: "database is locked" } secret-token-dynamic-detail',
+      "conductor-database-locked",
+    ],
+    [
       403,
       '{"reason":"local-compute-capability-required","secret":"secret-token-dynamic-detail"}',
       "local-capability-refused",
@@ -379,13 +384,15 @@ test("health refusal cancels its unread body without waiting on cancellation", a
   assert.deepEqual(f.receipts, []);
 });
 
-test("only a timed-out, unreachable or 502/503/504 grant request is a temporary refusal", () => {
+test("only a timed-out, unreachable, lock-expired or 429/502/503/504 grant request is a temporary refusal", () => {
   for (const diagnostic of [
     { category: "request-timeout", httpStatus: null },
     { category: "connection-failed", httpStatus: null },
     { category: "native-unavailable", httpStatus: 503 },
     { category: "native-unavailable", httpStatus: 502 },
     { category: "native-unavailable", httpStatus: 504 },
+    { category: "conductor-database-locked", httpStatus: 500 },
+    { category: "http-refused", httpStatus: 429 },
   ])
     assert.equal(
       grantRefusalExitCode(diagnostic),
@@ -399,6 +406,8 @@ test("only a timed-out, unreachable or 502/503/504 grant request is a temporary 
     { category: "native-refused", httpStatus: 403 },
     { category: "native-response-invalid", httpStatus: 200 },
     { category: "body-limit", httpStatus: 200 },
+    { category: "conductor-error", httpStatus: 500 },
+    { category: "grant-withdrawn", httpStatus: 500 },
   ])
     assert.equal(
       grantRefusalExitCode(diagnostic),

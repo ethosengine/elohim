@@ -319,6 +319,72 @@ export async function readPersistedLogs({
   throw new Error("persisted-log transport unavailable: observation deadline");
 }
 // Failure observations never replace activation or admit a task. Only CI calls this.
+// Runs inside the worker pod (serialized into the exec script). The household's
+// storage logs can carry request data, so only a timestamp, the peer and an
+// allowlisted category leave the pod: never the error text itself.
+export function classifyMeshRequestErrors(
+  base = "/var/lib/compute/mesh/",
+  readFile = null,
+) {
+  const read =
+    readFile ||
+    ((path) => {
+      const fs = require("node:fs");
+      let fd;
+      try {
+        fd = fs.openSync(path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        const stat = fs.fstatSync(fd);
+        if (!stat.isFile()) return null;
+        const length = Math.min(stat.size, 4194304);
+        const buffer = Buffer.alloc(length);
+        fs.readSync(fd, buffer, 0, length, stat.size - length);
+        return buffer.toString();
+      } catch {
+        return null;
+      } finally {
+        if (fd !== undefined) fs.closeSync(fd);
+      }
+    });
+  const classifiers = [
+    [
+      /database is locked|SQLITE_BUSY|code: (5|517)\b/i,
+      "conductor-database-locked",
+    ],
+    [/HeadMoved|source chain head/i, "source-chain-head-moved"],
+    [/Guest\(|WasmError|ribosome/i, "zome-refused"],
+    [/ValidationFailed|validation/i, "validation-refused"],
+    [/timed? ?out|timeout|deadline/i, "timeout"],
+    [/capability|unauthoriz/i, "authorization"],
+    [/deserial|serializ|decode|missing field|invalid type/i, "wire-shape"],
+    [/Invalid input: compute grant/i, "grant-refused"],
+    [/Conductor error/i, "conductor-error-unclassified"],
+  ];
+  const rows = [];
+  let unavailable = 0;
+  for (const peer of ["matthew", "jessica", "james"]) {
+    const text = read(base + "logs/" + peer + ".log");
+    if (text === null) {
+      unavailable += 1;
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      if (!line.includes("Request error")) continue;
+      const at = /"timestamp":"([0-9T:.\-]+Z)"/.exec(line)?.[1] || null;
+      const category =
+        classifiers.find(([pattern]) => pattern.test(line))?.[1] ||
+        "request-error-unclassified";
+      rows.push({ peer, at, category });
+    }
+  }
+  rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return {
+    kind: "mesh-request-error-observation",
+    requestErrorCount: rows.length,
+    logsUnavailable: unavailable,
+    recent: rows.slice(-12),
+  };
+}
+
 export async function captureDiagnostics({
   root,
   workload,
@@ -477,6 +543,7 @@ for (const peer of ['matthew','jessica','james']) {
 const imageHead = checkoutProbe('/opt/compute/repo', 'image');
 if (imageHead) checkoutProbe('/var/lib/compute/repos/' + imageHead, 'persistent');
 console.log('recovery-proof ' + JSON.stringify((${readRecoveryProof.toString()})()));
+try { console.log('mesh-request-errors ' + JSON.stringify((${classifyMeshRequestErrors.toString()})())); } catch { console.log('mesh-request-errors unavailable'); }
 (${inspectProviderBootstrap.toString()})().then(result => console.log('provider-observation ' + JSON.stringify(result)), () => console.log('provider-observation unavailable'));`;
   reads.push([
     "mesh-startup.log",

@@ -119,6 +119,14 @@ function nativeFailureCategory(status, text) {
       return "consent-verification-refused";
     return "grant-native-refused";
   }
+  // A conductor whose sqlite lock wait expired never wrote the action: the same
+  // content-addressed request is safe to repeat once the lock clears.
+  if (
+    status === 500 &&
+    text.startsWith("Error: Conductor error: ") &&
+    /database is locked|SQLITE_BUSY/.test(text)
+  )
+    return "conductor-database-locked";
   for (const [prefix, category] of [
     ["Error: Conductor error: ", "conductor-error"],
     ["Error: Serialization error: ", "serialization-error"],
@@ -168,14 +176,17 @@ async function boundedBody(response, signal) {
 
 // A refusal the worker may safely repeat: issuance is content-addressed (storage reuses an
 // existing commitment for identical content), so a timed-out or unreachable first attempt is
-// re-run as the same request. Exit 75 (EX_TEMPFAIL) tells worker-start.sh to retry in place
+// re-run as the same request, as is one refused by an expired sqlite lock wait. Exit 75 (EX_TEMPFAIL) tells worker-start.sh to retry in place
 // rather than restart the container and its whole mesh. Every other refusal stays 2.
 export const TEMPORARY_GRANT_EXIT = 75;
 export function grantRefusalExitCode(diagnostic) {
   if (!diagnostic) return 2;
   if (["request-timeout", "connection-failed"].includes(diagnostic.category))
     return TEMPORARY_GRANT_EXIT;
-  if ([502, 503, 504].includes(diagnostic.httpStatus))
+  if (diagnostic.category === "conductor-database-locked")
+    return TEMPORARY_GRANT_EXIT;
+  // 429 is storage's own sqlite-lock or admission backpressure, sent with Retry-After.
+  if ([429, 502, 503, 504].includes(diagnostic.httpStatus))
     return TEMPORARY_GRANT_EXIT;
   return 2;
 }
