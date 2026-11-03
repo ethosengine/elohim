@@ -277,8 +277,9 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
   for (const project of projects.filter(p => enabled.has(p.name))) {
     let paths;
     try {
-      // Projects outside the named set key on the whole tree (pool-policy.json gate_reuse).
-      const result = NAMED_READ_SET_PROJECTS.includes(project.name)
+      // Mirror the closure key (gate-evidence.mjs readSetAt): every cargo project is keyed on its
+      // named reads when it has no unresolved one; only a non-cargo gate keys on the whole tree.
+      const result = NAMED_READ_SET_PROJECTS.includes(project.name) || project.run?.cargo
         ? read({ root, project, sources: sourcesOf(root, project) }) : null;
       const reads = result && result.unresolved.length === 0 && !result.paths.includes('.')
         ? { scope: 'paths', oids: result.paths.map(path => ({ path })) }
