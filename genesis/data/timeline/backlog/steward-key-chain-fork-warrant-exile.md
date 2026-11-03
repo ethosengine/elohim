@@ -48,6 +48,33 @@ is 0. Loki's four-day retention holds six distinct fork pairs (adam four, eve tw
 consecutive days, and one each after the 2026-10-09 conductor clear. That pattern argues against a
 one-time event. Evidence and queries: `dataplane-convergence` DELTA 2026-10-10a and 10-10b.
 
+**Alpha re-read, 2026-11-03 (still open, 24 days; read from the k8s side ~21:15Z):**
+- Adam is still exiled. Every alpha conductor lists adam's peer `e4c62570` in `blocked_message_counts`
+  across all 5 spaces, with up to 106,985 dropped incoming messages (lamad `uhC0k51dR_…` at eve and
+  gertrude). Matthew logs kitsune2 `transport.rs:805` "Attempted to send module message to a peer that
+  is blocked in the associated space. Dropping message." Every peer holds adam's 48 agent infos per
+  space, none tombstoned or expired, so the blocks are warrant-driven and not caused by missing info.
+- Adam's bytes arrive (gertrude rx 24.20M = adam tx 24.2M), but 5 of 6 peers send nothing back (tx 0.0M);
+  susan is the only exception. Adam's own conductor reports `NoPeersForLocation`, sys validation fetched
+  0 of 456 missing dependencies, and `select_election` canonical-head link gather fails under Network
+  strategy.
+- An operator restart of `elohim-adam-alpha-conductor-0` at 20:49:41Z changed nothing: 5 of 6 links
+  were send-only again within 20 minutes. All links are iroh `is_direct: true`. The image,
+  `elohim-storage:1.0.0-dev-5e4cab27`, was unchanged by the restart.
+- **Downstream red named:** the edge wave's standing `statefulset/elohim-adam-alpha rollout did not
+  complete` testcase is this exile. Adam's compute worker asks for its runner grant as provider
+  `uhCAkCUzKl3…` (edge #1811 `provider-observation`), the exiled key. It gets `503 catching-up` and
+  then `500 conductor-error` (worker attempts through 38, sha256:2b49ac89…, source 7e934af10). The
+  worker-image fixes from 2026-11-01 to 11-03 (grant retry, generated secrets, fsGroup, 120 s request)
+  are sound, but none can turn this test green. It turns green through D1 → C4 → C7, not through
+  another worker build.
+- Peer `df537973`, blocked everywhere with no live agent info, is a departed peer and not a relay fault.
+- eve, gertrude and susan `-alpha-0` pods restarted 14–17 times in the 24 h before the read. eve is the
+  other exiled key, but gertrude and susan are not, so the link is unproven. This is not yet triaged.
+- No pre-restart diagnostics were captured (DEBUG logs rotate within seconds). A post-restart snapshot
+  of all 7 conductors' `/db/p2p/conductor-diagnostics` was saved on the operator's machine, outside
+  this repository.
+
 **Household, 2026-10-18 (a controlled case; ended by recast).**
 - The conductors' last log line is `2026-10-18T00:37:37.755Z`, written under `database is locked`
   (517/5) contention. That moment is the power loss.
