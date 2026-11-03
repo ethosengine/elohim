@@ -429,7 +429,9 @@ class ControlTest(unittest.TestCase):
             with self.subTest(event=event):
                 self.assertEqual(self.invoke(event, tool_name='Bash',
                                              tool_input={'command': 'git status'}).stdout, '')
-                self.assertLess(self.elapsed, 2.2)
+                # Includes Python/schema startup as well as the native deadline.
+                # Both runtime hook registrations allow three seconds.
+                self.assertLess(self.elapsed, 3)
                 time.sleep(.5)
                 self.assertFalse((self.repo / 'escaped').exists())
 
