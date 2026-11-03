@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { api, save, taskPath, readJson } from "./common.mjs";
 import { issueGrant, pollInbox, reviewCommand } from "./workspace.mjs";
-import { executeTask, guestEnvironment } from "./worker.mjs";
+import {
+  executeOrDecline,
+  executeTask,
+  guestEnvironment,
+} from "./worker.mjs";
 import { expired } from "./retention.mjs";
 import { leaseSeconds, payloadClient, materialize } from "./payloads.mjs";
 import { collectStageEvidence, stageVerdict } from "./stage/collect-stage.mjs";
@@ -134,6 +138,141 @@ test("review adapters constrain tools and guests cannot inherit signing credenti
     }),
     { PATH: "/bin" },
   );
+});
+
+async function providerStageFixture(t, mutate = () => {}) {
+  const state = await mkdtemp(join(tmpdir(), "provider-stage-worker-"));
+  t.after(() => rm(state, { recursive: true, force: true }));
+  const commit = "a".repeat(40);
+  const repo = join(state, "repos", commit);
+  await mkdir(join(repo, "genesis/agentic/compute"), { recursive: true });
+  await mkdir(join(repo, "genesis/a2o/reports"), { recursive: true });
+  await writeFile(
+    join(repo, "genesis/agentic/compute/provider-stages.json"),
+    JSON.stringify({ features: ["features/dataplane/peer-mesh.feature"] }),
+  );
+  const binary = Buffer.from("#!/bin/sh\necho provider-built\n");
+  const dna = Buffer.from("Feature: provider built\n");
+  const descriptor = (bytes, cid) => ({
+    cid,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    bytes: bytes.length,
+  });
+  const envelope = {
+    schemaVersion: 1,
+    taskKind: "feedback_signal",
+    requester: "runner",
+    provider: "adam",
+    project: "a2o-stage:peer-mesh",
+    runtimeImage: `sha256:${"b".repeat(64)}`,
+    binary: descriptor(binary, "binary-cid"),
+    dna: descriptor(dna, "dna-cid"),
+    expectedTests: ["feedback_signal::peer-mesh"],
+    resources: {
+      cpuMillis: 8000,
+      memoryBytes: 25769803776,
+      maxPayloadBytes: 8388608,
+      timeoutSeconds: 1800,
+    },
+    retention: { maxAgeSeconds: 86400, maxRuns: 5, expireWhen: "either" },
+  };
+  const submitted = structuredClone(envelope);
+  submitted.invocation = "runner-nonce";
+  submitted.binary.chunks = [{ cid: "chunk-binary", sha256: submitted.binary.sha256, bytes: binary.length }];
+  submitted.dna.chunks = [{ cid: "chunk-dna", sha256: submitted.dna.sha256, bytes: dna.length }];
+  mutate(submitted);
+  const calls = [];
+  const buildStage = async ({ out, env, repoRoot, writablePaths }) => {
+    assert.deepEqual(env, {});
+    assert.equal(repoRoot, repo);
+    assert.deepEqual(writablePaths, [join(repo, "genesis/a2o/reports")]);
+    await mkdir(out, { recursive: true });
+    const runnerPath = join(out, "stage-runner.sh");
+    const dnaPath = join(out, "peer-mesh.feature");
+    await writeFile(runnerPath, binary);
+    await writeFile(dnaPath, dna);
+    return { envelope, runnerPath, dnaPath };
+  };
+  const request = async (path, body) => {
+    calls.push({ path, body });
+    return {};
+  };
+  const root = join(state, "worker");
+  const result = await executeOrDecline({
+    root,
+    status: {
+      requestActionHash: "request",
+      taskCid: "task-cid",
+      grantActionHash: "grant",
+      envelope: submitted,
+    },
+    request,
+    artifactBase: "http://localhost",
+    fetchInput: async () => assert.fail("runner payload must never be fetched"),
+    buildStage,
+    env: {
+      COMPUTE_PRIVATE_MESH: "1",
+      COMPUTE_SOURCE_COMMIT: commit,
+      COMPUTE_STATE_ROOT: state,
+      COMPUTE_PERFORMER: "adam",
+      COMPUTE_RUNTIME_IMAGE: envelope.runtimeImage,
+      COMPUTE_SLICE_CPU_MILLIS: "8000",
+      COMPUTE_SLICE_MEMORY_BYTES: "25769803776",
+      COMPUTE_NODE_BIN: process.execPath,
+      COMPUTE_JUST_BIN: "/opt/compute/mesh-just.sh",
+    },
+    execute: async (_program, args) => {
+      if (args[0] === "cid")
+        return args[1].endsWith("task.json") ? "task-cid" : "receipt-cid";
+      if (args[0] === "receipt-path") return join(state, "absent", "receipt.json");
+      if (args[0] === "run") {
+        assert.equal(
+          await readFile(args[args.indexOf("--binary") + 1], "utf8"),
+          binary.toString(),
+        );
+        return JSON.stringify({ status: "passed", logs: [] });
+      }
+      if (args[0] === "cleanup") return "";
+      throw new Error(`unexpected executor call ${args.join(" ")}`);
+    },
+  });
+  return { result, calls };
+}
+
+test("identical provider-built stage is accepted and runner bytes never execute", async (t) => {
+  const { result, calls } = await providerStageFixture(t);
+  assert.equal(result.declined, false);
+  assert.ok(calls.some(({ path }) => path.endsWith("/accept")));
+  assert.ok(calls.some(({ path }) => path.endsWith("/complete")));
+});
+
+test("one changed stage byte and a runner-chosen envelope change decline before acceptance", async (t) => {
+  for (const mutate of [
+    (task) => {
+      const changed = Buffer.from("#!/bin/sh\necho provider-builu\n");
+      assert.equal(changed.length, task.binary.bytes);
+      task.binary.sha256 = createHash("sha256").update(changed).digest("hex");
+    },
+    (task) => {
+      task.resources.timeoutSeconds += 1;
+    },
+  ]) {
+    const { result, calls } = await providerStageFixture(t, mutate);
+    assert.equal(result.reason, "invalid-artifact");
+    assert.match(result.message, /provider stage differs/);
+    assert.equal(calls.filter(({ path }) => path.endsWith("/decline")).length, 1);
+    assert.equal(calls.some(({ path }) => path.endsWith("/accept")), false);
+  }
+});
+
+test("a non-allowlisted provider feature is declined once before acceptance", async (t) => {
+  const { result, calls } = await providerStageFixture(t, (task) => {
+    task.project = "a2o-stage:not-reviewed";
+  });
+  assert.equal(result.reason, "invalid-artifact");
+  assert.match(result.message, /not listed in provider-stages\.json/);
+  assert.equal(calls.filter(({ path }) => path.endsWith("/decline")).length, 1);
+  assert.equal(calls.some(({ path }) => path.endsWith("/accept")), false);
 });
 
 test("completion publication retries use durable receipt without executing again", async (t) => {

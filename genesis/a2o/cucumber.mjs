@@ -30,6 +30,8 @@
 //
 // A stage that owns its own report sets these so exactly one JSON is written
 // per run. Unset (local dev, `just test`, ad-hoc runs) the paths are unchanged.
+import { MESH_PROFILE_TAGS } from './mesh-profile.mjs';
+
 const jsonReportPath = process.env.CUCUMBER_JSON_REPORT || 'reports/cucumber-report.json';
 const htmlReportPath = process.env.CUCUMBER_HTML_REPORT || 'reports/cucumber-report.html';
 
@@ -173,7 +175,7 @@ export default function () {
       ...base,
       paths: ['features/**/*.feature'],
       worldParameters: { env: 'mesh' },
-      tags: '@e2e and not @wip and not @browser and not @browser-only',
+      tags: MESH_PROFILE_TAGS,
     },
     // Act I, THE PORTAL. The browser half of the household lane, split out only
     // because it needs a real browser (`E2E_DEVICE_MODE=playwright`) — the

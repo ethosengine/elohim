@@ -38,8 +38,13 @@ function tap(t, script, { run = true } = {}) {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const runPath = resolve(dir, 'run.jsonl');
   if (run) writeFileSync(runPath, '');
+  // The pre-push hook and gate-runner export GATE_REMAINING, which makes the first red append an
+  // outlook event. A fixture tap is not a gate in that run: inheriting it made this suite count
+  // events differently inside a push (2 !== 1) than when run alone.
+  const env = { ...process.env };
+  delete env.GATE_REMAINING;
   const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', ...(run ? ['--run', runPath] : []), '--', 'bash', '-c', script],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 15000 });
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 15000, env });
   const events = run ? readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
   const summary = JSON.parse(String(result.output[3]).trim());
   return { result, events, summary };

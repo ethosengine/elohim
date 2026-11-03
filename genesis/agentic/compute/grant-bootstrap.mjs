@@ -34,6 +34,16 @@ export function validateGrantDeclaration(config, now = Date.now()) {
   const stamps = ["issuedAt", "validFrom", "validUntil"].map((k) =>
     Date.parse(grant[k]),
   );
+  // Name the two refusals a steward acts on, before the general shape check: a window that
+  // has closed (there is no automatic renewal) and one that has not opened yet.
+  insist(
+    !Number.isFinite(stamps[2]) || stamps[2] > now,
+    `runner grant expired at ${grant.validUntil}: no automatic renewal — the steward of record approves a replacement window (genesis/agentic/compute/operations.md)`,
+  );
+  insist(
+    !Number.isFinite(stamps[1]) || stamps[1] <= now,
+    `runner grant not yet valid: its window opens at ${grant.validFrom}`,
+  );
   insist(
     stamps.every(Number.isFinite) &&
       stamps[0] <= now &&
@@ -109,6 +119,14 @@ function nativeFailureCategory(status, text) {
       return "consent-verification-refused";
     return "grant-native-refused";
   }
+  // A conductor whose sqlite lock wait expired never wrote the action: the same
+  // content-addressed request is safe to repeat once the lock clears.
+  if (
+    status === 500 &&
+    text.startsWith("Error: Conductor error: ") &&
+    /database is locked|SQLITE_BUSY/.test(text)
+  )
+    return "conductor-database-locked";
   for (const [prefix, category] of [
     ["Error: Conductor error: ", "conductor-error"],
     ["Error: Serialization error: ", "serialization-error"],
@@ -154,6 +172,23 @@ async function boundedBody(response, signal) {
     signal?.removeEventListener("abort", listener);
     void reader.cancel().catch(() => {});
   }
+}
+
+// A refusal the worker may safely repeat: issuance is content-addressed (storage reuses an
+// existing commitment for identical content), so a timed-out or unreachable first attempt is
+// re-run as the same request, as is one refused by an expired sqlite lock wait. Exit 75 (EX_TEMPFAIL) tells worker-start.sh to retry in place
+// rather than restart the container and its whole mesh. Every other refusal stays 2.
+export const TEMPORARY_GRANT_EXIT = 75;
+export function grantRefusalExitCode(diagnostic) {
+  if (!diagnostic) return 2;
+  if (["request-timeout", "connection-failed"].includes(diagnostic.category))
+    return TEMPORARY_GRANT_EXIT;
+  if (diagnostic.category === "conductor-database-locked")
+    return TEMPORARY_GRANT_EXIT;
+  // 429 is storage's own sqlite-lock or admission backpressure, sent with Retry-After.
+  if ([429, 502, 503, 504].includes(diagnostic.httpStatus))
+    return TEMPORARY_GRANT_EXIT;
+  return 2;
 }
 
 export async function bootstrapGrant(options = {}) {
@@ -259,11 +294,16 @@ async function bootstrapGrantAttempt({
   if (config.enabled === false) return null;
   validateGrantDeclaration(config, now);
   const base = env.COMPUTE_API_URL || "http://127.0.0.1:8090";
+  // Issuing a grant is several conductor round trips (read, create, authenticated read,
+  // authority links, consent event). On a conductor that just restarted they took longer than
+  // the shared 30 s: edge #1800 logged 15 of 17 attempts as request-timeout. The client may give
+  // this one call longer; storage reuses a grant whose content it already committed.
   const request = api(
     base,
     config.provider,
     fetcher,
     env.ELOHIM_COMPUTE_LOCAL_TOKEN || "",
+    Number(env.COMPUTE_GRANT_REQUEST_TIMEOUT_MS) || 120_000,
   );
   insist(
     env.COMPUTE_PERFORMER === config.provider,
@@ -332,8 +372,10 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
+  let lastDiagnostic = null;
   bootstrapGrant({
     observe: (diagnostic) => {
+      lastDiagnostic = diagnostic;
       process.stderr.write(
         "provider grant diagnostic: " + JSON.stringify(diagnostic) + "\n",
       );
@@ -349,7 +391,7 @@ if (
       process.stderr.write(
         "REFUSED provider grant bootstrap: verify approved declaration, provider identity and native grant availability\n",
       );
-      process.exitCode = 2;
+      process.exitCode = grantRefusalExitCode(lastDiagnostic);
     },
   );
 }

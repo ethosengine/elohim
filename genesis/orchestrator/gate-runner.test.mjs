@@ -380,6 +380,15 @@ describe('manifest-driven local gate registry', () => {
     assert.equal(gateChildEnv(bare, { GATE_CARGO_ENV: '{"X":"1"}' }).GATE_CARGO_ENV, '{"RUSTUP_TOOLCHAIN":"1.96.1"}');
     assert.equal(Object.hasOwn(gateChildEnv(none, {}), 'GATE_CARGO_ENV'), false);
     assert.equal(Object.hasOwn(gateChildEnv(declared, { cargoEnv: undefined, PATH: '/bin' }), 'PATH'), true);
+    // Push-scoped git config (`git -c …`) never reaches the temp repositories a gate creates.
+    const scrubbed = gateChildEnv(none, {
+      PATH: '/bin', GIT_CONFIG_PARAMETERS: "'core.hookspath'='/x/.husky/_'",
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: '/x', GIT_CONFIG_GLOBAL: '/g',
+    });
+    for (const k of ['GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0']) {
+      assert.equal(Object.hasOwn(scrubbed, k), false, k);
+    }
+    assert.equal(scrubbed.GIT_CONFIG_GLOBAL, '/g', 'a global config file location is not push-scoped');
 
     const probe = (env) => spawnSync(
       'bash',

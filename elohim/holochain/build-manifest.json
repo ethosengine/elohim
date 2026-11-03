@@ -135,6 +135,69 @@
         "function": null
       }
     },
+    "build-doorway-app": {
+      "description": "Build the doorway operator dashboard and thin nginx image",
+      "inputs": {
+        "sources": [
+          "doorway/doorway-app/**",
+          "app/elohim-elements/elohim-core/**",
+          "app/elohim-elements/elohim-imagodei/**",
+          "app/elohim-elements/custom-elements-manifest.config.mjs",
+          "app/elohim-library/projects/elohim-service/**",
+          "app/elohim-library/projects/elohim-identity/**",
+          "elohim/sdk/storage-client-ts/**",
+          "elohim/eprfs/eprfs-ts/**",
+          "elohim/sdk/epr-ts/**",
+          "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
+          "package.json",
+          ".npmrc",
+          "patches/@angular__build@22.1.0.patch"
+        ],
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile",
+          "scripts/ci/build-doorway-app-image.sh",
+          "scripts/ci/closure-input-digest.sh",
+          "scripts/ci/harbor-oracle.sh"
+        ]
+      },
+      "outputs": {
+        "artifacts": [
+          "doorway-app-image"
+        ],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Doorway App",
+        "function": "runDoorwayAppStageBody"
+      }
+    },
+    "build-agent-sdk": {
+      "description": "Build the Elohim Agent SDK constitutional-reasoning sidecar image",
+      "inputs": {
+        "sources": [
+          "elohim/elohim-agent/elohim-agent-sdk/**"
+        ],
+        "buildProcess": [
+          "elohim/holochain/Jenkinsfile",
+          "scripts/ci/build-agent-sdk-image.sh",
+          "scripts/ci/closure-input-digest.sh",
+          "scripts/ci/harbor-oracle.sh"
+        ]
+      },
+      "outputs": {
+        "artifacts": [
+          "elohim-agent-sdk-image"
+        ],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Agent SDK",
+        "function": "runAgentSdkStageBody"
+      }
+    },
     "sdk-feature-matrix": {
       "description": "Run elohim-sdk tests across its advertised feature sets, plus fmt and clippy",
       "inputs": {
@@ -215,7 +278,9 @@
         "verify": null
       },
       "depends": [
-        "build-edge-image"
+        "build-edge-image",
+        "build-doorway-app",
+        "build-agent-sdk"
       ],
       "executor": {
         "stage": "Deploy Edge Node - Alpha",

@@ -1245,7 +1245,32 @@ def runAdamAuthorityProof() {
 
 // Whole-worker snapshot after verified Adam completion; lifetime peak is not stage peak.
 // Called outside the parent submission's credential scope; no dependency install needed.
-def captureAdamAfterPeerStage(Map peerStageConfig) {
+// Report what cucumber-js reports. A skipped step (a held @requires lane, an @wip hold) is not a
+// failure natively, but the plugin's default counts it as one: genesis #1722 published 3/151
+// features and 21/593 scenarios passed from 10 failed steps beside 7099 skipped. Pending and
+// undefined stay failing, as cucumber-js strict mode treats them; the lane classification names
+// what was held. Its own def, so the E2E stage's script body stays under the CPS method cap.
+def publishA2oCucumber(String featureSummary) {
+    def report = [
+        reportTitle: 'A2O E2E Reports',
+        classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
+        fileIncludePattern: 'cucumber-report-*.json',
+        jsonReportDirectory: 'genesis/a2o/reports',
+        buildStatus: 'UNSTABLE',
+        sortingMethod: 'ALPHABETICAL',
+        trendsLimit: 10
+    ]
+    try {
+        cucumber(report + [skippedAsNotFailingStatus: true])
+    } catch (IllegalArgumentException unsupported) {
+        // A plugin older than jenkinsci/cucumber-reports-plugin#413 has no such option; publish
+        // as before rather than lose the report.
+        echo "cucumber: skippedAsNotFailingStatus unsupported (${unsupported.message}); skipped steps count as failing in this report"
+        cucumber(report)
+    }
+}
+
+def captureAdamForPeerStage(Map peerStageConfig, String output) {
     def worker = readJSON(file: 'genesis/orchestrator/data/adam-compute-worker.json')
     if (worker.enabled != true || worker.performer != peerStageConfig.provider) { return }
     def provider = getHumanStorageUrls('').find { it.humanId == 'human-adam-firstman' }
@@ -1254,14 +1279,18 @@ def captureAdamAfterPeerStage(Map peerStageConfig) {
         withAdamDiagnosticPod {
             try {
                 withEnv(['COMPUTE_WORKER_STARTUP_SECS=60']) {
-                    sh "node '${env.WORKSPACE}/genesis/scripts/ci/runner-capture-activation.mjs' '${provider.service}' '${provider.namespace}' 'compute-worker-after-stage'"
+                    sh "node '${env.WORKSPACE}/genesis/scripts/ci/runner-capture-activation.mjs' '${provider.service}' '${provider.namespace}' '${output}'"
                 }
-                archiveArtifacts(artifacts: 'compute-worker-after-stage/**/activation.json', allowEmptyArchive: false, fingerprint: true)
+                archiveArtifacts(artifacts: "${output}/**/activation.json", allowEmptyArchive: false, fingerprint: true)
             } finally {
-                archiveArtifacts(artifacts: 'compute-worker-after-stage/**/status.txt,rollout-evidence/**', allowEmptyArchive: true, fingerprint: true)
+                archiveArtifacts(artifacts: "${output}/**/status.txt,rollout-evidence/**", allowEmptyArchive: true, fingerprint: true)
             }
         }
     }
+    def activation = readJSON(file: "${output}/${provider.namespace}--${provider.service}/activation.json")
+    def sourceCommit = activation?.worker?.sourceCommit
+    if (!(sourceCommit ==~ /[0-9a-f]{40}/)) { error('Adam activation did not prove its pinned source commit') }
+    return sourceCommit
 }
 
 def runnerPreflight() {
@@ -2188,16 +2217,18 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         def peerStageFeature = params.PEER_STAGE_FEATURE?.trim() ?: (peerStageConfig.enabled == true ? peerStageConfig.feature : '')
                         if (peerStageFeature) {
                             catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                                def peerStageSourceCommit = captureAdamForPeerStage(peerStageConfig, 'compute-worker-for-stage')
                                 withCredentials([string(credentialsId: 'doorway-admin-bootstrap-key', variable: 'ADMIN_KEY')]) {
                                     withEnv(["DOORWAY_URL=http://${env.INTERNAL_DOORWAY_URL}",
                                              "RUNNER_STAGE_FEATURE=${peerStageFeature}",
-                                             "RUNNER_STAGE_CONFIG=${peerStageConfigPath}"]) {
+                                             "RUNNER_STAGE_CONFIG=${peerStageConfigPath}",
+                                             "RUNNER_STAGE_SOURCE_COMMIT=${peerStageSourceCommit}"]) {
                                         timeout(time: 75, unit: 'MINUTES') {
                                             sh "'${env.WORKSPACE}/genesis/a2o/node_modules/.bin/tsx' '${env.WORKSPACE}/genesis/scripts/ci/runner-stage.mjs'"
                                         }
                                     }
                                 }
-                                captureAdamAfterPeerStage(peerStageConfig)
+                                captureAdamForPeerStage(peerStageConfig, 'compute-worker-after-stage')
                             }
                         }
 
@@ -2286,15 +2317,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         if (fileExists('genesis/a2o/reports/cucumber-report-api.json') ||
                             fileExists('genesis/a2o/reports/cucumber-report-browser.json') ||
                             fileExists('genesis/a2o/reports/cucumber-report-peer-stage.json')) {
-                            cucumber([
-                                reportTitle: 'A2O E2E Reports',
-                                classifications: [[key: 'Scenario evidence by lane', value: featureSummary]],
-                                fileIncludePattern: 'cucumber-report-*.json',
-                                jsonReportDirectory: 'genesis/a2o/reports',
-                                buildStatus: 'UNSTABLE',
-                                sortingMethod: 'ALPHABETICAL',
-                                trendsLimit: 10
-                            ])
+                            publishA2oCucumber(featureSummary)
                         }
                     }
                 }

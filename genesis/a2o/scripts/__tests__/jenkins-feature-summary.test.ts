@@ -3,6 +3,8 @@ import { test } from 'node:test';
 
 import { featureSummary } from '../jenkins-feature-summary.js';
 
+const PEER_STAGE = 'peer-stage';
+
 void test('preserves separate lane results and missing evidence', () => {
   const report = JSON.stringify([
     {
@@ -29,5 +31,46 @@ void test('empty, malformed, and unreadable reports never claim a pass', () => {
   assert.equal(
     summary,
     'api: not measured (empty report) | browser: not measured (unreadable report) | peer-stage: not measured (unreadable report)'
+  );
+});
+
+void test('peer-stage reports held scenarios as not measured and counts mixed held evidence', () => {
+  const allHeld = JSON.stringify([
+    {
+      uri: 'features/peer.feature',
+      elements: [{ type: 'scenario', name: 'held', steps: [{ result: { status: 'skipped' } }] }],
+    },
+  ]);
+  assert.equal(
+    featureSummary(lane => (lane === PEER_STAGE ? allHeld : undefined)),
+    'api: not measured (no report) | browser: not measured (no report) | peer-stage: held, not measured (1 held)'
+  );
+
+  const mixed = JSON.stringify([
+    {
+      uri: 'features/peer.feature',
+      elements: [
+        { type: 'scenario', name: 'ran', steps: [{ result: { status: 'passed' } }] },
+        { type: 'scenario', name: 'held', steps: [{ result: { status: 'skipped' } }] },
+      ],
+    },
+  ]);
+  assert.equal(
+    featureSummary(lane => (lane === PEER_STAGE ? mixed : undefined)),
+    'api: not measured (no report) | browser: not measured (no report) | peer-stage: 1/1 measured scenarios passed, 0 failed, 1 held, 0 pending/undefined'
+  );
+
+  const verdict = JSON.stringify({
+    verdict: 'pass',
+    summary: 'pass (1 measured, 2 held)',
+    scenarios: [{ name: 'ran', status: 'passed' }],
+    held: 2,
+  });
+  assert.equal(
+    featureSummary(
+      lane => (lane === PEER_STAGE ? mixed : undefined),
+      () => verdict
+    ),
+    'api: not measured (no report) | browser: not measured (no report) | peer-stage: pass (1 measured, 2 held)'
   );
 });

@@ -240,6 +240,11 @@
       "comm": ["claude"],
       "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"],
       "modelEnv": [],
+      "commitAttribution": {
+        "email": "noreply@anthropic.com",
+        "modelSuffix": "",
+        "sessionTrailer": "Claude-Session"
+      },
       "capabilityBindings": {
         "C1": {
           "model": "haiku"
@@ -344,6 +349,12 @@
       "comm": ["codex"],
       "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
       "modelEnv": [],
+      "modelSource": "codex-state-v5",
+      "commitAttribution": {
+        "email": "noreply@openai.com",
+        "modelSuffix": " (Codex)",
+        "sessionTrailer": "Codex-Session"
+      },
       "capabilityBindings": {
         "C3": {
           "model": "gpt-6-astra",

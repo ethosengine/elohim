@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   bootstrapGrant,
   validateGrantDeclaration,
+  grantRefusalExitCode,
+  TEMPORARY_GRANT_EXIT,
 } from "./grant-bootstrap.mjs";
 const provider = "uhCAk" + "a".repeat(48);
 const recipient = "uhCAk" + "b".repeat(48);
@@ -136,6 +138,22 @@ test("approval must name Matthew, Adam, active fixed bounds and separate actors"
     assert.throws(() => validateGrantDeclaration(c, now));
   }
 });
+test("an expired or not-yet-open window names its date and the steward's cure", () => {
+  const expired = declaration();
+  expired.grant.validUntil = new Date(now - 1000).toISOString();
+  assert.throws(
+    () => validateGrantDeclaration(expired, now),
+    /runner grant expired at .*no automatic renewal.*steward of record approves a replacement window/,
+  );
+  const early = declaration();
+  early.grant.validFrom = new Date(now + 3600_000).toISOString();
+  assert.throws(
+    () => validateGrantDeclaration(early, now),
+    /runner grant not yet valid: its window opens at /,
+  );
+  // An active window still passes the named checks and reaches the general ones.
+  assert.doesNotThrow(() => validateGrantDeclaration(declaration(), now));
+});
 test("remote adapter, missing token and wrong performer refuse without grant calls", async () => {
   for (const edit of [
     (env) => (env.COMPUTE_API_URL = "https://public.example"),
@@ -160,6 +178,11 @@ test("normal attempt emits bounded native categories without extra POST or secre
       500,
       "Error: Conductor error: secret-token-dynamic-detail",
       "conductor-error",
+    ],
+    [
+      500,
+      'Error: Conductor error: SqliteError { code: 5, message: "database is locked" } secret-token-dynamic-detail',
+      "conductor-database-locked",
     ],
     [
       403,
@@ -281,7 +304,9 @@ test("timeout, connection, body and receipt failures after POST have unknown out
     );
     assert.ok(!JSON.stringify(diagnostics).includes("SECRET"));
   }
-  assert.ok(deadlines.length === 10 && deadlines.every((ms) => ms === 30000));
+  // Each of the five runs reads health under the shared 30 s and posts the grant under the
+  // grant's own 120 s, since issuance on a freshly restarted conductor outlasts 30 s.
+  assert.deepEqual(deadlines, Array(5).fill([30000, 120000]).flat());
 });
 
 test("pre-POST refusal stays not-submitted; an observer cannot swallow a receipt error", async () => {
@@ -357,4 +382,36 @@ test("health refusal cancels its unread body without waiting on cancellation", a
   assert.equal(diagnostics[0].category, "health-http-refused");
   assert.equal(diagnostics[0].outcome, "not-submitted");
   assert.deepEqual(f.receipts, []);
+});
+
+test("only a timed-out, unreachable, lock-expired or 429/502/503/504 grant request is a temporary refusal", () => {
+  for (const diagnostic of [
+    { category: "request-timeout", httpStatus: null },
+    { category: "connection-failed", httpStatus: null },
+    { category: "native-unavailable", httpStatus: 503 },
+    { category: "native-unavailable", httpStatus: 502 },
+    { category: "native-unavailable", httpStatus: 504 },
+    { category: "conductor-database-locked", httpStatus: 500 },
+    { category: "http-refused", httpStatus: 429 },
+  ])
+    assert.equal(
+      grantRefusalExitCode(diagnostic),
+      TEMPORARY_GRANT_EXIT,
+      JSON.stringify(diagnostic),
+    );
+  for (const diagnostic of [
+    null,
+    { category: "declaration-refused", httpStatus: null },
+    { category: "provider-identity-refused", httpStatus: null },
+    { category: "native-refused", httpStatus: 403 },
+    { category: "native-response-invalid", httpStatus: 200 },
+    { category: "body-limit", httpStatus: 200 },
+    { category: "conductor-error", httpStatus: 500 },
+    { category: "grant-withdrawn", httpStatus: 500 },
+  ])
+    assert.equal(
+      grantRefusalExitCode(diagnostic),
+      2,
+      JSON.stringify(diagnostic),
+    );
 });

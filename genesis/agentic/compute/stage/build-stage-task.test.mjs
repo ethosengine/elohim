@@ -12,6 +12,7 @@ import {
   assessDelegability,
   buildStageTask,
   parseFeatureConcern,
+  parseScenarioInventory,
   parseScenarioNames,
   probeRunParser,
   slugify,
@@ -147,17 +148,36 @@ test("slugify matches the verbatim §3 D6 expression on the pinned scenario name
   );
 });
 
-test("parseScenarioNames finds Scenario: and Scenario Outline: lines without a Gherkin parser", () => {
+test("parseScenarioNames selects the mesh profile and holds scenario/feature exclusions", () => {
   const text = [
+    "@e2e",
     "Feature: x",
     "  Background:",
     "    Given y",
     "  Scenario: first one",
     "    Given z",
+    "  @wip",
+    "  Scenario: held work",
+    "    Given h",
     "  Scenario Outline: second <one>",
     "    Given w",
   ].join("\n");
   assert.deepEqual(parseScenarioNames(text), ["first one", "second <one>"]);
+  assert.deepEqual(parseScenarioInventory(text), {
+    scenarioNames: ["first one", "second <one>"],
+    heldScenarioNames: ["held work"],
+  });
+
+  const browserFeature = [
+    "@e2e @browser",
+    "Feature: browser only",
+    "  Scenario: held by feature tag",
+    "    Given x",
+  ].join("\n");
+  assert.deepEqual(parseScenarioInventory(browserFeature), {
+    scenarioNames: [],
+    heldScenarioNames: ["held by feature tag"],
+  });
 });
 
 test("parseFeatureConcern reads only the tag lines above Feature:", () => {
@@ -192,6 +212,7 @@ test("stage.json carries the requester's sut/sutParts and the feature's @concern
   assert.ok(stage.sutParts && typeof stage.sutParts === "object");
   assert.ok(Object.keys(stage.sutParts).length > 0);
   assert.deepEqual(stage.scenarioNames, result.scenarioNames);
+  assert.deepEqual(stage.heldScenarioNames, result.heldScenarioNames);
   assert.equal(stage.testPrefix, result.testPrefix);
 
   const runner = await readFile(result.runnerPath, "utf8");

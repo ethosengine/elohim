@@ -434,3 +434,42 @@ fn successor_archive_retry_is_idempotent_and_conflicting_history_refuses() {
     );
     assert_eq!(std::fs::read(&archive).unwrap(), bytes);
 }
+
+#[test]
+fn commit_decoration_declines_unknown_closed_and_injectable_context() {
+    let registry: Registry = serde_json::from_value(json!({"runtimes": [{
+        "id": "codex", "comm": ["codex"], "sessionEnv": [],
+        "commitAttribution": {"email": "noreply@openai.com", "modelSuffix": " (Codex)",
+                              "sessionTrailer": "Codex-Session"}
+    }]}))
+    .unwrap();
+    let mut record = binding(Path::new("/fixture"), "session-1");
+    let derive =
+        |record: &Envelope| elohim_device_runtime::commit_attribution::trailers(record, &registry);
+    assert!(derive(&record).unwrap_err().contains("model is unmeasured"));
+    record.model = Some("gpt-fixture".into());
+    assert_eq!(
+        derive(&record).unwrap(),
+        vec![
+            (
+                "Co-Authored-By".into(),
+                "gpt-fixture (Codex) <noreply@openai.com>".into()
+            ),
+            ("Codex-Session".into(), "session-1".into()),
+        ]
+    );
+    for model in [
+        "gpt-fixture\nOther: forged",
+        "gpt-fixture <forged@example.test>",
+        " ",
+    ] {
+        record.model = Some(model.into());
+        assert!(derive(&record).is_err());
+    }
+    record.model = Some("gpt-fixture".into());
+    record.identity.runtime = "unknown".into();
+    assert!(derive(&record).unwrap_err().contains("no declared"));
+    record.identity.runtime = "codex".into();
+    record.closed_at = Some("2026-11-01T00:00:00Z".into());
+    assert!(derive(&record).unwrap_err().contains("closed"));
+}

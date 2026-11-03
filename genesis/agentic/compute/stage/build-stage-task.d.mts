@@ -28,6 +28,7 @@ export declare function buildStageTask(input: BuildStageTaskInput): Promise<{
   dnaPath: string;
   featureSha256: string;
   scenarioNames: string[];
+  heldScenarioNames: string[];
   scenarioSlugs: string[];
   expectedTests: string[];
   concern: string;

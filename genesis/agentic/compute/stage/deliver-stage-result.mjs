@@ -94,6 +94,8 @@ export function recordGapOutcome({
   entry,
   verdict,
   scenarios,
+  held = 0,
+  notMeasured = false,
   durableDir,
   cwd,
   exec = defaultExec,
@@ -129,7 +131,8 @@ export function recordGapOutcome({
       "--kind",
       "observation",
       "--reason",
-      `peer-stage ${verdict}: ${failedSlugs}`,
+      `peer-stage ${verdict} (${scenarios.length} measured, ${held} held)` +
+        (notMeasured ? " — held, not measured" : `: ${failedSlugs}`),
       "--root",
       cwd,
     ],
@@ -151,6 +154,7 @@ export function recordHabitDelta({
   status,
   scenarios,
   verdict,
+  held = 0,
   reportPath,
   durableDir,
   reportRelDir,
@@ -177,7 +181,9 @@ export function recordHabitDelta({
   const failed = scenarios.length - passed;
   const receiptRel = join(reportRelDir ?? relative(cwd, durableDir), "receipt.json");
   const reportRel = reportPath ? relative(cwd, reportPath) : "(report not written)";
-  const text = `${stage.concern} passed=${passed} failed=${failed} — report ${reportRel}; receipt ${receiptRel}`;
+  const text =
+    `${stage.concern} ${verdict} (${scenarios.length} measured, ${held} held) ` +
+    `passed=${passed} failed=${failed} — report ${reportRel}; receipt ${receiptRel}`;
   const date = now().toISOString().slice(0, 10);
   const result = appendDelta(found.path, { date, label, text, onceKey: completionShort });
   return { ok: result.ok, appended: result.appended, path: found.path, reason: result.reason };
@@ -193,6 +199,9 @@ export async function deliverStageResult({
   stage,
   verdict,
   scenarios,
+  held = 0,
+  heldScenarios = [],
+  notMeasured = false,
   durableDir,
   reportRelDir,
   cwd = process.cwd(),
@@ -211,6 +220,8 @@ export async function deliverStageResult({
     entry,
     verdict,
     scenarios,
+    held,
+    notMeasured,
     durableDir,
     cwd,
     exec,
@@ -222,6 +233,7 @@ export async function deliverStageResult({
     status,
     scenarios,
     verdict,
+    held,
     reportPath: report.ok ? report.path : null,
     durableDir,
     reportRelDir,
@@ -235,6 +247,10 @@ export async function deliverStageResult({
   });
 
   return {
+    verdictText:
+      `${verdict} (${scenarios.length} measured, ${held} held)` +
+      (notMeasured ? " — held, not measured" : ""),
+    heldScenarios,
     reportPath: report.ok ? report.path : null,
     reportError: report.ok ? undefined : { status: report.status, stderr: report.stderr },
     fulfill,

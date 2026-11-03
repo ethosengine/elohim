@@ -13,6 +13,12 @@
       "inputs": {
         "sources": [
           "elohim/eprfs/**",
+          "genesis/agentic/agent-runtimes.json",
+          "genesis/agentic/commit-attribution.py",
+          "genesis/agentic/session_envelope_test.py",
+          ".husky/prepare-commit-msg",
+          ".husky/hooks-path.mjs",
+          ".husky/hooks-path.test.mjs",
           "elohim/ark/core/**",
           "elohim/placement/core/**",
           "elohim/elohim-compute/**",

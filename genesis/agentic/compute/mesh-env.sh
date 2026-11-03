@@ -22,8 +22,6 @@ export MESH_HAPP_PATH="$compute_image_root/elohim.happ"
 # Doorways declare Mongo explicitly; retain an isolated archive even though this
 # initial profile casts nobody. Never attach the host's default-port archive.
 export MONGOD_BIN=/usr/local/bin/mongod MONGO_PORT=37017 MESH_DOORWAY_MAX_AGENTS=0
-export MESH_API_KEY_ADMIN=provider-private-mesh-fixture
-export MESH_COMPUTE_LOCAL_TOKEN=provider-private-mesh-fixture-local-only
 export E2E_DOORWAY_ALPHA=http://localhost:18888
 export E2E_DOORWAY_B=http://localhost:18889 E2E_DOORWAY_BETA=http://localhost:18889
 export E2E_STORAGE_URL=http://localhost:18090 E2E_STORAGE_B=http://localhost:18091

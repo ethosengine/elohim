@@ -20,6 +20,7 @@ export function api(
   performer,
   fetcher = fetch,
   localToken = process.env.ELOHIM_COMPUTE_LOCAL_TOKEN || "",
+  timeoutMs = 30_000,
 ) {
   const origin = new URL(base);
   if (
@@ -39,7 +40,7 @@ export function api(
         "x-elohim-compute-token": localToken,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
       redirect: "error",
     });
     if (!response.ok)

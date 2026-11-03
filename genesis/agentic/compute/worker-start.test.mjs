@@ -8,6 +8,9 @@ import {
   readFileSync,
   chmodSync,
   existsSync,
+  chownSync,
+  symlinkSync,
+  readdirSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -30,17 +33,23 @@ function mapsGuest(mapping) {
     .split("\n")
     .some((row) => {
       const fields = row.trim().split(/\s+/).map(Number);
-      if (fields.length !== 3 || !fields.every(Number.isSafeInteger)) return false;
+      if (fields.length !== 3 || !fields.every(Number.isSafeInteger))
+        return false;
       const [inside, outside, count] = fields;
       return (
-        inside >= 0 && outside >= 0 && count > 0 &&
-        65534 >= inside && 65534 - inside < count
+        inside >= 0 &&
+        outside >= 0 &&
+        count > 0 &&
+        65534 >= inside &&
+        65534 - inside < count
       );
     });
 }
 
 function guestPrerequisite(readProc) {
-  const missing = ["uid_map", "gid_map"].filter((name) => !mapsGuest(readProc(name)));
+  const missing = ["uid_map", "gid_map"].filter(
+    (name) => !mapsGuest(readProc(name)),
+  );
   if (missing.length) {
     return `guest ownership prerequisite unavailable: guest ID 65534 is not mapped in ${missing.map((name) => `/proc/self/${name}`).join(" and ")}`;
   }
@@ -51,16 +60,22 @@ function guestPrerequisite(readProc) {
 }
 
 const guestOnly =
-  rootOnly || guestPrerequisite((name) => readFileSync(`/proc/self/${name}`, "utf8"));
+  rootOnly ||
+  guestPrerequisite((name) => readFileSync(`/proc/self/${name}`, "utf8"));
 
 const fullMap = "         0          0 4294967295\n";
 const singleMap = "         0          0          1\n";
 const prerequisites = (uid, gid, setgroups = "allow\n") =>
-  guestPrerequisite((name) => ({ uid_map: uid, gid_map: gid, setgroups })[name]);
+  guestPrerequisite(
+    (name) => ({ uid_map: uid, gid_map: gid, setgroups })[name],
+  );
 
 test("guest prerequisite accepts full and multiple namespace-local mappings", () => {
   assert.equal(prerequisites(fullMap, fullMap), false);
-  assert.equal(prerequisites("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"), false);
+  assert.equal(
+    prerequisites("0 1000 1\n65534 2000 1\n", "65534 3000 1\n"),
+    false,
+  );
 });
 
 test("guest prerequisite names single-ID and separately missing UID/GID mappings", () => {
@@ -76,15 +91,26 @@ test("guest mapping uses the inside column and inclusive-start exclusive-end bou
     assert.equal(mapsGuest(mapping), true, mapping);
   }
   for (const mapping of [
-    "0 65534 1", "65535 42 1", "65533 42 1", "65534 42 0", "0 0 65534",
-    "", "invalid", "65534 -1 1", "65534 0 1.5", "65534 0 1 2",
+    "0 65534 1",
+    "65535 42 1",
+    "65533 42 1",
+    "65534 42 0",
+    "0 0 65534",
+    "",
+    "invalid",
+    "65534 -1 1",
+    "65534 0 1.5",
+    "65534 0 1 2",
   ]) {
     assert.equal(mapsGuest(mapping), false, mapping);
   }
 });
 
 test("guest prerequisite preserves the clear-groups permission boundary", () => {
-  assert.match(prerequisites(fullMap, fullMap, "deny\n"), /setgroups.*setpriv --clear-groups/);
+  assert.match(
+    prerequisites(fullMap, fullMap, "deny\n"),
+    /setgroups.*setpriv --clear-groups/,
+  );
   assert.match(prerequisites(fullMap, fullMap, ""), /setgroups/);
   assert.equal(prerequisites(fullMap, fullMap, "allow\n"), false);
 });
@@ -99,6 +125,7 @@ function fixture(t) {
   mkdirSync(join(image, "mesh-bin"), { recursive: true });
   mkdirSync(join(source, "app/elohim-app/scripts"), { recursive: true });
   mkdirSync(join(source, "genesis/a2o"), { recursive: true });
+  mkdirSync(join(source, "genesis/agentic/compute"), { recursive: true });
   for (const name of [
     "elohim-storage",
     "doorway",
@@ -114,9 +141,19 @@ function fixture(t) {
   writeFileSync(join(image, "elohim.happ"), "fixture-only");
   writeFileSync(
     join(image, "grant-bootstrap.mjs"),
-    `if (process.env.FIXTURE_GRANT_REFUSE === '1') process.exit(23);\n`,
+    `import fs from 'node:fs';
+const attempts = process.env.COMPUTE_STATE_ROOT + '/grant-attempts';
+const n = (fs.existsSync(attempts) ? Number(fs.readFileSync(attempts, 'utf8')) : 0) + 1;
+fs.writeFileSync(attempts, String(n));
+if (process.env.FIXTURE_GRANT_REFUSE === '1') process.exit(23);
+if (n <= Number(process.env.FIXTURE_GRANT_TEMPFAIL || 0)) process.exit(75);
+`,
   );
   writeFileSync(join(source, ".gitignore"), "genesis/a2o/reports/\n");
+  writeFileSync(
+    join(source, "genesis/agentic/compute/provider-stages.json"),
+    JSON.stringify({ features: ["features/dataplane/peer-mesh.feature"] }),
+  );
   writeFileSync(join(source, "justfile"), "fixture:\n    true\n");
   writeFileSync(
     join(source, "app/elohim-app/scripts/hc-mesh.sh"),
@@ -153,14 +190,21 @@ console.log('fixture worker invoked');
 console.log(JSON.stringify({args:process.argv.slice(2), mesh:process.env.MESH_DIR,
 storage:process.env.MESH_STORAGE_BASE_PORT, conductor:process.env.MESH_CONDUCTOR_BASE_PORT,
 alpha:process.env.E2E_DOORWAY_ALPHA,beta:process.env.E2E_DOORWAY_B,
-noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED}));
+noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED,
+admin:process.env.MESH_API_KEY_ADMIN,token:process.env.MESH_COMPUTE_LOCAL_TOKEN}));
 `,
     { mode: 0o755 },
   );
   const git = (...args) =>
     execFileSync("git", ["-C", source, ...args], { encoding: "utf8" }).trim();
   git("init", "-q");
-  git("add", "justfile", ".gitignore", "app/elohim-app/scripts/hc-mesh.sh");
+  git(
+    "add",
+    "justfile",
+    ".gitignore",
+    "app/elohim-app/scripts/hc-mesh.sh",
+    "genesis/agentic/compute/provider-stages.json",
+  );
   git(
     "-c",
     "user.name=Fixture",
@@ -205,6 +249,8 @@ noPrologue:process.env.MESH_ALLOW_NO_PROLOGUE,fenced:process.env.BERTH_FENCED}))
     COMPUTE_STATE_ROOT: state,
     COMPUTE_JUST_BIN: just,
     PROVIDER_TEST_TOKEN: "must-not-reach-mesh",
+    MESH_API_KEY_ADMIN: "must-not-reach-guest",
+    MESH_COMPUTE_LOCAL_TOKEN: "must-not-reach-guest",
   };
   const run = () => spawnSync("bash", [bootstrap], { env, encoding: "utf8" });
   return {
@@ -229,6 +275,21 @@ test(
     f.env.COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256 = "e".repeat(64);
     let run = f.run();
     assert.equal(run.status, 0, run.stderr);
+    const adminSecretPath = join(f.state, "private-home/mesh-api-key-admin");
+    const computeSecretPath = join(
+      f.state,
+      "private-home/mesh-compute-local-token",
+    );
+    const firstSecrets = [adminSecretPath, computeSecretPath].map((path) => {
+      const metadata = statSync(path);
+      assert.equal(metadata.isFile(), true);
+      assert.equal(metadata.uid, 0);
+      assert.equal(metadata.gid, 0);
+      assert.equal(metadata.mode & 0o777, 0o600);
+      const value = readFileSync(path, "utf8").trim();
+      assert.ok(value.length >= 32);
+      return value;
+    });
     assert.equal(
       readFileSync(join(f.state, "mesh/continuation-digest"), "utf8"),
       "d".repeat(64),
@@ -242,7 +303,7 @@ test(
     assert.equal(statSync(join(f.repo, "genesis/a2o/reports")).uid, 65534);
     assert.equal(
       statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o777,
-      0o606,
+      0o644,
     );
     assert.match(
       readFileSync(join(f.state, "mesh/events"), "utf8"),
@@ -251,11 +312,84 @@ test(
     writeFileSync(key, "identity-kept-across-restart");
     run = f.run();
     assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(
+      [adminSecretPath, computeSecretPath].map((path) =>
+        readFileSync(path, "utf8").trim(),
+      ),
+      firstSecrets,
+    );
     assert.equal(readFileSync(key, "utf8"), "identity-kept-across-restart");
     writeFileSync(join(f.repo, "justfile"), "modified source\n");
     run = f.run();
     assert.equal(run.status, 2);
     assert.match(run.stderr, /modified tracked source/);
+  },
+);
+
+test(
+  "bootstrap refuses a secret that is not a root-owned regular file",
+  { skip: rootOnly },
+  (t) => {
+    for (const unsafe of ["directory", "symlink", "guest-owned"]) {
+      const f = fixture(t);
+      const privateHome = join(f.state, "private-home");
+      mkdirSync(privateHome, { recursive: true, mode: 0o700 });
+      const path = join(privateHome, "mesh-api-key-admin");
+      if (unsafe === "directory") mkdirSync(path);
+      else if (unsafe === "symlink") {
+        writeFileSync(join(f.root, "elsewhere"), "x".repeat(44));
+        symlinkSync(join(f.root, "elsewhere"), path);
+      } else {
+        writeFileSync(path, "x".repeat(44), { mode: 0o600 });
+        chownSync(path, 65534, 65534);
+      }
+      const run = f.run();
+      assert.equal(run.status, 2, `${unsafe}: ${run.stderr}`);
+      assert.match(run.stderr, /regular file owned by root/);
+    }
+  },
+);
+
+test(
+  "an fsGroup remount's group and mode drift on private-home and its secrets is repaired, not refused",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    assert.equal(f.run().status, 0);
+    const privateHome = join(f.state, "private-home");
+    const secret = join(privateHome, "mesh-api-key-admin");
+    const before = readFileSync(secret, "utf8");
+    // What the kubelet leaves on adam's volume: gid 1000, setgid on the directory, group rw.
+    chownSync(privateHome, 0, 1000);
+    chmodSync(privateHome, 0o2770);
+    chownSync(secret, 0, 1000);
+    chmodSync(secret, 0o660);
+    const run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(readFileSync(secret, "utf8"), before);
+    const home = statSync(privateHome);
+    assert.equal(home.gid, 0);
+    assert.equal(home.mode & 0o7777, 0o700);
+    const file = statSync(secret);
+    assert.equal(file.gid, 0);
+    assert.equal(file.mode & 0o777, 0o600);
+  },
+);
+
+test(
+  "an existing mesh takes generated secrets at its ordinary start, with no restart arms",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    mkdirSync(join(f.state, "mesh"), { recursive: true });
+    const run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    const commands = readFileSync(join(f.state, "mesh/events"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => line.split(" ", 1)[0]);
+    // A pod start launches every mesh process afresh, so start + wait is the whole migration.
+    assert.deepEqual(commands, ["start", "wait"]);
   },
 );
 
@@ -294,6 +428,57 @@ test(
 );
 
 test(
+  "a persistent checkout that lost git's empty directories is restored, then still verified",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    // The image snapshot is a detached shallow checkout: refs/heads and refs/tags are empty.
+    const branch = f.git("symbolic-ref", "--short", "HEAD");
+    f.git("checkout", "-q", "--detach");
+    f.git("update-ref", "-d", `refs/heads/${branch}`);
+    let run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    // adam's copy, edge #1784: .git/refs gone, so git saw no repository at all.
+    rmSync(join(f.repo, ".git/refs"), { recursive: true, force: true });
+    run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stderr, /restored empty git directory \.git\/refs\b/);
+    assert.match(run.stderr, /restored empty git directory \.git\/refs\/heads/);
+    assert.equal(
+      statSync(join(f.repo, ".git/refs")).mode & 0o777,
+      statSync(join(f.source, ".git/refs")).mode & 0o777,
+    );
+    // Nothing is restored on a whole checkout, so a clean restart stays quiet.
+    run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.doesNotMatch(run.stderr, /restored empty git directory/);
+    // Restoring directories never stands in for content: lost objects still refuse.
+    const starts = () => readFileSync(join(f.state, "worker-starts"), "utf8");
+    const before = starts();
+    rmSync(join(f.repo, ".git/objects"), { recursive: true, force: true });
+    run = f.run();
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /pinned checkout is not a readable git checkout/);
+    assert.equal(starts(), before);
+  },
+);
+
+test(
+  "a pinned checkout is never resolved through a parent repository",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    assert.equal(f.run().status, 0);
+    // A repository above the state root must not answer for a checkout without .git.
+    execFileSync("git", ["init", "-q", f.root]);
+    rmSync(join(f.repo, ".git"), { recursive: true, force: true });
+    const run = f.run();
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /pinned checkout has no git directory/);
+  },
+);
+
+test(
   "readiness failure and reset request cannot start the worker",
   { skip: rootOnly },
   (t) => {
@@ -305,6 +490,49 @@ test(
     assert.equal(existsSync(join(f.state, "worker-starts")), false);
     f.env.MESH_RESET = "1";
     assert.match(f.run().stderr, /MESH_RESET is forbidden/);
+  },
+);
+
+test(
+  "a temporary grant refusal is retried in place without restarting the mesh; a permanent one is not",
+  { skip: guestOnly },
+  (t) => {
+    const attempts = (f) =>
+      Number(readFileSync(join(f.state, "grant-attempts"), "utf8"));
+    const meshCommands = (f) =>
+      readFileSync(join(f.state, "mesh/events"), "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => l.split(" ", 1)[0]);
+    // Two timeouts, then issuance: one mesh start, three grant attempts, the worker starts.
+    let f = fixture(t);
+    f.env.FIXTURE_GRANT_TEMPFAIL = "2";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "0";
+    let run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(attempts(f), 3);
+    assert.deepEqual(meshCommands(f), ["start", "wait"]);
+    assert.match(
+      run.stderr,
+      /temporary refusal on attempt \d+; retrying the identical request/,
+    );
+    assert.equal(existsSync(join(f.state, "worker-starts")), true);
+    // An explicit deadline, once spent, ends the boot with the temporary code and no worker.
+    f = fixture(t);
+    f.env.FIXTURE_GRANT_TEMPFAIL = "5";
+    f.env.COMPUTE_GRANT_RETRY_SECS = "1";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "2";
+    run = f.run();
+    assert.equal(run.status, 75);
+    assert.equal(attempts(f), 2);
+    assert.equal(existsSync(join(f.state, "worker-starts")), false);
+    // A permanent refusal is never retried.
+    f = fixture(t);
+    f.env.FIXTURE_GRANT_REFUSE = "1";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "0";
+    run = f.run();
+    assert.equal(run.status, 23);
+    assert.equal(attempts(f), 1);
   },
 );
 
@@ -348,6 +576,20 @@ test(
     assert.equal(seen.beta, "http://localhost:18889");
     assert.equal(seen.noPrologue, "1");
     assert.equal(seen.fenced, "1");
+    assert.equal(seen.admin, undefined);
+    assert.equal(seen.token, undefined);
+    for (const name of ["mesh-api-key-admin", "mesh-compute-local-token"]) {
+      const secret = readFileSync(
+        join(f.state, "private-home", name),
+        "utf8",
+      ).trim();
+      assert.doesNotMatch(run.stdout, new RegExp(secret));
+      assert.doesNotMatch(run.stderr, new RegExp(secret));
+    }
+    assert.equal(
+      statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o002,
+      0,
+    );
     assert.match(
       run.stderr,
       /sequential worker admission and executor deadline/,
@@ -356,10 +598,23 @@ test(
       ["mesh", "stop"],
       ["test", "mesh", "features/auth/login.feature"],
       ["test", "mesh", "@e2e"],
-    ])
-      assert.equal(invoke(args).status, 2);
+    ]) {
+      const refused = invoke(args);
+      assert.equal(refused.status, 2);
+      if (args[0] === "test")
+        assert.match(refused.stderr, /provider-stages\.json/);
+    }
   },
 );
+
+test("provider fixture literals are absent from compute shell scripts", () => {
+  const shell = readdirSync(here)
+    .filter((name) => name.endsWith(".sh"))
+    .map((name) => readFileSync(join(here, name), "utf8"))
+    .join("\n");
+  assert.doesNotMatch(shell, /provider-private-mesh-fixture/);
+  assert.doesNotMatch(shell, /provider-private-mesh-fixture-local-only/);
+});
 
 test(
   "bootstrap and resume work with only SETUID SETGID CHOWN capabilities",

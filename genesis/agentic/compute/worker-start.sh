@@ -16,9 +16,53 @@ umask 077
 mkdir -p "$state/repos" "$state/private-home" "$state/tmp"
 chmod 755 "$state" "$state/repos"
 chmod 700 "$state/private-home" "$state/tmp"
+# The state volume is group-owned by the pod's fsGroup: the kubelet re-chowns its group (gid
+# 1000 on adam) and sets setgid on directories, so a strict 0:0:700 reading refuses every
+# boot (edge #1795). What protects the secrets is that only root can reach them: a root
+# owner and no access for anyone else. Repair the group drift; refuse a non-root owner or a
+# symlink, which is what tampering would look like.
+[[ -d "$state/private-home" && ! -L "$state/private-home" ]] ||
+  refuse 'private-home must be a real directory'
+[[ "$(stat -c '%u' "$state/private-home")" == 0 ]] ||
+  refuse 'private-home must be owned by root'
+chown 0:0 "$state/private-home"
+chmod g-s,g-rwx,o-rwx "$state/private-home"
 # Only one bootstrap/worker may own this state, including across restarts of the entrypoint.
 exec 9>"$state/worker.lock"
 flock -n 9 || refuse 'another worker owns this provider state'
+load_or_create_secret() { # <root-only-file> <output-variable>
+  local path="$1" output="$2" directory temporary metadata value
+  directory="$(dirname -- "$path")"
+  if [[ -e "$path" || -L "$path" ]]; then
+    metadata="$(stat -c '%F:%u' -- "$path" 2>/dev/null)" ||
+      refuse "cannot inspect provider secret $path"
+    # A root-owned regular file whose group or mode an fsGroup remount rewrote is repaired;
+    # a symlink, a non-regular file or a non-root owner is refused.
+    [[ ! -L "$path" && "$metadata" == 'regular file:0' ]] ||
+      refuse "provider secret must be a regular file owned by root: $path"
+    chown 0:0 -- "$path"
+    chmod 600 -- "$path"
+  else
+    temporary="$(mktemp "$directory/.mesh-secret.XXXXXX")" ||
+      refuse "cannot create provider secret beside $path"
+    if ! head -c 32 /dev/urandom | base64 > "$temporary"; then
+      rm -f -- "$temporary"
+      refuse "cryptographic secret generation failed for $path"
+    fi
+    chmod 600 "$temporary"
+    chown 0:0 "$temporary"
+    mv -T -- "$temporary" "$path"
+  fi
+  IFS= read -r value < "$path" || refuse "provider secret is unreadable: $path"
+  [[ ${#value} -ge 32 ]] || refuse "provider secret is shorter than 32 characters: $path"
+  printf -v "$output" '%s' "$value"
+}
+# Both values are read only from each process's environment at launch (doorway config.rs:175/339,
+# storage compute_tasks.rs:19); nothing persists them except storage's root-only restart capture,
+# which `start` rewrites. A pod start launches every mesh process afresh, so a generated value
+# takes effect with no migration and the repository-known fixture literals are retired.
+load_or_create_secret "$state/private-home/mesh-api-key-admin" mesh_api_key_admin
+load_or_create_secret "$state/private-home/mesh-compute-local-token" mesh_compute_local_token
 for binary in elohim-storage doorway holochain hc iroh-relay relay-addr-beacon; do
   [[ -x "$image/mesh-bin/$binary" ]] || refuse "missing pinned image binary $binary"
 done
@@ -49,8 +93,26 @@ if [[ ! -e "$repo" ]]; then
 fi
 [[ -d "$repo" && ! -L "$repo" ]] || refuse 'pinned checkout must be a physical directory'
 [[ "$(cat "$repo/.compute-source-commit")" == "$commit" ]] || refuse 'pinned checkout marker mismatch'
-[[ "$(git -C "$repo" rev-parse --verify HEAD)" == "$commit" ]] || refuse 'pinned checkout HEAD mismatch'
-[[ -z "$(git -C "$repo" status --porcelain --untracked-files=no)" ]] || refuse 'pinned checkout has modified tracked source; refusing to overwrite it'
+[[ -d "$repo/.git" && ! -L "$repo/.git" ]] || refuse 'pinned checkout has no git directory'
+# A copy can lose directories that hold nothing: a detached shallow checkout keeps
+# refs/heads and refs/tags empty, and git refuses a .git without refs/. Restore only
+# the directories the image has and the copy lacks, with the image's modes. No file is
+# written; the HEAD and clean-tree checks below still decide whether this is the pin.
+while IFS= read -r -d '' rel; do
+  [[ -e "$repo/.git/$rel" || -L "$repo/.git/$rel" ]] && continue
+  mkdir -- "$repo/.git/$rel"
+  chmod --reference="$source_repo/.git/$rel" -- "$repo/.git/$rel"
+  echo "provider bootstrap: restored empty git directory .git/${rel#./} in the pinned checkout" >&2
+done < <(cd "$source_repo/.git" && find . -mindepth 1 -type d -print0)
+# Name the git directory, so a damaged checkout is never resolved through a parent.
+pinned_git=(git --git-dir="$repo/.git" --work-tree="$repo")
+head="$("${pinned_git[@]}" rev-parse --verify --end-of-options 'HEAD^{commit}' 2>&1)" ||
+  refuse "pinned checkout is not a readable git checkout: ${head##*$'\n'}"
+[[ "$head" == "$commit" ]] || refuse 'pinned checkout HEAD mismatch'
+# A failing status prints nothing on stdout; read its exit before its silence.
+tracked="$("${pinned_git[@]}" status --porcelain --untracked-files=no 2>&1)" ||
+  refuse "pinned checkout status is unreadable: ${tracked##*$'\n'}"
+[[ -z "$tracked" ]] || refuse 'pinned checkout has modified tracked source; refusing to overwrite it'
 # Discovery pointer only. Stage profiles use repos/<commit> so an upgrade never retargets a task.
 [[ ! -e "$state/repo" || -L "$state/repo" ]] || refuse 'legacy repo directory needs operator migration; will not overwrite it'
 ln -sfn "repos/$commit" "$state/repo"
@@ -59,17 +121,39 @@ mesh_script="$repo/app/elohim-app/scripts/hc-mesh.sh"
 echo "provider bootstrap: source $commit; persistent mesh $state/mesh; sequential worker admission"
 # Do not leak the outer provider API token into captured mesh process environments.
 mesh_run() {
-  env -i HOME="$state/private-home" TMPDIR="$state/tmp" PATH=/usr/local/bin:/usr/bin:/bin \
-    COMPUTE_IMAGE_ROOT="$image" COMPUTE_STATE_ROOT="$state" \
-    MESH_CONTINUE_INITIALIZATION_LOG_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
-    MESH_CONTINUE_INITIALIZATION_STATE_SHA256="${COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256:-}" \
-    bash "$here/mesh-env.sh" bash "$mesh_script" "$@" 9>&-
+  PROVIDER_MESH_ADMIN_SECRET="$mesh_api_key_admin" \
+  PROVIDER_MESH_COMPUTE_SECRET="$mesh_compute_local_token" \
+  PROVIDER_MESH_CONTINUE_LOG="${COMPUTE_CONTINUE_INITIALIZATION_LOG_SHA256:-}" \
+  PROVIDER_MESH_CONTINUE_STATE="${COMPUTE_CONTINUE_INITIALIZATION_STATE_SHA256:-}" \
+  python3 - "$state" "$image" "$here/mesh-env.sh" "$mesh_script" "$@" 9>&- <<'PY'
+import os
+import sys
+
+state, image, mesh_env, mesh_script, *arguments = sys.argv[1:]
+environment = {
+    "HOME": f"{state}/private-home",
+    "TMPDIR": f"{state}/tmp",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "COMPUTE_IMAGE_ROOT": image,
+    "COMPUTE_STATE_ROOT": state,
+    "MESH_API_KEY_ADMIN": os.environ["PROVIDER_MESH_ADMIN_SECRET"],
+    "MESH_COMPUTE_LOCAL_TOKEN": os.environ["PROVIDER_MESH_COMPUTE_SECRET"],
+    "MESH_CONTINUE_INITIALIZATION_LOG_SHA256": os.environ["PROVIDER_MESH_CONTINUE_LOG"],
+    "MESH_CONTINUE_INITIALIZATION_STATE_SHA256": os.environ["PROVIDER_MESH_CONTINUE_STATE"],
+}
+environment["MESH_DOORWAY_ENV_SET"] = "\n".join((
+    f"API_KEY_ADMIN={environment['MESH_API_KEY_ADMIN']}",
+    f"POOL_COMPUTE_TOKEN={environment['MESH_COMPUTE_LOCAL_TOKEN']}",
+))
+os.execve("/bin/bash", ["bash", mesh_env, "bash", mesh_script, *arguments], environment)
+PY
 }
 mesh_run start
 mesh_run wait --timeout 900
 reports="$repo/genesis/a2o/reports"
 [[ ! -L "$reports" ]] || refuse 'reports cannot be a symlink'
-# Only the report subtree and the declared runtime-config files are guest writable.
+# The report subtree is the guest's only persistent write grant. Stage reports themselves are
+# redirected to executor scratch, but `just test mesh` still emits its scoped config/summary here.
 if [[ ! -d "$reports" ]]; then
   mkdir -p "$reports"
   chmod 755 "$reports"
@@ -89,7 +173,7 @@ for peer in matthew jessica james; do
   path="$directory/runtime-config.toml"
   [[ -f "$path" && ! -L "$path" ]] || refuse "missing owned runtime config for $peer"
   chmod 755 "$directory"
-  chmod 606 "$path"
+  chmod 644 "$path"
 done
 if [[ -f "$state/mesh/household-fixture.json" ]]; then
   chmod 644 "$state/mesh/household-fixture.json"
@@ -97,7 +181,32 @@ fi
 printf '%s\n' "$commit" > "$state/mesh/.provider-mesh-ready"
 chmod 644 "$state/mesh/.provider-mesh-ready"
 export COMPUTE_WORKER_ROOT="$state/worker"
+export COMPUTE_STATE_ROOT="$state"
+export COMPUTE_SOURCE_COMMIT="$commit"
 echo "provider bootstrap ready: repoRoot=$repo justBin=$image/mesh-just.sh"
 cd "$repo"
-node "$image/grant-bootstrap.mjs"
+# Issuing the grant on a freshly started conductor is slow: admission stays saturated for a
+# while after a restart, and storage refuses writes (503 catching-up) until its projector has
+# caught up. Exiting would restart the container and the whole mesh, recreating exactly that
+# slow conductor, so a temporary refusal (exit 75: timeout, unreachable, 502/503/504) is
+# retried in place, backing off from COMPUTE_GRANT_RETRY_INTERVAL_SECS (30) doubling to
+# COMPUTE_GRANT_RETRY_MAX_INTERVAL_SECS (300). There is no deadline by default: giving up only
+# restarts the mesh, and every attempt is logged where Jenkins' activation capture reads it.
+# COMPUTE_GRANT_RETRY_SECS > 0 bounds it. Issuance is content-addressed, so repeating the
+# identical request is safe. Every other refusal ends the boot as before.
+grant_retry_secs="${COMPUTE_GRANT_RETRY_SECS:-0}"
+grant_deadline=$((SECONDS + grant_retry_secs))
+grant_interval="${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}"
+grant_max_interval="${COMPUTE_GRANT_RETRY_MAX_INTERVAL_SECS:-300}"
+grant_attempt=1
+until node "$image/grant-bootstrap.mjs"; do
+  grant_status=$?
+  if [[ "$grant_status" -ne 75 ]]; then exit "$grant_status"; fi
+  if [[ "$grant_retry_secs" -gt 0 && "$SECONDS" -ge "$grant_deadline" ]]; then exit "$grant_status"; fi
+  echo "provider grant bootstrap: temporary refusal on attempt $grant_attempt; retrying the identical request in ${grant_interval}s" >&2
+  sleep "$grant_interval"
+  grant_attempt=$((grant_attempt + 1))
+  grant_interval=$((grant_interval * 2))
+  if [[ "$grant_interval" -gt "$grant_max_interval" ]]; then grant_interval="$grant_max_interval"; fi
+done
 exec node "$image/worker.mjs"

@@ -21,6 +21,7 @@ import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { run } from "../common.mjs";
+import { MESH_PROFILE_TAGS } from "../../../a2o/mesh-profile.mjs";
 // S3.0 — the honest artifact: the requester's own SUT identity rides in the stage so the
 // provider can refuse a drifted tree before running anything. Import style mirrors
 // genesis/orchestrator/scripts/serving-receipt.mjs:17-23 (Node's native TS type-stripping,
@@ -42,14 +43,60 @@ export const slugify = (s) =>
     .slice(0, 96)
     .replace(/-+$/, "");
 
-// A `Scenario:` / `Scenario Outline:` line scan — deliberately not a Gherkin parser (§9 task 1).
-export function parseScenarioNames(featureText) {
-  const names = [];
+function tagsOn(line) {
+  return [...line.matchAll(/(?:^|\s)(@[A-Za-z0-9_:-]+)/g)].map((match) => match[1]);
+}
+
+// The selector understands exactly `@a and not @b and not @c …`. Any richer expression (or,
+// parentheses) would be misread here, so it refuses rather than pin a wrong inventory.
+if (!/^\s*@[A-Za-z0-9_:-]+(\s+and\s+(not\s+)?@[A-Za-z0-9_:-]+)*\s*$/.test(MESH_PROFILE_TAGS)) {
+  throw new Error(`build-stage-task: unsupported mesh profile tag expression: ${MESH_PROFILE_TAGS}`);
+}
+
+function matchesMeshProfile(tags) {
+  const effective = new Set(tags);
+  const excluded = [...MESH_PROFILE_TAGS.matchAll(/\bnot\s+(@[A-Za-z0-9_:-]+)/g)].map(
+    (match) => match[1],
+  );
+  const required = tagsOn(MESH_PROFILE_TAGS.replaceAll(/\bnot\s+@[A-Za-z0-9_:-]+/g, ""));
+  return required.every((tag) => effective.has(tag)) && excluded.every((tag) => !effective.has(tag));
+}
+
+// A tag-aware `Scenario:` / `Scenario Outline:` line scan — deliberately not a Gherkin parser
+// (§9 task 1). Tags directly above Feature apply to every scenario; tags directly above a
+// scenario apply to that scenario. The selector is imported from cucumber.mjs so this inventory
+// cannot silently drift from the mesh profile.
+export function parseScenarioInventory(featureText) {
+  const selected = [];
+  const held = [];
+  let pendingTags = [];
+  let featureTags = [];
   for (const line of featureText.split("\n")) {
-    const match = line.match(/^\s*Scenario(?: Outline)?:\s*(.+?)\s*$/);
-    if (match) names.push(match[1]);
+    const trimmed = line.trim();
+    if (trimmed.startsWith("@")) {
+      pendingTags.push(...tagsOn(trimmed));
+      continue;
+    }
+    if (/^Feature:/.test(trimmed)) {
+      featureTags = pendingTags;
+      pendingTags = [];
+      continue;
+    }
+    const match = trimmed.match(/^Scenario(?: Outline)?:\s*(.+?)\s*$/);
+    if (match) {
+      (matchesMeshProfile([...featureTags, ...pendingTags]) ? selected : held).push(match[1]);
+      pendingTags = [];
+      continue;
+    }
+    // Blank/comment lines may separate a tag line from its declaration; executable Gherkin does
+    // not otherwise carry pending tags across another declaration or step.
+    if (trimmed && !trimmed.startsWith("#")) pendingTags = [];
   }
-  return names;
+  return { scenarioNames: selected, heldScenarioNames: held };
+}
+
+export function parseScenarioNames(featureText) {
+  return parseScenarioInventory(featureText).scenarioNames;
 }
 
 // The feature-level `@concern:<tag>` — scanned only in the tag lines above `Feature:` (the
@@ -264,8 +311,8 @@ export async function buildStageTask({
       [delegability.headline, ...delegability.evidence.map(formatEvidence)].join("\n"),
     );
 
-  const scenarioNames = parseScenarioNames(featureText);
-  if (scenarioNames.length === 0)
+  const { scenarioNames, heldScenarioNames } = parseScenarioInventory(featureText);
+  if (scenarioNames.length + heldScenarioNames.length === 0)
     throw new Error(`no Scenario:/Scenario Outline: lines found in ${featureAbs}`);
   const scenarioSlugs = scenarioNames.map(slugify);
 
@@ -376,6 +423,7 @@ export async function buildStageTask({
     sutParts,
     testPrefix,
     scenarioNames,
+    heldScenarioNames,
   };
   await writeFile(stagePath, JSON.stringify(stageMeta, null, 2) + "\n", {
     mode: 0o600,
@@ -399,6 +447,7 @@ export async function buildStageTask({
     featureDir,
     testPrefix,
     scenarioNames,
+    heldScenarioNames,
     scenarioSlugs,
     expectedTests,
     concern,

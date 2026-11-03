@@ -245,7 +245,9 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
       for (const status of [0, 1, 2]) {
         const result = spawnSync(
           "bash",
-          ["-c", `${block}printf caller-continued`],
+          // leg_red is the hook's red recorder; under GATE_ON_RED=stop it ends the push, which is
+          // the propagation this test pins (under continue the hook refuses at its end instead).
+          ["-c", `leg_red() { exit 1; }\n${block}printf caller-continued`],
           {
             cwd: dir,
             encoding: "utf8",

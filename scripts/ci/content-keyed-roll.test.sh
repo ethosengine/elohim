@@ -25,7 +25,8 @@ D2="sha256:$(printf 'b%.0s' $(seq 64))"
 
 # ─── 1. storage-input-digest.sh ─────────────────────────────────────────────
 R="${T}/repo"
-mkdir -p "${R}/elohim/elohim-storage/src" "${R}/crates/a" "${R}/elohim/rakia" "${R}/elohim/holochain-conductor" "${R}/scripts/ci" "${R}/doorway"   # empty dirs = unpopulated submodules, as a CI checkout leaves them
+mkdir -p "${R}/elohim/elohim-storage/src" "${R}/elohim/elohim-agent/elohim-agent-sdk/src" \
+  "${R}/crates/a" "${R}/elohim/rakia" "${R}/elohim/holochain-conductor" "${R}/scripts/ci" "${R}/doorway"   # empty dirs = unpopulated submodules, as a CI checkout leaves them
 cd "${R}"
 git init -q . && git config user.email t@t && git config user.name t
 cat > elohim/elohim-storage/Dockerfile <<'EOF'
@@ -40,12 +41,22 @@ echo '[package]' > elohim/elohim-storage/Cargo.toml
 echo 'fn main(){}' > elohim/elohim-storage/src/main.rs
 echo 'a' > crates/a/lib.rs
 echo 'build' > scripts/ci/build-storage-image.sh
+echo 'agent build' > scripts/ci/build-agent-sdk-image.sh
 echo 'doorway' > doorway/main.rs
+cat > elohim/elohim-agent/elohim-agent-sdk/Dockerfile <<'EOF'
+FROM node:24-alpine
+COPY package.json ./
+COPY tsconfig.json ./
+COPY src ./src
+EOF
+echo '{"name":"@elohim/agent-sdk"}' > elohim/elohim-agent/elohim-agent-sdk/package.json
+echo '{"compilerOptions":{}}' > elohim/elohim-agent/elohim-agent-sdk/tsconfig.json
+echo 'export const sdk = true;' > elohim/elohim-agent/elohim-agent-sdk/src/index.ts
 # The closure digest also reads the edge manifest's step inputs, the edge
 # Jenkinsfile's recipe helpers and its own scripts from the repo it digests.
 mkdir -p elohim/holochain
 cat > elohim/holochain/build-manifest.json <<'EOF'
-{"steps":{"cargo-build-storage":{"inputs":{"sources":["elohim/elohim-storage/src"]}}}}
+{"steps":{"cargo-build-storage":{"inputs":{"sources":["elohim/elohim-storage/src"]}},"build-agent-sdk":{"inputs":{"sources":["elohim/elohim-agent/elohim-agent-sdk/**"],"buildProcess":["elohim/holochain/Jenkinsfile","scripts/ci/build-agent-sdk-image.sh","scripts/ci/closure-input-digest.sh","scripts/ci/harbor-oracle.sh"]}}}}
 EOF
 cat > elohim/holochain/Jenkinsfile <<'EOF'
 def runQualityGates() {
@@ -53,6 +64,9 @@ def runQualityGates() {
 }
 def runStorageStageBody() {
     sh 'bash scripts/ci/build-storage-image.sh'
+}
+def runAgentSdkStageBody() {
+    sh 'bash scripts/ci/build-agent-sdk-image.sh'
 }
 EOF
 cp "${CI}/closure-input-digest.sh" "${CI}/harbor-oracle.sh" "${CI}/storage-input-digest.sh" scripts/ci/
@@ -90,6 +104,22 @@ set +e; out="$(bash "${DIG}" 2>/dev/null)"; rc=$?; set -e
 [ "${rc}" -ne 0 ] && [ -z "${out}" ] || fail "dirty tracked input must refuse (rc=${rc} out='${out}')"
 git checkout -q -- crates/a/lib.rs
 pass "dirty tracked input refuses (cannot judge)"
+
+agent_base="$(bash "${CI}/closure-input-digest.sh" build-agent-sdk)"
+echo 'doorway3' > doorway/main.rs && git commit -qam "unrelated doorway"
+[ "$(bash "${CI}/closure-input-digest.sh" build-agent-sdk)" = "${agent_base}" ] || fail "an unrelated commit moved the agent SDK digest"
+pass "unrelated commit leaves the agent SDK digest unchanged"
+
+echo 'export const sdk = false;' > elohim/elohim-agent/elohim-agent-sdk/src/index.ts && git commit -qam "agent SDK src"
+agent_changed="$(bash "${CI}/closure-input-digest.sh" build-agent-sdk)"
+[ "${agent_changed}" != "${agent_base}" ] || fail "an agent SDK source change did not move the digest"
+pass "agent SDK source change moves the digest"
+
+echo 'dirty' >> elohim/elohim-agent/elohim-agent-sdk/package.json
+set +e; out="$(bash "${CI}/closure-input-digest.sh" build-agent-sdk 2>/dev/null)"; rc=$?; set -e
+[ "${rc}" -ne 0 ] && [ -z "${out}" ] || fail "dirty tracked agent SDK input must refuse (rc=${rc} out='${out}')"
+git checkout -q -- elohim/elohim-agent/elohim-agent-sdk/package.json
+pass "dirty tracked agent SDK input refuses (cannot judge)"
 
 echo 'COPY missing/dir ./x' >> elohim/elohim-storage/Dockerfile && git commit -qam "bad copy"
 set +e; out="$(bash "${DIG}" 2>/dev/null)"; rc=$?; set -e

@@ -16,7 +16,7 @@ import {
   checkNameFor,
   classifyPutRefusal,
 } from "../../../a2o/scripts/lib/household-attestation.ts";
-import { collectStageEvidence } from "./collect-stage.mjs";
+import { collectStageEvidence, stageVerdict } from "./collect-stage.mjs";
 
 const SCRATCH = process.env.COLLECT_STAGE_SCRATCH || tmpdir();
 
@@ -48,6 +48,73 @@ function cucumberReport({ uri, scenarioName, passed }) {
     },
   ];
 }
+
+function verdictReport(statuses) {
+  return [
+    {
+      uri: "features/example.feature",
+      elements: Object.entries(statuses).map(([name, status]) => ({
+        type: "scenario",
+        name,
+        tags: [],
+        steps: [{ result: { status, duration: 1000000 } }],
+      })),
+    },
+  ];
+}
+
+const verdictStage = {
+  feature: "features/example.feature",
+  concern: "example",
+  scenarioNames: ["measured", "held at runtime"],
+};
+
+test("stageVerdict counts only real measured outcomes and keeps held scenarios out of refs", () => {
+  const passed = stageVerdict(verdictReport({ measured: "passed" }), {
+    ...verdictStage,
+    scenarioNames: ["measured"],
+  });
+  assert.deepEqual(passed.scenarios.map((s) => s.status), ["passed"]);
+  assert.equal(passed.verdict, "pass");
+  assert.equal(passed.held, 0);
+
+  const passedHeld = stageVerdict(
+    verdictReport({ measured: "passed", "held at runtime": "skipped" }),
+    { ...verdictStage, heldScenarioNames: ["held by profile"] },
+  );
+  assert.equal(passedHeld.verdict, "pass");
+  assert.deepEqual(passedHeld.scenarios.map((s) => s.name), ["measured"]);
+  assert.deepEqual(passedHeld.heldScenarios, ["held by profile", "held at runtime"]);
+  assert.equal(passedHeld.held, 2);
+
+  const failedHeld = stageVerdict(
+    verdictReport({ measured: "failed", "held at runtime": "skipped" }),
+    verdictStage,
+  );
+  assert.equal(failedHeld.verdict, "fail");
+  assert.equal(failedHeld.scenarios[0].status, "failed");
+  assert.equal(failedHeld.held, 1);
+
+  const allHeld = stageVerdict(
+    verdictReport({ "held at runtime": "skipped" }),
+    { ...verdictStage, scenarioNames: ["held at runtime"] },
+  );
+  assert.equal(allHeld.verdict, "skip");
+  assert.equal(allHeld.notMeasured, true);
+  assert.deepEqual(allHeld.scenarios, []);
+  assert.equal(allHeld.reason, "every selected scenario was held — not measured");
+});
+
+test("stageVerdict preserves pending and undefined and treats both as failures", () => {
+  for (const status of ["pending", "undefined"]) {
+    const result = stageVerdict(verdictReport({ measured: status }), {
+      ...verdictStage,
+      scenarioNames: ["measured"],
+    });
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.scenarios[0].status, status);
+  }
+});
 
 function framedStdout(reportDoc) {
   const encoded = Buffer.from(JSON.stringify(reportDoc)).toString("base64");

@@ -352,7 +352,17 @@ export function formatEvent(raw) {
       const prefix = ['[gate-live] RED', event.project, failureClass, file, test, by]
         .filter((part) => part !== undefined && part !== null && part !== '')
         .join(' ');
-      return `${prefix} — ${(lines[0] ?? '').slice(0, 160)}`;
+      const cure = lines.find((line) => /^cure: /.test(line.trim()));
+      return `${prefix} — ${(lines[0] ?? '').slice(0, 160)}${cure ? ` · ${cure.trim().slice(0, 160)}` : ''}`;
+    }
+    case 'outlook': {
+      const remaining = Array.isArray(event.remaining) ? event.remaining : [];
+      const stop = event.stop ? ` — to stop and fix now: ${event.stop}` : '';
+      if (!remaining.length) return `[gate-live] no gate left to run after this red; the verdict is close`;
+      const parts = remaining.slice(0, 4)
+        .map((gate) => `${gate.project} ${gate.p90_s == null ? '~?' : `~${Math.max(1, Math.round(gate.p90_s / 60))}m`}`);
+      const more = remaining.length > 4 ? ` +${remaining.length - 4}` : '';
+      return `[gate-live] the push keeps reporting: ${remaining.length} gate(s) still to run, ~${Math.max(1, Math.round((event.total_s ?? 0) / 60))} min (${parts.join(', ')}${more})${stop}`;
     }
     case 'detail': {
       const detail = lines.find((line) => line.includes('panicked at'))
@@ -369,6 +379,8 @@ export function formatEvent(raw) {
       const failureClass = event.failure_class ?? event.failureClass ?? 'none';
       return `[gate-live] ${event.project} ${verdict} ${event.seconds}s failure_class=${failureClass}`;
     }
+    case 'stop-request':
+      return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run`;
     case 'run-close':
       return `[gate-live] run ${event.outcome}${event.deferred > 0 ? ` (${event.deferred} deferred)` : ''}`;
     default:
@@ -449,7 +461,7 @@ export async function follow({
 // What an agent hears without asking: every red, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'detail', 'step-failed', 'run-close'].includes(event.kind);
+    return ['failure', 'detail', 'step-failed', 'outlook', 'stop-request', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict
@@ -500,6 +512,143 @@ function closedBefore(path, instant) {
   }
 }
 
+/**
+ * The developer's or integrator's stop: the hook and gate-runner read it before each gate, so the
+ * gate already running finishes and nothing after it starts. Kill the push for an immediate stop.
+ */
+export function requestStop(path, { reason = '', now } = {}) {
+  return appendEvent(path, { kind: 'stop-request', ...(reason ? { reason } : {}) }, now ? { now } : {});
+}
+
+export function stopRequested(path) {
+  try {
+    return parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-request');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After a run's first red, what continuing costs: the gates still to run with their recorded p90,
+ * and the exact stop command. Once per run, so the agent gets one decision, not a stream of them.
+ * The push itself continues (operator ruling 2026-11-01): the agent weighs signal against cost.
+ */
+export async function outlook(path, remaining, { root = process.cwd(), rows } = {}) {
+  try {
+    if (parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'outlook')) return undefined;
+    // Loaded on demand: the live channel's other verbs never depend on the cost ledger's reader.
+    const { costOf, readCycleUnion } = await import('./gate-cost.mjs');
+    let ledger = rows;
+    if (ledger === undefined) {
+      try {
+        const union = readCycleUnion(root);
+        ledger = union.readableLedgers ? union.rows : [];
+      } catch { ledger = []; }
+    }
+    const gates = remaining.map((project) => ({
+      project, p90_s: costOf(ledger, { project: { name: project }, subjectFallback: null }).p90,
+    }));
+    return appendEvent(path, {
+      kind: 'outlook',
+      remaining: gates,
+      total_s: gates.reduce((sum, gate) => sum + (gate.p90_s ?? 120), 0),
+      stop: `node genesis/orchestrator/gate-live.mjs stop --run ${path}`,
+    });
+  } catch {
+    return null;
+  }
+}
+
+// A red the preflight or a pre-gate leg raised, or one from a gate whose own verdict took under
+// two minutes, is cheap: arriving later than ten minutes into the run means it waited behind
+// something long.
+const CHEAP_GATE_S = 120;
+const LATE_S = 600;
+
+/**
+ * Read this device's last `last` closed runs and name the slices worth an integrator's hour:
+ * reds that recur across pushes, cheap reds that arrived late, and the minutes spent after a run's
+ * first red. Reads only the device-local run logs; writes nothing.
+ */
+export function harvest({ root = process.cwd(), last = 10 } = {}) {
+  const directory = liveRoot(resolve(root));
+  const runsDir = join(directory, 'runs');
+  let names = [];
+  try { names = runFiles(runsDir); } catch { return { runs: 0, slices: [] }; }
+  const runs = [];
+  for (const name of names) {
+    if (runs.length >= last) break;
+    let events;
+    try { events = parseEvents(readFileSync(join(runsDir, name), 'utf8')); } catch { continue; }
+    const open = events.find((event) => event.kind === 'run-open');
+    const close = events.findLast((event) => event.kind === 'run-close');
+    if (!open || !close) continue;
+    const t0 = Date.parse(open.at);
+    const at = (event) => (Date.parse(event.at) - t0) / 1000;
+    const seconds = new Map();
+    for (const event of events.filter((e) => e.kind === 'gate-verdict' && e.verdict)) {
+      seconds.set(event.project, Number(event.verdict.seconds) || 0);
+    }
+    // A failure-shaped line inside a gate whose verdict was green (a test named "…REFUSED…", a
+    // logged refusal the test expects) is noise, not a red: only reds from red or unfinished gates
+    // and from pre-gate checks count.
+    const green = new Set(events.filter((e) => e.kind === 'gate-verdict' && e.verdict && e.verdict.exit === 0)
+      .map((e) => e.project));
+    const reds = events.filter((event) => event.kind === 'failure' && !green.has(event.project)).map((event) => {
+      const failure = event.failure && typeof event.failure === 'object' ? event.failure : event;
+      return { project: event.project ?? 'unknown', cls: failure.class ?? 'unknown', at: at(event), first: String(excerptLines(failure.excerpt)[0] ?? '').slice(0, 120) };
+    });
+    runs.push({ name, sha: open.candidate?.sha ?? null, outcome: close.outcome, total: at(close), reds, seconds });
+  }
+
+  const slices = [];
+  const byKey = new Map();
+  for (const run of runs) {
+    for (const key of new Set(run.reds.map((red) => `${red.project}/${red.cls}`))) {
+      const red = run.reds.find((r) => `${r.project}/${r.cls}` === key);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push({ run, red });
+    }
+  }
+  for (const [key, hits] of byKey) {
+    if (hits.length < 2) continue;
+    slices.push({
+      kind: 'recurring', key, count: hits.length,
+      cost_s: hits.reduce((sum, { run }) => sum + run.total, 0),
+      line: `${key} red in ${hits.length} of the last ${runs.length} runs (latest: ${hits[0].red.first || 'no excerpt'}) — move its cheapest detector left: gate-preflight.mjs, a pre-commit leg, or an edit-time hook`,
+    });
+  }
+  for (const run of runs) {
+    for (const red of run.reds) {
+      const cheap = red.project === 'preflight' || red.cls === 'pre-gate'
+        || (run.seconds.has(red.project) && run.seconds.get(red.project) < CHEAP_GATE_S);
+      if (!cheap || red.at <= LATE_S) continue;
+      slices.push({
+        kind: 'late-cheap-red', key: `${red.project}/${red.cls}`, cost_s: red.at,
+        line: `${red.project}/${red.cls} is a cheap red that arrived ${Math.round(red.at / 60)} min into run ${run.name.slice(0, 16)} — order it ahead of the long gates`,
+      });
+      break;
+    }
+  }
+  const failed = runs.filter((run) => run.reds.length > 0 && run.outcome !== 'passed' && run.outcome !== 'gates-passed');
+  const after = failed.reduce((sum, run) => sum + Math.max(0, run.total - run.reds[0].at), 0);
+  if (failed.length && after > LATE_S) {
+    slices.push({
+      kind: 'spent-after-red', key: 'policy', cost_s: after,
+      line: `${Math.round(after / 60)} min ran after the first red across ${failed.length} failed run(s) — the reds were live by then; stop with \`gate-live.mjs stop --run <run>\` or GATE_ON_RED=stop when the rest of the report is not worth that`,
+    });
+  }
+  slices.sort((a, b) => b.cost_s - a.cost_s);
+  return { runs: runs.length, slices };
+}
+
+export function formatHarvest({ runs, slices }) {
+  if (!runs) return ['[harvest] no closed gate runs on this device yet'];
+  if (!slices.length) return [`[harvest] ${runs} recent run(s): no recurring or late cheap reds`];
+  return [`[harvest] ${slices.length} QoL slice(s) from the last ${runs} run(s), costliest first:`,
+    ...slices.slice(0, 6).map((slice) => `[harvest]   ${slice.kind}: ${slice.line}`)];
+}
+
 const USAGE = `Usage:
   node gate-live.mjs open --sha S --target T [--session S]
   node gate-live.mjs event --run PATH --json '<event json>'
@@ -507,6 +656,11 @@ const USAGE = `Usage:
   node gate-live.mjs follow [--session S | --run R | --latest] [--timeout-ms N]
   node gate-live.mjs show (--run R | --session S | --latest) [--seq N]
   node gate-live.mjs unseen --session S [--reader R]
+  node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
+  node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R]
+  node gate-live.mjs stopped --run PATH                         (exit 0 when a stop was requested)
+  node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
+  node gate-live.mjs harvest [--last N]
 `;
 
 function parseArguments(argv) {
@@ -518,6 +672,11 @@ function parseArguments(argv) {
     follow: ['session', 'run', 'latest', 'timeout-ms'],
     show: ['session', 'run', 'latest', 'seq'],
     unseen: ['session', 'reader'],
+    red: ['run', 'project', 'message'],
+    stop: ['run', 'session', 'latest', 'reason'],
+    stopped: ['run'],
+    harvest: ['last'],
+    outlook: ['run', 'remaining'],
   };
   if (!Object.hasOwn(allowed, verb)) throw new Error('unknown verb');
 
@@ -544,6 +703,11 @@ function parseArguments(argv) {
     follow: [],
     show: [],
     unseen: ['session'],
+    red: ['run', 'project', 'message'],
+    stop: [],
+    stopped: ['run'],
+    harvest: [],
+    outlook: ['run'],
   };
   if (required[verb].some((name) => !Object.hasOwn(options, name))) {
     throw new Error('missing required option');
@@ -552,13 +716,13 @@ function parseArguments(argv) {
   const selectors = ['session', 'run', 'latest']
     .filter((name) => Object.hasOwn(options, name)).length;
   if (
-    ((verb === 'follow' || verb === 'show') && selectors > 1)
+    ((verb === 'follow' || verb === 'show' || verb === 'stop') && selectors > 1)
     || (verb === 'show' && selectors === 0)
   ) {
     throw new Error('choose one run selector');
   }
 
-  for (const name of ['seq', 'timeout-ms', 'deferred']) {
+  for (const name of ['seq', 'timeout-ms', 'deferred', 'last']) {
     if (Object.hasOwn(options, name)) {
       if (!/^\d+$/.test(options[name]) || !Number.isSafeInteger(Number(options[name]))) {
         throw new Error('expected a non-negative integer');
@@ -651,6 +815,39 @@ async function main(argv) {
         }
         return 0;
       }
+      case 'red':
+        if (appendEvent(resolve(root, options.run), {
+          kind: 'failure', project: options.project,
+          failure: { class: 'pre-gate', excerpt: [options.message] },
+        }) === null) {
+          throw new Error(`could not append red to ${options.run}`);
+        }
+        return 0;
+      case 'stop': {
+        let session = options.session;
+        let latest = options.latest ?? false;
+        if (!options.run && session === undefined && !latest) {
+          session = resolveSession();
+          latest = session === null;
+        }
+        const path = options.run ? resolve(root, options.run) : findRun({ root, session, latest });
+        if (!path || readRun(path).outcome !== 'running') throw new Error('no running gate run to stop');
+        if (requestStop(path, { reason: options.reason }) === null) throw new Error(`could not request a stop on ${path}`);
+        process.stdout.write(`stop requested: ${path}\n`);
+        return 0;
+      }
+      case 'outlook':
+        if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
+          throw new Error(`could not append an outlook to ${options.run}`);
+        }
+        return 0;
+      case 'stopped':
+        return stopRequested(resolve(root, options.run)) ? 0 : 1;
+      case 'harvest':
+        for (const line of formatHarvest(harvest({ root, last: options.last ?? 10 }))) {
+          process.stdout.write(`${line}\n`);
+        }
+        return 0;
       case 'unseen':
         for (const line of unseen({ root, session: options.session, reader: options.reader })) {
           process.stdout.write(`${line}\n`);
@@ -662,7 +859,7 @@ async function main(argv) {
   } catch (error) {
     const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ');
     process.stderr.write(`[gate-live] ${message}\n`);
-    if (verb === 'open' || verb === 'event' || verb === 'close' || verb === 'unseen') return 0;
+    if (['open', 'event', 'close', 'unseen', 'red', 'harvest', 'outlook'].includes(verb)) return 0;
     return verb === 'follow' ? 3 : 1;
   }
 }

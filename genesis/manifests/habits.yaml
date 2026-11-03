@@ -250,6 +250,8 @@ habits:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/epr-app-deliverability.feature — Act I: just test mesh features/dataplane/epr-app-deliverability.feature runs every station, including Chromium. Checks browser boot through both public mounts; server declaration and bytes on all peers; actual SSR and running-version adoption at both doorways; warmed rendering with storage unavailable; restart-before-storage recovery; and broken-bundle refusal/fallback. The serving receipt requires all stations passed for the current source, with no skipped or pending proof.)"
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/doorway-node-identity.feature — @act:i, the PREREQUISITE station the pair's failover promise rests on: `just test mesh features/dataplane/doorway-node-identity.feature`. A doorway's federation identity survives its OWN restart — DOORWAY_NODE_KEY_FILE is named and holds exactly 32 bytes; after `doorway-restart`, the boot line in logs/doorway-restart-<a|b>.log reports mode `loaded` from that same file (never `generated`, never the ephemeral line); the fingerprint it names at boot is the key it actually serves at /.well-known/doorway-keys; that key set comes back byte-identical under the same kid; /.well-known/did.json still names the same doorway; and the pair's two identities stay distinct, each published under its own DOORWAY_ID, with a restart of one changing neither. Held on any lane that does not own the doorway processes (`@requires:owned-substrate`) — a fleet build number can never measure it. Two legs are explicitly NOT discharged by a green here: the cross-doorway TOKEN leg (household minting is the shared-secret algorithm, DOORWAY_JWT_SIGN_ALG unset, so a token crossing the pair would prove the shared secret survived and not the node key) and the MESH_RESET recast scenario, which is @wip and deliberately left without step definitions so no routine lane can erase a shared household. This station proves continuity across a RESTART only; a doorway's LOSS remains doorway-failover.feature and doorway-apex-transition.feature.)"
       - "a2o @concern:record-proves (genesis/a2o/features/delivery/client-resilience.feature — @act:i, RED-FIRST 2026-09-26, the client half of this habit's retire-when: with the network cut and the service worker restarted cold, a person's app view resolves from bytes their browser verified against their address and the version it remembered verifying. A sibling @wip scenario names the open edge: the remembered version comes from a doorway header, not yet the election. Spec: genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md)"
+      - "Unrouted CI repetition (algedonic sensor, observation only): fold unrouted-finding-recurrence@1 --env concern=doorway-failover per its procedure in .claude/epr-meta/measures.yaml (max `seen` of open, concern-less .claude/data/ci-findings.jsonl rows thrown by steps of this habit's own stories); lens unrouted-finding-recurrence-doorway-failover@1 reads red at 3 or more on `epr flow report --bound unrouted-finding-recurrence-doorway-failover`."
+      - "Fleet apex-root count (observation, algedonic-designer 2026-10-28): fold edge-apex-root-unserved@1 per its procedure in .claude/epr-meta/measures.yaml (newest ten elohim-edge runs where scripts/ci/verify-served-shell.sh checked https://elohim.host: a run without its `✓ … https://elohim.host/ boots` line, or with an apex served-shell-boots assertion, counts as unserved; a run where the check did not run is excluded); lens edge-apex-root-unserved-ceiling@1 reads it on `epr flow report --bound edge-apex-root-unserved-ceiling`, soft 1, hard 2; with no readable console the reading is unmeasured. First reading 2026-11-02: 0 of 10 (#1760–#1784, all `✓`)."
     evidence: >
       DELTA 2026-10-24 (RED preserved; the cold-start precondition no longer needs a doorway restart): `just test mesh features/dataplane/doorway-failover.feature` passed 10/10 scenarios, 41/41 steps on a household cold start in which every doorway deferred its SSR slug at boot and the reconcile tick adopted it 13–28 s after storage answered (fix 432049fe8; sprint-report-household-20261024T170625Z-f2c9ca61). The 10-19 workaround of restarting doorways a and b after the prologue is no longer needed. The fleet-side checks are unchanged.
     evidence-fingerprint: sha256:133a505bec86274a
@@ -709,10 +711,10 @@ habits:
       - "python3 -c \"import json,glob,re,sys;E=re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}');S=lambda v:[v] if isinstance(v,str) else [s for x in (v.values() if isinstance(v,dict) else v if isinstance(v,list) else []) for s in S(x)];F=sorted(glob.glob('.eprfs/status/memory/contributions/*.json'));B=[f for f in F for d in [json.load(open(f))] if any(E.search(s) for s in S({k:v for k,v in (d.get('imported') or {}).items() if k!='display'})+S(d.get('steward'))+S(d.get('author'))+S(d.get('classified_as'))+S(d.get('slots')))];print(f'{len(B)} of {len(F)} carry an email in an identity field',*B);sys.exit(1 if B else 0)\" (no tracked contribution carries an email of any shape in an IDENTITY field — `imported.*` except the authored `display`, `steward`, `author`, and any `classified_as`/`slots` string; authored `claim`, `display` and body text are the author's own speech and are not read (ruling R-P20, narrowing the 2026-09-24 whole-file any-email form, finding M7); MEASURED 2026-09-23 whole-file bracketed form: 250 of 251 carry one; MEASURED 2026-09-24 whole-file any-email form: 1 of 254 — project_civic_ai_outreach_thread.json, a correspondent's public address in its authored claim, exit 1; MEASURED 2026-09-24 identity fields (R-P20): `0 of 254 carry an email in an identity field`, exit 0; negative control: a copy with an email in `imported.gitName` exits 1 naming it while the claim-only copy passes)"
       - "test $(ls .eprfs/status/memory/contributions/*.acts.jsonl 2>/dev/null | wc -l) -gt 0 (the per-concern acts projection exists in the tracked store; MEASURED 2026-09-23: 0 files)"
     evidence: >
-      DELTA 2026-10-16 (STAYS RED; checks 1 and 2 of 3 green). Read-only measurement at origin/dev@42941449e: `grep -q 'human:' elohim/epr-rea/src/actor.rs` exit 0 (previously recorded exit 1); the `*.acts.jsonl` count probe still finds 0 files, exit 1; the identity-field email scan reports `0 of 269 carry an email in an identity field`. Status stays red because the acts.jsonl leg fails.
-    evidence-fingerprint: sha256:8f2b67b9a0fc1123
-    evidence-bytes: 11994
-    evidence-entries: 9
+      DELTA 2026-11-01 (Codex session discipline; STAYS RED, checks unchanged): integrator feedback and `git show -s --format="%(trailers)"` confirm 03103fb79, ecb38aa8d and a157fd828 omitted agent/session attribution. Package-owned gospel places routine decoration in the harness: prepare-commit-msg asks the owner-validated native session for declared trailers, and Git appends them idempotently, including empty handoffs; Codex reads only its exact thread model metadata, while unavailable metadata stays UNMEASURED. Purpose, vision, governance and trust remain the agent’s responsibilities; Codex preamble distinguishes registered hooks from trusted invocation coverage. Package verify: 2350 passed. Native OpenAI co-author vocabulary parity and passive decoration verified: `just gate eprfs` full workspace EXIT 0; `just gate elohim/sdk` EXIT 0 (89 checks); Rust-style gate EXIT 0; package selftest 79 passed; Git hook installation 9 passed; focused real-Git attribution tests 2 passed, including live model changes and missing metadata. Full session-envelope lifecycle/hook regression fixture passed. The registry schema explicitly admits the new conventions and model adapter. Existing published history is untouched. Native observation bafyreie6dpjzjy6mahz45uahtmswgjtxaxr4xi7nseu7sxiypgcinhwlr4 preserves the incident. Missing node between session discipline and adaptive feedback: a runtime-scoped native audit distinguishes observed violations from unsupported adapter coverage and feeds declared sense/algedonic measures; current state UNMEASURED (harness-exceptions@1 declares an unwired emitter). A trailer remains a claim, never verified identity or authority.
+    evidence-fingerprint: sha256:65c173a13bca2e66
+    evidence-bytes: 13667
+    evidence-entries: 10
     first_move: >
       Widen the grammar. `parse_agent_ref` (elohim/epr-rea/src/actor.rs) becomes
       `parse_participant_ref` accepting `human:<handle>` beside `agent:<role>@<model>`, born with the
@@ -2287,6 +2289,42 @@ habits:
     retire-when: >
       when measure-class runs have no dev-berth path at all.
 
+  - id: careless-reds-cost-seconds
+    declared: genesis/orchestrator/.epr-meta/careless-reds-cost-seconds.habit.md
+    invariant: >-
+      A red that a seconds-cheap check can find is found, and is live on the pushing session's run,
+      before any gate longer than two minutes starts. Gates run cheapest first by recorded p90. Every
+      later check and gate still runs and reports unless the integrator stops the run or the declared
+      policy (GATE_ON_RED, pool-policy.json gate_on_red) says stop; nothing decides that silently. An
+      unreadable change range refuses, never reads as "nothing changed". Each closed run ends with a
+      harvest naming the reds that recur across pushes, the cheap reds that arrived late, and the time
+      spent after a first red, so the next integrator picks the slice up instead of re-learning it.
+    status: red
+    active: false
+    checks:
+      - "node --test genesis/orchestrator/gate-preflight.test.mjs (each preflight check refuses its miss with a cure and stays silent for unaffected gates; REFUSED reaches the live run; on-red policy order; cheapest-first ordering; harvest slices)"
+      - "node --test genesis/orchestrator/prepush-gate-live.test.mjs (run opens before the first check; a pre-gate red is live at once and the push continues; an early pass still refuses; GATE_ON_RED=stop ends at the first red; a stop request is seen; the close follows the hook's exit status and prints the harvest)"
+      - "node --test genesis/orchestrator/cargo-affected.test.mjs genesis/orchestrator/serving-receipt.test.mjs (change detection never passes an unreadable range; mandatory receipt refusal still refuses)"
+      - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
+    evidence: >
+      DELTA 2026-11-01c (still RED; first real stop, and two gaps it exposed): the feature-branch push of 56c3ec891 got an orchestrator red at 24 min; the agent stopped it with `gate-live.mjs stop`, and the hook ended after the running gate (`stopped: stop requested on the live run; not run: agentic-shift memory-ceremony`, refused at 345 s instead of ~80 min more). Gap 1: the red arrived mid-gate and no outlook came with it (outlooks fired only after a gate's verdict), so the cost of continuing was worked out by hand; the tap now emits the outlook on its first red from GATE_REMAINING. Gap 2: the red was not a flake as first read: the push used `git -c core.hooksPath=…`, which reaches every child git through GIT_CONFIG_PARAMETERS, so build-compute-worker's fixture `git push` ran the pre-push hook and failed (reproduced: leaked 0/1, clean 1/1). gateChildEnv now strips push-scoped git config alongside GIT_DIR/GIT_WORK_TREE.
+    evidence-fingerprint: sha256:c0c59c2cb8cf5f77
+    evidence-bytes: 3251
+    evidence-entries: 3
+    guard: >-
+      Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
+      check into the preflight that is not seconds-cheap on a warm tree, and never make a WARN refuse.
+      The preflight names cures; it never runs builds or installs itself. The harvest reads device-local
+      run logs only and writes nothing; it is advice to the integrator, never a verdict.
+    refs:
+      - genesis/orchestrator/gate-preflight.mjs
+      - genesis/orchestrator/gate-live.mjs
+      - genesis/orchestrator/gate-runner.mjs
+      - .husky/pre-push.bash
+      - genesis/agentic/pool-policy.json
+      - genesis/orchestrator/.epr-meta/gate-failures-arrive-live.habit.md
+    retire-when: "the edit-time and commit-time hooks catch every class the preflight refuses, and the harvest names no recurring or late cheap red across 20 consecutive pushes"
+
   - id: gate-failures-arrive-live
     declared: genesis/orchestrator/.epr-meta/gate-failures-arrive-live.habit.md
     invariant: >-
@@ -2372,10 +2410,10 @@ habits:
       - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-10-31 (RED preserved; "a push that changed nothing deployed does not roll the fleet" measured once): edge #1771 (3475524c8, build class, both image closures unchanged) is the first closure HIT — storage 44d7e0f6… and doorway ae9e133b… answered hit, Quality Gate: Doorway + Build Doorway + Build Storage took 0.1 min against the 50.6 min baseline, all 7 storage arms and 7 conductors held on an unchanged pod-inputs fingerprint. Two doorways still rolled: their pod template carried app.kubernetes.io/version=<commit> (5f276a61f removes it from the five doorway manifests and content-keyed-roll.test.sh now refuses it). The wave still ended UNSTABLE on the standing "Adam compute worker activation unproven" rollout testcase (also #1769), which is not a roll. Pass 1 of the two the shift's done-when needs; pass 2 is the first build-class wave with no closure change after 5f276a61f lands.
-    evidence-fingerprint: sha256:e48ad6e835ec79a3
-    evidence-bytes: 40765
-    evidence-entries: 37
+      DELTA 2026-11-03 (second consecutive pass-3 reading — "a push that changed nothing deployed does not roll the fleet" held on two waves; habit status unchanged, other clauses not re-run): edge #1793 (b61b9a79c, build class, no closure input changed, no deployed declaration changed) answered closure HIT for storage 02b05303…, doorway 58635694…, doorway-app 70eca07d… and agent-sdk cfbde683… (the same digests as #1791). No pod restarted: both doorways printed "pod template + config unchanged — no doorway restart" with the same fingerprints as #1791 (alpha ae307ace…, alpha-b 768b8128…), and every conductor held on hApp bundle 51218255…. Validation run #1794 then had 0 failed scenarios (9 passed), where #1786 and #1790, each after a doorway roll, failed on doorway-B catch-up (p2p.caughtUp false for 600 s). Its only red was adam's compute worker activation, which is outside this clause.
+    evidence-fingerprint: sha256:791f1137dba3bf15
+    evidence-bytes: 44157
+    evidence-entries: 40
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"

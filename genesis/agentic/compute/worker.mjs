@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { mkdir, rm, chmod } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, chmod } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { api, delay, key, readJson, run, save } from "./common.mjs";
 import {
   leaseSeconds,
@@ -19,6 +20,147 @@ export function guestEnvironment(env) {
       .filter((name) => env[name] !== undefined)
       .map((name) => [name, env[name]]),
   );
+}
+
+const artifactIdentity = ({ cid, sha256, bytes } = {}) => ({
+  cid,
+  sha256,
+  bytes,
+});
+
+// Submission adds an invocation nonce and transport chunk lists. Neither changes the stage
+// Adam is willing to run; every other field is provider-reconstructed and must match exactly.
+export function comparableStageEnvelope(envelope) {
+  const { invocation: _invocation, ...comparable } = envelope;
+  return {
+    ...comparable,
+    binary: artifactIdentity(envelope.binary),
+    dna: artifactIdentity(envelope.dna),
+  };
+}
+
+function declined(message, reason = "invalid-artifact") {
+  return Object.assign(new Error(message), { computeDeclineReason: reason });
+}
+
+function stageFeatureForProject(features, project) {
+  return features.find((feature) => {
+    const file = feature.split("/").at(-1);
+    return project === `a2o-stage:${file.replace(/\.feature$/, "")}`;
+  });
+}
+
+async function rebuildProviderStage({
+  task,
+  root,
+  dir,
+  env,
+  executor,
+  execute,
+  buildStage,
+}) {
+  const sourceCommit = env.COMPUTE_SOURCE_COMMIT;
+  if (!/^[0-9a-f]{40,64}$/.test(sourceCommit || ""))
+    throw declined(
+      "provider stage refused: pinned COMPUTE_SOURCE_COMMIT is absent",
+    );
+  const stateRoot = env.COMPUTE_STATE_ROOT || dirname(root);
+  const repoRoot = join(stateRoot, "repos", sourceCommit);
+  const allowlistPath = join(
+    repoRoot,
+    "genesis",
+    "agentic",
+    "compute",
+    "provider-stages.json",
+  );
+  let allowlist;
+  try {
+    allowlist = JSON.parse(await readFile(allowlistPath, "utf8"));
+  } catch (error) {
+    throw declined(
+      `provider stage refused: provider-stages.json unreadable: ${error.message}`,
+    );
+  }
+  if (
+    !Array.isArray(allowlist.features) ||
+    allowlist.features.some(
+      (feature) =>
+        typeof feature !== "string" ||
+        !/^features\/[a-zA-Z0-9_./-]+\.feature$/.test(feature) ||
+        feature.split("/").includes(".."),
+    )
+  )
+    throw declined(
+      "provider stage refused: provider-stages.json has an invalid feature list",
+    );
+  // A task names its feature by basename (a2o-stage:<basename>), so two allowlisted features
+  // sharing a basename would resolve to whichever is listed first. Refuse that list outright.
+  const basenames = allowlist.features.map((feature) =>
+    feature.split("/").at(-1),
+  );
+  if (new Set(basenames).size !== basenames.length)
+    throw declined(
+      "provider stage refused: provider-stages.json lists two features with the same file name",
+    );
+  const feature = stageFeatureForProject(allowlist.features, task.project);
+  if (!feature)
+    throw declined(
+      `provider stage refused: ${task.project || "unnamed project"} is not listed in provider-stages.json`,
+    );
+
+  let builder = buildStage;
+  let built;
+  try {
+    if (!builder) {
+      const modulePath = join(
+        repoRoot,
+        "genesis",
+        "agentic",
+        "compute",
+        "stage",
+        "build-stage-task.mjs",
+      );
+      builder = (await import(pathToFileURL(modulePath).href)).buildStageTask;
+    }
+    built = await builder({
+      feature,
+      requester: task.requester,
+      provider: env.COMPUTE_PERFORMER,
+      out: join(dir, "provider-stage"),
+      runtimeImage: env.COMPUTE_RUNTIME_IMAGE,
+      executor,
+      repoRoot,
+      sourceRepoRoot: repoRoot,
+      a2oDir: join(repoRoot, "genesis", "a2o"),
+      nodeBin: env.COMPUTE_NODE_BIN || process.execPath,
+      justBin:
+        env.COMPUTE_JUST_BIN ||
+        join(env.COMPUTE_IMAGE_ROOT || "/opt/compute", "mesh-just.sh"),
+      writablePaths: [join(repoRoot, "genesis", "a2o", "reports")],
+      cpuMillis: Number(env.COMPUTE_SLICE_CPU_MILLIS),
+      memoryBytes: Number(env.COMPUTE_SLICE_MEMORY_BYTES),
+      timeoutSeconds: Number(env.COMPUTE_STAGE_TIMEOUT_SECONDS || 1800),
+      // SUT identity is derived only from the pinned checkout. Runner environment cannot
+      // inject E2E_DNA_HASH, A2O_SUT_*, or E2E_HOUSEHOLD_FIXTURE_PATH into this build.
+      env: {},
+      execute,
+      probeRun: false,
+    });
+  } catch (error) {
+    throw declined(
+      `provider stage refused while rebuilding ${feature}: ${error.message}`,
+    );
+  }
+  if (
+    !isDeepStrictEqual(
+      comparableStageEnvelope(task),
+      comparableStageEnvelope(built.envelope),
+    )
+  )
+    throw declined(
+      `provider stage differs from submitted envelope for ${feature}`,
+    );
+  return built;
 }
 
 export async function executeTask({
@@ -38,6 +180,7 @@ export async function executeTask({
       0,
     ),
   env = process.env,
+  buildStage,
 }) {
   const ref = status.requestActionHash;
   const dir = join(root, "jobs", key(ref));
@@ -96,6 +239,18 @@ export async function executeTask({
     );
   }
   const taskFile = join(dir, "task.json");
+  const providerStage =
+    env.COMPUTE_PRIVATE_MESH === "1" || env.COMPUTE_SOURCE_COMMIT
+      ? await rebuildProviderStage({
+          task,
+          root,
+          dir,
+          env,
+          executor,
+          execute,
+          buildStage,
+        })
+      : null;
   const runtimeArgs = [
     "run",
     "--task",
@@ -162,8 +317,16 @@ export async function executeTask({
     });
     const binary = join(dir, "test-binary");
     const dna = join(dir, "lamad.dna");
-    await fetchInput(artifactBase, task.binary, binary);
-    await fetchInput(artifactBase, task.dna, dna);
+    if (providerStage) {
+      // The submitted payload is never executed. Descriptor equality above proves these
+      // provider-built bytes have the identity the immutable task and receipt will bind.
+      await copyFile(providerStage.runnerPath, binary);
+      await chmod(binary, 0o755);
+      await copyFile(providerStage.dnaPath, dna);
+    } else {
+      await fetchInput(artifactBase, task.binary, binary);
+      await fetchInput(artifactBase, task.dna, dna);
+    }
     await request(
       `/api/v1/compute/tasks/${encodeURIComponent(ref)}/authorize-launch`,
       { attemptId: state.attemptId },
@@ -243,6 +406,47 @@ export async function executeTask({
   });
 }
 
+export function taskDeclineReason(error) {
+  return (
+    error.computeDeclineReason ||
+    (/API 403/.test(error.message)
+      ? "compute-grant-refused"
+      : /mismatch|invalid artifact|digest/i.test(error.message)
+        ? "invalid-artifact"
+        : /capacity|quota|ceiling/i.test(error.message)
+          ? "capacity-unavailable"
+          : /runtime image|runtime.*incompatible/i.test(error.message)
+            ? "runtime-incompatible"
+            : null)
+  );
+}
+
+export async function executeOrDecline(options) {
+  try {
+    await executeTask(options);
+    return { declined: false };
+  } catch (error) {
+    console.error(
+      `Task ${key(options.status.requestActionHash)}: ${error.message}`,
+    );
+    const reason = taskDeclineReason(error);
+    if (!reason) throw error;
+    const local = await readJson(
+      join(
+        options.root,
+        "jobs",
+        key(options.status.requestActionHash),
+        "state.json",
+      ),
+    );
+    await options.request(
+      `/api/v1/compute/tasks/${encodeURIComponent(options.status.requestActionHash)}/decline`,
+      { attemptId: local.attemptId, reason },
+    );
+    return { declined: true, reason, message: error.message };
+  }
+}
+
 export async function main() {
   const root = resolve(process.env.COMPUTE_WORKER_ROOT || "/var/lib/compute");
   await mkdir(root, { recursive: true, mode: 0o755 });
@@ -268,7 +472,7 @@ export async function main() {
       for (const status of page.tasks) {
         if (status.provider !== performer) continue;
         try {
-          await executeTask({
+          await executeOrDecline({
             status,
             root,
             request,
@@ -287,27 +491,7 @@ export async function main() {
           // Apply count retention between runs, not after an entire queue page.
           await cleanWorker(root, payloadClient(base));
         } catch (error) {
-          console.error(
-            `Task ${key(status.requestActionHash)}: ${error.message}`,
-          );
-          const reason = /API 403/.test(error.message)
-            ? "compute-grant-refused"
-            : /mismatch|invalid artifact|digest/i.test(error.message)
-              ? "invalid-artifact"
-              : /capacity|quota|ceiling/i.test(error.message)
-                ? "capacity-unavailable"
-                : /runtime image|runtime.*incompatible/i.test(error.message)
-                  ? "runtime-incompatible"
-                  : null;
-          if (reason) {
-            const local = await readJson(
-              join(root, "jobs", key(status.requestActionHash), "state.json"),
-            );
-            await request(
-              `/api/v1/compute/tasks/${encodeURIComponent(status.requestActionHash)}/decline`,
-              { attemptId: local.attemptId, reason },
-            );
-          }
+          console.error(`Worker queue error: ${error.message}`);
         }
       }
       offset = page.nextOffset;
