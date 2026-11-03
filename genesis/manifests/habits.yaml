@@ -2470,10 +2470,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-10-30 (RED preserved; the landing push paid once where it could): push 370721d7f (56 commits) reused the recorded verdicts of elohim-storage, doorway, steward-node, cargo-bridge and jenkins-bridge at push time (paths-scoped closures recorded on the line the day before; `GATE_EVIDENCE=reuse`), and re-ran the tree-scoped gates (eprfs 716 s, orchestrator 120 s, elohim-app 127 s, genesis-a2o 88 s …): ALL CLEAR in 1298 s. Two refusals before it: NO-SERVING-RECEIPT (cured by the epr-app-deliverability lane, 7/7, 135/135) and one ark test red from an ETXTBSY race in a test stub helper (the stub exec raced a sibling test's fork; test-only guard landed). Still red: the tree-scoped gates re-pay on every push because any hook-written ledger under .claude/data dirties the tree at record time.
-    evidence-fingerprint: sha256:ff035206bb04ceb1
-    evidence-bytes: 10118
-    evidence-entries: 12
+      DELTA 2026-11-03 (status unchanged; closure soundness, not hit rate): d612f49bb closes workspace-discipline row 76. A `// gate-reads:` declaration now resolves only the statement it sits above and that statement's derived reads, so a fixed-read declaration can no longer mask a data-derived walk and shrink a closure key (which would mean wrong reuse). Eleven eprfs declarations moved onto their statements. Read sets are unchanged (eprfs 176 paths / 12 unresolved; the four named projects have 0 unresolved). gate-input-audit 42/42, gate-preflight 17/17, gate-evidence 64/64. eprfs still keys on the whole tree (row 73).
+    evidence-fingerprint: sha256:d764545602d78d90
+    evidence-bytes: 10740
+    evidence-entries: 13
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
