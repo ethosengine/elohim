@@ -15,6 +15,7 @@ checks:
   - "no-op rolls: `node --test genesis/orchestrator/validate-only-pipeline.test.mjs` checks that an edge selection with only dataplane-validation stale dispatches validate-only."
   - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
   - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
+  - "harvester liveness (algedonic sensor, observation only): fold ci-harvest-cursor-lag@1 --env job=elohim-edge per its procedure in .claude/epr-meta/measures.yaml (newest completed elohim-edge dev build minus .claude/data/ci-cursor.json jobs.elohim-edge; Jenkins unreadable = unmeasured, never 0); lens ci-harvest-cursor-lag-ceiling@1 renders on the `cost:` line of `epr flow report --headline`, soft 10 / hard 15 builds (ci-harvest.py reads at most 10 of the newest 15)."
 refs:
   - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
   - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"

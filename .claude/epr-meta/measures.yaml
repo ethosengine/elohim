@@ -1726,6 +1726,44 @@ measures:
       concern, concern_routes.route() returns None for them, no measure reads elohim-edge
       results, and the habit that owns the clause still described the fleet check as unmeasured.
 
+
+  # ── algedonic-designer firing 2026-11-03 (seed 69918774; waiting, repetition, numbness / 5d) ──
+  # The CI harvester's cursor stood still while the pipelines it reads kept running: the tracked
+  # ledger's newest row is 2026-10-22 and ci-cursor.json holds elohim-edge at 1704, while the
+  # window's own commits cite edge #1785–#1797. --hook mode exits 0 silently on any Jenkins error,
+  # so a numb harvester and a quiet fleet look the same.
+  - id: ci-harvest-cursor-lag
+    version: 1
+    family: delivery
+    unit: builds
+    procedure: >
+      For one job J in .claude/scripts/ci-harvest.py JOBS, read the newest completed build number
+      N from `https://jenkins.ethosengine.com/job/J/job/dev/api/json?tree=builds[number,result]`
+      (first entry with a non-null result) and the harvested cursor C from
+      .claude/data/ci-cursor.json `jobs.J`. Fold N - C: `epr flow note --kind observation
+      --measure ci-harvest-cursor-lag@1 --subject . --value <N-C> --env job=J --env newest=<N>
+      --env cursor=<C>`. When Jenkins cannot be read, fold nothing: the reading is UNMEASURED,
+      never 0. A build number cited in a commit message (e.g. `edge #1797`) may stand in for N
+      only as a lower bound, and the fold's reason must say so.
+    provenance: >
+      .claude/data/ci-cursor.json (tracked copy, last committed c0ad6902 2026-11-01) jobs.elohim-edge
+      = 1704; .claude/data/ci-findings.jsonl newest elohim-edge row ts 2026-10-22T20:00:26Z; commits
+      5f515c0b / 2852ec4f (2026-11-03) cite edge #1793 and #1797, so the lag lower bound is
+      1797 - 1704 = 93 builds. .claude/scripts/ci-harvest.py:71 MAX_BUILDS_PER_JOB = 10 and
+      harvest_job() lists only the newest MAX_BUILDS_PER_JOB + 5 builds, so every build older than
+      the newest 15 at the next harvest is never read. Caveat: the tracked copy may lag a
+      workspace's live cursor; the reading is a lower bound from the tree, not a live probe.
+    status: active
+    env-sensitivity: [job, newest, cursor]
+    default-authority: observation
+    established_by: algedonic-designer-2026-11-03
+    why: >
+      push-delivers-within-budget names ci-harvest.py as its ledger check (a BUDGET_EXHAUSTED
+      finding for any build its own timeout killed). A harvester that stops advancing makes that
+      check silently pass, and the --hook fail-safe exits 0 with no output on any Jenkins error,
+      so nothing distinguishes "no reds" from "nobody looked". No declared measure or bound reads
+      the cursor's distance from Jenkins.
+
 lenses:
   - id: dialogue-blocked-ceiling
     version: 1
@@ -2763,3 +2801,29 @@ lenses:
       (16b82ec09dc5, to 2026-10-22); that cumulative count is provenance, not a newest-ten
       reading. Read with `epr flow report --bound edge-apex-root-unserved-ceiling`; the bound
       declares no headline slot.
+
+  # ── harvester numbness bound (algedonic-designer, 2026-11-03) ──
+  - id: ci-harvest-cursor-lag-ceiling
+    version: 1
+    headline: cost
+    binding: binding-local
+    class: measure
+    consumes: [ci-harvest-cursor-lag@1]
+    subject: .
+    env: { job: elohim-edge }
+    context: session-headline
+    compare: above
+    soft: 10
+    hard: 15
+    concern: push-delivers-within-budget
+    retire-when: >
+      when ci-harvest.py walks every build past its cursor (no listing window) or reports its own
+      read failure as unmeasured, so a lagging cursor can no longer drop builds silently
+    status: active
+    established_by: algedonic-designer-2026-11-03
+    why: >
+      Arithmetic from the harvester itself: one harvest reads at most MAX_BUILDS_PER_JOB = 10 fresh
+      builds (soft) out of a listing of the newest MAX_BUILDS_PER_JOB + 5 = 15 (hard). Above 15,
+      builds between the cursor and the listing's oldest entry are never harvested at all, so the
+      ledger's silence about them is numbness, not health. At mint the tree's lower-bound reading
+      for elohim-edge was 1797 - 1704 = 93, above hard 15: red.
