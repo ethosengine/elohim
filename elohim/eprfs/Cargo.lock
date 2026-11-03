@@ -1580,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-local"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "bytes",

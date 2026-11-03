@@ -286,6 +286,33 @@ with tempfile.TemporaryDirectory() as td:
 # ═══════════════════════════════════════════════════════════════
 # 3. LIVE, READ-ONLY — the catalog's structural contract
 # ═══════════════════════════════════════════════════════════════
+# Preserve the independent spot-check across nested repository boundaries too.
+for git_marker in ("directory", "file"):
+    with tempfile.TemporaryDirectory() as td:
+        root = _fixture_repo(Path(td), _point(
+            "nested_point", "      - id: C2\n        status: answered\n", _REAL_TEST))
+        (root / ".git").mkdir()
+        nested = root / "nested"
+        (nested / "fix/tests").mkdir(parents=True)
+        if git_marker == "directory":
+            (nested / ".git").mkdir()
+        else:
+            _w(nested / ".git", "gitdir: ../worktree-metadata\n")
+        (root / "fix/seam-registry.yaml").rename(nested / "fix/seam-registry.yaml")
+        (root / "fix/tests/t.rs").rename(nested / "fix/tests/t.rs")
+        data = sm.matrix_data(root)
+        check(f"nested {git_marker}: matrix verifies repository-relative citations",
+              _cell(data, "C2", "SX")["state"] == "conformant")
+        check(f"nested {git_marker}: independent spot-check agrees on real nested tests",
+              sm.spot_check(root, 1)["verdict"] == "trust")
+        _w(root / "fix/tests/t.rs", "#[test]\nfn a_real_test() {}\n")
+        (nested / "fix/tests/t.rs").unlink()
+        data = sm.matrix_data(root)
+        check(f"nested {git_marker}: outer decoy cannot make the matrix conformant",
+              _cell(data, "C2", "SX")["state"] == "variant")
+        check(f"nested {git_marker}: independent spot-check also rejects the outer decoy",
+              sm.spot_check(root, 1)["verdict"] == "trust")
+
 live_cat, live_errs = sm.load_catalog(REPO)
 check("LIVE: the real seam catalog loads clean", live_cat and live_errs == [])
 

@@ -546,6 +546,19 @@ def load_concerns(repo_root: Path) -> tuple[dict, list[str]]:
 
 # ───────────────────────────── contract-test citation checks ─────────────────────────────
 
+def registry_repo_root(repo_root: Path, registry_path: Path) -> Path:
+    """Resolve citations in their registry's repository, including nested gitfiles.
+
+    Reuse the governance boundary resolver. Unowned fixture/snapshot trees retain
+    the caller's root; a checkout outside that root must not capture their paths.
+    """
+    root = Path(repo_root).resolve()
+    owner = _em.find_repo_root(Path(registry_path).parent)
+    if owner.is_relative_to(root) and (owner / ".git").exists():
+        return owner
+    return root
+
+
 def _finding(severity: str, kind: str, crate: str, point: str, detail: str) -> dict:
     return {"severity": severity, "kind": kind, "crate": crate, "point": point, "detail": detail}
 
@@ -686,9 +699,10 @@ def census_data(repo_root: Path) -> dict:
                                 "n_cited": 0, "n_uncited": 0})
             continue
         crate = data.get("crate", "?")
+        citation_root = registry_repo_root(repo_root, path)
         n_cited = n_uncited = 0
         for pt in data["decisionPoints"]:
-            verified, pt_findings = _check_contract_tests(repo_root, crate, pt)
+            verified, pt_findings = _check_contract_tests(citation_root, crate, pt)
             findings.extend(pt_findings)
             if verified:
                 n_cited += 1

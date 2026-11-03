@@ -212,6 +212,7 @@ def matrix_data(repo_root: Path) -> dict:
         for e in row_errs:
             errors.append(f"{rel}: {e}")
         crate = data.get("crate", "?")
+        citation_root = _sc.registry_repo_root(repo_root, path)
         for pt in data["decisionPoints"]:
             points_seen += 1
             name = pt.get("name", "?")
@@ -230,7 +231,7 @@ def matrix_data(repo_root: Path) -> dict:
             # (interface-first-reuse). Forking it here is what would let the matrix and the census
             # disagree about whether a cell is conformant. If this helper ever graduates to public,
             # this call site is the reason.
-            verified, _f = _sc._check_contract_tests(repo_root, crate, pt)
+            verified, _f = _sc._check_contract_tests(citation_root, crate, pt)
             for cb in pt.get("concernIds", []):
                 cid = cb.get("id")
                 if cid not in _sc._CONCERN_ID_SET:
@@ -481,6 +482,7 @@ def spot_check(repo_root: Path, n: int = 8, *, seed: str = "") -> dict:
     mismatches: list[str] = []
     for rel, crate, pt in picks:
         name = pt["name"]
+        citation_root = _sc.registry_repo_root(repo_root, repo_root / rel)
         seam_id = by_point.get(f"{crate}::{name}") or by_crate.get(crate)
         disk_concerns = sorted({cb.get("id") for cb in pt.get("concernIds") or []
                                 if isinstance(cb, dict)})
@@ -489,7 +491,7 @@ def spot_check(repo_root: Path, n: int = 8, *, seed: str = "") -> dict:
         for ct in pt.get("contractTests") or []:
             if not isinstance(ct, dict):
                 continue
-            f = repo_root / str(ct.get("path", ""))
+            f = citation_root / str(ct.get("path", ""))
             tn = str(ct.get("testName", ""))
             if not tn or not f.is_file():
                 continue

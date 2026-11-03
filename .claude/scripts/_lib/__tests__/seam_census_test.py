@@ -532,4 +532,54 @@ with tempfile.TemporaryDirectory() as td:
     verified, findings = sc._check_contract_tests(root, "gate-runner", point)
     check("Node phantom callback refuses", not verified and any("missing-contract-test" in str(f) for f in findings))
 
+# A submodule/worktree registry owns its repository-relative citations. A matching
+# file in the outer checkout is not evidence for a missing nested test.
+for git_marker in ("directory", "file"):
+    with tempfile.TemporaryDirectory() as td:
+        root = _with_schema(Path(td))
+        (root / ".git").mkdir()
+        nested = root / "nested"
+        nested.mkdir()
+        if git_marker == "directory":
+            (nested / ".git").mkdir()
+        else:
+            _w(nested / ".git", "gitdir: ../worktree-metadata\n")
+        registry = nested / "crate" / sc.REGISTRY_FILENAME
+        _w(registry, """\
+seamRegistryVersion: 1
+crate: nested-crate
+crateRoot: crate
+seamLocus: nested repository citation fixture
+decisionPoints:
+  - name: decide
+    kind: pure-decision-predicate
+    sourceLocation: {file: src/lib.rs}
+    concernIds: [{id: C7, status: answered}]
+    contractTests:
+      - {path: tests/contract.rs, testName: nested_contract, kind: unit}
+""")
+        source = "#[test]\nfn nested_contract() { assert!(true); }\n"
+        _w(nested / "tests/contract.rs", source)
+        original = registry.read_bytes()
+        data = sc.census_data(root)
+        check(f"nested {git_marker}: census verifies the owning repository's citation",
+              data["registries"][0]["n_cited"] == 1)
+        _w(root / "tests/contract.rs", source)
+        (nested / "tests/contract.rs").unlink()
+        data = sc.census_data(root)
+        check(f"nested {git_marker}: an outer test cannot satisfy a missing nested citation",
+              data["registries"][0]["n_cited"] == 0
+              and any(f["kind"] == "missing-contract-test" for f in data["findings"]))
+        check(f"nested {git_marker}: producer registry bytes remain unchanged",
+              registry.read_bytes() == original)
+
+with tempfile.TemporaryDirectory() as td:
+    outer = Path(td)
+    (outer / ".git").mkdir()
+    snapshot = outer / "snapshot"
+    registry = snapshot / "crate" / sc.REGISTRY_FILENAME
+    _w(registry, "fixture")
+    check("unowned snapshot retains its explicit root, not an enclosing checkout",
+          sc.registry_repo_root(snapshot, registry) == snapshot)
+
 print(f"\n  {_passed} assertions passed ✅")
