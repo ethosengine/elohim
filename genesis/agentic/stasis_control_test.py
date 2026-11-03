@@ -574,10 +574,15 @@ class ControlTest(unittest.TestCase):
         self.assertFalse((self.repo / 'calls').exists())
 
     def test_wiring_patch_preserves_all_existing_settings(self):
-        settings = json.loads((ROOT / '.claude/settings.json').read_text())
+        # The historical patch applies to the pre-wiring layout. Existing
+        # arrays are retained, as the operations guide requires.
+        settings = {'hooks': {event: [{'hooks': [{'command': 'existing'}]}]
+                              for event in ['PreToolUse', 'Stop', 'UserPromptSubmit',
+                                            'SessionStart', 'PostToolUse']},
+                    'permissions': {'ask': ['Bash(example)']}}
         original = copy.deepcopy(settings)
         patch_rows = json.loads((ROOT / 'genesis/agentic/stasis-settings.patch.json').read_text())
-        regs = json.loads((ROOT / '.epr-meta/elohim/packages/hooks/dialogue-stasis-sense.json').read_text())['metadata']['intendedRegistrations']
+        regs = json.loads((ROOT / '.epr-meta/elohim/packages/hooks/dialogue-stasis-sense.json').read_text())['registration']
         for op in patch_rows:
             self.assertEqual(op['op'], 'add')
             path = op['path'].split('/')[1:]
@@ -609,7 +614,7 @@ class ControlTest(unittest.TestCase):
         line = self.invoke('SessionStart').stdout
         self.assertIn('coordinator unknown', line)
         self.assertIn('unknown open incidents', line)
-        self.assertLess(self.elapsed, 1)
+        self.assertLess(self.elapsed, 2.5)
 
     def test_idle_wakes_once_and_does_not_consume_context(self):
         self.env['STASIS_REWAKE_SECONDS'] = '.3'

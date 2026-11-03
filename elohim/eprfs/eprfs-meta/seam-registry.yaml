@@ -1,0 +1,170 @@
+seamRegistryVersion: 1
+crate: eprfs-meta
+crateRoot: elohim/eprfs/eprfs-meta
+seamLocus: Portable policy content admission and opt-in repository-authored import
+  evaluation; no witnessed adoption is claimed.
+decisionPoints:
+- name: portable_policy::verify_policy
+  kind: verdict-fn
+  sourceLocation:
+    file: src/portable_policy.rs
+    modulePath: eprfs_meta::portable_policy
+  summary: Verify raw-addressed policy content without granting adoption authority.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Portable bytes and offered standing are separate; no adoption or
+      network write occurs.
+  - id: C1
+    status: answered
+    justification: A successful content verification grants no standing or execution
+      authority.
+  - id: C2
+    status: n-a
+    justification: Immutable content comparison does not choose or move a governing
+      head.
+  - id: C3
+    status: partial
+    justification: Held bytes verify offline; fetching absent content belongs to the
+      consumer.
+  - id: C4
+    status: answered
+    justification: Malformed, unsupported, oversized, noncanonical and mismatched
+      content return explicit errors.
+  - id: C5
+    status: answered
+    justification: Only exact bytes/format are established; host semantic support
+      and adoption remain separate.
+  - id: C6a
+    status: answered
+    justification: Verification rejects input above MAX_REGISTRY_BYTES before parsing.
+  - id: C6b
+    status: answered
+    justification: Verification is pure; rechecking identical content has no effect.
+  - id: C7
+    status: partial
+    justification: Artifact preserves unknown semantic fields; consumer must check
+      supported meaning before enforcing.
+  - id: C8
+    status: partial
+    justification: Typed errors name the refusal; caller owns counters and durable
+      observations.
+  - id: C9
+    status: n-a
+    justification: No participant identity or key is created, rotated or selected.
+  - id: C10
+    status: answered
+    justification: Unknown envelope fields and versions fail; semantic extension fields
+      stay addressed and visible.
+  - id: C11
+    status: n-a
+    justification: Pure local bounded verification performs no peer calls or queued
+      work.
+  - id: C12
+    status: n-a
+    justification: Content validation grants no permission; receiving-space adoption
+      is a separate boundary.
+  - id: C13
+    status: partial
+    justification: Versioned raw representation preserves legacy pins; network adoption
+      remains SRD-3.
+  - id: C14
+    status: answered
+    justification: All verification failures return a typed residual to the caller;
+      none is treated as acceptance.
+  contractTests:
+  - path: elohim/eprfs/eprfs-meta/src/portable_policy.rs
+    testName: standing_changes_do_not_change_content
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/portable_policy.rs
+    testName: verifies_raw_codec_and_rejects_tamper_and_legacy_codec
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/portable_policy.rs
+    testName: rejects_unknown_format_fields_and_standing_in_content
+    kind: unit
+- name: evaluation::materialize_import
+  kind: verdict-fn
+  sourceLocation:
+    file: src/evaluation.rs
+    modulePath: eprfs_meta::evaluation
+  summary: Verify locally pinned portable content before evaluating repository-authored
+    standing.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Local registry pins standing; portable artifact contains meaning
+      only. No remote authority is imported.
+  - id: C1
+    status: answered
+    justification: Ask and deny imports require local establishment provenance and
+      an exact authored row pin.
+  - id: C2
+    status: answered
+    justification: Explicit id/version and CID selection; no newest-version selection
+      or moving head.
+  - id: C3
+    status: answered
+    justification: Only bounded local regular files are read; network absence cannot
+      change evaluation.
+  - id: C4
+    status: answered
+    justification: Invalid imports, missing references and duplicates produce mandatory
+      Ask verdicts.
+  - id: C5
+    status: answered
+    justification: Verified content is separate from locally authored enforcement
+      class and scope.
+  - id: C6a
+    status: partial
+    justification: Objects are bounded before decode; existing registry loader size
+      check follows file read.
+  - id: C6b
+    status: answered
+    justification: Read-only evaluation is repeatable and makes no adoption or publication
+      writes.
+  - id: C7
+    status: answered
+    justification: Only explicitly supported semantic fields, predicates and scope
+      shapes execute.
+  - id: C8
+    status: partial
+    justification: Structured policy diagnostics and referral reasons are returned;
+      durable observations belong to caller.
+  - id: C9
+    status: n-a
+    justification: No actor key or identity lifecycle is introduced.
+  - id: C10
+    status: answered
+    justification: Portable version, CID, row pin, semantic identity and supported
+      vocabulary are verified.
+  - id: C11
+    status: n-a
+    justification: No network calls or queued reconciliation occur.
+  - id: C12
+    status: partial
+    justification: Authored local configuration remains authority; independently witnessed
+      space authority is out of scope.
+  - id: C13
+    status: partial
+    justification: Legacy valid row parsing remains; missing or duplicate bindings
+      now refer rather than silently permit.
+  - id: C14
+    status: answered
+    justification: Missing, malformed, tampered and unsupported inputs remain explicit
+      non-permit residuals.
+  contractTests:
+  - path: elohim/eprfs/eprfs-meta/src/evaluation.rs
+    testName: addressed_import_is_offline_and_standing_is_independent_across_repositories
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/evaluation.rs
+    testName: addressed_import_disappearing_or_duplicate_registry_row_refers
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/evaluation.rs
+    testName: addressed_import_malformed_scope_or_binding_refers
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/evaluation.rs
+    testName: addressed_import_missing_tampered_or_escaped_content_refers
+    kind: unit
+  - path: elohim/eprfs/eprfs-meta/src/evaluation.rs
+    testName: addressed_successor_discovery_never_upgrades_or_executes_until_explicit_local_repin
+    kind: unit

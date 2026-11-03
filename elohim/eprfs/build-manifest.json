@@ -57,7 +57,7 @@
         "run": {
           "kind": "root-just",
           "recipe": "_gate-eprfs",
-          "cargo": { "targetDir": "/tmp/eprfs-gate-target", "profile": "dev", "rustflags": "" }
+          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "" }
         }
       },
       "seam-guidance-contracts": {

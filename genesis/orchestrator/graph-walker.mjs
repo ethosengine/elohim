@@ -97,14 +97,14 @@ export function isGovernancePath(filePath) {
   return normalized.split('/').includes('.epr-meta');
 }
 
-function matchInputs(inputs, changedFiles) {
+function matchInputs(inputs, changedFiles, { includeGovernance = false } = {}) {
   const reasons = [];
   if (!inputs) return reasons;
 
   for (const pattern of inputs.sources || []) {
     const matcher = picomatch(pattern);
     for (const file of changedFiles) {
-      if (isGovernancePath(file)) continue;
+      if (!includeGovernance && isGovernancePath(file)) continue;
       if (matcher(file)) {
         reasons.push(`source: ${file}`);
         break;
@@ -152,7 +152,9 @@ export function projectsFromStale(manifests, stale, changedFiles) {
     if (!content.gate?.projects) continue;
     for (const [projectName, config] of Object.entries(content.gate.projects)) {
       const triggerSteps = config.steps || (config.inputs ? [] : Object.keys(content.steps));
-      const reasons = matchInputs(config.inputs, changedFiles);
+      // A local quality gate may explicitly consume policy bytes. Keep those
+      // inputs separate from pipeline sources so governance never rolls a fleet.
+      const reasons = matchInputs(config.inputs, changedFiles, { includeGovernance: true });
       let minOrder = Infinity;
       for (const stepName of triggerSteps) {
         const qualified = `${content.pipeline}:${stepName}`;

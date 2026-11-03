@@ -12,7 +12,10 @@ import { resolve, relative, sep } from 'path';
 export function discoverManifests(rootDir) {
   const root = resolve(rootDir);
   const found = [];
-  const skipped = new Set(['.claude', '.git', '.superpowers', '.worktrees', 'node_modules']);
+  // local-dev holds ignored runtime state and disposable proof checkouts. Their
+  // manifests belong to those fixtures, not this repository's build graph.
+  // Keep traversing ordinary submodules: their manifests are production inputs.
+  const skipped = new Set(['.claude', '.git', '.superpowers', '.worktrees', 'local-dev', 'node_modules']);
 
   function visit(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

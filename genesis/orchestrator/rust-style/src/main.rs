@@ -1,10 +1,10 @@
-use elohim_rust_style::repository;
+use elohim_rust_style::{discipline, repository};
 use std::{io::Read, path::PathBuf};
 
 fn run() -> Result<i32, String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help") {
-        println!("epr-rust-style --root PATH [--base REF] [--head REF] [--json] [--path FILE --stdin]\nAll cfg branches; baseline derives from Git. Exit 1 = violations, 2 = unmeasured.");
+        println!("epr-rust-style --root PATH [--base REF] [--head REF] [--json] [--path FILE --stdin]\nepr-rust-style --export-discipline --guide FILE --out DIR\nAll cfg branches; baseline derives from Git. Export offers content, not adoption. Exit 1 = violations, 2 = unmeasured.");
         return Ok(0);
     }
     let mut root = PathBuf::from(".");
@@ -14,9 +14,15 @@ fn run() -> Result<i32, String> {
     let mut json = false;
     let mut stdin = false;
     let mut scope = None;
+    let mut export_discipline = false;
+    let mut guide = None;
+    let mut out = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
+            "--export-discipline" => export_discipline = true,
+            "--guide" => guide = Some(PathBuf::from(iter.next().ok_or("--guide requires a path")?)),
+            "--out" => out = Some(PathBuf::from(iter.next().ok_or("--out requires a path")?)),
             "--root" => root = PathBuf::from(iter.next().ok_or("--root requires a path")?),
             "--base" => base = iter.next().ok_or("--base requires a ref")?.clone(),
             "--head" => head = Some(iter.next().ok_or("--head requires a ref")?.clone()),
@@ -26,6 +32,29 @@ fn run() -> Result<i32, String> {
             "--stdin" => stdin = true,
             _ => return Err(format!("unknown argument {arg}")),
         }
+    }
+    if export_discipline {
+        if head.is_some() || path.is_some() || scope.is_some() || stdin {
+            return Err("discipline export cannot evaluate source".into());
+        }
+        let closure = discipline::export(
+            &guide.ok_or("--guide required")?,
+            &out.ok_or("--out required")?,
+        )?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&closure).map_err(|e| e.to_string())?
+        );
+        return Ok(0);
+    }
+    if guide.is_some() || out.is_some() {
+        return Err("--guide/--out require --export-discipline".into());
+    }
+    if head.is_some() && (path.is_some() || stdin) {
+        return Err("--head cannot use working-tree prospective stdin mode".into());
+    }
+    if stdin && path.is_none() {
+        return Err("--stdin requires --path".into());
     }
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     if let Some(path) = path {

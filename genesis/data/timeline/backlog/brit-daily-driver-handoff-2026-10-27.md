@@ -49,7 +49,48 @@ Their consistent message is that brit should not race to replace git transport. 
 The SCM-side primitives from the scans mostly did not reach the spec's slices (stable change id, CAS
 with expected-prior head, walkthrough records, sparse fetch, derived data). This handoff carries them.
 
-## Precondition (do first)
+## Operator intent — first-class native blob storage (2026-11-02)
+
+**Open, high priority; capture for the next Brit planning pass.** The operator
+clarified during the first Brit dogfooding sprint: Brit is intended to be the
+reference SCM tooling for the Elohim-native developer. The blobs it works with
+are expected to be stored on the P2P datastore and cached locally in the EPRFS
+filesystem projection. This is core product intent, including large-file support,
+not an optional future LFS storage bridge. It extends the social/evidence emphasis
+above; that emphasis must not exclude native content storage and projection.
+
+Git LFS is an interoperability surface for existing repositories within this
+direction. Its pointer format and content hashes must not become a second native
+storage authority. Reuse the existing EPRFS addressing, storage and projection
+interfaces; establish the current implementation before proposing new ones.
+
+Desired developer outcomes to turn into executable acceptance scenarios:
+
+- A developer checks out a revision and obtains its file bytes through the local
+  projection, retrieving missing blobs from the P2P datastore and verifying them.
+- Staging changed content enters the native blob-storage lifecycle. Work remains
+  possible offline with locally available content, and missing content produces
+  an explicit availability result.
+- Publication distinguishes a locally recorded commit from the availability of
+  its required blobs to the intended peers. Define and test the required
+  availability evidence before claiming that publication is complete.
+- Existing Git LFS content can cross the compatibility boundary with byte/hash
+  verification. Git object IDs, LFS SHA-256 identities and EPRFS CIDs are not
+  interchangeable without an explicit, verified mapping.
+- Local cache eviction and subsequent retrieval preserve content identity;
+  corrupt or unavailable bytes cannot be presented as a successful checkout.
+
+Planning handoff: ground this in Brit's existing daily-driver habit and the
+current EPRFS/storage seams, then apply the P2P and local-first design gates before
+choosing entities, routes, retention rules or publication semantics. This entry
+records operator intent and desired outcomes, not a completed design or capability.
+
+The current dogfooding fix for `brit diff --cached` refusing on unchanged
+`diff=lfs` fixture files remains independently useful and should continue. Its
+completion does not fulfil this native-storage requirement. Preserve that sprint's
+friction evidence while graduating this intent into a bounded implementation slice.
+
+## Initial daily-driver prerequisites
 
 - **Pin the brit checkout to its pin.** The working tree was 385 commits behind
   (`git submodule update elohim/brit`). Re-read anything cited from the off-pin checkout.

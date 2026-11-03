@@ -6,5 +6,19 @@
   "external_roots": [
     "vendor",
     ".cargo-pool"
-  ]
+  ],
+  "discipline": {
+    "policy": {
+      "cid": "bafkreidd2ije344x7jldsfitomqcc6smrnsp6bhuinn2sblfsiuth6yf6i",
+      "path": ".epr-meta/rust-style/objects/bafkreidd2ije344x7jldsfitomqcc6smrnsp6bhuinn2sblfsiuth6yf6i.json"
+    },
+    "guide": {
+      "cid": "bafkreidv7yjl7bp5gls3uwbldjp5rdni3robbnbdfkxwsjvcnjn2wpt2j4",
+      "path": "genesis/docs/rust-style-guide.md"
+    },
+    "method": {
+      "cid": "bafkreidmczh47krdmia4qsv4sgmovx6cyxj4d4bjvtybpot6qb2ft36h2y",
+      "path": ".epr-meta/rust-style/objects/bafkreidmczh47krdmia4qsv4sgmovx6cyxj4d4bjvtybpot6qb2ft36h2y.json"
+    }
+  }
 }

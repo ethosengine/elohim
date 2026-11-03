@@ -835,7 +835,9 @@ test('CLI follow exits zero for gates-passed', (t) => {
   const root = fixture(t);
   const { path } = open(root);
   appendEvent(path, { kind: 'run-close', outcome: 'gates-passed', deferred: 2 });
-  const result = cli(root, ['follow', '--run', path, '--timeout-ms', '100']);
+  // This proves the terminal outcome, not a latency budget. The deadline also
+  // covers checkout discovery, which can exceed 100 ms on a busy build host.
+  const result = cli(root, ['follow', '--run', path, '--timeout-ms', '2000']);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '[gate-live] run gates-passed (2 deferred)\n');
 });

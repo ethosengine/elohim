@@ -24,7 +24,7 @@ if [[ "${1:-}" == "--hook" ]]; then
     exit 2
   fi
   shopt -s globstar nullglob
-  for style_input in "$style_root"/genesis/orchestrator/rust-style/{Cargo.toml,Cargo.lock,src/**/*.rs} "$style_root"/elohim/eprfs/{eprfs-meta,eprfs-core}/{Cargo.toml,src/**/*.rs} "$style_root"/crates/seam-contracts/{Cargo.toml,src/**/*.rs}; do
+  for style_input in "$style_root"/.cargo/config.toml "$style_root"/elohim/eprfs/Cargo.toml "$style_root"/genesis/orchestrator/rust-style/{Cargo.toml,Cargo.lock,build.rs,src/**/*.rs} "$style_root"/elohim/eprfs/{eprfs-meta,eprfs-core}/{Cargo.toml,src/**/*.rs} "$style_root"/crates/seam-contracts/{Cargo.toml,src/**/*.rs}; do
     if [[ "$style_input" -nt "$style_binary" ]]; then
       echo "Rust style UNMEASURED: checker inputs changed; run just gate rust-style." >&2
       exit 2
@@ -45,5 +45,6 @@ if [[ "${1:-}" == "--verify" ]]; then
   cargo clippy --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --all-targets -- -D warnings
   cargo test --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml"
   python3 "$style_root/genesis/orchestrator/rust-style/hook_test.py"
+  python3 -m unittest discover -s "$style_root/genesis/orchestrator/rust-style" -p test_source_distribution.py
 fi
 exec "$style_target/debug/epr-rust-style" --root "$style_root" "$@"

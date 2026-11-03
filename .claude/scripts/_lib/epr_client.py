@@ -189,6 +189,15 @@ def _arrival_owed(returncode: int, environment) -> bool:
     return not native or returncode == 127
 
 
+def _candidate_path(value: str) -> str | None:
+    """Validate an explicitly selected executable without reading its identity bytes."""
+    path = os.path.realpath(os.path.expanduser(value))
+    if (not os.path.isfile(path) or not os.access(path, os.X_OK)
+            or os.path.basename(path) == "bin-launch"):
+        return None
+    return path
+
+
 def _candidate(value: str) -> tuple[str | None, str | None]:
     """An explicit `EPR_BIN` is the answer itself: never asked to read a store, never a bootstrap.
 
@@ -196,10 +205,8 @@ def _candidate(value: str) -> tuple[str | None, str | None]:
     status`), and a refused or absent candidate is an absence: it must not queue a bootstrap
     that ingests into the live device store from whatever checkout the caller runs in.
     """
-    path = os.path.realpath(os.path.expanduser(value))
-    if not os.path.isfile(path) or not os.access(path, os.X_OK):
-        return None, None
-    if os.path.basename(path) == "bin-launch":
+    path = _candidate_path(value)
+    if path is None:
         return None, None
     digest = hashlib.sha256()
     with open(path, "rb") as source:
@@ -226,7 +233,16 @@ def bootstrap(environment: dict[str, str]) -> None:
 
 
 def resolve_binary(env: dict[str, str] | None = None) -> str | None:
-    """Compatibility accessor for callers that need only the path."""
+    """Resolve execution only; identity consumers must use resolve/resolved_cid.
+
+    Hashing an explicit candidate on every hook can consume its entire deadline.
+    No expected CID is checked by that hash; the caller selected the executable.
+    Keep the same path validation without computing an unused identity.
+    """
+    environment = os.environ if env is None else env
+    candidate = environment.get("EPR_BIN", "").strip()
+    if candidate:
+        return _candidate_path(candidate)
     return resolve(env)[0]
 
 

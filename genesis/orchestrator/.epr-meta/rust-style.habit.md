@@ -9,7 +9,7 @@ status: green
 active: false
 checks:
   - "just gate rust-style (native syntax, Git ratchet, strict scopes, checker fmt/Clippy/tests and agent adapter contracts)"
-  - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (three isolated-Git acceptance scenarios)"
+  - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (six isolated-Git acceptance scenarios, including independent addressed-policy holdings)"
   - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
 guard: >
   Never equate equal counts with no new findings; never use dirty source for a pushed object;
@@ -52,3 +52,17 @@ Durable local receipts: `genesis/a2o/reports/recovery/rust-style/`. The feature-
 now explicitly fetches its integration ref; no history or hook-availability gap is called clean.
 
 DELTA 2026-10-24 (ownership diagnostic): `python3 -m unittest discover -s genesis/orchestrator/rust-style -p hook_test.py` passed 8 tests; normal and `--hook` entrypoints now name the safe.directory cure and exit 2 before pool/Cargo on Git ownership refusal. No Cargo build or full native gate was run in this bounded fix; habit status unchanged.
+
+DELTA 2026-11-02 (portable discipline, partial delivery; status unchanged): 35 metadata
+tests and 4 portable CLI tests pass, including independent local standing, explicit
+successor adoption and corrupt/missing-policy refusal; touched-package Clippy and
+workspace formatting pass. Rust-style recipe passes 19 native and 8 adapter tests,
+2,088 files / 84 crates; publisher tests pass 32 cases and precheck verifies existing
+packages with the changed metadata version absent. Independent source review found
+no remaining local correctness blocker. Two fresh repository representatives reached
+a conditional scoped trial recommendation (task-srd-4-report.md), not Brit adoption.
+Full gates refuse an unrelated duplicate manifest before recipes; standalone checker
+publication/install, full discipline closure and network authority/witnessing remain
+open. No commit, push, remote acceptance or new strict scope is claimed.
+
+DELTA 2026-11-02 (GREEN, local shared-discipline trial): normal Rust-style, orchestrator and EPRFS gates pass; Rust-style has 30 native / 9 hook / 4 distribution tests and scans 2,090 files in 84 crates; EPRFS has 1,970 passing Rust tests, zero failures or ignored tests, with workspace fmt/Clippy green. Six a2o scenarios / 18 steps pass. Brit's actual standalone offline install verifies the same policy/guide/method CIDs as Elohim, and its independently selected `brit-build-ref` trial measures 14 files with zero debt; committed fixtures refuse new suppressions, dirty repairs and corrupt holdings. Both story files had two fresh-reader rounds, each 0/3/0 then 0/2/0 correctness/interpretability/preference findings, final READY; remaining interpretation findings are retained in task-srd-5-report.md. Durable proof: genesis/a2o/reports/recovery/shared-rust-discipline-2026-11-02/. Network authority/witnessing and scope/checker migration remain open; no commit, push or remote CI claimed. The 72-minute EPRFS gate leaves performance finding 330923a9dd23 open.

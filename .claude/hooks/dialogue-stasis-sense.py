@@ -223,7 +223,7 @@ class Journal:
 
     def append(self, kind, **fields):
         event = {"schemaVersion": 1, "kind": kind,
-                 "session": {"runtime": "claude-code", "session": self.payload["session_id"]},
+                 "session": {"runtime": self.payload.get("_runtime", "claude-code"), "session": self.payload["session_id"]},
                  "agentId": self.agent, "seq": self.state["nextSeq"],
                  "clock": self.now, "presence": self.presence(), "source": self.source, **fields}
         raw = (json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n").encode()
@@ -284,7 +284,7 @@ def map_event(j):
     key = json.dumps([agent, prompt, tool])
     if event in {"PreToolUse", "Stop", "UserPromptSubmit"}:
         for opened in opens[:]:
-            known = bool(opened["precedingToolUseId"])
+            known = bool(opened["precedingToolUseId"]) and p.get("_runtime", "claude-code") == "claude-code"
             j.append("prompt-closed", closedBy="denied-inferred" if known else "unknown",
                      correlation=correlation(opened["incidentId"], "low", "inferred-next-event"))
             if not known:
@@ -333,7 +333,7 @@ def map_event(j):
             duration = number(p.get("duration_ms"))
             # A tool completion proves permission, including a failed tool.
             # Only a matching pending dialog supplies an interaction witness.
-            if duration is not None:
+            if duration is not None and p.get("_runtime", "claude-code") == "claude-code":
                 j.witness(duration)
             j.append("prompt-closed", closedBy="approved", durationMs=duration,
                      correlation=correlation(opened["incidentId"], "high", "tool-use-id"))
@@ -353,7 +353,7 @@ def map_event(j):
         return recorded
     elif event == "UserPromptSubmit":
         text = p.get("prompt")
-        if isinstance(text, str) and not text.startswith("<task-notification>"):
+        if p.get("_runtime", "claude-code") == "claude-code" and isinstance(text, str) and not text.startswith("<task-notification>"):
             j.witness()
             if re.search(r"\b(stuck|status|progress|still there)\b", text, re.I):
                 j.append("steward-ping")
@@ -477,6 +477,11 @@ def main():
     payload = json.load(sys.stdin)
     if not isinstance(payload, dict):
         return
+    # Runtime comes from the registered command, never from quoted tool input.
+    runtime = "codex" if "--runtime=codex" in sys.argv else "claude-code"
+    payload["_runtime"] = runtime
+    if runtime == "codex":
+        payload["prompt_id"] = payload.get("turn_id")
     session = payload.get("session_id")
     if not isinstance(session, str) or not session or session in {".", ".."} or not re.fullmatch(r"[A-Za-z0-9._-]+", session):
         return
@@ -498,6 +503,9 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if control.mode() == "live" else 0))
         j = Journal(directory, payload)
         try:
+            if runtime == "codex" and not j.state.get("codexCoverageRecorded"):
+                j.gap("codex-notification-human-denial-and-presence-unobserved")
+                j.state["codexCoverageRecorded"] = True
             if payload.get("hook_event_name") == "Notification" and payload.get("notification_type") == "idle_prompt":
                 # Probe 20261030T162945Z: arrives ~60 s after Stop, never while
                 # a dialog is open. Evidence only: no witness, inferred close,
@@ -527,7 +535,9 @@ def main():
     # Native decide may append to events.jsonl: never call it while holding
     # journal.lock. An inert result cannot deliver pending control context.
     try:
-        action = control.live_hook(repo, root, payload, normalized or {})
+        action = (control.live_hook(repo, root, payload, normalized or {})
+                  if runtime == "claude-code" or payload.get("hook_event_name") in
+                  {"PostToolUse", "UserPromptSubmit"} else None)
         if action:
             if payload.get("hook_event_name") == "PermissionRequest":
                 iid = normalized["correlation"]["incidentId"]

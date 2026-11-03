@@ -80,6 +80,22 @@ def number(value):
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
+def codex_tokens(stdout):
+    """Read the completed turn's combined usage; cached input is already included."""
+    try:
+        rows = [json.loads(line) for line in stdout.splitlines() if line.strip()]
+    except ValueError:
+        return None
+    completed = [r for r in rows if isinstance(r, dict) and r.get('type') == 'turn.completed']
+    if len(completed) != 1:
+        return None
+    usage = completed[0].get('usage', {})
+    if not isinstance(usage, dict):
+        return None
+    parts = [usage.get('input_tokens'), usage.get('output_tokens')]
+    return sum(parts) if all(type(n) is int and n >= 0 for n in parts) else None
+
+
 def load_json(path, default=None):
     try:
         return json.loads(path.read_text())
@@ -343,7 +359,7 @@ class Coordinator:
         spec = importlib.util.spec_from_file_location('stasis_epr_client', REPO / '.claude/scripts/_lib/epr_client.py')
         client = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(client)
-        binary, _ = client.resolve()
+        binary = client.resolve_binary()
         if not binary:
             raise ValueError('epr unavailable')
         command = [binary, 'session', 'stasis', 'fold', '--session', session,
@@ -593,7 +609,8 @@ class Coordinator:
             if live:
                 incident['_reshape_used'] |= any(r['kind'] == 'guidance' and r.get('pivot') == 'reshape'
                                                 and r['incidentId'] == iid for r in delivery.rows)
-            brief = self.brief(incident, presence, claim, binding, history, shift_used)
+            brief = self.brief(incident, presence, claim, binding, history, shift_used,
+                               policy_matches=True if activation else None)
             self.future = self.worker.submit(self.consult, repo, journal.directory, session,
                                             presence, incident, claim, runtime, binding, brief, stage)
             return
@@ -609,6 +626,12 @@ class Coordinator:
             required = ['restricted-has-no-bash', 'restricted-raises-no-permission-request',
                         'restricted-ignores-project-hooks', 'hook-sees-keeper-env',
                         f'model-binding[{binding["model"]}]']
+            return all(capabilities.get(k, {}).get('status') == 'yes' and
+                       capabilities[k].get('evidence') for k in required)
+        if runtime.get('id') == 'codex':
+            capabilities = runtime.get('harnessCapabilities', {})
+            required = ['keeper-read-only', 'keeper-nonprompting', 'keeper-isolated-config',
+                        'keeper-json-usage', f'model-binding[{binding["model"]}]']
             return all(capabilities.get(k, {}).get('status') == 'yes' and
                        capabilities[k].get('evidence') for k in required)
         return True  # Other runtimes require their own probed invocation, never a declaration.
@@ -652,12 +675,12 @@ class Coordinator:
         delivery.add('PushNotification', f'PushNotification:{iid}:{stage}', incidentId=iid,
                      policyCid=cid, agentId=agent, stage=stage, rung=rung, message=message)
 
-    def brief(self, incident, presence, claim, binding, history, shift_used):
+    def brief(self, incident, presence, claim, binding, history, shift_used, policy_matches=None):
         c = claim['consultation']
         trusted = {k: incident[k] for k in ('stallClass', 'concernClass')}
         trusted.update(incident_id=incident['id'], presence=presence, rung=c['rung'], level=c['level'],
                        effort=binding.get('effort', 'low'), deadline=c['deadlineAt'],
-                       coordinator_checks={'policy_cid_matches': None, 'standing_ruling': None},
+                       coordinator_checks={'policy_cid_matches': policy_matches, 'standing_ruling': None},
                        evidence={'denial': 'procedural-park' if incident['concernClass'] == 'shape' else 'uncertain',
                                  'reshape_used': incident['_reshape_used'],
                                  'stage': incident['state'], 'notification_history': history,
@@ -759,8 +782,10 @@ class Coordinator:
                 atomic_json(settings, {'hooks': {}, 'permissions': {'allow': ['Read', 'Grep', 'Glob']}})
                 inv = runtime.get('keeperInvocation') or {}
                 codex = runtime.get('id') == 'codex'
+                # An isolated cwd plus --ignore-user-config prevents a keeper
+                # loading the session's plugins/MCP servers or project hooks.
                 substitutions = {'<file>': str(output if codex else settings),
-                                 '<bound>': binding['model'], '<dir>': str(repo)}
+                                 '<bound>': binding['model'], '<dir>': str(scratch if codex else repo)}
                 command = [substitutions.get(v, v) for v in inv.get('argv', [])]
                 if codex:
                     command += ['--model', binding['model'], '-c', f'model_reasoning_effort="{binding.get("effort", "low")}"']
@@ -769,7 +794,7 @@ class Coordinator:
                 if self.args.keeper_cmd_override:
                     command = shlex.split(self.args.keeper_cmd_override)
                 env = {**os.environ, **inv.get('env', {}), 'STASIS_KEEPER': '1'}
-                stdout, stderr, code = self.run_keeper(command, brief, env, repo, claim)
+                stdout, stderr, code = self.run_keeper(command, brief, env, scratch if codex else repo, claim)
                 if code:
                     answer = refer(f'keeper exit {code}')
                     payload = None
@@ -784,9 +809,7 @@ class Coordinator:
                         tokens = sum(parts)
                     payload = json.loads(payload['result'])
                 elif codex:
-                    match = re.search(r'tokens used\s*([\d,]+)', stderr)
-                    if match:
-                        tokens = int(match[1].replace(',', ''))
+                    tokens = codex_tokens(stdout)
                 if not code and not schema_valid(payload, self.schema):
                     answer = refer('invalid keeper answer (schema)')
                 elif not code:

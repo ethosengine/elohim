@@ -241,22 +241,93 @@
       "sessionEnv": ["CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"],
       "modelEnv": [],
       "capabilityBindings": {
-        "C1": { "model": "haiku" },
-        "C2": { "model": "sonnet" },
-        "C3": { "model": "opus" },
-        "C4": { "model": "fable" }
+        "C1": {
+          "model": "haiku"
+        },
+        "C2": {
+          "model": "sonnet"
+        },
+        "C3": {
+          "model": "opus"
+        },
+        "C4": {
+          "model": "fable"
+        }
       }
     },
     {
       "id": "codex",
-      "harnessCapabilities": {},
+      "harnessCapabilities": {
+        "keeper-read-only": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "keeper-nonprompting": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "keeper-isolated-config": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "keeper-json-usage": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "model-binding[gpt-6-astra]": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "async-rewake-wakes-idle": {
+          "status": "unsupported",
+          "evidence": "https://learn.chatgpt.com/docs/hooks#how-background-hooks-run",
+          "cliVersion": null
+        },
+        "session-start-context": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/delivery-hook-inputs.jsonl",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "posttooluse-context": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/delivery-hook-inputs.jsonl",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "session-end-event": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/delivery-hook-inputs.jsonl",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "stop-event": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/delivery-hook-inputs.jsonl",
+          "cliVersion": "codex-cli 0.166.0"
+        },
+        "turn-id-field": {
+          "status": "yes",
+          "evidence": "genesis/local-dev/stasis-runtime-wiring/delivery-hook-inputs.jsonl",
+          "cliVersion": "codex-cli 0.166.0"
+        }
+      },
       "keeperInvocation": {
-        "status": "declared",
+        "status": "probed",
         "argv": [
           "codex",
           "exec",
+          "--ignore-user-config",
+          "--skip-git-repo-check",
           "--sandbox",
           "read-only",
+          "-c",
+          "approval_policy=\"never\"",
+          "--disable",
+          "hooks",
+          "--json",
           "-C",
           "<dir>",
           "-o",
@@ -267,15 +338,21 @@
         "env": {
           "STASIS_KEEPER": "1"
         },
-        "evidence": null,
-        "cliVersion": null
+        "evidence": "genesis/local-dev/stasis-runtime-wiring/codex-probe.json",
+        "cliVersion": "codex-cli 0.166.0"
       },
       "comm": ["codex"],
       "sessionEnv": ["CODEX_SESSION_ID", "CODEX_THREAD_ID"],
       "modelEnv": [],
       "capabilityBindings": {
-        "C3": { "model": "gpt-6-astra", "effort": "high" },
-        "C4": { "model": "gpt-6-astra", "effort": "xhigh" }
+        "C3": {
+          "model": "gpt-6-astra",
+          "effort": "high"
+        },
+        "C4": {
+          "model": "gpt-6-astra",
+          "effort": "xhigh"
+        }
       }
     },
     {

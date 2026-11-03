@@ -99,6 +99,18 @@ describe('source glob matching', () => {
     assert.match(groovy, /split\('\/'\)\.any \{ it == '\.epr-meta' \}/);
     assert.match(groovy, /for \(def file : changedFiles\) \{\n\s+if \(isGovernancePath\(file\)\) continue\n/);
   });
+
+  it('explicit local policy inputs select their gate without dispatching a pipeline', () => {
+    const manifests = [makeManifest('app', {
+      build: makeStep(['app/**']),
+    }, { projects: {
+      app: { dir: 'app', steps: ['build'] },
+      policy: { dir: 'app', inputs: { sources: ['app/.epr-meta/**'] } },
+    } })];
+    const result = walkGraph(manifests, ['app/.epr-meta/objects/policy.json']);
+    assert.deepEqual(result.projects.map(p => p.name), ['policy']);
+    assert.deepEqual(result.pipelines, []);
+  });
 });
 
 // ── BuildProcess file matching ───────────────────────────────────

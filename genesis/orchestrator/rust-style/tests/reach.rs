@@ -165,3 +165,237 @@ fn compiler_refuses_stale_expectations_with_warning_denial() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unfulfilled_lint_expectations"));
 }
+
+fn adopted(
+    root: &Path,
+    scope: Option<&str>,
+    guide: &str,
+) -> elohim_rust_style::discipline::Discipline {
+    use elohim_rust_style::{discipline, repository::POLICY};
+    let (mut closure, objects) = discipline::bundle(guide.as_bytes()).unwrap();
+    for (path, bytes) in objects {
+        let path = root.join(".epr-meta/rust-style").join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+    for object in [&mut closure.policy, &mut closure.guide, &mut closure.method] {
+        object.path = format!(".epr-meta/rust-style/{}", object.path);
+    }
+    let mut policy: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join(POLICY)).unwrap()).unwrap();
+    policy["discipline"] = serde_json::to_value(&closure).unwrap();
+    if let Some(scope) = scope {
+        policy["scope_roots"] = serde_json::json!([scope]);
+    }
+    write(
+        root,
+        POLICY,
+        &serde_json::to_string_pretty(&policy).unwrap(),
+    );
+    closure
+}
+
+#[test]
+fn addressed_discipline_is_offline_scoped_and_never_auto_upgrades() {
+    use elohim_rust_style::{discipline, repository::POLICY};
+    let (first, _) = fixture();
+    let (second, _) = fixture();
+    let one = adopted(first.path(), Some("crate/src"), "Shared reviewed guide.");
+    let two = adopted(second.path(), Some("crate"), "Shared reviewed guide.");
+    assert_eq!(one, two, "local scope must not change addressed meaning");
+    let first_base = commit(first.path());
+    let second_base = commit(second.path());
+    let held = fs::read(first.path().join(POLICY)).unwrap();
+    let (_, successor) = discipline::bundle(b"Unadopted successor guide.").unwrap();
+    for (path, bytes) in successor {
+        let path = first.path().join(".epr-meta/rust-style").join(path);
+        fs::write(path, bytes).unwrap();
+    }
+    write(
+        first.path(),
+        "crate/other.rs",
+        "#[allow(unused)] fn outside_scope() {}",
+    );
+    write(
+        second.path(),
+        "crate/other.rs",
+        "#[allow(unused)] fn inside_scope() {}",
+    );
+    let first_report = run(first.path(), &["--base", &first_base]);
+    assert!(
+        first_report.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first_report.stderr)
+    );
+    assert_eq!(
+        run(second.path(), &["--base", &second_base]).status.code(),
+        Some(1)
+    );
+    assert_eq!(fs::read(first.path().join(POLICY)).unwrap(), held);
+    assert_eq!(
+        fs::read(first.path().join(&one.policy.path)).unwrap(),
+        fs::read(second.path().join(&two.policy.path)).unwrap()
+    );
+    // A verified closure is required before the edit-time source path as well.
+    let good = elohim_rust_style::repository::prospective(
+        first.path(),
+        "crate/src/lib.rs",
+        "pub fn clean() {}",
+    );
+    assert!(good.unwrap().is_empty());
+}
+
+#[test]
+fn committed_closure_cannot_borrow_worktree_repair() {
+    use elohim_rust_style::repository::POLICY;
+    let (dir, base) = fixture();
+    let closure = adopted(dir.path(), None, "Reviewed guide.");
+    let valid = commit(dir.path());
+    let guide = fs::read(dir.path().join(&closure.guide.path)).unwrap();
+    write(dir.path(), &closure.guide.path, "corrupted committed guide");
+    let corrupt = commit(dir.path());
+    fs::write(dir.path().join(&closure.guide.path), &guide).unwrap();
+    assert_eq!(
+        run(dir.path(), &["--base", &base, "--head", &corrupt])
+            .status
+            .code(),
+        Some(2)
+    );
+    assert!(run(dir.path(), &["--base", &base, "--head", &valid])
+        .status
+        .success());
+    let mut policy: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(POLICY)).unwrap()).unwrap();
+    policy["discipline"]["guide"]["cid"] = "malformed".into();
+    write(dir.path(), POLICY, &serde_json::to_string(&policy).unwrap());
+    let bad_policy = commit(dir.path());
+    adopted(dir.path(), None, "Reviewed guide.");
+    assert_eq!(
+        run(dir.path(), &["--base", &base, "--head", &bad_policy])
+            .status
+            .code(),
+        Some(2)
+    );
+    assert!(run(dir.path(), &["--base", &base]).status.success());
+}
+
+#[test]
+fn missing_or_malformed_method_refuses_before_source_evaluation() {
+    use elohim_rust_style::repository::{self, POLICY};
+    let (dir, base) = fixture();
+    let closure = adopted(dir.path(), None, "Reviewed guide.");
+    let method = fs::read(dir.path().join(&closure.method.path)).unwrap();
+    fs::remove_file(dir.path().join(&closure.method.path)).unwrap();
+    assert_eq!(run(dir.path(), &["--base", &base]).status.code(), Some(2));
+    assert!(repository::prospective(dir.path(), "crate/src/lib.rs", "pub fn clean() {}").is_err());
+    fs::write(dir.path().join(&closure.method.path), b"{}").unwrap();
+    assert_eq!(run(dir.path(), &["--base", &base]).status.code(), Some(2));
+    fs::write(dir.path().join(&closure.method.path), method).unwrap();
+    assert!(run(dir.path(), &["--base", &base]).status.success());
+    let mut policy: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(POLICY)).unwrap()).unwrap();
+    policy["discipline"]["method"]["path"] = "../outside.json".into();
+    write(dir.path(), POLICY, &serde_json::to_string(&policy).unwrap());
+    assert_eq!(run(dir.path(), &["--base", &base]).status.code(), Some(2));
+}
+
+#[test]
+fn additive_addressing_preserves_debt_and_adopted_content_cannot_be_removed() {
+    use elohim_rust_style::repository::POLICY;
+    let (dir, _) = fixture();
+    write(
+        dir.path(),
+        "crate/src/lib.rs",
+        "#[allow(dead_code)] fn debt() {}",
+    );
+    let base = commit(dir.path());
+    adopted(dir.path(), None, "Reviewed guide.");
+    assert!(
+        run(dir.path(), &["--base", &base]).status.success(),
+        "addressing alone is not a source touch"
+    );
+    write(
+        dir.path(),
+        "crate/src/lib.rs",
+        "#[allow(dead_code)] fn debt() {} // touched",
+    );
+    assert_eq!(run(dir.path(), &["--base", &base]).status.code(), Some(1));
+    write(
+        dir.path(),
+        "crate/src/lib.rs",
+        "#[allow(dead_code)] fn debt() {}",
+    );
+    let adopted_base = commit(dir.path());
+    let mut policy: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(POLICY)).unwrap()).unwrap();
+    policy.as_object_mut().unwrap().remove("discipline");
+    write(dir.path(), POLICY, &serde_json::to_string(&policy).unwrap());
+    assert_eq!(
+        run(dir.path(), &["--base", &adopted_base]).status.code(),
+        Some(1)
+    );
+}
+
+#[test]
+fn validly_rehashed_unknown_method_is_not_executable_authority() {
+    use elohim_rust_style::repository::POLICY;
+    use eprfs_core::BlobCid;
+    use eprfs_meta::portable_policy::PortablePolicy;
+    let (dir, base) = fixture();
+    let closure = adopted(dir.path(), None, "Reviewed guide.");
+    let method = b"{\"format\":\"foreign-method\"}";
+    fs::write(dir.path().join(&closure.method.path), method).unwrap();
+    let cid = BlobCid::compute_raw(method).to_string();
+    let mut artifact: PortablePolicy =
+        serde_json::from_slice(&fs::read(dir.path().join(&closure.policy.path)).unwrap()).unwrap();
+    artifact
+        .semantics
+        .insert("method".into(), cid.clone().into());
+    let policy_bytes = artifact.canonical_bytes().unwrap();
+    fs::write(dir.path().join(&closure.policy.path), &policy_bytes).unwrap();
+    let mut local: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join(POLICY)).unwrap()).unwrap();
+    local["discipline"]["method"]["cid"] = cid.into();
+    local["discipline"]["policy"]["cid"] = BlobCid::compute_raw(&policy_bytes).to_string().into();
+    write(dir.path(), POLICY, &serde_json::to_string(&local).unwrap());
+    let output = run(dir.path(), &["--base", &base]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("installed checker"));
+}
+
+#[test]
+fn committed_mode_cannot_select_worktree_prospective_input() {
+    let (dir, base) = fixture();
+    let output = run(
+        dir.path(),
+        &[
+            "--base",
+            &base,
+            "--head",
+            &base,
+            "--path",
+            "crate/src/lib.rs",
+            "--stdin",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("working-tree prospective"));
+}
+
+#[cfg(unix)]
+#[test]
+fn committed_policy_symlink_is_not_authored_policy_even_if_target_text_is_json() {
+    use elohim_rust_style::repository::POLICY;
+    let (dir, base) = fixture();
+    adopted(dir.path(), None, "Reviewed guide.");
+    let policy = fs::read_to_string(dir.path().join(POLICY)).unwrap();
+    fs::remove_file(dir.path().join(POLICY)).unwrap();
+    std::os::unix::fs::symlink(policy, dir.path().join(POLICY)).unwrap();
+    let linked = commit(dir.path());
+    assert_eq!(
+        run(dir.path(), &["--base", &base, "--head", &linked])
+            .status
+            .code(),
+        Some(2)
+    );
+}

@@ -75,3 +75,26 @@ def test_an_explicit_candidate_is_the_answer_and_never_runs_or_bootstraps(tmp_pa
     assert path == str(candidate.resolve())
     # `epr bin status` reports this CID for the same bytes as a candidate (native BlobCid raw).
     assert cid == 'bafkreidtfucy7lozbrypejbjej5llwohjemsc4ez57ttpksgqnoohjqiky'
+
+
+def test_execution_only_candidate_resolution_skips_hash_but_keeps_validation(tmp_path):
+    candidate = tmp_path / 'epr'
+    candidate.write_bytes(b'candidate bytes')
+    candidate.chmod(0o755)
+    launcher = tmp_path / 'bin-launch'
+    launcher.symlink_to(candidate)
+    with patch.object(epr_client.hashlib, 'sha256', side_effect=AssertionError('unused identity')):
+        assert epr_client.resolve_binary({'EPR_BIN': str(candidate)}) == str(candidate)
+        assert epr_client.resolve_binary({'EPR_BIN': str(tmp_path / 'absent')}) is None
+        candidate.chmod(0o644)
+        assert epr_client.resolve_binary({'EPR_BIN': str(candidate)}) is None
+        launcher.unlink()
+        launcher.write_bytes(b'launcher')
+        launcher.chmod(0o755)
+        assert epr_client.resolve_binary({'EPR_BIN': str(launcher)}) is None
+
+
+def test_execution_only_default_still_uses_native_store_resolution():
+    with patch.object(epr_client, 'resolve', return_value=('/device/cid/epr', 'bafkreifixture')) as resolve:
+        assert epr_client.resolve_binary({}) == '/device/cid/epr'
+    resolve.assert_called_once_with({})

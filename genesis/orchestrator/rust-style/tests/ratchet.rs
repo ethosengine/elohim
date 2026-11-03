@@ -231,3 +231,104 @@ fn lint_config_and_nested_policy_changes_touch_the_owning_crate() {
         );
     }
 }
+
+#[test]
+fn malformed_scope_roots_never_disable_governance() {
+    for scope in [
+        serde_json::json!([]),
+        serde_json::json!([""]),
+        serde_json::json!(["../crate"]),
+        serde_json::json!(["missing"]),
+    ] {
+        let before = tree(DEBT);
+        let mut after = tree(DEBT);
+        let mut policy: serde_json::Value = serde_json::from_str(&after.files[POLICY]).unwrap();
+        policy["scope_roots"] = scope;
+        after
+            .files
+            .insert(POLICY.into(), serde_json::to_string(&policy).unwrap());
+        assert!(compare(&before, &after, "base".into(), "head".into()).is_err());
+    }
+}
+
+#[test]
+fn refused_scope_narrowing_keeps_previously_governed_sources_in_evidence() {
+    let before = tree(DEBT);
+    let mut after = tree(DEBT);
+    after.files.insert(
+        "other/Cargo.toml".into(),
+        "[package]\nname='other'\nversion='0.1.0'\n".into(),
+    );
+    after
+        .files
+        .insert("other/lib.rs".into(), "pub fn clean() {}".into());
+    let mut policy: serde_json::Value = serde_json::from_str(&after.files[POLICY]).unwrap();
+    policy["scope_roots"] = serde_json::json!(["other"]);
+    after
+        .files
+        .insert(POLICY.into(), serde_json::to_string(&policy).unwrap());
+    let report = compare(&before, &after, "base".into(), "head".into()).unwrap();
+    assert!(report
+        .failures
+        .iter()
+        .any(|failure| failure.contains("scope changes")));
+    assert_eq!(report.crates["crate"].before, 1);
+    assert_eq!(report.crates["crate"].after, 1);
+    assert_eq!(report.scanned_files, 2);
+}
+
+#[test]
+fn moving_debt_outside_scope_is_not_paydown_but_real_deletion_is() {
+    let mut before = tree(DEBT);
+    let mut policy: serde_json::Value = serde_json::from_str(&before.files[POLICY]).unwrap();
+    policy["scope_roots"] = serde_json::json!(["crate/src"]);
+    before
+        .files
+        .insert(POLICY.into(), serde_json::to_string(&policy).unwrap());
+    let mut after = Snapshot {
+        files: before.files.clone(),
+    };
+    after.files.remove("crate/src/lib.rs");
+    after.files.insert("crate/other.rs".into(), DEBT.into());
+    let report = compare(&before, &after, "base".into(), "head".into()).unwrap();
+    assert!(report
+        .failures
+        .iter()
+        .any(|failure| failure.contains("not paydown")));
+    assert_eq!(
+        report.scanned_files, 0,
+        "transfer evidence is not adoption of excluded source"
+    );
+    after.files.remove("crate/other.rs");
+    assert!(compare(&before, &after, "base".into(), "head".into())
+        .unwrap()
+        .failures
+        .is_empty());
+    after.files.insert(
+        "crate/unrelated.rs".into(),
+        "#[allow(unused)] fn unrelated() {}".into(),
+    );
+    assert!(compare(&before, &after, "base".into(), "head".into())
+        .unwrap()
+        .failures
+        .is_empty());
+}
+
+#[test]
+fn unrelated_excluded_compile_fail_fixture_does_not_block_real_paydown() {
+    let mut before = tree(DEBT);
+    let mut policy: serde_json::Value = serde_json::from_str(&before.files[POLICY]).unwrap();
+    policy["scope_roots"] = serde_json::json!(["crate/src"]);
+    before
+        .files
+        .insert(POLICY.into(), serde_json::to_string(&policy).unwrap());
+    let mut after = Snapshot {
+        files: before.files.clone(),
+    };
+    after.files.remove("crate/src/lib.rs");
+    after.files.insert("crate/ui/invalid.rs".into(), "{".into());
+    assert!(compare(&before, &after, "base".into(), "head".into())
+        .unwrap()
+        .failures
+        .is_empty());
+}

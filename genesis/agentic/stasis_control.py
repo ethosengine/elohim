@@ -460,21 +460,23 @@ def live_hook(repo, root, payload, normalized):
         for row in rows:
             journal.add('receipt', f"receipt:{reader}:{row['seq']}", reader=reader, deliverySeq=row['seq'])
             if row['kind'] == 'PushNotification':
-                lines.append(f"Stasis {row['incidentId']}: request PushNotification once: {row['message']}")
+                request = ('notify the steward in the session dialogue' if payload.get('_runtime') == 'codex'
+                           else 'request PushNotification once')
+                lines.append(f"Stasis {row['incidentId']}: {request}: {row['message']}")
             else:
                 lines.append(f"Stasis {row['incidentId']} guidance (advice, never authority): {row['message']}")
         return context(event, '\n'.join(lines))
 
 
-def capability(name):
+def capability(name, runtime_id='claude-code'):
     data = json.loads((REPO / 'genesis/agentic/agent-runtimes.json').read_text())
-    runtime = next(r for r in data['runtimes'] if r['id'] == 'claude-code')
+    runtime = next((r for r in data['runtimes'] if r['id'] == runtime_id), {})
     cap = runtime.get('harnessCapabilities', {}).get(name, {})
     return cap.get('status') == 'yes' and bool(cap.get('evidence'))
 
 
 def session_start(repo, root, session):
-    """One line, with a total subprocess budget below one second."""
+    """One line, bounded below the three-second hook registration."""
     from concurrent.futures import ThreadPoolExecutor
     command = [os.environ.get('STASIS_COORDINATOR_BIN', str(REPO / 'genesis/agentic/bin/stasis-coordinator')),
                'start', '--start-wait', '.35']
@@ -482,7 +484,7 @@ def session_start(repo, root, session):
         command.append('--live')
     with ThreadPoolExecutor(max_workers=2) as pool:
         started = pool.submit(bounded, command, cwd=repo, timeout=.65)
-        state = pool.submit(snapshot, repo, root, session, .65)
+        state = pool.submit(snapshot, repo, root, session, 1.9)
         try:
             code, _ = started.result()
             alive = 'alive' if code == 0 else 'unknown'
@@ -504,7 +506,7 @@ def session_start(repo, root, session):
 
 def rewake(repo, root, payload):
     """Async Stop watcher: exit 2 is the probed wake transport, never a Stop loop."""
-    if mode() != 'live' or not capability('async-rewake-wakes-idle'):
+    if mode() != 'live' or not capability('async-rewake-wakes-idle', payload.get('_runtime', 'claude-code')):
         return 0
     directory = root / payload['session_id']
     if not directory.is_dir():
@@ -562,7 +564,7 @@ def worker():
     spec.loader.exec_module(client)
     # Read-only resolution must not launch provisioning from a keystroke.
     client.bootstrap = lambda _: None
-    binary, _ = client.resolve()
+    binary = client.resolve_binary()
     if not binary:
         return 1
     result = subprocess.run([binary, 'session', 'stasis', *sys.argv[2:]], input=sys.stdin.read(),

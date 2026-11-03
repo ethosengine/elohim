@@ -6,10 +6,15 @@
 //! asserts reach; callers decide whether the resulting local evidence is
 //! advisory (`check`) or admission-relevant (`ready`).
 
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    io::Read,
+    path::{Component, Path},
+};
 
 use eprfs_core::{
-    EprMetaResolution, GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate,
+    BlobCid, EprMetaResolution, GovernanceRule, GovernanceRuleClass, GovernanceRulePredicate,
     GovernanceValidator,
 };
 use serde::{Deserialize, Serialize};
@@ -19,6 +24,175 @@ use sha2::{Digest, Sha256};
 use crate::{canonical_body, flow_depth_ok, hex_lower, resolve_path, Result, MAX_REGISTRY_BYTES};
 
 const POLICY_REGISTRY_REL: &str = ".claude/epr-meta/policies.yaml";
+
+/// Repository-authored pointer to portable content, not a witnessed adoption.
+/// `path` is relative to this repository; no fetch or execution occurs on import.
+///
+/// In the existing version-1 policy registry, opt in with a row containing
+/// `id`, `version`, local `class`, optional local `scope`, `established_by`,
+/// `content: { cid: <raw CID>, path: objects/policy.json }`, and `contentHash`.
+/// Compute `contentHash` over the authored row with the existing canonical row
+/// algorithm, before substituting semantics. The row cannot also declare a
+/// predicate or semantic rationale. Bind its `id@version` from `.epr-meta` as
+/// usual. Initially only `validator` and `require-frontmatter` portable
+/// predicates are supported; every other semantic field refuses evaluation.
+/// Source-space standing from an export must never be copied as authorization.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyContentRef {
+    pub cid: String,
+    pub path: String,
+}
+
+fn supported_import_scope(scope: &Value) -> bool {
+    scope.as_object().is_some_and(|scope| {
+        scope.iter().all(|(key, value)| match key.as_str() {
+            "write" | "contains" => value.as_str().is_some_and(|text| !text.is_empty()),
+            "new" => value.is_boolean(),
+            "contains-any" => value.as_array().is_some_and(|items| {
+                !items.is_empty()
+                    && items
+                        .iter()
+                        .all(|item| item.as_str().is_some_and(|text| !text.is_empty()))
+            }),
+            _ => false,
+        })
+    })
+}
+
+fn materialize_import(
+    repo_root: &Path,
+    policy: &mut RegistryPolicy,
+) -> std::result::Result<(), String> {
+    let row = policy.raw_row.as_mapping().ok_or("missing authored row")?;
+    const LOCAL_FIELDS: &[&str] = &[
+        "id",
+        "version",
+        "class",
+        "scope",
+        "established_by",
+        "contentHash",
+        "content",
+        "binding",
+        "status",
+        "superseded_by",
+        "established_at",
+        "retire-when",
+    ];
+    if row
+        .keys()
+        .any(|key| key.as_str().is_none_or(|key| !LOCAL_FIELDS.contains(&key)))
+    {
+        return Err("import row contains semantic shadowing or unsupported standing fields".into());
+    }
+    if !matches!(policy.class.as_str(), "inject" | "ask" | "deny") {
+        return Err("unsupported imported policy class".into());
+    }
+    if policy
+        .scope
+        .as_ref()
+        .is_some_and(|scope| !supported_import_scope(scope))
+    {
+        return Err("local import scope contains unsupported keys or types".into());
+    }
+    if matches!(policy.class.as_str(), "ask" | "deny")
+        && policy.established_by.as_deref().is_none_or(str::is_empty)
+    {
+        return Err("ask/deny import requires locally authored established_by".into());
+    }
+    let pin = policy
+        .content_hash
+        .as_deref()
+        .ok_or("import requires local contentHash pin")?;
+    if compute_row_hash(&policy.raw_row).as_deref() != Some(pin) {
+        return Err("local import row failed its contentHash pin".into());
+    }
+    let pointer: PolicyContentRef =
+        serde_json::from_value(policy.content.clone().unwrap_or(Value::Null))
+            .map_err(|error| format!("invalid content pointer: {error}"))?;
+    let cid = BlobCid::parse(&pointer.cid).map_err(|error| format!("invalid CID: {error}"))?;
+    let relative = Path::new(&pointer.path);
+    if pointer.path.is_empty()
+        || relative
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        return Err("content path must contain only normal repository-relative components".into());
+    }
+    let mut path = repo_root
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    for part in relative.components() {
+        path.push(part);
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|error| format!("content unavailable: {error}"))?;
+        if metadata.file_type().is_symlink() {
+            return Err("content path traverses a symlink".into());
+        }
+    }
+    if !fs::symlink_metadata(&path)
+        .map_err(|error| error.to_string())?
+        .is_file()
+    {
+        return Err("content object is not a regular file".into());
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .map_err(|error| error.to_string())?
+        .take((MAX_REGISTRY_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    let portable =
+        crate::portable_policy::verify_policy(&cid, &bytes).map_err(|error| error.to_string())?;
+    let semantics = serde_json::to_value(&portable.semantics).map_err(|error| error.to_string())?;
+    let semantics = semantics.as_object().ok_or("invalid semantic object")?;
+    const SEMANTIC_FIELDS: &[&str] = &[
+        "id",
+        "version",
+        "title",
+        "why",
+        "validator",
+        "require-frontmatter",
+    ];
+    if semantics
+        .keys()
+        .any(|key| !SEMANTIC_FIELDS.contains(&key.as_str()))
+    {
+        return Err("content contains semantics unsupported by this evaluator".into());
+    }
+    if semantics.get("id").and_then(Value::as_str) != Some(policy.id.as_str())
+        || semantics.get("version").and_then(Value::as_u64) != Some(u64::from(policy.version))
+    {
+        return Err("portable id/version differs from local binding".into());
+    }
+    for key in ["title", "why"] {
+        if semantics.get(key).is_some_and(|value| !value.is_string()) {
+            return Err(format!("{key} must be a string"));
+        }
+    }
+    match (
+        semantics.get("validator"),
+        semantics.get("require-frontmatter"),
+    ) {
+        (Some(Value::String(name)), None) if !name.trim().is_empty() => {
+            policy.validator = Some(name.clone());
+        }
+        (None, Some(Value::Array(fields)))
+            if !fields.is_empty()
+                && fields
+                    .iter()
+                    .all(|field| field.as_str().is_some_and(|field| !field.is_empty())) =>
+        {
+            policy.require_frontmatter = Some(Value::Array(fields.clone()));
+        }
+        _ => return Err("content must declare exactly one supported, valid predicate".into()),
+    }
+    policy.why = semantics
+        .get("why")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    Ok(())
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -330,10 +504,59 @@ pub fn evaluate_path_with(
     let declared_validators = resolution.effective_validators.clone();
     // Verdicts a tampered content pin injects directly, bypassing rule expansion.
     let mut pin_verdicts: Vec<GovernanceVerdict> = Vec::new();
+    if !resolution.effective_policies.is_empty()
+        && diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code.starts_with("policy.registry-"))
+    {
+        pin_verdicts.push(GovernanceVerdict {
+            class: GovernanceRuleClass::Ask,
+            reason: "policy registry could not be verified; repair it before applying bindings"
+                .into(),
+            rule_id: String::new(),
+            policy_ref: None,
+            refer_reason: Some("policy-registry-invalid".into()),
+            evidence: None,
+        });
+    }
 
     for binding in &resolution.effective_policies {
         match policies.get(&binding.policy) {
             Some(policy) => {
+                if policy.content.is_some()
+                    && (binding
+                        .when
+                        .as_ref()
+                        .is_some_and(|when| !supported_import_scope(when))
+                        || binding
+                            .params
+                            .as_object()
+                            .is_some_and(|params| !params.is_empty()))
+                {
+                    pin_verdicts.push(GovernanceVerdict {
+                        class: GovernanceRuleClass::Ask,
+                        reason: format!(
+                            "policy `{}` binding has unsupported scope or parameters",
+                            binding.policy
+                        ),
+                        rule_id: binding.id.clone(),
+                        policy_ref: Some(binding.policy.clone()),
+                        refer_reason: Some("policy-import-invalid".into()),
+                        evidence: None,
+                    });
+                    continue;
+                }
+                if let Some(error) = &policy.import_error {
+                    pin_verdicts.push(GovernanceVerdict {
+                        class: GovernanceRuleClass::Ask,
+                        reason: format!("policy `{}` import refused: {error}", binding.policy),
+                        rule_id: binding.id.clone(),
+                        policy_ref: Some(binding.policy.clone()),
+                        refer_reason: Some("policy-import-invalid".into()),
+                        evidence: None,
+                    });
+                    continue;
+                }
                 // Content-pin verification (authoring polarity): a tampered
                 // registry row routes to judgment rather than applying its
                 // unverified semantics — never bricks the repo, never proceeds
@@ -388,13 +611,26 @@ pub fn evaluate_path_with(
                     }),
                 }
             }
-            None => diagnostics.push(PolicyDiagnostic {
-                code: "policy.unknown".into(),
-                message: format!(
-                    "rule `{}` binds unknown policy `{}`; it was not applied",
-                    binding.id, binding.policy
-                ),
-            }),
+            None => {
+                diagnostics.push(PolicyDiagnostic {
+                    code: "policy.unknown".into(),
+                    message: format!(
+                        "rule `{}` binds unknown policy `{}`",
+                        binding.id, binding.policy
+                    ),
+                });
+                pin_verdicts.push(GovernanceVerdict {
+                    class: GovernanceRuleClass::Ask,
+                    reason: format!(
+                        "bound policy `{}` is unavailable; restore its local registry row",
+                        binding.policy
+                    ),
+                    rule_id: binding.id.clone(),
+                    policy_ref: Some(binding.policy.clone()),
+                    refer_reason: Some("policy-unavailable".into()),
+                    evidence: None,
+                });
+            }
         }
     }
 
@@ -457,6 +693,10 @@ struct RegistryPolicy {
     /// Not deserialized from the typed schema — populated during load.
     #[serde(skip)]
     raw_row: serde_yaml::Value,
+    /// Opt-in pointer, parsed separately so a malformed pointer cannot erase the row.
+    content: Option<Value>,
+    #[serde(skip)]
+    import_error: Option<String>,
 }
 
 impl RegistryPolicy {
@@ -611,19 +851,35 @@ fn load_policies(repo_root: &Path) -> (BTreeMap<String, RegistryPolicy>, Vec<Pol
             .cloned()
             .unwrap_or(serde_yaml::Value::Null);
         let key = policy.key();
-        if policy.predicate_and_parameters().is_none() {
+        if policy.content.is_some()
+            || policy
+                .raw_row
+                .as_mapping()
+                .is_some_and(|row| row.contains_key("content"))
+        {
+            if let Err(error) = materialize_import(repo_root, &mut policy) {
+                diagnostics.push(PolicyDiagnostic {
+                    code: "policy.import-invalid".into(),
+                    message: format!("policy `{key}` import refused: {error}"),
+                });
+                policy.import_error = Some(error);
+            }
+        }
+        if policy.import_error.is_none() && policy.predicate_and_parameters().is_none() {
             diagnostics.push(PolicyDiagnostic {
                 code: "policy.no-predicate".into(),
                 message: format!("policy `{key}` has no evaluable predicate"),
             });
-            continue;
+            policy.import_error = Some("policy has no evaluable predicate".into());
         }
-        if policies.insert(key.clone(), policy).is_some() {
+        if policies.contains_key(&key) {
+            policy.import_error = Some("duplicate policy identity in local registry".into());
             diagnostics.push(PolicyDiagnostic {
                 code: "policy.duplicate".into(),
                 message: format!("duplicate policy `{key}`"),
             });
         }
+        policies.insert(key, policy);
     }
     (policies, diagnostics)
 }
@@ -651,6 +907,7 @@ pub fn policy_established_by(repo_root: impl AsRef<Path>, policy_key: &str) -> O
     let (policies, _diagnostics) = load_policies(repo_root.as_ref());
     policies
         .get(policy_key)
+        .filter(|policy| policy.import_error.is_none())
         .and_then(|policy| policy.established_by.clone())
 }
 
@@ -990,6 +1247,339 @@ mod tests {
         .unwrap();
     }
 
+    fn import_fixture(semantics: &str, scope: &str) -> (TempDir, serde_yaml::Value, Vec<u8>) {
+        let dir = TempDir::new().unwrap();
+        write_root(&dir, "  - id: local-rule\n    policy: shared@1");
+        fs::create_dir_all(dir.path().join(".claude/epr-meta")).unwrap();
+        fs::create_dir(dir.path().join("objects")).unwrap();
+        let portable = crate::portable_policy::PortablePolicy {
+            format: crate::portable_policy::PORTABLE_POLICY_FORMAT.into(),
+            semantics: serde_yaml::from_str(semantics).unwrap(),
+        };
+        let bytes = portable.canonical_bytes().unwrap();
+        let cid = portable.cid().unwrap();
+        fs::write(dir.path().join("objects/policy.json"), &bytes).unwrap();
+        let row: serde_yaml::Value = serde_yaml::from_str(&format!(
+            "id: shared\nversion: 1\nclass: deny\nscope: {{ write: '{scope}' }}\nestablished_by: operator-local\ncontent: {{ cid: {cid}, path: objects/policy.json }}\n"
+        )).unwrap();
+        write_import_row(&dir, row.clone());
+        (dir, row, bytes)
+    }
+
+    fn write_import_row(dir: &TempDir, mut row: serde_yaml::Value) {
+        let pin = compute_row_hash(&row).unwrap();
+        row.as_mapping_mut()
+            .unwrap()
+            .insert("contentHash".into(), pin.into());
+        let registry = serde_json::json!({"epr-meta-policies-version": 1, "policies": [row]});
+        fs::write(
+            dir.path().join(POLICY_REGISTRY_REL),
+            serde_yaml::to_string(&registry).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn imported_evaluation(dir: &TempDir, path: &str) -> GovernanceEvaluation {
+        evaluate_path(
+            dir.path(),
+            dir.path().join(path),
+            &GovernanceWrite::new(path),
+        )
+        .unwrap()
+    }
+
+    const IMPORT_SEMANTICS: &str = "id: shared\nversion: 1\nrequire-frontmatter: [id]\n";
+
+    #[test]
+    fn addressed_import_is_offline_and_standing_is_independent_across_repositories() {
+        let (first, _, first_bytes) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        let (second, _, second_bytes) = import_fixture(IMPORT_SEMANTICS, "*.rs");
+        assert_eq!(first_bytes, second_bytes);
+        let evaluation = imported_evaluation(&first, "note.md");
+        assert!(evaluation.diagnostics.is_empty());
+        assert_eq!(evaluation.verdicts[0].class, GovernanceRuleClass::Deny);
+        assert!(imported_evaluation(&second, "note.md").verdicts.is_empty());
+        assert_eq!(
+            imported_evaluation(&second, "lib.rs").verdicts[0].class,
+            GovernanceRuleClass::Deny
+        );
+        assert_eq!(
+            policy_established_by(first.path(), "shared@1").as_deref(),
+            Some("operator-local")
+        );
+    }
+
+    #[test]
+    fn addressed_successor_discovery_never_upgrades_or_executes_until_explicit_local_repin() {
+        let (first, mut first_row, original_bytes) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        let (second, mut second_row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        first_row["established_by"] = "operator-space-one".into();
+        second_row["established_by"] = "operator-space-two".into();
+        write_import_row(&first, first_row.clone());
+        write_import_row(&second, second_row);
+        let first_pin = fs::read(first.path().join(POLICY_REGISTRY_REL)).unwrap();
+        let second_pin = fs::read(second.path().join(POLICY_REGISTRY_REL)).unwrap();
+        let successor = crate::portable_policy::PortablePolicy {
+            format: crate::portable_policy::PORTABLE_POLICY_FORMAT.into(),
+            semantics: serde_yaml::from_str("id: shared\nversion: 2\nvalidator: candidate-check\n")
+                .unwrap(),
+        };
+        let successor_bytes = successor.canonical_bytes().unwrap();
+        let successor_cid = successor.cid().unwrap();
+        let recorder = super::validator_declaration_tests::Recorder::default();
+        let write = GovernanceWrite::new("note.md");
+        for dir in [&first, &second] {
+            fs::write(dir.path().join("objects/successor.json"), &successor_bytes).unwrap();
+            crate::portable_policy::verify_policy(&successor_cid, &successor_bytes).unwrap();
+            let evaluation =
+                evaluate_path_with(dir.path(), dir.path().join("note.md"), &write, &recorder)
+                    .unwrap();
+            assert_eq!(evaluation.rules[0].policy_ref.as_deref(), Some("shared@1"));
+            assert_eq!(evaluation.verdicts[0].class, GovernanceRuleClass::Deny);
+        }
+        assert!(
+            recorder.seen.borrow().is_empty(),
+            "discovery must not execute the successor validator"
+        );
+        assert_eq!(
+            fs::read(first.path().join(POLICY_REGISTRY_REL)).unwrap(),
+            first_pin
+        );
+        assert_eq!(
+            fs::read(second.path().join(POLICY_REGISTRY_REL)).unwrap(),
+            second_pin
+        );
+        assert_eq!(
+            policy_established_by(first.path(), "shared@1").as_deref(),
+            Some("operator-space-one")
+        );
+        assert_eq!(
+            policy_established_by(second.path(), "shared@1").as_deref(),
+            Some("operator-space-two")
+        );
+
+        first_row["version"] = 2.into();
+        first_row["content"]["cid"] = successor_cid.to_string().into();
+        first_row["content"]["path"] = "objects/successor.json".into();
+        write_import_row(&first, first_row);
+        write_root(&first, "  - id: local-rule\n    policy: shared@2");
+        let adopted = evaluate_path_with(
+            first.path(),
+            first.path().join("note.md"),
+            &write,
+            &recorder,
+        )
+        .unwrap();
+        assert!(adopted.diagnostics.is_empty());
+        assert_eq!(adopted.rules[0].policy_ref.as_deref(), Some("shared@2"));
+        assert_eq!(
+            adopted.rules[0].parameters,
+            Value::String("candidate-check".into())
+        );
+        assert_eq!(recorder.seen.borrow().len(), 1);
+        let retained = evaluate_path_with(
+            second.path(),
+            second.path().join("note.md"),
+            &write,
+            &recorder,
+        )
+        .unwrap();
+        assert_eq!(retained.rules[0].policy_ref.as_deref(), Some("shared@1"));
+        assert_eq!(retained.verdicts[0].class, GovernanceRuleClass::Deny);
+        assert_eq!(recorder.seen.borrow().len(), 1);
+        assert_eq!(
+            fs::read(second.path().join(POLICY_REGISTRY_REL)).unwrap(),
+            second_pin
+        );
+        assert_eq!(
+            fs::read(first.path().join("objects/policy.json")).unwrap(),
+            original_bytes
+        );
+        assert_eq!(
+            policy_established_by(first.path(), "shared@2").as_deref(),
+            Some("operator-space-one")
+        );
+    }
+
+    #[test]
+    fn addressed_import_missing_tampered_or_escaped_content_refers() {
+        for path in [
+            "missing.json",
+            "../outside.json",
+            "/outside.json",
+            "objects/policy.json",
+        ] {
+            let (dir, mut row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+            row["content"]["path"] = path.into();
+            if path == "objects/policy.json" {
+                fs::write(dir.path().join(path), b"tampered").unwrap();
+            }
+            write_import_row(&dir, row);
+            // Broken imports refer even outside declared scope: invalid scope/content is not authority.
+            let evaluation = imported_evaluation(&dir, "lib.rs");
+            assert_eq!(
+                evaluation.verdicts[0].refer_reason.as_deref(),
+                Some("policy-import-invalid")
+            );
+            assert_eq!(evaluation.verdicts[0].class, GovernanceRuleClass::Ask);
+            assert!(policy_established_by(dir.path(), "shared@1").is_none());
+        }
+    }
+
+    #[test]
+    fn addressed_import_rejects_shadowing_unsupported_semantics_and_bad_identity() {
+        for semantics in [
+            "id: shared\nversion: 1\nvalidator: local-check\nunknown: true\n",
+            "id: shared\nversion: 1\nallowed-types: [doc]\n",
+            "id: shared\nversion: 1\nrequire-frontmatter: wrong\n",
+            "id: shared\nversion: 1\nrequire-frontmatter: [id]\nvalidator: local-check\n",
+            "id: other\nversion: 1\nrequire-frontmatter: [id]\n",
+        ] {
+            let (dir, _, _) = import_fixture(semantics, "*.md");
+            assert_eq!(
+                imported_evaluation(&dir, "note.md").verdicts[0].class,
+                GovernanceRuleClass::Ask
+            );
+        }
+        for (key, value) in [
+            ("why", "shadow"),
+            ("validator", "local-check"),
+            ("class", "unknown"),
+            ("established_by", ""),
+        ] {
+            let (dir, mut row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+            row[key] = value.into();
+            write_import_row(&dir, row);
+            assert_eq!(
+                imported_evaluation(&dir, "note.md").verdicts[0].class,
+                GovernanceRuleClass::Ask
+            );
+        }
+    }
+
+    #[test]
+    fn addressed_import_raw_parse_failure_never_materializes_shadowed_semantics() {
+        let (dir, _, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        fs::write(dir.path().join(POLICY_REGISTRY_REL), "epr-meta-policies-version: 1\npolicies:\n  - id: shared\n    version: 1\n    class: deny\n    content: { cid: malformed, path: missing }\n    require-frontmatter: [id]\n    status: active\n    status: superseded\n").unwrap();
+        let evaluation = imported_evaluation(&dir, "note.md");
+        assert!(evaluation.rules.is_empty());
+        assert!(evaluation
+            .verdicts
+            .iter()
+            .all(|verdict| verdict.class == GovernanceRuleClass::Ask));
+    }
+
+    #[test]
+    fn addressed_import_malformed_scope_or_binding_refers() {
+        for scope in [
+            "unexpected",
+            "{ contains-any: [123] }",
+            "{ unknown: true }",
+            "{ new: nope }",
+        ] {
+            let (dir, mut row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+            row["scope"] = serde_yaml::from_str(scope).unwrap();
+            write_import_row(&dir, row);
+            assert_eq!(
+                imported_evaluation(&dir, "note.md").verdicts[0].class,
+                GovernanceRuleClass::Ask
+            );
+        }
+        for extra in ["when: { contains-any: [123] }", "params: { hidden: true }"] {
+            let (dir, _, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+            write_root(
+                &dir,
+                &format!("  - id: local-rule\n    policy: shared@1\n    {extra}"),
+            );
+            assert_eq!(
+                imported_evaluation(&dir, "note.md").verdicts[0].class,
+                GovernanceRuleClass::Ask
+            );
+        }
+    }
+
+    #[test]
+    fn addressed_import_requires_local_pin_and_verifies_it_before_materializing() {
+        let (dir, row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        let registry = serde_json::json!({"epr-meta-policies-version": 1, "policies": [row]});
+        fs::write(
+            dir.path().join(POLICY_REGISTRY_REL),
+            serde_yaml::to_string(&registry).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            imported_evaluation(&dir, "note.md").verdicts[0].class,
+            GovernanceRuleClass::Ask
+        );
+        let (dir, mut row, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        row["contentHash"] = "sha256:wrong".into();
+        let registry = serde_json::json!({"epr-meta-policies-version": 1, "policies": [row]});
+        fs::write(
+            dir.path().join(POLICY_REGISTRY_REL),
+            serde_yaml::to_string(&registry).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            imported_evaluation(&dir, "note.md").verdicts[0].class,
+            GovernanceRuleClass::Ask
+        );
+    }
+
+    #[test]
+    fn addressed_import_disappearing_or_duplicate_registry_row_refers() {
+        for missing_file in [true, false] {
+            let (dir, _, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+            if missing_file {
+                fs::remove_file(dir.path().join(POLICY_REGISTRY_REL)).unwrap();
+            } else {
+                fs::write(
+                    dir.path().join(POLICY_REGISTRY_REL),
+                    "epr-meta-policies-version: 1\npolicies: []\n",
+                )
+                .unwrap();
+            }
+            assert_eq!(
+                imported_evaluation(&dir, "note.md").verdicts[0].class,
+                GovernanceRuleClass::Ask
+            );
+        }
+        let (dir, _, _) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        let mut registry: serde_yaml::Value = serde_yaml::from_str(
+            &fs::read_to_string(dir.path().join(POLICY_REGISTRY_REL)).unwrap(),
+        )
+        .unwrap();
+        let row = registry["policies"][0].clone();
+        registry["policies"].as_sequence_mut().unwrap().push(row);
+        fs::write(
+            dir.path().join(POLICY_REGISTRY_REL),
+            serde_yaml::to_string(&registry).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            imported_evaluation(&dir, "note.md").verdicts[0].class,
+            GovernanceRuleClass::Ask
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn addressed_import_rejects_symlink_even_when_target_bytes_match() {
+        let (dir, row, bytes) = import_fixture(IMPORT_SEMANTICS, "*.md");
+        let outside = TempDir::new().unwrap();
+        fs::write(outside.path().join("policy.json"), bytes).unwrap();
+        fs::remove_file(dir.path().join("objects/policy.json")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("policy.json"),
+            dir.path().join("objects/policy.json"),
+        )
+        .unwrap();
+        write_import_row(&dir, row);
+        assert_eq!(
+            imported_evaluation(&dir, "note.md").verdicts[0].class,
+            GovernanceRuleClass::Ask
+        );
+    }
+
     #[test]
     fn policy_hash_matches_python_for_unicode_and_excludes_lifecycle_keys() {
         let row: serde_yaml::Value = serde_yaml::from_str(
@@ -1187,8 +1777,8 @@ mod validator_declaration_tests {
 
     /// Captures what actually reached the execution boundary.
     #[derive(Default)]
-    struct Recorder {
-        seen: RefCell<Vec<(Option<String>, Option<u32>)>>,
+    pub(super) struct Recorder {
+        pub(super) seen: RefCell<Vec<(Option<String>, Option<u32>)>>,
     }
 
     impl ValidatorProvider for Recorder {

@@ -213,9 +213,16 @@ describe('gate expectations and feature-branch CI deferral', () => {
 });
 
 test('Rust style selects new crates and inherited lint configuration', () => {
-  for (const changed of ['new-crate/src/lib.rs', '.cargo/config.toml', 'some/crate/clippy.toml']) {
-    const selected = projectsForChanges(ROOT, [changed], { oracle: 'path' }).map(p => p.name);
-    assert.ok(selected.includes('rust-style'), `${changed} must select the style floor`);
+  for (const changed of [
+    'new-crate/src/lib.rs', '.cargo/config.toml', 'some/crate/clippy.toml',
+    '.epr-meta/rust-style-policy.json', '.epr-meta/rust-style/objects/policy.json',
+    'genesis/docs/rust-style-guide.md', 'genesis/orchestrator/rust-style/source-distribution.py',
+    'some/crate/.epr-meta/manifest.md',
+  ]) {
+    for (const oracle of ['path', 'rakia']) {
+      const selected = projectsForChanges(ROOT, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+      assert.ok(selected.includes('rust-style'), `${changed} must select the style floor (${oracle})`);
+    }
   }
 });
 

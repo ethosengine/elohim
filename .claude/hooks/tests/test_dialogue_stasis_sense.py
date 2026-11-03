@@ -562,11 +562,16 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.invoke('Stop', session_id='../escape')
         self.assertFalse(self.journal.exists())
 
-    def test_package_source_is_identical_and_registration_is_unwired(self):
+    def test_package_source_is_identical_and_registration_covers_both_runtimes(self):
         pkg = json.loads((REPO / '.epr-meta/elohim/packages/hooks/dialogue-stasis-sense.json').read_text())
         self.assertEqual(pkg['source']['body'].encode(), HOOK.read_bytes())
-        self.assertIsNone(pkg['registration'])
-        registrations = pkg['metadata']['intendedRegistrations']
+        self.assertEqual(pkg['registration'], pkg['registrations']['claude'])
+        self.assertEqual((REPO / '.codex/hooks/dialogue-stasis-sense.py').read_text(), pkg['source']['body'])
+        codex = pkg['registrations']['codex']
+        self.assertEqual({r['event'] for r in codex}, {'SessionStart', 'PreToolUse',
+                         'PermissionRequest', 'PostToolUse', 'UserPromptSubmit', 'Stop', 'SessionEnd'})
+        self.assertFalse(any(r.get('asyncRewake') for r in codex))
+        registrations = pkg['registration']
         self.assertEqual(len(registrations), 12)
         self.assertEqual([r['matcher'] for r in registrations if r['event'] == 'Notification'],
                          ['permission_prompt', 'idle_prompt'])

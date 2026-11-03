@@ -72,6 +72,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "Stop": [
@@ -81,6 +90,26 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-postflight.sh\"",
             "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\" --rewake",
+            "timeout": 1870,
+            "async": true,
+            "asyncRewake": true
           }
         ]
       }
@@ -107,6 +136,15 @@
             "type": "command",
             "command": "ELOHIM_HOOK_RUNTIME_PID=$PPID python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/device-head-notice.py\"",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
           }
         ]
       }
@@ -219,6 +257,25 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust-style.py\"",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/brit-first.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+            "timeout": 2
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
           }
         ]
       }
@@ -368,6 +425,15 @@
             "timeout": 2
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -376,6 +442,72 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/covenant-subagent-stamp.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "permission_prompt"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "idle_prompt"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
             "timeout": 3
           }
         ]
@@ -456,13 +588,17 @@
   },
   "extraKnownMarketplaces": {
     "elohim-workspace": {
-      "source": { "source": "directory", "path": "./.claude/marketplace" }
+      "source": {
+        "source": "directory",
+        "path": "./.claude/marketplace"
+      }
     }
   },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": false,
     "rust-analyzer-lsp@claude-plugins-official": false,
-    "elohim-lsp@elohim-workspace": true
+    "elohim-lsp@elohim-workspace": true,
+    "codex-dispatch@anthropic-plugin-directory": true
   }
 }

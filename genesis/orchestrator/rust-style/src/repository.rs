@@ -1,5 +1,8 @@
 //! Git supplies the baseline; it cannot be widened by editing a debt file.
-use crate::scan::{scan, Finding};
+use crate::{
+    discipline::{self, Discipline},
+    scan::{scan, Finding},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -19,6 +22,12 @@ pub struct Policy {
     pub rules: Vec<String>,
     /// Explicit external source roots; submodules are already opaque gitlinks.
     pub external_roots: Vec<String>,
+    /// None preserves legacy all-first-party scope; Some must name nonempty roots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_roots: Option<Vec<String>>,
+    /// Addressed meaning; scope and provenance remain authored in this repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discipline: Option<Discipline>,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -31,6 +40,9 @@ pub struct Report {
     pub findings: Vec<Finding>,
     pub failures: Vec<String>,
     pub enrollment: bool,
+    /// Exact locally selected meaning and standing measured by this report.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_policy: Option<Policy>,
 }
 #[derive(Debug, Default, Serialize)]
 pub struct CrateReport {
@@ -175,7 +187,26 @@ impl Snapshot {
                 files.insert(name, fs::read_to_string(p).map_err(|e| e.to_string())?);
             }
         }
-        Ok(Self { files })
+        let mut snapshot = Self { files };
+        if snapshot.files.contains_key(POLICY) {
+            let body = String::from_utf8(read_object(root, revision, POLICY)?)
+                .map_err(|e| e.to_string())?;
+            let policy: Policy = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+            snapshot.files.insert(POLICY.into(), body);
+            if let Some(discipline) = policy.discipline {
+                for object in discipline.objects() {
+                    if !discipline::relative_path(&object.path) {
+                        return Err("discipline object path must stay inside repository".into());
+                    }
+                    let bytes = read_object(root, revision, &object.path)?;
+                    snapshot.files.insert(
+                        object.path.clone(),
+                        String::from_utf8(bytes).map_err(|e| e.to_string())?,
+                    );
+                }
+            }
+        }
+        Ok(snapshot)
     }
 
     fn policy(&self) -> Result<Policy, String> {
@@ -185,10 +216,20 @@ impl Snapshot {
         if policy.version != 1 || policy.rules != ["RS-GOV-04"] {
             return Err("unsupported Rust style policy; migrate the checker explicitly".into());
         }
-        if policy.external_roots.iter().any(|s| {
-            s.is_empty() || s.starts_with('/') || s.split('/').any(|p| p == ".." || p == ".")
-        }) {
+        if policy
+            .external_roots
+            .iter()
+            .any(|s| !discipline::relative_path(s))
+        {
             return Err("external roots must be nonempty repository-relative paths".into());
+        }
+        if policy.scope_roots.as_ref().is_some_and(|roots| {
+            roots.is_empty() || roots.iter().any(|root| !discipline::relative_path(root))
+        }) {
+            return Err("scope_roots must name nonempty repository-relative roots".into());
+        }
+        if let Some(discipline) = &policy.discipline {
+            discipline.verify(&self.files)?;
         }
         Ok(policy)
     }
@@ -233,11 +274,78 @@ impl Snapshot {
     }
 }
 
+fn read_object(root: &Path, revision: Option<&str>, path: &str) -> Result<Vec<u8>, String> {
+    if !discipline::relative_path(path) {
+        return Err("discipline object path must stay inside repository".into());
+    }
+    let bytes = if let Some(rev) = revision {
+        let entry = git(root, &["ls-tree", "-z", rev, "--", path])?;
+        let header = String::from_utf8(entry).map_err(|e| e.to_string())?;
+        if !header.starts_with("100644 blob ") && !header.starts_with("100755 blob ") {
+            return Err(format!(
+                "missing or nonregular committed discipline object: {path}"
+            ));
+        }
+        let size = git(root, &["cat-file", "-s", &format!("{rev}:{path}")])?;
+        let size = std::str::from_utf8(&size)
+            .map_err(|e| e.to_string())?
+            .trim()
+            .parse::<u64>()
+            .map_err(|e| e.to_string())?;
+        if size > discipline::MAX_OBJECT_BYTES as u64 {
+            return Err("discipline object exceeds size limit".into());
+        }
+        git(root, &["show", &format!("{rev}:{path}")])?
+    } else {
+        let mut at = root.to_path_buf();
+        for component in Path::new(path).components() {
+            at.push(component);
+            if fs::symlink_metadata(&at)
+                .map_err(|e| e.to_string())?
+                .file_type()
+                .is_symlink()
+            {
+                return Err(format!("discipline object traverses a symlink: {path}"));
+            }
+        }
+        if !fs::metadata(&at).map_err(|e| e.to_string())?.is_file() {
+            return Err("discipline object must be a regular file".into());
+        }
+        let mut bytes = Vec::new();
+        fs::File::open(at)
+            .map_err(|e| e.to_string())?
+            .take(discipline::MAX_OBJECT_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        bytes
+    };
+    if bytes.len() > discipline::MAX_OBJECT_BYTES {
+        return Err("discipline object exceeds size limit".into());
+    }
+    Ok(bytes)
+}
+
+fn same_standing(left: &Policy, right: &Policy) -> bool {
+    left.version == right.version
+        && left.rules == right.rules
+        && left.external_roots == right.external_roots
+        && left.scope_roots == right.scope_roots
+}
+
 fn external(policy: &Policy, path: &str) -> bool {
+    let outside_scope = policy.scope_roots.as_ref().is_some_and(|roots| {
+        !roots
+            .iter()
+            .any(|root| path == root || path.starts_with(&format!("{root}/")))
+    });
+    outside_scope || external_boundary(policy, path)
+}
+
+fn external_boundary(policy: &Policy, path: &str) -> bool {
     policy
         .external_roots
         .iter()
-        .any(|p| path == p || path.starts_with(&format!("{p}/")))
+        .any(|root| path == root || path.starts_with(&format!("{root}/")))
 }
 
 /// The native resolver owns inheritance. Strict bindings deliberately have no
@@ -287,6 +395,9 @@ pub fn evaluate(
     let mut before = Snapshot::load(root, Some(&base))?;
     let mut after = Snapshot::load(root, head.as_deref())?;
     if let Some(scope) = scope.filter(|s| *s != ".") {
+        if !discipline::relative_path(scope) {
+            return Err("scope must stay inside repository".into());
+        }
         for snapshot in [&mut before, &mut after] {
             snapshot.files.retain(|path, _| {
                 !path.ends_with(".rs") || path == scope || path.starts_with(&format!("{scope}/"))
@@ -308,24 +419,52 @@ pub fn compare(
     head: String,
 ) -> Result<Report, String> {
     let policy = after.policy()?;
+    if let Some(roots) = &policy.scope_roots {
+        for root in roots {
+            if !before.files.keys().chain(after.files.keys()).any(|path| {
+                path.ends_with(".rs")
+                    && (path == root || path.starts_with(&format!("{root}/")))
+                    && !external_boundary(&policy, path)
+            }) {
+                return Err(format!(
+                    "scope root {root} contains no governed Rust source"
+                ));
+            }
+        }
+    }
     let enrollment = !before.files.contains_key(POLICY);
     let mut report = Report {
         version: 1,
         base,
         head,
         enrollment,
+        effective_policy: Some(policy.clone()),
         ..Report::default()
     };
-    if !enrollment && before.policy()? != policy {
-        report.failures.push("style policy changed: v1 forbids rule removal or exclusion widening; use a reviewed checker migration".into());
+    let previous = if enrollment {
+        None
+    } else {
+        Some(before.policy()?)
+    };
+    let additive_addressing = previous.as_ref().is_some_and(|old| {
+        old.discipline.is_none() && policy.discipline.is_some() && same_standing(old, &policy)
+    });
+    if previous.as_ref().is_some_and(|old| old != &policy) && !additive_addressing {
+        report.failures.push("style policy changed: v1 forbids rule removal, exclusion widening, scope changes or replacing/removing adopted content; use a reviewed checker migration".into());
     }
+    // Scan the union of old and new standing when a policy change is refused,
+    // so source cannot disappear from the evidence behind an exclusion change.
+    let excluded = |path: &str| {
+        external(&policy, path) && previous.as_ref().is_none_or(|old| external(old, path))
+    };
     let old_manifests = before.manifests()?;
     let new_manifests = after.manifests()?;
     let mut baseline = BTreeMap::<String, usize>::new();
+    let mut disappearing = BTreeMap::<String, usize>::new();
     let mut old_strict = BTreeMap::new();
     let mut new_strict = BTreeMap::new();
     for (path, body) in &before.files {
-        if !path.ends_with(".rs") || external(&policy, path) {
+        if !path.ends_with(".rs") || excluded(path) {
             continue;
         }
         let findings = scan(path, body)?;
@@ -335,6 +474,7 @@ pub fn compare(
             .or_default()
             .before += findings.len();
         for finding in findings {
+            *disappearing.entry(transfer_key(&finding)).or_default() += 1;
             *baseline
                 .entry(format!("{}|{}", before.crate_for(path), finding.identity()))
                 .or_default() += 1;
@@ -348,7 +488,7 @@ pub fn compare(
         }
     }
     for (path, body) in &after.files {
-        if !path.ends_with(".rs") || external(&policy, path) {
+        if !path.ends_with(".rs") || excluded(path) {
             continue;
         }
         report.scanned_files += 1;
@@ -368,6 +508,8 @@ pub fn compare(
         let findings = scan(path, body)?;
         entry.after += findings.len();
         for finding in findings {
+            let count = disappearing.entry(transfer_key(&finding)).or_default();
+            *count = count.saturating_sub(1);
             let remaining = baseline
                 .entry(format!("{crate_name}|{}", finding.identity()))
                 .or_default();
@@ -393,7 +535,14 @@ pub fn compare(
         .chain(after.files.keys())
         .collect::<BTreeSet<_>>()
     {
-        if external(&policy, path) || before.files.get(path) == after.files.get(path) {
+        if (path.ends_with(".rs") && excluded(path))
+            || (external_boundary(&policy, path)
+                && previous
+                    .as_ref()
+                    .is_none_or(|old| external_boundary(old, path)))
+            || before.files.get(path) == after.files.get(path)
+            || (path == POLICY && additive_addressing)
+        {
             continue;
         }
         if path.ends_with(".rs") {
@@ -431,6 +580,9 @@ pub fn compare(
             }
         }
     }
+    report
+        .failures
+        .extend(debt_transfers(before, after, &excluded, &disappearing)?);
     for (name, entry) in &report.crates {
         if !enrollment && entry.touched && entry.before > 0 && entry.after >= entry.before {
             report.failures.push(format!(
@@ -442,12 +594,74 @@ pub fn compare(
     Ok(report)
 }
 
+/// A boundary crossing is not a paydown. Match the scanner's semantic tuple
+/// without its file path, and inspect excluded changes only when governed debt
+/// disappears. This does not enroll unrelated unscoped additions in the rule.
+fn transfer_key(finding: &Finding) -> String {
+    format!("{}|{}|{}", finding.rule, finding.scope, finding.attribute)
+}
+
+fn debt_transfers(
+    before: &Snapshot,
+    after: &Snapshot,
+    excluded: &impl Fn(&str) -> bool,
+    removed: &BTreeMap<String, usize>,
+) -> Result<Vec<String>, String> {
+    if !removed.values().any(|count| *count > 0) {
+        return Ok(Vec::new());
+    }
+    let mut failures = Vec::new();
+    for (path, body) in &after.files {
+        if !path.ends_with(".rs") || !excluded(path) || before.files.get(path) == Some(body) {
+            continue;
+        }
+        let mut prior = BTreeMap::<String, usize>::new();
+        if let Some(old) = before.files.get(path) {
+            let Ok(findings) = scan(path, old) else {
+                continue;
+            };
+            for finding in findings {
+                *prior.entry(transfer_key(&finding)).or_default() += 1;
+            }
+        }
+        // Excluded compile-fail fixtures are not enrolled by a nearby paydown.
+        // Only parseable before/after tuples can establish a matching transfer.
+        let Ok(findings) = scan(path, body) else {
+            continue;
+        };
+        for finding in findings {
+            let key = transfer_key(&finding);
+            let count = prior.entry(key.clone()).or_default();
+            if *count == 0 && removed.get(&key).is_some_and(|count| *count > 0) {
+                failures.push(format!("{path}: governed debt moved outside adopted scope; boundary transfer is not paydown"));
+            }
+            *count = count.saturating_sub(1);
+        }
+    }
+    Ok(failures)
+}
+
 /// Fast edit-time check against the last committed source. Paydown is a reach
 /// obligation; an individual intermediate write may keep existing debt.
 pub fn prospective(root: &Path, path: &str, content: &str) -> Result<Vec<String>, String> {
+    let mut snapshot = Snapshot::default();
+    let body = read_object(root, None, POLICY)?;
+    snapshot.files.insert(
+        POLICY.into(),
+        String::from_utf8(body).map_err(|e| e.to_string())?,
+    );
     let policy: Policy =
-        serde_json::from_str(&fs::read_to_string(root.join(POLICY)).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+        serde_json::from_str(&snapshot.files[POLICY]).map_err(|e| e.to_string())?;
+    if let Some(discipline) = policy.discipline {
+        for object in discipline.objects() {
+            snapshot.files.insert(
+                object.path.clone(),
+                String::from_utf8(read_object(root, None, &object.path)?)
+                    .map_err(|e| e.to_string())?,
+            );
+        }
+    }
+    let policy = snapshot.policy()?;
     if external(&policy, path) || !path.ends_with(".rs") {
         return Ok(Vec::new());
     }

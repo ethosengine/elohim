@@ -6,6 +6,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Polyglot monorepo for the Elohim Protocol - a distributed learning platform built on Holochain, Angular, and Rust. `dev` is the integration target (not a protected default): feature branches land on `dev` via local fast-forward merge — no PR. Release-grade PR review happens at `dev → main`.
 
+## Brit is the daily driver
+
+Use the installed `brit` for agent-authored repository operations in this workspace,
+including submodules and worktrees. This is an operator-requested experiment in replacing
+an agent's habitual Git usage. Start with `brit <command> --help` when syntax is unfamiliar;
+Brit has its own CLI, so do not mechanically substitute its name into Git commands.
+For an initial inspection, use `brit status --no-write` and `brit log`.
+
+Before invoking Git directly, state `Git fallback: <operation> — <specific missing Brit
+capability or observed failure>` in commentary. A remembered Git spelling, unfamiliarity
+with Brit, or an example in an older document is not sufficient reason. Check the installed
+Brit's help first. If Brit fails, preserve the error and inspect repository state before
+trying a Git mutation; do not replay a potentially partial write automatically. A fallback
+does not require asking the human for permission already granted for the operation.
+
+Existing scripts, hooks, tests and third-party programs may continue to invoke Git
+internally. Do not rewrite those callers or alias `git` to `brit` to satisfy this experiment.
+Record slips and concrete Brit gaps in the session's existing evidence rather than claiming
+that an instruction proves adoption. This rule is instruction-level friction; command-time
+reminders require a supported shell invocation adapter and must not be claimed from the
+edit-only `.epr-meta` resolver. All existing staging, hook, gate and history safeguards apply.
+
 ## What to work on, and how you know it's done
 
 Four artifacts. Everything else in the development machinery is commentary hanging off them.

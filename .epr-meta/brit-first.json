@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "description": "Experimental Brit-first command friction. Set enabled to false to disable immediately. Missing or invalid configuration reports a coverage gap and allows execution.",
+  "scope": "Visible direct shell commands only; scripts and computed commands are outside coverage.",
+  "fallback": "Leading # Brit fallback: <specific reason> comment, with explanation in commentary."
+}

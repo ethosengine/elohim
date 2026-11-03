@@ -48,6 +48,27 @@
   },
   "gate": {
     "projects": {
+      "dialogue-stasis": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            "genesis/agentic/stasis*",
+            "genesis/agentic/bin/stasis-*",
+            "genesis/agentic/agent-runtimes.json",
+            ".claude/hooks/dialogue-stasis-sense.py",
+            ".codex/hooks/dialogue-stasis-sense.py",
+            ".claude/hooks/tests/test_dialogue_stasis_sense.py",
+            ".epr-meta/elohim/packages/hooks/dialogue-stasis-sense.json",
+            ".epr-meta/elohim/packages/agents/stasis-keeper.json",
+            ".epr-meta/elohim/packages/skills/stasis-keeper-brief.json",
+            "elohim/sdk/domains/elohim-agent/schemas/*stasis*.json",
+            "elohim/sdk/domains/elohim-agent/schemas/session-event.schema.json",
+            "elohim/sdk/domains/elohim-agent/schemas/keeper-decision.schema.json"
+          ],
+          "buildProcess": ["justfile"]
+        },
+        "run": { "kind": "root-just", "recipe": "_gate-dialogue-stasis" }
+      },
       "agentic-shift": {
         "dir": ".",
         "inputs": {
@@ -90,7 +111,11 @@
         "run": {
           "kind": "just",
           "recipe": "gate",
-          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "" }
+          "cargo": {
+            "workspace": "elohim/eprfs",
+            "profile": "dev",
+            "rustflags": ""
+          }
         }
       },
       "rakia-codegen": {
@@ -158,6 +183,9 @@
             "**/.epr-meta",
             "**/.epr-meta/manifest.md",
             ".epr-meta/rust-style-policy.json",
+            ".epr-meta/rust-style/**",
+            "genesis/docs/rust-style-guide.md",
+            "genesis/orchestrator/rust-style/**",
             "**/clippy.toml",
             "**/.clippy.toml",
             "**/rustfmt.toml",

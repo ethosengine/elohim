@@ -418,10 +418,11 @@ class CoordinatorTest(unittest.TestCase):
         self.assertEqual(len([e for e in self.would() if e['effect'] == 'PushNotification']), 1)
 
     def test_unprobed_codex_binding_never_launches(self):
-        self.seed(runtime='codex')
-        self.run_cmd(override=False)
-        self.assertFalse(self.starts())
-        self.assertTrue(any('probe' in e.get('reason', '') for e in self.would()))
+        runtime = next(r for r in json.loads((ROOT / 'genesis/agentic/agent-runtimes.json')
+                                            .read_text())['runtimes'] if r['id'] == 'codex')
+        invocation = {**runtime['keeperInvocation'], 'status': 'declared', 'evidence': None}
+        self.assertFalse(coordinator.Coordinator.invocation_probed(
+            runtime, invocation, runtime['capabilityBindings']['C3']))
 
     def test_ladder_off_only_heartbeats_and_logs(self):
         before = (self.directory / 'events.jsonl').read_bytes()

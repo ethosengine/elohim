@@ -3,7 +3,10 @@
 The steward reviews and pins the exact bytes of
 `.epr-meta/elohim/policies/dialogue-stasis-policy.json`. Creating the file,
 validating its schema, or preparing a command does not activate it. The native
-policy loader and live CID enforcement are the separate slice 6 cargo leg.
+policy loader and live CID enforcement are implemented; the installed binary
+must expose `policyState` and `policyCid` in `session stasis status --json`.
+A successful command without those fields is an older native implementation,
+not evidence that a policy is pinned.
 
 Run from the checkout:
 
@@ -25,8 +28,8 @@ command targeted at the policy path. The reason is JSON with `purpose`,
 `policyPath`, `policyCid`, and `version`. **Only the steward runs that command**,
 in a session whose resolved actor is the steward, after reviewing the exact
 bytes. Do not copy an agent identity into the ruling. Rerun the helper after
-any byte change, including formatting. No ruling has been recorded by this
-procedure's implementation.
+any byte change, including formatting. The helper only prepares the command;
+it never records a ruling itself.
 
 The policy uses the native camelCase budget fields and `Bound` wire shape.
 Approach is derived from `stall.limit * stall.thresholdPct / 100` (180 s),
@@ -40,8 +43,8 @@ implementation; this slice adds no alternative permission matcher.
 The native `bash-c` pattern also recognizes `sh` and `zsh`, while the spec's
 initial list names `bash -c`; the policy preserves the native pattern unchanged.
 
-The native follow-up must load and validate these fields, use them in the fold
-and classifier, and resolve the latest applicable **steward** ruling. With the
+The native loader validates these fields, uses them in the fold and classifier,
+and resolves the latest applicable **steward** ruling. With the
 ladder on, a live `decide` must return exit 3 for a missing policy or CID
 mismatch, emit no decision or guidance, and record why it stayed inert. Preserve
 shadow defaults and ladder-off sensing. Confirm the ruling reason format above
@@ -91,30 +94,87 @@ independent review is complete, its reviewer records its own evidence-backed
 verdict through the existing flow-note interface. Missing or failed review
 leaves a rung 0 entry proposed.
 
-## Control wiring and session awareness (slice 9)
+## Runtime wiring and activation
 
 Apply in this order:
 
-1. Land the reviewed implementation and the native slice-6 leg.
-2. Wire with `STASIS_LADDER` **unset** (shadow). Apply
-   `genesis/agentic/stasis-settings.patch.json` once as RFC 6902 JSON Patch.
-   Its first five operations create hook arrays absent in the reviewed settings;
-   if any already exists, retain that array and omit its initializer. The next
-   twelve operations append registrations: the sensor's nine, Notification
-   `idle_prompt`, Stop with `--rewake`/`async`/`asyncRewake`, and SessionStart.
-   Existing hooks and permissions remain intact. After wiring, the steward sets
-   the HookPackage's `registration` to `metadata.intendedRegistrations` and runs
-   `node elohim/sdk/domains/elohim-agent/scripts/replant.mjs dialogue-stasis-sense`.
-   It is deliberately `null` in this unwired change, so package verification
-   describes the actual settings.
+1. Use a current native binary. `EPR_BIN` selects one explicitly for both hooks
+   and the coordinator. The device's existing `epr bin follow --tool epr`
+   handles published descendant upgrades; a refused follow is not permission
+   to replace the shared binary head manually.
+2. Wiring is checked in: twelve Claude registrations in `.claude/settings.json`
+   and seven Codex registrations in `.codex/hooks.json`. Both sensor files are
+   projections of the same planted HookPackage, whose `registrations` records
+   each runtime separately. Do **not** reapply the historical
+   `stasis-settings.patch.json` to an already wired checkout. Leave
+   `STASIS_LADDER` unset for shadow sensing. Review/trust the new Codex hook
+   definitions with `/hooks`, then start a new session. No persisted hook trust
+   is installed by the package projector.
 3. Review and pin the policy's exact CID using the procedure above. Confirm
-   `epr session stasis status --session SESSION --json` says
+   `"${EPR_BIN:-epr}" session stasis status --session SESSION --json` says
    `policyState: pinned-match`, with a `policyCid`. A missing, mismatched or
    unreadable status cannot activate delivery.
-4. Set `STASIS_LADDER=live` for new harness processes. Restart an existing shadow
+4. Set `STASIS_LADDER=live` and the selected `EPR_BIN` for new harness processes.
+   Restart an existing shadow
    daemon with `stasis-coordinator stop`, then `stasis-coordinator start --live`
    after its flock is released. A daemon inherits its launch environment;
    changing a parent shell cannot reconfigure an already running process.
+
+Run `just gate dialogue-stasis` for the sensor, coordinator, delivery, policy,
+audit and probe fixture contracts. Run `pnpm run elohim-agent:packages:verify`
+after package or registration changes. These checks do not call a model or
+record a policy ruling.
+
+### Codex coverage
+
+Codex registers SessionStart, PreToolUse, PermissionRequest, PostToolUse,
+UserPromptSubmit, Stop and SessionEnd. Its `turn_id` becomes the sensor's
+prompt correlation key; journal session identity remains `runtime: codex`.
+Notification, PermissionDenied and PostToolUseFailure are not registered.
+Missing human-denial and presence evidence stays unknown. A continuation
+prompt is not promoted into a human-presence witness. Codex currently captures
+permission requests and Stop events without emitting control decisions on them.
+
+Pinned guidance returns through PostToolUse or UserPromptSubmit, once per
+reader and delivery record. Codex notifications name the session dialogue,
+not a Claude-only PushNotification tool. It does not borrow Claude's idle-wake
+capability: advice waits for the next supported hook. The official
+[Codex hook contract](https://learn.chatgpt.com/docs/hooks) describes this
+background-delivery and trust boundary.
+
+The Codex keeper runs with a separate working directory, user configuration
+ignored, hooks disabled, read-only sandbox and approval policy `never`.
+`STASIS_KEEPER=1` remains the sensor's early recursion guard. Combined usage
+comes from JSON `turn.completed` input/output tokens; cached input is already
+included. Missing usage remains unmeasured. C1/C2 are unbound in the current
+Codex capability table and are skipped with evidence; C3/C4 use their declared
+bindings. This does not change the incident or shift budgets.
+
+The 2026-11-02 device probes used Codex 0.166.0. An actual shell write was denied
+by its read-only sandbox, and a separate real session received a marker through
+the projected PostToolUse hook and repeated it in its final reply. The latter
+used isolated fixture authority and one-off trust of vetted fixture hooks,
+not production policy activation. Measured hook calls were 0.09–0.32 seconds.
+Actual coordinator consultations returned validated decisions: Claude C1,
+13.12 s / 11,163 tokens; Codex C3, 39.16 s / 17,489 tokens, followed by C4,
+48.15 s / 18,025 tokens and its steward ask. Native authority in
+those consultation probes was a fixture. Private evidence and raw transcripts:
+`genesis/local-dev/stasis-runtime-wiring/`.
+
+On this device, native stasis tests passed 35 checks and the selected immutable
+candidate reports the production policy `unpinned`. The coordinator runs in
+shadow with that explicit candidate; four real Codex sessions have emitted
+private events. `runtime.env`, `policy-pin.txt` and `activation.md` in the
+private evidence directory contain the tested selection and steward activation
+steps. The shared installed native head was preserved after its governed
+follow refused a non-descendant source head.
+
+Story-harvest station: dialogue-stasis / between hook registration → production
+guidance / missing node: the runtime trusts the registered hook, the selected
+native binary reports `pinned-match`, and its coordinator's guidance reaches
+the intended session reader / probe: native status plus events, consultation
+usage and delivery receipt in that session / current state: red; real capture
+and isolated delivery are measured, production pin and live delivery pending.
 
 SessionStart starts the daemon idempotently and emits one context line containing
 effective mode, policy state, coordinator liveness and incident count. Unreadable
@@ -125,7 +185,15 @@ existing `harnessCapabilities` gates waking; no new capability is claimed.
 The PermissionRequest transport is exactly:
 
 ```json
-{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"parked as stasis `<id>`. Do not retry this effect by any tool or spelling. Continue independent authorized work. Guidance will arrive."}}}
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PermissionRequest",
+    "decision": {
+      "behavior": "deny",
+      "message": "parked as stasis `<id>`. Do not retry this effect by any tool or spelling. Continue independent authorized work. Guidance will arrive."
+    }
+  }
+}
 ```
 
 `stasis-probe`'s recorder emits this envelope. Report
@@ -138,25 +206,26 @@ unsupported; a displayed collaborative dialog must wait for human closure.
 Local stub measurements on 2026-10-31 (five samples per synchronous registration,
 including process startup; seconds) set the wiring timeouts:
 
-| Registration | Largest measured | Timeout |
-|---|---:|---:|
-| PermissionRequest | 0.455 | 3 |
-| Notification permission_prompt / idle_prompt | 0.204 / 0.183 | 3 / 3 |
-| PreToolUse | 0.330 | 3 |
-| PostToolUse / PostToolUseFailure | 0.328 / 0.135 | 3 / 3 |
-| PermissionDenied | 0.182 | 3 |
-| Stop | 0.311 | 3 |
-| UserPromptSubmit | 0.378 | 3 |
-| SessionEnd | 0.407 | 3 |
-| SessionStart, available / unavailable | 0.412 / 0.869 | 1 |
-| Stop asyncRewake, guidance ready | 0.512 | 1870 |
+| Registration                                             | Largest measured | Timeout |
+| -------------------------------------------------------- | ---------------: | ------: |
+| PermissionRequest                                        |            0.455 |       3 |
+| Notification permission_prompt / idle_prompt             |    0.204 / 0.183 |   3 / 3 |
+| PreToolUse                                               |            0.330 |       3 |
+| PostToolUse / PostToolUseFailure                         |    0.328 / 0.135 |   3 / 3 |
+| PermissionDenied                                         |            0.182 |       3 |
+| Stop                                                     |            0.311 |       3 |
+| UserPromptSubmit                                         |            0.378 |       3 |
+| SessionEnd                                               |            0.407 |       3 |
+| SessionStart, available / unavailable (original fixture) |    0.412 / 0.869 |       3 |
+| Stop asyncRewake, guidance ready                         |            0.512 |    1870 |
 
 The async timeout includes a **configured** 1860-second idle watch, covering the
 1800-second incident ceiling plus a minute for delivery; a full 31-minute idle
 wait was not measured. The measured row is wake latency, not a claim that the
 whole watch ran. Internal native decisions share a 1.9-second budget including
 `epr_client` resolution and kill the whole process group on timeout. SessionStart
-runs startup and status concurrently, each bounded to 0.65 seconds. Live hooks
+runs daemon startup and status concurrently, bounded to 0.65 and 1.9 seconds
+respectively, under a three-second registration in both runtimes. Live hooks
 fail open on lock contention. These are fixture measurements, not model or
 deployed harness latency. Private raw samples: `genesis/local-dev/dialogue-stasis-slice9/hook-latency.json`.
 
@@ -166,6 +235,16 @@ control delivery, blocks and wake requests. `STASIS_SENSE=off` exits before
 reading stdin or writing anything. SessionStart's new awareness line still
 reports `off`; it is not an old slice-3 event. Stopping the independent daemon
 remains `stasis-coordinator stop`.
+
+Activation measurement on 2026-11-02 exposed an unused binary hash on every
+stasis lookup: resolving the explicit 120 MB candidate cost 0.99 seconds before
+native validation took another 0.86–0.93 seconds. Execution-only callers now use
+`epr_client.resolve_binary`; identity consumers still calculate the CID. With
+the real steward pin, isolated guidance replay took 1.18 seconds and the Codex
+startup hook reported live/pinned in 1.25 seconds. These are device measurements,
+not guaranteed latency under every load. Evidence:
+`genesis/local-dev/stasis-runtime-wiring/activation-delivery-after.json` and
+`activation-hook-output.json` in that directory.
 
 ## Delivery contract and remaining native seam
 
@@ -194,7 +273,7 @@ Interpretations where the spec lacks a wire contract:
   `effectClass`, `legibleForm`, `status: active`, `auditVerdict: approved`,
   `auditRef` and `rulingRef`. No entry exists today. The pinned policy must name
   those bytes and native classification must return `shape` with `ruleMatch:
-  none`. Proposed forms, ask matches and uncertain inputs never reshape.
+none`. Proposed forms, ask matches and uncertain inputs never reshape.
 - The native keeper answer has no validated, scoped ruling receipt. Every
   `proceed` therefore downgrades to park. Peer text and a ruling id in a keeper's
   reason do not establish standing.
@@ -202,12 +281,12 @@ Interpretations where the spec lacks a wire contract:
   delivery. `berth say --session SESSION TEXT` is the independent fallback;
   its bounded attempt and success/unknown receipt are retained per stage.
 
-Native follow-up is still required: a pinned `decide --live` currently answers
-`effect: none`. Enable its automated deny with `incidentId`, `policyCid`,
-`shadow: false` and a nonempty message before the real PermissionRequest path
-can park. Accept and validate the optional learned-form policy vocabulary before
-activating any rung-0 entry. Add scoped, unexpired steward-ruling validation
-before delivering `proceed`.
+The current native source implements automated deny with `incidentId`,
+`policyCid`, `shadow: false` and a nonempty message, and validates optional
+learned forms. An older installed binary can still return `effect: none` or
+omit the policy status fields; check the actual executable before activation.
+Scoped, unexpired steward-ruling validation remains required before delivering
+`proceed`; the coordinator continues to downgrade it to park.
 
 Story-graph seam: dialogue-stasis / between native policy pin → measured live
 closure / missing node: native replay recognizes an adapter's parked closure

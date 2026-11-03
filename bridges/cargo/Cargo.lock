@@ -662,11 +662,13 @@ dependencies = [
 name = "elohim-rust-style"
 version = "0.1.0"
 dependencies = [
+ "eprfs-core",
  "eprfs-meta",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
+ "serde_yaml",
  "syn",
  "tempfile",
  "toml",
@@ -728,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-meta"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "eprfs-core",
  "serde",

@@ -179,7 +179,7 @@
         {
           "type": "command",
           "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/dialogue-stasis-sense.py\"",
-          "timeout": 1
+          "timeout": 3
         }
       ]
     }

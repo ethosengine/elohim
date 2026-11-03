@@ -326,7 +326,7 @@ class PrecheckTests(unittest.TestCase):
             with self.subTest(path=path):
                 local = self.crate / path
                 original = local.read_bytes()
-                local.write_bytes(b"changed")
+                local.write_bytes(original + b"\n# changed\n" if path == "Cargo.toml" else b"changed")
                 status, _, stderr = self.run_precheck()
                 local.write_bytes(original)
                 self.assertEqual(status, 1)
@@ -354,6 +354,22 @@ class PrecheckTests(unittest.TestCase):
         status, stdout, stderr = self.run_precheck(responses)
         self.assertEqual(status, 0, stderr)
         self.assertEqual(stdout, f"absent: {NAME} {VERSION}\neprfs precheck complete\n")
+        self.git.assert_not_called()
+
+    def test_mixed_member_versions_are_checked_independently(self):
+        meta = self.workspace / "eprfs-meta"
+        meta.mkdir()
+        (meta / "Cargo.toml").write_text(
+            '[package]\nname="eprfs-meta"\nversion="0.1.1"\n'
+        )
+        with mock.patch.object(publisher, "CRATES", (NAME, "eprfs-meta")), mock.patch.object(
+            publisher, "download_base", return_value=BASE + "/crates"
+        ), mock.patch.object(publisher, "index_record", return_value=None) as index:
+            publisher.precheck(self.root)
+        self.assertEqual(index.call_args_list, [
+            mock.call(BASE, NAME, "0.1.0"),
+            mock.call(BASE, "eprfs-meta", "0.1.1"),
+        ])
         self.git.assert_not_called()
 
     def test_unreachable_registry_is_claimed(self):
@@ -405,6 +421,20 @@ class PrecheckTests(unittest.TestCase):
         )
 
 
+class PackageVersionTests(unittest.TestCase):
+    def test_invalid_member_versions_do_not_fall_back_to_workspace(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            crate = Path(temporary)
+            for declaration in ("", "version.workspace=false", "version.workspace=1", 'version=""'):
+                with self.subTest(declaration=declaration):
+                    (crate / "Cargo.toml").write_text(f'[package]\nname="member"\n{declaration}\n')
+                    with self.assertRaisesRegex(publisher.PublishError, "package version"):
+                        publisher.package_version(crate, "0.2.0")
+            (crate / "Cargo.toml").write_text('[package]\nname="leaf"\nversion.workspace=true\n')
+            with self.assertRaisesRegex(publisher.PublishError, "package version"):
+                publisher.package_version(crate)
+
+
 class PublicationTests(unittest.TestCase):
     def run_one(self, *, upload_result: bool, receipts: list[bool], publish: bool = True):
         with tempfile.TemporaryDirectory() as temporary:
@@ -412,6 +442,10 @@ class PublicationTests(unittest.TestCase):
             workspace = root / "elohim/eprfs"
             workspace.mkdir(parents=True)
             (workspace / "Cargo.toml").write_text('[workspace.package]\nversion="0.1.0"\n')
+            (workspace / NAME).mkdir()
+            (workspace / NAME / "Cargo.toml").write_text(
+                f'[package]\nname="{NAME}"\nversion.workspace=true\n'
+            )
             target = root.parent / (root.name + "-target")
             (target / "package").mkdir(parents=True)
             (target / "package" / f"{NAME}-{VERSION}.crate").write_bytes(archive())
@@ -473,8 +507,18 @@ class PrerequisitePublicationTests(unittest.TestCase):
             "elohim-seam-contracts", "eprfs-core", "eprfs-host",
             "eprfs-storage", "eprfs-meta", "eprfs-local",
         )
+        self.versions = {
+            name: "0.1.0" if name == "elohim-seam-contracts" else
+            "0.2.1" if name == "eprfs-meta" else "0.2.0"
+            for name in self.names
+        }
         for name in self.names:
-            version = "0.1.0" if name == "elohim-seam-contracts" else "0.2.0"
+            version = self.versions[name]
+            if name != "elohim-seam-contracts":
+                crate = self.eprfs / name
+                crate.mkdir()
+                declared_version = f'version="{version}"' if name == "eprfs-meta" else 'version.workspace=true'
+                (crate / "Cargo.toml").write_text(f'[package]\nname="{name}"\n{declared_version}\n')
             stream = io.BytesIO()
             with tarfile.open(fileobj=stream, mode="w:gz") as tar:
                 contents = f'[package]\nname="{name}"\nversion="{version}"\n'.encode()
@@ -528,7 +572,7 @@ class PrerequisitePublicationTests(unittest.TestCase):
                 ])
         for call in self.receipts.call_args_list:
             name, version = call.args[2:4]
-            self.assertEqual(version, "0.1.0" if name == self.names[0] else "0.2.0")
+            self.assertEqual(version, self.versions[name])
 
     def test_verified_existing_prerequisite_is_not_uploaded_again(self):
         self.receipts.side_effect = [True] + [False, True] * 5

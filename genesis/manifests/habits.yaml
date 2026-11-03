@@ -2213,14 +2213,16 @@ habits:
       A stalled session dialogue — an open permission prompt, a turn ending in a question, or the
       steward waiting on silence — is answered by the cheapest sufficient capability level before
       the human is interrupted, and nothing approves on the human's behalf.
-    status: unwired
+    status: red
     active: false
-    checks: []
+    checks:
+      - "just gate dialogue-stasis (private sensor, keeper, policy, audit and delivery regression contracts; no model calls)"
+      - "pnpm run elohim-agent:packages:verify (both runtime projections and recorded hook registrations)"
     evidence: >
-      DELTA 2026-10-31 (landed, still unwired): slices 1-5, 6 (non-native), 7, 8, 10 and H reached dev in train 3 (6108c434b..cd84aeaf0, every gate green incl. eprfs, rust-style, memory-ceremony); not yet in effect for any session until the main checkout catches up and the steward applies genesis/agentic/stasis-settings.patch.json.
-    evidence-fingerprint: sha256:a085f1a0cc5ecceb
-    evidence-bytes: 9056
-    evidence-entries: 16
+      DELTA 2026-11-02 (activation, RED retained): Matthew explicitly authorized activation in dialogue; device standing and the recorded policy ruling resolve to human:matthew, and native status reports pinned-match. Coordinator restarted live with the tested immutable candidate; new login shells inherit the private runtime.env, preserving explicit off/shadow overrides. Activation exposed 0.99 s spent hashing an unused executable identity before each native lookup; execution-only resolver now skips that hash, while identity consumers retain it. Real-authority isolated guidance delivery passed in 1.18 s, startup live/pinned awareness in 1.25 s; both runtimes give startup a 3 s registration. Resolver tests: 8 passed. Evidence: genesis/local-dev/stasis-runtime-wiring/policy-ruling.json, live-policy-status.json, activation-delivery-after.json, activation-hook-output.json. This does not claim a newly launched production incident completed its full keeper ladder.
+    evidence-fingerprint: sha256:b4578e236e8fe758
+    evidence-bytes: 11411
+    evidence-entries: 18
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
@@ -2459,13 +2461,13 @@ habits:
     active: false
     checks:
       - "just gate rust-style (native syntax, Git ratchet, strict scopes, checker fmt/Clippy/tests and agent adapter contracts)"
-      - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (three isolated-Git acceptance scenarios)"
+      - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (six isolated-Git acceptance scenarios, including independent addressed-policy holdings)"
       - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
     evidence: >
-      DELTA 2026-10-24 (ownership diagnostic): `python3 -m unittest discover -s genesis/orchestrator/rust-style -p hook_test.py` passed 8 tests; normal and `--hook` entrypoints now name the safe.directory cure and exit 2 before pool/Cargo on Git ownership refusal. No Cargo build or full native gate was run in this bounded fix; habit status unchanged.
-    evidence-fingerprint: sha256:36684d35fdeccd85
-    evidence-bytes: 2428
-    evidence-entries: 3
+      DELTA 2026-11-02 (GREEN, local shared-discipline trial): normal Rust-style, orchestrator and EPRFS gates pass; Rust-style has 30 native / 9 hook / 4 distribution tests and scans 2,090 files in 84 crates; EPRFS has 1,970 passing Rust tests, zero failures or ignored tests, with workspace fmt/Clippy green. Six a2o scenarios / 18 steps pass. Brit's actual standalone offline install verifies the same policy/guide/method CIDs as Elohim, and its independently selected `brit-build-ref` trial measures 14 files with zero debt; committed fixtures refuse new suppressions, dirty repairs and corrupt holdings. Both story files had two fresh-reader rounds, each 0/3/0 then 0/2/0 correctness/interpretability/preference findings, final READY; remaining interpretation findings are retained in task-srd-5-report.md. Durable proof: genesis/a2o/reports/recovery/shared-rust-discipline-2026-11-02/. Network authority/witnessing and scope/checker migration remain open; no commit, push or remote CI claimed. The 72-minute EPRFS gate leaves performance finding 330923a9dd23 open.
+    evidence-fingerprint: sha256:b799c686f983d874
+    evidence-bytes: 4414
+    evidence-entries: 5
     guard: >
       Never equate equal counts with no new findings; never use dirty source for a pushed object;
       never call a missing baseline or a stale checker clean. Scope and owner moves cannot transfer

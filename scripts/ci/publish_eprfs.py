@@ -340,6 +340,16 @@ def cargo(workspace: Path, arguments: list[str], env: dict[str, str]) -> bool:
     return result.returncode == 0
 
 
+def package_version(crate: Path, workspace_version: str | None = None) -> str:
+    manifest = tomllib.loads((crate / "Cargo.toml").read_text())
+    version = manifest["package"].get("version")
+    if isinstance(version, dict) and set(version) == {"workspace"} and version["workspace"] is True:
+        version = workspace_version
+    if not isinstance(version, str) or not version.strip():
+        raise PublishError(f"{crate.name}: package version must be explicit or inherited from its workspace")
+    return version
+
+
 def precheck(repo: Path) -> None:
     eprfs_workspace = repo / "elohim/eprfs"
     manifest = tomllib.loads((eprfs_workspace / "Cargo.toml").read_text())
@@ -351,11 +361,7 @@ def precheck(repo: Path) -> None:
             crate = repo / "crates/seam-contracts" if name == "elohim-seam-contracts" else eprfs_workspace / name
             if not crate.is_dir():
                 raise PublishError(f"{name}: crate directory is absent")
-            if name == "elohim-seam-contracts":
-                manifest = tomllib.loads((crate / "Cargo.toml").read_text())
-                version = manifest["package"]["version"]
-            else:
-                version = eprfs_version
+            version = package_version(crate, None if name == "elohim-seam-contracts" else eprfs_version)
             record = index_record(index_base, name, version)
             if record is None:
                 print(f"absent: {name} {version}", flush=True)
@@ -415,17 +421,16 @@ def run(repo: Path, publish: bool) -> None:
         CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS="cargo:token",
         CARGO_REGISTRIES_ELOHIM_INDEX="sparse+" + index_base + "/",
     )
-    print(f"eprfs library target version: {eprfs_version}", flush=True)
+    print(f"eprfs inherited workspace version: {eprfs_version}", flush=True)
     for name in CRATES:
         # The leaf prerequisite has its own workspace, lockfile and package version.
         # Publishing verifies its registry receipt before packaging any eprfs dependent.
         if name == "elohim-seam-contracts":
             workspace = repo / "crates/seam-contracts"
-            manifest = tomllib.loads((workspace / "Cargo.toml").read_text())
-            version = manifest["package"]["version"]
+            version = package_version(workspace)
         else:
             workspace = eprfs_workspace
-            version = eprfs_version
+            version = package_version(workspace / name, eprfs_version)
         package_args = ["package", "--locked", "--registry", "elohim", "--no-verify", "-p", name]
         if not cargo(workspace, package_args, env):
             raise PublishError(f"{name} {version}: locked packaging failed")

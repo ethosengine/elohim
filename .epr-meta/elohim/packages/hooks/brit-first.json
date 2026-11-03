@@ -1,0 +1,63 @@
+{
+  "apiVersion": "elohim-agent/v1alpha1",
+  "kind": "HookPackage",
+  "metadata": {
+    "id": "brit-first",
+    "name": "brit-first",
+    "version": "1.0.0",
+    "description": "Refuse habitual direct Git calls with an explicit per-command fallback for Brit gaps.",
+    "sourceRuntime": "elohim-agent",
+    "master": "package",
+    "runtimeTargets": [
+      "claude",
+      "codex"
+    ],
+    "assetRefs": [],
+    "governance": {
+      "eprRef": "epr:elohim-agent/hooks/brit-first",
+      "policy": "capability-governance@1",
+      "gates": [
+        "epr-meta-resolver",
+        "elohim-agent:packages:verify"
+      ],
+      "ledger": ".claude/data/governance-findings.jsonl"
+    }
+  },
+  "source": {
+    "language": "python",
+    "interpreter": "python3",
+    "path": ".claude/hooks/brit-first.py",
+    "body": "#!/usr/bin/env python3\n\"\"\"Brit habit friction for visible shell commands; not a security boundary.\"\"\"\nimport importlib.util\nimport json\nfrom pathlib import Path\nimport sys\n\nROOT = Path(__file__).resolve().parents[2]\nspec = importlib.util.spec_from_file_location(\"command_parser\", ROOT / \".claude/hooks/capability-tier-gate.py\")\nparser = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(parser)\n\n\ndef uses_git(command, depth=0):\n    if depth > 4:\n        return False\n    for chain in parser._chains(command):\n        for stage in chain:\n            argv = parser._strip_wrappers(stage)\n            if not argv:\n                continue\n            head = Path(argv[0]).name\n            if head == \"git\":\n                return True\n            if head in (\"bash\", \"sh\", \"zsh\", \"dash\"):\n                index = parser._find_dash_c(argv[1:])\n                if index is not None and index + 2 < len(argv):\n                    if uses_git(argv[index + 2], depth + 1):\n                        return True\n    return False\n\n\ndef evaluate(event):\n    config = json.loads((ROOT / \".epr-meta/brit-first.json\").read_text())\n    if config.get(\"enabled\") is not True:\n        return None\n    name = event.get(\"tool_name\", \"\")\n    if name not in (\"Bash\", \"exec_command\", \"functions.exec_command\", \"shell_command\"):\n        return None\n    args = event.get(\"tool_input\", {})\n    command = args.get(\"command\", args.get(\"cmd\", \"\"))\n    if not isinstance(command, str) or not uses_git(command):\n        return None\n    # A leading comment belongs only to this invocation, never ambient environment.\n    first = command.splitlines()[0].strip()\n    prefix = \"# Brit fallback: \"\n    if first.startswith(prefix) and len(first[len(prefix):].strip()) >= 12:\n        return {\"additionalContext\": \"Brit fallback recorded in this tool call: \" + first[len(prefix):]}\n    return {\"permissionDecision\": \"deny\", \"permissionDecisionReason\":\n        \"Use Brit for this repository operation. Check brit <command> --help first. \"\n        \"If a specific capability is missing or failed, explain it in commentary and retry \"\n        \"with a leading '# Brit fallback: <specific reason>' comment on this command. \"\n        \"Inspect state before retrying a failed mutation. No human approval is needed.\"}\n\n\ndef main():\n    try:\n        raw = sys.stdin.buffer.read(1572865)\n        if len(raw) > 1572864:\n            raise ValueError(\"event too large\")\n        result = evaluate(json.loads(raw))\n    except (OSError, ValueError, TypeError, AttributeError):\n        result = {\"additionalContext\": \"Brit reminder coverage gap: shell event could not be decoded.\"}\n    if result:\n        print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", **result}}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n"
+  },
+  "registration": {
+    "event": "PreToolUse",
+    "matcher": ".*",
+    "type": "command",
+    "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/brit-first.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+    "timeout": 2
+  },
+  "registrations": {
+    "claude": {
+      "event": "PreToolUse",
+      "matcher": ".*",
+      "type": "command",
+      "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/brit-first.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
+      "timeout": 2
+    },
+    "codex": {
+      "event": "PreToolUse",
+      "matcher": ".*",
+      "type": "command",
+      "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/brit-first.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+      "timeout": 2
+    }
+  },
+  "projections": {
+    "claude": {
+      "path": ".claude/hooks/brit-first.py"
+    },
+    "codex": {
+      "path": ".codex/hooks/brit-first.py"
+    }
+  }
+}

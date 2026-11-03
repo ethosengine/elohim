@@ -12,6 +12,25 @@ interface StyleWorld {
   rustStyleResult?: ReturnType<typeof spawnSync>;
 }
 
+for (const [statement, fixture] of [
+  [
+    'two isolated repositories hold an addressed guide, full discipline and checker method',
+    'addressed_discipline_is_offline_scoped_and_never_auto_upgrades',
+  ],
+  [
+    'a committed discipline artifact is damaged and its working copy is repaired',
+    'committed_closure_cannot_borrow_worktree_repair',
+  ],
+  [
+    'a repository holds an incomplete or unsupported discipline method',
+    'missing_or_malformed_method_refuses_before_source_evaluation',
+  ],
+] as const) {
+  Given(statement, function (this: StyleWorld) {
+    this.rustStyleFixture = fixture;
+  });
+}
+
 Given(
   'a Rust change with a committed unexplained suppression and an uncommitted repair',
   function (this: StyleWorld) {
@@ -31,7 +50,7 @@ Given(
   }
 );
 When(
-  /^(?:I exercise the Rust style reach gate on isolated Git commits|I check that repair twice, accept it as the integration baseline, and check a later change touching the same crate without further debt reduction|I check the refactor, repair the strict module, and finally repair the legacy suppression)$/,
+  /^(?:I exercise the Rust style reach gate on isolated Git commits|I check each repository offline and make a successor policy available without adopting it|I check the committed artifacts separately from the repaired working tree|I check the source against its locally held discipline|I check that repair twice, accept it as the integration baseline, and check a later change touching the same crate without further debt reduction|I check the refactor, repair the strict module, and finally repair the legacy suppression)$/,
   { timeout: 300000 },
   function (this: StyleWorld) {
     assert.ok(this.rustStyleFixture);
@@ -58,6 +77,15 @@ function verified(this: StyleWorld) {
 }
 Then('the committed violation is refused while the repaired working tree passes', verified);
 Then('both checks of the repair pass and the later change is refused', verified);
+Then(
+  'their local scopes remain independent and discovering a successor changes neither adoption',
+  verified
+);
+Then(
+  'the committed check refuses the damaged artifact while the repaired local check passes',
+  verified
+);
+Then('checking refuses before reporting source compliance', verified);
 Then(
   'the gate refuses both incomplete stages and accepts the clean strict module with its crate debt reduced',
   verified

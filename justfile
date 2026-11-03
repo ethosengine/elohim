@@ -650,6 +650,12 @@ _gate-elohim-ark:
     cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
     cd elohim && cargo test -p elohim-ark-core --doc
 
+# Private sensor, consultation and delivery contracts; no live model calls.
+_gate-dialogue-stasis:
+    python3 -m unittest discover -s genesis/agentic -p 'stasis*_test.py'
+    python3 -m unittest discover -s .claude/hooks/tests -p 'test_dialogue_stasis_sense.py'
+    node --test elohim/sdk/domains/elohim-agent/scripts/stasis-keeper.test.mjs
+
 # Real ark/namespace fault injection is required; absent containment primitives refuse.
 _gate-agentic-shift:
     node --test genesis/agentic/objective-schema.test.mjs genesis/agentic/readiness.test.mjs genesis/agentic/seed-target.test.mjs

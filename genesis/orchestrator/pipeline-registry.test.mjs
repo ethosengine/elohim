@@ -1,6 +1,9 @@
 import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { discoverManifests } from './manifest-utils.mjs';
 import { fileURLToPath } from 'url';
 import {
   loadPipelineRegistry,
@@ -76,4 +79,29 @@ describe('pipeline-registry', () => {
     assert.strictEqual(gates.get('doorway').dir, 'doorway/doorway-service');
     assert.strictEqual(gates.get('doorway').run.kind, 'just');
   });
+});
+
+test('private proof checkouts cannot introduce duplicate gates; submodules still participate', () => {
+  const root = mkdtempSync(join(tmpdir(), 'manifest-discovery-'));
+  try {
+    for (const [path, name] of [
+      ['app/client', 'client'],
+      ['genesis/local-dev/proof/repo/app/client', 'client'],
+      ['elohim/independent', 'independent'],
+    ]) {
+      const dir = join(root, path);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'build-manifest.json'), JSON.stringify({
+        steps: {},
+        gate: { projects: { [name]: { dir: path, steps: [], run: { kind: 'just', recipe: 'check' } } } },
+      }));
+    }
+    writeFileSync(join(root, 'elohim/independent/.git'), 'gitdir: ../../.git/modules/independent\n');
+    assert.deepEqual(discoverManifests(root), [
+      './app/client/build-manifest.json', './elohim/independent/build-manifest.json',
+    ]);
+    assert.deepEqual([...loadGateRegistry(root).keys()].sort(), ['client', 'independent']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -96,6 +96,38 @@ class CiBaseline(unittest.TestCase):
 
 
 class GateGit(unittest.TestCase):
+    def test_hook_refuses_changed_method_build_inputs_without_running_cargo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = root / "genesis/orchestrator/rust-style.sh"
+            script.parent.mkdir(parents=True)
+            script.write_text((ROOT / "genesis/orchestrator/rust-style.sh").read_text())
+            pool = root / "genesis/agentic/bin/pool-lib.sh"
+            pool.parent.mkdir(parents=True)
+            pool.write_text('detect_family() { echo fixture; }\nslot_path() { echo "$STYLE_TEST_SLOT"; }\n')
+            (pool.parent.parent / "pool-policy.json").write_text(json.dumps({
+                "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": "1.96.1"}}
+            }))
+            binary = root / "pool/debug/epr-rust-style"
+            binary.parent.mkdir(parents=True)
+            binary.write_text('#!/bin/sh\necho "checker invoked"\n')
+            binary.chmod(0o755)
+            os.utime(binary, (100, 100))
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            env = {**os.environ, "STYLE_TEST_SLOT": str(binary.parent.parent)}
+            for relative in ("genesis/orchestrator/rust-style/build.rs", ".cargo/config.toml", "elohim/eprfs/Cargo.toml"):
+                with self.subTest(relative=relative):
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("changed method input\n")
+                    os.utime(path, (200, 200))
+                    result = subprocess.run(["bash", str(script), "--hook"], cwd=root,
+                                            env=env, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("checker inputs changed", result.stderr)
+                    self.assertNotIn("checker invoked", result.stdout)
+                    path.unlink()
+
     def test_ownership_failure_names_cure_before_pool_or_cargo(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -61,6 +61,7 @@
 //! from here), so until then: regenerate in the same commit as the pin.
 
 pub mod canonical;
+pub mod portable;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -989,6 +990,12 @@ pub fn check(projection: &Projection, dir: &Path) -> Vec<String> {
 // ---------------------------------------------------------------------------
 
 pub fn run(args: &[String]) -> CanonLiftResult<ExitCode> {
+    if args
+        .iter()
+        .any(|arg| arg == "--portable" || arg == "--verify-portable")
+    {
+        return portable::run(args);
+    }
     let mut root = PathBuf::from(".");
     let mut out: Option<PathBuf> = None;
     let mut write = false;
@@ -1099,6 +1106,9 @@ pub fn usage() -> String {
     format!(
         "usage: epr canon-lift [--check | --write] [--json] [--root DIR] [--out DIR]\n  \
          projects .claude/epr-meta/{{policies,concerns}}.yaml into {OUT_DIR_REL}/ as \
-         CIDv1 EPR atoms + declared heads + Precedent standing"
+         CIDv1 EPR atoms + declared heads + Precedent standing\n\
+         epr canon-lift --portable [--write] [--root DIR] [--out DIR]\n\
+         epr canon-lift --verify-portable CID --file PATH\n\
+         Portable export uses raw-addressed canonical JSON and does not alter legacy pins."
     )
 }
