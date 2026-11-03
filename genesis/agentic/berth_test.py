@@ -1662,12 +1662,43 @@ class StewardClaimTest(unittest.TestCase):
         # 2026-10-30, after a power loss: the view had not folded the override row yet, the
         # pending verdict carried no device, and the reason formatter raised. The claim then
         # released and every retry wrote a fresh lease and a fresh override, never converging.
-        self.views(view(), view(dev_integration=unconfirmed_a()), view(dev_integration=pending()))
-        ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        # The clock and sleep are virtual: do not race real Python startup against the final
+        # 100 ms read budget. Keep the parser and timeout calculation, supplying only process I/O.
+        answers = iter([view(), view(dev_integration=unconfirmed_a())])
+
+        def read(command, **kwargs):
+            answer = next(answers, view(dev_integration=pending()))
+            return subprocess.CompletedProcess(command, 0, json.dumps(answer), "")
+
+        with mock.patch("subprocess.run", side_effect=read) as runner:
+            ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertEqual(runner.call_args.kwargs["timeout"], 0.1)
         self.assertFalse(ok)
         self.assertEqual(reason, f"unconfirmed: {DEVICE_A} has not acknowledged yet — override on the record")
         self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
         self.assertEqual(self.rows("override")[-1]["overrode"], DEVICE_A)
+
+    def test_a_timed_out_override_reread_keeps_the_lease_and_reports_the_timeout(self):
+        answers = iter([view(), view(dev_integration=unconfirmed_a())])
+
+        def read(command, **kwargs):
+            if kwargs["timeout"] == 0.1:
+                raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+            answer = next(answers, view(dev_integration=pending()))
+            return subprocess.CompletedProcess(command, 0, json.dumps(answer), "")
+
+        with mock.patch("subprocess.run", side_effect=read):
+            ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertIn("the steward lease view did not answer:", reason)
+        self.assertIn("timed out after 0.1 seconds", reason)
+        local = self.berth.who("dev-integration")
+        self.assertEqual(local["holder"], "codex-1")
+        self.assertEqual(self.berth.override_wait,
+                         {"override_at_ms": None, "claimed_at": local["claimed_at"]})
+        self.assertEqual(len(self.rows("override")), 1)
+        self.assertEqual(self.rows("release"), [])
 
     def test_offline_ok_returns_claimed_when_the_delayed_reread_is_effective(self):
         self.views(view(), view(dev_integration=unconfirmed_a()),
