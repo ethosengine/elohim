@@ -15,6 +15,7 @@
 
 import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -80,6 +81,24 @@ export function checkSubmodules({ root, spawn = spawnSync }) {
       `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`);
   }
   return row('submodules', 'ok');
+}
+
+/**
+ * A temp root inside a git repository nests every fixture repository a test creates there, so
+ * `git` in a test resolves the OUTER repository (the Codex sandbox's transient `/tmp/.git`
+ * redded eprfs trust tests deep in a run; row 74). Refused in the first second instead.
+ */
+export function checkTmpdir({ projects, env = process.env, exists = existsSync }) {
+  if (!projects.length) return null;
+  const tmp = resolve(env.TMPDIR || tmpdir());
+  for (let dir = tmp; ; dir = dirname(dir)) {
+    if (exists(join(dir, '.git'))) {
+      return row('tmpdir', 'REFUSED',
+        `TMPDIR ${tmp} is inside the git repository at ${dir} — every fixture repository a test creates there resolves that outer repository`,
+        `export TMPDIR=<a directory outside any repository>, or remove a stray ${join(dir, '.git')}`);
+    }
+    if (dirname(dir) === dir) return row('tmpdir', 'ok');
+  }
 }
 
 export function checkNodeModules({ root, projects }) {
@@ -290,6 +309,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
   };
   return [
     ...timed(() => checkSubmodules({ root, spawn })),
+    ...timed(() => checkTmpdir({ projects, env })),
     ...timed(() => checkNodeModules({ root, projects })),
     ...timed(() => checkElementDists({ root, projects })),
     ...timed(() => checkStorageClientDist({ root, projects })),

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
+  checkArk, checkCargoDeny, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -31,6 +31,24 @@ test('submodules: an uninitialised attested submodule refuses with the init comm
   const r = checkSubmodules({ root: '/x', spawn });
   assert.equal(r.level, 'REFUSED');
   assert.match(r.cure, /git submodule update --init elohim\/brit/);
+});
+
+test('tmpdir: a temp root inside a git repository refuses in the first second, naming both', () => {
+  const root = mkdtempSync(join(tmpdir(), 'preflight-tmpdir-'));
+  try {
+    mkdirSync(join(root, '.git'));
+    mkdirSync(join(root, 'scratch/deeper'), { recursive: true });
+    const red = checkTmpdir({ projects: [{ name: 'eprfs' }], env: { TMPDIR: join(root, 'scratch/deeper') } });
+    assert.equal(red.level, 'REFUSED');
+    assert.match(red.why, /scratch\/deeper is inside the git repository at /);
+    assert.match(red.cure, /export TMPDIR=/);
+    const clean = mkdtempSync(join(tmpdir(), 'preflight-tmpdir-clean-'));
+    try {
+      // Injected: a sandbox whose real /tmp sits in a repository must not red this case.
+      assert.equal(checkTmpdir({ projects: [{ name: 'eprfs' }], env: { TMPDIR: clean }, exists: () => false }).level, 'ok');
+    } finally { rmSync(clean, { recursive: true, force: true }); }
+    assert.equal(checkTmpdir({ projects: [], env: { TMPDIR: root } }), null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('submodules: a checked-out commit off the pin warns, never refuses', () => {
@@ -93,7 +111,7 @@ test('rows stream as each check completes', (t) => {
   const seen = [];
   const spawn = () => ({ status: 0, stdout: '' });
   runPreflight({ root, projects: [app], env: {}, spawn, registry: new Map(), changed: [], onRow: r => seen.push(r.check) });
-  assert.deepEqual(seen.slice(0, 2), ['submodules', 'node_modules']);
+  assert.deepEqual(seen.slice(0, 3), ['submodules', 'tmpdir', 'node_modules']);
 });
 
 function readSetFixture(t) {
