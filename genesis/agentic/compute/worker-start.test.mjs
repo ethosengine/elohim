@@ -514,16 +514,17 @@ test(
     assert.deepEqual(meshCommands(f), ["start", "wait"]);
     assert.match(
       run.stderr,
-      /temporary refusal; retrying the identical request/,
+      /temporary refusal on attempt \d+; retrying the identical request/,
     );
     assert.equal(existsSync(join(f.state, "worker-starts")), true);
-    // A deadline already spent ends the boot with the temporary code and no worker.
+    // An explicit deadline, once spent, ends the boot with the temporary code and no worker.
     f = fixture(t);
     f.env.FIXTURE_GRANT_TEMPFAIL = "5";
-    f.env.COMPUTE_GRANT_RETRY_SECS = "0";
+    f.env.COMPUTE_GRANT_RETRY_SECS = "1";
+    f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "2";
     run = f.run();
     assert.equal(run.status, 75);
-    assert.equal(attempts(f), 1);
+    assert.equal(attempts(f), 2);
     assert.equal(existsSync(join(f.state, "worker-starts")), false);
     // A permanent refusal is never retried.
     f = fixture(t);

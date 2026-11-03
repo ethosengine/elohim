@@ -185,16 +185,28 @@ export COMPUTE_STATE_ROOT="$state"
 export COMPUTE_SOURCE_COMMIT="$commit"
 echo "provider bootstrap ready: repoRoot=$repo justBin=$image/mesh-just.sh"
 cd "$repo"
-# Issuing the grant on a freshly started conductor can time out: admission stays saturated for a
-# while after a restart. Exiting would restart the container and the whole mesh, recreating that
-# slow conductor, so a temporary refusal (exit 75: timeout, unreachable, 502/503/504) is retried
-# in place. Issuance is content-addressed, so the identical request is safe to repeat. Bounded
-# by COMPUTE_GRANT_RETRY_SECS (default 900); every other refusal ends the boot as before.
-grant_deadline=$((SECONDS + ${COMPUTE_GRANT_RETRY_SECS:-900}))
+# Issuing the grant on a freshly started conductor is slow: admission stays saturated for a
+# while after a restart, and storage refuses writes (503 catching-up) until its projector has
+# caught up. Exiting would restart the container and the whole mesh, recreating exactly that
+# slow conductor, so a temporary refusal (exit 75: timeout, unreachable, 502/503/504) is
+# retried in place, backing off from COMPUTE_GRANT_RETRY_INTERVAL_SECS (30) doubling to
+# COMPUTE_GRANT_RETRY_MAX_INTERVAL_SECS (300). There is no deadline by default: giving up only
+# restarts the mesh, and every attempt is logged where Jenkins' activation capture reads it.
+# COMPUTE_GRANT_RETRY_SECS > 0 bounds it. Issuance is content-addressed, so repeating the
+# identical request is safe. Every other refusal ends the boot as before.
+grant_retry_secs="${COMPUTE_GRANT_RETRY_SECS:-0}"
+grant_deadline=$((SECONDS + grant_retry_secs))
+grant_interval="${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}"
+grant_max_interval="${COMPUTE_GRANT_RETRY_MAX_INTERVAL_SECS:-300}"
+grant_attempt=1
 until node "$image/grant-bootstrap.mjs"; do
   grant_status=$?
-  if [[ "$grant_status" -ne 75 || "$SECONDS" -ge "$grant_deadline" ]]; then exit "$grant_status"; fi
-  echo "provider grant bootstrap: temporary refusal; retrying the identical request in ${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}s" >&2
-  sleep "${COMPUTE_GRANT_RETRY_INTERVAL_SECS:-30}"
+  if [[ "$grant_status" -ne 75 ]]; then exit "$grant_status"; fi
+  if [[ "$grant_retry_secs" -gt 0 && "$SECONDS" -ge "$grant_deadline" ]]; then exit "$grant_status"; fi
+  echo "provider grant bootstrap: temporary refusal on attempt $grant_attempt; retrying the identical request in ${grant_interval}s" >&2
+  sleep "$grant_interval"
+  grant_attempt=$((grant_attempt + 1))
+  grant_interval=$((grant_interval * 2))
+  if [[ "$grant_interval" -gt "$grant_max_interval" ]]; then grant_interval="$grant_max_interval"; fi
 done
 exec node "$image/worker.mjs"

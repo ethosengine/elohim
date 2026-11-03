@@ -299,7 +299,9 @@ test("timeout, connection, body and receipt failures after POST have unknown out
     );
     assert.ok(!JSON.stringify(diagnostics).includes("SECRET"));
   }
-  assert.ok(deadlines.length === 10 && deadlines.every((ms) => ms === 30000));
+  // Each of the five runs reads health under the shared 30 s and posts the grant under the
+  // grant's own 120 s, since issuance on a freshly restarted conductor outlasts 30 s.
+  assert.deepEqual(deadlines, Array(5).fill([30000, 120000]).flat());
 });
 
 test("pre-POST refusal stays not-submitted; an observer cannot swallow a receipt error", async () => {

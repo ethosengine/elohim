@@ -283,11 +283,16 @@ async function bootstrapGrantAttempt({
   if (config.enabled === false) return null;
   validateGrantDeclaration(config, now);
   const base = env.COMPUTE_API_URL || "http://127.0.0.1:8090";
+  // Issuing a grant is several conductor round trips (read, create, authenticated read,
+  // authority links, consent event). On a conductor that just restarted they took longer than
+  // the shared 30 s: edge #1800 logged 15 of 17 attempts as request-timeout. The client may give
+  // this one call longer; storage reuses a grant whose content it already committed.
   const request = api(
     base,
     config.provider,
     fetcher,
     env.ELOHIM_COMPUTE_LOCAL_TOKEN || "",
+    Number(env.COMPUTE_GRANT_REQUEST_TIMEOUT_MS) || 120_000,
   );
   insist(
     env.COMPUTE_PERFORMER === config.provider,
