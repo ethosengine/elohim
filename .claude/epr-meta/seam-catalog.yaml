@@ -473,6 +473,8 @@ seams:
     # (the gate's exit status stays the verdict), which makes it a reading of the repo's own gate
     # instrument, beside gate-runner. Routed 2026-10-27; its registry was born unrouted with
     # feat/gate-live (c832238fe).
-    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer, elohim-device-runtime, gate-runner, elohim-epr-lsp]
+    # `eprfs-meta` verifies portable policy content and evaluates explicitly authored local
+    # imports. These are repository governance decisions; they confer no network authority.
+    registry_crates: [elohim-seam-contracts, elohim-epr-rea, elohim-epr-cli, eprfs-core, eprfs-local, eprfs-storage, eprfs-serve, eprfs-peer, eprfs-meta, elohim-device-runtime, gate-runner, elohim-epr-lsp]
     habits: []
     n_a_concerns: []

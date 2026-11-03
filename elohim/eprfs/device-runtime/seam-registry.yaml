@@ -3425,6 +3425,6 @@ decisionPoints:
   - path: elohim/eprfs/device-runtime/tests/envelope.rs
     testName: commit_decoration_declines_unknown_closed_and_injectable_context
     kind: integration
-  - path: genesis/agentic/session_envelope_test.py
-    testName: test_commit_decoration_uses_mounted_model_and_session_without_claiming_authority
+  - path: elohim/eprfs/epr-cli/tests/session_envelope.rs
+    testName: session_envelope_native_facets_and_hook_pin_regressions
     kind: integration
