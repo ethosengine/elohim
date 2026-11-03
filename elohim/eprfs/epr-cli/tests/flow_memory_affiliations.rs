@@ -756,6 +756,14 @@ fn a_cyclic_supersedes_chain_is_refused_naming_the_cid() {
 
 #[test]
 fn every_repository_contribution_pins_the_current_declaration_or_its_lineage() {
+    // `collective` reads the root declaration, the repository agent, the affiliation sidecar, the
+    // signers' rosters and the registry catalog with the schema it names.
+    // gate-reads: .epr-meta/collective.json
+    // gate-reads: .epr-meta/repository.yaml
+    // gate-reads: .eprfs/status/affiliations.jsonl
+    // gate-reads: .eprfs/status/participants
+    // gate-reads: genesis/data/collectives/collectives.json
+    // gate-reads: genesis/data/collectives/collectives.schema.json
     let view = memory::execute(repository(), "collective", None, None).unwrap();
     let current = view["resource"]["cid"].as_str().unwrap().to_string();
     let chain: Vec<String> =
@@ -829,6 +837,14 @@ fn the_repository_seed_verifies_line_by_line_and_carries_no_email() {
 
 #[test]
 fn the_repository_collective_reads_with_its_stewards_and_its_registry_terms_verify() {
+    // `collective` reads the root declaration, the repository agent, the affiliation sidecar, the
+    // signers' rosters and the registry catalog with the schema it names.
+    // gate-reads: .epr-meta/collective.json
+    // gate-reads: .epr-meta/repository.yaml
+    // gate-reads: .eprfs/status/affiliations.jsonl
+    // gate-reads: .eprfs/status/participants
+    // gate-reads: genesis/data/collectives/collectives.json
+    // gate-reads: genesis/data/collectives/collectives.schema.json
     let view = memory::execute(repository(), "collective", None, None).unwrap();
     assert_eq!(view["affiliations"]["invalidLines"], 0);
     let members: Vec<&str> = view["stewards"]

@@ -73,6 +73,18 @@ fn base() -> TempDir {
 }
 
 fn repo_root() -> Option<PathBuf> {
+    // The live legs read the scope zones (live and held), the cluster-state manifests and their act
+    // lane contracts, deployments.json, and the kit oracle's presence.
+    // gate-reads: genesis/docs/superpowers/specs
+    // gate-reads: genesis/docs/superpowers/plans
+    // gate-reads: genesis/docs/superpowers/held
+    // gate-reads: genesis/docs/plans
+    // gate-reads: genesis/docs/held
+    // gate-reads: genesis/a2o/features
+    // gate-reads: genesis/a2o/held
+    // gate-reads: genesis/manifests
+    // gate-reads: genesis/orchestrator/data/deployments.json
+    // gate-reads: .claude/scripts/memory-kit
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(3)

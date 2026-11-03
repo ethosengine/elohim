@@ -24,6 +24,15 @@ const FABRIC_SPEC: &str =
 
 #[test]
 fn cite_fingerprints_match_the_rust_body_encoder() {
+    // The spec and the seven cite targets its frontmatter names; a new cite must be declared.
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md
+    // gate-reads: genesis/docs/content/elohim-protocol/architecture/2026-05-24-records-lifecycle-design.md
+    // gate-reads: genesis/docs/content/elohim-protocol/architecture/2026-05-20-wave3-valueflows-hrea-interop-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md
+    // gate-reads: genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-12-epr-meta-kinship-lineage-reconciliation-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md
     let root = repo_root();
     let spec_path = root.join(FABRIC_SPEC);
     let text = std::fs::read_to_string(&spec_path).expect("fabric spec is present");

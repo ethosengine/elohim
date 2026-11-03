@@ -27,12 +27,17 @@ const DECLARATIONS: &[&str] = &[
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let method = ".epr-meta/elohim/algorithms/seam-guidance.json";
+    // gate-reads: .epr-meta/elohim/algorithms/seam-guidance.json
     put(
         dir.path(),
         method,
         &fs::read_to_string(repo().join(method)).unwrap(),
     );
     for path in DECLARATIONS {
+        // gate-reads: elohim/sdk/working-version.seam.json
+        // gate-reads: elohim/elohim-storage/.epr-meta/publication-authority.seam.json
+        // gate-reads: elohim/elohim-storage/.epr-meta/peer-serving.seam.json
+        // gate-reads: elohim/eprfs/epr-cli/developer-composition.seam.json
         let raw = fs::read_to_string(repo().join(path)).unwrap();
         put(dir.path(), path, &raw);
         let d: Value = serde_json::from_str(&raw).unwrap();
@@ -43,6 +48,18 @@ fn fixture() -> TempDir {
             .chain(d["reusableInterfaces"].as_array().unwrap())
         {
             let path = source["path"].as_str().unwrap();
+            // The contracts and interfaces the four declarations name today; a new one must be
+            // declared here.
+            // gate-reads: genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md
+            // gate-reads: elohim/sdk/.epr-meta
+            // gate-reads: elohim/sdk/storage-client-ts/src/sync.ts
+            // gate-reads: elohim/elohim-storage/src/sync/doc_store.rs
+            // gate-reads: .epr-meta/composition.md
+            // gate-reads: elohim/elohim-storage/src/epr_head.rs
+            // gate-reads: elohim/elohim-storage/src/http_blob_router.rs
+            // gate-reads: elohim/elohim-storage/src/content_server.rs
+            // gate-reads: elohim/eprfs/epr-cli/src/govern.rs
+            // gate-reads: elohim/eprfs/epr-cli/src/git.rs
             put(
                 dir.path(),
                 path,

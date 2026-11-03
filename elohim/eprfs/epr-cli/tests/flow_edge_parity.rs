@@ -23,6 +23,14 @@ const SEALED_EDGES_SPEC: &str =
 
 #[test]
 fn sealed_cites_in_the_spec_derive_ok_verdicts() {
+    // The spec and the six sealed cite targets its frontmatter names; a new cite must be declared.
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md
+    // gate-reads: genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md
     let root = repo_root();
     let spec_path = root.join(SEALED_EDGES_SPEC);
     let Ok(text) = std::fs::read_to_string(&spec_path) else {

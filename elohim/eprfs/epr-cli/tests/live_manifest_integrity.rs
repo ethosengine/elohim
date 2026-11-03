@@ -67,7 +67,9 @@ fn frontmatter_body(text: &str) -> Option<&str> {
 
 #[test]
 fn live_manifests_are_integrity_clean() {
-    // gate-reads: .
+    // The walk reads every tracked `.epr-meta` manifest and nothing else (SKIP_DIRS / SKIP_REL
+    // prune only untracked or ignored trees), so its closure is that file kind, not the repository.
+    // gate-reads: **/.epr-meta
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .canonicalize()

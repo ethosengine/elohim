@@ -9,7 +9,30 @@ import { dirname, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
-/** Deliberately simpler than full glob syntax: a terminal /** is a subtree; otherwise exact. */
+/**
+ * A repository-wide basename read: `**\/<name>` names every tracked file whose last path segment
+ * is exactly `<name>` (for example every `.epr-meta` manifest). It is the only wildcard a
+ * gate-reads declaration may carry; it lets a walk over one file kind leave tree scope.
+ */
+export function isReadPattern(path) {
+  return /^\*\*\/[^/*\\]+$/.test(path);
+}
+
+/** Does a read (exact path, directory prefix, `.`, or `**\/<name>`) cover a repo-relative file? */
+export function readCovers(read, file) {
+  if (read === '.') return true;
+  if (isReadPattern(read)) {
+    const name = read.slice(3);
+    return file === name || file.endsWith(`/${name}`);
+  }
+  return file === read || file.startsWith(`${read}/`);
+}
+
+/**
+ * Deliberately simpler than full glob syntax: a terminal /** is a subtree; otherwise exact.
+ * Manifest `sources` globs also drive CI dispatch, so a basename read is NOT a source glob here —
+ * reads are matched by readCovers.
+ */
 export function globCovers(glob, path) {
   if (glob === '**') return true;
   if (!glob.endsWith('/**')) return glob === path;
@@ -315,8 +338,9 @@ function auditFile(root, file, text, crate) {
       return (fn && declarationFn === fn) ||
         (!declarationFn && declaration.line <= row.line && row.line - declaration.line <= 15);
     }).filter(({ path }) => {
+      if (isReadPattern(path)) return true;
       const rel = relative(root, resolve(root, path));
-      return !path.startsWith('/') && !path.includes('\\') && rel !== '..' && !rel.startsWith('../');
+      return !path.startsWith('/') && !path.includes('\\') && !path.includes('*') && rel !== '..' && !rel.startsWith('../');
     });
     return declared.length ? declared.map(({ path }) => ({ ...row, path, how: 'gate-reads' })) : [row];
   });

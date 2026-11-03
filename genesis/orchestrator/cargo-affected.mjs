@@ -3,6 +3,7 @@
 
 import { spawnSync } from 'child_process';
 import { basename, dirname, relative, resolve } from 'path';
+import { isReadPattern, readCovers } from './gate-input-audit.mjs';
 
 /** Metadata resolves dependencies but never builds; failed discovery cannot narrow a gate. */
 export function loadMetadata({ root, workspaceDir, spawn = spawnSync }) {
@@ -66,7 +67,7 @@ export function affectedPackages({ root, workspaceDir, files, metadata, readsOf 
     // Test reads of those files are handled by readsOf below, before reverse reachability.
   }
   for (const pkg of packages.filter(pkg => members.has(pkg.id))) {
-    if (readsOf(pkg.dir).some(read => changed.some(file => covers(repoPath(read), file)))) {
+    if (readsOf(pkg.dir).some(read => changed.some(file => readCovers(isReadPattern(read) ? read : repoPath(read), file)))) {
       affected.add(pkg.id);
     }
   }

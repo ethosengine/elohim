@@ -127,7 +127,8 @@ test('read sets: an unnamed read in a changed crate refuses with file:line, unch
 
 test('evidence: a dirty closure under a reuse-enabled gate warns before it runs', () => {
   const rows = checkEvidenceRecordable({
-    root: '/x', projects: [{ name: 'eprfs' }, { name: 'elohim-app' }], reuse: ['eprfs'], env: {},
+    // orchestrator is a JS gate: its reads cannot be named, so it keys on the commit tree.
+    root: '/x', projects: [{ name: 'orchestrator' }, { name: 'elohim-app' }], reuse: ['orchestrator'], env: {},
     read: () => { throw new Error('tree-scope projects are not read'); },
     dirty: () => ['.claude/data/ci-findings.jsonl'],
   });

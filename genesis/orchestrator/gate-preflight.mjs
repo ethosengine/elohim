@@ -32,8 +32,10 @@ export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
 /**
  * Projects whose Rust read set must be fully named (gate-input-audit.test.mjs `REAL … read set`).
  * The orchestrator gate runs that test, so any of these, or the orchestrator itself, selects it.
+ * eprfs joined 2026-11-03: its governance walk is named as `**\/.epr-meta` and its 12 data-derived
+ * test reads are declared, so it keys on paths, not the commit tree.
  */
-export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr'];
+export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr', 'eprfs'];
 
 const ELEMENTS_DIR = 'app/elohim-elements';
 const STORAGE_CLIENT_DIST = 'elohim/sdk/storage-client-ts/dist/index.js';

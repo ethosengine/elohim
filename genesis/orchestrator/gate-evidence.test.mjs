@@ -24,6 +24,7 @@ import {
   emitGateVerdict,
   findEvidence,
   gateEvidence,
+  patternDigest,
   recordEvidence,
   reusableHit,
   resolveBin,
@@ -1254,4 +1255,43 @@ test('attestation output carries the measured cost vector unchanged', () => {
   assert.equal(put.status, 0);
   const args = calls.find(c => isPut(c.bin, c.args)).args;
   assert.deepEqual(JSON.parse(args[args.indexOf('--output-json') + 1]).cost, cost);
+});
+
+test('a basename read keys on every tracked match, and its dirt check finds a new untracked match anywhere', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-pattern-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => {
+    const r = spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout;
+  };
+  const put = (path, text) => { mkdirSync(join(root, dirname(path)), { recursive: true }); writeFileSync(join(root, path), text); };
+  git('init', '-q');
+  put('.epr-meta', 'root');
+  put('a/b/.epr-meta', 'nested');
+  put('a/x.epr-meta', 'not a manifest');
+  put('notes.md', 'unrelated');
+  git('add', '-A'); git('commit', '-qm', 'one');
+  const first = patternDigest(root, 'HEAD', '**/.epr-meta');
+  assert.match(first, /^[0-9a-f]{64}$/);
+
+  put('notes.md', 'still unrelated'); put('a/x.epr-meta', 'still not a manifest');
+  git('commit', '-qam', 'two');
+  assert.equal(patternDigest(root, 'HEAD', '**/.epr-meta'), first, 'non-matching files do not move the key');
+
+  put('a/b/.epr-meta', 'edited');
+  git('commit', '-qam', 'three');
+  const edited = patternDigest(root, 'HEAD', '**/.epr-meta');
+  assert.notEqual(edited, first, 'editing a match moves the key');
+
+  put('c/.epr-meta', 'added'); git('add', '-A'); git('commit', '-qm', 'four');
+  assert.notEqual(patternDigest(root, 'HEAD', '**/.epr-meta'), edited, 'adding a match moves the key');
+  assert.equal(patternDigest(root, 'no-such-ref', '**/.epr-meta'), null);
+
+  put('d/e/.epr-meta', 'untracked'); put('loose.txt', 'untracked, not read');
+  const dirty = dirtyPaths({ dir: 'proj', manifestPath: 'proj/build-manifest.json' }, {
+    root, sources: [], recipePath: 'recipe.sh', reads: { scope: 'paths', oids: [{ path: '**/.epr-meta' }] },
+  });
+  assert.ok(dirty.some(path => path.startsWith('d/')), `a new untracked manifest is dirt: ${dirty}`);
+  assert.ok(!dirty.includes('loose.txt'), 'an unread untracked file is not dirt');
 });

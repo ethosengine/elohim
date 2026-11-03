@@ -100,6 +100,13 @@ describe('Cargo reverse dependencies', () => {
     assert.deepEqual(affected(['fixtures-other/x.json'], { readsOf }).packages, []);
   });
 
+  test('a basename read covers that file kind at any depth, and nothing else', () => {
+    const readsOf = dir => dir === 'ws/tool' ? ['**/.epr-meta'] : [];
+    assert.deepEqual(affected(['deep/dir/.epr-meta'], { readsOf }).packages, ['tool']);
+    assert.deepEqual(affected(['.epr-meta'], { readsOf }).packages, ['tool']);
+    assert.deepEqual(affected(['deep/dir/x.epr-meta', '.epr-meta/elohim/policy.json'], { readsOf }).packages, []);
+  });
+
   test('null metadata requires the full workspace', () => {
     assert.deepEqual(affected(['ws/leaf/src/lib.rs'], { metadata: null }), { packages: null, why: 'metadata unavailable' });
   });

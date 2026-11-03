@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { auditProject, globCovers, readSet } from './gate-input-audit.mjs';
+import { auditProject, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
@@ -219,6 +219,30 @@ test('a declaration covers the reads derived from its construction through bindi
   assert.deepEqual(result, { paths: ['shared/data.json'], unresolved: [] });
 });
 
+test('a **/<basename> declaration names one file kind across the repository, and no other wildcard is valid', () => {
+  const walk = decl => readSet(fixture(`fn walk() {
+    // gate-reads: ${decl}
+    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);
+  }`));
+  assert.deepEqual(walk('**/.epr-meta'), { paths: ['**/.epr-meta'], unresolved: [] });
+  for (const invalid of ['shared/*.json', '**/a/b', '**/*', '*', 'shared/**']) {
+    const result = walk(invalid);
+    assert.deepEqual(result.paths, [], invalid);
+    assert.equal(result.unresolved.length, 1, invalid);
+  }
+});
+
+test('readCovers matches a basename read at the root and any depth only; source globs stay literal', () => {
+  assert.ok(readCovers('**/.epr-meta', '.epr-meta'));
+  assert.ok(readCovers('**/.epr-meta', 'a/b/.epr-meta'));
+  assert.ok(!readCovers('**/.epr-meta', 'a/x.epr-meta'));
+  assert.ok(!readCovers('**/.epr-meta', '.epr-meta/elohim/policy.json'));
+  assert.ok(!globCovers('**/.epr-meta', 'a/b/.epr-meta'), 'manifest source globs do not gain basename patterns');
+  assert.ok(readCovers('.', 'any/file'));
+  assert.ok(readCovers('shared', 'shared/x') && !readCovers('shared', 'shared-other/x'));
+  assert.ok(isReadPattern('**/.epr-meta') && !isReadPattern('**/a/b') && !isReadPattern('shared/**'));
+});
+
 test('gate-reads dot explicitly names the whole repository', () => {
   assert.deepEqual(readSet(fixture(`fn walk() {
     // gate-reads: .
@@ -359,9 +383,10 @@ function realReadSet(name) {
   });
 }
 
-test('REAL eprfs declares the whole-repository governance walk and requires tree scope', () => {
+test('REAL eprfs names its governance walk as the .epr-meta file kind, not the whole repository', () => {
   const result = realReadSet('eprfs');
-  assert.ok(result.paths.includes('.'), 'the whole-repo governance walk must remain visible');
+  assert.ok(result.paths.includes('**/.epr-meta'), 'the governance walk must remain visible as its file kind');
+  assert.ok(!result.paths.includes('.'), 'no eprfs read may name the whole repository');
   assert.ok(!result.unresolved.some(row => row.file.endsWith('/live_manifest_integrity.rs')));
   assert.ok(!result.unresolved.some(row => row.file.includes('/flow/memory/recall/')));
   for (const name of ['recall-contract', 'recall-semantic-index', 'recall-lexical-index']) {
@@ -376,7 +401,9 @@ for (const name of NAMED_READ_SET_PROJECTS) {
     assert.deepEqual(result.unresolved, []);
     assert.ok(!result.paths.includes('.'));
     assert.ok(result.paths.includes('elohim/sdk/schemas/v1/feedback-signals'));
-    if (name !== 'elohim-epr') {
+    // The shared-crate reads below belong to the three runtime services; elohim-epr and eprfs
+    // read neither the render fixtures nor the canon-lift sources through those crates.
+    if (!['elohim-epr', 'eprfs'].includes(name)) {
       assert.ok(result.paths.includes('.claude/epr-meta/policies.yaml'));
       assert.ok(result.paths.includes('.claude/epr-meta/concerns.yaml'));
       assert.ok(result.paths.includes('elohim/elohim-render/fixtures'));

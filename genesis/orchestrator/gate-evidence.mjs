@@ -26,7 +26,7 @@ import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { delimiter, isAbsolute, join, relative, resolve } from 'path';
-import { globCovers, readSet } from './gate-input-audit.mjs';
+import { globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
 import { buildNotesRef, expectedRefusal, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
@@ -107,6 +107,23 @@ export function stepFingerprints(project, commit, { britBin, root, spawn = spawn
 export function manifestBlob(root, commit, manifestPath, spawn = spawnSync) {
   const rel = relative(root, resolve(root, manifestPath)).split('\\').join('/');
   return gitRead(root, ['rev-parse', `${commit}:${rel}`], spawn)?.trim() || null;
+}
+
+/**
+ * One digest for a `**\/<name>` read: sha256 over the sorted `<blob oid> <path>` lines of every
+ * tracked file at `commit` whose basename is `<name>`. Null when the listing cannot be read.
+ */
+export function patternDigest(root, commit, pattern, spawn = spawnSync) {
+  const listing = gitRead(root, ['ls-tree', '-r', '-z', commit], spawn);
+  if (listing === null) return null;
+  const name = pattern.slice(3);
+  const lines = listing.split('\0').filter(Boolean).flatMap(entry => {
+    const tab = entry.indexOf('\t');
+    const [, type, oid] = entry.slice(0, tab).split(' ');
+    const path = entry.slice(tab + 1);
+    return type === 'blob' && (path === name || path.endsWith(`/${name}`)) ? [`${oid} ${path}`] : [];
+  }).sort();
+  return createHash('sha256').update(lines.join('\n')).digest('hex');
 }
 
 function gitRead(root, args, spawn) {
@@ -313,8 +330,10 @@ export function closureKey(closure) {
  */
 export function dirtyPaths(project, { root, spawn = spawnSync, commit = 'HEAD', sources = stepSources(project, root, commit, spawn), recipePath = recipeAt(project, root, commit, spawn).path, reads = { scope: 'tree' } }) {
   if (!sources) return null;
+  // A basename read (`**\/.epr-meta`) is a glob pathspec, so a NEW untracked match anywhere is dirt too.
+  const pathspec = path => (isReadPattern(path) ? `:(glob)${path}` : path);
   const paths = [project.dir, project.manifestPath, ...sources.map(source => source.endsWith('/**') ? source.slice(0, -2) : source), recipePath,
-    ...(reads.scope === 'paths' ? reads.oids.map(row => row.path) : ['.'])];
+    ...(reads.scope === 'paths' ? reads.oids.map(row => pathspec(row.path)) : ['.'])];
   const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths)], spawn);
   if (out === null) return null;
   return out.split('\n').map(line => line.slice(3).trim()).filter(Boolean);
@@ -509,8 +528,13 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   // Deliberately conservative tier for gates whose reads cannot be named: eprfs
   // walks the repository and JS gates read many manifests. Require identical
   // repository trees and check all checkout dirt, including hook-written ledgers.
-  const reads = read && read.unresolved.length === 0
-    ? { scope: 'paths', oids: read.paths.map(path => ({ path, oid: manifestBlob(root, commit, path, spawn) })) }
+  // A basename read keys on every tracked match at the commit (path + blob), so adding, removing
+  // or editing any one of them moves the key; an unreadable listing falls back to tree scope.
+  const readOid = path => (isReadPattern(path) ? patternDigest(root, commit, path, spawn) : manifestBlob(root, commit, path, spawn));
+  const named = read && read.unresolved.length === 0
+    ? read.paths.map(path => ({ path, oid: readOid(path) })) : null;
+  const reads = named && !named.some(row => isReadPattern(row.path) && row.oid === null)
+    ? { scope: 'paths', oids: named }
     : { scope: 'tree', oid: tree };
   const scope = reads.scope === 'paths' ? `paths (${read.paths.length} reads)`
     : `tree (${read ? 'unresolved' : 'unknown'} reads)`;

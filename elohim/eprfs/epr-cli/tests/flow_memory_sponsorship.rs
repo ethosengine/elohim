@@ -795,6 +795,14 @@ fn the_cli_verb_signs_with_the_enrolled_device_named_on_the_child() {
 
 #[test]
 fn the_repository_seed_folds_with_no_refusal_and_every_later_line_is_sponsored_by_matthew() {
+    // `collective` reads the root declaration, the repository agent, the affiliation sidecar, the
+    // signers' rosters and the registry catalog with the schema it names.
+    // gate-reads: .epr-meta/collective.json
+    // gate-reads: .epr-meta/repository.yaml
+    // gate-reads: .eprfs/status/affiliations.jsonl
+    // gate-reads: .eprfs/status/participants
+    // gate-reads: genesis/data/collectives/collectives.json
+    // gate-reads: genesis/data/collectives/collectives.schema.json
     let repository = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.."));
     let view = memory::execute(repository, "collective", None, None).unwrap();
     assert_eq!(

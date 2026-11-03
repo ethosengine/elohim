@@ -232,6 +232,13 @@ const SEAL_LEGACY: &[Row] = &[
 
 fn repo_root() -> PathBuf {
     // tests/ -> epr-cli -> eprfs -> elohim -> <repo>
+    // The live legs read the doc roots, every gospel CLAUDE.md, and the two in-repo legacy path
+    // cites the LIVE_VERIFY documents carry today; a new legacy cite there must be declared here.
+    // gate-reads: genesis/docs
+    // gate-reads: .claude/memory
+    // gate-reads: **/CLAUDE.md
+    // gate-reads: elohim/sdk/domains/lamad/manifest.json
+    // gate-reads: .claude/skills/memory-ceremony/SKILL.md
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for _ in 0..3 {
         p = p
