@@ -3,6 +3,8 @@
 mod brit_index;
 mod material;
 mod task;
+mod task_files;
+mod task_native;
 
 use std::{
     collections::BTreeMap,
@@ -91,7 +93,7 @@ enum Command {
     /// Place a device's own task (a local gate) in its own envelope.
     Task {
         #[command(subcommand)]
-        command: TaskCommand,
+        command: Box<TaskCommand>,
     },
 }
 
@@ -103,23 +105,35 @@ enum TaskCommand {
         #[arg(long)]
         request: PathBuf,
         /// Path to the closure material: canonical JSON, the task's input.
-        #[arg(long)]
-        material: PathBuf,
+        #[arg(long, conflicts_with_all = ["root", "store"], required_unless_present = "root")]
+        material: Option<PathBuf>,
+        #[arg(long, requires = "store")]
+        root: Option<String>,
+        #[arg(long, requires = "root")]
+        store: Option<PathBuf>,
     },
     /// Validate, place, look up and run a task; append its status lines to --status.
     Run {
         /// Path to the TaskSpec JSON (`ark task spec`).
-        #[arg(long)]
-        spec: PathBuf,
+        #[arg(long, conflicts_with = "request", required_unless_present = "request")]
+        spec: Option<PathBuf>,
+        #[arg(long, requires_all = ["root", "store", "run_dir"])]
+        request: Option<PathBuf>,
         /// Path to the closure material the spec's input root addresses.
-        #[arg(long)]
-        material: PathBuf,
+        #[arg(long, conflicts_with_all = ["root", "store", "run_dir", "request"], required_unless_present = "store")]
+        material: Option<PathBuf>,
+        #[arg(long, requires_all = ["store", "run_dir"], conflicts_with_all = ["reuse", "repo", "data_root"])]
+        root: Option<String>,
+        #[arg(long, requires = "run_dir", conflicts_with_all = ["reuse", "repo", "data_root"])]
+        store: Option<PathBuf>,
+        #[arg(long, requires = "store", conflicts_with_all = ["reuse", "repo", "data_root", "status"])]
+        run_dir: Option<PathBuf>,
         /// The local file the child's pinned artifact resolves to.
         #[arg(long)]
         artifact: PathBuf,
         /// Where PendingStatus JSON lines are appended.
-        #[arg(long)]
-        status: PathBuf,
+        #[arg(long, required_unless_present = "run_dir")]
+        status: Option<PathBuf>,
         /// The reuse context JSON (mode, enabled, selfId, dirty, commit); absent reuses nothing.
         #[arg(long)]
         reuse: Option<PathBuf>,
@@ -223,11 +237,26 @@ fn execute(command: Command) -> Result<u8, Failure> {
         Command::Manifest { command } => match command {
             ManifestCommand::Cid { manifest } => manifest_cid(&manifest),
         },
-        Command::Task { command } => match command {
-            TaskCommand::Spec { request, material } => task::spec(&request, &material),
+        Command::Task { command } => match *command {
+            TaskCommand::Spec {
+                request,
+                material,
+                root,
+                store,
+            } => match (material, root, store) {
+                (Some(material), None, None) => task::spec(&request, &material),
+                (None, Some(root), Some(store)) => task_native::spec(&request, &root, &store),
+                _ => Err(Failure::data(
+                    "select material or a whole-tree root and store",
+                )),
+            },
             TaskCommand::Run {
                 spec,
+                request,
                 material,
+                root,
+                store,
+                run_dir,
                 artifact,
                 status,
                 reuse,
@@ -235,16 +264,28 @@ fn execute(command: Command) -> Result<u8, Failure> {
                 data_root,
                 device,
             } => {
+                if let (Some(store), Some(run_dir)) = (store, run_dir) {
+                    return task_native::run(task_native::RunArgs {
+                        spec,
+                        request,
+                        root,
+                        store,
+                        run_dir,
+                        artifact,
+                        device,
+                    });
+                }
                 let repo = match repo {
                     Some(repo) => repo,
                     None => env::current_dir()
                         .map_err(|error| Failure::data(format!("current directory: {error}")))?,
                 };
                 task::run(task::RunArgs {
-                    spec,
-                    material,
+                    spec: spec.ok_or_else(|| Failure::data("material run needs --spec"))?,
+                    material: material
+                        .ok_or_else(|| Failure::data("material run needs --material"))?,
                     artifact,
-                    status,
+                    status: status.ok_or_else(|| Failure::data("material run needs --status"))?,
                     reuse,
                     data_root: data_root.unwrap_or_else(|| repo.clone()),
                     repo,

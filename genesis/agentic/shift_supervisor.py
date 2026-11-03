@@ -17,9 +17,9 @@ import time
 import traceback
 import uuid
 
-from shift_ops import (execute, next_operation, op_dir, prepare, receipts, require_delivery_evidence)
+from shift_ops import (execute, next_operation, op_dir, prepare, receipts, require_completion)
 from shift_evidence import binary_observation
-from shift_lease import host_berth, resources
+from shift_lease import host_berth, host_session, host_session_id, lease_budget, resources
 from shift_state import (Refused, alive, atomic, authority, checkpoint, digest,
                          incarnation, load, lock, native_context, read, revision,
                          run, signal_handle)
@@ -110,6 +110,56 @@ def descendant(pid, parent):
     return False
 
 
+class ReadinessProxy:
+    """Use the same host lease checks during the contained readiness baseline.
+
+    Serviced by the host wait loop, so its PID and lease remain outside the
+    namespace. Credentials alone do not authorize a non-child socket peer.
+    """
+    def __init__(self, contract, resource, started):
+        self.contract, self.resource, self.started = contract, resources(resource), started
+        self.token = str(uuid.uuid4())
+        self.address = '@elohim-shift-readiness-' + self.token
+        self.environment = {'BERTH_SESSION': host_session_id(contract),
+                            'ELOHIM_SHIFT_BERTH_ADDRESS': self.address,
+                            'ELOHIM_SHIFT_BERTH_TOKEN': self.token}
+
+    def __enter__(self):
+        self.server = socket.socket(socket.AF_UNIX)
+        try:
+            self.server.bind('\0' + self.address[1:])
+            self.server.listen(4)
+            self.server.setblocking(False)
+        except BaseException:
+            self.server.close()
+            raise
+        return self
+
+    def __exit__(self, *_exception):
+        self.server.close()
+
+    def poll(self, process):
+        try:
+            connection, _ = self.server.accept()
+        except BlockingIOError:
+            return
+        with connection:
+            connection.settimeout(0.2)
+            from shift_lease import handle_request, refused
+            try:
+                pid, uid, _gid = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+                message = read_message(connection)
+                if (message.get('kind') != 'berth' or message.get('token') != self.token
+                        or uid != os.getuid() or process.poll() is not None
+                        or not descendant(pid, process.pid)):
+                    response = refused('readiness delegation peer is not the active contained child')
+                else:
+                    response = handle_request(self.contract, self.resource, self.started, message.get('argv'))
+            except (OSError, ValueError) as error:
+                response = refused(f'invalid readiness delegation request: {error}')
+            reply(connection, json.dumps(response).encode() + b'\n')
+
+
 def controller(directory, address, token):
     while True:
         with socket.socket(socket.AF_UNIX) as stream:
@@ -151,7 +201,7 @@ def lease(contract, resource, release=False):
     selected = resources(resource)
     if not selected:
         return
-    session = f"shift-{contract['id']}"
+    session = host_session_id(contract)
     def release_all(owned):
         failures = []
         for name in reversed(owned):
@@ -172,8 +222,8 @@ def lease(contract, resource, release=False):
             for name in selected:
                 attempted.append(name)  # A lost claim response may already have acquired it.
                 argv = ['claim', name, '--session', session]
-                if name == 'mesh':
-                    argv += ['--class', 'verify', '--ttl', '1800']
+                if lease_budget(name) is not None:
+                    argv += ['--class', 'verify', '--ttl', str(lease_budget(name))]
                 host_berth(contract, *argv)
         except BaseException as error:
             try:
@@ -185,7 +235,11 @@ def lease(contract, resource, release=False):
 
 def guardian(directory):
     with lock(directory / 'execution.lock', blocking=False):
-        return _guard(directory)
+        contract, state = load(directory)
+        authority(directory, contract, state)
+        native_context(contract)
+        with host_session(contract, directory):
+            return _guard(directory)
 
 
 def _guard(directory):
@@ -233,6 +287,9 @@ def _guard(directory):
     def check_termination():
         if termination_requested:
             kill_children()  # also covers a signal during spawn, before assignment
+            budget = lease_budget(held_resources)
+            if budget is not None and time.monotonic() - lease_started >= budget:
+                raise Refused('operation lease expired; scope the operation within its original lease')
             raise Refused('guardian termination requested')
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
@@ -308,6 +365,10 @@ def _guard(directory):
             # Persist wall-clock floor while quiet builds run; transcript silence is not a stall.
             if time.time() - state['last_wall'] >= 1:
                 checkpoint(directory)
+            if worker is not None and held_resources:
+                budget = lease_budget(held_resources)
+                if budget is not None and time.monotonic() - lease_started >= budget:
+                    raise Refused('operation lease expired; scope the operation within its original lease')
             if worker and worker.poll() is not None:
                 if active_step['kind'] == 'household':
                     binary_observation(directory, contract, active_step, 'after')
@@ -315,13 +376,12 @@ def _guard(directory):
                     lease(contract, held_resources, release=True)
                     held_resources = []
                 worker = None
+                signal.setitimer(signal.ITIMER_REAL, authority(directory, contract, state))
                 tick = bool(last_heartbeat and time.monotonic() - last_heartbeat < 2 * HEARTBEAT)
             if worker is not None and held_resources:
-                if 'mesh' in held_resources and time.monotonic() - lease_started >= 1800:
-                    raise Refused('household verify lease expired; scope the lane down or use just measure')
                 if time.monotonic() - lease_touched >= HEARTBEAT:
                     # Touch the host guardian's mooring; never reset the lease's original TTL.
-                    host_berth(contract, 'touch', '--session', f"shift-{contract['id']}", '--pid', str(os.getpid()))
+                    host_berth(contract, 'touch', '--session', host_session_id(contract), '--pid', str(os.getpid()))
                     lease_touched = time.monotonic()
             if worker is not None or not tick:
                 continue
@@ -339,9 +399,8 @@ def _guard(directory):
             step = next_operation(directory, contract, state)
             check_termination()
             if step is None:
-                if contract['mode'] == 'delivery':
-                    require_delivery_evidence(directory, contract, revision(contract['worktree']), published=True)
-                checkpoint(directory, phase='complete' if contract['mode'] == 'delivery' else 'rehearsal-complete', pending=None)
+                phase = require_completion(directory, contract, revision(contract['worktree']))
+                checkpoint(directory, phase=phase, pending=None)
                 return 0
             if remaining < 1:
                 raise Refused('no remaining execution time')
@@ -352,6 +411,13 @@ def _guard(directory):
             lease(contract, selected)
             held_resources = selected  # Expose only the fully acquired set to authenticated workers.
             lease_touched = time.monotonic()
+            budget = lease_budget(selected)
+            left = authority(directory, contract, state)
+            if budget is not None:
+                left = min(left, budget - (time.monotonic() - lease_started))
+            if left <= 0:
+                raise Refused('operation lease expired during acquisition')
+            signal.setitimer(signal.ITIMER_REAL, left)
             check_termination()
             active_step = step
             if step['kind'] == 'household':
@@ -363,7 +429,7 @@ def _guard(directory):
                 check_termination()
                 worker = spawn_owned(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                      stderr=errors, env={**os.environ, **contract.get('workload_env', {}),
-                                                        'BERTH_SESSION': f"shift-{contract['id']}",
+                                                        'BERTH_SESSION': host_session_id(contract),
                                                         'ELOHIM_SHIFT_BERTH_ADDRESS': advertised,
                                                         'ELOHIM_SHIFT_BERTH_TOKEN': token})
             check_termination()

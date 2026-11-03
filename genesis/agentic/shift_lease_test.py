@@ -1,5 +1,6 @@
 """Host lease delegation, including a real worker PID namespace and private berth store."""
 import datetime as dt
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -52,11 +53,11 @@ class ShiftLease(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         for name in lease.PROXY_ENV:
             os.environ.pop(name, None)
-        self.session = 'shift-lease-fixture'
         self.contract = {
             'id': 'lease-fixture', 'worktree': str(ROOT),
             'deadline': dt.datetime.fromtimestamp(time.time() + 60, dt.timezone.utc).isoformat(),
         }
+        self.session = lease.host_session_id(self.contract)
         self.berth = Berth(d=str(self.store), policy_path='/nonexistent/shift-fixture-policy')
         self.berth.moor(self.session, pid=os.getpid(), runtime='shift')
         self.berth.claim('mesh', self.session, ttl_s=1800, klass='verify')
@@ -86,6 +87,9 @@ class ShiftLease(unittest.TestCase):
         self.assertEqual(lease.resources([]), [])
         self.assertEqual(lease.resources('mesh'), ['mesh'])
         self.assertEqual(lease.resources(['mesh', 'disk-heavy', 'cargo']), ['cargo', 'disk-heavy', 'mesh'])
+        publication = ['dev-integration', 'alpha-fleet', 'jenkins-dispatch', 'lane:native-source']
+        self.assertEqual(lease.resources(publication), sorted(publication))
+        self.assertEqual(lease.lease_budget(['mesh', 'dev-integration']), 600)
         for value in ['unknown', True, 1, {}, ('cargo',), ['mesh', 'mesh'], ['cargo', None], [['cargo']]]:
             with self.subTest(value=value), self.assertRaises(Refused):
                 lease.resources(value)
@@ -115,10 +119,12 @@ class ShiftLease(unittest.TestCase):
                 'deadline': 'original-deadline', 'steps': [
                     {'id': 'gate', 'kind': 'gate', 'project': 'fixture', 'resource': ['mesh', 'disk-heavy']}]}
         elapsed = [0]
-        def bounded(argv, cwd, timeout, log, text=None, *, env=None, check=None):
+        expected = [1800]
+        def bounded(argv, cwd, timeout, log, text=None, *, env=None, check=None, delegation=None):
             if 'genesis/agentic/readiness.mjs' in argv:
-                self.assertEqual(timeout, 1800)
-                elapsed[0] = 1801
+                self.assertEqual(timeout, expected[0])
+                self.assertEqual(delegation, (spec, spec['measurement_resource'], 0))
+                elapsed[0] = expected[0] + 1
                 self.assertEqual(check(), -1)
                 raise Refused('mesh readiness lease expired')
         with patch.object(launcher.shutil, 'which', return_value='/fixture/tool'), \
@@ -126,6 +132,7 @@ class ShiftLease(unittest.TestCase):
                 patch.object(launcher, 'session_from', return_value='fixture-session'), \
                 patch.object(launcher, 'completed', return_value=True), \
                 patch.object(launcher, 'native_context'), \
+                patch.object(launcher, 'host_session', return_value=contextlib.nullcontext()), \
                 patch.object(launcher, 'bounded', side_effect=bounded), \
                 patch.object(launcher, 'run', return_value='fixture\tfixture'), \
                 patch.object(launcher.time, 'monotonic', side_effect=lambda: elapsed[0]), \
@@ -137,6 +144,13 @@ class ShiftLease(unittest.TestCase):
                 unittest.mock.call(spec, ['cargo', 'disk-heavy', 'mesh'], release=True),
                 unittest.mock.call(spec, ['mesh', 'cargo']),
                 unittest.mock.call(spec, ['mesh', 'cargo'], release=True)])
+            claim.reset_mock()
+            elapsed[0], expected[0] = 0, 600
+            spec['measurement_resource'] = ['mesh', 'dev-integration']
+            with self.assertRaisesRegex(Refused, 'mesh readiness lease expired'):
+                launcher.preflight(spec, root / '.claude/shifts/fixture')
+            self.assertEqual(claim.call_args_list[-1],
+                             unittest.mock.call(spec, ['mesh', 'dev-integration'], release=True))
 
     def test_multiple_resources_preserve_each_original_lease_and_refuse_expansion(self):
         self.berth.claim('cargo', self.session)
@@ -149,6 +163,22 @@ class ShiftLease(unittest.TestCase):
         self.assertEqual(self.request('claim', resource='disk-heavy', held=held)['exit'], 3)
         self.assertEqual(self.request('claim', '--ttl', '1801', held=held)['exit'], 3)
         self.assertEqual(self.request('claim', '--class', 'mesh', held=held)['exit'], 3)
+        self.assertEqual(self.files(), before)
+
+    def test_pre_push_session_read_and_generation_fence_preserve_held_lease(self):
+        before = self.files()
+        result = lease.handle_request(self.contract, ['mesh'], self.started,
+                                      ['session-show', '--session', self.session])
+        self.assertEqual(result['exit'], 0, result)
+        view = json.loads(result['stdout'])
+        self.assertEqual(view['mooring']['session'], self.session)
+        self.assertEqual(list(view['leases']), ['mesh'])
+        generation = str(view['leases']['mesh']['claimed_at'])
+        self.assertEqual(self.request('release', '--expected-claimed-at', generation)['exit'], 0)
+        self.assertEqual(self.request('release', '--expected-claimed-at', '0')['exit'], 3)
+        self.assertEqual(self.request('release', '--expected-claimed-at', 'nan')['exit'], 3)
+        # The hook's flag is tolerated only for the already-held lease; no override is recorded.
+        self.assertEqual(self.request('claim', '--offline-ok')['exit'], 0)
         self.assertEqual(self.files(), before)
 
     def test_requested_member_still_requires_its_live_exact_host_lease(self):
@@ -380,6 +410,47 @@ class ShiftLease(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.files(), before)
 
+    def test_actual_readiness_wait_delegates_nested_namespace_checks(self):
+        import shift as launcher
+        self.berth.claim('cargo', self.session)
+        before = self.files()
+        log = self.store.parent / (self.store.name + '-baseline.log')
+        self.addCleanup(lambda: log.unlink(missing_ok=True))
+        script = ('import subprocess,sys\n'
+                  f'commands=[[{str(BERTH)!r},"claim","cargo"],'
+                  f'[{str(BERTH)!r},"release","cargo"],'
+                  f'[{str(BERTH)!r},"owner-check","mesh","--action","baseline"]]\n'
+                  'for command in commands:\n'
+                  ' result=subprocess.run(command,text=True,capture_output=True)\n'
+                  ' print(result.stdout,result.stderr,flush=True)\n'
+                  ' if result.returncode: sys.exit(result.returncode)\n')
+        # Exercise the real bounded launcher and host socket, not a mocked baseline.
+        launcher.bounded([sys.executable, '-c', script], ROOT, 15, log,
+                         delegation=(self.contract, ['cargo', 'mesh'], self.started))
+        self.assertIn('renewed', log.read_text())
+        self.assertIn('retained', log.read_text())
+        self.assertEqual(self.files(), before)
+
+    def test_readiness_proxy_refuses_authenticated_non_child(self):
+        with supervisor.ReadinessProxy(self.contract, 'mesh', self.started) as proxy:
+            unrelated = subprocess.Popen(['sleep', '5'])
+            try:
+                result = []
+                thread = threading.Thread(target=lambda: result.append(
+                    lease.proxy_request(['claim', 'mesh'], proxy.environment)))
+                thread.start()
+                until = time.monotonic() + 3
+                while thread.is_alive() and time.monotonic() < until:
+                    proxy.poll(unrelated)
+                    time.sleep(.01)
+                thread.join(timeout=3)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(result[0]['exit'], 3)
+                self.assertIn('not the active contained child', result[0]['stderr'])
+            finally:
+                unrelated.terminate()
+                unrelated.wait(timeout=5)
+
     def test_real_guardian_holds_and_releases_the_set_around_a_contained_worker(self):
         from shift_process_test import ProcessRecovery
         fixture = ProcessRecovery('runTest')
@@ -407,12 +478,37 @@ class ShiftLease(unittest.TestCase):
         host = Berth(d=fixture.env['BERTH_DIR'], policy_path='/nonexistent/shift-fixture-policy')
         for resource in ['cargo', 'mesh']:
             held = host.who(resource)
-            self.assertEqual((held[0] if isinstance(held, list) else held)['holder'], 'shift-' + fixture.contract['id'])
+            self.assertEqual((held[0] if isinstance(held, list) else held)['holder'],
+                             f"shift-{fixture.contract['id']}-{state.incarnation(process.pid)['boot']}-{process.pid}-{state.incarnation(process.pid)['start']}")
         finish.touch()
         process.wait(timeout=15)
         self.assertEqual(process.returncode, 0, list(fixture.directory.glob('refusal-*.json')))
         for resource in ['cargo', 'mesh']:
             self.assertIsNone(host.who(resource))
+
+    def test_guardian_stops_quiet_worker_at_original_publication_lease_expiry(self):
+        from shift_process_test import ProcessRecovery
+        fixture = ProcessRecovery('runTest')
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        fixture.env['BERTH_DIR'] = str(self.store / 'guardian-expiry-berth')
+        (fixture.root / 'genesis').mkdir()
+        (fixture.root / 'genesis/agentic').symlink_to(ROOT / 'genesis/agentic', target_is_directory=True)
+        fixture.env['CLAUDE_PROJECT_DIR'] = str(self.store / 'no-policy')
+        # Accelerate the declared TTL only in the retained disposable test driver.
+        driver = fixture.driver/'shift_lease.py'
+        driver.write_text(driver.read_text().replace('STEWARD_LEASE_SECONDS = 600', 'STEWARD_LEASE_SECONDS = 1'))
+        marker = fixture.directory/'must-not-finish'
+        fixture.contract['steps'] = [{'id': 'quiet-transfer', 'kind': 'measure', 'resource': 'dev-integration',
+            'argv': [sys.executable, '-c', f'import time,pathlib; time.sleep(5); pathlib.Path({str(marker)!r}).touch()']}]
+        fixture.fixture.freeze()
+        process = fixture.launch('claude')
+        process.wait(timeout=15)
+        self.assertEqual(process.returncode, 3)
+        self.assertFalse(marker.exists())
+        refusals = [state.read(p) for p in fixture.directory.glob('refusal-*.json')]
+        self.assertTrue(any('operation lease expired' in r['reason'] for r in refusals), refusals)
+        self.assertFalse((fixture.directory/'operations/quiet-transfer/receipt.json').exists())
 
 
 class ReadinessCapacity(unittest.TestCase):
@@ -469,6 +565,9 @@ class ReadinessCapacity(unittest.TestCase):
             patcher = patch.object(launcher, name, return_value=replacement)
             patcher.start()
             self.addCleanup(patcher.stop)
+        patcher = patch.object(launcher, 'host_session', return_value=contextlib.nullcontext())
+        patcher.start()
+        self.addCleanup(patcher.stop)
         patcher = patch.object(launcher.shutil, 'which', return_value='/fixture/tool')
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -495,7 +594,7 @@ class ReadinessCapacity(unittest.TestCase):
         result = self.launcher.preflight(self.spec, self.directory)
         self.assertEqual(result['measured'], 1)
         self.assertEqual({row['holder'] for row in self.baseline_holders},
-                         {'incumbent', 'shift-capacity-fixture'})
+                         {'incumbent', lease.host_session_id(self.spec)})
         self.assertEqual(self.berth.who('cargo'), before)
         self.assertEqual((self.store / 'moorings/incumbent.json').read_bytes(), mooring)
 
@@ -518,7 +617,7 @@ class ReadinessCapacity(unittest.TestCase):
         self.assertEqual(self.berth.who('cargo'), cargo)
         self.assertEqual(self.berth.who('mesh'), mesh)
         events = self.berth.ledger(0)
-        self.assertTrue(any(e['kind'] == 'claim' and e.get('session') == 'shift-capacity-fixture'
+        self.assertTrue(any(e['kind'] == 'claim' and e.get('session') == lease.host_session_id(self.spec)
                             and e.get('resource') == 'cargo' for e in events), events)
 
     def test_probe_release_failure_refuses_before_canaries_or_baseline(self):
@@ -554,7 +653,7 @@ class ReadinessCapacity(unittest.TestCase):
         def revoked(directory):
             left = remaining(directory)
             held = self.berth.who('cargo') or []
-            if any(row['holder'] == 'shift-capacity-fixture' for row in held):
+            if any(row['holder'] == lease.host_session_id(self.spec) for row in held):
                 raise Refused('fixture authority revoked during probe')
             return left
         with patch.object(self.launcher, 'initialization_remaining', side_effect=revoked):
@@ -568,12 +667,131 @@ class ReadinessCapacity(unittest.TestCase):
         supervisor.lease(self.spec, 'cargo')
         try:
             result = lease.handle_request(self.spec, 'cargo', time.monotonic(),
-                ['owner-check', 'cargo', '--session', 'shift-capacity-fixture', '--action', 'build'])
+                ['owner-check', 'cargo', '--session', lease.host_session_id(self.spec), '--action', 'build'])
             self.assertEqual(result['exit'], 3, result)
             self.assertIn('another host session', result['stderr'])
         finally:
             supervisor.lease(self.spec, 'cargo', release=True)
         self.assertEqual(self.berth.who('cargo'), incumbent)
+
+
+class NativeHostSession(unittest.TestCase):
+    def test_host_uses_native_envelope_without_taking_callers_session(self):
+        import session_envelope_test as native
+        import shift as launcher
+        executable = os.environ.get('EPR_BIN') or shutil.which('epr')
+        self.assertTrue(executable, 'native EPR_BIN required for session adaptation proof')
+        with tempfile.TemporaryDirectory(prefix='shift-native-session-') as base, \
+                patch.object(native, 'BINARY', Path(executable).resolve()):
+            fixture = native.Fixture(base)
+            fixture.setup()
+            # Copy the real berth adapter so its authoritative repository is the fixture,
+            # never the developer checkout the original symlink points into.
+            fixture_berth = fixture.root / 'genesis/agentic/bin/berth'
+            fixture_berth.unlink()
+            shutil.copy2(BERTH, fixture_berth)
+            for source in ['.claude/scripts/_lib/__init__.py', '.claude/scripts/_lib/session.py',
+                           '.claude/scripts/_lib/epr_client.py', '.claude/hooks/_observation.py',
+                           '.claude/epr-meta/measures.yaml', 'genesis/agentic/pool-policy.json',
+                           'genesis/agentic/shift_lease.py', 'genesis/agentic/shift_state.py',
+                           'genesis/agentic/shift_inputs.py']:
+                destination = fixture.root / source
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT/source, destination)
+            environment = fixture.env()
+            environment.update(EPR_BIN=str(Path(executable).resolve()), EPR_PROC_ROOT='/proc',
+                               EPR_UNDER_TEST='0', BERTH_UNDER_TEST='0', ELOHIM_SESSION_ID='caller-runtime',
+                               ELOHIM_SESSION_OWNER_PID=str(os.getpid()))
+            # A genuinely enrolled disposable device and real /proc: no mocked berth/session layer.
+            with patch.dict(os.environ, environment, clear=True):
+                peer_id = subprocess.run([environment['EPR_BIN'], 'peer', 'id', '--json'],
+                                        cwd=fixture.root, env=environment, capture_output=True, text=True)
+                self.assertEqual(peer_id.returncode, 0, peer_id.stderr)
+                endpoint = subprocess.run([environment['EPR_BIN'], 'actor', 'device', 'endpoint',
+                    '--node-id', json.loads(peer_id.stdout)['nodeId']], cwd=fixture.root, env=environment,
+                    capture_output=True, text=True)
+                self.assertEqual(endpoint.returncode, 0, endpoint.stderr)
+                caller = subprocess.run([environment['EPR_BIN'], 'session', 'open', '--json'],
+                                        cwd=fixture.root, env=environment, capture_output=True, text=True)
+                self.assertEqual(caller.returncode, 0, caller.stderr)
+                session_dir = fixture.base / 'config-home/elohim/device/sessions'
+                caller_path = session_dir / 'caller-runtime.json'
+                before = caller_path.read_bytes()
+                wrong = subprocess.run([str(fixture_berth), 'moor', '--session', 'shift-unbound',
+                                        '--pid', str(os.getpid())], cwd=fixture.root, env=environment,
+                                       text=True, capture_output=True)
+                self.assertNotEqual(wrong.returncode, 0)
+                self.assertIn('envelope-owner-mismatch', wrong.stderr)
+                contract = {'id': 'native-envelope', 'worktree': str(fixture.root),
+                            'deadline': dt.datetime.fromtimestamp(time.time()+120, dt.timezone.utc).isoformat()}
+                evidence = fixture.base / 'proof'
+                evidence.mkdir()
+                with lease.host_session(contract, evidence):
+                    held = ['mesh', 'dev-integration', 'alpha-fleet', 'jenkins-dispatch']
+                    supervisor.lease(contract, held)
+                    try:
+                        peer = subprocess.run([environment['EPR_BIN'], 'peer', 'leases', '--json',
+                            '--root', str(fixture.root), '--policy', str(fixture.root/'genesis/agentic/pool-policy.json')],
+                            cwd=fixture.root, env=lease.host_environment(contract), text=True, capture_output=True)
+                        self.assertEqual(peer.returncode, 0, peer.stderr)
+                        self.assertEqual(json.loads(peer.stdout)['standing'], 'device')
+                        launcher.bounded([str(fixture_berth), 'claim', 'mesh', '--class', 'verify', '--ttl', '1800'],
+                                         fixture.root, 20, evidence/'baseline.log',
+                                         delegation=(contract, held, time.monotonic()))
+                        result = lease.handle_request(contract, held, time.monotonic(),
+                                                      ['session-show', '--session', lease.host_session_id(contract)])
+                        self.assertEqual(result['exit'], 0, result)
+                        self.assertEqual(set(json.loads(result['stdout'])['leases']), set(held))
+                        for resource in held[1:]:
+                            result = lease.handle_request(contract, held, time.monotonic(),
+                                ['claim', resource, '--class', 'verify', '--ttl', '600', '--offline-ok',
+                                 '--session', lease.host_session_id(contract)])
+                            self.assertEqual(result['exit'], 0, result)
+                        launcher.bounded([str(fixture_berth), 'session-show'], fixture.root, 30,
+                                         evidence/'publication-session.log',
+                                         delegation=(contract, held, time.monotonic()))
+                        self.assertIn('dev-integration', (evidence/'publication-session.log').read_text())
+                        # Enrol a second real fixture device, which has acknowledged no head.
+                        # Its absence changes the native peer verdict while the local lease
+                        # remains present: the proxy must not infer authority from that file.
+                        second = {**environment, 'XDG_CONFIG_HOME': str(fixture.base/'second-config')}
+                        def invoke(args, env):
+                            result = subprocess.run([environment['EPR_BIN'], *args], cwd=fixture.root,
+                                                    env=env, text=True, capture_output=True)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            return json.loads(result.stdout)
+                        request = invoke(['actor', 'device', 'enroll', '--handle', 'matthew'], second)
+                        authorization = invoke(['actor', 'device', 'authorize', json.dumps(request)], environment)
+                        invoke(['actor', 'device', 'bind', json.dumps(authorization)], second)
+                        node = invoke(['peer', 'id', '--json'], second)['nodeId']
+                        invoke(['actor', 'device', 'endpoint', '--node-id', node], second)
+                        # A newly admitted device is pending during the policy's confirmation
+                        # interval. Observe its actual native transition instead of relying on
+                        # fixture setup being slow enough to have consumed that interval.
+                        query = ['peer', 'leases', '--json', '--root', str(fixture.root),
+                                 '--policy', str(fixture.root/'genesis/agentic/pool-policy.json')]
+                        view = invoke(query, lease.host_environment(contract))
+                        until = time.monotonic() + view['confirm_wait_s'] + 5
+                        while view['dev-integration']['verdict'] == 'pending' and time.monotonic() < until:
+                            time.sleep(0.1)
+                            view = invoke(query, lease.host_environment(contract))
+                        self.assertEqual(view['dev-integration']['verdict'], 'unconfirmed', view)
+                        lease_file = fixture.base/'berth/leases.json'
+                        lease_bytes = lease_file.read_bytes()
+                        result = lease.handle_request(contract, held, time.monotonic(),
+                            ['owner-check', 'dev-integration', '--session', lease.host_session_id(contract)])
+                        self.assertEqual(result['exit'], 3, result)
+                        self.assertIn('unconfirmed', result['stderr'])
+                        self.assertEqual(lease_file.read_bytes(), lease_bytes)
+                    finally:
+                        supervisor.lease(contract, held, release=True)
+                self.assertEqual(caller_path.read_bytes(), before)
+                opened = json.loads(next(evidence.glob('*-open.json')).read_text())
+                closed = json.loads(next(evidence.glob('*-close.json')).read_text())
+                self.assertEqual(opened['identity']['ownerPid'], os.getpid())
+                self.assertEqual(opened['identity']['session'], lease.host_session_id(contract))
+                self.assertIsNotNone(closed['closedAt'])
+                self.assertIn('renewed', (evidence/'baseline.log').read_text())
 
 
 if __name__ == '__main__':

@@ -436,7 +436,8 @@ class PackageVersionTests(unittest.TestCase):
 
 
 class PublicationTests(unittest.TestCase):
-    def run_one(self, *, upload_result: bool, receipts: list[bool], publish: bool = True):
+    def run_one(self, *, upload_result: bool, receipts: list[bool], publish: bool = True,
+                credentials: dict[str, str] | None = None):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = root / "elohim/eprfs"
@@ -450,15 +451,28 @@ class PublicationTests(unittest.TestCase):
             (target / "package").mkdir(parents=True)
             (target / "package" / f"{NAME}-{VERSION}.crate").write_bytes(archive())
             try:
-                env = {"CARGO_TARGET_DIR": str(target), "CARGO_REGISTRIES_ELOHIM_TOKEN": "secret-token"}
+                env = {"CARGO_TARGET_DIR": str(target), **(
+                    {"CARGO_REGISTRIES_ELOHIM_TOKEN": "secret-token"}
+                    if credentials is None else credentials
+                )}
                 with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
                     publisher, "CRATES", (NAME,)
                 ), mock.patch.object(publisher, "registry_base", return_value=BASE), mock.patch.object(
                     publisher, "download_base", return_value=BASE + "/crates"
                 ), mock.patch.object(publisher, "cargo", side_effect=[True, upload_result] if publish else [True]) as calls, mock.patch.object(
                     publisher, "verify_existing", side_effect=receipts
-                ), mock.patch.object(publisher.time, "sleep"):
-                    publisher.run(root, publish)
+                ), mock.patch.object(publisher.time, "sleep"), mock.patch.object(
+                    sys, "stdout", new_callable=io.StringIO
+                ) as stdout, mock.patch.object(sys, "stderr", new_callable=io.StringIO) as stderr:
+                    try:
+                        publisher.run(root, publish)
+                    finally:
+                        self.assertEqual(dict(os.environ), env, "publisher mutated caller environment")
+                        for token in (credentials or {"token": "secret-token"}).values():
+                            if token:
+                                self.assertNotIn(token, stdout.getvalue() + stderr.getvalue())
+                                for call in calls.call_args_list:
+                                    self.assertNotIn(token, " ".join(call.args[1]))
                 return calls.call_args_list
             finally:
                 for child in (target / "package").iterdir():
@@ -472,6 +486,36 @@ class PublicationTests(unittest.TestCase):
         self.assertIn("--locked", calls[0].args[1])
         self.assertEqual(calls[0].args[1][0], "package")
         self.assertEqual(calls[0].args[2]["CARGO_REGISTRIES_ELOHIM_INDEX"], "sparse+" + BASE + "/")
+
+    def test_documented_npm_token_is_mapped_only_in_cargo_environment(self):
+        for explicit in ({}, {"CARGO_REGISTRIES_ELOHIM_TOKEN": ""}):
+            with self.subTest(explicit=explicit):
+                calls = self.run_one(upload_result=True, receipts=[False, True],
+                                     credentials={**explicit, "NPM_TOKEN": "fixture-npm-token"})
+                self.assertEqual([call.args[1][0] for call in calls], ["package", "publish"])
+                for call in calls:
+                    self.assertEqual(call.args[2]["CARGO_REGISTRIES_ELOHIM_TOKEN"],
+                                     "Bearer fixture-npm-token")
+
+    def test_explicit_cargo_token_takes_precedence_over_npm_token(self):
+        calls = self.run_one(upload_result=True, receipts=[False, True], credentials={
+            "CARGO_REGISTRIES_ELOHIM_TOKEN": "Basic fixture-cargo-token",
+            "NPM_TOKEN": "fixture-npm-token",
+        })
+        for call in calls:
+            self.assertEqual(call.args[2]["CARGO_REGISTRIES_ELOHIM_TOKEN"],
+                             "Basic fixture-cargo-token")
+
+    def test_missing_or_empty_credentials_refuse_absent_version(self):
+        for credentials in ({}, {"NPM_TOKEN": "", "CARGO_REGISTRIES_ELOHIM_TOKEN": ""}):
+            with self.subTest(credentials=credentials), self.assertRaisesRegex(
+                publisher.PublishError, "write credential is missing"
+            ):
+                self.run_one(upload_result=True, receipts=[False], credentials=credentials)
+
+    def test_existing_verified_version_needs_no_write_credential(self):
+        calls = self.run_one(upload_result=True, receipts=[True], credentials={})
+        self.assertEqual([call.args[1][0] for call in calls], ["package"])
 
     def test_failed_upload_requires_verified_existing_payload(self):
         calls = self.run_one(upload_result=False, receipts=[False, True])

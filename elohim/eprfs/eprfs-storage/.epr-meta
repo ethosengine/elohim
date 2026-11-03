@@ -26,7 +26,20 @@ rules:
 `MemoryStorage` is a test/prototyping adapter. `DirectoryStorage` verifies immutable
 local CID-named files and refuses corrupt or public Unix stores/objects; it does
 not resolve EPRs or publish attestations. The caller owns and trusts its directory
-against hostile path replacement. The additive 0.1.2 API is under qualification.
+against hostile path replacement. Successful puts sync the verified object inode,
+store directory and store parent, including already-present objects and a competing
+writer's winner. Creating a root syncs it and its existing parent even if another
+creator won; opening a root remains read-only and makes no durability claim.
+Sync errors are errors, never successful custody. Incomplete temporary objects are
+retained and named on write/sync failure; existing objects are never overwritten.
+Windows custody additionally requires NTFS, verified on each synchronization
+directory handle, and write access for the object and directory flushes. Other
+filesystems and failed filesystem queries refuse before creating a root or an
+object candidate; opening and reading a store remain read-only operations.
+The 64 MiB object ceiling can be lowered but not raised. Version 0.3.4 preserves
+legacy `put_blob` codec behavior and explicit verified raw/DAG-CBOR writes.
+Persistence relies on the filesystem/device honoring `sync_all`; process-exit and
+injected-error tests do not simulate physical power failure.
 The approved peer-delivery
 station will use existing transport to publish and retrieve verified bytes through a
 second peer; that outcome needs a separate household receipt. Blob possession alone

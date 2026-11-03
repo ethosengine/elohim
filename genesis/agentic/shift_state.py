@@ -21,6 +21,24 @@ class Refused(RuntimeError):
     pass
 
 
+def completion_phase(contract):
+    phases = {'delivery': 'complete', 'local-delivery': 'local-complete',
+              'rehearsal': 'rehearsal-complete'}
+    mode = contract.get('mode')
+    if not isinstance(mode, str) or mode not in phases:
+        raise Refused('declare delivery, local-delivery or rehearsal mode')
+    return phases[mode]
+
+
+def validate_mode(contract, step=None):
+    completion_phase(contract)
+    if contract['mode'] == 'local-delivery':
+        allowed = {'agent', 'measure', 'gate', 'native', 'commit'}
+        steps = [*contract['steps'], *([step] if step is not None else [])]
+        if any(s.get('kind') not in allowed for s in steps):
+            raise Refused('local-delivery cannot publish or touch the household')
+
+
 def ci_policy(contract):
     policy = contract.get('ci_policy', 'success')
     if policy not in ('success', 'inspect'):
@@ -217,6 +235,10 @@ def load(directory):
     if Path(contract['worktree']).resolve() != directory.parents[2].resolve():
         raise Refused('execution contract belongs to another worktree')
     authority(directory, contract, state)
+    validate_mode(contract)
+    if (state.get('phase') in {'complete', 'local-complete', 'rehearsal-complete'}
+            and state['phase'] != completion_phase(contract)):
+        raise Refused('completed checkpoint differs from frozen delivery mode')
     return contract, state
 
 

@@ -24,7 +24,7 @@ import groovy.json.JsonOutput
  */
 def discoverAndParseManifests() {
     def paths = sh(
-        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*' -not -path '*/.claude/*' | sort",
+        script: "find . -name 'build-manifest.json' -not -path '*/node_modules/*' -not -path '*/.superpowers/*' -not -path '*/.claude/*' -not -path '*/local-dev/*' | sort",
         returnStdout: true
     ).trim().split('\n').findAll { it }
 

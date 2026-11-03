@@ -1,5 +1,6 @@
 """Crash-boundary recovery and bounded retry tests in disposable repositories."""
 import json
+import contextlib
 from pathlib import Path
 import subprocess
 import sys
@@ -58,6 +59,18 @@ class RecoveryTests(unittest.TestCase):
 
     def next(self):
         return ops.next_operation(self.directory, self.contract, self.checkpoint)
+
+    def test_completed_success_past_lease_is_refused_on_recovery(self):
+        self.configure({'id': 'late-transfer', 'kind': 'measure', 'resource': 'dev-integration',
+                        'argv': ['true']})
+        pending = self.dispatch()
+        receipt = self.finish(pending)
+        receipt.update(started=pending['prepared_at'], finished=pending['prepared_at']+600)
+        state.atomic(self.operation/'receipt.json', receipt)
+        before = (self.operation/'receipt.json').read_bytes()
+        with self.assertRaisesRegex(state.Refused, 'original lease budget'):
+            ops.receipt_history(self.directory, self.contract, self.step)
+        self.assertEqual((self.operation/'receipt.json').read_bytes(), before)
 
     def commit_effect(self, message=None):
         self.configure({'id': 'commit', 'kind': 'commit', 'message': 'delivered fixture'})
@@ -376,7 +389,7 @@ class ReadinessResourceTests(unittest.TestCase):
                     'deadline': 'unchanged-original-deadline', 'measurement_resource': 'cargo',
                     'workload_env': {'CARGO_TARGET_POOL_FAMILY': 'fixture-pool'}}
             calls = []
-            def bounded(argv, cwd, timeout, log, text=None, *, env=None, check=None):
+            def bounded(argv, cwd, timeout, log, text=None, *, env=None, check=None, delegation=None):
                 calls.append((argv, env))
                 if 'genesis/agentic/readiness.mjs' in argv:
                     self.assertEqual(lease.call_args_list, [
@@ -392,6 +405,7 @@ class ReadinessResourceTests(unittest.TestCase):
                     patch.object(launcher, 'session_from', return_value='fixture-session'), \
                     patch.object(launcher, 'completed', return_value=True), \
                     patch.object(launcher, 'native_context'), \
+                    patch.object(launcher, 'host_session', return_value=contextlib.nullcontext()), \
                     patch.object(launcher, 'bounded', side_effect=bounded), \
                     patch.object(launcher, 'run', side_effect=run), \
                     patch.object(launcher, 'lease') as lease:

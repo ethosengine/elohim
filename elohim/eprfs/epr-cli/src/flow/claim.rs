@@ -150,19 +150,14 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     let on = non_empty(request.on, "--on")?;
     let named = named_identity(request.actor.as_ref.as_deref())?;
 
-    // `--serves` is checked against the GENERATED register before anything else is resolved:
+    // `--serves` is checked against its explicit owning declaration before resolving intent:
     // an unknown habit id is a typo in the accounting, and accounting work to a habit that
     // does not exist is worse than not accounting it at all.
+    let mut habit_evidence = Vec::new();
     let habit = match request.serves {
         Some(raw) => {
             let id = non_empty(raw, "--serves")?;
-            let habits = registers::read_habits(root)?;
-            if !habits.iter().any(|habit| habit.id == id) {
-                return Err(FlowError::InvalidArguments(format!(
-                    "unknown habit `{id}` — this repository declares no such habit; \
-                     a habit is DECLARED in its `.epr-meta` atom, never invented at claim time"
-                )));
-            }
+            habit_evidence = registers::claim_habit(root, id)?;
             Some(id.to_string())
         }
         None => None,
@@ -206,6 +201,7 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
     if let Some(habit) = &habit {
         classified_as.push(format!("{HABIT_SLOT_PREFIX}{habit}"));
     }
+    classified_as.extend(habit_evidence.iter().cloned());
     if let Some((session, _)) = &scope {
         classified_as.push(format!("session:{session}"));
     }
@@ -255,6 +251,13 @@ pub fn claim(root: &Path, request: &ClaimRequest) -> FlowResult<ClaimOutcome> {
         }
     }
 
+    if let Some(habit) = habit.as_ref().filter(|_| !habit_evidence.is_empty()) {
+        if registers::claim_habit(root, habit)? != habit_evidence {
+            return Err(FlowError::InvalidArguments(
+                "habit ownership evidence changed during claim".into(),
+            ));
+        }
+    }
     let outcome = ClaimOutcome {
         intent: intent_cid.to_string(),
         gap_id,

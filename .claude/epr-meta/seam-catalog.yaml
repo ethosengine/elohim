@@ -249,9 +249,11 @@ seams:
     # (`MESH_CONDUCTOR_LAUNCH=ark` makes conductors children of an envelope). The spec's own
     # concern-canon walk agrees on the plane: "C0 plane: the runtime seam's own crate, bridging
     # to the p2p plane through storage".
-    # This is a routing of the CORE crate only, per the birth rule: `elohim-ark-supervisor` and
-    # `elohim-ark` carry no row-bearing registry yet (I/O and CLI instantiate decisions minted
-    # here). Route them on the commit that mints one.
+    # The supervisor and CLI now carry their own row-bearing registries. The CLI's
+    # native whole-tree execution verifies private inputs and declared outputs through
+    # the existing task admission/supervisor boundary, so it belongs in this runtime seam.
+    # Brit's CLI registry covers that same native execution delegation to installed Ark;
+    # it does not claim coverage for Brit's other Git or repository authority operations.
     # `holochain`, `holochain_conductor_api` and `holochain_trace` (elohim/holochain-conductor/crates)
     # carry registries only on the conductor fork's fix/wasm-store-retention-0.7 line (born at
     # 915acf6bc), NOT at the pinned c916eddbe. Un-routed 2026-10-09 so the harness's
@@ -260,6 +262,8 @@ seams:
     registry_crates:
       - elohim-ark-core
       - elohim-ark-supervisor
+      - elohim-ark
+      - brit-cli
     # habits: [declarative-desired-state] — parked 2026-08-13, see plane_note above.
     habits: []
     n_a_concerns: []

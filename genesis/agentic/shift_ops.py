@@ -9,13 +9,13 @@ import time
 import uuid
 
 from shift_runtime import command, completed, prompt, session_from
-from shift_lease import resources
+from shift_lease import lease_budget, resources
 from shift_evidence import oracle_proof, require_binary_evidence, require_measurements, satisfies
 from shift_reconcile import commit_argv, commit_identity, dispatch_binding, native_argv, native_effect, observe_effect
 from shift_repair import (eligible as repair_eligible, fingerprint, next_repair, validate_pending,
                           validate_reference, validate_spec)
-from shift_state import (Refused, atomic, authority, ci_policy, digest, load, lock, native_context,
-                         read, require_acceptance, revision, run, under)
+from shift_state import (Refused, atomic, authority, ci_policy, digest, finite_number, load, lock, native_context,
+                         read, require_acceptance, revision, run, under, completion_phase, validate_mode)
 
 
 KINDS = {'agent', 'measure', 'gate', 'household', 'lifecycle', 'native', 'commit', 'land', 'push', 'ci'}
@@ -80,6 +80,11 @@ def receipt_history(directory, contract, step):
         value = read(path)
         if value['operation'] != step['id'] or value['contract_sha256'] != digest(directory / 'contract.json'):
             raise Refused('operation receipt belongs to another contract')
+        budget = lease_budget(step.get('resource'))
+        if value.get('exit') == 0 and budget is not None:
+            if (not finite_number(value.get('started')) or not finite_number(value.get('finished'))
+                    or not 0 <= value['finished'] - value['started'] < budget):
+                raise Refused('successful operation receipt exceeded or lacks its original lease budget')
         for source in value['evidence']:
             if digest(under(contract['worktree'], source['path'])) != source['sha256']:
                 raise Refused(f"changed receipt evidence: {source['path']}")
@@ -196,6 +201,16 @@ def next_operation(directory, contract, checkpoint):
 
 
 def require_delivery_evidence(directory, contract, delivered, *, published=False):
+    validate_mode(contract)
+    local = contract['mode'] == 'local-delivery'
+    if local:
+        if published:
+            raise Refused('local-delivery cannot establish publication')
+        if (revision(contract['worktree']) != delivered
+                or not clean(contract['worktree'], contract, include_submodules=True)):
+            raise Refused('local delivery requires the exact clean committed revision')
+        if not contract['verification']:
+            raise Refused('local delivery requires declared owner gates')
     require_acceptance(contract, delivered)
     evidence = [r for r in receipts(directory, contract)
                 if r['exit'] == 0 and r['revision'] == delivered and r['clean']]
@@ -203,7 +218,7 @@ def require_delivery_evidence(directory, contract, delivered, *, published=False
     if not set(contract['verification']) <= projects:
         raise Refused('required gate receipts missing for exact delivered revision')
     kinds = {r['kind'] for r in evidence}
-    if 'household' not in kinds:
+    if not local and 'household' not in kinds:
         raise Refused('matching household receipt missing')
     require_measurements(contract, objective_history(directory, contract), delivered)
     for step in contract['steps']:
@@ -213,13 +228,23 @@ def require_delivery_evidence(directory, contract, delivered, *, published=False
         raise Refused('authorized publication or downstream CI receipt missing')
 
 
+def require_completion(directory, contract, delivered):
+    """Revalidate the frozen delivery boundary both at completion and on resume."""
+    validate_mode(contract)
+    if contract['mode'] != 'rehearsal':
+        require_delivery_evidence(directory, contract, delivered,
+                                  published=contract['mode'] == 'delivery')
+    return completion_phase(contract)
+
+
 def observer_paths(contract):
     return contract.get('observer_paths', [])
 
 
-def clean(root, contract=None):
+def clean(root, contract=None, *, include_submodules=False):
     allowed = observer_paths(contract or {})
-    result = subprocess.run(['git', 'status', '--porcelain', '--ignore-submodules=dirty'],
+    submodules = '--ignore-submodules=none' if include_submodules else '--ignore-submodules=dirty'
+    result = subprocess.run(['git', 'status', '--porcelain', submodules],
                             cwd=root, text=True, capture_output=True, check=True)
     return all(row.startswith(' M ') and row[3:] in allowed for row in result.stdout.splitlines())
 
@@ -241,6 +266,7 @@ def scoped_changes(contract):
 
 
 def host_argv(directory, contract, state, step):
+    validate_mode(contract, step)
     kind, root = step['kind'], contract['worktree']
     authority(directory, contract, state, publication=kind in {'land', 'push'})
     if kind == 'lifecycle':
@@ -288,6 +314,7 @@ def reconcile_operation(directory, contract, step, checkpoint=None):
     operation = op_dir(directory, step)
     pending = read(operation / 'pending.json')
     checkpoint = checkpoint or load(directory)[1]
+    validate_mode(contract, step)
     authority(directory, contract, checkpoint, publication=step['kind'] in {'land', 'push'})
     if pending['contract_sha256'] != digest(directory / 'contract.json'):
         raise Refused('pending operation contract changed')
@@ -392,15 +419,22 @@ def execute(directory, step_id):
     exit_code = process.returncode
     if step['kind'] == 'agent' and exit_code == 0 and not completed(pending['runtime'], operation / pending['log']):
         exit_code = 125
+    finished = time.time()
+    budget = lease_budget(step.get('resource'))
+    lease_expired = budget is not None and finished - pending['prepared_at'] >= budget
+    if lease_expired:
+        exit_code = 125
     result = {
         'operation': step_id, 'kind': step['kind'], 'project': step.get('project'),
         'contract_sha256': pending['contract_sha256'], 'attempt': pending['attempt'], 'exit': exit_code,
         'objective': step.get('objective') is True,
         'revision': after, 'clean': is_clean and clean(contract['worktree'], contract) and before == after,
-        'started': pending['prepared_at'], 'finished': time.time(), 'session': session,
+        'started': pending['prepared_at'], 'finished': finished, 'session': session,
         'evidence': [{'path': str((operation / pending['log']).relative_to(contract['worktree'])),
                       'sha256': digest(operation / pending['log'])}],
     }
+    if lease_expired:
+        result['refusal'] = 'operation lease expired before completion'
     if pending.get('repair_for'):
         result['repair_for'] = pending['repair_for']
         if step['kind'] == 'agent':
@@ -440,10 +474,14 @@ def execute(directory, step_id):
             result.update(exit=125, refusal=str(error))
     if repair_eligible(step) and result['exit'] != 0:
         result['verification_failure'] = True
+    result['finished'] = time.time()
+    if budget is not None and result['finished'] - pending['prepared_at'] >= budget:
+        result.update(exit=125, refusal='operation lease expired before completion')
     save_receipt(operation, result)
 
 
 def prepare(directory, contract, state, step):
+    validate_mode(contract, step)
     authority(directory, contract, state)
     repair_target = step.get('repair_for')
     if repair_target is not None:

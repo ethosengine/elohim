@@ -2502,10 +2502,10 @@ habits:
       - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (six isolated-Git acceptance scenarios, including independent addressed-policy holdings)"
       - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
     evidence: >
-      DELTA 2026-11-03 (reach correction): the pre-push seam-matrix harness exposed the unmapped eprfs-meta registry and an upstream Python test citation outside the registry schema. Routed portable policy evaluation to the governing/meta column and cited the existing Rust integration wrapper for the Python suite; all 38 matrix assertions pass. Evidence: genesis/local-dev/integration-20261103/seam-matrix-repaired.log. No policy or licensing restriction changed.
-    evidence-fingerprint: sha256:a11da8112e74dda8
-    evidence-bytes: 5364
-    evidence-entries: 7
+      DELTA 2026-11-03 (native sprint integration): EPRFS core 0.3.3 requires the checker's exact dependency pin to advance; rebuilt and re-exported the complete method/source closure while retaining prior addressed holdings and the same guide/rules. The normal Rust-style gate passes on the combined tree, including the Windows storage branch; publisher precheck preserves existing immutable packages and 36 publisher tests pass. Evidence: genesis/local-dev/integration-20261103/native-rust-style-gate.log and native-checker-discipline.json.
+    evidence-fingerprint: sha256:b305561e9cee9fdb
+    evidence-bytes: 5902
+    evidence-entries: 8
     guard: >
       Never equate equal counts with no new findings; never use dirty source for a pushed object;
       never call a missing baseline or a stale checker clean. Scope and owner moves cannot transfer

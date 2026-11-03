@@ -1,8 +1,8 @@
-//! Storage-facing adapter scaffolding for `eprfs`.
+//! Storage-facing adapters for `eprfs`.
 //!
 //! This crate is where `elohim-storage` integration belongs. The current
-//! implementation provides a memory-backed adapter used by tests and early
-//! consumers while the storage HTTP/DHT contract is selected.
+//! implementation provides a memory-backed adapter for tests and a verified,
+//! synchronized private directory store. Neither elects a release head.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -18,6 +18,9 @@ use tokio::sync::RwLock;
 
 pub mod budget;
 pub use budget::{BudgetScope, SemaphoreGate};
+
+#[cfg(windows)]
+mod windows;
 
 /// Adapter configuration for a future elohim-storage HTTP-backed client.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +122,11 @@ impl EprfsStorage for MemoryStorage {
 /// Flat local content store for explicit caller-selected private bytes. This
 /// does not resolve EPRs, publish attestations, or establish release standing.
 /// Its directory is caller-owned and trusted against concurrent path replacement.
+/// Successful puts synchronize the verified object, store directory and store's
+/// parent, including deduplicated/concurrent puts. This relies on the filesystem
+/// honoring `sync_all`; reads alone do not establish durable custody.
+/// On Windows, custody requires NTFS and write access to the synchronized handles;
+/// other filesystems refuse before creating a store or a content candidate.
 #[derive(Debug, Clone)]
 pub struct DirectoryStorage {
     root: PathBuf,
@@ -127,11 +135,26 @@ pub struct DirectoryStorage {
 
 const DEFAULT_MAX_BLOB_BYTES: usize = 64 * 1024 * 1024;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StoreStep {
+    CreateRoot,
+    WriteObject,
+    SyncObject,
+    PublishObject,
+    SyncRoot,
+    SyncParent,
+}
+
 impl DirectoryStorage {
     /// Open an existing directory without creating or modifying it.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let root = path.as_ref();
-        let metadata = std::fs::symlink_metadata(root).map_err(|source| EprfsError::Io {
+        // Bind relative paths once; a later process-wide cwd change must not
+        // redirect an already opened store.
+        let root = std::path::absolute(path.as_ref()).map_err(|source| EprfsError::Io {
+            path: path.as_ref().to_path_buf(),
+            source,
+        })?;
+        let metadata = std::fs::symlink_metadata(&root).map_err(|source| EprfsError::Io {
             path: root.to_path_buf(),
             source,
         })?;
@@ -158,28 +181,66 @@ impl DirectoryStorage {
     }
 
     /// Restrict each object read and write before allocating or persisting it.
+    /// Values above the 64 MiB native ceiling are clamped to that ceiling.
     pub fn with_max_blob_bytes(mut self, max_blob_bytes: usize) -> Self {
-        self.max_blob_bytes = max_blob_bytes;
+        self.max_blob_bytes = max_blob_bytes.min(DEFAULT_MAX_BLOB_BYTES);
         self
     }
 
     /// Explicitly create a new store, then open it. Existing stores are opened
-    /// without changing their contents.
+    /// without changing their contents. Synchronize the directory and its parent
+    /// even when another creator won the race or a prior creation was interrupted.
     pub fn create(path: impl AsRef<Path>) -> Result<Self> {
-        let root = path.as_ref();
-        if !root.exists() {
-            let mut builder = std::fs::DirBuilder::new();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::DirBuilderExt;
-                builder.mode(0o700);
-            }
-            builder.create(root).map_err(|source| EprfsError::Io {
-                path: root.to_path_buf(),
-                source,
-            })?;
+        Self::create_with_hook(path.as_ref(), &mut |_, _| Ok(()))
+    }
+
+    fn create_with_hook(
+        path: &Path,
+        hook: &mut impl FnMut(StoreStep, &Path) -> std::io::Result<()>,
+    ) -> Result<Self> {
+        let root = std::path::absolute(path).map_err(|source| storage_io(path, source))?;
+        // Refuse unsupported Windows filesystems before creating a new directory.
+        #[cfg(windows)]
+        {
+            let parent = root.parent().unwrap_or(&root);
+            windows::open_sync_directory(parent).map_err(|source| storage_io(parent, source))?;
         }
-        Self::open(root)
+        let mut builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        hook(StoreStep::CreateRoot, &root).map_err(|source| storage_io(&root, source))?;
+        match builder.create(&root) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(source) => return Err(storage_io(&root, source)),
+        }
+        let store = Self::open(&root)?;
+        store.sync_directories(hook)?;
+        Ok(store)
+    }
+
+    fn sync_directories(
+        &self,
+        hook: &mut impl FnMut(StoreStep, &Path) -> std::io::Result<()>,
+    ) -> Result<()> {
+        let parent = self.root.parent().unwrap_or(&self.root);
+        for (step, path) in [
+            (StoreStep::SyncRoot, self.root.as_path()),
+            (StoreStep::SyncParent, parent),
+        ] {
+            #[cfg(windows)]
+            let file =
+                windows::open_sync_directory(path).map_err(|source| storage_io(path, source))?;
+            #[cfg(not(windows))]
+            let file = std::fs::File::open(path).map_err(|source| storage_io(path, source))?;
+            hook(step, path)
+                .and_then(|()| file.sync_all())
+                .map_err(|source| storage_io(path, source))?;
+        }
+        Ok(())
     }
 
     fn object_path(&self, cid: &BlobCid) -> PathBuf {
@@ -199,6 +260,15 @@ impl DirectoryStorage {
     }
 
     fn put_object(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
+        self.put_object_with_hook(cid, bytes, &mut |_, _| Ok(()))
+    }
+
+    fn put_object_with_hook(
+        &self,
+        cid: &BlobCid,
+        bytes: Bytes,
+        hook: &mut impl FnMut(StoreStep, &Path) -> std::io::Result<()>,
+    ) -> Result<()> {
         if bytes.len() > self.max_blob_bytes {
             return Err(EprfsError::Storage(format!(
                 "content object exceeds byte limit: {cid}"
@@ -209,11 +279,20 @@ impl DirectoryStorage {
                 "blob integrity verification failed for {cid}"
             )));
         }
+        // `open` is read-only and permits stores whose filesystem cannot promise
+        // custody. Check before creating any candidate through such a store.
+        #[cfg(windows)]
+        for directory in [
+            self.root.as_path(),
+            self.root.parent().unwrap_or(&self.root),
+        ] {
+            windows::open_sync_directory(directory)
+                .map_err(|source| storage_io(directory, source))?;
+        }
         let path = self.object_path(cid);
         match std::fs::symlink_metadata(&path) {
             Ok(_) => {
-                self.read_object(cid)?;
-                return Ok(());
+                return self.sync_existing(cid, hook);
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(source) => return Err(EprfsError::Io { path, source }),
@@ -223,33 +302,48 @@ impl DirectoryStorage {
                 path: self.root.clone(),
                 source,
             })?;
-        temporary
-            .write_all(&bytes)
-            .map_err(|source| EprfsError::Io {
-                path: path.clone(),
-                source,
-            })?;
-        temporary
-            .as_file()
-            .sync_all()
-            .map_err(|source| EprfsError::Io {
-                path: path.clone(),
-                source,
-            })?;
+        let prepared = (|| {
+            hook(StoreStep::WriteObject, temporary.path())?;
+            temporary.write_all(&bytes)?;
+            hook(StoreStep::SyncObject, temporary.path())?;
+            temporary.as_file().sync_all()?;
+            hook(StoreStep::PublishObject, &path)
+        })();
+        if let Err(source) = prepared {
+            return Err(retain_temporary(temporary, storage_io(&path, source)));
+        }
         match temporary.persist_noclobber(&path) {
-            Ok(_) => Ok(()),
+            Ok(_) => self.sync_directories(hook),
             Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
-                self.read_object(cid)?;
-                Ok(())
+                // The winner may not have reached fsync yet. Verify and sync
+                // its actual inode, not just our losing temporary inode.
+                match self.sync_existing(cid, hook) {
+                    Ok(()) => Ok(()),
+                    Err(failure) => Err(retain_temporary(error.file, failure)),
+                }
             }
-            Err(error) => Err(EprfsError::Io {
-                path,
-                source: error.error,
-            }),
+            Err(error) => Err(retain_temporary(error.file, storage_io(&path, error.error))),
         }
     }
 
+    fn sync_existing(
+        &self,
+        cid: &BlobCid,
+        hook: &mut impl FnMut(StoreStep, &Path) -> std::io::Result<()>,
+    ) -> Result<()> {
+        let (file, _) = self.read_object_file(cid, true)?;
+        let path = self.object_path(cid);
+        hook(StoreStep::SyncObject, &path)
+            .and_then(|()| file.sync_all())
+            .map_err(|source| storage_io(&path, source))?;
+        self.sync_directories(hook)
+    }
+
     fn read_object(&self, cid: &BlobCid) -> Result<Bytes> {
+        self.read_object_file(cid, false).map(|(_, bytes)| bytes)
+    }
+
+    fn read_object_file(&self, cid: &BlobCid, for_custody: bool) -> Result<(std::fs::File, Bytes)> {
         let path = self.object_path(cid);
         let metadata = std::fs::symlink_metadata(&path).map_err(|source| {
             if source.kind() == std::io::ErrorKind::NotFound {
@@ -280,12 +374,19 @@ impl DirectoryStorage {
                 "content object exceeds byte limit: {cid}"
             )));
         }
-        let file = std::fs::File::open(&path).map_err(|source| EprfsError::Io {
-            path: path.clone(),
-            source,
-        })?;
+        // FlushFileBuffers requires write access. Verify and flush this same
+        // handle for custody; fetching never requests write access.
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(for_custody && cfg!(windows))
+            .open(&path)
+            .map_err(|source| EprfsError::Io {
+                path: path.clone(),
+                source,
+            })?;
         let mut bytes = Vec::new();
-        file.take((self.max_blob_bytes as u64).saturating_add(1))
+        (&file)
+            .take((self.max_blob_bytes as u64).saturating_add(1))
             .read_to_end(&mut bytes)
             .map_err(|source| EprfsError::Io { path, source })?;
         if bytes.len() > self.max_blob_bytes {
@@ -296,9 +397,37 @@ impl DirectoryStorage {
         if !cid.verifies(&bytes) {
             return Err(EprfsError::Corrupt(cid.clone()));
         }
-        Ok(Bytes::from(bytes))
+        Ok((file, Bytes::from(bytes)))
     }
 }
+
+fn storage_io(path: &Path, source: std::io::Error) -> EprfsError {
+    EprfsError::Io {
+        path: path.to_path_buf(),
+        source,
+    }
+}
+
+fn retain_temporary(mut file: tempfile::NamedTempFile, error: EprfsError) -> EprfsError {
+    let path = file.path().to_path_buf();
+    // Retention itself may fail on a platform with delete-on-close semantics.
+    // Never let dropping that second error silently request filesystem cleanup.
+    file.disable_cleanup(true);
+    match file.keep() {
+        Ok(_) => EprfsError::Storage(format!(
+            "{error}; incomplete object retained at {}",
+            path.display()
+        )),
+        Err(keep) => EprfsError::Storage(format!(
+            "{error}; retaining incomplete object at {} failed: {}",
+            path.display(),
+            keep.error
+        )),
+    }
+}
+
+#[cfg(test)]
+mod durability_tests;
 
 #[async_trait]
 impl EprfsStorage for DirectoryStorage {

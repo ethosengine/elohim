@@ -1,8 +1,9 @@
 # Bounded delivery shifts
 
 > **Status: dormant.** Nothing starts a shift automatically (no devfile `postStart`, no hook). It runs only when
-> invoked, and its publication leg is not yet adapted to dev's `dev-integration` lease or native session
-> envelope: see `genesis/data/timeline/backlog/shift-launcher-lease-and-session-adaptation.md`.
+> invoked. Native host-envelope, baseline delegation and publication-lease adaptation are covered by
+> the prerequisite tests; no unattended re-arming or completed delivery is implied. Current evidence
+> and remaining obligations: `genesis/data/timeline/backlog/shift-launcher-lease-and-session-adaptation.md`.
 
 The shift launcher carries one authorized task through a retained worktree, durable
 evidence, independent native acceptance, and publication. Claude and Codex share
@@ -32,6 +33,20 @@ need `household_lifecycle: true`. A separate revocation file starts with
 `{"revoked": false}`; changing it to true stops execution. Do not rewrite original
 authority to simulate a fresh grant. A covenant variance grants neither build nor
 publication authority.
+
+Freeze the completion boundary in `mode`. `delivery` retains the household,
+gated publication and downstream CI requirements. `local-delivery` carries a
+task to an independently accepted, clean committed revision on this device:
+it requires the declared owner gates and consecutive objective measurements
+at that exact revision, and refuses `household`, `lifecycle`, `land`, `push`
+and `ci` operations. It may commit and fulfill the original native commitment;
+its terminal state is `local-complete`, with no publication claim. `rehearsal`
+remains limited to agent, measure and gate operations and establishes neither
+fulfillment nor acceptance. Mode is immutable with the contract, checked again
+on load/recovery, and a completed local delivery revalidates acceptance, current
+clean source and its exact-revision evidence on resume. This boundary is covered
+by `shift_test.py`'s local-delivery regressions and
+`shift_initialization_test.py::Initialization::test_local_delivery_is_frozen_and_forbidden_effects_refuse_before_readiness`.
 
 `intent`, `commitment`, `scope_cid`, and `habit` name the native claim made with
 `epr flow claim --serves`. Preserve the intent's existing scope CID. A sprint ID,
@@ -119,7 +134,9 @@ Each operation has a frozen ID and arguments. Available kinds are:
 
 Declare `resource: cargo|mesh|disk-heavy` on operations that use one lease, or an
 explicit list such as `resource: [cargo, mesh]` when a storage build also checks
-household ownership. `measurement_resource` accepts the same forms for the
+household ownership. Publication may explicitly name `dev-integration`,
+`jenkins-dispatch`, `alpha-fleet`, and `lane:<id>`; their native peer verdict must
+still admit the hold. `measurement_resource` accepts the same forms for the
 readiness baseline; omitted/null or an empty list means no lease. Names must be
 known and unique. The host claims the set in sorted order, rolls back its own
 claims if acquisition fails, and releases every held resource after the operation,
@@ -127,10 +144,21 @@ including failed readiness attempts. Nested commands in the PID namespace
 delegate checks only for a requested member of that held set, validated against
 its current host lease; they cannot renew its TTL, release it, change class, or
 expand to another resource.
-The household verify lease retains its original 1,800-second limit. The only
+The readiness baseline uses the same authenticated host delegation as execution.
+Readiness and each guardian incarnation open their own native process-owned
+envelope and close it through `epr session close`, retaining both receipts. These
+envelopes never take the caller's identity, actor appointment or acceptance authority.
+The household verify lease retains its original 1,800-second limit; publication
+leases are bounded to 600 seconds. Both baseline and guardian fence the entire
+operation at the shortest original lease budget, without renewal; a late success
+receipt cannot establish success during recovery. The only
 persisted workload environment overrides are `MESH_DIR`, `MESH_TRANSPORT_BACKEND`,
 and `CARGO_TARGET_POOL_FAMILY`; runtime authentication remains in the runtime's own
 configuration. Pin `MESH_DIR` when using a retained household outside this worktree.
+
+Native context, original commitments and the served habit must resolve within the
+declared worktree's repository. The launcher has no separate native-record root;
+a parent checkout cannot claim a nested repository's habit by copying its declaration.
 
 Household and CI commands receive `SHIFT_CONTRACT_SHA256`, `SHIFT_OPERATION`,
 `SHIFT_ATTEMPT`, `SHIFT_PREPARED_AT`, `SHIFT_REVISION`, and `SHIFT_PROOF_PATH`.
@@ -234,9 +262,11 @@ review → appointed independent acceptance → native reconciliation. The accep
 runs or inspects the declared oracle at the exact revision. Later verification
 creates new evidence and acceptance reports, with explicit supersession when
 needed; it never rewrites original fulfillment. Current native acceptance is
-rechecked even when the checkpoint says complete. Stable objective measurements,
-all required gates, household proof, authorized publication and downstream CI
-are required. A cross-runtime mutation rehearsal is a separate verification run;
+rechecked even when the checkpoint says complete. Both delivery modes require
+stable objective measurements and all declared gates at the clean delivered
+revision. `delivery` additionally requires household proof, authorized publication
+and downstream CI; `local-delivery` closes at independent local acceptance.
+A cross-runtime mutation rehearsal is a separate verification run;
 it cannot fulfill, publish, or manage the shared household.
 
 Run `just gate agentic-shift` for the launcher regression suite. It requires real

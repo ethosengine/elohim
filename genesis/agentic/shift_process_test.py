@@ -48,7 +48,10 @@ class ProcessRecovery(unittest.TestCase):
         context = {'reconciliation': {'scope_cid': 'scope-existing', 'assertions': [{
             'intent': 'intent-existing', 'commitments': [{'commitment': 'promise-existing',
                 'attribution': {'eligible': True, 'actor_claim': 'fixture-actor-claim', 'witness': None, 'issues': []}}]}]}}
-        self.executable('epr', f'print({json.dumps(json.dumps(context))})\n')
+        self.executable('epr', 'import json,os,sys\n'
+                        'if sys.argv[1:2] == ["session"]:\n'
+                        ' print(json.dumps({"identity":{"session":os.environ["ELOHIM_SESSION_ID"]}}))\n'
+                        f'else: print({json.dumps(json.dumps(context))})\n')
         adapter = '''import json, os, sys, time, uuid
 args = sys.argv[1:]
 runtime = os.path.basename(sys.argv[0])
@@ -71,7 +74,7 @@ print(json.dumps({'type':'turn.completed'} if runtime == 'codex' else {'type':'r
         state.atomic(self.directory / 'authority.json', grant)
         self.contract['authority']['sha256'] = state.digest(self.directory / 'authority.json')
         self.fixture.freeze()
-        self.env = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ['PATH'])
+        self.env = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ['PATH'], EPR_BIN=str(self.bin/'epr'))
 
     def executable(self, name, source):
         path = self.bin / name

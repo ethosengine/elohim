@@ -7,9 +7,46 @@ Feature: People share unfinished work without silently publishing or executing i
   A commons charter governs shared storage, bandwidth and maintenance labor;
   shared compute requires a separate agreement. Source and evidence are artifacts.
   A person's elohim is their assistant, never an independent collective decision maker.
-  These are pending acceptance stories, not evidence of implemented behavior.
+  The @local-native stations exercise only one device's filesystem and fixed candidate.
+  The other stories remain pending, including Avodah, sharing, authority and peer freshness.
+  Local execution evidence is not publication authority or independent acceptance.
 
   # Design: genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md
+
+  # Local stations use the isolated scripts/brit-native-source-loop.mjs profile.
+  # The feature remains @wip; that profile needs Linux and installed Brit/Ark, not household nodes.
+  @local-native @regression
+  Scenario: Matthew reopens an unpublished filesystem candidate without Git
+    Given Matthew has local source files outside Git and a separate private store
+    When he captures only his selected files as candidate A and the capture process closes
+    And he changes his original source to B and restores A in a fresh process
+    Then restored A retains the selected bytes, executable mode and literal link
+    And omitted files stay absent, captured hooks stay inert and B remains editable
+    And the capture reports an unpublished candidate
+
+  @local-native @regression
+  Scenario: Matthew explicitly tests A while continuing to edit B
+    Given Matthew has local source files outside Git and a separate private store
+    When he captures only his selected files as candidate A and the capture process closes
+    And he explicitly runs a pinned native task against A while editing his original source to B
+    Then the stored output contains only A's answer and B survives
+    And the result binds A and the original task specification without a reusable gate attestation
+    And capturing B gives a different candidate which cannot inherit A's result
+
+  # Constraint: selection is literal and explicit; a directory or glob cannot widen it.
+  @local-native @regression
+  Scenario Outline: Matthew gets a refusal before an ambiguous selection can be saved
+    Given Matthew has local source files outside Git and a separate private store
+    When he attempts to capture the unsupported selection "<selection>"
+    Then Matthew receives an explicit unsupported-selection refusal
+    And no candidate store is created and his source stays intact
+
+    Examples:
+      | selection   |
+      | .           |
+      | ../escape   |
+      | *.rs        |
+      | .git/config |
 
   Scenario Outline: Saved changes survive reopening offline
     Given Matthew holds a working version and no other device is reachable
@@ -52,7 +89,8 @@ Feature: People share unfinished work without silently publishing or executing i
     Given Matthew authorizes an agent under "<agreement>"
     When the agent prepares a change
     Then the change "<result>"
-    And changes outside the authorized scope remain proposals for human acceptance
+    When the agent also attempts to edit the shared copy outside its authorized scope
+    Then that edit remains a proposal for human acceptance and the shared copy stays unchanged
 
     Examples:
       | agreement                                | result                                                  |
@@ -110,7 +148,7 @@ Feature: People share unfinished work without silently publishing or executing i
       | Q1 purpose and resource rules       | fetch the charter-named rules          | fetched bytes match their declared content address and state the purpose and draw rules |
       | Q2 proportional draw rule           | request a draw above the agreed limit  | the granted allocation is capped at the member's remaining allowance in the declared window           |
       | Q3 facility condition measure       | read as an ordinary member             | condition is readable without a steward                |
-      | Q5 draw-record visibility           | list permitted recent draws            | records stay within the member's admitted audience      |
+      | Q5 draw-record visibility, with one admitted draw and one outside the member's audience | list recent draws | the admitted draw is returned and the outside draw is undisclosed |
       | Q6 joining and leaving              | withdraw and request another draw      | current membership refuses the new draw                |
       | Q7 holdings and boundaries          | draw outside holdings                  | refusal names the resource boundary                    |
       | Q8 member-proposed amendments       | propose and adopt a charter amendment  | two peers derive the same revised charter head         |
@@ -141,17 +179,21 @@ Feature: People share unfinished work without silently publishing or executing i
 
   Scenario: Management and exclusion rights cannot be sold away
     Given members adopted a coding commons charter with declared artifact rights
+    And the member attempting the transfer holds management and exclusion rights
     When they inspect those rights
     Then access, contribution, extraction, removal, management, and exclusion name their holders
-    And nobody may sell or lease management and exclusion
-    And leaving ends future access without promising erasure of already received copies
+    When a member attempts to sell or lease management and exclusion
+    Then the transfer is refused and the original holders retain those rights
+    When that member leaves and attempts to read new shared material
+    Then future access is refused without promising erasure of already received copies
 
   Scenario: Several devices and agents do not multiply a human choice
     Given Matthew has two devices and agents while members decide an amendment
     When he votes from one device and repeats the act from another
     Then the decision contains one human choice from Matthew
-    And agents may carry evidence but cannot cast or multiply his vote
-    And his serving doorway has no additional seat
+    When an agent attempts to cast an additional vote and his serving doorway requests a seat
+    Then both attempts are refused and Matthew's one human choice is unchanged
+    And agents may still carry evidence without voting
 
   Scenario: Repeated agents cannot supply missing plurality
     Given members have approved an amendment to their resource allocation rule

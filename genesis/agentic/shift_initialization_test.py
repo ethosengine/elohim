@@ -85,6 +85,20 @@ class Initialization(unittest.TestCase):
         self.assertEqual(contract['ci_policy'], 'success')
         self.assertEqual(json.loads(initialized)['spec']['ci_policy'], 'success')
 
+    def test_local_delivery_is_frozen_and_forbidden_effects_refuse_before_readiness(self):
+        self.spec['mode'] = 'local-delivery'
+        for kind in ['household', 'lifecycle', 'land', 'push', 'ci']:
+            candidate = {**self.spec, 'steps': [{'id': 'forbidden', 'kind': kind}]}
+            state.atomic(self.declaration, candidate)
+            with self.subTest(kind=kind), self.assertRaisesRegex(state.Refused, 'cannot publish or touch'):
+                shift.start(self.declaration, 'codex')
+        self.assertEqual(self.attempts, [])
+        state.atomic(self.declaration, self.spec)
+        self.ready = True
+        contract = shift.start(self.declaration, 'codex')
+        self.assertEqual(contract['mode'], 'local-delivery')
+        self.assertEqual(state.read(self.directory / 'initialization.json')['spec']['mode'], 'local-delivery')
+
     def test_explicit_inspection_policy_is_frozen_and_invalid_values_refuse(self):
         for policy in [None, True, '', 'ignore', [], {}]:
             state.atomic(self.declaration, {**self.spec, 'ci_policy': policy})

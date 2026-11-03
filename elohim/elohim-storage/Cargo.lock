@@ -2497,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "elohim-device-runtime"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "chrono",
  "elohim-ark-core",
@@ -2894,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2910,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-serve"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "bytes",

@@ -80,25 +80,25 @@ static INTERRUPT: AtomicI32 = AtomicI32::new(0);
 /// and its outputs. `spec` fills the rest from the child and the material.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct TaskRequest {
-    method: MethodRequest,
-    child: TaskChild,
+pub(crate) struct TaskRequest {
+    pub(crate) method: MethodRequest,
+    pub(crate) child: TaskChild,
     #[serde(default)]
-    outputs: Vec<String>,
+    pub(crate) outputs: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct MethodRequest {
-    name: String,
+pub(crate) struct MethodRequest {
+    pub(crate) name: String,
     #[serde(default)]
-    tools: BTreeMap<String, String>,
+    pub(crate) tools: BTreeMap<String, String>,
     #[serde(default)]
-    flags: Vec<String>,
-    step: Option<String>,
+    pub(crate) flags: Vec<String>,
+    pub(crate) step: Option<String>,
     #[serde(default)]
-    non_path_inputs: BTreeMap<String, String>,
-    deterministic: bool,
+    pub(crate) non_path_inputs: BTreeMap<String, String>,
+    pub(crate) deterministic: bool,
 }
 
 /// `ark task spec`: prints `{spec, derivation: {method, input}}`, the checked [`TaskSpec`] for a
@@ -162,10 +162,10 @@ pub struct RunArgs {
 type Status = PendingStatus<TaskOutcome, DerivationUnanswered>;
 
 /// Appends status lines to `--status`, one JSON object each.
-struct StatusFile(PathBuf);
+pub(crate) struct StatusFile(pub(crate) PathBuf);
 
 impl StatusFile {
-    fn append(&self, status: &Status) -> Result<(), Failure> {
+    pub(crate) fn append(&self, status: &Status) -> Result<(), Failure> {
         let mut line = serde_json::to_string(status)
             .map_err(|error| Failure::data(format!("status: {error}")))?;
         line.push('\n');
@@ -219,7 +219,7 @@ pub fn run(args: RunArgs) -> Result<u8, Failure> {
 
     // 2. The device membrane, then the floor, against the device's own offer.
     let berth = berth(&args)?;
-    if let Err(refused) = carried_here(&spec, &material, &me, &berth, &args.data_root) {
+    if let Err(refused) = carried_here(&spec, material.byte_len(), &me, &berth, &args.data_root) {
         eprintln!("ark task: not carried here: {:?}", refused.why);
         status.append(&PendingStatus::Unanswered(
             (*refused).map_why(|_| DerivationUnanswered::NotCarried),
@@ -289,34 +289,7 @@ pub fn run(args: RunArgs) -> Result<u8, Failure> {
 
     // 4. The child, under the native driver.
     let child = spec.child_spec();
-    let started = NativeDriver
-        .start(&child, &berth)
-        .map_err(|error| match error {
-            DriverError::ArtifactHashMismatch { .. } => Failure {
-                code: EXIT_ARTIFACT,
-                message: error.to_string(),
-            },
-            other => Failure::data(other.to_string()),
-        })?;
-    let pid = started.pid;
-    let pumps = [
-        pump(started.stdout, || -> Box<dyn Write> {
-            Box::new(io::stdout())
-        }),
-        pump(started.stderr, || -> Box<dyn Write> {
-            Box::new(io::stderr())
-        }),
-    ];
-    let (exit, interrupted) = supervise(pid)?;
-    let deadline = interrupted.map(|_| Instant::now() + DRAIN_AFTER_INTERRUPT);
-    for pump in pumps {
-        while deadline.is_some_and(|at| Instant::now() < at) && !pump.is_finished() {
-            thread::sleep(Duration::from_millis(20));
-        }
-        if deadline.is_none() || pump.is_finished() {
-            let _ = pump.join();
-        }
-    }
+    let (exit, interrupted, _) = execute(&child, &berth, false)?;
 
     if let Some(signal) = interrupted {
         let meanwhile = if held {
@@ -355,6 +328,84 @@ pub fn run(args: RunArgs) -> Result<u8, Failure> {
     Ok(exit_code(&exit))
 }
 
+/// One process invocation and supervision path for both material and native-tree tasks.
+pub(crate) fn execute(
+    child: &ark_core::manifest::ChildSpec,
+    berth: &Berth,
+    native: bool,
+) -> Result<(ExitClass, Option<i32>, bool), Failure> {
+    let started = NativeDriver
+        .start(child, berth)
+        .map_err(|error| match error {
+            DriverError::ArtifactHashMismatch { .. } => Failure {
+                code: EXIT_ARTIFACT,
+                message: error.to_string(),
+            },
+            other => Failure::data(other.to_string()),
+        })?;
+    let pid = started.pid;
+    let pumps = [
+        pump(
+            started.stdout,
+            if native { stderr_sink } else { stdout_sink },
+        ),
+        pump(started.stderr, || -> Box<dyn Write> {
+            Box::new(io::stderr())
+        }),
+    ];
+    let supervised = supervise(pid);
+    let descendants = if native || supervised.is_err() {
+        settle_descendants()?
+    } else {
+        false
+    };
+    let (exit, interrupted) = supervised?;
+    let deadline =
+        (native || interrupted.is_some()).then(|| Instant::now() + DRAIN_AFTER_INTERRUPT);
+    for pump in pumps {
+        while deadline.is_some_and(|at| Instant::now() < at) && !pump.is_finished() {
+            thread::sleep(Duration::from_millis(20));
+        }
+        if deadline.is_none() || pump.is_finished() {
+            let _ = pump.join();
+        }
+    }
+
+    Ok((exit, interruption().or(interrupted), descendants))
+}
+
+fn stdout_sink() -> Box<dyn Write> {
+    Box::new(io::stdout())
+}
+fn stderr_sink() -> Box<dyn Write> {
+    Box::new(io::stderr())
+}
+
+/// A successful parent with surviving children cannot define stable output. Reuse Ark's
+/// subreaper and descendant walk; terminate, kill and reap before inspecting filesystem state.
+fn settle_descendants() -> Result<bool, Failure> {
+    reap_orphans(0);
+    let survived = signal_descendants(Signal::SIGTERM) != 0;
+    let start = Instant::now();
+    loop {
+        reap_orphans(0);
+        let signal = if start.elapsed() > Duration::from_millis(200) {
+            Signal::SIGKILL
+        } else {
+            Signal::SIGTERM
+        };
+        if signal_descendants(signal) == 0 {
+            return Ok(survived);
+        }
+        if start.elapsed() > DRAIN_AFTER_INTERRUPT {
+            return Err(Failure::data(
+                "task descendants did not settle; no output verdict",
+            ));
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// The berth the child runs in: the device's own, holding the pinned artifact.
 fn berth(args: &RunArgs) -> Result<Berth, Failure> {
     let manifest = device_manifest(&args.data_root)?;
@@ -371,7 +422,7 @@ fn berth(args: &RunArgs) -> Result<Berth, Failure> {
 /// The manifest the device's own berth declares for a task: no children of its own, and an
 /// envelope whose disk bound is what the data root's filesystem has free, read now. A
 /// declaration, not enforcement (`EffectiveTier` stays `None`).
-fn device_manifest(data_root: &Path) -> Result<RuntimeManifest, Failure> {
+pub(crate) fn device_manifest(data_root: &Path) -> Result<RuntimeManifest, Failure> {
     let stat = nix::sys::statvfs::statvfs(data_root)
         .map_err(|error| Failure::data(format!("statvfs {}: {error}", data_root.display())))?;
     let free = stat.blocks_available().saturating_mul(stat.fragment_size());
@@ -390,9 +441,9 @@ fn device_manifest(data_root: &Path) -> Result<RuntimeManifest, Failure> {
 /// Steps 2 of the flow: the device membrane offers tasks, and the floor admits this need on the
 /// device's own offer (consent `NotNeeded`, the own-envelope scope, the material's size within
 /// the declared disk bound). A refusal is the floor's own, with its three parts.
-fn carried_here(
+pub(crate) fn carried_here(
     spec: &TaskSpec,
-    material: &Material,
+    input_bytes: u64,
     me: &AgentRef,
     berth: &Berth,
     data_root: &Path,
@@ -469,11 +520,11 @@ fn carried_here(
             Reach::Private,
             NeedClass::Member,
             None,
-            material.byte_len(),
+            input_bytes,
         )
         .map_err(|_| not_known("task-spec"))?;
     let kind = TaskKind::new()
-        .with_spec(spec, Some(material.byte_len()))
+        .with_spec(spec, Some(input_bytes))
         .map_err(|_| not_known("task-spec"))?;
     let remaining = Capacity::of_offer(&candidate.posture.offers[&KindId::Task]);
     admit(
@@ -516,7 +567,10 @@ fn reuse_context(path: Option<&Path>) -> Result<ReuseContext, Failure> {
 /// Copies a child pipe to this process's stream byte for byte, flushing each read, until EOF.
 /// A closed destination stops the copy but not the read, so the child never blocks on a full
 /// pipe.
-fn pump(mut from: impl Read + Send + 'static, to: fn() -> Box<dyn Write>) -> JoinHandle<()> {
+pub(crate) fn pump(
+    mut from: impl Read + Send + 'static,
+    to: fn() -> Box<dyn Write>,
+) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut out = to();
         let mut open = true;
@@ -540,7 +594,7 @@ fn pump(mut from: impl Read + Send + 'static, to: fn() -> Box<dyn Write>) -> Joi
 /// Waits for the child. On an interrupt, the signal goes to every descendant (this process is
 /// their subreaper, so orphans are found too), and the tree is killed after
 /// [`INTERRUPT_GRACE`]. Returns the exit and the interrupt, if one arrived.
-fn supervise(pid: u32) -> Result<(ExitClass, Option<i32>), Failure> {
+pub(crate) fn supervise(pid: u32) -> Result<(ExitClass, Option<i32>), Failure> {
     let mut forwarded: Option<Instant> = None;
     let mut killed = false;
     loop {
@@ -579,7 +633,7 @@ fn supervise(pid: u32) -> Result<(ExitClass, Option<i32>), Failure> {
 /// Reaps the orphaned descendants this subreaper has inherited and that have exited, leaving the
 /// task's own child for [`supervise`]: a long gate spawns thousands of short processes (every
 /// `git` its tests run), and unreaped they would hold a pid each until ark exits.
-fn reap_orphans(task: u32) {
+pub(crate) fn reap_orphans(task: u32) {
     let peek = WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT;
     while let Ok(status) = waitid(Id::All, peek) {
         match status.pid() {
@@ -592,7 +646,7 @@ fn reap_orphans(task: u32) {
 }
 
 /// Signals every live descendant of this process, read from `/proc`.
-fn signal_descendants(signal: Signal) {
+pub(crate) fn signal_descendants(signal: Signal) -> usize {
     let mut children: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
     if let Ok(entries) = fs::read_dir("/proc") {
         for entry in entries.flatten() {
@@ -620,10 +674,18 @@ fn signal_descendants(signal: Signal) {
         .get(&std::process::id())
         .cloned()
         .unwrap_or_default();
+    let mut count = 0;
     while let Some(pid) = stack.pop() {
+        count += 1;
         let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid as i32), signal);
         stack.extend(children.get(&pid).into_iter().flatten().copied());
     }
+    count
+}
+
+pub(crate) fn interruption() -> Option<i32> {
+    let signal = INTERRUPT.load(Ordering::SeqCst);
+    (signal != 0).then_some(signal)
 }
 
 extern "C" fn record_interrupt(signal: libc::c_int) {
@@ -632,7 +694,7 @@ extern "C" fn record_interrupt(signal: libc::c_int) {
 
 /// SIGINT and SIGTERM are recorded, never acted on in the handler; this process also becomes the
 /// subreaper of its descendants, so an interrupt reaches the whole tree.
-fn install_interrupt_handlers() -> Result<(), Failure> {
+pub(crate) fn install_interrupt_handlers() -> Result<(), Failure> {
     let action = SigAction::new(
         SigHandler::Handler(record_interrupt),
         SaFlags::empty(),
@@ -647,7 +709,7 @@ fn install_interrupt_handlers() -> Result<(), Failure> {
 }
 
 /// The child's exit as this process's: its code, or 128 plus the signal that ended it.
-fn exit_code(exit: &ExitClass) -> u8 {
+pub(crate) fn exit_code(exit: &ExitClass) -> u8 {
     match exit {
         ExitClass::Exited { code } => (*code & 0xff) as u8,
         ExitClass::Signaled { signal, .. } => 128u8.saturating_add(*signal as u8),
@@ -656,7 +718,7 @@ fn exit_code(exit: &ExitClass) -> u8 {
     }
 }
 
-fn epoch_secs() -> u64 {
+pub(crate) fn epoch_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |since| since.as_secs())

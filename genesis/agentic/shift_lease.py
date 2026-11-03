@@ -5,27 +5,41 @@ module never claims, renews, releases, or changes that lease: a nested command
 can only use a resource the guardian currently holds for this operation.
 """
 import datetime as dt
+import contextlib
 import fcntl
 import json
 import math
 import os
+import re
 from pathlib import Path
 import socket
 import subprocess
 import sys
 import time
 
-from shift_state import Refused
+from shift_state import Refused, atomic, incarnation
 
 
 PROXY_ENV = ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')
 MAX_MESSAGE = 16384
 OPTIONS = {
-    'claim': {'--session', '--class', '--ttl', '--note'},
-    'release': {'--session'},
+    'claim': {'--session', '--class', '--ttl', '--note', '--offline-ok'},
+    'release': {'--session', '--expected-claimed-at'},
     'owner-check': {'--session', '--action', '--note'},
     'who': {'--session'},
 }
+STEWARD_RESOURCES = {'dev-integration', 'jenkins-dispatch', 'alpha-fleet'}
+STEWARD_LEASE_SECONDS = 600
+
+
+def steward_resource(name):
+    return name in STEWARD_RESOURCES or re.fullmatch(r'lane:[A-Za-z0-9][A-Za-z0-9._-]*', name) is not None
+
+
+def lease_budget(resource):
+    bounded = [1800 if name == 'mesh' else STEWARD_LEASE_SECONDS
+               for name in resources(resource) if name == 'mesh' or steward_resource(name)]
+    return min(bounded) if bounded else None
 
 
 def resources(value):
@@ -34,8 +48,9 @@ def resources(value):
         return []
     values = [value] if isinstance(value, str) else value
     if (not isinstance(values, list) or not all(isinstance(item, str) for item in values)
-            or len(values) != len(set(values)) or not set(values) <= {'cargo', 'mesh', 'disk-heavy'}):
-        raise Refused('resource must name cargo, mesh, disk-heavy, or a unique list of those leases')
+            or len(values) != len(set(values))
+            or not all(item in {'cargo', 'mesh', 'disk-heavy'} or steward_resource(item) for item in values)):
+        raise Refused('resource must name cargo, mesh, disk-heavy, a publication lease or lane:<id>, or a unique list')
     return sorted(values)
 
 
@@ -43,15 +58,49 @@ def refused(reason):
     return {'exit': 3, 'stdout': '', 'stderr': f'berth: shift lease REFUSED — {reason}\n'}
 
 
-def host_environment():
+def host_session_id(contract):
+    """A process-owned envelope, distinct from the operator's enclosing runtime.
+
+    Readiness and each recovered guardian have different incarnations. They
+    never take over a live runtime's envelope or inherit its actor appointment.
+    """
+    owner = incarnation(os.getpid())
+    return f"shift-{contract['id']}-{owner['boot']}-{owner['pid']}-{owner['start']}"
+
+
+def host_environment(contract=None):
     """Host inspection must not recursively call the contained-worker proxy."""
-    return {key: value for key, value in os.environ.items() if key not in PROXY_ENV}
+    env = {key: value for key, value in os.environ.items() if key not in PROXY_ENV}
+    if contract is not None:
+        env.update(ELOHIM_SESSION_ID=host_session_id(contract),
+                   ELOHIM_SESSION_OWNER_PID=str(os.getpid()))
+    return env
+
+
+@contextlib.contextmanager
+def host_session(contract, evidence):
+    """Open and close through the native lifecycle; receipts grant no authority."""
+    def native(verb):
+        result = subprocess.run([os.environ.get('EPR_BIN') or 'epr', 'session', verb, '--json'],
+                                cwd=contract['worktree'], env=host_environment(contract),
+                                text=True, capture_output=True, timeout=45)
+        if result.returncode:
+            raise Refused(f'host session {verb} exited {result.returncode}: {result.stderr[-1500:]}')
+        record = json.loads(result.stdout)
+        if record.get('identity', {}).get('session') != host_session_id(contract):
+            raise Refused(f'host session {verb} did not resolve this process-owned envelope')
+        atomic(Path(evidence) / f"{host_session_id(contract)}-{verb}.json", record)
+    native('open')
+    try:
+        yield
+    finally:
+        native('close')
 
 
 def host_berth(contract, *argv):
     """Only host-side ownership calls may bypass the contained worker's proxy."""
     binary = str(Path(contract['worktree']) / 'genesis/agentic/bin/berth')
-    result = subprocess.run([binary, *argv], cwd=contract['worktree'], env=host_environment(),
+    result = subprocess.run([binary, *argv], cwd=contract['worktree'], env=host_environment(contract),
                             text=True, capture_output=True, timeout=30)
     if result.returncode:
         raise Refused(f'host berth {argv[0]} exited {result.returncode}: {result.stderr[-1500:]}')
@@ -109,9 +158,14 @@ def parse_request(argv, resource, session):
     options = {}
     while tail:
         option = tail.pop(0)
-        if option not in OPTIONS[command] or option in options or not tail:
+        if option not in OPTIONS[command] or option in options:
             raise ValueError(f'unsupported or repeated option: {option}')
-        options[option] = tail.pop(0)
+        if option == '--offline-ok':
+            options[option] = True  # Already admitted: never creates or extends an override.
+        elif tail:
+            options[option] = tail.pop(0)
+        else:
+            raise ValueError(f'option needs a value: {option}')
     if options.get('--session') != session:
         raise ValueError('request does not name the guardian shift session')
     return command, options
@@ -128,7 +182,19 @@ existing just wrappers retain the outer lease instead of releasing it.
         held = resources(held_resource)
         if not held:
             raise ValueError('the guardian holds no delegated resource')
-        session = f"shift-{contract['id']}"
+        session = host_session_id(contract)
+        if argv == ['session-show', '--session', session]:
+            # The hook uses this read to retain the guardian's already-held lease.
+            # Expose only this operation's admitted set, not unrelated host leases.
+            leases = {}
+            for resource in held:
+                checked = handle_request(contract, held, lease_started,
+                                         ['who', resource, '--session', session])
+                if checked['exit']:
+                    return checked
+                leases[resource] = json.loads(checked['stdout'])
+            return {'exit': 0, 'stdout': json.dumps({'mooring': {'session': session}, 'leases': leases})+'\n',
+                    'stderr': ''}
         command, options = parse_request(argv, held, session)
         requested_resource = argv[1]
         elapsed = time.monotonic() - lease_started
@@ -137,16 +203,33 @@ existing just wrappers retain the outer lease instead of releasing it.
         deadline = dt.datetime.fromisoformat(contract['deadline'].replace('Z', '+00:00'))
         if deadline.tzinfo is None or deadline.timestamp() <= time.time():
             raise ValueError('original shift deadline expired or invalid')
-        env = host_environment()
+        def remaining():
+            left = deadline.timestamp() - time.time()
+            budget = lease_budget(held)
+            if budget is not None:
+                left = min(left, budget - (time.monotonic() - lease_started))
+            if left <= 0:
+                raise ValueError('original operation lease or shift deadline expired')
+            return left
+        env = host_environment(contract)
         store = Path(env.get('BERTH_DIR') or Path(env.get('CLAUDE_CONFIG_DIR', '/projects/.claude-config')) / 'berth')
         binary = Path(contract['worktree']) / 'genesis/agentic/bin/berth'
+        if steward_resource(requested_resource):
+            # A local lease file alone cannot establish cross-device standing.
+            # Reuse berth's current peer verdict before inspecting that exact lease.
+            check = subprocess.run([str(binary), 'owner-check', requested_resource,
+                                    '--session', session, '--action', 'shift delegated execution'],
+                                   cwd=contract['worktree'], env=env, text=True,
+                                   capture_output=True, timeout=min(30, remaining()))
+            if check.returncode:
+                raise ValueError(f'steward lease no longer admitted: {check.stderr[-1500:]} {check.stdout[-1500:]}')
         # Read under berth's existing lock. Missing stores and concurrent writers
         # refuse; neither a new mooring nor an unleased fallback is permissible.
         with open(store / 'berth.lock', 'rb') as ownership:
             fcntl.flock(ownership, fcntl.LOCK_SH | fcntl.LOCK_NB)
             result = subprocess.run([sys.executable, str(binary), 'who', requested_resource],
                                     cwd=contract['worktree'], env=env, text=True,
-                                    capture_output=True, timeout=5)
+                                    capture_output=True, timeout=min(5, remaining()))
             if result.returncode:
                 raise ValueError('host berth inspection failed')
             current = json.loads(result.stdout)
@@ -169,6 +252,10 @@ existing just wrappers retain the outer lease instead of releasing it.
                 requested = int(options['--ttl'])
                 if ttl is None or requested <= 0 or requested > ttl:
                     raise ValueError('nested claims cannot extend the host lease TTL')
+            if '--expected-claimed-at' in options:
+                generation = float(options['--expected-claimed-at'])
+                if not math.isfinite(generation) or generation != lease.get('claimed_at'):
+                    raise ValueError('nested release does not name the held lease generation')
             if command == 'owner-check' and len(holders) != 1:
                 raise ValueError('another host session also holds this resource')
             if command == 'who':
@@ -176,6 +263,7 @@ existing just wrappers retain the outer lease instead of releasing it.
             else:
                 verb = {'claim': 'renewed', 'release': 'retained', 'owner-check': 'owned'}[command]
                 output = f'{requested_resource}: {verb} by {session} (guardian lease unchanged)\n'
+            remaining()
             return {'exit': 0, 'stdout': output, 'stderr': ''}
     except (Refused, OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError) as error:
         return refused(str(error))

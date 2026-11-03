@@ -1,6 +1,6 @@
 [package]
 name = "eprfs-storage"
-version.workspace = true
+version = "0.3.4"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -11,11 +11,15 @@ publish = ["elohim"]
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-eprfs-core = { version = "0.3.2", path = "../eprfs-core", registry = "elohim" }
+eprfs-core = { version = "0.3.3", path = "../eprfs-core", registry = "elohim" }
 serde.workspace = true
 serde_json.workspace = true
-tempfile = "3"
+# Explicit cleanup control used when retaining failed object writes.
+tempfile = "3.27"
 tokio = { workspace = true, features = ["sync", "rt"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
 [dev-dependencies]
 eprfs-serve = { path = "../eprfs-serve", features = ["testing"] }

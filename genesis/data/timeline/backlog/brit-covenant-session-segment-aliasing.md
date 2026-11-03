@@ -165,3 +165,12 @@ Committed as `d99e80c2f` on `fix/covenant-session-isolation`, stacked after the
 session-isolation fix. The candidate successfully rendered the real worktree's
 unscoped staged diff for all three intended paths; no direct Git fallback.
 The branch is locally committed, with upstream integration still pending.
+
+## Native-storage ownership
+
+The native source capture, durable restore and fixed-candidate execution progression
+is owned by the [daily-driver backlog's native-storage section](brit-daily-driver-handoff-2026-10-27.md#native-storage-source-to-explicit-execution-2026-11-02).
+Its scoped measurements and ordered successor stations live there, with runnable
+commands in the owning sprint result. This covenant/session-segment bug remains
+open: local source execution does not repair ref encoding, clause verification or
+session authority, and its evidence must not be read as closure of this note.

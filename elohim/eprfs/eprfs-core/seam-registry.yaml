@@ -7,6 +7,77 @@ seamLocus: >
   BlobCid addressing and the versioned canonical tree are artifact-neutral
   byte-integrity contracts. They never decide which release is authoritative.
 decisionPoints:
+  - name: ProjectedRoot::verify_whole_tree
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/derive.rs
+      modulePath: eprfs_core::derive::ProjectedRoot::verify_whole_tree
+    summary: >
+      Require a whole declared view and verified complete closure before identity projection; reject empty, narrow and external inputs. No tree is disguised as Raw.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Private local content custody; no reach or head election.
+      - id: C1
+        status: n-a
+        justification: No candidate is elected or accepted.
+      - id: C2
+        status: n-a
+        justification: No mutable authoritative head or ordering clock is written.
+      - id: C3
+        status: answered
+        justification: A bounded attempt returns a result or refusal without retrying unstable input.
+      - id: C4
+        status: answered
+        justification: Invalid views, incomplete closure, corrupt bytes and budget failures remain distinct TreeError variants.
+      - id: C5
+        status: answered
+        justification: Canonical Tree v1 closure and raw leaves are verified locally; this confers no authority.
+      - id: C6a
+        status: partial
+        justification: TreeLimits bound the closure walk; the storage adapter must bound fetch allocation and duration.
+      - id: C6b
+        status: answered
+        justification: Read-only closure verification has no effects to replay.
+      - id: C7
+        status: answered
+        justification: Only whole-tree identity projection is offered; narrow or external views explicitly refuse.
+      - id: C8
+        status: partial
+        justification: Typed tree errors expose refusals; durable labeled telemetry belongs to the caller.
+      - id: C9
+        status: n-a
+        justification: No actor identity or key lineage is interpreted.
+      - id: C10
+        status: answered
+        justification: Existing Tree v1 and BlobCid codecs remain unchanged; no alternative wire format is added.
+      - id: C11
+        status: partial
+        justification: Per-operation budgets refuse excess work; this local API does not schedule concurrent callers.
+      - id: C12
+        status: n-a
+        justification: Explicit local selection does not authorize publication, remote access, or execution.
+      - id: C13
+        status: n-a
+        justification: No authority tier or scaffold is introduced.
+      - id: C14
+        status: partial
+        justification: Typed tree errors propagate; durable witnesses belong to the caller.
+    contractTests:
+      - path: elohim/eprfs/eprfs-core/src/whole_tree_tests.rs
+        testName: whole_tree_projection_checks_bytes_and_preserves_identity
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/whole_tree_tests.rs
+        testName: empty_and_narrow_views_refuse_before_fetch
+        kind: unit
+      - path: elohim/eprfs/eprfs-core/src/whole_tree_tests.rs
+        testName: whole_tree_projection_rejects_incomplete_corrupt_external_and_over_budget
+        kind: unit
+    notes: >
+      Private (B) native working material; no DHT entry, coordinator, signal, HTTP route,
+      peer transport or head-plane items (zero at one year). All network stages retain
+      byte verification and confinement. The worst local holder sees selected bytes and
+      names; nothing is indexed or served outside the device by this operation.
   - name: canonical_tree_and_verified_closure
     kind: boundary-answer-type
     sourceLocation:

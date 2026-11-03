@@ -11,7 +11,7 @@ include = ["Cargo.toml", "Cargo.lock", "build.rs", "src/**", "tests/**", "DISTRI
 [workspace]
 
 [dependencies]
-eprfs-core = { version = "=0.3.2", path = "../../../elohim/eprfs/eprfs-core", registry = "elohim" }
+eprfs-core = { version = "=0.3.3", path = "../../../elohim/eprfs/eprfs-core", registry = "elohim" }
 eprfs-meta = { version = "=0.3.4", path = "../../../elohim/eprfs/eprfs-meta", registry = "elohim" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"

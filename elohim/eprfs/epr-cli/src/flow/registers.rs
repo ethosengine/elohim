@@ -71,6 +71,258 @@ pub fn read_habits(root: &Path) -> FlowResult<Vec<HabitEntry>> {
     Ok(register.habits)
 }
 
+/// Claim-time evidence only: qualified habits never join the parent's habit census.
+/// The returned slots supplement an existing commitment, not its authority or scope.
+pub(super) fn claim_habit(root: &Path, selector: &str) -> FlowResult<Vec<String>> {
+    let Some((owner, id)) = selector.split_once('#') else {
+        if !read_habits(root)?.iter().any(|habit| habit.id == selector) {
+            return Err(FlowError::InvalidArguments(format!(
+                "unknown habit `{selector}` — this repository declares no such habit; \
+                 a habit is DECLARED in its `.epr-meta` atom, never invented at claim time"
+            )));
+        }
+        return Ok(Vec::new());
+    };
+    qualified_claim_habit(root, selector, owner, id)
+}
+
+#[cfg(not(unix))]
+fn qualified_claim_habit(
+    _root: &Path,
+    _selector: &str,
+    _owner: &str,
+    _id: &str,
+) -> FlowResult<Vec<String>> {
+    Err(FlowError::InvalidArguments(
+        "qualified habit confinement requires Unix".into(),
+    ))
+}
+
+#[cfg(unix)]
+fn qualified_claim_habit(
+    root: &Path,
+    selector: &str,
+    owner: &str,
+    id: &str,
+) -> FlowResult<Vec<String>> {
+    let invalid = |reason: &str| {
+        FlowError::InvalidArguments(format!("qualified habit `{selector}`: {reason}"))
+    };
+    if selector.len() > 512
+        || !plain_relative(owner)
+        || id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        || matches!(id, "." | "..")
+    {
+        return Err(invalid("expected canonical gitlink-path#habit-id"));
+    }
+    let head = habit_git(root, &["rev-parse", "--verify", "HEAD"], 1024)?;
+    let head = head.trim();
+    let link = habit_git(root, &["ls-tree", "-z", head, "--", owner], 4096)?;
+    let (mode, pin, name) =
+        tree_entry(&link).ok_or_else(|| invalid("owner is not one committed gitlink"))?;
+    if mode != "160000" || name != owner {
+        return Err(invalid("owner is not one committed gitlink"));
+    }
+    let indexed = habit_git(root, &["ls-files", "--stage", "-z", "--", owner], 4096)?;
+    if indexed != format!("160000 {pin} 0\t{owner}\0") {
+        return Err(invalid("owner gitlink index differs from committed pin"));
+    }
+    // Refuse symlinked ancestors before asking Git to enter the explicitly named owner.
+    let owner_dir = confined_directory(root, owner)?;
+    let owner_root = root.join(owner);
+    let current = habit_git(
+        &owner_root,
+        &["rev-parse", "--verify", "HEAD^{commit}"],
+        1024,
+    )?;
+    if current.trim() != pin {
+        return Err(invalid("owner HEAD differs from committed gitlink pin"));
+    }
+    let pattern = format!(":(glob)**/.epr-meta/{id}.habit.md");
+    // Index queries are filtered by the exact filename. First prove those entries and
+    // repository attribution still match the pinned tree; never scan a whole repository.
+    let changed = habit_git(
+        &owner_root,
+        &[
+            "diff",
+            "--cached",
+            "--name-only",
+            "-z",
+            pin,
+            "--",
+            super::repository::DECLARATION,
+            &pattern,
+        ],
+        65536,
+    )?;
+    if changed
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .any(|path| {
+            path == super::repository::DECLARATION || super::habit_census::keep(Path::new(path))
+        })
+    {
+        return Err(invalid("owner declaration index differs from pinned tree"));
+    }
+    let candidates = habit_git(
+        &owner_root,
+        &["ls-files", "-z", "--cached", "--", &pattern],
+        65536,
+    )?;
+    let paths: Vec<&str> = candidates
+        .split('\0')
+        .filter(|p| !p.is_empty() && super::habit_census::keep(Path::new(p)))
+        .take(2)
+        .collect();
+    if paths.len() != 1 {
+        return Err(invalid(
+            "habit declaration missing or ambiguous in pinned owner",
+        ));
+    }
+    let path = paths[0];
+    if !plain_relative(path) {
+        return Err(invalid("habit declaration path is unsupported"));
+    }
+    let declaration = pinned_habit_text(&owner_root, &owner_dir, pin, path)?;
+    let habit = parse_habit(Path::new(path), &declaration)?;
+    if habit.id != id {
+        return Err(invalid("habit declaration identity differs from selector"));
+    }
+    let owner_text =
+        pinned_habit_text(&owner_root, &owner_dir, pin, super::repository::DECLARATION)?;
+    let agent = super::repository::parse_repository_agent(
+        Path::new(super::repository::DECLARATION),
+        &owner_text,
+    )?;
+    Ok(vec![
+        format!("habit-owner:{}", agent.0),
+        format!("habit-owner-path:{owner}"),
+        format!("habit-owner-commit:{pin}"),
+        format!("habit-parent-commit:{head}"),
+        format!("habit-declaration-path:{path}"),
+        format!(
+            "habit-declaration:{}",
+            eprfs_core::BlobCid::compute_raw(declaration.as_bytes())
+        ),
+        format!(
+            "habit-owner-declaration:{}",
+            eprfs_core::BlobCid::compute_raw(owner_text.as_bytes())
+        ),
+    ])
+}
+
+#[cfg(unix)]
+fn plain_relative(path: &str) -> bool {
+    !path.is_empty()
+        && path.split('/').all(|part| {
+            !part.is_empty()
+                && !matches!(part, "." | "..")
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        })
+}
+
+#[cfg(unix)]
+fn habit_git(root: &Path, args: &[&str], cap: usize) -> FlowResult<String> {
+    let mut argv = crate::git::trust_args(root);
+    argv.extend([
+        "--no-replace-objects".into(),
+        "-c".into(),
+        "protocol.allow=never".into(),
+        "-c".into(),
+        "core.fsmonitor=false".into(),
+        "-C".into(),
+        root.to_str()
+            .ok_or_else(|| FlowError::InvalidArguments("habit owner path is not UTF-8".into()))?
+            .into(),
+    ]);
+    argv.extend(args.iter().map(|arg| (*arg).into()));
+    let out = super::memory::recall::bounded_process("git", &argv, cap, 10.0, None)?;
+    if out.error.is_some() || out.status != Some(0) {
+        return Err(FlowError::InvalidArguments(format!(
+            "habit owner Git evidence unavailable: {} {}",
+            out.error.unwrap_or_default(),
+            String::from_utf8_lossy(&out.stderr)
+        )));
+    }
+    String::from_utf8(out.stdout)
+        .map_err(|_| FlowError::InvalidArguments("habit owner Git evidence is not UTF-8".into()))
+}
+
+#[cfg(unix)]
+fn tree_entry(row: &str) -> Option<(&str, &str, &str)> {
+    let row = row.strip_suffix('\0')?;
+    if row.contains('\0') {
+        return None;
+    }
+    let (fields, name) = row.split_once('\t')?;
+    let mut fields = fields.split(' ');
+    let mode = fields.next()?;
+    let _kind = fields.next()?;
+    let oid = fields.next()?;
+    (fields.next().is_none()).then_some((mode, oid, name))
+}
+
+#[cfg(unix)]
+fn confined_directory(root: &Path, rel: &str) -> FlowResult<std::os::fd::OwnedFd> {
+    use rustix::fs::{open, openat, Mode, OFlags};
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let mut dir = open(root, flags, Mode::empty()).map_err(std::io::Error::from)?;
+    for component in rel.split('/') {
+        dir = openat(&dir, component, flags, Mode::empty()).map_err(std::io::Error::from)?;
+    }
+    Ok(dir)
+}
+
+#[cfg(unix)]
+fn pinned_habit_text(
+    root: &Path,
+    owner: &std::os::fd::OwnedFd,
+    pin: &str,
+    rel: &str,
+) -> FlowResult<String> {
+    use rustix::fs::{openat, Mode, OFlags};
+    use std::io::Read;
+    let invalid =
+        |reason: &str| FlowError::InvalidArguments(format!("habit owner `{rel}`: {reason}"));
+    let entry = habit_git(root, &["ls-tree", "-z", pin, "--", rel], 4096)?;
+    let (mode, oid, name) =
+        tree_entry(&entry).ok_or_else(|| invalid("missing pinned declaration"))?;
+    if !matches!(mode, "100644" | "100755") || name != rel {
+        return Err(invalid("pinned declaration must be a regular file"));
+    }
+    let text = habit_git(root, &["cat-file", "blob", oid], 65536)?;
+    let mut components = rel.split('/').peekable();
+    let mut directory = rustix::io::dup(owner).map_err(std::io::Error::from)?;
+    while let Some(component) = components.next() {
+        let mut flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK;
+        if components.peek().is_some() {
+            flags |= OFlags::DIRECTORY;
+        }
+        let next =
+            openat(&directory, component, flags, Mode::empty()).map_err(std::io::Error::from)?;
+        if components.peek().is_none() {
+            let file = std::fs::File::from(next);
+            if !file.metadata()?.is_file() {
+                return Err(invalid("working declaration is not a regular file"));
+            }
+            let mut bytes = Vec::new();
+            file.take(65537).read_to_end(&mut bytes)?;
+            if bytes != text.as_bytes() {
+                return Err(invalid("working declaration differs from pinned bytes"));
+            }
+            break;
+        }
+        directory = next;
+    }
+    Ok(text)
+}
+
 /// The habits whose `checks:` or `refs:` mention `rel_path` — the register's own statement that
 /// this file's behaviour is covered by that standard.
 ///

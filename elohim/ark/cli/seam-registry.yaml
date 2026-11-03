@@ -1,0 +1,83 @@
+seamRegistryVersion: 1
+crate: elohim-ark
+crateRoot: elohim/ark/cli
+seamLocus: Private whole-tree execution through the existing task admission and supervisor.
+decisionPoints:
+- name: task_native::run
+  kind: verdict-fn
+  sourceLocation:
+    file: src/task_native.rs
+    modulePath: ark::task_native
+  summary: Verify and materialize a whole private tree, run the unchanged task identity, and capture only declared outputs after input and descendant checks.
+  concernIds: &nativeTaskConcerns
+  - {id: C0, status: answered, justification: 'Private B source/spec/output custody; ephemeral C run layout; no DHT entry, head, route or transport.'}
+  - {id: C1, status: answered, justification: 'Outcome is local evidence, never publication, acceptance or a reusable record.'}
+  - {id: C2, status: answered, justification: 'No head moves; absent run directory and immutable object custody preserve earlier candidates.'}
+  - {id: C3, status: partial, justification: 'Signals settle the process tree; no execution timeout or hostile-code isolation is promised.'}
+  - {id: C4, status: answered, justification: 'Missing and corrupt closure data refuse; missing outputs and unknown placeholders refuse explicitly.'}
+  - {id: C5, status: answered, justification: 'OwnEnvelope derives from the original method; verified bytes do not confer authority.'}
+  - {id: C6a, status: answered, justification: '64 MiB objects and 1 GiB expanded closure; bounded inventory and executable copy; actual expanded bytes reach admission.'}
+  - {id: C6b, status: answered, justification: 'Existing run directory refuses; no retry overwrites a prior run or creates a reusable derivation.'}
+  - {id: C7, status: answered, justification: 'Local execution only; no hermetic sandbox, kernel quota or peer availability claim.'}
+  - {id: C8, status: answered, justification: 'Existing PendingStatus and TaskOutcome carry the result; refusal diagnostics name the failed boundary.'}
+  - {id: C9, status: answered, justification: 'Original spec and method CID precede runtime substitutions; input root stays the verified whole-tree CID.'}
+  - {id: C10, status: answered, justification: 'Material and native CLI inputs are exclusive; existing material commands remain compatible.'}
+  - {id: C11, status: n-a, justification: 'No network or external provider; local disk admission uses existing placement floor.'}
+  - {id: C12, status: answered, justification: 'Explicit invocation and unchanged brit-gate OwnEnvelope scope; private PATH and HOME values required.'}
+  - {id: C13, status: n-a, justification: 'No authority graduation, delegation or peer acceptance added.'}
+  - {id: C14, status: partial, justification: 'Failed run directories and immutable output objects remain inspectable; no atomic snapshot or malicious mutate-restore detection claim.'}
+  contractTests:
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_fixed_candidate_and_identity, kind: integration}
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_method_identity_changes_with_each_declared_execution_input, kind: integration}
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_preflight_refusals_spawn_nothing, kind: integration}
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_mutation_missing_output_and_descendants_refuse, kind: integration}
+  - {path: elohim/ark/cli/src/task_native/tests.rs, testName: native_interrupt_before_answer_is_unanswered, kind: unit}
+- name: task_files::expanded_bytes
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: Charge every materialized leaf occurrence and refuse object, expanded byte and inventory limits.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/src/task_files.rs, testName: expanded_input_counts_repeated_paths_and_enforces_object_and_closure_caps, kind: unit}
+- name: task_files::retain_artifact
+  kind: verdict-fn
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: Retain a bounded executable copy whose bytes match the original pinned digest before pathname execution.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/src/task_files.rs, testName: retained_artifact_is_private_verified_and_independent_of_original_replacement, kind: unit}
+- name: task_files::new_run
+  kind: verdict-fn
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: Require an absent private run directory outside the store with no symlinked ancestors.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/src/task_files.rs, testName: private_layout_refuses_existing_overlap_and_symlink_ancestors, kind: unit}
+- name: task_files::inventory
+  kind: verdict-fn
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: Compare a bounded descriptor-confined whole inventory including directories, modes and literal links.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_mutation_missing_output_and_descendants_refuse, kind: integration}
+- name: task_files::selected_outputs
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: Select declared prefixes from the confined inventory and refuse missing or leafless declarations.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_declared_directory_captures_only_its_leaves_and_failed_exit_has_no_output, kind: integration}
+- name: task_native::validate_templates
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/task_native.rs, modulePath: ark::task_native}
+  summary: Require explicit environment and known runtime placeholders before spawning without modifying the original spec identity.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/tests/native_task.rs, testName: native_preflight_refusals_spawn_nothing, kind: integration}
+- name: task_files::matches_candidate
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/task_files.rs, modulePath: ark::task_files}
+  summary: The first restored inventory must match the verified candidate before it can become the mutation baseline.
+  concernIds: *nativeTaskConcerns
+  contractTests:
+  - {path: elohim/ark/cli/src/task_files.rs, testName: the_initial_inventory_must_match_the_candidate_before_execution, kind: unit}
