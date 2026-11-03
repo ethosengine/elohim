@@ -1,5 +1,6 @@
 {
-  "enabled": true,
+  "$pausedComment": "2026-11-03: paused until steward-key-chain-fork-warrant-exile D1 is decided. The worker requests its runner grant as performer uhCAkCUzKl3..., the agent key every alpha conductor blocks after the 2026-10-10 chain-fork warrants. It cannot succeed (500 conductor-error, attempts 1-38), yet burns ~4.7 cores / 5.8Gi on shem in its retry loop and starves eve/gertrude/susan. Re-enable with C7 (adam returned under a re-keyed or unblocked agent).",
+  "enabled": false,
   "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:2b49ac89a0cc0ed4eb06f9381f63f22cb70f0bd11e1fba4113e847cf31b621bc",
   "performer": "uhCAkCUzKl3Y1B2af9NJmO-Ov-sGPFIzUpAWuMMiWvoGTV16BX9Un",
   "slice": {
