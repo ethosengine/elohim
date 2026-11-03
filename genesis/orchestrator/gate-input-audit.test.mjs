@@ -177,15 +177,46 @@ test('a gate-reads comment within 15 lines resolves an otherwise unresolved walk
   }
 });
 
-test('stacked gate-reads comments anywhere in the same function resolve its walk', () => {
+test('stacked gate-reads comments resolve the walk of the statement they sit above', () => {
   const result = readSet(fixture(`fn walk() {
     // gate-reads: shared/a.json
-    ${'\n'.repeat(20)}
-    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);
-    ${'\n'.repeat(20)}
     // gate-reads: shared/b.json
+    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);
   }`));
   assert.deepEqual(result, { paths: ['shared/a.json', 'shared/b.json'], unresolved: [] });
+});
+
+test('a declaration away from its statement resolves nothing, before or after it', () => {
+  for (const body of [
+    `// gate-reads: shared/a.json\n    let unrelated = 1;\n    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);`,
+    `Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);\n    // gate-reads: shared/a.json`,
+  ]) {
+    const result = readSet(fixture(`fn walk() {\n    ${body}\n  }`));
+    assert.deepEqual(result.paths, []);
+    assert.equal(result.unresolved.length, 1);
+  }
+});
+
+test('a fixed-read declaration cannot mask a data-derived walk in the same function (row 76)', () => {
+  const result = readSet(fixture(`fn fixture() {
+    // gate-reads: shared/fixed.json
+    let fixed = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let copy = fs::read(fixed.join("shared/fixed.json"));
+    for entry in Path::new(env!("CARGO_MANIFEST_DIR")).ancestors() { visit(entry); }
+  }`));
+  assert.deepEqual(result.paths, ['shared/fixed.json']);
+  assert.equal(result.unresolved.length, 1);
+  assert.equal(result.unresolved[0].line, 5);
+});
+
+test('a declaration covers the reads derived from its construction through bindings', () => {
+  const result = readSet(fixture(`fn copy() {
+    // gate-reads: shared/data.json
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap();
+    let name = pick();
+    let bytes = fs::read(repo.join(name));
+  }`));
+  assert.deepEqual(result, { paths: ['shared/data.json'], unresolved: [] });
 });
 
 test('gate-reads dot explicitly names the whole repository', () => {

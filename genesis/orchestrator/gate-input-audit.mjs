@@ -283,13 +283,34 @@ function auditFile(root, file, text, crate) {
   // Keep root/dynamic candidates: a descendant does not prove the rest of a walk.
   const helperOrigins = new Set([...usedHelpers].map(name => helpers.get(name).origin));
   const owner = offset => functions.filter(fn => ts[fn.body].offset < offset && offset < ts[fn.end].offset).at(-1);
+  // A declaration (or a stack of them) names the reads of the ONE statement it sits above:
+  // the rows whose construction begins there, and the rows derived from that construction
+  // through bindings (they share its origin). Another walk in the same function stays
+  // unresolved, so a fixed-read declaration cannot mask a data-derived walk beside it.
+  const statementAfter = offset => {
+    const from = ts.findIndex(token => token.offset > offset);
+    if (from < 0) return null;
+    let to = from;
+    for (let j = from; j < ts.length; j++) {
+      to = j;
+      if (ts[j].text === ';') break;
+      if ([')', ']', '}'].includes(ts[j].text)) { to = j - 1; break; }
+      if (ts[j].close === undefined) continue;
+      j = ts[j].close;
+      to = j;
+      if (ts[j].text === '}' && !['.', '?', ';', 'else'].includes(ts[j + 1]?.text)) break;
+    }
+    return { from, to };
+  };
+  const spans = declarations.map(declaration => ({ ...declaration, span: statementAfter(declaration.offset) }));
   return candidates.filter(row => !helperOrigins.has(row.origin)).filter(row => row.how === 'unresolved' || row.kind === 'read' ||
     candidates.some(other => other.kind === 'read' && other.path === row.path) ||
     !candidates.some(other => other.origin === row.origin && other.kind === 'read' && other.how !== 'unresolved' && other.path.startsWith(`${row.path}/`)),
   ).flatMap(({ kind, origin, ...row }) => {
     if (row.how !== 'unresolved') return [row];
     const fn = owner(ts[origin].offset);
-    const declared = declarations.filter(declaration => {
+    const declared = spans.filter(declaration => {
+      if (!declaration.span || origin < declaration.span.from || origin > declaration.span.to) return false;
       const declarationFn = owner(declaration.offset);
       return (fn && declarationFn === fn) ||
         (!declarationFn && declaration.line <= row.line && row.line - declaration.line <= 15);

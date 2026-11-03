@@ -160,7 +160,6 @@ fn reviews_bind_exact_proposal_declarations_contracts_and_citations() {
 
 #[test]
 fn invalid_declarations_boundaries_and_nearest_rule() {
-    // gate-reads: elohim/sdk/working-version.seam.json
     let dir = fixture();
     put(dir.path(), DECLARATIONS[0], "{}");
     let report = classify(dir.path(), "app/x.ts", "indexedDB.open('draft');\n");
@@ -169,6 +168,7 @@ fn invalid_declarations_boundaries_and_nearest_rule() {
     assert!(adapters::normalize(dir.path(), "claude", &event("nested/x.ts", "hi")).is_err());
     assert!(adapters::normalize(dir.path(), "claude", &event("../x.ts", "hi")).is_err());
     put(dir.path(), "app/.epr-meta", "---\nepr-meta-version: 1\nid: nested\nrules:\n  - id: seams\n    class: inject\n    when: {write: '*'}\n    validator: epr:validator-native-seam-guidance\n    parameters: {algorithm: .epr-meta/elohim/algorithms/seam-guidance.json, declarations: [local.seam.json]}\n---\n");
+    // gate-reads: elohim/sdk/working-version.seam.json
     let d = fs::read_to_string(repo().join(DECLARATIONS[0])).unwrap();
     put(dir.path(), "local.seam.json", &d);
     let report = classify(dir.path(), "app/x.ts", "indexedDB.open('draft');\n");

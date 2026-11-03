@@ -1771,7 +1771,6 @@ mod tests {
 
     #[test]
     fn deployment_scope_and_renderer_serialize_without_lost_updates() {
-        // gate-reads: genesis/orchestrator/runtime-declaration-render.mjs
         use std::{
             io::Read,
             os::unix::fs::PermissionsExt,
@@ -1802,6 +1801,7 @@ while not pathlib.Path(os.environ['RENDER_RELEASE']).exists():
 print('{"manifestCid":"new-cid"}' if '--json' in sys.argv else 'ELOHIM_RELEASE_CHANNELS = "bin:epr=apply"')
 "#).unwrap();
         std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // gate-reads: genesis/orchestrator/runtime-declaration-render.mjs
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let renderer = repo.join("genesis/orchestrator/runtime-declaration-render.mjs");
         // Start through the public renderer, so removal of its lock fails this test too.

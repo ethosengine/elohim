@@ -794,6 +794,7 @@ mod tests {
             assert_eq!(atom.rubric.apex_answer, APEX_ANSWER);
             assert!(!atom.reason_clause.is_empty());
         }
+        // gate-reads: elohim/sdk/schemas/v1/frames/frame-ontology.json
         load_ontology(&repo_root()).expect("the ontology parses strictly");
 
         // Strict: an unknown key (a lifecycle key smuggled into the atom) refuses.
@@ -902,8 +903,6 @@ mod tests {
 
     #[test]
     fn marker_legitimate_is_silent() {
-        // gate-reads: elohim/sdk/schemas/v1/frames
-        // gate-reads: elohim/sdk/schemas/v1/frames
         let content = "sovereignty-frame: adversary\nNation-states promise digital sovereignty.";
         let classification = classify_as(SOVEREIGNTY, None, content).unwrap();
         assert_eq!(classification.verdict, FrameVerdict::Legitimate);
@@ -911,6 +910,7 @@ mod tests {
             classification.evidence.rubric_answer.as_deref(),
             Some("adversary")
         );
+        // gate-reads: elohim/sdk/schemas/v1/frames
         assert!(matches!(
             outcome(&repo_root(), SOVEREIGNTY, content),
             ValidatorOutcome::Pass
@@ -918,6 +918,7 @@ mod tests {
         // Ownership honours both markers.
         for marker in ["stewardship-frame: bounded", "sovereignty-frame: adversary"] {
             let content = format!("{marker}\nPlatforms promise true data ownership.");
+            // gate-reads: elohim/sdk/schemas/v1/frames
             assert!(matches!(
                 outcome(&repo_root(), OWNERSHIP, &content),
                 ValidatorOutcome::Pass
@@ -927,7 +928,6 @@ mod tests {
 
     #[test]
     fn marker_apex_is_drift_confidence_1() {
-        // gate-reads: elohim/sdk/schemas/v1/frames
         let content = "sovereignty-frame: apex\nWe are self-sovereign.";
         let classification = classify_as(SOVEREIGNTY, None, content).unwrap();
         assert_eq!(classification.verdict, FrameVerdict::Drift);
@@ -943,6 +943,7 @@ mod tests {
                 "sovereignty-frame:".to_string()
             ]
         );
+        // gate-reads: elohim/sdk/schemas/v1/frames
         assert!(matches!(
             outcome(&repo_root(), SOVEREIGNTY, content),
             ValidatorOutcome::Classified { .. }
@@ -1091,7 +1092,6 @@ mod tests {
     /// other `minLength` / `minimum` constraints refuse the same way.
     #[test]
     fn m1_uppercase_phrase_is_refused() {
-        // gate-reads: elohim/sdk/schemas/v1/frames
         let dir = fixture_with_sovereignty_atom(|raw| {
             raw["recall_signal"]["phrases"][0] = json!("Self-Sovereign");
         });
@@ -1125,6 +1125,7 @@ mod tests {
             );
         }
         // The live atoms satisfy their schema.
+        // gate-reads: elohim/sdk/schemas/v1/frames
         load_frames(&repo_root()).expect("the live atoms are schema-valid");
     }
 
