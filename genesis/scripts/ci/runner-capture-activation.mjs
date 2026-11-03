@@ -449,7 +449,9 @@ export async function captureDiagnostics({
     ],
     [
       "provider-errors.json",
-      ["logs", pod, "-n", namespace, "-c", "elohim-node", "--tail=200"],
+      // G2 issues on the provider's own loopback API (this container), and its
+      // log is gossip-heavy: 200 lines covered seconds, so read a time window.
+      ["logs", pod, "-n", namespace, "-c", "elohim-node", "--since=20m"],
     ],
     [
       "previous.log",
@@ -570,7 +572,8 @@ try { console.log('mesh-request-errors ' + JSON.stringify((${classifyMeshRequest
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
         timeout: 20000,
-        maxBuffer: 262144,
+        // Only categories leave this process for the provider log, never its text.
+        maxBuffer: file === "provider-errors.json" ? 67108864 : 262144,
       };
       output =
         file === "mesh-startup.log" && retryLogs
@@ -599,6 +602,13 @@ try { console.log('mesh-request-errors ' + JSON.stringify((${classifyMeshRequest
         .filter((line) => /Request error/i.test(line));
       const classifiers = [
         [
+          /database is locked|SQLITE_BUSY|code: (5|517)\b/i,
+          "conductor-database-locked",
+        ],
+        [/HeadMoved|source chain head/i, "source-chain-head-moved"],
+        [/Guest\(|WasmError|ribosome/i, "zome-refused"],
+        [/ValidationFailed/i, "validation-refused"],
+        [
           /capability|cap.?grant|cap.?secret|unauthoriz/i,
           "native-authorization",
         ],
@@ -624,6 +634,12 @@ try { console.log('mesh-request-errors ' + JSON.stringify((${classifyMeshRequest
               (line) =>
                 classifiers.find(([pattern]) => pattern.test(line))?.[1] ||
                 "request-error-unclassified",
+            ),
+          // Timestamps only, so a category can be lined up with a grant attempt.
+          at: errors
+            .slice(-16)
+            .map(
+              (line) => /"timestamp":"([0-9T:.\-]+Z)"/.exec(line)?.[1] || null,
             ),
           grantRequestCorrelationProven: false,
         }) + "\n";
