@@ -162,3 +162,20 @@ installed Brit CLI. Two fallback invocations included their machine-readable
 reason but lacked the required advance commentary; that instruction-level lapse
 is recorded rather than counted as adoption. An attempted add without its `--`
 separator refused before staging and was corrected after inspecting help.
+
+The standalone CI also found four new shell adapters with shebangs but no
+executable bit; their modes are corrected. Two i386 runs exposed the same
+pre-existing restore-fixture race in different tests: the child completed its
+large write before SIGSTOP arrived. The helper now retries only that missed
+setup window with a fresh repository, at most eight times. Actual cancellation,
+publication failure, preservation and progress assertions are never retried.
+All 14 local restore journey tests pass against the existing production binary;
+the exact repaired commit still requires its full upstream CI attestation.
+The existing restore scenarios and repository mode checker retain these
+constraints, so no duplicate acceptance scenario was added.
+
+The native-source sprint remains isolated: its required AGPL dependency is still
+rejected by Brit's unchanged license allow-list, and its Windows storage path
+still lacks a proven durable namespace implementation. The two Windows handle
+defects are recorded in the sprint's original diagnosis; neither no-op syncing
+nor a test skip counts as a repair. No native-sprint closure is claimed here.
