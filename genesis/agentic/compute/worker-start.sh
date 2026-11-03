@@ -16,8 +16,17 @@ umask 077
 mkdir -p "$state/repos" "$state/private-home" "$state/tmp"
 chmod 755 "$state" "$state/repos"
 chmod 700 "$state/private-home" "$state/tmp"
-[[ "$(stat -c '%u:%g:%a' "$state/private-home")" == 0:0:700 ]] ||
-  refuse 'private-home must be owned by root:root with mode 0700'
+# The state volume is group-owned by the pod's fsGroup: the kubelet re-chowns its group (gid
+# 1000 on adam) and sets setgid on directories, so a strict 0:0:700 reading refuses every
+# boot (edge #1795). What protects the secrets is that only root can reach them: a root
+# owner and no access for anyone else. Repair the group drift; refuse a non-root owner or a
+# symlink, which is what tampering would look like.
+[[ -d "$state/private-home" && ! -L "$state/private-home" ]] ||
+  refuse 'private-home must be a real directory'
+[[ "$(stat -c '%u' "$state/private-home")" == 0 ]] ||
+  refuse 'private-home must be owned by root'
+chown 0:0 "$state/private-home"
+chmod g-s,g-rwx,o-rwx "$state/private-home"
 # Only one bootstrap/worker may own this state, including across restarts of the entrypoint.
 exec 9>"$state/worker.lock"
 flock -n 9 || refuse 'another worker owns this provider state'
@@ -25,10 +34,14 @@ load_or_create_secret() { # <root-only-file> <output-variable>
   local path="$1" output="$2" directory temporary metadata value
   directory="$(dirname -- "$path")"
   if [[ -e "$path" || -L "$path" ]]; then
-    metadata="$(stat -c '%F:%u:%g:%a' -- "$path" 2>/dev/null)" ||
+    metadata="$(stat -c '%F:%u' -- "$path" 2>/dev/null)" ||
       refuse "cannot inspect provider secret $path"
-    [[ "$metadata" == 'regular file:0:0:600' ]] ||
-      refuse "provider secret must be a regular file owned by root:root with mode 0600: $path"
+    # A root-owned regular file whose group or mode an fsGroup remount rewrote is repaired;
+    # a symlink, a non-regular file or a non-root owner is refused.
+    [[ ! -L "$path" && "$metadata" == 'regular file:0' ]] ||
+      refuse "provider secret must be a regular file owned by root: $path"
+    chown 0:0 -- "$path"
+    chmod 600 -- "$path"
   else
     temporary="$(mktemp "$directory/.mesh-secret.XXXXXX")" ||
       refuse "cannot create provider secret beside $path"

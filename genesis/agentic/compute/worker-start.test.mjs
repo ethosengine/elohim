@@ -8,6 +8,8 @@ import {
   readFileSync,
   chmodSync,
   existsSync,
+  chownSync,
+  symlinkSync,
   readdirSync,
   rmSync,
   statSync,
@@ -325,23 +327,52 @@ test(
 );
 
 test(
-  "bootstrap refuses provider secret paths with unsafe types or modes",
+  "bootstrap refuses a secret that is not a root-owned regular file",
   { skip: rootOnly },
   (t) => {
-    for (const unsafe of ["directory", "wrong-mode"]) {
+    for (const unsafe of ["directory", "symlink", "guest-owned"]) {
       const f = fixture(t);
       const privateHome = join(f.state, "private-home");
       mkdirSync(privateHome, { recursive: true, mode: 0o700 });
       const path = join(privateHome, "mesh-api-key-admin");
       if (unsafe === "directory") mkdirSync(path);
-      else writeFileSync(path, "x".repeat(44), { mode: 0o644 });
+      else if (unsafe === "symlink") {
+        writeFileSync(join(f.root, "elsewhere"), "x".repeat(44));
+        symlinkSync(join(f.root, "elsewhere"), path);
+      } else {
+        writeFileSync(path, "x".repeat(44), { mode: 0o600 });
+        chownSync(path, 65534, 65534);
+      }
       const run = f.run();
       assert.equal(run.status, 2, `${unsafe}: ${run.stderr}`);
-      assert.match(
-        run.stderr,
-        /regular file owned by root:root with mode 0600/,
-      );
+      assert.match(run.stderr, /regular file owned by root/);
     }
+  },
+);
+
+test(
+  "an fsGroup remount's group and mode drift on private-home and its secrets is repaired, not refused",
+  { skip: guestOnly },
+  (t) => {
+    const f = fixture(t);
+    assert.equal(f.run().status, 0);
+    const privateHome = join(f.state, "private-home");
+    const secret = join(privateHome, "mesh-api-key-admin");
+    const before = readFileSync(secret, "utf8");
+    // What the kubelet leaves on adam's volume: gid 1000, setgid on the directory, group rw.
+    chownSync(privateHome, 0, 1000);
+    chmodSync(privateHome, 0o2770);
+    chownSync(secret, 0, 1000);
+    chmodSync(secret, 0o660);
+    const run = f.run();
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(readFileSync(secret, "utf8"), before);
+    const home = statSync(privateHome);
+    assert.equal(home.gid, 0);
+    assert.equal(home.mode & 0o7777, 0o700);
+    const file = statSync(secret);
+    assert.equal(file.gid, 0);
+    assert.equal(file.mode & 0o777, 0o600);
   },
 );
 
