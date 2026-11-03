@@ -439,7 +439,7 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     execute(command, args, opts) {
       calls.push({ command, args, opts });
       if (args.includes("elohim-node"))
-        return "Request error: missing field private-provider-detail\nRequest error: timeout private-value";
+        return 'Request error: missing field private-provider-detail\nRequest error: timeout private-value\n{"timestamp":"2026-11-03T17:46:19.5Z","fields":{"message":"Request error","error":"Conductor error: Guest(\\"private-zome\\")"}}';
       return "bootstrap failed private-bootstrap-value eyJabc.payload.signature";
     },
   });
@@ -448,7 +448,12 @@ test("failure diagnostics are bounded read-only worker observations and redact c
     assert.equal(call.command, "kubectl");
     assert.equal(call.args[0], "--request-timeout=15s");
     assert.equal(call.opts.timeout, 20000);
-    assert.equal(call.opts.maxBuffer, 262144);
+    assert.equal(
+      call.opts.maxBuffer,
+      call.args.includes("elohim-node") ? 67108864 : 262144,
+    );
+    if (call.args.includes("elohim-node"))
+      assert(call.args.includes("--since=20m"));
     assert(["get", "logs", "exec"].includes(call.args[1]));
     if (call.args[1] === "exec") {
       assert.match(call.args.at(-1), /O_RDONLY \| fs.constants.O_NOFOLLOW/);
@@ -492,7 +497,9 @@ test("failure diagnostics are bounded read-only worker observations and redact c
   assert.deepEqual(providerErrors.categories, [
     "native-wire-shape",
     "native-timeout",
+    "zome-refused",
   ]);
+  assert.deepEqual(providerErrors.at, [null, null, "2026-11-03T17:46:19.5Z"]);
   assert.equal(providerErrors.grantRequestCorrelationProven, false);
   assert(!JSON.stringify(providerErrors).includes("private-"));
   assert(
