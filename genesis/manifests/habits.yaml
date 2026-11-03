@@ -2221,10 +2221,10 @@ habits:
       - "just gate dialogue-stasis (private sensor, keeper, policy, audit and delivery regression contracts; no model calls)"
       - "pnpm run elohim-agent:packages:verify (both runtime projections and recorded hook registrations)"
     evidence: >
-      DELTA 2026-11-02 (activation, RED retained): Matthew explicitly authorized activation in dialogue; device standing and the recorded policy ruling resolve to human:matthew, and native status reports pinned-match. Coordinator restarted live with the tested immutable candidate; new login shells inherit the private runtime.env, preserving explicit off/shadow overrides. Activation exposed 0.99 s spent hashing an unused executable identity before each native lookup; execution-only resolver now skips that hash, while identity consumers retain it. Real-authority isolated guidance delivery passed in 1.18 s, startup live/pinned awareness in 1.25 s; both runtimes give startup a 3 s registration. Resolver tests: 8 passed. Evidence: genesis/local-dev/stasis-runtime-wiring/policy-ruling.json, live-policy-status.json, activation-delivery-after.json, activation-hook-output.json. This does not claim a newly launched production incident completed its full keeper ladder.
-    evidence-fingerprint: sha256:b4578e236e8fe758
-    evidence-bytes: 11411
-    evidence-entries: 18
+      DELTA 2026-11-03 (integration, RED retained): merged upstream runtime attribution with the session wiring; dialogue-stasis gate passes 156 coordinator/control tests, 51 sensor tests and three keeper tests. Timeout/descendant regression now measures the declared three-second hook registration (observed 2.274 seconds under concurrent checks exceeded its obsolete 2.2-second assertion); descendant-kill assertion retained. Resolver tests pass eight and package verification passes 2,372. Evidence: genesis/local-dev/integration-20261103/stasis-final.log; no new live-ladder completion claimed.
+    evidence-fingerprint: sha256:deb03ef4b798e8e4
+    evidence-bytes: 12005
+    evidence-entries: 19
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
@@ -2502,10 +2502,10 @@ habits:
       - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (six isolated-Git acceptance scenarios, including independent addressed-policy holdings)"
       - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
     evidence: >
-      DELTA 2026-11-02 (GREEN, local shared-discipline trial): normal Rust-style, orchestrator and EPRFS gates pass; Rust-style has 30 native / 9 hook / 4 distribution tests and scans 2,090 files in 84 crates; EPRFS has 1,970 passing Rust tests, zero failures or ignored tests, with workspace fmt/Clippy green. Six a2o scenarios / 18 steps pass. Brit's actual standalone offline install verifies the same policy/guide/method CIDs as Elohim, and its independently selected `brit-build-ref` trial measures 14 files with zero debt; committed fixtures refuse new suppressions, dirty repairs and corrupt holdings. Both story files had two fresh-reader rounds, each 0/3/0 then 0/2/0 correctness/interpretability/preference findings, final READY; remaining interpretation findings are retained in task-srd-5-report.md. Durable proof: genesis/a2o/reports/recovery/shared-rust-discipline-2026-11-02/. Network authority/witnessing and scope/checker migration remain open; no commit, push or remote CI claimed. The 72-minute EPRFS gate leaves performance finding 330923a9dd23 open.
-    evidence-fingerprint: sha256:b799c686f983d874
-    evidence-bytes: 4414
-    evidence-entries: 5
+      DELTA 2026-11-03 (integration): upstream dev reconciled; published eprfs-meta 0.3.3 collision detected by the precheck, assigned 0.3.4 and regenerated the addressed checker method/source without overwriting the prior holdings. Full Rust-style gate passes on 2,092 files / 84 crates, six a2o scenarios / 18 steps pass, publisher precheck and 32 publisher tests pass. Proof: genesis/local-dev/integration-20261103/. Network authority and the separate native-source sprint remain unclaimed.
+    evidence-fingerprint: sha256:10215cdde8815cc4
+    evidence-bytes: 4903
+    evidence-entries: 6
     guard: >
       Never equate equal counts with no new findings; never use dirty source for a pushed object;
       never call a missing baseline or a stale checker clean. Scope and owner moves cannot transfer

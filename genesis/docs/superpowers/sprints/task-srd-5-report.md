@@ -133,3 +133,32 @@ after refreshing the plan projection. An independent reviewer recorded approved
 technical verdicts on those exact commitments; they do not confer appointed or
 network acceptance. The full gate subsequently passed without a further source
 change. SRD-3 remains open.
+
+## Integration correction — 2026-11-03
+
+The independent native-source sprint published `eprfs-meta 0.3.3` before this
+portable-policy change landed. The publication precheck correctly refused the
+different source bytes. This integration assigns the changed metadata package
+`0.3.4`, retains the prior addressed holdings, and regenerates the checker method
+and standalone source distribution from the corrected manifests and locks.
+Current local selections are `.epr-meta/rust-style-policy.json` in each repository
+and Brit's `.epr-meta/rust-style/source.json`; the earlier CIDs above describe the
+original trial, not this corrected candidate. No license metadata or allow-list
+changes are part of this correction.
+
+The corrected native Rust-style gate, six acceptance scenarios, publication
+precheck, 32 publisher tests and 2,372 package checks pass. The upstream merge
+retains both the session hook wiring and upstream runtime attribution. Worktree
+setup initially lacked generated Husky shims; restoring them made all six
+commit-hook fixture tests pass. Final downstream gates and exact-revision Brit
+CI remain separate reach requirements. Integration evidence is retained under
+`genesis/local-dev/integration-20261103/`.
+
+Brit operation evidence: staged-diff submodule refusal, conflicted-index staging
+refusal and send-pack closed-channel failure required Git fallbacks; remote
+absence was checked before retrying publication, with its hooks enabled. Branch
+creation/configuration and submodule initialization are also missing from the
+installed Brit CLI. Two fallback invocations included their machine-readable
+reason but lacked the required advance commentary; that instruction-level lapse
+is recorded rather than counted as adoption. An attempted add without its `--`
+separator refused before staging and was corrected after inspecting help.
