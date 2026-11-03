@@ -335,7 +335,7 @@ export function classifyMeshRequestErrors(
         fd = fs.openSync(path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
         const stat = fs.fstatSync(fd);
         if (!stat.isFile()) return null;
-        const length = Math.min(stat.size, 4194304);
+        const length = Math.min(stat.size, 50331648); // ~50 min of gossip-heavy storage log
         const buffer = Buffer.alloc(length);
         fs.readSync(fd, buffer, 0, length, stat.size - length);
         return buffer.toString();
