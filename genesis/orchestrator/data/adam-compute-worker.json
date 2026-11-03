@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:52d1d746454769de8205ffc37c02d830720efb0869fae15907f5c3256faa3cc0",
+  "image": "harbor.ethosengine.com/ethosengine/elohim-compute-worker@sha256:e87b2735af5f135e82737397a0ed431d2cb1dc58d30b63179e3bb169cf8f0a04",
   "performer": "uhCAkCUzKl3Y1B2af9NJmO-Ov-sGPFIzUpAWuMMiWvoGTV16BX9Un",
   "slice": {
     "cpuMillis": 8000,
@@ -31,7 +31,7 @@
     }
   },
   "privateMesh": true,
-  "sourceCommit": "b61b9a79c2882d3def61d07e634f7d0c71cdb4f2",
+  "sourceCommit": "b6d32552fee30d0794c1f66b5559ba4742f7b233",
   "resumeInitializationLogSha256": "490ba1c27615728aab776a6e25fa2afeca7e92e30ed9157e7573d232ee324c4c",
   "resumeInitializationStateSha256": "8d5e87b8824ee9d89d640bb4e71128b3a4abfb04dc6a4a46e73c6a0f6805ab65"
 }
