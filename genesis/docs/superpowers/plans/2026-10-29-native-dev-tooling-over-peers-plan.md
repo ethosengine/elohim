@@ -127,6 +127,11 @@ Also A7b: a sibling's commit objects are absent from the local odb.
 tracked file (the eprfs gate appends to `.claude/data/architecture-findings.jsonl` today); one
 `// gate-reads:` must not mask a walk in the same function; undeclared inputs refuse in seconds; eprfs
 leaves tree scope (12 unresolved reads after S1). Cluster rows 73, 76 and 74.
+**Met 2026-11-03/04.** Rows 73, 74, 76 and 80 are closed. eprfs keys on paths: 222 reads, its
+governance walk named as `**/.epr-meta`. A clean-worktree reuse was measured at 35 min 32 s, then
+22 s. Thirteen more cargo gates are enrolled for reuse. The oracle again plans dependents with
+sibling worktrees present (row 81; rakia#3, brit#4/#5). Baseline detail: spec
+native-dev-plane-one-derivation-earned-reach §11.
 
 **Requests and offers (rows 8 and 15).** A landing intent is already a ValueFlows `Intent` its
 pusher fulfils; `just measure` sends a stage to a named provider under a grant. A market adds a job

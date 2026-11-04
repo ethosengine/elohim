@@ -217,6 +217,16 @@ The repo already holds the native record. Nobody needs to invent one.
 - The key is `KeyInput::Projected`: an eprfs `TreeView` built from the manifest's `inputs.sources`, the
   audited `// gate-reads:` paths and gitlinks. That one object is both the cache key and **the sparse
   checkout a carrier materializes**, so peers agree on sparse checkouts by agreeing on a CID.
+- **An audited read can be a pattern rather than a path.** Since 2026-11-03 the audit admits one pattern form,
+  `// gate-reads: **/<basename>`: every tracked file with that basename. eprfs's governance walk
+  (`elohim/eprfs/epr-cli/tests/live_manifest_integrity.rs`) declares `**/.epr-meta`, 84 tracked
+  manifests. Today's closure keys it as a digest over each match's path and blob at the commit
+  (`gate-evidence.mjs` `patternDigest`), and the dirt check passes it as a `:(glob)` pathspec.
+  `project_view` must expand the pattern the same way at the commit. A view that carries only literal
+  paths would key correctly by accident, yet hand a carrier a sparse checkout with none of the 84
+  manifests. Two further audit properties hold, and the view inherits them unchanged: a declaration
+  names only the statement directly below it (row 76 of the workspace-discipline cluster), and a test
+  that reads paths from data fails when the data outgrows its declarations (row 80).
 - `project_view` has not landed, and `ProjectedRoot` has no public constructor until it does
   (`derive.rs:9-12`). The missing work is already specified as slice 4 of
   placement-contract-interfaces §C: `walk_spine`, `SpineWalk`, `project_view`, `derive_or_reuse`, the
@@ -529,6 +539,12 @@ thing an onboarding developer touches, so it teaches the honest states.
    miss.
 3. **[I2, I4]** Every non-hit is a typed reason. A store that is absent, slow, uncredentialed or empty
    changes speed and reach, never a verdict.
+   - Access to the tier follows reach. It is not modelled on the legacy registries it retires. The
+     Nexus cargo registry advertises `auth-required` while answering reads anonymously, so a device
+     with no token cannot resolve a lockfile at all (workspace-discipline row 82). That is a concession
+     inside the legacy plane, to be accommodated where Nexus is still used; it is not a design input.
+     The tier asks for a credential only where an object's reach requires one; a device reading its
+     own `self`-reach bytes needs none.
 4. **[new]** **The first act is a local tier put:** write, address, record, flow event. Publishing and
    replicating are asynchronous widenings whose state is shown per copy. Row 5's "slice 1 PUTs to a
    server" is struck.
@@ -585,12 +601,26 @@ eprfs workspace each peak at several GB, and the workspace RAM guard sheds concu
 track names the wall-clock it is expected to remove and the receipt that shows it. Expected figures are
 historical; each track takes fresh before-and-after gate-cycle rows.
 
+**First fresh baseline (2026-11-03, one device; plan §5's hit-rate preconditions are met).**
+- Workspace-discipline rows 73, 74, 76 and 80 are closed. No gate rewrites a tracked file on a
+  steady run, undeclared inputs refuse in the preflight's first second, a declaration masks nothing,
+  and data-derived reads check themselves.
+- eprfs keys on paths (222 reads) instead of the commit tree. In a clean worktree,
+  `GATE_EVIDENCE=reuse just gate eprfs` ran green in 35 min 32 s; the next run was an evidence hit at
+  paths scope in 22 s.
+- Thirteen more cargo gates are enrolled in `gate_reuse` (`genesis/agentic/pool-policy.json`), each
+  one's recipe surveyed as cargo over its own crates. The policy comment names the eight left out and
+  the read each one's key cannot see.
+- Single-device reuse therefore holds. F1r's sibling reuse is the first figure still unmeasured.
+  eprfs's paths scope may also shrink S2b's re-gate cost for eprfs; re-measure before splitting the
+  corpus.
+
 ### Parallel tracks (start together)
 
 | Track | Write-set | Work | Why it is on the trajectory | Expected wall-clock | Receipt |
 |---|---|---|---|---|---|
 | **A — foundational** | `elohim/eprfs/eprfs-core`, `elohim/ark/cli/src/material.rs` | Slice 4 of placement-contract-interfaces §C: `walk_spine`, `project_view`, `derive_or_reuse`, the `P` vectors, `tests/derive.rs`. Retire ark's identity-projection workaround (`material.rs:101-113`). Key view declarations so a component's view can be asked for by its `.epr-meta` root (§1a). Retain unknown `ext` bytes and make `DerivationKey` decode per D7 | The one object that is both the cache key and the sparse checkout (D2); every later join keys on it | No standalone saving; enables every join | `P` vectors green; ark keys a task on a real projected root |
-| **B — F0** | `genesis/orchestrator/gate-oracle.mjs`, `gate-runner.mjs` | Selection resolves through `brit build affected`, not the deprecated `rakia` PATH binary (`gate-oracle.mjs:24-37`) | Removes a retired tool from the reuse path | Restores dark reuse: up to a full gate (e.g. 5,757 s → 56 s) on a device without the shim | Reuse hit with no `rakia` on PATH |
+| **B — F0** | `genesis/orchestrator/gate-oracle.mjs`, `gate-runner.mjs` | Selection resolves through `brit build affected`, not the deprecated `rakia` PATH name (`gate-oracle.mjs:24-37`). On a device with the bin store, that name is already a launcher alias for `brit build`. The correctness defect behind the oracle was separate and is fixed: rakia-core 0.1.0's discovery walked sibling worktrees inside the checkout (13 copies, 296 manifests), duplicated every edge and dropped every dependent from the plan. rakia#3 (rakia-core 0.1.1), brit#4/#5 (brit-cli 0.1.7); monorepo pins rakia `a0dc6983f`, brit `b8a5f4b34` | Removes a retired tool name from the reuse path and keeps one-hop dependent selection, so a pin move re-selects its consumers | Restores dark reuse on a device without the alias: up to a full gate (35 min 32 s → 22 s measured for eprfs, 2026-11-03) | Reuse hit with no `rakia` on PATH, **and** dependents are planned with sibling worktrees present: a `sophia` change selects `elohim:build-angular`, and gate-runner's shadow-oracle test is green |
 | **C — record [integrity]** | `elohim/brit/brit-epr`, `brit-build-ref`, `elohim/brit/gitoxide-core/src/repository/push.rs`, `elohim/ark/cli/src/brit_index.rs` | brit signs `DerivationRecord` bodies (D7 framing); verification follows D7's three cases; notes carry records; old notes convert unsigned with a witness pointer; brit push keeps the fast-forward check under an explicit lease | The one unit every rung moves (D1) | No standalone saving; enables F1r | Signed-record vectors: tampered bodies and unknown non-`ext` fields refused, unknown epochs held; substituted method/input in a converted note never verifies; brit push refuses a non-fast-forward under an explicit lease; a Claude-family adversarial review before it lands |
 | **D — honesty** | `genesis/orchestrator/gate-attest.mjs`, `.claude/scripts/habits-status.py`, `elohim/eprfs/eprfs-meta` | `claimed` gets its own exit code; a mix of passed and skipped reads `partly-measured`; an integrity-class marker lints rules declared below `ask` | Stops green-by-default before more peers read these verdicts | No saving; prevents false green | Unit tests on each |
 | **E — tier blob store** | `elohim/eprfs/eprfs-peer`, `eprfs-storage` | Plan row 5 slice 1: the local tier blob put (chunked, CID-addressed, daemon-down path per §10.12a); then A11's tolerant reader; then a `serve-blob` mount with scope enforcement (§10.12) | A peer runtime holding a closure-keyed artifact, which the operator named | None until the join F2 | One-device I1–I7 failure tests with zero peers and with no daemon; the unauthorized-CID refusal |
@@ -608,8 +638,8 @@ Every other pair of tracks shares neither files nor types.
 | F1r | **Live two-device sibling reuse** (plan row 7) on a real push. Includes the **producer**: `gate-task.mjs` hands ark a projected view of real source trees, not today's closure-metadata JSON (`gate-task.mjs:105,150`, `ark/cli/src/task.rs:107`). Also emits minimal `Use`/`Produce` events with quantities. Sibling reuse must also run when an ark task handles the gate; today it is bypassed (`gate-runner.mjs:461`, `!task`) | A, B, C, D | One full gate per closure on the second device | A `basis: Computed` sibling row, `independence: sibling`, with its `Use` event |
 | F2 | The sibling fetches the mesh storage and doorway binaries from the peer's tier instead of rebuilding. Includes capturing `just mesh build` outputs into the tier as declared method outputs | A, C, E, F1r | One storage build (tens of minutes at `CARGO_BUILD_JOBS=1`) per closure per extra device | Fetch vs rebuild as `Use` vs `Produce`; the 454 MB chunked case |
 | F3 | S1b (Phase V gates hold nothing; Phase L holds for the CAS window) with D3 riding along | Owned by the closure-keyed landing plan; D3's fast-forward fix comes from C; D first, so `claimed` never lands silently | Lease p90 3,321 s → the CAS window (S1b's own target p90 < 120 s) | Landing with the forge unreachable; the partition interleaving of §8; mirror catch-up as a fast-forward |
-| F4 | D9 carry as the single offload path; source materialization by projected view; `just measure` re-plumbed | A, E, F1r | Requester wall-clock while a peer carries | `basis: UnderGrant` record; `NotCarried` when absent |
-| F5 | One release plane for tools; `Work` in `ReaVerb`; deliverables as projections | C, D, E, F1r | Small | A changelog reproduced from fulfilled commitments |
+| F4 | D9 carry as the single offload path; source materialization by projected view; `just measure` re-plumbed. The carrier's envelope sets `TMPDIR` outside any repository: a sandbox that leaves `/tmp/.git` behind nests every fixture repository a test creates (the gate preflight's `checkTmpdir` refuses that state) | A, E, F1r, **and a carrier whose key is not exiled**: adam's agent key is chain-fork-warranted on every alpha conductor until exile D1 is decided (`steward-key-chain-fork-warrant-exile`), so the first carrier is one of the steward's own workspaces | Requester wall-clock while a peer carries | `basis: UnderGrant` record; `NotCarried` when absent |
+| F5 | One release plane for tools; `Work` in `ReaVerb`; deliverables as projections. Two lessons from brit#4/#5 bind it. A lockfile-only change alters a binary crate's published bytes, so a release named by version collides (brit-cli 0.1.6), while one named by its derivation cannot. And device delivery waits on the whole CI run, publish included, while pin attestation reads only `Tests pass`, so the release plane must report the two separately | C, D, E, F1r | Small | A changelog reproduced from fulfilled commitments |
 | F6 | R3: a second principal, the signer → `agent_cid` binding, the graduation verb, the `derivation` attestation kind and the three integrity fixes of D5, in the batched DNA move | Standing redraft (§13), C, D | Reuse across principals | The one-human adversarial test yields k = 1; then the first graduation act |
 
 The closure-keyed landing plan's S2b corpus split (eprfs and orchestrator re-gate 547–1,518 s per
