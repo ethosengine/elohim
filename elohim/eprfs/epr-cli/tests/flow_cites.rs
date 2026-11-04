@@ -21,10 +21,13 @@
 //! dot-prefixed directories — so the fixture cannot shadow the real gospel it was copied from in
 //! the live slug index.
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use elohim_epr_cli::flow::cites::{parse_cite, split_frontmatter};
 use sha2::{Digest, Sha256};
 
 /// The ten baseline documents, in the order station three recorded them.
@@ -474,9 +477,102 @@ const LIVE_VERIFY: &[(&str, i32, usize)] = &[
     ("genesis/docs/architecture/content-pipeline.md", 0, 0),
 ];
 
+fn is_frontmatter_list_item(line: &str) -> bool {
+    line.trim_start()
+        .strip_prefix('-')
+        .is_some_and(|rest| rest.starts_with(char::is_whitespace))
+}
+
+/// Read cite items with `verify_doc`'s list semantics: a blank or non-item closes the list.
+fn verify_cite_items(text: &str) -> Vec<String> {
+    let Some((frontmatter, _)) = split_frontmatter(text) else {
+        return Vec::new();
+    };
+    let mut items = Vec::new();
+    let mut inside = false;
+    for line in frontmatter {
+        let stripped = line.trim_end();
+        if stripped.is_empty() {
+            inside = false;
+            continue;
+        }
+        if inside && is_frontmatter_list_item(stripped) {
+            items.push(stripped.trim_start()[1..].trim().to_string());
+            continue;
+        }
+        inside = stripped
+            .split_once(':')
+            .is_some_and(|(key, value)| key == "cites" && value.trim().is_empty());
+    }
+    items
+}
+
+/// Keep this predicate byte-for-byte equivalent in meaning to `cites::looks_like_repo_path`.
+fn looks_like_repo_path(reference: &str) -> bool {
+    if reference.contains("://")
+        || reference.starts_with("http")
+        || reference.starts_with("mailto:")
+        || reference.starts_with('#')
+    {
+        return false;
+    }
+    if !reference.contains('/') || reference.trim() != reference || reference.contains(' ') {
+        return false;
+    }
+    let path = Path::new(reference);
+    path.extension().is_some() && !path.is_absolute()
+}
+
+fn live_verify_legacy_read_paths(root: &Path) -> Vec<String> {
+    let canonical_root = root.canonicalize().expect("repository root resolves");
+    let mut paths = Vec::new();
+    for (doc, _, _) in LIVE_VERIFY {
+        let Ok(text) = std::fs::read_to_string(root.join(doc)) else {
+            continue;
+        };
+        for item in verify_cite_items(&text) {
+            let cite = parse_cite(&item);
+            if !cite.legacy_path {
+                continue;
+            }
+            let reference = Path::new(&cite.reference);
+            let candidate = if reference.is_absolute() {
+                reference.to_path_buf()
+            } else {
+                root.join(reference)
+            };
+            let resolves_as_doc = candidate.extension().and_then(|ext| ext.to_str()) == Some("md");
+            if !resolves_as_doc && !looks_like_repo_path(&cite.reference) {
+                continue;
+            }
+            let Ok(target) = candidate.canonicalize() else {
+                continue;
+            };
+            if target.is_file() && target.starts_with(&canonical_root) {
+                paths.push(
+                    target
+                        .strip_prefix(&canonical_root)
+                        .expect("target is beneath repository root")
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                );
+            }
+        }
+    }
+    paths.sort_unstable();
+    paths.dedup();
+    paths
+}
+
 #[test]
 fn verify_agrees_with_the_oracle_on_twenty_live_documents() {
     let root = repo_root();
+    let read_paths = live_verify_legacy_read_paths(&root);
+    common::assert_declared_reads(
+        include_str!("flow_cites.rs"),
+        read_paths.iter().map(String::as_str),
+        "live verify legacy cite targets",
+    );
     let mut checked = 0;
     for (doc, want_exit, want_problems) in LIVE_VERIFY {
         if !root.join(doc).is_file() {

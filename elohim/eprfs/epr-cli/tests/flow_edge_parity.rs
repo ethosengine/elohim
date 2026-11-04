@@ -4,6 +4,8 @@
 //! rule, not just the digest, matches the live corpus. Read-only; skips gracefully when run
 //! outside the repo (the spec file absent).
 
+mod common;
+
 use std::path::PathBuf;
 
 use elohim_epr_cli::flow::edges::{derive_verdict, EdgePlane, IndexedEdge, SealForm, Verdict};
@@ -38,6 +40,16 @@ fn sealed_cites_in_the_spec_derive_ok_verdicts() {
         return;
     };
     let fm = parse_frontmatter(&text);
+    let read_paths = fm
+        .list("cites")
+        .iter()
+        .filter_map(|entry| cite_fingerprint(entry).and_then(|_| cite_path(entry)))
+        .collect::<Vec<_>>();
+    common::assert_declared_reads(
+        include_str!("flow_edge_parity.rs"),
+        read_paths.iter().map(String::as_str),
+        "sealed edge parity cite targets",
+    );
 
     let mut checked = 0usize;
     for entry in fm.list("cites") {

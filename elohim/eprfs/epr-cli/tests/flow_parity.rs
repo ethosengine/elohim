@@ -6,6 +6,8 @@
 //! entry's `sha256:hex16` + `path:` locator, computes the target file's body CID in Rust,
 //! and asserts the short form equals the sealed hex16.
 
+mod common;
+
 use std::path::PathBuf;
 
 use elohim_epr_cli::flow::{canonical_body, cite_fingerprint, cite_path, parse_frontmatter};
@@ -43,6 +45,16 @@ fn cite_fingerprints_match_the_rust_body_encoder() {
         cites.len() >= 7,
         "fabric spec should declare at least 7 cites, found {}",
         cites.len()
+    );
+
+    let read_paths = cites
+        .iter()
+        .filter_map(|entry| cite_fingerprint(entry).and_then(|_| cite_path(entry)))
+        .collect::<Vec<_>>();
+    common::assert_declared_reads(
+        include_str!("flow_parity.rs"),
+        read_paths.iter().map(String::as_str),
+        "fabric parity cite targets",
     );
 
     let mut checked = 0usize;

@@ -19,6 +19,67 @@ use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
+/// Fails when a path this test reads from data is not covered by a `// gate-reads:` line in
+/// `source` (the test file's own text, via `include_str!`). A declaration covers a path when
+/// it equals it, is a directory prefix of it (`dir` covers `dir/x`), or is `**/<name>` and the
+/// path's last segment is `<name>`. `.` covers everything but must not be used.
+#[allow(
+    dead_code,
+    reason = "shared by every integration test binary; each binary uses only some helpers"
+)]
+pub fn assert_declared_reads<'a>(
+    source: &str,
+    read: impl IntoIterator<Item = &'a str>,
+    context: &str,
+) {
+    fn normalize(path: &str) -> &str {
+        path.strip_prefix("./").unwrap_or(path)
+    }
+
+    fn covers(declaration: &str, path: &str) -> bool {
+        if let Some(name) = declaration.strip_prefix("**/") {
+            return path.rsplit('/').next() == Some(name);
+        }
+        path == declaration
+            || path
+                .strip_prefix(declaration)
+                .is_some_and(|suffix| suffix.starts_with('/'))
+    }
+
+    let declared = source
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("// gate-reads:")
+                .map(str::trim)
+                .map(normalize)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        !declared.contains(&"."),
+        "{context}: `// gate-reads: .` is forbidden; declare the paths this test reads"
+    );
+
+    let mut uncovered = read
+        .into_iter()
+        .map(normalize)
+        .filter(|path| !declared.iter().any(|declaration| covers(declaration, path)))
+        .collect::<Vec<_>>();
+    uncovered.sort_unstable();
+    uncovered.dedup();
+
+    assert!(
+        uncovered.is_empty(),
+        "{context}: paths read from data are missing gate declarations:\n{}\n\
+         Add `// gate-reads: <path>` above the statement that reads it.",
+        uncovered
+            .iter()
+            .map(|path| format!("  - {path}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
 #[allow(
     dead_code,
     reason = "only the binaries that glob-import common (flow_memory_recall, _lens) read SESSION; \

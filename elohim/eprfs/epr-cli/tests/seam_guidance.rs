@@ -1,4 +1,6 @@
 //! Authoring acceptance: one native classifier, two harnesses, private reconstructable evidence.
+mod common;
+
 use elohim_epr_cli::seam::{self, adapters, declarations};
 use serde_json::{json, Value};
 use std::{
@@ -41,13 +43,19 @@ fn fixture() -> TempDir {
         let raw = fs::read_to_string(repo().join(path)).unwrap();
         put(dir.path(), path, &raw);
         let d: Value = serde_json::from_str(&raw).unwrap();
-        for source in d["authoritativeContracts"]
+        let source_paths = d["authoritativeContracts"]
             .as_array()
             .unwrap()
             .iter()
             .chain(d["reusableInterfaces"].as_array().unwrap())
-        {
-            let path = source["path"].as_str().unwrap();
+            .map(|source| source["path"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        common::assert_declared_reads(
+            include_str!("seam_guidance.rs"),
+            source_paths.iter().copied(),
+            "seam declaration sources",
+        );
+        for path in source_paths {
             // The contracts and interfaces the four declarations name today; a new one must be
             // declared here.
             // gate-reads: genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md
