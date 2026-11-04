@@ -47,3 +47,14 @@ the cause.
 
 **Probe for the cure:** `brit build fingerprint elohim/eprfs/build-manifest.json --commit HEAD` prints
 a fingerprint in the monorepo, and a push shows `evidence: hit` lines again.
+
+## 2026-11-04 lead: the repository is shallow
+
+`brit rebase origin/dev` refused this checkout outright: "shallow repositories require Git".
+`.git/shallow` exists (written 2026-11-03 09:44), so some fetch truncated this repository's history.
+The gix paths behind `build fingerprint`, brit's rebase and rakia-brit's commit resolution do not
+support a shallow repository. `brit revision resolve` still works, which explains the split seen
+above. First probe: `git rev-parse --is-shallow-repository`, then `git fetch --unshallow origin`
+on a copy of this repository and re-run `brit build fingerprint … --commit HEAD`. Also find which
+fetch created the shallow boundary (an integrator `--depth` fetch, or a Che bootstrap clone), so it
+does not recur.
