@@ -1,7 +1,7 @@
 ---
 id: brit-native-source-loop-result-2026-11-02
 title: Brit native source loop — local evidence and successor journey
-status: In Progress
+status: Closed
 date: 2026-11-02
 serves: brit-native-daily-driver
 cites: []
