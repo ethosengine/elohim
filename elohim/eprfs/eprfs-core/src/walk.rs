@@ -981,6 +981,196 @@ pub struct WalkedView {
     pub stats: WalkStats,
 }
 
+/// The verified directory nodes needed to project one view. In-view directory links stay in
+/// their containing spine node and are never followed; only strict ancestors of a declared path
+/// are fetched. Observed `NotFound` and `ThroughLeaf` answers are retained so projection can drop
+/// empty spine branches while preserving a leaf at which a view path stopped.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SpineWalk {
+    pub root: BlobCid,
+    pub nodes: Vec<WalkedNode>,
+    pub absent: Vec<WalkItem>,
+    pub stats: WalkStats,
+}
+
+impl SpineWalk {
+    /// Construct a gathered spine while preserving the same invariants as [`walk_spine`].
+    /// Adapters that already hold a verified root node can use this without fabricating a
+    /// storage round trip.
+    pub fn new(
+        root: BlobCid,
+        nodes: Vec<WalkedNode>,
+        absent: Vec<WalkItem>,
+        stats: WalkStats,
+    ) -> TreeResult<Self> {
+        if nodes
+            .first()
+            .is_none_or(|node| !node.path.is_root() || node.cid != root)
+        {
+            return Err(TreeError::InvalidView(
+                "a spine walk must begin with its root node".into(),
+            ));
+        }
+        if nodes
+            .iter()
+            .any(|node| node.node.entries.len() != node.entry_coverage.len())
+        {
+            return Err(TreeError::InvalidView(
+                "a spine node's entry coverage is incomplete".into(),
+            ));
+        }
+        if absent.iter().any(|item| {
+            !matches!(
+                item,
+                WalkItem::Absent {
+                    reason: AbsentReason::NotFound { .. } | AbsentReason::ThroughLeaf { .. },
+                    ..
+                }
+            )
+        }) {
+            return Err(TreeError::InvalidView(
+                "a spine walk retains only observed path absences".into(),
+            ));
+        }
+        Ok(Self {
+            root,
+            nodes,
+            absent,
+            stats,
+        })
+    }
+}
+
+/// Fetch only the verified directory spine needed to project `view` from `root`.
+///
+/// A missing or withheld directory on that spine refuses the walk: a projected key over partly
+/// held input has no useful meaning. A missing name in a held node and a view path that reaches a
+/// file or symlink are observed answers and remain in [`SpineWalk::absent`]. No file, symlink, or
+/// in-view directory body is fetched.
+pub async fn walk_spine<S: EprfsStorage + ?Sized>(
+    storage: &S,
+    root: &BlobCid,
+    view: &View,
+    opts: &BatchOptions,
+    limits: &TreeLimits,
+) -> TreeResult<SpineWalk> {
+    check_root_codec(root)?;
+    view.check_path_bytes(limits)?;
+    let Some(root_frame) = Frame::root(root, view) else {
+        return Err(TreeError::InvalidView(
+            "a projected view must name at least one path".into(),
+        ));
+    };
+
+    let mut budget = Budget::new(limits);
+    let mut retained = Budget::new(limits);
+    let mut stack = vec![root_frame];
+    let mut cache: HashMap<BlobCid, (TreeNode, usize)> = HashMap::new();
+    let mut nodes = Vec::new();
+    let mut absent = Vec::new();
+    let mut stats = WalkStats::default();
+
+    while let Some(frame) = stack.pop() {
+        budget.pop_pending(frame.charge);
+        budget.check_depth(frame.depth)?;
+        let node = if let Some((node, len)) = cache.get(&frame.cid) {
+            budget.charge_reused(*len)?;
+            stats.nodes_reused += 1;
+            node.clone()
+        } else {
+            match fetch_node(storage, root, &frame.item(), opts, &mut budget).await {
+                Ok((node, len)) => {
+                    stats.nodes_fetched += 1;
+                    stats.node_bytes += len;
+                    cache.insert(frame.cid.clone(), (node.clone(), len));
+                    node
+                }
+                Err(TreeError::Incomplete { .. }) => {
+                    return Err(TreeError::Unanswered {
+                        cid: frame.cid,
+                        path: frame.path,
+                        why: Box::new(local_miss()),
+                    });
+                }
+                Err(TreeError::Unanswered { why, .. }) => {
+                    return Err(TreeError::Unanswered {
+                        cid: frame.cid,
+                        path: frame.path,
+                        why,
+                    });
+                }
+                Err(error) => return Err(error),
+            }
+        };
+
+        stats.entries_visited += node.entries.len();
+        budget.charge_entries(node.entries.len())?;
+        let classified = classify(&frame.scope, frame.depth, &node.entries);
+        let mut children = Vec::new();
+        for (entry, scope) in node.entries.iter().zip(&classified.entries) {
+            let Some(scope) = scope else { continue };
+            let child_path_bytes = budget.child_path_bytes(frame.path_bytes, entry.name.len())?;
+            let child_path = frame.path.join(&entry.name);
+            match (&entry.kind, scope) {
+                (TreeEntryKind::Directory { tree }, Scope::Spine(_)) => {
+                    budget.check_child_depth(frame.depth)?;
+                    budget.push_pending(stack.len() + children.len(), child_path_bytes)?;
+                    children.push(Frame {
+                        cid: tree.as_blob_cid().clone(),
+                        path: child_path,
+                        depth: frame.depth + 1,
+                        path_bytes: child_path_bytes,
+                        charge: child_path_bytes,
+                        scope: scope.clone(),
+                    });
+                }
+                (
+                    TreeEntryKind::File { .. } | TreeEntryKind::Symlink { .. },
+                    Scope::Spine(tails),
+                ) => {
+                    for view_path in tails {
+                        absent.push(WalkItem::through_leaf(
+                            (*view_path).clone(),
+                            child_path.clone(),
+                        ));
+                    }
+                }
+                (
+                    TreeEntryKind::Directory { .. }
+                    | TreeEntryKind::File { .. }
+                    | TreeEntryKind::Symlink { .. }
+                    | TreeEntryKind::External { .. },
+                    Scope::InView(_),
+                )
+                | (TreeEntryKind::External { .. }, Scope::Spine(_)) => {}
+            }
+        }
+        for view_path in &classified.unmatched {
+            absent.push(WalkItem::not_found(
+                (*view_path).clone(),
+                frame.path.join(&view_path.components()[frame.depth]),
+            ));
+        }
+
+        retained.charge_result(frame.path.byte_len())?;
+        let walked = WalkedNode::new(
+            frame.path,
+            frame.cid,
+            node,
+            frame.scope.coverage(),
+            classified.entries.iter().map(coverage_of).collect(),
+        );
+        nodes.push(walked);
+        stack.extend(children.into_iter().rev());
+    }
+
+    for item in &absent {
+        retained.charge_result(item.retained_bytes())?;
+    }
+    SpineWalk::new(root.clone(), nodes, absent, stats)
+}
+
 impl WalkedView {
     /// Every file and symlink in view: what a sparse materializer would fetch.
     pub fn leaves_in_view(&self) -> impl Iterator<Item = (TreePath, &TreeEntryKind)> {

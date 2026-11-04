@@ -324,6 +324,103 @@
       }
     ]
   },
+  "project": {
+    "cases": [
+      {
+        "expect": {
+          "nodes": [
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a16466696c65a264626c6f62d82a58250001551220ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb6a65786563757461626c65f4646e616d6544612e72736776657273696f6e01",
+              "cid": "bafyreiflbzm33zohycxnnbqtzhbimn7iqax62cusd2ik4t2bzb7jfiujpe"
+            },
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a1696469726563746f7279a16474726565d82a58250001711220ab0e59bde5c7c0aed68613c9c28637e8802fed0a921e90ae4f41c87e92a28979646e616d65436c69626776657273696f6e01",
+              "cid": "bafyreigorhazflcqfqipl52mzj537msvtjjzfxnmswhkqs7fa7bqouu5hq"
+            },
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a1696469726563746f7279a16474726565d82a58250001711220ce89c192ac502c10f5f74cca7bbfb2559a5392ddac958ea84be507c307529d3c646e616d65437372636776657273696f6e01",
+              "cid": "bafyreiaomtv7tbfakwv3uqa4gdhymamfi3bxrkmx474wsrzzxdujygiuoq"
+            }
+          ],
+          "root": "bafyreiaomtv7tbfakwv3uqa4gdhymamfi3bxrkmx474wsrzzxdujygiuoq"
+        },
+        "name": "one leaf",
+        "view": [
+          "src/lib/a.rs"
+        ]
+      },
+      {
+        "expect": {
+          "nodes": [
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a1696469726563746f7279a16474726565d82a58250001711220e745b5f43e8e44281eb3adc027da284c3218ae7e91009ca15b0bfdc6bfde17f8646e616d65436c69626776657273696f6e01",
+              "cid": "bafyreifdl4d2j3nsy2ool5wstbm2evmr77j3zrhnvz4i2pm7vvt5bofpqy"
+            },
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a1696469726563746f7279a16474726565d82a58250001711220a35f07a4edb2c69ce5f6d29859a25591ffd3bcc4edae788d3d9fad67d0b8af86646e616d65437372636776657273696f6e01",
+              "cid": "bafyreigxnouglac2p7slxcxwnc5r7dlbkfggpub72gzbbtkk5v3nvrx4ui"
+            }
+          ],
+          "root": "bafyreigxnouglac2p7slxcxwnc5r7dlbkfggpub72gzbbtkk5v3nvrx4ui"
+        },
+        "name": "in-view directory keeps its existing link",
+        "view": [
+          "src/lib"
+        ]
+      },
+      {
+        "expect": {
+          "nodes": [
+            {
+              "bytesHex": "a267656e747269657381a2646b696e64a16865787465726e616ca2646b696e646d6769742d7375626d6f64756c65697265666572656e63654200ff646e616d654676656e646f726776657273696f6e01",
+              "cid": "bafyreiazm2nihimz4k5ad2g35k2q2vepas2resujlqhw2ow3uxbeokznme"
+            },
+            {
+              "bytesHex": "a267656e747269657382a2646b696e64a16466696c65a264626c6f62d82a58250001551220711a6108ba2ce6ca93dd47d6817f2361db10d8ab6eec89460b2dfc2c325efabe6a65786563757461626c65f4646e616d6546524541444d45a2646b696e64a1696469726563746f7279a16474726565d82a5825000171122019669a83a199e2ba01e8dbeab50d548f04b5124a895c0f6d3adba5c2472b2d61646e616d65437372636776657273696f6e01",
+              "cid": "bafyreidyid2vh2ogatc6357szgjqot6bgyh22jr7k35t5dxumfy6zlaq2e"
+            }
+          ],
+          "root": "bafyreidyid2vh2ogatc6357szgjqot6bgyh22jr7k35t5dxumfy6zlaq2e"
+        },
+        "name": "missing path drops an empty spine branch while boundaries and through-leaves remain",
+        "view": [
+          "README/deeper",
+          "src/missing/deeper",
+          "src/vendor/deeper"
+        ]
+      },
+      {
+        "expect": {
+          "nodes": [
+            {
+              "bytesHex": "a267656e747269657382a2646b696e64a16466696c65a264626c6f62d82a58250001551220711a6108ba2ce6ca93dd47d6817f2361db10d8ab6eec89460b2dfc2c325efabe6a65786563757461626c65f4646e616d6546524541444d45a2646b696e64a1696469726563746f7279a16474726565d82a58250001711220f86ba75715de445275e51c7e24edb9e3e676590cf28cb509df433b72e97e390b646e616d65437372636776657273696f6e01",
+              "cid": "bafyreibw5fgojyilph2itoqrmqxa6shyweeudfiaxwsx3qdsm6jv7kmuw4"
+            }
+          ],
+          "root": "bafyreibw5fgojyilph2itoqrmqxa6shyweeudfiaxwsx3qdsm6jv7kmuw4"
+        },
+        "name": "whole view preserves the root",
+        "view": [
+          ""
+        ]
+      }
+    ],
+    "tree": {
+      "README": "readme",
+      "src": {
+        "lib": {
+          "a.rs": "a",
+          "b.rs": "b"
+        },
+        "vendor": {
+          "$external": {
+            "kind": "git-submodule",
+            "referenceHex": "00ff"
+          }
+        }
+      }
+    }
+  },
   "treeView": {
     "cid": "bafyreidfywl6b6crw3mc5q65cjthr7faedj4mp5kqy24znjwyuaznsrfme",
     "dagCborHex": "a264726f6f74d82a582500017112201f289ddfb754f44df670f8678f7fa466d8be607c2865142767a2b9d19954215965706174687381814161",

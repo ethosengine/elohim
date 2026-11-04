@@ -11,11 +11,12 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use bytes::Bytes;
 use eprfs_core::{
-    encode_tree, walk_batched, walk_collect, AbsentReason, AskPolicy, AttestationDraft, BlobCid,
-    BlobHandle, BlobPresence, Coverage, EprRecord, EprRef, EprfsError, EprfsStorage, FetchPolicy,
-    ItemAbsence, KeyCustody, OpennessAsk, Proximity, ProximityOrder, ReachLevel, ReachReason,
-    ReachRefusal, TierAddress, TierClass, TierId, TierOrder, TierRecord, TierSource, TreeChange,
-    TreeEntry, TreeEntryKind, TreeLimits, TreeNode, TreePath, TreeView, View, WalkItem, WalkedView,
+    encode_tree, project_view, walk_batched, walk_collect, walk_spine, AbsentReason, AskPolicy,
+    AttestationDraft, BatchOptions, BlobCid, BlobHandle, BlobPresence, Coverage, EprRecord, EprRef,
+    EprfsError, EprfsStorage, FetchPolicy, ItemAbsence, KeyCustody, OpennessAsk, Proximity,
+    ProximityOrder, ReachLevel, ReachReason, ReachRefusal, TierAddress, TierClass, TierId,
+    TierOrder, TierRecord, TierSource, TreeChange, TreeEntry, TreeEntryKind, TreeLimits, TreeNode,
+    TreePath, TreeView, View, WalkItem, WalkedView,
 };
 use serde_json::{json, Value};
 
@@ -284,6 +285,40 @@ async fn recompute(file: &Value) -> Value {
             "case {i}: the two walks disagree"
         );
         out["walk"]["cases"][i]["expect"] = expect;
+    }
+
+    // Projected-root P vectors (§C C6): sparse roots and every re-encoded spine node.
+    let mut project_store = Store::default();
+    let project_root = build(
+        &mut project_store,
+        &file["project"]["tree"],
+        &mut BTreeMap::new(),
+        &TreePath::root(),
+    );
+    for (i, case) in file["project"]["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        let view = View::from_tree_paths(paths_of(&case["view"]));
+        let spine = walk_spine(
+            &project_store,
+            &project_root,
+            &view,
+            &BatchOptions::default(),
+            &TreeLimits::default(),
+        )
+        .await
+        .unwrap();
+        let (projected, nodes) = project_view(&spine, &TreeLimits::default()).unwrap();
+        out["project"]["cases"][i]["expect"] = json!({
+            "root": projected.cid().to_string(),
+            "nodes": nodes
+                .iter()
+                .map(|(cid, bytes)| json!({"cid": cid.to_string(), "bytesHex": hex(bytes)}))
+                .collect::<Vec<_>>(),
+        });
     }
 
     // Diff vectors.

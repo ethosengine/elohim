@@ -45,9 +45,10 @@ pub use awareness::{
 };
 pub use composition::{CompositionGraph, CompositionNode, DerivationEdge, DerivationKind};
 pub use derive::{
-    AdoptedHead, DerivationBasis, DerivationBundle, DerivationIndex, DerivationKey,
-    DerivationLookup, DerivationRecord, DerivationUnanswered, Derive, DeriveOutcome, Derived,
-    DomainRoster, KeyInput, MethodDescriptor, ProjectedRoot, TrustPolicy, Witness,
+    derive_or_reuse, project_view, AdoptedHead, DerivationBasis, DerivationBundle, DerivationIndex,
+    DerivationKey, DerivationLookup, DerivationRecord, DerivationUnanswered, Derive, DeriveOutcome,
+    Derived, DomainRoster, KeyInput, MethodDescriptor, ProjectedRoot, RecordWitness,
+    RetainedDerivationRecord, TrustPolicy, UnrecordedDerivation, UnrecordedReason, Witness,
 };
 pub use error::{EprfsError, Result};
 pub use level_walk::{
@@ -80,9 +81,9 @@ pub use tree::{
 };
 pub use view_decl::TreeView;
 pub use walk::{
-    diff_trees, list_dir, read_path, walk, walk_collect, AbsentReason, Coverage, Depth, DirListing,
-    LeafKind, ReadLeaf, TreeChange, TreePath, TreeWalk, View, WalkItem, WalkStats, WalkedNode,
-    WalkedView,
+    diff_trees, list_dir, read_path, walk, walk_collect, walk_spine, AbsentReason, Coverage, Depth,
+    DirListing, LeafKind, ReadLeaf, SpineWalk, TreeChange, TreePath, TreeWalk, View, WalkItem,
+    WalkStats, WalkedNode, WalkedView,
 };
 
 /// Rails R-E1 and R-E2 (interfaces spec §1.3): eprfs-core's frozen dependency set, and no I/O,

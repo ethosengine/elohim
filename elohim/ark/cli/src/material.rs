@@ -10,8 +10,8 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
 use eprfs_core::{
-    encode_tree, BlobCid, ProjectedRoot, TreeEntry, TreeEntryKind, TreeLimits, TreeNode, TreePath,
-    TreeView, View,
+    encode_tree, project_view, BlobCid, ProjectedRoot, SpineWalk, TreeEntry, TreeEntryKind,
+    TreeLimits, TreeNode, TreePath, TreeView, View, WalkStats, WalkedNode,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -22,6 +22,7 @@ pub struct Material {
     bytes: Vec<u8>,
     fields: BTreeMap<String, Value>,
     root: BlobCid,
+    node: TreeNode,
 }
 
 impl Material {
@@ -67,6 +68,7 @@ impl Material {
             bytes,
             fields,
             root,
+            node,
         })
     }
 
@@ -98,18 +100,33 @@ impl Material {
         Ok(View::from_tree_paths(paths))
     }
 
-    /// The input projected under `view`. `project_view` has not landed in eprfs-core, so this is
-    /// the one projection decidable without it: a view naming every field of this one-level tree
-    /// projects to the tree itself. Any other view is refused rather than guessed.
+    /// The input projected under `view` through eprfs-core's canonical projection. Closure
+    /// material is one verified node, so its spine is that node and no leaf bytes are needed.
     pub fn projected(&self, view: &TreeView) -> Result<ProjectedRoot, String> {
         if view.root() != &self.root {
             return Err("the view is not over this closure's root".into());
         }
-        if !view.paths().iter().eq(self.view()?.paths()) {
-            return Err("only a view naming every closure field projects here".into());
-        }
-        // A ProjectedRoot decodes from its CID string, as a record's writer leaves it.
-        serde_json::from_value(Value::String(self.root.to_string()))
+        let declared = view.view();
+        let root_path = TreePath::root();
+        let spine = SpineWalk::new(
+            self.root.clone(),
+            vec![WalkedNode::new(
+                root_path.clone(),
+                self.root.clone(),
+                self.node.clone(),
+                declared.coverage(&root_path),
+                self.node
+                    .entries
+                    .iter()
+                    .map(|entry| declared.coverage(&root_path.join(&entry.name)))
+                    .collect(),
+            )],
+            Vec::new(),
+            WalkStats::default(),
+        )
+        .map_err(|error| format!("projected root: {error}"))?;
+        project_view(&spine, &TreeLimits::default())
+            .map(|(projected, _)| projected)
             .map_err(|error| format!("projected root: {error}"))
     }
 }
@@ -146,10 +163,10 @@ mod tests {
         }
     }
 
-    /// One field moves the root; the same fields give the same root; the whole-field view
-    /// projects to the root and a narrower view is refused.
+    /// One field moves the root; the same fields give the same root; every declared view is
+    /// projected by eprfs-core.
     #[test]
-    fn the_root_follows_the_fields_and_projects_only_under_the_whole_view() {
+    fn the_root_follows_the_fields_and_each_view_gets_a_real_projection() {
         let a = material(r#"{"manifest":"abc","v":3}"#).unwrap();
         let b = material(r#"{"manifest":"abd","v":3}"#).unwrap();
         assert_ne!(a.root(), b.root());
@@ -164,7 +181,7 @@ mod tests {
             a.root().clone(),
             &View::from_tree_paths([TreePath::from_slash_bytes(b"v").unwrap()]),
         );
-        assert!(a.projected(&narrow).is_err());
+        assert_ne!(a.projected(&narrow).unwrap().cid(), a.root());
         let other = TreeView::new(b.root().clone(), &b.view().unwrap());
         assert!(a.projected(&other).is_err());
     }

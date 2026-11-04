@@ -6,16 +6,16 @@
 //! §12.5): the reader judges it through its own [`TrustPolicy`], and an accepted record whose
 //! output bytes cannot be fetched is a miss.
 //!
-//! This module carries the types and the ports. The functions that build a projected root
-//! (`walk_spine`, `project_view`) and the look-up-else-compute driver (`derive_or_reuse`) are the
-//! slice-4 follow-on named in the C4 report. [`ProjectedRoot::verify_whole_tree`] is the narrow
-//! identity projection for a verified whole tree; it cannot stand in for `project_view` on a
-//! narrower declared view.
+//! This module carries the types and ports plus [`project_view`], the constructor for sparse
+//! projected roots. [`ProjectedRoot::verify_whole_tree`] is the narrow identity projection for a
+//! verified whole tree; it cannot stand in for `project_view` on a narrower declared view.
 
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use seam_contracts::Unanswered;
+use bytes::Bytes;
+use seam_contracts::{ComeBack, Meanwhile, Unanswered};
+use serde::de::{Deserializer, IgnoredAny};
 use serde::{Deserialize, Serialize};
 
 use crate::address::{BlobCid, EprRef};
@@ -25,7 +25,8 @@ use crate::error::{EprfsError, Result};
 use crate::reach::{ReachRefusal, Requester};
 use crate::storage::{BatchItem, EprfsStorage};
 use crate::view_decl::TreeView;
-use crate::walk::{TreePath, View};
+use crate::walk::{Coverage, SpineWalk, TreePath, View};
+use crate::{TreeEntry, TreeEntryKind, TreeNode};
 
 /// The canonical DAG-CBOR descriptor of everything that changes the output except the input
 /// bytes (C4, C12, C15). Its CID is the method CID. `view` is the method's declared input set (for
@@ -72,7 +73,7 @@ impl MethodDescriptor {
 }
 
 /// A view-projected input root. A whole tree has an identity projection, available through
-/// [`Self::verify_whole_tree`]. Narrower projections await `project_view` (C14).
+/// [`Self::verify_whole_tree`]. Build narrower projections with [`project_view`].
 /// Deserialization retains the existing record wire contract; a decoded value is a writer's
 /// claim, not evidence that this reader verified a closure.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -110,6 +111,89 @@ impl ProjectedRoot {
     }
 }
 
+/// Re-encode the verified spine as the sparse tree named by its view.
+///
+/// In-view directory links and every kept leaf or external entry remain byte-for-byte the entry
+/// the source tree carried. Only spine nodes are re-encoded. A spine directory whose projected
+/// child is empty disappears from its parent; the root itself remains an empty tree when no view
+/// path exists in the source. The returned nodes are ordered deepest-first, ending at the
+/// projected root, so a caller can store them in one pass.
+pub fn project_view(
+    spine: &SpineWalk,
+    limits: &crate::TreeLimits,
+) -> crate::tree::TreeResult<(ProjectedRoot, Vec<(BlobCid, Bytes)>)> {
+    if spine
+        .nodes
+        .first()
+        .is_none_or(|node| !node.path.is_root() || node.cid != spine.root)
+    {
+        return Err(crate::TreeError::InvalidView(
+            "a spine walk must begin with its root node".into(),
+        ));
+    }
+
+    let mut projected: BTreeMap<TreePath, Option<BlobCid>> = BTreeMap::new();
+    let mut encoded = Vec::with_capacity(spine.nodes.len());
+    let mut total_bytes = 0usize;
+    for walked in spine.nodes.iter().rev() {
+        if walked.node.entries.len() != walked.entry_coverage.len() {
+            return Err(crate::TreeError::InvalidView(
+                "a spine node's entry coverage is incomplete".into(),
+            ));
+        }
+        let mut entries = Vec::new();
+        for (entry, coverage) in walked.node.entries.iter().zip(&walked.entry_coverage) {
+            match coverage {
+                Coverage::Outside => {}
+                Coverage::InView => entries.push(entry.clone()),
+                Coverage::Spine => match &entry.kind {
+                    TreeEntryKind::Directory { .. } => {
+                        let child_path = walked.path.join(&entry.name);
+                        match projected.get(&child_path) {
+                            Some(Some(child)) => entries.push(TreeEntry {
+                                name: entry.name.clone(),
+                                kind: TreeEntryKind::Directory {
+                                    tree: child.clone().into(),
+                                },
+                            }),
+                            Some(None) => {}
+                            None => {
+                                return Err(crate::TreeError::InvalidView(format!(
+                                    "spine walk has no node for {child_path}"
+                                )))
+                            }
+                        }
+                    }
+                    TreeEntryKind::File { .. }
+                    | TreeEntryKind::Symlink { .. }
+                    | TreeEntryKind::External { .. } => entries.push(entry.clone()),
+                },
+            }
+        }
+
+        if entries.is_empty() && !walked.path.is_root() {
+            projected.insert(walked.path.clone(), None);
+            continue;
+        }
+        let node = TreeNode::new(entries)?;
+        let (cid, bytes) = crate::encode_tree(&node, limits)?;
+        total_bytes = total_bytes
+            .checked_add(bytes.len())
+            .ok_or(crate::TreeError::Budget("projected node bytes"))?;
+        if total_bytes > limits.max_total_bytes {
+            return Err(crate::TreeError::Budget("projected node bytes"));
+        }
+        projected.insert(walked.path.clone(), Some(cid.clone()));
+        encoded.push((cid, Bytes::from(bytes)));
+    }
+
+    let root = projected
+        .remove(&TreePath::root())
+        .flatten()
+        .ok_or_else(|| crate::TreeError::InvalidView("projection produced no root".into()))?;
+    Ok((ProjectedRoot(root), encoded))
+}
+
 /// What a derivation key's input is. `Raw` is a CID that is not a tree root (a wasm module).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "form", content = "cid")]
@@ -129,11 +213,33 @@ impl KeyInput {
 
 /// (method CID, input). The storage key, never the reach key: reach is judged on the input root
 /// (C1).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DerivationKey {
     pub method: BlobCid,
     pub input: KeyInput,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DerivationKeyWire {
+    method: BlobCid,
+    input: KeyInput,
+    /// D7: extensions inside the namespace carry no decision meaning. The enclosing retained body
+    /// preserves their exact bytes; the key decoder deliberately does not interpret them.
+    #[serde(default)]
+    ext: Option<IgnoredAny>,
+}
+
+impl<'de> Deserialize<'de> for DerivationKey {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let wire = DerivationKeyWire::deserialize(deserializer)?;
+        let _ = wire.ext;
+        Ok(Self {
+            method: wire.method,
+            input: wire.input,
+        })
+    }
 }
 
 /// What the WRITER observed (C3). Agreement is not a recorded basis: the reader computes it from
@@ -174,8 +280,21 @@ pub enum Witness {
     Attestation { epr: EprRef },
 }
 
-/// No `deny_unknown_fields`: records travel between peers on different versions (C11).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Injected authentication for a newly computed derivation record. The core passes the exact D7
+/// canonical body bytes and never reaches for a key, signer, filesystem or process itself (R-E2).
+#[async_trait]
+pub trait RecordWitness: Send + Sync {
+    /// The agent key this witness signs as; becomes [`DerivationRecord::computed_by`].
+    fn agent(&self) -> &str;
+
+    /// Witness over the record's canonical body bytes (the bytes a
+    /// [`RetainedDerivationRecord`] retains), never over a re-serialization.
+    async fn witness(&self, body: &[u8]) -> Result<Witness>;
+}
+
+/// Records travel between peers on different versions. D7 accepts additions only under `ext`;
+/// fields outside that namespace may carry meaning and therefore refuse in the current epoch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivationRecord {
     pub key: DerivationKey,
@@ -188,7 +307,115 @@ pub struct DerivationRecord {
     pub witness: Witness,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DerivationRecordWire {
+    key: DerivationKey,
+    output: BlobCid,
+    computed_by: String,
+    basis: DerivationBasis,
+    deterministic: bool,
+    witness: Witness,
+    #[serde(default)]
+    ext: Option<IgnoredAny>,
+}
+
+/// D7's signed body. Authentication is framing around these bytes, never a field inside them.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DerivationRecordBodyWire {
+    key: DerivationKey,
+    output: BlobCid,
+    computed_by: String,
+    basis: DerivationBasis,
+    deterministic: bool,
+    #[serde(default)]
+    ext: Option<IgnoredAny>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalDerivationRecordBody<'a> {
+    key: &'a DerivationKey,
+    output: &'a BlobCid,
+    computed_by: &'a str,
+    basis: &'a DerivationBasis,
+    deterministic: bool,
+}
+
+impl<'de> Deserialize<'de> for DerivationRecord {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let wire = DerivationRecordWire::deserialize(deserializer)?;
+        let _ = wire.ext;
+        Ok(Self {
+            key: wire.key,
+            output: wire.output,
+            computed_by: wire.computed_by,
+            basis: wire.basis,
+            deterministic: wire.deterministic,
+            witness: wire.witness,
+        })
+    }
+}
+
+/// One known-epoch record plus the exact body bytes it arrived with. D7 extensions are retained
+/// here without interpretation or re-encoding; a signature verifier uses [`Self::body`] directly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetainedDerivationRecord {
+    record: DerivationRecord,
+    body: Bytes,
+}
+
+impl RetainedDerivationRecord {
+    pub fn record(&self) -> &DerivationRecord {
+        &self.record
+    }
+
+    pub fn body(&self) -> &[u8] {
+        &self.body
+    }
+
+    pub fn into_parts(self) -> (DerivationRecord, Bytes) {
+        (self.record, self.body)
+    }
+}
+
 impl DerivationRecord {
+    /// Canonical D7 body bytes. The witness is deliberately outside this encoding, so signing is
+    /// neither circular nor dependent on a later serialization of the logical record.
+    pub fn canonical_body(&self) -> Result<Bytes> {
+        encode_record_body(
+            &self.key,
+            &self.output,
+            &self.computed_by,
+            &self.basis,
+            self.deterministic,
+        )
+    }
+
+    /// Decode one record body in the current epoch under D7's three-case law.
+    ///
+    /// The five body fields decide the current record. Additions are accepted only beneath the
+    /// top-level `ext` namespace, whose exact representation remains in the returned body bytes.
+    /// Any other top-level field is refused because an older reader cannot know whether it narrows
+    /// authority. Epoch selection happens in the signed framing layer before this decoder.
+    pub fn decode_known_epoch(body: &[u8], witness: Witness) -> Result<RetainedDerivationRecord> {
+        let wire: DerivationRecordBodyWire = serde_ipld_dagcbor::from_slice(body)
+            .map_err(|error| EprfsError::Storage(format!("derivation record: {error}")))?;
+        let _ = wire.ext;
+        Ok(RetainedDerivationRecord {
+            record: DerivationRecord {
+                key: wire.key,
+                output: wire.output,
+                computed_by: wire.computed_by,
+                basis: wire.basis,
+                deterministic: wire.deterministic,
+                witness,
+            },
+            body: Bytes::copy_from_slice(body),
+        })
+    }
+
     /// Projects onto the existing edge: source = input, derived = output, attributed_to =
     /// computed_by, relation = [`DerivationKind::Derivation`], metadata = `{method}`.
     pub fn to_edge(&self) -> DerivationEdge {
@@ -216,6 +443,25 @@ impl DerivationRecord {
             }),
         })
     }
+}
+
+fn encode_record_body(
+    key: &DerivationKey,
+    output: &BlobCid,
+    computed_by: &str,
+    basis: &DerivationBasis,
+    deterministic: bool,
+) -> Result<Bytes> {
+    let body = CanonicalDerivationRecordBody {
+        key,
+        output,
+        computed_by,
+        basis,
+        deterministic,
+    };
+    serde_ipld_dagcbor::to_vec(&body)
+        .map(Bytes::from)
+        .map_err(|error| EprfsError::Storage(format!("derivation record body: {error}")))
 }
 
 /// A declared head and the root it adopted; drafts have none. Plain data, built by the caller from
@@ -413,6 +659,23 @@ pub struct Derived {
     pub reused: bool,
 }
 
+/// Why a computed output has no reusable record. This is an outcome rather than an error because
+/// the method already produced and stored the output; hiding that successful computation would
+/// make a failed witness or index write look like no work happened.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnrecordedReason {
+    WitnessFailed { message: String },
+    IndexFailed { message: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnrecordedDerivation {
+    pub output: BlobCid,
+    /// Present when witnessing succeeded but the index refused or failed the write.
+    pub record: Option<DerivationRecord>,
+    pub reason: UnrecordedReason,
+}
+
 /// The spec's shape, unboxed: an outcome is returned once per task, so its size is allowed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(
@@ -421,7 +684,197 @@ pub struct Derived {
 )]
 pub enum DeriveOutcome {
     Derived(Derived),
+    ComputedUnrecorded(UnrecordedDerivation),
     NotDerived(Unanswered<DerivationUnanswered>),
+}
+
+fn derivation_unanswered(why: DerivationUnanswered) -> Unanswered<DerivationUnanswered> {
+    match why {
+        DerivationUnanswered::OutputNotFetchable => Unanswered::new(
+            DerivationUnanswered::OutputNotFetchable,
+            ComeBack::OnEvent {
+                event: "derivation-output-fetchable".into(),
+            },
+            Meanwhile::RunHere,
+        ),
+        DerivationUnanswered::NotCarried => Unanswered::new(
+            DerivationUnanswered::NotCarried,
+            ComeBack::OnEvent {
+                event: "capacity-admits-derivation".into(),
+            },
+            Meanwhile::Nothing {
+                because: "this device did not admit the derivation run".into(),
+            },
+        ),
+        other => Unanswered::new(
+            other,
+            ComeBack::OnEvent {
+                event: "derivation-recorded".into(),
+            },
+            Meanwhile::RunHere,
+        ),
+    }
+}
+
+async fn accepted_output(
+    index: &dyn DerivationIndex,
+    trust: &dyn TrustPolicy,
+    descriptor: &MethodDescriptor,
+    input: &TreeView,
+    storage: &dyn EprfsStorage,
+    who: &Requester,
+    me: &str,
+    roster: &dyn DomainRoster,
+) -> std::result::Result<Option<Derived>, Unanswered<DerivationUnanswered>> {
+    let key = DerivationKey {
+        method: descriptor.cid().map_err(|_| {
+            derivation_unanswered(DerivationUnanswered::InputIncomplete {
+                at: "method descriptor".into(),
+            })
+        })?,
+        input: KeyInput::Projected(ProjectedRoot(input.root().clone())),
+    };
+    let records = match index.lookup(who, input, descriptor).await? {
+        DerivationLookup::Found(records) => records,
+        DerivationLookup::NotRecorded => return Ok(None),
+    };
+    let accepted = trust.accept(&key, &records, me, roster)?.clone();
+    let item = BatchItem::derived(accepted.output.clone(), &key.method);
+    let fetched = storage
+        .fetch_at(
+            input.root(),
+            &item,
+            &crate::BatchOptions::from(crate::FetchPolicy::FetchIfMissing),
+        )
+        .await;
+    match fetched {
+        Ok(handle)
+            if handle.cid == accepted.output && accepted.output.verifies(handle.bytes.as_ref()) =>
+        {
+            Ok(Some(Derived {
+                output: accepted.output.clone(),
+                record: accepted,
+                reused: true,
+            }))
+        }
+        Ok(_) | Err(_) => Err(derivation_unanswered(
+            DerivationUnanswered::OutputNotFetchable,
+        )),
+    }
+}
+
+/// Reuse an accepted, fetchable output; otherwise compute only when capacity admits the run.
+/// Newly computed records are authenticated through the injected [`RecordWitness`] port.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The placement contract keeps every policy and storage seam explicit"
+)]
+pub async fn derive_or_reuse(
+    index: &dyn DerivationIndex,
+    trust: &dyn TrustPolicy,
+    method: &dyn Derive,
+    input_root: &BlobCid,
+    storage: &dyn EprfsStorage,
+    who: &Requester,
+    witness: &dyn RecordWitness,
+    roster: &dyn DomainRoster,
+    parents: &[BlobCid],
+    capacity_admits: bool,
+) -> Result<DeriveOutcome> {
+    let descriptor = method.descriptor();
+    let input = TreeView::new(input_root.clone(), &descriptor.view());
+    let miss = match accepted_output(
+        index,
+        trust,
+        descriptor,
+        &input,
+        storage,
+        who,
+        witness.agent(),
+        roster,
+    )
+    .await
+    {
+        Ok(Some(derived)) => return Ok(DeriveOutcome::Derived(derived)),
+        Ok(None) => None,
+        Err(why) => Some(why),
+    };
+
+    if !capacity_admits {
+        return Ok(DeriveOutcome::NotDerived(miss.unwrap_or_else(|| {
+            derivation_unanswered(DerivationUnanswered::NotCarried)
+        })));
+    }
+
+    let mut prior = None;
+    for parent in parents {
+        let parent_input = TreeView::new(parent.clone(), &descriptor.view());
+        if let Ok(Some(found)) = accepted_output(
+            index,
+            trust,
+            descriptor,
+            &parent_input,
+            storage,
+            who,
+            witness.agent(),
+            roster,
+        )
+        .await
+        {
+            prior = Some(found);
+            break;
+        }
+    }
+
+    let output = method
+        .derive(&input, storage, storage, prior.as_ref())
+        .await?;
+    let key = DerivationKey {
+        method: descriptor.cid()?,
+        input: KeyInput::Projected(ProjectedRoot(input_root.clone())),
+    };
+    let basis = DerivationBasis::Computed;
+    let body = encode_record_body(
+        &key,
+        &output,
+        witness.agent(),
+        &basis,
+        descriptor.deterministic,
+    )?;
+    let authentication = match witness.witness(&body).await {
+        Ok(authentication) => authentication,
+        Err(error) => {
+            return Ok(DeriveOutcome::ComputedUnrecorded(UnrecordedDerivation {
+                output,
+                record: None,
+                reason: UnrecordedReason::WitnessFailed {
+                    message: error.to_string(),
+                },
+            }));
+        }
+    };
+    let record = DerivationRecord {
+        key,
+        output: output.clone(),
+        computed_by: witness.agent().to_owned(),
+        basis,
+        deterministic: descriptor.deterministic,
+        witness: authentication,
+    };
+    if let Err(error) = index.record(&record).await {
+        return Ok(DeriveOutcome::ComputedUnrecorded(UnrecordedDerivation {
+            output,
+            record: Some(record),
+            reason: UnrecordedReason::IndexFailed {
+                message: error.to_string(),
+            },
+        }));
+    }
+    Ok(DeriveOutcome::Derived(Derived {
+        output,
+        record,
+        reused: false,
+    }))
 }
 
 const DERIVED_PREFIX: &[u8] = b"\0derived:";
@@ -513,9 +966,41 @@ mod tests {
     fn unknown_basis_decodes_as_unknown() {
         let mut json = serde_json::to_value(record(DerivationBasis::Computed)).unwrap();
         json["basis"] = serde_json::json!({"basis": "agreed-by-council", "council": "x"});
-        json["futureField"] = serde_json::json!(true);
+        json["ext"] = serde_json::json!({"futureField": true});
         let decoded: DerivationRecord = serde_json::from_value(json).unwrap();
         assert_eq!(decoded.basis, DerivationBasis::Unknown);
+    }
+
+    #[test]
+    fn derivation_key_accepts_only_ext_namespaced_additions() {
+        let key = record(DerivationBasis::Computed).key;
+        let mut value = serde_json::to_value(&key).unwrap();
+        value["ext"] = serde_json::json!({"newWriter": {"opaque": [0, 255]}});
+        assert_eq!(
+            serde_json::from_value::<DerivationKey>(value.clone()).unwrap(),
+            key
+        );
+        value["restriction"] = serde_json::json!("household-only");
+        assert!(serde_json::from_value::<DerivationKey>(value).is_err());
+    }
+
+    #[test]
+    fn known_epoch_decoder_retains_ext_bytes_and_refuses_other_additions() {
+        let expected = record(DerivationBasis::Computed);
+        let mut value = serde_json::to_value(&expected).unwrap();
+        value.as_object_mut().unwrap().remove("witness");
+        value["ext"] = serde_json::json!({"newWriter": {"opaque": [0, 255]}});
+        let body = serde_ipld_dagcbor::to_vec(&value).unwrap();
+        let retained =
+            DerivationRecord::decode_known_epoch(&body, expected.witness.clone()).unwrap();
+        assert_eq!(retained.record(), &expected);
+        assert_eq!(retained.body(), body);
+
+        value["restriction"] = serde_json::json!("household-only");
+        let restricted = serde_ipld_dagcbor::to_vec(&value).unwrap();
+        assert!(
+            DerivationRecord::decode_known_epoch(&restricted, expected.witness.clone()).is_err()
+        );
     }
 
     #[test]
