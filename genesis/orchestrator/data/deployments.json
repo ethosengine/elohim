@@ -253,7 +253,7 @@
       "name": "gertrude",
       "storageDataSize": "80Gi",
       "runtimeManifest": {
-        "cid": "bafyreidq4pbmfoxlgd66xh7qpva44o7fzd77tcdhaeuxxmutpmqmd26hxe",
+        "cid": "bafyreidzamdboeiganelbnzg5mwym3bcephjvykejsyqjzkxpocn4kbau4",
         "path": "genesis/orchestrator/manifests/runtime/gertrude.manifest.json"
       },
       "resourceOverride": {
@@ -294,7 +294,7 @@
       "name": "susan",
       "storageDataSize": "80Gi",
       "runtimeManifest": {
-        "cid": "bafyreigghe6sxcunirdb7t2q2jica64vp334t5f3nufmhtrhv4ujs7m2cy",
+        "cid": "bafyreigrnssbza2zbv6c4t674a4dneygn2bcyatjzztru7zwbry5wrlcj4",
         "path": "genesis/orchestrator/manifests/runtime/susan.manifest.json"
       },
       "resourceOverride": {
@@ -405,7 +405,7 @@
       "storageDataSize": "80Gi",
       "conductorStorage": "20Gi",
       "runtimeManifest": {
-        "cid": "bafyreidq4pbmfoxlgd66xh7qpva44o7fzd77tcdhaeuxxmutpmqmd26hxe",
+        "cid": "bafyreidzamdboeiganelbnzg5mwym3bcephjvykejsyqjzkxpocn4kbau4",
         "path": "genesis/orchestrator/manifests/runtime/eve.manifest.json"
       },
       "resourceOverride": {

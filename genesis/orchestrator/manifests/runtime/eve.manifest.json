@@ -45,7 +45,7 @@
   "envelope": {
     "bound": {
       "memory_bytes": 3221225472,
-      "cpu_millis": 3000
+      "cpu_millis": 3750
     },
     "headroom_bytes": 0,
     "measure": "committed",
@@ -54,7 +54,7 @@
     ],
     "shed_order": []
   },
-  "supersedes": "bafyreih6eqxw7nkehgj7mb6o5vxdx3brzttuvbcivm7z2e26rgawhlo3hq",
+  "supersedes": "bafyreidq4pbmfoxlgd66xh7qpva44o7fzd77tcdhaeuxxmutpmqmd26hxe",
   "follows": [
     {
       "channel": "runtime:coordinators:elohim:workspace",

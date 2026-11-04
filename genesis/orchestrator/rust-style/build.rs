@@ -27,6 +27,10 @@ fn walk(root: &Path, at: &Path, output: &mut Vec<PathBuf>) -> Result<(), Box<dyn
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // The three method-dependency crates below are embedded whole (src/ and Cargo.toml):
+    // gate-reads: elohim/eprfs/eprfs-core
+    // gate-reads: elohim/eprfs/eprfs-meta
+    // gate-reads: crates/seam-contracts
     let package = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let mut generated = String::from("pub const DEPENDENCY_SOURCES: &[(&str, &[u8])] = &[\n");
     for (label, relative) in [
