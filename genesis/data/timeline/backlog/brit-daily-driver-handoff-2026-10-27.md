@@ -185,10 +185,56 @@ outcome is neither an acceptance decision nor a reusable build attestation.
 
 The captured source, output and executable boundaries retain the 64 MiB object
 and 1 GiB expanded closure caps. EPRFS owns filesystem capture/restore and canonical
-storage; Brit consumes released 0.3.3 registry interfaces; Ark owns execution.
+storage; Brit consumes released registry interfaces, including `eprfs-storage` 0.3.4; Ark owns execution.
 No sibling dependency override or competing collaboration model is introduced.
 
-Measured evidence and frontier:
+### November 4 reconciliation
+
+The steward's separate November 3 authority permitted finishing and integration;
+it did not resume either expired November 2 shift. The implementation qualified
+at root `60e8e604068e0a228293832ecd4f92b36c7df787`, binding Brit
+`69d283b068452a7c74b11394fe74074ba371b34b`. Brit consumes `eprfs-local` and
+`eprfs-storage` 0.3.4; core and host remain 0.3.3.
+
+The package-specific permission for `elohim-seam-contracts` 0.1.2 under unchanged
+AGPL-3.0 supersedes the earlier licensing refusal. Native ruling
+`bafyreietmnn6i2s7hyqgd3ndve6vhzmdd3rusurd37y45q44e6oyt5rd34` records that narrow
+permission; all other licensing restrictions remain. Production Windows tests
+pass 24 cases on each of x64 and ARM64
+([run 41701703748](https://github.com/ethosengine/brit/actions/runs/41701703748)).
+The immutable 0.3.4 release and consumer upgrade supersede the recorded 0.3.3
+Windows blocker; physical power loss remains untested.
+
+All 30 selected project gates and the complete pre-push dry run passed at the
+qualified implementation revision; the final hook exit was 0 at 02:48:45Z on
+November 4. Brit's complete CI also passed at the pinned consumer commit
+([run 41707023797](https://github.com/ethosengine/brit/actions/runs/41707023797)).
+Two unchanged frozen-oracle runs returned numeric **1**, and fresh other-runtime
+rehearsal 03 passed the unchanged manual journey against the final executable
+hashes. Rehearsal 01 qualified intermediate bytes only; rehearsal 02 was
+permission-blocked. All failed and superseded evidence remains retained.
+
+Evidence lives in `genesis/local-dev/integration-20261103/`:
+`native-root-prepush-dry-run-02-result.json`, `native-pinned-oracles.json`,
+`rehearsal-review.json` and the Windows production receipts. The
+[owning sprint result](../../../docs/superpowers/sprints/2026-11-02-brit-native-source-loop-result.md)
+records exact evidence locations, the unchanged operator journey and limits.
+Five native fulfillments were recorded on November 4. The independent review
+approved stations 1–4 and requested this reconciliation for station 5; the
+corrected revision still requires fresh review and appointed acceptance before
+publication. Current standing comes from the original native scope
+`bafkreiewyy6d4mwppo5g5utkn4zt5z4n4kkxekygev6gptwvwvzsbvqi5e`, not from the
+historical frontier below.
+
+This local slice does not complete the broader daily-driver habit, which remains
+**red**, or the shared-working-versions feature, which remains **@wip**. The
+ordered successor stations still own the remaining work.
+
+### Preserved November 2 measurements and frontier
+
+The following observations and pending boundaries describe the expired
+continuation. The November 4 reconciliation above supersedes only the blockers
+for which it supplies replacement evidence; the historical failures remain intact.
 
 - Capture `a64aa39627170cc7a91de3207ebc3bed30b34da8` and durability
   `34fb6a57db18c36d23c3fbde5d7e1244b731dd04` are committed. The continuation

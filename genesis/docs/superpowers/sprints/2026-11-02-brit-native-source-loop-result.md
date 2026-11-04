@@ -12,15 +12,19 @@ cites: []
 Matthew can retain selected source as candidate A outside Git, continue editing B,
 and explicitly execute a pinned native artifact against A. This is the local
 filesystem slice of the existing shared-working-versions story. The broader habit
-remains **red**, and native acceptance remains **pending**. This document is an
-operator journey and partial sprint result, not the immutable fulfillment report.
+remains **red**. This document records the implementation evidence and operator
+journey; immutable fulfillment and appointed acceptance live in the original
+native scope below. The dated reconciliation distinguishes current evidence from
+the preserved November 2 failures.
 
 Original scope: `bafkreiewyy6d4mwppo5g5utkn4zt5z4n4kkxekygev6gptwvwvzsbvqi5e`.
 Intent: `bafyreic4ohovm4wcni37tvv7ofk34wdmffc45ls7wsuwvjvuok55cvjfci`.
 Enclosing commitment: `bafyreiafhuwxfowok472rdgf6oa725hpxdc5aloaykjuqtdkq7hrpt3kra`.
 Original actor claim: `bafyreibojewkr3wxaokjepfrhi2fup6dzfvj2b67cjpz7l3bbkynj2ga5q`.
-The original 2026-11-02 13:44:31.647660Z start and 21:44:31.647660Z deadline
-still apply. Recovery grants no additional time.
+The original shift started at 2026-11-02 13:44:31.647660Z and expired at
+21:44:31.647660Z. Those bounds remain part of its historical record. The
+steward's separate November 3 finishing and integration authority neither resumes
+that shift nor extends its deadline.
 
 ## Integration repair — 2026-11-03
 
@@ -36,11 +40,14 @@ verifies NTFS on the opened handle, and refuses unsupported namespace durability
 Verified read-only retrieval remains available; a fresh custody claim requires a
 writable handle. Standard-user API probes pass on Windows x64 and ARM
 ([run 41698810809](https://github.com/ethosengine/brit/actions/runs/41698810809)).
-The source passes 23 Linux storage tests, strict Clippy and an independent source
-review. Production Windows Rust tests, the released-package consumer journey,
-final owner gates and native acceptance are still pending. No physical power-loss
-experiment is claimed. The candidate storage version is 0.3.4; published bytes
-are never replaced. Durable repair evidence is
+Production Windows Rust verification passes 24 tests on each of x64 and ARM64
+under standard-user accounts
+([run 41701703748](https://github.com/ethosengine/brit/actions/runs/41701703748)).
+The delivered Brit consumes immutable registry package `eprfs-storage` 0.3.4;
+published 0.3.3 bytes were not replaced. The released-package consumer journey
+and final implementation gates also passed, as recorded below. These results
+supersede the Windows blocker preserved in the historical section. No physical
+power-loss experiment is claimed. Durable repair evidence remains in
 `genesis/local-dev/integration-20261103/`.
 
 The discovered precondition between verified object bytes and durable snapshot
@@ -48,7 +55,64 @@ closure is now explicit: the host filesystem and handle must support namespace
 persistence. Windows NTFS/handle tests preserve that condition alongside the
 existing failure-injection and interruption tests.
 
-## Delivery boundary and evidence
+## Verification reconciliation — 2026-11-04
+
+The implementation qualified at root
+`60e8e604068e0a228293832ecd4f92b36c7df787`, binding Brit
+`69d283b068452a7c74b11394fe74074ba371b34b`. Brit consumes `eprfs-local` and
+`eprfs-storage` 0.3.4; `eprfs-core` and `eprfs-host` remain 0.3.3.
+The package/version-specific license ruling is
+`bafyreietmnn6i2s7hyqgd3ndve6vhzmdd3rusurd37y45q44e6oyt5rd34`:
+Brit may consume `elohim-seam-contracts` 0.1.2 under its unchanged AGPL-3.0
+license. The general license allow-list and other restrictions remain unchanged.
+
+All 30 selected project gates passed, and the complete pre-push dry run exited 0
+on November 4 at 02:48:45Z with HEAD unchanged. The exact receipt is
+`genesis/local-dev/integration-20261103/native-root-prepush-dry-run-02-result.json`;
+its log and gate ledger distinguish actual successful exits from cache
+attestations unavailable because generated observer records were present.
+Brit's complete upstream CI, including Windows x64 and ARM64, passed at the
+pinned consumer commit
+([run 41707023797](https://github.com/ethosengine/brit/actions/runs/41707023797)).
+
+The unchanged frozen oracle returned numeric **1** twice, each with process exit
+0, against the final Brit and Ark executable hashes.
+`native-pinned-oracles.json` retains the revisions, oracle and fixture hashes,
+executable hashes and both observations. This supersedes the November 2 numeric
+**0** without deleting that failed evidence. Six local scenarios and all 28 steps
+also passed at the qualified candidate.
+
+Fresh Claude rehearsal **03** ran the unchanged documented broken and corrected
+journeys against those final executable hashes: the wrong artifact was refused,
+A supplied the result, and B remained editable. The independent
+`rehearsal-review.json` records `PASS_REHEARSAL_03_FINAL_ARTIFACT`. Rehearsal 01
+qualified an intermediate Ark artifact only; rehearsal 02 did not execute because
+permissions refused its operations. Both attempts remain retained. Rehearsal 03
+lives under the retained native worktree's
+`genesis/local-dev/integration-20261103/claude-rehearsal-03/`; the independent review
+and oracle receipts live under the main checkout's corresponding directory.
+
+On November 4, the fresh coordinator recorded five immutable fulfillments in the
+original scope. The independent acceptor approved the four implementation
+stations and requested this dated backlog/result reconciliation for station five.
+Those technical verdicts are not appointed acceptance. The corrected revision
+must receive fresh review and acceptance before publication. The retained native
+worktree's `claude-coordinator-20261104-02/` and
+`claude-acceptance-20261104-02/`, beneath the evidence directory above, retain the
+reports, returned native identifiers and requested changes. Read current standing
+with `epr flow context bafkreiewyy6d4mwppo5g5utkn4zt5z4n4kkxekygev6gptwvwvzsbvqi5e --json`.
+
+The broader daily-driver habit remains **red**, and
+`shared-working-versions.feature` remains **@wip**. Avodah, peer sharing and
+freshness, shared-edit authority, publication, large-file custody and reusable
+execution closures remain successor work. Physical power loss remains untested.
+
+## Preserved November 2 delivery boundary and evidence
+
+The following records the expired continuation's observations and outstanding
+boundaries at that time. Its present-tense blocker and pending statements are
+superseded only where the November 4 reconciliation above supplies replacement
+evidence. Failed measurements, reviews and logs remain intact.
 
 Capture and durability already landed in this retained branch at
 `a64aa39627170cc7a91de3207ebc3bed30b34da8` and
@@ -303,7 +367,8 @@ Story review: three fresh-context rounds, class counts
 The missing trigger actions in the preserved pending stories were clarified;
 those stories remain unwired. Final reader: READY. Evidence:
 `.claude/shifts/brit-c1-20261102/acceptance-story-blind-review.json`.
-The current independent technical review found the two issues documented in the
-verification addendum; its original transcript remains unchanged. Native appointed
-acceptance remains pending.
+The November 2 independent technical review found the two issues documented in
+the verification addendum; its original transcript remains unchanged. The dated
+reconciliation above records their replacement evidence and the subsequent
+native review boundary.
 Dialogue-blocked duration is unmeasured here; no stasis policy or state was edited.
