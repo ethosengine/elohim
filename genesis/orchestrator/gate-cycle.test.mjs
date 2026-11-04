@@ -244,9 +244,28 @@ test('over the hard ceiling: one finding, one directive — and silence the seco
     assert.match(directive, /Can this be modularized\?/);
 
     lines.length = 0;
+    const before = readFileSync(ledger, 'utf8');
     recordCycle(project, 2050, 0, {}, deps);
-    assert.equal(readFileSync(ledger, 'utf8').trim().split('\n').length, 1, 'same fingerprint, no second row');
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'a steady still-over run leaves the tracked ledger byte-identical (row 73)');
+    assert.match(lines.join('\n'), /still over/);
     assert.doesNotMatch(lines.join('\n'), /DISPATCH/, 'an open finding is not re-dispatched');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a hard run after one good run resets the recovery streak, and that is the only rewrite', () => {
+  const { dir, measures, ledger } = sandbox();
+  const deps = { measuresPath: measures, ledgerPath: ledger, runEpr: () => 0, print: () => {}, now: () => 't' };
+  try {
+    recordCycle(project, 1980, 0, {}, deps);
+    recordCycle(project, 300, 0, {}, deps);
+    assert.equal(JSON.parse(readFileSync(ledger, 'utf8').trim()).under_streak, 1);
+    recordCycle(project, 2000, 0, {}, deps);
+    const reset = readFileSync(ledger, 'utf8');
+    assert.equal(JSON.parse(reset.trim()).under_streak, 0, 'the broken streak is a transition the ledger records');
+    recordCycle(project, 2100, 0, {}, deps);
+    assert.equal(readFileSync(ledger, 'utf8'), reset, 'the next steady run writes nothing');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

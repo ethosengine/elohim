@@ -164,10 +164,13 @@ export function recordCycle(project, seconds, status, env, deps, signals = {}) {
 
     if (verdict === 'hard') {
       if (open) {
-        open.under_streak = 0;
-        open.stock = Math.round(seconds);
-        open.last_seen = deps.now();
-        writeLedger(deps.ledgerPath, rows);
+        // The ledger is tracked: a steady "still over" run must not rewrite it, or every gate run
+        // dirties the tree it is keyed on (row 73). This run's duration is already in the native
+        // observation above; the row changes only when a recovery streak is broken.
+        if (open.under_streak) {
+          open.under_streak = 0;
+          writeLedger(deps.ledgerPath, rows);
+        }
         deps.print(`[gate-cycle] ${project.name}: ${minutes(seconds)} — still over ${ceiling.id}; finding ${fp} is open.`);
         return;
       }
