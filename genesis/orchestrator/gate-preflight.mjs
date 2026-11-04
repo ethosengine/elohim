@@ -33,10 +33,13 @@ export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
 /**
  * Projects whose Rust read set must be fully named (gate-input-audit.test.mjs `REAL … read set`).
  * The orchestrator gate runs that test, so any of these, or the orchestrator itself, selects it.
- * eprfs joined 2026-11-03: its governance walk is named as `**\/.epr-meta` and its 12 data-derived
- * test reads are declared, so it keys on paths, not the commit tree.
+ * eprfs is not listed (it joined 2026-11-03, left 2026-11-04): the merged shared-Rust-discipline checker's
+ * build.rs embeds eprfs-core, eprfs-meta and seam-contracts, and that read cannot be declared in place,
+ * because build.rs is hashed into the adopted discipline method (rust-style/src/discipline.rs method_bytes),
+ * so any edit there refuses every gate. Those paths are inside eprfs's own closure already; eprfs keys on
+ * the commit tree until the method owner adopts a build.rs that carries the declaration.
  */
-export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr', 'eprfs'];
+export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr'];
 
 const ELEMENTS_DIR = 'app/elohim-elements';
 const STORAGE_CLIENT_DIST = 'elohim/sdk/storage-client-ts/dist/index.js';
