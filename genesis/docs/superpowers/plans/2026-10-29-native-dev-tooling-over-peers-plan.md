@@ -18,6 +18,7 @@ cites:
   - elohim/rakia/docs/plans/stage-2-canopy.md
   - elohim/rakia/docs/specs/2026-04-27-rakia-as-brit-attestation-executor-design.md
   - elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md
+  - "native-dev-plane-one-derivation-earned-reach-design | the 2026-11-04 design pass whose rulings §6 applies to the concern table | sha256:b4377d0a57c36c48 | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
 ---
 
 # Native developer CI/CD over peers — scaffold
@@ -138,3 +139,67 @@ premium. Shefa's requests and offers are the home. Cluster row 77, after row 5 h
 spreads shard fetches across holders, so committed holders add their upload for large derivations
 and any four of seven shards rebuild (the slow peer is skipped). Compile-unit objects gain nothing
 from sharding; between two workspaces on one cluster, locality and hashing dominate.
+
+## 6. Reconciliation 2026-11-04 — one derivation, earned reach
+
+> **Operator direction (2026-11-04).** A design pass from the primitives (epr, eprfs, `.epr-meta`) to
+> brit and rakia, before returning to row 5. "Native" means the integration and build queues live
+> between peers. Jenkins is a participant, and external runners are mirrors or peers, never
+> bottlenecks. Builds graduate through the social-reach primitives. Spend is revealed by epr-rea, and
+> deliverables are derived from mishpat. Wall-clock removed from push → landed breaks ties, aimed at
+> the prize.
+
+The rulings and their evidence are in
+[the native dev plane design](epr:native-dev-plane-one-derivation-earned-reach-design). Where a row
+above disagrees with this section, this section governs.
+
+- **Row 1.** Each manifest step declares a `TreeView` (sources, audited gate-reads, gitlinks) and a
+  method descriptor (recipe, toolchain, env). The projected view is both the key and the sparse
+  checkout (D2).
+- **Row 2.** `ark task run` is the only executor. A Jenkinsfile stage becomes `ark task run <method>`.
+  rakia Stage 1's executor sprint retires (D8).
+- **Row 3.** "Wired" was overstated: reuse goes dark without the deprecated `rakia` binary. Track B
+  moves selection to `brit build affected`.
+- **Row 4.** Closure-keyed artifacts become `DerivationRecord`s keyed (method CID, projected root).
+- **Row 5.** The record is `DerivationRecord`. Cache bytes are a local `custody-blob` pledge (B, born
+  `self`). Release holder sets use the elohim DNA's `CustodianCommitment`/`BlobToReplicas`/`ShardManifest`
+  links. `node_registry::CustodianAssignment` is struck. Slice 1 starts with a **local** tier put
+  (track E). The spec's §10 adds eight requirements to I1–I7 (D6).
+- **Row 6.** One `DerivationRecord` per device, signed by the brit signer. brit notes carry records.
+  The Jenkins attest arm is deleted, not adapted (D1, track C).
+- **Row 7.** `gate-verdict@1` carries record bytes. The two-device receipt is join F1r, labelled
+  `independence: sibling` and never counted toward reach (D4).
+- **Row 8.** The eprfs-peer carry is the only offload path, and its result is `basis: UnderGrant`.
+  `just measure` is re-plumbed onto it and the `feedback_signal` path retires. The carry needs source
+  materialization by projected view, not output custody (D9, join F4).
+- **Row 9.** The steward-space signed `dev` head is the landing record. A silent sibling cannot block a
+  landing. The head is a set of tips, so a partitioned double landing keeps both tips durably until a
+  merge containing both lands. The forge mirror only fast-forwards and halts while a fork stands. The
+  receipt includes that interleaving (D3, riding S1b).
+- **Row 10.** Jenkins is an R2 carrier and witness under a `delegates-compute` grant. Its records stay
+  `self`.
+- **Row 11.** brit, epr, rakia and ark publish as `release-manifest` channel heads. One admission rule
+  covers every tool, including the verifier itself.
+- **Row 13.** Struck: "the device's verdicts count as an independent lineage". Instead, after a
+  cross-signed signer → `agent_cid` binding and standing in the space, the *principal's* records count
+  at `trusted`.
+- **Row 14.** The record is `DerivationRecord`. "rakia names, the tier serves", which supersedes
+  steward-space §5.1's "Rakia serves".
+- **Row 15.** Same-principal carrying is provider = receiver = `human:matthew`. `Work` is added to
+  `ReaVerb`. Gate cost moves from `--env` slots to `Use` quantities. Changelogs, trailers and DELTAs
+  become projections over fulfilled commitments.
+- **Row 16.** Add the missing liquidity facts as folded measures: refusal rate by guard axis, lease-hold
+  p90, and availability history. Liquidity feeds carry admission, never reach.
+
+**Sequence.** Five parallel tracks on disjoint write-sets:
+
+- A: eprfs-core slice 4 (`project_view`). This is foundational.
+- B: the gate oracle.
+- C: the brit record (integrity).
+- D: honesty gaps.
+- E: the tier blob store.
+
+Then come the joins: F1r (live sibling reuse), F2 (a sibling fetches the storage binary instead of
+rebuilding), F3 (S1b with the landing CAS), F4 (carry), F5 (one release plane and deliverables as
+reads), and F6 (a second principal). The prize is that two workspaces build once between them. Every
+later rung widens that record and path; none replaces it.

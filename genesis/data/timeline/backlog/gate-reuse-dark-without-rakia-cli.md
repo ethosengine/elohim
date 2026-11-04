@@ -42,3 +42,7 @@ the evidence that flips `push-gate-pays-once` green.
 **Decide first:** which repository and commit hold the rakia CLI source. Either it
 is a crate that has not reached the pinned rakia yet, or the reuse rule should accept
 brit's `build plan` as its oracle in place of rakia.
+
+## 2026-11-04 note (native-dev-plane-one-derivation-earned-reach-design)
+
+Spec §11 Track B cures this by resolving selection through `brit build affected` rather than the deprecated `rakia` PATH binary (`gate-oracle.mjs:24-37` re-verified). Tracked in `native-dev-track-b-gate-oracle-via-brit-build-affected`; close both together. Receipt: a reuse hit with no `rakia` on PATH.
