@@ -18,7 +18,7 @@ cites:
   - elohim/rakia/docs/plans/stage-2-canopy.md
   - elohim/rakia/docs/specs/2026-04-27-rakia-as-brit-attestation-executor-design.md
   - elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md
-  - "native-dev-plane-one-derivation-earned-reach-design | the 2026-11-04 design pass whose rulings §6 applies to the concern table | sha256:b4377d0a57c36c48 | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
+  - "native-dev-plane-one-derivation-earned-reach-design | the 2026-11-04 design pass whose rulings §6 applies to the concern table | sha256:024a89c3dba2699f | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
 ---
 
 # Native developer CI/CD over peers — scaffold
