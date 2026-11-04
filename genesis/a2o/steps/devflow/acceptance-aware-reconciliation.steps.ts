@@ -16,11 +16,13 @@ interface Fixture {
   acceptance?: string;
   context?: Record<string, unknown>;
   text?: string;
+  candidate?: string;
 }
 
 const fixtures = new WeakMap<object, Fixture>();
 const scope = 'plans/experience.md';
 const delivery = 'delivery.md';
+const workerPath = 'worker.json';
 // The host fixture uses the operator-selected toolchain, with no shell interpolation.
 const gitBinary = process.env.GIT_BIN ?? 'git';
 
@@ -35,11 +37,27 @@ function write(root: string, path: string, body: string): void {
   writeFileSync(join(root, path), body);
 }
 
+function isolatedEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) delete env[key];
+  }
+  return {
+    ...env,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_AUTHOR_NAME: 'Fixture',
+    GIT_AUTHOR_EMAIL: 'fixture@example.test',
+    GIT_COMMITTER_NAME: 'Fixture',
+    GIT_COMMITTER_EMAIL: 'fixture@example.test',
+  };
+}
+
 function run(root: string, args: string[], json = true): string {
   return execFileSync(
     process.env.EPR_BIN ?? 'epr',
     [...args, '--root', root, ...(json ? ['--json'] : [])],
-    { cwd: root, encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 }
+    { cwd: root, env: isolatedEnv(), encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 }
   );
 }
 
@@ -57,16 +75,15 @@ function identityCid(root: string, path: string): string {
   return cid(result.identity as Record<string, unknown>, 'cid');
 }
 
-Given(
-  'an isolated reconciliation repository with one promised experience and simulated acceptance evidence',
-  function () {
-    const root = mkdtempSync(join(tmpdir(), 'acceptance-reconciliation-'));
-    const state: Fixture = { root, commitment: '' };
-    fixtures.set(this, state);
-    write(
-      root,
-      '.claude/epr-meta/recipes.yaml',
-      `version: 1
+function prepare(world: object, intent: string): void {
+  const root = mkdtempSync(join(tmpdir(), 'acceptance-reconciliation-'));
+  const state: Fixture = { root, commitment: '' };
+  fixtures.set(world, state);
+  write(root, '.epr-meta/repository.yaml', 'version: 1\nagent: repo:fixture/reconciliation\n');
+  write(
+    root,
+    '.claude/epr-meta/recipes.yaml',
+    `version: 1
 recipes:
   - id: acceptance-fixture
     version: 1
@@ -80,51 +97,106 @@ recipes:
         paths: ["gap-items/*.json"]
     edges: []
 `
-    );
-    write(
-      root,
-      scope,
-      '---\nid: experience\n---\n\nA reader can find the next unresolved assertion.\n'
-    );
-    write(
-      root,
-      'gap-items/experience.json',
-      JSON.stringify({
-        doc: scope,
-        items: [{ id: 'experience#1', state: 'OPEN' }],
-      })
-    );
-    write(root, delivery, 'Implemented and verified the context reader.\n');
-    const git = (args: string[]): string =>
-      execFileSync(gitBinary, args, {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GIT_AUTHOR_NAME: 'Fixture',
-          GIT_AUTHOR_EMAIL: 'fixture@example.test',
-          GIT_COMMITTER_NAME: 'Fixture',
-          GIT_COMMITTER_EMAIL: 'fixture@example.test',
-        },
-      });
-    git(['init', '-q']);
-    git(['add', '.claude/epr-meta/recipes.yaml', scope, 'gap-items/experience.json', delivery]);
-    git(['-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'isolated fixture']);
-    command(root, ['flow', 'project']);
-    command(root, [
-      'actor',
-      'claim',
-      '--as',
-      'agent:implementer@fixture',
-      '--session',
-      'implementer',
-    ]);
-    state.commitment = cid(
-      command(root, ['flow', 'claim', '--on', 'experience#1', '--session', 'implementer']),
-      'commitment_cid'
+  );
+  write(root, scope, `---\nid: experience\n---\n\n${intent}\n`);
+  write(
+    root,
+    'gap-items/experience.json',
+    JSON.stringify({
+      doc: scope,
+      items: [{ id: 'experience#1', state: 'OPEN' }],
+    })
+  );
+  write(root, delivery, 'Implemented and verified the context reader.\n');
+  const git = (args: string[]): string =>
+    execFileSync(gitBinary, args, {
+      cwd: root,
+      encoding: 'utf8',
+      env: isolatedEnv(),
+    });
+  git(['init', '-q']);
+  git(['add', '.claude/epr-meta/recipes.yaml', scope, 'gap-items/experience.json', delivery]);
+  git(['-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'isolated fixture']);
+  command(root, ['flow', 'project']);
+  command(root, [
+    'actor',
+    'claim',
+    '--as',
+    'agent:implementer@fixture',
+    '--session',
+    'implementer',
+  ]);
+  state.commitment = cid(
+    command(root, ['flow', 'claim', '--on', 'experience#1', '--session', 'implementer']),
+    'commitment_cid'
+  );
+}
+
+Given(
+  'an isolated reconciliation repository with one promised experience and simulated acceptance evidence',
+  function () {
+    prepare(this, 'A reader can find the next unresolved assertion.');
+  }
+);
+
+Given(
+  'an isolated promise to reconcile worker settings while preserving unrelated work',
+  function () {
+    prepare(
+      this,
+      'Reconcile worker settings while preserving unrelated work; staging does not establish acceptance.'
     );
   }
 );
+
+When('the developer stages a chosen worker resolution through Brit', function () {
+  const state = fixture(this);
+  const invoke = (program: string, args: string[], input?: string): string =>
+    execFileSync(program, args, {
+      cwd: state.root,
+      env: isolatedEnv(),
+      input,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+  const git = (args: string[], input?: string): string => invoke(gitBinary, args, input);
+  const base = git(['hash-object', '-w', '--stdin'], '{"jobs":1}\n').trim();
+  const ours = git(['hash-object', '-w', '--stdin'], '{"jobs":2}\n').trim();
+  const theirs = git(['hash-object', '-w', '--stdin'], '{"jobs":3}\n').trim();
+  git(
+    ['update-index', '--index-info'],
+    [workerPath, 'unresolved.json']
+      .flatMap(path => [base, ours, theirs].map((oid, i) => `100644 ${oid} ${i + 1}\t${path}\n`))
+      .join('')
+  );
+  write(state.root, 'neighbor', 'staged neighbor\n');
+  git(['add', 'neighbor']);
+  write(state.root, 'neighbor', 'unstaged neighbor\n');
+  const neighbors = git(['ls-files', '--stage', '--', 'neighbor', 'unresolved.json']);
+  write(state.root, workerPath, '{"jobs":2}\n');
+  invoke(process.env.BRIT_BIN ?? 'brit', ['add', '--', workerPath]);
+  assert.equal(git(['ls-files', '--unmerged', '--', workerPath]), '');
+  assert.equal(git(['ls-files', '--stage', '--', 'neighbor', 'unresolved.json']), neighbors);
+  assert.equal(readFileSync(join(state.root, 'neighbor'), 'utf8'), 'unstaged neighbor\n');
+  // Seal the selected candidate in a separate index: unresolved neighbors remain untouched.
+  const env = { ...isolatedEnv(), GIT_INDEX_FILE: join(state.root, '.git', 'candidate-index') };
+  const candidateGit = (args: string[], input?: string): string =>
+    execFileSync(gitBinary, args, {
+      cwd: state.root,
+      env,
+      input,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+  candidateGit(['read-tree', 'HEAD']);
+  candidateGit(['update-index', '--index-info'], git(['ls-files', '--stage', '--', workerPath]));
+  state.candidate = candidateGit(['write-tree']).trim();
+  write(
+    state.root,
+    delivery,
+    `Candidate Git tree: ${state.candidate}\nSelected worker jobs=2; unrelated staged and unresolved entries and dirty bytes preserved.\n`
+  );
+});
 
 Given('the implementer delivered the experience and technical review approved it', function () {
   const state = fixture(this);
@@ -197,22 +269,40 @@ Given('an independent agent is appointed to accept that exact promise', function
 When('the appointed agent records its exercised experience and approves acceptance', function () {
   const state = fixture(this);
   assert.ok(state.appointment && state.fulfillment && state.review);
-  write(state.root, 'observations.md', 'Tried context; the unresolved assertion was visible.\n');
+  write(
+    state.root,
+    'observations.md',
+    state.candidate
+      ? `Exercised scoped Brit staging; candidate ${state.candidate}; neighbors preserved.\n`
+      : 'Tried context; the unresolved assertion was visible.\n'
+  );
   const evidenceCid = identityCid(state.root, 'observations.md');
   const deliveryCid = identityCid(state.root, delivery);
-  const revision = execFileSync(gitBinary, ['rev-parse', 'HEAD'], {
-    cwd: state.root,
-    encoding: 'utf8',
-  }).trim();
+  const revision =
+    state.candidate ??
+    execFileSync(gitBinary, ['rev-parse', 'HEAD'], {
+      cwd: state.root,
+      env: isolatedEnv(),
+      encoding: 'utf8',
+    }).trim();
   write(
     state.root,
     'acceptance.json',
     JSON.stringify({
-      intent: 'Find the next unresolved assertion',
+      intent: state.candidate
+        ? 'Reconcile worker settings while preserving unrelated work'
+        : 'Find the next unresolved assertion',
       revision,
       environment: 'isolated local fixture',
-      actions: ['Ran native context for the promised experience'],
-      observations: ['The unresolved assertion and its evidence were visible'],
+      actions: state.candidate
+        ? [
+            'Staged selected resolution with Brit',
+            'Checked preserved neighbors and sealed candidate tree',
+          ]
+        : ['Ran native context for the promised experience'],
+      observations: state.candidate
+        ? ['Selected resolution staged; unrelated work preserved; acceptance remained separate']
+        : ['The unresolved assertion and its evidence were visible'],
       evidence: [
         { path: 'observations.md', cid: evidenceCid },
         { path: delivery, cid: deliveryCid },

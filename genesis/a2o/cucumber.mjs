@@ -49,6 +49,12 @@ const base = {
 
 export default function () {
   return {
+    'acceptance-reconciliation': {
+      requireModule: ['tsx'],
+      require: ['steps/devflow/acceptance-aware-reconciliation.steps.ts'],
+      paths: ['features/devflow/acceptance-aware-reconciliation.feature'],
+      format: ['progress'],
+    },
     'device-declared-target': {
       requireModule: ['tsx'],
       require: ['steps/devflow/device-declared-target.steps.ts'],
