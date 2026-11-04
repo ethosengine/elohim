@@ -106,3 +106,83 @@ decisionPoints:
       Success relies on the filesystem honoring sync_all; reads do not establish
       durable custody. The worst holder sees selected bytes and names locally;
       this adapter creates no remote index or cross-identity join.
+  - name: TierBlobDraw
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/tier_blob.rs
+      modulePath: eprfs_storage::TierBlobDraw
+    summary: >
+      Put a derivation output as raw chunks of at most 1 MiB plus one DAG-CBOR manifest carrying
+      its DerivationRecord, then read it only after the manifest, every chunk and the complete
+      output verify. A draw is exactly hit, miss with a typed reason, or unavailable with a typed
+      reason; only hit carries bytes. This is local self-reach custody with no daemon or head.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: The manifest and chunks live on the local byte-custody plane, not the head, reach-election, or replication planes.
+      - id: C1
+        status: n-a
+        justification: Content-addressed custody selects no candidate and elects no head.
+      - id: C2
+        status: n-a
+        justification: Immutable CIDs have no update clock or backwards transition.
+      - id: C3
+        status: answered
+        justification: A wipe is a cold miss and every completed read has a hit, miss, or unavailable transition; no repair requires a human-only mutation.
+      - id: C4
+        status: answered
+        justification: Manifest absence, corruption, invalid shape, unknown epoch, missing/corrupt chunks, complete-blob corruption, and store failure remain distinct typed outcomes.
+      - id: C5
+        status: partial
+        justification: Bytes and closure identity are re-derived from CIDs; the embedded witness remains a claim for the caller's trust policy to verify.
+      - id: C6a
+        status: partial
+        justification: Each chunk is capped at 1 MiB and fetched sequentially, but the complete local artifact is assembled in memory and has no smaller declared ceiling than the manifest and platform usize.
+      - id: C6b
+        status: answered
+        justification: Repeated puts converge on the same chunk and manifest CIDs through DirectoryStorage's verified no-clobber path.
+      - id: C7
+        status: n-a
+        justification: Slice 1 advertises and serves nothing; the serve-blob mount is a later gated slice.
+      - id: C8
+        status: partial
+        justification: Every completed outcome is typed and printable; durable Use/Produce observations are owned by the eprfs-peer caller.
+      - id: C9
+        status: partial
+        justification: The manifest retains DerivationRecord computed_by exactly; signer-to-agent resolution is a later join and is not inferred here.
+      - id: C10
+        status: partial
+        justification: The manifest declares epoch 1 and refuses unknown epochs, but A11 tolerant DerivationRecord decoding is the next ordered slice.
+      - id: C11
+        status: n-a
+        justification: Local explicit calls have no externally scheduled ingress or queue.
+      - id: C12
+        status: answered
+        justification: Only an explicit local caller writes or reads; custody confers no publication, execution, or serving authority.
+      - id: C13
+        status: n-a
+        justification: Custody does not participate in an authority stage.
+      - id: C14
+        status: partial
+        justification: Completed failures return a residual reason; abrupt process death cannot return one, while a cancelled fetch exposes no partial hit and an explicit retry re-verifies all bytes.
+    contractTests:
+      - path: elohim/eprfs/eprfs-storage/tests/local_tier_blob.rs
+        testName: local_put_chunks_at_one_mib_and_records_each_cid_in_a_manifest
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/local_tier_blob.rs
+        testName: one_device_wipe_is_a_typed_miss_and_reput_recovers_identical_bytes
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/local_tier_blob.rs
+        testName: one_device_corruption_never_returns_bytes_and_reput_recovers_identically
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/local_tier_blob.rs
+        testName: one_device_killed_fetch_exposes_no_partial_hit_and_retry_is_identical
+        kind: integration
+      - path: elohim/eprfs/eprfs-storage/tests/local_tier_blob.rs
+        testName: revoked_peer_credential_is_irrelevant_to_self_reach_local_read
+        kind: integration
+    notes: >
+      Classification is Private (B) local custody by the native-dev-plane ruling. Addresses are
+      existing BlobCid values: raw for chunks/output and DAG-CBOR for the manifest. Head-plane
+      cost is zero at seed and one year. A future carrier can learn sizes, timing and requested
+      CIDs, which is why serve-blob must enforce object reach before it lands.
