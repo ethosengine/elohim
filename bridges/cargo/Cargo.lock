@@ -596,7 +596,7 @@ dependencies = [
  "elohim-epr",
  "elohim-epr-index",
  "elohim-epr-rea",
- "elohim-rust-style",
+ "elohim-rust-style-scan",
  "eprfs-agent",
  "eprfs-core",
  "eprfs-host",
@@ -659,19 +659,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "elohim-rust-style"
+name = "elohim-rust-style-scan"
 version = "0.1.0"
 dependencies = [
- "eprfs-core",
- "eprfs-meta",
  "proc-macro2",
  "quote",
  "serde",
- "serde_json",
- "serde_yaml",
  "syn",
- "tempfile",
- "toml",
 ]
 
 [[package]]
