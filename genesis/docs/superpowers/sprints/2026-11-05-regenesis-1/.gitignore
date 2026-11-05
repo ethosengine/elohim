@@ -1,0 +1,4 @@
+logs/
+*.log
+tmp/
+census-0.json

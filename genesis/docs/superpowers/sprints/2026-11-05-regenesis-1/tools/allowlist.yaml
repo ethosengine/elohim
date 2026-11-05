@@ -1,0 +1,56 @@
+# Allowlist for address-codemod.py (census classes + mechanical exclusions).
+# The durable lint (address-profile-lint.sh) embeds its own copy so it can move to scripts/ci/.
+
+# Directory prefixes never scanned (not part of the crossing).
+exclude_prefixes:
+  - .git/
+  - .worktrees/
+  - .claude/worktrees/
+  - genesis/local-dev/archive/
+  - genesis/research/repos/
+  - vendor/
+  - sophia/
+  - target-pool/
+
+# Directory names never scanned at any depth.
+exclude_dirnames: [node_modules, target, .angular, dist, coverage, .nx]
+
+# File globs never scanned (digest lockfiles carry integrity hashes only).
+exclude_globs:
+  - "**/pnpm-lock.yaml"
+  - "**/package-lock.json"
+  - "**/Cargo.lock"
+  - "**/*.lock"
+  - "**/*.min.js"
+  - "**/*.map"
+
+# Keep paths: hits here are classified as given and are NEVER proposed for change.
+keep_paths:
+  - {glob: "scripts/ci/build-storage-image.sh", class: oci}
+  - {glob: "scripts/ci/harbor-oracle.sh", class: oci}
+  - {glob: "elohim/eprfs/epr-cli/src/flow/cites.rs", class: cite}
+  - {glob: "genesis/data/**", class: cite}
+  - {glob: ".eprfs/**", class: prose}
+  - {glob: "refs/notes/**", class: prose}
+  - {glob: "genesis/local-dev/archive/**", class: prose}
+  - {glob: ".claude/data/**", class: prose}        # agent ledgers (evidence, not code)
+  - {glob: ".epr-meta/**/objects/**", class: record}  # brit/rust-style content-addressed objects (UNSURE: see report)
+
+# Keep patterns: a hit on a line matching one of these keeps that class.
+keep_patterns:
+  - {regex: '@sha256:[0-9a-fA-F]{64}', class: oci}
+  - {regex: 'drift_fingerprint|short_fingerprint', class: cite}
+  - {regex: 'address-lint:\s*allow', class: digest}
+
+# Path globs where the mechanical classes are never applied (generated or coupled elsewhere).
+skip_mechanical_globs:
+  - "**/generated/**"            # C13: regenerated, never hand-edited
+  - "**/tree-vectors.json"       # written by EPRFS_WRITE_VECTORS=1
+  - "**/migrations/**"           # DB schema: owner track writes a new migration
+  - "**/diesel_schema.rs"
+  - "elohim/holochain/dna/**"    # DNA fields: DNA track, DNA-HASH-MOVING
+  - "genesis/local-dev/**"
+  - "genesis/docs/**"
+
+# Tracks whose identifier renames are coupled to schema/DNA and need --allow-coupled to apply.
+coupled_tracks: [DNA, elohim-storage]
