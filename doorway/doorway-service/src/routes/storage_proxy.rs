@@ -2453,6 +2453,65 @@ mod tests {
     /// successful (200) blob GETs are cacheable. The 206 test covers partial
     /// content; this closes the error-status bound the cache-write contract
     /// promises ("never cache errors or non-blob routes").
+    /// A storage 200 whose body is not the bytes its byte CID names is refused (502
+    /// `upstream-cid-mismatch`) and never stocked: verify before serve on the live path.
+    #[tokio::test]
+    async fn blob_200_that_misses_its_address_is_refused_and_not_stocked() {
+        let _guard = BLOB_TEST_LOCK.lock().await;
+        let (addr, _handle) = spawn_mock_storage(
+            200,
+            b"some other bytes".to_vec(),
+            "application/octet-stream",
+        )
+        .await;
+        let storage_url = format!("http://{addr}");
+        let cache = make_cache();
+        let hash_owned = elohim_address::compute_bytes_cid(b"the addressed bytes").to_string();
+        let hash = hash_owned.as_str();
+        let path = format!("/blob/{hash}");
+
+        let req = make_get_request(&format!("http://doorway{path}"));
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+        assert!(cache.blob_size(hash).is_none(), "never stocked");
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["error"], "upstream-cid-mismatch");
+    }
+
+    /// A legacy spelling on the live path is the typed 400 before any storage call.
+    #[tokio::test]
+    async fn blob_legacy_spelling_is_the_typed_400() {
+        let _guard = BLOB_TEST_LOCK.lock().await;
+        let cache = make_cache();
+        let path = format!("/blob/sha256-{}", "ab".repeat(32));
+        let req = make_get_request(&format!("http://doorway{path}"));
+        let resp = forward_blob_to_storage(
+            req,
+            "http://127.0.0.1:1",
+            &path,
+            Arc::clone(&cache),
+            &reqwest::Client::new(),
+            &UpstreamBreakers::default(),
+            ForwardCtx::default(),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["error"], "invalid-byte-cid");
+    }
+
     #[tokio::test]
     async fn blob_404_does_not_stock_pantry() {
         let _guard = BLOB_TEST_LOCK.lock().await;
