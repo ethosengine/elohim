@@ -1293,7 +1293,9 @@ pub enum P2PCommand {
     /// (`services::device_carrier`).
     DeviceCarry {
         peer: PeerId,
-        request: consent_grant::CarryRequest,
+        /// Boxed: the carrier proof now carries its signature envelope (key + sig bytes),
+        /// which made this the enum's largest variant by 2x (clippy::large_enum_variant).
+        request: Box<consent_grant::CarryRequest>,
         reply: oneshot::Sender<Result<consent_grant::CarryResponse, String>>,
     },
     /// Publish an EPR Head to Kademlia DHT.
@@ -1869,7 +1871,7 @@ impl P2PHandle {
         self.command_tx
             .send(P2PCommand::DeviceCarry {
                 peer,
-                request,
+                request: Box::new(request),
                 reply,
             })
             .await
