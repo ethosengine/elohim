@@ -1,7 +1,7 @@
 import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
@@ -540,14 +540,60 @@ describe('selection oracle — shadow, rakia, path', () => {
 });
 
 describe('attested dispatch', () => {
-  test('an attested project never reaches run-local-gate.sh', () => {
-    const out = spawnSync(process.execPath, [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--target', 'brit'], {
-      cwd: ROOT, encoding: 'utf8', env: { ...process.env, GH_BIN: '/nonexistent/gh', EPR_BIN: '/nonexistent/epr' },
+  function fixture(t, checkRuns) {
+    const root = mkdtempSync(resolve(tmpdir(), 'gate-attested-refused-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const gh = resolve(root, 'gh');
+    writeFileSync(gh, '#!/bin/sh\nexit 1\n');
+    chmodSync(gh, 0o755);
+    const project = {
+      name: 'fixture-attested',
+      dir: 'component',
+      run: { kind: 'attested', attestation: { provider: 'github-checks', repo: 'example/component', check: 'Tests pass' } },
+    };
+    const sha = 'a'.repeat(40);
+    const lines = [];
+    const calls = [];
+    const spawn = (command, args) => {
+      calls.push({ command, args });
+      if (command === 'git' && args.includes('ls-tree')) {
+        return { status: 0, stdout: `160000 commit ${sha}\tcomponent\n`, stderr: '' };
+      }
+      if (command === 'git' && args.includes('status')) return { status: 0, stdout: '', stderr: '' };
+      if (command === gh) return checkRuns();
+      if (command === 'fixture-epr') return { status: 0, stdout: '', stderr: '' };
+      return { status: 7, stdout: '', stderr: `unexpected ${command}` };
+    };
+    const run = () => runProject(project, false, false, {
+      root,
+      env: { GH_BIN: gh, EPR_BIN: 'fixture-epr' },
+      spawn,
+      write: text => lines.push(text),
     });
-    assert.equal(out.status, 0, out.stdout + out.stderr);
-    assert.match(out.stdout, /attested, no local recipe/);
-    assert.match(out.stdout, /attested: claimed — gh not found/);
-    assert.doesNotMatch(out.stdout, /cargo target:/);
+    return { calls, lines, run };
+  }
+
+  test('claimed is admitted with debt, named claimed, and never recorded as green evidence', t => {
+    const f = fixture(t, () => ({ status: 1, stdout: '', stderr: 'offline' }));
+    assert.equal(f.run(), 0);
+    const output = f.lines.join('');
+    assert.match(output, /attested, no local recipe/);
+    assert.match(output, /attested: claimed — offline/);
+    assert.match(output, /^\[gate\] fixture-attested: claimed \(admitted with debt; no green evidence\)$/m);
+    assert.doesNotMatch(output, /\[gate\] fixture-attested (?:evidence: recorded|reused: green)/);
+    assert.equal(f.calls.some(({ command, args }) => command.includes('brit') || args.includes('attest')), false,
+      'a claim must not write reusable green evidence');
+  });
+
+  test('a witnessed refusal still makes the run non-zero', t => {
+    const f = fixture(t, () => ({ status: 0, stdout: JSON.stringify({ check_runs: [] }), stderr: '' }));
+    const status = f.run();
+    const output = f.lines.join('');
+    assert.notEqual(status, 0);
+    assert.match(output, /attested: REFUSED/);
+    assert.doesNotMatch(output, /^\[gate\] fixture-attested: claimed/m);
+    assert.equal(f.calls.some(({ command, args }) => command.includes('brit') || args.includes('attest')), false,
+      'a refusal must not write reusable green evidence either');
   });
 });
 

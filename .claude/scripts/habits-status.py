@@ -406,6 +406,7 @@ MAX_REPORTS = 60  # newest-first cap — session start stays cheap, never scans 
 DEFAULT_MAX_EVIDENCE_AGE = "14d"
 
 NOT_MEASURED = "not-measured"
+PARTLY_MEASURED = "partly-measured"
 _AGE_UNITS = {"h": 3600.0, "d": 86400.0, "w": 604800.0}
 _AGE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*([hdw])?$")
 # jenkins-elohim-<job>-<branch>-<n>  ->  "<job> #<n>"  (jenkins-elohim-edge-dev-1376)
@@ -492,12 +493,13 @@ def load_reports() -> list:
 
 
 def observe_concern(rollup) -> str:
-    """green | red | not-measured for ONE concern in ONE report.
+    """green | red | partly-measured | not-measured for ONE concern in ONE report.
 
-    any failed -> red. passed>0 with no failure -> green. passed==0 — whether the
-    scenarios were pending/skipped, or the concern is absent from `byConcern` entirely
-    (rollup is None) — -> NOT MEASURED. An all-zero rollup is an apparatus that ran
-    nothing, never a pass: that conflation is what let 76-of-80 skips read as green.
+    any failed -> red. passed>0 with pending/skipped -> partly-measured. passed>0 with
+    no failure and no unfinished scenario -> green. passed==0 — whether the scenarios
+    were pending/skipped, or the concern is absent from `byConcern` entirely (rollup is
+    None) — -> NOT MEASURED. An all-zero rollup is an apparatus that ran nothing, never
+    a pass: that conflation is what let 76-of-80 skips read as green.
     """
     if not isinstance(rollup, dict):
         return NOT_MEASURED
@@ -509,6 +511,8 @@ def observe_concern(rollup) -> str:
     if n("failed") > 0:
         return "red"
     if n("passed") > 0:
+        if n("pending") > 0 or n("skipped") > 0:
+            return PARTLY_MEASURED
         return "green"
     return NOT_MEASURED
 
@@ -530,6 +534,8 @@ def observe_habit(habit: dict, report) -> tuple:
         return ("red", missing)
     if missing:
         return (NOT_MEASURED, missing)
+    if any(o == PARTLY_MEASURED for _, o in seen):
+        return (PARTLY_MEASURED, [])
     return ("green", [])
 
 
@@ -591,14 +597,14 @@ def not_measured_view(doc: dict, now=None, reports=None) -> dict:
         last = None
         for report in reports:
             verdict, _ = observe_habit(habit, report)
-            if verdict in ("green", "red"):
+            if verdict in ("green", "red", PARTLY_MEASURED):
                 last = report
                 break
 
         declared_age = habit.get("max_evidence_age", DEFAULT_MAX_EVIDENCE_AGE)
         limit = _parse_age(declared_age)
         stale, undated = False, False
-        if observed in ("green", "red") and limit is not None:
+        if observed in ("green", "red", PARTLY_MEASURED) and limit is not None:
             when = last.get("when") if last else None
             if when is None:
                 # A verdict exists but cannot be DATED (no parseable `generatedAt`, no
@@ -628,9 +634,12 @@ def not_measured_view(doc: dict, now=None, reports=None) -> dict:
         })
 
     not_measured = [r for r in rows if r["observed"] == NOT_MEASURED]
+    partly_measured = [r for r in rows if r["observed"] == PARTLY_MEASURED]
     return {
         "rows": rows,
         "not_measured": not_measured,
+        "partly_measured": partly_measured,
+        "measurement_gaps": not_measured + partly_measured,
         "disagreements": [r for r in rows if r["disagrees"]],
         "concern_count": sum(len(r["missing"]) for r in not_measured),
         "no_concern": no_concern,
@@ -646,11 +655,21 @@ def not_measured_lines(view: dict) -> list:
     Rendered ABOVE the next-move line, because a green habit with no witness invalidates
     the selection the next-move line is about to make.
     """
-    if not view["not_measured"]:
+    gaps = view.get("measurement_gaps", view["not_measured"])
+    if not gaps:
         return []
-    shown = view["disagreements"] or []
-    head = (f"  NOT MEASURED  {len(view['not_measured'])} habits · "
-            f"{view['concern_count']} declared concerns ({view['run_label']})")
+    gap_ids = {row["id"] for row in gaps}
+    shown = [row for row in view["disagreements"] if row["id"] in gap_ids]
+    if view.get("partly_measured") and view["not_measured"]:
+        label = "INCOMPLETE MEASUREMENT"
+    elif view.get("partly_measured"):
+        label = "PARTLY MEASURED"
+    else:
+        label = "NOT MEASURED"
+    head = f"  {label}  {len(gaps)} habits"
+    if view["not_measured"]:
+        head += f" · {view['concern_count']} declared concerns without a witness"
+    head += f" ({view['run_label']})"
     if shown:
         head += "  ← read this first"
     lines = [head]
@@ -658,9 +677,9 @@ def not_measured_lines(view: dict) -> list:
         lines.append(
             f"    {r['id']:<34} status: {r['declared']:<7} "
             f"observed_status: {r['observed']:<13} last_measured: {r['age']}")
-    rest = len(view["not_measured"]) - len(shown)
+    rest = len(gaps) - len(shown)
     if rest:
-        lines.append(f"    +{rest} more not measured, already declared red/unwired "
+        lines.append(f"    +{rest} more incomplete measurements, already declared red/unwired "
                      f"(habits-status.py --full)")
     if shown:
         lines.append("  → the register and the evidence disagree. Covenant rule 4: the "

@@ -13,6 +13,8 @@ import { delimiter, isAbsolute, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 export const PIN_ATTESTATION_MEASURE = 'pin-attestation@1';
+/** A reachable green is 0, a witnessed refusal is 1, a manifest error is 2, and claimed is typed. */
+export const CLAIMED_EXIT_CODE = 3;
 /** The floor never blocks on the network: a stalled forge read degrades to `claimed`. */
 export const GH_TIMEOUT_MS = 60_000;
 
@@ -150,7 +152,7 @@ export function observationArgs(subject, attestation, verdict) {
   ];
 }
 
-/** Run one attested gate project. Returns the exit status (0 pass, 1 refuse, 2 manifest error). */
+/** Run one attested gate project. Returns 0 witnessed pass, 1 refusal, 2 manifest error, 3 claimed. */
 export function runAttested(project, { root, env = process.env, spawn = spawnSync, log, runEpr }) {
   const say = log || (line => process.stdout.write(`${line}\n`));
   const attestation = project.run?.attestation;
@@ -174,6 +176,7 @@ export function runAttested(project, { root, env = process.env, spawn = spawnSyn
     const record = runEpr || (args => spawn(env.EPR_BIN || 'epr', args, { cwd: root, stdio: 'ignore', timeout: 30000 })?.status);
     record(observationArgs(project.dir, attestation, verdict));
   } catch { /* best-effort; the verdict never depends on the observation */ }
+  if (verdict.tier === 'claimed') return CLAIMED_EXIT_CODE;
   return verdict.outcome === 'pass' ? 0 : 1;
 }
 
@@ -188,7 +191,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     try {
       const verdict = judgePin(args[dirAt + 1], args[shaAt + 1]);
       process.stdout.write(`${JSON.stringify(verdict)}\n`);
-      process.exitCode = verdict.outcome === 'pass' ? 0 : 1;
+      process.exitCode = verdict.tier === 'claimed'
+        ? CLAIMED_EXIT_CODE
+        : verdict.outcome === 'pass' ? 0 : 1;
     } catch (error) {
       process.stderr.write(`${error.message}\n`);
       process.exitCode = 2;

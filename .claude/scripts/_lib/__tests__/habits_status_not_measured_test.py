@@ -224,6 +224,33 @@ def test_all_passed_is_green_and_agrees_with_a_green_register():
     assert "notary-authority" not in flips
 
 
+def test_passed_with_pending_or_skipped_is_partly_measured_not_green():
+    """A partial run is evidence, but it is not evidence that the whole concern passed."""
+    for unfinished in ("pending", "skipped"):
+        rollup = {"passed": 2, "failed": 0, "pending": 0, "skipped": 0}
+        rollup[unfinished] = 1
+        assert m.observe_concern(rollup) == m.PARTLY_MEASURED, unfinished
+
+    doc = {"habits": [
+        habit("notary-authority", "green", ["a2o @concern:notary-authority"],
+              max_evidence_age="none"),
+    ]}
+    partial = report(
+        "partial-run",
+        "dataplane",
+        {"notary-authority": {"passed": 2, "failed": 0, "pending": 1, "skipped": 0}},
+        "2026-08-22T11:45:42.118Z",
+        scenarios={"total": 3, "passed": 2, "failed": 0, "pending": 1, "skipped": 0},
+    )
+    view = view_of(partial, doc=doc)
+    row = view["rows"][0]
+    assert row["observed"] == m.PARTLY_MEASURED
+    assert row["disagrees"] is True
+    with reports_dir(partial):
+        rendered = m.headline(doc)
+    assert "observed_status: partly-measured" in rendered
+
+
 def test_all_concerns_not_just_the_first():
     """_first_concern's regex, generalized: a check list declares EVERY tag it names."""
     checks = DOC["habits"][0]["checks"]
