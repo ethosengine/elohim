@@ -70,7 +70,8 @@ pub mod witness;
 
 pub use act::{ActRefusal, RequestedAct};
 pub use carrier::{
-    proof_holds, statement, CarrierKind, CarrierProof, CarryRequest, CarryResponse, CARRIER_DOMAIN,
+    proof_check, proof_holds, statement, CarrierKind, CarrierProof, CarryRequest, CarryResponse,
+    ProofCheck, CARRIER_DOMAIN,
 };
 pub use ceremony::{
     attendance, issue, redeem, settle, AgreedView, Attendance, Collection, CollectionRefusal,

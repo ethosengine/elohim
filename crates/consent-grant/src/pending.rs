@@ -234,11 +234,12 @@ pub struct Ask {
 impl Ask {
     /// What the ask's proof says, as sent from `transport_id`: `Verified`
     /// when the device key the request names signed it, `Held` under a scheme
-    /// this build does not implement, `Invalid` when absent or not holding.
-    pub fn signature_from(&self, transport_id: &str) -> elohim_epr::SignatureCheck {
+    /// this build does not implement, `StatementRefused` when the statement
+    /// it would sign is not one, `Invalid` when absent or not holding.
+    pub fn signature_from(&self, transport_id: &str) -> crate::carrier::ProofCheck {
         self.proof
             .as_ref()
-            .map_or(elohim_epr::SignatureCheck::Invalid, |p| {
+            .map_or(crate::carrier::ProofCheck::Invalid, |p| {
                 crate::carrier::proof_check(
                     p,
                     &self.request.device_key,
@@ -253,7 +254,7 @@ impl Ask {
     /// Whether the device key the request names signed this ask, as sent
     /// from `transport_id`. A held proof is not a signature.
     pub fn signed_from(&self, transport_id: &str) -> bool {
-        self.signature_from(transport_id) == elohim_epr::SignatureCheck::Verified
+        self.signature_from(transport_id) == crate::carrier::ProofCheck::Verified
     }
 }
 
@@ -306,6 +307,10 @@ pub enum Dropped {
     /// The ask's proof is made under a signature scheme this build does not
     /// implement: held, not forged, and listed nowhere.
     HeldScheme(u16),
+    /// The statement the ask's proof would sign is not one (the transport id
+    /// it came from is empty, too long or holds a line break): refused on its
+    /// structure, not as a forgery.
+    ProofStatementRefused,
     /// The same device's ask is already listed from another transport id; an
     /// ask is replaced only from where it was listed, by its own device.
     ListedFromElsewhere,
@@ -323,6 +328,7 @@ impl Dropped {
             Self::SourceOverLimit => "ask_source_over_limit",
             Self::Unsigned => "ask_unsigned",
             Self::HeldScheme(_) => "ask_signature_scheme_held",
+            Self::ProofStatementRefused => "ask_proof_statement_refused",
             Self::ListedFromElsewhere => "ask_listed_from_elsewhere",
         }
     }
@@ -385,9 +391,12 @@ impl PendingAsks {
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
         // Adversarial review, high 4: the ask is the device's own, from here.
         match ask.signature_from(source) {
-            elohim_epr::SignatureCheck::Verified => {}
-            elohim_epr::SignatureCheck::Held { scheme } => return Err(Dropped::HeldScheme(scheme)),
-            elohim_epr::SignatureCheck::Invalid => return Err(Dropped::Unsigned),
+            crate::carrier::ProofCheck::Verified => {}
+            crate::carrier::ProofCheck::Held { scheme } => return Err(Dropped::HeldScheme(scheme)),
+            crate::carrier::ProofCheck::StatementRefused => {
+                return Err(Dropped::ProofStatementRefused)
+            }
+            crate::carrier::ProofCheck::Invalid => return Err(Dropped::Unsigned),
         }
         {
             let mut inner = self.lock();
@@ -683,7 +692,7 @@ pub(crate) mod tests {
         held.proof.as_mut().unwrap().envelope.scheme = 5;
         assert_eq!(
             held.signature_from("peer-a"),
-            elohim_epr::SignatureCheck::Held { scheme: 5 }
+            crate::carrier::ProofCheck::Held { scheme: 5 }
         );
         assert!(!held.signed_from("peer-a"));
         assert_eq!(
@@ -703,6 +712,34 @@ pub(crate) mod tests {
             ),
             Ok(Listed::New(1))
         );
+    }
+
+    /// An ask arriving from a transport id no statement can name is refused
+    /// on its structure — not as unsigned, not as held — and lists nothing;
+    /// an unknown scheme from there is still held first.
+    #[test]
+    fn an_ask_whose_proof_statement_is_refused_is_its_own_drop() {
+        let list = PendingAsks::new();
+        let a = ask_from(1, "peer-a");
+        assert_eq!(
+            a.signature_from(""),
+            crate::carrier::ProofCheck::StatementRefused
+        );
+        assert_eq!(
+            list.admit(a.clone(), "", None, &speaks(), &policy(), NOW),
+            Err(Dropped::ProofStatementRefused)
+        );
+        assert_eq!(
+            Dropped::ProofStatementRefused.code(),
+            "ask_proof_statement_refused"
+        );
+        let mut held = a;
+        held.proof.as_mut().unwrap().envelope.scheme = 5;
+        assert_eq!(
+            list.admit(held, "a\nb", None, &speaks(), &policy(), NOW),
+            Err(Dropped::HeldScheme(5))
+        );
+        assert_eq!(list.len(), 0);
     }
 
     #[test]

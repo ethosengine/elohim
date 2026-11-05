@@ -1177,9 +1177,12 @@ impl Carrier {
                         );
                         return None;
                     }
-                    // A signature scheme this build does not implement is held:
-                    // dropped like an unsigned ask, counting nothing.
+                    // A signature scheme this build does not implement is held,
+                    // and a proof statement that is not one is refused on its
+                    // structure: each dropped like an unsigned ask, counting
+                    // nothing.
                     Dropped::HeldScheme(_)
+                    | Dropped::ProofStatementRefused
                     | Dropped::Malformed(_)
                     | Dropped::NotForThisApprover
                     | Dropped::AlreadyDecided

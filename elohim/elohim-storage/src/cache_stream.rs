@@ -62,7 +62,10 @@ fn format_heartbeat() -> String {
 /// Spawns a background task that queries SQLite in batches and sends
 /// each cacheable item as an SSE event. The stream ends with a
 /// `cache.done` event containing item counts.
-#[allow(clippy::field_reassign_with_default)]
+#[allow(
+    clippy::field_reassign_with_default,
+    reason = "each count is filled in turn by its own awaited table stream; a struct literal would hold every stream open until the last one finished"
+)]
 pub fn create_cache_stream(pool: DbPool, h_app_id: &str) -> hyper::Response<SseBody> {
     let (tx, rx) = mpsc::channel::<Bytes>(64);
     let h_app_id = h_app_id.to_string();

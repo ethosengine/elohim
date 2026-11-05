@@ -35,12 +35,15 @@
 //! for, and the receiver checks it against the one the message came from.
 //!
 //! A proof is a [`SignatureEnvelope`] (scheme, multikey, signature) over the
-//! transcript `CARRIER_DOMAIN ‖ u16be(CARRIER_EPOCH) ‖ u16be(scheme) ‖ key ‖
-//! statement` ([`elohim_epr::signature`]). The key the proof must carry is
-//! derived from the claimed agent key, never taken from the envelope. A proof
-//! under a scheme this build does not implement is *held*
-//! ([`SignatureCheck::Held`]): it lists nothing and hands nothing back, and it
-//! is told apart from a forgery.
+//! transcript-v1 bytes of `(CARRIER_DOMAIN, CARRIER_EPOCH, scheme, key,
+//! statement)` ([`elohim_epr::signature::signing_transcript`]). The key the
+//! proof must carry is derived from the claimed agent key, never taken from the
+//! envelope. A proof under a scheme this build does not implement is *held*
+//! ([`ProofCheck::Held`]) whatever else is wrong with it — before the claimed
+//! signer or the statement is looked at: it lists nothing and hands nothing
+//! back, and it is told apart from a forgery. A statement that is not one
+//! ([`statement`] refuses it) is [`ProofCheck::StatementRefused`]: a structural
+//! refusal, not a signature that failed.
 
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +54,36 @@ use crate::ceremony::Delivered;
 use crate::delivery::Redemption;
 use crate::hash_shape::agent_public_key;
 use crate::pending::Ask;
+
+/// What a carrier proof says about a claimed signer's statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProofCheck {
+    /// The claimed signer's key signed the statement under an implemented scheme.
+    Verified,
+    /// An implemented scheme, and the signature, the envelope key or the
+    /// claimed signer does not hold.
+    Invalid,
+    /// A scheme this build does not implement: neither authentic nor forged
+    /// here, reported before any signer or statement check. Confers no effect.
+    Held {
+        /// The scheme code carried.
+        scheme: u16,
+    },
+    /// The statement the proof would be checked over is not one (a field too
+    /// long, a line break, an empty transport id): refused on its structure
+    /// before any signature is checked.
+    StatementRefused,
+}
+
+impl From<SignatureCheck> for ProofCheck {
+    fn from(check: SignatureCheck) -> Self {
+        match check {
+            SignatureCheck::Verified => ProofCheck::Verified,
+            SignatureCheck::Invalid => ProofCheck::Invalid,
+            SignatureCheck::Held { scheme } => ProofCheck::Held { scheme },
+        }
+    }
+}
 
 /// The domain every carrier statement is signed under. Nothing else signed by
 /// an agent key starts with it. `v2`: the envelope transcript replaced the v1
@@ -147,8 +180,9 @@ pub fn statement(
 }
 
 /// The exact bytes a scheme-0 signer with `public_key` signs for a statement:
-/// `CARRIER_DOMAIN ‖ u16be(CARRIER_EPOCH) ‖ 0000 ‖ (ed 01 ‖ public_key) ‖
-/// statement`. `None` when the statement is not one.
+/// the transcript-v1 bytes `0019 ‖ CARRIER_DOMAIN ‖ u16be(CARRIER_EPOCH) ‖ 0000
+/// ‖ 0022 ‖ (ed 01 ‖ public_key) ‖ statement`. `None` when the statement is not
+/// one.
 pub fn statement_transcript(
     public_key: &[u8; 32],
     kind: CarrierKind,
@@ -157,19 +191,25 @@ pub fn statement_transcript(
     challenge: &str,
 ) -> Option<Vec<u8>> {
     let body = statement(kind, state, transport_id, challenge)?;
-    Some(elohim_epr::signature::signing_transcript(
+    elohim_epr::signature::signing_transcript(
         CARRIER_DOMAIN.as_bytes(),
         CARRIER_EPOCH,
         SignatureScheme::Ed25519.code(),
         Multikey::ed25519(public_key).as_bytes(),
         &body,
-    ))
+    )
+    .ok()
 }
 
-/// What `proof` says about `signer`'s statement: `Verified` when it is
-/// `signer`'s signature over it, `Held` when it is made under a scheme this
-/// build does not implement, `Invalid` otherwise. The key the proof must
-/// carry is derived from `signer`, never read from the proof.
+/// What `proof` says about `signer`'s statement, in this order:
+///
+/// 1. a scheme this build does not implement is `Held`, whatever the claimed
+///    signer or statement;
+/// 2. a statement [`statement`] refuses is `StatementRefused`;
+/// 3. a proof claimed for another signer, or a signer that is not an agent
+///    key, is `Invalid`;
+/// 4. otherwise the envelope is checked against the key derived from `signer`
+///    (never read from the proof): `Verified` or `Invalid`.
 pub fn proof_check(
     proof: &CarrierProof,
     signer: &str,
@@ -177,22 +217,27 @@ pub fn proof_check(
     state: &str,
     transport_id: &str,
     challenge: &str,
-) -> SignatureCheck {
-    if proof.signer != signer {
-        return SignatureCheck::Invalid;
+) -> ProofCheck {
+    if SignatureScheme::from_code(proof.envelope.scheme).is_none() {
+        return ProofCheck::Held {
+            scheme: proof.envelope.scheme,
+        };
     }
-    let (Some(key), Some(body)) = (
-        agent_public_key(signer),
-        statement(kind, state, transport_id, challenge),
-    ) else {
-        return SignatureCheck::Invalid;
+    let Some(body) = statement(kind, state, transport_id, challenge) else {
+        return ProofCheck::StatementRefused;
     };
-    proof.envelope.check_for(
-        &Multikey::ed25519(&key),
-        CARRIER_DOMAIN.as_bytes(),
-        CARRIER_EPOCH,
-        &body,
-    )
+    let Some(key) = agent_public_key(signer).filter(|_| proof.signer == signer) else {
+        return ProofCheck::Invalid;
+    };
+    proof
+        .envelope
+        .check_for(
+            &Multikey::ed25519(&key),
+            CARRIER_DOMAIN.as_bytes(),
+            CARRIER_EPOCH,
+            &body,
+        )
+        .into()
 }
 
 /// Whether `proof` is `signer`'s signature over the statement, and `signer`
@@ -205,7 +250,7 @@ pub fn proof_holds(
     transport_id: &str,
     challenge: &str,
 ) -> bool {
-    proof_check(proof, signer, kind, state, transport_id, challenge) == SignatureCheck::Verified
+    proof_check(proof, signer, kind, state, transport_id, challenge) == ProofCheck::Verified
 }
 
 /// What one node asks of another over a carrier.
@@ -437,8 +482,75 @@ mod tests {
         );
         assert_eq!(
             proof_check(&proof, &agent7, CarrierKind::Code, "s", "peer-a", ""),
-            SignatureCheck::Invalid
+            ProofCheck::Invalid
         );
+    }
+
+    /// The unknown-scheme rule is unconditional: a held proof stays `Held`
+    /// whoever it is claimed for, whatever key and signature bytes it carries
+    /// and whatever statement it would be checked over. Under scheme 0, a
+    /// statement that is not one is `StatementRefused` before the signer is
+    /// looked at, and a wrong or undecodable signer is `Invalid`.
+    #[test]
+    fn carrier_unknown_scheme_is_held_before_signer_and_statement_checks() {
+        use CarrierKind::Code;
+        let (key, agent) = crate::pending::tests::keypair(7);
+        let (_, other) = crate::pending::tests::keypair(8);
+        let good = CarrierProof::sign(&key, agent.clone(), Code, "s", "peer-a", "").unwrap();
+        let mut held = good.clone();
+        held.envelope.scheme = 5;
+        let long = "x".repeat(MAX_STATEMENT_FIELD + 1);
+        let not_an_agent = "not-an-agent-key";
+        let mut garbled = held.clone();
+        garbled.signer = not_an_agent.into();
+        let mut junk = held.clone();
+        junk.envelope.key = vec![0x80];
+        junk.envelope.sig = vec![];
+        let h = ProofCheck::Held { scheme: 5 };
+        // Signer failures.
+        assert_eq!(proof_check(&held, &other, Code, "s", "peer-a", ""), h);
+        assert_eq!(
+            proof_check(&garbled, not_an_agent, Code, "s", "peer-a", ""),
+            h
+        );
+        // Statement failures: a line break, an empty transport id, a long field.
+        assert_eq!(proof_check(&held, &agent, Code, "a\nb", "peer-a", ""), h);
+        assert_eq!(proof_check(&held, &agent, Code, "s", "", ""), h);
+        assert_eq!(proof_check(&held, &agent, Code, "s", "peer-a", &long), h);
+        // Both at once, and key/signature bytes no scheme admits.
+        assert_eq!(proof_check(&garbled, &other, Code, "s", "", ""), h);
+        assert_eq!(proof_check(&junk, &agent, Code, "s", "peer-a", ""), h);
+
+        // Scheme 0: a statement that is not one is its own outcome, whoever
+        // the proof is claimed for.
+        let refused = ProofCheck::StatementRefused;
+        assert_eq!(
+            proof_check(&good, &agent, Code, "a\nb", "peer-a", ""),
+            refused
+        );
+        assert_eq!(proof_check(&good, &other, Code, "s", "", ""), refused);
+        assert_eq!(
+            proof_check(&good, &agent, Code, &long, "peer-a", ""),
+            refused
+        );
+        // A wrong or undecodable signer is Invalid; the right one Verified.
+        assert_eq!(
+            proof_check(&good, &other, Code, "s", "peer-a", ""),
+            ProofCheck::Invalid
+        );
+        let mut good_garbled = good.clone();
+        good_garbled.signer = not_an_agent.into();
+        assert_eq!(
+            proof_check(&good_garbled, not_an_agent, Code, "s", "peer-a", ""),
+            ProofCheck::Invalid
+        );
+        assert_eq!(
+            proof_check(&good, &agent, Code, "s", "peer-a", ""),
+            ProofCheck::Verified
+        );
+        for outcome in [h, refused, ProofCheck::Invalid] {
+            assert_ne!(outcome, ProofCheck::Verified);
+        }
     }
 
     #[test]
@@ -449,7 +561,7 @@ mod tests {
         proof.envelope.scheme = 5;
         assert_eq!(
             proof_check(&proof, &agent, CarrierKind::Code, "s", "peer-a", ""),
-            SignatureCheck::Held { scheme: 5 }
+            ProofCheck::Held { scheme: 5 }
         );
         assert!(!proof_holds(
             &proof,

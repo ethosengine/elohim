@@ -10,7 +10,10 @@ use crate::imagodei::*;
     reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
 )]
 use crate::infrastructure::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::lamad::*;
 use crate::shared::*;
 use serde::{Deserialize, Serialize};
