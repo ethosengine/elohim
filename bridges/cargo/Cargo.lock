@@ -701,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "bytes",
@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-meta"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "eprfs-core",
  "serde",
