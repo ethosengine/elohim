@@ -1661,9 +1661,8 @@ fn resilience_snapshot_view_with_coverage_shortfall_validates() {
 // ============================================================================
 
 fn sample_envelope_view() -> elohim_storage::EprEnvelopeView {
-    use elohim_storage::{
-        EprCouplingView, EprEnvelopeView, EprSignatureEnvelopeView, EprSignatureView,
-    };
+    use elohim_storage::views::EprSignatureEnvelopeView;
+    use elohim_storage::{EprCouplingView, EprEnvelopeView, EprSignatureView};
     EprEnvelopeView {
         cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
         kind: "Manifest".into(),
@@ -3547,7 +3546,7 @@ fn put_blob_response_view_matches_schema_unstriped() {
     let manifest = ShardEncoder::new(ShardConfig::default())
         .create_manifest(&data, "application/octet-stream", "commons")
         .expect("manifest");
-    let view = elohim_storage::put_blob_response_view_from_manifest(manifest.clone());
+    let view = elohim_storage::views::put_blob_response_view_from_manifest(manifest.clone());
     assert_eq!(
         view.blob_cid,
         elohim_epr::address::compute_bytes_cid(&data).to_string()
@@ -3570,7 +3569,7 @@ fn put_blob_response_view_matches_schema_striped() {
     })
     .create_manifest(&data, "application/zip", "commons")
     .expect("striped manifest");
-    let view = elohim_storage::put_blob_response_view_from_manifest(manifest);
+    let view = elohim_storage::views::put_blob_response_view_from_manifest(manifest);
     assert!(!view.stripes.is_empty());
     assert_eq!(view.stripes[0].shards.len(), 7);
     let json = serde_json::to_value(&view).unwrap();
@@ -3586,9 +3585,9 @@ fn put_blob_response_schema_refuses_a_sha256_blob_cid() {
     let manifest = ShardEncoder::new(ShardConfig::default())
         .create_manifest(&data, "application/octet-stream", "commons")
         .expect("manifest");
-    let mut json = serde_json::to_value(elohim_storage::put_blob_response_view_from_manifest(
-        manifest,
-    ))
+    let mut json = serde_json::to_value(
+        elohim_storage::views::put_blob_response_view_from_manifest(manifest),
+    )
     .unwrap();
     json["blobCid"] =
         serde_json::json!(elohim_epr::address::compute_raw_sha2_cid(&data).to_string());
