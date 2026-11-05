@@ -45,7 +45,9 @@ use std::sync::{Arc, Mutex, RwLock};
 use bytes::Bytes;
 use cid::Cid;
 use elohim_epr::address::{compute_bytes_cid, compute_record_cid, ByteCid, RECORD_CODEC, SHA2_256};
-use elohim_epr::profile::{chunk_bytes, chunk_stream, ByteProfile, BYTE_PROFILE_0};
+use elohim_epr::profile::{
+    chunk_bytes, chunk_stream, ByteProfile, ValidatedProfile, BYTE_PROFILE_0,
+};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncRead;
 use tracing::{info, warn};
@@ -554,7 +556,7 @@ impl Inner {
     fn store(&self, data: &[u8]) -> Result<StoreResult, StorageError> {
         let cid = compute_bytes_cid(data);
         let byte_len = data.len() as u64;
-        let cuts = chunk_bytes(&STORE_PROFILE, data);
+        let cuts = chunk_bytes(&ValidatedProfile::EPOCH_0, data);
         let chunks: Vec<ChunkRef> = cuts
             .iter()
             .map(|&(offset, len)| ChunkRef {
@@ -1613,7 +1615,7 @@ pub(crate) mod tests {
     async fn crash_before_marker_leaves_absent() {
         let (_dir, store) = open().await;
         let data = chunked_payload();
-        let chunk_count = chunk_bytes(&STORE_PROFILE, &data).len();
+        let chunk_count = chunk_bytes(&ValidatedProfile::EPOCH_0, &data).len();
         // Every chunk and the index land; the marker write dies.
         faults(&store).crash_at = Some(chunk_count + 2);
         assert!(store.store(&data).await.is_err());

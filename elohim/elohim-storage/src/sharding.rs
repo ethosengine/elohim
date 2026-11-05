@@ -17,8 +17,8 @@
 
 use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use elohim_epr::profile::{
-    chunk_bytes, Chunker, Erasure, BYTE_PROFILE_0, CHUNKER_FASTCDC_2020, ERASURE_NONE,
-    ERASURE_RS_GF8_0X11D_V1,
+    chunk_bytes, Chunker, Erasure, ValidatedProfile, BYTE_PROFILE_0, CHUNKER_FASTCDC_2020,
+    ERASURE_NONE, ERASURE_RS_GF8_0X11D_V1,
 };
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use serde::{Deserialize, Serialize};
@@ -401,7 +401,7 @@ impl ShardEncoder {
         reach: &str,
     ) -> Result<(ShardManifest, Vec<StripeShards>), ShardError> {
         let erasure = self.erasure_for(data.len() as u64);
-        let chunks = chunk_bytes(&BYTE_PROFILE_0, data)
+        let chunks = chunk_bytes(&ValidatedProfile::EPOCH_0, data)
             .into_iter()
             .map(|(offset, len)| ChunkRef {
                 cid: compute_bytes_cid(&data[offset..offset + len]),
