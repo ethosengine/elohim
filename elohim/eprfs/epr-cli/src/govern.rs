@@ -63,7 +63,9 @@ pub fn evaluator_identity() -> Value {
             let cid = std::env::current_exe()
                 .ok()
                 .and_then(|path| std::fs::read(path).ok())
-                .map(|bytes| eprfs_core::BlobCid::compute_raw(&bytes).to_string());
+                // The executable is payload bytes: named under the byte profile, the same CID the
+                // bin store admits it by.
+                .map(|bytes| eprfs_core::BlobCid::compute_bytes(&bytes).to_string());
             json!({
                 "id": "elohim-epr-cli",
                 "version": env!("CARGO_PKG_VERSION"),

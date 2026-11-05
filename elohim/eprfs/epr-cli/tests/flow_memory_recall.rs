@@ -993,7 +993,10 @@ fn a_changed_executor_refuses_the_session_and_adopt_carries_both_digests() {
         .expect("the session pins the running executor")
         .to_string();
     assert!(eprfs_core::BlobCid::parse(&running).is_ok());
-    assert!(running.starts_with("bafkrei"));
+    assert!(
+        eprfs_core::ByteCid::parse(&running).is_ok(),
+        "{running} is a byte-profile CID"
+    );
     let totals = before["totals"].clone();
     let attempts = before["attempts"].as_u64().expect("attempts");
 

@@ -156,8 +156,8 @@ fn peer_daemon_status_compares_live_lease_with_current() {
     let temp = fixture();
     let base = temp.path();
     let store = base.join("store/epr");
-    let current = eprfs_core::BlobCid::compute_raw(b"current").to_string();
-    let older = eprfs_core::BlobCid::compute_raw(b"older").to_string();
+    let current = eprfs_core::BlobCid::compute_bytes(b"current").to_string();
+    let older = eprfs_core::BlobCid::compute_bytes(b"older").to_string();
     fs::create_dir_all(store.join(&current)).unwrap();
     fs::create_dir_all(store.join("sessions")).unwrap();
     let executable = store.join(&current).join("epr");

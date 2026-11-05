@@ -31,7 +31,7 @@ fn version_names_the_binary_from_outside_a_worktree() {
 
     let identity: Value = serde_json::from_str(stdout.trim()).expect("version is JSON");
     let bytes = fs::read(binary).expect("read the tested executable");
-    let expected = BlobCid::compute_raw(&bytes).to_string();
+    let expected = BlobCid::compute_bytes(&bytes).to_string();
     assert_eq!(identity["id"], "elohim-epr-cli");
     assert_eq!(identity["cid"], expected);
 
