@@ -40,8 +40,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use seam_contracts::{Answer, ReasonLabel};
-use sha2::{Digest, Sha256};
 
 use super::apply::{ApplyRegistry, SoakAttestor};
 use super::state::{
@@ -378,41 +378,44 @@ impl ArtifactSource for BlobStoreArtifactSource {
     ) -> Result<FetchedArtifact, AdoptionRefusal> {
         let staged = staging_dir.join(&artifact.filename);
 
+        let declared = ByteCid::parse(&artifact.blob_cid).map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ArtifactUnavailable,
+                format!("artifact {} names no byte CID: {e}", artifact.blob_cid),
+            )
+        })?;
+
         // C6b — idempotent on (channel, releaseCid): a sweep that already
         // staged these exact bytes re-uses them instead of re-reading the blob.
-        // The digest is re-checked, never assumed from the filename.
+        // The CID is recomputed, never assumed from the filename.
         if let Ok(existing) = tokio::fs::read(&staged).await {
-            let sha256 = sha256_hex(&existing);
-            if sha256.eq_ignore_ascii_case(&artifact.sha256) {
+            let served_cid = compute_bytes_cid(&existing);
+            if served_cid == declared {
                 return Ok(FetchedArtifact {
                     blob_cid: artifact.blob_cid.clone(),
                     path: staged,
                     bytes: existing.len() as u64,
-                    sha256,
+                    served_cid,
                 });
             }
         }
 
-        let bytes = self
-            .blobs
-            .get_by_address(&artifact.blob_cid)
-            .await
-            .map_err(|e| {
-                AdoptionRefusal::new(
-                    RefusalReason::ArtifactUnavailable,
-                    format!(
-                        "blob {} is not held locally ({e}) — the bytes may simply not have \
+        let bytes = self.blobs.get(&declared).await.map_err(|e| {
+            AdoptionRefusal::new(
+                RefusalReason::ArtifactUnavailable,
+                format!(
+                    "blob {} is not held locally ({e}) — the bytes may simply not have \
                          replicated yet",
-                        artifact.blob_cid
-                    ),
-                )
-            })?;
+                    artifact.blob_cid
+                ),
+            )
+        })?;
 
-        let sha256 = sha256_hex(&bytes);
+        let served_cid = compute_bytes_cid(&bytes);
         // Stage only bytes that already prove out. Writing unverified bytes
         // into the directory an apply vehicle reads from would move the floor
         // from "verify then apply" to "apply what happens to be on disk".
-        if sha256.eq_ignore_ascii_case(&artifact.sha256) && bytes.len() as u64 == artifact.bytes {
+        if served_cid == declared && bytes.len() as u64 == artifact.bytes {
             if let Err(e) = write_staged(&staged, &bytes).await {
                 return Err(AdoptionRefusal::new(
                     RefusalReason::ArtifactUnavailable,
@@ -429,7 +432,7 @@ impl ArtifactSource for BlobStoreArtifactSource {
             blob_cid: artifact.blob_cid.clone(),
             path: staged,
             bytes: bytes.len() as u64,
-            sha256,
+            served_cid,
         })
     }
 }
@@ -495,7 +498,7 @@ pub async fn app_bundle_entries(
         let Some(actual) = fetched.iter().find(|f| f.blob_cid == declared.blob_cid) else {
             return Answer::Unreachable;
         };
-        if actual.bytes != declared.bytes || !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
+        if actual.bytes != declared.bytes || actual.served_cid.to_string() != declared.blob_cid {
             return Answer::Unreachable;
         }
         let Ok(bytes) = tokio::fs::read(&actual.path).await else {
@@ -510,12 +513,6 @@ pub async fn app_bundle_entries(
         out.insert(slug, zip);
     }
     Answer::Present(out)
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
 }
 
 async fn write_staged(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -675,7 +672,7 @@ impl AdoptionController {
     /// release is whole and in the ledger, this is the only thing that says
     /// what those bytes are for, so the retention pass reads them as arriving
     /// and leaves them alone. Skipped once the release is in the ledger.
-    fn record_adoption_arrival(&self, channel_id: &str, release_cid: &str, sha256: &str) {
+    fn record_adoption_arrival(&self, channel_id: &str, release_cid: &str, blob_cid: &str) {
         let Some(pool) = self.db.as_ref() else {
             return;
         };
@@ -683,7 +680,7 @@ impl AdoptionController {
         if self.ledger_recorded.lock().unwrap().contains(&key) {
             return;
         }
-        let blob_hash = format!("sha256-{}", sha256.to_ascii_lowercase());
+        let blob_hash = blob_cid.to_string();
         let recorded = pool
             .get()
             .map_err(|e| crate::error::StorageError::Database(e.to_string()))
@@ -724,7 +721,7 @@ impl AdoptionController {
                 .artifacts
                 .iter()
                 .zip(fetched)
-                .all(|(declared, got)| declared.sha256.eq_ignore_ascii_case(&got.sha256));
+                .all(|(declared, got)| got.served_cid.to_string() == declared.blob_cid);
         if !complete {
             return;
         }
@@ -977,7 +974,7 @@ impl AdoptionController {
         let ctx = crate::db::AppContext::default_lamad();
         let mut actual = std::collections::BTreeMap::new();
         for (slug, _) in &expected {
-            let pointer = crate::db::content_diesel::blob_hash_for(&mut conn, &ctx, slug)
+            let pointer = crate::db::content_diesel::blob_cid_for(&mut conn, &ctx, slug)
                 .ok()
                 .flatten();
             actual.insert(slug.clone(), pointer);
@@ -1860,7 +1857,11 @@ impl AdoptionController {
                 match source.fetch(artifact, &staging_dir).await {
                     Ok(f) => {
                         *byte_budget = byte_budget.saturating_sub(f.bytes);
-                        self.record_adoption_arrival(&channel.channel_id, &release_cid, &f.sha256);
+                        self.record_adoption_arrival(
+                            &channel.channel_id,
+                            &release_cid,
+                            &f.served_cid.to_string(),
+                        );
                         fetched.push(f);
                     }
                     Err(refusal) => {
@@ -2905,9 +2906,9 @@ mod tests {
         let blobs = Arc::new(BlobStore::new_memory());
         let source = BlobStoreArtifactSource::new(blobs);
         let artifact = Artifact {
-            blob_cid: "bafkreih55t4vyzozvjgu7b62baj5oe2oyrkshcgw4yq7oamvmo3eainmsa".to_string(),
+            blob_cid: compute_bytes_cid(b"not held").to_string(),
             bytes: 3,
-            sha256: "0".repeat(64),
+            profile: super::super::ArtifactProfile { epoch: 0 },
             filename: "content_store.wasm".to_string(),
             mime_type: None,
             role: None,
@@ -2933,9 +2934,9 @@ mod tests {
         let source = BlobStoreArtifactSource::new(blobs);
 
         let good = Artifact {
-            blob_cid: stored.cid.clone(),
+            blob_cid: stored.cid.to_string(),
             bytes: payload.len() as u64,
-            sha256: sha256_hex(&payload),
+            profile: super::super::ArtifactProfile { epoch: 0 },
             filename: "artifact.bin".to_string(),
             mime_type: None,
             role: None,
@@ -2944,7 +2945,7 @@ mod tests {
         };
         let fetched = source.fetch(&good, dir.path()).await.expect("held locally");
         assert_eq!(fetched.bytes, payload.len() as u64);
-        assert_eq!(fetched.sha256, sha256_hex(&payload));
+        assert_eq!(fetched.served_cid, compute_bytes_cid(&payload));
         assert!(fetched.path.exists(), "verified bytes are staged");
         assert_eq!(tokio::fs::read(&fetched.path).await.unwrap(), payload);
 
@@ -2952,15 +2953,16 @@ mod tests {
         let again = source.fetch(&good, dir.path()).await.expect("idempotent");
         assert_eq!(again, fetched);
 
+        // A manifest that declares a different length for the same CID.
         let lying = Artifact {
-            sha256: "1".repeat(64),
+            bytes: payload.len() as u64 + 1,
             filename: "lying.bin".to_string(),
             ..good.clone()
         };
         let observed = source.fetch(&lying, dir.path()).await.expect("bytes exist");
         assert_eq!(
-            observed.sha256,
-            sha256_hex(&payload),
+            observed.bytes,
+            payload.len() as u64,
             "the source reports what ARRIVED; the floor does the judging"
         );
         assert!(
@@ -3453,12 +3455,12 @@ mod tests {
             let path = dir.path().join(&artifact.filename);
             std::fs::write(&path, &bytes).unwrap();
             artifact.bytes = bytes.len() as u64;
-            artifact.sha256 = sha256_hex(&bytes);
+            artifact.blob_cid = compute_bytes_cid(&bytes).to_string();
             fetched.push(FetchedArtifact {
                 blob_cid: artifact.blob_cid.clone(),
                 path,
                 bytes: artifact.bytes,
-                sha256: artifact.sha256.clone(),
+                served_cid: compute_bytes_cid(&bytes),
             });
         }
         let Answer::Present(entries) = app_bundle_entries(&manifest, &fetched).await else {
@@ -3471,9 +3473,9 @@ mod tests {
         ));
         assert_eq!(entries["lamad-spa"], verify::BrowserZip::NotAZip);
 
-        // A digest that does not match what was staged is not evidence.
+        // A length that does not match what was staged is not evidence.
         let mut lying = manifest.clone();
-        lying.artifacts[0].sha256 = "0".repeat(64);
+        lying.artifacts[0].bytes += 1;
         assert_eq!(
             app_bundle_entries(&lying, &fetched).await,
             Answer::Unreachable

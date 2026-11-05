@@ -531,7 +531,7 @@ mod tests {
         crate::db::shard_locations::upsert_location(
             conn,
             &NewShardLocation {
-                shard_hash: shard,
+                shard_cid: shard,
                 peer_id: peer,
                 h_app_id: "lamad",
                 status: "verified",

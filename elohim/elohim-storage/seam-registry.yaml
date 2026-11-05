@@ -2378,7 +2378,7 @@ decisionPoints:
       Which of this node's ACTIVE `custody-blob` pledges have drifted off the bytes their
       content now points at, and therefore need a successor pledge authored. A pledge is a
       candidate iff its metadata resolves a contentId, that content row's blob column FOR THE
-      PLEDGE'S ARTIFACT ROLE (blob_hash vs server_blob_hash) is non-empty, that current blob
+      PLEDGE'S ARTIFACT ROLE (blob_cid vs server_blob_cid) is non-empty, that current blob
       appears in NONE of the pledge's resource_classified_as entries, and the deterministic
       successor id for (provider, receiver, current blob) is not already present. Reads and
       decides only — the acting half (possession gate, notarized author, supersession) is
@@ -2642,7 +2642,7 @@ decisionPoints:
       - { id: C3, status: answered, justification: "Empty holders return no work; finite holders deterministically cover every manifest shard." }
       - { id: C4, status: answered, justification: "Zero holders stays visibly empty instead of fabricating a placement." }
       - { id: C5, status: answered, justification: "Role comes from the manifest and diversity order comes from the existing contract-aware selector." }
-      - { id: C6a, status: answered, justification: "One bounded pass over manifest.shard_hashes with no retry." }
+      - { id: C6a, status: answered, justification: "One bounded pass over manifest.custody_units() with no retry." }
       - { id: C6b, status: answered, justification: "Pure deterministic slots make repeated passes byte-identical." }
       - { id: C7, status: n-a, justification: "The plan itself neither advertises nor serves; push acknowledgement remains the evidence gate." }
       - { id: C8, status: answered, justification: "The live caller logs data_shards_diverse_households and parity_shards once per RS distribution." }
@@ -2843,7 +2843,7 @@ decisionPoints:
     notes: >
       The verdict is pure; the impure shell is `HttpServer::blob_reach_refusal` (http.rs), which
       resolves the caller identity (X-Agent-Cid first, legacy x-agent-id fallback), builds the
-      hash candidate set across content.{blob_hash,blob_cid,server_blob_hash}, loads referencing
+      hash candidate set across content.{blob_cid,server_blob_cid}, loads referencing
       rows via `blob_reach::lookup_references`, and renders the 403. The gate runs BEFORE both the
       iroh cutover and the legacy backend so an early return from either cannot bypass it.
 

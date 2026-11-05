@@ -41,7 +41,6 @@
 //! "ciphertext blob" self-describing: everything needed to decrypt (given the
 //! DEK) travels with the erasure-coded payload.
 
-use crate::blob_store::BlobStore;
 use crate::sharding::{ShardConfig, ShardEncoder, ShardManifest};
 use dryoc::classic::crypto_box::{crypto_box_seal, crypto_box_seal_open, PublicKey, SecretKey};
 use dryoc::classic::crypto_secretbox::{
@@ -80,23 +79,22 @@ pub type Dek = Key;
 /// The shards together with [`manifest`](Self::manifest) are what get
 /// distributed to peers; none of them reveal the plaintext without the DEK.
 pub struct EncryptedReplica {
-    /// Reed-Solomon shards of the (nonce ++ ciphertext) blob. `data_shards` of
-    /// these (any subset of that size) suffice to reconstruct.
+    /// Reed-Solomon shards of the (nonce ++ ciphertext) blob, every stripe's shards
+    /// in order (`manifest.shards()` order). Any `data` of each stripe's
+    /// `data + parity` suffice to reconstruct.
     pub shards: Vec<Vec<u8>>,
     /// Manifest describing the erasure coding — drives reconstruction. Its
-    /// `total_size` is the length of the (nonce ++ ciphertext) blob, NOT the
+    /// `byte_len` is the length of the (nonce ++ ciphertext) blob, NOT the
     /// plaintext, so reconstruction restores the exact blob.
     pub manifest: ShardManifest,
 }
 
-/// Build a [`ShardEncoder`] configured to ALWAYS use Reed-Solomon (rs-4-7),
-/// regardless of how small the ciphertext is. The default encoder would pick
-/// the "none" band for tiny payloads, which has no parity and cannot survive a
-/// dropped shard — defeating the whole proof.
+/// Build a [`ShardEncoder`] configured to ALWAYS erasure-code (`rs-gf8-0x11d-v1`,
+/// 4 data + 3 parity per stripe), regardless of how small the ciphertext is. The
+/// default encoder elects no erasure for small payloads, which has no parity and
+/// cannot survive a dropped shard — defeating the whole proof.
 fn rs_encoder() -> ShardEncoder {
     ShardEncoder::new(ShardConfig {
-        // Force the RS band for any input ≥ 1 byte: never "none", never "chunked".
-        single_shard_max: 0,
         rs_threshold: 0,
         ..ShardConfig::default()
     })
@@ -132,13 +130,10 @@ pub fn encrypt_then_shard(
     blob.extend_from_slice(&ciphertext);
 
     // 4. Reed-Solomon erasure-code the ciphertext blob.
-    let encoder = rs_encoder();
-    let manifest = encoder
-        .create_manifest(&blob, "application/octet-stream", "private")
+    let (manifest, stripes) = rs_encoder()
+        .encode(&blob, "application/octet-stream", "private")
         .map_err(|e| PrivateReplicaError::Erasure(e.to_string()))?;
-    let shards = encoder
-        .create_shards(&blob, &manifest.encoding)
-        .map_err(|e| PrivateReplicaError::Erasure(e.to_string()))?;
+    let shards: Vec<Vec<u8>> = stripes.into_iter().flatten().collect();
 
     Ok((dek, EncryptedReplica { shards, manifest }))
 }
@@ -146,18 +141,24 @@ pub fn encrypt_then_shard(
 /// Reconstruct the ciphertext blob from a (possibly incomplete) set of shards,
 /// then symmetrically decrypt it under `dek` to recover the plaintext.
 ///
-/// `shards` is positional and parallel to the manifest's shard order: a `None`
-/// entry marks a missing shard (e.g. a lost custodian). Reconstruction succeeds
-/// as long as at least `manifest.data_shards` shards are present.
+/// `shards` is positional and parallel to the manifest's shard order (every
+/// stripe's shards in turn): a `None` entry marks a missing shard (e.g. a lost
+/// custodian). Reconstruction succeeds while every stripe keeps `data` shards.
 pub fn reconstruct_then_decrypt(
     dek: &Dek,
     manifest: &ShardManifest,
     shards: &[Option<Vec<u8>>],
 ) -> Result<Vec<u8>, PrivateReplicaError> {
-    // 1. Reed-Solomon reconstruct the (nonce ++ ciphertext) blob.
-    let encoder = rs_encoder();
-    let blob = encoder
-        .reconstruct(manifest, shards)
+    // 1. Reed-Solomon reconstruct the (nonce ++ ciphertext) blob, stripe by stripe.
+    let mut rest = shards;
+    let mut stripes = Vec::with_capacity(manifest.stripes.len());
+    for stripe in &manifest.stripes {
+        let n = stripe.shards.len().min(rest.len());
+        let (head, tail) = rest.split_at(n);
+        stripes.push(head.to_vec());
+        rest = tail;
+    }
+    let blob = ShardEncoder::reconstruct(manifest, &stripes)
         .map_err(|e| PrivateReplicaError::Erasure(e.to_string()))?;
 
     // 2. Split the public nonce back off the front.
@@ -226,7 +227,7 @@ pub fn unseal_dek(
 /// substrate addresses content. A future caller verifies a recovered private
 /// blob by comparing `plaintext_cid(recovered) == plaintext_cid(original)`.
 pub fn plaintext_cid(bytes: &[u8]) -> String {
-    BlobStore::compute_cid(bytes).to_string()
+    elohim_epr::address::compute_bytes_cid(bytes).to_string()
 }
 
 #[cfg(test)]
@@ -260,9 +261,10 @@ mod tests {
 
         let (dek, replica) = encrypt_then_shard(plaintext).expect("encrypt_then_shard");
 
-        // The replica is rs-4-7: 4 data + 3 parity = 7 shards.
-        assert_eq!(replica.manifest.encoding, "rs-4-7");
-        assert_eq!(replica.shards.len(), 7);
+        // One RS stripe of the epoch-0 code: data + parity shards.
+        assert_eq!(replica.manifest.stripes.len(), 1);
+        let per_stripe = replica.manifest.stripes[0].shards.len();
+        assert_eq!(replica.shards.len(), per_stripe);
 
         // Drop one shard (a parity shard here) — a lost custodian.
         let with_loss = drop_one(&replica.shards, 6);
@@ -337,9 +339,7 @@ mod tests {
         // but WITHOUT the DEK the bytes are opaque — and contain no plaintext.
         let all_present: Vec<Option<Vec<u8>>> =
             replica.shards.iter().map(|s| Some(s.clone())).collect();
-        let encoder = rs_encoder();
-        let ct_blob = encoder
-            .reconstruct(&replica.manifest, &all_present)
+        let ct_blob = ShardEncoder::reconstruct(&replica.manifest, &[all_present])
             .expect("custodian reconstructs ciphertext blob");
         // Ciphertext blob (nonce ++ ct) must NOT contain the plaintext.
         assert_ne!(ct_blob.as_slice(), plaintext.as_slice());

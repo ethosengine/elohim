@@ -150,7 +150,7 @@ fn load_all_placement_gaps(conn: &mut SqliteConnection) -> Vec<PlacementGapView>
 /// ANY shard on this node — for the viewer-less `region_occupancy` fold.
 ///
 /// This is the cluster-scoped sibling of `household_resilience::load_holder_relation`,
-/// which is content-scoped (filters by a content's `shard_hashes` + `h_app_id`). The
+/// which is content-scoped (filters by a content's `shard_cids` + `h_app_id`). The
 /// operational weave has no single content and no single viewer, so we load ALL
 /// `shard_locations` with NO shard/content/app filter (mirroring
 /// `load_all_placement_gaps`).
@@ -246,7 +246,7 @@ mod tests {
         PlacementGapView {
             id: "g".into(),
             content_id: "c".into(),
-            shard_hash: "s".into(),
+            shard_cid: "s".into(),
             requested_steward_count: 3,
             achieved_steward_count: 1,
             contract_coverage: 0.33,

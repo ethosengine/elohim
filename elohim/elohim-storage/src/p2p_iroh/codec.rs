@@ -303,7 +303,7 @@ mod tests {
         use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
 
         let request = ShardRequest::Push {
-            hash: "sha256-existing".into(),
+            cid: elohim_epr::address::compute_bytes_cid(b"request-wire"),
             data: b"request-wire".to_vec(),
         };
         let response = ShardResponse::Data(b"response-wire".to_vec());

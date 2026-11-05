@@ -383,7 +383,7 @@ pub async fn staged_bundle_evidence(
     let Some(actual) = fetched.iter().find(|f| f.blob_cid == declared.blob_cid) else {
         return StagedBundleEvidence::unreachable();
     };
-    if actual.bytes != declared.bytes || !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
+    if actual.bytes != declared.bytes || actual.served_cid.to_string() != declared.blob_cid {
         return StagedBundleEvidence::unreachable();
     }
 
@@ -1504,25 +1504,23 @@ impl super::sunset::LineageSunsetter for HappLineageVehicle {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppMountPlan {
     pub slug: String,
-    /// `(sha256-<hex>, bytes)` of the browser zip — `None` when the release
+    /// `(byte CID, bytes)` of the browser zip — `None` when the release
     /// carries no browser half for this app (its pointer is left alone).
     pub browser: Option<(String, u64)>,
-    /// `sha256-<hex>` of the server zip. `None` REMOVES a previously carried
+    /// Byte CID of the server zip. `None` REMOVES a previously carried
     /// server bundle: the release is the whole truth for the app.
     pub server: Option<String>,
     pub mount: Option<String>,
 }
 
-/// `sha256-<hex>` — the legacy blob-path spelling the row, `routes/apps`, SSR
-/// and `verify-served-shell.sh` all read. The same digest the manifest's
-/// `blobCid` addresses (`blob_store::compute_addresses` returns both and stores
-/// ONE file), so writing it changes no reader.
-pub(crate) fn row_blob_hash(sha256: &str) -> String {
-    format!("sha256-{}", sha256.to_ascii_lowercase())
+/// The row pointer for an artifact: its byte CID, the one spelling the row,
+/// `routes/apps`, SSR and `verify-served-shell.sh` read.
+pub(crate) fn row_blob_hash(blob_cid: &str) -> String {
+    blob_cid.to_string()
 }
 
 /// **Pure.** The browser pointer every bound slug's row must carry once
-/// `manifest` is applied: `(slug, sha256-<hex>)`, for the slugs whose binding
+/// `manifest` is applied: `(slug, byte CID)`, for the slugs whose binding
 /// names a browser half. The installed-reality check the adoption controller
 /// runs on its idempotence exit compares these against the rows, so a pointer
 /// another writer moved underneath an applied release is re-applied instead
@@ -1537,7 +1535,7 @@ pub fn expected_browser_pointers(manifest: &super::ReleaseManifest) -> Vec<(Stri
         if let Some(artifact) = manifest.artifacts.iter().find(|a| {
             a.app.as_deref() == Some(slug.as_str()) && a.kind == Some(AppArtifactKind::Browser)
         }) {
-            out.push((slug.clone(), row_blob_hash(&artifact.sha256)));
+            out.push((slug.clone(), row_blob_hash(&artifact.blob_cid)));
         }
     }
     out
@@ -1611,9 +1609,9 @@ pub fn plan_app_mounts(verified: &VerifiedRelease) -> Result<Vec<AppMountPlan>, 
             };
             match kind {
                 AppArtifactKind::Browser => {
-                    plan.browser = Some((row_blob_hash(&artifact.sha256), artifact.bytes))
+                    plan.browser = Some((row_blob_hash(&artifact.blob_cid), artifact.bytes))
                 }
-                AppArtifactKind::Server => plan.server = Some(row_blob_hash(&artifact.sha256)),
+                AppArtifactKind::Server => plan.server = Some(row_blob_hash(&artifact.blob_cid)),
             }
         }
         plans.push(plan);
@@ -1621,7 +1619,7 @@ pub fn plan_app_mounts(verified: &VerifiedRelease) -> Result<Vec<AppMountPlan>, 
     Ok(plans)
 }
 
-/// **Pure.** The row's metadata with `serverBlobHash` set to the plan's
+/// **Pure.** The row's metadata with `serverBlobCid` set to the plan's
 /// server bundle — or removed when the release carries none. Every other key
 /// (the slug's `releaseChannel` binding above all) is carried unchanged. A
 /// metadata value that is not a JSON object is replaced by one: a row whose
@@ -1637,12 +1635,12 @@ pub fn metadata_with_server_bundle(existing: Option<&str>, server: Option<&str>)
     match server {
         Some(hash) => {
             map.insert(
-                "serverBlobHash".to_string(),
+                "serverBlobCid".to_string(),
                 serde_json::Value::String(hash.to_string()),
             );
         }
         None => {
-            map.remove("serverBlobHash");
+            map.remove("serverBlobCid");
         }
     }
     serde_json::Value::Object(map).to_string()
@@ -1651,9 +1649,9 @@ pub fn metadata_with_server_bundle(existing: Option<&str>, server: Option<&str>)
 /// One slug's row as the vehicle reads it before deciding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppRowState {
-    pub blob_hash: Option<String>,
+    pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
-    pub server_blob_hash: Option<String>,
+    pub server_blob_cid: Option<String>,
     pub metadata_json: Option<String>,
 }
 
@@ -1667,11 +1665,11 @@ pub fn app_mount_patch(
     let browser_current = match &plan.browser {
         None => true,
         Some((hash, bytes)) => {
-            row.blob_hash.as_deref() == Some(hash.as_str())
+            row.blob_cid.as_deref() == Some(hash.as_str())
                 && row.content_size_bytes == Some(i32::try_from(*bytes).unwrap_or(i32::MAX))
         }
     };
-    let server_current = row.server_blob_hash.as_deref() == plan.server.as_deref();
+    let server_current = row.server_blob_cid.as_deref() == plan.server.as_deref();
     if browser_current && server_current {
         return None;
     }
@@ -1704,8 +1702,8 @@ pub fn app_mount_patch(
 /// # What it writes
 ///
 /// The same per-field `ContentProjectionPatch` write every row projection uses
-/// (`blob_cid`/`blob_hash` + `content_size_bytes`, and `metadata_json` whose
-/// `serverBlobHash` projects `server_blob_hash`) — never an anchor, never a
+/// (`blob_cid` + `content_size_bytes`, and `metadata_json` whose
+/// `serverBlobCid` projects `server_blob_cid`) — never an anchor, never a
 /// head stamp. The slug's head is untouched; its channel elects its bytes, and
 /// `head_adoption::held_by_release_channel` keeps the heal from undoing it.
 ///
@@ -1807,9 +1805,9 @@ impl AppBundleVehicle {
                     .into());
                 }
                 let state = AppRowState {
-                    blob_hash: row.blob_hash.clone(),
+                    blob_cid: row.blob_cid.clone(),
                     content_size_bytes: row.content_size_bytes,
-                    server_blob_hash: row.server_blob_hash.clone(),
+                    server_blob_cid: row.server_blob_cid.clone(),
                     metadata_json: row.metadata_json.clone(),
                 };
                 if let Some(patch) = app_mount_patch(plan, &state) {
@@ -2157,7 +2155,7 @@ impl ApplyVehicle for StorageBinaryVehicle {
             "releaseCid": verified.release_cid,
             "filename": artifact.filename,
             "bytes": artifact.bytes,
-            "sha256": artifact.sha256,
+            "blobCid": artifact.blob_cid,
             "stagedAtUnix": staged_at,
             "pendingRestart": true,
             "note": "STAGED, NOT RUNNING. This process never execs a staged binary; a restart \
@@ -2197,7 +2195,7 @@ impl ApplyVehicle for StorageBinaryVehicle {
                 "slot": slot.display().to_string(),
                 "sidecar": sidecar_path.display().to_string(),
                 "bytes": artifact.bytes,
-                "sha256": artifact.sha256,
+                "blobCid": artifact.blob_cid,
                 "pendingRestart": true,
                 "stakes": format!("{stage:?}"),
             }),
@@ -2424,13 +2422,11 @@ mod tests {
             vec![
                 (
                     "elohim-host-landing".to_string(),
-                    "sha256-44092a11c534311df7b183bf84af669b8d3df27c7fdf6ed4f5f018e50e770239"
-                        .to_string()
+                    "bafkr4ibifmjfcql7kfcg7n3ht7tnhrayzyzktw3hwgtcutztwxdlh5yrve".to_string()
                 ),
                 (
                     "lamad-spa".to_string(),
-                    "sha256-bdad7de66087d90d682839862bb3817316dc534206b0062c9348d9f76be8d2f9"
-                        .to_string()
+                    "bafkr4icw2skqgjgoj6z5mamr6u64ohz45blay3ccg24tnprhkdtxkxdkti".to_string()
                 ),
             ]
         );
@@ -2447,10 +2443,7 @@ mod tests {
         let mut pulled_back = in_step.clone();
         pulled_back.insert(
             "lamad-spa".to_string(),
-            Some(
-                "sha256-dcd51e262f5073e81491e63918b11add3015ae71634a75158c39c4b00fb639de"
-                    .to_string(),
-            ),
+            Some("bafkr4ig7tkqvx7dmwescjrik3jtwyrxgmb3qfc2cabvsvu3bvk3iqxlsiu".to_string()),
         );
         assert_eq!(
             drifted_pointers(&expected, &pulled_back),
@@ -3122,8 +3115,9 @@ mod tests {
                 description: None,
                 content_type: "html5-app".to_string(),
                 content_format: "html5-app".to_string(),
-                blob_hash: Some("sha256-old-browser".to_string()),
-                blob_cid: Some("sha256-old-browser".to_string()),
+                blob_cid: Some(
+                    "bafkr4iehadtpocpchjk7bdo6lffisiihj3iiftkptc6fyk3ojyf5oharaa".to_string(),
+                ),
                 content_size_bytes: Some(7),
                 metadata_json: Some(metadata.to_string()),
                 reach: "commons".to_string(),
@@ -3139,7 +3133,7 @@ mod tests {
     fn bound_metadata(server: Option<&str>) -> String {
         let mut m = serde_json::json!({ "releaseChannel": APP_CHANNEL });
         if let Some(server) = server {
-            m["serverBlobHash"] = serde_json::json!(server);
+            m["serverBlobCid"] = serde_json::json!(server);
         }
         m.to_string()
     }
@@ -3187,14 +3181,14 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 plan.browser,
-                Some((format!("sha256-{}", browser.sha256), browser.bytes)),
-                "{}: the row is written in the legacy spelling every reader keys on",
+                Some((browser.blob_cid.clone(), browser.bytes)),
+                "{}: the row is written under the artifact's byte CID",
                 plan.slug
             );
             assert!(plan
                 .server
                 .as_deref()
-                .is_some_and(|h| h.starts_with("sha256-")));
+                .is_some_and(|h| elohim_epr::address::ByteCid::parse(h).is_ok()));
         }
         assert_eq!(plans[1].mount.as_deref(), Some("/lamad/"));
 
@@ -3208,17 +3202,22 @@ mod tests {
 
     #[test]
     fn the_server_bundle_is_the_releases_whole_truth() {
-        let bound = bound_metadata(Some("sha256-old-server"));
+        let bound = bound_metadata(Some(
+            "bafkr4ifwojbaqjub4g4haxysqzbxpdbdjzvovtczd4i2k4limegr4pejjy",
+        ));
         let set: serde_json::Value = serde_json::from_str(&metadata_with_server_bundle(
             Some(&bound),
-            Some("sha256-new"),
+            Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"),
         ))
         .unwrap();
-        assert_eq!(set["serverBlobHash"], "sha256-new");
+        assert_eq!(
+            set["serverBlobCid"],
+            "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
+        );
         assert_eq!(set["releaseChannel"], APP_CHANNEL, "the binding is carried");
         let removed: serde_json::Value =
             serde_json::from_str(&metadata_with_server_bundle(Some(&bound), None)).unwrap();
-        assert!(removed.get("serverBlobHash").is_none());
+        assert!(removed.get("serverBlobCid").is_none());
         assert_eq!(removed["releaseChannel"], APP_CHANNEL);
         assert_eq!(metadata_with_server_bundle(Some("not json"), None), "{}");
     }
@@ -3233,7 +3232,9 @@ mod tests {
         seed_slug(
             &pool,
             "elohim-host-landing",
-            &bound_metadata(Some("sha256-old-server")),
+            &bound_metadata(Some(
+                "bafkr4ifwojbaqjub4g4haxysqzbxpdbdjzvovtczd4i2k4limegr4pejjy",
+            )),
         );
         seed_slug(&pool, "lamad-spa", &bound_metadata(None));
         let events = Arc::new(crate::services::events::EventBus::new());
@@ -3249,10 +3250,9 @@ mod tests {
         for plan in &plans {
             let r = row(&pool, &plan.slug);
             let (hash, bytes) = plan.browser.clone().unwrap();
-            assert_eq!(r.blob_hash.as_deref(), Some(hash.as_str()));
             assert_eq!(r.blob_cid.as_deref(), Some(hash.as_str()));
             assert_eq!(r.content_size_bytes, Some(bytes as i32));
-            assert_eq!(r.server_blob_hash, plan.server, "{}", plan.slug);
+            assert_eq!(r.server_blob_cid, plan.server, "{}", plan.slug);
             assert_eq!(
                 crate::services::head_adoption::bound_release_channel(r.metadata_json.as_deref())
                     .as_deref(),
@@ -3283,12 +3283,16 @@ mod tests {
         seed_slug(
             &pool,
             "elohim-host-landing",
-            &bound_metadata(Some("sha256-old-server")),
+            &bound_metadata(Some(
+                "bafkr4ifwojbaqjub4g4haxysqzbxpdbdjzvovtczd4i2k4limegr4pejjy",
+            )),
         );
         seed_slug(
             &pool,
             "lamad-spa",
-            &bound_metadata(Some("sha256-old-server")),
+            &bound_metadata(Some(
+                "bafkr4ifwojbaqjub4g4haxysqzbxpdbdjzvovtczd4i2k4limegr4pejjy",
+            )),
         );
         let mut verified = app_bundle_release();
         let keep: Vec<usize> = verified
@@ -3319,8 +3323,8 @@ mod tests {
             .kinds = vec![super::super::AppArtifactKind::Browser];
 
         vehicle(&pool, None).apply(&verified).await.unwrap();
-        assert_eq!(row(&pool, "lamad-spa").server_blob_hash, None);
-        assert!(row(&pool, "elohim-host-landing").server_blob_hash.is_some());
+        assert_eq!(row(&pool, "lamad-spa").server_blob_cid, None);
+        assert!(row(&pool, "elohim-host-landing").server_blob_cid.is_some());
     }
 
     /// The mutual binding check, and the all-or-nothing write: one slug that
@@ -3339,8 +3343,8 @@ mod tests {
         assert!(!r.transient);
         assert!(r.detail.contains("lamad-spa"), "{}", r.detail);
         assert_eq!(
-            row(&pool, "elohim-host-landing").blob_hash.as_deref(),
-            Some("sha256-old-browser"),
+            row(&pool, "elohim-host-landing").blob_cid.as_deref(),
+            Some("bafkr4iehadtpocpchjk7bdo6lffisiihj3iiftkptc6fyk3ojyf5oharaa"),
             "the bound slug did not move either"
         );
 
@@ -3356,8 +3360,8 @@ mod tests {
             "a row that has not projected here yet heals on its own"
         );
         assert_eq!(
-            row(&pool, "elohim-host-landing").blob_hash.as_deref(),
-            Some("sha256-old-browser")
+            row(&pool, "elohim-host-landing").blob_cid.as_deref(),
+            Some("bafkr4iehadtpocpchjk7bdo6lffisiihj3iiftkptc6fyk3ojyf5oharaa")
         );
     }
 }

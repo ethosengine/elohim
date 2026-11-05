@@ -24,6 +24,7 @@
 //! gauges. It never leaves the node: what a peer holds says what its person
 //! uses.
 
+use elohim_epr::address::ByteCid;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -32,7 +33,6 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 
 use super::release_adoption::retention::{split_window, RetentionSweeper};
-use crate::blob_store::BlobStore;
 use crate::db::blob_arrivals::{self, Arrival, ArrivalVia, UnnamedWatch};
 use crate::db::diesel_schema::{
     content, economic_events, peer_blob_inventory, rea_commitments, shard_manifests,
@@ -274,26 +274,21 @@ fn read_tables(
     let kept = split_window(&releases, depth, in_use)
         .kept
         .iter()
-        .flat_map(|r| r.artifacts.iter().map(LedgerArtifact::blob_hash))
+        .flat_map(|r| r.artifacts.iter().map(|a| a.blob_cid.clone()))
         .collect();
 
     let mut served = HashSet::new();
-    let rows: Vec<(Option<String>, Option<String>, Option<String>)> = content::table
-        .select((
-            content::blob_hash,
-            content::server_blob_hash,
-            content::blob_cid,
-        ))
+    let rows: Vec<(Option<String>, Option<String>)> = content::table
+        .select((content::server_blob_cid, content::blob_cid))
         .filter(
-            content::blob_hash
+            content::server_blob_cid
                 .is_not_null()
-                .or(content::server_blob_hash.is_not_null())
                 .or(content::blob_cid.is_not_null()),
         )
         .load(conn)
         .map_err(|e| db("content rows", e))?;
-    for (blob, server, cid) in rows {
-        served.extend([blob, server, cid].into_iter().flatten());
+    for (server, cid) in rows {
+        served.extend([server, cid].into_iter().flatten());
     }
     // A hash or CID anywhere in a row's metadata names the blob too (a channel
     // row carries its release manifest there). One read of the column per
@@ -315,21 +310,16 @@ fn read_tables(
         .select(rea_commitments::resource_classified_as)
         .load(conn)
         .map_err(|e| db("custody commitments", e))?;
-    // A commitment names its blob bare or as a JSON list, and as `sha256-<hex>`,
-    // bare hex, a CID, or a CID behind a `sha256-` prefix. Each is brought to
-    // the blob store's own spelling; one that cannot be read is left to the
-    // per-blob read, which matches the digest anywhere in the field.
+    // A commitment names its blob by byte CID, bare or as a JSON list. One that
+    // cannot be read is left to the per-blob read, which matches the CID anywhere
+    // in the field.
     let pledged = pledged_rows
         .iter()
         .flat_map(|raw| crate::db::rea_commitments::classifications_of(raw.as_deref()))
         .filter_map(|named| store_spelling(&named))
         .collect();
 
-    let manifest_rows: Vec<(String, String)> = shard_manifests::table
-        .select((
-            shard_manifests::blob_hash,
-            shard_manifests::shard_hashes_json,
-        ))
+    let manifest_rows: Vec<crate::db::models::ShardManifestRow> = shard_manifests::table
         .load(conn)
         .map_err(|e| db("manifests", e))?;
     // A `blob:` manifest is NOT evidence of how a blob arrived: the manifest
@@ -338,8 +328,13 @@ fn read_tables(
     // one three minutes later). Only rows a single arrival path writes count.
     let mut own_evidence: HashMap<String, (ArrivalVia, String)> = HashMap::new();
     let manifests = manifest_rows
-        .into_iter()
-        .map(|(blob, json)| (blob, serde_json::from_str(&json).unwrap_or_default()))
+        .iter()
+        .map(|row| {
+            (
+                row.blob_cid.clone(),
+                crate::db::shard_manifests::custody_unit_cids(row),
+            )
+        })
         .collect();
 
     // Match on `source`, never on `peer_id`: a peer that has not learned its
@@ -347,7 +342,7 @@ fn read_tables(
     let self_custody: Vec<(String, String)> = peer_blob_inventory::table
         .filter(peer_blob_inventory::source.eq("self-custody"))
         .select((
-            peer_blob_inventory::blob_hash,
+            peer_blob_inventory::blob_cid,
             peer_blob_inventory::last_seen_at,
         ))
         .load(conn)
@@ -383,36 +378,26 @@ fn read_tables(
         served,
         pledged,
         manifests,
-        arrivals: blob_arrivals::arrivals_by_hash(conn)?,
+        arrivals: blob_arrivals::arrivals_by_cid(conn)?,
         own_evidence,
         watch: blob_arrivals::watched(conn)?,
     })
 }
 
-/// Every sha2-256 digest (64 hex, as `sha256-<hex>`) and every raw-codec CID
-/// (`bafkrei…`) that appears in a text, in the spellings the served set holds.
+/// Every byte CID (`bafkr4i…`, admitted by full decode) that appears in a text.
 fn digest_tokens(text: &str) -> Vec<String> {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
+    // bounded-work: one forward scan over `text`; every index is visited once.
     while i < bytes.len() {
-        let c = bytes[i];
-        // A CID first: its `baf` prefix is also three hex digits.
-        if c == b'b' && text[i..].starts_with("baf") {
+        if bytes[i] == b'b' {
             let start = i;
             while i < bytes.len() && (bytes[i].is_ascii_lowercase() || bytes[i].is_ascii_digit()) {
                 i += 1;
             }
-            if i - start >= 50 {
-                out.push(text[start..i].to_string());
-            }
-        } else if c.is_ascii_hexdigit() {
-            let start = i;
-            while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
-                i += 1;
-            }
-            if i - start == 64 {
-                out.push(format!("sha256-{}", text[start..i].to_ascii_lowercase()));
+            if let Ok(cid) = ByteCid::parse(&text[start..i]) {
+                out.push(cid.to_string());
             }
         } else {
             i += 1;
@@ -421,16 +406,9 @@ fn digest_tokens(text: &str) -> Vec<String> {
     out
 }
 
-/// A blob address in any of its spellings, as the blob store spells it.
+/// A pledged blob address as the blob store names it: its byte CID.
 fn store_spelling(named: &str) -> Option<String> {
-    let named = named.trim();
-    BlobStore::parse_content_address(named)
-        .or_else(|_| {
-            BlobStore::parse_content_address(named.strip_prefix("sha256-").unwrap_or(named))
-        })
-        .or_else(|_| BlobStore::parse_content_address(&format!("sha256-{named}")))
-        .ok()
-        .map(|hex| format!("sha256-{}", hex.to_ascii_lowercase()))
+    ByteCid::parse(named.trim()).ok().map(|cid| cid.to_string())
 }
 
 /// Unix seconds of a recorded time, or `None` when it cannot be read. Rows
@@ -467,10 +445,6 @@ struct Standing {
 }
 
 fn standing(tables: &Tables, in_use: &HashSet<String>, hash: &str) -> Standing {
-    let cid = hash
-        .strip_prefix("sha256-")
-        .and_then(|hex| BlobStore::hash_to_cid(hex).ok())
-        .map(|cid| cid.to_string());
     let arrivals = tables.arrivals.get(hash).map(Vec::as_slice).unwrap_or(&[]);
     // This peer's own acts, and placements the placing peer has since
     // withdrawn: those bytes are nobody else's any more.
@@ -485,8 +459,7 @@ fn standing(tables: &Tables, in_use: &HashSet<String>, hash: &str) -> Standing {
     own.sort_by_key(|(_, at)| parse_time(at));
     let facts = BlobFacts {
         in_kept_release: tables.kept.contains(hash),
-        served: tables.served.contains(hash)
-            || cid.as_ref().is_some_and(|cid| tables.served.contains(cid)),
+        served: tables.served.contains(hash),
         pledged: tables.pledged.contains(hash),
         part_of_held: false,
         placed: arrivals.iter().any(Arrival::is_live_placement),
@@ -543,16 +516,16 @@ pub async fn run_pass(
             .await?
     };
 
-    let hashes = {
+    let cids = {
         let blobs = sweeper.blobs().clone();
-        tokio::task::spawn_blocking(move || blobs.list_hashes())
+        tokio::task::spawn_blocking(move || blobs.list_cids())
             .await
             .map_err(|e| StorageError::Internal(format!("holds: listing blobs: {e}")))??
     };
     let mut on_disk: BTreeMap<String, u64> = BTreeMap::new();
-    for hash in hashes {
-        let bytes = sweeper.blobs().size(&hash).await.unwrap_or(0);
-        on_disk.insert(hash, bytes);
+    for cid in cids {
+        let bytes = sweeper.blobs().size(&cid).await.unwrap_or(0);
+        on_disk.insert(cid.to_string(), bytes);
     }
 
     // The shards each blob's manifest names, and the blobs each shard is a
@@ -691,12 +664,8 @@ pub async fn run_pass(
             let hash = hash.clone();
             sweeper
                 .db(move |conn| {
-                    let sha256 = hash.strip_prefix("sha256-").unwrap_or(&hash).to_string();
                     let artifact = LedgerArtifact {
-                        blob_cid: BlobStore::hash_to_cid(&sha256)
-                            .map(|cid| cid.to_string())
-                            .unwrap_or_default(),
-                        sha256,
+                        blob_cid: hash.clone(),
                         bytes: 0,
                         filename: String::new(),
                     };
@@ -858,6 +827,8 @@ pub async fn run_pass(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blob_store::BlobStore;
+    use elohim_epr::address::compute_bytes_cid;
 
     const LIMITS: Limits = Limits {
         min_age_secs: 60,
@@ -980,7 +951,7 @@ mod tests {
 
         /// Bytes in the blob store with nothing to say how they got there.
         async fn bare(&self, bytes: &[u8]) -> String {
-            self.blobs.store(bytes).await.unwrap().hash
+            self.blobs.store(bytes).await.unwrap().cid.to_string()
         }
 
         /// Bytes that arrived `via`, long enough ago to be past any age.
@@ -994,7 +965,7 @@ mod tests {
 
         fn arrived_at(&self, hash: &str, at: &str) {
             let mut conn = self.pool.get().unwrap();
-            diesel::sql_query("UPDATE blob_arrivals SET arrived_at = ? WHERE blob_hash = ?")
+            diesel::sql_query("UPDATE blob_arrivals SET arrived_at = ? WHERE blob_cid = ?")
                 .bind::<diesel::sql_types::Text, _>(at)
                 .bind::<diesel::sql_types::Text, _>(hash)
                 .execute(&mut conn)
@@ -1003,7 +974,7 @@ mod tests {
 
         /// A content row naming `blob_hash` in its own column, or only inside
         /// its metadata.
-        fn content_row(&self, id: &str, blob_hash: Option<&str>, metadata_json: Option<String>) {
+        fn content_row(&self, id: &str, blob_cid: Option<&str>, metadata_json: Option<String>) {
             let mut conn = self.pool.get().unwrap();
             crate::db::content_diesel::create_content(
                 &mut conn,
@@ -1014,8 +985,7 @@ mod tests {
                     description: None,
                     content_type: "app".to_string(),
                     content_format: "html5-app".to_string(),
-                    blob_hash: blob_hash.map(str::to_string),
-                    blob_cid: None,
+                    blob_cid: blob_cid.map(str::to_string),
                     content_size_bytes: None,
                     metadata_json,
                     reach: "commons".to_string(),
@@ -1042,8 +1012,9 @@ mod tests {
                 .unwrap()
         }
 
-        async fn holds(&self, hash: &str) -> bool {
-            self.blobs.exists(hash).await
+        async fn holds(&self, cid: &str) -> bool {
+            let cid = ByteCid::parse(cid).expect("a held blob is named by its byte CID");
+            self.blobs.exists(&cid).await == crate::blob_store::Exists::Verified
         }
     }
 
@@ -1087,7 +1058,7 @@ mod tests {
 
         // Its records went with it: nothing is left naming bytes that are gone.
         let mut conn = peer.pool.get().unwrap();
-        assert!(blob_arrivals::arrivals_by_hash(&mut conn)
+        assert!(blob_arrivals::arrivals_by_cid(&mut conn)
             .unwrap()
             .is_empty());
         assert!(blob_arrivals::watched(&mut conn).unwrap().is_empty());
@@ -1142,11 +1113,10 @@ mod tests {
                 None,
             )
             .await;
-        let hex = hash.trim_start_matches("sha256-");
         peer.content_row(
             "channel-row",
             None,
-            Some(format!(r#"{{"artifacts":[{{"sha256":"{hex}"}}]}}"#)),
+            Some(format!(r#"{{"artifacts":[{{"blobCid":"{hash}"}}]}}"#)),
         );
         for _ in 0..3 {
             let report = peer.pass(SOON).await;
@@ -1205,28 +1175,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_blob_under_a_live_pledge_is_held_however_the_pledge_spells_it() {
+    async fn a_blob_under_a_live_pledge_is_held_bare_or_listed() {
         let peer = peer().await;
         let mut hashes = Vec::new();
-        for (i, bytes) in [
-            &b"pledged, plain"[..],
-            b"pledged, in a list",
-            b"pledged, bare hex",
-            b"pledged, as a cid",
-            b"pledged, cid behind a prefix",
-        ]
-        .into_iter()
-        .enumerate()
+        for (i, bytes) in [&b"pledged, plain"[..], b"pledged, in a list"]
+            .into_iter()
+            .enumerate()
         {
             let hash = peer.arrived(bytes, ArrivalVia::SelfFetch, None).await;
-            let hex = hash.trim_start_matches("sha256-").to_string();
-            let cid = BlobStore::hash_to_cid(&hex).unwrap().to_string();
             let spelled = match i {
                 0 => hash.clone(),
-                1 => format!("[\"{hash}\"]"),
-                2 => hex.to_ascii_uppercase(),
-                3 => cid,
-                _ => format!("sha256-{cid}"),
+                _ => format!("[\"{hash}\"]"),
             };
             let mut conn = peer.pool.get().unwrap();
             diesel::sql_query(
@@ -1299,25 +1258,22 @@ mod tests {
         assert!(peer.holds(&hash).await);
     }
 
-    /// A blob over the single-shard size: on disk only as its shards, named
-    /// by a manifest, with the arrival recorded under the blob's own hash.
+    /// A blob held here only as its custody units: the units on disk under their
+    /// own byte CIDs, named by a manifest, the arrival recorded under the blob's.
     async fn sharded(peer: &Peer, blob: &str, shards: &[&[u8]]) -> Vec<String> {
         let mut hashes = Vec::new();
         for shard in shards {
             hashes.push(peer.bare(shard).await);
         }
         let mut conn = peer.pool.get().unwrap();
-        diesel::sql_query(
-            "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, blob_cid, encoding, \
-             data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
-             shard_size_bytes, mime_type, reach, created_at) VALUES (?, 'lamad', ?, NULL, \
-             'rs-4-7', 2, 0, ?, 1, 1, 'application/zip', 'commons', '2026-01-01T00:00:00Z')",
-        )
-        .bind::<diesel::sql_types::Text, _>(format!("row-for-{blob}"))
-        .bind::<diesel::sql_types::Text, _>(blob)
-        .bind::<diesel::sql_types::Text, _>(serde_json::to_string(&hashes).unwrap())
-        .execute(&mut conn)
-        .unwrap();
+        let units: Vec<&str> = hashes.iter().map(String::as_str).collect();
+        crate::db::shard_manifests::insert_unit_manifest(
+            &mut conn,
+            &format!("row-for-{blob}"),
+            "lamad",
+            blob,
+            &units,
+        );
         blob_arrivals::record_arrival(&mut conn, blob, ArrivalVia::SelfPut, None, None).unwrap();
         drop(conn);
         peer.arrived_at(blob, OLD);
@@ -1327,7 +1283,7 @@ mod tests {
     #[tokio::test]
     async fn a_blob_held_only_as_shards_is_let_go_whole() {
         let peer = peer().await;
-        let blob = format!("sha256-{}", "a".repeat(64));
+        let blob = compute_bytes_cid(b"a blob held only as shards").to_string();
         let shards = sharded(&peer, &blob, &[b"shard one", b"shard two"]).await;
 
         let first = peer.pass(SOON).await;
@@ -1349,7 +1305,7 @@ mod tests {
     #[tokio::test]
     async fn a_shard_another_peer_placed_stays_when_the_blob_it_is_part_of_goes() {
         let peer = peer().await;
-        let blob = format!("sha256-{}", "b".repeat(64));
+        let blob = compute_bytes_cid(b"a blob part placed by a peer").to_string();
         let shards = sharded(
             &peer,
             &blob,
@@ -1379,7 +1335,7 @@ mod tests {
         assert_eq!(tally(&after, HoldReason::Placed), 1);
         let mut conn = peer.pool.get().unwrap();
         assert!(
-            blob_arrivals::arrivals_by_hash(&mut conn).unwrap()[&shards[1]][0].is_live_placement()
+            blob_arrivals::arrivals_by_cid(&mut conn).unwrap()[&shards[1]][0].is_live_placement()
         );
     }
 
@@ -1389,17 +1345,13 @@ mod tests {
         let hash = peer.bare(b"present, provenance unknown").await;
         // The manifest backfill stamps a `blob:` manifest on every local blob.
         let mut conn = peer.pool.get().unwrap();
-        diesel::sql_query(
-            "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, blob_cid, encoding, \
-             data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
-             shard_size_bytes, mime_type, reach, created_at) VALUES (?, 'lamad', ?, NULL, \
-             'none', 1, 0, ?, 1, 1, 'application/octet-stream', 'commons', '2026-01-01T00:00:00Z')",
-        )
-        .bind::<diesel::sql_types::Text, _>(format!("blob:bafkrei{}", &hash[7..47]))
-        .bind::<diesel::sql_types::Text, _>(&hash)
-        .bind::<diesel::sql_types::Text, _>(format!("[\"{hash}\"]"))
-        .execute(&mut conn)
-        .unwrap();
+        crate::db::shard_manifests::insert_unit_manifest(
+            &mut conn,
+            &format!("blob:{hash}"),
+            "lamad",
+            &hash,
+            &[&hash],
+        );
         drop(conn);
         for _ in 0..3 {
             let report = peer.pass(SOON).await;
@@ -1410,16 +1362,15 @@ mod tests {
     }
 
     #[test]
-    fn digests_are_found_wherever_metadata_spells_them() {
+    fn byte_cids_are_found_wherever_metadata_names_them() {
+        let cid = compute_bytes_cid(b"an artifact").to_string();
+        let sha2 = elohim_epr::address::compute_raw_sha2_cid(b"an artifact").to_string();
         let hex = "a".repeat(64);
-        let cid = BlobStore::hash_to_cid(&hex).unwrap().to_string();
         let text = format!(
-            r#"{{"artifacts":[{{"sha256":"{}"}}],"blobCid":"{cid}","blobHash":"sha256-{hex}"}}"#,
-            hex.to_ascii_uppercase()
+            r#"{{"artifacts":[{{"blobCid":"{cid}"}}],"legacy":"sha256-{hex}","sha2":"{sha2}"}}"#
         );
         let tokens = digest_tokens(&text);
-        assert!(tokens.contains(&format!("sha256-{hex}")));
-        assert!(tokens.contains(&cid));
+        assert_eq!(tokens, vec![cid], "only the byte CID names a blob");
         assert!(digest_tokens("no digest here, just words and 1234").is_empty());
     }
 
@@ -1432,16 +1383,13 @@ mod tests {
         let shard = peer.bare(b"one shard of it").await;
         peer.content_row("app-two", Some(&blob), None);
         let mut conn = peer.pool.get().unwrap();
-        diesel::sql_query(
-            "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, blob_cid, encoding, \
-             data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
-             shard_size_bytes, mime_type, reach, created_at) VALUES ('app-two', 'lamad', ?, \
-             NULL, 'rs', 1, 0, ?, 1, 1, 'application/zip', 'commons', '2026-01-01T00:00:00Z')",
-        )
-        .bind::<diesel::sql_types::Text, _>(&blob)
-        .bind::<diesel::sql_types::Text, _>(format!("[\"{shard}\"]"))
-        .execute(&mut conn)
-        .unwrap();
+        crate::db::shard_manifests::insert_unit_manifest(
+            &mut conn,
+            "app-two",
+            "lamad",
+            &blob,
+            &[&shard],
+        );
         drop(conn);
 
         let report = peer.pass(SOON).await;
@@ -1467,7 +1415,7 @@ mod tests {
             crate::db::shard_locations::upsert_location(
                 &mut conn,
                 &crate::db::models::NewShardLocation {
-                    shard_hash: &hash,
+                    shard_cid: &hash,
                     peer_id: holder,
                     h_app_id: "lamad",
                     status,
@@ -1487,7 +1435,7 @@ mod tests {
         }
         let mut conn = peer.pool.get().unwrap();
         let left: Vec<Holder> =
-            diesel::sql_query("SELECT peer_id FROM shard_locations WHERE shard_hash = ?")
+            diesel::sql_query("SELECT peer_id FROM shard_locations WHERE shard_cid = ?")
                 .bind::<diesel::sql_types::Text, _>(&hash)
                 .load(&mut conn)
                 .unwrap();
@@ -1528,7 +1476,7 @@ mod tests {
         for (bytes, receiver) in [(&mine, "12D3KooWSelf"), (&theirs, "12D3KooWOther")] {
             crate::p2p::blob_fetch::finalize_fetch_success(
                 &mut conn,
-                &BlobStore::compute_hash(bytes),
+                &compute_bytes_cid(bytes),
                 "12D3KooWSource",
                 bytes,
                 receiver,
@@ -1551,7 +1499,7 @@ mod tests {
         assert_eq!(tally(&report, HoldReason::OwnUnnamed), 1);
         assert_eq!(
             report.own_unnamed[0].blob_hash,
-            BlobStore::compute_hash(&mine)
+            compute_bytes_cid(&mine).to_string()
         );
         assert_eq!(report.own_unnamed[0].arrived_via, vec!["self-fetch"]);
         // The other node's fetch event says nothing about how OUR copy got

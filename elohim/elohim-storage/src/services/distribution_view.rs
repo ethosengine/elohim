@@ -141,7 +141,7 @@ pub fn compute_fault_domain_diversity(replica_peers: &[ReplicaPeer]) -> FaultDom
 ///   `:169–183`). Returns `None` when no archetype-tagged peers are known.
 pub async fn compose_distribution_summary(
     pool: &DbPool,
-    blob_hash: &str,
+    blob_cid: &str,
     ctx: DistributionContext<'_>,
 ) -> Result<DistributionSummary, DistributionViewError> {
     let mut conn = pool
@@ -152,12 +152,12 @@ pub async fn compose_distribution_summary(
     let inventory_rows: Vec<(String, String)> = {
         use crate::db::diesel_schema::peer_blob_inventory::dsl as inv;
         inv::peer_blob_inventory
-            .filter(inv::blob_hash.eq(blob_hash))
+            .filter(inv::blob_cid.eq(blob_cid))
             .select((inv::peer_id, inv::last_seen_at))
             .load::<(String, String)>(&mut conn)?
     };
 
-    // Deduplicate by peer_id (composite PK is (peer_id, blob_hash) but load
+    // Deduplicate by peer_id (composite PK is (peer_id, blob_cid) but load
     // may return multiple rows if the schema ever evolves — be defensive).
     let mut seen_peers: HashSet<String> = HashSet::new();
     let mut max_last_seen: Option<String> = None;
@@ -184,7 +184,7 @@ pub async fn compose_distribution_summary(
     let reach_str: Option<String> = {
         use crate::db::diesel_schema::content::dsl as c;
         c::content
-            .filter(c::blob_hash.eq(blob_hash))
+            .filter(c::blob_cid.eq(blob_cid))
             .select(c::reach)
             .first::<String>(&mut conn)
             .optional()?
@@ -200,7 +200,7 @@ pub async fn compose_distribution_summary(
 
     // --- projector_count: from projection_events distinct projectors ---
     let projector_count =
-        crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+        crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_cid)
             .map(|v| v.len() as u32)
             .unwrap_or(0);
 
@@ -239,7 +239,7 @@ pub async fn compose_distribution_summary(
             let my_agent_cids: HashSet<&str> =
                 bindings.iter().map(|b| b.agent_cid.as_str()).collect();
             let any_projector =
-                crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+                crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_cid)
                     .map(|projectors| {
                         projectors
                             .iter()
@@ -328,25 +328,25 @@ pub(crate) fn parse_reach_class(s: &str) -> Option<ReachClass> {
 /// `recent_projection_events` until those substrate sources land.
 pub async fn compose_distribution_details(
     pool: &DbPool,
-    blob_hash: &str,
+    blob_cid: &str,
     ctx: DistributionContext<'_>,
 ) -> Result<DistributionDetails, DistributionViewError> {
     // Fan-in: build the summary first (reuses T23's logic).
     let summary_ctx = ctx_for_summary(&ctx);
-    let summary = compose_distribution_summary(pool, blob_hash, summary_ctx).await?;
+    let summary = compose_distribution_summary(pool, blob_cid, summary_ctx).await?;
 
     let mut conn = pool
         .get()
         .map_err(|e| DistributionViewError::Pool(e.to_string()))?;
 
-    let replica_peers = load_replica_peers_full(&mut conn, blob_hash)?;
+    let replica_peers = load_replica_peers_full(&mut conn, blob_cid)?;
 
     // projector_identities: from distinct_projectors_for_blob; use agent_cid as
     // doorway_hostname (best available until a real hostname registry lands),
     // last_ack_seconds derived from most-recent emitted_at for each projector.
     let projector_identities: Vec<ProjectorIdentity> = {
         let projector_cids =
-            crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+            crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_cid)
                 .unwrap_or_default();
         let now_seconds = chrono::Utc::now().timestamp().max(0) as u64;
         let mut out = Vec::with_capacity(projector_cids.len());
@@ -355,7 +355,7 @@ pub async fn compose_distribution_details(
             let recent_for_cid: Vec<crate::db::projection_events::ProjectionEventRow> = {
                 use crate::db::diesel_schema::projection_events::dsl as pe;
                 pe::projection_events
-                    .filter(pe::blob_hash.eq(blob_hash))
+                    .filter(pe::blob_cid.eq(blob_cid))
                     .filter(pe::projector_agent_cid.eq(&cid))
                     .order(pe::emitted_at.desc())
                     .limit(1)
@@ -379,17 +379,17 @@ pub async fn compose_distribution_details(
         out
     };
 
-    let placement_gaps = load_placement_gaps_for(pool, &mut conn, blob_hash)?;
+    let placement_gaps = load_placement_gaps_for(pool, &mut conn, blob_cid)?;
 
     // recent_projection_events: last 20 events as open-shape JSON.
     let recent_projection_events: Vec<JsonVal> = {
-        let recent = crate::db::projection_events::list_recent_for_blob(&mut conn, blob_hash, 20)
+        let recent = crate::db::projection_events::list_recent_for_blob(&mut conn, blob_cid, 20)
             .unwrap_or_default();
         recent
             .into_iter()
             .map(|r| {
                 JsonVal(serde_json::json!({
-                    "blobHash": r.blob_hash,
+                    "blobCid": r.blob_cid,
                     "projectorAgentCid": r.projector_agent_cid,
                     "emittedAt": r.emitted_at,
                     "sourceActionHash": r.source_action_hash,
@@ -402,7 +402,7 @@ pub async fn compose_distribution_details(
         DistributionContext::Visitor => None,
         DistributionContext::Steward { bindings, .. } => {
             let my_peers: Vec<&str> = bindings.iter().map(|b| b.peer_id.as_str()).collect();
-            Some(load_commitment_refs(&mut conn, blob_hash, &my_peers)?)
+            Some(load_commitment_refs(&mut conn, blob_cid, &my_peers)?)
         }
     };
 
@@ -428,11 +428,11 @@ pub async fn compose_distribution_details(
     // (evaluating a scope filter per-CID is a separate lens).
     let replication_commitments = {
         let mut addresses: std::collections::HashSet<String> =
-            [blob_hash.to_string()].into_iter().collect();
+            [blob_cid.to_string()].into_iter().collect();
         {
             use crate::db::diesel_schema::content::dsl as c;
             let content_ids: Vec<String> = c::content
-                .filter(c::blob_hash.eq(blob_hash))
+                .filter(c::blob_cid.eq(blob_cid))
                 .select(c::id)
                 .load::<String>(&mut conn)
                 .unwrap_or_default();
@@ -483,13 +483,13 @@ fn ctx_for_summary<'a>(ctx: &'a DistributionContext<'a>) -> DistributionContext<
 /// used. If no binding row exists for a peer, `DeviceArchetype::Node` is used.
 fn load_replica_peers_full(
     conn: &mut diesel::SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<Vec<ReplicaPeer>, DistributionViewError> {
     use crate::db::diesel_schema::peer_blob_inventory::dsl as inv;
     use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
 
     let rows: Vec<(String, String, Option<String>)> = inv::peer_blob_inventory
-        .filter(inv::blob_hash.eq(blob_hash))
+        .filter(inv::blob_cid.eq(blob_cid))
         .left_join(bind::peer_identity_bindings.on(bind::peer_id.eq(inv::peer_id)))
         .select((
             inv::peer_id,
@@ -539,7 +539,7 @@ fn parse_archetype(s: &str) -> DeviceArchetype {
     }
 }
 
-/// Load hub-abstract `PlacementGapRow` view rows for the given blob_hash.
+/// Load hub-abstract `PlacementGapRow` view rows for the given blob_cid.
 ///
 /// Calls `services::resilience::hub_summary` (C2) to classify peers into hubs,
 /// then emits a `HubDiversity` gap row when the observed hub count falls below
@@ -557,7 +557,7 @@ fn parse_archetype(s: &str) -> DeviceArchetype {
 fn load_placement_gaps_for(
     pool: &DbPool,
     _conn: &mut diesel::SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<Vec<PlacementGapRow>, DistributionViewError> {
     // Minimum distinct hubs required for content to survive a single-hub failure.
     // Fixed floor for C4; reach-class-aware tuning is a follow-up (see TODO above).
@@ -568,7 +568,7 @@ fn load_placement_gaps_for(
     // the hub classification queries are not yet app-id-filtered.
     let ctx = AppContext::default_lamad();
 
-    let hubs = crate::services::resilience::hub_summary(pool, &ctx, blob_hash).unwrap_or_default(); // permissive: lookup failure → treat as zero hubs
+    let hubs = crate::services::resilience::hub_summary(pool, &ctx, blob_cid).unwrap_or_default(); // permissive: lookup failure → treat as zero hubs
 
     let observed = hubs.len() as i32;
     let mut gaps = Vec::new();
@@ -576,7 +576,7 @@ fn load_placement_gaps_for(
     if observed < TARGET_HUBS {
         gaps.push(PlacementGapRow {
             kind: PlacementGapKind::HubDiversity,
-            content_id: blob_hash.to_string(),
+            content_id: blob_cid.to_string(),
             shortfall: PlacementGapShortfall {
                 target: TARGET_HUBS,
                 observed,
@@ -589,10 +589,10 @@ fn load_placement_gaps_for(
 }
 
 /// Load rea_commitment IDs where (`action='custody-blob'` AND
-/// `resource_classified_as=blob_hash`) AND (provider OR receiver is one of my_peers).
+/// `resource_classified_as=blob_cid`) AND (provider OR receiver is one of my_peers).
 fn load_commitment_refs(
     conn: &mut diesel::SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     my_peers: &[&str],
 ) -> Result<Vec<String>, DistributionViewError> {
     if my_peers.is_empty() {
@@ -616,7 +616,7 @@ fn load_commitment_refs(
         .filter(|(_, classified)| {
             crate::db::rea_commitments::classifications_of(classified.as_deref())
                 .iter()
-                .any(|c| c == blob_hash)
+                .any(|c| c == blob_cid)
         })
         .map(|(id, _)| id)
         .collect();

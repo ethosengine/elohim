@@ -42,7 +42,7 @@ pub fn handle_projection_ack_sync(
     append_projection_event(
         &mut conn,
         &NewProjectionEvent {
-            blob_hash: resource_classified_as.to_string(),
+            blob_cid: resource_classified_as.to_string(),
             projector_agent_cid: provider.to_string(),
             emitted_at: emitted_at.to_string(),
             source_action_hash: action_hash.to_string(),
@@ -51,7 +51,7 @@ pub fn handle_projection_ack_sync(
 
     tracing::debug!(
         target = "phase4::projection_ack",
-        blob_hash = %resource_classified_as,
+        blob_cid = %resource_classified_as,
         projector = %provider,
         "recorded projection ack"
     );

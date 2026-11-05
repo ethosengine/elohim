@@ -304,7 +304,8 @@ mod tests {
             ratio_attestation, ..
         } = &mut payload
         {
-            ratio_attestation.effective_ratio_cid = "bafkrei-stale-manifest".to_string();
+            ratio_attestation.effective_ratio_cid =
+                "bafkr4ibmplgz2jeu5ppr37ghnsu45wl42kfko3i6lq5343lzmtqhqisyd4".to_string();
         }
         assert!(matches!(
             validate_typed_for_creation_commons(&payload),

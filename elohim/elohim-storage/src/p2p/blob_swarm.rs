@@ -23,16 +23,15 @@
 //!   uses, so per-shard REA delivery attribution stays correct (the peer that
 //!   actually served shard N is who gets credited, not a single "composite
 //!   source").
-//! - the composite itself is never stored under its own name (unchanged from
-//!   `put_blob_bytes`/Q2): once shards + manifest are durable, Q2's
-//!   `HttpServer::get_blob_or_heal` / `handle_get_blob` already reassemble it
-//!   on demand via `reassemble_from_local_shards`.
+//! - the reassembled payload is verified against the manifest's byte CID before it
+//!   is returned (every unit is also checked against its own CID as it lands).
 
 use crate::blob_store::BlobStore;
 use crate::db::peer_blob_inventory::lookup_hosts;
 use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
-use crate::sharding::ShardManifest;
+use crate::sharding::{ShardEncoder, ShardManifest};
 use diesel::SqliteConnection;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -59,16 +58,16 @@ use tracing::{info, warn};
 /// Pure and synchronous by design — this is the scheduling decision, kept
 /// separate from I/O so it is directly unit-testable without a swarm.
 pub fn plan_shard_holders(
-    shard_hashes: &[String],
+    shard_cids: &[ByteCid],
     composite_holders: &[String],
-    per_shard_hosts: &HashMap<String, Vec<String>>,
-) -> Vec<(String, Vec<String>)> {
+    per_shard_hosts: &HashMap<ByteCid, Vec<String>>,
+) -> Vec<(ByteCid, Vec<String>)> {
     let n = composite_holders.len();
-    shard_hashes
+    shard_cids
         .iter()
         .enumerate()
-        .map(|(index, shard_hash)| {
-            let mut candidates = per_shard_hosts.get(shard_hash).cloned().unwrap_or_default();
+        .map(|(index, shard_cid)| {
+            let mut candidates = per_shard_hosts.get(shard_cid).cloned().unwrap_or_default();
             if candidates.is_empty() && n > 0 {
                 let offset = index % n;
                 candidates = composite_holders[offset..]
@@ -77,7 +76,7 @@ pub fn plan_shard_holders(
                     .cloned()
                     .collect();
             }
-            (shard_hash.clone(), candidates)
+            (*shard_cid, candidates)
         })
         .collect()
 }
@@ -125,16 +124,54 @@ pub struct SwarmFetchOutcome {
     pub elapsed: Duration,
 }
 
-/// The number of locally-landed shards that makes this manifest servable.
-/// Only a well-formed Reed-Solomon manifest has a threshold below its full
-/// shard count; `none`/`chunked` and malformed RS metadata remain
-/// all-or-nothing.
+/// The number of landed units below which a striped manifest certainly cannot be
+/// reconstructed: `data` shards for every stripe. Each stripe still needs its own
+/// `data` (checked by reconstruction); an unstriped manifest needs every chunk.
 fn reconstructible_threshold(manifest: &ShardManifest) -> Option<usize> {
-    let data_shards = manifest.data_shards as usize;
-    (manifest.encoding.starts_with("rs-")
-        && data_shards > 0
-        && data_shards <= manifest.shard_hashes.len())
-    .then_some(data_shards)
+    let data = usize::from(manifest.data_shards());
+    (!manifest.stripes.is_empty() && data > 0).then(|| data * manifest.stripes.len())
+}
+
+/// Reassemble a payload from landed units keyed by position in
+/// `manifest.custody_units()`, and verify it against the manifest's byte CID.
+fn reassemble(manifest: &ShardManifest, fetched: &mut HashMap<usize, Vec<u8>>) -> Option<Vec<u8>> {
+    let bytes = if manifest.stripes.is_empty() {
+        let mut out = Vec::with_capacity(usize::try_from(manifest.byte_len).unwrap_or(0));
+        for index in 0..manifest.chunks.len() {
+            out.extend_from_slice(fetched.get(&index)?);
+        }
+        out
+    } else {
+        let mut position = 0usize;
+        let stripes: Vec<Vec<Option<Vec<u8>>>> = manifest
+            .stripes
+            .iter()
+            .map(|stripe| {
+                stripe
+                    .shards
+                    .iter()
+                    .map(|_| {
+                        let shard = fetched.remove(&position);
+                        position += 1;
+                        shard
+                    })
+                    .collect()
+            })
+            .collect();
+        match ShardEncoder::reconstruct(manifest, &stripes) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                warn!(
+                    target: "elohim_storage::blob_swarm",
+                    blob_cid = %manifest.blob_cid,
+                    error = %error,
+                    "Q4: landed shards failed to reconstruct — refusing payload"
+                );
+                return None;
+            }
+        }
+    };
+    (compute_bytes_cid(&bytes) == manifest.blob_cid).then_some(bytes)
 }
 
 fn should_start_shard_race(landed: &AtomicUsize, threshold: Option<usize>) -> bool {
@@ -176,34 +213,32 @@ pub async fn fetch_shards_via_swarm(
     // banding caps a realistic manifest at low hundreds of shards). Absent
     // rows fall through to the composite-holder rotation in
     // `plan_shard_holders`.
-    // bounded-work: manifest.shard_hashes.len() — a fixed, already-persisted
+    // bounded-work: units.len() — a fixed, already-persisted
     // manifest; no retry, no growth, one DB read per shard, once.
-    let mut per_shard_hosts: HashMap<String, Vec<String>> = HashMap::new();
-    for shard_hash in &manifest.shard_hashes {
-        if let Ok(rows) = lookup_hosts(conn, shard_hash, fresh_after) {
+    let units = manifest.custody_units();
+    let mut per_shard_hosts: HashMap<ByteCid, Vec<String>> = HashMap::new();
+    for shard_cid in &units {
+        if let Ok(rows) = lookup_hosts(conn, &shard_cid.to_string(), fresh_after) {
             if !rows.is_empty() {
-                per_shard_hosts.insert(
-                    shard_hash.clone(),
-                    rows.into_iter().map(|r| r.peer_id).collect(),
-                );
+                per_shard_hosts.insert(*shard_cid, rows.into_iter().map(|r| r.peer_id).collect());
             }
         }
     }
 
-    let plan = plan_shard_holders(&manifest.shard_hashes, composite_holders, &per_shard_hosts);
+    let plan = plan_shard_holders(&units, composite_holders, &per_shard_hosts);
 
     // Local-first: a shard already on disk needs no race at all. Splitting
     // this from the network plan keeps `distinct_source_peers` honest (only
     // network-served shards count) and avoids wasting a swarm slot on a
     // shard we already have.
     let mut fetched: HashMap<usize, Vec<u8>> = HashMap::new();
-    let mut to_race: Vec<(usize, String, Vec<String>)> = Vec::new();
-    for (index, (shard_hash, candidates)) in plan.into_iter().enumerate() {
-        match params.blob_store.get(&shard_hash).await {
+    let mut to_race: Vec<(usize, ByteCid, Vec<String>)> = Vec::new();
+    for (index, (shard_cid, candidates)) in plan.into_iter().enumerate() {
+        match params.blob_store.get(&shard_cid).await {
             Ok(bytes) => {
-                fetched.insert(index, bytes);
+                fetched.insert(index, bytes.to_vec());
             }
-            Err(_) => to_race.push((index, shard_hash, candidates)),
+            Err(_) => to_race.push((index, shard_cid, candidates)),
         }
     }
 
@@ -224,12 +259,18 @@ pub async fn fetch_shards_via_swarm(
     // peer that is *transferring* is indistinguishable from a peer that is
     // *dead*, and the round records a miss either way. The configured value
     // stays the FLOOR — raising it raises it for every object.
+    let largest_unit = manifest
+        .shards()
+        .map(|(_, s)| u64::from(s.len))
+        .chain(manifest.chunks.iter().map(|c| u64::from(c.len)))
+        .max()
+        .unwrap_or(0);
     let per_peer_timeout = crate::p2p::blob_fetch::size_aware_timeout(
-        manifest.shard_size,
+        largest_unit,
         params.per_peer_timeout,
         MAX_PER_SHARD_TIMEOUT,
     );
-    let make_race = |(index, shard_hash, candidates): (usize, String, Vec<String>)| {
+    let make_race = |(index, shard_cid, candidates): (usize, ByteCid, Vec<String>)| {
         let landed = Arc::clone(&landed);
         async move {
             if !should_start_shard_race(&landed, reconstructible_at) {
@@ -239,7 +280,7 @@ pub async fn fetch_shards_via_swarm(
             // swarm fan-out.
             let shard_fetch_started = Instant::now();
             let outcome = race_fetch_dual(
-                &shard_hash,
+                &shard_cid,
                 candidates,
                 cmd_tx,
                 |p: &str| connected.contains(p),
@@ -251,7 +292,7 @@ pub async fn fetch_shards_via_swarm(
                 crate::metrics::ConvergenceAtom::ShardFetch,
                 shard_fetch_started.elapsed(),
             );
-            Some((index, shard_hash, outcome))
+            Some((index, shard_cid, outcome))
         }
     };
 
@@ -272,7 +313,7 @@ pub async fn fetch_shards_via_swarm(
     // RS threshold and declines to start. Breaking drops/cancels races already
     // in flight; no new parity work is admitted after reconstructibility.
     while let Some(result) = results.next().await {
-        let Some((index, shard_hash, outcome)) = result else {
+        let Some((index, shard_cid, outcome)) = result else {
             continue;
         };
         completed_network_races += 1;
@@ -280,7 +321,7 @@ pub async fn fetch_shards_via_swarm(
             FetchOutcome::Hit { bytes, source_peer } => {
                 if let Err(e) = finalize_fetch_success(
                     conn,
-                    &shard_hash,
+                    &shard_cid,
                     &source_peer,
                     &bytes,
                     params.self_cid,
@@ -290,7 +331,7 @@ pub async fn fetch_shards_via_swarm(
                 {
                     warn!(
                         target: "elohim_storage::blob_swarm",
-                        shard_hash = %shard_hash,
+                        shard_cid = %shard_cid,
                         error = %e,
                         "Q4: swarm-fetched shard failed to persist"
                     );
@@ -302,13 +343,9 @@ pub async fn fetch_shards_via_swarm(
                 landed.fetch_add(1, Ordering::Release);
                 crate::metrics::inc_blob_swarm_shard_fetched("hit");
             }
-            // A shard hash is never itself a composite — a Manifest reply
-            // here means a misbehaving or confused peer; treat as a miss.
-            // InvalidAddress: the manifest carried a shard hash that is not a
-            // valid content address (race_fetch refused to send it and
-            // already WARNed) — a corrupt manifest row, counted as failed so
-            // the composite is never served truncated.
-            FetchOutcome::Manifest { .. } | FetchOutcome::Miss | FetchOutcome::InvalidAddress => {
+            // A unit is never itself a composite — a Manifest reply here means a
+            // misbehaving or confused peer; treat as a miss.
+            FetchOutcome::Manifest { .. } | FetchOutcome::Miss | FetchOutcome::BudgetExhausted => {
                 crate::metrics::inc_blob_swarm_shard_fetched("miss");
             }
             FetchOutcome::NoCandidates => {
@@ -339,34 +376,16 @@ pub async fn fetch_shards_via_swarm(
     drop(results);
 
     let shards_fetched = fetched.len();
-    let shards_failed = manifest.shard_hashes.len().saturating_sub(shards_fetched);
+    let shards_failed = units.len().saturating_sub(shards_fetched);
     let parity_skipped = network_race_count.saturating_sub(completed_network_races);
     for _ in 0..parity_skipped {
         crate::metrics::inc_blob_swarm_shard_fetched("parity_skipped");
     }
-    // bounded-work: manifest.shard_hashes.len() — reassembly walks the
-    // already-completed `fetched` map exactly once; no I/O, no retry.
-    let required = reconstructible_at.unwrap_or(manifest.shard_hashes.len());
+    // bounded-work: units.len() — reassembly walks the already-completed
+    // `fetched` map exactly once; no I/O, no retry.
+    let required = reconstructible_threshold(manifest).unwrap_or(units.len());
     let bytes = if shards_fetched >= required {
-        let mut shards = Vec::with_capacity(manifest.shard_hashes.len());
-        for index in 0..manifest.shard_hashes.len() {
-            shards.push(fetched.remove(&index));
-        }
-        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
-        match encoder.reconstruct(manifest, &shards) {
-            Ok(bytes) => Some(bytes),
-            Err(error) => {
-                warn!(
-                    target: "elohim_storage::blob_swarm",
-                    blob_hash = %manifest.blob_hash,
-                    shards_fetched,
-                    required,
-                    error = %error,
-                    "Q4: reconstructible shard count failed to reconstruct — refusing composite"
-                );
-                None
-            }
-        }
+        reassemble(manifest, &mut fetched)
     } else {
         None
     };
@@ -375,8 +394,8 @@ pub async fn fetch_shards_via_swarm(
         crate::metrics::inc_blob_swarm_composite_completed();
         info!(
             target: "elohim_storage::blob_swarm",
-            blob_hash = %manifest.blob_hash,
-            shards = manifest.shard_hashes.len(),
+            blob_cid = %manifest.blob_cid,
+            units = units.len(),
             distinct_source_peers = source_peers.len(),
             elapsed_ms = started.elapsed().as_millis() as u64,
             "Q4: composite reassembled from swarm-fetched shards"
@@ -430,7 +449,7 @@ pub enum SwarmRaceOutcome {
 /// ingress convention) and attempt the full swarm-spread shard fetch before
 /// giving up.
 pub async fn race_fetch_with_swarm(
-    blob_hash: &str,
+    blob_hash: &ByteCid,
     candidates: Vec<String>,
     conn: &mut SqliteConnection,
     fresh_after: &str,
@@ -458,7 +477,7 @@ pub async fn race_fetch_with_swarm(
             ) {
                 warn!(
                     target: "elohim_storage::blob_swarm",
-                    blob_hash = %manifest.blob_hash,
+                    blob_cid = %manifest.blob_cid,
                     error = %e,
                     "Q3: failed to persist manifest received from a peer"
                 );
@@ -484,10 +503,7 @@ pub async fn race_fetch_with_swarm(
                 },
             }
         }
-        // Terminal miss: race_fetch refused to put a malformed content
-        // address on the wire (and WARNed with the address). No retry at
-        // this layer can succeed until the row carrying it is healed.
-        FetchOutcome::Miss | FetchOutcome::InvalidAddress => SwarmRaceOutcome::Miss,
+        FetchOutcome::Miss | FetchOutcome::BudgetExhausted => SwarmRaceOutcome::Miss,
         FetchOutcome::NoCandidates => SwarmRaceOutcome::NoCandidates,
     }
 }
@@ -495,12 +511,11 @@ pub async fn race_fetch_with_swarm(
 // ────────────────────────────────────────────────────────────────
 // T2 — dual-plane heal-on-read
 //
-// `race_fetch` (libp2p) is unchanged and still owns the wire, the address
-// hygiene, and the verify-then-serve rule. This section adds a SECOND leg
-// over iroh for the peers the iroh peer book can dial, races the two, and
-// returns the first VERIFIED bytes. Nothing here relaxes verification:
-// both legs terminate in `blob_fetch::verify_blob_hash` on the requested
-// address before any byte is handed back for persistence.
+// `race_fetch` (libp2p) owns the libp2p wire and the verify-then-serve rule.
+// This section adds a SECOND leg over the iroh shard ALPN (served from the same
+// `BlobStore`, never an iroh-blobs copy) for the peers the iroh peer book can
+// dial, races the two, and returns the first VERIFIED bytes: both legs terminate
+// in `blob_fetch::verify_fetched_bytes` on the requested byte CID.
 // ────────────────────────────────────────────────────────────────
 
 /// Which transport legs a heal-on-read race should construct.
@@ -591,7 +606,7 @@ pub fn enrich_candidates(
 /// existing `parallelism` knob; no new retry loop, no queue, no second
 /// concurrency dial.
 pub async fn race_fetch_dual(
-    blob_hash: &str,
+    blob_hash: &ByteCid,
     candidates: Vec<String>,
     cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
     // `Sync` (not just `Fn`) because the dual path boxes the libp2p leg into a
@@ -640,7 +655,7 @@ pub async fn race_fetch_dual(
 #[allow(clippy::too_many_arguments)]
 async fn race_both_planes(
     leg: &'static crate::p2p_iroh::IrohFetchLeg,
-    blob_hash: &str,
+    blob_hash: &ByteCid,
     candidates: Vec<String>,
     cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
     is_connected: &(impl Fn(&str) -> bool + Sync),
@@ -649,17 +664,7 @@ async fn race_both_planes(
 ) -> FetchOutcome {
     use futures::future::FutureExt;
 
-    // Same address hygiene, same choke point, same terminal verdict as
-    // `race_fetch` — applied BEFORE either leg exists so a malformed address
-    // never reaches the iroh wire either.
-    let Ok(wire_addr) = crate::p2p::blob_fetch::normalize_fetch_address(blob_hash) else {
-        tracing::warn!(
-            target: "elohim_storage::blob_fetch",
-            hash = %blob_hash,
-            "T2: refusing to fetch a malformed content address on either plane"
-        );
-        return FetchOutcome::InvalidAddress;
-    };
+    let wire_addr = *blob_hash;
 
     // iroh reachability is INDEPENDENT of libp2p connectedness: a peer we are
     // not libp2p-connected to may still be dialable over QUIC. So enrich over
@@ -703,7 +708,7 @@ async fn race_both_planes(
     }
 
     for (peer_id, addr) in iroh_targets.iter().cloned() {
-        let wire = wire_addr.clone();
+        let wire = wire_addr;
         in_flight.push(
             async move {
                 // The iroh leg may ride a relay locally (no direct address in the
@@ -747,22 +752,21 @@ async fn race_both_planes(
                         // Composite pivot (parity with the libp2p leg): an honest
                         // whole-bytes miss may still be a peer holding the blob as
                         // RS shards — ask for the manifest over the same ALPN.
-                        let req = crate::p2p::shard_protocol::ShardRequest::GetManifest {
-                            hash: wire.clone(),
-                        };
+                        let req =
+                            crate::p2p::shard_protocol::ShardRequest::GetManifest { cid: wire };
                         let client = crate::p2p_iroh::IrohShardClient::new(leg.endpoint());
                         match tokio::time::timeout(per_peer_timeout, client.request(addr, &req))
                             .await
                         {
                             Ok(Ok(crate::p2p::shard_protocol::ShardResponse::Manifest(
                                 manifest,
-                            ))) if manifest.blob_hash == wire => {
+                            ))) if manifest.blob_cid == wire => {
                                 tracing::debug!(
                                     target: "recovery::transport",
                                     blob_hash = %wire,
                                     source_peer = %peer_id,
                                     transport = "iroh",
-                                    shards = manifest.shard_hashes.len(),
+                                    units = manifest.custody_units().len(),
                                     "peer answered with a shard manifest instead of bytes"
                                 );
                                 FetchOutcome::Manifest {
@@ -796,10 +800,10 @@ async fn race_both_planes(
                     }
                     Ok(Ok(bytes)) => {
                         // Verify parity: the SAME predicate the libp2p leg
-                        // applies to its reply (`blob_fetch::verify_blob_hash`
+                        // applies to its reply (`blob_fetch::verify_fetched_bytes`
                         // on the requested address). Unverified iroh bytes are
                         // discarded here and never reach persistence.
-                        if crate::p2p::blob_fetch::verify_blob_hash(&bytes, &wire) {
+                        if crate::p2p::blob_fetch::verify_fetched_bytes(&bytes, &wire) {
                             crate::metrics::inc_iroh_blob_fetch("ok");
                             crate::p2p::transport_paths::global().record(
                                 &peer_id,
@@ -869,7 +873,7 @@ async fn race_both_planes(
                 }
             }
             // A leg that gave up is just a leg that gave up; keep polling.
-            FetchOutcome::Miss | FetchOutcome::NoCandidates | FetchOutcome::InvalidAddress => {}
+            FetchOutcome::Miss | FetchOutcome::NoCandidates | FetchOutcome::BudgetExhausted => {}
         }
     }
     if let Some(manifest) = manifest_fallback {
@@ -889,6 +893,10 @@ mod tests {
         names.iter().map(|s| s.to_string()).collect()
     }
 
+    fn unit(label: &str) -> ByteCid {
+        elohim_epr::address::compute_bytes_cid(label.as_bytes())
+    }
+
     /// Q4 scheduling test: with NO per-shard inventory at all, each shard
     /// must still get a candidate list, and consecutive shards must prefer a
     /// DIFFERENT first holder — the rotation that spreads load instead of
@@ -897,15 +905,11 @@ mod tests {
     /// practice, since every batch's first pick would be the same peer).
     #[test]
     fn plan_shard_holders_rotates_composite_fallback_across_shards() {
-        let shard_hashes = vec![
-            "sha256-shard0".to_string(),
-            "sha256-shard1".to_string(),
-            "sha256-shard2".to_string(),
-        ];
+        let shard_cids = vec![unit("shard0"), unit("shard1"), unit("shard2")];
         let composite_holders = holders(&["peer-A", "peer-B"]);
         let per_shard_hosts = HashMap::new();
 
-        let plan = plan_shard_holders(&shard_hashes, &composite_holders, &per_shard_hosts);
+        let plan = plan_shard_holders(&shard_cids, &composite_holders, &per_shard_hosts);
         assert_eq!(plan.len(), 3);
 
         // Shard 0 → offset 0 → [A, B]; shard 1 → offset 1 → [B, A]; shard 2
@@ -926,12 +930,12 @@ mod tests {
     /// specific fact beats the generic fallback.
     #[test]
     fn plan_shard_holders_prefers_per_shard_inventory_when_present() {
-        let shard_hashes = vec!["sha256-shard0".to_string(), "sha256-shard1".to_string()];
+        let shard_cids = vec![unit("shard0"), unit("shard1")];
         let composite_holders = holders(&["peer-A", "peer-B"]);
         let mut per_shard_hosts = HashMap::new();
-        per_shard_hosts.insert("sha256-shard1".to_string(), holders(&["peer-C"]));
+        per_shard_hosts.insert(unit("shard1"), holders(&["peer-C"]));
 
-        let plan = plan_shard_holders(&shard_hashes, &composite_holders, &per_shard_hosts);
+        let plan = plan_shard_holders(&shard_cids, &composite_holders, &per_shard_hosts);
         assert_eq!(plan[0].1, vec!["peer-A", "peer-B"]); // no per-shard row → fallback
         assert_eq!(plan[1].1, vec!["peer-C"]); // per-shard row → used verbatim
     }
@@ -941,35 +945,33 @@ mod tests {
     /// `NoCandidates`) rather than panicking on the `index % n` rotation.
     #[test]
     fn plan_shard_holders_handles_no_holders_at_all() {
-        let shard_hashes = vec!["sha256-shard0".to_string()];
-        let plan = plan_shard_holders(&shard_hashes, &[], &HashMap::new());
+        let shard_cids = vec![unit("shard0")];
+        let plan = plan_shard_holders(&shard_cids, &[], &HashMap::new());
         assert_eq!(plan.len(), 1);
         assert!(plan[0].1.is_empty());
     }
 
-    fn manifest(encoding: &str, data_shards: u8, total_shards: u8) -> ShardManifest {
-        ShardManifest {
-            blob_cid: "bafkrei-test".to_string(),
-            blob_hash: "sha256-test".to_string(),
-            total_size: 7,
-            mime_type: "application/octet-stream".to_string(),
-            encoding: encoding.to_string(),
-            data_shards,
-            total_shards,
-            shard_size: 1,
-            shard_hashes: (0..total_shards)
-                .map(|i| format!("sha256-shard-{i}"))
-                .collect(),
-            reach: "commons".to_string(),
-            author_id: None,
-            created_at: "2026-08-23T00:00:00Z".to_string(),
-            verified_at: None,
-        }
+    /// A one-stripe RS(4,3) manifest and its shards (erasure forced on).
+    fn rs_4_7(data: &[u8]) -> (ShardManifest, Vec<crate::sharding::StripeShards>) {
+        crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig {
+            rs_threshold: 0,
+            rs_data_shards: 4,
+            rs_parity_shards: 3,
+        })
+        .encode(data, "application/octet-stream", "commons")
+        .expect("rs manifest")
+    }
+
+    /// An unstriped (chunked) manifest.
+    fn chunked(data: &[u8]) -> ShardManifest {
+        crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default())
+            .create_manifest(data, "application/octet-stream", "commons")
+            .expect("chunked manifest")
     }
 
     #[test]
     fn rs_4_7_stops_admitting_races_at_four_landed_shards() {
-        let rs = manifest("rs-4-7", 4, 7);
+        let (rs, _) = rs_4_7(b"seven bytes of payload");
         let threshold = reconstructible_threshold(&rs);
         let landed = AtomicUsize::new(3);
         assert!(should_start_shard_race(&landed, threshold));
@@ -1015,7 +1017,7 @@ mod tests {
 
     #[test]
     fn rs_4_7_with_three_landed_remains_incomplete() {
-        let rs = manifest("rs-4-7", 4, 7);
+        let (rs, _) = rs_4_7(b"seven bytes of payload");
         let landed = AtomicUsize::new(3);
         assert!(should_start_shard_race(
             &landed,
@@ -1025,7 +1027,7 @@ mod tests {
 
     #[test]
     fn chunked_manifest_never_skips_a_missing_shard() {
-        let chunked = manifest("chunked", 3, 3);
+        let chunked = chunked(b"a small chunked payload");
         let landed = AtomicUsize::new(2);
         assert_eq!(reconstructible_threshold(&chunked), None);
         assert!(should_start_shard_race(&landed, None));
@@ -1057,28 +1059,42 @@ mod tests {
         assert_eq!(plan_race_legs(2, 0), RaceLegs::IrohOnly);
     }
 
-    /// Address hygiene is applied BEFORE either leg exists: a malformed
-    /// content address is terminal on both planes and emits no wire request.
-    #[tokio::test]
-    async fn race_fetch_dual_refuses_a_malformed_address_on_both_planes() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
-        let outcome = race_fetch_dual(
-            "sha256-definitely-not-a-content-address",
-            vec!["peer-A".to_string()],
-            &cmd_tx,
-            |_| true,
-            1,
-            Duration::from_millis(50),
-        )
-        .await;
-        assert!(
-            matches!(outcome, FetchOutcome::InvalidAddress),
-            "expected InvalidAddress, got {outcome:?}"
-        );
-        assert!(
-            cmd_rx.try_recv().is_err(),
-            "no wire request may be issued for a malformed address"
-        );
+    /// A chunked payload reassembles from its chunks in order and is verified
+    /// against the manifest's byte CID; a missing or altered chunk yields nothing.
+    #[test]
+    fn reassemble_chunked_payload_verifies_against_the_blob_cid() {
+        let data: Vec<u8> = (0..20_000u32).flat_map(|n| n.to_le_bytes()).collect();
+        let m = chunked(&data);
+        let mut fetched: HashMap<usize, Vec<u8>> = HashMap::new();
+        let mut offset = 0usize;
+        for (index, chunk) in m.chunks.iter().enumerate() {
+            let len = chunk.len as usize;
+            fetched.insert(index, data[offset..offset + len].to_vec());
+            offset += len;
+        }
+        assert_eq!(reassemble(&m, &mut fetched.clone()), Some(data.clone()));
+
+        let mut altered = fetched.clone();
+        altered.get_mut(&0).expect("chunk 0")[0] ^= 1;
+        assert_eq!(reassemble(&m, &mut altered), None);
+
+        let mut missing = fetched;
+        missing.remove(&0);
+        assert_eq!(reassemble(&m, &mut missing), None);
+    }
+
+    /// A striped payload reassembles from any `data` shards of its stripe.
+    #[test]
+    fn reassemble_striped_payload_from_data_threshold_of_shards() {
+        let data = b"payload reconstructed from four of seven shards".to_vec();
+        let (m, stripes) = rs_4_7(&data);
+        let shards = &stripes[0];
+        // Keep shards 1, 2, 4 and 6 (positions in custody_units()).
+        let mut fetched: HashMap<usize, Vec<u8>> = [1usize, 2, 4, 6]
+            .into_iter()
+            .map(|i| (i, shards[i].clone()))
+            .collect();
+        assert_eq!(reassemble(&m, &mut fetched), Some(data));
     }
 
     #[cfg(feature = "p2p-iroh")]

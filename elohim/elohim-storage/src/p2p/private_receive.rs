@@ -138,11 +138,7 @@ pub async fn preauthorize_private_record(
         return PrivateReceiveVerdict::Keep;
     }
 
-    let digest = record
-        .blob_hash
-        .as_deref()
-        .or(record.blob_cid.as_deref())
-        .and_then(digest_key);
+    let digest = record.blob_cid.as_deref().and_then(digest_key);
     let (custody_for_ward, custody_for_digest) = match standing
         .custody_of(&this_peer_agent, &sender_agent, digest.as_deref())
         .await
@@ -208,17 +204,17 @@ mod tests {
     const THIS_PEER: &str = "uhCAkThisPeerAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const WARD: &str = "uhCAkWardAgentKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const STRANGER: &str = "uhCAkStrangerKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    const DIGEST: &str = "26d7ced97ee329025135f0ad4791b3e24d526b200b9147943450cb9141480406";
+    /// A byte CID (`compute_bytes_cid(b"custody-standing ward blob")`).
+    const DIGEST: &str = "bafkr4igv7j6jlga27parufsnss3qlcjeekj2pdy4loalxc46uts6gumhom";
 
     fn record(reach: &str) -> ContentRecord {
         ContentRecord {
-            id: "bafkreiacquired".to_string(),
+            id: "bafkr4iex67r7rndkemwps6s6eetzbfjmsao3neqtoai64vd2rfavserpq4".to_string(),
             title: "t".to_string(),
             description: None,
             content_type: "issue-report".to_string(),
             content_format: "json".to_string(),
-            blob_hash: Some(DIGEST.to_string()),
-            blob_cid: None,
+            blob_cid: Some(DIGEST.to_string()),
             content_size_bytes: None,
             metadata_json: None,
             reach: reach.to_string(),

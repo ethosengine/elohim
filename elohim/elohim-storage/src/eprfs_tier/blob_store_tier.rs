@@ -7,17 +7,18 @@
 //!
 //! # Preconditions (spec §12.3 rule 5, §17 slice 2, finding A1)
 //!
-//! - **dag-cbor objects.** `BlobStore` files every object under the sha2-256 of its bytes, so a
-//!   tree node (`bafyrei…`, codec 0x71) and a raw leaf (`bafkrei…`, 0x55) are both held; the CID's
-//!   codec decides how bytes are verified and how they are written (`store_dag_cbor` or `store`).
+//! - **Two lanes, by the CID's own profile.** A tree node (`bafyrei…`, dag-cbor + sha2-256) is a
+//!   record and lives on the store's record lane (`store_record`/`get_record`); a leaf is a byte CID
+//!   (`bafkr4i…`, raw + BLAKE3-256) and lives in the payload store (`store`/`get`). Any other
+//!   profile is not held here. Bytes are verified by the address kernel's `verify_cid_any`, which
+//!   dispatches on the CID's declared `(codec, multihash, length)` and fails closed.
 //! - **Off the `/blob/{cid}` route.** That route serves any blob no content row references to an
 //!   anonymous caller (`blob_reach.rs`, honest absence), so a tree object held in the route's own
 //!   store would be served past its root's reach. The tier is therefore built only over a store of
 //!   its own, in [`TIER_SUBDIR`] beside the route's store ([`BlobStoreTier::dedicated`]): the only
 //!   door to its bytes is a `TierEndpoint` fronted by a [`super::RootReachGate`]. The cost is that
 //!   a leaf also published as public content is held twice.
-//! - **The sha256-to-iroh alias** (spec §17 slice 2) is the iroh blob plane's precondition, not
-//!   this tier's: this tier never speaks iroh.
+//! - This tier never speaks iroh.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -29,14 +30,14 @@ use eprfs_core::{
     EprfsStorage, FetchPolicy, Result,
 };
 
-use crate::blob_store::BlobStore;
+use elohim_epr::address::{verify_cid_any, ByteCid, Verify};
+
+use crate::blob_store::{BlobStore, Exists};
 use crate::epr_codec::DAG_CBOR_CODEC;
 use crate::error::StorageError;
 
 /// The directory, under the storage root, that holds the tier's own store.
 pub const TIER_SUBDIR: &str = "eprfs-tier";
-
-const RAW_CODEC: u64 = 0x55;
 
 /// The peer's own store as an eprfs tier. `tier_id` is `own` (the default): a serving
 /// `TierEndpoint` stamps its agent key on what it answers for this store.
@@ -61,10 +62,35 @@ impl BlobStoreTier {
         &self.store
     }
 
-    fn sha256_name(cid: &BlobCid) -> String {
-        let digest = cid.as_cid().hash().digest();
-        format!("sha256-{}", hex::encode(digest))
+    /// Where `cid` lives in the store: the record lane, the payload store, or nowhere.
+    fn lane(cid: &BlobCid) -> Lane {
+        if cid.as_cid().codec() == DAG_CBOR_CODEC {
+            return Lane::Record;
+        }
+        match ByteCid::try_from(*cid.as_cid()) {
+            Ok(byte_cid) => Lane::Payload(byte_cid),
+            Err(_) => Lane::NotHeld,
+        }
     }
+
+    async fn read(&self, cid: &BlobCid) -> std::result::Result<Bytes, StorageError> {
+        match Self::lane(cid) {
+            Lane::Record => self.store.get_record(cid.as_cid()).await,
+            Lane::Payload(byte_cid) => self.store.get(&byte_cid).await,
+            Lane::NotHeld => Err(StorageError::NotFound(cid.to_string())),
+        }
+    }
+}
+
+/// The store lane a CID's profile names.
+enum Lane {
+    Record,
+    Payload(ByteCid),
+    NotHeld,
+}
+
+fn verified(cid: &BlobCid, bytes: &[u8]) -> bool {
+    verify_cid_any(cid.as_cid(), bytes) == Verify::Verified
 }
 
 /// `StorageError` → `EprfsError`, keeping absence apart from failure (A17): only a not-found is
@@ -90,60 +116,70 @@ impl EprfsStorage for BlobStoreTier {
     /// Whether the object is held here. Probe through the store's metadata path so only a
     /// confirmed absence is `Missing`; unreadable storage remains an error (A17).
     async fn has_blob(&self, cid: &BlobCid) -> Result<BlobPresence> {
-        match self.store.size(&Self::sha256_name(cid)).await {
-            Ok(_) => Ok(BlobPresence::Local),
-            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
-                Ok(BlobPresence::Missing)
-            }
-            Err(error) => Err(storage_error(cid, error)),
+        match Self::lane(cid) {
+            // The length read separates a confirmed absence from unreadable storage,
+            // which the structural `exists` probe folds together.
+            Lane::Payload(byte_cid) => match self.store.size(&byte_cid).await {
+                Ok(_) => match self.store.exists(&byte_cid).await {
+                    Exists::Verified => Ok(BlobPresence::Local),
+                    Exists::Absent | Exists::Quarantined => Ok(BlobPresence::Missing),
+                },
+                Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
+                    Ok(BlobPresence::Missing)
+                }
+                Err(error) => Err(storage_error(cid, error)),
+            },
+            Lane::Record => match self.store.get_record(cid.as_cid()).await {
+                Ok(_) => Ok(BlobPresence::Local),
+                Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
+                    Ok(BlobPresence::Missing)
+                }
+                Err(error) => Err(storage_error(cid, error)),
+            },
+            Lane::NotHeld => Ok(BlobPresence::Missing),
         }
     }
 
     /// The held bytes, verified against `cid`'s own codec. Both policies answer from this store
     /// alone (contract 11). Bytes that fail their address are `Corrupt`, never returned.
     async fn fetch_blob(&self, cid: &BlobCid, _policy: FetchPolicy) -> Result<BlobHandle> {
-        let bytes = self
-            .store
-            .get(&Self::sha256_name(cid))
-            .await
-            .map_err(|e| storage_error(cid, e))?;
-        if !cid.verifies(&bytes) {
+        let bytes = self.read(cid).await.map_err(|e| storage_error(cid, e))?;
+        if !verified(cid, &bytes) {
             return Err(EprfsError::Corrupt(cid.clone()));
         }
         Ok(BlobHandle {
             cid: cid.clone(),
-            bytes: Bytes::from(bytes),
+            bytes,
         })
     }
 
-    /// Stores raw bytes and returns their raw-codec CID.
+    /// Stores raw bytes and returns their byte CID (raw + BLAKE3-256).
     async fn put_blob(&self, bytes: Bytes) -> Result<BlobCid> {
-        self.store
+        let stored = self
+            .store
             .store(&bytes)
             .await
             .map_err(|e| EprfsError::Storage(e.to_string()))?;
-        Ok(BlobCid::compute_raw(&bytes))
+        BlobCid::parse(&stored.cid.to_string()).map_err(|e| EprfsError::Storage(e.to_string()))
     }
 
-    /// Stores bytes under an explicit raw or dag-cbor CID, after checking they are its bytes.
+    /// Stores bytes under an explicit byte or record CID, after checking they are its bytes.
     async fn put_blob_verified(&self, cid: &BlobCid, bytes: Bytes) -> Result<()> {
-        if !cid.verifies(&bytes) {
+        if !verified(cid, &bytes) {
             return Err(EprfsError::Storage(format!(
                 "refusing to store bytes that do not verify against {cid}"
             )));
         }
-        let stored = match cid.as_cid().codec() {
-            RAW_CODEC => self.store.store(&bytes).await,
-            DAG_CBOR_CODEC => self.store.store_dag_cbor(&bytes).await,
-            other => {
+        let stored = match Self::lane(cid) {
+            Lane::Payload(_) => self.store.store(&bytes).await.map(|_| ()),
+            Lane::Record => self.store.store_record(&bytes).await.map(|_| ()),
+            Lane::NotHeld => {
                 return Err(EprfsError::Storage(format!(
-                    "codec {other:#x} is not held by the blob-store tier"
+                    "{cid}: this profile is not held by the blob-store tier"
                 )))
             }
         };
-        stored
-            .map(|_| ())
-            .map_err(|e| EprfsError::Storage(e.to_string()))
+        stored.map_err(|e| EprfsError::Storage(e.to_string()))
     }
 
     /// A blob store publishes no attestations.
@@ -157,11 +193,17 @@ impl EprfsStorage for BlobStoreTier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elohim_epr::address::compute_bytes_cid;
     use eprfs_core::{
         BatchAnswer, BatchItem, CollectSink, ItemAbsence, TreeEntry, TreeEntryKind, TreeNode,
         TreePath,
     };
     use eprfs_serve::testing::assert_leaf_contract;
+
+    /// A leaf's byte CID (raw + BLAKE3-256), as the tier names what it holds.
+    fn leaf(bytes: &[u8]) -> BlobCid {
+        BlobCid::parse(&compute_bytes_cid(bytes).to_string()).unwrap()
+    }
 
     async fn tier() -> (tempfile::TempDir, BlobStoreTier) {
         let dir = tempfile::tempdir().unwrap();
@@ -173,18 +215,18 @@ mod tests {
     async fn the_blob_store_tier_passes_the_leaf_contract() {
         let (_dir, tier) = tier().await;
         let held_bytes = Bytes::from_static(b"held by the blob-store tier");
-        let held = BlobCid::compute_raw(&held_bytes);
+        let held = leaf(&held_bytes);
         tier.put_blob_verified(&held, held_bytes).await.unwrap();
-        let missing = BlobCid::compute_raw(b"never stored");
+        let missing = leaf(b"never stored");
         assert_leaf_contract(&tier, &held, &missing).await;
     }
 
     #[tokio::test]
     async fn a_dag_cbor_tree_node_round_trips_under_its_own_codec() {
         let (_dir, tier) = tier().await;
-        let leaf = Bytes::from_static(b"a leaf");
-        let leaf_cid = tier.put_blob(leaf.clone()).await.unwrap();
-        assert_eq!(leaf_cid, BlobCid::compute_raw(&leaf));
+        let leaf_bytes = Bytes::from_static(b"a leaf");
+        let leaf_cid = tier.put_blob(leaf_bytes.clone()).await.unwrap();
+        assert_eq!(leaf_cid, leaf(&leaf_bytes));
         let node = TreeNode::new(vec![TreeEntry {
             name: b"leaf".to_vec(),
             kind: TreeEntryKind::File {
@@ -230,7 +272,7 @@ mod tests {
     async fn bytes_that_fail_their_address_are_refused_and_never_returned() {
         let (dir, tier) = tier().await;
         let real = Bytes::from_static(b"the real bytes");
-        let cid = BlobCid::compute_raw(&real);
+        let cid = leaf(&real);
         assert!(tier
             .put_blob_verified(&cid, Bytes::from_static(b"other bytes"))
             .await
@@ -240,13 +282,12 @@ mod tests {
         // A held object corrupted on disk reads as the typed `Corrupt`, and a batch names it
         // `Integrity`, never an arrival.
         tier.put_blob_verified(&cid, real).await.unwrap();
-        let name = BlobStoreTier::sha256_name(&cid);
-        let hex = name.trim_start_matches("sha256-");
+        let name = cid.to_string();
         let path = dir
             .path()
             .join(TIER_SUBDIR)
             .join("blobs")
-            .join(&hex[..4])
+            .join(&name[7..11])
             .join(&name);
         std::fs::write(&path, b"tampered").unwrap();
         match tier.fetch_blob(&cid, FetchPolicy::LocalOnly).await {
@@ -276,10 +317,13 @@ mod tests {
         let route = BlobStore::new(dir.path()).await.unwrap();
         let tier = BlobStoreTier::dedicated(dir.path()).await.unwrap();
         let bytes = Bytes::from_static(b"a tree object under a private root");
-        let cid = BlobCid::compute_raw(&bytes);
+        let cid = leaf(&bytes);
         tier.put_blob_verified(&cid, bytes).await.unwrap();
         assert!(
-            !route.exists(&BlobStoreTier::sha256_name(&cid)).await,
+            route
+                .exists(&ByteCid::parse(&cid.to_string()).unwrap())
+                .await
+                != Exists::Verified,
             "A1: an object the tier holds is not reachable through the /blob route's store"
         );
         assert_eq!(tier.store().root_dir(), dir.path().join(TIER_SUBDIR));
@@ -289,7 +333,7 @@ mod tests {
     async fn an_unreadable_store_is_not_a_missing_blob() {
         let (dir, tier) = tier().await;
         let bytes = Bytes::from_static(b"presence is observed, not guessed");
-        let cid = BlobCid::compute_raw(&bytes);
+        let cid = leaf(&bytes);
         assert_eq!(tier.has_blob(&cid).await.unwrap(), BlobPresence::Missing);
         tier.put_blob_verified(&cid, bytes).await.unwrap();
         assert_eq!(tier.has_blob(&cid).await.unwrap(), BlobPresence::Local);

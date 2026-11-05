@@ -5,7 +5,7 @@
 //!
 //! The genesis seeder stamps reach on every content row by PATCHing
 //! `{p2pPublishedAt, reach}`. The substrate-correct PATCH path routes any patch
-//! touching a DNA-notarized field (`reach`/`blob_hash`) through
+//! touching a DNA-notarized field (`reach`/`blob_cid`) through
 //! `ContentService::update_via_conductor` so the re-authored entry reaches the
 //! DHT. But when the in-pod conductor's cells are still `CellDisabled` during the
 //! seed/boot window, those conductor calls fail; the seeder's circuit latches
@@ -618,8 +618,8 @@ pub async fn run_once(
             metadata: None,
             tags: None,
             reach: None,
-            blob_hash: None,
-            server_blob_hash: None,
+            blob_cid: None,
+            server_blob_cid: None,
             p2p_published_at: None,
         };
         // WHY NOW. This loop runs on a clock, and a row stays a candidate until

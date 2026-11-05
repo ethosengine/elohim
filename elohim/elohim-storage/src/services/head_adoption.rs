@@ -1500,15 +1500,13 @@ pub fn release_channel_owns_serving(local_channel: Option<&str>, incoming: Optio
 /// it lives on its CHANNEL's. So the candidate a candidate-channel doorway
 /// serves is: the channel's staging candidate (a release version), proven
 /// through this conductor, whose manifest's `(app = slug, kind = browser)`
-/// artifact names the bytes. The `sha256-<hex>` spelling is what the doorway's
-/// `parse_candidate_head` already consumes as `stagingCandidateBlobHash`, so
-/// no doorway change is needed.
+/// artifact names the bytes, by byte CID (`stagingCandidateBlobCid`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundSlugCandidate {
     /// The staged release version's action hash on the channel.
     pub candidate: Option<String>,
-    /// That release's browser bytes for this slug, `sha256-<hex>`.
-    pub blob_hash: Option<String>,
+    /// That release's browser bytes for this slug, by byte CID.
+    pub blob_cid: Option<String>,
     pub state: elohim_views::lamad::StagingCandidateState,
 }
 
@@ -1531,7 +1529,7 @@ pub fn candidate_blob_for_bound_slug(
         .artifacts
         .iter()
         .find(|a| a.app.as_deref() == Some(slug) && a.kind == Some(AppArtifactKind::Browser))
-        .map(|a| format!("sha256-{}", a.sha256.to_ascii_lowercase()))
+        .map(|a| a.blob_cid.clone())
 }
 
 /// **N4.** Resolve a bound slug's candidate on its CHANNEL's election.
@@ -1550,7 +1548,7 @@ pub async fn candidate_head_for_bound_slug(
 
     let unavailable = BoundSlugCandidate {
         candidate: None,
-        blob_hash: None,
+        blob_cid: None,
         state: StagingCandidateState::Unavailable,
     };
     let election = match tokio::time::timeout_at(
@@ -1568,7 +1566,7 @@ pub async fn candidate_head_for_bound_slug(
     else {
         return BoundSlugCandidate {
             candidate: None,
-            blob_hash: None,
+            blob_cid: None,
             state: StagingCandidateState::None,
         };
     };
@@ -1595,10 +1593,10 @@ pub async fn candidate_head_for_bound_slug(
         Ok(Ok(Some(proven))) => proven,
         _ => return unavailable,
     };
-    let blob_hash = candidate_blob_for_bound_slug(channel_id, slug, &proven.content.metadata_json);
+    let blob_cid = candidate_blob_for_bound_slug(channel_id, slug, &proven.content.metadata_json);
     BoundSlugCandidate {
         candidate: Some(candidate),
-        blob_hash,
+        blob_cid,
         state: StagingCandidateState::Staged,
     }
 }
@@ -2593,7 +2591,7 @@ fn adopt_local(
     // same reason.
     // The canonical answer comes from this node's own conductor and carries
     // the complete notarized Content entry. Its metadata is therefore the
-    // authority for reserved serving fields such as `serverBlobHash`, including
+    // authority for reserved serving fields such as `serverBlobCid`, including
     // an explicit `{}` that removes obsolete server code. Keep this patch on
     // the SAME guarded stamp: a stale canonical answer that cannot move the
     // head also cannot mutate metadata, while a fill or same-head refresh can
@@ -2646,7 +2644,7 @@ fn adopt_local(
         }
     }
     if local_declared == Some(head.head_action_hash.as_str()) {
-        let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
+        let row_blob_hash = match content_diesel::blob_cid_for(&mut conn, ctx, id) {
             Ok(v) => v,
             Err(e) => {
                 // A pointer we cannot read is a pointer we do not heal. The head
@@ -4665,8 +4663,9 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: Some("sha256-browser".to_string()),
-                blob_cid: Some("sha256-browser".to_string()),
+                blob_cid: Some(
+                    "bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi".to_string(),
+                ),
                 content_size_bytes: Some(10),
                 metadata_json: Some(metadata.to_string()),
                 reach: "commons".to_string(),
@@ -4815,7 +4814,7 @@ mod tests {
         )
         .expect("read content")
         .expect("content exists")
-        .server_blob_hash
+        .server_blob_cid
     }
 
     fn body(pool: &DbPool, id: &str) -> Option<String> {
@@ -5086,13 +5085,15 @@ mod tests {
         let ctx = AppContext::default_lamad();
         let mut head = wire(true);
         head.content.id = "refresh".to_string();
-        head.content.metadata_json = r#"{"serverBlobHash":"sha256-server-new"}"#.to_string();
+        head.content.metadata_json =
+            r#"{"serverBlobCid":"bafkr4ihzns5un4wj5vwywdywds3jxowmya534pk6qnagp44wi64uywsypi"}"#
+                .to_string();
         let head_hash = head.head_action_hash.to_string();
 
         seed_adoption_content(
             &pool,
             "refresh",
-            r#"{"serverBlobHash":"sha256-server-old"}"#,
+            r#"{"serverBlobCid":"bafkr4ig4wrjpj24fzgtjevdjhi7iakkyavaqqmr3tpit6hsia2whj4ydla"}"#,
         );
         {
             let mut conn = pool.get().expect("connection");
@@ -5115,7 +5116,7 @@ mod tests {
         );
         assert_eq!(
             server_hash(&pool, "refresh").as_deref(),
-            Some("sha256-server-new")
+            Some("bafkr4ihzns5un4wj5vwywdywds3jxowmya534pk6qnagp44wi64uywsypi")
         );
 
         let accepted_head = head.head_action_hash.clone();
@@ -5129,7 +5130,7 @@ mod tests {
         );
         assert_eq!(
             server_hash(&pool, "refresh").as_deref(),
-            Some("sha256-server-new"),
+            Some("bafkr4ihzns5un4wj5vwywdywds3jxowmya534pk6qnagp44wi64uywsypi"),
             "an older canonical answer cannot mutate accepted metadata"
         );
 
@@ -5148,7 +5149,9 @@ mod tests {
         );
 
         head.canonical = false;
-        head.content.metadata_json = r#"{"serverBlobHash":"sha256-unverified"}"#.to_string();
+        head.content.metadata_json =
+            r#"{"serverBlobCid":"bafkr4ieqlea34rcjagc6pyc7kyzdwtdjumatjdvotnjatvjqu37djen5ze"}"#
+                .to_string();
         assert_eq!(
             adopt_local(&pool, &ctx, "refresh", &head, Some(&head_hash)),
             AdoptOutcome::Held
@@ -5162,14 +5165,16 @@ mod tests {
         seed_adoption_content(&pool, "fill", "{}");
         head.canonical = true;
         head.content.id = "fill".to_string();
-        head.content.metadata_json = r#"{"serverBlobHash":"sha256-server-fill"}"#.to_string();
+        head.content.metadata_json =
+            r#"{"serverBlobCid":"bafkr4ianmx22nop2gd4g3jfrrygf3jt7ivahyu7yrat4rrpxob54dayzyi"}"#
+                .to_string();
         assert_eq!(
             adopt_local(&pool, &ctx, "fill", &head, None),
             AdoptOutcome::Adopted
         );
         assert_eq!(
             server_hash(&pool, "fill").as_deref(),
-            Some("sha256-server-fill")
+            Some("bafkr4ianmx22nop2gd4g3jfrrygf3jt7ivahyu7yrat4rrpxob54dayzyi")
         );
     }
 
@@ -5205,7 +5210,8 @@ mod tests {
 
         let mut head = wire(true);
         head.content.id = "move-carries-pointer".to_string();
-        head.content.blob_cid = Some("sha256-conductor-answer".to_string());
+        head.content.blob_cid =
+            Some("bafkr4idw2ti24s6kcxw7mzxad4zl7obyzgp2d66ncrfaajxfhn77bgla44".to_string());
         head.content.content_size_bytes = Some(4096);
         head.canonical_declared_at = Some(2);
         head.canonical_earned = Some(true);
@@ -5232,8 +5238,8 @@ mod tests {
         .expect("read content")
         .expect("content exists");
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-conductor-answer"),
+            row.blob_cid.as_deref(),
+            Some("bafkr4idw2ti24s6kcxw7mzxad4zl7obyzgp2d66ncrfaajxfhn77bgla44"),
             "T-1: an adopted move must write the head's own blob pointer"
         );
         assert_eq!(
@@ -5319,11 +5325,14 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
-            Some(("sha256-fresh".to_string(), 4096))
+            Some((
+                "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                4096
+            ))
         );
         // The POINTER is trimmed — padding around a blob address is noise. The
         // HEAD is not; see `the_head_test_is_untrimmed_so_the_two_layers_cannot_disagree`.
@@ -5332,11 +5341,14 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some(" sha256-fresh "),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some(" bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq "),
                 Some(1),
             ),
-            Some(("sha256-fresh".to_string(), 1))
+            Some((
+                "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                1
+            ))
         );
         // A row already naming the value writes NOTHING — a converged corpus
         // heals zero pointers per sweep.
@@ -5345,8 +5357,8 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-x"),
-                Some("sha256-x"),
+                Some("bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"),
+                Some("bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"),
                 Some(9),
             ),
             None
@@ -5355,7 +5367,14 @@ mod tests {
         // with no pointer must not blank a row that has one.
         for empty in [None, Some(""), Some("   ")] {
             assert_eq!(
-                pointer_heal_patch(true, Some(HEAD_A), HEAD_A, Some("sha256-x"), empty, Some(9)),
+                pointer_heal_patch(
+                    true,
+                    Some(HEAD_A),
+                    HEAD_A,
+                    Some("bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"),
+                    empty,
+                    Some(9)
+                ),
                 None
             );
         }
@@ -5386,8 +5405,8 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 None,
             ),
             None
@@ -5401,11 +5420,14 @@ mod tests {
                     true,
                     Some(HEAD_A),
                     HEAD_A,
-                    Some("sha256-stale"),
-                    Some("sha256-fresh"),
+                    Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                    Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                     Some(huge),
                 ),
-                Some(("sha256-fresh".to_string(), i32::MAX))
+                Some((
+                    "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                    i32::MAX
+                ))
             );
         }
         // The i32 boundary itself is exact, not clamped.
@@ -5414,11 +5436,14 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(i32::MAX as u64),
             ),
-            Some(("sha256-fresh".to_string(), i32::MAX))
+            Some((
+                "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                i32::MAX
+            ))
         );
         // A zero-byte blob is a real size, not an absence.
         assert_eq!(
@@ -5426,11 +5451,14 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(0),
             ),
-            Some(("sha256-fresh".to_string(), 0))
+            Some((
+                "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                0
+            ))
         );
     }
 
@@ -5456,8 +5484,8 @@ mod tests {
                     true,
                     Some(&padded),
                     HEAD_A,
-                    Some("sha256-stale"),
-                    Some("sha256-fresh"),
+                    Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                    Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                     Some(4096),
                 ),
                 None,
@@ -5482,8 +5510,8 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_B,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             None
@@ -5493,8 +5521,8 @@ mod tests {
                 true,
                 None,
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             None
@@ -5516,8 +5544,8 @@ mod tests {
                 false,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             None
@@ -7305,7 +7333,9 @@ mod tests {
 
     #[test]
     fn only_a_channel_id_binds_a_slug() {
-        let bound = format!(r#"{{"releaseChannel":"{CHANNEL}","serverBlobHash":"sha256-s"}}"#);
+        let bound = format!(
+            r#"{{"releaseChannel":"{CHANNEL}","serverBlobCid":"bafkr4ib5dwjcgd7lnw2gsuzpe3m6fv5lfonhtausjqtqnlc2rftzovxgx4"}}"#
+        );
         assert_eq!(
             bound_release_channel(Some(&bound)).as_deref(),
             Some(CHANNEL)
@@ -7395,8 +7425,8 @@ mod tests {
     }
 
     /// N4's pure half: the candidate release's browser bytes for THIS slug,
-    /// in the `sha256-<hex>` spelling the doorway already parses — and
-    /// nothing for a release of another channel, another slug, or no release.
+    /// named by the artifact's byte CID — and nothing for a release of another
+    /// channel, another slug, or no release.
     #[test]
     fn a_bound_slugs_candidate_is_its_browser_artifact_on_the_channel() {
         let meta = app_bundle_release_metadata();
@@ -7407,13 +7437,13 @@ mod tests {
             .unwrap()
             .iter()
             .find(|a| a["app"] == "lamad-spa" && a["kind"] == "browser")
-            .unwrap()["sha256"]
+            .unwrap()["blobCid"]
             .as_str()
             .unwrap()
             .to_string();
         assert_eq!(
             candidate_blob_for_bound_slug(CHANNEL, "lamad-spa", &meta),
-            Some(format!("sha256-{lamad_browser}"))
+            Some(lamad_browser)
         );
         assert_eq!(
             candidate_blob_for_bound_slug("runtime:app-bundle:alpha:canary", "lamad-spa", &meta),

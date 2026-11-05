@@ -326,7 +326,7 @@ fn row_is_still_settled(
         return false;
     };
     // A pointer that cannot be read, or is absent, settles nothing.
-    let Ok(Some(blob)) = content_diesel::blob_hash_for(&mut conn, ctx, id) else {
+    let Ok(Some(blob)) = content_diesel::blob_cid_for(&mut conn, ctx, id) else {
         return false;
     };
     settled.is_settled(id, &declared, &blob)
@@ -414,7 +414,7 @@ async fn heal_one(
             return PointerAuditOutcome::Error;
         }
     };
-    let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
+    let row_blob_hash = match content_diesel::blob_cid_for(&mut conn, ctx, id) {
         Ok(v) => v,
         Err(e) => {
             // A pointer we cannot read is a pointer we do not heal — same
@@ -619,7 +619,7 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-released-by-the-vehicle"),
+                Some("bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu"),
                 Some("sha256-named-by-the-legacy-head"),
                 Some(42),
             ),
@@ -659,11 +659,14 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
-            PointerAuditDecision::Heal("sha256-fresh".to_string(), 4096)
+            PointerAuditDecision::Heal(
+                "bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq".to_string(),
+                4096
+            )
         );
     }
 
@@ -680,8 +683,8 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_B,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             PointerAuditDecision::Skip(crate::metrics::PointerAuditOutcome::InStep)
@@ -699,8 +702,8 @@ mod tests {
                 false,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-stale"),
-                Some("sha256-fresh"),
+                Some("bafkr4igwn2wkj3lqrxr27aswsbtceocamjjjipjnsbeb4jb6hitgl3akwq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             PointerAuditDecision::Skip(crate::metrics::PointerAuditOutcome::NotCanonical)
@@ -718,8 +721,8 @@ mod tests {
                 true,
                 Some(HEAD_A),
                 HEAD_A,
-                Some("sha256-fresh"),
-                Some("sha256-fresh"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
                 Some(4096),
             ),
             PointerAuditDecision::Skip(crate::metrics::PointerAuditOutcome::InStep)
@@ -752,8 +755,7 @@ mod candidate_query_tests {
                 content_type TEXT NOT NULL DEFAULT 'concept',
                 content_format TEXT NOT NULL DEFAULT 'markdown',
                 content_body TEXT,
-                blob_hash TEXT,
-                server_blob_hash TEXT,
+                server_blob_cid TEXT,
                 blob_cid TEXT,
                 content_size_bytes INTEGER,
                 metadata_json TEXT,
@@ -811,13 +813,13 @@ mod candidate_query_tests {
             &mut conn,
             "declared-with-pointer",
             Some(HEAD_A),
-            Some("bafkrei-fresh"),
+            Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
         );
         insert_row(
             &mut conn,
             "undeclared-with-pointer",
             None,
-            Some("bafkrei-fresh"),
+            Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
         );
 
         let candidates =
@@ -839,7 +841,7 @@ mod candidate_query_tests {
                 &mut conn,
                 &format!("row-{i}"),
                 Some(HEAD_A),
-                Some("bafkrei-fresh"),
+                Some("bafkr4igppsrdpaizzilt7vxxuxyfwxjufr2s7yquo3ysvue3jqtfmho3dq"),
             );
         }
 

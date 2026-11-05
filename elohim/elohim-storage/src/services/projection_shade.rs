@@ -386,9 +386,13 @@ mod tests {
         }
 
         let blob_store = std::sync::Arc::new(
-            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            crate::blob_store::BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = crate::http::HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_db_pool(pool.clone());
@@ -444,9 +448,13 @@ mod tests {
         set_shaded(PROJECT_EPR, true).unwrap();
 
         let blob_store = std::sync::Arc::new(
-            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            crate::blob_store::BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = crate::http::HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_db_pool(crate::test_util::test_pool());

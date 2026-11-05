@@ -456,7 +456,7 @@ pub fn pointer_would_be_left_behind(
         .ok()
         .and_then(|mut c| content_diesel::get_content(&mut c, ctx, id, MinTrust::Invisible).ok())
         .flatten()
-        .is_some_and(|row| row.blob_hash.as_deref().is_some_and(|b| !b.is_empty()))
+        .is_some_and(|row| row.blob_cid.as_deref().is_some_and(|b| !b.is_empty()))
 }
 
 /// The blobs a version needs to be served: its browser blob and, when the
@@ -654,8 +654,9 @@ pub(crate) mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "html5-app".to_string(),
-                blob_hash: Some("sha256-aaaa".to_string()),
-                blob_cid: Some("sha256-aaaa".to_string()),
+                blob_cid: Some(
+                    "bafkr4ieq6wkcxrzrz2yggxqssytshbkca25hmxzv74aqiibarrm7gfmhyq".to_string(),
+                ),
                 content_size_bytes: Some(10),
                 metadata_json: Some("{}".to_string()),
                 reach: "commons".to_string(),
@@ -695,7 +696,7 @@ pub(crate) mod tests {
         .unwrap();
         (
             c.declared_head_action_hash,
-            c.blob_hash,
+            c.blob_cid,
             c.canonical_declared_at,
         )
     }
@@ -853,14 +854,18 @@ pub(crate) mod tests {
         let pool = pool_with_row_at_a();
         let v = verifier(Verdict::Proves(evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let outcome = run(&v, &courier(HEAD_B), &bytes(true), &memo(), &pool, HEAD_B).await;
         assert_eq!(outcome, CourierOutcome::Stamped);
         assert_eq!(
             row(&pool),
-            (Some(HEAD_B.into()), Some("sha256-bbbb".into()), Some(AT_B)),
+            (
+                Some(HEAD_B.into()),
+                Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm".into()),
+                Some(AT_B)
+            ),
             "head, pointer and the author's election clock move as one"
         );
     }
@@ -871,7 +876,7 @@ pub(crate) mod tests {
         let pool = pool_with_row_at_a();
         let v = verifier(Verdict::Proves(evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let b = bytes(false);
@@ -880,11 +885,18 @@ pub(crate) mod tests {
         assert!(outcome.retry_warranted());
         assert_eq!(
             row(&pool),
-            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+            (
+                Some(HEAD_A.into()),
+                Some("bafkr4ieq6wkcxrzrz2yggxqssytshbkca25hmxzv74aqiibarrm7gfmhyq".into()),
+                Some(AT_A)
+            )
         );
         assert_eq!(
             *b.requested.lock().unwrap(),
-            vec![("sha256-bbbb".to_string(), COURIER.to_string())]
+            vec![(
+                "bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm".to_string(),
+                COURIER.to_string()
+            )]
         );
     }
 
@@ -893,7 +905,7 @@ pub(crate) mod tests {
         let pool = pool_with_row_at_a();
         let v = verifier(Verdict::Proves(evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let outcome = run(&v, &courier(HEAD_A), &bytes(true), &memo(), &pool, HEAD_B).await;
@@ -916,14 +928,18 @@ pub(crate) mod tests {
         let pool = pool_with_row_at_a();
         let v = verifier(Verdict::Proves(evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_A - 1,
         )));
         let outcome = run(&v, &courier(HEAD_B), &bytes(true), &memo(), &pool, HEAD_B).await;
         assert_eq!(outcome, CourierOutcome::StampRefused);
         assert_eq!(
             row(&pool),
-            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+            (
+                Some(HEAD_A.into()),
+                Some("bafkr4ieq6wkcxrzrz2yggxqssytshbkca25hmxzv74aqiibarrm7gfmhyq".into()),
+                Some(AT_A)
+            )
         );
     }
 
@@ -1076,7 +1092,7 @@ pub(crate) mod tests {
         );
         let v = verifier(Verdict::Proves(evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let f = courier(HEAD_B);
@@ -1120,13 +1136,16 @@ pub(crate) mod tests {
         let entry: ContentEntry = serde_json::from_value(serde_json::json!({
             "id": ID, "content_type": "concept", "title": "t", "description": "",
             "content_format": "html5-app", "reach": "commons",
-            "blob_cid": "sha256-browser",
-            "metadata_json": r#"{"serverBlobHash":"sha256-server"}"#,
+            "blob_cid": "bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi",
+            "metadata_json": r#"{"serverBlobCid":"bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m"}"#,
         }))
         .unwrap();
         assert_eq!(
             bytes_needed(&entry),
-            vec!["sha256-browser", "sha256-server"]
+            vec![
+                "bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi",
+                "bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m"
+            ]
         );
     }
 
@@ -1162,12 +1181,20 @@ pub(crate) mod tests {
         assert_eq!(patch_from_proven(&entry("", None)).content_body, None);
         assert_eq!(move_patch_from_proven(&entry("", None)).content_body, None);
         assert_eq!(
-            patch_from_proven(&entry("", Some("bafkreiblob"))).content_body,
+            patch_from_proven(&entry(
+                "",
+                Some("bafkr4ibd7avcsuzi4eliah6f5o43qtb4de6tvdzmgfp7i6x3autnahy7sq")
+            ))
+            .content_body,
             Some(None),
             "a version that moved its bytes behind a blob clears the stale inline body"
         );
         assert_eq!(
-            move_patch_from_proven(&entry("", Some("bafkreiblob"))).content_body,
+            move_patch_from_proven(&entry(
+                "",
+                Some("bafkr4ibd7avcsuzi4eliah6f5o43qtb4de6tvdzmgfp7i6x3autnahy7sq")
+            ))
+            .content_body,
             Some(None)
         );
     }

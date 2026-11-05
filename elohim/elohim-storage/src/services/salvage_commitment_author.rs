@@ -777,10 +777,11 @@ mod tests {
             .unwrap();
         // Mark the existing provider as freshly hosting → honored = 1 (< target 2).
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-        crate::db::peer_blob_inventory::apply_snapshot(
+        crate::db::peer_blob_inventory::apply_delta(
             conn,
             provider,
             std::slice::from_ref(&blob.to_string()),
+            &[],
             1,
             &when,
         )
@@ -797,7 +798,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "a".repeat(64);
+        let blob = elohim_epr::address::compute_bytes_cid(b"under-replicated blob").to_string();
         seed_under_replicated_blob(&mut conn, "uhCAk-prov", "uhCAk-steward", &blob, now);
         // The provider is in the salvage pool; self is appended by build_candidates.
         seed_capacity(&mut conn, "uhCAk-prov");
@@ -863,7 +864,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "a".repeat(64);
+        let blob = elohim_epr::address::compute_bytes_cid(b"under-replicated blob").to_string();
         // A transport-id self_cid (the production hazard): self_cid is a libp2p id
         // but no agent_cid is resolvable.
         seed_under_replicated_blob(&mut conn, "uhCAk-prov", "uhCAk-steward", &blob, now);
@@ -913,7 +914,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "a".repeat(64);
+        let blob = elohim_epr::address::compute_bytes_cid(b"under-replicated blob").to_string();
         seed_under_replicated_blob(&mut conn, "uhCAk-prov", "uhCAk-steward", &blob, now);
         seed_capacity(&mut conn, "uhCAk-prov");
 

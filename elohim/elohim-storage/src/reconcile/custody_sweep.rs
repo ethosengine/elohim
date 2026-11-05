@@ -34,6 +34,7 @@ use crate::db::DbPool;
 use crate::p2p::blob_fetch::{finalize_fetch_success, race_fetch, FetchOutcome};
 use crate::p2p::{P2PCommand, ReconciliationMetrics};
 use crate::reconcile::custody::FetchKicker;
+use elohim_epr::address::ByteCid;
 
 /// Default cooldown when `custody_sweep_seconds` is unset or disabled (0).
 /// Mirrors the `run()` sweep-timer default so the gate and the timer agree on
@@ -235,7 +236,9 @@ pub struct RaceFetchKicker {
 }
 
 impl FetchKicker for RaceFetchKicker {
-    fn kick(&self, blob_hash: &str, candidates: Vec<String>) {
+    fn kick(&self, blob_cid: &ByteCid, candidates: Vec<String>) {
+        let blob_hash = blob_cid.to_string();
+        let blob_hash = blob_hash.as_str();
         // T23 review fix #1: bound concurrent in-flight kicks via a
         // semaphore. Under reconnect bursts (cluster restart) an unbounded
         // spawn-per-(missing × candidate) explosion could exhaust the r2d2
@@ -287,6 +290,7 @@ impl FetchKicker for RaceFetchKicker {
         let timeout = Duration::from_secs(self.fetch_blob_timeout_seconds.max(1));
         let metrics = self.metrics.clone();
         let hash_owned = blob_hash.to_string();
+        let cid_owned = *blob_cid;
 
         // The kick atomic is incremented before scheduling so a saturated
         // tokio runtime cannot drop the count silently.
@@ -321,7 +325,7 @@ impl FetchKicker for RaceFetchKicker {
             let is_connected = move |peer: &str| connected_set.contains(peer);
 
             let outcome = race_fetch(
-                &hash_owned,
+                &cid_owned,
                 candidates,
                 &cmd_tx,
                 is_connected,
@@ -346,7 +350,7 @@ impl FetchKicker for RaceFetchKicker {
                     };
                     if let Err(e) = finalize_fetch_success(
                         &mut conn,
-                        &hash_owned,
+                        &cid_owned,
                         &source_peer,
                         &bytes,
                         &self_cid,
@@ -411,7 +415,7 @@ impl FetchKicker for RaceFetchKicker {
                         debug!(
                             target: "elohim_storage::reconcile",
                             hash = %hash_owned,
-                            shards = manifest.shard_hashes.len(),
+                            units = manifest.custody_units().len(),
                             "T23/Q3: race-fetch returned a manifest; persisted for later reassembly"
                         );
                     }
@@ -430,18 +434,13 @@ impl FetchKicker for RaceFetchKicker {
                         "T23: race-fetch found no connected candidates"
                     );
                 }
-                // Terminal for this address: race_fetch refused to put a
-                // malformed content address on the wire (and already logged
-                // it at WARN). reconcile_pass normalizes markers before
-                // kicking, so reaching this arm means a caller bypassed that
-                // hygiene — do not retry; the row carrying the address needs
-                // healing.
-                FetchOutcome::InvalidAddress => {
-                    warn!(
+                // The race's total deadline passed; every racer was cancelled.
+                // The next sweep tick retries under a fresh budget.
+                FetchOutcome::BudgetExhausted => {
+                    debug!(
                         target: "elohim_storage::reconcile",
                         hash = %hash_owned,
-                        "T23: kicked address is not a valid content address; \
-                         giving up (no retry can succeed)"
+                        "T23: race-fetch budget exhausted; next sweep retries"
                     );
                 }
             }
@@ -492,14 +491,20 @@ mod tests {
         };
 
         kicker.kick(
-            "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &elohim_epr::address::ByteCid::parse(
+                "bafkr4ichfrissdlap4ia2ibw7xhn25mqxorel2nn5mqtmsqghn53jsuby4",
+            )
+            .unwrap(),
             vec!["peer-A".into(), "peer-B".into()],
         );
         // Atomic increments before tokio::spawn returns.
         assert_eq!(metrics.kicks_fired_total.load(Ordering::Relaxed), 1);
 
         kicker.kick(
-            "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            &elohim_epr::address::ByteCid::parse(
+                "bafkr4icufwcvskyhqc5ct7rgitz76xebwwevdy3uwm6aehrw6ymkol7q6m",
+            )
+            .unwrap(),
             vec![],
         );
         assert_eq!(metrics.kicks_fired_total.load(Ordering::Relaxed), 2);
@@ -532,7 +537,10 @@ mod tests {
         };
 
         kicker.kick(
-            "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            &elohim_epr::address::ByteCid::parse(
+                "bafkr4icjoacz45cbheotswjobehjde6ymd2efmulohfqle6aa4ri7w2xtm",
+            )
+            .unwrap(),
             vec!["peer-A".into()],
         );
 
@@ -552,8 +560,8 @@ mod tests {
     // KickGate — cross-pass idempotency (2026-09-13 household-mesh loop)
     // ---------------------------------------------------------------
 
-    const H_A: &str = "sha256-1111111111111111111111111111111111111111111111111111111111111111";
-    const H_B: &str = "sha256-2222222222222222222222222222222222222222222222222222222222222222";
+    const H_A: &str = "bafkr4ig7w4mlajch2gl34lfvqa3rkhyfwwxb655xpvw7hgeamnd23m7clm";
+    const H_B: &str = "bafkr4iciihmbdhu4s6ncoh3qh2aiqbcchckkyt3yl7mvsbukc7orwcpvfy";
 
     /// A second pass must NOT re-race a hash the first pass is still racing.
     /// This is the defect the mesh exposed: `reconcile_pass` re-decides the
@@ -674,7 +682,10 @@ mod tests {
         };
 
         for _ in 0..5 {
-            kicker.kick(H_A, vec!["peer-A".into(), "peer-B".into()]);
+            kicker.kick(
+                &elohim_epr::address::ByteCid::parse(H_A).unwrap(),
+                vec!["peer-A".into(), "peer-B".into()],
+            );
         }
         assert_eq!(
             metrics.kicks_fired_total.load(Ordering::Relaxed),
@@ -683,7 +694,10 @@ mod tests {
         );
 
         // The gate is per-hash: a different missing blob is still healed.
-        kicker.kick(H_B, vec!["peer-A".into()]);
+        kicker.kick(
+            &elohim_epr::address::ByteCid::parse(H_B).unwrap(),
+            vec!["peer-A".into()],
+        );
         assert_eq!(metrics.kicks_fired_total.load(Ordering::Relaxed), 2);
 
         tokio::task::yield_now().await;

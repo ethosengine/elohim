@@ -3647,8 +3647,8 @@ async fn witness_ghost_anchors(
                 metadata: None,
                 tags: None,
                 reach: None,
-                blob_hash: None,
-                server_blob_hash: None,
+                blob_cid: None,
+                server_blob_cid: None,
                 p2p_published_at: None,
             };
             // WHY NOW. This sweep's whole population is rows the own conductor

@@ -185,7 +185,7 @@ mod tests {
             "bounded_by": "comm-abc",
             "target": "epr-head-new",
             "payload": {
-                "blob_cid": "bafkrei-blob-cid",
+                "blob_cid": "bafkr4idwrma44bwbtj32wigo52t3s332nlcprwcegu5kyljdqhykbjmesy",
                 "epr_kind": "Content",
                 "reach": "commons",
                 "bundle_path": "lamad-spa"

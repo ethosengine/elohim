@@ -240,9 +240,9 @@ pub fn known_holder_distribution(
 ) -> Result<[u64; 5], diesel::result::Error> {
     use crate::db::diesel_schema::shard_locations::dsl as sl;
     use diesel::prelude::*;
-    // (shard_hash, peer_id) is the primary key, so rows per shard are distinct peers.
+    // (shard_cid, peer_id) is the primary key, so rows per shard are distinct peers.
     let counts: Vec<i64> = sl::shard_locations
-        .group_by(sl::shard_hash)
+        .group_by(sl::shard_cid)
         .select(diesel::dsl::count_star())
         .load(conn)?;
     Ok(fold_known_holders(counts))
@@ -307,7 +307,10 @@ mod tests {
         };
         assert_eq!(s("content.db"), ("content_db".into(), "main"));
         assert_eq!(s("content.db-wal"), ("content_db".into(), "wal"));
-        assert_eq!(s("blobs/blobs/9212/sha256-9212"), ("blobs".into(), "file"));
+        assert_eq!(
+            s("blobs/blobs/9212/bafkr4igq6axnkh757e5fbqdwsc6y2mq34gy5ngzsszdcdpyk2cnqhqdufy"),
+            ("blobs".into(), "file")
+        );
         assert_eq!(s("sync.sled/db"), ("sync_sled".into(), "file"));
     }
 

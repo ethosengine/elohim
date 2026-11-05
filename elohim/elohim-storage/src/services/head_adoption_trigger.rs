@@ -3703,7 +3703,7 @@ mod tests {
         let pool = fixture::pool_with_row_at_a();
         let verifier = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let courier = fixture::courier(HEAD_B);
@@ -3759,7 +3759,7 @@ mod tests {
         let pool = fixture::pool_with_row_at_a();
         let verifier = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let courier = fixture::courier(HEAD_B);
@@ -3800,7 +3800,11 @@ mod tests {
         assert_eq!(local, Some("own conductor elects C"));
         assert_eq!(
             fixture::row(&pool),
-            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+            (
+                Some(HEAD_A.into()),
+                Some("bafkr4ieq6wkcxrzrz2yggxqssytshbkca25hmxzv74aqiibarrm7gfmhyq".into()),
+                Some(AT_A)
+            )
         );
     }
 
@@ -3843,7 +3847,11 @@ mod tests {
         assert!(outcome.retry_warranted());
         assert_eq!(
             fixture::row(&pool),
-            (Some(HEAD_A.into()), Some("sha256-aaaa".into()), Some(AT_A))
+            (
+                Some(HEAD_A.into()),
+                Some("bafkr4ieq6wkcxrzrz2yggxqssytshbkca25hmxzv74aqiibarrm7gfmhyq".into()),
+                Some(AT_A)
+            )
         );
         assert_eq!(
             gate.schedule_retry(initial),
@@ -3859,7 +3867,7 @@ mod tests {
         // Local ancestry is now integrated, but version B's bytes arrive later.
         let accepted_b = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
             Some(HEAD_B),
-            Some("sha256-bbbb"),
+            Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm"),
             AT_B,
         )));
         let outcome = fixture::run(
@@ -3900,7 +3908,11 @@ mod tests {
         assert!(!outcome.retry_warranted());
         assert_eq!(
             fixture::row(&pool),
-            (Some(HEAD_B.into()), Some("sha256-bbbb".into()), Some(AT_B))
+            (
+                Some(HEAD_B.into()),
+                Some("bafkr4ifo5eg5glcdoknep6bkmwdk4rrquw67x5wckg2uu5runazz7t6wvm".into()),
+                Some(AT_B)
+            )
         );
         gate.release(&bytes_retry.content_id); // same terminal branch as process_trigger
         assert_eq!(gate.claim_count(), 0);
@@ -3914,7 +3926,7 @@ mod tests {
         assert_eq!(next.attempt, 0);
         let accepted_c = fixture::verifier(fixture::Verdict::Proves(fixture::evidence(
             Some("uhCkkC"),
-            Some("sha256-cccc"),
+            Some("bafkr4igjrhmdepwlevxdfpkpgvv4jqoq2iuyvkwttqr5em7rahc2mvvmwu"),
             AT_B + 1,
         )));
         let outcome = fixture::run(
@@ -3933,7 +3945,7 @@ mod tests {
             current,
             (
                 Some("uhCkkC".into()),
-                Some("sha256-cccc".into()),
+                Some("bafkr4igjrhmdepwlevxdfpkpgvv4jqoq2iuyvkwttqr5em7rahc2mvvmwu".into()),
                 Some(AT_B + 1)
             )
         );

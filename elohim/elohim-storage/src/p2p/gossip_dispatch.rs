@@ -799,24 +799,6 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
         return;
     }
 
-    // Dedup on the FULL identity incl. timestamp: an exact replay is dropped, but
-    // a fresher re-announce (newer `announced_at_ms`) is NOT deduped so the
-    // monotone refresh can still land.
-    let dedup_key = format!(
-        "Custody:{}:{}:{}",
-        ann.shard_cid, ann.holder_agent_cid, ann.announced_at_ms
-    );
-    if !ctx.dedup.insert(&dedup_key) {
-        debug!(
-            target: "elohim_storage::dedup",
-            from = %source,
-            shard_cid = %ann.shard_cid,
-            holder = %ann.holder_agent_cid,
-            "duplicate custody announcement — dropped"
-        );
-        return;
-    }
-
     crate::metrics::inc_custody_announce("received");
 
     let Some(pool) = ctx.db_pool else {
@@ -853,6 +835,27 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
             from = %source,
             %reason,
             "custody announcement not bound to its author — refused"
+        );
+        return;
+    }
+
+    // B (fix in A's handler): dedup only claims that passed the author binding,
+    // so an unbound relay of the same bytes cannot consume the key first and
+    // shadow the bound author's claim.
+    // Dedup on the FULL identity incl. timestamp: an exact replay is dropped, but
+    // a fresher re-announce (newer `announced_at_ms`) is NOT deduped so the
+    // monotone refresh can still land.
+    let dedup_key = format!(
+        "Custody:{}:{}:{}",
+        ann.shard_cid, ann.holder_agent_cid, ann.announced_at_ms
+    );
+    if !ctx.dedup.insert(&dedup_key) {
+        debug!(
+            target: "elohim_storage::dedup",
+            from = %source,
+            shard_cid = %ann.shard_cid,
+            holder = %ann.holder_agent_cid,
+            "duplicate custody announcement — dropped"
         );
         return;
     }

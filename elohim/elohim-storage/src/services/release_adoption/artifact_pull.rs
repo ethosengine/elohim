@@ -68,6 +68,7 @@
 //!
 //! [`race_fetch_with_swarm`]: crate::p2p::blob_swarm::race_fetch_with_swarm
 
+use elohim_epr::address::ByteCid;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -311,7 +312,7 @@ impl RaceFetchPuller {
                     .and_then(|mut conn| {
                         crate::db::blob_arrivals::record_arrival(
                             &mut conn,
-                            &stored.hash,
+                            &stored.cid.to_string(),
                             crate::db::blob_arrivals::ArrivalVia::SelfFetch,
                             None,
                             None,
@@ -319,7 +320,7 @@ impl RaceFetchPuller {
                         .map_err(|e| e.to_string())
                     });
                 if let Err(e) = recorded {
-                    tracing::warn!(blob = %stored.hash, error = %e, "blob arrival not recorded");
+                    tracing::warn!(blob = %stored.cid, error = %e, "blob arrival not recorded");
                 }
                 PullOutcome::Pulled {
                     source_peer: source_peer.to_string(),
@@ -360,31 +361,17 @@ impl RaceFetchPuller {
     /// a blob published minutes ago is routinely newer than the inventory-gossip
     /// cadence that would have named its hosts, so an inventory-only candidate
     /// list is empty precisely when the controller needs it most.
-    fn candidates(&self, blob_cid: &str, connected: &[String]) -> (Vec<String>, usize) {
+    fn candidates(&self, blob_cid: &ByteCid, connected: &[String]) -> (Vec<String>, usize) {
         let mut inventory: Vec<String> = Vec::new();
         if let Ok(mut conn) = self.pool.get() {
             let fresh_after = self.fresh_after();
-            // Both spellings of the SAME digest. The manifest addresses the
-            // artifact as a CIDv1 (`bafkrei…`) while a gossiped inventory row
-            // may carry the legacy `sha256-<hex>` marker for the identical
-            // bytes; `lookup_hosts` matches the column literally, so asking for
-            // only one form silently drops the hosts recorded under the other.
-            let mut forms = vec![blob_cid.to_string()];
-            if let Some(hex) = crate::p2p::blob_fetch::content_address_hex(blob_cid) {
-                let legacy = format!("sha256-{hex}");
-                if legacy != blob_cid {
-                    forms.push(legacy);
-                }
-                if hex != blob_cid {
-                    forms.push(hex);
-                }
-            }
-            for form in forms {
-                if let Ok(rows) =
-                    crate::db::peer_blob_inventory::lookup_hosts(&mut conn, &form, &fresh_after)
-                {
-                    inventory.extend(rows.into_iter().map(|r| r.peer_id));
-                }
+            // One spelling: inventory rows name payloads by byte CID only.
+            if let Ok(rows) = crate::db::peer_blob_inventory::lookup_hosts(
+                &mut conn,
+                &blob_cid.to_string(),
+                &fresh_after,
+            ) {
+                inventory.extend(rows.into_iter().map(|r| r.peer_id));
             }
         }
         let inventory_named = inventory.len();
@@ -416,19 +403,6 @@ fn merge_candidates(inventory: Vec<String>, connected: &[String], cap: usize) ->
     out
 }
 
-/// The spelling a peer pull puts on the wire: the `sha256-<hex>` key every
-/// blob store indexes by. The manifest's CIDv1 (`bafkrei…`) names the same
-/// digest, but a holder resolves `ShardRequest::Get { hash }` against its disk
-/// key; sending the CID is how 2026-09-06's fleet pull asked 7 peers and heard
-/// "not found" from all of them. Unparseable input passes through unchanged.
-#[cfg(feature = "p2p")]
-pub(crate) fn wire_address(blob_cid: &str) -> String {
-    match crate::p2p::blob_fetch::content_address_hex(blob_cid) {
-        Some(hex) => format!("sha256-{hex}"),
-        None => blob_cid.to_string(),
-    }
-}
-
 #[cfg(feature = "p2p")]
 #[async_trait::async_trait]
 impl BlobPuller for RaceFetchPuller {
@@ -436,10 +410,11 @@ impl BlobPuller for RaceFetchPuller {
         use crate::p2p::blob_fetch::finalize_fetch_success;
         use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
 
-        // What goes on the wire is the holder's on-disk key, not the
-        // manifest's CIDv1 spelling: an unpatched holder looks the key up
-        // literally and answers an honest NotFound for bytes it has.
-        let blob_cid = &wire_address(blob_cid);
+        // The manifest's byte CID is what goes on the wire, admitted by full decode.
+        let blob_cid = &match ByteCid::parse(blob_cid) {
+            Ok(cid) => cid,
+            Err(e) => return PullOutcome::Failed(format!("artifact names no byte CID: {e}")),
+        };
         let connected: Vec<String> = self
             .peers
             .list_peers()
@@ -532,13 +507,11 @@ impl BlobPuller for RaceFetchPuller {
             // "swarm" peer would double-book a delivery that never happened from
             // one peer (the same rule the bytes-heal call site honours).
             //
-            // The composite is deliberately never stored under its own name by
-            // the swarm path — the HTTP reader reassembles on demand. This
-            // source's local re-read goes through `BlobStore::get_by_address`,
-            // which does NOT reassemble, so the composite is stored here. That
-            // is safe by construction: `store` is CONTENT-ADDRESSED, so bytes
-            // that are not what they claim land under a different address and
-            // the re-read still misses.
+            // The swarm path verified the reassembled payload against its byte
+            // CID; it is stored here so this source's local re-read (a verified
+            // `BlobStore::get`) finds it. `store` is content-addressed, so bytes
+            // that are not what they claim land under a different CID and the
+            // re-read still misses.
             SwarmRaceOutcome::Hit { bytes, source_peer } if source_peer == "swarm" => {
                 self.store_reassembled(bytes, "swarm").await
             }
@@ -587,7 +560,7 @@ impl BlobPuller for RaceFetchPuller {
             } => PullOutcome::ManifestOnly {
                 source_peer: format!(
                     "a holder of {} ({missing_shards} shard(s) still missing; manifest persisted)",
-                    manifest.blob_hash
+                    manifest.blob_cid
                 ),
             },
             SwarmRaceOutcome::Miss => PullOutcome::Miss { asked },
@@ -603,9 +576,9 @@ mod tests {
 
     fn artifact() -> Artifact {
         Artifact {
-            blob_cid: "bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            blob_cid: elohim_epr::address::compute_bytes_cid(b"hello world").to_string(),
             bytes: 11,
-            sha256: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9".to_string(),
+            profile: super::super::ArtifactProfile { epoch: 0 },
             filename: "coordinators.happ".to_string(),
             mime_type: None,
             role: None,
@@ -633,7 +606,7 @@ mod tests {
                     blob_cid: artifact.blob_cid.clone(),
                     path: std::path::PathBuf::from("/tmp/staged"),
                     bytes: artifact.bytes,
-                    sha256: artifact.sha256.clone(),
+                    served_cid: ByteCid::parse(&artifact.blob_cid).unwrap(),
                 })
             } else {
                 Err(AdoptionRefusal::new(
@@ -837,18 +810,6 @@ mod tests {
         let candidates = merge_candidates(many.clone(), &[], 9);
         assert_eq!(candidates.len(), 9);
         assert_eq!(candidates[0], many[0], "ordering survives the cap");
-    }
-
-    /// The manifest spells the artifact as a CIDv1; the wire must carry the
-    /// on-disk key, and a legacy key must pass through untouched.
-    #[cfg(feature = "p2p")]
-    #[test]
-    fn the_wire_address_is_the_holders_on_disk_key() {
-        let cid = "bafkreieuv7mhe4yezvkveojnttanmbyritm752gqx2gkx2lmlm7te7osg4";
-        let key = "sha256-94afd8727304cd5552392d9cc0d6071144d9fee8d0be8cabe96c5b3f327dd237";
-        assert_eq!(wire_address(cid), key);
-        assert_eq!(wire_address(key), key);
-        assert_eq!(wire_address("not-an-address"), "not-an-address");
     }
 
     /// A digest mismatch is not a replication problem — asking a peer again

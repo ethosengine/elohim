@@ -209,7 +209,7 @@ impl ArtifactClass {
 pub enum AppArtifactKind {
     /// The SPA zip the slug row's blob pointer serves (`blob_hash`).
     Browser,
-    /// The SSR zip the slug row carries as `metadata_json.serverBlobHash`.
+    /// The SSR zip the slug row carries as `metadata_json.serverBlobCid`.
     Server,
 }
 
@@ -1406,8 +1406,8 @@ mod tests {
     #[test]
     fn app_bundle_fields_are_additive_on_the_wire() {
         let art: Artifact = serde_json::from_value(serde_json::json!({
-            "blobCid": format!("bafkrei{}", "a".repeat(52)),
-            "bytes": 3, "sha256": "a".repeat(64), "filename": "b.zip",
+            "blobCid": elohim_epr::address::compute_bytes_cid(b"b.zip").to_string(),
+            "bytes": 3, "profile": { "epoch": 0 }, "filename": "b.zip",
             "app": "lamad-spa", "kind": "server"
         }))
         .expect("an app-bundle artifact decodes");
@@ -1415,10 +1415,10 @@ mod tests {
         assert_eq!(art.kind, Some(AppArtifactKind::Server));
 
         let plain: Artifact = serde_json::from_value(serde_json::json!({
-            "blobCid": format!("bafkrei{}", "a".repeat(52)),
-            "bytes": 3, "sha256": "a".repeat(64), "filename": "c.wasm"
+            "blobCid": elohim_epr::address::compute_bytes_cid(b"c.wasm").to_string(),
+            "bytes": 3, "profile": { "epoch": 0 }, "filename": "c.wasm"
         }))
-        .expect("a pre-slice-2 artifact still decodes");
+        .expect("an artifact without app fields still decodes");
         let wire = serde_json::to_value(&plain).unwrap();
         assert!(wire.get("app").is_none() && wire.get("kind").is_none());
         let applies = serde_json::to_value(AppliesTo::default()).unwrap();

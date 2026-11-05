@@ -1,13 +1,13 @@
 //! One-shot startup pass: shard-manifest backfill for legacy content.
 //!
-//! Content seeded BEFORE the distribute-at-ingest path existed has a `blob_hash`
+//! Content seeded BEFORE the distribute-at-ingest path existed has a `blob_cid`
 //! (and bytes in the blob store) but no `shard_manifests` row. Without a manifest
 //! the resilience snapshot (`services::household_resilience::snapshot`) reads that
 //! content as never-distributed (`distributionState: "unmeasured"`) and
 //! `shard_locations` never populates → "Stewarding collectives: 0".
 //!
 //! This backfill closes that gap without a re-seed:
-//!   1. Find content rows with a non-empty `blob_hash` and NO matching
+//!   1. Find content rows with a non-empty `blob_cid` and NO matching
 //!      `shard_manifests` row (for the given `h_app_id`).
 //!   2. For each: persist a manifest via the shared, shape-aware
 //!      `db::shard_manifests::record_manifest_for_blob` helper (the same one
@@ -21,7 +21,7 @@
 //!      and lights "stewarding collectives").
 //!
 //! The pass is bounded (batched with a small inter-item delay — RS-encoding is
-//! CPU, distribution is network) and tolerant: a content row whose `blob_hash`
+//! CPU, distribution is network) and tolerant: a content row whose `blob_cid`
 //! is set but whose bytes are absent locally is skipped-and-warned, never fatal.
 //!
 //! Category C (operational): manifests are local projection state rebuilt from
@@ -32,6 +32,8 @@ use std::time::Duration;
 
 use diesel::prelude::*;
 
+use elohim_epr::address::ByteCid;
+
 use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 use crate::StorageError;
@@ -41,15 +43,14 @@ use crate::StorageError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackfillCandidate {
     pub content_id: String,
-    /// `content.blob_hash` — the bytes the content points at RIGHT NOW.
-    pub blob_hash: String,
-    pub blob_cid: Option<String>,
+    /// `content.blob_cid` — the bytes the content points at RIGHT NOW.
+    pub blob_cid: ByteCid,
     pub content_format: String,
     pub reach: String,
-    /// `shard_manifests.blob_hash` — the bytes the STORED manifest was stamped
-    /// from. `None` when no manifest exists (Part A). `Some(h)` with
-    /// `h != blob_hash` is the divergence this sweep re-stamps.
-    pub manifest_blob_hash: Option<String>,
+    /// `shard_manifests.blob_cid` — the bytes the STORED manifest was stamped
+    /// from. `None` when no manifest exists (Part A). `Some(c)` with
+    /// `c != blob_cid` is the divergence this sweep re-stamps.
+    pub manifest_blob_cid: Option<String>,
 }
 
 impl BackfillCandidate {
@@ -65,9 +66,10 @@ impl BackfillCandidate {
     /// distribution SUCCEEDED and holder rows exist. The card reads
     /// `distributionState: "measured"` with zero stewards — measured yet dark.
     pub fn is_manifest_divergent(&self) -> bool {
-        self.manifest_blob_hash
+        let current = self.blob_cid.to_string();
+        self.manifest_blob_cid
             .as_deref()
-            .is_some_and(|stamped| stamped != self.blob_hash)
+            .is_some_and(|stamped| stamped != current)
     }
 }
 
@@ -110,12 +112,12 @@ pub struct BackfillReport {
     /// still-unresolvable peer set leaves shards unplaced; honest attempt count).
     pub redistribute_attempts: usize,
     /// Part B: candidates selected because their stored manifest had DIVERGED
-    /// from `content.blob_hash` (blob rotation). Subset of `redistribute_candidates`.
+    /// from `content.blob_cid` (blob rotation). Subset of `redistribute_candidates`.
     pub divergent_manifests: usize,
     /// Part B: divergent manifests actually RE-STAMPED from the current local bytes.
     pub manifests_restamped: usize,
     /// Part B: divergent manifests that could NOT be re-stamped because the bytes
-    /// for `content.blob_hash` are absent locally — the `bytes-not-local` gap arm
+    /// for `content.blob_cid` are absent locally — the `bytes-not-local` gap arm
     /// stays authoritative for these (never a re-stamp from bytes we don't hold).
     pub restamp_bytes_missing: usize,
     /// Part B: orphaned `shard_locations` rows pruned after re-stamping (keyed
@@ -132,7 +134,7 @@ const REDISTRIBUTE_CAP_PER_BOOT: usize = 50;
 
 /// Select content rows that have a blob but no shard manifest for `h_app_id`.
 ///
-/// A row qualifies iff `content.blob_hash` is non-null AND non-empty AND there
+/// A row qualifies iff `content.blob_cid` is non-null AND non-empty AND there
 /// is no `shard_manifests` row for `(content.id, h_app_id)`.
 ///
 /// Pure query — no blob I/O, no encoding — so it is cheap to unit-test.
@@ -143,8 +145,8 @@ pub fn select_candidates(
     use crate::db::diesel_schema::{content, shard_manifests};
 
     // Tuple shape of the candidate projection:
-    // (content_id, blob_hash, blob_cid, content_format, reach).
-    type CandidateRow = (String, Option<String>, Option<String>, String, String);
+    // (content_id, blob_cid, content_format, reach).
+    type CandidateRow = (String, Option<String>, String, String);
 
     // Left-join content → its manifest for this h_app_id; keep rows where the
     // manifest side is NULL (no manifest) and the blob_hash is present.
@@ -155,11 +157,10 @@ pub fn select_candidates(
                 .and(shard_manifests::h_app_id.eq(h_app_id))),
         )
         .filter(content::h_app_id.eq(h_app_id))
-        .filter(content::blob_hash.is_not_null())
+        .filter(content::blob_cid.is_not_null())
         .filter(shard_manifests::content_id.is_null())
         .select((
             content::id,
-            content::blob_hash,
             content::blob_cid,
             content::content_format,
             content::reach,
@@ -169,21 +170,17 @@ pub fn select_candidates(
 
     let candidates = rows
         .into_iter()
-        .filter_map(|(content_id, blob_hash, blob_cid, content_format, reach)| {
-            // Defensive: SQL filtered NULL, but an empty-string blob_hash is also
-            // "no blob" and must not produce a bogus manifest.
-            let blob_hash = blob_hash?;
-            if blob_hash.trim().is_empty() {
-                return None;
-            }
+        .filter_map(|(content_id, blob_cid, content_format, reach)| {
+            // Defensive: SQL filtered NULL; text that is not a byte CID names no
+            // bytes and must not produce a bogus manifest.
+            let blob_cid = ByteCid::parse(blob_cid?.trim()).ok()?;
             Some(BackfillCandidate {
                 content_id,
-                blob_hash,
                 blob_cid,
                 content_format,
                 reach,
                 // Part A selects on the ABSENCE of a manifest, by construction.
-                manifest_blob_hash: None,
+                manifest_blob_cid: None,
             })
         })
         .collect();
@@ -194,7 +191,7 @@ pub fn select_candidates(
 /// Part B — select content that HAS a manifest but is not truthfully readable
 /// through it. Two admission arms, in priority order:
 ///
-/// 1. **DIVERGENT** (`shard_manifests.blob_hash != content.blob_hash`) — the blob
+/// 1. **DIVERGENT** (`shard_manifests.blob_cid != content.blob_cid`) — the blob
 ///    rotated (an SSR bundle rebuild) and the stored manifest still names the OLD
 ///    bytes' shard hashes. Every per-content reader joins through that manifest, so
 ///    the holder join is guaranteed-empty *no matter how well distribution went*.
@@ -228,16 +225,13 @@ pub fn select_redistribution_candidates(
         return Ok(Vec::new());
     }
 
-    // (content_id, blob_hash, blob_cid, content_format, reach, shard_hashes_json,
-    //  manifest_blob_hash)
+    // (content_id, blob_cid, content_format, reach, manifest row)
     type Row = (
         String,
         Option<String>,
-        Option<String>,
         String,
         String,
-        String,
-        String,
+        crate::db::models::ShardManifestRow,
     );
 
     let rows: Vec<Row> = content::table
@@ -247,15 +241,13 @@ pub fn select_redistribution_candidates(
                 .and(shard_manifests::h_app_id.eq(h_app_id))),
         )
         .filter(content::h_app_id.eq(h_app_id))
-        .filter(content::blob_hash.is_not_null())
+        .filter(content::blob_cid.is_not_null())
         .select((
             content::id,
-            content::blob_hash,
             content::blob_cid,
             content::content_format,
             content::reach,
-            shard_manifests::shard_hashes_json,
-            shard_manifests::blob_hash,
+            crate::db::models::ShardManifestRow::as_select(),
         ))
         .load::<Row>(conn)
         .map_err(StorageError::from)?;
@@ -263,32 +255,21 @@ pub fn select_redistribution_candidates(
     let mut divergent: Vec<BackfillCandidate> = Vec::new();
     let mut dark: Vec<BackfillCandidate> = Vec::new();
 
-    for (
-        content_id,
-        blob_hash,
-        blob_cid,
-        content_format,
-        reach,
-        shard_hashes_json,
-        manifest_blob_hash,
-    ) in rows
-    {
+    for (content_id, blob_cid, content_format, reach, manifest) in rows {
         // Both buckets full — nothing further can enter the capped result.
         if divergent.len() >= cap && dark.len() >= cap {
             break;
         }
-        let Some(blob_hash) = blob_hash else { continue };
-        if blob_hash.trim().is_empty() {
+        let Some(blob_cid) = blob_cid.and_then(|text| ByteCid::parse(text.trim()).ok()) else {
             continue;
-        }
+        };
 
         let candidate = BackfillCandidate {
             content_id,
-            blob_hash,
             blob_cid,
             content_format,
             reach,
-            manifest_blob_hash: Some(manifest_blob_hash),
+            manifest_blob_cid: Some(manifest.blob_cid.clone()),
         };
 
         // Arm 1 — divergent manifest. Admitted on the divergence alone; the
@@ -307,10 +288,9 @@ pub fn select_redistribution_candidates(
             continue;
         }
 
-        // The manifest's shard hashes are the join key into shard_locations.
-        let shard_hashes: Vec<String> =
-            serde_json::from_str(&shard_hashes_json).unwrap_or_default();
-        if shard_hashes.is_empty() {
+        // The manifest's custody units are the join key into shard_locations.
+        let shard_cids = crate::db::shard_manifests::custody_unit_cids(&manifest);
+        if shard_cids.is_empty() {
             continue;
         }
 
@@ -319,7 +299,7 @@ pub fn select_redistribution_candidates(
         // partially-placed content alone (only fully-dark content re-attempts).
         let location_count: i64 = shard_locations::table
             .filter(shard_locations::h_app_id.eq(h_app_id))
-            .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+            .filter(shard_locations::shard_cid.eq_any(&shard_cids))
             .count()
             .get_result(conn)
             .map_err(StorageError::from)?;
@@ -342,10 +322,10 @@ pub fn select_redistribution_candidates(
 /// encode/persist failure (logged by the caller).
 ///
 /// Shape-aware: routes through `db::shard_manifests::record_manifest_for_blob`,
-/// which reuses an already-known manifest for `blob_hash` (the common case for
+/// which reuses an already-known manifest for `blob_cid` (the common case for
 /// a `"chunked"`/`"rs-*"` blob — e.g. the landing bundle — whose composite is
 /// never stored under its own hash, only its shards under theirs) before
-/// falling back to a bytes read. A bare `blob_store.get(blob_hash)` here would
+/// falling back to a bytes read. A bare `blob_store.get(blob_cid)` here would
 /// silently miss every such blob even though the manifest, and every shard
 /// byte it names, is already on disk.
 async fn record_one(
@@ -363,8 +343,7 @@ async fn record_one(
         blob_store,
         &candidate.content_id,
         h_app_id,
-        &candidate.blob_hash,
-        candidate.blob_cid.as_deref(),
+        &candidate.blob_cid,
         &candidate.content_format,
         &candidate.reach,
     )
@@ -374,7 +353,7 @@ async fn record_one(
         Err(StorageError::NotFound(_)) => {
             tracing::warn!(
                 content_id = %candidate.content_id,
-                blob_hash = %candidate.blob_hash,
+                blob_cid = %candidate.blob_cid,
                 "shard_manifest_backfill: blob bytes absent locally and no manifest known; skipping"
             );
             Ok(false)
@@ -386,7 +365,7 @@ async fn record_one(
 /// Record an honest, idempotent placement gap for a redistribution candidate whose
 /// blob bytes are NOT local — this node holds a manifest but cannot source the
 /// bytes, so it cannot be the distributor. One row per manifest shard, upserted by
-/// `(content_id, shard_hash, h_app_id, gap_kind)` exactly like `distribute_shards`'
+/// `(content_id, shard_cid, h_app_id, gap_kind)` exactly like `distribute_shards`'
 /// gap writer (so `first_seen_at` is preserved and `last_seen_at` bumps on re-run).
 ///
 /// Returns the number of gap rows written (0 when the manifest is missing or has no
@@ -411,23 +390,22 @@ fn record_bytes_not_local_gap(
     else {
         return Ok(0);
     };
-    let shard_hashes: Vec<String> =
-        serde_json::from_str(&manifest.shard_hashes_json).unwrap_or_default();
-    if shard_hashes.is_empty() {
+    let shard_cids = crate::db::shard_manifests::custody_unit_cids(&manifest);
+    if shard_cids.is_empty() {
         return Ok(0);
     }
 
     let now = chrono::Utc::now().to_rfc3339();
     // Desired steward count mirrors `distribute_shards` (one steward per shard);
     // achieved is 0 because distribution never began (bytes could not be sourced).
-    let requested = i32::try_from(shard_hashes.len()).unwrap_or(i32::MAX);
+    let requested = i32::try_from(shard_cids.len()).unwrap_or(i32::MAX);
     let mut written = 0usize;
-    for hash in &shard_hashes {
+    for hash in &shard_cids {
         let id = uuid::Uuid::new_v4().to_string();
         let gap = crate::db::models::NewPlacementGap {
             id: &id,
             content_id,
-            shard_hash: hash,
+            shard_cid: hash,
             h_app_id,
             requested_steward_count: requested,
             achieved_steward_count: 0,
@@ -451,7 +429,7 @@ fn record_bytes_not_local_gap(
 /// Shape-aware: routes through `db::shard_manifests::read_blob_bytes_for_manifest`,
 /// which falls back to reassembling from the candidate's manifest shards when
 /// the composite is absent — the shape a `"chunked"`/`"rs-*"` blob actually
-/// takes. A bare `blob_store.get(blob_hash)` here reads as "bytes not local"
+/// takes. A bare `blob_store.get(blob_cid)` here reads as "bytes not local"
 /// for such a blob even when every shard byte it names is already on disk.
 #[cfg(feature = "p2p")]
 async fn distribute_one(
@@ -476,7 +454,7 @@ async fn distribute_one(
     let data = match crate::db::shard_manifests::read_blob_bytes_for_manifest(
         &mut conn,
         blob_store,
-        &candidate.blob_hash,
+        &candidate.blob_cid,
     )
     .await
     {
@@ -495,7 +473,7 @@ async fn distribute_one(
             crate::metrics::inc_shard_redistribute_bytes_missing();
             tracing::warn!(
                 content_id = %candidate.content_id,
-                blob_hash = %candidate.blob_hash,
+                blob_cid = %candidate.blob_cid,
                 h_app_id,
                 "shard_manifest_backfill: redistribution candidate bytes absent locally — \
                  cannot distribute; recording bytes-not-local placement gap"
@@ -653,16 +631,14 @@ pub async fn run_once(
                             )
                             .ok()
                             .flatten()
-                            .and_then(|m| {
-                                serde_json::from_str::<Vec<String>>(&m.shard_hashes_json).ok()
-                            })
+                            .map(|m| crate::db::shard_manifests::custody_unit_cids(&m))
                             .unwrap_or_default(),
                             Err(_) => Vec::new(),
                         }
                     };
 
                     // HONESTY: re-stamp ONLY from bytes we actually hold. When the
-                    // bytes for `content.blob_hash` are absent locally the stored
+                    // bytes for `content.blob_cid` are absent locally the stored
                     // manifest is stale but we cannot truthfully replace it — the
                     // `bytes-not-local` gap arm inside `distribute_one` stays
                     // authoritative, and the divergence remains visible.
@@ -672,8 +648,8 @@ pub async fn run_once(
                             orphan_candidates.extend(superseded);
                             tracing::info!(
                                 content_id = %candidate.content_id,
-                                content_blob_hash = %candidate.blob_hash,
-                                stale_manifest_blob_hash = ?candidate.manifest_blob_hash,
+                                content_blob_cid = %candidate.blob_cid,
+                                stale_manifest_blob_cid = ?candidate.manifest_blob_cid,
                                 h_app_id,
                                 "shard_manifest_backfill: manifest re-stamped after blob rotation \
                                  (stale shard hashes were the guaranteed-empty holder join)"
@@ -683,10 +659,10 @@ pub async fn run_once(
                             report.restamp_bytes_missing += 1;
                             tracing::warn!(
                                 content_id = %candidate.content_id,
-                                content_blob_hash = %candidate.blob_hash,
-                                stale_manifest_blob_hash = ?candidate.manifest_blob_hash,
+                                content_blob_cid = %candidate.blob_cid,
+                                stale_manifest_blob_cid = ?candidate.manifest_blob_cid,
                                 h_app_id,
-                                "shard_manifest_backfill: manifest DIVERGED from content.blob_hash \
+                                "shard_manifest_backfill: manifest DIVERGED from content.blob_cid \
                                  but the current bytes are absent locally — not re-stamping \
                                  (bytes-not-local gap stays authoritative)"
                             );
@@ -766,10 +742,11 @@ pub async fn run_once(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{NewContent, NewShardManifest};
+    use crate::db::models::NewContent;
+    use crate::db::shard_manifests::{fixture_unit, insert_unit_manifest};
     use crate::test_util::test_pool;
 
-    fn insert_content(conn: &mut SqliteConnection, id: &str, blob_hash: Option<&str>) {
+    fn insert_content(conn: &mut SqliteConnection, id: &str, blob_cid: Option<&str>) {
         use crate::db::diesel_schema::content;
         diesel::insert_into(content::table)
             .values(&NewContent {
@@ -779,67 +756,40 @@ mod tests {
                 description: None,
                 content_type: "concept",
                 content_format: "html5-app",
-                blob_hash,
-                blob_cid: None,
+                blob_cid,
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: "commons",
                 created_by: None,
                 content_body: None,
                 dht_anchor_hash: None,
-                server_blob_hash: None,
+                server_blob_cid: None,
             })
             .execute(conn)
             .expect("insert content");
     }
 
-    fn insert_manifest(conn: &mut SqliteConnection, content_id: &str, blob_hash: &str) {
-        let new_manifest = NewShardManifest {
-            content_id,
-            h_app_id: "lamad",
-            blob_hash,
-            blob_cid: None,
-            encoding: "none",
-            data_shard_count: 1,
-            parity_shard_count: 0,
-            shard_hashes_json: "[]",
-            total_size_bytes: 0,
-            shard_size_bytes: 0,
-            mime_type: "html5-app",
-            reach: "commons",
-        };
-        crate::db::shard_manifests::upsert_manifest(conn, &new_manifest).expect("insert manifest");
+    /// A manifest row naming no custody units.
+    fn insert_manifest(conn: &mut SqliteConnection, content_id: &str, blob_cid: &str) {
+        insert_unit_manifest(conn, content_id, "lamad", blob_cid, &[]);
     }
 
+    /// A manifest row whose custody units are the given fixture labels.
     fn insert_manifest_with_shards(
         conn: &mut SqliteConnection,
         content_id: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         shards: &[&str],
     ) {
-        let json = serde_json::to_string(shards).expect("encode shard hashes");
-        let new_manifest = NewShardManifest {
-            content_id,
-            h_app_id: "lamad",
-            blob_hash,
-            blob_cid: None,
-            encoding: "rs",
-            data_shard_count: shards.len() as i32,
-            parity_shard_count: 0,
-            shard_hashes_json: &json,
-            total_size_bytes: 0,
-            shard_size_bytes: 0,
-            mime_type: "html5-app",
-            reach: "commons",
-        };
-        crate::db::shard_manifests::upsert_manifest(conn, &new_manifest).expect("insert manifest");
+        insert_unit_manifest(conn, content_id, "lamad", blob_cid, shards);
     }
 
-    fn seed_location(conn: &mut SqliteConnection, shard_hash: &str, peer_id: &str) {
+    fn seed_location(conn: &mut SqliteConnection, shard_label: &str, peer_id: &str) {
+        let shard_cid = fixture_unit(shard_label);
         crate::db::shard_locations::upsert_location(
             conn,
             &crate::db::models::NewShardLocation {
-                shard_hash,
+                shard_cid: &shard_cid,
                 peer_id,
                 h_app_id: "lamad",
                 status: "announced",
@@ -857,20 +807,50 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         // dark: manifest, no locations → candidate.
-        insert_content(&mut conn, "dark", Some("sha256-dark"));
-        insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1", "s-dark-2"]);
+        insert_content(
+            &mut conn,
+            "dark",
+            Some("bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "dark",
+            "bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu",
+            &["s-dark-1", "s-dark-2"],
+        );
 
         // lit: manifest + a location present → NOT a candidate.
-        insert_content(&mut conn, "lit", Some("sha256-lit"));
-        insert_manifest_with_shards(&mut conn, "lit", "sha256-lit", &["s-lit-1"]);
+        insert_content(
+            &mut conn,
+            "lit",
+            Some("bafkr4icb4lsxtvqamheudyjkn4qo52ft5t2vrqheoi5zdnjo4njyosh7km"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "lit",
+            "bafkr4icb4lsxtvqamheudyjkn4qo52ft5t2vrqheoi5zdnjo4njyosh7km",
+            &["s-lit-1"],
+        );
         seed_location(&mut conn, "s-lit-1", "uhCAkHolder");
 
         // no-manifest: Part A territory, never a redistribution candidate.
-        insert_content(&mut conn, "no-manifest", Some("sha256-nm"));
+        insert_content(
+            &mut conn,
+            "no-manifest",
+            Some("bafkr4iflyyr2fheqefhh3sjluyy3beof7w5x2wzifpnuvl7lrxkf7plkju"),
+        );
 
         // empty-shards manifest: nothing to place → skipped.
-        insert_content(&mut conn, "empty-shards", Some("sha256-es"));
-        insert_manifest(&mut conn, "empty-shards", "sha256-es");
+        insert_content(
+            &mut conn,
+            "empty-shards",
+            Some("bafkr4icfcyrdh2thf54p75difbikiqavxcnb5qswzzjrydvlygmbg2bun4"),
+        );
+        insert_manifest(
+            &mut conn,
+            "empty-shards",
+            "bafkr4icfcyrdh2thf54p75difbikiqavxcnb5qswzzjrydvlygmbg2bun4",
+        );
 
         let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
         let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
@@ -897,8 +877,17 @@ mod tests {
             let mut conn = pool.get().expect("conn");
             // Manifest present + zero shard_locations → a Part B candidate,
             // and (because the manifest exists) NOT a Part A candidate.
-            insert_content(&mut conn, "dark", Some("sha256-dark"));
-            insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1"]);
+            insert_content(
+                &mut conn,
+                "dark",
+                Some("bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu"),
+            );
+            insert_manifest_with_shards(
+                &mut conn,
+                "dark",
+                "bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu",
+                &["s-dark-1"],
+            );
 
             assert!(
                 select_candidates(&mut conn, "lamad")
@@ -942,8 +931,17 @@ mod tests {
     fn bytes_not_local_gap_is_written_per_shard_and_idempotent() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
-        insert_content(&mut conn, "dark", Some("sha256-dark"));
-        insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1", "s-dark-2"]);
+        insert_content(
+            &mut conn,
+            "dark",
+            Some("bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "dark",
+            "bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu",
+            &["s-dark-1", "s-dark-2"],
+        );
 
         let n = record_bytes_not_local_gap(&mut conn, "dark", "lamad").expect("write gap");
         assert_eq!(n, 2, "one gap row per manifest shard");
@@ -982,8 +980,17 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "dark", Some("sha256-dark"));
-            insert_manifest_with_shards(&mut conn, "dark", "sha256-dark", &["s-dark-1"]);
+            insert_content(
+                &mut conn,
+                "dark",
+                Some("bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu"),
+            );
+            insert_manifest_with_shards(
+                &mut conn,
+                "dark",
+                "bafkr4ibmw5ztpg4ao5uors6tzkobakds2coamj4opf2qeyempwsrgiredu",
+                &["s-dark-1"],
+            );
         }
         // Blob bytes deliberately ABSENT from this store → distribute_one bails.
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -1029,11 +1036,11 @@ mod tests {
     // through the stored manifest, so after a blob rotation the holder join is
     // guaranteed-empty even though distribution succeeded — `distributionState:
     // "measured"` with `stewardingCollectives: 0` (live: elohim-host-landing, stored
-    // manifest stamped from a 9,972,404-byte SSR bundle while content.blob_hash
+    // manifest stamped from a 9,972,404-byte SSR bundle while content.blob_cid
     // points at the 10,002,432-byte current one).
     // ────────────────────────────────────────────────────────────────────────
 
-    /// DETECTOR (i): manifest present + DIVERGENT blob_hash → selected for the
+    /// DETECTOR (i): manifest present + DIVERGENT blob_cid → selected for the
     /// re-stamp path, *regardless of how many holder rows exist*.
     ///
     /// This is the leg the pre-fix selector could never reach: its only admission
@@ -1047,11 +1054,24 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         // Content now points at the NEW bytes; the manifest still names the OLD.
-        insert_content(&mut conn, "rotated", Some("sha256-new"));
-        insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+        insert_content(
+            &mut conn,
+            "rotated",
+            Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "rotated",
+            "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu",
+            &["bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"],
+        );
         // Distribution DID succeed — but the holder row is keyed under the new hash,
         // which the stored manifest does not name.
-        seed_location(&mut conn, "sha256-new", "uhCAkHolder");
+        seed_location(
+            &mut conn,
+            "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi",
+            "uhCAkHolder",
+        );
 
         let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
         let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
@@ -1061,23 +1081,35 @@ mod tests {
             "a divergent manifest must be admitted despite holder rows existing"
         );
         assert!(cands[0].is_manifest_divergent());
-        assert_eq!(cands[0].blob_hash, "sha256-new");
         assert_eq!(
-            cands[0].manifest_blob_hash.as_deref(),
-            Some("sha256-old"),
+            cands[0].blob_cid.to_string(),
+            "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
+        );
+        assert_eq!(
+            cands[0].manifest_blob_cid.as_deref(),
+            Some("bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"),
             "the candidate must carry the stale stamp so the sweep can log the divergence"
         );
     }
 
-    /// DETECTOR (ii): manifest present + MATCHING blob_hash + holders → untouched.
+    /// DETECTOR (ii): manifest present + MATCHING blob_cid + holders → untouched.
     /// The healthy steady state must never enter the re-stamp path.
     #[test]
     fn matching_manifest_with_holders_is_not_selected() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        insert_content(&mut conn, "healthy", Some("sha256-same"));
-        insert_manifest_with_shards(&mut conn, "healthy", "sha256-same", &["s-1"]);
+        insert_content(
+            &mut conn,
+            "healthy",
+            Some("bafkr4ied72bfoovvg3hsbsxry6hjqanh327ls2t7g2ldp5byxmjmb2acd4"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "healthy",
+            "bafkr4ied72bfoovvg3hsbsxry6hjqanh327ls2t7g2ldp5byxmjmb2acd4",
+            &["s-1"],
+        );
         seed_location(&mut conn, "s-1", "uhCAkHolder");
 
         let cands = select_redistribution_candidates(&mut conn, "lamad", 50).expect("select");
@@ -1099,12 +1131,21 @@ mod tests {
         // Two dark rows FIRST in insertion order, then the divergent one.
         for i in 0..2 {
             let id = format!("dark-{i}");
-            let bh = format!("sha256-dark-{i}");
+            let bh = fixture_unit(&format!("dark-blob-{i}"));
             insert_content(&mut conn, &id, Some(&bh));
             insert_manifest_with_shards(&mut conn, &id, &bh, &[&format!("s-dark-{i}")]);
         }
-        insert_content(&mut conn, "rotated", Some("sha256-new"));
-        insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+        insert_content(
+            &mut conn,
+            "rotated",
+            Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"),
+        );
+        insert_manifest_with_shards(
+            &mut conn,
+            "rotated",
+            "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu",
+            &["bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"],
+        );
 
         let cands = select_redistribution_candidates(&mut conn, "lamad", 1).expect("select");
         let ids: Vec<&str> = cands.iter().map(|c| c.content_id.as_str()).collect();
@@ -1131,13 +1172,13 @@ mod tests {
             .expect("store current blob");
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "rotated", Some(&current.hash));
+            insert_content(&mut conn, "rotated", Some(&current.cid.to_string()));
             // Manifest stamped from a PREVIOUS bundle's bytes.
             insert_manifest_with_shards(
                 &mut conn,
                 "rotated",
-                "sha256-previous-bundle",
-                &["sha256-previous-bundle"],
+                "bafkr4idpr2eghdkpc2zvxnrutmvd3geadxv3tb3jnll5idyuav4m6bfo6y",
+                &["bafkr4idpr2eghdkpc2zvxnrutmvd3geadxv3tb3jnll5idyuav4m6bfo6y"],
             );
         }
 
@@ -1163,19 +1204,21 @@ mod tests {
             .expect("get manifest")
             .expect("manifest present");
         assert_eq!(
-            manifest.blob_hash, current.hash,
+            manifest.blob_cid,
+            current.cid.to_string(),
             "the manifest must now be stamped from the content's CURRENT blob"
         );
-        let shard_hashes: Vec<String> =
-            serde_json::from_str(&manifest.shard_hashes_json).expect("decode shard hashes");
-        // Small payload → encoding "none" → the single shard IS the blob.
+        let shard_cids = crate::db::shard_manifests::custody_unit_cids(&manifest);
+        // Small payload → one chunk → the single custody unit IS the blob.
         assert_eq!(
-            shard_hashes,
-            vec![current.hash.clone()],
+            shard_cids,
+            vec![current.cid.to_string()],
             "the join key readers use must be the current bytes' hash"
         );
         assert!(
-            !shard_hashes.contains(&"sha256-previous-bundle".to_string()),
+            !shard_cids.contains(
+                &"bafkr4idpr2eghdkpc2zvxnrutmvd3geadxv3tb3jnll5idyuav4m6bfo6y".to_string()
+            ),
             "the superseded shard hash must be gone from the manifest"
         );
     }
@@ -1190,8 +1233,17 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "rotated", Some("sha256-new-not-held"));
-            insert_manifest_with_shards(&mut conn, "rotated", "sha256-old", &["sha256-old"]);
+            insert_content(
+                &mut conn,
+                "rotated",
+                Some("bafkr4ierfgqucjo64cxrxnzdmvgotnjohjmdqj7cbzrop4qip6ikvto3ky"),
+            );
+            insert_manifest_with_shards(
+                &mut conn,
+                "rotated",
+                "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu",
+                &["bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"],
+            );
         }
         // Blob store deliberately EMPTY — the current bytes are not local.
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -1223,7 +1275,7 @@ mod tests {
             .expect("get manifest")
             .expect("manifest present");
         assert_eq!(
-            manifest.blob_hash, "sha256-old",
+            manifest.blob_cid, "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu",
             "the stale manifest must be left exactly as it was"
         );
 
@@ -1252,7 +1304,7 @@ mod tests {
     /// blob hash).
     #[cfg(feature = "p2p")]
     #[tokio::test]
-    async fn restamp_prunes_orphans_but_spares_shared_shard_hashes() {
+    async fn restamp_prunes_orphans_but_spares_shared_shard_cids() {
         let pool = test_pool();
         let blob_store = BlobStore::new_memory();
         let current = blob_store
@@ -1262,11 +1314,11 @@ mod tests {
 
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "rotated", Some(&current.hash));
+            insert_content(&mut conn, "rotated", Some(&current.cid.to_string()));
             insert_manifest_with_shards(
                 &mut conn,
                 "rotated",
-                "sha256-old",
+                "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu",
                 &["s-orphan", "s-kept"],
             );
             // A holder row under each of the OLD manifest's shard hashes.
@@ -1274,8 +1326,17 @@ mod tests {
             seed_location(&mut conn, "s-kept", "uhCAkHolder");
             // A DIFFERENT content whose manifest also names `s-kept` — that shard
             // hash is still live and its holder row must survive the prune.
-            insert_content(&mut conn, "sibling", Some("sha256-sibling"));
-            insert_manifest_with_shards(&mut conn, "sibling", "sha256-sibling", &["s-kept"]);
+            insert_content(
+                &mut conn,
+                "sibling",
+                Some("bafkr4ibarcb35ygauwbdo2dy22v6elgdjoj5yesgzazayrhi35mkemwa34"),
+            );
+            insert_manifest_with_shards(
+                &mut conn,
+                "sibling",
+                "bafkr4ibarcb35ygauwbdo2dy22v6elgdjoj5yesgzazayrhi35mkemwa34",
+                &["s-kept"],
+            );
         }
 
         let config = BackfillConfig {
@@ -1295,13 +1356,16 @@ mod tests {
 
         let mut conn = pool.get().expect("conn");
         assert!(
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, "s-orphan")
-                .expect("query")
-                .is_empty(),
+            crate::db::shard_locations::get_locations_for_shard(
+                &mut conn,
+                &fixture_unit("s-orphan")
+            )
+            .expect("query")
+            .is_empty(),
             "the orphaned holder row must be gone"
         );
         assert_eq!(
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, "s-kept")
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &fixture_unit("s-kept"))
                 .expect("query")
                 .len(),
             1,
@@ -1316,7 +1380,7 @@ mod tests {
         let mut conn = pool.get().expect("conn");
         for i in 0..3 {
             let id = format!("dark-{i}");
-            let bh = format!("sha256-{i}");
+            let bh = fixture_unit(&format!("dark-blob-{i}"));
             insert_content(&mut conn, &id, Some(&bh));
             insert_manifest_with_shards(&mut conn, &id, &bh, &[&format!("s-{i}")]);
         }
@@ -1336,12 +1400,19 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        insert_content(&mut conn, "has-blob-no-manifest", Some("sha256-aaa"));
+        insert_content(
+            &mut conn,
+            "has-blob-no-manifest",
+            Some("bafkr4ibqyd44nilh7qvjckc4qw7h5i2bk2ntwop4yx3x7u2fgtfn5fy5ea"),
+        );
 
         let candidates = select_candidates(&mut conn, "lamad").expect("select");
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].content_id, "has-blob-no-manifest");
-        assert_eq!(candidates[0].blob_hash, "sha256-aaa");
+        assert_eq!(
+            candidates[0].blob_cid.to_string(),
+            "bafkr4ibqyd44nilh7qvjckc4qw7h5i2bk2ntwop4yx3x7u2fgtfn5fy5ea"
+        );
         assert_eq!(candidates[0].content_format, "html5-app");
         assert_eq!(candidates[0].reach, "commons");
     }
@@ -1351,8 +1422,16 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        insert_content(&mut conn, "has-blob-and-manifest", Some("sha256-bbb"));
-        insert_manifest(&mut conn, "has-blob-and-manifest", "sha256-bbb");
+        insert_content(
+            &mut conn,
+            "has-blob-and-manifest",
+            Some("bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq"),
+        );
+        insert_manifest(
+            &mut conn,
+            "has-blob-and-manifest",
+            "bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq",
+        );
 
         let candidates = select_candidates(&mut conn, "lamad").expect("select");
         assert!(
@@ -1376,17 +1455,17 @@ mod tests {
     }
 
     #[test]
-    fn empty_string_blob_hash_is_not_selected() {
+    fn empty_string_blob_cid_is_not_selected() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        // A blob_hash present-but-empty is "no blob" — must not yield a bogus manifest.
+        // A blob_cid present-but-empty is "no blob" — must not yield a bogus manifest.
         insert_content(&mut conn, "empty-blob-hash", Some(""));
 
         let candidates = select_candidates(&mut conn, "lamad").expect("select");
         assert!(
             candidates.is_empty(),
-            "empty-string blob_hash must not be a candidate, got {candidates:?}"
+            "empty-string blob_cid must not be a candidate, got {candidates:?}"
         );
     }
 
@@ -1395,10 +1474,26 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        insert_content(&mut conn, "gap-1", Some("sha256-g1"));
-        insert_content(&mut conn, "gap-2", Some("sha256-g2"));
-        insert_content(&mut conn, "already-done", Some("sha256-done"));
-        insert_manifest(&mut conn, "already-done", "sha256-done");
+        insert_content(
+            &mut conn,
+            "gap-1",
+            Some("bafkr4id2neh47ho6lxutfjxwh7uzumir3uxmisgbtzak25vd26xrbhy2tq"),
+        );
+        insert_content(
+            &mut conn,
+            "gap-2",
+            Some("bafkr4ie6zr7acux4ks3riip454mwg5exxeiy7ogzyzc2gsfw4vq5jghcqe"),
+        );
+        insert_content(
+            &mut conn,
+            "already-done",
+            Some("bafkr4ibbdlsv723jzj3egm34qio7ew6osk2s2mwvtqo45ln7xzeexfl6zm"),
+        );
+        insert_manifest(
+            &mut conn,
+            "already-done",
+            "bafkr4ibbdlsv723jzj3egm34qio7ew6osk2s2mwvtqo45ln7xzeexfl6zm",
+        );
         insert_content(&mut conn, "no-blob", None);
 
         let mut candidates = select_candidates(&mut conn, "lamad").expect("select");
@@ -1414,22 +1509,18 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         // Content is lamad; a manifest exists but for a different h_app_id.
-        insert_content(&mut conn, "cross-app", Some("sha256-x"));
-        let other = NewShardManifest {
-            content_id: "cross-app",
-            h_app_id: "other-app",
-            blob_hash: "sha256-x",
-            blob_cid: None,
-            encoding: "none",
-            data_shard_count: 1,
-            parity_shard_count: 0,
-            shard_hashes_json: "[]",
-            total_size_bytes: 0,
-            shard_size_bytes: 0,
-            mime_type: "html5-app",
-            reach: "commons",
-        };
-        crate::db::shard_manifests::upsert_manifest(&mut conn, &other).expect("insert other");
+        insert_content(
+            &mut conn,
+            "cross-app",
+            Some("bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"),
+        );
+        insert_unit_manifest(
+            &mut conn,
+            "cross-app",
+            "other-app",
+            "bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu",
+            &[],
+        );
 
         let candidates = select_candidates(&mut conn, "lamad").expect("select");
         assert_eq!(
@@ -1452,9 +1543,13 @@ mod tests {
             .expect("store blob");
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "present", Some(&stored.hash));
-            // Candidate 2: blob_hash set but bytes absent → skip-and-warn.
-            insert_content(&mut conn, "absent", Some("sha256-not-in-store"));
+            insert_content(&mut conn, "present", Some(&stored.cid.to_string()));
+            // Candidate 2: blob_cid set but bytes absent → skip-and-warn.
+            insert_content(
+                &mut conn,
+                "absent",
+                Some("bafkr4ia3rduognysdovj6zfv4cjf56gppnvhes6lqkiqngsh4kzqqpxopy"),
+            );
         }
 
         let config = BackfillConfig {
@@ -1489,70 +1584,37 @@ mod tests {
         }
     }
 
-    /// The mesh-measured defect this closes: a landing-bundle-shaped blob
-    /// (`"chunked"` encoding, ~16MB+, composite NEVER stored under its own
-    /// hash — only its shards under theirs) already got a manifest at ingest
-    /// time (`put_blob_bytes`, filed under a `blob:{cid}` projection id). A
-    /// content row pointing at that same `blob_hash` — the `POST /db/content`
-    /// create for the bundle's slug — is a Part A backfill candidate (no
-    /// `(content_id, h_app_id)` manifest row yet). The NEXT backfill sweep
-    /// must pick it up and reuse the real, already-stored shard hashes rather
-    /// than skip-and-warn on the (genuinely absent) composite.
+    /// A content row whose bytes this node does not hold, but whose manifest was
+    /// already recorded at ingest under the `blob:{cid}` projection id, is a Part A
+    /// candidate the next sweep records by REUSING that manifest (content-addressed:
+    /// the same byte CID names the same chunks and stripes) — never skip-and-warn.
     #[tokio::test]
-    async fn run_once_picks_up_chunk_stored_blob_with_no_composite_on_next_run() {
+    async fn run_once_reuses_an_ingest_time_manifest_without_reading_bytes() {
         let pool = test_pool();
         let blob_store = BlobStore::new_memory();
 
-        // Shards already on disk under THEIR OWN hashes — exactly what
-        // `put_blob_bytes` leaves for a `"chunked"`-encoded blob.
-        let shard_a = blob_store
-            .store(b"landing bundle shard one---")
-            .await
-            .expect("store shard a");
-        let shard_b = blob_store
-            .store(b"landing bundle shard two---")
-            .await
-            .expect("store shard b");
-        let mut composite = Vec::new();
-        composite.extend_from_slice(b"landing bundle shard one---");
-        composite.extend_from_slice(b"landing bundle shard two---");
-        let composite_hash = crate::blob_store::BlobStore::compute_hash(&composite);
-
-        let manifest = crate::sharding::ShardManifest {
-            blob_cid: format!("bafkrei-{composite_hash}"),
-            blob_hash: composite_hash.clone(),
-            total_size: composite.len() as u64,
-            mime_type: "html5-app".to_string(),
-            encoding: "chunked".to_string(),
-            data_shards: 2,
-            total_shards: 2,
-            shard_size: shard_a.size_bytes,
-            shard_hashes: vec![shard_a.hash.clone(), shard_b.hash.clone()],
-            reach: "commons".to_string(),
-            author_id: None,
-            created_at: "2026-08-21T00:00:00Z".to_string(),
-            verified_at: None,
-        };
+        let payload: Vec<u8> = (0..120_000u32).flat_map(|n| n.to_le_bytes()).collect();
+        let manifest = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default())
+            .create_manifest(&payload, "html5-app", "commons")
+            .expect("manifest");
+        let blob_cid = manifest.blob_cid.to_string();
 
         {
             let mut conn = pool.get().expect("conn");
-            // Ingest-time manifest projection, filed under `blob:{cid}` — the
-            // same call `put_blob_bytes` makes, and NOT under the content id
-            // used below.
             crate::db::shard_manifests::record_generated_manifest(
                 &mut conn,
-                &format!("blob:{}", manifest.blob_cid),
+                &format!("blob:{blob_cid}"),
                 "lamad",
                 &manifest,
             )
             .expect("seed ingest-time manifest");
-            insert_content(&mut conn, "elohim-host-landing", Some(&composite_hash));
+            insert_content(&mut conn, "elohim-host-landing", Some(&blob_cid));
         }
 
-        // Confirms the shape under test: the composite is genuinely absent.
-        assert!(
-            blob_store.get(&composite_hash).await.is_err(),
-            "a chunked blob's composite must never be stored under its own hash"
+        // The bytes are genuinely absent here.
+        assert_ne!(
+            blob_store.exists(&manifest.blob_cid).await,
+            crate::blob_store::Exists::Verified
         );
 
         let config = BackfillConfig {
@@ -1574,7 +1636,7 @@ mod tests {
         assert_eq!(report.candidates, 1);
         assert_eq!(
             report.recorded, 1,
-            "the chunk-stored blob must gain a manifest, not be skipped as missing"
+            "the known manifest must be reused, not skipped as missing"
         );
         assert_eq!(report.missing_blob, 0);
         assert_eq!(report.failed, 0);
@@ -1584,13 +1646,11 @@ mod tests {
             crate::db::shard_manifests::get_manifest(&mut conn, "lamad", "elohim-host-landing")
                 .expect("get manifest")
                 .expect("manifest must be persisted for the content id");
-        assert_eq!(row.encoding, "chunked");
-        let shard_hashes: Vec<String> =
-            serde_json::from_str(&row.shard_hashes_json).expect("decode shard hashes");
+        let hydrated = crate::db::shard_manifests::hydrate_manifest(&row).expect("hydrates");
+        assert_eq!(hydrated.blob_cid, manifest.blob_cid);
         assert_eq!(
-            shard_hashes,
-            vec![shard_a.hash, shard_b.hash],
-            "shard hashes must be the REAL, already-stored chunk hashes"
+            hydrated.chunks, manifest.chunks,
+            "the reused manifest names the same chunks"
         );
     }
 
@@ -1620,7 +1680,7 @@ mod tests {
             .expect("store blob");
         {
             let mut conn = pool.get().expect("conn");
-            insert_content(&mut conn, "held-doc", Some(&stored.hash));
+            insert_content(&mut conn, "held-doc", Some(&stored.cid.to_string()));
         }
 
         // BEFORE: no manifest → honest non-measurement. The card is dark, and it

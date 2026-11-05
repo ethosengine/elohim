@@ -57,6 +57,7 @@ pub mod identity_handshake;
 pub mod identity_map;
 pub mod inventory_broadcaster;
 pub mod inventory_gossip;
+pub mod inventory_recon; // negentropy-v1 range reconciliation over sorted byte CIDs
 pub mod inventory_reorder; // receive-side reorder window for paged inventory refreshes
 pub mod kad_store;
 pub mod observation_gossip;
@@ -65,6 +66,7 @@ pub mod private_receive; // station 3b receiver-side pre-authorization: keep a p
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
+pub mod recon_wire; // libp2p framing of /elohim/inventory-recon/1.0.0
 pub mod reconcile_peers; // transport-neutral peer source for the reconcile arms (libp2p | iroh)
 pub mod reconcile_rails;
 pub mod recovery_invitation;
@@ -290,7 +292,7 @@ type PendingKadGetProvidersMap = Arc<
     >,
 >;
 
-/// Map of pending shard verification requests: outbound request ID → (shard_hash, peer_id)
+/// Map of pending shard verification requests: outbound request ID → (shard_cid, peer_id)
 type PendingVerificationMap = Arc<
     tokio::sync::Mutex<
         std::collections::HashMap<request_response::OutboundRequestId, (String, String)>,
@@ -321,7 +323,7 @@ fn rotated_peer_index(rotation: usize, position: usize, peer_count: usize) -> us
 }
 
 /// Map of pending blob-pull requests (issued after a replication GetContent returns a
-/// non-empty blob_hash): outbound request ID → (content_id, blob_hash).
+/// byte CID): outbound request ID → (content_id, blob_cid).
 ///
 /// When the `ShardResponse::Data` arrives the handler stores the bytes into the local
 /// BlobStore and emits a tracing event.  Kept separate from `pending_shard_fetches` (which
@@ -329,7 +331,7 @@ fn rotated_peer_index(rotation: usize, position: usize, peer_count: usize) -> us
 /// no caller waiting on a channel.
 type PendingBlobPullMap = Arc<
     tokio::sync::Mutex<
-        std::collections::HashMap<request_response::OutboundRequestId, (String, String)>,
+        std::collections::HashMap<request_response::OutboundRequestId, (String, ByteCid)>,
     >,
 >;
 
@@ -347,6 +349,16 @@ type PendingEprAtomFetchMap = Arc<
 /// F-T19: Map of pending view-federation requests on `/elohim/view-federation/1.0.0`.
 /// Resolved when the behaviour event delivers `Message::Response` or `OutboundFailure`.
 /// Mirrors `PendingBlobFetchMap` with typed result error.
+/// In-flight `/elohim/inventory-recon/1.0.0` round trips, keyed by request id.
+type PendingReconMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<inventory_recon::ReconResponse, String>>,
+        >,
+    >,
+>;
+
 type PendingViewFederationMap = Arc<
     tokio::sync::Mutex<
         std::collections::HashMap<
@@ -425,9 +437,10 @@ fn take_replication_dispatches(
 
 use dashmap::DashMap;
 
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 
 // =============================================================================
 // Gossipsub topic constants (centralised here to prevent drift)
@@ -956,6 +969,8 @@ pub struct P2PNode {
     /// Populated by `handle_command(ViewFederate)`, resolved in the behaviour
     /// event arm when `Message::Response` or `OutboundFailure` fires.
     pending_view_federations: PendingViewFederationMap,
+    /// Pending inventory-recon round trips (`/elohim/inventory-recon/1.0.0`).
+    pending_recons: PendingReconMap,
     /// T20: pending Shamir share requests on `/elohim/shamir-share/1.0.0`.
     /// Populated by `handle_command(RequestShamirShare)`, resolved in the behaviour
     /// event arm when `Message::Response` or `OutboundFailure` fires.
@@ -988,6 +1003,10 @@ pub struct P2PNode {
     /// Replaced by `DualGossipPublisher` via `with_gossip_publisher()` when the
     /// iroh stack is running — fans out to both libp2p and iroh simultaneously.
     gossip_publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
+    /// Signs this node's inventory envelopes: the libp2p identity's own ed25519
+    /// key, so a receiver binds `holder ↔ author_peer` to the gossipsub author.
+    /// `None` only for a non-ed25519 identity, which then announces nothing.
+    inventory_signer: Option<Arc<elohim_epr::proof::AgentKeypair>>,
     /// Inventory refresh pages not yet published — drained `INVENTORY_PAGES_PER_TICK`
     /// per `INVENTORY_PACER_INTERVAL` so a 77-page refresh never overruns the
     /// 64-slot command channel the swarm loop itself drains (measured
@@ -1313,13 +1332,13 @@ pub enum P2PCommand {
     },
     /// Fetch content bytes via shard protocol from a connected peer
     FetchShard {
-        hash: String,
+        cid: ByteCid,
         reply: oneshot::Sender<Option<Vec<u8>>>,
     },
     /// Push a shard to a peer for replication
     PushShard {
         peer_id: PeerId,
-        hash: String,
+        cid: ByteCid,
         data: Vec<u8>,
         reply: oneshot::Sender<Result<(), String>>,
     },
@@ -1440,12 +1459,25 @@ pub enum P2PCommand {
     /// for content-reach broadcasts. Best-effort — publish failure (e.g. no
     /// peers subscribed) is logged and does not block the caller.
     GossipPublish { topic: String, payload: Vec<u8> },
-    /// T14: request a fresh `BlobInventorySnapshot` from the named peer.
-    /// Issued by the projection writer when it detects a sequence gap.
-    /// Stage 1 placeholder — just logs and drops; Stage 2 will route this
-    /// as a libp2p request-response message. The next periodic snapshot from
-    /// the source peer will close the gap naturally in the interim.
-    SnapshotRequest { peer_id: libp2p::PeerId },
+    /// Reconcile this node's projection of `peer_id`'s blob inventory with the
+    /// peer over `/elohim/inventory-recon/1.0.0`: issued for a gap the reorder
+    /// window could not close, and by the periodic recon tick. Spawns one bounded
+    /// session; a completed session re-bases the peer's cursor.
+    ReconcileInventory { peer_id: libp2p::PeerId },
+    /// One recon round trip: send `request` to `peer`, resolve `respond` with the
+    /// response or the transport failure.
+    InventoryRecon {
+        peer: libp2p::PeerId,
+        request: inventory_recon::ReconRequest,
+        respond: oneshot::Sender<Result<inventory_recon::ReconResponse, String>>,
+    },
+    /// Deliver a recon reply built off the event loop (the responder lists the
+    /// local store, which must not stall the swarm).
+    SendReconResponse {
+        /// Boxed: a response channel is far larger than every other command.
+        channel: Box<request_response::ResponseChannel<inventory_recon::ReconResponse>>,
+        response: inventory_recon::ReconResponse,
+    },
     /// Transport-neutral inventory work queued by either gossip receive plane.
     /// The event loop drains this bounded command channel and invokes the one
     /// commitment scorer / libp2p byte-fetch path. The iroh receive task never
@@ -1453,7 +1485,7 @@ pub enum P2PCommand {
     InventoryAdvertisement {
         source_peer_id: String,
         hints: Vec<crate::p2p::inventory_gossip::BlobHint>,
-        hashes: Vec<String>,
+        cids: Vec<String>,
     },
     /// T17: fetch a blob from a specific peer. Used by the race-fetch helper
     /// (`p2p::blob_fetch::race_fetch`) for GET-time fallback and custody-driven kicks.
@@ -1477,7 +1509,7 @@ pub enum P2PCommand {
     /// Stage 1 placeholder")` because no real swarm runs in unit tests.
     FetchBlob {
         peer_id: libp2p::PeerId,
-        hash: String,
+        cid: ByteCid,
         reply: tokio::sync::oneshot::Sender<Result<crate::p2p::blob_fetch::BlobFetchReply, String>>,
     },
     /// T23 review fix #2: trigger a custody reconcile pass from the
@@ -1714,7 +1746,11 @@ impl P2PHandle {
                         // P3.4 stub: no swarm in test, always miss.
                         let _ = reply.send(None);
                     }
-                    P2PCommand::SnapshotRequest { .. } => {} // T14 Stage-1 placeholder
+                    P2PCommand::ReconcileInventory { .. } => {} // no swarm in test
+                    P2PCommand::InventoryRecon { respond, .. } => {
+                        let _ = respond.send(Err("no swarm in test".to_string()));
+                    }
+                    P2PCommand::SendReconResponse { .. } => {} // no swarm in test
                     P2PCommand::InventoryAdvertisement { .. } => {} // fire-and-forget
                     P2PCommand::FetchBlob { reply, .. } => {
                         // T17 Stage-1 stub: no swarm in test.
@@ -2055,12 +2091,12 @@ impl P2PHandle {
     }
 
     /// Fetch content bytes via shard protocol. Returns None on timeout or not found.
-    pub async fn fetch_shard(&self, hash: &str) -> Option<Vec<u8>> {
+    pub async fn fetch_shard(&self, cid: &ByteCid) -> Option<Vec<u8>> {
         let (reply_tx, reply_rx) = oneshot::channel();
         if self
             .command_tx
             .send(P2PCommand::FetchShard {
-                hash: hash.to_string(),
+                cid: *cid,
                 reply: reply_tx,
             })
             .await
@@ -2084,7 +2120,7 @@ impl P2PHandle {
         label: &str,
         libp2p_id: Option<&str>,
         iroh_addr: Option<IrohPushAddr>,
-        hash: &str,
+        cid: &ByteCid,
         data: Vec<u8>,
     ) -> Result<&'static str, String> {
         use crate::p2p::transport_paths::{global, OpClass, Route, Transport};
@@ -2111,14 +2147,14 @@ impl P2PHandle {
             let started = std::time::Instant::now();
             let res: Result<(), String> = match t {
                 Transport::Libp2p => match libp2p_id {
-                    Some(id) => self.push_shard(id, hash, data.clone()).await,
+                    Some(id) => self.push_shard(id, cid, data.clone()).await,
                     None => Err("no libp2p binding".to_string()),
                 },
                 Transport::Iroh => {
                     #[cfg(feature = "p2p-iroh")]
                     {
                         match iroh_addr.clone() {
-                            Some(addr) => push_shard_over_iroh(addr, hash, data.clone()).await,
+                            Some(addr) => push_shard_over_iroh(addr, cid, data.clone()).await,
                             None => Err("no iroh binding".to_string()),
                         }
                     }
@@ -2141,7 +2177,12 @@ impl P2PHandle {
         Err(last_err)
     }
 
-    pub async fn push_shard(&self, peer_id: &str, hash: &str, data: Vec<u8>) -> Result<(), String> {
+    pub async fn push_shard(
+        &self,
+        peer_id: &str,
+        cid: &ByteCid,
+        data: Vec<u8>,
+    ) -> Result<(), String> {
         let peer_id: PeerId = peer_id
             .parse()
             .map_err(|e| format!("Invalid peer ID: {e}"))?;
@@ -2149,7 +2190,7 @@ impl P2PHandle {
         self.command_tx
             .send(P2PCommand::PushShard {
                 peer_id,
-                hash: hash.to_string(),
+                cid: *cid,
                 data,
                 reply: tx,
             })
@@ -2184,7 +2225,7 @@ impl P2PHandle {
     /// row that never overwrites a locally-witnessed one.
     async fn announce_custody(
         &self,
-        shard_hash: &str,
+        shard_cid: &ByteCid,
         holder_agent_cid: &str,
         h_app_id: &str,
         status: &str,
@@ -2192,12 +2233,11 @@ impl P2PHandle {
         use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
 
         let ann = CustodyAnnouncement {
-            shard_hash: shard_hash.to_string(),
+            shard_cid: *shard_cid,
             holder_agent_cid: holder_agent_cid.to_string(),
             h_app_id: h_app_id.to_string(),
             status: status.to_string(),
             announced_at_ms: chrono::Utc::now().timestamp_millis(),
-            signature: vec![0x00], // Stage 1 structural non-empty
         };
         let bytes = match ann.to_bytes() {
             Ok(b) => b,
@@ -2228,7 +2268,7 @@ impl P2PHandle {
         crate::metrics::inc_custody_announce("sent");
         debug!(
             target: "elohim_storage::custody",
-            shard_hash = %shard_hash,
+            shard_cid = %shard_cid,
             holder = %holder_agent_cid,
             status = %status,
             "queued custody announcement for gossip"
@@ -2255,12 +2295,37 @@ impl P2PHandle {
         h_app_id: &str,
     ) -> Result<usize, String> {
         let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
-        let manifest = encoder
-            .create_manifest(blob_data, "application/octet-stream", "commons")
+        let (manifest, stripe_shards) = encoder
+            .encode(blob_data, "application/octet-stream", "commons")
             .map_err(|e| format!("shard manifest encode: {e}"))?;
-        let shards = encoder
-            .create_shards(blob_data, &manifest.encoding)
-            .map_err(|e| format!("shard data encode: {e}"))?;
+        // The custody units in placement order, with their bytes: the stripes'
+        // shards when erasure-coded, else the payload's chunks.
+        let units: Vec<(ByteCid, Vec<u8>)> = if manifest.stripes.is_empty() {
+            let mut offset = 0usize;
+            manifest
+                .chunks
+                .iter()
+                .map(|chunk| {
+                    let len = chunk.len as usize;
+                    let bytes = blob_data[offset..offset + len].to_vec();
+                    offset += len;
+                    (chunk.cid, bytes)
+                })
+                .collect()
+        } else {
+            manifest
+                .stripes
+                .iter()
+                .zip(stripe_shards.iter())
+                .flat_map(|(stripe, shards)| {
+                    stripe
+                        .shards
+                        .iter()
+                        .map(|r| (r.cid, shards[usize::from(r.index)].clone()))
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        };
 
         // The location rows below are custody evidence, so write the exact
         // manifest they describe before attempting a placement. Without this
@@ -2277,7 +2342,7 @@ impl P2PHandle {
             .map_err(|e| format!("shard manifest projection: {e}"))?;
         }
 
-        let total_shards = shards.len();
+        let total_shards = units.len();
 
         // Run the contract-aware diverse selector. The liveness staleness window
         // (honesty guard: a fanned-in "online" from a peer that has since gone dark
@@ -2402,7 +2467,7 @@ impl P2PHandle {
         };
 
         let placement_plan = crate::sharding::plan_shard_placement_slots(&manifest, selected.len());
-        if manifest.encoding.starts_with("rs-") {
+        if !manifest.stripes.is_empty() {
             let data_households: std::collections::HashSet<String> = placement_plan
                 .iter()
                 .filter(|slot| slot.role == crate::sharding::ShardRole::Data)
@@ -2425,10 +2490,10 @@ impl P2PHandle {
             );
         }
 
-        for slot in placement_plan {
+        for (position, slot) in placement_plan.into_iter().enumerate() {
             let i = slot.shard_index;
-            let shard_data = &shards[i];
-            let hash = &manifest.shard_hashes[i];
+            let (unit_cid, shard_data) = &units[position];
+            let hash = unit_cid;
             let peer = &selected[slot.holder_index];
 
             // SELF-selected: record what we can verify, never dial ourselves.
@@ -2525,8 +2590,9 @@ impl P2PHandle {
                         "Shard distributed"
                     );
                     if let Ok(mut conn) = pool.get() {
+                        let unit_text = hash.to_string();
                         let location = crate::db::models::NewShardLocation {
-                            shard_hash: hash,
+                            shard_cid: &unit_text,
                             // Store the AGENT key, not the transport dial id — the
                             // resilience join is agent_cid == agent_cid.
                             peer_id: &peer.peer_id,
@@ -2572,8 +2638,8 @@ impl P2PHandle {
                         match crate::services::rea_commitment_service::ReaCommitmentService::ensure_active_self_custody(
                             &mut conn,
                             &ctx,
-                            &manifest.blob_hash,
-                            manifest.total_size,
+                            &manifest.blob_cid,
+                            manifest.byte_len,
                             provider,
                             Some(content_id),
                             hc,
@@ -2582,13 +2648,13 @@ impl P2PHandle {
                         {
                             Ok(outcome) => tracing::info!(
                                 content_id,
-                                blob_hash = %manifest.blob_hash,
+                                blob_cid = %manifest.blob_cid,
                                 ?outcome,
                                 "self-stewardship: active custody-blob commitment ensured"
                             ),
                             Err(e) => tracing::warn!(
                                 content_id,
-                                blob_hash = %manifest.blob_hash,
+                                blob_cid = %manifest.blob_cid,
                                 error = %e,
                                 "self-stewardship: custody commitment authoring failed; evidence remains and a later pass retries"
                             ),
@@ -2602,7 +2668,7 @@ impl P2PHandle {
                 },
                 (Some(_), None) => tracing::warn!(
                     content_id,
-                    blob_hash = %manifest.blob_hash,
+                    blob_cid = %manifest.blob_cid,
                     "self-stewardship: lamad conductor bridge offline; skipping unanchored custody commitment"
                 ),
                 (None, _) => {}
@@ -2643,12 +2709,13 @@ impl P2PHandle {
                 } else {
                     gap_achieved as f32 / gap_requested as f32
                 };
-                for hash in &manifest.shard_hashes {
+                for (unit, _) in &units {
                     let id = uuid::Uuid::new_v4().to_string();
+                    let unit_text = unit.to_string();
                     let gap = crate::db::models::NewPlacementGap {
                         id: &id,
                         content_id,
-                        shard_hash: hash,
+                        shard_cid: &unit_text,
                         h_app_id,
                         requested_steward_count: gap_requested,
                         achieved_steward_count: gap_achieved,
@@ -2691,16 +2758,19 @@ impl P2PHandle {
             debug!(id = %id, "EPR Head has no blob_cid, skipping shard fetch");
             return None;
         }
-        let content_bytes = self.fetch_shard(&head.content).await?;
+        let Ok(content_cid) = ByteCid::parse(&head.content) else {
+            debug!(id = %id, content = %head.content, "EPR Head content is not a byte CID");
+            return None;
+        };
+        let content_bytes = self.fetch_shard(&content_cid).await?;
 
-        // Step 3: Verify content integrity (accept sha256-hex or CID formats)
-        use sha2::{Digest, Sha256};
-        let computed_hash = format!("sha256-{}", hex::encode(Sha256::digest(&content_bytes)));
-        if computed_hash != head.content && !head.content.starts_with("bafkrei") {
+        // Step 3: the bytes must hash to the byte CID the head declares.
+        let computed = compute_bytes_cid(&content_bytes);
+        if computed != content_cid {
             warn!(
                 id = %id,
-                expected = %head.content,
-                actual = %computed_hash,
+                expected = %content_cid,
+                actual = %computed,
                 "Content integrity check failed"
             );
             return None;
@@ -3113,10 +3183,15 @@ impl P2PNode {
                 .unwrap_or(crate::reconcile::custody_sweep::DEFAULT_KICK_COOLDOWN_SECONDS),
         );
 
+        let inventory_signer = inventory_signer_of(&identity);
+
         Ok(Self {
             identity,
             config,
-            #[allow(clippy::arc_with_non_send_sync)]
+            #[allow(
+                clippy::arc_with_non_send_sync,
+                reason = "the swarm is only touched under this RwLock on the node's own runtime; it is shared, never sent"
+            )]
             swarm: Arc::new(RwLock::new(swarm)),
             shard_service: Arc::new(crate::shard_service::ShardService::new(
                 blob_store.clone(),
@@ -3199,6 +3274,7 @@ impl P2PNode {
             pending_view_federations: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_recons: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             pending_shamir_shares: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -3220,6 +3296,7 @@ impl P2PNode {
             ),
             salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
+            inventory_signer,
             inventory_page_backlog: std::sync::Mutex::new(std::collections::VecDeque::new()),
             sealing_keys: None,
             agent_info_inbound_tx: None,
@@ -4189,7 +4266,7 @@ impl P2PNode {
                     }
                 } => {
                     drop(swarm);
-                    self.broadcast_inventory_snapshot().await;
+                    self.reconcile_with_connected_peers();
                     // P3-4: piggyback the salvage-capacity advertisement on the
                     // same broadcast cadence. Self-gates (opt-in + always-on
                     // archetype + self_cid) inside the method — a no-op for
@@ -4301,147 +4378,111 @@ impl P2PNode {
             .is_empty()
     }
 
-    async fn broadcast_inventory_snapshot(&self) {
-        use crate::p2p::inventory_broadcaster::{
-            build_bounded_inventory_publications, gather_hints, LocalInventory as _,
-            StaticInventory, INVENTORY_GOSSIP_PAYLOAD_BUDGET,
-        };
+    /// How many connected peers one recon tick reconciles with.
+    const RECON_PEERS_PER_TICK: usize = 8;
 
-        // Fetch hashes directly so I/O failure can skip the tick. Must happen
-        // before constructing StaticInventory + entering build_snapshot.
-        let hashes = match self.blob_store.list_hashes() {
-            Ok(h) => h,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    "T22: list_hashes failed; skipping inventory snapshot tick \
-                     (would have corrupted remote projection)"
-                );
-                return;
-            }
-        };
-
-        // Convert raw filenames to validated BlobAddress instances, dropping
-        // any non-canonical entries. The production blob store always emits
-        // canonical sha256-<hex> names; this filter guards against filesystem
-        // contamination (temp files, .DS_Store, etc.).
-        use crate::p2p::inventory_gossip::BlobAddress;
-        use std::sync::Once;
-        static WARN_ONCE_BROADCAST: Once = Once::new();
-        let mut dropped_broadcast = 0_usize;
-        let blob_addresses: Vec<BlobAddress> = hashes
-            .into_iter()
-            .filter_map(|s| match BlobAddress::new(s) {
-                Ok(a) => Some(a),
-                Err(_) => {
-                    dropped_broadcast += 1;
-                    None
-                }
-            })
-            .collect();
-        if dropped_broadcast > 0 {
-            WARN_ONCE_BROADCAST.call_once(|| {
-                warn!(
-                    target: "elohim_storage::inventory",
-                    dropped = dropped_broadcast,
-                    "broadcast_inventory_snapshot: list_hashes returned non-canonical \
-                     filenames; dropped from snapshot (logged once per session)"
-                );
-            });
-        }
-        let inventory = StaticInventory::new(blob_addresses);
-        let local_peer_id = self.peer_id().to_string();
-        let now_micros = chrono::Utc::now().timestamp_micros();
-
-        // Wave 3: gather per-blob hints from the content projection. Failures
-        // are non-fatal (gather_hints logs internally and returns empty vec).
-        let hints = if let Some(pool) = self.db_pool.as_ref() {
-            match pool.get() {
-                Ok(mut conn) => {
-                    gather_hints(&mut conn, &inventory.current_hashes(), &local_peer_id)
-                }
-                Err(_) => vec![],
-            }
-        } else {
-            vec![]
-        };
-
-        let hashes_for_record: Vec<String> = inventory
-            .current_hashes()
+    /// The periodic inventory tick: run a recon session with up to
+    /// [`Self::RECON_PEERS_PER_TICK`] connected peers (rotating, so a larger mesh is
+    /// covered across ticks). Snapshots are gone: a full inventory is never gossiped;
+    /// each peer's projection converges by range reconciliation, and deltas carry
+    /// the changes between sessions.
+    fn reconcile_with_connected_peers(&self) {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let mut peers: Vec<libp2p::PeerId> = self
+            .peer_metrics
             .iter()
-            .map(|a| a.as_str().to_string())
+            .filter(|e| e.value().is_connected)
+            .filter_map(|e| e.key().parse().ok())
             .collect();
-        let count = hashes_for_record.len();
-        let publications = match build_bounded_inventory_publications(
-            &local_peer_id,
-            &inventory,
-            &self.inventory_seq,
-            now_micros,
-            hints,
-            INVENTORY_GOSSIP_PAYLOAD_BUDGET,
-        ) {
-            Ok(publications) => publications,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    "T22: failed to build bounded inventory publication"
-                );
-                return;
-            }
-        };
-        let page_count = publications.len();
-        let last_sequence = publications.last().map(|p| p.sequence()).unwrap_or(0);
+        if peers.is_empty() {
+            return;
+        }
+        peers.sort();
+        let offset = NEXT.fetch_add(
+            Self::RECON_PEERS_PER_TICK,
+            std::sync::atomic::Ordering::Relaxed,
+        ) % peers.len();
+        peers.rotate_left(offset);
+        peers.truncate(Self::RECON_PEERS_PER_TICK);
+        // The parity diagnostic compares what this node holds with what peers see.
+        if let Ok(local) = self.blob_store.list_cids() {
+            self.set_last_gossiped_inventory(local.iter().map(ToString::to_string).collect());
+        }
+        for peer in peers {
+            self.spawn_recon_session(peer);
+        }
+    }
 
-        // Plan 4: every bounded page routes through the same dual publisher, so
-        // libp2p and iroh receive byte-identical snapshot+delta sequences.
-        // Serialize the whole refresh first, then PACE it: the libp2p leg is a
-        // try_send into the 64-slot command channel this very loop drains, so a
-        // tight 77-page loop lost its tail on every refresh (measured 2026-08-29).
-        // A refresh still in the backlog when the next one is built is
-        // superseded — its snapshot page would only be replaced anyway.
-        let mut pages: std::collections::VecDeque<Vec<u8>> =
-            std::collections::VecDeque::with_capacity(page_count);
-        for (page_index, publication) in publications.into_iter().enumerate() {
-            match publication.to_bytes() {
-                Ok(bytes) => pages.push_back(bytes),
+    /// Run one recon session with `peer` off the event loop (its round trips come
+    /// back through this loop's command channel).
+    fn spawn_recon_session(&self, peer: libp2p::PeerId) {
+        let Some(pool) = self.db_pool.clone() else {
+            return;
+        };
+        let cmd_tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            match run_recon_session(&cmd_tx, &pool, peer).await {
+                Ok(outcome) => debug!(
+                    target: "elohim_storage::inventory",
+                    peer = %peer,
+                    added = outcome.added,
+                    removed = outcome.removed,
+                    rounds = outcome.rounds,
+                    sequence = outcome.sequence,
+                    "inventory recon converged; cursor re-based"
+                ),
+                Err(e) => debug!(
+                    target: "elohim_storage::inventory",
+                    peer = %peer,
+                    error = %e,
+                    "inventory recon session did not complete; cursor unchanged"
+                ),
+            }
+        });
+    }
+
+    /// Answer one inbound recon message off the event loop: admit it, reconcile it
+    /// against this node's own byte CIDs, and send the reply back through the loop.
+    fn answer_recon(
+        &self,
+        request: inventory_recon::ReconRequest,
+        channel: request_response::ResponseChannel<inventory_recon::ReconResponse>,
+    ) {
+        let blob_store = Arc::clone(&self.blob_store);
+        let sequence = self.inventory_seq.current();
+        let cmd_tx = self.command_tx.clone();
+        tokio::spawn(async move {
+            let reply = tokio::task::spawn_blocking(move || {
+                request.admit().map_err(|e| e.to_string())?;
+                let local = blob_store.list_cids().map_err(|e| e.to_string())?;
+                let set = inventory_recon::ReconSet::new(&local);
+                inventory_recon::Reconciler::responder(&set)
+                    .reconcile(&request.msg)
+                    .map_err(|e| e.to_string())
+            })
+            .await;
+            let msg = match reply {
+                Ok(Ok(step)) => step
+                    .next
+                    .unwrap_or_else(|| recon_wire::RECON_EMPTY_REPLY.to_vec()),
+                Ok(Err(e)) => {
+                    debug!(target: "elohim_storage::inventory", error = %e, "recon request refused");
+                    // A refused message is answered with the empty reply, which ends
+                    // the initiator's session without moving its cursor further.
+                    recon_wire::RECON_EMPTY_REPLY.to_vec()
+                }
                 Err(e) => {
-                    crate::metrics::inc_inventory_page_published("serialize_failed");
-                    warn!(
-                        target: "elohim_storage::inventory",
-                        error = %e,
-                        page_index,
-                        "T22: failed to serialize bounded inventory page"
-                    );
+                    warn!(target: "elohim_storage::inventory", error = %e, "recon responder task failed");
                     return;
                 }
-            }
-        }
-        {
-            let mut backlog = self
-                .inventory_page_backlog
-                .lock()
-                .unwrap_or_else(|p| p.into_inner());
-            for _ in 0..backlog.len() {
-                crate::metrics::inc_inventory_page_published("superseded");
-            }
-            *backlog = pages;
-        }
-        self.drain_inventory_backlog();
-
-        // T22 review fix #3: delegate the parity-record write to the
-        // shared method so poisoned-lock handling stays consistent
-        // with `P2PHandle::set_last_gossiped_inventory`.
-        self.set_last_gossiped_inventory(hashes_for_record);
-        info!(
-            target: "elohim_storage::inventory",
-            count,
-            page_count,
-            sequence = last_sequence,
-            payload_budget = INVENTORY_GOSSIP_PAYLOAD_BUDGET,
-            "T22: published bounded inventory refresh via DualGossipPublisher"
-        );
+            };
+            let _ = cmd_tx
+                .send(P2PCommand::SendReconResponse {
+                    channel: Box::new(channel),
+                    response: inventory_recon::ReconResponse { msg, sequence },
+                })
+                .await;
+        });
     }
 
     /// P3-4: Build and publish a [`SalvageCapacityAd`] on the salvage-capacity
@@ -4574,9 +4615,9 @@ impl P2PNode {
             return; // Fast path: no commitments → nothing to score
         }
 
-        // Build hint map keyed by blob_hash string (O(1) lookup per hash).
-        let hint_map: HashMap<&str, &BlobHint> =
-            hints.iter().map(|h| (h.address.as_str(), h)).collect();
+        // Build hint map keyed by byte-CID text (O(1) lookup per address).
+        let hint_map: HashMap<String, &BlobHint> =
+            hints.iter().map(|h| (h.address.to_string(), h)).collect();
 
         let fresh_after = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::seconds(
@@ -4587,7 +4628,7 @@ impl P2PNode {
             .to_string();
 
         for hash in hashes {
-            let hint = hint_map.get(hash.as_str());
+            let hint = hint_map.get(hash).copied();
             let advertised = AdvertisedBlob {
                 blob_cid: hash.clone(),
                 source_peer_cid: source_peer_id.to_string(),
@@ -4618,6 +4659,9 @@ impl P2PNode {
 
             let Some(pool) = self.db_pool.clone() else {
                 continue; // No pool — cannot finalize
+            };
+            let Ok(cid_owned) = ByteCid::parse(hash) else {
+                continue; // Advertised text that is not a byte CID names nothing
             };
 
             let cmd_tx = self.command_tx.clone();
@@ -4711,7 +4755,7 @@ impl P2PNode {
                 let is_connected = move |peer: &str| connected_set.contains(peer);
 
                 let outcome = race_fetch(
-                    &hash_owned,
+                    &cid_owned,
                     candidates,
                     &cmd_tx,
                     is_connected,
@@ -4724,7 +4768,7 @@ impl P2PNode {
                     if let Ok(mut c) = pool.get() {
                         if let Err(e) = finalize_fetch_success(
                             &mut c,
-                            &hash_owned,
+                            &cid_owned,
                             &source_peer,
                             &bytes,
                             &self_cid_owned,
@@ -4845,38 +4889,35 @@ impl P2PNode {
                     .unwrap_or_else(|e| e.into_inner())
                     .insert(req_id, reply);
             }
-            P2PCommand::FetchShard { hash, reply } => {
+            P2PCommand::FetchShard { cid, reply } => {
                 let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
                 if let Some(peer_id) = peers.first() {
                     let req_id = swarm
                         .behaviour_mut()
                         .shard_protocol
-                        .send_request(peer_id, ShardRequest::Get { hash: hash.clone() });
-                    debug!(peer = %peer_id, hash = %hash, request_id = ?req_id, "Sent shard fetch request to peer");
+                        .send_request(peer_id, ShardRequest::Get { cid });
+                    debug!(peer = %peer_id, cid = %cid, request_id = ?req_id, "Sent shard fetch request to peer");
                     self.pending_shard_fetches
                         .lock()
                         .await
                         .insert(req_id, reply);
                 } else {
-                    debug!(hash = %hash, "No connected peers for shard fetch");
+                    debug!(cid = %cid, "No connected peers for shard fetch");
                     let _ = reply.send(None);
                 }
             }
             P2PCommand::PushShard {
                 peer_id,
-                hash,
+                cid,
                 data,
                 reply,
             } => {
-                let request = ShardRequest::Push {
-                    hash: hash.clone(),
-                    data,
-                };
+                let request = ShardRequest::Push { cid, data };
                 let request_id = swarm
                     .behaviour_mut()
                     .shard_protocol
                     .send_request(&peer_id, request);
-                debug!(peer = %peer_id, hash = %hash, request_id = ?request_id, "Sent shard push request to peer");
+                debug!(peer = %peer_id, cid = %cid, request_id = ?request_id, "Sent shard push request to peer");
                 self.pending_shard_pushes
                     .lock()
                     .await
@@ -5265,20 +5306,37 @@ impl P2PNode {
                     ),
                 }
             }
-            // T14: Stage-1 placeholder — log and drop. Stage 2 will route this as a
-            // libp2p request-response message to the named peer. The next periodic
-            // snapshot from the source peer closes the gap naturally in the interim.
-            P2PCommand::SnapshotRequest { peer_id } => {
-                debug!(
-                    target: "elohim_storage::inventory",
-                    peer_id = %peer_id,
-                    "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
-                );
+            P2PCommand::ReconcileInventory { peer_id } => {
+                self.spawn_recon_session(peer_id);
+            }
+            P2PCommand::InventoryRecon {
+                peer,
+                request,
+                respond,
+            } => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .inventory_recon
+                    .send_request(&peer, request);
+                self.pending_recons.lock().await.insert(request_id, respond);
+            }
+            P2PCommand::SendReconResponse { channel, response } => {
+                if swarm
+                    .behaviour_mut()
+                    .inventory_recon
+                    .send_response(*channel, response)
+                    .is_err()
+                {
+                    debug!(
+                        target: "elohim_storage::inventory",
+                        "recon response not delivered (requester went away)"
+                    );
+                }
             }
             P2PCommand::InventoryAdvertisement {
                 source_peer_id,
                 hints,
-                hashes,
+                cids: hashes,
             } => {
                 let Some(pool) = self.db_pool.as_ref() else {
                     warn!(
@@ -5308,10 +5366,10 @@ impl P2PNode {
             // the entry on `Message::Response` or cleans up on `OutboundFailure`.
             P2PCommand::FetchBlob {
                 peer_id,
-                hash,
+                cid,
                 reply,
             } => {
-                let request = BlobFetchRequest { hash: hash.clone() };
+                let request = BlobFetchRequest { cid };
                 let request_id = swarm
                     .behaviour_mut()
                     .blob_protocol
@@ -5319,9 +5377,9 @@ impl P2PNode {
                 debug!(
                     target: "elohim_storage::blob_fetch",
                     peer_id = %peer_id,
-                    hash = %hash,
+                    cid = %cid,
                     request_id = ?request_id,
-                    "T21: blob fetch request sent on /elohim/blob/1.0.0"
+                    "T21: blob fetch request sent on /elohim/blob/2.0.0"
                 );
                 self.pending_blob_fetches
                     .lock()
@@ -5988,7 +6046,7 @@ impl P2PNode {
                                 }
                             }
                             // Check pending verification requests
-                            else if let Some((shard_hash, peer_id_str)) =
+                            else if let Some((shard_cid, peer_id_str)) =
                                 self.pending_verifications.lock().await.remove(&request_id)
                             {
                                 if let Some(ref pool) = self.db_pool {
@@ -5997,7 +6055,7 @@ impl P2PNode {
                                             ShardResponse::Have(true) => {
                                                 let _ = crate::db::shard_locations::update_verified(
                                                     &mut conn,
-                                                    &shard_hash,
+                                                    &shard_cid,
                                                     &peer_id_str,
                                                 );
                                             }
@@ -6005,10 +6063,10 @@ impl P2PNode {
                                             | ShardResponse::NotFound => {
                                                 let _ = crate::db::shard_locations::mark_lost(
                                                     &mut conn,
-                                                    &shard_hash,
+                                                    &shard_cid,
                                                     &peer_id_str,
                                                 );
-                                                info!(shard = %shard_hash, peer = %peer_id_str, "Shard lost — peer reports not having it");
+                                                info!(shard = %shard_cid, peer = %peer_id_str, "Shard lost — peer reports not having it");
                                             }
                                             _ => {}
                                         }
@@ -6160,16 +6218,16 @@ impl P2PNode {
                                             crate::services::custody_standing::Requester::libp2p(
                                                 peer.to_base58(),
                                             );
-                                        if let StoredRecord::Stored { blob_hash, .. } =
+                                        if let StoredRecord::Stored { blob_cid, .. } =
                                             store_acquired_record(&ctx, sender, *record).await
                                         {
                                             self.publish_epr_head_record(&content_id).await;
-                                            if let Some(ref hash) = blob_hash {
-                                                if !hash.is_empty()
-                                                    && !self.blob_store.exists(hash).await
+                                            if let Some(hash) = blob_cid {
+                                                if self.blob_store.exists(&hash).await
+                                                    != Exists::Verified
                                                 {
                                                     let pull_request =
-                                                        ShardRequest::Get { hash: hash.clone() };
+                                                        ShardRequest::Get { cid: hash };
                                                     let mut swarm = self.swarm.write().await;
                                                     let pull_id = swarm
                                                         .behaviour_mut()
@@ -6178,7 +6236,7 @@ impl P2PNode {
                                                     drop(swarm);
                                                     self.pending_blob_pulls.lock().await.insert(
                                                         pull_id,
-                                                        (content_id.clone(), hash.clone()),
+                                                        (content_id.clone(), hash),
                                                     );
                                                     info!(
                                                         content_id = %content_id,
@@ -6325,14 +6383,14 @@ impl P2PNode {
                     );
                 }
                 // Mark lost for any pending verification request that failed
-                if let Some((shard_hash, peer_id_str)) =
+                if let Some((shard_cid, peer_id_str)) =
                     self.pending_verifications.lock().await.remove(&request_id)
                 {
                     if let Some(ref pool) = self.db_pool {
                         if let Ok(mut conn) = pool.get() {
                             let _ = crate::db::shard_locations::mark_lost(
                                 &mut conn,
-                                &shard_hash,
+                                &shard_cid,
                                 &peer_id_str,
                             );
                         }
@@ -6389,90 +6447,75 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    // T21 review fix #1: validate the requested hash before touching the
-                    // filesystem. `BlobStore::blob_path` does not normalize `..` components,
-                    // so a crafted `BlobFetchRequest { hash: "../../etc/passwd" }` could
-                    // otherwise read arbitrary files outside the blob root. Treat any
-                    // invalid content address as `NotFound` — do not leak that the path was
-                    // malformed.
-                    let response =
-                        match crate::blob_store::BlobStore::parse_content_address(&request.hash) {
-                            Ok(_) => match self.blob_store.get(&request.hash).await {
-                                Ok(bytes) => {
+                    // The request's CID was admitted by full decode in the codec; the
+                    // store verifies the whole payload before returning a byte (C5).
+                    let cid = request.cid;
+                    let response = match self.blob_store.get(&cid).await {
+                        Ok(bytes) => {
+                            debug!(
+                                target: "elohim_storage::blob_fetch",
+                                peer = %peer,
+                                cid = %cid,
+                                size = bytes.len(),
+                                "T21: serving blob to peer"
+                            );
+                            BlobFetchResponse::found(bytes.to_vec())
+                        }
+                        Err(StorageError::NotFound(_))
+                        | Err(StorageError::BlobNotFound(_))
+                        | Err(StorageError::HashMismatch { .. }) => {
+                            // An unexpired compute attachment answers from its own
+                            // store (C10: the payload store never falls back to it).
+                            let attachment = crate::compute_payload_store::get(
+                                self.blob_store.root_dir(),
+                                &cid.to_string(),
+                            )
+                            .await
+                            .ok();
+                            // A striped payload held only as shards answers with its
+                            // durable manifest so the requester can shard-fetch.
+                            let manifest = match self.db_pool.as_ref() {
+                                Some(pool) => pool.get().ok().and_then(|mut conn| {
+                                    crate::db::shard_manifests::resolve_manifest_by_cid(
+                                        &mut conn, &cid,
+                                    )
+                                }),
+                                None => None,
+                            };
+                            match (attachment, manifest) {
+                                (Some(bytes), _) => BlobFetchResponse::found(bytes),
+                                (None, Some(m)) if !m.stripes.is_empty() => {
+                                    debug!(
+                                        target: "elohim_storage::blob_swarm",
+                                        peer = %peer,
+                                        cid = %cid,
+                                        units = m.custody_units().len(),
+                                        "Q3: no direct bytes; replying with shard manifest"
+                                    );
+                                    BlobFetchResponse::manifest_only(m)
+                                }
+                                _ => {
                                     debug!(
                                         target: "elohim_storage::blob_fetch",
                                         peer = %peer,
-                                        hash = %request.hash,
-                                        size = bytes.len(),
-                                        "T21: serving blob to peer"
+                                        cid = %cid,
+                                        "T21: blob not found locally; replying NotFound"
                                     );
-                                    BlobFetchResponse::found(bytes)
+                                    BlobFetchResponse::not_found()
                                 }
-                                Err(StorageError::NotFound(_))
-                                | Err(StorageError::BlobNotFound(_)) => {
-                                    // Q3 (minutes-quiesce W1.2): no direct bytes under this
-                                    // hash — before giving up, consult the durable shard
-                                    // manifest projection. This peer runs as a separate
-                                    // actor with no access to `HttpServer::manifests`
-                                    // (Q2's in-process cache), so it always falls straight
-                                    // to `resolve_manifest_by_hash`'s DB read — the same
-                                    // fallback `HttpServer::resolve_manifest` uses on its
-                                    // own cache miss. `encoding == "none"` manifests name
-                                    // the composite itself (no shards to reassemble from),
-                                    // so those are not useful to hand back — the responder
-                                    // demonstrably has no bytes for that name either.
-                                    let manifest = match self.db_pool.as_ref() {
-                                        Some(pool) => pool.get().ok().and_then(|mut conn| {
-                                            crate::db::shard_manifests::resolve_manifest_by_hash(
-                                                &mut conn,
-                                                &request.hash,
-                                            )
-                                        }),
-                                        None => None,
-                                    };
-                                    match manifest {
-                                        Some(m) if m.encoding != "none" => {
-                                            debug!(
-                                                target: "elohim_storage::blob_swarm",
-                                                peer = %peer,
-                                                hash = %request.hash,
-                                                shards = m.shard_hashes.len(),
-                                                "Q3: no direct bytes; replying with shard manifest"
-                                            );
-                                            BlobFetchResponse::manifest_only(m)
-                                        }
-                                        _ => {
-                                            debug!(
-                                                target: "elohim_storage::blob_fetch",
-                                                peer = %peer,
-                                                hash = %request.hash,
-                                                "T21: blob not found locally; replying NotFound"
-                                            );
-                                            BlobFetchResponse::not_found()
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!(
-                                        target: "elohim_storage::blob_fetch",
-                                        peer = %peer,
-                                        hash = %request.hash,
-                                        error = %e,
-                                        "T21: blob fetch error; replying Error"
-                                    );
-                                    BlobFetchResponse::error(e.to_string())
-                                }
-                            },
-                            Err(_) => {
-                                warn!(
-                                    target: "elohim_storage::blob_fetch",
-                                    peer = %peer,
-                                    hash = %request.hash,
-                                    "T21: rejected blob request with invalid content address"
-                                );
-                                BlobFetchResponse::not_found()
                             }
-                        };
+                        }
+                        Err(e) => {
+                            warn!(
+                                target: "elohim_storage::blob_fetch",
+                                peer = %peer,
+                                cid = %cid,
+                                error = %e,
+                                "T21: blob fetch error; replying Error"
+                            );
+                            BlobFetchResponse::error(e.to_string())
+                        }
+                    };
                     let mut swarm = self.swarm.write().await;
                     if let Err(e) = swarm
                         .behaviour_mut()
@@ -6531,8 +6574,8 @@ impl P2PNode {
                                 debug!(
                                     target: "elohim_storage::blob_swarm",
                                     request_id = ?request_id,
-                                    blob_hash = %manifest.blob_hash,
-                                    shards = manifest.shard_hashes.len(),
+                                    blob_cid = %manifest.blob_cid,
+                                    units = manifest.custody_units().len(),
                                     "Q3: blob fetch returned a shard manifest instead of bytes"
                                 );
                                 let _ = reply.send(Ok(
@@ -7256,6 +7299,32 @@ impl P2PNode {
                 debug!(peer = %peer, "Identity handshake response sent");
             }
 
+            // Inventory range reconciliation (`/elohim/inventory-recon/1.0.0`).
+            behaviour::ElohimStorageBehaviourEvent::InventoryRecon(
+                request_response::Event::Message { message, .. },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => self.answer_recon(request, channel),
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    if let Some(respond) = self.pending_recons.lock().await.remove(&request_id) {
+                        let _ = respond.send(Ok(response));
+                    }
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::InventoryRecon(
+                request_response::Event::OutboundFailure {
+                    request_id, error, ..
+                },
+            ) => {
+                if let Some(respond) = self.pending_recons.lock().await.remove(&request_id) {
+                    let _ = respond.send(Err(format!("recon transport failure: {error}")));
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::InventoryRecon(_) => {}
             // F-T19: View federation outbound response/failure dispatch.
             // Message::Response — resolve the pending oneshot with Ok(response).
             // OutboundFailure — map to FederationError and resolve with Err.
@@ -7972,9 +8041,13 @@ impl P2PNode {
                         // receive loop). libp2p passes `self` as the
                         // `InventoryFetch` hook so the commitment-driven active
                         // fetch + delta-gap snapshot-request stay byte-identical.
+                        // `message.source` is the author gossipsub authenticated
+                        // (Signed validation); the envelope must bind to it, never
+                        // to the relaying neighbour.
                         let source = crate::p2p::gossip_dispatch::GossipSource::Libp2p {
                             peer: propagation_source.to_string(),
                             message_id: format!("{message_id:?}"),
+                            author: message.source.map(|p| p.to_string()),
                         };
                         let self_iroh_node_id = self.status_tx.borrow().iroh_node_id.clone();
                         let ctx = crate::p2p::gossip_dispatch::GossipDispatchCtx {
@@ -8058,14 +8131,16 @@ impl P2PNode {
 
             if !swarm.is_connected(&peer_id) {
                 let _ =
-                    crate::db::shard_locations::mark_lost(&mut conn, &loc.shard_hash, &loc.peer_id);
-                info!(shard = %loc.shard_hash, peer = %loc.peer_id, "Marked lost (peer disconnected)");
+                    crate::db::shard_locations::mark_lost(&mut conn, &loc.shard_cid, &loc.peer_id);
+                info!(shard = %loc.shard_cid, peer = %loc.peer_id, "Marked lost (peer disconnected)");
                 continue;
             }
 
-            let request = ShardRequest::Have {
-                hash: loc.shard_hash.clone(),
+            let Ok(cid) = ByteCid::parse(&loc.shard_cid) else {
+                debug!(shard = %loc.shard_cid, "custody location names no byte CID; not verified");
+                continue;
             };
+            let request = ShardRequest::Have { cid };
             let request_id = swarm
                 .behaviour_mut()
                 .shard_protocol
@@ -8074,7 +8149,7 @@ impl P2PNode {
             self.pending_verifications
                 .lock()
                 .await
-                .insert(request_id, (loc.shard_hash.clone(), loc.peer_id.clone()));
+                .insert(request_id, (loc.shard_cid.clone(), loc.peer_id.clone()));
         }
     }
 
@@ -8924,11 +8999,11 @@ impl P2PNode {
             .get_doc_field(
                 crate::sync::projector::PROJECTION_NAMESPACE,
                 doc_id,
-                "blobHash",
+                "blobCid",
             )
             .await
         else {
-            return; // no blobHash on the doc — nothing to pull
+            return; // no blobCid on the doc — nothing to pull
         };
         self.heal_blob_hash_if_absent(doc_id, hash, None).await;
     }
@@ -8951,7 +9026,10 @@ impl P2PNode {
         use crate::p2p::blob_fetch::finalize_fetch_success;
         use crate::p2p::blob_swarm::{race_fetch_with_swarm, SwarmFetchParams, SwarmRaceOutcome};
 
-        if hash.is_empty() || self.blob_store.exists(&hash).await {
+        let Ok(cid) = ByteCid::parse(&hash) else {
+            return;
+        };
+        if self.blob_store.exists(&cid).await == Exists::Verified {
             return;
         }
         let Some(self_cid) = self.config.self_cid.clone() else {
@@ -8984,6 +9062,7 @@ impl P2PNode {
         let gossip_publisher = self.gossip_publisher.clone();
         let inventory_seq = self.inventory_seq.clone();
         let local_peer_id = self.peer_id().to_string();
+        let inventory_signer = self.inventory_signer.clone();
         let fresh_after = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::seconds(
                 self.config.inventory_freshness_seconds as i64,
@@ -9051,7 +9130,7 @@ impl P2PNode {
                 blob_store: &blob_store,
             };
             let outcome =
-                race_fetch_with_swarm(&hash, candidates, &mut conn, &fresh_after, &swarm_params)
+                race_fetch_with_swarm(&cid, candidates, &mut conn, &fresh_after, &swarm_params)
                     .await;
             drop(conn);
 
@@ -9077,50 +9156,20 @@ impl P2PNode {
                         // without waiting for the next periodic snapshot
                         // tick (which would never include it anyway; see
                         // the capture-site comment above).
-                        match crate::p2p::inventory_gossip::BlobAddress::new(hash.clone()) {
-                            Ok(addr) => {
-                                let delta = crate::p2p::inventory_broadcaster::build_delta(
-                                    &local_peer_id,
-                                    vec![addr],
-                                    vec![],
-                                    &inventory_seq,
-                                    chrono::Utc::now().timestamp_micros(),
-                                    vec![],
-                                );
-                                match delta.to_bytes() {
-                                    Ok(bytes) => {
-                                        if let Err(e) = gossip_publisher.publish(
-                                            crate::p2p::inventory_gossip::INVENTORY_TOPIC,
-                                            bytes,
-                                        ) {
-                                            warn!(
-                                                doc_id = %doc_id_owned, hash = %hash, error = %e,
-                                                "bytes-heal/Q4: composite delta publish failed (often: no subscribed peers yet)"
-                                            );
-                                        } else {
-                                            debug!(
-                                                doc_id = %doc_id_owned, hash = %hash,
-                                                "bytes-heal/Q4: advertised swarm-completed composite via inventory delta"
-                                            );
-                                        }
-                                    }
-                                    Err(e) => warn!(
-                                        doc_id = %doc_id_owned, hash = %hash, error = %e,
-                                        "bytes-heal/Q4: failed to serialize composite delta"
-                                    ),
-                                }
-                            }
-                            Err(e) => warn!(
-                                doc_id = %doc_id_owned, hash = %hash, error = ?e,
-                                "bytes-heal/Q4: composite hash is not canonical wire-shaped; skipping delta advertise"
-                            ),
-                        }
+                        publish_inventory_delta(
+                            inventory_signer.as_deref(),
+                            &local_peer_id,
+                            gossip_publisher.as_ref(),
+                            &inventory_seq,
+                            &[crate::p2p::inventory_gossip::BlobAddress::from(cid)],
+                            &[],
+                        );
                         return;
                     }
                     if let Ok(mut c) = pool.get() {
                         match finalize_fetch_success(
                             &mut c,
-                            &hash,
+                            &cid,
                             &source_peer,
                             &bytes,
                             &self_cid,
@@ -9144,7 +9193,7 @@ impl P2PNode {
                     missing_shards,
                 } => debug!(
                     doc_id = %doc_id_owned, hash = %hash,
-                    total_shards = manifest.shard_hashes.len(), missing_shards,
+                    total_shards = manifest.custody_units().len(), missing_shards,
                     "bytes-heal/Q3: manifest persisted but swarm shard-fetch incomplete (next sync round retries)"
                 ),
                 SwarmRaceOutcome::Reconstructible {
@@ -9157,39 +9206,14 @@ impl P2PNode {
                     // The composite is now servable even though parity salvage
                     // remains. Advertise that fact immediately, just like the
                     // all-shards swarm completion arm above.
-                    match crate::p2p::inventory_gossip::BlobAddress::new(hash.clone()) {
-                        Ok(addr) => {
-                            let delta = crate::p2p::inventory_broadcaster::build_delta(
-                                &local_peer_id,
-                                vec![addr],
-                                vec![],
-                                &inventory_seq,
-                                chrono::Utc::now().timestamp_micros(),
-                                vec![],
-                            );
-                            match delta.to_bytes() {
-                                Ok(bytes) => {
-                                    if let Err(e) = gossip_publisher.publish(
-                                        crate::p2p::inventory_gossip::INVENTORY_TOPIC,
-                                        bytes,
-                                    ) {
-                                        warn!(
-                                            doc_id = %doc_id_owned, hash = %hash, error = %e,
-                                            "bytes-heal/Q4: reconstructible composite delta publish failed"
-                                        );
-                                    }
-                                }
-                                Err(e) => warn!(
-                                    doc_id = %doc_id_owned, hash = %hash, error = %e,
-                                    "bytes-heal/Q4: failed to serialize reconstructible composite delta"
-                                ),
-                            }
-                        }
-                        Err(e) => warn!(
-                            doc_id = %doc_id_owned, hash = %hash, error = ?e,
-                            "bytes-heal/Q4: reconstructible composite hash is not canonical wire-shaped"
-                        ),
-                    }
+                    publish_inventory_delta(
+                        inventory_signer.as_deref(),
+                        &local_peer_id,
+                        gossip_publisher.as_ref(),
+                        &inventory_seq,
+                        &[crate::p2p::inventory_gossip::BlobAddress::from(cid)],
+                        &[],
+                    );
                 }
                 other => debug!(
                     doc_id = %doc_id_owned, hash = %hash, outcome = ?other,
@@ -10573,6 +10597,149 @@ mod reach_gate_tests {
     }
 }
 
+/// The inventory signer of a libp2p identity: its own ed25519 secret as an
+/// [`elohim_epr::proof::AgentKeypair`], so envelopes are signed by the key the
+/// gossipsub author's PeerId embeds.
+fn inventory_signer_of(identity: &NodeIdentity) -> Option<Arc<elohim_epr::proof::AgentKeypair>> {
+    let ed = identity.keypair().clone().try_into_ed25519().ok()?;
+    let secret = ed.secret();
+    elohim_epr::proof::AgentKeypair::from_secret(secret.as_ref())
+        .ok()
+        .map(Arc::new)
+}
+
+/// Sign and publish an inventory delta (`added`/`removed` byte CIDs) on
+/// `elohim/inventory/blob/2`, each page under the next sequence. Best-effort: a
+/// node without a signer announces nothing, and a publish failure is logged.
+/// Returns the number of pages published.
+pub(crate) fn publish_inventory_delta(
+    signer: Option<&elohim_epr::proof::AgentKeypair>,
+    author_peer: &str,
+    publisher: &dyn crate::services::gossip_flood::GossipPublisher,
+    seq: &inventory_broadcaster::SequenceAllocator,
+    added: &[crate::p2p::inventory_gossip::BlobAddress],
+    removed: &[crate::p2p::inventory_gossip::BlobAddress],
+) -> usize {
+    let Some(signer) = signer else {
+        debug!(target: "elohim_storage::inventory", "no inventory signer; delta not announced");
+        return 0;
+    };
+    let pages = inventory_broadcaster::build_delta_pages(
+        signer,
+        author_peer,
+        added,
+        removed,
+        seq,
+        chrono::Utc::now().timestamp_micros(),
+        &[],
+    );
+    let mut sent = 0usize;
+    for page in pages {
+        match publisher.publish(
+            crate::p2p::inventory_gossip::INVENTORY_TOPIC,
+            page.to_bytes(),
+        ) {
+            Ok(()) => sent += 1,
+            Err(e) => warn!(
+                target: "elohim_storage::inventory",
+                error = %e,
+                "inventory delta publish failed (often: no subscribed peers yet)"
+            ),
+        }
+    }
+    sent
+}
+
+/// What a completed recon session changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReconOutcome {
+    pub added: usize,
+    pub removed: usize,
+    pub rounds: usize,
+    pub sequence: u64,
+}
+
+/// Per-round deadline for one recon round trip.
+const RECON_ROUND_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Reconcile this node's projection of `peer`'s inventory with the peer, negentropy-v1
+/// over `/elohim/inventory-recon/1.0.0`, as the initiator. The initiator's set is the
+/// projection (`peer_blob_inventory` rows for `peer`); on convergence the items the peer
+/// holds and the projection lacks are added, the ones it no longer holds are removed,
+/// and the peer's cursor is re-based to the responder's sequence — the only cursor
+/// re-base there is. Bounded: at most `RECON_MAX_ROUNDS` round trips of at most one
+/// page each, each under [`RECON_ROUND_TIMEOUT`].
+pub async fn run_recon_session(
+    cmd_tx: &mpsc::Sender<P2PCommand>,
+    pool: &DbPool,
+    peer: libp2p::PeerId,
+) -> Result<ReconOutcome, String> {
+    let peer_label = peer.to_string();
+    let projected: Vec<ByteCid> = {
+        let mut conn = pool.get().map_err(|e| e.to_string())?;
+        crate::db::peer_blob_inventory::cids_for_peer(&mut conn, &peer_label)
+            .map_err(|e| e.to_string())?
+            .iter()
+            .filter_map(|text| ByteCid::parse(text).ok())
+            .collect()
+    };
+    let set = inventory_recon::ReconSet::new(&projected);
+    let initiator = inventory_recon::Reconciler::initiator(&set);
+    let mut msg = initiator.initiate();
+    let mut have: Vec<ByteCid> = Vec::new();
+    let mut need: Vec<ByteCid> = Vec::new();
+    let mut rounds = 0usize;
+    // bounded-work: RECON_MAX_ROUNDS round trips, each one page under RECON_ROUND_TIMEOUT.
+    let sequence = loop {
+        rounds += 1;
+        if rounds > inventory_recon::RECON_MAX_ROUNDS {
+            return Err("recon did not converge within RECON_MAX_ROUNDS".to_string());
+        }
+        let (tx, rx) = oneshot::channel();
+        cmd_tx
+            .send(P2PCommand::InventoryRecon {
+                peer,
+                request: inventory_recon::ReconRequest::new(msg),
+                respond: tx,
+            })
+            .await
+            .map_err(|_| "swarm gone".to_string())?;
+        let response = match tokio::time::timeout(RECON_ROUND_TIMEOUT, rx).await {
+            Ok(Ok(Ok(response))) => response,
+            Ok(Ok(Err(e))) => return Err(e),
+            Ok(Err(_)) => return Err("swarm gone".to_string()),
+            Err(_) => return Err("recon round timed out".to_string()),
+        };
+        let step = initiator
+            .reconcile(&response.msg)
+            .map_err(|e| e.to_string())?;
+        have.extend(step.have);
+        need.extend(step.need);
+        match step.next {
+            Some(next) => msg = next,
+            None => break response.sequence,
+        }
+    };
+    let add: Vec<String> = need.iter().map(ToString::to_string).collect();
+    let remove: Vec<String> = have.iter().map(ToString::to_string).collect();
+    let mut conn = pool.get().map_err(|e| e.to_string())?;
+    crate::db::peer_blob_inventory::rebase_after_recon(
+        &mut conn,
+        &peer_label,
+        &add,
+        &remove,
+        i64::try_from(sequence).unwrap_or(i64::MAX),
+        &chrono::Utc::now().to_rfc3339(),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(ReconOutcome {
+        added: add.len(),
+        removed: remove.len(),
+        rounds,
+        sequence,
+    })
+}
+
 // ---------------------------------------------------------------------------
 // InventoryFetch — libp2p-command-path inventory hook for the transport-neutral
 // gossip dispatch. Both receive planes enter the same bounded command queue;
@@ -10584,32 +10751,31 @@ impl crate::p2p::gossip_dispatch::InventoryFetch for P2PNode {
         _conn: &mut diesel::SqliteConnection,
         source_peer_id: &str,
         hints: &[crate::p2p::inventory_gossip::BlobHint],
-        hashes: &[String],
+        cids: &[String],
     ) {
         let work = P2PCommand::InventoryAdvertisement {
             source_peer_id: source_peer_id.to_string(),
             hints: hints.to_vec(),
-            hashes: hashes.to_vec(),
+            cids: cids.to_vec(),
         };
         if let Err(error) = self.command_tx.try_send(work) {
             warn!(
                 target: "elohim_storage::inventory",
                 peer_id = %source_peer_id,
-                count = hashes.len(),
+                count = cids.len(),
                 error = ?error,
                 "libp2p inventory fetch work could not enter the bounded command queue"
             );
         }
     }
 
-    fn request_snapshot_for_gap(&self, peer_id: &str) {
-        // Best-effort: parse the peer_id string into a libp2p::PeerId and send
-        // the snapshot-request command. A pure iroh NodeId will not parse;
-        // the bridge logs that explicit unsupported case.
+    fn request_recon(&self, peer_id: &str) {
+        // A libp2p author reconciles over `/elohim/inventory-recon/1.0.0`; a pure
+        // iroh NodeId does not parse here and is reconciled by the iroh bridge.
         if let Ok(pid) = peer_id.parse::<libp2p::PeerId>() {
             let _ = self
                 .command_tx
-                .try_send(P2PCommand::SnapshotRequest { peer_id: pid });
+                .try_send(P2PCommand::ReconcileInventory { peer_id: pid });
         }
     }
 }
@@ -10807,9 +10973,8 @@ pub(crate) struct AcquisitionIngestCtx {
 
 pub(crate) enum StoredRecord {
     Stored {
-        #[allow(dead_code)]
-        content_id: String,
-        blob_hash: Option<String>,
+        /// The row's byte CID, when it names one that parses.
+        blob_cid: Option<ByteCid>,
     },
     Failed,
 }
@@ -10828,7 +10993,10 @@ pub(crate) async fn store_acquired_record(
     record: crate::p2p::shard_protocol::ContentRecord,
 ) -> StoredRecord {
     let content_id = record.id.clone();
-    let blob_hash_opt = record.blob_hash.clone();
+    let blob_cid_opt = record
+        .blob_cid
+        .as_deref()
+        .and_then(|c| ByteCid::parse(c).ok());
     let pool = match ctx.db_pool.as_ref() {
         Some(p) => p,
         None => {
@@ -10886,7 +11054,6 @@ pub(crate) async fn store_acquired_record(
         description: record.description,
         content_type: record.content_type,
         content_format: record.content_format,
-        blob_hash: record.blob_hash,
         blob_cid: record.blob_cid,
         content_size_bytes: record.content_size_bytes,
         metadata_json: record.metadata_json,
@@ -10914,8 +11081,7 @@ pub(crate) async fn store_acquired_record(
                     &sender,
                 );
                 StoredRecord::Stored {
-                    content_id,
-                    blob_hash: blob_hash_opt,
+                    blob_cid: blob_cid_opt,
                 }
             } else {
                 // Neither inserted nor skipped: the insert itself failed and
@@ -11004,16 +11170,13 @@ fn iroh_push_addr_for(_agent_cid: &str, _libp2p_id: Option<&str>) -> Option<Iroh
 #[cfg(feature = "p2p-iroh")]
 async fn push_shard_over_iroh(
     addr: iroh::NodeAddr,
-    hash: &str,
+    cid: &ByteCid,
     data: Vec<u8>,
 ) -> Result<(), String> {
     use crate::p2p_iroh::IrohShardClient;
     let leg = crate::p2p_iroh::iroh_fetch_leg().ok_or_else(|| "iroh leg not ready".to_string())?;
     let client = IrohShardClient::new(leg.endpoint());
-    let request = ShardRequest::Push {
-        hash: hash.to_string(),
-        data,
-    };
+    let request = ShardRequest::Push { cid: *cid, data };
     match tokio::time::timeout(
         std::time::Duration::from_secs(30),
         client.request(addr, &request),
@@ -11130,11 +11293,12 @@ pub(crate) async fn acquire_over_iroh(
     );
     debug!(id = %content_id, peer = %label, transport = "iroh", "Received content record from peer");
     let sender = crate::services::custody_standing::Requester::iroh(addr.node_id.to_string());
-    if let StoredRecord::Stored { blob_hash, .. } =
-        store_acquired_record(&ctx, sender, *record).await
+    if let StoredRecord::Stored {
+        blob_cid: Some(hash),
+    } = store_acquired_record(&ctx, sender, *record).await
     {
-        if let Some(hash) = blob_hash.filter(|h| !h.is_empty()) {
-            if !ctx.blob_store.exists(&hash).await {
+        {
+            if ctx.blob_store.exists(&hash).await != Exists::Verified {
                 info!(
                     content_id = %content_id,
                     blob_hash = %hash,
@@ -11142,7 +11306,7 @@ pub(crate) async fn acquire_over_iroh(
                     transport = "iroh",
                     "quilt draw: pulling blob from peer after content replication"
                 );
-                let pull = ShardRequest::Get { hash: hash.clone() };
+                let pull = ShardRequest::Get { cid: hash };
                 match tokio::time::timeout(BLOB_TIMEOUT, client.request(addr, &pull)).await {
                     Ok(Ok(ShardResponse::Data(data))) => {
                         let _write = ctx.write_gate.lock().await;

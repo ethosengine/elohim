@@ -16,7 +16,8 @@ const RECEIVER: &str = "uhCAkReceiverFixtureAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const WARD: &str = "uhCAkWardFixtureAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 // Content identity from the measured witness fixture; no alternate CID encoder.
 const CID: &str = "bafyreigwunm4vxkdsmu6frmcc6jv2yzwy73dwsxlsj5bqdp4gqhkktaaya";
-const DIGEST: &str = "d6a359cadd439329e2c58217935d6336c7f63b4aeb927a180dfc340ea54c00c0";
+/// A byte CID (`compute_bytes_cid(b"private-receive death witness")`).
+const DIGEST: &str = "bafkr4iatjkffdti4vq5lecvp3jt6pqjbd6odp2rulalapsqf3bnpers62m";
 
 fn test_pool() -> DbPool {
     let url = format!(
@@ -38,8 +39,7 @@ fn delivered_record() -> ContentRecord {
         description: None,
         content_type: "issue-report".to_string(),
         content_format: "json".to_string(),
-        blob_hash: Some(format!("sha256-{DIGEST}")),
-        blob_cid: None,
+        blob_cid: Some(DIGEST.to_string()),
         content_size_bytes: None,
         metadata_json: Some(r#"{"kind":"death-witness"}"#.to_string()),
         reach: "private".to_string(),
@@ -98,7 +98,12 @@ async fn assert_handler_refuses_then_accepts_custody(sender: Requester) {
     )
     .expect("read rejected record")
     .is_none());
-    assert!(!blob_store.exists(&format!("sha256-{DIGEST}")).await);
+    assert_ne!(
+        blob_store
+            .exists(&elohim_epr::address::ByteCid::parse(DIGEST).unwrap())
+            .await,
+        crate::blob_store::Exists::Verified
+    );
     let status = ctx.replication_state.status().await;
     assert_eq!(status.pending, 0);
     assert_eq!(status.completed, 0);

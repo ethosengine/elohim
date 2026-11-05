@@ -43,7 +43,6 @@ use elohim_facings::folds::content_chrome::{
 };
 use elohim_facings::folds::epr_content::CouplingRow;
 
-use crate::blob_store::BlobStore;
 use crate::db::content_diesel::{self, MinTrust};
 use crate::db::models::Content;
 use crate::db::{AppContext, DbPool};
@@ -94,19 +93,19 @@ pub fn peer_status_staleness_secs() -> i64 {
     })
 }
 
-/// The canonical blob-store key (`sha256-{hex}`) of a content address in either
-/// spelling, or `None` when `addr` is not an address.
+/// The canonical byte-CID text of a content address (full decode), or `None`
+/// when `addr` is not a byte CID.
 pub fn canonical_address(addr: &str) -> Option<String> {
-    BlobStore::parse_content_address(addr)
+    elohim_epr::address::ByteCid::parse(addr)
         .ok()
-        .map(|hex| format!("sha256-{hex}"))
+        .map(|cid| cid.to_string())
 }
 
-/// The spelling the chrome shows and keys grants on: CIDv1 (the
-/// `X-Content-Address` spelling), from either stored spelling.
-pub fn display_address(blob_hash: &str) -> Option<String> {
-    let key = canonical_address(blob_hash)?;
-    BlobStore::hash_to_cid(&key).ok().map(|cid| cid.to_string())
+/// The spelling the chrome shows and keys grants on: the byte CID (the
+/// `X-Content-Address` spelling). One spelling exists, so this is
+/// [`canonical_address`].
+pub fn display_address(blob_cid: &str) -> Option<String> {
+    canonical_address(blob_cid)
 }
 
 /// Resolve the record a chrome request names: by record id first, then — when
@@ -124,18 +123,10 @@ pub fn resolve_record(
     let Some(key) = canonical_address(id) else {
         return Ok(None);
     };
-    let mut spellings = vec![key.clone(), id.to_string()];
-    if let Some(cid) = display_address(&key) {
-        spellings.push(cid);
-    }
     use crate::db::diesel_schema::content::dsl as c;
     let owner: Option<String> = c::content
         .filter(c::h_app_id.eq(&ctx.h_app_id))
-        .filter(
-            c::blob_hash
-                .eq_any(&spellings)
-                .or(c::blob_cid.eq_any(&spellings)),
-        )
+        .filter(c::blob_cid.eq(&key))
         .order(c::updated_at.desc())
         .select(c::id)
         .first(conn)
@@ -154,11 +145,7 @@ pub fn record_row(record: &Content) -> RecordRow {
         title: record.title.clone(),
         content_format: record.content_format.clone(),
         reach: record.reach.clone(),
-        content_address: record
-            .blob_hash
-            .as_deref()
-            .or(record.blob_cid.as_deref())
-            .and_then(display_address),
+        content_address: record.blob_cid.as_deref().and_then(display_address),
         content_body: record.content_body.clone(),
         dht_anchor_hash: record.dht_anchor_hash.clone(),
     }
@@ -207,14 +194,9 @@ fn load_claims(
     record: &Content,
 ) -> Result<Vec<ClaimRow>, StorageError> {
     let mut subjects = vec![record.id.clone()];
-    for addr in [record.blob_cid.as_deref(), record.blob_hash.as_deref()]
-        .into_iter()
-        .flatten()
-    {
-        if let Some(cid) = display_address(addr) {
-            if !subjects.contains(&cid) {
-                subjects.push(cid);
-            }
+    if let Some(cid) = record.blob_cid.as_deref().and_then(display_address) {
+        if !subjects.contains(&cid) {
+            subjects.push(cid);
         }
     }
     let mut rows = Vec::new();
@@ -462,6 +444,8 @@ mod tests {
     }
 
     const HEX: &str = "a3f1c0b2d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f";
+    /// The bundle's byte CID (`compute_bytes_cid(b"evolution-of-trust bundle")`).
+    const BUNDLE: &str = "bafkr4id3pqozc4vena2tgknk3ngx4llmg4jcqionp5tggl7aumv7rlsmxe";
 
     fn insert_record(pool: &DbPool, id: &str, format: &str, anchor: Option<&str>) {
         let mut conn = pool.get().unwrap();
@@ -476,8 +460,7 @@ mod tests {
                 description: None,
                 content_type: "simulation".to_string(),
                 content_format: format.to_string(),
-                blob_hash: Some(format!("sha256-{HEX}")),
-                blob_cid: None,
+                blob_cid: Some(BUNDLE.to_string()),
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: "commons".to_string(),
@@ -497,10 +480,10 @@ mod tests {
     }
 
     #[test]
-    fn display_address_renders_cidv1_from_either_spelling() {
-        let cid = display_address(&format!("sha256-{HEX}")).unwrap();
-        assert!(cid.starts_with("bafkrei"), "{cid}");
+    fn display_address_admits_only_the_byte_cid_spelling() {
+        let cid = elohim_epr::address::compute_bytes_cid(b"bundle").to_string();
         assert_eq!(display_address(&cid).as_deref(), Some(cid.as_str()));
+        assert!(display_address(&format!("sha256-{HEX}")).is_none());
         assert!(display_address("not-an-address").is_none());
     }
 
@@ -588,6 +571,7 @@ mod tests {
 
         // Addressed by its bundle instead of its id: the same record answers.
         let cid = view.content_address.clone().unwrap();
+        assert_eq!(cid, BUNDLE);
         let (by_address, _) = build_facing(&pool, &ctx, &cid, 0, "t", authored_here(0))
             .await
             .unwrap()

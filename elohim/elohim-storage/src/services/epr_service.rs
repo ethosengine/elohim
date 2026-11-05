@@ -1178,7 +1178,7 @@ mod ingest_with_cache_tests {
 
         assert_eq!(
             stored_fp, expected_fp,
-            "stored fingerprint must equal blake3-128-prefix of signing pubkey"
+            "stored fingerprint must equal bafkr4ihfadpibkqyffu5qtbqcfbeq76q27nihsddvsl25nwxw2bzxabjfu of signing pubkey"
         );
     }
 }

@@ -192,13 +192,6 @@ mod tests {
         elohim_epr::address::compute_bytes_cid(&[byte as u8]).to_string()
     }
 
-    struct MockInventory(Vec<BlobAddress>);
-    impl LocalInventory for MockInventory {
-        fn current_addresses(&self) -> Vec<BlobAddress> {
-            self.0.clone()
-        }
-    }
-
     #[test]
     fn sequence_allocator_increments() {
         let alloc = SequenceAllocator::new(0);
@@ -233,7 +226,7 @@ mod tests {
     fn static_inventory_returns_provided_addresses() {
         let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
         let addr_b = BlobAddress::parse(&cid_wire('b')).unwrap();
-        let inv = StaticInventory::new(vec![addr_a.clone(), addr_b.clone()]);
+        let inv = StaticInventory::new(vec![addr_a, addr_b]);
         let hashes = inv.current_addresses();
         assert_eq!(hashes, vec![addr_a, addr_b]);
     }
@@ -761,16 +754,15 @@ mod tests {
             "2026-08-22T00:00:00Z",
         )
         .unwrap();
+        // B (minimal compile fix): `plan_shard_holders` takes byte CIDs.
+        let units: Vec<elohim_epr::address::ByteCid> = shard_cids
+            .iter()
+            .map(|c| elohim_epr::address::ByteCid::parse(c).unwrap())
+            .collect();
         let mut per_shard = std::collections::HashMap::new();
-        per_shard.insert(
-            shard_cids[2].clone(),
-            rows.into_iter().map(|row| row.peer_id).collect(),
-        );
-        let plan = crate::p2p::blob_swarm::plan_shard_holders(
-            &shard_cids,
-            &["peer-A".to_string()],
-            &per_shard,
-        );
+        per_shard.insert(units[2], rows.into_iter().map(|row| row.peer_id).collect());
+        let plan =
+            crate::p2p::blob_swarm::plan_shard_holders(&units, &["peer-A".to_string()], &per_shard);
 
         assert_eq!(plan[0].1, vec!["peer-A"]);
         assert_eq!(plan[1].1, vec!["peer-A"]);
@@ -870,7 +862,7 @@ mod parity_tests {
         let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
         let addr_b = BlobAddress::parse(&cid_wire('b')).unwrap();
         let addr_c_str = cid_wire('c');
-        let local = MockInventory(vec![addr_a.clone(), addr_b.clone()]);
+        let local = MockInventory(vec![addr_a, addr_b]);
         let gossiped = vec![addr_a.to_string(), addr_b.to_string(), addr_c_str.clone()];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 
@@ -885,7 +877,7 @@ mod parity_tests {
         // Filesystem has cid_wire('d') that was never included in the published inventory.
         let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
         let addr_d = BlobAddress::parse(&cid_wire('d')).unwrap();
-        let local = MockInventory(vec![addr_a.clone(), addr_d.clone()]);
+        let local = MockInventory(vec![addr_a, addr_d]);
         let gossiped = vec![addr_a.to_string()];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 

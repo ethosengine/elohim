@@ -1,13 +1,17 @@
 //! Shard Protocol - Request-response protocol for shard transfer
 
 use async_trait::async_trait;
+use elohim_epr::address::ByteCid;
 use futures::prelude::*;
 use libp2p::request_response;
 use serde::{Deserialize, Serialize};
 use std::io;
 
 /// Protocol identifier for shard transfer
-pub const SHARD_PROTOCOL_ID: &str = "/elohim/shard/1.0.0";
+/// Version 2.0.0: every address on this protocol is a byte CID (raw + BLAKE3-256,
+/// `bafkr4i…`) decoded by [`ByteCid::parse`]; a request naming any other spelling
+/// fails to decode and is refused. Not wire-compatible with 1.0.0 (C12).
+pub const SHARD_PROTOCOL_ID: &str = "/elohim/shard/2.0.0";
 
 /// Maximum serialized frame accepted by a shard-bearing transport.
 ///
@@ -129,13 +133,20 @@ impl AsRef<str> for ShardProtocol {
 /// Shard request types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ShardRequest {
-    /// Get a shard by hash
-    Get { hash: String },
-    /// Check if peer has a shard
-    Have { hash: String },
-    /// Push a shard to peer (replication)
+    /// Get a payload or shard by byte CID
+    Get {
+        #[serde(with = "crate::blob_store::byte_cid_serde")]
+        cid: ByteCid,
+    },
+    /// Check if peer holds a payload or shard
+    Have {
+        #[serde(with = "crate::blob_store::byte_cid_serde")]
+        cid: ByteCid,
+    },
+    /// Push a shard to peer (replication); the bytes must hash to `cid`
     Push {
-        hash: String,
+        #[serde(with = "crate::blob_store::byte_cid_serde")]
+        cid: ByteCid,
         /// `bin`, never an integer array — see `serialize_bounded_messagepack`.
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
@@ -157,7 +168,10 @@ pub enum ShardRequest {
     /// pivot a whole-bytes `Get` miss takes on the iroh plane, mirroring the
     /// libp2p blob protocol's `BlobFetchReply::Manifest`. Appended last so an
     /// older peer never receives it unless it asked (positional codec).
-    GetManifest { hash: String },
+    GetManifest {
+        #[serde(with = "crate::blob_store::byte_cid_serde")]
+        cid: ByteCid,
+    },
 }
 
 /// Lightweight content summary for inventory listing
@@ -180,7 +194,6 @@ pub struct ContentRecord {
     pub description: Option<String>,
     pub content_type: String,
     pub content_format: String,
-    pub blob_hash: Option<String>,
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
     pub metadata_json: Option<String>,
@@ -229,7 +242,7 @@ impl ShardResponse {
     pub fn summary(&self) -> String {
         match self {
             Self::Data(bytes) => format!("Data({} bytes)", bytes.len()),
-            Self::Manifest(m) => format!("Manifest({} shards)", m.shard_hashes.len()),
+            Self::Manifest(m) => format!("Manifest({} units)", m.custody_units().len()),
             Self::Have(has) => format!("Have({has})"),
             Self::PushAck => "PushAck".to_string(),
             Self::NotFound => "NotFound".to_string(),
@@ -359,7 +372,7 @@ mod tests {
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
                 reach: "public".to_string(),
-                blob_cid: Some(format!("bafkrei{i:056}")),
+                blob_cid: Some(format!("bafkr4i{i:056}")),
                 updated_at: "2026-07-03T00:00:00Z".to_string(),
             })
             .collect();
@@ -392,7 +405,7 @@ mod tests {
         use libp2p::request_response::Codec;
 
         let request = ShardRequest::Push {
-            hash: "sha256-small".to_string(),
+            cid: elohim_epr::address::compute_bytes_cid(b"small"),
             data: b"existing-wire".to_vec(),
         };
         let historical = rmp_serde::to_vec(&request).expect("historical serializer");
@@ -432,7 +445,7 @@ mod tests {
         // Byte fields ride as `bin` (one wire byte per payload byte), so a
         // payload is oversize only when it genuinely exceeds the budget.
         let request = ShardRequest::Push {
-            hash: "sha256-oversize".to_string(),
+            cid: elohim_epr::address::compute_bytes_cid(b"oversize"),
             data: vec![0xff; SHARD_TRANSFER_MAX_FRAME_SIZE + 1],
         };
         let mut framed = Vec::new();
@@ -507,7 +520,10 @@ mod tests {
         #[derive(Serialize, Deserialize)]
         enum LegacyShardResponse {
             Data(Vec<u8>),
-            #[allow(dead_code)]
+            #[allow(
+                dead_code,
+                reason = "mirrors the legacy wire enum's variant set; only Data is exercised"
+            )]
             Have(bool),
         }
 

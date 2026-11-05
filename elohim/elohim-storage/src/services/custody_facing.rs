@@ -236,19 +236,18 @@ fn recorded_class(commitment: &ReaCommitment) -> Option<CustodyClass> {
 fn load_commitment_plane(
     conn: &mut SqliteConnection,
     h_app_id: &str,
-    shard_hashes: &[String],
+    shard_cids: &[String],
     holders: &[String],
 ) -> CommitmentPlane {
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
     use crate::db::diesel_schema::shard_manifests::dsl as sm;
 
-    // 1. shard -> blob, via the manifests' shard_hashes_json. The column is JSON
-    //    TEXT (unindexable), so the scope's manifests are read once and inverted
-    //    in memory rather than issuing one LIKE query per shard.
-    let manifests: Vec<(String, String)> = match sm::shard_manifests
+    // 1. unit -> blob, via each manifest's declared custody units. The units live
+    //    in JSON TEXT (unindexable), so the scope's manifests are read once and
+    //    inverted in memory rather than issuing one LIKE query per unit.
+    let manifests: Vec<crate::db::models::ShardManifestRow> = match sm::shard_manifests
         .filter(sm::h_app_id.eq(h_app_id))
-        .select((sm::blob_hash, sm::shard_hashes_json))
-        .load::<(String, String)>(conn)
+        .load(conn)
     {
         Ok(rows) => rows,
         Err(e) => {
@@ -262,15 +261,12 @@ fn load_commitment_plane(
         }
     };
 
-    let wanted: std::collections::HashSet<&str> = shard_hashes.iter().map(String::as_str).collect();
+    let wanted: std::collections::HashSet<&str> = shard_cids.iter().map(String::as_str).collect();
     let mut shard_to_blob: HashMap<String, String> = HashMap::new();
-    for (blob_hash, shard_hashes_json) in manifests {
-        let Ok(hashes) = serde_json::from_str::<Vec<String>>(&shard_hashes_json) else {
-            continue;
-        };
-        for h in hashes {
-            if wanted.contains(h.as_str()) {
-                shard_to_blob.insert(h, blob_hash.clone());
+    for row in &manifests {
+        for unit in crate::db::shard_manifests::custody_unit_cids(row) {
+            if wanted.contains(unit.as_str()) {
+                shard_to_blob.insert(unit, row.blob_cid.clone());
             }
         }
     }
@@ -367,7 +363,7 @@ fn derive_class(
 // The loader
 // ---------------------------------------------------------------------------
 
-/// Materialize one observer's current custody facts for `shard_hashes`, ready
+/// Materialize one observer's current custody facts for `shard_cids`, ready
 /// for `observed_custody_class_counts` / `fresh_evidence_counts`.
 ///
 /// Rows are latest-wins per `(observer, shard, holder)` — greatest parsed
@@ -383,13 +379,13 @@ pub fn load_custody_observation_relation(
     conn: &mut SqliteConnection,
     h_app_id: &str,
     observer_agent_cid: &str,
-    shard_hashes: &[String],
+    shard_cids: &[String],
     now_micros: i64,
     staleness_secs: i64,
 ) -> Result<Vec<CustodyObservationRow>, StorageError> {
     use crate::db::diesel_schema::shard_locations::dsl as sl;
 
-    if shard_hashes.is_empty() {
+    if shard_cids.is_empty() {
         return Ok(Vec::new());
     }
 
@@ -400,13 +396,13 @@ pub fn load_custody_observation_relation(
     let mut chunks_failed = 0usize;
     let mut last_err: Option<String> = None;
 
-    for chunk in shard_hashes.chunks(IN_CHUNK) {
+    for chunk in shard_cids.chunks(IN_CHUNK) {
         chunks_total += 1;
         let rows: Vec<(String, String, String, String, Option<String>)> = match sl::shard_locations
             .filter(sl::h_app_id.eq(h_app_id))
-            .filter(sl::shard_hash.eq_any(chunk))
+            .filter(sl::shard_cid.eq_any(chunk))
             .select((
-                sl::shard_hash,
+                sl::shard_cid,
                 sl::peer_id,
                 sl::status,
                 sl::first_seen,
@@ -518,11 +514,11 @@ pub fn compute_and_emit_custody_counts(
 ) -> Result<CustodyClassCounts, StorageError> {
     use crate::db::diesel_schema::shard_locations::dsl as sl;
 
-    let shard_hashes: Vec<String> = sl::shard_locations
+    let shard_cids: Vec<String> = sl::shard_locations
         .filter(sl::h_app_id.eq(h_app_id))
-        .select(sl::shard_hash)
+        .select(sl::shard_cid)
         .distinct()
-        .order(sl::shard_hash.asc())
+        .order(sl::shard_cid.asc())
         .limit(MAX_EMIT_SHARDS)
         .load::<String>(conn)
         .map_err(|e| {
@@ -533,7 +529,7 @@ pub fn compute_and_emit_custody_counts(
         conn,
         h_app_id,
         observer_agent_cid,
-        &shard_hashes,
+        &shard_cids,
         now_micros,
         staleness_secs,
     )?;
@@ -552,11 +548,15 @@ mod tests {
     const HOLDER_A: &str = "uhCAkholderaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HOLDER_B: &str = "uhCAkholderbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const OBSERVER: &str = "uhCAkobserveraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    /// Custody units: byte CIDs (`compute_bytes_cid(b"shard-a-0")`, `b"shard-b-0"`),
+    /// ordered SHARD_A < SHARD_B as the fixtures read them.
+    const SHARD_A: &str = "bafkr4ibe5xtf3ybukkaautulv3rwwrqqfyczcj3x47sreka6djluzv6b4e";
+    const SHARD_B: &str = "bafkr4igcyitpsr7rpog5muxuk2zadtvjwlgoa52r7haxgug7b35b2ikthy";
 
     fn insert_location(conn: &mut SqliteConnection, shard: &str, holder: &str, status: &str) {
         diesel::replace_into(shard_locations::table)
             .values(&NewShardLocation {
-                shard_hash: shard,
+                shard_cid: shard,
                 peer_id: holder,
                 h_app_id: "lamad",
                 status,
@@ -575,7 +575,7 @@ mod tests {
     ) {
         diesel::update(
             shard_locations::table
-                .filter(shard_locations::shard_hash.eq(shard))
+                .filter(shard_locations::shard_cid.eq(shard))
                 .filter(shard_locations::peer_id.eq(holder)),
         )
         .set((
@@ -588,18 +588,11 @@ mod tests {
 
     fn insert_manifest(conn: &mut SqliteConnection, content_id: &str, blob: &str, shards: &[&str]) {
         use crate::db::diesel_schema::shard_manifests;
-        diesel::sql_query(format!(
-            "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, blob_cid, encoding, \
-             data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
-             shard_size_bytes, mime_type, reach, created_at) VALUES ('{content_id}', 'lamad', \
-             '{blob}', NULL, 'rs', {}, 0, '{}', 100, 10, 'application/octet-stream', 'public', \
-             '2026-07-25T00:00:00Z')",
-            shards.len(),
-            serde_json::to_string(shards).unwrap()
-        ))
-        .execute(conn)
-        .expect("insert shard_manifest");
-        let _ = shard_manifests::table;
+        crate::db::shard_manifests::insert_unit_manifest(conn, content_id, "lamad", blob, shards);
+        diesel::update(shard_manifests::table.filter(shard_manifests::content_id.eq(content_id)))
+            .set(shard_manifests::reach.eq("public"))
+            .execute(conn)
+            .expect("stamp manifest reach");
     }
 
     fn insert_commitment(
@@ -710,13 +703,18 @@ mod tests {
         let mut conn = pool.get().unwrap();
         // shard-a IS in a manifest → the blob key is resolvable → a completed
         // lookup that finds no active commitment is a MEASURED absence.
-        insert_location(&mut conn, "shard-a", HOLDER_A, "verified");
-        insert_manifest(&mut conn, "content-1", "sha256-blob1", &["shard-a"]);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "verified");
+        insert_manifest(
+            &mut conn,
+            "content-1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A],
+        );
         // shard-b is in NO manifest → the blob-keyed half is unsearchable →
         // honest unknown, never Some(None).
-        insert_location(&mut conn, "shard-b", HOLDER_A, "verified");
+        insert_location(&mut conn, SHARD_B, HOLDER_A, "verified");
 
-        let shards = vec!["shard-a".to_string(), "shard-b".to_string()];
+        let shards = vec![SHARD_A.to_string(), SHARD_B.to_string()];
         let rows =
             load_custody_observation_relation(&mut conn, "lamad", OBSERVER, &shards, 0, 0).unwrap();
 
@@ -735,13 +733,18 @@ mod tests {
     fn inactive_commitment_is_a_measured_absence_not_a_promise() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_location(&mut conn, "shard-a", HOLDER_A, "self-held");
-        insert_manifest(&mut conn, "content-1", "sha256-blob1", &["shard-a"]);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "self-held");
+        insert_manifest(
+            &mut conn,
+            "content-1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A],
+        );
         insert_commitment(
             &mut conn,
             "c-cancelled",
             HOLDER_A,
-            "sha256-blob1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
             "cancelled",
             None,
         );
@@ -750,7 +753,7 @@ mod tests {
             &mut conn,
             "lamad",
             OBSERVER,
-            &["shard-a".to_string()],
+            &[SHARD_A.to_string()],
             0,
             0,
         )
@@ -767,15 +770,29 @@ mod tests {
         insert_manifest(
             &mut conn,
             "content-1",
-            "sha256-blob1",
-            &["shard-a", "shard-b"],
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A, SHARD_B],
         );
-        insert_location(&mut conn, "shard-a", HOLDER_A, "self-held"); // witnessed
-        insert_location(&mut conn, "shard-b", HOLDER_B, "peer-announced"); // asserted only
-        insert_commitment(&mut conn, "c-a", HOLDER_A, "sha256-blob1", "active", None);
-        insert_commitment(&mut conn, "c-b", HOLDER_B, "sha256-blob1", "active", None);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "self-held"); // witnessed
+        insert_location(&mut conn, SHARD_B, HOLDER_B, "peer-announced"); // asserted only
+        insert_commitment(
+            &mut conn,
+            "c-a",
+            HOLDER_A,
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            "active",
+            None,
+        );
+        insert_commitment(
+            &mut conn,
+            "c-b",
+            HOLDER_B,
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            "active",
+            None,
+        );
 
-        let shards = vec!["shard-a".to_string(), "shard-b".to_string()];
+        let shards = vec![SHARD_A.to_string(), SHARD_B.to_string()];
         let rows =
             load_custody_observation_relation(&mut conn, "lamad", OBSERVER, &shards, 0, 0).unwrap();
         assert_eq!(rows[0].observed_custody_class, Some(CustodyClass::Stocked));
@@ -790,13 +807,18 @@ mod tests {
     fn recorded_tier_wins_and_is_the_only_path_to_stocked_warm() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_manifest(&mut conn, "content-1", "sha256-blob1", &["shard-a"]);
-        insert_location(&mut conn, "shard-a", HOLDER_A, "peer-announced");
+        insert_manifest(
+            &mut conn,
+            "content-1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A],
+        );
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "peer-announced");
         insert_commitment(
             &mut conn,
             "c-warm",
             HOLDER_A,
-            "sha256-blob1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
             "active",
             Some(r#"{"origin":"salvage","custodyClass":"stocked-warm"}"#),
         );
@@ -805,7 +827,7 @@ mod tests {
             &mut conn,
             "lamad",
             OBSERVER,
-            &["shard-a".to_string()],
+            &[SHARD_A.to_string()],
             0,
             0,
         )
@@ -842,8 +864,13 @@ mod tests {
     fn commitment_query_error_yields_unknown_but_preserves_evidence() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_location(&mut conn, "shard-a", HOLDER_A, "self-held");
-        insert_manifest(&mut conn, "content-1", "sha256-blob1", &["shard-a"]);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "self-held");
+        insert_manifest(
+            &mut conn,
+            "content-1",
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A],
+        );
         // Make the commitment plane unreadable while the evidence plane stays fine.
         diesel::sql_query("DROP TABLE rea_commitments")
             .execute(&mut conn)
@@ -853,7 +880,7 @@ mod tests {
             &mut conn,
             "lamad",
             OBSERVER,
-            &["shard-a".to_string()],
+            &[SHARD_A.to_string()],
             0,
             0,
         )
@@ -874,7 +901,7 @@ mod tests {
     fn manifest_query_error_yields_unknown_but_preserves_evidence() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_location(&mut conn, "shard-a", HOLDER_A, "verified");
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "verified");
         diesel::sql_query("DROP TABLE shard_manifests")
             .execute(&mut conn)
             .unwrap();
@@ -883,7 +910,7 @@ mod tests {
             &mut conn,
             "lamad",
             OBSERVER,
-            &["shard-a".to_string()],
+            &[SHARD_A.to_string()],
             0,
             0,
         )
@@ -904,7 +931,7 @@ mod tests {
             &mut conn,
             "lamad",
             OBSERVER,
-            &["shard-a".to_string()],
+            &[SHARD_A.to_string()],
             0,
             0,
         );
@@ -921,12 +948,12 @@ mod tests {
     fn missing_or_unparseable_timestamp_is_never_fresh() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_location(&mut conn, "shard-a", HOLDER_A, "verified");
-        set_timestamps(&mut conn, "shard-a", HOLDER_A, "", None);
-        insert_location(&mut conn, "shard-b", HOLDER_A, "verified");
-        set_timestamps(&mut conn, "shard-b", HOLDER_A, "not-a-timestamp", None);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "verified");
+        set_timestamps(&mut conn, SHARD_A, HOLDER_A, "", None);
+        insert_location(&mut conn, SHARD_B, HOLDER_A, "verified");
+        set_timestamps(&mut conn, SHARD_B, HOLDER_A, "not-a-timestamp", None);
 
-        let shards = vec!["shard-a".to_string(), "shard-b".to_string()];
+        let shards = vec![SHARD_A.to_string(), SHARD_B.to_string()];
         // staleness_secs = 0 DISABLES the window — even so, an unreadable stamp
         // must not read as fresh.
         let rows =
@@ -1028,11 +1055,11 @@ mod tests {
     fn output_order_is_deterministic_by_shard_then_holder() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_location(&mut conn, "shard-b", HOLDER_B, "verified");
-        insert_location(&mut conn, "shard-a", HOLDER_B, "verified");
-        insert_location(&mut conn, "shard-a", HOLDER_A, "verified");
+        insert_location(&mut conn, SHARD_B, HOLDER_B, "verified");
+        insert_location(&mut conn, SHARD_A, HOLDER_B, "verified");
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "verified");
 
-        let shards = vec!["shard-a".to_string(), "shard-b".to_string()];
+        let shards = vec![SHARD_A.to_string(), SHARD_B.to_string()];
         let rows =
             load_custody_observation_relation(&mut conn, "lamad", OBSERVER, &shards, 0, 0).unwrap();
         let keys: Vec<(&str, &str)> = rows
@@ -1042,9 +1069,9 @@ mod tests {
         assert_eq!(
             keys,
             vec![
-                ("shard-a", HOLDER_A),
-                ("shard-a", HOLDER_B),
-                ("shard-b", HOLDER_B),
+                (SHARD_A, HOLDER_A),
+                (SHARD_A, HOLDER_B),
+                (SHARD_B, HOLDER_B),
             ]
         );
     }
@@ -1072,14 +1099,21 @@ mod tests {
         insert_manifest(
             &mut conn,
             "content-1",
-            "sha256-blob1",
-            &["shard-a", "shard-b"],
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            &[SHARD_A, SHARD_B],
         );
-        insert_location(&mut conn, "shard-a", HOLDER_A, "self-held");
-        set_timestamps(&mut conn, "shard-a", HOLDER_A, "2026-07-25 11:00:00", None);
-        insert_location(&mut conn, "shard-b", HOLDER_B, "lost");
-        set_timestamps(&mut conn, "shard-b", HOLDER_B, "2026-07-25 11:00:00", None);
-        insert_commitment(&mut conn, "c-a", HOLDER_A, "sha256-blob1", "active", None);
+        insert_location(&mut conn, SHARD_A, HOLDER_A, "self-held");
+        set_timestamps(&mut conn, SHARD_A, HOLDER_A, "2026-07-25 11:00:00", None);
+        insert_location(&mut conn, SHARD_B, HOLDER_B, "lost");
+        set_timestamps(&mut conn, SHARD_B, HOLDER_B, "2026-07-25 11:00:00", None);
+        insert_commitment(
+            &mut conn,
+            "c-a",
+            HOLDER_A,
+            "bafkr4if7kp4tkak47jdawedacnkfl75mngw4zphktjja7hnakhvj7w2noe",
+            "active",
+            None,
+        );
 
         let counts =
             compute_and_emit_custody_counts(&mut conn, "lamad", OBSERVER, now, 86_400).unwrap();

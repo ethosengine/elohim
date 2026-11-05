@@ -45,6 +45,8 @@ use std::collections::HashSet;
 /// recovery/revocation.
 const INBOUND_TOPICS: &[&str] = &[
     crate::p2p::inventory_gossip::INVENTORY_TOPIC,
+    // Read only to report its publishers unavailable; bodies are never decoded.
+    crate::p2p::inventory_gossip::LEGACY_INVENTORY_TOPIC,
     crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
     crate::p2p::RECOVERY_INVITATION_TOPIC,
     crate::p2p::RECOVERY_REVOCATION_TOPIC,
@@ -218,6 +220,7 @@ mod tests {
         // identity-binding, recovery/revocation. Guard against accidental
         // removal.
         assert!(INBOUND_TOPICS.contains(&crate::p2p::inventory_gossip::INVENTORY_TOPIC));
+        assert!(INBOUND_TOPICS.contains(&crate::p2p::inventory_gossip::LEGACY_INVENTORY_TOPIC));
         assert!(
             INBOUND_TOPICS.contains(&crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC)
         );

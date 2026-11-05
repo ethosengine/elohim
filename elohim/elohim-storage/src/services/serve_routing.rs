@@ -120,13 +120,13 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
         .collect()
 }
 
-/// Load serve candidates for `blob_hash` from the agent_cid-native shard tables.
+/// Load serve candidates for `blob_cid` from the agent_cid-native shard tables.
 ///
 /// Join path (agent_cid-keyed throughout — no libp2p namespace crossing in the
 /// SQL joins themselves):
 /// ```text
-/// shard_manifests (blob_hash → shard_hashes_json)
-///   → shard_locations.shard_hash (peer_id = agent_cid)
+/// shard_manifests (blob_cid → shard_cids_json)
+///   → shard_locations.shard_cid (peer_id = agent_cid)
 ///   → humans.agent_pub_key (household_id)
 ///   → humans.id → node_stewardship.human_id → stewarded_nodes (capability_level)
 ///   → rea_commitments.provider (bonded = active provide/replicates-*)
@@ -141,36 +141,34 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
 /// have landed under whichever label was known when it was recorded.
 pub fn load_serve_rows(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<Vec<ServeRow>, StorageError> {
-    // Step 1: find the shard_manifests rows for this blob_hash, collect shard hashes.
-    // Load shard_hashes_json as Vec<String> directly (single-column select — no struct wrapper).
-    let manifest_json_rows: Vec<String> = shard_manifests::table
-        .filter(shard_manifests::blob_hash.eq(blob_hash))
-        .select(shard_manifests::shard_hashes_json)
-        .load::<String>(conn)
+    // Step 1: find the shard_manifests rows for this blob_cid, collect their
+    // custody units (may span h_app_id).
+    let manifest_rows: Vec<crate::db::models::ShardManifestRow> = shard_manifests::table
+        .filter(shard_manifests::blob_cid.eq(blob_cid))
+        .load(conn)
         .map_err(|e| StorageError::Database(format!("load_serve_rows manifest: {e}")))?;
 
-    if manifest_json_rows.is_empty() {
+    if manifest_rows.is_empty() {
         return Ok(vec![]);
     }
 
-    // Collect all shard hashes across matching manifests (may span h_app_id).
-    let mut shard_hashes: Vec<String> = Vec::new();
-    for json in &manifest_json_rows {
-        let parsed: Vec<String> = serde_json::from_str(json).unwrap_or_default();
-        shard_hashes.extend(parsed);
-    }
-    shard_hashes.dedup();
+    let mut shard_cids: Vec<String> = manifest_rows
+        .iter()
+        .flat_map(crate::db::shard_manifests::custody_unit_cids)
+        .collect();
+    shard_cids.sort();
+    shard_cids.dedup();
 
-    if shard_hashes.is_empty() {
+    if shard_cids.is_empty() {
         return Ok(vec![]);
     }
 
     // Step 2: find distinct agent_cids holding any of these shards.
     // shard_locations.peer_id stores agent_cid (uhCAk…) — verified in CLAUDE.md.
     let location_rows: Vec<String> = shard_locations::table
-        .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+        .filter(shard_locations::shard_cid.eq_any(&shard_cids))
         .select(shard_locations::peer_id)
         .distinct()
         .load::<String>(conn)
@@ -305,7 +303,7 @@ pub fn load_serve_rows(
     Ok(rows)
 }
 
-/// Select up to `n` peers for serving `blob_hash`, ordered by capability/headroom/RTT/bond/delivery/diversity.
+/// Select up to `n` peers for serving `blob_cid`, ordered by capability/headroom/RTT/bond/delivery/diversity.
 ///
 /// Returns chosen `agent_cid`s. An empty result means no eligible peer was found —
 /// the caller should shed (503), never fan out to all peers.
@@ -315,10 +313,10 @@ pub fn load_serve_rows(
 /// population gap (the libp2p_peer_id column has only `#[cfg(test)]` writers in prod).
 pub fn select_serve_peers(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     n: usize,
 ) -> Result<Vec<String>, StorageError> {
-    let rows = load_serve_rows(conn, blob_hash)?;
+    let rows = load_serve_rows(conn, blob_cid)?;
     let candidates = fold_candidates(&rows);
     let chosen = score::select_diverse(&candidates, MIN_CAP, n);
     Ok(chosen.into_iter().map(|s| s.agent_cid).collect())

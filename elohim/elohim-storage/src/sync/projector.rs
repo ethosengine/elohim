@@ -73,9 +73,9 @@ enum FieldVal {
 /// (`doc_matches` checks exactly this list; keys NOT in the list are "don't
 /// care", so a converged peer value a local row can't produce is never fought).
 ///
-/// `blobHash`/`serverBlobHash`/`blobCid`/`contentSizeBytes` are LOAD-BEARING for
+/// `serverBlobCid`/`blobCid`/`contentSizeBytes` are LOAD-BEARING for
 /// peer convergence of the SERVING path: a peer whose content row lost its
-/// `blobHash` (e.g. a deploy PATCH that never landed on a degraded conductor) can
+/// `blobCid` (e.g. a deploy PATCH that never landed on a degraded conductor) can
 /// only re-derive it by converging this doc from a healthy peer.
 ///
 /// Two invariants keep a FLEET-WIDE backfill safe (every peer projects its own
@@ -121,8 +121,7 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
         }
     }
     for (key, val) in [
-        ("blobHash", &content.blob_hash),
-        ("serverBlobHash", &content.server_blob_hash),
+        ("serverBlobCid", &content.server_blob_cid),
         ("blobCid", &content.blob_cid),
     ] {
         if let Some(v) = val {
@@ -220,10 +219,10 @@ fn doc_head_hint_at(doc: &Automerge, now_us: i64) -> Option<content_diesel::DocH
 /// `versionCid`. Two peers that authored DISTINCT bytes for the same id therefore
 /// hold DISTINCT version keys — so both versions COEXIST in the grow-only
 /// `versions` map (never an LWW clobber), and HEAD-election (Plan C3) picks which
-/// is canonical. Absent/empty `blobHash` ⇒ no serving version to record yet.
+/// is canonical. Absent/empty `blobCid` ⇒ no serving version to record yet.
 fn head_version_cid(content: &Content) -> Option<String> {
     content
-        .blob_hash
+        .blob_cid
         .as_deref()
         .filter(|b| !b.is_empty())
         .map(str::to_string)
@@ -240,14 +239,14 @@ fn root_str(doc: &Automerge, key: &str) -> Option<String> {
     }
 }
 
-/// Resolve the head version's blobHash from a projected doc:
-/// `head → versions[head] → blobHash`, falling back to the flat ROOT `blobHash`
+/// Resolve the head version's byte CID from a projected doc:
+/// `head → versions[head]`, falling back to the flat ROOT `blobCid`
 /// for docs written by a pre-C2 peer (the dual-write compat leg). Returns None if
 /// neither is present. Test-only: the serve path no longer consults the doc's
 /// blob (story 1.4c — it is unauthenticated peer input); the projector's tests
 /// read the shape they wrote with it.
 #[cfg(test)]
-pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
+pub(crate) fn read_head_blob_cid(doc: &Automerge) -> Option<String> {
     if let Some(head) = root_str(doc, "head") {
         if let Ok(Some((Value::Object(automerge::ObjType::Map), versions_id))) =
             doc.get(automerge::ROOT, "versions")
@@ -259,8 +258,8 @@ pub(crate) fn read_head_blob_hash(doc: &Automerge) -> Option<String> {
             }
         }
     }
-    // Fallback: flat ROOT blobHash (pre-C2 dual-write leg).
-    root_str(doc, "blobHash")
+    // Fallback: the flat ROOT `blobCid` scalar.
+    root_str(doc, "blobCid")
 }
 
 /// Read the doc's `headActionHash` observability/hint scalar (Plan C2) — the
@@ -410,7 +409,7 @@ pub async fn project_content_doc(
             }
             // Version-DAG leg (Plan C2): record this serving version in the grow-only
             // `versions` map keyed by its content-address, and move `head` to it. The
-            // flat ROOT `blobHash` above is the dual-write compat leg for pre-C2 peers;
+            // flat ROOT `blobCid` above is the dual-write compat leg for pre-C2 peers;
             // grow-only means a divergent peer version is ADDED, never overwriting.
             if let Some(vcid) = &head_vcid {
                 let versions_id = match tx.get(automerge::ROOT, "versions")? {
@@ -452,7 +451,7 @@ pub async fn project_content_doc_reconcile(
 
 /// [`project_content_doc_reconcile`] that names WHICH doc fields it filled —
 /// the back-fill's drift report reads these so a fleet operator can tell
-/// "docs were missing `blobHash`" from "docs were missing `declaredHead`"
+/// "docs were missing `blobCid`" from "docs were missing `declaredHead`"
 /// without a debugger. Empty = nothing to fill (or reach not distributable).
 pub async fn project_content_doc_reconcile_keys(
     sync: &SyncManager,
@@ -531,9 +530,9 @@ pub const HALF_ROW_HEAL_BATCH: i64 = 200;
 /// arrived at 14:42:49, the row landed at 14:43:53 as a HALF record (the
 /// pull leg's best-RTT survivor held only a half row itself), and nothing
 /// ever re-read that row against the doc it already had — 134 rows stayed
-/// `blobHash: null` for the whole 915 s run while the doc held the hash. This
+/// `blobCid: null` for the whole 915 s run while the doc held the hash. This
 /// sweep visits half rows in id order, `batch` per call, and asks the doc;
-/// a doc without a blobHash leaves the row alone (the legitimate half state:
+/// a doc without a blobCid leaves the row alone (the legitimate half state:
 /// a declared blob nobody has uploaded yet). Returns the keyset cursor to
 /// continue from, or `None` when the set is exhausted (the caller wraps).
 ///
@@ -721,22 +720,22 @@ pub async fn backfill_content_docs(
 ///
 /// Division of labor (spec §5.5): the shard/replication plane heals ABSENCE (a
 /// missing row/bytes, via `bulk_create_content`); this heals DRIFT — a stale/null
-/// `blob_hash` on a row that already EXISTS locally. An absent
+/// `blob_cid` on a row that already EXISTS locally. An absent
 /// row is skipped (`Ok(false)`) — that is the shard plane's job, not the
 /// drift-heal's.
 ///
 /// Guards: (1) **empty-never-wins** — only heals when the converged value is
 /// non-empty (a peer holding `""` never marks us amber or clobbers us); (2)
-/// **green-inviolable** (blob_hash only) — the write rides `update_content`'s amber path
+/// **green-inviolable** (blob_cid only) — the write rides `update_content`'s amber path
 /// (`crdt_converged_at` set), which never overwrites a notarized (`dht_anchor_hash`)
-/// `blob_hash` but DOES replace a non-green one, so amber rows converge set→set
+/// `blob_cid` but DOES replace a non-green one, so amber rows converge set→set
 /// instead of freezing on their first heal (A3 precedence: green > amber);
 /// (3) **namespace** — writes under `default_lamad` (the serving scope), never
 /// the doc's `"elohim"` sync namespace (REQ-F5).
 ///
 /// # The green-inviolable guard stays shut — T7 heals the other side (2026-09-05)
 ///
-/// Guard (2) is why a GREEN row whose `blob_hash` has drifted from a peer's
+/// Guard (2) is why a GREEN row whose `blob_cid` has drifted from a peer's
 /// cannot converge here, and it must stay that way: a converged CRDT doc is
 /// unauthenticated peer input, so opening the amber path onto a notarized row
 /// would let any peer repoint a green row's bytes. That is the whole point of
@@ -762,7 +761,7 @@ pub async fn backfill_content_docs(
 /// converged doc value is unauthenticated peer input: any peer can put any
 /// bytes into a CRDT doc, so consuming it into either column would launder
 /// gossip into notarization provenance — an amber-tier hint silently promoted
-/// to authority. This function heals `blobHash` (amber, `crdt_converged_at`
+/// to authority. This function heals `blobCid` (amber, `crdt_converged_at`
 /// marker) ONLY. If
 /// you are about to plumb another doc field into a SQL write, stop: route it
 /// through a conductor-verified path instead.
@@ -784,11 +783,13 @@ pub async fn reverse_project_content_doc(
     // Empty-never-wins: read each converged field independently; a field
     // absent/empty in the doc simply does not participate in this heal — it is
     // NOT treated as "erase the local value" (no-clobber).
+    // A converged value that is not a byte CID (full decode) names no bytes and
+    // never heals a row.
     let doc_blob_hash = match sync
-        .get_doc_field(PROJECTION_NAMESPACE, doc_id, "blobHash")
+        .get_doc_field(PROJECTION_NAMESPACE, doc_id, "blobCid")
         .await
     {
-        Ok(h) if !h.is_empty() => Some(h),
+        Ok(h) if elohim_epr::address::ByteCid::parse(&h).is_ok() => Some(h),
         _ => None,
     };
     if doc_blob_hash.is_none() {
@@ -818,7 +819,7 @@ pub async fn reverse_project_content_doc(
             content_id = %id,
             channel = %channel,
             "reverse projection: the slug is bound to a release channel, which owns its \
-             serving pointer — the converged blobHash is not applied"
+             serving pointer — the converged blobCid is not applied"
         );
         return Ok(false);
     }
@@ -830,7 +831,7 @@ pub async fn reverse_project_content_doc(
     // peer had no log line naming its writer.
     let blob_hash_changed = doc_blob_hash
         .as_deref()
-        .is_some_and(|h| existing.blob_hash.as_deref() != Some(h));
+        .is_some_and(|h| existing.blob_cid.as_deref() != Some(h));
     if !blob_hash_changed {
         return Ok(false);
     }
@@ -840,15 +841,15 @@ pub async fn reverse_project_content_doc(
             target: "elohim_storage::sync_heal",
             content_id = %id,
             doc_id = %doc_id,
-            from = ?existing.blob_hash,
+            from = ?existing.blob_cid,
             to = ?doc_blob_hash,
             green = existing.dht_anchor_hash.is_some(),
-            "reverse projection: converged blobHash differs from the local row (amber heal; a green row keeps its own)"
+            "reverse projection: converged blobCid differs from the local row (amber heal; a green row keeps its own)"
         );
     }
     let input = content_diesel::UpdateContentInput {
         id: id.to_string(),
-        blob_hash: if blob_hash_changed {
+        blob_cid: if blob_hash_changed {
             doc_blob_hash
         } else {
             None
@@ -1134,7 +1135,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: Some("{}".to_string()),
@@ -1146,7 +1146,7 @@ mod tests {
             content_body: Some("hello".to_string()),
             dht_anchor_hash: None,
             p2p_published_at: None,
-            server_blob_hash: None,
+            server_blob_cid: None,
             crdt_converged_at: None,
             declared_head_action_hash: None,
             declared_head_at: None,
@@ -1263,11 +1263,13 @@ mod tests {
         let (sync, _temp) = test_sync_manager().await;
         let mut content = sample_content("vdag-1", "v1");
 
-        content.blob_hash = Some("sha256-aaa".to_string());
+        content.blob_cid =
+            Some("bafkr4ibqyd44nilh7qvjckc4qw7h5i2bk2ntwop4yx3x7u2fgtfn5fy5ea".to_string());
         content.declared_head_action_hash = Some("uhCkkAAA".to_string());
         assert!(super::project_content_doc(&sync, &content).await.unwrap());
 
-        content.blob_hash = Some("sha256-bbb".to_string());
+        content.blob_cid =
+            Some("bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq".to_string());
         content.declared_head_action_hash = Some("uhCkkBBB".to_string());
         assert!(super::project_content_doc(&sync, &content).await.unwrap());
 
@@ -1285,23 +1287,36 @@ mod tests {
             _ => panic!("versions map must exist after C2 projection"),
         };
         assert!(
-            doc.get(&versions_id, "sha256-aaa").unwrap().is_some(),
+            doc.get(
+                &versions_id,
+                "bafkr4ibqyd44nilh7qvjckc4qw7h5i2bk2ntwop4yx3x7u2fgtfn5fy5ea"
+            )
+            .unwrap()
+            .is_some(),
             "version A must remain — the version-DAG is grow-only, not LWW"
         );
         assert!(
-            doc.get(&versions_id, "sha256-bbb").unwrap().is_some(),
+            doc.get(
+                &versions_id,
+                "bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq"
+            )
+            .unwrap()
+            .is_some(),
             "version B must be present"
         );
         // Head selects the latest version; the reader resolves its blobHash.
-        assert_eq!(super::root_str(&doc, "head").as_deref(), Some("sha256-bbb"));
         assert_eq!(
-            super::read_head_blob_hash(&doc).as_deref(),
-            Some("sha256-bbb")
+            super::root_str(&doc, "head").as_deref(),
+            Some("bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq")
+        );
+        assert_eq!(
+            super::read_head_blob_cid(&doc).as_deref(),
+            Some("bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq")
         );
         // Dual-write compat: flat ROOT blobHash mirrors head's bytes.
         assert_eq!(
-            super::root_str(&doc, "blobHash").as_deref(),
-            Some("sha256-bbb")
+            super::root_str(&doc, "blobCid").as_deref(),
+            Some("bafkr4id6pkc6iyiz3mx76lcjmm77uurrn2cmd2i3holht5zqcbg5aotjmq")
         );
         // Notary HINT carried alongside (never authority — see the REQ-N5 guard).
         assert_eq!(
@@ -1314,7 +1329,7 @@ mod tests {
     /// pre-C2 peer (no `versions` map / `head`) — the dual-write compat leg that
     /// keeps convergence working across the mixed-version window.
     #[tokio::test]
-    async fn read_head_blob_hash_falls_back_to_root_for_pre_c2_doc() {
+    async fn read_head_blob_cid_falls_back_to_root_for_pre_c2_doc() {
         use automerge::transaction::Transactable;
         let (sync, _temp) = test_sync_manager().await;
         let doc_id = super::content_doc_id("pre-c2");
@@ -1323,7 +1338,11 @@ mod tests {
             .await
             .unwrap();
         doc.transact::<_, _, automerge::AutomergeError>(|tx| {
-            tx.put(automerge::ROOT, "blobHash", "sha256-legacy")?;
+            tx.put(
+                automerge::ROOT,
+                "blobCid",
+                "bafkr4ib6ulpjt2qiahxlb4pd3vdqoafilrqgxvrlvm2gbagqhf55mrvdkm",
+            )?;
             Ok(())
         })
         .unwrap();
@@ -1335,8 +1354,8 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            super::read_head_blob_hash(&doc).as_deref(),
-            Some("sha256-legacy")
+            super::read_head_blob_cid(&doc).as_deref(),
+            Some("bafkr4ib6ulpjt2qiahxlb4pd3vdqoafilrqgxvrlvm2gbagqhf55mrvdkm")
         );
     }
 
@@ -1346,7 +1365,8 @@ mod tests {
     async fn doc_head_action_hash_reads_projected_hint() {
         let (sync, _temp) = test_sync_manager().await;
         let mut content = sample_content("hint-1", "v1");
-        content.blob_hash = Some("sha256-head".to_string());
+        content.blob_cid =
+            Some("bafkr4ibv6hvaak73adaslccomuhymqcgw2d6bjekn3obuwi4iwpyyna5uu".to_string());
         content.declared_head_action_hash = Some("uhCkkDECLARED".to_string());
         assert!(super::project_content_doc(&sync, &content).await.unwrap());
 
@@ -1373,7 +1393,8 @@ mod tests {
         assert!(super::project_content_doc(&sync, &content).await.unwrap());
         let heads1 = sync.get_heads("elohim", "node:chg-1").await.unwrap();
 
-        content.blob_hash = Some("sha256-deadbeef".to_string());
+        content.blob_cid =
+            Some("bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u".to_string());
         assert!(
             super::project_content_doc(&sync, &content).await.unwrap(),
             "a changed field must re-project"
@@ -1382,10 +1403,13 @@ mod tests {
         assert_ne!(heads1, heads2, "a changed field must append a change");
 
         let blob = sync
-            .get_doc_field("elohim", "node:chg-1", "blobHash")
+            .get_doc_field("elohim", "node:chg-1", "blobCid")
             .await
             .unwrap();
-        assert_eq!(blob, "sha256-deadbeef");
+        assert_eq!(
+            blob,
+            "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u"
+        );
     }
 
     /// The projected doc carries the serving-critical blob fields (this is what
@@ -1394,22 +1418,24 @@ mod tests {
     async fn projects_serving_critical_blob_fields() {
         let (sync, _temp) = test_sync_manager().await;
         let mut content = sample_content("blob-1", "landing");
-        content.blob_hash = Some("sha256-abc".to_string());
-        content.server_blob_hash = Some("sha256-ssr".to_string());
+        content.blob_cid =
+            Some("bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu".to_string());
+        content.server_blob_cid =
+            Some("bafkr4ifpobx5ao3lnf2uijg3lks24lt4pufftvt6bphqjroyhyydscikea".to_string());
 
         super::project_content_doc(&sync, &content).await.unwrap();
 
         assert_eq!(
-            sync.get_doc_field("elohim", "node:blob-1", "blobHash")
+            sync.get_doc_field("elohim", "node:blob-1", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-abc"
+            "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu"
         );
         assert_eq!(
-            sync.get_doc_field("elohim", "node:blob-1", "serverBlobHash")
+            sync.get_doc_field("elohim", "node:blob-1", "serverBlobCid")
                 .await
                 .unwrap(),
-            "sha256-ssr"
+            "bafkr4ifpobx5ao3lnf2uijg3lks24lt4pufftvt6bphqjroyhyydscikea"
         );
         assert_eq!(
             sync.get_doc_field("elohim", "node:blob-1", "hAppId")
@@ -1431,17 +1457,16 @@ mod tests {
         let (sync, _temp) = test_sync_manager().await;
         let pool = crate::test_util::test_pool();
         let ctx = AppContext::default_lamad();
-        let cid_a = "bafkrei-half-a-cid".to_string();
+        let cid_a = "bafkr4ibba3kkg77f2dlhgbgd6lzhhs5gbpgej4yr56i4pxgp3m7eii4sqi".to_string();
 
         {
             let mut conn = pool.get().unwrap();
-            for (id, blob_cid, blob_hash) in [
-                ("half-a", Some(cid_a.clone()), None),
-                ("half-b", Some("bafkrei-half-b-cid".to_string()), None),
+            for (id, blob_cid) in [
+                ("half-a", None),
+                ("half-b", None),
                 (
                     "full-c",
-                    Some("bafkrei-full-c".to_string()),
-                    Some("bafkrei-full-c".to_string()),
+                    Some("bafkr4igongulpd4iozu4dikwa7lqs7bjleueomdo27jdk6imyxhjvczh4a".to_string()),
                 ),
             ] {
                 let input = CreateContentInput {
@@ -1450,7 +1475,6 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash,
                     blob_cid,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -1464,13 +1488,11 @@ mod tests {
             }
         }
         // half-a's doc converged from a peer that holds the bytes: it carries
-        // the blobHash. half-b's doc came from a half row: no blobHash.
+        // the blobCid. half-b's doc came from a half row: no blobCid.
         let mut full_a = sample_content("half-a", "half-a");
         full_a.blob_cid = Some(cid_a.clone());
-        full_a.blob_hash = Some(cid_a.clone());
         super::project_content_doc(&sync, &full_a).await.unwrap();
-        let mut half_b = sample_content("half-b", "half-b");
-        half_b.blob_cid = Some("bafkrei-half-b-cid".to_string());
+        let half_b = sample_content("half-b", "half-b");
         super::project_content_doc(&sync, &half_b).await.unwrap();
 
         // Batch of 1 exercises the cursor: half-a first (id order).
@@ -1498,9 +1520,9 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(
-                row.blob_hash.as_deref(),
+                row.blob_cid.as_deref(),
                 Some(cid_a.as_str()),
-                "the doc's blobHash healed the half row"
+                "the doc's blobCid healed the half row"
             );
         }
         let (s2, c2) = super::heal_half_rows_from_docs(&sync, &pool, c1.as_deref(), 1)
@@ -1517,7 +1539,7 @@ mod tests {
         );
         assert_eq!(c2.as_deref(), Some("half-b"));
         // Past the end: nothing left, cursor wraps to None. full-c was never a
-        // candidate (it has a blob_hash), and half-a is no longer half.
+        // candidate (it has a blob_cid), and half-a is no longer half.
         let (s3, c3) = super::heal_half_rows_from_docs(&sync, &pool, c2.as_deref(), 1)
             .await
             .unwrap();
@@ -1550,8 +1572,10 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: Some(format!("sha256-{i}")),
-                    blob_cid: None,
+                    blob_cid: Some(
+                        elohim_epr::address::compute_bytes_cid(i.to_string().as_bytes())
+                            .to_string(),
+                    ),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: "commons".to_string(),
@@ -1580,10 +1604,10 @@ mod tests {
 
         // The seeded blobHash converged into the sync doc.
         assert_eq!(
-            sync.get_doc_field("elohim", "node:bf-0", "blobHash")
+            sync.get_doc_field("elohim", "node:bf-0", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-0"
+            "bafkr4icnazyvhldstjfh5arazf4tl752m5ehqygvqkmm52zdqzbwtbt5t4"
         );
     }
 
@@ -1606,7 +1630,10 @@ mod tests {
             let mut conn = pool.get().unwrap();
             for (id, bh) in [
                 ("heal-null", None),
-                ("heal-real", Some("sha256-existing".to_string())),
+                (
+                    "heal-real",
+                    Some("bafkr4icj6bntabcbbmxgfdnb563p3x52327nlkeff7ooa2u2thcv4ecwtq".to_string()),
+                ),
             ] {
                 content_diesel::create_content(
                     &mut conn,
@@ -1617,8 +1644,7 @@ mod tests {
                         description: None,
                         content_type: "concept".to_string(),
                         content_format: "markdown".to_string(),
-                        blob_hash: bh,
-                        blob_cid: None,
+                        blob_cid: bh,
                         content_size_bytes: None,
                         metadata_json: None,
                         reach: "commons".to_string(),
@@ -1634,7 +1660,8 @@ mod tests {
 
         // Peer A's converged doc for heal-null carries a REAL blob_hash.
         let mut peer_a = sample_content("heal-null", "t");
-        peer_a.blob_hash = Some("sha256-converged".to_string());
+        peer_a.blob_cid =
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa".to_string());
         super::project_content_doc(&sync, &peer_a).await.unwrap();
         // Peer B's converged doc for heal-real carries an EMPTY blob_hash (None → "").
         let peer_b = sample_content("heal-real", "t");
@@ -1662,7 +1689,10 @@ mod tests {
         )
         .unwrap()
         .unwrap();
-        assert_eq!(healed.blob_hash.as_deref(), Some("sha256-converged"));
+        assert_eq!(
+            healed.blob_cid.as_deref(),
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa")
+        );
         assert!(
             healed.crdt_converged_at.is_some(),
             "healed row is amber-stamped"
@@ -1678,15 +1708,15 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            untouched.blob_hash.as_deref(),
-            Some("sha256-existing"),
+            untouched.blob_cid.as_deref(),
+            Some("bafkr4icj6bntabcbbmxgfdnb563p3x52327nlkeff7ooa2u2thcv4ecwtq"),
             "empty never clobbers a real hash"
         );
     }
 
     /// Unauthenticated sync cannot choose a server executable.
     #[tokio::test]
-    async fn reverse_project_never_adopts_unverified_server_blob_hash() {
+    async fn reverse_project_never_adopts_unverified_server_blob_cid() {
         use crate::db::content_diesel::{self, CreateContentInput};
         use crate::db::context::AppContext;
 
@@ -1694,8 +1724,8 @@ mod tests {
         let pool = crate::test_util::test_pool();
         let ctx = AppContext::default_lamad();
 
-        // Local rows: server-heal-null (server_blob_hash NULL — the adam
-        // case); server-heal-real (a present real server_blob_hash that an
+        // Local rows: server-heal-null (server_blob_cid NULL — the adam
+        // case); server-heal-real (a present real server_blob_cid that an
         // absent doc field must never clobber).
         {
             let mut conn = pool.get().unwrap();
@@ -1703,7 +1733,7 @@ mod tests {
                 ("server-heal-null", None::<String>),
                 (
                     "server-heal-real",
-                    Some("sha256-existing-server".to_string()),
+                    Some("bafkr4idqa2jmhnypdqnwmztfp576jvbkwoqpzzlvre7jtdknvo54gna4dm".to_string()),
                 ),
             ] {
                 content_diesel::create_content(
@@ -1715,8 +1745,10 @@ mod tests {
                         description: None,
                         content_type: "concept".to_string(),
                         content_format: "markdown".to_string(),
-                        blob_hash: Some("sha256-browser-unchanged".to_string()),
-                        blob_cid: None,
+                        blob_cid: Some(
+                            "bafkr4ic7g5kortrzubb3jxk2fqgs7ifxn6gwgzqalmlp4oozhrdufr5k3y"
+                                .to_string(),
+                        ),
                         content_size_bytes: None,
                         metadata_json: None,
                         reach: "commons".to_string(),
@@ -1733,7 +1765,7 @@ mod tests {
                         &ctx,
                         content_diesel::UpdateContentInput {
                             id: id.to_string(),
-                            server_blob_hash: Some(v),
+                            server_blob_cid: Some(v),
                             ..Default::default()
                         },
                     )
@@ -1743,18 +1775,21 @@ mod tests {
         }
 
         // Peer A's converged doc for server-heal-null carries a REAL
-        // serverBlobHash (and the SAME blobHash the row already has, so this
-        // heal isolates the serverBlobHash leg — blob_hash must not move).
+        // serverBlobCid (and the SAME blobHash the row already has, so this
+        // heal isolates the serverBlobCid leg — blob_hash must not move).
         let mut peer_a = sample_content("server-heal-null", "t");
-        peer_a.blob_hash = Some("sha256-browser-unchanged".to_string());
-        peer_a.server_blob_hash = Some("sha256-server-converged".to_string());
+        peer_a.blob_cid =
+            Some("bafkr4ic7g5kortrzubb3jxk2fqgs7ifxn6gwgzqalmlp4oozhrdufr5k3y".to_string());
+        peer_a.server_blob_cid =
+            Some("bafkr4ic4jpyg3xb4qkm2v57funq222esyhxsdq5d5lkv2qqn3jmwyslgju".to_string());
         super::project_content_doc(&sync, &peer_a).await.unwrap();
 
-        // Peer B's converged doc for server-heal-real never set serverBlobHash
+        // Peer B's converged doc for server-heal-real never set serverBlobCid
         // (absent from the doc entirely — `projected_fields` never emits an
         // empty string for it).
         let mut peer_b = sample_content("server-heal-real", "t");
-        peer_b.blob_hash = Some("sha256-browser-unchanged".to_string());
+        peer_b.blob_cid =
+            Some("bafkr4ic7g5kortrzubb3jxk2fqgs7ifxn6gwgzqalmlp4oozhrdufr5k3y".to_string());
         super::project_content_doc(&sync, &peer_b).await.unwrap();
 
         assert!(
@@ -1767,7 +1802,7 @@ mod tests {
             !super::reverse_project_content_doc(&sync, &pool, "node:server-heal-real")
                 .await
                 .unwrap(),
-            "absent converged serverBlobHash → skipped (no-clobber)"
+            "absent converged serverBlobCid → skipped (no-clobber)"
         );
 
         let mut conn = pool.get().unwrap();
@@ -1780,14 +1815,14 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            healed.server_blob_hash.as_deref(),
+            healed.server_blob_cid.as_deref(),
             None,
-            "serverBlobHash requires accepted Content metadata"
+            "serverBlobCid requires accepted Content metadata"
         );
         assert_eq!(
-            healed.blob_hash.as_deref(),
-            Some("sha256-browser-unchanged"),
-            "a serverBlobHash-only heal must not move blob_hash"
+            healed.blob_cid.as_deref(),
+            Some("bafkr4ic7g5kortrzubb3jxk2fqgs7ifxn6gwgzqalmlp4oozhrdufr5k3y"),
+            "a serverBlobCid-only heal must not move blob_hash"
         );
         assert!(
             healed.crdt_converged_at.is_none(),
@@ -1803,15 +1838,15 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            untouched.server_blob_hash.as_deref(),
-            Some("sha256-existing-server"),
-            "no-clobber: an absent doc field must never erase an existing serverBlobHash"
+            untouched.server_blob_cid.as_deref(),
+            Some("bafkr4idqa2jmhnypdqnwmztfp576jvbkwoqpzzlvre7jtdknvo54gna4dm"),
+            "no-clobber: an absent doc field must never erase an existing serverBlobCid"
         );
     }
 
     /// Accepted Content metadata still reaches the diagnostic sync document.
     #[tokio::test]
-    async fn server_blob_hash_patch_projects_into_sync_doc_via_listener() {
+    async fn server_blob_cid_patch_projects_into_sync_doc_via_listener() {
         use crate::db::content_diesel::{self, CreateContentInput};
         use crate::db::context::AppContext;
         use crate::services::events::EventBus;
@@ -1833,8 +1868,9 @@ mod tests {
                     description: None,
                     content_type: "epr-composite".to_string(),
                     content_format: "html".to_string(),
-                    blob_hash: Some("sha256-browser-listener".to_string()),
-                    blob_cid: None,
+                    blob_cid: Some(
+                        "bafkr4ihgkymwf7nmlh7jivf7koawymb36yubxrj6ummz5ljohjdad3jrm4".to_string(),
+                    ),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: "commons".to_string(),
@@ -1864,7 +1900,7 @@ mod tests {
                 &ctx,
                 "d3-listener-head",
                 content_diesel::ContentProjectionPatch {
-                    metadata_json: Some(r#"{"serverBlobHash":"sha256-listener-server-1"}"#.into()),
+                    metadata_json: Some(r#"{"serverBlobCid":"bafkr4ibavoyo4rbsnjqaoylf5wr4va46wfdctnxqezimviw6npe74oy6na"}"#.into()),
                     ..Default::default()
                 },
                 "uhCkk-trusted",
@@ -1876,21 +1912,24 @@ mod tests {
             id: "d3-listener-head".into(),
         });
 
-        // Poll for the listener to (re)project the sync doc with serverBlobHash —
+        // Poll for the listener to (re)project the sync doc with serverBlobCid —
         // bounded so a broken wire (event never emitted, or projector never
         // includes the field) fails the test instead of hanging.
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
         loop {
             if let Ok(v) = sync
-                .get_doc_field("elohim", "node:d3-listener-head", "serverBlobHash")
+                .get_doc_field("elohim", "node:d3-listener-head", "serverBlobCid")
                 .await
             {
-                assert_eq!(v, "sha256-listener-server-1");
+                assert_eq!(
+                    v,
+                    "bafkr4ibavoyo4rbsnjqaoylf5wr4va46wfdctnxqezimviw6npe74oy6na"
+                );
                 break;
             }
             assert!(
                 tokio::time::Instant::now() < deadline,
-                "serverBlobHash never converged into the sync doc via the listener"
+                "serverBlobCid never converged into the sync doc via the listener"
             );
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
@@ -1911,11 +1950,11 @@ mod tests {
         use automerge::ReadDoc;
 
         let (sync, _temp) = test_sync_manager().await;
-        // sample_content: blob_hash/server_blob_hash/blob_cid/content_size_bytes all unset.
+        // sample_content: blob_hash/server_blob_cid/blob_cid/content_size_bytes all unset.
         let content = sample_content("empty-1", "t");
         super::project_content_doc(&sync, &content).await.unwrap();
 
-        for field in ["blobHash", "serverBlobHash", "blobCid"] {
+        for field in ["serverBlobCid", "blobCid"] {
             assert!(
                 sync.get_doc_field("elohim", "node:empty-1", field)
                     .await
@@ -2020,13 +2059,15 @@ mod tests {
 
         // Fresh event projection establishes the converged truth (H2).
         let mut fresh = sample_content("rec-1", "t");
-        fresh.blob_hash = Some("sha256-h2".to_string());
+        fresh.blob_cid =
+            Some("bafkr4ie5ezzmepoylv5akwlx2sis3piixkcj37vjvr4jycu2l7pljj7a7q".to_string());
         super::project_content_doc(&sync, &fresh).await.unwrap();
         let heads_converged = sync.get_heads("elohim", "node:rec-1").await.unwrap();
 
         // A stale peer's back-fill (row still holds H1) must not fight.
         let mut stale = sample_content("rec-1", "t");
-        stale.blob_hash = Some("sha256-h1".to_string());
+        stale.blob_cid =
+            Some("bafkr4idjewpne3sgj6bptwu3ujtmyyo75o2mdwiqr7hicu3u3dssv2zchi".to_string());
         assert!(
             !super::project_content_doc_reconcile(&sync, &stale)
                 .await
@@ -2039,10 +2080,10 @@ mod tests {
             "the declined fight must append no change"
         );
         assert_eq!(
-            sync.get_doc_field("elohim", "node:rec-1", "blobHash")
+            sync.get_doc_field("elohim", "node:rec-1", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-h2"
+            "bafkr4ie5ezzmepoylv5akwlx2sis3piixkcj37vjvr4jycu2l7pljj7a7q"
         );
 
         // Legacy pre-guard docs hold blobHash:"" — reconcile treats empty as
@@ -2055,7 +2096,7 @@ mod tests {
         legacy
             .transact::<_, _, automerge::AutomergeError>(|tx| {
                 tx.put(automerge::ROOT, "title", "t")?;
-                tx.put(automerge::ROOT, "blobHash", "")?;
+                tx.put(automerge::ROOT, "blobCid", "")?;
                 Ok(())
             })
             .unwrap();
@@ -2063,7 +2104,8 @@ mod tests {
             .await
             .unwrap();
         let mut healthy = sample_content("rec-2", "t");
-        healthy.blob_hash = Some("sha256-real".to_string());
+        healthy.blob_cid =
+            Some("bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y".to_string());
         assert!(
             super::project_content_doc_reconcile(&sync, &healthy)
                 .await
@@ -2071,10 +2113,10 @@ mod tests {
             "reconcile must fill a legacy empty-string value"
         );
         assert_eq!(
-            sync.get_doc_field("elohim", "node:rec-2", "blobHash")
+            sync.get_doc_field("elohim", "node:rec-2", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-real"
+            "bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y"
         );
     }
 
@@ -2096,7 +2138,7 @@ mod tests {
                 ("amber-stale", None::<String>, None::<String>),
                 (
                     "green-locked",
-                    Some("sha256-green-h1".to_string()),
+                    Some("bafkr4igtwessve3pdlwsqclj6gw6g7meydxfpijm55cu5mt4pj5xbnnggy".to_string()),
                     Some("uhCkk-fake-anchor".to_string()),
                 ),
             ] {
@@ -2109,8 +2151,7 @@ mod tests {
                         description: None,
                         content_type: "concept".to_string(),
                         content_format: "markdown".to_string(),
-                        blob_hash: bh,
-                        blob_cid: None,
+                        blob_cid: bh,
                         content_size_bytes: None,
                         metadata_json: None,
                         reach: "commons".to_string(),
@@ -2126,7 +2167,8 @@ mod tests {
 
         // Round 1: heal amber-stale to H1 (row NULL → amber write).
         let mut v1 = sample_content("amber-stale", "t");
-        v1.blob_hash = Some("sha256-h1".to_string());
+        v1.blob_cid =
+            Some("bafkr4idjewpne3sgj6bptwu3ujtmyyo75o2mdwiqr7hicu3u3dssv2zchi".to_string());
         super::project_content_doc(&sync, &v1).await.unwrap();
         assert!(
             super::reverse_project_content_doc(&sync, &pool, "node:amber-stale")
@@ -2136,7 +2178,8 @@ mod tests {
 
         // Round 2: the fleet converges to H2 — the amber row must FOLLOW.
         let mut v2 = sample_content("amber-stale", "t");
-        v2.blob_hash = Some("sha256-h2".to_string());
+        v2.blob_cid =
+            Some("bafkr4ie5ezzmepoylv5akwlx2sis3piixkcj37vjvr4jycu2l7pljj7a7q".to_string());
         super::project_content_doc(&sync, &v2).await.unwrap();
         assert!(
             super::reverse_project_content_doc(&sync, &pool, "node:amber-stale")
@@ -2154,8 +2197,8 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(
-                row.blob_hash.as_deref(),
-                Some("sha256-h2"),
+                row.blob_cid.as_deref(),
+                Some("bafkr4ie5ezzmepoylv5akwlx2sis3piixkcj37vjvr4jycu2l7pljj7a7q"),
                 "amber must replace amber (set→set convergence)"
             );
             assert!(row.dht_anchor_hash.is_none());
@@ -2164,7 +2207,8 @@ mod tests {
         // Green is inviolable: a converged doc value never overwrites an
         // anchored blob_hash.
         let mut g2 = sample_content("green-locked", "t");
-        g2.blob_hash = Some("sha256-green-h2".to_string());
+        g2.blob_cid =
+            Some("bafkr4iglnqevxeiavkeei6fhnl4rforty4yts7qin3ivvjqp3pdzd2fic4".to_string());
         super::project_content_doc(&sync, &g2).await.unwrap();
         super::reverse_project_content_doc(&sync, &pool, "node:green-locked")
             .await
@@ -2180,8 +2224,8 @@ mod tests {
             .unwrap()
             .unwrap();
             assert_eq!(
-                row.blob_hash.as_deref(),
-                Some("sha256-green-h1"),
+                row.blob_cid.as_deref(),
+                Some("bafkr4igtwessve3pdlwsqclj6gw6g7meydxfpijm55cu5mt4pj5xbnnggy"),
                 "amber must never clobber a green (anchored) blob_hash"
             );
         }
@@ -2196,7 +2240,8 @@ mod tests {
         let (sync, _temp) = test_sync_manager().await;
 
         let mut healthy = sample_content("conv-1", "t");
-        healthy.blob_hash = Some("sha256-real".to_string());
+        healthy.blob_cid =
+            Some("bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y".to_string());
         assert!(super::project_content_doc(&sync, &healthy).await.unwrap());
         let heads_converged = sync.get_heads("elohim", "node:conv-1").await.unwrap();
 
@@ -2212,10 +2257,10 @@ mod tests {
             "the skip must not append a change"
         );
         assert_eq!(
-            sync.get_doc_field("elohim", "node:conv-1", "blobHash")
+            sync.get_doc_field("elohim", "node:conv-1", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-real",
+            "bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y",
             "converged value survives the degraded re-projection"
         );
     }
@@ -2230,7 +2275,8 @@ mod tests {
         let (degraded_mgr, _t2) = test_sync_manager().await;
 
         let mut healthy = sample_content("clob-1", "t");
-        healthy.blob_hash = Some("sha256-real".to_string());
+        healthy.blob_cid =
+            Some("bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y".to_string());
         super::project_content_doc(&healthy_mgr, &healthy)
             .await
             .unwrap();
@@ -2258,10 +2304,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             degraded_mgr
-                .get_doc_field("elohim", "node:clob-1", "blobHash")
+                .get_doc_field("elohim", "node:clob-1", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-real",
+            "bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y",
             "degraded peer must converge to the real hash"
         );
 
@@ -2272,10 +2318,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             healthy_mgr
-                .get_doc_field("elohim", "node:clob-1", "blobHash")
+                .get_doc_field("elohim", "node:clob-1", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-real",
+            "bafkr4ibw5e7ycpo6evhyggrjb66q7vowm6pcanhclj5fea26veijv6ow2y",
             "healthy peer must retain the real hash after merging a degraded doc"
         );
     }
@@ -2405,8 +2451,9 @@ mod tests {
                     description: None,
                     content_type: "application".to_string(),
                     content_format: "html5-app".to_string(),
-                    blob_hash: Some("sha256-released-by-the-vehicle".to_string()),
-                    blob_cid: Some("sha256-released-by-the-vehicle".to_string()),
+                    blob_cid: Some(
+                        "bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu".to_string(),
+                    ),
                     content_size_bytes: Some(3_097_083),
                     metadata_json: Some(
                         r#"{"releaseChannel":"runtime:app-bundle:household:dev"}"#.to_string(),
@@ -2422,13 +2469,14 @@ mod tests {
         }
 
         let mut peer = sample_content("bound-slug", "t");
-        peer.blob_hash = Some("sha256-what-a-peer-served-before".to_string());
+        peer.blob_cid =
+            Some("bafkr4ieyxgutnbkk5cxfnrsac6ezdoc6gkmt3ru2dzikyaravzcs6egqim".to_string());
         super::project_content_doc(&sync, &peer).await.unwrap();
         assert_eq!(
-            sync.get_doc_field("elohim", "node:bound-slug", "blobHash")
+            sync.get_doc_field("elohim", "node:bound-slug", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-what-a-peer-served-before",
+            "bafkr4ieyxgutnbkk5cxfnrsac6ezdoc6gkmt3ru2dzikyaravzcs6egqim",
             "precondition: the converged doc names the stale pointer"
         );
 
@@ -2448,8 +2496,8 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-released-by-the-vehicle")
+            row.blob_cid.as_deref(),
+            Some("bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu")
         );
         assert!(
             row.crdt_converged_at.is_none(),
@@ -2482,7 +2530,6 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -2499,7 +2546,8 @@ mod tests {
         // A peer's converged doc carries BOTH a real blobHash and a head hint —
         // exactly what an adversarial (or merely divergent) peer could gossip.
         let mut peer = sample_content("head-launder", "t");
-        peer.blob_hash = Some("sha256-converged".to_string());
+        peer.blob_cid =
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa".to_string());
         peer.declared_head_action_hash = Some("uhCkk-peer-declared-head".to_string());
         super::project_content_doc(&sync, &peer).await.unwrap();
         assert_eq!(
@@ -2528,8 +2576,8 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-converged"),
+            row.blob_cid.as_deref(),
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa"),
             "the blobHash heal itself must still land"
         );
         assert!(
@@ -2729,7 +2777,6 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -2743,7 +2790,8 @@ mod tests {
             .unwrap();
         }
         let mut peer = ordered_content("ord-launder", "uhCkk-peer-head", 999, true);
-        peer.blob_hash = Some("sha256-converged".to_string());
+        peer.blob_cid =
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa".to_string());
         super::project_content_doc(&sync, &peer).await.unwrap();
         assert!(sync
             .get_doc_field("elohim", "node:ord-launder", "headOrdering")
@@ -2763,7 +2811,10 @@ mod tests {
         )
         .unwrap()
         .unwrap();
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-converged"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ictjplzp6doaasnq5m24qdozcvkzsoiztxc2tpvahewayumq46nqa")
+        );
         assert!(row.declared_head_action_hash.is_none());
         assert!(row.dht_anchor_hash.is_none());
         assert!(row.canonical_declared_at.is_none());
@@ -2833,7 +2884,6 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -3058,8 +3108,10 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: Some(format!("sha256-{prefix}-{i}")),
-                    blob_cid: None,
+                    blob_cid: Some(
+                        elohim_epr::address::compute_bytes_cid(format!("{prefix}-{i}").as_bytes())
+                            .to_string(),
+                    ),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: "commons".to_string(),
@@ -3090,10 +3142,10 @@ mod tests {
         assert_eq!(stats.failed, 0);
         assert_eq!(sync.count_documents("elohim").await.unwrap(), 5);
         assert_eq!(
-            sync.get_doc_field("elohim", "node:bulk-0", "blobHash")
+            sync.get_doc_field("elohim", "node:bulk-0", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-bulk-0",
+            "bafkr4ig7if43ohl6qqzlwo3ro4pv4udvyxysrunggxtvziia6u4dm7dr4e",
             "the seeded blobHash converged into the sync doc"
         );
     }
@@ -3175,8 +3227,9 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: Some("sha256-B1".to_string()),
-                    blob_cid: None,
+                    blob_cid: Some(
+                        "bafkr4igm6ewz5d7e6imdh6hqrz5e4jphpptettg34jlstn2yynrpeiy5cm".to_string(),
+                    ),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: "commons".to_string(),
@@ -3192,7 +3245,8 @@ mod tests {
         // Pre-converge the doc to the FRESHER peer value B2 via the assertive event
         // path (what a healthy peer's sync round would have delivered).
         let mut fresher = sample_content("regress-x", "t");
-        fresher.blob_hash = Some("sha256-B2".to_string());
+        fresher.blob_cid =
+            Some("bafkr4ibtvjrfujltvufkvtirhrejor2etf2ycbgkj3jdcjvurtgm6vf234".to_string());
         super::project_content_doc(&sync, &fresher).await.unwrap();
         let heads_converged = sync.get_heads("elohim", "node:regress-x").await.unwrap();
 
@@ -3206,10 +3260,10 @@ mod tests {
         assert_eq!(stats.failed, 0);
 
         assert_eq!(
-            sync.get_doc_field("elohim", "node:regress-x", "blobHash")
+            sync.get_doc_field("elohim", "node:regress-x", "blobCid")
                 .await
                 .unwrap(),
-            "sha256-B2",
+            "bafkr4ibtvjrfujltvufkvtirhrejor2etf2ycbgkj3jdcjvurtgm6vf234",
             "the converged value must NOT be regressed to the stale SQL row's B1"
         );
         assert_eq!(

@@ -269,7 +269,7 @@ pub(crate) fn compute_unique_shard_bytes(
 
     let held: Vec<String> = pbi::peer_blob_inventory
         .filter(pbi::peer_id.eq(peer_cid))
-        .select(pbi::blob_hash)
+        .select(pbi::blob_cid)
         .load::<String>(conn)
         .map_err(|e| StorageError::Database(e.to_string()))?;
     if held.is_empty() {
@@ -277,8 +277,8 @@ pub(crate) fn compute_unique_shard_bytes(
     }
 
     let sized: Vec<(String, i64)> = sm::shard_manifests
-        .filter(sm::blob_hash.eq_any(&held))
-        .select((sm::blob_hash, sm::total_size_bytes))
+        .filter(sm::blob_cid.eq_any(&held))
+        .select((sm::blob_cid, sm::byte_len))
         .load::<(String, i64)>(conn)
         .map_err(|e| StorageError::Database(e.to_string()))?;
 
@@ -295,9 +295,7 @@ pub(crate) fn compute_unique_shard_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{
-        NewObservationRow, NewPeerBlobInventoryRow, NewReaCommitment, NewShardManifest,
-    };
+    use crate::db::models::{NewObservationRow, NewPeerBlobInventoryRow, NewReaCommitment};
     use crate::test_util::test_pool;
     use elohim_views::replicates_dwelling::{
         ProviderRole, RatioAttestation, ReplicatesDwellingPayload, ScopeFilter,
@@ -400,15 +398,14 @@ mod tests {
             .expect("insert commitment");
     }
 
-    fn insert_inventory(conn: &mut SqliteConnection, peer_id: &str, blob_hash: &str) {
+    fn insert_inventory(conn: &mut SqliteConnection, peer_id: &str, blob_cid: &str) {
         use crate::db::diesel_schema::peer_blob_inventory;
         let row = NewPeerBlobInventoryRow {
             peer_id: peer_id.to_string(),
-            blob_hash: blob_hash.to_string(),
+            blob_cid: blob_cid.to_string(),
             last_seen_at: "2026-05-29T00:00:00Z".to_string(),
             source: "self-custody".to_string(),
             sequence: 1,
-            blake3_hash: None,
         };
         diesel::insert_into(peer_blob_inventory::table)
             .values(&row)
@@ -419,28 +416,12 @@ mod tests {
     fn insert_manifest(
         conn: &mut SqliteConnection,
         content_id: &str,
-        blob_hash: &str,
-        total_size_bytes: i64,
+        blob_cid: &str,
+        byte_len: i64,
     ) {
-        use crate::db::diesel_schema::shard_manifests;
-        let row = NewShardManifest {
-            content_id,
-            h_app_id: "lamad",
-            blob_hash,
-            blob_cid: None,
-            encoding: "rs",
-            data_shard_count: 4,
-            parity_shard_count: 3,
-            shard_hashes_json: "[]",
-            total_size_bytes,
-            shard_size_bytes: total_size_bytes / 4,
-            mime_type: "application/octet-stream",
-            reach: "commons",
-        };
-        diesel::insert_into(shard_manifests::table)
-            .values(&row)
-            .execute(conn)
-            .expect("insert manifest");
+        crate::db::shard_manifests::insert_declared_row(
+            conn, content_id, "lamad", blob_cid, byte_len,
+        );
     }
 
     // --- view-shape regressions (unchanged behavior for empty peers) --------

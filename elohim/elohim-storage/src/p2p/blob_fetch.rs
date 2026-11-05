@@ -1,5 +1,5 @@
 //! Shared blob-fetch helper. Used by both:
-//! - HTTP blob handler (`GET /blob/{hash}`) on local miss
+//! - HTTP blob handler (`GET /blob/{cid}`) on local miss
 //! - Custody reconciliation controller (T16) for own-commitment kicks
 //!
 //! Strategy:
@@ -7,23 +7,18 @@
 //!    strength (fetch-success first, then by recency).
 //! 2. Filter to currently-connected peers.
 //! 3. Race candidates in parallel batches of `fetch_blob_parallelism` (default 3).
-//!    First reply that returns `Ok(bytes)` AND verifies the content hash wins.
-//!    Pending replies in the batch are dropped; failed batch advances to the next.
+//!    The first reply whose bytes hash to the requested byte CID wins; the losing
+//!    racers in the batch are **cancelled** (their tasks aborted), and a failed batch
+//!    advances to the next.
 //! 4. On verified success: persist locally, record fetch-success in
 //!    `peer_blob_inventory`, emit `serve-blob` REA event.
 //!
-//! Hash verification: sha256-hex matches the requested hash (case-insensitive).
+//! Every fetch runs under a [`FetchBudget`]: a byte ceiling checked before a reply or
+//! a manifest is acted on, a total deadline after which a trickling holder is
+//! abandoned, and a bound on how many batches are tried.
 //!
-//! # Stage 2 (T21 onward)
-//! `P2PCommand::FetchBlob` issues a `/elohim/blob/1.0.0` request-response
-//! exchange to the named peer (see `p2p/blob_protocol.rs`). The reply oneshot
-//! is delivered when the response arrives, the outbound times out, or the
-//! connection fails — all three cases produce a deterministic
-//! `Result<Vec<u8>, String>` the helper can act on. The helper's control flow,
-//! hash verification, persistence, and serve-blob emission are still exercised
-//! by unit tests without requiring a running swarm — those tests use the
-//! `for_testing()` handle, which keeps the Stage-1 placeholder error so race
-//! batches resolve to `Miss` deterministically.
+//! Verification: the bytes recompute to the requested byte CID (raw + BLAKE3-256),
+//! the multihash the CID itself declares. There is no other accepted spelling.
 
 use crate::blob_store::BlobStore;
 use crate::config::Config;
@@ -33,117 +28,83 @@ use crate::db::peer_blob_inventory::record_fetch_success;
 use crate::error::StorageError;
 use crate::sharding::ShardManifest;
 use chrono::Utc;
-use cid::Cid;
 use diesel::Connection;
 use diesel::RunQueryDsl;
 use diesel::SqliteConnection;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use futures::stream::{FuturesUnordered, StreamExt};
-use sha2::{Digest, Sha256};
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 /// Internal reply payload carried by `P2PCommand::FetchBlob`'s oneshot channel.
 ///
 /// **Not a wire type** — the wire type is `blob_protocol::BlobFetchResponse`.
-/// This is the in-process contract between the swarm event loop (which
-/// resolves the wire response) and `race_fetch` (which never sees the wire
-/// bytes). Q3 adds `Manifest`: a peer with no direct bytes for a sharded
-/// composite hash can still answer usefully with the durable manifest it
-/// resolved, so `race_fetch` treats that as a distinct outcome from a plain
-/// miss instead of discarding it.
+/// A peer with no direct bytes for a striped payload can still answer usefully with
+/// the durable manifest it resolved, so `race_fetch` treats that as a distinct
+/// outcome from a plain miss.
 #[derive(Debug, Clone)]
 pub enum BlobFetchReply {
-    /// Verified-pending bytes for the requested hash.
+    /// Bytes for the requested CID, not yet verified.
     Bytes(Vec<u8>),
-    /// No direct bytes, but the peer resolved a durable manifest for the
-    /// hash. Boxed — see the size-note on `FetchOutcome::Manifest`.
+    /// No direct bytes, but the peer resolved a durable manifest for the CID.
     Manifest(Box<ShardManifest>),
 }
 
-/// The sha256 hex digest a content address names, for any recognizable form:
-///
-/// - CIDv1 (`bafkrei…` raw, `bafyrei…` dag-cbor — both carry a sha2-256
-///   multihash): the wrapped digest.
-/// - `sha256-<64 hex>` (canonical legacy marker): the hex part.
-/// - bare 64-hex: itself.
-/// - `sha256-<CID>` (the double-wrapped seed defect this module repairs —
-///   a CID-form blob hash wrapped in the legacy marker by an address
-///   constructor that assumed bare hex): the CID's wrapped digest.
-///
-/// Returns `None` for anything else (test fixtures like `"sha256-shardA"`,
-/// slugs, garbage) so callers can keep their legacy lenient comparison for
-/// non-address strings.
-pub fn content_address_hex(addr: &str) -> Option<String> {
-    // Hex forms FIRST: a bare 64-hex string starting with a multibase prefix
-    // character (`f` = base16, `b` = base32) could otherwise be misread as a
-    // CID by the parser. Mirrors `BlobStore::parse_content_address`'s intent
-    // with the precedence hardened for the hex-shaped majority.
-    let bare = addr.strip_prefix("sha256-").unwrap_or(addr);
-    if bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Some(bare.to_lowercase());
-    }
-    if let Ok(c) = Cid::from_str(addr) {
-        return Some(hex::encode(c.hash().digest()));
-    }
-    // Double-wrapped `sha256-<cid>`: recover the digest from the inner CID.
-    if bare != addr {
-        if let Ok(c) = Cid::from_str(bare) {
-            return Some(hex::encode(c.hash().digest()));
-        }
-    }
-    None
+/// The bounds one artifact's fetch runs under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FetchBudget {
+    /// Largest payload this fetch will accept: a reply or a manifest declaring more
+    /// is refused before anything is allocated for it.
+    pub max_bytes: u64,
+    /// Deadline for one peer's reply (a stalled holder is dropped after this).
+    pub stall_deadline: Duration,
+    /// Deadline for the whole race: a holder still trickling when it passes is
+    /// abandoned, and the fetch reports `BudgetExhausted`.
+    pub total_deadline: Duration,
+    /// How many batches of candidates are tried before giving up.
+    pub retries: usize,
 }
 
-/// Build the outgoing wire address for a blob fetch from a stored blob-hash
-/// value, whatever form the row carries.
-///
-/// Contract (backlog `blob-fetch-sha256-prefixed-cid-rejection`):
-/// - CID-form (`baf…`) passes through untouched.
-/// - Already-marked `sha256-<64 hex>` passes through untouched.
-/// - Bare 64-hex gets the legacy `sha256-` prefix.
-/// - `sha256-<CID>` — the double-wrapped defect minted by seed-side
-///   `normalizeBlobHash` (`sha256-` prefixed onto a CID-form blob hash) —
-///   is REPAIRED to the inner CID rather than sent as-is: no responder
-///   accepts the double-wrapped form (T21 rejects it), so passing it
-///   through would re-create the infinite rejection drumbeat this fix
-///   removes.
-/// - Anything else is an error: a malformed address must never reach the
-///   wire, where the responder's strict parse would reject it on every
-///   retry forever.
-pub fn normalize_fetch_address(addr: &str) -> Result<String, StorageError> {
-    if let Some(bare) = addr.strip_prefix("sha256-") {
-        if bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Ok(addr.to_string());
+impl FetchBudget {
+    /// The largest payload a fetch accepts by default (4 GiB): replies are further
+    /// bounded by the protocol frame, so this binds manifests (the pivot for payloads
+    /// too large for one frame).
+    pub const DEFAULT_MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+    /// A manifest naming more custody units than this is refused unread: at the
+    /// epoch-0 profile it would describe tens of gigabytes.
+    pub const MAX_MANIFEST_UNITS: usize = 1 << 16;
+
+    /// The default budget around a per-peer stall deadline: [`Self::DEFAULT_MAX_BYTES`],
+    /// eight batches, and a total deadline of four stall deadlines per batch.
+    pub fn for_stall(stall_deadline: Duration) -> Self {
+        const DEFAULT_RETRIES: u32 = 8;
+        Self {
+            max_bytes: Self::DEFAULT_MAX_BYTES,
+            stall_deadline,
+            total_deadline: stall_deadline.saturating_mul(4 * DEFAULT_RETRIES),
+            retries: DEFAULT_RETRIES as usize,
         }
-        if Cid::from_str(bare).is_ok() {
-            return Ok(bare.to_string());
-        }
-        return Err(StorageError::InvalidContentAddress(addr.to_string()));
     }
-    // Bare hex BEFORE the CID parse: a 64-hex string starting with a multibase
-    // prefix character (`f`/`b`) must be read as hex, not as a CID.
-    if addr.len() == 64 && addr.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Ok(format!("sha256-{addr}"));
+
+    /// Whether a manifest received from a peer is within this budget: its declared
+    /// length and unit counts are checked BEFORE any reconstruction buffer exists.
+    pub fn admits_manifest(&self, manifest: &ShardManifest) -> bool {
+        manifest.byte_len <= self.max_bytes
+            && manifest.chunks.len() <= Self::MAX_MANIFEST_UNITS
+            && manifest.stripes.len() <= Self::MAX_MANIFEST_UNITS
     }
-    if Cid::from_str(addr).is_ok() {
-        return Ok(addr.to_string());
-    }
-    Err(StorageError::InvalidContentAddress(addr.to_string()))
 }
 
 /// Outcome of a race-fetch.
 #[derive(Debug)]
 pub enum FetchOutcome {
-    /// Bytes fetched and verified.
+    /// Bytes fetched and verified against the requested CID.
     Hit { bytes: Vec<u8>, source_peer: String },
-    /// Q3: no peer served bytes, but a peer answered with a durable
-    /// `ShardManifest` for the requested (composite) hash — the caller can
-    /// pivot to a swarm shard-fetch (`p2p::blob_swarm`, Q4) instead of
-    /// treating this as a dead-end miss. `manifest.blob_hash` is verified to
-    /// equal the requested hash before this variant is ever returned. Boxed:
-    /// `ShardManifest` (~240 bytes) would otherwise bloat every `FetchOutcome`
-    /// to its size regardless of variant (clippy::large_enum_variant).
+    /// No peer served bytes, but a peer answered with a durable `ShardManifest` for
+    /// the requested CID (verified to name it, and within the budget) — the caller
+    /// can pivot to a swarm shard-fetch (`p2p::blob_swarm`). Boxed: `ShardManifest`
+    /// would otherwise bloat every `FetchOutcome` (clippy::large_enum_variant).
     Manifest {
         manifest: Box<ShardManifest>,
         source_peer: String,
@@ -152,108 +113,118 @@ pub enum FetchOutcome {
     Miss,
     /// Inventory had no candidates to try (either empty or none connected).
     NoCandidates,
-    /// The requested address is not a valid content address in any accepted
-    /// form (`normalize_fetch_address` refused it). NO wire request was sent:
-    /// every responder would reject it (T21) on every retry forever, so the
-    /// only honest outcome is to give up immediately and say so. Callers must
-    /// treat this as terminal for the address — retrying cannot succeed until
-    /// the row that carries it is healed.
-    InvalidAddress,
+    /// The budget's total deadline passed before any peer delivered; every racer
+    /// still in flight was cancelled.
+    BudgetExhausted,
 }
 
-/// Case-insensitive, prefix-tolerant match between a manifest's own
-/// `blob_hash` and the hash `race_fetch` requested. Mirrors
-/// `verify_blob_hash`'s normalization so a canonical `sha256-<hex>` on one
-/// side and raw hex on the other still compare equal. A mismatch here means
-/// the peer answered for the wrong blob — never trust it.
-fn manifest_hash_matches(manifest: &ShardManifest, requested_hash: &str) -> bool {
-    // Digest-aware first (CID vs `sha256-<hex>` vs bare hex all name the same
-    // digest), then the legacy lenient strip-and-lowercase for strings that
-    // are not content addresses at all (fixture/test values).
-    let norm = |s: &str| {
-        content_address_hex(s)
-            .unwrap_or_else(|| s.strip_prefix("sha256-").unwrap_or(s).to_lowercase())
-    };
-    norm(&manifest.blob_hash) == norm(requested_hash)
-}
-
-/// Race a fetch across the candidates known to host the blob.
-/// Returns the verified bytes on first hit, or Miss/NoCandidates if no peer served.
-///
-/// `cmd_tx` is the swarm command channel.  `is_connected` filters the
-/// candidate list to peers actively connected at call time.
-///
-/// Candidates are processed in batches of `parallelism`.  All peers in a
-/// batch are attempted concurrently; the first that returns verified bytes
-/// wins and remaining in-flight requests are dropped.  If the whole batch
-/// fails, the next batch is tried.
+/// Race a fetch across the candidates known to host the blob, under the default
+/// budget for `per_peer_timeout`. See [`race_fetch_budgeted`].
 pub async fn race_fetch(
-    blob_hash: &str,
+    cid: &ByteCid,
     candidates: Vec<String>,
     cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
     is_connected: impl Fn(&str) -> bool,
     parallelism: usize,
     per_peer_timeout: Duration,
 ) -> FetchOutcome {
-    // Requester-side address hygiene at the single choke point every
-    // `/elohim/blob/1.0.0` request funnels through: CID and `sha256-<hex>`
-    // forms pass untouched, bare hex gets the legacy marker, and the
-    // double-wrapped `sha256-<cid>` seed defect is repaired to the inner CID.
-    // A string that is no content address in any form never reaches the wire
-    // — the responder's strict T21 parse would reject it on every retry
-    // forever (the 2-minute drumbeat this guard removes).
-    let blob_hash: String = match normalize_fetch_address(blob_hash) {
-        Ok(addr) => addr,
-        Err(_) => {
-            tracing::warn!(
-                target: "elohim_storage::blob_fetch",
-                hash = %blob_hash,
-                "T21: refusing to fetch a malformed content address — no peer \
-                 can accept it; giving up (the row carrying it needs healing)"
-            );
-            return FetchOutcome::InvalidAddress;
-        }
-    };
-    let blob_hash = blob_hash.as_str();
-    let connected: Vec<String> = candidates.into_iter().filter(|p| is_connected(p)).collect();
+    race_fetch_budgeted(
+        cid,
+        candidates,
+        cmd_tx,
+        is_connected,
+        parallelism,
+        &FetchBudget::for_stall(per_peer_timeout),
+    )
+    .await
+}
 
+/// Race a fetch across the candidates known to host the blob.
+///
+/// Candidates are filtered to peers connected at call time and processed in batches
+/// of `parallelism`; all peers in a batch are attempted concurrently. The first reply
+/// whose bytes hash to `cid` wins and every other racer is aborted (no request keeps
+/// running for a race already won). A manifest that names `cid` and fits the budget
+/// ends the race as `Manifest`. Replies larger than `budget.max_bytes`, bytes that do
+/// not hash to `cid`, and manifests naming another payload are refused. The whole race
+/// is bounded by `budget.total_deadline` and `budget.retries` batches.
+pub async fn race_fetch_budgeted(
+    cid: &ByteCid,
+    candidates: Vec<String>,
+    cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
+    is_connected: impl Fn(&str) -> bool,
+    parallelism: usize,
+    budget: &FetchBudget,
+) -> FetchOutcome {
+    let connected: Vec<String> = candidates.into_iter().filter(|p| is_connected(p)).collect();
     if connected.is_empty() {
         return FetchOutcome::NoCandidates;
     }
+    match tokio::time::timeout(
+        budget.total_deadline,
+        race_batches(cid, connected, cmd_tx, parallelism.max(1), budget),
+    )
+    .await
+    {
+        Ok(outcome) => outcome,
+        Err(_) => {
+            tracing::debug!(
+                target: "elohim_storage::blob_fetch",
+                cid = %cid,
+                total_deadline_ms = budget.total_deadline.as_millis() as u64,
+                "fetch budget exhausted; in-flight racers cancelled"
+            );
+            FetchOutcome::BudgetExhausted
+        }
+    }
+}
 
+/// Aborts every task it holds when dropped, so a race that returns (won, lost or
+/// timed out) leaves no racer running.
+struct AbortOnDrop(Vec<tokio::task::AbortHandle>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        for handle in &self.0 {
+            handle.abort();
+        }
+    }
+}
+
+type RacerResult = (String, std::time::Instant, Result<BlobFetchReply, String>);
+
+async fn race_batches(
+    cid: &ByteCid,
+    connected: Vec<String>,
+    cmd_tx: &mpsc::Sender<crate::p2p::P2PCommand>,
+    parallelism: usize,
+    budget: &FetchBudget,
+) -> FetchOutcome {
     let mut iter = connected.into_iter();
-    loop {
+    // bounded-work: at most `budget.retries` batches of `parallelism` racers, each
+    // racer bounded by `budget.stall_deadline`, the whole under `total_deadline`.
+    for _ in 0..budget.retries.max(1) {
         let batch: Vec<String> = iter.by_ref().take(parallelism).collect();
         if batch.is_empty() {
             return FetchOutcome::Miss;
         }
-
-        // Spawn a per-peer fetch task into a FuturesUnordered for
-        // first-responder semantics: as soon as any peer returns verified
-        // bytes we return Hit and stop awaiting the rest of the batch.
-        //
-        // Note: `tokio::spawn` detaches the task — dropping the JoinHandle
-        // does NOT abort it. The spawned future runs to completion (bounded
-        // by the per_peer_timeout in `tokio::time::timeout`). At Stage 2 with
-        // real network I/O, replace `tokio::spawn` with unboxed futures
-        // inside `FuturesUnordered` so drop = cancel for true cooperative
-        // cancellation.
-        let mut in_flight: FuturesUnordered<_> = FuturesUnordered::new();
-        for peer_id_str in batch {
-            let Ok(peer_id) = peer_id_str.parse::<libp2p::PeerId>() else {
+        let mut in_flight: FuturesUnordered<tokio::task::JoinHandle<RacerResult>> =
+            FuturesUnordered::new();
+        let mut aborts = AbortOnDrop(Vec::with_capacity(batch.len()));
+        for peer_label in batch {
+            let Ok(peer_id) = peer_label.parse::<libp2p::PeerId>() else {
                 continue;
             };
             let cmd_tx = cmd_tx.clone();
-            let hash = blob_hash.to_string();
-            let timeout = per_peer_timeout;
-            let peer_label = peer_id_str.clone();
+            let cid = *cid;
+            let stall = budget.stall_deadline;
             let started = std::time::Instant::now();
-            in_flight.push(tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 let (reply_tx, reply_rx) = oneshot::channel();
                 if cmd_tx
                     .send(crate::p2p::P2PCommand::FetchBlob {
                         peer_id,
-                        hash: hash.clone(),
+                        cid,
                         reply: reply_tx,
                     })
                     .await
@@ -261,105 +232,90 @@ pub async fn race_fetch(
                 {
                     return (peer_label, started, Err("swarm channel closed".to_string()));
                 }
-                match tokio::time::timeout(timeout, reply_rx).await {
+                match tokio::time::timeout(stall, reply_rx).await {
                     Ok(Ok(Ok(reply))) => (peer_label, started, Ok(reply)),
                     Ok(Ok(Err(e))) => (peer_label, started, Err(e)),
                     Ok(Err(_)) => (peer_label, started, Err("oneshot dropped".to_string())),
-                    Err(_) => (peer_label, started, Err("timeout".to_string())),
+                    Err(_) => (peer_label, started, Err("stalled".to_string())),
                 }
-            }));
+            });
+            aborts.0.push(handle.abort_handle());
+            in_flight.push(handle);
         }
 
-        // Drain in completion order; first verified hit (or first
-        // hash-verified manifest, Q3) wins. Mismatches and errors are
-        // skipped — keep polling the remaining futures.
+        // Drain in completion order; the first verified reply wins and `aborts`
+        // cancels the rest when this scope ends.
         while let Some(joined) = in_flight.next().await {
             let Ok((peer, started, reply)) = joined else {
                 continue;
             };
-            let reply = match reply {
-                Ok(reply) => reply,
-                Err(_) => {
-                    // The races are the probe: a failed leg is a libp2p Small sample too.
-                    crate::p2p::transport_paths::global().record(
-                        &peer,
-                        crate::p2p::transport_paths::Transport::Libp2p,
-                        crate::p2p::transport_paths::OpClass::Small,
-                        None,
-                        false,
-                        false,
-                    );
-                    continue;
-                }
-            };
+            let ok = reply.is_ok();
             crate::p2p::transport_paths::global().record(
                 &peer,
                 crate::p2p::transport_paths::Transport::Libp2p,
                 crate::p2p::transport_paths::OpClass::Small,
-                Some(started.elapsed()),
-                true,
+                ok.then(|| started.elapsed()),
+                ok,
                 false,
             );
+            let Ok(reply) = reply else { continue };
             match reply {
                 BlobFetchReply::Bytes(bytes) => {
-                    if verify_blob_hash(&bytes, blob_hash) {
-                        // Gate #5 cross-stack transport observability.
-                        // `race_fetch` is the libp2p fetch path; transport = "libp2p".
-                        // The iroh blob path (IrohBlobStore) emits its own receipt
-                        // when that path is wired in Phase 11 backend graduation.
-                        // Structured field `transport` feeds the parity-soak (gate #6)
-                        // so reviewers can confirm cross-stack delivery happened.
-                        // PII check: `peer` is the libp2p PeerId string (already public
-                        // per the peer-map); `blob_hash` is content-addressed.
+                    if bytes.len() as u64 > budget.max_bytes {
+                        tracing::warn!(
+                            target: "elohim_storage::blob_fetch",
+                            cid = %cid, source_peer = %peer, size = bytes.len(),
+                            "reply exceeds the fetch budget; refused"
+                        );
+                        continue;
+                    }
+                    if verify_fetched_bytes(&bytes, cid) {
                         tracing::debug!(
                             target: "recovery::transport",
-                            blob_hash = %blob_hash,
+                            blob_cid = %cid,
                             source_peer = %peer,
                             transport = "libp2p",
                             "share-blob received"
                         );
-                        // Returning here drops `in_flight`, which stops awaiting
-                        // the remaining JoinHandles. The detached tokio tasks
-                        // continue running to completion (bounded by
-                        // per_peer_timeout) — see Stage 2 note on the spawn
-                        // block above.
                         return FetchOutcome::Hit {
                             bytes,
                             source_peer: peer,
                         };
                     }
-                    // Hash mismatch: never trust it, keep polling the batch.
+                    // Bytes that do not hash to the CID: never trusted.
                 }
                 BlobFetchReply::Manifest(manifest) => {
-                    // Integrity gate (Q3 design #1): a manifest naming a
-                    // DIFFERENT blob than requested must never be accepted —
-                    // reject and keep polling rather than substituting it.
-                    if manifest_hash_matches(&manifest, blob_hash) {
-                        crate::metrics::inc_blob_swarm_manifest_received();
-                        tracing::debug!(
+                    if manifest.blob_cid != *cid {
+                        tracing::warn!(
                             target: "elohim_storage::blob_swarm",
-                            blob_hash = %blob_hash,
+                            requested = %cid,
+                            manifest_cid = %manifest.blob_cid,
                             source_peer = %peer,
-                            shards = manifest.shard_hashes.len(),
-                            "Q3: peer answered with a shard manifest instead of bytes"
+                            "manifest names another payload — rejecting, not substituting"
                         );
-                        return FetchOutcome::Manifest {
-                            manifest,
-                            source_peer: peer,
-                        };
+                        continue;
                     }
-                    tracing::warn!(
-                        target: "elohim_storage::blob_swarm",
-                        requested_hash = %blob_hash,
-                        manifest_hash = %manifest.blob_hash,
-                        source_peer = %peer,
-                        "Q3: manifest blob_hash mismatch — rejecting, not substituting"
-                    );
+                    if !budget.admits_manifest(&manifest) || manifest.validate().is_err() {
+                        tracing::warn!(
+                            target: "elohim_storage::blob_swarm",
+                            cid = %cid,
+                            source_peer = %peer,
+                            byte_len = manifest.byte_len,
+                            "manifest outside the fetch budget or inconsistent — refused before allocation"
+                        );
+                        continue;
+                    }
+                    crate::metrics::inc_blob_swarm_manifest_received();
+                    return FetchOutcome::Manifest {
+                        manifest,
+                        source_peer: peer,
+                    };
                 }
             }
         }
-        // All in batch failed (timeout, error, or hash/manifest mismatch); try next batch.
+        // All in batch failed (stall, error, or a refused reply); try the next batch.
     }
+    FetchOutcome::Miss
 }
 
 /// Persist verified bytes to the local blob store, record fetch-success in
@@ -388,7 +344,7 @@ pub async fn race_fetch(
 /// 2. `conn.transaction(|txn| { record_fetch_success(txn, ...); insert serve-blob event })`.
 pub async fn finalize_fetch_success(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    cid: &ByteCid,
     source_peer: &str,
     bytes: &[u8],
     self_cid: &str,
@@ -400,7 +356,14 @@ pub async fn finalize_fetch_success(
 
     // Step 1: persist to filesystem first. On error, return without writing
     // any SQL — leaving inventory clean.
-    blob_store.store(bytes).await?;
+    let stored = blob_store.store(bytes).await?;
+    if stored.cid != *cid {
+        return Err(StorageError::HashMismatch {
+            expected: cid.to_string(),
+            actual: stored.cid.to_string(),
+        });
+    }
+    let blob_cid = cid.to_string();
 
     let now_iso = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let event_id = uuid::Uuid::new_v4().to_string();
@@ -420,13 +383,11 @@ pub async fn finalize_fetch_success(
     // is provider, content steward is receiver). Cross-event analytics joining
     // on these fields must be aware of the per-action semantics.
     conn.transaction::<(), StorageError, _>(|txn| {
-        record_fetch_success(txn, source_peer, blob_hash, &now_iso)?;
-        // How these bytes got here: this peer fetched them. Keyed by the
-        // blob store's own spelling of the hash, which is what the retention
-        // pass walks; a caller may have asked by another spelling.
+        record_fetch_success(txn, source_peer, &blob_cid, &now_iso)?;
+        // How these bytes got here: this peer fetched them.
         crate::db::blob_arrivals::record_arrival(
             txn,
-            &BlobStore::compute_hash(bytes),
+            &blob_cid,
             crate::db::blob_arrivals::ArrivalVia::SelfFetch,
             None,
             None,
@@ -448,7 +409,7 @@ pub async fn finalize_fetch_success(
             provider: source_peer,
             receiver: self_cid,
             resource_conforms_to: None,
-            resource_inventoried_as: Some(blob_hash),
+            resource_inventoried_as: Some(&blob_cid),
             resource_classified_as_json: None,
             resource_quantity_value: Some(qty_value),
             resource_quantity_unit: Some("bytes"),
@@ -497,12 +458,12 @@ pub async fn finalize_fetch_success(
 /// Unlike the race-fetch path (which verifies bytes BEFORE `finalize_fetch_success`),
 /// the quilt-draw arm has NOT verified the reply, so verify here first. Without
 /// it a mismatched reply would write an inventory row + `serve-blob` event
-/// claiming we host `blob_hash` while `BlobStore::store` filed the bytes under
-/// their real (different) hash. Returns `Ok(false)` when the bytes fail
+/// claiming we host `cid` while `BlobStore::store` filed the bytes under
+/// their real (different) CID. Returns `Ok(false)` when the bytes fail
 /// verification (discarded, no writes); `Ok(true)` when stocked + booked.
 pub async fn finalize_quilt_draw(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    cid: &ByteCid,
     source_peer: &str,
     bytes: &[u8],
     self_cid: &str,
@@ -513,37 +474,20 @@ pub async fn finalize_quilt_draw(
     // BlobStore::store files bytes under their REAL hash, so an inventory row +
     // serve-blob event keyed on `blob_hash` would otherwise claim we host
     // content we never stored.
-    if !verify_blob_hash(bytes, blob_hash) {
+    if !verify_fetched_bytes(bytes, cid) {
         return Ok(false);
     }
     // Verified: same atomic pair as an on-demand serve (store + inventory row +
     // serve-blob delivery event). Reuse — do not fork — to keep the T18 parity
     // contract (inventory row ⟺ serve-blob event) coherent across both paths.
-    finalize_fetch_success(conn, blob_hash, source_peer, bytes, self_cid, blob_store).await?;
+    finalize_fetch_success(conn, cid, source_peer, bytes, self_cid, blob_store).await?;
     Ok(true)
 }
 
-/// Verify that `bytes` has the sha256 hex digest matching `expected_hex`.
-/// Comparison is case-insensitive (both sides lowercased).
-///
-/// Accepts raw hex (`"a7ffc6f8..."`), the canonical `"sha256-<hex>"` form
-/// used at the HTTP boundary, and CID-form addresses (`bafkrei…`/`bafyrei…`,
-/// whose multihash wraps the same sha2-256 digest). Without the prefix
-/// strip, callers that normalize to the prefixed form (see `http.rs`
-/// `handle_get_blob`) would always see a hash mismatch and silently return
-/// `FetchOutcome::Miss`; without the CID extraction, a fetch addressed by a
-/// CID-form blob hash could never verify its received bytes.
-pub fn verify_blob_hash(bytes: &[u8], expected_hex: &str) -> bool {
-    let expected = content_address_hex(expected_hex).unwrap_or_else(|| {
-        expected_hex
-            .strip_prefix("sha256-")
-            .unwrap_or(expected_hex)
-            .to_lowercase()
-    });
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    let actual_hex = hex::encode(hasher.finalize());
-    actual_hex == expected
+/// Whether fetched `bytes` are the payload `cid` names: the BLAKE3 the byte CID
+/// declares, recomputed over the bytes (C5 verify before use).
+pub fn verify_fetched_bytes(bytes: &[u8], cid: &ByteCid) -> bool {
+    compute_bytes_cid(bytes) == *cid
 }
 
 /// Bytes-per-second a peer transfer is assumed to sustain when sizing a
@@ -588,189 +532,185 @@ pub fn fetch_params_from_config(config: &Config) -> (usize, Duration) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sharding::{ShardConfig, ShardEncoder};
 
-    fn known_blob() -> (Vec<u8>, String) {
+    /// A libp2p `PeerId` that round-trips through the `String` parse `race_fetch`
+    /// performs on each candidate.
+    fn test_peer_id() -> libp2p::PeerId {
+        libp2p::PeerId::from(libp2p::identity::Keypair::generate_ed25519().public())
+    }
+
+    fn manifest_for(data: &[u8]) -> ShardManifest {
+        ShardEncoder::new(ShardConfig::default())
+            .create_manifest(data, "application/octet-stream", "commons")
+            .expect("manifest")
+    }
+
+    /// The fetched bytes are checked under the multihash the CID declares (raw +
+    /// BLAKE3-256): the CID's digest IS blake3(bytes), and one flipped byte fails.
+    #[test]
+    fn fetched_bytes_verified_under_declared_multihash() {
         let bytes = b"hello world".to_vec();
-        let mut hasher = Sha256::new();
-        hasher.update(&bytes);
-        let hex = hex::encode(hasher.finalize());
-        (bytes, hex)
+        let cid = compute_bytes_cid(&bytes);
+        assert_eq!(cid.digest(), blake3::hash(&bytes).as_bytes());
+        assert!(verify_fetched_bytes(&bytes, &cid));
+
+        let mut tampered = bytes.clone();
+        tampered[0] ^= 0x01;
+        assert!(!verify_fetched_bytes(&tampered, &cid));
+        assert!(!verify_fetched_bytes(&bytes, &compute_bytes_cid(b"other")));
     }
 
-    #[test]
-    fn verify_blob_hash_accepts_match() {
-        let (bytes, hex) = known_blob();
-        assert!(verify_blob_hash(&bytes, &hex));
-    }
+    /// The first verified reply wins and every other racer in the batch is
+    /// cancelled: the slow holder's reply channel closes because its racer task
+    /// was aborted, not because it answered.
+    #[tokio::test]
+    async fn losing_racers_are_cancelled() {
+        let bytes = b"raced payload".to_vec();
+        let cid = compute_bytes_cid(&bytes);
+        let (fast, slow) = (test_peer_id(), test_peer_id());
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
 
-    #[test]
-    fn verify_blob_hash_rejects_mismatch() {
-        let (bytes, _) = known_blob();
-        assert!(!verify_blob_hash(&bytes, &"a".repeat(64)));
-    }
+        let served = bytes.clone();
+        let responder = tokio::spawn(async move {
+            let mut held = Vec::new();
+            for _ in 0..2 {
+                if let Some(crate::p2p::P2PCommand::FetchBlob { peer_id, reply, .. }) =
+                    cmd_rx.recv().await
+                {
+                    if peer_id == fast {
+                        let _ = reply.send(Ok(BlobFetchReply::Bytes(served.clone())));
+                    } else {
+                        held.push(reply);
+                    }
+                }
+            }
+            // The losing racer's receiver must be dropped (its task aborted).
+            let mut slow_reply = held.pop().expect("the slow holder was asked");
+            tokio::time::timeout(Duration::from_secs(2), slow_reply.closed())
+                .await
+                .is_ok()
+        });
 
-    #[test]
-    fn verify_blob_hash_handles_uppercase_expected() {
-        let (bytes, hex) = known_blob();
-        let upper = hex.to_uppercase();
-        assert!(verify_blob_hash(&bytes, &upper));
-    }
-
-    /// Backlog `blob-fetch-sha256-prefixed-cid-rejection` regression #1:
-    /// address construction for all three legitimate input forms. Bare hex
-    /// gets the legacy marker; already-marked and CID-form addresses pass
-    /// through untouched (the double-wrap `sha256-<cid>` was minted by a
-    /// constructor that prefixed unconditionally).
-    #[test]
-    fn normalize_fetch_address_bare_hex_gets_legacy_prefix() {
-        let (_, hex) = known_blob();
-        assert_eq!(
-            normalize_fetch_address(&hex).unwrap(),
-            format!("sha256-{hex}")
+        let outcome = race_fetch(
+            &cid,
+            vec![slow.to_string(), fast.to_string()],
+            &cmd_tx,
+            |_| true,
+            2,
+            Duration::from_secs(30),
+        )
+        .await;
+        match outcome {
+            FetchOutcome::Hit {
+                bytes: got,
+                source_peer,
+            } => {
+                assert_eq!(got, bytes);
+                assert_eq!(source_peer, fast.to_string());
+            }
+            other => panic!("expected Hit, got {other:?}"),
+        }
+        assert!(
+            responder.await.expect("responder"),
+            "the losing racer was not cancelled"
         );
     }
 
-    #[test]
-    fn normalize_fetch_address_already_marked_passes_through() {
-        let (_, hex) = known_blob();
-        let marked = format!("sha256-{hex}");
-        assert_eq!(normalize_fetch_address(&marked).unwrap(), marked);
-    }
-
-    #[test]
-    fn normalize_fetch_address_cid_passes_through() {
-        let cid = BlobStore::compute_cid(b"hello world").to_string();
-        assert!(cid.starts_with("baf"), "raw-codec CIDv1 is base32 baf…");
-        assert_eq!(normalize_fetch_address(&cid).unwrap(), cid);
-    }
-
-    /// The live defect: a CIDv1 double-wrapped in the legacy `sha256-` marker
-    /// (james's mesh logged `hash="sha256-bafkrei…"` rejected by every peer at
-    /// ~2min cadence). The constructor must REPAIR it to the inner CID — the
-    /// form responders accept — never emit it as-is.
-    #[test]
-    fn normalize_fetch_address_repairs_double_wrapped_cid() {
-        let cid = BlobStore::compute_cid(b"hello world").to_string();
-        let double_wrapped = format!("sha256-{cid}");
-        assert_eq!(normalize_fetch_address(&double_wrapped).unwrap(), cid);
-    }
-
-    #[test]
-    fn normalize_fetch_address_rejects_garbage() {
-        assert!(normalize_fetch_address("not-an-address").is_err());
-        assert!(normalize_fetch_address("sha256-not-hex-not-cid").is_err());
-        assert!(normalize_fetch_address("").is_err());
-    }
-
-    /// A CID-form expected address must verify against the bytes it wraps —
-    /// the CID's multihash IS the sha2-256 digest of the bytes. Without this,
-    /// a fetch addressed by CID could receive correct bytes and still report
-    /// a mismatch (silent `FetchOutcome::Miss`).
-    #[test]
-    fn verify_blob_hash_accepts_cid_form() {
-        let (bytes, _) = known_blob();
-        let cid = BlobStore::compute_cid(&bytes).to_string();
-        assert!(verify_blob_hash(&bytes, &cid));
-        // And the repaired double-wrap resolves to the same digest.
-        assert!(verify_blob_hash(&bytes, &format!("sha256-{cid}")));
-    }
-
-    /// Retry hygiene at the wire choke point: a malformed address never
-    /// produces a `P2PCommand::FetchBlob` — `race_fetch` gives up immediately
-    /// with `InvalidAddress` (an honest terminal outcome) instead of letting
-    /// every responder reject the request forever.
+    /// A holder that never finishes is abandoned when the total deadline passes,
+    /// even though its per-peer stall deadline is far away; its racer is cancelled.
     #[tokio::test]
-    async fn race_fetch_gives_up_on_invalid_address_without_wire_request() {
+    async fn trickling_holder_abandoned_on_total_deadline() {
+        let cid = compute_bytes_cid(b"never arrives");
         let peer = test_peer_id();
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            let Some(crate::p2p::P2PCommand::FetchBlob { mut reply, .. }) = cmd_rx.recv().await
+            else {
+                return false;
+            };
+            tokio::time::timeout(Duration::from_secs(2), reply.closed())
+                .await
+                .is_ok()
+        });
 
+        let budget = FetchBudget {
+            max_bytes: FetchBudget::DEFAULT_MAX_BYTES,
+            stall_deadline: Duration::from_secs(60),
+            total_deadline: Duration::from_millis(200),
+            retries: 4,
+        };
+        let started = std::time::Instant::now();
+        let outcome =
+            race_fetch_budgeted(&cid, vec![peer.to_string()], &cmd_tx, |_| true, 1, &budget).await;
+        assert!(
+            matches!(outcome, FetchOutcome::BudgetExhausted),
+            "expected BudgetExhausted, got {outcome:?}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(
+            responder.await.expect("responder"),
+            "the trickling racer was not cancelled"
+        );
+    }
+
+    /// A manifest declaring more bytes than the budget admits is refused before
+    /// any reconstruction buffer exists: the race reports a miss, not a manifest.
+    #[tokio::test]
+    async fn oversized_manifest_refused_before_allocation() {
+        let data = vec![7u8; 4096];
+        let mut manifest = manifest_for(&data);
+        let cid = manifest.blob_cid;
+        manifest.byte_len = 1 << 40;
+        let budget = FetchBudget::for_stall(Duration::from_secs(2));
+        assert!(!budget.admits_manifest(&manifest));
+
+        let peer = test_peer_id();
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            if let Some(crate::p2p::P2PCommand::FetchBlob { reply, .. }) = cmd_rx.recv().await {
+                let _ = reply.send(Ok(BlobFetchReply::Manifest(Box::new(manifest))));
+            }
+        });
+        let outcome =
+            race_fetch_budgeted(&cid, vec![peer.to_string()], &cmd_tx, |_| true, 1, &budget).await;
+        responder.await.expect("responder");
+        assert!(
+            matches!(outcome, FetchOutcome::Miss),
+            "an oversized manifest must be refused; got {outcome:?}"
+        );
+    }
+
+    /// Bytes that do not hash to the requested CID are never a hit.
+    #[tokio::test]
+    async fn race_fetch_refuses_bytes_that_do_not_hash_to_the_cid() {
+        let cid = compute_bytes_cid(b"the payload we asked for");
+        let peer = test_peer_id();
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            if let Some(crate::p2p::P2PCommand::FetchBlob { reply, .. }) = cmd_rx.recv().await {
+                let _ = reply.send(Ok(BlobFetchReply::Bytes(b"something else".to_vec())));
+            }
+        });
         let outcome = race_fetch(
-            "sha256-definitely-not-a-content-address",
+            &cid,
             vec![peer.to_string()],
             &cmd_tx,
             |_| true,
             1,
-            Duration::from_secs(1),
+            Duration::from_secs(2),
         )
         .await;
-
-        assert!(
-            matches!(outcome, FetchOutcome::InvalidAddress),
-            "expected InvalidAddress, got {outcome:?}"
-        );
-        drop(cmd_tx);
-        assert!(
-            cmd_rx.recv().await.is_none(),
-            "no wire request may be sent for a malformed address"
-        );
+        responder.await.expect("responder");
+        assert!(matches!(outcome, FetchOutcome::Miss), "got {outcome:?}");
     }
 
-    /// T19 review Fix #1 regression: the call site in `http.rs::race_fetch`
-    /// passes the canonical `"sha256-<64hex>"` form (set by
-    /// `handle_get_blob`'s `normalized_hash`), not the raw hex. Prior to
-    /// the fix, `verify_blob_hash` compared raw-hex against prefixed-hex
-    /// and always returned false, causing every Stage 2 race-fetch with
-    /// real bytes to silently degrade to `FetchOutcome::Miss`.
-    #[test]
-    fn verify_blob_hash_handles_sha256_prefix() {
-        let (bytes, hex) = known_blob();
-        let prefixed = format!("sha256-{}", hex);
-        assert!(
-            verify_blob_hash(&bytes, &prefixed),
-            "verify_blob_hash must accept canonical 'sha256-<hex>' form"
-        );
-    }
-
-    /// T19 Fix #2 regression: race-fetch must use FuturesUnordered so that
-    /// the FIRST future to finish wins, regardless of how late other futures
-    /// might complete. Prior implementation iterated `for handle in handles`
-    /// which awaited them in spawn-order — a slow first peer would make the
-    /// whole batch wait on it before noticing a fast second peer.
-    ///
-    /// This test models the await semantics directly: we spawn three tasks
-    /// with staggered completion, push them into FuturesUnordered, drain via
-    /// `.next().await`, and assert the FIRST one off the stream is the
-    /// fastest one — proving "first responder wins" wiring is in place.
-    #[tokio::test]
-    async fn race_fetch_first_responder_wins() {
-        use std::time::Duration;
-
-        let mut fu: FuturesUnordered<_> = FuturesUnordered::new();
-        // Slow peer (~400 ms).
-        fu.push(tokio::spawn(async {
-            tokio::time::sleep(Duration::from_millis(400)).await;
-            "slow"
-        }));
-        // Medium peer (~200 ms).
-        fu.push(tokio::spawn(async {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            "medium"
-        }));
-        // Fast peer (~20 ms).
-        fu.push(tokio::spawn(async {
-            tokio::time::sleep(Duration::from_millis(20)).await;
-            "fast"
-        }));
-
-        let first = fu.next().await.expect("at least one future").unwrap();
-        assert_eq!(
-            first, "fast",
-            "FuturesUnordered must yield the fastest future first; \
-             sequential .await would yield 'slow' (spawn-order head)"
-        );
-    }
-
-    /// T20 contract test: `finalize_fetch_success` must persist the bytes
-    /// to the BlobStore FIRST, then write the `peer_blob_inventory` row
-    /// (source = `fetch-success`), then emit exactly one `serve-blob`
-    /// REA `economic_events` row. The persist-first ordering is what
-    /// makes the T18 parity sweep correct: a crash mid-finalize leaves
-    /// a benign orphan blob on disk that the sweep reconciles via
-    /// re-fetch — never an inventory row pointing at bytes we don't
-    /// actually have.
+    /// `finalize_fetch_success` persists the bytes FIRST, then writes the
+    /// `peer_blob_inventory` row (source = `fetch-success`), then exactly one
+    /// `serve-blob` REA event visible under the default (lamad) read scope.
     #[tokio::test]
     async fn finalize_persists_bytes_then_writes_sql() {
-        use crate::blob_store::BlobStore;
+        use crate::blob_store::Exists;
         use crate::db::peer_blob_inventory::lookup_hosts;
         use crate::test_util::test_pool;
 
@@ -779,103 +719,52 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         let bytes = b"finalize-test-payload".to_vec();
-        let hash = {
-            let mut h = Sha256::new();
-            h.update(&bytes);
-            format!("sha256-{}", hex::encode(h.finalize()))
-        };
+        let cid = compute_bytes_cid(&bytes);
+        let cid_text = cid.to_string();
 
-        finalize_fetch_success(
-            &mut conn,
-            &hash,
-            "peer_X",
-            &bytes,
-            "self_cid_Y",
-            &blob_store,
-        )
-        .await
-        .expect("finalize ok");
+        finalize_fetch_success(&mut conn, &cid, "peer_X", &bytes, "self_cid_Y", &blob_store)
+            .await
+            .expect("finalize ok");
 
-        // Filesystem first: BlobStore filenames are canonical
-        // `sha256-<hex>`, so probe with the prefixed form.
-        assert!(
-            blob_store.exists(&hash).await,
-            "blob persisted to filesystem before SQL writes"
-        );
+        assert_eq!(blob_store.exists(&cid).await, Exists::Verified);
 
-        // SQL second: peer_blob_inventory row written with source='fetch-success'.
-        // Use a fresh_after cutoff well in the past so the lookup window
-        // includes our just-written row.
-        let rows = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
+        let rows = lookup_hosts(&mut conn, &cid_text, "2020-01-01T00:00:00Z").unwrap();
         assert!(
             rows.iter()
                 .any(|r| r.peer_id == "peer_X" && r.source == "fetch-success"),
-            "peer_blob_inventory row written with source='fetch-success'; \
-             got rows: {rows:?}"
+            "peer_blob_inventory row written with source='fetch-success'; got rows: {rows:?}"
         );
 
-        // SQL third: exactly one serve-blob REA event present, scoped to
-        // this blob hash.
         use crate::db::diesel_schema::economic_events::dsl as ee;
         use diesel::prelude::*;
         let count: i64 = ee::economic_events
             .filter(ee::action.eq("serve-blob"))
-            .filter(ee::resource_inventoried_as.eq(&hash))
+            .filter(ee::resource_inventoried_as.eq(&cid_text))
             .count()
             .get_result(&mut conn)
             .unwrap();
         assert_eq!(count, 1, "exactly one serve-blob event");
 
-        // AND the event is VISIBLE through the scoped read surface consumers
-        // actually query: GET /api/v1/economic-events resolves its AppContext
-        // from the X-App-Id header with DEFAULT "lamad" (api/mod.rs), and
-        // list_economic_events filters h_app_id = ctx. An event written under
-        // any other scope is structurally invisible to that surface — the
-        // genesis delivery.serve-blob-events verdict read 0 forever while the
-        // atomic pair worked perfectly (#1224-#1230; the dormant-scope class:
-        // written under one h_app_id, read under another). custody-blob rows
-        // (the working sibling) live under the lamad default; serve-blob must
-        // match.
         let visible = crate::db::economic_events::list_economic_events(
             &mut conn,
             &crate::db::AppContext::default_lamad(),
             &crate::db::economic_events::EconomicEventQuery {
                 action: Some("serve-blob".to_string()),
-                // NB: derive-Default gives limit 0 (LIMIT 0 → always empty);
-                // the serde default_limit(100) applies only on deserialization.
                 limit: 50,
                 ..Default::default()
             },
         )
         .expect("scoped list ok");
-        assert!(
-            visible
-                .iter()
-                .any(|e| e.resource_inventoried_as.as_deref() == Some(hash.as_str())),
-            "serve-blob event must be visible under the DEFAULT (lamad) read \
-             scope that /api/v1/economic-events serves; got {} visible events",
-            visible.len()
-        );
+        assert!(visible
+            .iter()
+            .any(|e| e.resource_inventoried_as.as_deref() == Some(cid_text.as_str())));
     }
 
-    /// T20 review Fix #2 regression: the two SQL writes inside
-    /// `finalize_fetch_success` (record_fetch_success + serve-blob event
-    /// insert) MUST be wrapped in a single transaction so a failure in the
-    /// serve-blob insert rolls back the peer_blob_inventory row that was
-    /// just written. Otherwise a crash between them leaves an inventory row
-    /// with `source='fetch-success'` that the T18 parity sweep cannot
-    /// detect (because the row says we host the blob and the filesystem
-    /// agrees) but no matching REA event exists.
-    ///
-    /// We induce a SQL failure cheaply by dropping the `economic_events`
-    /// table BEFORE calling finalize. The first SQL statement
-    /// (record_fetch_success on peer_blob_inventory) succeeds, but the
-    /// second (insert into economic_events) fails because the table is
-    /// missing. With the transaction wrap in place, the inventory row must
-    /// also be rolled back.
+    /// The two SQL writes inside `finalize_fetch_success` share one transaction:
+    /// a failed `serve-blob` insert rolls back the inventory row.
     #[tokio::test]
     async fn finalize_rolls_back_inventory_on_event_insert_failure() {
-        use crate::blob_store::BlobStore;
+        use crate::blob_store::Exists;
         use crate::db::peer_blob_inventory::lookup_hosts;
         use crate::test_util::test_pool;
         use diesel::RunQueryDsl;
@@ -885,60 +774,30 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         let bytes = b"rollback-test-payload".to_vec();
-        let hash = {
-            let mut h = Sha256::new();
-            h.update(&bytes);
-            format!("sha256-{}", hex::encode(h.finalize()))
-        };
+        let cid = compute_bytes_cid(&bytes);
 
-        // Force the second SQL write to fail by dropping its target table.
         diesel::sql_query("DROP TABLE economic_events;")
             .execute(&mut conn)
             .expect("drop economic_events");
 
-        let result = finalize_fetch_success(
-            &mut conn,
-            &hash,
-            "peer_R",
-            &bytes,
-            "self_cid_R",
-            &blob_store,
-        )
-        .await;
-        assert!(
-            result.is_err(),
-            "finalize must fail when economic_events insert fails"
-        );
+        let result =
+            finalize_fetch_success(&mut conn, &cid, "peer_R", &bytes, "self_cid_R", &blob_store)
+                .await;
+        assert!(result.is_err());
+        assert_eq!(blob_store.exists(&cid).await, Exists::Verified);
 
-        // The filesystem write happened first (and is intentionally NOT
-        // rolled back; the parity sweep handles orphan blobs).
-        assert!(
-            blob_store.exists(&hash).await,
-            "blob persisted to filesystem before SQL transaction"
-        );
-
-        // Critical assertion: the peer_blob_inventory row must NOT exist,
-        // because the wrapping transaction rolled it back when the
-        // serve-blob insert failed.
-        let rows = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
+        let rows = lookup_hosts(&mut conn, &cid.to_string(), "2020-01-01T00:00:00Z").unwrap();
         assert!(
             !rows.iter().any(|r| r.peer_id == "peer_R"),
-            "peer_blob_inventory row must be rolled back when serve-blob \
-             insert fails; got rows: {rows:?}"
+            "got rows: {rows:?}"
         );
     }
 
-    /// #3 regression (Verify Delivery Events): a proactive quilt-draw moves
-    /// bytes but must ALSO leave the REA delivery trail. `finalize_quilt_draw`
-    /// books exactly one `serve-blob` event with the on-demand direction
-    /// (provider = the serving peer, receiver = self) AND writes the
-    /// `peer_blob_inventory` row — so the proactive replication path is no
-    /// longer invisible to both delivery verification and replica_count.
-    /// RED before the fix: the production arm called bare `blob_store.store()`,
-    /// booking zero events.
+    /// A proactive quilt-draw books exactly one `serve-blob` event (provider = the
+    /// serving peer, receiver = self) and writes the inventory row.
     #[tokio::test]
     async fn quilt_draw_books_serve_blob_event() {
-        use crate::blob_store::BlobStore;
+        use crate::blob_store::Exists;
         use crate::db::peer_blob_inventory::lookup_hosts;
         use crate::test_util::test_pool;
         use diesel::prelude::*;
@@ -948,60 +807,36 @@ mod tests {
         let mut conn = pool.get().expect("conn");
 
         let bytes = b"quilt-draw-payload".to_vec();
-        let hash = {
-            let mut h = Sha256::new();
-            h.update(&bytes);
-            format!("sha256-{}", hex::encode(h.finalize()))
-        };
+        let cid = compute_bytes_cid(&bytes);
+        let cid_text = cid.to_string();
 
-        let booked = finalize_quilt_draw(
-            &mut conn,
-            &hash,
-            "peer_Q",
-            &bytes,
-            "self_cid_Q",
-            &blob_store,
-        )
-        .await
-        .expect("finalize_quilt_draw ok");
-        assert!(booked, "verified bytes must be stocked + booked");
+        let booked =
+            finalize_quilt_draw(&mut conn, &cid, "peer_Q", &bytes, "self_cid_Q", &blob_store)
+                .await
+                .expect("finalize_quilt_draw ok");
+        assert!(booked);
+        assert_eq!(blob_store.exists(&cid).await, Exists::Verified);
 
-        assert!(
-            blob_store.exists(&hash).await,
-            "blob persisted to filesystem"
-        );
-
-        let inv = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
-        assert!(
-            inv.iter().any(|r| r.peer_id == "peer_Q"),
-            "peer_blob_inventory row written for the proactive draw; got: {inv:?}"
-        );
+        let inv = lookup_hosts(&mut conn, &cid_text, "2020-01-01T00:00:00Z").unwrap();
+        assert!(inv.iter().any(|r| r.peer_id == "peer_Q"), "got: {inv:?}");
 
         use crate::db::diesel_schema::economic_events::dsl as ee;
         let count: i64 = ee::economic_events
             .filter(ee::action.eq("serve-blob"))
-            .filter(ee::resource_inventoried_as.eq(&hash))
+            .filter(ee::resource_inventoried_as.eq(&cid_text))
             .filter(ee::provider.eq("peer_Q"))
             .filter(ee::receiver.eq("self_cid_Q"))
             .count()
             .get_result(&mut conn)
             .unwrap();
-        assert_eq!(
-            count, 1,
-            "exactly one serve-blob event, provider=serving peer, receiver=self"
-        );
+        assert_eq!(count, 1);
     }
 
-    /// `finalize_quilt_draw` must verify the pulled bytes against the expected
-    /// hash before booking — the quilt-draw arm does NOT pre-verify like the
-    /// race-fetch path. A peer returning mismatched bytes must be discarded
-    /// (`Ok(false)`), leaving NO inventory row and NO `serve-blob` event that
-    /// would falsely claim we host `blob_hash` (the bytes would have been
-    /// filed under their real, different hash). RED before the fix: the stub
-    /// stored unverified bytes and returned `Ok(true)`.
+    /// A quilt-draw whose bytes do not hash to the claimed CID is discarded:
+    /// nothing stored under the claim, no inventory row, no `serve-blob` event.
     #[tokio::test]
     async fn quilt_draw_discards_mismatched_bytes() {
-        use crate::blob_store::BlobStore;
+        use crate::blob_store::Exists;
         use crate::db::peer_blob_inventory::lookup_hosts;
         use crate::test_util::test_pool;
         use diesel::prelude::*;
@@ -1010,13 +845,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        // The hash the peer claimed to be serving (hash of OTHER content)…
-        let claimed = {
-            let mut h = Sha256::new();
-            h.update(b"the-content-we-asked-for");
-            format!("sha256-{}", hex::encode(h.finalize()))
-        };
-        // …but it actually returned these (mismatched) bytes.
+        let claimed = compute_bytes_cid(b"the-content-we-asked-for");
+        let claimed_text = claimed.to_string();
         let bytes = b"a-different-payload-entirely".to_vec();
 
         let booked = finalize_quilt_draw(
@@ -1029,76 +859,38 @@ mod tests {
         )
         .await
         .expect("finalize_quilt_draw ok");
-        assert!(!booked, "mismatched bytes must be discarded (Ok(false))");
-
-        assert!(
-            !blob_store.exists(&claimed).await,
-            "no blob stored under the claimed hash"
-        );
-        let inv = lookup_hosts(&mut conn, &claimed, "2020-01-01T00:00:00Z").unwrap();
-        assert!(
-            !inv.iter().any(|r| r.peer_id == "peer_M"),
-            "no inventory row for a mismatched draw; got: {inv:?}"
-        );
+        assert!(!booked);
+        assert_ne!(blob_store.exists(&claimed).await, Exists::Verified);
+        let inv = lookup_hosts(&mut conn, &claimed_text, "2020-01-01T00:00:00Z").unwrap();
+        assert!(!inv.iter().any(|r| r.peer_id == "peer_M"), "got: {inv:?}");
         use crate::db::diesel_schema::economic_events::dsl as ee;
         let count: i64 = ee::economic_events
             .filter(ee::action.eq("serve-blob"))
-            .filter(ee::resource_inventoried_as.eq(&claimed))
+            .filter(ee::resource_inventoried_as.eq(&claimed_text))
             .count()
             .get_result(&mut conn)
             .unwrap();
-        assert_eq!(count, 0, "no serve-blob event for a discarded draw");
+        assert_eq!(count, 0);
     }
 
-    /// A libp2p `PeerId` that round-trips through the `String` parse
-    /// `race_fetch` performs on each candidate (mirrors
-    /// `reconcile::controller::tests::test_peer_id`).
-    fn test_peer_id() -> libp2p::PeerId {
-        libp2p::PeerId::from(libp2p::identity::Keypair::generate_ed25519().public())
-    }
-
-    fn fixture_manifest(blob_hash: &str) -> ShardManifest {
-        ShardManifest {
-            blob_cid: format!("bafkrei-{blob_hash}"),
-            blob_hash: blob_hash.to_string(),
-            total_size: 10,
-            mime_type: "application/octet-stream".to_string(),
-            encoding: "chunked".to_string(),
-            data_shards: 2,
-            total_shards: 2,
-            shard_size: 5,
-            shard_hashes: vec!["sha256-s0".to_string(), "sha256-s1".to_string()],
-            reach: "commons".to_string(),
-            author_id: None,
-            created_at: "2026-08-16T00:00:00Z".to_string(),
-            verified_at: None,
-        }
-    }
-
-    /// Q3 requester test #1: a peer that answers `FetchBlob` with a manifest
-    /// whose `blob_hash` matches the requested hash must be ACCEPTED —
-    /// `race_fetch` returns `FetchOutcome::Manifest`, not `Miss`, so the
-    /// caller can pivot to a swarm shard-fetch instead of dead-ending.
+    /// A manifest reply naming the requested CID (and within budget) ends the race
+    /// as `Manifest`, so the caller can pivot to the shard swarm.
     #[tokio::test]
     async fn race_fetch_accepts_matching_manifest_reply() {
         let peer = test_peer_id();
-        // A real canonical address: race_fetch now validates the requested
-        // address before putting it on the wire.
-        let hash = format!("sha256-{}", "a".repeat(64));
-        let manifest = fixture_manifest(&hash);
-        let manifest_for_responder = manifest.clone();
+        let manifest = manifest_for(b"a payload a peer only holds as a manifest");
+        let cid = manifest.blob_cid;
+        let for_responder = manifest.clone();
 
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
         let responder = tokio::spawn(async move {
             if let Some(crate::p2p::P2PCommand::FetchBlob { reply, .. }) = cmd_rx.recv().await {
-                let _ = reply.send(Ok(BlobFetchReply::Manifest(Box::new(
-                    manifest_for_responder,
-                ))));
+                let _ = reply.send(Ok(BlobFetchReply::Manifest(Box::new(for_responder))));
             }
         });
 
         let outcome = race_fetch(
-            &hash,
+            &cid,
             vec![peer.to_string()],
             &cmd_tx,
             |_| true,
@@ -1113,25 +905,19 @@ mod tests {
                 manifest: m,
                 source_peer,
             } => {
-                assert_eq!(m.blob_hash, hash);
+                assert_eq!(m.blob_cid, cid);
                 assert_eq!(source_peer, peer.to_string());
             }
             other => panic!("expected Manifest outcome, got {other:?}"),
         }
     }
 
-    /// Q3 requester test #2 (integrity reject): a peer that answers with a
-    /// manifest naming a DIFFERENT `blob_hash` than requested must be
-    /// REJECTED, not substituted. With a single candidate and no other batch
-    /// to try, the race exhausts to `Miss` — proving the mismatched manifest
-    /// was discarded rather than silently accepted for the wrong blob.
+    /// A manifest naming a DIFFERENT payload is rejected, not substituted.
     #[tokio::test]
-    async fn race_fetch_rejects_manifest_hash_mismatch() {
+    async fn race_fetch_rejects_manifest_naming_another_payload() {
         let peer = test_peer_id();
-        // Real canonical addresses: race_fetch now validates the requested
-        // address before putting it on the wire.
-        let requested_hash = format!("sha256-{}", "a".repeat(64));
-        let wrong_manifest = fixture_manifest(&format!("sha256-{}", "b".repeat(64)));
+        let requested = compute_bytes_cid(b"requested payload");
+        let wrong_manifest = manifest_for(b"some other payload");
 
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
         let responder = tokio::spawn(async move {
@@ -1141,7 +927,7 @@ mod tests {
         });
 
         let outcome = race_fetch(
-            &requested_hash,
+            &requested,
             vec![peer.to_string()],
             &cmd_tx,
             |_| true,
@@ -1150,10 +936,21 @@ mod tests {
         )
         .await;
         responder.await.expect("responder task");
+        assert!(matches!(outcome, FetchOutcome::Miss), "got {outcome:?}");
+    }
 
-        assert!(
-            matches!(outcome, FetchOutcome::Miss),
-            "a manifest naming the wrong blob must be rejected, not returned as a Manifest outcome; got {outcome:?}"
-        );
+    #[tokio::test]
+    async fn race_fetch_with_no_connected_candidate_reports_no_candidates() {
+        let (cmd_tx, _cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(1);
+        let outcome = race_fetch(
+            &compute_bytes_cid(b"x"),
+            vec![test_peer_id().to_string()],
+            &cmd_tx,
+            |_| false,
+            1,
+            Duration::from_secs(1),
+        )
+        .await;
+        assert!(matches!(outcome, FetchOutcome::NoCandidates));
     }
 }

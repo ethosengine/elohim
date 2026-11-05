@@ -77,7 +77,7 @@ struct Args {
     /// Storage directory (blobs + content.db). In k8s this MUST point at the
     /// storage-data PVC mount (/data) — the default (dirs::data_local_dir) is
     /// the container overlay, wiped on every pod restart: rows get reseeded
-    /// but blob bytes don't, leaving dangling blobHash rows that 404 the
+    /// but blob bytes don't, leaving dangling blobCid rows that 404 the
     /// projected EPR apps (2026-06-09 regression class).
     #[arg(long, env = "STORAGE_DIR")]
     storage_dir: Option<PathBuf>,
@@ -4035,9 +4035,6 @@ async fn async_main(
                 );
                 // Cutover gate #2 (Plan 2): clone blob store for HTTP server wiring.
                 let iroh_blob_store_for_http = Arc::new(node.store().clone());
-                // Parity (2026-08-28): the shard responder serves iroh-staged blobs
-                // to peers by alias, exactly as HTTP `/blob` serves them locally.
-                shard_service.set_iroh_store(iroh_blob_store_for_http.clone());
                 (
                     Some(node),
                     Some(iroh_blob_store_for_http),
@@ -4093,9 +4090,7 @@ async fn async_main(
         Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>,
     > = if let Some(iroh_n) = _iroh_node.as_ref() {
         let iroh_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
-            elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
-                iroh_n.gossip().clone(),
-            ),
+            elohim_storage::p2p_iroh::IrohGossipPublisher::spawn(iroh_n.gossip().clone()),
         );
 
         // Dual mode: fan the node's internal broadcaster out to both stacks.
@@ -4105,19 +4100,18 @@ async fn async_main(
                 Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
                     libp2p_tx,
                 ));
-            let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
-                elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+            let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+                Arc::new(elohim_storage::p2p_iroh::FanoutGossipPublisher::new(
                     Some(libp2p_pub),
                     Some(iroh_pub.clone()),
-                ),
-            );
+                ));
             libp2p_n.set_gossip_publisher(dual);
             // Dual-stack observability: surface the co-resident iroh NodeId on
             // /p2p/status (the setter mutates the live watch value; the periodic
             // libp2p status rebuild preserves it — see P2PNode::set_iroh_node_id).
             libp2p_n.set_iroh_node_id(iroh_n.node_id().to_string());
             info!(
-                "Dual: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack"
+                "Dual: FanoutGossipPublisher wired into P2PNode — gossip fans out to both stacks"
             );
         }
 
@@ -4188,12 +4182,10 @@ async fn async_main(
                     > = Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
                         libp2p_n.handle().command_sender(),
                     ));
-                    Arc::new(
-                        elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
-                            Some(libp2p_pub),
-                            Some(iroh_pub.clone()),
-                        ),
-                    )
+                    Arc::new(elohim_storage::p2p_iroh::FanoutGossipPublisher::new(
+                        Some(libp2p_pub),
+                        Some(iroh_pub.clone()),
+                    ))
                 }
                 None => iroh_pub.clone(),
             };
@@ -4818,7 +4810,7 @@ async fn async_main(
                 // only projects content written AFTER startup; on a fresh deploy
                 // or a sled DocStore reset the already-seeded corpus never
                 // converges until each row is re-written — so a degraded peer that
-                // lost a row's blobHash can't re-derive it from a healthy peer,
+                // lost a row's blobCid can't re-derive it from a healthy peer,
                 // and a healthy peer never OFFERS its pre-producer corpus to the
                 // sync plane at all (the elohim.host `App not found` stranding:
                 // the landing row predated the producer on every peer, so no
@@ -4832,7 +4824,7 @@ async fn async_main(
                 // blob_cid, no blob_hash) are re-read against their converged
                 // docs, one bounded slice per sync round. The edge-triggered heal
                 // no-ops when the doc lands before the row (measured 2026-08-29:
-                // 134 rows stayed blobHash:null for a whole recovery while the
+                // 134 rows stayed blobCid:null for a whole recovery while the
                 // doc held the hash). Spawned ONCE — the SyncManager is shared.
                 elohim_storage::sync::projector::spawn_half_row_heal_sweep(
                     node.sync_manager().clone(),
@@ -5243,17 +5235,15 @@ async fn async_main(
                     tx,
                 ));
 
-            // Wrap in DualGossipPublisher — fans out to iroh when the iroh node
+            // Wrap in FanoutGossipPublisher — fans out to iroh when the iroh node
             // is running, degrades to libp2p-only when it is absent (None).
             // REUSES the single `shared_iroh_gossip_publisher` built above at the
             // dual-stack wiring site — no second IrohGossipPublisher task.
             let publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-                Arc::new(
-                    elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
-                        Some(libp2p_publisher),
-                        shared_iroh_gossip_publisher.clone(),
-                    ),
-                );
+                Arc::new(elohim_storage::p2p_iroh::FanoutGossipPublisher::new(
+                    Some(libp2p_publisher),
+                    shared_iroh_gossip_publisher.clone(),
+                ));
 
             let peer_id = node.handle().local_peer_id();
             (Some(sink), Some(publisher), Some(peer_id))

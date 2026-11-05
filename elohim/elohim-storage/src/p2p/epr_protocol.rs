@@ -47,7 +47,7 @@ pub enum EprRequest {
     GetDocument { id: String },
     /// Query a peer's delivery capability for a specific blob.
     /// No reach authorization needed — asking "can you serve this?" not "give me this."
-    QueryDelivery { blob_hash: String },
+    QueryDelivery { blob_cid: String },
     /// The device-consent carrier (`services::device_carrier`): a
     /// `consent_grant::CarryRequest` as JSON. Additive; a peer that predates
     /// it fails to decode the request and is simply not an approving node here.
@@ -393,13 +393,16 @@ mod tests {
     #[test]
     fn test_epr_request_query_delivery_roundtrip() {
         let request = EprRequest::QueryDelivery {
-            blob_hash: "sha256-abc123def456".to_string(),
+            blob_cid: "bafkr4ifiye6iiyzhzzdv3xcjkqyzu4nunpm5nz3ycad34vvx2flzqammoa".to_string(),
         };
         let bytes = rmp_serde::to_vec(&request).unwrap();
         let decoded: EprRequest = rmp_serde::from_slice(&bytes).unwrap();
         match decoded {
-            EprRequest::QueryDelivery { blob_hash } => {
-                assert_eq!(blob_hash, "sha256-abc123def456");
+            EprRequest::QueryDelivery { blob_cid } => {
+                assert_eq!(
+                    blob_cid,
+                    "bafkr4ifiye6iiyzhzzdv3xcjkqyzu4nunpm5nz3ycad34vvx2flzqammoa"
+                );
             }
             _ => panic!("Wrong variant"),
         }
@@ -477,7 +480,7 @@ mod tests {
                 id: "doc-1".to_string(),
             },
             EprRequest::QueryDelivery {
-                blob_hash: "hash-1".to_string(),
+                blob_cid: "hash-1".to_string(),
             },
         ];
 

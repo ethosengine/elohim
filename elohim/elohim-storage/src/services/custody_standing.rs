@@ -13,7 +13,7 @@
 //! * `custody-spool` (provider = custodian, receiver = ward): the STANDING
 //!   consent [`crate::services::spool_custody_author`] expands per witness.
 //! * `custody-blob` (provider = custodian, receiver = ward,
-//!   `resource_classified_as` = `sha256-<digest>`): the per-blob pledge.
+//!   `resource_classified_as` = the byte CID): the per-blob pledge.
 //!
 //! "Live" is defined once, by [`crate::services::spool_custody_author::RETIRED_STATES`]
 //! — gating on a single state string would silently disable the station, since
@@ -47,7 +47,6 @@ use std::time::{Duration, Instant};
 use diesel::prelude::*;
 use tracing::{debug, warn};
 
-use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 use crate::private_reach::{is_private, PrivateServeFacts, WithholdReason};
 use crate::services::rea_commitment_service::{
@@ -161,9 +160,8 @@ pub struct RowFacts {
     pub reach: String,
     /// Content id — for logs only; standing never keys on it.
     pub id: String,
-    /// Canonical lowercase multihash digest of the row's bytes, if it has any.
-    /// Built with [`BlobStore::parse_content_address`] so `sha256-<hex>` and
-    /// `bafkrei…` collapse to ONE key (identity = one digest, two renderings).
+    /// Canonical byte-CID text of the row's bytes, if it has any. Built with
+    /// [`digest_key`] (full decode): one admissible spelling, one key.
     pub blob_digest: Option<String>,
     /// The ark passport `node` of the berth that produced the witness. Per
     /// `ark_core::passport::Passport::node` this is an **agent CID string**
@@ -181,11 +179,7 @@ pub struct RowFacts {
 impl RowFacts {
     /// Build from a projected `content` row.
     pub fn from_content(row: &crate::db::models::Content) -> Self {
-        let digest = row
-            .blob_hash
-            .as_deref()
-            .or(row.blob_cid.as_deref())
-            .and_then(digest_key);
+        let digest = row.blob_cid.as_deref().and_then(digest_key);
         Self {
             reach: row.reach.clone(),
             id: row.id.clone(),
@@ -206,13 +200,12 @@ impl RowFacts {
     }
 }
 
-/// Canonical digest key shared by every accepted content-address rendering
-/// (`sha256-<hex>`, bare hex, `bafkrei…`). Lowercased so a set membership test
-/// cannot miss on case.
+/// The canonical byte-CID text of a content address (full decode). The one
+/// admissible spelling, so a set membership test cannot miss on form.
 pub fn digest_key(address: &str) -> Option<String> {
-    BlobStore::parse_content_address(address)
+    elohim_epr::address::ByteCid::parse(address)
         .ok()
-        .map(|d| d.to_ascii_lowercase())
+        .map(|cid| cid.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1177,7 +1170,8 @@ mod tests {
     const WARD: &str = "uhCAkWardAgentKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const CUSTODIAN: &str = "uhCAkCustodianKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const STRANGER: &str = "uhCAkStrangerKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    const DIGEST: &str = "26d7ced97ee329025135f0ad4791b3e24d526b200b9147943450cb9141480406";
+    /// A byte CID (`compute_bytes_cid(b"custody-standing ward blob")`).
+    const DIGEST: &str = "bafkr4igv7j6jlga27parufsnss3qlcjeekj2pdy4loalxc46uts6gumhom";
 
     fn test_pool() -> DbPool {
         let url = format!(
@@ -1242,7 +1236,7 @@ mod tests {
     fn private_row() -> RowFacts {
         RowFacts {
             reach: "private".to_string(),
-            id: "bafkreiwitness".to_string(),
+            id: "bafkr4ien63dvqlniu4fqyg6vwaenw7ft2lc46jkfxqwu37ftu7uq2sxkyq".to_string(),
             blob_digest: Some(DIGEST.to_string()),
             created_by: Some(WARD.to_string()),
             dht_anchor_hash_present: false,
@@ -1391,7 +1385,7 @@ mod tests {
             CUSTODY_BLOB_ACTION,
             CUSTODIAN,
             WARD,
-            Some(&format!("sha256-{DIGEST}")),
+            Some(DIGEST),
             "created",
         );
         let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
@@ -1462,7 +1456,7 @@ mod tests {
             CUSTODY_BLOB_ACTION,
             CUSTODIAN,
             WARD,
-            Some(&format!("sha256-{DIGEST}")),
+            Some(DIGEST),
             "created",
         );
         let (resolver, requester) = bound_resolver(pool, WARD);
@@ -1540,7 +1534,7 @@ mod tests {
             CUSTODY_BLOB_ACTION,
             CUSTODIAN,
             WARD,
-            Some(&format!("sha256-{DIGEST}")),
+            Some(DIGEST),
             "created",
         );
         let (resolver, requester) = bound_resolver(pool, CUSTODIAN);
@@ -1867,14 +1861,14 @@ mod tests {
     }
 
     #[test]
-    fn digest_key_collapses_all_three_accepted_address_renderings() {
-        let sha = format!("sha256-{DIGEST}");
-        let cid = BlobStore::hash_to_cid(DIGEST)
-            .expect("valid sha256 hex")
-            .to_string();
-        assert_eq!(digest_key(&sha), Some(DIGEST.to_string()));
+    fn digest_key_admits_only_the_byte_cid() {
+        let cid = elohim_epr::address::compute_bytes_cid(b"custody-standing ward blob");
+        assert_eq!(cid.to_string(), DIGEST, "fixture is the real byte CID");
         assert_eq!(digest_key(DIGEST), Some(DIGEST.to_string()));
-        assert_eq!(digest_key(&cid), Some(DIGEST.to_string()));
+        let sha2_raw = elohim_epr::address::compute_raw_sha2_cid(b"custody-standing ward blob");
+        assert_eq!(digest_key(&sha2_raw.to_string()), None);
+        assert_eq!(digest_key(&format!("sha256-{}", "a".repeat(64))), None);
+        assert_eq!(digest_key(&"a".repeat(64)), None);
     }
 
     // ── `resolve_agent` / `custody_of` — the station 3b receiver-side escape
@@ -1934,7 +1928,7 @@ mod tests {
             CUSTODY_BLOB_ACTION,
             CUSTODIAN,
             WARD,
-            Some(&format!("sha256-{DIGEST}")),
+            Some(DIGEST),
             "created",
         );
         let lookup = Arc::new(CountingConductor {

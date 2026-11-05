@@ -5,8 +5,12 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
 use ark_core::DeathWitness;
 use tracing::{info, warn};
 
+use elohim_epr::address::compute_bytes_cid;
+
 use crate::{
-    blob_store::BlobStore, db::content_diesel::CreateContentInput, error::StorageError,
+    blob_store::{BlobStore, Exists},
+    db::content_diesel::CreateContentInput,
+    error::StorageError,
     services::ContentService,
 };
 
@@ -118,38 +122,38 @@ impl SpoolIngest {
                 continue;
             }
 
-            let (_, expected_hash) = BlobStore::compute_addresses(&bytes);
-            let witness_digest = BlobStore::parse_content_address(&filename_cid)?;
-            let bytes_digest = BlobStore::parse_content_address(&expected_hash)?;
-            if witness_digest != bytes_digest {
-                warn!(
-                    path = %path.display(),
-                    filename_cid = %filename_cid,
-                    bytes_digest = %bytes_digest,
-                    "spool-ingest: refusing witness bytes whose digest differs from filename"
-                );
-                continue;
-            }
-
-            let row_exists = self.content.get(&filename_cid)?.is_some();
-            if self.blobs.exists_by_address(&expected_hash).await? {
-                let present_bytes = self.blobs.get(&expected_hash).await?;
-                let present_digest = BlobStore::parse_content_address(
-                    &BlobStore::compute_addresses(&present_bytes).1,
-                )?;
-                if present_digest == witness_digest && row_exists {
-                    self.seen.insert(filename_cid);
+            // The record CID names the canonical encoding: bytes that decode to the
+            // same witness but are not that encoding would be stored under a byte CID
+            // no other holder computes, so they are refused before any write.
+            match witness.canonical_bytes() {
+                Ok(canonical) if canonical == bytes => {}
+                Ok(_) => {
+                    warn!(
+                        path = %path.display(),
+                        witness_cid = %filename_cid,
+                        "spool-ingest: refusing non-canonical death witness bytes"
+                    );
                     continue;
                 }
-                if present_digest != witness_digest {
-                    warn!(
-                        filename_cid = %filename_cid,
-                        expected_digest = %witness_digest,
-                        actual_digest = %present_digest,
-                        "spool-ingest: repairing blob whose bytes do not match its address"
-                    );
-                    self.blobs.delete(&expected_hash).await?;
+                Err(error) => {
+                    warn!(path = %path.display(), error = %error, "spool-ingest: refusing unencodable death witness");
+                    continue;
                 }
+            }
+
+            // The witness is named by its own record CID (checked above); its bytes
+            // are held under their (canonical) byte CID.
+            let blob_cid = compute_bytes_cid(&bytes);
+
+            let row_exists = self.content.get(&filename_cid)?.is_some();
+            // `exists` is structural and `get` re-verifies the whole BLAKE3: bytes that
+            // fail their address are quarantined by the store, never treated as held.
+            if self.blobs.exists(&blob_cid).await == Exists::Verified
+                && self.blobs.get(&blob_cid).await.is_ok()
+                && row_exists
+            {
+                self.seen.insert(filename_cid);
+                continue;
             }
 
             if !row_exists {
@@ -163,19 +167,16 @@ impl SpoolIngest {
 
             // Deliberately after the private row: blob_reach treats row-less bytes as servable.
             let stored = self.blobs.store(&bytes).await?;
-            let hash_digest = BlobStore::parse_content_address(&stored.hash)?;
-            let blob_cid_digest = BlobStore::parse_content_address(&stored.cid)?;
-            if witness_digest != hash_digest || witness_digest != blob_cid_digest {
+            if stored.cid != blob_cid {
                 return Err(StorageError::HashMismatch {
-                    expected: witness_digest,
-                    actual: format!("hash={hash_digest}, cid={blob_cid_digest}"),
+                    expected: blob_cid.to_string(),
+                    actual: stored.cid.to_string(),
                 });
             }
 
             self.seen.insert(filename_cid.clone());
             info!(
                 witness_cid = %filename_cid,
-                blob_hash = %stored.hash,
                 blob_cid = %stored.cid,
                 "spool-ingest: death witness stored"
             );
@@ -210,7 +211,7 @@ pub fn witness_content_input(
     bytes: &[u8],
     self_agent: Option<&str>,
 ) -> CreateContentInput {
-    let (blob_cid, blob_hash) = BlobStore::compute_addresses(bytes);
+    let blob_cid = compute_bytes_cid(bytes);
     let metadata = serde_json::json!({
         "kind": "death-witness",
         "incident": witness.incident,
@@ -232,7 +233,6 @@ pub fn witness_content_input(
         description: None,
         content_type: "issue-report".to_string(),
         content_format: "json".to_string(),
-        blob_hash: Some(blob_hash),
         blob_cid: Some(blob_cid.to_string()),
         content_size_bytes: Some(i32::try_from(bytes.len()).unwrap_or(i32::MAX)),
         metadata_json: Some(metadata.to_string()),
@@ -263,6 +263,7 @@ mod tests {
     use serde_json::Value;
 
     use super::*;
+    use crate::blob_store::Exists;
     use crate::{
         db::{content_diesel, AppContext},
         services::Services,
@@ -390,7 +391,7 @@ mod tests {
         let witness = witness(2_000);
         let cid = witness.cid().unwrap();
         let bytes = write_witness(&spool_root, &witness, &cid);
-        let expected_hash = BlobStore::compute_hash(&bytes);
+        let expected_cid = compute_bytes_cid(&bytes);
         let (mut ingest, content, blobs, _) = ingester(&spool_root, &blob_root).await;
 
         assert_eq!(ingest.run_once().await.unwrap(), vec![cid.clone()]);
@@ -398,14 +399,13 @@ mod tests {
         let row = content.get(&cid).unwrap().expect("witness content row");
         assert_eq!(row.id, cid);
         assert_eq!(row.reach, "private");
-        assert_eq!(row.blob_hash.as_deref(), Some(expected_hash.as_str()));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some(expected_cid.to_string().as_str())
+        );
         let metadata: Value = serde_json::from_str(row.metadata_json.as_deref().unwrap()).unwrap();
         assert_eq!(metadata["kind"], "death-witness");
-        assert!(blobs.exists_by_address(&expected_hash).await.unwrap());
-        assert_eq!(
-            BlobStore::parse_content_address(row.blob_cid.as_deref().unwrap()).unwrap(),
-            BlobStore::parse_content_address(&row.id).unwrap()
-        );
+        assert_eq!(blobs.exists(&expected_cid).await, Exists::Verified);
     }
 
     #[tokio::test]
@@ -473,14 +473,14 @@ mod tests {
         let actual_cid = death_witness.cid().unwrap();
         let other_cid = witness(3_000).cid().unwrap();
         let bytes = write_witness(&spool_root, &death_witness, &other_cid);
-        let expected_hash = BlobStore::compute_hash(&bytes);
+        let expected_cid = compute_bytes_cid(&bytes);
         let (mut ingest, content, blobs, _) =
             ingester(&spool_root, &tmp.path().join("pantry")).await;
 
         assert!(ingest.run_once().await.unwrap().is_empty());
         assert!(content.get(&actual_cid).unwrap().is_none());
         assert!(content.get(&other_cid).unwrap().is_none());
-        assert!(!blobs.exists_by_address(&expected_hash).await.unwrap());
+        assert_ne!(blobs.exists(&expected_cid).await, Exists::Verified);
     }
 
     #[tokio::test]
@@ -491,18 +491,20 @@ mod tests {
         let witness = witness(2_000);
         let cid = witness.cid().unwrap();
         let bytes = write_witness(&spool_root, &witness, &cid);
-        let expected_hash = BlobStore::compute_hash(&bytes);
+        let expected_cid = compute_bytes_cid(&bytes);
         let (mut ingest, content, blobs, pool) = ingester(&spool_root, &blob_root).await;
         let obstruction = blob_root.join("blobs");
+        // The store made its `blobs/` directory at open; obstruct it with a file.
+        std::fs::remove_dir_all(&obstruction).unwrap();
         std::fs::write(&obstruction, b"not a directory").unwrap();
 
         assert!(ingest.run_once().await.is_err());
         assert!(content.get(&cid).unwrap().is_some());
-        assert!(!blobs.exists_by_address(&expected_hash).await.unwrap());
+        assert_ne!(blobs.exists(&expected_cid).await, Exists::Verified);
 
         std::fs::remove_file(obstruction).unwrap();
         assert_eq!(ingest.run_once().await.unwrap(), vec![cid]);
-        assert!(blobs.exists_by_address(&expected_hash).await.unwrap());
+        assert_eq!(blobs.exists(&expected_cid).await, Exists::Verified);
         let mut conn = pool.get().unwrap();
         assert_eq!(
             content_diesel::content_count(&mut conn, &AppContext::default_lamad()).unwrap(),
@@ -518,12 +520,10 @@ mod tests {
         let witness = witness(2_000);
         let cid = witness.cid().unwrap();
         let bytes = write_witness(&spool_root, &witness, &cid);
-        let expected_hash = BlobStore::compute_hash(&bytes);
-        let hash_part = expected_hash.strip_prefix("sha256-").unwrap();
-        let blob_path = blob_root
-            .join("blobs")
-            .join(&hash_part[..4])
-            .join(&expected_hash);
+        let expected_cid = compute_bytes_cid(&bytes);
+        // A torn earlier write: half the bytes at the payload's own path.
+        let name = expected_cid.to_string();
+        let blob_path = blob_root.join("blobs").join(&name[7..11]).join(&name);
         std::fs::create_dir_all(blob_path.parent().unwrap()).unwrap();
         std::fs::write(&blob_path, &bytes[..bytes.len() / 2]).unwrap();
         let (mut ingest, _, blobs, pool) = ingester(&spool_root, &blob_root).await;
@@ -535,12 +535,9 @@ mod tests {
             content_diesel::content_count(&mut conn, &AppContext::default_lamad()).unwrap(),
             1
         );
-        let repaired = blobs.get(&expected_hash).await.unwrap();
-        assert_eq!(repaired, bytes);
-        assert_eq!(
-            BlobStore::parse_content_address(&BlobStore::compute_hash(&repaired)).unwrap(),
-            BlobStore::parse_content_address(&cid).unwrap()
-        );
+        let repaired = blobs.get(&expected_cid).await.unwrap();
+        assert_eq!(repaired.as_ref(), bytes.as_slice());
+        assert_eq!(compute_bytes_cid(&repaired), expected_cid);
     }
 
     #[tokio::test]
@@ -564,12 +561,12 @@ mod tests {
         let witnesses = spool_root.join("witnesses");
         std::fs::create_dir_all(&witnesses).unwrap();
         std::fs::write(witnesses.join(format!("{cid}.cbor")), &noncanonical).unwrap();
-        let unexpected_hash = BlobStore::compute_hash(&noncanonical);
+        let unexpected_cid = compute_bytes_cid(&noncanonical);
         let (mut ingest, content, blobs, _) =
             ingester(&spool_root, &tmp.path().join("pantry")).await;
 
         assert!(ingest.run_once().await.unwrap().is_empty());
         assert!(content.get(&cid).unwrap().is_none());
-        assert!(!blobs.exists_by_address(&unexpected_hash).await.unwrap());
+        assert_ne!(blobs.exists(&unexpected_cid).await, Exists::Verified);
     }
 }

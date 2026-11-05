@@ -84,7 +84,7 @@ mod tests {
         let backend = ShardServiceBackend::new(Arc::new(ShardService::new(blob_store, None)));
 
         match backend
-            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
             .await
         {
             ShardResponse::Data(data) => assert_eq!(data, b"db-less peer blob"),
@@ -95,7 +95,7 @@ mod tests {
             .handle(
                 &Requester::local(),
                 ShardRequest::Get {
-                    hash: "missing".into(),
+                    cid: elohim_epr::address::compute_bytes_cid(b"missing"),
                 },
             )
             .await
@@ -115,8 +115,7 @@ mod tests {
             .handle(
                 &Requester::local(),
                 ShardRequest::GetManifest {
-                    hash: "sha256-0000000000000000000000000000000000000000000000000000000000000000"
-                        .into(),
+                    cid: elohim_epr::address::compute_bytes_cid(b"no manifest here"),
                 },
             )
             .await

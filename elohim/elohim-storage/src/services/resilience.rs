@@ -52,9 +52,9 @@ pub fn hub_summary(
     };
 
     // -----------------------------------------------------------------------
-    // Step 1: fetch all peer_blob_inventory rows where blob_hash = content_id.
+    // Step 1: fetch all peer_blob_inventory rows where blob_cid = content_id.
     //
-    // The content_id used as the primary lookup key here is the blob_hash
+    // The content_id used as the primary lookup key here is the blob_cid
     // column in peer_blob_inventory. Callers pass the content identifier
     // from their route context — EPR-addressed blobs use sha256-{hex} or
     // blake3-{hex} as their stable identity, which is what inventory gossip
@@ -64,7 +64,7 @@ pub fn hub_summary(
     // -----------------------------------------------------------------------
 
     let inventory_rows: Vec<(String, String, i64)> = peer_blob_inventory::table
-        .filter(peer_blob_inventory::blob_hash.eq(content_id))
+        .filter(peer_blob_inventory::blob_cid.eq(content_id))
         .select((
             peer_blob_inventory::peer_id,
             peer_blob_inventory::last_seen_at,

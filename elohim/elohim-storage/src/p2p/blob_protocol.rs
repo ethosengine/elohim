@@ -1,4 +1,4 @@
-//! Blob fetch request-response protocol — `/elohim/blob/1.0.0`.
+//! Blob fetch request-response protocol — `/elohim/blob/2.0.0`.
 //!
 //! Targeted peer-to-peer blob fetch. Differs from [`super::shard_protocol`] in
 //! one critical way: this protocol routes requests to an **explicit `peer_id`**
@@ -27,8 +27,10 @@ use std::io;
 
 use super::shard_protocol::{serialize_bounded_messagepack, SHARD_TRANSFER_MAX_FRAME_SIZE};
 
-/// Protocol identifier for explicit-peer blob fetch.
-pub const BLOB_PROTOCOL_ID: &str = "/elohim/blob/1.0.0";
+/// Protocol identifier for explicit-peer blob fetch. Version 2.0.0: the request
+/// names a byte CID (raw + BLAKE3-256), decoded by full decode; any other spelling
+/// fails to decode and is refused. Not wire-compatible with 1.0.0 (C12).
+pub const BLOB_PROTOCOL_ID: &str = "/elohim/blob/2.0.0";
 
 /// Default cap on response size if no override is configured. Shard healing
 /// uses this protocol, so it shares the shard byteplane's bounded frame budget.
@@ -58,10 +60,9 @@ impl AsRef<str> for BlobProtocol {
 /// Blob fetch request — asks a specific peer for the bytes of a single blob.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlobFetchRequest {
-    /// Either a sha256-prefixed identifier (e.g. `"sha256-<hex>"`) or a raw hex
-    /// content address. The receiver passes this through to
-    /// [`crate::blob_store::BlobStore::get`].
-    pub hash: String,
+    /// The payload's byte CID, admitted by full decode on read.
+    #[serde(with = "crate::blob_store::byte_cid_serde")]
+    pub cid: elohim_epr::address::ByteCid,
 }
 
 /// Blob fetch response — the targeted peer's verdict on the requested blob.
@@ -160,7 +161,7 @@ impl BlobFetchResponse {
             Self::Found(bytes) => format!("Found({} bytes)", bytes.len()),
             Self::NotFound => "NotFound".to_string(),
             Self::Error(msg) => format!("Error({msg})"),
-            Self::Manifest(m) => format!("Manifest({} shards)", m.shard_hashes.len()),
+            Self::Manifest(m) => format!("Manifest({} units)", m.custody_units().len()),
         }
     }
 }
@@ -316,12 +317,37 @@ mod tests {
 
     #[test]
     fn request_roundtrips_via_messagepack() {
-        let req = BlobFetchRequest {
-            hash: "sha256-abc".to_string(),
-        };
+        let cid = elohim_epr::address::compute_bytes_cid(b"abc");
+        let req = BlobFetchRequest { cid };
         let bytes = rmp_serde::to_vec(&req).unwrap();
         let back: BlobFetchRequest = rmp_serde::from_slice(&bytes).unwrap();
-        assert_eq!(back.hash, "sha256-abc");
+        assert_eq!(back.cid, cid);
+    }
+
+    /// The request's address is decoded in full: a sha2-256 raw CID (`bafkrei…`),
+    /// a legacy `sha256-<hex>`, a path-traversal string and a malformed CID are each
+    /// refused at decode, before any store is touched.
+    #[test]
+    fn request_refuses_every_address_that_is_not_a_byte_cid() {
+        #[derive(Serialize)]
+        struct RawRequest {
+            cid: String,
+        }
+        let sha2_raw = elohim_epr::address::compute_raw_sha2_cid(b"abc").to_string();
+        assert!(sha2_raw.starts_with("bafkrei"));
+        for bad in [
+            sha2_raw,
+            format!("sha256-{}", "a".repeat(64)),
+            "../../etc/passwd".to_string(),
+            "bafkr4i".to_string(),
+            String::new(),
+        ] {
+            let bytes = rmp_serde::to_vec(&RawRequest { cid: bad.clone() }).unwrap();
+            assert!(
+                rmp_serde::from_slice::<BlobFetchRequest>(&bytes).is_err(),
+                "{bad:?} must not decode as a blob request"
+            );
+        }
     }
 
     #[test]
@@ -357,21 +383,9 @@ mod tests {
     /// Minimal fixture for wire-compat tests — field values are irrelevant to
     /// the shape assertion, only that the manifest round-trips intact.
     fn fixture_manifest() -> crate::sharding::ShardManifest {
-        crate::sharding::ShardManifest {
-            blob_cid: "bafkreitest".to_string(),
-            blob_hash: "sha256-abc".to_string(),
-            total_size: 2_000_000,
-            mime_type: "application/octet-stream".to_string(),
-            encoding: "chunked".to_string(),
-            data_shards: 2,
-            total_shards: 2,
-            shard_size: 1_000_000,
-            shard_hashes: vec!["sha256-shard0".to_string(), "sha256-shard1".to_string()],
-            reach: "commons".to_string(),
-            author_id: None,
-            created_at: "2026-08-16T00:00:00Z".to_string(),
-            verified_at: None,
-        }
+        crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default())
+            .create_manifest(&[3u8; 2048], "application/octet-stream", "commons")
+            .expect("manifest")
     }
 
     /// Q3 wire-compat #1: round-trip a `Manifest` response.
@@ -383,8 +397,9 @@ mod tests {
         let back: BlobFetchResponse = rmp_serde::from_slice(&bytes).unwrap();
         match back {
             BlobFetchResponse::Manifest(m) => {
-                assert_eq!(m.blob_hash, manifest.blob_hash);
-                assert_eq!(m.shard_hashes, manifest.shard_hashes);
+                assert_eq!(m.blob_cid, manifest.blob_cid);
+                assert_eq!(m.chunks, manifest.chunks);
+                assert_eq!(m.stripes, manifest.stripes);
             }
             other => panic!("expected Manifest, got {other:?}"),
         }
@@ -497,28 +512,7 @@ mod tests {
 
     #[test]
     fn protocol_id_is_canonical() {
-        assert_eq!(BlobProtocol.as_ref(), "/elohim/blob/1.0.0");
-    }
-
-    /// T21 review fix #1: validate-or-die assumption — `parse_content_address`
-    /// rejects path-traversal payloads. The inbound BlobProtocol handler runs
-    /// requests through this gate before touching the filesystem, so any input
-    /// that this rejects is treated as `NotFound` upstream. Re-asserting it here
-    /// guards against future drift in the validator contract.
-    #[test]
-    fn parse_content_address_rejects_path_traversal() {
-        use crate::blob_store::BlobStore;
-        // Classic traversal payloads
-        assert!(BlobStore::parse_content_address("../../etc/passwd").is_err());
-        assert!(BlobStore::parse_content_address("/etc/passwd").is_err());
-        assert!(BlobStore::parse_content_address("..").is_err());
-        assert!(BlobStore::parse_content_address("../").is_err());
-        assert!(BlobStore::parse_content_address("sha256-../../etc/passwd").is_err());
-        // And the happy path still works
-        let valid = format!("sha256-{}", "a".repeat(64));
-        assert!(BlobStore::parse_content_address(&valid).is_ok());
-        let valid_raw = "a".repeat(64);
-        assert!(BlobStore::parse_content_address(&valid_raw).is_ok());
+        assert_eq!(BlobProtocol.as_ref(), "/elohim/blob/2.0.0");
     }
 
     /// T21 review fix #2/#6: round-trip a sizable response through the codec

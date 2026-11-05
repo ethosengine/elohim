@@ -10,7 +10,7 @@
 //! §3 L5.
 
 use crate::db::{AppContext, DbPool};
-use crate::trust::snapshot::{HeadSetEntry, SignerEdgeSet, SnapshotProof, SNAPSHOT_SCHEME_VERSION};
+use crate::trust::snapshot::{HeadSetEntry, SignerEdgeSet, SnapshotProof};
 
 // ── Source ──────────────────────────────────────────────────────────────────
 
@@ -226,18 +226,14 @@ impl LocalKeySnapshotSigner {
 
 impl SnapshotSigner for LocalKeySnapshotSigner {
     fn sign(&self, canonical_bytes: &[u8]) -> Result<SnapshotProof, SignerUnavailable> {
-        let preimage = crate::trust::snapshot::signing_preimage(canonical_bytes);
-        Ok(SnapshotProof {
-            algorithm: "ed25519".to_string(),
-            signature: elohim_epr::proof::sign(&self.keypair, &preimage),
-            scheme_version: SNAPSHOT_SCHEME_VERSION,
-        })
+        Ok(SnapshotProof::sign(&self.keypair, canonical_bytes))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trust::snapshot::SNAPSHOT_SCHEME_VERSION;
 
     #[test]
     fn the_production_signer_refuses_and_names_the_gap() {
@@ -252,24 +248,35 @@ mod tests {
     }
 
     #[test]
-    fn the_local_key_signer_produces_a_scheme_v1_ed25519_proof() {
+    fn the_local_key_signer_produces_a_scheme_v2_envelope_proof() {
+        use elohim_epr::signature::{Multikey, SignatureCheck};
         let kp = elohim_epr::AgentKeypair::from_secret(&[3u8; 32]).expect("seed");
         let signer = LocalKeySnapshotSigner::new(kp);
         let proof = signer.sign(b"canonical").expect("sign");
-        assert_eq!(proof.algorithm, "ed25519");
+        assert_eq!(SNAPSHOT_SCHEME_VERSION, 2);
         assert_eq!(proof.scheme_version, SNAPSHOT_SCHEME_VERSION);
-        assert_eq!(proof.signature.len(), 64);
-        assert!(
-            elohim_epr::proof::verify(
-                &signer.public_key_bytes(),
-                &crate::trust::snapshot::signing_preimage(b"canonical"),
-                &proof.signature
+        assert_eq!(proof.envelope.scheme, 0, "scheme 0 = Ed25519");
+        assert_eq!(proof.envelope.sig.len(), 64);
+        let expected = Multikey::ed25519(&signer.public_key_bytes());
+        assert_eq!(
+            proof.envelope.check_for(
+                &expected,
+                crate::trust::snapshot::SNAPSHOT_SIGNING_DOMAIN,
+                SNAPSHOT_SCHEME_VERSION,
+                b"canonical",
             ),
-            "the proof must verify over the DOMAIN-SEPARATED preimage"
+            SignatureCheck::Verified,
+            "the envelope verifies under the snapshot domain and the signer's own key"
         );
-        assert!(
-            !elohim_epr::proof::verify(&signer.public_key_bytes(), b"canonical", &proof.signature),
-            "and must NOT verify over the bare bytes — the domain tag is load-bearing"
+        assert_eq!(
+            proof.envelope.check_for(
+                &expected,
+                b"elohim:other:v2:",
+                SNAPSHOT_SCHEME_VERSION,
+                b"canonical"
+            ),
+            SignatureCheck::Invalid,
+            "and not under another domain — the domain tag is load-bearing"
         );
     }
 

@@ -54,7 +54,7 @@ pub fn compute(
 /// exists — the distribution-state tell. No manifest means the content never
 /// entered the distribution plane; we do NOT aggregate across all shard_locations
 /// (that would inflate counts for orphaned content), so the relation is empty and
-/// folds to the degenerate at-risk view. Malformed `shard_hashes_json` is a hard
+/// folds to the degenerate at-risk view. Malformed `shard_cids_json` is a hard
 /// error (mirrors the prior `compute`).
 fn load_manifest_and_relation(
     conn: &mut diesel::SqliteConnection,
@@ -65,13 +65,17 @@ fn load_manifest_and_relation(
     let relation = match &manifest {
         None => vec![],
         Some(m) => {
-            let shard_hashes: Vec<String> =
-                serde_json::from_str(&m.shard_hashes_json).map_err(|e| {
-                    StorageError::Internal(format!(
-                        "shard manifest for content_id={content_id} has malformed shard_hashes_json: {e}"
-                    ))
-                })?;
-            load_holder_relation(conn, h_app_id, &shard_hashes)?
+            let manifest = crate::db::shard_manifests::hydrate_manifest(m).map_err(|e| {
+                StorageError::Internal(format!(
+                    "shard manifest for content_id={content_id} does not hydrate: {e}"
+                ))
+            })?;
+            let shard_cids: Vec<String> = manifest
+                .custody_units()
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            load_holder_relation(conn, h_app_id, &shard_cids)?
         }
     };
     Ok((manifest.is_some(), relation))
@@ -449,19 +453,19 @@ pub fn snapshot_with_staleness_secs(
 /// because it takes `&mut conn`; returns the crate's `HolderRow`.
 ///
 /// Design: `genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md` §3.
-/// Raw join row: (shard_hash, peer_id, household_id, human_id, region).
+/// Raw join row: (shard_cid, peer_id, household_id, human_id, region).
 type HolderJoinRow = (String, String, Option<String>, String, Option<String>);
-/// Winning row per (shard_hash, peer_id) after dedup: (human_id, household_id, region).
+/// Winning row per (shard_cid, peer_id) after dedup: (human_id, household_id, region).
 type BestHolder = (String, Option<String>, Option<String>);
 
 pub(crate) fn load_holder_relation(
     conn: &mut diesel::SqliteConnection,
     h_app_id: &str,
-    shard_hashes: &[String],
+    shard_cids: &[String],
 ) -> Result<Vec<HolderRow>, StorageError> {
     use crate::db::diesel_schema::{collectives, humans, shard_locations};
 
-    if shard_hashes.is_empty() {
+    if shard_cids.is_empty() {
         return Ok(vec![]);
     }
 
@@ -475,9 +479,9 @@ pub(crate) fn load_holder_relation(
         )
         .left_join(collectives::table.on(collectives::id.nullable().eq(humans::household_id)))
         .filter(shard_locations::h_app_id.eq(h_app_id))
-        .filter(shard_locations::shard_hash.eq_any(shard_hashes))
+        .filter(shard_locations::shard_cid.eq_any(shard_cids))
         .select((
-            shard_locations::shard_hash,
+            shard_locations::shard_cid,
             shard_locations::peer_id,
             humans::household_id,
             humans::id,
@@ -513,12 +517,12 @@ pub(crate) fn load_holder_relation(
     let identity = HouseholdIdentity::load(conn)?;
     let rows: Vec<HolderJoinRow> = rows
         .into_iter()
-        .map(|(shard_hash, peer_id, household_id, human_id, region)| {
+        .map(|(shard_cid, peer_id, household_id, human_id, region)| {
             let key = identity.group_key_opt(household_id);
             // A cid-form household missed the id-keyed left join, so its region
             // came back NULL; backfill from whichever row anchors the group.
             let region = region.or_else(|| key.as_deref().and_then(|k| identity.region_for(k)));
-            (shard_hash, peer_id, key, human_id, region)
+            (shard_cid, peer_id, key, human_id, region)
         })
         .collect();
 
@@ -529,13 +533,13 @@ pub(crate) fn load_holder_relation(
     // SAME key onto both). Left un-deduped, ONE physical shard_location fans out
     // into multiple HolderRows and silently inflates distinct-household /
     // intra-hub / diversity counts for what is physically ONE holder. Collapse to
-    // one row per (shard_hash, peer_id) using the SAME last-write-wins-by-humans.id
+    // one row per (shard_cid, peer_id) using the SAME last-write-wins-by-humans.id
     // discipline salvage_commitment_author applies (the lexicographically-greatest
     // `id` wins) so the choice is deterministic and consistent across the crate.
     let mut best: std::collections::HashMap<(String, String), BestHolder> =
         std::collections::HashMap::new();
-    for (shard_hash, peer_id, household_id, human_id, region) in rows {
-        let key = (shard_hash, peer_id);
+    for (shard_cid, peer_id, household_id, human_id, region) in rows {
+        let key = (shard_cid, peer_id);
         match best.get(&key) {
             Some((existing_id, _, _)) if *existing_id >= human_id => {}
             _ => {
@@ -1125,7 +1129,7 @@ mod tests {
         for peer in ["uhCAkJESSICA", "uhCAkMATTHEW"] {
             diesel::insert_into(shard_locations::table)
                 .values(&NewShardLocation {
-                    shard_hash: "sha256-shard-1",
+                    shard_cid: "bafkr4igogkqu2653f3ochcusdn3qda2sekryhofdaenh7ck7esmziuicnq",
                     peer_id: peer,
                     h_app_id: "lamad",
                     status: "confirmed",
@@ -1134,8 +1138,12 @@ mod tests {
                 .expect("seed shard location");
         }
 
-        let relation = load_holder_relation(&mut conn, "lamad", &["sha256-shard-1".to_string()])
-            .expect("holder relation");
+        let relation = load_holder_relation(
+            &mut conn,
+            "lamad",
+            &["bafkr4igogkqu2653f3ochcusdn3qda2sekryhofdaenh7ck7esmziuicnq".to_string()],
+        )
+        .expect("holder relation");
 
         let relation_identity = HouseholdIdentity::load(&mut conn).expect("identity");
 

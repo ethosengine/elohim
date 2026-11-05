@@ -231,8 +231,8 @@ pub async fn aggregate_peer_topology_view(
 /// offline, that content is lost.
 ///
 /// Algorithm:
-/// 1. Find all blob_hashes authored by `agent_cid` (via `content.created_by`).
-/// 2. For each blob_hash, count distinct replica holders in `peer_blob_inventory`.
+/// 1. Find all blob_cids authored by `agent_cid` (via `content.created_by`).
+/// 2. For each blob_cid, count distinct replica holders in `peer_blob_inventory`.
 /// 3. If replica_count == 1, the sole holder is at risk.
 /// 4. Resolve the sole holder to their household_id.
 /// 5. Group by household_id, count sole-replica CIDs per household.
@@ -245,16 +245,16 @@ fn compute_resilience_cliffs(
     use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
 
     // 1) CIDs authored by this agent (content.created_by = agent_cid).
-    let my_blob_hashes: Vec<String> = c::content
+    let my_blob_cids: Vec<String> = c::content
         .filter(c::created_by.eq(agent_cid))
-        .filter(c::blob_hash.is_not_null())
-        .select(c::blob_hash)
+        .filter(c::blob_cid.is_not_null())
+        .select(c::blob_cid)
         .load::<Option<String>>(conn)?
         .into_iter()
         .flatten()
         .collect();
 
-    if my_blob_hashes.is_empty() {
+    if my_blob_cids.is_empty() {
         return Ok(vec![]);
     }
 
@@ -262,9 +262,9 @@ fn compute_resilience_cliffs(
     //      resolve that holder's household_id (falls back to peer_id).
     let mut cliff_map: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
 
-    for blob_hash in &my_blob_hashes {
+    for blob_cid in &my_blob_cids {
         let replica_peers: Vec<String> = inv::peer_blob_inventory
-            .filter(inv::blob_hash.eq(blob_hash))
+            .filter(inv::blob_cid.eq(blob_cid))
             .select(inv::peer_id)
             .load::<String>(conn)?;
 
@@ -513,7 +513,7 @@ mod tests {
                     content::title.eq("Cliff test content"),
                     content::content_type.eq("concept"),
                     content::content_format.eq("markdown"),
-                    content::blob_hash.eq(Some("blob-sole-001")),
+                    content::blob_cid.eq(Some("blob-sole-001")),
                     content::reach.eq("commons"),
                     content::validation_status.eq("valid"),
                     content::created_by.eq(Some("agent-cliff-test")),
@@ -527,8 +527,8 @@ mod tests {
             diesel::insert_into(peer_blob_inventory::table)
                 .values((
                     peer_blob_inventory::peer_id.eq("peer-sole-holder"),
-                    peer_blob_inventory::blob_hash.eq("blob-sole-001"),
-                    peer_blob_inventory::source.eq("gossip-snapshot"),
+                    peer_blob_inventory::blob_cid.eq("blob-sole-001"),
+                    peer_blob_inventory::source.eq("recon"),
                     peer_blob_inventory::sequence.eq(0i64),
                     peer_blob_inventory::last_seen_at.eq("2026-05-15T00:00:00Z"),
                 ))

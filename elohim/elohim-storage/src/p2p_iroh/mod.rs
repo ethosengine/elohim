@@ -20,11 +20,10 @@ pub mod announce_change;
 pub mod announcer;
 pub mod auth;
 pub mod auth_backends;
-mod blob_store;
+pub mod blob_store;
 pub mod codec;
 mod config;
 pub mod doorway_bootstrap;
-pub mod dual_publish;
 mod endpoint;
 pub mod epr;
 pub mod epr_atom_backend;
@@ -64,7 +63,6 @@ pub use doorway_bootstrap::{
     doorway_base_url, spawn_doorway_bootstrap, verify_and_upsert, BootstrapOutcome,
     DoorwayBootstrapInputs,
 };
-pub use dual_publish::{classify_topic, DualGossipPublisher, IrohGossipPublisher, TopicTransports};
 pub use endpoint::{build_endpoint, BuildEndpointError};
 pub use epr::{
     EprAtomBackend, EprBackend, IrohEprAtomClient, IrohEprAtomProtocol, IrohEprClient,
@@ -72,7 +70,7 @@ pub use epr::{
 };
 pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
-pub use gossip::{GossipEvent, IrohGossip};
+pub use gossip::{FanoutGossipPublisher, GossipEvent, IrohGossip, IrohGossipPublisher};
 pub use gossip_receive::{spawn_iroh_gossip_receive, IrohReceiveDeps};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use inventory_fetch::{InventoryFetchBridgeStats, IrohInventoryFetch};
@@ -97,4 +95,4 @@ pub use view_fed_backend::ViewFedServiceBackend;
 
 // Re-export the iroh-blobs Hash type so callers don't have to depend on
 // iroh-blobs directly when they live behind this module's API.
-pub use iroh_blobs::Hash as BlobHash;
+pub use iroh_blobs::Hash as BlobCid;

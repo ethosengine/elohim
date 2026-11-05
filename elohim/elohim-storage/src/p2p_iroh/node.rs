@@ -160,16 +160,15 @@ impl IrohNode {
         self.store.get_bytes(hash).await
     }
 
-    /// Fetch a **SHA-256 content-addressed** blob or shard from `peer` over
-    /// the iroh shard ALPN ([`SHARD_ALPN`]). Thin delegation to
-    /// [`fetch_blob_over_iroh`] — see that function for why this plane, and
-    /// not iroh-blobs, is the one heal-on-read races.
+    /// Fetch a payload or shard by byte CID from `peer` over the iroh shard ALPN
+    /// ([`SHARD_ALPN`]). Thin delegation to [`fetch_blob_over_iroh`] — see that
+    /// function for why this plane, and not iroh-blobs, is the one heal-on-read races.
     pub async fn fetch_blob_by_content_address(
         &self,
         peer: NodeAddr,
-        content_address: &str,
+        cid: &elohim_epr::address::ByteCid,
     ) -> Result<Vec<u8>, IrohBlobFetchError> {
-        fetch_blob_over_iroh(&self.endpoint, peer, content_address).await
+        fetch_blob_over_iroh(&self.endpoint, peer, cid).await
     }
 
     /// Shut down router (closes accept loop + endpoint) gracefully.
@@ -220,16 +219,14 @@ impl IrohBlobFetchError {
 
 /// Fetch a SHA-256 content-addressed blob/shard from `peer` over
 /// [`SHARD_ALPN`], returning the raw bytes **unverified** — the caller
-/// verifies with the same `blob_fetch::verify_blob_hash` the libp2p leg uses,
+/// verifies with the same `blob_fetch::verify_blob_cid` the libp2p leg uses,
 /// so both transports pass through one verification rule.
 ///
 /// ## Why the shard ALPN and not iroh-blobs
 ///
-/// The heal-on-read race is addressed by SHA-256 (`sha256-<hex>` / CID form);
-/// iroh-blobs is BLAKE3-addressed, so serving that race over
-/// [`IrohNode::fetch_blob_from`] would require a BLAKE3 alias
-/// (`peer_blob_inventory.blake3_hash`) that is NULL for every blob a peer did
-/// not itself ingest through the iroh store. The shard ALPN's responder
+/// iroh-blobs would need a persistent iroh copy of every payload, and there is
+/// none (C10: the `BlobStore` is the one authoritative payload store). The shard
+/// ALPN's responder
 /// ([`super::shard_backend::ShardServiceBackend`] → `ShardService::handle_get`)
 /// reads the SAME `BlobStore` the libp2p `/elohim/blob/1.0.0` responder reads,
 /// so the iroh leg has byte-for-byte availability parity with the libp2p leg
@@ -242,7 +239,7 @@ impl IrohBlobFetchError {
 pub async fn fetch_blob_over_iroh(
     endpoint: &Endpoint,
     peer: NodeAddr,
-    content_address: &str,
+    cid: &elohim_epr::address::ByteCid,
 ) -> Result<Vec<u8>, IrohBlobFetchError> {
     let conn = endpoint
         .connect(peer, SHARD_ALPN)
@@ -253,9 +250,7 @@ pub async fn fetch_blob_over_iroh(
         .await
         .map_err(|e| IrohBlobFetchError::Dial(e.to_string()))?;
 
-    let req = ShardRequest::Get {
-        hash: content_address.to_string(),
-    };
+    let req = ShardRequest::Get { cid: *cid };
     write_frame_bounded(&mut send, &req, SHARD_TRANSFER_MAX_FRAME_SIZE)
         .await
         .map_err(|e| IrohBlobFetchError::Transport(e.to_string()))?;
@@ -274,7 +269,7 @@ pub async fn fetch_blob_over_iroh(
     match res {
         ShardResponse::Data(bytes) => Ok(bytes),
         ShardResponse::NotFound | ShardResponse::ContentNotFound => {
-            Err(IrohBlobFetchError::NotFound(content_address.to_string()))
+            Err(IrohBlobFetchError::NotFound(cid.to_string()))
         }
         ShardResponse::Error(msg) => Err(IrohBlobFetchError::Transport(msg)),
         other => Err(IrohBlobFetchError::Transport(format!(
@@ -311,13 +306,13 @@ impl IrohFetchLeg {
         &self.book
     }
 
-    /// One-shot fetch of a SHA-256 content address from `peer`.
+    /// One-shot fetch of a byte CID from `peer` over the shard ALPN.
     pub async fn fetch(
         &self,
         peer: NodeAddr,
-        content_address: &str,
+        cid: &elohim_epr::address::ByteCid,
     ) -> Result<Vec<u8>, IrohBlobFetchError> {
-        fetch_blob_over_iroh(&self.endpoint, peer, content_address).await
+        fetch_blob_over_iroh(&self.endpoint, peer, cid).await
     }
 }
 

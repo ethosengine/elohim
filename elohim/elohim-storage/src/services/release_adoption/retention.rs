@@ -29,6 +29,7 @@
 //! held, and lets go the ones this peer brought here itself that nothing names
 //! any more. That is what reaches bytes this ledger never named.
 
+use elohim_epr::address::ByteCid;
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,7 +39,7 @@ use std::time::Duration;
 use elohim_cache_core::extraction::ExtractionCache;
 
 use super::{state, ArtifactClass, ReleaseManifest};
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::db::release_ledger::{self, LedgerArtifact, LedgerRelease};
 use crate::db::DbPool;
 use crate::error::StorageError;
@@ -58,7 +59,6 @@ pub fn ledger_artifacts(manifest: &ReleaseManifest) -> Vec<LedgerArtifact> {
         .artifacts
         .iter()
         .map(|a| LedgerArtifact {
-            sha256: a.sha256.to_ascii_lowercase(),
             blob_cid: a.blob_cid.clone(),
             bytes: a.bytes,
             filename: a.filename.clone(),
@@ -278,7 +278,7 @@ impl RetentionSweeper {
         let kept_blobs: HashSet<&str> = split
             .kept
             .iter()
-            .flat_map(|r| r.artifacts.iter().map(|a| a.sha256.as_str()))
+            .flat_map(|r| r.artifacts.iter().map(|a| a.blob_cid.as_str()))
             .collect();
 
         let mut report = PassReport {
@@ -315,16 +315,13 @@ impl RetentionSweeper {
             report.staging_bytes_released += self.remove_staging(&release.release_cid).await;
             let mut finished = true;
             for artifact in &release.artifacts {
-                let in_kept = kept_blobs.contains(artifact.sha256.as_str());
+                let in_kept = kept_blobs.contains(artifact.blob_cid.as_str());
                 let facts = {
                     let artifact = artifact.clone();
                     self.db(move |conn| {
                         Ok((
                             release_ledger::content_rows_naming(conn, &artifact)?,
-                            release_ledger::live_custody_pledges_naming(
-                                conn,
-                                &artifact.blob_hash(),
-                            )?,
+                            release_ledger::live_custody_pledges_naming(conn, &artifact.blob_cid)?,
                         ))
                     })
                     .await
@@ -336,7 +333,7 @@ impl RetentionSweeper {
                         // permission to release it.
                         tracing::warn!(
                             channel = %release.channel_id,
-                            blob = %artifact.blob_hash(),
+                            blob = %artifact.blob_cid,
                             error = %e,
                             "release retention: could not read whether a blob is in use; kept"
                         );
@@ -364,7 +361,7 @@ impl RetentionSweeper {
                             tracing::warn!(
                                 channel = %release.channel_id,
                                 release_cid = %release.release_cid,
-                                blob = %artifact.blob_hash(),
+                                blob = %artifact.blob_cid,
                                 error = %e,
                                 "release retention: could not let a blob go; trying again next pass"
                             );
@@ -450,20 +447,12 @@ impl RetentionSweeper {
     /// removed.
     pub(crate) async fn release_hash(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         keep: &HashSet<String>,
     ) -> Result<u64, StorageError> {
-        let sha256 = blob_hash
-            .strip_prefix("sha256-")
-            .unwrap_or(blob_hash)
-            .to_string();
-        let blob_cid = BlobStore::hash_to_cid(&sha256)
-            .map(|cid| cid.to_string())
-            .unwrap_or_default();
         self.release_blob(
             &LedgerArtifact {
-                sha256,
-                blob_cid,
+                blob_cid: blob_cid.to_string(),
                 bytes: 0,
                 filename: String::new(),
             },
@@ -482,7 +471,7 @@ impl RetentionSweeper {
         artifact: &LedgerArtifact,
         keep: &HashSet<String>,
     ) -> Result<u64, StorageError> {
-        let blob_hash = artifact.blob_hash();
+        let blob_hash = artifact.blob_cid.clone();
 
         let mut plan = {
             let blob_hash = blob_hash.clone();
@@ -503,67 +492,36 @@ impl RetentionSweeper {
 
         // The extraction first: it is what a request would be served from.
         if let Some(cache) = self.extraction.as_ref() {
-            for spelling in [
-                blob_hash.as_str(),
-                artifact.sha256.as_str(),
-                artifact.blob_cid.as_str(),
-            ] {
-                if spelling.is_empty() {
-                    continue;
-                }
-                cache
-                    .evict_blob(spelling)
-                    .await
-                    .map_err(|e| StorageError::Internal(format!("extraction evict: {e}")))?;
-            }
+            cache
+                .evict_blob(&blob_hash)
+                .await
+                .map_err(|e| StorageError::Internal(format!("extraction evict: {e}")))?;
         }
-
-        // A blob that arrived by fetch or push has an iroh copy only if some
-        // path put one there, and no alias row either way. Its BLAKE3 address
-        // is computable from the bytes while they are still here.
-        #[cfg(feature = "p2p-iroh")]
-        let computed_alias: Option<iroh_blobs::Hash> =
-            if self.iroh.is_some() && plan.blake3.is_none() {
-                self.blobs
-                    .get(&blob_hash)
-                    .await
-                    .ok()
-                    .map(|bytes| iroh_blobs::Hash::new(&bytes))
-            } else {
-                None
-            };
 
         let mut bytes = 0u64;
         for file in &plan.files {
-            if !self.blobs.exists(file).await {
+            let Ok(cid) = ByteCid::parse(file) else {
+                continue;
+            };
+            if self.blobs.exists(&cid).await == Exists::Absent {
                 continue;
             }
-            bytes += self.blobs.size(file).await.unwrap_or(0);
-            self.blobs.delete(file).await?;
-            if self.blobs.exists(file).await {
+            bytes += self.blobs.size(&cid).await.unwrap_or(0);
+            self.blobs.delete(&cid).await?;
+            if self.blobs.exists(&cid).await == Exists::Verified {
                 return Err(StorageError::Internal(format!(
-                    "blob file {file} is still present after delete"
+                    "blob {file} is still present after delete"
                 )));
             }
-        }
-
-        #[cfg(feature = "p2p-iroh")]
-        if let (Some(store), Some(alias)) = (self.iroh.as_ref(), plan.blake3.as_deref()) {
-            let hex = alias.strip_prefix("blake3-").unwrap_or(alias);
-            let hash: iroh_blobs::Hash = hex
-                .parse()
-                .map_err(|e| StorageError::Internal(format!("blake3 alias {alias}: {e}")))?;
-            store
-                .forget(hash)
-                .await
-                .map_err(|e| StorageError::Internal(format!("iroh forget {alias}: {e}")))?;
-        }
-        #[cfg(feature = "p2p-iroh")]
-        if let (Some(store), Some(hash)) = (self.iroh.as_ref(), computed_alias) {
-            store
-                .forget(hash)
-                .await
-                .map_err(|e| StorageError::Internal(format!("iroh forget {hash}: {e}")))?;
+            // Any iroh transport-cache entry under the same digest goes too.
+            #[cfg(feature = "p2p-iroh")]
+            if let Some(store) = self.iroh.as_ref() {
+                let hash = crate::p2p_iroh::blob_store::hash_for(&cid);
+                store
+                    .forget(hash)
+                    .await
+                    .map_err(|e| StorageError::Internal(format!("iroh forget {hash}: {e}")))?;
+            }
         }
 
         let self_cid = self.self_cid.clone();
@@ -691,11 +649,10 @@ mod tests {
             artifact_class: "app-bundle".to_string(),
             artifacts: blobs
                 .iter()
-                .map(|hex| LedgerArtifact {
-                    sha256: hex.to_string(),
-                    blob_cid: String::new(),
+                .map(|label| LedgerArtifact {
+                    blob_cid: elohim_epr::address::compute_bytes_cid(label.as_bytes()).to_string(),
                     bytes: 1,
-                    filename: format!("{hex}.zip"),
+                    filename: format!("{label}.zip"),
                 })
                 .collect(),
             first_seen_at: String::new(),
@@ -804,35 +761,26 @@ mod tests {
             let mut artifacts = Vec::new();
             for (i, zip) in zips.iter().enumerate() {
                 let stored = self.blobs.store(zip).await.unwrap();
-                let hex = stored.hash.trim_start_matches("sha256-").to_string();
                 let artifact = LedgerArtifact {
-                    sha256: hex,
                     blob_cid: stored.cid.to_string(),
                     bytes: zip.len() as u64,
                     filename: format!("app-{i}.zip"),
                 };
                 let mut conn = self.pool.get().unwrap();
-                let hash = artifact.blob_hash();
-                diesel::sql_query(
-                    "INSERT OR REPLACE INTO shard_manifests (content_id, h_app_id, blob_hash, \
-                     blob_cid, encoding, data_shard_count, parity_shard_count, \
-                     shard_hashes_json, total_size_bytes, shard_size_bytes, mime_type, reach, \
-                     created_at) VALUES (?, 'lamad', ?, ?, 'none', 1, 0, ?, ?, ?, \
-                     'application/zip', 'commons', '2026-10-05T00:00:00Z')",
+                let hash = artifact.blob_cid.clone();
+                crate::db::shard_manifests::record_manifest_from_bytes(
+                    &mut conn,
+                    &format!("blob:{hash}"),
+                    "lamad",
+                    zip,
+                    "application/zip",
+                    "commons",
                 )
-                .bind::<diesel::sql_types::Text, _>(format!("blob:{}", artifact.blob_cid))
-                .bind::<diesel::sql_types::Text, _>(&hash)
-                .bind::<diesel::sql_types::Text, _>(&artifact.blob_cid)
-                .bind::<diesel::sql_types::Text, _>(format!("[\"{hash}\"]"))
-                .bind::<diesel::sql_types::BigInt, _>(zip.len() as i64)
-                .bind::<diesel::sql_types::BigInt, _>(zip.len() as i64)
-                .execute(&mut conn)
                 .unwrap();
                 crate::db::peer_blob_inventory::record_self_custody(
                     &mut conn,
                     "self",
                     &hash,
-                    None,
                     "2026-10-05T00:00:00Z",
                 )
                 .unwrap();
@@ -852,7 +800,8 @@ mod tests {
         }
 
         async fn holds(&self, artifact: &LedgerArtifact) -> bool {
-            self.blobs.exists(&artifact.blob_hash()).await
+            let cid = elohim_epr::address::ByteCid::parse(&artifact.blob_cid).unwrap();
+            self.blobs.exists(&cid).await == crate::blob_store::Exists::Verified
         }
 
         fn staged(&self, cid: &str) -> bool {
@@ -900,9 +849,9 @@ mod tests {
                 !peer.holds(artifact).await,
                 "a past-window blob is still in the store"
             );
-            let hash = artifact.blob_hash();
-            assert_eq!(peer.rows("shard_manifests", "blob_hash", &hash), 0);
-            assert_eq!(peer.rows("peer_blob_inventory", "blob_hash", &hash), 0);
+            let hash = artifact.blob_cid.clone();
+            assert_eq!(peer.rows("shard_manifests", "blob_cid", &hash), 0);
+            assert_eq!(peer.rows("peer_blob_inventory", "blob_cid", &hash), 0);
         }
         assert!(!peer.staged("r1"));
         for artifact in r2.iter().chain(&r3) {
@@ -911,7 +860,7 @@ mod tests {
                 "a blob inside the window was let go"
             );
             assert_eq!(
-                peer.rows("shard_manifests", "blob_hash", &artifact.blob_hash()),
+                peer.rows("shard_manifests", "blob_cid", &artifact.blob_cid.clone()),
                 1
             );
         }
@@ -944,9 +893,9 @@ mod tests {
             let mut conn = peer.pool.get().unwrap();
             diesel::sql_query(
                 "INSERT INTO content (id, h_app_id, title, content_type, content_format, \
-                 blob_hash) VALUES ('elohim-app', 'lamad', 'App', 'app', 'html5-app', ?)",
+                 blob_cid) VALUES ('elohim-app', 'lamad', 'App', 'app', 'html5-app', ?)",
             )
-            .bind::<diesel::sql_types::Text, _>(r1[0].blob_hash())
+            .bind::<diesel::sql_types::Text, _>(r1[0].blob_cid.clone())
             .execute(&mut conn)
             .unwrap();
         }
@@ -968,7 +917,7 @@ mod tests {
         {
             let mut conn = peer.pool.get().unwrap();
             diesel::sql_query(
-                "UPDATE content SET blob_hash = 'sha256-other' WHERE id = 'elohim-app'",
+                "UPDATE content SET blob_cid = 'bafkr4ib7pfqwh27zi4mn4hgxlatflqas7gk4a3y6nfyouk64cw6nrcrsji' WHERE id = 'elohim-app'",
             )
             .execute(&mut conn)
             .unwrap();
@@ -1009,7 +958,7 @@ mod tests {
                  resource_classified_as, state) VALUES ('c1', 'lamad', 'custody-blob', 'me', \
                  'me', ?, 'active')",
             )
-            .bind::<diesel::sql_types::Text, _>(r1[0].blob_hash())
+            .bind::<diesel::sql_types::Text, _>(r1[0].blob_cid.clone())
             .execute(&mut conn)
             .unwrap();
         }
@@ -1035,16 +984,13 @@ mod tests {
         // Some unrelated blob's manifest names r1's file as one of its shards.
         {
             let mut conn = peer.pool.get().unwrap();
-            diesel::sql_query(
-                "INSERT INTO shard_manifests (content_id, h_app_id, blob_hash, encoding, \
-                 data_shard_count, parity_shard_count, shard_hashes_json, total_size_bytes, \
-                 shard_size_bytes, mime_type, reach, created_at) VALUES ('other', 'lamad', \
-                 'sha256-other', 'chunked', 1, 0, ?, 7, 7, 'application/zip', 'commons', \
-                 '2026-10-05T00:00:00Z')",
-            )
-            .bind::<diesel::sql_types::Text, _>(format!("[\"{}\"]", r1[0].blob_hash()))
-            .execute(&mut conn)
-            .unwrap();
+            crate::db::shard_manifests::insert_unit_manifest(
+                &mut conn,
+                "other",
+                "lamad",
+                "bafkr4ib7pfqwh27zi4mn4hgxlatflqas7gk4a3y6nfyouk64cw6nrcrsji",
+                &[r1[0].blob_cid.as_str()],
+            );
         }
         let report = peer.sweeper.run_pass(1, &HashSet::new()).await.unwrap();
         assert!(
@@ -1075,7 +1021,7 @@ mod tests {
         cache
             .put_app(
                 &r1[0].blob_cid,
-                &r1[0].blob_hash(),
+                &r1[0].blob_cid.clone(),
                 vec![("index.html".into(), b"old".to_vec())],
             )
             .await
@@ -1083,7 +1029,7 @@ mod tests {
         cache
             .put_app(
                 "elohim-app",
-                &r2[0].blob_hash(),
+                &r2[0].blob_cid.clone(),
                 vec![("index.html".into(), b"new".to_vec())],
             )
             .await

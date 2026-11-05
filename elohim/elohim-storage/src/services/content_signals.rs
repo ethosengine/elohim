@@ -579,11 +579,11 @@ mod tests {
 
     fn subject() -> SignalSubject {
         SignalSubject {
-            content_address: "bafkreiexample".into(),
+            content_address: "bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy".into(),
             record_id: Some("evolution-of-trust".into()),
             names: vec![
-                "bafkreiexample".into(),
-                "sha256-abc".into(),
+                "bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy".into(),
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu".into(),
                 "evolution-of-trust".into(),
                 "evo".into(),
             ],
@@ -739,27 +739,51 @@ mod tests {
         let mut limiter = SignalRateLimiter::default();
         let t0 = Instant::now();
         for _ in 0..MAX_SIGNALS_PER_SOURCE {
-            assert!(limiter.allow("bafkreia", "doorway:alpha", t0));
+            assert!(limiter.allow(
+                "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4",
+                "doorway:alpha",
+                t0
+            ));
         }
         assert!(
-            !limiter.allow("bafkreia", "doorway:alpha", t0),
+            !limiter.allow(
+                "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4",
+                "doorway:alpha",
+                t0
+            ),
             "one source cannot take more than its share"
         );
         // Other sources fill the rest of the address's allowance.
         let others = MAX_SIGNALS_PER_WINDOW - MAX_SIGNALS_PER_SOURCE;
         for i in 0..others {
-            assert!(limiter.allow("bafkreia", &format!("direct:10.0.0.{i}"), t0));
+            assert!(limiter.allow(
+                "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4",
+                &format!("direct:10.0.0.{i}"),
+                t0
+            ));
         }
         assert!(
-            !limiter.allow("bafkreia", "direct:10.0.0.250", t0),
+            !limiter.allow(
+                "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4",
+                "direct:10.0.0.250",
+                t0
+            ),
             "the address's whole allowance is spent"
         );
         assert!(
-            limiter.allow("bafkreib", "doorway:alpha", t0),
+            limiter.allow(
+                "bafkr4iaq4xht2pekj6pti2gizrmo5kciskrc7ww3ygwlejaqdeaejqovkm",
+                "doorway:alpha",
+                t0
+            ),
             "limits are per content address"
         );
         assert!(
-            limiter.allow("bafkreia", "doorway:alpha", t0 + SIGNAL_WINDOW),
+            limiter.allow(
+                "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4",
+                "doorway:alpha",
+                t0 + SIGNAL_WINDOW
+            ),
             "a new window"
         );
     }
@@ -899,7 +923,7 @@ mod tests {
         let rows = manager
             .query_by_subject(
                 &mut conn,
-                "bafkreiexample",
+                "bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy",
                 UNDECLARED_BEHAVIOUR_OBSERVATION,
             )
             .unwrap();
@@ -912,7 +936,7 @@ mod tests {
         let via_route = crate::api::observations::observations_by_subject(
             &mut conn,
             Some(&registry),
-            &format!("subjectCid=bafkreiexample&kind={UNDECLARED_BEHAVIOUR_OBSERVATION}"),
+            &format!("subjectCid=bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy&kind={UNDECLARED_BEHAVIOUR_OBSERVATION}"),
         )
         .unwrap();
         assert_eq!(
@@ -920,7 +944,10 @@ mod tests {
             2,
             "by-subject returns the recorded reports"
         );
-        assert_eq!(via_route[0].subject_cid.as_deref(), Some("bafkreiexample"));
+        assert_eq!(
+            via_route[0].subject_cid.as_deref(),
+            Some("bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy")
+        );
     }
 
     #[test]

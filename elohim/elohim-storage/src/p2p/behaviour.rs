@@ -19,6 +19,7 @@ use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
 use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
 use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtocol};
+use super::recon_wire::{ReconCodec, ReconProtocol};
 use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shamir_transport::{
     ShamirShareCodec, ShamirShareProtocol, ShamirShareRequest, ShamirShareResponse,
@@ -111,6 +112,9 @@ pub struct ElohimStorageBehaviour {
     /// handler land in F-T19/F-T20; until then the behaviour is registered
     /// (so peers advertise the protocol) but produces no handled events.
     pub view_federation: RequestResponse<ViewFederationCodec>,
+    /// Range reconciliation of blob inventories (`/elohim/inventory-recon/1.0.0`,
+    /// negentropy-v1, 4 KiB pages). The one path that re-bases a peer's cursor.
+    pub inventory_recon: RequestResponse<ReconCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -175,6 +179,13 @@ pub enum ElohimStorageBehaviourEvent {
             crate::views::ViewFederationResponse,
         >,
     ),
+    /// Inventory range-reconciliation event (`/elohim/inventory-recon/1.0.0`).
+    InventoryRecon(
+        request_response::Event<
+            super::inventory_recon::ReconRequest,
+            super::inventory_recon::ReconResponse,
+        >,
+    ),
     /// mDNS event
     Mdns(mdns::Event),
     /// Relay client event (reservations, connection through relay)
@@ -191,6 +202,24 @@ pub enum ElohimStorageBehaviourEvent {
     Ping(ping::Event),
     /// Gossipsub event (pub/sub messages)
     Gossipsub(gossipsub::Event),
+}
+
+impl
+    From<
+        request_response::Event<
+            super::inventory_recon::ReconRequest,
+            super::inventory_recon::ReconResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            super::inventory_recon::ReconRequest,
+            super::inventory_recon::ReconResponse,
+        >,
+    ) -> Self {
+        Self::InventoryRecon(event)
+    }
 }
 
 impl From<kad::Event> for ElohimStorageBehaviourEvent {
@@ -401,6 +430,12 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // Inventory range reconciliation (negentropy-v1 over 4 KiB pages).
+        let inventory_recon = RequestResponse::new(
+            [(ReconProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // Trust request-response protocol for per-connection trust negotiation
         let trust_protocol = RequestResponse::new(
             [(TrustProtocol, ProtocolSupport::Full)],
@@ -563,13 +598,18 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&integrity_revocation_topic)
             .expect("subscribe to elohim/integrity/revocation");
-        // T14: subscribe to blob inventory topic for peer-to-peer inventory reconciliation.
-        // Broadcaster peers publish `BlobInventorySnapshot` and `BlobInventoryDelta` on this topic.
-        // The receive arm in p2p/mod.rs projects arrivals into `peer_blob_inventory` (SQLite).
-        let inventory_topic = gossipsub::IdentTopic::new(super::inventory_gossip::INVENTORY_TOPIC);
-        gossipsub
-            .subscribe(&inventory_topic)
-            .expect("subscribe to elohim/inventory/blob");
+        // Blob inventory: signed delta envelopes on `elohim/inventory/blob/2`; the receive
+        // arm projects admitted deltas into `peer_blob_inventory`. The pre-crossing topic is
+        // subscribed only so its publishers are reported unavailable — its bodies are never
+        // decoded (no dual read).
+        for topic in [
+            super::inventory_gossip::INVENTORY_TOPIC,
+            super::inventory_gossip::LEGACY_INVENTORY_TOPIC,
+        ] {
+            gossipsub
+                .subscribe(&gossipsub::IdentTopic::new(topic))
+                .expect("subscribe to a blob inventory topic");
+        }
         // P3-4: subscribe to the salvage-capacity topic. Opt-in peers publish
         // `SalvageCapacityAd`; the receive arm in p2p/mod.rs projects arrivals
         // into `salvage_capacity` (SQLite), populating the salvage candidate pool.
@@ -619,6 +659,7 @@ impl ElohimStorageBehaviour {
             shamir_share,
             identity_handshake,
             view_federation,
+            inventory_recon,
             mdns,
             relay_client,
             relay_server,

@@ -249,7 +249,6 @@ mod tests {
                 description: None,
                 content_type: "concept".into(),
                 content_format: "markdown".into(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,

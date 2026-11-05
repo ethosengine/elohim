@@ -108,31 +108,31 @@ impl InventoryFetch for IrohInventoryFetch {
         _conn: &mut diesel::SqliteConnection,
         source_peer_id: &str,
         hints: &[BlobHint],
-        hashes: &[String],
+        cids: &[String],
     ) {
         self.enqueue(
             P2PCommand::InventoryAdvertisement {
                 source_peer_id: source_peer_id.to_string(),
                 hints: hints.to_vec(),
-                hashes: hashes.to_vec(),
+                cids: cids.to_vec(),
             },
             source_peer_id,
-            hashes.len(),
+            cids.len(),
         );
     }
 
-    fn request_snapshot_for_gap(&self, peer_id: &str) {
+    fn request_recon(&self, peer_id: &str) {
         let Ok(peer_id_parsed) = peer_id.parse::<libp2p::PeerId>() else {
             self.counters.unavailable.fetch_add(1, Ordering::Relaxed);
             warn!(
                 target: "elohim_storage::inventory",
                 peer_id,
-                "iroh inventory delta gap cannot request a libp2p snapshot for this peer id"
+                "iroh inventory gap: the author is no libp2p peer, so no recon session can open"
             );
             return;
         };
         self.enqueue(
-            P2PCommand::SnapshotRequest {
+            P2PCommand::ReconcileInventory {
                 peer_id: peer_id_parsed,
             },
             peer_id,

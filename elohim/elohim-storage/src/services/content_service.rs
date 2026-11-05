@@ -106,8 +106,8 @@ pub(crate) fn empty_update_view() -> crate::views::UpdateContentInputView {
         metadata: None,
         tags: None,
         reach: None,
-        blob_hash: None,
-        server_blob_hash: None,
+        blob_cid: None,
+        server_blob_cid: None,
         p2p_published_at: None,
     }
 }
@@ -199,7 +199,7 @@ fn merge_server_bundle_metadata(
             StorageError::Validation("SSR bundle metadata must be an object".into())
         })?;
         object.insert(
-            "serverBlobHash".into(),
+            "serverBlobCid".into(),
             serde_json::Value::String(hash.into()),
         );
     }
@@ -507,7 +507,7 @@ impl ContentService {
     /// The `view.metadata` field is shallow-merged with existing metadata:
     /// only the keys present in the patch object are overwritten.
     ///
-    /// Notarized fields (blob_hash, reach) are NOT written here — they are
+    /// Notarized fields (blob_cid, reach) are NOT written here — they are
     /// authored through the conductor by [`Self::update_via_conductor`] so the
     /// Holochain DHT witnesses a single head (in context with the network) that
     /// gossips to every peer. There is no diesel-direct "amber" write: a
@@ -522,14 +522,14 @@ impl ContentService {
         id: &str,
         view: crate::views::UpdateContentInputView,
     ) -> Result<crate::db::models::ContentWithTags, StorageError> {
-        if view.server_blob_hash.is_some()
+        if view.server_blob_cid.is_some()
             || view
                 .metadata
                 .as_ref()
-                .is_some_and(|metadata| metadata.0.get("serverBlobHash").is_some())
+                .is_some_and(|metadata| metadata.0.get("serverBlobCid").is_some())
         {
             return Err(StorageError::Validation(
-                "serverBlobHash requires the conductor-backed Content update".into(),
+                "serverBlobCid requires the conductor-backed Content update".into(),
             ));
         }
         let mut conn = self.conn()?;
@@ -552,7 +552,7 @@ impl ContentService {
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
                 let patch_value = patch_meta.0.clone();
-                if existing_meta.get("serverBlobHash").is_some() && !patch_value.is_object() {
+                if existing_meta.get("serverBlobCid").is_some() && !patch_value.is_object() {
                     return Err(StorageError::Validation(
                     "replacing SSR bundle metadata requires the conductor-backed Content update"
                         .into(),
@@ -585,8 +585,8 @@ impl ContentService {
             metadata_json: merged_metadata_json,
             tags: view.tags,
             reach: view.reach,
-            blob_hash: view.blob_hash,
-            server_blob_hash: view.server_blob_hash,
+            blob_cid: view.blob_cid,
+            server_blob_cid: view.server_blob_cid,
             p2p_published_at: view.p2p_published_at,
             // The HTTP PATCH path never stamps the amber tier — that is the
             // DocStore reverse-projection's job (drift-heal). Always None here.
@@ -627,9 +627,6 @@ impl ContentService {
     /// The bounded poll below sees the projection land in ~tens of ms via
     /// the in-process signal subscriber wired in Task 6.5.
     ///
-    /// Field naming: HTTP wire / storage diesel use `blob_hash`, DNA entry
-    /// uses `blob_cid` (Phase 0 refactor — same SHA256 SemEantically).
-    /// Translation happens here.
     /// `election` decides whether the committed action also becomes this row's
     /// NOTARY-DECLARED head, and is required at every call site rather than
     /// defaulted — see [`content_diesel::HeadElection`]. Request-borne
@@ -764,11 +761,10 @@ impl ContentService {
         let merged_metadata_json = merge_server_bundle_metadata(
             existing.content.metadata_json.as_deref(),
             view.metadata.as_ref().map(|value| &value.0),
-            view.server_blob_hash.as_deref(),
+            view.server_blob_cid.as_deref(),
         )?;
 
-        // The DNA target field is `blob_cid`. View carries `blob_hash`.
-        let new_blob_cid = view.blob_hash.clone();
+        let new_blob_cid = view.blob_cid.clone();
 
         // Built unconditionally: the NULL-anchor branch publishes it, and the
         // stale-anchor heal below re-publishes it when the conductor has lost
@@ -816,10 +812,8 @@ impl ContentService {
                     .unwrap_or_else(|| "{}".to_string()),
                 blob_cid: new_blob_cid
                     .clone()
-                    .or_else(|| existing.content.blob_cid.clone())
-                    .or_else(|| existing.content.blob_hash.clone()),
+                    .or_else(|| existing.content.blob_cid.clone()),
                 content_size_bytes: existing.content.content_size_bytes.map(|n| n as u64),
-                content_hash: existing.content.blob_hash.clone(),
             }
         };
 
@@ -1276,7 +1270,7 @@ fn reach_mirror_after_renotarize(
 /// answer is a refusal.
 ///
 /// A re-send of the SAME reach is not a change and is never refused — the
-/// deploy PATCH sends `{blobHash, reach}` together on every deploy and must
+/// deploy PATCH sends `{blobCid, reach}` together on every deploy and must
 /// keep working.
 fn reach_patch_refusal(
     id: &str,
@@ -1309,8 +1303,8 @@ pub struct ContentStats {
 /// The patch an anchored-row PATCH sends to `content_store::update_content`:
 /// only the fields the request carried cross the wire (absent = unchanged).
 ///
-/// `blob_cid` is the DNA name for the view's `blob_hash`; `content_size_bytes`
-/// / `content_hash` come from the entry's existing fields (the coordinator
+/// `blob_cid` is the view's byte CID; `content_size_bytes` comes from the
+/// entry's existing fields (the coordinator
 /// keeps an inline-only entry's size coherent with a patched body). The BODY
 /// rides here (content-body-travels): a changed body on an anchored row is a
 /// new signed version, and it reaches other peers only inside the entry they
@@ -1329,7 +1323,6 @@ pub(crate) fn anchored_update_input(
         id: id.to_string(),
         blob_cid,
         content_size_bytes: None,
-        content_hash: None,
         title: view.title.clone(),
         description: view.description.clone(),
         metadata_json: merged_metadata_json,
@@ -1427,7 +1420,7 @@ mod tests {
     /// The 2026-10-07 household recast: `update_content` answers PENDING (no
     /// canonical identity root on this network) where it used to answer "no
     /// Content entry found", so the stale-anchor heal never fired and the
-    /// stage leg's blobHash PATCH failed for 50+ minutes. Both spellings of
+    /// stage leg's blobCid PATCH failed for 50+ minutes. Both spellings of
     /// "no root here" heal; a root that exists but has not gossiped in does not.
     #[test]
     fn stale_anchor_heal_matches_both_spellings_of_no_root() {
@@ -1598,7 +1591,7 @@ mod tests {
 
     #[test]
     fn idempotent_reach_resend_is_not_refused() {
-        // The deploy PATCH sends {blobHash, reach} together and re-sends the
+        // The deploy PATCH sends {blobCid, reach} together and re-sends the
         // SAME reach on every deploy. Refusing that would 400 every deploy.
         assert!(reach_patch_refusal("c1", Some(ANCHOR), "public", Some("public")).is_none());
     }
@@ -1665,21 +1658,23 @@ mod tests {
             metadata: None,
             tags: None,
             reach: None,
-            blob_hash: None,
-            server_blob_hash: None,
+            blob_cid: None,
+            server_blob_cid: None,
             p2p_published_at: None,
         }
     }
 
     #[test]
-    fn server_blob_hash_only_patch_requires_conductor() {
+    fn server_blob_cid_only_patch_requires_conductor() {
         let service = ContentService::new(
             crate::test_util::test_pool(),
             AppContext::default_lamad(),
             Arc::new(EventBus::new()),
         );
         let view = crate::views::UpdateContentInputView {
-            server_blob_hash: Some("sha256-server".into()),
+            server_blob_cid: Some(
+                "bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m".into(),
+            ),
             ..empty_patch_view()
         };
         assert!(matches!(
@@ -1695,7 +1690,10 @@ mod tests {
         {
             let mut conn = pool.get().unwrap();
             for (id, metadata) in [
-                ("ssr-app", r#"{"serverBlobHash":"sha256-server","keep":1}"#),
+                (
+                    "ssr-app",
+                    r#"{"serverBlobCid":"bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m","keep":1}"#,
+                ),
                 ("plain", "{}"),
             ] {
                 content_diesel::upsert_with_anchor(
@@ -1725,12 +1723,15 @@ mod tests {
             .update("ssr-app", patch(serde_json::json!({"other":2})))
             .unwrap();
         assert_eq!(
-            updated.content.server_blob_hash.as_deref(),
-            Some("sha256-server")
+            updated.content.server_blob_cid.as_deref(),
+            Some("bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m")
         );
         let metadata: serde_json::Value =
             serde_json::from_str(updated.content.metadata_json.as_deref().unwrap()).unwrap();
-        assert_eq!(metadata["serverBlobHash"], "sha256-server");
+        assert_eq!(
+            metadata["serverBlobCid"],
+            "bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m"
+        );
         assert_eq!(metadata["keep"], 1);
         assert_eq!(metadata["other"], 2);
         assert!(service
@@ -1742,7 +1743,7 @@ mod tests {
     fn server_bundle_metadata_preserves_other_fields_and_never_imports_a_sql_hint() {
         let patch = serde_json::json!({"newField": true});
         let merged = merge_server_bundle_metadata(
-            Some(r#"{"keep":42,"serverBlobHash":"old"}"#),
+            Some(r#"{"keep":42,"serverBlobCid":"old"}"#),
             Some(&patch),
             Some("new"),
         )
@@ -1750,7 +1751,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&merged).unwrap(),
-            serde_json::json!({"keep":42,"newField":true,"serverBlobHash":"new"})
+            serde_json::json!({"keep":42,"newField":true,"serverBlobCid":"new"})
         );
         assert_eq!(
             merge_server_bundle_metadata(Some("{}"), None, None).unwrap(),
@@ -1992,7 +1993,6 @@ mod tests {
             description: None,
             content_type: "concept".into(),
             content_format: "markdown".into(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,

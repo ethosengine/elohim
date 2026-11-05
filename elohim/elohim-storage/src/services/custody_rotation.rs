@@ -15,7 +15,7 @@
 //! underneath the pledge**.
 //!
 //! The seeder says so in its own words (`genesis/seeder/src/seed-commitments.ts`):
-//! "a server-bundle re-upload mints a new serverBlobHash and therefore a NEW
+//! "a server-bundle re-upload mints a new serverBlobCid and therefore a NEW
 //! commitment id; the old pledge is not superseded automatically (that reconcile
 //! pass remains out of scope)". This module is that reconcile pass.
 //!
@@ -45,7 +45,7 @@
 //!
 //! A custody pledge can name either of a content's two artifacts: the browser
 //! bundle (`content.blob_hash`) or the SSR server bundle
-//! (`content.server_blob_hash`), discriminated by `metadata.artifactRole`
+//! (`content.server_blob_cid`), discriminated by `metadata.artifactRole`
 //! (`"ssr-server"`). Comparing an ssr-server pledge against `blob_hash` would
 //! read as divergent every single tick and rotate it onto the WRONG artifact,
 //! so the role selects the column — and the successor carries the role forward
@@ -79,7 +79,7 @@ pub enum ArtifactRole {
     /// The browser bundle — `content.blob_hash`. The default when a pledge
     /// records no role (every pre-role commitment).
     Content,
-    /// The SSR server bundle — `content.server_blob_hash`.
+    /// The SSR server bundle — `content.server_blob_cid`.
     SsrServer,
 }
 
@@ -216,17 +216,17 @@ fn current_blob_for(
     let row: Option<(Option<String>, Option<String>)> = c::content
         .filter(c::h_app_id.eq(h_app_id))
         .filter(c::id.eq(content_id))
-        .select((c::blob_hash, c::server_blob_hash))
+        .select((c::blob_cid, c::server_blob_cid))
         .first::<(Option<String>, Option<String>)>(conn)
         .optional()
         .map_err(|e| StorageError::Database(format!("custody rotation: content lookup: {e}")))?;
 
-    let Some((blob_hash, server_blob_hash)) = row else {
+    let Some((blob_hash, server_blob_cid)) = row else {
         return Ok(None);
     };
     let picked = match role {
         ArtifactRole::Content => blob_hash,
-        ArtifactRole::SsrServer => server_blob_hash,
+        ArtifactRole::SsrServer => server_blob_cid,
     };
     Ok(picked.filter(|h| !h.trim().is_empty()))
 }
@@ -394,7 +394,9 @@ pub fn run_rotation_pass(
         // supersession whose successor is already notarized has no byte
         // precondition — the promise over the new bytes already stands.
         if candidate.author_needed {
-            if !local_store.has(&candidate.current_blob_hash) {
+            let held = elohim_epr::address::ByteCid::parse(&candidate.current_blob_hash)
+                .is_ok_and(|cid| local_store.has(&cid));
+            if !held {
                 outcome.bytes_absent += 1;
                 crate::metrics::inc_custody_rotation_skipped(CustodyRotationSkip::BytesAbsent);
                 tracing::debug!(
@@ -605,17 +607,18 @@ impl RotationAuthor for ConductorRotationAuthor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::{NewContent, NewReaCommitment, NewShardManifest};
+    use crate::db::models::{NewContent, NewReaCommitment};
     use crate::metrics::CustodyRotationSkip;
     use crate::test_util::test_pool;
 
     const APP: &str = "lamad";
     const SELF: &str = "uhCAkSelfAgent";
     const STEWARD: &str = "uhCAkStewardAgent";
-    /// The bytes the content points at now.
-    const NEW_BLOB: &str = "sha256-93ecnewblob";
+    /// The bytes the content points at now: `compute_bytes_cid(NEW_BLOB_BYTES)`.
+    const NEW_BLOB_BYTES: &[u8] = b"93ecnewblob";
+    const NEW_BLOB: &str = "bafkr4iafyukwtnwda5p45omkwrd755ukvvjqoca2phutltxutrq4qj2cvy";
     /// The bytes the seeded pledge still names.
-    const OLD_BLOB: &str = "sha256-7ce8oldblob";
+    const OLD_BLOB: &str = "bafkr4igipiaqow4qoabrcnsb6dygtw2cuswhct3emsclfafrpmsrstupc4";
 
     fn ctx() -> AppContext {
         AppContext::new(APP)
@@ -642,8 +645,8 @@ mod tests {
     /// A `LocalBlobStore` fake holding an explicit hash list.
     struct FakeStore(Vec<String>);
     impl LocalBlobStore for FakeStore {
-        fn has(&self, hash: &str) -> bool {
-            self.0.iter().any(|h| h == hash)
+        fn has(&self, cid: &elohim_epr::address::ByteCid) -> bool {
+            self.0.contains(&cid.to_string())
         }
     }
 
@@ -745,7 +748,7 @@ mod tests {
     fn seed_stale_pledge(conn: &mut SqliteConnection, id: &str, content_id: &str) {
         let metadata = serde_json::json!({
             "seedGeneration": "genesis",
-            "blobHash": OLD_BLOB,
+            "blobCid": OLD_BLOB,
             "contentId": content_id,
         })
         .to_string();
@@ -764,8 +767,8 @@ mod tests {
     fn insert_content(
         conn: &mut SqliteConnection,
         id: &str,
-        blob_hash: Option<&str>,
-        server_blob_hash: Option<&str>,
+        blob_cid: Option<&str>,
+        server_blob_cid: Option<&str>,
     ) {
         use crate::db::diesel_schema::content;
         diesel::insert_into(content::table)
@@ -776,15 +779,14 @@ mod tests {
                 description: None,
                 content_type: "concept",
                 content_format: "html5-app",
-                blob_hash,
-                blob_cid: None,
+                blob_cid,
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: "commons",
                 created_by: None,
                 content_body: None,
                 dht_anchor_hash: None,
-                server_blob_hash,
+                server_blob_cid,
             })
             .execute(conn)
             .expect("insert content");
@@ -905,7 +907,7 @@ mod tests {
             STEWARD,
             OLD_BLOB,
             "active",
-            Some(r#"{"blobHash":"sha256-7ce8oldblob"}"#),
+            Some(r#"{"blobCid":"bafkr4igipiaqow4qoabrcnsb6dygtw2cuswhct3emsclfafrpmsrstupc4"}"#),
             APP,
         );
 
@@ -944,14 +946,19 @@ mod tests {
         );
     }
 
-    /// An ssr-server pledge is compared against `server_blob_hash`, never the
+    /// An ssr-server pledge is compared against `server_blob_cid`, never the
     /// browser bundle — otherwise it would read divergent every tick and rotate
     /// onto the wrong artifact.
     #[test]
     fn ssr_server_pledge_tracks_the_server_blob_column() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert_content(&mut conn, "c1", Some(NEW_BLOB), Some("sha256-serverNEW"));
+        insert_content(
+            &mut conn,
+            "c1",
+            Some(NEW_BLOB),
+            Some("bafkr4ic5loihewpnlwh275trbu5uoaul7n5cptb6vr3xyu5qhk54rb4obu"),
+        );
         let metadata = serde_json::json!({
             "contentId": "c1",
             "artifactRole": "ssr-server",
@@ -962,7 +969,7 @@ mod tests {
             "cb-ssr",
             SELF,
             STEWARD,
-            "sha256-serverOLD",
+            "bafkr4idsolyqyct6cp52jumttftnfsvoxdaon3nesajwhltes7oylodwzu",
             "active",
             Some(&metadata),
             APP,
@@ -971,7 +978,10 @@ mod tests {
         let found = select_rotation_candidates(&mut conn, APP, &selves()).expect("detect");
 
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].current_blob_hash, "sha256-serverNEW");
+        assert_eq!(
+            found[0].current_blob_hash,
+            "bafkr4ic5loihewpnlwh275trbu5uoaul7n5cptb6vr3xyu5qhk54rb4obu"
+        );
         assert_eq!(found[0].artifact_role, ArtifactRole::SsrServer);
     }
 
@@ -1229,7 +1239,9 @@ mod tests {
             &mut conn,
             &ctx(),
             &selves(),
-            &FakeStore(vec!["sha256-somethingelse".to_string()]),
+            &FakeStore(vec![
+                "bafkr4idnajl7z2zsk5ytuqv5iwms2tona3abh7tdcjnxkrzu4ftncqiroy".to_string(),
+            ]),
             &author,
         )
         .expect("pass");
@@ -1280,29 +1292,31 @@ mod tests {
         insert_content(&mut conn, "c1", Some(NEW_BLOB), None);
         seed_stale_pledge(&mut conn, "custody-blob-stale", "c1");
 
-        // encoding "none": the single shard IS the whole blob, so
-        // shard_hash == blob_hash (services::self_stewardship's rationale).
-        let manifest = NewShardManifest {
-            content_id: "c1",
-            h_app_id: APP,
-            blob_hash: NEW_BLOB,
-            blob_cid: None,
-            encoding: "none",
-            data_shard_count: 1,
-            parity_shard_count: 0,
-            shard_hashes_json: &serde_json::to_string(&[NEW_BLOB]).unwrap(),
-            total_size_bytes: 0,
-            shard_size_bytes: 0,
-            mime_type: "html5-app",
-            reach: "commons",
-        };
-        crate::db::shard_manifests::upsert_manifest(&mut conn, &manifest).expect("manifest");
+        // A one-chunk payload: its manifest's single custody unit IS the whole
+        // blob, so shard_cid == blob_cid (services::self_stewardship's rationale).
+        let manifest = crate::db::shard_manifests::record_manifest_from_bytes(
+            &mut conn,
+            "c1",
+            APP,
+            NEW_BLOB_BYTES,
+            "html5-app",
+            "commons",
+        )
+        .expect("manifest");
+        assert_eq!(
+            crate::db::shard_manifests::custody_unit_cids(&manifest),
+            vec![NEW_BLOB.to_string()]
+        );
 
         // Locally-witnessed possession, recorded only because the bytes are here.
         let store = holding_new_blob();
         assert_eq!(
             crate::services::self_stewardship::record_self_held_shard(
-                &mut conn, &store, NEW_BLOB, SELF, APP
+                &mut conn,
+                &store,
+                &elohim_epr::address::ByteCid::parse(NEW_BLOB).unwrap(),
+                SELF,
+                APP
             )
             .expect("record"),
             crate::services::self_stewardship::SelfHeldOutcome::Recorded,

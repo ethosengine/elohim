@@ -501,9 +501,8 @@ mod tests {
             "../../../../../../genesis/a2o/scripts/__tests__/fixtures/release-manifest-config-epr.json"
         )).unwrap();
         body["channelId"] = serde_json::json!(channel);
-        body["artifacts"][0]["blobCid"] = serde_json::json!(blob.cid);
+        body["artifacts"][0]["blobCid"] = serde_json::json!(blob.cid.to_string());
         body["artifacts"][0]["bytes"] = serde_json::json!(payload.len());
-        body["artifacts"][0]["sha256"] = serde_json::json!(sha256_hex(payload.as_bytes()));
         let manifest = verify::verify_shape(&body).unwrap();
         struct FixtureReality(InstalledReality);
         #[async_trait::async_trait]
@@ -876,7 +875,6 @@ mod tests {
                     description: None,
                     content_type: "concept".to_string(),
                     content_format: "markdown".to_string(),
-                    blob_hash: Some(hash.clone()),
                     blob_cid: Some(hash.clone()),
                     content_size_bytes: None,
                     metadata_json: None,
@@ -924,7 +922,9 @@ mod tests {
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(&pointers[0].0)),
         )
-        .set(content::blob_hash.eq(Some("sha256-moved-by-another-writer")))
+        .set(content::blob_cid.eq(Some(
+            "bafkr4ic5t33jhg2gepqb3ksdcr2lhbptmxgvs2mreeavnvjsbaa5ze4lae",
+        )))
         .execute(&mut pool.get().unwrap())
         .unwrap();
 

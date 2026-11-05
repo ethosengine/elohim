@@ -63,8 +63,8 @@ impl EprBackend for EprServiceBackend {
             }
             EprRequest::ResolveBatch { ids } => self.service.handle_resolve_batch(ids),
             EprRequest::GetDocument { id } => self.service.handle_get_document(&id),
-            EprRequest::QueryDelivery { blob_hash } => {
-                self.service.handle_query_delivery(blob_hash).await
+            EprRequest::QueryDelivery { blob_cid } => {
+                self.service.handle_query_delivery(blob_cid).await
             }
             EprRequest::Announce { head } => {
                 // Identity binding is now published via the dual-publish gossip path

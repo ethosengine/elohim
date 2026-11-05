@@ -18,6 +18,8 @@
 
 use std::sync::Arc;
 
+use elohim_epr::address::ByteCid;
+
 use diesel::SqliteConnection;
 use sha2::{Digest, Sha256};
 
@@ -213,30 +215,31 @@ pub fn deterministic_spool_custody_id(provider: &str, receiver: &str, ward: &str
 }
 
 /// Build the canonical storage-layer custody input from an exact manifest
-/// address. Runtime callers must pass `ShardManifest.blob_hash` directly; this
-/// function never resolves or prefers a content-row hash field.
+/// address. Runtime callers pass `ShardManifest.blob_cid` (the byte CID)
+/// directly; this function never resolves or prefers a content-row field.
 pub fn build_custody_blob_input(
-    blob_marker: &str,
+    blob_cid: &ByteCid,
     blob_size_bytes: u64,
     provider: &str,
     receiver: &str,
     content_id: Option<&str>,
     origin: &str,
 ) -> CreateReaCommitmentInput {
+    let blob_marker = blob_cid.to_string();
     CreateReaCommitmentInput {
-        id: Some(deterministic_custody_id(provider, receiver, blob_marker)),
+        id: Some(deterministic_custody_id(provider, receiver, &blob_marker)),
         action: "custody-blob".to_string(),
         provider: provider.to_string(),
         receiver: receiver.to_string(),
         resource_conforms_to: Some("blob".to_string()),
-        resource_classified_as: Some(blob_marker.to_string()),
+        resource_classified_as: Some(blob_marker.clone()),
         resource_quantity_value: Some(blob_size_bytes.min(f32::MAX as u64) as f32),
         resource_quantity_unit: Some("B".to_string()),
         note: Some(format!("{provider} commits self-custody of {blob_marker}")),
         metadata_json: Some(
             serde_json::json!({
                 "origin": origin,
-                "blobHash": blob_marker,
+                "blobCid": blob_marker,
                 "contentId": content_id,
                 "consentBasis": "node-self-stewardship-placement",
             })
@@ -307,7 +310,7 @@ impl ReaCommitmentService {
     pub async fn ensure_active_self_custody(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
-        blob_marker: &str,
+        blob_cid: &ByteCid,
         blob_size_bytes: u64,
         provider: &str,
         content_id: Option<&str>,
@@ -315,7 +318,7 @@ impl ReaCommitmentService {
     ) -> Result<EnsureCustodyOutcome, StorageError> {
         let _guard = CUSTODY_AUTHOR_LOCK.lock().await;
         let input = build_custody_blob_input(
-            blob_marker,
+            blob_cid,
             blob_size_bytes,
             provider,
             provider,
@@ -1509,9 +1512,10 @@ mod tests {
             updated_at: "2026-05-29T00:00:00Z".to_string(),
             schema_version: 1,
             validation_status: "Valid".to_string(),
-            blob_cid: Some("sha256-deadbeef".to_string()),
+            blob_cid: Some(
+                "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u".to_string(),
+            ),
             content_size_bytes: Some(4096),
-            content_hash: None,
         };
 
         let bytes = rmp_serde::to_vec_named(&original).expect("encode Content");
@@ -1718,7 +1722,10 @@ mod tests {
     #[test]
     fn runtime_custody_input_uses_exact_manifest_address_and_shared_id() {
         let input = build_custody_blob_input(
-            "sha256-server-artifact",
+            &elohim_epr::address::ByteCid::parse(
+                "bafkr4id7yr5s7was2aibyohjvzbhpwzoaruk7yiuex2dy5hshpjaf2vmo4",
+            )
+            .unwrap(),
             4096,
             "uhCAk-self",
             "uhCAk-self",
@@ -1730,13 +1737,13 @@ mod tests {
             Some(deterministic_custody_id(
                 "uhCAk-self",
                 "uhCAk-self",
-                "sha256-server-artifact"
+                "bafkr4id7yr5s7was2aibyohjvzbhpwzoaruk7yiuex2dy5hshpjaf2vmo4"
             ))
             .as_deref()
         );
         assert_eq!(
             input.resource_classified_as.as_deref(),
-            Some("sha256-server-artifact")
+            Some("bafkr4id7yr5s7was2aibyohjvzbhpwzoaruk7yiuex2dy5hshpjaf2vmo4")
         );
         assert_eq!(input.resource_quantity_value, Some(4096.0));
         assert_eq!(input.resource_quantity_unit.as_deref(), Some("B"));
@@ -1748,8 +1755,16 @@ mod tests {
 
     #[test]
     fn runtime_custody_id_changes_with_the_exact_artifact_address() {
-        let browser = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-browser");
-        let server = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-server");
+        let browser = deterministic_custody_id(
+            "uhCAk-self",
+            "uhCAk-self",
+            "bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi",
+        );
+        let server = deterministic_custody_id(
+            "uhCAk-self",
+            "uhCAk-self",
+            "bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m",
+        );
         assert_ne!(browser, server);
     }
 }

@@ -53,7 +53,6 @@ use diesel::prelude::*;
 use diesel::SqliteConnection;
 use tracing::{info, warn};
 
-use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::reconcile::custody::CommitmentAuthor;
@@ -117,7 +116,7 @@ impl SkipReason {
 pub struct SpoolCustodySkip {
     /// Ward (`agent_cid`) whose spool commitment was being expanded.
     pub ward: String,
-    /// Blob marker (`sha256-<hex>`) when the skip is per-witness; `None` when
+    /// Blob marker (byte CID) when the skip is per-witness; `None` when
     /// the whole ward was skipped.
     pub blob: Option<String>,
     pub reason: SkipReason,
@@ -290,7 +289,7 @@ fn advertised_blobs(
     use crate::db::diesel_schema::peer_blob_inventory as pbi;
     let rows: Vec<String> = pbi::table
         .filter(pbi::peer_id.eq_any(peer_ids))
-        .select(pbi::blob_hash)
+        .select(pbi::blob_cid)
         .load(conn)
         .map_err(|e| StorageError::Database(format!("spool custody: advertised blobs: {e}")))?;
     Ok(rows
@@ -299,18 +298,19 @@ fn advertised_blobs(
         .collect())
 }
 
-/// Canonical digest key shared by every accepted content-address rendering.
+/// The canonical byte-CID text of a content address (full decode); anything else
+/// names no blob.
 fn digest_key(address: &str) -> Option<String> {
-    BlobStore::parse_content_address(address)
+    elohim_epr::address::ByteCid::parse(address)
         .ok()
-        .map(|digest| digest.to_ascii_lowercase())
+        .map(|cid| cid.to_string())
 }
 
 /// Death-witness content rows held locally, as `digest -> size_bytes`.
 ///
 /// This is the ONLY qualifier for "is that advertised blob a death witness":
-/// `peer_blob_inventory` carries no metadata column (peer_id, blob_hash,
-/// last_seen_at, source, sequence, blake3_hash, transport_affinity) and the
+/// `peer_blob_inventory` carries no metadata column (peer_id, blob_cid,
+/// last_seen_at, source, sequence) and the
 /// gossip `BlobHint` is consumed by the fetch prioritizer without being
 /// persisted — so there is no inventory-side marker to fall back to. A witness
 /// this custodian has no content row for is invisible to the pass until the row
@@ -325,9 +325,9 @@ fn local_death_witnesses(
     use crate::db::diesel_schema::content;
     let rows: Vec<(Option<String>, Option<String>, Option<i32>)> = content::table
         .filter(content::content_type.eq("issue-report"))
-        .filter(content::blob_hash.is_not_null())
+        .filter(content::blob_cid.is_not_null())
         .select((
-            content::blob_hash,
+            content::blob_cid,
             content::metadata_json,
             content::content_size_bytes,
         ))
@@ -335,8 +335,8 @@ fn local_death_witnesses(
         .map_err(|e| StorageError::Database(format!("spool custody: witness rows: {e}")))?;
 
     let mut witnesses = HashMap::new();
-    for (blob_hash, metadata_json, size) in rows {
-        let (Some(blob_hash), Some(metadata_json)) = (blob_hash, metadata_json) else {
+    for (blob_cid, metadata_json, size) in rows {
+        let (Some(blob_cid), Some(metadata_json)) = (blob_cid, metadata_json) else {
             continue;
         };
         let is_witness = serde_json::from_str::<serde_json::Value>(&metadata_json)
@@ -348,7 +348,7 @@ fn local_death_witnesses(
             })
             .unwrap_or(false);
         if is_witness {
-            if let Some(digest) = digest_key(&blob_hash) {
+            if let Some(digest) = digest_key(&blob_cid) {
                 witnesses.insert(digest, size.map(|s| s.max(0) as u64));
             }
         }
@@ -479,7 +479,7 @@ pub fn run_spool_custody_pass(
         let mut bytes_left = pledge.bounds.max_bytes;
 
         for digest in candidates {
-            let blob_marker = format!("sha256-{digest}");
+            let blob_marker = digest.clone();
             if covered.contains(digest) {
                 pass.already += 1;
                 continue;
@@ -619,8 +619,6 @@ impl CommitmentAuthor for SpoolCustodyAuthor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cid::Cid;
-    use multihash_codetable::{Code, MultihashDigest};
 
     use crate::db::content_diesel::{create_content, CreateContentInput};
     use crate::db::models::{NewPeerIdentityBindingRow, NewReaCommitment};
@@ -630,12 +628,9 @@ mod tests {
 
     const SELF_AGENT: &str = "uhCAk-matthew";
     const WARD: &str = "uhCAk-jessica";
-    const WITNESS_A: &str =
-        "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const WITNESS_B: &str =
-        "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const NOT_A_WITNESS: &str =
-        "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const WITNESS_A: &str = "bafkr4ichfrissdlap4ia2ibw7xhn25mqxorel2nn5mqtmsqghn53jsuby4";
+    const WITNESS_B: &str = "bafkr4icufwcvskyhqc5ct7rgitz76xebwwevdy3uwm6aehrw6ymkol7q6m";
+    const NOT_A_WITNESS: &str = "bafkr4icjoacz45cbheotswjobehjde6ymd2efmulohfqle6aa4ri7w2xtm";
 
     fn now() -> DateTime<Utc> {
         Utc::now()
@@ -645,13 +640,8 @@ mod tests {
         at.format("%Y-%m-%dT%H:%M:%SZ").to_string()
     }
 
-    fn witness_addresses(bytes: &[u8]) -> (String, String, String) {
-        let digest = Code::Sha2_256.digest(bytes);
-        (
-            BlobStore::compute_hash(bytes),
-            Cid::new_v1(0x55, digest).to_string(),
-            Cid::new_v1(0x71, digest).to_string(),
-        )
+    fn witness_cid(bytes: &[u8]) -> String {
+        elohim_epr::address::compute_bytes_cid(bytes).to_string()
     }
 
     /// Records what a pass authored, exactly like the salvage tests' harness —
@@ -722,7 +712,7 @@ mod tests {
             .expect("insert custody-spool");
     }
 
-    fn seed_witness_row(conn: &mut SqliteConnection, id: &str, blob_hash: &str, kind: &str) {
+    fn seed_witness_row(conn: &mut SqliteConnection, id: &str, blob_cid: &str, kind: &str) {
         create_content(
             conn,
             &AppContext::default_lamad(),
@@ -732,8 +722,7 @@ mod tests {
                 description: None,
                 content_type: "issue-report".to_string(),
                 content_format: "json".to_string(),
-                blob_hash: Some(blob_hash.to_string()),
-                blob_cid: None,
+                blob_cid: Some(blob_cid.to_string()),
                 content_size_bytes: Some(1024),
                 metadata_json: Some(serde_json::json!({ "kind": kind }).to_string()),
                 reach: "private".to_string(),
@@ -748,8 +737,8 @@ mod tests {
 
     fn seed_inventory(conn: &mut SqliteConnection, peer_id: &str, blobs: &[&str], at: &str) {
         let owned: Vec<String> = blobs.iter().map(|b| b.to_string()).collect();
-        crate::db::peer_blob_inventory::apply_snapshot(conn, peer_id, &owned, 1, at)
-            .expect("apply inventory snapshot");
+        crate::db::peer_blob_inventory::apply_delta(conn, peer_id, &owned, &[], 1, at)
+            .expect("apply inventory delta");
     }
 
     fn seed_binding(conn: &mut SqliteConnection, peer_id: &str, agent_cid: &str, at: &str) {
@@ -831,79 +820,19 @@ mod tests {
     }
 
     #[test]
-    fn authors_legacy_marker_when_content_is_raw_cid_and_inventory_is_legacy() {
+    fn deduplicates_an_existing_custody_blob_named_in_a_list() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let at = now();
-        let (legacy, raw_cid, _) = witness_addresses(b"raw content, legacy inventory");
-        seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
-        seed_witness_row(
-            &mut conn,
-            "witness-raw-content",
-            &raw_cid,
-            DEATH_WITNESS_KIND,
-        );
-        seed_inventory(&mut conn, WARD, &[&legacy], &iso(at));
-
-        let author = RecordingAuthor::default();
-        let pass = run_spool_custody_pass(
-            &mut conn,
-            Some(SELF_AGENT),
-            &author,
-            SpoolCustodyConfig { tick_seconds: 3600 },
-            at,
-        )
-        .unwrap();
-
-        assert_eq!(pass.authored, vec![legacy.clone()]);
-        assert_eq!(author.tuples().len(), 1);
-        assert_eq!(author.tuples()[0].0, legacy);
-    }
-
-    #[test]
-    fn authors_legacy_marker_when_content_is_legacy_and_inventory_is_raw_cid() {
-        let pool = test_pool();
-        let mut conn = pool.get().unwrap();
-        let at = now();
-        let (legacy, raw_cid, _) = witness_addresses(b"legacy content, raw inventory");
-        seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
-        seed_witness_row(
-            &mut conn,
-            "witness-legacy-content",
-            &legacy,
-            DEATH_WITNESS_KIND,
-        );
-        seed_inventory(&mut conn, WARD, &[&raw_cid], &iso(at));
-
-        let author = RecordingAuthor::default();
-        let pass = run_spool_custody_pass(
-            &mut conn,
-            Some(SELF_AGENT),
-            &author,
-            SpoolCustodyConfig { tick_seconds: 3600 },
-            at,
-        )
-        .unwrap();
-
-        assert_eq!(pass.authored, vec![legacy.clone()]);
-        assert_eq!(author.tuples().len(), 1);
-        assert_eq!(author.tuples()[0].0, legacy);
-    }
-
-    #[test]
-    fn deduplicates_existing_custody_blob_across_renderings() {
-        let pool = test_pool();
-        let mut conn = pool.get().unwrap();
-        let at = now();
-        let (legacy, raw_cid, witness_cid) = witness_addresses(b"existing rendered custody");
+        let witness_cid = witness_cid(b"existing rendered custody");
         seed_spool_commitment(&mut conn, SELF_AGENT, WARD, None);
         seed_witness_row(
             &mut conn,
             "witness-existing-custody",
-            &raw_cid,
+            &witness_cid,
             DEATH_WITNESS_KIND,
         );
-        seed_inventory(&mut conn, WARD, &[&legacy], &iso(at));
+        seed_inventory(&mut conn, WARD, &[&witness_cid], &iso(at));
 
         use crate::db::diesel_schema::rea_commitments;
         let classification = serde_json::json!([witness_cid]).to_string();

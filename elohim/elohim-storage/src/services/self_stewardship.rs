@@ -29,7 +29,7 @@
 //!
 //! This is NOT a no-op in practice: `sharding::ShardEncoder` uses
 //! `encoding = "none"` for blobs ≤ `SINGLE_SHARD_MAX` (16 MiB), where the single
-//! shard IS the whole blob and `shard_hash == blob_hash` — bytes this node
+//! shard IS the whole blob and `shard_cid == blob_cid` — bytes this node
 //! demonstrably holds (they are what it just encoded). Larger content
 //! (`"chunked"` / `"rs-4-7"`) produces derived shard payloads that are NOT in
 //! the local blob store, so those honestly record no self-held location and
@@ -77,30 +77,31 @@ pub enum SelfHeldOutcome {
     NotAgentCid,
 }
 
-/// Record that THIS node holds `shard_hash`, but only if it verifiably does.
+/// Record that THIS node holds `shard_cid`, but only if it verifiably does.
 ///
-/// Returns [`SelfHeldOutcome::Recorded`] iff `local_store.has(shard_hash)` and
+/// Returns [`SelfHeldOutcome::Recorded`] iff `local_store.has(shard_cid)` and
 /// `self_agent_cid` is a well-formed `agent_cid`. Never dials, never pushes.
 pub fn record_self_held_shard(
     conn: &mut SqliteConnection,
     local_store: &dyn LocalBlobStore,
-    shard_hash: &str,
+    shard: &elohim_epr::address::ByteCid,
     self_agent_cid: &str,
     h_app_id: &str,
 ) -> Result<SelfHeldOutcome, StorageError> {
+    let shard_cid = shard.to_string();
     if !crate::identity_namespace::is_agent_cid(self_agent_cid) {
         tracing::warn!(
             self_agent_cid = %self_agent_cid,
-            shard_hash = %shard_hash,
+            shard_cid = %shard_cid,
             "self-stewardship refused: identity is not an agent_cid (uhCAk…); a \
              cross-namespace value in shard_locations.peer_id can never join"
         );
         return Ok(SelfHeldOutcome::NotAgentCid);
     }
 
-    if !local_store.has(shard_hash) {
+    if !local_store.has(shard) {
         tracing::debug!(
-            shard_hash = %shard_hash,
+            shard_cid = %shard_cid,
             "self-stewardship skipped: local blob store does not hold these bytes \
              (gap left honestly visible)"
         );
@@ -110,7 +111,7 @@ pub fn record_self_held_shard(
     crate::db::shard_locations::upsert_location(
         conn,
         &NewShardLocation {
-            shard_hash,
+            shard_cid: &shard_cid,
             peer_id: self_agent_cid,
             h_app_id,
             status: SELF_HELD_STATUS,
@@ -125,32 +126,43 @@ mod tests {
     use super::*;
     use crate::db::shard_locations::get_locations_for_shard;
     use crate::test_util::test_pool;
+    use elohim_epr::address::ByteCid;
 
-    /// Minimal `LocalBlobStore` fake: holds an explicit hash list.
+    /// Minimal `LocalBlobStore` fake: holds an explicit byte-CID list.
     struct FakeStore(Vec<&'static str>);
     impl LocalBlobStore for FakeStore {
-        fn has(&self, hash: &str) -> bool {
-            self.0.contains(&hash)
+        fn has(&self, cid: &ByteCid) -> bool {
+            self.0.contains(&cid.to_string().as_str())
         }
+    }
+
+    fn cid(text: &str) -> ByteCid {
+        ByteCid::parse(text).expect("fixture is a byte CID")
     }
 
     #[test]
     fn records_a_self_held_row_when_bytes_are_present() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
-        let store = FakeStore(vec!["sha256-present"]);
+        let store = FakeStore(vec![
+            "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+        ]);
 
         let outcome = record_self_held_shard(
             &mut conn,
             &store,
-            "sha256-present",
+            &cid("bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"),
             "uhCAkSelfAgent",
             "lamad",
         )
         .expect("record");
         assert_eq!(outcome, SelfHeldOutcome::Recorded);
 
-        let rows = get_locations_for_shard(&mut conn, "sha256-present").expect("load");
+        let rows = get_locations_for_shard(
+            &mut conn,
+            "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+        )
+        .expect("load");
         assert_eq!(rows.len(), 1, "exactly one location row");
         assert_eq!(rows[0].peer_id, "uhCAkSelfAgent");
         assert_eq!(
@@ -163,19 +175,25 @@ mod tests {
     fn records_nothing_when_bytes_are_absent() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
-        let store = FakeStore(vec!["sha256-something-else"]);
+        let store = FakeStore(vec![
+            "bafkr4icfpekvpcigixgecyp4h7zykygnh2kzsnhy6a2bict6blajcuugne",
+        ]);
 
         let outcome = record_self_held_shard(
             &mut conn,
             &store,
-            "sha256-absent",
+            &cid("bafkr4idvtojjlg5uff5v6qgycw4r7mkuyhse5o4z6rjzt7s5zillpyjpai"),
             "uhCAkSelfAgent",
             "lamad",
         )
         .expect("record");
         assert_eq!(outcome, SelfHeldOutcome::BytesAbsent);
 
-        let rows = get_locations_for_shard(&mut conn, "sha256-absent").expect("load");
+        let rows = get_locations_for_shard(
+            &mut conn,
+            "bafkr4idvtojjlg5uff5v6qgycw4r7mkuyhse5o4z6rjzt7s5zillpyjpai",
+        )
+        .expect("load");
         assert!(
             rows.is_empty(),
             "an unverifiable location must never be fabricated, got {rows:?}"
@@ -188,12 +206,14 @@ mod tests {
     fn refuses_a_non_agent_cid_identity() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
-        let store = FakeStore(vec!["sha256-present"]);
+        let store = FakeStore(vec![
+            "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+        ]);
 
         let outcome = record_self_held_shard(
             &mut conn,
             &store,
-            "sha256-present",
+            &cid("bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"),
             "12D3KooWTransportId",
             "lamad",
         )
@@ -201,9 +221,12 @@ mod tests {
         assert_eq!(outcome, SelfHeldOutcome::NotAgentCid);
 
         assert!(
-            get_locations_for_shard(&mut conn, "sha256-present")
-                .expect("load")
-                .is_empty(),
+            get_locations_for_shard(
+                &mut conn,
+                "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"
+            )
+            .expect("load")
+            .is_empty(),
             "a cross-namespace identity must not produce a row"
         );
     }
@@ -213,20 +236,26 @@ mod tests {
     fn self_held_recording_is_idempotent() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
-        let store = FakeStore(vec!["sha256-present"]);
+        let store = FakeStore(vec![
+            "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+        ]);
 
         for _ in 0..3 {
             record_self_held_shard(
                 &mut conn,
                 &store,
-                "sha256-present",
+                &cid("bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"),
                 "uhCAkSelfAgent",
                 "lamad",
             )
             .expect("record");
         }
 
-        let rows = get_locations_for_shard(&mut conn, "sha256-present").expect("load");
+        let rows = get_locations_for_shard(
+            &mut conn,
+            "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+        )
+        .expect("load");
         assert_eq!(rows.len(), 1, "upsert keeps a single row");
     }
 }

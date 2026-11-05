@@ -7,13 +7,14 @@ use std::sync::Arc;
 use seam_contracts::Answer;
 use tokio::sync::mpsc;
 
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::db::DbPool;
 use crate::p2p::head_record_client::PeerHeadRecordFetcher;
 use crate::p2p::reconcile_peers::ReconcilePeers;
 use crate::p2p::P2PCommand;
 use crate::services::courier_obey::BytePresence;
 use crate::services::head_adoption::{CarriedHeadRecord, HeadRecordFetcher};
+use elohim_epr::address::ByteCid;
 
 /// [`PeerHeadRecordFetcher`] that owns its peer source, so a long-lived worker
 /// can hold it.
@@ -55,7 +56,7 @@ impl NodeBytePresence {
     /// nodes have no libp2p event loop to send `HealBlobBytes` to; without
     /// this, the bytes gate would hold a head move until the sweep.
     #[cfg(feature = "p2p-iroh")]
-    fn request_over_iroh(&self, origin: &str, hash: String, holder: &str) {
+    fn request_over_iroh(&self, origin: &str, hash: ByteCid, holder: &str) {
         let Ok(permit) = IROH_BYTE_REQUESTS.try_acquire() else {
             return;
         };
@@ -102,36 +103,31 @@ impl NodeBytePresence {
     }
 }
 
-/// `sha256-<hex>` for any address form the blob plane accepts, or `None`.
-fn legacy_hash(address: &str) -> Option<String> {
-    BlobStore::parse_content_address(address)
-        .ok()
-        .map(|hex| format!("sha256-{hex}"))
+/// The byte CID an address names (full decode), or `None`.
+fn byte_cid(address: &str) -> Option<ByteCid> {
+    ByteCid::parse(address).ok()
 }
 
 #[async_trait::async_trait]
 impl BytePresence for NodeBytePresence {
     async fn held(&self, address: &str) -> bool {
-        let Some(hash) = legacy_hash(address) else {
+        let Some(cid) = byte_cid(address) else {
             return false;
         };
-        if self.blob_store.exists(&hash).await {
+        if self.blob_store.exists(&cid).await == Exists::Verified {
             return true;
         }
         let manifest = self.pool.get().ok().and_then(|mut conn| {
-            crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, &hash)
-                .ok()
-                .flatten()
-                .and_then(|row| crate::db::shard_manifests::hydrate_manifest(&row).ok())
+            crate::db::shard_manifests::resolve_manifest_by_cid(&mut conn, &cid)
         });
         match manifest {
-            Some(m) => self.blob_store.holds_as_shards(&m).await,
+            Some(m) => crate::sharding::holds_as_shards(&self.blob_store, &m).await,
             None => false,
         }
     }
 
     fn request(&self, origin: &str, address: &str, holder: &str) {
-        let Some(hash) = legacy_hash(address) else {
+        let Some(hash) = byte_cid(address) else {
             return;
         };
         let Some(command_tx) = self.command_tx.as_ref() else {
@@ -143,7 +139,7 @@ impl BytePresence for NodeBytePresence {
         // re-checks presence and asks again on its next rung.
         let _ = command_tx.try_send(P2PCommand::HealBlobBytes {
             origin: origin.to_string(),
-            hash,
+            hash: hash.to_string(),
             holder_hint: Some(holder.to_string()),
         });
     }
