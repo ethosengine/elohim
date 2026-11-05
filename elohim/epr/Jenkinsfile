@@ -162,11 +162,14 @@ spec:
       when {
         allOf {
           expression { env.PIPELINE_SKIPPED != 'true' }
-          // main publishes every version bump; a `publish/*` branch is the deliberate
-          // out-of-band publish (re-genesis 1, 2026-11-05: consumers pinned by registry —
-          // brit — needed elohim-address + elohim-epr 0.2.0 before the kernel reached main).
-          // The script is idempotent and 409-safe, so a republish of a version is a no-op.
-          anyOf { branch 'main'; branch 'publish/*'; expression { env.BRANCH_NAME == 'main' } }
+          // dev and main publish every version bump (the orchestrator indexes only dev,
+          // main and PRs, and this job has never had a main branch job — a main-only gate
+          // had no path to fire). A crate version is an immutable promise: bump it when the
+          // API changes, and the index keeps every published version. `publish/*` stays as
+          // the deliberate out-of-band publish for a branch an operator scans and builds by
+          // hand. The script is idempotent and 409-safe, so a republish is a no-op.
+          // (re-genesis 1, 2026-11-05: brit consumes elohim-address + elohim-epr by registry.)
+          anyOf { branch 'main'; branch 'dev'; branch 'publish/*'; expression { env.BRANCH_NAME == 'main' } }
         }
       }
       steps {
