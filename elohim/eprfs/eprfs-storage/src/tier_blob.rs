@@ -115,7 +115,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TierBlobStreamDraw {
     Completed {
-        manifest: TierBlobManifest,
+        manifest: Box<TierBlobManifest>,
     },
     Miss {
         manifest_cid: BlobCid,
@@ -142,7 +142,7 @@ impl TierBlobStreamDraw {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TierBlobDraw {
     Hit {
-        manifest: TierBlobManifest,
+        manifest: Box<TierBlobManifest>,
         bytes: Bytes,
     },
     Miss {
@@ -331,7 +331,9 @@ where
             },
         };
     }
-    TierBlobStreamDraw::Completed { manifest }
+    TierBlobStreamDraw::Completed {
+        manifest: Box::new(manifest),
+    }
 }
 
 /// Read a complete local chunked artifact into memory.

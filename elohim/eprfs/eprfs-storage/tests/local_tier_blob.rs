@@ -77,7 +77,7 @@ async fn local_put_chunks_at_one_mib_and_records_each_cid_in_a_manifest() {
     assert_eq!(
         read_tier_blob(&store, &put.manifest_cid).await,
         TierBlobDraw::Hit {
-            manifest: put.manifest,
+            manifest: Box::new(put.manifest),
             bytes,
         }
     );
