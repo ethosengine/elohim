@@ -2,7 +2,7 @@
 title: "Re-genesis 1 T6 report: doorway on the byte profile"
 id: task-rg1-doorway-report
 status: claimed-not-verified
-landed_commit: "regenesis/doorway on regenesis/storage bc0edbd64: f02fce8d5 (doorway-service + doorway-client)"
+landed_commit: "regenesis/doorway on regenesis/storage bc0edbd64: f02fce8d5 (doorway-service + doorway-client), 3ed8d4984 (report + live /blob tests), 6a6679917 (clippy fix)"
 verified_by:
 actor:
   - "agent:doorway-implementer@claude-opus-5-5 (brief named Sonnet 5.5; run on Opus 5.5)"
@@ -15,7 +15,7 @@ concerns:
   - "new decision type VerifyOutcome (services/verification.rs) and the upstream-cid-mismatch refusal are not registered in doorway/doorway-service/seam-registry.yaml (the seam-birth advisory fired on commit); census backstop not run"
   - "cache/keys.rs holds zome-call cache keys only (args digest), no blob address: nothing to recast there"
   - "TieredBlobCache's BlobMetadata.hash field keeps its name (it now holds a byte CID; compute_hash became compute_cid)"
-  - "clippy under the host default toolchain (rustc 1.99.1) reports pre-existing findings in untouched files (bootstrap/k2.rs, routes/admin_users.rs, routes/human_binding.rs, signal/bus.rs); the gate pins 1.96.1, see the gate log"
+  - "clippy under the host default toolchain (rustc 1.99.1) reports pre-existing findings in untouched files (bootstrap/k2.rs, routes/admin_users.rs, routes/human_binding.rs, signal/bus.rs); the gate's pinned 1.96.1 does not (gate EXIT=0); they will surface on the next toolchain bump"
   - "no epr session or actor claim from the worktree; the commit carries UNMEASURED attribution (hook output recorded)"
 ---
 
@@ -65,7 +65,8 @@ Typed refusal, the same shape as elohim-storage's:
 - `cargo test --offline --tests`: **INTEG_EXIT=0** (every integration target ok) — `test-T6-doorway-clippy-integ.log`. Same log: `cargo clippy --all-targets -- -D warnings` **CLIPPY_EXIT=101** on 1.99.1, findings only in untouched files (see concerns).
 - `cargo test --offline -p doorway-client` (through doorway's lockfile): **EXIT=0**, 14 + 2 passed.
 - Named tests: `routes::blob::proxy_cache_tests::blob_route_refuses_legacy_spellings_400`, `routes::storage_proxy::…::blob_200_that_misses_its_address_is_refused_and_not_stocked` and `…::blob_legacy_spelling_is_the_typed_400` (added after run 3; exercised by the gate run), `services::shard_resolver::tests::shard_fallback_reassembles_from_stripes_and_verifies_whole`, `…::reordered_chunks_are_refused`, plus `a_33_byte_digest_header_is_refused_by_its_header`, `blob_proxy_refuses_bytes_that_miss_their_address`, `too_few_good_shards_is_refused`, `manifest_with_unknown_chunker_or_erasure_fails_closed`, `addressed_blob_cid_admits_only_byte_cids`, `seed_claims_are_admitted_by_full_decode`, `unsupported_profile_is_typed_not_valid`, `parse_blob_cids_refuse_legacy_spellings`.
-- `just gate doorway`: `genesis/local-dev/regenesis-1/gate-T6-doorway.log` (the EXIT line is appended there, or "gate not run (host slot held >10 min)").
+- `just gate doorway` at 3ed8d4984 (f02fce8d5 code): **EXIT=1** — clippy (pinned 1.96.1) refused three large `Err` variants (seed.rs `claimed_seed_cid`, verification.rs `parse_expected`) and one index loop in a shard test — `genesis/local-dev/regenesis-1/gate-T6-doorway.log`. Fixed in 6a6679917.
+- `just gate doorway` at 6a6679917: **EXIT=0** — rust-style PASS (`doorway/doorway-service: debt 38 -> 37`), clippy and fmt clean, `cargo test` lib `2002 passed; 0 failed; 7 ignored` plus integration targets ok; evidence recorded `bafyreihiwi2slnp…` — `genesis/local-dev/regenesis-1/gate-T6-doorway-2.log`. The pre-existing clippy findings seen under rustc 1.99.1 do not appear under the gate's pinned toolchain.
 
 ## Deviations (with reasons)
 
