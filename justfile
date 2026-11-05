@@ -778,6 +778,7 @@ _gate-seam-contracts:
 # env_wasm_roots does in genesis/agentic/pool-policy.json.
 _gate-elohim-address:
     cd crates/elohim-address && cargo test --all-features
+    cd crates/elohim-address && cargo test --release --test parse_never_panics
     cd crates/elohim-address && cargo clippy --all-features --all-targets -- -D warnings
     cd crates/elohim-address && cargo fmt --check
     cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features

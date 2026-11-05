@@ -116,6 +116,10 @@ pub enum AddressError {
         /// The multihash code declared.
         multihash: u64,
     },
+    /// A header varint carries a redundant trailing zero group (e.g. version `81 00`): a second
+    /// spelling of the same field, refused before any decoder sees it.
+    #[error("byte CID header varint is not minimal")]
+    NonMinimalVarint,
     /// The declared digest length is not 32.
     #[error("byte CID digest must be 32 bytes, header declares {len}")]
     DigestLength {
@@ -146,6 +150,7 @@ impl AddressError {
             Self::Version { .. } => "version",
             Self::Codec { .. } => "codec",
             Self::Multihash { .. } => "multihash",
+            Self::NonMinimalVarint => "non-minimal-varint",
             Self::DigestLength { .. } => "digest-length",
             Self::NonCanonical => "non-canonical",
             Self::NotSha2 { .. } => "not-sha2",
@@ -165,41 +170,50 @@ fn base32_lower() -> &'static Encoding {
     })
 }
 
-/// One unsigned LEB128 varint from the front of `bytes`: (value, bytes read).
-fn varint(bytes: &[u8]) -> Option<(u64, usize)> {
+/// One unsigned LEB128 varint from the front of `bytes`, requiring the minimal encoding:
+/// (value, bytes read). A varint that runs past nine bytes or past the input is
+/// [`AddressError::NonCanonical`].
+fn minimal_varint(bytes: &[u8]) -> Result<(u64, usize), AddressError> {
     let mut value = 0u64;
     for (i, b) in bytes.iter().enumerate().take(9) {
         value |= u64::from(b & 0x7f) << (7 * i);
         if b & 0x80 == 0 {
-            return Some((value, i + 1));
+            if i > 0 && *b == 0 {
+                return Err(AddressError::NonMinimalVarint);
+            }
+            return Ok((value, i + 1));
         }
     }
-    None
+    Err(AddressError::NonCanonical)
 }
 
 /// Check a decoded header field by field, naming the first that differs from the byte profile.
+/// Every field must be a minimal varint, so a header that passes is exactly [`BYTE_HEADER`].
 fn check_header(bytes: &[u8]) -> Result<(), AddressError> {
     let mut at = 0;
-    let mut next = || {
-        let (v, n) = varint(&bytes[at..]).unwrap_or((u64::MAX, 1));
+    let mut next = || -> Result<u64, AddressError> {
+        let (v, n) = minimal_varint(bytes.get(at..).unwrap_or_default())?;
         at += n;
-        v
+        Ok(v)
     };
-    let version = next();
+    let version = next()?;
     if version != 1 {
         return Err(AddressError::Version { version });
     }
-    let codec = next();
+    let codec = next()?;
     if codec != BYTE_CODEC {
         return Err(AddressError::Codec { codec });
     }
-    let multihash = next();
+    let multihash = next()?;
     if multihash != BYTE_MULTIHASH {
         return Err(AddressError::Multihash { multihash });
     }
-    let len = next();
+    let len = next()?;
     if len != BYTE_DIGEST_LEN as u64 {
         return Err(AddressError::DigestLength { len });
+    }
+    if bytes.get(..BYTE_HEADER.len()) != Some(BYTE_HEADER.as_slice()) {
+        return Err(AddressError::NonCanonical);
     }
     Ok(())
 }
@@ -214,8 +228,9 @@ pub struct ByteCid(Cid);
 
 impl ByteCid {
     /// Admit a byte address from text by full decode: length 59, multibase `b`, base32-lower
-    /// alphabet, zero padding bits, exactly 36 decoded bytes, header `01 55 1e 20`, and
-    /// canonical re-encoding equal to the input. The error names the first failed check.
+    /// alphabet, zero padding bits, exactly 36 decoded bytes, header `01 55 1e 20` in minimal
+    /// varints, and canonical re-encoding equal to the input. The error names the first failed
+    /// check. Never panics, in any build mode, on any input.
     pub fn parse(text: &str) -> Result<ByteCid, AddressError> {
         if text.len() != BYTE_CID_LEN {
             return Err(AddressError::Length { len: text.len() });
@@ -234,7 +249,6 @@ impl ByteCid {
             return Err(AddressError::DecodedLength { len: bytes.len() });
         }
         check_header(&bytes)?;
-        debug_assert_eq!(bytes[..4], BYTE_HEADER);
         let cid = Cid::try_from(bytes.as_slice()).map_err(|_| AddressError::NonCanonical)?;
         if cid.to_string() != text {
             return Err(AddressError::NonCanonical);

@@ -99,6 +99,21 @@
       "name": "legacy-sha256-spelling-59",
       "input": "sha256-0000000000000000000000000000000000000000000000000000",
       "check": "multibase"
+    },
+    {
+      "name": "non-minimal-version-varint",
+      "input": "bqeafkhraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "check": "non-minimal-varint"
+    },
+    {
+      "name": "non-minimal-codec-varint",
+      "input": "bahkqahraaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "check": "non-minimal-varint"
+    },
+    {
+      "name": "non-minimal-digest-length-varint",
+      "input": "bafkr5iaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "check": "non-minimal-varint"
     }
   ]
 }
