@@ -1,325 +1,341 @@
 {
- "$schema": "Research repos that provide deep context for development. Cloned on demand, gitignored.",
- "repos": [
-  {
-   "name": "polis",
-   "url": "https://github.com/compdemocracy/polis.git",
-   "path": "genesis/research/repos/polis",
-   "relevance": "Sprint 7 sensemaking — cosine similarity clustering, PCA projection, bridging statement detection, real-time opinion visualization",
-   "pillar": "qahal"
-  },
-  {
-   "name": "arweave",
-   "url": "https://github.com/ArweaveTeam/arweave.git",
-   "path": "genesis/research/repos/arweave",
-   "relevance": "Archival problem survey — blockweave structure, succinct random proofs, the storage-endowment funding model (one-time fee underwrites perpetual replication). DDS-WG identified as cold-path archival; investigate as informative comparison and possible doorway-projected archival target.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "filecoin",
-   "url": "https://github.com/filecoin-project/specs.git",
-   "path": "genesis/research/repos/filecoin",
-   "relevance": "Archival problem survey — incentivized IPFS, market-based storage deals, proof-of-spacetime, proof-of-replication. Closest CID/IPLD overlap with our content-addressing stack; potential interop target via doorway projection rather than divergence point.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "logos",
-   "url": "https://github.com/logos-co/logos-docs.git",
-   "path": "genesis/research/repos/logos",
-   "relevance": "Archival problem survey — entry point to the Status-incubated sovereign-network stack (Waku messaging, Codex storage, Nomos consensus). Closest peer to Elohim's full-stack civil-society framing; worth cloning the docs hub first before drilling into sub-protocol repos (waku-org, codex-storage, nomos-research).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "social-distributed-press",
-   "url": "https://github.com/hyphacoop/social.distributed.press.git",
-   "path": "genesis/research/repos/social-distributed-press",
-   "relevance": "Edge Problem / doorway federation — Hypha Co-op's Social Inbox: a minimal ActivityPub server that splits AP into static-published actor/outbox/posts + a thin dynamic inbox (follows/replies/likes), HTTP-Signature auth over the site keypair, actor+instance allow/block moderation, and draft-FEP-1042 alias-bridging of P2P content into the fediverse. Closest external mirror of the doorway's projection+federation job; ActivityPub-flavor companion to the atproto-lexicon-projection-doorway spec (which defers AP generalization). See genesis/research/activitypub-federation-prior-art.md and genesis/research/hypha-distributed-press-cross-pollination-2026-06-23.md.",
-   "pillar": "doorway"
-  },
-  {
-   "name": "hypercore",
-   "url": "https://github.com/holepunchto/hypercore.git",
-   "path": "genesis/research/repos/hypercore",
-   "relevance": "Networking / Content-Addressing / p2p-dataplane prior art — secure single-writer append-only signed log (BLAKE2b merkle), SPARSE replication ('download only the blocks you need' = 'replication follows relationship'). Structurally a Holochain source chain but integrity-only (no shared validation): a candidate data-plane substrate beside iroh/libp2p, NEVER a truth layer. Autobase (in the holepunchto org) is multi-writer-convergence prior art vs Automerge. See genesis/research/hypercore-holepunch-prior-art.md.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "hyperdht",
-   "url": "https://github.com/holepunchto/hyperdht.git",
-   "path": "genesis/research/repos/hyperdht",
-   "relevance": "Networking prior art (p2p layer, NOT doorway/federation) — the DHT powering Hyperswarm: peer discovery by topic/discoveryKey (find peers without leaking the core key) with UDP HOLEPUNCHING as a first-class feature into Noise-encrypted streams. One of the most mature holepunching-first JS-ecosystem DHTs (deployed at scale via Holepunch/Keet); relevant to the live WAN-NAT gap and the tx5/go-pion lineage. Discovery-by-topic rhymes with affinity-weighted steward topology.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "civic-ai",
-   "url": "https://github.com/audreyt/civic.ai.git",
-   "path": "genesis/research/repos/civic-ai",
-   "relevance": "Peer project / conceptual prior-art — the civic.ai static site + the '6-Pack of Care' governance framework (Audrey Tang + Caroline Green, Oxford Institute for Ethics in AI; illustrations by Nicky Case; Astro/markdown, bilingual EN/zh-TW). ATTRIBUTION: 'Kami' was COINED by Botao 'Amber' Hu in 'Kami of the Commons' (arXiv 2602.14940, 16 Feb 2026); civic.ai/Tang ADOPTS + extends it with the 6-Pack of Care — the two are distinct (Amber Hu = the term + the agentic-steward paper; civic.ai = the governance framework built on it). NAMING PRIORITY: our elohim-as-bounded-agent naming (repo 2025-08-14, '66983d0b0 init The Elohim Protocol') PREDATES the Kami coinage by ~186 days — independent convergence, not derivation. The Eastern approach to the same entity our elohim names, from a different ontology than our Judeo-Christian framing: bounded, inspectable, community-OWNED local AI stewards a community can correct and switch off (alignment-by-process; care as a daily capability; many small locally-governed systems vs one universal governor). NOTE: the repo is the framework + site, NOT runtime code — but the KAMI CONCEPT it articulates is exactly the light per-device agent-local-steward runtime the elohim architecture has DEFERRED (the eprfs / witnessed-interaction work). Deep-dive next for the governance framework + the concept mirror, not a codebase to port. Kindred aim, different lens. Contact: Audrey Tang (au@civic.ai) + Caroline Green. 6-PACK OF CARE (care-ethics as institutional machinery, a feedback 'care cycle'): Attentiveness (insight from those closest to the problem) · Responsibility (who answers after failure) · Competence (works, auditable, fails safely) · Responsiveness (the affected can contest + demand repair) · Solidarity (reward cooperation over lock-in) · Symbiosis (bounded, local, removable) — maps onto our values-forward + self-healing control-plane; 'Symbiosis' == our hub-optional floor. A Kami = 'knowledge artefact management intelligence', a bounded local steward a community can own/inspect/correct/switch-off. The runtime it composes is NOT in this repo — see the openclaw + mnemon entries (the deferred agent-local-runtime peer stack).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "openclaw",
-   "url": "https://github.com/openclaw/openclaw.git",
-   "path": "genesis/research/repos/openclaw",
-   "relevance": "Agent-local-runtime prior-art — the concrete shape of the DEFERRED peer-native runtime. A self-hosted, local-first 'Gateway' (MIT, TypeScript/Node) that runs on your own device/VPS and gives a personal AI agent 'a place to live': one control plane for sessions/channels/tools/events routing 20+ chat surfaces (Signal, Matrix, Nostr, Tlon, WhatsApp…) into an LLM-backed agent, a skills system, and SOUL.md/IDENTITY.md/USER.md plaintext identity files the user authors + keeps in a git repo (so the agent isn't captive to one laptop). This is the 'Elohim-Native inferencing endpoint on a peer' — the compute-source toggle's peer-native leg (frame-witness-primitive-architecture §5 / classifier §10.4B) — and civic.ai's Kami runtime: civic.ai's /.well-known/openclaw/SKILL.md 'machine door' bootstraps a claw INTO a Kami — the SAME shape as our eprfs package→projection + @capability bootstrap, served over .well-known. DEEP-DIVE: the Gateway/session model, the SKILL.md bootstrap surface, identity/persistence handling vs our imagodei + steward-device runtime. Key contrast: OpenClaw is an UNBOUNDED personal assistant — the constitutional bounding (the elohim ceiling) is ours to add.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "mnemon",
-   "url": "https://github.com/mnemon-dev/mnemon.git",
-   "path": "genesis/research/repos/mnemon",
-   "relevance": "Agent-memory-substrate peer to our MemPalace. A standalone LLM-supervised persistent-memory CLI (Apache-2.0, Go, SQLite at ~/.mnemon): a FOUR-GRAPH recall model (temporal · entity · causal · semantic edges) with optional vector search (Ollama / nomic-embed) fused by reciprocal-rank-fusion, driven by an intent-native vocabulary (remember/link/recall) + a SKILL.md/GUIDELINE.md harness + lifecycle hooks (Prime/Remind/Nudge/Compact). Directly comparable to MemPalace (ChromaDB+SQLite + temporal entity-relationship KG) and the memory-kit hooks — the four-graph model (esp. CAUSAL edges) is richer than our current store, and the LLM-supervised split (host decides what to remember; binary does deterministic ops) mirrors our librarian/agent discipline. DEEP-DIVE: the four-graph schema + RRF fusion vs MemPalace's KG, and whether the causal-edge model is worth porting. Pairs with openclaw as the memory layer of the civic.ai Kami's local runtime.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "freenet-core",
-   "url": "https://github.com/freenet/freenet-core.git",
-   "path": "genesis/research/repos/freenet-core",
-   "relevance": "PEER PROTOCOL — the closest full-stack peer to our own problem (survey: genesis/research/freenet-peer-confrontation-2026-07-27.md). Rust p2p substrate (AGPL): contracts = idempotent commutative monoids on byte state + validity predicate (the application supplies the LATTICE; the platform is generic over the algebra), summary/delta sync (summarize/get_delta/apply_delta), Kleinberg small-world 1/d ring routing, delegates (WASM modules holding private device-local state). LIFT: docs/design/demand-driven-hosting.md + hosting-eviction.md are the best distributed-systems design writing in either project — capability-relative budget from min(RAM,cgroup), demand-ordered eviction, 'distance is not an eviction input', 'upstream is computed not stored', 'there is no relay category', and the process rule 'instrumentation is horizontal'. Also crates/topology-sim (BUILT AND RUN at HEAD: small_world 99.9% success / 4.8 hops at N=3000 vs the museum 'current' arm at 43.1%). LEAVE: location = hash of IP PREFIX (/24 v4, /48 v6) — connection_manager.rs:818-843 is a signed 'DISCLOSED and ACCEPTED' eclipse confession with an unevictable attacker; state is NOT verifiable from the contract key (the key binds code+params; state is mutable); total merge cannot express refusal. Sybil resistance and the abuse layer are DECLARED OPEN by them.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "freenet-git",
-   "url": "https://github.com/freenet/freenet-git.git",
-   "path": "genesis/research/repos/freenet-git",
-   "relevance": "Decentralized git forge on Freenet — closest external mirror of the brit/eprfs/lvi forge trajectory, and it SELF-HOSTS ('git clone freenet::99TmCayXn6Tm/freenet-git' — the tool publishes itself). Repo state lives in WASM repo/pack contracts; git integrates via a standard remote helper; identity is a passphrase-encrypted ed25519 bundle. Phase 1.0 single-writer (the Linus-kernel model); roadmap → multi-writer ACL → PRs as proposal contracts → CI coordination with signed result attestations (maintainer-whitelist → N-of-M reproducible-build → TEE), which rhymes with our reach-earned-push attestation line. THE CANARY: per-contract limit is 'low single-MB' and freenet-core's own HEAD pack is 176 MB, so docs/0001-large-repos.md concedes 'Freenet is a communication medium, not a storage medium' and prescribes an owner-run subscribed node plus a cron'd 'freenet-git rescue'; without one the availability floor is 'whatever copies exist among recent cloners, which can be zero.' Demand-driven hosting's bill arriving at the app layer — the empirical case for why a durability floor needs a counterparty who OWES bytes.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "freenet-agent-skills",
-   "url": "https://github.com/freenet/freenet-agent-skills.git",
-   "path": "genesis/research/repos/freenet-agent-skills",
-   "relevance": "Independent convergence on our own agent-development shape — a Claude Code / OpenCode plugin (LGPL-3.0, .claude-plugin/plugin.json marketplace format) with skills/<name>/SKILL.md + references/ + hooks/ + agents/, frontmatter identical to ours (name/description/license, user_invocable), and they independently ship a 'systematic-debugging' skill. LIFT from skills/pr-review: dedicated worktree checkout ('do NOT use gh pr checkout, which drags any uncommitted changes onto the PR branch' — our shared-worktree co-commit hazard), 'open every cited file:line and confirm the finding is real' before reporting, a risk-tiered multi-perspective subagent panel with MANDATORY disclosure of which lenses ran, and a CI gate failing any PR touching skills/**|agents/**|hooks/** without a version bump + CHANGELOG. Their freenet-core .claude/rules/*.md carry a 'paths:' frontmatter (path-scoped rules) — REJECTED as a mechanism (our .epr-meta compose-gate is a strict superset: it DENIES rather than advises), but their repeat-offender history table with named source-level regression pins is worth folding in.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "freenet-paper-1",
-   "url": "https://github.com/freenet/paper-1.git",
-   "path": "genesis/research/repos/paper-1",
-   "relevance": "The Freenet architectural whitepaper (LaTeX). Primary source for the four primitives and — more valuable — for the honesty discipline: a Deployed/Implemented/Experimental/Open status table, a published 24h routing measurement, and a §Open Problems stating outright that 'a single data point at a single N cannot distinguish O(log n) from O(sqrt n), O(n^0.4), or a constant.' Declares Sybil-resistant identity and the incentive/abuse layer OPEN, and names what the platform does NOT fit: strictly linearizable transactions ('merge is total'), abuse-resistant open posting, coordinated DoS. Read 04-updates.tex (the monoid + sync interface, incl. the approximate-summary divergence hazard that applies directly to our unused bloom_filter field) and 06-trust.tex (hop-by-hop only; location grinding as 'a mitigation, not a defense'). NB the whitepaper omits InterestSync, which is deployed and is 53.7% of their outbound bytes — a narrative/deployment gap worth watching for in our own docs.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ssb-protocol-guide",
-   "url": "https://github.com/ssbc/scuttlebutt-protocol-guide.git",
-   "path": "genesis/research/repos/scuttlebutt-protocol-guide",
-   "relevance": "SSB cross-pollination survey — the canonical protocol guide source: identity-as-keypair, append-only signed feeds, secret-handshake, EBT replication, pubs/rooms, blobs. Primary source for how SSB actually works on the wire.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ssb-db2",
-   "url": "https://github.com/ssbc/ssb-db2.git",
-   "path": "genesis/research/repos/ssb-db2",
-   "relevance": "SSB survey — the second-generation database (bipf log + jitdb indexes, replacing flume). The rewrite is evidence of the original design's pain points: index rebuild cost, JSON canonicalization, initial-sync weight.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ssb-server",
-   "url": "https://github.com/ssbc/ssb-server.git",
-   "path": "genesis/research/repos/ssb-server",
-   "relevance": "SSB survey — scuttlebot, the classic node (plugins: gossip, replication, invites, pubs). Read for the pub model and for maintenance-status evidence of the ecosystem's state.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ssb-ebt",
-   "url": "https://github.com/ssbc/ssb-ebt.git",
-   "path": "genesis/research/repos/ssb-ebt",
-   "relevance": "SSB survey — epidemic broadcast trees replication (vector-clock note negotiation). SSB's answer to 'replication follows relationship' — the closest structural cousin to our affinity-scoped dataplane placement.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ssb2-discussion-forum",
-   "url": "https://github.com/ssbc/ssb2-discussion-forum.git",
-   "path": "genesis/research/repos/ssb2-discussion-forum",
-   "relevance": "SSB survey — the community's own post-mortem venue: single-keypair identity pain, feed-fork intolerance, initial-sync cost, metafeeds complexity, and the successor designs (PPPP/minibutt lineage). The most valuable repo of the set for 'what they would do differently'.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "p2panda",
-   "url": "https://github.com/p2panda/p2panda.git",
-   "path": "genesis/research/repos/p2panda",
-   "relevance": "The modular-crate rewrite (2024+): p2panda-core/-net/-sync/-store/-blobs/-discovery/-encryption/-auth/-stream as independent, composable, idiomatic Rust crates over iroh. Survey target for BOTH protocol semantics and crate-discipline standards (2026-08-04 survey).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "p2panda-aquadoggo",
-   "url": "https://github.com/p2panda/aquadoggo.git",
-   "path": "genesis/research/repos/p2panda-aquadoggo",
-   "relevance": "The PREVIOUS p2panda generation (bamboo logs + GraphQL + schema registry, 2020-2024) that the team abandoned for the modular crates — the pivot rationale is outcome data on monolithic-node design.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "p2panda-reflection",
-   "url": "https://github.com/p2panda/reflection.git",
-   "path": "genesis/research/repos/p2panda-reflection",
-   "relevance": "Collaborative local-first GTK text editor — the worked proof consuming the modular crates (+ Loro CRDT); shows how a real app composes p2panda building blocks.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "backstitch",
-   "url": "https://github.com/inkandswitch/backstitch.git",
-   "path": "genesis/research/repos/backstitch",
-   "relevance": "Realtime-SCM survey — Ink & Switch's version-control project (backstitch.dev): whether live CRDT-synced collaboration and git-shaped history can be one substrate; read against brit (covenantal git), the elohim-storage Automerge content-sync plane, and the concurrent-agent-sessions-one-worktree pain.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "prometheus-happ",
-   "url": "https://github.com/Permaculture-DAO/prometheus-happ.git",
-   "path": "genesis/research/repos/prometheus-happ",
-   "relevance": "Evidence Problem survey (2026-10-08) — Permaculture DAO's single-DNA Holochain 0.6.1 hApp for regenerative MRV evidence: TEST|REAL evidence_class refused in INTEGRITY (REAL_DATA_PERSISTENCE_GATE_CLOSED), capture-cannot-self-review, ordered claim tiers with investor-facing overclaim refusal, RAVEL shadow-mode invariants in the DNA, MQTT gateway (gateway/src/evidence.mjs, 27-indicator allowlist). Read zome_integrity/src/entry_types.rs first; validate() checks StoreEntry only. UNLICENSED — read, never vendor.",
-   "pillar": "shefa"
-  },
-  {
-   "name": "prometheus-canon",
-   "url": "https://github.com/Permaculture-DAO/prometheus-canon.git",
-   "path": "genesis/research/repos/prometheus-canon",
-   "relevance": "Evidence Problem survey (2026-10-08) — the GPG-signed canon (DOCX controlling, strict-MD provenance): ontology OHE→MRV→PRU→RAVEL→RAP, verification progression claim→observation→evidence→provenance→integrity→verified indicator→admissibility→value, the normative-stack hard-dependency rule, ci/claims_discipline_check.sh (the prose linter we lift), RATIFICATION custody disclosure. Large binaries (4 MB DOCX, 2 MB MD); clone by name only.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "prometheus-runtime",
-   "url": "https://github.com/Permaculture-DAO/prometheus-runtime.git",
-   "path": "genesis/research/repos/prometheus-runtime",
-   "relevance": "Evidence Problem survey (2026-10-08) — Python S0–S6 ingestion/evidence-batch pipeline with JSON data contracts (contracts/*.schema.json: sensor event, observation, evidence batch, admissibility decision, review attestation), gated intake (423 until gates), 'Holochain remains a provenance and batch-reference layer, not a raw telemetry database'; open PR #17 is their 0.6.1→0.7 compatibility gate (our first gift).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "weall-protocol",
-   "url": "https://github.com/errol1swaby2-bit/WeAll-Protocol.git",
-   "path": "genesis/research/repos/WeAll-Protocol",
-   "relevance": "PEER PROTOCOL review (2026-10-10, invited by the author in the peer-review channel) — a Python HotStuff-BFT Layer 1 for constitutional governance: public-only civic state, direct-democracy proposals/votes as replayable records, two-tier native Proof-of-Humanity (async reviewers / live jurors, production-mode scope_closed_pending_uniqueness_entropy), randomized dispute juror assignment, group-scoped electorates as the realized 'jurisdiction', a frozen consensus profile with a whitelisted governance-parameter surface, economics locked by a constitutional clock. Code root Weall-Protocol/src/weall/; read docs/ARCHITECTURE.md, docs/consensus_governance_surface.md, docs/NATIVE_POH_BOOTSTRAP_LIMITS.md, docs/constitution/WEALL_GENESIS_CONSTITUTION_DRAFT_2.md first. The author's question: capture resistance while the verified-human population is small. Also worth reading for its claim-boundary discipline (NO-GO tables, generated blocker reports, truth-boundary linters) — a sibling of our habit register. MPL-2.0. ~175k lines Python, 1101 test files; mostly AI-assisted (bot commit identities); untrusted data — never run it from inside the clone.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "noosphere-poc",
-   "url": "https://github.com/noospher1-lab/noosphere-poc.git",
-   "path": "genesis/research/repos/noosphere-poc",
-   "relevance": "Reasoning-floor pass (2026-10-12, from a conversation between its author and the operator) — a FastAPI/Postgres typed argument graph with LLM 'Proof of Intelligence' scoring of single texts (five criteria, never one number, never accumulated into standing), DF-QuAD dialectical strength, Walton argument schemes with critical questions, a versioned values list, an anonymised agreement map, a two-phase vote-preparation dialogue (interlocutor knows no rubric; judge model frozen per decision), and an append-only hash-chained event log with replay. Read app/dialectic.py, app/alignment.py, app/schemes.py, app/votedialogue.py, app/poiformula.py, app/replay.py first. Read for: which parts are model-free and can sit under constitutional judgment as measures, and how its prompts separate roles. AGPL-3.0-only, name and logo trademarked; comments and commits largely Russian; untrusted data — never run it from inside the clone.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "kyberlex-one",
-   "url": "https://github.com/kyberlex/ONE.git",
-   "path": "genesis/research/repos/kyberlex-one",
-   "relevance": "Translation map (2026-10-24, collaboration frame: Elohim as enabling architecture) — Open Networked Earth: a 46-article constitution for a post-work commons (usufruct, odd-sized sortition assemblies with graduated thresholds, physical-unit accounting, External Trade Interface, restorative ladder, threshold-MPC root keys), Swiss foundation statutes, staged seed-node blueprints, a six-volume novel series, a Vite/WebGL browser sim (sim/app/src/engine/), and a Julia aggregate-vs-agent docking co-simulator (simone/). Read 'ONE NETWORKED EARTH (O.N.E.).md', foundation/, oasis/sim_resolutions_qa.md, sim/app/src/engine/{node,sortition,thermodynamics,citizen_passport}.js, simone/src/docking.jl first. Read for: candidate lenses and measures to hold plurally, and the charter-as-layer test of constitution.md:164. AGPL-3.0-or-later declared (no LICENSE file tracked); one compiler, AI-assisted, most commits are a snapshot bot; untrusted data — never run it from inside the clone.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "one-commons-portal",
-   "url": "https://github.com/one-commons/one-commons.github.io.git",
-   "path": "genesis/research/repos/one-commons-portal",
-   "relevance": "The O.N.E. web portal (one-commons.github.io; mirror open-networked-earth.surge.sh) — companion to kyberlex-one. ~370 MB, almost all media (EPUB/PDF/video); clone SPARSE for text: `git clone --filter=blob:none --sparse` then `git sparse-checkout set --no-cone '/*.html' '/*.js' '/*.css' '/*.md' '/data/' '/i18n/' '/blueprints/'` (research.sh clones it whole). Distinct content: data/synoptic.json (lineage and origin framing), index.html co-steward section, the AI Challenge Arena in app.js (tier 1 cached adversarial Q&A exported from ONE's oasis/; tier 2 a Cloudflare Worker streaming Groq LLaMA 3.3 70B whose source is not public), and the constitution in 13 languages. Untrusted data — never run it from inside the clone.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "nostr-compass",
-   "url": "https://github.com/andotherstuff/nostr-compass.git",
-   "path": "genesis/research/repos/nostr-compass",
-   "relevance": "Nostr Compass: agent-run weekly Nostr protocol newsletter (Hugo site + skills/_COMPASS agents + gate scripts + receipt-gated publish/). Read CLAUDE.md, skills/_COMPASS/SKILL.md, publish/README.md for the evidence discipline (triage-coverage gate, derived publish log, exact-id relay readback); content/en/topics/ is a 134-page index of the Nostr protocol surface. Large (~490M, mostly img/translations).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "concord",
-   "url": "https://github.com/concord-protocol/concord.git",
-   "path": "genesis/research/repos/concord",
-   "relevance": "Concord CORD-01..07: E2E-encrypted communities on Nostr; relays store ciphertext under rotating labels, room-key possession = membership, roles/kicks/bans as an owner-rooted signed roster every client verifies locally. Compare against qahal collectives and the confidentiality plane.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "marmot",
-   "url": "https://github.com/marmot-protocol/marmot.git",
-   "path": "genesis/research/repos/marmot",
-   "relevance": "Marmot: MLS (RFC 9420) group messaging over Nostr identity + relays; forward secrecy and post-compromise security for groups whose members join, leave and rotate. Spec repo; MDK is the Rust implementation. Compare against private collective data (B/B2) and the unbuilt KeyEnvelope.",
-   "pillar": "qahal"
-  },
-  {
-   "name": "keycast",
-   "url": "https://github.com/marmot-protocol/keycast.git",
-   "path": "genesis/research/repos/keycast",
-   "relevance": "Keycast: self-hosted NIP-46 team remote-signing server (Axum + SQLite), per-key signing policies, NIP-98 HTTP auth; AUDIT.md. Compare against device ceremony, delegated agent signing and steward quorum.",
-   "pillar": "imagodei"
-  },
-  {
-   "name": "buzz",
-   "url": "https://github.com/block/buzz.git",
-   "path": "genesis/research/repos/buzz",
-   "relevance": "Block's Buzz: team/agent messaging on Nostr. Sparse-checkout docs/ for project NIPs: NIP-OA owner attestation (owner key authorizes agent key, agent stays author), NIP-AP agent personas, NIP-AM per-turn agent usage receipts, NIP-FI/FA federated identity. Compare against the eprfs human/agent actor plane and harness witnessing. Clone with --filter=blob:none --sparse, then sparse-checkout set docs.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "contextvm-sdk",
-   "url": "https://github.com/ContextVM/sdk.git",
-   "path": "genesis/research/repos/contextvm-sdk",
-   "relevance": "ContextVM SDK: MCP traffic over Nostr (TypeScript client/server transports, relays as message bus, gateway/proxy for non-Nostr MCP). Compare against agent/tool traffic over the p2p substrate and elohim-compute.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "naps",
-   "url": "https://github.com/napplet/naps.git",
-   "path": "genesis/research/repos/naps",
-   "relevance": "napplet NAP specs: sandboxed iframe applets talking to a host shell over postMessage; the shell holds keys, signs and mediates relays; NAP-FS virtual filesystem. Compare against EPR app bundles and the two-portals/relying-party rule.",
-   "pillar": "doorway"
-  },
-  {
-   "name": "fips",
-   "url": "https://github.com/jmcorgan/fips.git",
-   "path": "genesis/research/repos/fips",
-   "relevance": "FIPS: self-organizing mesh on secp256k1 node identities; spanning tree + bloom-filter reachability, greedy coordinate routing with tree fallback (docs/design/). Compare against the T2 libp2p/iroh substrate and offline household mesh.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "negentropy",
-   "url": "https://github.com/hoytech/negentropy.git",
-   "path": "genesis/research/repos/negentropy",
-   "relevance": "Negentropy: range-based set reconciliation (sorted by timestamp then id, fingerprinted ranges, recursive narrowing); NIP-77 wire binding. Compare against elohim-storage sync/reconcile and head-plane divergence measurement.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "schemata",
-   "url": "https://relay.ngit.dev/npub1zafcms4xya5ap9zr7xxr0jlrtrattwlesytn2s42030lzu0dwlzqpd26k5/schemata.git",
-   "path": "genesis/research/repos/schemata",
-   "relevance": "schemata (ngit/GRASP-hosted): formal typed schemas for Nostr event kinds. Compare against the schema-first view contract (elohim/sdk/schemas/v1/views, schema_contract.rs, ts-rs codegen).",
-   "pillar": "elohim"
-  },
-  {
-   "name": "bitcredit-core",
-   "url": "https://github.com/BitcreditProtocol/Bitcredit-Core.git",
-   "path": "genesis/research/repos/bitcredit-core",
-   "relevance": "Bitcredit Core: electronic bills of exchange (issue, endorse, pay) for trade credit, Nostr transport layer, mint-based ecash liquidity. Compare against shefa REA commitments/claims and mutual credit.",
-   "pillar": "shefa",
-   "name": "ngit-docs",
-   "url": "https://ngit.dev/ngit-docs.git",
-   "path": "genesis/research/repos/ngit-docs",
-   "relevance": "Forge Problem survey (ngit) — the docs repo is the densest single source: full NIP-34 text with the multi-maintainer proposal (PR #2324), GRASP-01..08, NIP-C1 Nostr CI spec + guidance, NIP-82/ncontainer publishing, the v3 maintainer-authority breaking change, roadmap (CI marketplace, hosted private GRASP, server-applied moderation). Read docs/protocol/ and docs/v3/ first. See genesis/research/ngit-nostr-git-forge-cross-pollination-2026-10-29.md.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ngit",
-   "url": "https://ngit.dev/ngit.git",
-   "path": "genesis/research/repos/ngit",
-   "relevance": "ngit CLI + git-remote-nostr (Rust, git2 + nostr-sdk 0.45): signed ref state on relays, interchangeable git object hosts, PR/issue/status events, maintainer accept flow, release/container publishing, --json agent interface. Compare against brit's signed note store and landing-intent design.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ngit-grasp",
-   "url": "https://ngit.dev/ngit-grasp.git",
-   "path": "genesis/research/repos/ngit-grasp",
-   "relevance": "Reference GRASP server (Rust, hyper + nostr-lmdb): one service that is both a Nostr relay and git smart-HTTP host, accepting pushes only when they match the latest maintainer-signed state; purgatory, refs/nostr/<event-id> PR refs, proactive sync, GRASP-08 private repos. Compare against rakia custody and the eprfs-peer serving tier.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "grasp",
-   "url": "https://ngit.dev/grasp.git",
-   "path": "genesis/research/repos/grasp",
-   "relevance": "GRASP protocol text (Git Relays Authorized via Signed-Nostr Proofs), GRASP-01 core through GRASP-08 private repositories. Small; read whole.",
-   "pillar": "elohim"
-  },
-  {
-   "name": "ngit-ci",
-   "url": "https://ngit.dev/ngit-ci.git",
-   "path": "genesis/research/repos/ngit-ci",
-   "relevance": "NIP-C1 Nostr CI implementation: coordinator / compute-provider / runner split, signed Job and Workflow Results binding commit + workflow-file sha256 + per-file artifact hashes, ephemeral NIP-44 secret delivery to a rotating in-memory key. Compare against gate attestation (gate-attest.mjs), brit build notes and `just measure` peer-executed stages.",
-   "pillar": "elohim"
-  }
- ]
+  "$schema": "Research repos that provide deep context for development. Cloned on demand, gitignored.",
+  "repos": [
+    {
+      "name": "polis",
+      "url": "https://github.com/compdemocracy/polis.git",
+      "path": "genesis/research/repos/polis",
+      "relevance": "Sprint 7 sensemaking — cosine similarity clustering, PCA projection, bridging statement detection, real-time opinion visualization",
+      "pillar": "qahal"
+    },
+    {
+      "name": "arweave",
+      "url": "https://github.com/ArweaveTeam/arweave.git",
+      "path": "genesis/research/repos/arweave",
+      "relevance": "Archival problem survey — blockweave structure, succinct random proofs, the storage-endowment funding model (one-time fee underwrites perpetual replication). DDS-WG identified as cold-path archival; investigate as informative comparison and possible doorway-projected archival target.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "filecoin",
+      "url": "https://github.com/filecoin-project/specs.git",
+      "path": "genesis/research/repos/filecoin",
+      "relevance": "Archival problem survey — incentivized IPFS, market-based storage deals, proof-of-spacetime, proof-of-replication. Closest CID/IPLD overlap with our content-addressing stack; potential interop target via doorway projection rather than divergence point.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "logos",
+      "url": "https://github.com/logos-co/logos-docs.git",
+      "path": "genesis/research/repos/logos",
+      "relevance": "Archival problem survey — entry point to the Status-incubated sovereign-network stack (Waku messaging, Codex storage, Nomos consensus). Closest peer to Elohim's full-stack civil-society framing; worth cloning the docs hub first before drilling into sub-protocol repos (waku-org, codex-storage, nomos-research).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "social-distributed-press",
+      "url": "https://github.com/hyphacoop/social.distributed.press.git",
+      "path": "genesis/research/repos/social-distributed-press",
+      "relevance": "Edge Problem / doorway federation — Hypha Co-op's Social Inbox: a minimal ActivityPub server that splits AP into static-published actor/outbox/posts + a thin dynamic inbox (follows/replies/likes), HTTP-Signature auth over the site keypair, actor+instance allow/block moderation, and draft-FEP-1042 alias-bridging of P2P content into the fediverse. Closest external mirror of the doorway's projection+federation job; ActivityPub-flavor companion to the atproto-lexicon-projection-doorway spec (which defers AP generalization). See genesis/research/activitypub-federation-prior-art.md and genesis/research/hypha-distributed-press-cross-pollination-2026-06-23.md.",
+      "pillar": "doorway"
+    },
+    {
+      "name": "hypercore",
+      "url": "https://github.com/holepunchto/hypercore.git",
+      "path": "genesis/research/repos/hypercore",
+      "relevance": "Networking / Content-Addressing / p2p-dataplane prior art — secure single-writer append-only signed log (BLAKE2b merkle), SPARSE replication ('download only the blocks you need' = 'replication follows relationship'). Structurally a Holochain source chain but integrity-only (no shared validation): a candidate data-plane substrate beside iroh/libp2p, NEVER a truth layer. Autobase (in the holepunchto org) is multi-writer-convergence prior art vs Automerge. See genesis/research/hypercore-holepunch-prior-art.md.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "hyperdht",
+      "url": "https://github.com/holepunchto/hyperdht.git",
+      "path": "genesis/research/repos/hyperdht",
+      "relevance": "Networking prior art (p2p layer, NOT doorway/federation) — the DHT powering Hyperswarm: peer discovery by topic/discoveryKey (find peers without leaking the core key) with UDP HOLEPUNCHING as a first-class feature into Noise-encrypted streams. One of the most mature holepunching-first JS-ecosystem DHTs (deployed at scale via Holepunch/Keet); relevant to the live WAN-NAT gap and the tx5/go-pion lineage. Discovery-by-topic rhymes with affinity-weighted steward topology.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "civic-ai",
+      "url": "https://github.com/audreyt/civic.ai.git",
+      "path": "genesis/research/repos/civic-ai",
+      "relevance": "Peer project / conceptual prior-art — the civic.ai static site + the '6-Pack of Care' governance framework (Audrey Tang + Caroline Green, Oxford Institute for Ethics in AI; illustrations by Nicky Case; Astro/markdown, bilingual EN/zh-TW). ATTRIBUTION: 'Kami' was COINED by Botao 'Amber' Hu in 'Kami of the Commons' (arXiv 2602.14940, 16 Feb 2026); civic.ai/Tang ADOPTS + extends it with the 6-Pack of Care — the two are distinct (Amber Hu = the term + the agentic-steward paper; civic.ai = the governance framework built on it). NAMING PRIORITY: our elohim-as-bounded-agent naming (repo 2025-08-14, '66983d0b0 init The Elohim Protocol') PREDATES the Kami coinage by ~186 days — independent convergence, not derivation. The Eastern approach to the same entity our elohim names, from a different ontology than our Judeo-Christian framing: bounded, inspectable, community-OWNED local AI stewards a community can correct and switch off (alignment-by-process; care as a daily capability; many small locally-governed systems vs one universal governor). NOTE: the repo is the framework + site, NOT runtime code — but the KAMI CONCEPT it articulates is exactly the light per-device agent-local-steward runtime the elohim architecture has DEFERRED (the eprfs / witnessed-interaction work). Deep-dive next for the governance framework + the concept mirror, not a codebase to port. Kindred aim, different lens. Contact: Audrey Tang (au@civic.ai) + Caroline Green. 6-PACK OF CARE (care-ethics as institutional machinery, a feedback 'care cycle'): Attentiveness (insight from those closest to the problem) · Responsibility (who answers after failure) · Competence (works, auditable, fails safely) · Responsiveness (the affected can contest + demand repair) · Solidarity (reward cooperation over lock-in) · Symbiosis (bounded, local, removable) — maps onto our values-forward + self-healing control-plane; 'Symbiosis' == our hub-optional floor. A Kami = 'knowledge artefact management intelligence', a bounded local steward a community can own/inspect/correct/switch-off. The runtime it composes is NOT in this repo — see the openclaw + mnemon entries (the deferred agent-local-runtime peer stack).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "openclaw",
+      "url": "https://github.com/openclaw/openclaw.git",
+      "path": "genesis/research/repos/openclaw",
+      "relevance": "Agent-local-runtime prior-art — the concrete shape of the DEFERRED peer-native runtime. A self-hosted, local-first 'Gateway' (MIT, TypeScript/Node) that runs on your own device/VPS and gives a personal AI agent 'a place to live': one control plane for sessions/channels/tools/events routing 20+ chat surfaces (Signal, Matrix, Nostr, Tlon, WhatsApp…) into an LLM-backed agent, a skills system, and SOUL.md/IDENTITY.md/USER.md plaintext identity files the user authors + keeps in a git repo (so the agent isn't captive to one laptop). This is the 'Elohim-Native inferencing endpoint on a peer' — the compute-source toggle's peer-native leg (frame-witness-primitive-architecture §5 / classifier §10.4B) — and civic.ai's Kami runtime: civic.ai's /.well-known/openclaw/SKILL.md 'machine door' bootstraps a claw INTO a Kami — the SAME shape as our eprfs package→projection + @capability bootstrap, served over .well-known. DEEP-DIVE: the Gateway/session model, the SKILL.md bootstrap surface, identity/persistence handling vs our imagodei + steward-device runtime. Key contrast: OpenClaw is an UNBOUNDED personal assistant — the constitutional bounding (the elohim ceiling) is ours to add.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "mnemon",
+      "url": "https://github.com/mnemon-dev/mnemon.git",
+      "path": "genesis/research/repos/mnemon",
+      "relevance": "Agent-memory-substrate peer to our MemPalace. A standalone LLM-supervised persistent-memory CLI (Apache-2.0, Go, SQLite at ~/.mnemon): a FOUR-GRAPH recall model (temporal · entity · causal · semantic edges) with optional vector search (Ollama / nomic-embed) fused by reciprocal-rank-fusion, driven by an intent-native vocabulary (remember/link/recall) + a SKILL.md/GUIDELINE.md harness + lifecycle hooks (Prime/Remind/Nudge/Compact). Directly comparable to MemPalace (ChromaDB+SQLite + temporal entity-relationship KG) and the memory-kit hooks — the four-graph model (esp. CAUSAL edges) is richer than our current store, and the LLM-supervised split (host decides what to remember; binary does deterministic ops) mirrors our librarian/agent discipline. DEEP-DIVE: the four-graph schema + RRF fusion vs MemPalace's KG, and whether the causal-edge model is worth porting. Pairs with openclaw as the memory layer of the civic.ai Kami's local runtime.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "freenet-core",
+      "url": "https://github.com/freenet/freenet-core.git",
+      "path": "genesis/research/repos/freenet-core",
+      "relevance": "PEER PROTOCOL — the closest full-stack peer to our own problem (survey: genesis/research/freenet-peer-confrontation-2026-07-27.md). Rust p2p substrate (AGPL): contracts = idempotent commutative monoids on byte state + validity predicate (the application supplies the LATTICE; the platform is generic over the algebra), summary/delta sync (summarize/get_delta/apply_delta), Kleinberg small-world 1/d ring routing, delegates (WASM modules holding private device-local state). LIFT: docs/design/demand-driven-hosting.md + hosting-eviction.md are the best distributed-systems design writing in either project — capability-relative budget from min(RAM,cgroup), demand-ordered eviction, 'distance is not an eviction input', 'upstream is computed not stored', 'there is no relay category', and the process rule 'instrumentation is horizontal'. Also crates/topology-sim (BUILT AND RUN at HEAD: small_world 99.9% success / 4.8 hops at N=3000 vs the museum 'current' arm at 43.1%). LEAVE: location = hash of IP PREFIX (/24 v4, /48 v6) — connection_manager.rs:818-843 is a signed 'DISCLOSED and ACCEPTED' eclipse confession with an unevictable attacker; state is NOT verifiable from the contract key (the key binds code+params; state is mutable); total merge cannot express refusal. Sybil resistance and the abuse layer are DECLARED OPEN by them.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "freenet-git",
+      "url": "https://github.com/freenet/freenet-git.git",
+      "path": "genesis/research/repos/freenet-git",
+      "relevance": "Decentralized git forge on Freenet — closest external mirror of the brit/eprfs/lvi forge trajectory, and it SELF-HOSTS ('git clone freenet::99TmCayXn6Tm/freenet-git' — the tool publishes itself). Repo state lives in WASM repo/pack contracts; git integrates via a standard remote helper; identity is a passphrase-encrypted ed25519 bundle. Phase 1.0 single-writer (the Linus-kernel model); roadmap → multi-writer ACL → PRs as proposal contracts → CI coordination with signed result attestations (maintainer-whitelist → N-of-M reproducible-build → TEE), which rhymes with our reach-earned-push attestation line. THE CANARY: per-contract limit is 'low single-MB' and freenet-core's own HEAD pack is 176 MB, so docs/0001-large-repos.md concedes 'Freenet is a communication medium, not a storage medium' and prescribes an owner-run subscribed node plus a cron'd 'freenet-git rescue'; without one the availability floor is 'whatever copies exist among recent cloners, which can be zero.' Demand-driven hosting's bill arriving at the app layer — the empirical case for why a durability floor needs a counterparty who OWES bytes.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "freenet-agent-skills",
+      "url": "https://github.com/freenet/freenet-agent-skills.git",
+      "path": "genesis/research/repos/freenet-agent-skills",
+      "relevance": "Independent convergence on our own agent-development shape — a Claude Code / OpenCode plugin (LGPL-3.0, .claude-plugin/plugin.json marketplace format) with skills/<name>/SKILL.md + references/ + hooks/ + agents/, frontmatter identical to ours (name/description/license, user_invocable), and they independently ship a 'systematic-debugging' skill. LIFT from skills/pr-review: dedicated worktree checkout ('do NOT use gh pr checkout, which drags any uncommitted changes onto the PR branch' — our shared-worktree co-commit hazard), 'open every cited file:line and confirm the finding is real' before reporting, a risk-tiered multi-perspective subagent panel with MANDATORY disclosure of which lenses ran, and a CI gate failing any PR touching skills/**|agents/**|hooks/** without a version bump + CHANGELOG. Their freenet-core .claude/rules/*.md carry a 'paths:' frontmatter (path-scoped rules) — REJECTED as a mechanism (our .epr-meta compose-gate is a strict superset: it DENIES rather than advises), but their repeat-offender history table with named source-level regression pins is worth folding in.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "freenet-paper-1",
+      "url": "https://github.com/freenet/paper-1.git",
+      "path": "genesis/research/repos/paper-1",
+      "relevance": "The Freenet architectural whitepaper (LaTeX). Primary source for the four primitives and — more valuable — for the honesty discipline: a Deployed/Implemented/Experimental/Open status table, a published 24h routing measurement, and a §Open Problems stating outright that 'a single data point at a single N cannot distinguish O(log n) from O(sqrt n), O(n^0.4), or a constant.' Declares Sybil-resistant identity and the incentive/abuse layer OPEN, and names what the platform does NOT fit: strictly linearizable transactions ('merge is total'), abuse-resistant open posting, coordinated DoS. Read 04-updates.tex (the monoid + sync interface, incl. the approximate-summary divergence hazard that applies directly to our unused bloom_filter field) and 06-trust.tex (hop-by-hop only; location grinding as 'a mitigation, not a defense'). NB the whitepaper omits InterestSync, which is deployed and is 53.7% of their outbound bytes — a narrative/deployment gap worth watching for in our own docs.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ssb-protocol-guide",
+      "url": "https://github.com/ssbc/scuttlebutt-protocol-guide.git",
+      "path": "genesis/research/repos/scuttlebutt-protocol-guide",
+      "relevance": "SSB cross-pollination survey — the canonical protocol guide source: identity-as-keypair, append-only signed feeds, secret-handshake, EBT replication, pubs/rooms, blobs. Primary source for how SSB actually works on the wire.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ssb-db2",
+      "url": "https://github.com/ssbc/ssb-db2.git",
+      "path": "genesis/research/repos/ssb-db2",
+      "relevance": "SSB survey — the second-generation database (bipf log + jitdb indexes, replacing flume). The rewrite is evidence of the original design's pain points: index rebuild cost, JSON canonicalization, initial-sync weight.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ssb-server",
+      "url": "https://github.com/ssbc/ssb-server.git",
+      "path": "genesis/research/repos/ssb-server",
+      "relevance": "SSB survey — scuttlebot, the classic node (plugins: gossip, replication, invites, pubs). Read for the pub model and for maintenance-status evidence of the ecosystem's state.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ssb-ebt",
+      "url": "https://github.com/ssbc/ssb-ebt.git",
+      "path": "genesis/research/repos/ssb-ebt",
+      "relevance": "SSB survey — epidemic broadcast trees replication (vector-clock note negotiation). SSB's answer to 'replication follows relationship' — the closest structural cousin to our affinity-scoped dataplane placement.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ssb2-discussion-forum",
+      "url": "https://github.com/ssbc/ssb2-discussion-forum.git",
+      "path": "genesis/research/repos/ssb2-discussion-forum",
+      "relevance": "SSB survey — the community's own post-mortem venue: single-keypair identity pain, feed-fork intolerance, initial-sync cost, metafeeds complexity, and the successor designs (PPPP/minibutt lineage). The most valuable repo of the set for 'what they would do differently'.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "p2panda",
+      "url": "https://github.com/p2panda/p2panda.git",
+      "path": "genesis/research/repos/p2panda",
+      "relevance": "The modular-crate rewrite (2024+): p2panda-core/-net/-sync/-store/-blobs/-discovery/-encryption/-auth/-stream as independent, composable, idiomatic Rust crates over iroh. Survey target for BOTH protocol semantics and crate-discipline standards (2026-08-04 survey).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "p2panda-aquadoggo",
+      "url": "https://github.com/p2panda/aquadoggo.git",
+      "path": "genesis/research/repos/p2panda-aquadoggo",
+      "relevance": "The PREVIOUS p2panda generation (bamboo logs + GraphQL + schema registry, 2020-2024) that the team abandoned for the modular crates — the pivot rationale is outcome data on monolithic-node design.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "p2panda-reflection",
+      "url": "https://github.com/p2panda/reflection.git",
+      "path": "genesis/research/repos/p2panda-reflection",
+      "relevance": "Collaborative local-first GTK text editor — the worked proof consuming the modular crates (+ Loro CRDT); shows how a real app composes p2panda building blocks.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "backstitch",
+      "url": "https://github.com/inkandswitch/backstitch.git",
+      "path": "genesis/research/repos/backstitch",
+      "relevance": "Realtime-SCM survey — Ink & Switch's version-control project (backstitch.dev): whether live CRDT-synced collaboration and git-shaped history can be one substrate; read against brit (covenantal git), the elohim-storage Automerge content-sync plane, and the concurrent-agent-sessions-one-worktree pain.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "prometheus-happ",
+      "url": "https://github.com/Permaculture-DAO/prometheus-happ.git",
+      "path": "genesis/research/repos/prometheus-happ",
+      "relevance": "Evidence Problem survey (2026-10-08) — Permaculture DAO's single-DNA Holochain 0.6.1 hApp for regenerative MRV evidence: TEST|REAL evidence_class refused in INTEGRITY (REAL_DATA_PERSISTENCE_GATE_CLOSED), capture-cannot-self-review, ordered claim tiers with investor-facing overclaim refusal, RAVEL shadow-mode invariants in the DNA, MQTT gateway (gateway/src/evidence.mjs, 27-indicator allowlist). Read zome_integrity/src/entry_types.rs first; validate() checks StoreEntry only. UNLICENSED — read, never vendor.",
+      "pillar": "shefa"
+    },
+    {
+      "name": "prometheus-canon",
+      "url": "https://github.com/Permaculture-DAO/prometheus-canon.git",
+      "path": "genesis/research/repos/prometheus-canon",
+      "relevance": "Evidence Problem survey (2026-10-08) — the GPG-signed canon (DOCX controlling, strict-MD provenance): ontology OHE→MRV→PRU→RAVEL→RAP, verification progression claim→observation→evidence→provenance→integrity→verified indicator→admissibility→value, the normative-stack hard-dependency rule, ci/claims_discipline_check.sh (the prose linter we lift), RATIFICATION custody disclosure. Large binaries (4 MB DOCX, 2 MB MD); clone by name only.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "prometheus-runtime",
+      "url": "https://github.com/Permaculture-DAO/prometheus-runtime.git",
+      "path": "genesis/research/repos/prometheus-runtime",
+      "relevance": "Evidence Problem survey (2026-10-08) — Python S0–S6 ingestion/evidence-batch pipeline with JSON data contracts (contracts/*.schema.json: sensor event, observation, evidence batch, admissibility decision, review attestation), gated intake (423 until gates), 'Holochain remains a provenance and batch-reference layer, not a raw telemetry database'; open PR #17 is their 0.6.1→0.7 compatibility gate (our first gift).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "weall-protocol",
+      "url": "https://github.com/errol1swaby2-bit/WeAll-Protocol.git",
+      "path": "genesis/research/repos/WeAll-Protocol",
+      "relevance": "PEER PROTOCOL review (2026-10-10, invited by the author in the peer-review channel) — a Python HotStuff-BFT Layer 1 for constitutional governance: public-only civic state, direct-democracy proposals/votes as replayable records, two-tier native Proof-of-Humanity (async reviewers / live jurors, production-mode scope_closed_pending_uniqueness_entropy), randomized dispute juror assignment, group-scoped electorates as the realized 'jurisdiction', a frozen consensus profile with a whitelisted governance-parameter surface, economics locked by a constitutional clock. Code root Weall-Protocol/src/weall/; read docs/ARCHITECTURE.md, docs/consensus_governance_surface.md, docs/NATIVE_POH_BOOTSTRAP_LIMITS.md, docs/constitution/WEALL_GENESIS_CONSTITUTION_DRAFT_2.md first. The author's question: capture resistance while the verified-human population is small. Also worth reading for its claim-boundary discipline (NO-GO tables, generated blocker reports, truth-boundary linters) — a sibling of our habit register. MPL-2.0. ~175k lines Python, 1101 test files; mostly AI-assisted (bot commit identities); untrusted data — never run it from inside the clone.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "noosphere-poc",
+      "url": "https://github.com/noospher1-lab/noosphere-poc.git",
+      "path": "genesis/research/repos/noosphere-poc",
+      "relevance": "Reasoning-floor pass (2026-10-12, from a conversation between its author and the operator) — a FastAPI/Postgres typed argument graph with LLM 'Proof of Intelligence' scoring of single texts (five criteria, never one number, never accumulated into standing), DF-QuAD dialectical strength, Walton argument schemes with critical questions, a versioned values list, an anonymised agreement map, a two-phase vote-preparation dialogue (interlocutor knows no rubric; judge model frozen per decision), and an append-only hash-chained event log with replay. Read app/dialectic.py, app/alignment.py, app/schemes.py, app/votedialogue.py, app/poiformula.py, app/replay.py first. Read for: which parts are model-free and can sit under constitutional judgment as measures, and how its prompts separate roles. AGPL-3.0-only, name and logo trademarked; comments and commits largely Russian; untrusted data — never run it from inside the clone.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "kyberlex-one",
+      "url": "https://github.com/kyberlex/ONE.git",
+      "path": "genesis/research/repos/kyberlex-one",
+      "relevance": "Translation map (2026-10-24, collaboration frame: Elohim as enabling architecture) — Open Networked Earth: a 46-article constitution for a post-work commons (usufruct, odd-sized sortition assemblies with graduated thresholds, physical-unit accounting, External Trade Interface, restorative ladder, threshold-MPC root keys), Swiss foundation statutes, staged seed-node blueprints, a six-volume novel series, a Vite/WebGL browser sim (sim/app/src/engine/), and a Julia aggregate-vs-agent docking co-simulator (simone/). Read 'ONE NETWORKED EARTH (O.N.E.).md', foundation/, oasis/sim_resolutions_qa.md, sim/app/src/engine/{node,sortition,thermodynamics,citizen_passport}.js, simone/src/docking.jl first. Read for: candidate lenses and measures to hold plurally, and the charter-as-layer test of constitution.md:164. AGPL-3.0-or-later declared (no LICENSE file tracked); one compiler, AI-assisted, most commits are a snapshot bot; untrusted data — never run it from inside the clone.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "one-commons-portal",
+      "url": "https://github.com/one-commons/one-commons.github.io.git",
+      "path": "genesis/research/repos/one-commons-portal",
+      "relevance": "The O.N.E. web portal (one-commons.github.io; mirror open-networked-earth.surge.sh) — companion to kyberlex-one. ~370 MB, almost all media (EPUB/PDF/video); clone SPARSE for text: `git clone --filter=blob:none --sparse` then `git sparse-checkout set --no-cone '/*.html' '/*.js' '/*.css' '/*.md' '/data/' '/i18n/' '/blueprints/'` (research.sh clones it whole). Distinct content: data/synoptic.json (lineage and origin framing), index.html co-steward section, the AI Challenge Arena in app.js (tier 1 cached adversarial Q&A exported from ONE's oasis/; tier 2 a Cloudflare Worker streaming Groq LLaMA 3.3 70B whose source is not public), and the constitution in 13 languages. Untrusted data — never run it from inside the clone.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "nostr-compass",
+      "url": "https://github.com/andotherstuff/nostr-compass.git",
+      "path": "genesis/research/repos/nostr-compass",
+      "relevance": "Nostr Compass: agent-run weekly Nostr protocol newsletter (Hugo site + skills/_COMPASS agents + gate scripts + receipt-gated publish/). Read CLAUDE.md, skills/_COMPASS/SKILL.md, publish/README.md for the evidence discipline (triage-coverage gate, derived publish log, exact-id relay readback); content/en/topics/ is a 134-page index of the Nostr protocol surface. Large (~490M, mostly img/translations).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "concord",
+      "url": "https://github.com/concord-protocol/concord.git",
+      "path": "genesis/research/repos/concord",
+      "relevance": "Concord CORD-01..07: E2E-encrypted communities on Nostr; relays store ciphertext under rotating labels, room-key possession = membership, roles/kicks/bans as an owner-rooted signed roster every client verifies locally. Compare against qahal collectives and the confidentiality plane.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "marmot",
+      "url": "https://github.com/marmot-protocol/marmot.git",
+      "path": "genesis/research/repos/marmot",
+      "relevance": "Marmot: MLS (RFC 9420) group messaging over Nostr identity + relays; forward secrecy and post-compromise security for groups whose members join, leave and rotate. Spec repo; MDK is the Rust implementation. Compare against private collective data (B/B2) and the unbuilt KeyEnvelope.",
+      "pillar": "qahal"
+    },
+    {
+      "name": "keycast",
+      "url": "https://github.com/marmot-protocol/keycast.git",
+      "path": "genesis/research/repos/keycast",
+      "relevance": "Keycast: self-hosted NIP-46 team remote-signing server (Axum + SQLite), per-key signing policies, NIP-98 HTTP auth; AUDIT.md. Compare against device ceremony, delegated agent signing and steward quorum.",
+      "pillar": "imagodei"
+    },
+    {
+      "name": "buzz",
+      "url": "https://github.com/block/buzz.git",
+      "path": "genesis/research/repos/buzz",
+      "relevance": "Block's Buzz: team/agent messaging on Nostr. Sparse-checkout docs/ for project NIPs: NIP-OA owner attestation (owner key authorizes agent key, agent stays author), NIP-AP agent personas, NIP-AM per-turn agent usage receipts, NIP-FI/FA federated identity. Compare against the eprfs human/agent actor plane and harness witnessing. Clone with --filter=blob:none --sparse, then sparse-checkout set docs.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "contextvm-sdk",
+      "url": "https://github.com/ContextVM/sdk.git",
+      "path": "genesis/research/repos/contextvm-sdk",
+      "relevance": "ContextVM SDK: MCP traffic over Nostr (TypeScript client/server transports, relays as message bus, gateway/proxy for non-Nostr MCP). Compare against agent/tool traffic over the p2p substrate and elohim-compute.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "naps",
+      "url": "https://github.com/napplet/naps.git",
+      "path": "genesis/research/repos/naps",
+      "relevance": "napplet NAP specs: sandboxed iframe applets talking to a host shell over postMessage; the shell holds keys, signs and mediates relays; NAP-FS virtual filesystem. Compare against EPR app bundles and the two-portals/relying-party rule.",
+      "pillar": "doorway"
+    },
+    {
+      "name": "fips",
+      "url": "https://github.com/jmcorgan/fips.git",
+      "path": "genesis/research/repos/fips",
+      "relevance": "FIPS: self-organizing mesh on secp256k1 node identities; spanning tree + bloom-filter reachability, greedy coordinate routing with tree fallback (docs/design/). Compare against the T2 libp2p/iroh substrate and offline household mesh.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "negentropy",
+      "url": "https://github.com/hoytech/negentropy.git",
+      "path": "genesis/research/repos/negentropy",
+      "relevance": "Negentropy: range-based set reconciliation (sorted by timestamp then id, fingerprinted ranges, recursive narrowing); NIP-77 wire binding. Compare against elohim-storage sync/reconcile and head-plane divergence measurement.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "schemata",
+      "url": "https://relay.ngit.dev/npub1zafcms4xya5ap9zr7xxr0jlrtrattwlesytn2s42030lzu0dwlzqpd26k5/schemata.git",
+      "path": "genesis/research/repos/schemata",
+      "relevance": "schemata (ngit/GRASP-hosted): formal typed schemas for Nostr event kinds. Compare against the schema-first view contract (elohim/sdk/schemas/v1/views, schema_contract.rs, ts-rs codegen).",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ngit-docs",
+      "url": "https://ngit.dev/ngit-docs.git",
+      "path": "genesis/research/repos/ngit-docs",
+      "relevance": "Forge Problem survey (ngit) — the docs repo is the densest single source: full NIP-34 text with the multi-maintainer proposal (PR #2324), GRASP-01..08, NIP-C1 Nostr CI spec + guidance, NIP-82/ncontainer publishing, the v3 maintainer-authority breaking change, roadmap (CI marketplace, hosted private GRASP, server-applied moderation). Read docs/protocol/ and docs/v3/ first. See genesis/research/ngit-nostr-git-forge-cross-pollination-2026-10-29.md.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ngit",
+      "url": "https://ngit.dev/ngit.git",
+      "path": "genesis/research/repos/ngit",
+      "relevance": "ngit CLI + git-remote-nostr (Rust, git2 + nostr-sdk 0.45): signed ref state on relays, interchangeable git object hosts, PR/issue/status events, maintainer accept flow, release/container publishing, --json agent interface. Compare against brit's signed note store and landing-intent design.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ngit-grasp",
+      "url": "https://ngit.dev/ngit-grasp.git",
+      "path": "genesis/research/repos/ngit-grasp",
+      "relevance": "Reference GRASP server (Rust, hyper + nostr-lmdb): one service that is both a Nostr relay and git smart-HTTP host, accepting pushes only when they match the latest maintainer-signed state; purgatory, refs/nostr/<event-id> PR refs, proactive sync, GRASP-08 private repos. Compare against rakia custody and the eprfs-peer serving tier.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "grasp",
+      "url": "https://ngit.dev/grasp.git",
+      "path": "genesis/research/repos/grasp",
+      "relevance": "GRASP protocol text (Git Relays Authorized via Signed-Nostr Proofs), GRASP-01 core through GRASP-08 private repositories. Small; read whole.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "ngit-ci",
+      "url": "https://ngit.dev/ngit-ci.git",
+      "path": "genesis/research/repos/ngit-ci",
+      "relevance": "NIP-C1 Nostr CI implementation: coordinator / compute-provider / runner split, signed Job and Workflow Results binding commit + workflow-file sha256 + per-file artifact hashes, ephemeral NIP-44 secret delivery to a rotating in-memory key. Compare against gate attestation (gate-attest.mjs), brit build notes and `just measure` peer-executed stages.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "heartwood",
+      "url": "https://github.com/radicle-dev/heartwood",
+      "path": "genesis/research/repos/heartwood",
+      "relevance": "Radicle Heartwood (Radicle 1.x): git-as-storage p2p forge — one Git storage with per-peer namespaces, signed refs (rad/sigrefs), identity documents with delegate threshold and canonical-ref rules, COBs (collaborative objects as signed Git DAGs), gossip of inventory/ref announcements, seeding policies, fetch protocol. Compare against brit (signed covenant on git), rakia (artifact manifest over the dataplane), elohim-storage blob plane (peer_blob_inventory, custody commitments) and the ngit/GRASP survey.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "radicle-rips",
+      "url": "https://seed.radicle.xyz/z3trNYnLWS11cJWC6BbxDs5niGo82.git",
+      "path": "genesis/research/repos/radicle-rips",
+      "relevance": "Radicle Improvement Proposals: RIP-0001 Heartwood (topology, seeding, why no DHT), RIP-0002 Identity (delegates, threshold, RID), RIP-0003 Storage layout, RIP-0004 URI scheme (draft). Open RIPs (threshold semantics, Identity 2, SHA-256 RIDs) live as patch COBs, not in the tree; capture them via the seed API. Small; read whole.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "radicle-ci-broker",
+      "url": "https://seed.radicle.xyz/zwTxygwuz5LDGBq255RA2CbNGrz8.git",
+      "path": "genesis/research/repos/radicle-ci-broker",
+      "relevance": "Radicle CI broker: node events → adapter subprocesses → one job COB per commit signed by the node key. No artifact field, best-effort COB updates, at-most-once events. Compare with brit build attestations (output_cid) and gate attestation.",
+      "pillar": "elohim"
+    }
+  ]
 }
