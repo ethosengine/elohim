@@ -470,6 +470,9 @@ RUN rm -rf src benches target/debug/elohim-storage target/debug/libelohim* \
 # unchanged tree is a full cache hit and a changed tree re-runs exactly once.
 # ═══════════════════════════════════════════════════════════════════════════
 FROM check-deps AS check
+# blob_store's chunker test include_str!s the kernel's shared tree vectors
+# (src/../../eprfs/fixtures from /app/src resolves to /eprfs/fixtures).
+COPY elohim/eprfs/fixtures/tree-vectors.json /eprfs/fixtures/tree-vectors.json
 # search::measure include_str!s the governed content search declarations from
 # $CARGO_MANIFEST_DIR/.epr-meta/elohim/algorithms/ — their CIDs print on every answer.
 COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/content-lexical-index.json ./.epr-meta/elohim/algorithms/content-lexical-index.json
