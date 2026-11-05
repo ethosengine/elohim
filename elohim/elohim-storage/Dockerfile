@@ -196,6 +196,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../crates/seam-contracts"|path = "crates/seam-contracts"|' Cargo.toml && \
     sed -i 's|path = "../../crates/consent-grant"|path = "crates/consent-grant"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/epr"|path = "../../epr"|' crates/consent-grant/Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-address"|path = "../crates/elohim-address"|' epr/Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
