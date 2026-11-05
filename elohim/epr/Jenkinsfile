@@ -162,7 +162,11 @@ spec:
       when {
         allOf {
           expression { env.PIPELINE_SKIPPED != 'true' }
-          anyOf { branch 'main'; expression { env.BRANCH_NAME == 'main' } }
+          // main publishes every version bump; a `publish/*` branch is the deliberate
+          // out-of-band publish (re-genesis 1, 2026-11-05: consumers pinned by registry —
+          // brit — needed elohim-address + elohim-epr 0.2.0 before the kernel reached main).
+          // The script is idempotent and 409-safe, so a republish of a version is a no-op.
+          anyOf { branch 'main'; branch 'publish/*'; expression { env.BRANCH_NAME == 'main' } }
         }
       }
       steps {
