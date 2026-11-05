@@ -26,6 +26,7 @@ elohim-epr-rea = { path = "../../epr-rea" }
 elohim-seam-contracts = { path = "../../../crates/seam-contracts", features = ["serde"] }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-serve = { path = "../eprfs-serve" }
+eprfs-storage = { path = "../eprfs-storage" }
 # Pinned with elohim-storage (iroh 0.92 / iroh-gossip 0.92 share one iroh-base). The workspace
 # [patch] carries the same vendored iroh-quinn-proto storage carries.
 iroh = "=0.92"

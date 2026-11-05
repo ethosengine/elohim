@@ -17,7 +17,7 @@ import {
   siblingGovernanceChange, siblingVerdicts,
 } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
-import { runAttested } from './gate-attest.mjs';
+import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { readSet } from './gate-input-audit.mjs';
 import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
@@ -314,9 +314,17 @@ export function runProject(project, printOnly, namesOnly, {
     const attestedStatus = runAttested(project, {
       root,
       env,
+      spawn,
       log: line => write(`${line}\n`),
       runEpr: eprArgs => spawn(env.EPR_BIN || 'epr', eprArgs, { cwd: root, stdio: 'ignore', timeout: 30000 }).status,
     });
+    if (attestedStatus === CLAIMED_EXIT_CODE) {
+      // Claimed is admitted for landing until the debt-aware landing plane exists, but it is
+      // not a pass. In particular, do not emit an exit-0 gate verdict: live-run harvest treats
+      // those as green, and ordinary closure evidence must never become reusable from a claim.
+      write(`[gate] ${project.name}: claimed (admitted with debt; no green evidence)\n`);
+      return 0;
+    }
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: attestedStatus, seconds: 0 } });
     return attestedStatus;
   }

@@ -1,6 +1,6 @@
 [package]
 name = "eprfs-storage"
-version = "0.3.4"
+version = "0.3.5"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -14,6 +14,8 @@ bytes.workspace = true
 eprfs-core = { version = "0.3.3", path = "../eprfs-core", registry = "elohim" }
 serde.workspace = true
 serde_json.workspace = true
+serde_ipld_dagcbor = "0.6"
+sha2 = "0.10"
 # Explicit cleanup control used when retaining failed object writes.
 tempfile = "3.27"
 tokio = { workspace = true, features = ["sync", "rt"] }

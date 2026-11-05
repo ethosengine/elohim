@@ -2374,10 +2374,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-11-04 (RED preserved; Brit source integration): candidate 5269295760e9 merges the qualified native-source/shared-Rust work at 69d283b06845 with Brit main 11113c000061 (Rakia 0.1.1 and brit-cli 0.1.7). Local proof: 12 CLI tests pass, zero ignored; Brit native readiness and shared Rust discipline pass; parent Rust-style gate passes. The pin and this evidence select brit + orchestrator, with the exact commit requiring the upstream Tests pass attestation (CI run 41834990408). Source landing does not certify registry delivery: no-upload publication rehearsal refuses the existing gix-error 0.5.1 payload because its packaged Cargo.lock differs; immutable-version checks and the approved package-specific license exception are unchanged. Evidence: genesis/local-dev/integration-20261103/brit-main-landing-20261104.json and associated logs.
-    evidence-fingerprint: sha256:e4311209dd164ae0
-    evidence-bytes: 6158
-    evidence-entries: 9
+      DELTA 2026-11-05 (status unchanged; native-dev Track D): gate-attest now exits 3 for `claimed`, distinct from pass, refusal and manifest error; gate-runner admits a claimed gate with debt until F3 lands debt-aware landing — run exit 0, printed `claimed (admitted with debt; no green evidence)`, no exit-0 live verdict and no reusable closure evidence — while refusals still fail. Probe: gate-attest.test.mjs 25/25 and gate-runner.test.mjs's claimed/refusal cases; orchestrator gate green on native-dev/land-1. Open: pre-push still prints a generic PASSED after the claimed line, and the live-run schema has no `claimed` verdict (F3).
+    evidence-fingerprint: sha256:dbfae5bf8b21d5f3
+    evidence-bytes: 6797
+    evidence-entries: 10
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
@@ -2470,10 +2470,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-03c (status unchanged; the reuse is now measured, not projected): in a clean worktree at bb4772d67, `GATE_EVIDENCE=reuse just gate eprfs` ran green in 35m32s and recorded bafyreihg73…. The next run answered `evidence: hit green … closure scope paths (218 reads)` and finished in 22 s, even though the first run had rewritten tracked .claude/data/architecture-findings.jsonl (gate-cycle's ceiling finding, now outside eprfs's closure). c7e417ce5 enrols 13 more cargo gates whose recipes run only cargo over their own crates. Still red: gate-cycle writes a tracked ledger, and the rakia oracle drops dependents while sibling worktrees exist (rakia PR #3).
-    evidence-fingerprint: sha256:17869ee31d86aef3
-    evidence-bytes: 12189
-    evidence-entries: 15
+      DELTA 2026-11-05 (status unchanged; evidence still dark): the `evidence: unavailable` on every gate since 2026-11-04 is brit-cli's gix 0.81 opening this repository (`.git` owned by an unmapped uid) with a 32-slot object store kept after safe.directory promotes trust, while the repository holds 49 pack indexes — not shallowness (a probe with the shallow marker fingerprints cleanly). Cure committed in brit as 9776a9ad95 on fix/gix-slots-after-trust (three gpt-6-astra reviews); a debug build fingerprints the main checkout and a linked worktree where brit 0.1.8 fails. Lands as brit-cli 0.1.10 after shem's replay release (0.1.9). Backlog: brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo.
+    evidence-fingerprint: sha256:6ac66dd6058037ab
+    evidence-bytes: 12896
+    evidence-entries: 16
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
@@ -2502,10 +2502,10 @@ habits:
       - "a2o @concern:rust-style: cd genesis/a2o && pnpm exec cucumber-js --profile rust-style (six isolated-Git acceptance scenarios, including independent addressed-policy holdings)"
       - "node --test genesis/orchestrator/rust-toolchain-pin.test.mjs (CI/local checker toolchain agreement)"
     evidence: >
-      DELTA 2026-11-03 (native sprint integration): EPRFS core 0.3.3 requires the checker's exact dependency pin to advance; rebuilt and re-exported the complete method/source closure while retaining prior addressed holdings and the same guide/rules. The normal Rust-style gate passes on the combined tree, including the Windows storage branch; publisher precheck preserves existing immutable packages and 36 publisher tests pass. Evidence: genesis/local-dev/integration-20261103/native-rust-style-gate.log and native-checker-discipline.json.
-    evidence-fingerprint: sha256:b305561e9cee9fdb
-    evidence-bytes: 5902
-    evidence-entries: 8
+      DELTA 2026-11-05 (status unchanged; one-time registry-decoupled bootstrap, steward-authorized override): the checker no longer compiles the tree it polices. It builds published, checksummed eprfs-core 0.3.3, eprfs-meta 0.3.4 and seam-contracts 0.1.2 from the elohim registry, declares `build = false`, and its syntax scanner is extracted into the path-only `elohim-rust-style-scan` crate with no EPRFS or seam-contract dependency; epr-cli now consumes that scanner directly, so its workspace graph never crosses into the registry-backed checker. The adopted method inventories its nine checker inputs, including the scan crate's manifest and source (policy bafkreib6zgok5h2gtmoz2zipvssjjzlzml2j53vu2xua3f6qevtbednsfy, method bafkreif2lxmrsvrqy2e3umw2auo5gq7oxkz3r6aqnwr2salcivq367uudm; guide unchanged; landed old objects retained and the two unlanded intermediate objects replaced). The wrappers enter the repository root, refuse legacy and nested Cargo configuration, pin the compiler and wrappers, and wire anonymous registry reads for a cold cache. Both the old and new checkers refuse this replacement by design, so this single commit lands with hooks bypassed under steward human:matthew's covenant clause bafyreib72ths5psd6mpiowmhsf7v5sr6akr3jkr2lf3a5xmlflbaaryspi; its CI rust-style check is expected red once. Probe: cargo 32, hook 15 and distribution 4 tests, workspace fmt and Clippy `-D warnings`, epr-cli Clippy, credential-free offline tree resolution, and all 1,301 epr-cli tests after building their declared `bin-launch` fixture in the same target; the package test used no registry credentials. Three gpt-6-astra reviews covered the prior bootstrap (final finding, nested-config linker, fixed with an adversarial marker-linker test). After it, an edit confined to eprfs-core or eprfs-meta no longer changes the method. Open: effective Cargo configuration accounting (workspace-discipline row 84).
+    evidence-fingerprint: sha256:7d96209823aa1c15
+    evidence-bytes: 8684
+    evidence-entries: 10
     guard: >
       Never equate equal counts with no new findings; never use dirty source for a pushed object;
       never call a missing baseline or a stale checker clean. Scope and owner moves cannot transfer

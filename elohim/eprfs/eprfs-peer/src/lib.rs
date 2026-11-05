@@ -47,6 +47,7 @@ mod head;
 mod head_table;
 mod key;
 mod lease_view;
+mod local_blob;
 mod proof;
 mod rules;
 mod steward_scope;
@@ -89,6 +90,7 @@ pub use lease_view::{
     lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
     LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
+pub use local_blob::{put_local_blob, read_local_blob, stream_local_blob, LocalBlobContext};
 pub use rules::{Rules, RulesDigest, RulesState};
 pub use steward_scope::{
     Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,

@@ -92,6 +92,29 @@ pub enum PeerError {
     #[error("the flow store failed: {0}")]
     FlowStore(#[source] elohim_epr_rea::FabricError),
 
+    /// Direct local blob custody failed before a manifest was recorded.
+    #[error("the local tier blob operation failed: {0}")]
+    LocalBlob(#[source] eprfs_core::EprfsError),
+
+    /// Bytes and their manifest reached local custody, but their Produce event did not. The
+    /// manifest CID makes the partial state explicit so a caller can retry recording it.
+    #[error("local tier blob {manifest} is persisted, unrecorded: {source}")]
+    LocalBlobUnrecorded {
+        manifest: Box<eprfs_core::BlobCid>,
+        #[source]
+        source: elohim_epr_rea::FabricError,
+    },
+
+    /// A local draw could not record its Use event. A whole-artifact read withholds its bytes; a
+    /// streaming caller may already hold a verified prefix but receives this explicit failure
+    /// instead of a completed draw.
+    #[error("local tier blob draw for {manifest} is unrecorded: {source}")]
+    LocalBlobDrawUnrecorded {
+        manifest: Box<eprfs_core::BlobCid>,
+        #[source]
+        source: elohim_epr_rea::FabricError,
+    },
+
     /// A channel tree could not be encoded (an event or a directory past the tree limits).
     #[error("cannot build the channel tree: {reason}")]
     ChannelTree { reason: String },

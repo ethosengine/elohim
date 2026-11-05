@@ -1364,7 +1364,7 @@ dependencies = [
  "elohim-epr-index",
  "elohim-epr-lsp",
  "elohim-epr-rea",
- "elohim-rust-style",
+ "elohim-rust-style-scan",
  "eprfs-agent",
  "eprfs-core",
  "eprfs-host",
@@ -1444,19 +1444,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "elohim-rust-style"
+name = "elohim-rust-style-scan"
 version = "0.1.0"
 dependencies = [
- "eprfs-core",
- "eprfs-meta",
  "proc-macro2",
  "quote",
  "serde",
- "serde_json",
- "serde_yaml",
  "syn 2.0.118",
- "tempfile",
- "toml 0.8.23",
 ]
 
 [[package]]
@@ -1621,6 +1615,7 @@ dependencies = [
  "eprfs-core",
  "eprfs-peer",
  "eprfs-serve",
+ "eprfs-storage",
  "futures-lite",
  "iroh",
  "iroh-gossip",
@@ -1650,14 +1645,16 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
  "eprfs-core",
  "eprfs-serve",
  "serde",
+ "serde_ipld_dagcbor",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
  "windows-sys 0.61.2",

@@ -1,6 +1,13 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { judge, judgePin, observationArgs, readCheck, runAttested } from './gate-attest.mjs';
+import {
+  CLAIMED_EXIT_CODE,
+  judge,
+  judgePin,
+  observationArgs,
+  readCheck,
+  runAttested,
+} from './gate-attest.mjs';
 
 const attestation = { provider: 'github-checks', repo: 'ethosengine/brit', check: 'Tests pass' };
 const SHA = 'b86c5104d3398d89fe56d23199a9393fec534870';
@@ -150,9 +157,12 @@ describe('runAttested — reads the pin, not the checkout', () => {
     assert.equal(runAttested(project, h.deps), 1);
     assert.ok(h.epr[0].includes('conclusion=failure'));
   });
-  test('unreachable → exit 0 as claimed', () => {
+  test('unreachable → its own non-green exit as claimed', () => {
     const h = harness(() => ({ status: 1, stdout: '', stderr: 'offline' }), fakeGit());
-    assert.equal(runAttested(project, h.deps), 0);
+    assert.equal(runAttested(project, h.deps), CLAIMED_EXIT_CODE);
+    assert.notEqual(CLAIMED_EXIT_CODE, 0);
+    assert.notEqual(CLAIMED_EXIT_CODE, 1);
+    assert.notEqual(CLAIMED_EXIT_CODE, 2);
     assert.deepEqual(h.lines, ['attested: claimed — offline']);
     assert.ok(h.epr[0].includes('tier=claimed'));
   });

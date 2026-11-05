@@ -33,11 +33,8 @@ export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
 /**
  * Projects whose Rust read set must be fully named (gate-input-audit.test.mjs `REAL … read set`).
  * The orchestrator gate runs that test, so any of these, or the orchestrator itself, selects it.
- * eprfs is not listed (it joined 2026-11-03, left 2026-11-04): the merged shared-Rust-discipline checker's
- * build.rs embeds eprfs-core, eprfs-meta and seam-contracts, and that read cannot be declared in place,
- * because build.rs is hashed into the adopted discipline method (rust-style/src/discipline.rs method_bytes),
- * so any edit there refuses every gate. Those paths are inside eprfs's own closure already; eprfs keys on
- * the commit tree until the method owner adopts a build.rs that carries the declaration.
+ * Membership is an explicit read-set qualification, not an implication of dependency on the
+ * Rust-style checker. The checker consumes published EPRFS crates and does not read their source tree.
  */
 export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr'];
 

@@ -244,21 +244,31 @@ dependencies = [
 name = "elohim-rust-style"
 version = "0.1.0"
 dependencies = [
+ "elohim-rust-style-scan",
  "eprfs-core",
  "eprfs-meta",
- "proc-macro2",
- "quote",
  "serde",
  "serde_json",
  "serde_yaml",
- "syn 2.0.119",
  "tempfile",
  "toml",
 ]
 
 [[package]]
+name = "elohim-rust-style-scan"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "elohim-seam-contracts"
 version = "0.1.2"
+source = "sparse+https://nexus.ethosengine.com/repository/cargo-internal/"
+checksum = "20066a2ff010783eefa8261bf551d3cfa2b3f10ab3cc3a4c9527ae8f0d35c20a"
 dependencies = [
  "serde",
 ]
@@ -266,6 +276,8 @@ dependencies = [
 [[package]]
 name = "eprfs-core"
 version = "0.3.3"
+source = "sparse+https://nexus.ethosengine.com/repository/cargo-internal/"
+checksum = "3fae1576cfad33c12fbc6a9735a92282013569127430b644d1076b5dba159b49"
 dependencies = [
  "async-trait",
  "bytes",
@@ -282,6 +294,8 @@ dependencies = [
 [[package]]
 name = "eprfs-meta"
 version = "0.3.4"
+source = "sparse+https://nexus.ethosengine.com/repository/cargo-internal/"
+checksum = "8ed4ddc2f9fddc7d563f85ba055cf8f34b02ce0e1a20d0de28dad2ac36efc89d"
 dependencies = [
  "eprfs-core",
  "serde",

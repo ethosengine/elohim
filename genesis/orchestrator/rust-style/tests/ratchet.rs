@@ -2,7 +2,7 @@ use elohim_rust_style::{
     repository::{compare, Snapshot, POLICY},
     scan::scan,
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 fn tree(source: &str) -> Snapshot {
     Snapshot {
@@ -25,6 +25,137 @@ fn verdict(before: &str, after: &str) -> Vec<String> {
         .failures
 }
 const DEBT: &str = "#[allow(dead_code)] fn old() {}";
+
+#[test]
+fn method_inventory_contains_only_checker_inputs() {
+    let method: serde_json::Value =
+        serde_json::from_slice(&elohim_rust_style::discipline::method_bytes().unwrap()).unwrap();
+    let labels: Vec<_> = method["sources"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        labels,
+        [
+            ".cargo/config.toml",
+            "Cargo.lock",
+            "Cargo.toml",
+            "scan/Cargo.toml",
+            "scan/src/lib.rs",
+            "src/discipline.rs",
+            "src/lib.rs",
+            "src/main.rs",
+            "src/repository.rs",
+        ]
+    );
+    assert!(labels.iter().all(|label| !label.starts_with("eprfs-core/")
+        && !label.starts_with("eprfs-meta/")
+        && !label.starts_with("seam-contracts/")
+        && *label != "eprfs-workspace-inheritance"));
+}
+
+#[test]
+fn disabled_build_script_cannot_execute_or_change_the_method() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixture = tempfile::tempdir().unwrap();
+    let fixture_root = fixture.path();
+    let fixture_crate = fixture_root.join("genesis/orchestrator/rust-style");
+    fs::create_dir_all(fixture_crate.join("src")).unwrap();
+    fs::create_dir_all(fixture_crate.join("scan/src")).unwrap();
+    fs::create_dir_all(fixture_root.join(".cargo")).unwrap();
+    for name in ["Cargo.toml", "Cargo.lock"] {
+        fs::copy(source_root.join(name), fixture_crate.join(name)).unwrap();
+    }
+    for entry in fs::read_dir(source_root.join("src")).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_file() {
+            fs::copy(
+                entry.path(),
+                fixture_crate.join("src").join(entry.file_name()),
+            )
+            .unwrap();
+        }
+    }
+    fs::copy(
+        source_root.join("scan/Cargo.toml"),
+        fixture_crate.join("scan/Cargo.toml"),
+    )
+    .unwrap();
+    fs::copy(
+        source_root.join("scan/src/lib.rs"),
+        fixture_crate.join("scan/src/lib.rs"),
+    )
+    .unwrap();
+    fs::copy(
+        source_root.join("../../../.cargo/config.toml"),
+        fixture_root.join(".cargo/config.toml"),
+    )
+    .unwrap();
+    fs::write(
+        fixture_crate.join("build.rs"),
+        r#"fn main() {
+    std::fs::write(std::env::var("RUST_STYLE_BUILD_MARKER").unwrap(), "executed").unwrap();
+    panic!("Cargo executed a disabled build script");
+}
+"#,
+    )
+    .unwrap();
+    let marker = fixture_root.join("build-script-executed");
+    let target = std::path::PathBuf::from(
+        std::env::var_os("CARGO_TARGET_DIR").expect("native tests require CARGO_TARGET_DIR"),
+    )
+    .join("build-script-disabled-fixture");
+    let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+        .current_dir(fixture_root)
+        .args([
+            "build",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            fixture_crate.join("Cargo.toml").to_str().unwrap(),
+        ])
+        .env("CARGO_TARGET_DIR", &target)
+        .env("CARGO_BUILD_RUSTC", "rustc")
+        .env("CARGO_BUILD_RUSTC_WRAPPER", "")
+        .env("CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER", "")
+        .env("RUSTC_WRAPPER", "")
+        .env("RUSTC_WORKSPACE_WRAPPER", "")
+        .env("RUST_STYLE_BUILD_MARKER", &marker)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "temporary checker build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!marker.exists(), "disabled build.rs executed");
+
+    let guide = fixture_root.join("guide.md");
+    let exported = fixture_root.join("exported");
+    fs::write(&guide, "Temporary reviewed guide.\n").unwrap();
+    fs::create_dir(&exported).unwrap();
+    let binary = target.join("debug/epr-rust-style");
+    let output = Command::new(binary)
+        .args([
+            "--export-discipline",
+            "--guide",
+            guide.to_str().unwrap(),
+            "--out",
+            exported.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let discipline: elohim_rust_style::discipline::Discipline =
+        serde_json::from_slice(&output.stdout).unwrap();
+    let fixture_method = fs::read(exported.join(discipline.method.path)).unwrap();
+    assert_eq!(
+        fixture_method,
+        elohim_rust_style::discipline::method_bytes().unwrap()
+    );
+}
 
 #[test]
 fn moving_debt_to_a_nested_cargo_package_is_not_paydown() {

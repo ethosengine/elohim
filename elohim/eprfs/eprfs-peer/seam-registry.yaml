@@ -622,3 +622,79 @@ decisionPoints:
         testName: peer_leases_reports_a_device_whose_binding_is_contested_as_revoked
         kind: integration
     notes: "Spec §3.4; review focus items 1 and 2. berth (genesis/agentic/bin/berth) polls epr peer leases --json for steward-scoped claims and owner checks; container-scoped resources never call it."
+  - name: local_blob
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/local_blob.rs
+      modulePath: eprfs_peer::read_local_blob
+    summary: >
+      The daemon-independent one-device path for chunked custody. A successful put appends a
+      Produce event; every completed draw appends a Use event with hit, miss, or unavailable and
+      its reason. A flow append failure never reports success: puts return persisted, unrecorded with
+      the persisted manifest CID, and reads withhold hit bytes.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Direct local storage and the existing local flow sidecar are used; no transport or head plane participates.
+      - id: C1
+        status: n-a
+        justification: The path records custody observations and selects no authority.
+      - id: C2
+        status: n-a
+        justification: Events append and immutable manifests do not move a selected head.
+      - id: C3
+        status: answered
+        justification: The daemon, doorway, credential and peers are absent from the path; local put/read remains a legal move.
+      - id: C4
+        status: answered
+        justification: Storage's typed hit, miss and unavailable outcomes are preserved into distinct flow classifications and printable reasons.
+      - id: C5
+        status: answered
+        justification: The wrapper adds observations but grants no standing; the reader still verifies bytes locally through TierBlobDraw.
+      - id: C6a
+        status: partial
+        justification: Work inherits the storage chunk bound and sequential read; total artifact assembly remains the storage seam's declared gap.
+      - id: C6b
+        status: partial
+        justification: Byte custody is idempotent, while explicit retries append another truthful observation rather than deduplicating events.
+      - id: C7
+        status: n-a
+        justification: The local path advertises and serves nothing.
+      - id: C8
+        status: answered
+        justification: Produce and Use observations cover success and non-hit outcomes; a failed observation is itself returned explicitly.
+      - id: C9
+        status: partial
+        justification: computed_by and custodian namespaces are retained as supplied; the unresolved signer-to-agent join is not guessed.
+      - id: C10
+        status: answered
+        justification: This adds a local library surface and new event classifications without changing the existing tier ALPN.
+      - id: C11
+        status: n-a
+        justification: No ingress, fan-out, or externally driven queue is introduced.
+      - id: C12
+        status: answered
+        justification: Calls are explicit local acts; no carried credential or remote assertion authorizes them.
+      - id: C13
+        status: n-a
+        justification: The wrapper does not widen reach or authority.
+      - id: C14
+        status: partial
+        justification: Completed effects are witnessed in the flow sidecar and append failure is explicit; a hard process kill cannot append a completion event.
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/local_blob.rs
+        testName: daemon_down_put_and_read_record_produce_and_use_without_a_peer
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/local_blob.rs
+        testName: miss_is_a_recorded_use_with_a_typed_printable_reason
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/local_blob.rs
+        testName: unavailable_corrupt_draw_records_use_and_withholds_bytes
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/local_blob.rs
+        testName: failed_flow_record_is_explicitly_unrecorded_never_a_silent_put
+        kind: integration
+    notes: >
+      Classification is the spec's Private (B) self-reach custody. The worst local holder sees
+      artifact bytes, closure identity and sizes; no cross-holon join or network disclosure is
+      added. The serve-blob scope predicate and unauthorized-CID refusal remain out of slice 1.

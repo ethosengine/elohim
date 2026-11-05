@@ -1448,13 +1448,15 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
  "eprfs-core",
  "serde",
+ "serde_ipld_dagcbor",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
  "windows-sys 0.61.2",
