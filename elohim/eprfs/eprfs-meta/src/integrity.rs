@@ -14,11 +14,11 @@
 //! rather than guessing. The one exception is a write that TARGETS a manifest,
 //! because fixing broken governance must never be blocked by broken governance.
 //!
-//! Parity note. This mirrors `_lib.epr_meta.validate_meta` check-for-check, and
-//! deliberately mirrors ALL of it rather than only the checks the golden vectors
-//! exercise. A partial integrity layer would agree with Python on the vectors
-//! and diverge everywhere else — a fork that passes its own tests, which is the
-//! precise failure mode this corpus exists to catch.
+//! Parity note. This mirrors `_lib.epr_meta.validate_meta` check-for-check except
+//! for the native integrity-class floor. The Python hook treats that marker as
+//! malformed and therefore also routes it to judgment; `epr` remains its decision
+//! authority. All other checks stay mirrored rather than only matching the golden
+//! vectors, because partial parity would be a fork that passes its own tests.
 
 use std::path::{Path, PathBuf};
 
@@ -44,7 +44,7 @@ const ACTIONABLE_KEYS: [&str; 7] = [
 ];
 
 /// Every key a non-binding rule may carry. Anything else is a typo.
-const KNOWN_RULE_KEYS: [&str; 17] = [
+const KNOWN_RULE_KEYS: [&str; 18] = [
     "id",
     "class",
     "why",
@@ -62,6 +62,7 @@ const KNOWN_RULE_KEYS: [&str; 17] = [
     "require-sibling",
     "dedupe-of",
     "validator",
+    "integrity",
 ];
 
 /// A policy BINDING carries only placement and local variance; the registry
@@ -232,6 +233,19 @@ pub fn validate_meta(cfg: &Value) -> Vec<String> {
             )),
         }
 
+        match get(rule, "integrity") {
+            Some(Value::Bool(true)) if !matches!(class, Some("deny" | "ask")) => {
+                errs.push(format!(
+                    "rules[{index}] (`{rid}`) is marked `integrity: true` but class `{}` is below `ask` — integrity-class governance must fail closed",
+                    class.unwrap_or("None")
+                ));
+            }
+            Some(Value::Bool(_)) | None => {}
+            Some(_) => errs.push(format!(
+                "rules[{index}] (`{rid}`) `integrity` marker must be a boolean"
+            )),
+        }
+
         let mut unknown: Vec<&String> = keys
             .iter()
             .filter(|key| !KNOWN_RULE_KEYS.contains(&key.as_str()))
@@ -361,5 +375,42 @@ pub fn targets_manifest(path: &Path) -> bool {
             .and_then(|name| name.to_str())
             .is_some_and(|name| name == crate::MANIFEST_NAME),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_meta;
+
+    #[test]
+    fn integrity_marked_rules_declared_below_ask_fail_validation() {
+        for class in ["inject", "measure", "dispatch"] {
+            let source = format!(
+                "epr-meta-version: 1\nrules:\n  - id: evidence-admission\n    class: {class}\n    integrity: true\n    validator: validator-ref\n"
+            );
+            let config = serde_yaml::from_str(&source).expect("parse integrity rule fixture");
+            let problems = validate_meta(&config);
+            assert!(
+                problems
+                    .iter()
+                    .any(|problem| problem.contains("integrity") && problem.contains("below `ask`")),
+                "class {class} problems: {problems:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn integrity_marked_ask_and_deny_rules_pass_the_class_lint() {
+        for class in ["ask", "deny"] {
+            let source = format!(
+                "epr-meta-version: 1\nrules:\n  - id: evidence-admission\n    class: {class}\n    integrity: true\n    validator: validator-ref\n"
+            );
+            let config = serde_yaml::from_str(&source).expect("parse integrity rule fixture");
+            assert_eq!(
+                validate_meta(&config),
+                Vec::<String>::new(),
+                "class {class}"
+            );
+        }
     }
 }
