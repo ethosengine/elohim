@@ -18,7 +18,7 @@ use bytes::{Bytes, BytesMut};
 use elohim_epr::address::{
     BYTE_CODEC, BYTE_DIGEST_LEN, BYTE_MULTIHASH, CITE_CODEC, RECORD_CODEC, SHA2_256,
 };
-use elohim_epr::profile::{chunk_bytes, ByteProfile, Chunker, Erasure, BYTE_PROFILE_0};
+use elohim_epr::profile::{try_chunk_bytes, ByteProfile, Chunker, Erasure, BYTE_PROFILE_0};
 use eprfs_core::{BlobCid, DerivationRecord, EprfsError, EprfsStorage, FetchPolicy, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -228,7 +228,10 @@ pub async fn put_tier_blob<S: EprfsStorage + ?Sized>(
         )));
     }
 
-    let layout = chunk_bytes(&TIER_BLOB_PROFILE, &bytes);
+    // The whole profile is validated before any byte is cut (the kernel refuses, never chunks,
+    // a profile outside what it admits).
+    let layout = try_chunk_bytes(&TIER_BLOB_PROFILE, &bytes)
+        .map_err(|error| EprfsError::Storage(format!("tier blob profile: {error}")))?;
     let mut chunks = Vec::with_capacity(layout.len());
     for (offset, len) in layout {
         let chunk = bytes.slice(offset..offset + len);

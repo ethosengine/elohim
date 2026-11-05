@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use elohim_epr::profile::{chunk_bytes, Chunker, Erasure, BYTE_PROFILE_0};
+use elohim_epr::profile::{chunk_bytes, Chunker, Erasure, ValidatedProfile, BYTE_PROFILE_0};
 use eprfs_core::{
     AttestationDraft, BlobCid, BlobHandle, BlobPresence, DerivationBasis, DerivationKey,
     DerivationRecord, EprRecord, EprRef, EprfsStorage, FetchPolicy, KeyInput, Witness,
@@ -73,7 +73,7 @@ async fn local_put_chunks_by_the_byte_profile_and_records_each_cid_in_a_manifest
     assert_eq!(put.manifest.chunks[0].byte_len, MAX_CHUNK as u32);
     assert_eq!(put.manifest.chunks[1].byte_len, 12);
     // The layout is the profile's chunker, and every chunk is a byte-profile address.
-    let layout: Vec<u32> = chunk_bytes(&BYTE_PROFILE_0, &bytes)
+    let layout: Vec<u32> = chunk_bytes(&ValidatedProfile::EPOCH_0, &bytes)
         .into_iter()
         .map(|(_, len)| len as u32)
         .collect();

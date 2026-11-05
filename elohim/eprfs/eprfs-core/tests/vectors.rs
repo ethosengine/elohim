@@ -605,7 +605,8 @@ fn address_section() -> Value {
 /// parameters, table digest) through the byte profile's chunker and eprfs's byte constructor.
 fn recompute_chunker(out: &mut Value) {
     use elohim_epr::profile::{
-        chunk_bytes, fastcdc_2020_table_digest, Chunker, BYTE_PROFILE_0, CHUNKER_FASTCDC_2020,
+        chunk_bytes, fastcdc_2020_table_digest, Chunker, ValidatedProfile, BYTE_PROFILE_0,
+        CHUNKER_FASTCDC_2020,
     };
     let section = &out["chunker"];
     let Chunker::Fastcdc2020 {
@@ -647,7 +648,7 @@ fn recompute_chunker(out: &mut Value) {
         vector["inputBlake3"] = json!(hex(whole.as_cid().hash().digest()));
         vector["wholeCid"] = json!(whole.to_string());
         vector["chunks"] = Value::Array(
-            chunk_bytes(&BYTE_PROFILE_0, &bytes)
+            chunk_bytes(&ValidatedProfile::EPOCH_0, &bytes)
                 .into_iter()
                 .map(|(offset, len)| {
                     json!([
