@@ -29,6 +29,15 @@ Plan: `genesis/local-dev/regenesis-1/plan.md` (hub copy of `/projects/.claude-co
 | T9 a2o | not started | rg1-a2o | — |
 | T10 steward | not started | rg1-steward | — |
 
+### Device gate timings
+| Device | Gate | Worktree @ base | Cold | Warm | EXIT | Evidence |
+|---|---|---|---|---|---|---|
+| shem | `just gate sweettest-check` | rg1-dna @ a31d94403 | 1779 s (EXIT=1: preflight red, brit/rakia/sophia submodules missing; compile clean) | 52 s | 0 (warm) | not recorded (worktree dirty before the info/exclude fix) |
+| shem | `just gate elohim-storage` (`CARGO_BUILD_JOBS=1`, mesh down) | rg1-storage @ a31d94403 (old base) | 6014 s | — | 0 | `bafyreidexrg6b4uopprwxif2cewp3scgy56mdouvcjgzpy57uj26bl5vge` |
+| shem | `just build` in `elohim/holochain/dna/elohim` (wasm release, default stable toolchain) | rg1-dna @ a31d94403 | 275 s | — | 0 | toolchain warm for T1; a `RUSTUP_TOOLCHAIN=1.96.1` pin fails E0463 (no wasm32 target), so DNA builds take the default toolchain |
+
+Detail: `evidence/shem-pre-l1.md` on `regenesis/shem-evidence`.
+
 ### Open operator items
 - Open a session on shem (`epr peer serve` up; moor; read `berth inbox`).
 - Ack the brit pin takeover from `95f6fc83` (or tell me it is still theirs).

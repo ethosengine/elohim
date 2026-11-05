@@ -271,3 +271,55 @@ Feature: Crossed steward-space records earn authority from their signed carrier
     Then the compatibility station exits nonzero for workspaces "ethosengine" and "shem"
     And the station reports that workspace "shem" cannot enforce crossing provenance
     And the berth grants no cross-workspace lease on "dev-integration" until both peers enforce the declared posture
+
+  # A signature envelope travels with every newly signed record. It carries
+  # three things: a scheme code naming the signature method, the signer's
+  # multikey, and the signature. A multikey is a public key prefixed with a code
+  # for its key type, so a verifier never has to guess the algorithm. Scheme
+  # code 0 is ed25519, the only scheme in use today.
+  #
+  # A record's wire epoch names the format the record is written in. A device
+  # can understand that format and still not recognise a signature scheme code.
+  #
+  # The record kinds below are: a protocol record (any signed protocol entry),
+  # a brit build attestation (a signed gate result), a channel head (the signed
+  # current release of a channel), a trust snapshot (a signed copy of who a
+  # device trusts), a custody inventory (a signed list of what a device holds)
+  # and a consent grant carrier proof (the signed proof that a device may carry
+  # a consent grant).
+  #
+  # These stations cover newly produced envelopes. Historical brit notes keep
+  # their separately governed verification format.
+
+  @wip @concern:addresses-are-declared-profiles
+  Scenario Outline: Matthew can identify how each new signed record was verified
+    Given device B prepares a new "<record_kind>" for Matthew's steward space
+    When device B signs the record and device A inspects its signed envelope
+    Then the envelope explicitly carries scheme code 0 (ed25519), the signer's multikey, and the signature
+    And the multikey identifies the expected signer's ed25519 public key
+    And device A verifies the record's signature using the declared scheme code 0
+    And Matthew's verification report identifies the record as verified under ed25519
+
+    Examples:
+      | record_kind                |
+      | protocol record            |
+      | brit build attestation     |
+      | channel head               |
+      | trust snapshot             |
+      | custody inventory          |
+      | consent grant carrier proof |
+
+  @wip @concern:addresses-are-declared-profiles
+  Scenario: An unfamiliar signature scheme leaves Matthew's previous trusted head in place
+    Given device A has recorded signed head "prior-head" with committed root "prior-root" for device B
+    And device B signs with scheme code 65535, a test-only code that device A does not recognise
+    And device B publishes "candidate-head" carrying a green gate verdict for closure "closure-1" under that scheme
+    And the candidate uses a wire epoch device A understands
+    And its envelope contains scheme code 65535, the signer's multikey, and the signature
+    When device A folds the signed head from device B
+    Then device A gives "candidate-head" the verification outcome "HELD", naming unknown scheme code 65535
+    And device A retains the candidate envelope at its original content address for later inspection
+    And device A keeps "prior-head" as device B's folded head and "prior-root" as its committed root
+    And the candidate is neither accepted nor classified as an invalid signature
+    And device A receives no reusable green verdict for "closure-1" from the candidate
+    And Matthew can inspect the held candidate and its named scheme in the verification report
