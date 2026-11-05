@@ -9,18 +9,18 @@ use elohim_storage::test_util::test_pool;
 
 fn insert_content_with_creator(
     conn: &mut diesel::SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     created_by: &str,
 ) {
     use elohim_storage::db::diesel_schema::content;
     diesel::insert_or_ignore_into(content::table)
         .values((
-            content::id.eq(format!("content-{blob_hash}")),
+            content::id.eq(format!("content-{blob_cid}")),
             content::h_app_id.eq("lamad"),
             content::title.eq("Test content"),
             content::content_type.eq("concept"),
             content::content_format.eq("markdown"),
-            content::blob_hash.eq(blob_hash),
+            content::blob_cid.eq(blob_cid),
             content::reach.eq("private"),
             content::validation_status.eq("valid"),
             content::created_by.eq(created_by),
@@ -31,16 +31,15 @@ fn insert_content_with_creator(
         .expect("insert content");
 }
 
-fn insert_inventory(conn: &mut diesel::SqliteConnection, blob_hash: &str, peer_id: &str) {
+fn insert_inventory(conn: &mut diesel::SqliteConnection, blob_cid: &str, peer_id: &str) {
     use elohim_storage::db::diesel_schema::peer_blob_inventory;
     diesel::insert_or_ignore_into(peer_blob_inventory::table)
         .values(&NewPeerBlobInventoryRow {
             peer_id: peer_id.to_string(),
-            blob_hash: blob_hash.to_string(),
+            blob_cid: blob_cid.to_string(),
             last_seen_at: "2026-05-11T12:00:00Z".to_string(),
-            source: "gossip-snapshot".to_string(),
+            source: "gossip-delta".to_string(),
             sequence: 1,
-            blake3_hash: None,
         })
         .execute(conn)
         .expect("insert inventory");
@@ -78,8 +77,16 @@ async fn peer_topology_emits_resilience_cliff_when_sole_replica() {
         // jessica has a binding
         insert_binding(&mut conn, "agent-jessica-pt4", "12D3KooWjessica-pt4");
         // cidA is authored by matthew and has only ONE replica (held by jessica's peer)
-        insert_content_with_creator(&mut conn, "sha256-cidA-pt4", "agent-matthew-pt4");
-        insert_inventory(&mut conn, "sha256-cidA-pt4", "12D3KooWjessica-pt4");
+        insert_content_with_creator(
+            &mut conn,
+            "bafkr4ifwk43hlqxjy5hxl46gv47m26bbg7tfhd27kp6w6xy7kr5332f4tm",
+            "agent-matthew-pt4",
+        );
+        insert_inventory(
+            &mut conn,
+            "bafkr4ifwk43hlqxjy5hxl46gv47m26bbg7tfhd27kp6w6xy7kr5332f4tm",
+            "12D3KooWjessica-pt4",
+        );
     }
 
     let view = aggregate_peer_topology_view(&pool, &federator, "agent-matthew-pt4")
@@ -105,9 +112,21 @@ async fn peer_topology_no_cliffs_when_multiple_replicas() {
         insert_binding(&mut conn, "agent-jessica-pt4b", "12D3KooWjessica-pt4b");
         insert_binding(&mut conn, "agent-adam-pt4b", "12D3KooWadam-pt4b");
         // cidB has 2 replicas — no cliff
-        insert_content_with_creator(&mut conn, "sha256-cidB-pt4", "agent-matthew-pt4b");
-        insert_inventory(&mut conn, "sha256-cidB-pt4", "12D3KooWjessica-pt4b");
-        insert_inventory(&mut conn, "sha256-cidB-pt4", "12D3KooWadam-pt4b");
+        insert_content_with_creator(
+            &mut conn,
+            "bafkr4icrfiqsvony3oj3tku5wjgct3aonfagpmlg5cuzbzpj3kgvoig3ma",
+            "agent-matthew-pt4b",
+        );
+        insert_inventory(
+            &mut conn,
+            "bafkr4icrfiqsvony3oj3tku5wjgct3aonfagpmlg5cuzbzpj3kgvoig3ma",
+            "12D3KooWjessica-pt4b",
+        );
+        insert_inventory(
+            &mut conn,
+            "bafkr4icrfiqsvony3oj3tku5wjgct3aonfagpmlg5cuzbzpj3kgvoig3ma",
+            "12D3KooWadam-pt4b",
+        );
     }
 
     let view = aggregate_peer_topology_view(&pool, &federator, "agent-matthew-pt4b")

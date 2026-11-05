@@ -15,7 +15,7 @@ fn append_and_read_back_projection_event() {
     append_projection_event(
         &mut conn,
         &NewProjectionEvent {
-            blob_hash: "sha256-test1".into(),
+            blob_cid: "bafkr4ibvthw66kfpuz5zx3eyhvluc3m2ftbtuftfe7b7ntrkvpxzn5tmki".into(),
             projector_agent_cid: "agent-doorway-1".into(),
             emitted_at: now.clone(),
             source_action_hash: "u-source-1".into(),
@@ -23,7 +23,12 @@ fn append_and_read_back_projection_event() {
     )
     .expect("append");
 
-    let recent = list_recent_for_blob(&mut conn, "sha256-test1", 10).expect("list");
+    let recent = list_recent_for_blob(
+        &mut conn,
+        "bafkr4ibvthw66kfpuz5zx3eyhvluc3m2ftbtuftfe7b7ntrkvpxzn5tmki",
+        10,
+    )
+    .expect("list");
     assert_eq!(recent.len(), 1);
     assert_eq!(recent[0].projector_agent_cid, "agent-doorway-1");
 }
@@ -37,7 +42,7 @@ fn list_recent_returns_newest_first_and_respects_limit() {
         append_projection_event(
             &mut conn,
             &NewProjectionEvent {
-                blob_hash: "sha256-test2".into(),
+                blob_cid: "bafkr4iduobfuyndxvqkvylfd5o7lr4inwk5nvqlb4my5abvplaqpblgkpi".into(),
                 projector_agent_cid: agent.to_string(),
                 emitted_at: format!("2026-05-{:02}T00:00:00Z", i + 1),
                 source_action_hash: format!("u-source-{}", i),
@@ -46,7 +51,12 @@ fn list_recent_returns_newest_first_and_respects_limit() {
         .expect("append");
     }
 
-    let recent = list_recent_for_blob(&mut conn, "sha256-test2", 2).expect("list");
+    let recent = list_recent_for_blob(
+        &mut conn,
+        "bafkr4iduobfuyndxvqkvylfd5o7lr4inwk5nvqlb4my5abvplaqpblgkpi",
+        2,
+    )
+    .expect("list");
     assert_eq!(recent.len(), 2);
     // Newest first: agent-3 emitted on 2026-05-03, agent-2 on 2026-05-02.
     assert_eq!(recent[0].projector_agent_cid, "agent-3");
@@ -63,7 +73,7 @@ fn dedup_on_source_action_hash() {
         append_projection_event(
             &mut conn,
             &NewProjectionEvent {
-                blob_hash: "sha256-test3".into(),
+                blob_cid: "bafkr4ickvxdwu2xv2zizps44356xu2kfo4sttremaeqjdhzy655pfhapkm".into(),
                 projector_agent_cid: "agent-doorway-1".into(),
                 emitted_at: "2026-05-11T12:00:00Z".into(),
                 source_action_hash: "u-source-dedup".into(),
@@ -72,7 +82,12 @@ fn dedup_on_source_action_hash() {
         .expect("append");
     }
 
-    let recent = list_recent_for_blob(&mut conn, "sha256-test3", 10).expect("list");
+    let recent = list_recent_for_blob(
+        &mut conn,
+        "bafkr4ickvxdwu2xv2zizps44356xu2kfo4sttremaeqjdhzy655pfhapkm",
+        10,
+    )
+    .expect("list");
     assert_eq!(
         recent.len(),
         1,
@@ -90,7 +105,7 @@ fn distinct_projectors_returns_unique_agents() {
         append_projection_event(
             &mut conn,
             &NewProjectionEvent {
-                blob_hash: "sha256-test4".into(),
+                blob_cid: "bafkr4idvr7jjxsiwbk3ogav6rrw24a6sqvgm5ks62gwkkjnlk6tubkigiu".into(),
                 projector_agent_cid: "agent-doorway-1".into(),
                 emitted_at: "2026-05-11T12:00:00Z".into(),
                 source_action_hash: format!("u-source-d1-{i}"),
@@ -102,7 +117,7 @@ fn distinct_projectors_returns_unique_agents() {
     append_projection_event(
         &mut conn,
         &NewProjectionEvent {
-            blob_hash: "sha256-test4".into(),
+            blob_cid: "bafkr4idvr7jjxsiwbk3ogav6rrw24a6sqvgm5ks62gwkkjnlk6tubkigiu".into(),
             projector_agent_cid: "agent-doorway-2".into(),
             emitted_at: "2026-05-11T12:01:00Z".into(),
             source_action_hash: "u-source-d2-0".into(),
@@ -110,7 +125,11 @@ fn distinct_projectors_returns_unique_agents() {
     )
     .expect("append");
 
-    let mut projectors = distinct_projectors_for_blob(&mut conn, "sha256-test4").expect("list");
+    let mut projectors = distinct_projectors_for_blob(
+        &mut conn,
+        "bafkr4idvr7jjxsiwbk3ogav6rrw24a6sqvgm5ks62gwkkjnlk6tubkigiu",
+    )
+    .expect("list");
     projectors.sort();
     assert_eq!(projectors, vec!["agent-doorway-1", "agent-doorway-2"]);
 }

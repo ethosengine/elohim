@@ -1,30 +1,28 @@
 //! An artifact over the erasure-coding threshold must be accepted whole and
 //! served whole.
 //!
-//! `RS_THRESHOLD` is 64MB. Above it a manifest is `"rs-4-7"`: 4 data + 3 parity
-//! shards computed over data padded to `4 * ceil(len/4)`. The ingest path used
-//! to hand-slice the RAW body as if every non-`"none"` encoding were sequential
-//! chunks, which for this band mis-hashes the unpadded tail data shard and then
-//! indexes past the end of the body at the first parity shard — panicking the
-//! HTTP task mid-PUT and dropping the connection after `100 Continue`. The blob
-//! then 404s on every peer. Nothing in the suite PUT a blob above the threshold,
-//! so the RS band had never worked through PUT at all.
+//! `RS_THRESHOLD` is 64 MiB. Above it a manifest declares `rs-gf8-0x11d-v1` 4+3:
+//! the payload is cut into stripes of at most 16 MiB, each coded into 4 data and 3
+//! parity shards. The PUT stores the payload itself (the one authoritative payload
+//! store) and answers the manifest the producer minted; stripe shards are derived
+//! for distribution.
 //!
-//! These tests pin both halves of the fix:
+//! These tests pin:
 //!
-//! 1. **Write** — shards come from `ShardEncoder::create_shards`, the same
-//!    producer `create_manifest` hashed and the p2p push path already uses.
-//! 2. **Read** — an RS manifest reconstructs through parity, so the blob still
-//!    serves with up to `total_shards - data_shards` shards absent locally.
-//!    That is the entire reason parity is carried; concatenating all seven
-//!    shards only ever worked when none was missing.
+//! 1. **Write** — the payload above the threshold is accepted whole and served
+//!    byte-identical, with a striped manifest.
+//! 2. **Read** — a peer that holds only the stripe shards (custody it received,
+//!    not the payload) reconstructs through parity: with any 3 shards of every
+//!    stripe absent locally the blob still serves. That is the entire reason
+//!    parity is carried.
+//! 3. Below the threshold the manifest is unstriped and a payload absent locally
+//!    is an honest 404 (no parity to fall back on).
 
+use elohim_epr::address::compute_bytes_cid;
 use elohim_storage::blob_store::BlobStore;
 use elohim_storage::db::init_pool_from_dir;
 use elohim_storage::http::HttpServer;
-use elohim_storage::sharding::{
-    ShardConfig, ShardEncoder, ShardManifest, RS_THRESHOLD, SINGLE_SHARD_MAX,
-};
+use elohim_storage::sharding::{ShardConfig, ShardEncoder, ShardManifest, RS_THRESHOLD};
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -61,14 +59,19 @@ fn server_over(dir: &std::path::Path, blob_store: Arc<BlobStore>) -> HttpServer 
 async fn put_and_get_round_trip(len: usize) {
     let dir = tempdir().unwrap();
     let data = payload(len);
-    let hash = BlobStore::compute_hash(&data);
+    let hash = compute_bytes_cid(&data).to_string();
 
     let manifest = manifest_for(&data, "application/zip");
     assert_eq!(
-        manifest.encoding, "rs-4-7",
+        (
+            manifest.erasure.id.as_str(),
+            manifest.erasure.data,
+            manifest.erasure.parity
+        ),
+        ("rs-gf8-0x11d-v1", 4, 3),
         "test premise: {len} bytes must land in the erasure-coded band"
     );
-    assert_eq!(manifest.shard_hashes.len(), 7);
+    assert!(manifest.stripes.iter().all(|s| s.shards.len() == 7));
 
     let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
     let server = server_over(dir.path(), store);
@@ -79,6 +82,14 @@ async fn put_and_get_round_trip(len: usize) {
         201,
         "an erasure-coded blob must be accepted whole — got body: {}",
         String::from_utf8_lossy(&put.body[..put.body.len().min(200)])
+    );
+
+    let view: serde_json::Value = serde_json::from_slice(&put.body).unwrap();
+    assert_eq!(view["blobCid"], hash);
+    assert_eq!(
+        view["stripes"].as_array().unwrap().len(),
+        manifest.stripes.len(),
+        "the PUT answers the striped manifest the producer minted"
     );
 
     let got = server.test_get_blob(&hash).await;
@@ -104,20 +115,25 @@ async fn erasure_coded_blob_well_over_the_threshold_round_trips() {
     put_and_get_round_trip(RS_THRESHOLD + 4 * 1024 * 1024 + 1).await;
 }
 
-/// The point of parity: an RS blob still serves when shards are gone.
-///
-/// One data shard and one parity shard are deleted — 5 of 7 remain, above the
-/// 4 needed — and `/blob` must reconstruct rather than report a shard gap.
+/// The point of parity: a peer holding only the stripe shards — and three of
+/// every seven of those gone (one data shard, two parity shards) — reconstructs
+/// the payload rather than report a shard gap.
 #[tokio::test]
 async fn erasure_coded_blob_serves_through_parity_with_shards_missing() {
     let dir = tempdir().unwrap();
     let data = payload(RS_THRESHOLD + 2);
-    let hash = BlobStore::compute_hash(&data);
-    let manifest = manifest_for(&data, "application/zip");
+    let cid = compute_bytes_cid(&data);
+    let hash = cid.to_string();
+    let (manifest, stripe_shards) = ShardEncoder::new(ShardConfig::default())
+        .encode(&data, "application/zip", "commons")
+        .expect("encode");
 
     let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
     let server = server_over(dir.path(), store.clone());
 
+    // Ingest (mints the durable manifest), then become a peer that holds only
+    // custody shards: the payload goes, the surviving shards are stored under
+    // their own byte CIDs as received custody would be.
     assert_eq!(
         server
             .test_put_blob(&hash, &data, "application/zip")
@@ -125,19 +141,21 @@ async fn erasure_coded_blob_serves_through_parity_with_shards_missing() {
             .status,
         201
     );
-
-    // Drop one data shard (index 0) and one parity shard (index 6).
-    for index in [0usize, 6usize] {
-        store
-            .delete(&manifest.shard_hashes[index])
-            .await
-            .unwrap_or_else(|e| panic!("drop shard {index}: {e}"));
+    store.delete(&cid).await.expect("drop the payload");
+    for (stripe, shards) in manifest.stripes.iter().zip(&stripe_shards) {
+        for (shard_ref, bytes) in stripe.shards.iter().zip(shards) {
+            if [0u8, 5, 6].contains(&shard_ref.index) {
+                continue;
+            }
+            let stored = store.store(bytes).await.expect("store custody shard");
+            assert_eq!(stored.cid, shard_ref.cid);
+        }
     }
 
     let got = server.test_get_blob(&hash).await;
     assert_eq!(
         got.status, 200,
-        "5 of 7 shards is above the 4 an rs-4-7 blob needs — it must reconstruct, not 404"
+        "4 of 7 shards per stripe is what rs 4+3 needs — it must reconstruct, not 404"
     );
     assert_eq!(
         got.body.as_ref(),
@@ -146,16 +164,17 @@ async fn erasure_coded_blob_serves_through_parity_with_shards_missing() {
     );
 }
 
-/// Regression guard for the band below the threshold: `"chunked"` blobs keep
-/// their sequential, every-shard-required semantics unchanged. The RS fix must
-/// not have leaked reconstruction (or its tolerance for gaps) into this band.
+/// Below the threshold: an unstriped manifest (chunks, no stripes). Such a payload
+/// carries no parity, so with no peers to heal from a local miss is a 404.
 #[tokio::test]
-async fn chunked_band_is_unchanged_by_the_erasure_coding_fix() {
+async fn unstriped_band_has_no_parity_to_fall_back_on() {
     let dir = tempdir().unwrap();
-    let data = payload(SINGLE_SHARD_MAX + 1);
-    let hash = BlobStore::compute_hash(&data);
+    let data = payload(17 * 1024 * 1024 + 1);
+    let cid = compute_bytes_cid(&data);
+    let hash = cid.to_string();
     let manifest = manifest_for(&data, "application/zip");
-    assert_eq!(manifest.encoding, "chunked", "test premise");
+    assert!(manifest.stripes.is_empty(), "test premise");
+    assert_eq!(manifest.erasure.id, "none");
 
     let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
     let server = server_over(dir.path(), store.clone());
@@ -172,16 +191,10 @@ async fn chunked_band_is_unchanged_by_the_erasure_coding_fix() {
     assert_eq!(got.status, 200);
     assert_eq!(got.body.as_ref(), data.as_slice());
 
-    // A chunked blob carries no parity: one missing shard is terminal, and with
-    // no peers to heal from the route 404s. This is the `MissingShard` heal
-    // contract, preserved verbatim.
-    store
-        .delete(&manifest.shard_hashes[0])
-        .await
-        .expect("drop the first chunk");
+    store.delete(&cid).await.expect("drop the payload");
     assert_eq!(
         server.test_get_blob(&hash).await.status,
         404,
-        "a chunked blob with a missing chunk has no parity to fall back on"
+        "an unstriped payload absent locally has no parity to fall back on"
     );
 }

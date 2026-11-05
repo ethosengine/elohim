@@ -2,11 +2,11 @@
 //!
 //! Three-"node" fixture using CaptureMock publishers:
 //!
-//!   provider       — DualGossipPublisher(libp2p=libp2p_sub, iroh=iroh_sub)
+//!   provider       — FanoutGossipPublisher(libp2p=libp2p_sub, iroh=iroh_sub)
 //!   libp2p_sub     — CaptureMock acting as the libp2p transport subscriber
 //!   iroh_sub       — CaptureMock acting as the iroh-gossip transport subscriber
 //!
-//! The provider publishes five wire types (inventory snapshot, identity-binding,
+//! The provider publishes five wire types (signed inventory delta, identity-binding,
 //! recovery-invitation, recovery-revocation, feedback-signal). After each
 //! publish the test asserts:
 //!
@@ -14,7 +14,7 @@
 //!   2. Both received byte-identical payloads.
 //!   3. The payload round-trips to the originating struct.
 //!
-//! This validates that DualGossipPublisher routes every known gossip wire type
+//! This validates that FanoutGossipPublisher routes every known gossip wire type
 //! to both transports with zero byte divergence — the core guarantee of
 //! cutover gate #4. Mock transport, so no network or timeout involved.
 //!
@@ -22,14 +22,36 @@
 
 use std::sync::{Arc, Mutex};
 
+use elohim_epr::address::compute_bytes_cid;
+use elohim_epr::proof::AgentKeypair;
 use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
 use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTITY_BINDING_TOPIC};
-use elohim_storage::p2p::inventory_gossip::{BlobAddress, BlobInventorySnapshot, INVENTORY_TOPIC};
+use elohim_storage::p2p::inventory_broadcaster::{build_delta_pages, SequenceAllocator};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, InventoryEnvelope, INVENTORY_TOPIC};
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
 use elohim_storage::p2p::RECOVERY_REVOCATION_TOPIC;
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
+
+/// A signed inventory delta announcing the byte CIDs of `blobs`.
+fn signed_delta(author: &str, blobs: &[&[u8]], sequence_from: u64) -> InventoryEnvelope {
+    let keypair = AgentKeypair::from_secret(&[0xAA; 32]).unwrap();
+    let added: Vec<BlobAddress> = blobs
+        .iter()
+        .map(|b| BlobAddress::from(compute_bytes_cid(b)))
+        .collect();
+    build_delta_pages(
+        &keypair,
+        author,
+        &added,
+        &[],
+        &SequenceAllocator::new(sequence_from),
+        1_700_000_000_000_000,
+        &[],
+    )
+    .remove(0)
+}
 
 // ---------------------------------------------------------------------------
 // CaptureMock — transport subscriber stand-in
@@ -37,10 +59,13 @@ use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 /// Thread-safe capture of (topic, payload) calls. Simulates either a libp2p
 /// or iroh subscriber sink — both are structurally identical from the
-/// DualGossipPublisher's perspective.
+/// FanoutGossipPublisher's perspective.
 #[derive(Clone, Default)]
 struct CaptureMock {
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "a captured (topic, payload) log; a named alias adds nothing"
+    )]
     calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
 }
 
@@ -116,7 +141,7 @@ fn assert_round_parity(
 // Cross-stack e2e soak — five wire types
 // ---------------------------------------------------------------------------
 
-/// Provider publishes five different gossip wire types through DualGossipPublisher.
+/// Provider publishes five different gossip wire types through FanoutGossipPublisher.
 /// Both the libp2p subscriber mock and the iroh subscriber mock must receive
 /// byte-identical payloads for every type. Round-trip decode asserted on each.
 #[test]
@@ -127,44 +152,35 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
     let libp2p_sub = CaptureMock::new();
     let iroh_sub = CaptureMock::new();
 
-    // Provider: DualGossipPublisher fans out to both transport mocks.
-    let provider = DualGossipPublisher::new(
+    // Provider: FanoutGossipPublisher fans out to both transport mocks.
+    let provider = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
     );
 
     // -----------------------------------------------------------------------
-    // Round 1: BlobInventorySnapshot
+    // Round 1: signed inventory delta
     // -----------------------------------------------------------------------
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "12D3KooWProvider".to_string(),
-        hashes: vec![
-            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
-            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
-        ],
-        hints: vec![],
-        sequence: 1,
-        snapshot_at: 1_700_000_000_000_000,
-        signature: vec![0xAAu8; 32],
-    };
-    let snapshot_bytes = snapshot.to_bytes().expect("inventory snapshot to_bytes");
+    let delta = signed_delta("12D3KooWProvider", &[b"blob a", b"blob b"], 0);
+    let delta_bytes = delta.to_bytes();
 
     provider
-        .publish(INVENTORY_TOPIC, snapshot_bytes.clone())
-        .expect("provider publish inventory snapshot");
+        .publish(INVENTORY_TOPIC, delta_bytes.clone())
+        .expect("provider publish inventory delta");
 
     let received = assert_round_parity(
         &libp2p_sub,
         &iroh_sub,
         INVENTORY_TOPIC,
-        &snapshot_bytes,
-        "BlobInventorySnapshot",
+        &delta_bytes,
+        "InventoryEnvelope",
     );
-    let decoded_snap = BlobInventorySnapshot::from_bytes(&received)
-        .expect("round-trip decode BlobInventorySnapshot");
-    assert_eq!(decoded_snap.peer_id, snapshot.peer_id);
-    assert_eq!(decoded_snap.sequence, snapshot.sequence);
-    assert_eq!(decoded_snap.hashes, snapshot.hashes);
+    let decoded =
+        InventoryEnvelope::from_bytes(&received).expect("round-trip decode InventoryEnvelope");
+    assert_eq!(decoded, delta);
+    assert_eq!(decoded.author_peer, "12D3KooWProvider");
+    assert_eq!(decoded.body.sequence, 1);
+    assert_eq!(decoded.body.added.len(), 2);
 
     // -----------------------------------------------------------------------
     // Round 2: IdentityBindingGossip
@@ -315,27 +331,19 @@ fn provider_iroh_absent_all_types_delivered_via_libp2p() {
     let iroh_sub = CaptureMock::new(); // wired to nothing in this test
 
     // Provider: iroh side is None.
-    let provider = DualGossipPublisher::new(
+    let provider = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         None,
     );
 
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "12D3KooWLibp2pOnly".to_string(),
-        hashes: vec![BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap()],
-        hints: vec![],
-        sequence: 2,
-        snapshot_at: 1_700_000_001_000_000,
-        signature: vec![0xBBu8; 32],
-    };
-    let snapshot_bytes = snapshot.to_bytes().expect("to_bytes");
+    let snapshot_bytes = signed_delta("12D3KooWLibp2pOnly", &[b"blob c"], 1).to_bytes();
     provider
         .publish(INVENTORY_TOPIC, snapshot_bytes.clone())
         .expect("publish");
 
     let lp = libp2p_sub.drain();
     let ir = iroh_sub.drain();
-    assert_eq!(lp.len(), 1, "libp2p must receive inventory snapshot");
+    assert_eq!(lp.len(), 1, "libp2p must receive the inventory delta");
     assert!(ir.is_empty(), "iroh must NOT receive when absent");
     assert_eq!(lp[0].1, snapshot_bytes, "libp2p payload byte-identical");
 
@@ -382,7 +390,7 @@ fn all_known_topics_route_to_both_subscribers() {
     for topic in topics {
         let libp2p_sub = CaptureMock::new();
         let iroh_sub = CaptureMock::new();
-        let provider = DualGossipPublisher::new(
+        let provider = FanoutGossipPublisher::new(
             Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
             Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
         );

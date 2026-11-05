@@ -102,7 +102,7 @@ async fn query_delivery_via_iroh_reports_blob_only_when_no_cache() -> Result<()>
         .request(
             fixture.provider_addr.clone(),
             &EprRequest::QueryDelivery {
-                blob_hash: "sha256-abc".into(),
+                blob_cid: "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu".into(),
             },
         )
         .await?;

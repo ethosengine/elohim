@@ -1,7 +1,7 @@
 //! Plan 4 Task 5, Step 5.5 — identity-binding dual-publish integration test.
 //!
 //! Verifies that publishing an `IdentityBindingGossip` through a
-//! `DualGossipPublisher` delivers byte-identical payloads to both the libp2p
+//! `FanoutGossipPublisher` delivers byte-identical payloads to both the libp2p
 //! mock and the iroh mock. The wire format is positional MessagePack
 //! (`rmp_serde::to_vec`), unchanged from the existing libp2p path.
 //!
@@ -10,7 +10,7 @@
 use std::sync::{Arc, Mutex};
 
 use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTITY_BINDING_TOPIC};
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 #[derive(Clone, Default)]
@@ -39,7 +39,7 @@ impl GossipPublisher for CaptureMock {
     }
 }
 
-/// Provider holds `DualGossipPublisher(libp2p, iroh)`, publishes an
+/// Provider holds `FanoutGossipPublisher(libp2p, iroh)`, publishes an
 /// `IdentityBindingGossip`. Both mocks must receive the payload and it
 /// must decode to the same struct.
 #[test]
@@ -47,7 +47,7 @@ fn identity_binding_dual_publish_byte_parity() {
     let libp2p_sub = CaptureMock::new();
     let iroh_sub = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -67,7 +67,7 @@ fn identity_binding_dual_publish_byte_parity() {
 
     publisher
         .publish(IDENTITY_BINDING_TOPIC, payload_bytes.clone())
-        .expect("DualGossipPublisher should succeed");
+        .expect("FanoutGossipPublisher should succeed");
 
     // Both subscribers must receive the payload.
     let lp_calls = libp2p_sub.calls();

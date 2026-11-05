@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use elohim_storage::blob_store::BlobStore;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
+use elohim_storage::blob_store::{BlobStore, Exists};
 use elohim_storage::p2p::{
     BlobCodec, BlobFetchRequest, BlobFetchResponse, BlobProtocol, ShardCodec, ShardProtocol,
     ShardRequest, ShardResponse, SHARD_TRANSFER_MAX_FRAME_SIZE,
@@ -152,38 +153,37 @@ async fn await_blob_response(
     .expect("blob response timed out")
 }
 
-fn encoded_rs_shard() -> (String, Vec<u8>) {
-    // 0xff pins the largest per-byte representation in the existing
-    // MessagePack integer-array encoding: the 17 MiB raw shard becomes a frame
-    // above the old 16 MiB default while remaining below the shared 64 MiB cap.
+fn encoded_rs_shard() -> (ByteCid, Vec<u8>) {
+    // 0xff pins the largest per-byte representation in the MessagePack
+    // integer-array encoding. A 68 MiB artifact is erasure-coded in stripes of at
+    // most 16 MiB (the byte profile's stripe bound), so a full stripe's shard is
+    // the largest shard the profile ever puts on the wire.
     let artifact = vec![0xff; 68 * MIB];
     let encoder = ShardEncoder::new(ShardConfig::default());
-    let manifest = encoder
-        .create_manifest(&artifact, "application/octet-stream", "commons")
+    let (manifest, stripes) = encoder
+        .encode(&artifact, "application/octet-stream", "commons")
         .expect("RS manifest");
-    assert_eq!(manifest.encoding, "rs-4-7");
-    assert_eq!(manifest.data_shards, 4);
-    assert_eq!(manifest.total_shards, 7);
-    assert_eq!(manifest.shard_size, (17 * MIB) as u64);
+    assert_eq!(manifest.erasure.id, "rs-gf8-0x11d-v1");
+    assert_eq!((manifest.erasure.data, manifest.erasure.parity), (4, 3));
+    assert_eq!(manifest.stripes[0].byte_len as usize, 16 * MIB);
+    assert_eq!(manifest.stripes[0].shards.len(), 7);
+    assert_eq!(manifest.stripes[0].shards[0].len as usize, 4 * MIB);
 
-    let shard = encoder
-        .create_shards(&artifact, &manifest.encoding)
-        .expect("RS shards")
-        .into_iter()
-        .next()
-        .expect("first data shard");
+    let shard = stripes[0][0].clone();
+    let cid = manifest.stripes[0].shards[0].cid;
+    assert_eq!(compute_bytes_cid(&shard), cid);
     let frame = rmp_serde::to_vec(&ShardRequest::Push {
-        hash: manifest.shard_hashes[0].clone(),
+        cid,
         data: shard.clone(),
     })
-    .expect("historical shard wire");
-    assert!(frame.len() > 16 * MIB, "fixture must cross the old cap");
+    .expect("shard wire");
+    assert!(frame.len() > 4 * MIB, "the frame carries the whole shard");
     assert!(frame.len() <= SHARD_TRANSFER_MAX_FRAME_SIZE);
-    (manifest.shard_hashes[0].clone(), shard)
+    (cid, shard)
 }
 
 #[tokio::test]
-async fn rs_68_mib_shard_pushes_and_fetches_over_real_libp2p_codecs() -> Result<()> {
+async fn rs_68_mib_artifact_shard_pushes_and_fetches_over_real_libp2p_codecs() -> Result<()> {
     let (hash, shard) = encoded_rs_shard();
     let provider_dir = tempdir()?;
     let store = Arc::new(BlobStore::new(provider_dir.path().to_path_buf()).await?);
@@ -224,7 +224,7 @@ async fn rs_68_mib_shard_pushes_and_fetches_over_real_libp2p_codecs() -> Result<
                 )) => {
                     let requester = Requester::libp2p(peer.to_string());
                     let response = match service
-                        .handle(&requester, ShardRequest::Get { hash: request.hash })
+                        .handle(&requester, ShardRequest::Get { cid: request.cid })
                         .await
                     {
                         ShardResponse::Data(bytes) => BlobFetchResponse::found(bytes),
@@ -248,7 +248,7 @@ async fn rs_68_mib_shard_pushes_and_fetches_over_real_libp2p_codecs() -> Result<
     let push_id = fetcher.behaviour_mut().shard.send_request(
         &provider_id,
         ShardRequest::Push {
-            hash: hash.clone(),
+            cid: hash,
             data: shard.clone(),
         },
     );
@@ -256,12 +256,16 @@ async fn rs_68_mib_shard_pushes_and_fetches_over_real_libp2p_codecs() -> Result<
         await_shard_response(&mut fetcher, push_id).await,
         ShardResponse::PushAck
     ));
-    assert!(store.exists(&hash).await, "PushAck requires stored bytes");
+    assert_eq!(
+        store.exists(&hash).await,
+        Exists::Verified,
+        "PushAck requires stored bytes"
+    );
 
     let get_id = fetcher
         .behaviour_mut()
         .blob
-        .send_request(&provider_id, BlobFetchRequest { hash: hash.clone() });
+        .send_request(&provider_id, BlobFetchRequest { cid: hash });
     match await_blob_response(&mut fetcher, get_id).await {
         BlobFetchResponse::Found(bytes) => assert_eq!(bytes, shard),
         other => panic!("expected Found, got {other:?}"),

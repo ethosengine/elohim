@@ -1,15 +1,11 @@
-//! Integration test for cutover gate #2: HTTP `GET /blob/{hash}`
-//! dual-format dispatch. Two fixture blobs:
-//!   * `blob_blake3_only` — present in IrohBlobStore but absent from
-//!     legacy BlobStore. Iroh-capable caller must receive 200; the
-//!     iroh counter must increment by 1.
-//!   * `blob_sha256_only` — present in legacy BlobStore but absent
-//!     from IrohBlobStore. Iroh-capable caller must still receive 200
-//!     (fall-through); the libp2p counter must increment by 1.
+//! Integration test for `GET /blob/{cid}` with an iroh-capable caller. There is
+//! one payload store: the bytes serve from it under their byte CID whatever the
+//! caller's transport; a copy held only in the iroh blob store (the retired
+//! second, BLAKE3-keyed store) is not a second source and does not serve.
 //!
-//! Wire shape (`Content-Type`, `Content-Length`, `Cache-Control`)
-//! must be identical regardless of which backend served.
+//! Wire shape (`Content-Type`, `X-Content-Address`) is the payload store's.
 
+use elohim_epr::address::compute_bytes_cid;
 use elohim_storage::blob_store::BlobStore;
 use elohim_storage::http::HttpServer;
 use elohim_storage::p2p_iroh::peer_map::{
@@ -46,57 +42,43 @@ fn seed_iroh_capable_manifest(pool: &elohim_storage::db::DbPool, agent_cid: &str
 }
 
 #[tokio::test]
-async fn blake3_only_blob_served_from_iroh_for_iroh_capable_caller() {
-    // Arrange: IrohBlobStore with one blob; legacy BlobStore empty.
+async fn a_copy_only_in_the_iroh_store_does_not_serve() {
     let iroh_dir = tempdir().unwrap();
     let iroh = Arc::new(
         IrohBlobStore::load(&iroh_dir.path().join("blobs_iroh"))
             .await
             .unwrap(),
     );
-    let payload = b"blake3 only blob".to_vec();
-    let blake3 = iroh.add_bytes(payload.clone()).await.unwrap();
+    let payload = b"bytes held only by the iroh store".to_vec();
+    iroh.add_bytes(payload.clone()).await.unwrap();
 
-    let legacy_dir = tempdir().unwrap();
-    let legacy = Arc::new(
-        BlobStore::new(legacy_dir.path().to_path_buf())
+    let store_dir = tempdir().unwrap();
+    let store = Arc::new(
+        BlobStore::new(store_dir.path().to_path_buf())
             .await
             .unwrap(),
     );
 
-    // Seed a transport manifest for the caller so lookup_by_agent_cid finds it.
     let caller_cid = "did:elohim:test-iroh-caller";
     let pool = test_pool();
     seed_iroh_capable_manifest(&pool, caller_cid);
 
-    // Build HttpServer with both backends + an iroh-capable self manifest.
-    let server = HttpServer::new(legacy, "127.0.0.1:0".parse().unwrap())
+    let server = HttpServer::new(store, "127.0.0.1:0".parse().unwrap())
         .with_db_pool(pool)
         .with_iroh_blob_store(iroh.clone())
         .with_self_transport_manifest(Arc::new(PeerTransportManifest::iroh_capable_for_test()));
 
-    // Caller supplies a blake3-prefixed hash and their agent CID.
-    let hash_str = format!("blake3-{}", blake3);
+    let cid = compute_bytes_cid(&payload).to_string();
     let resp = server
-        .handle_blob_get_for_test(&hash_str, Some(caller_cid))
+        .handle_blob_get_for_test(&cid, Some(caller_cid))
         .await
         .unwrap();
-
-    assert_eq!(resp.status(), 200);
-    assert_eq!(
-        resp.headers()
-            .get(hyper::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok()),
-        Some("application/octet-stream")
-    );
-    // iroh counter must have incremented; libp2p counter must stay at 0.
-    assert_eq!(server.blob_iroh_served_count_snapshot(), 1);
-    assert_eq!(server.blob_libp2p_served_count_snapshot(), 0);
+    assert_eq!(resp.status(), 404, "the iroh store is no second source");
+    assert_eq!(server.blob_iroh_served_count_snapshot(), 0);
 }
 
 #[tokio::test]
-async fn sha256_only_blob_served_from_libp2p_even_for_iroh_capable_caller() {
-    // Arrange: legacy BlobStore with one blob; IrohBlobStore empty.
+async fn the_payload_store_serves_an_iroh_capable_caller_under_the_byte_cid() {
     let iroh_dir = tempdir().unwrap();
     let iroh = Arc::new(
         IrohBlobStore::load(&iroh_dir.path().join("blobs_iroh"))
@@ -104,28 +86,28 @@ async fn sha256_only_blob_served_from_libp2p_even_for_iroh_capable_caller() {
             .unwrap(),
     );
 
-    let legacy_dir = tempdir().unwrap();
-    let legacy = Arc::new(
-        BlobStore::new(legacy_dir.path().to_path_buf())
+    let store_dir = tempdir().unwrap();
+    let store = Arc::new(
+        BlobStore::new(store_dir.path().to_path_buf())
             .await
             .unwrap(),
     );
-    let payload = b"sha256 only blob".to_vec();
-    let stored = legacy.store(&payload).await.unwrap();
+    let payload = b"payload store blob".to_vec();
+    let stored = store.store(&payload).await.unwrap();
+    assert_eq!(stored.cid, compute_bytes_cid(&payload));
 
-    // Seed a transport manifest for the caller.
     let caller_cid = "did:elohim:test-iroh-caller-2";
     let pool = test_pool();
     seed_iroh_capable_manifest(&pool, caller_cid);
 
-    let server = HttpServer::new(legacy.clone(), "127.0.0.1:0".parse().unwrap())
+    let server = HttpServer::new(store.clone(), "127.0.0.1:0".parse().unwrap())
         .with_db_pool(pool)
         .with_iroh_blob_store(iroh.clone())
         .with_self_transport_manifest(Arc::new(PeerTransportManifest::iroh_capable_for_test()));
 
-    // Caller supplies a sha256-prefixed hash (no blake3 alias in DB).
+    let cid = stored.cid.to_string();
     let resp = server
-        .handle_blob_get_for_test(&stored.hash, Some(caller_cid))
+        .handle_blob_get_for_test(&cid, Some(caller_cid))
         .await
         .unwrap();
 
@@ -136,7 +118,12 @@ async fn sha256_only_blob_served_from_libp2p_even_for_iroh_capable_caller() {
             .and_then(|v| v.to_str().ok()),
         Some("application/octet-stream")
     );
-    // libp2p counter must have incremented; iroh counter must stay at 0.
+    assert_eq!(
+        resp.headers()
+            .get("X-Content-Address")
+            .and_then(|v| v.to_str().ok()),
+        Some(cid.as_str())
+    );
     assert_eq!(server.blob_iroh_served_count_snapshot(), 0);
     assert_eq!(server.blob_libp2p_served_count_snapshot(), 1);
 }

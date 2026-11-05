@@ -10,17 +10,16 @@
 //! blows up.
 //!
 //! Per [`genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md`],
-//! the shard plane is dual-stack permanent. This test exercises the
-//! legacy SHA-256 fetch plane the iroh side maintains for libp2p-
-//! fallback peers; the iroh-canonical BLAKE3-streamed plane is
-//! exercised separately by `iroh_blob_roundtrip`.
+//! the shard plane is dual-stack permanent. Every request names its unit by
+//! byte CID (raw + BLAKE3-256), the same address on both planes.
 //!
 //! Gated on `p2p-iroh`.
 
 use std::sync::Arc;
 
 use anyhow::Result;
-use elohim_storage::blob_store::BlobStore;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
+use elohim_storage::blob_store::{BlobStore, Exists};
 use elohim_storage::p2p::shard_protocol::{ShardRequest, ShardResponse};
 use elohim_storage::p2p_iroh::{
     parity_harness::TwoNodeFixture, AlpnRegistration, IrohShardClient, IrohShardProtocol,
@@ -82,7 +81,7 @@ async fn get_unknown_shard_via_iroh_returns_not_found() -> Result<()> {
         .request(
             fixture.provider_addr.clone(),
             &ShardRequest::Get {
-                hash: "missing-hash".into(),
+                cid: compute_bytes_cid(b"bytes nobody holds"),
             },
         )
         .await?;
@@ -111,14 +110,11 @@ async fn pre_seeded_shard_serves_via_iroh_get() -> Result<()> {
     // ShardService is wrapping THIS instance (not a different one).
     let payload = b"hello shard via iroh".to_vec();
     let stored = blob_store.store(&payload).await.unwrap();
-    let hash = stored.hash.clone();
+    let cid = stored.cid;
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());
     let res = client
-        .request(
-            fixture.provider_addr.clone(),
-            &ShardRequest::Get { hash: hash.clone() },
-        )
+        .request(fixture.provider_addr.clone(), &ShardRequest::Get { cid })
         .await?;
     match res {
         ShardResponse::Data(bytes) => {
@@ -132,7 +128,7 @@ async fn pre_seeded_shard_serves_via_iroh_get() -> Result<()> {
 
     // Have should also report true.
     let res = client
-        .request(fixture.provider_addr.clone(), &ShardRequest::Have { hash })
+        .request(fixture.provider_addr.clone(), &ShardRequest::Have { cid })
         .await?;
     match res {
         ShardResponse::Have(true) => {}
@@ -153,22 +149,16 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
     let (fixture, blob_store) =
         fixture_with_real_provider_backend(provider_dir.path(), fetcher_dir.path()).await?;
 
-    // Compute the hash by storing on a separate temp store first, just
-    // so we know the canonical hash for the bytes. (We store on the
-    // provider's pool below to verify the push got there.)
+    // The pushed unit is named by the byte CID of its bytes.
     let payload = b"push via iroh".to_vec();
-    let probe_dir = tempdir().unwrap();
-    let probe_store = BlobStore::new(probe_dir.path().to_path_buf())
-        .await
-        .unwrap();
-    let canonical = probe_store.store(&payload).await.unwrap();
+    let cid = compute_bytes_cid(&payload);
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());
     let res = client
         .request(
             fixture.provider_addr.clone(),
             &ShardRequest::Push {
-                hash: canonical.hash.clone(),
+                cid,
                 data: payload.clone(),
             },
         )
@@ -179,8 +169,9 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
     }
 
     // Provider's BlobStore now contains the bytes — verify directly.
-    assert!(
-        blob_store.exists(&canonical.hash).await,
+    assert_eq!(
+        blob_store.exists(&cid).await,
+        Exists::Verified,
         "provider BlobStore should contain pushed shard"
     );
 
@@ -188,29 +179,36 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
     Ok(())
 }
 
-/// A real shard from the 68 MiB RS4+3 boundary crosses the production iroh
-/// ALPN in both directions. The all-0xff fixture makes the unchanged
-/// MessagePack Vec<u8> representation expand beyond the old 16 MiB default.
+/// A real stripe shard of a 68 MiB erasure-coded payload crosses the production
+/// iroh ALPN in both directions. Above the RS threshold the payload is cut into
+/// stripes of at most 16 MiB, so every shard is a quarter of a stripe; the frame
+/// stays inside the declared shard budget.
 #[tokio::test]
 async fn rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend() -> Result<()> {
     let artifact = vec![0xff; 68 * MIB];
     let encoder = ShardEncoder::new(ShardConfig::default());
-    let manifest = encoder.create_manifest(&artifact, "application/octet-stream", "commons")?;
-    assert_eq!(manifest.encoding, "rs-4-7");
-    assert_eq!(manifest.data_shards, 4);
-    assert_eq!(manifest.total_shards, 7);
-    assert_eq!(manifest.shard_size, (17 * MIB) as u64);
-    let shard = encoder
-        .create_shards(&artifact, &manifest.encoding)?
-        .into_iter()
-        .next()
-        .expect("first data shard");
-    let hash = manifest.shard_hashes[0].clone();
+    let (manifest, stripes) = encoder.encode(&artifact, "application/octet-stream", "commons")?;
+    assert!(
+        !manifest.stripes.is_empty(),
+        "68 MiB is above the RS threshold"
+    );
+    assert_eq!(manifest.data_shards(), 4);
+    assert_eq!(manifest.stripes[0].shards.len(), 7);
+    assert!(manifest
+        .stripes
+        .iter()
+        .all(|stripe| stripe.byte_len as usize <= 16 * MIB));
+    let shard = stripes[0][0].clone();
+    let cid: ByteCid = manifest.stripes[0].shards[0].cid;
+    assert_eq!(
+        cid,
+        compute_bytes_cid(&shard),
+        "a shard is named by its bytes"
+    );
     let frame = rmp_serde::to_vec_named(&ShardRequest::Push {
-        hash: hash.clone(),
+        cid,
         data: shard.clone(),
     })?;
-    assert!(frame.len() > 16 * MIB, "fixture must cross the old cap");
     assert!(
         frame.len() <= elohim_storage::p2p::SHARD_TRANSFER_MAX_FRAME_SIZE,
         "fixture must remain inside the declared shard budget"
@@ -226,19 +224,20 @@ async fn rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend() -> Result<()
         .request(
             fixture.provider_addr.clone(),
             &ShardRequest::Push {
-                hash: hash.clone(),
+                cid,
                 data: shard.clone(),
             },
         )
         .await?;
     assert!(matches!(push, ShardResponse::PushAck));
-    assert!(
-        blob_store.exists(&hash).await,
+    assert_eq!(
+        blob_store.exists(&cid).await,
+        Exists::Verified,
         "PushAck requires stored bytes"
     );
 
     let get = client
-        .request(fixture.provider_addr.clone(), &ShardRequest::Get { hash })
+        .request(fixture.provider_addr.clone(), &ShardRequest::Get { cid })
         .await?;
     match get {
         ShardResponse::Data(bytes) => assert_eq!(bytes, shard),
@@ -347,7 +346,7 @@ fn gate_pool() -> elohim_storage::db::DbPool {
     pool
 }
 
-fn seed_row(pool: &elohim_storage::db::DbPool, id: &str, reach: &str, blob_hash: Option<&str>) {
+fn seed_row(pool: &elohim_storage::db::DbPool, id: &str, reach: &str, blob_cid: Option<&str>) {
     let mut conn = pool.get().expect("conn");
     elohim_storage::db::content_diesel::create_content(
         &mut conn,
@@ -358,8 +357,7 @@ fn seed_row(pool: &elohim_storage::db::DbPool, id: &str, reach: &str, blob_hash:
             description: None,
             content_type: "issue-report".to_string(),
             content_format: "json".to_string(),
-            blob_hash: blob_hash.map(str::to_string),
-            blob_cid: None,
+            blob_cid: blob_cid.map(str::to_string),
             content_size_bytes: None,
             metadata_json: None,
             reach: reach.to_string(),
@@ -379,14 +377,19 @@ fn seed_row(pool: &elohim_storage::db::DbPool, id: &str, reach: &str, blob_hash:
 async fn fixture_with_gated_provider(
     provider_dir: &std::path::Path,
     fetcher_dir: &std::path::Path,
-) -> Result<(TwoNodeFixture, String)> {
+) -> Result<(TwoNodeFixture, ByteCid)> {
     let dir = tempdir().unwrap();
     let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
     Box::leak(Box::new(dir));
     let stored = blob_store.store(b"death witness bytes").await.unwrap();
 
     let pool = gate_pool();
-    seed_row(&pool, "witness-private", "private", Some(&stored.hash));
+    seed_row(
+        &pool,
+        "witness-private",
+        "private",
+        Some(&stored.cid.to_string()),
+    );
     seed_row(&pool, "notice-public", "public", None);
 
     let standing = Arc::new(ProjectionCustodyStanding::new(pool.clone()));
@@ -398,7 +401,7 @@ async fn fixture_with_gated_provider(
     let fixture =
         TwoNodeFixture::new_asymmetric(provider_dir, provider_extras, fetcher_dir, Vec::new())
             .await?;
-    Ok((fixture, stored.hash))
+    Ok((fixture, stored.cid))
 }
 
 /// The station-3b assertion on the iroh transport: a fetcher whose `NodeId` the
@@ -460,7 +463,10 @@ async fn an_unresolved_iroh_requester_is_withheld_the_private_row_but_not_the_pu
     // 3. The bytes are refused too — the byte leg is where the HTTP path's
     //    asymmetry used to live.
     let res = client
-        .request(fixture.provider_addr.clone(), &ShardRequest::Get { hash })
+        .request(
+            fixture.provider_addr.clone(),
+            &ShardRequest::Get { cid: hash },
+        )
         .await?;
     match res {
         ShardResponse::Error(msg) => assert!(

@@ -25,6 +25,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use elohim_storage::p2p::{BlobCodec, BlobFetchRequest, BlobProtocol};
 use futures::StreamExt;
 use libp2p::{
@@ -33,14 +34,13 @@ use libp2p::{
     swarm::SwarmEvent,
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
-use sha2::{Digest, Sha256};
 use tokio::sync::{mpsc, oneshot};
 
 type FetchTx = oneshot::Sender<Result<Vec<u8>, String>>;
 
 enum Cmd {
     Dial(Multiaddr, oneshot::Sender<Result<(), String>>),
-    Fetch(PeerId, String, FetchTx),
+    Fetch(PeerId, ByteCid, FetchTx),
     WaitConnected(PeerId, oneshot::Sender<()>),
     /// Chaos kill switch: drop the swarm (severing every connection and the
     /// listener) and exit the driver task. The pod-death analogue.
@@ -69,12 +69,9 @@ impl Node {
         rx.await.unwrap();
     }
 
-    async fn fetch(&self, peer: PeerId, hash: &str) -> Result<Vec<u8>, String> {
+    async fn fetch(&self, peer: PeerId, cid: &ByteCid) -> Result<Vec<u8>, String> {
         let (tx, rx) = oneshot::channel();
-        self.cmd_tx
-            .send(Cmd::Fetch(peer, hash.to_string(), tx))
-            .await
-            .unwrap();
+        self.cmd_tx.send(Cmd::Fetch(peer, *cid, tx)).await.unwrap();
         rx.await.map_err(|_| "driver gone".to_string())?
     }
 
@@ -87,17 +84,15 @@ impl Node {
     }
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
-    let mut h = Sha256::new();
-    h.update(bytes);
-    format!("sha256-{}", hex::encode(h.finalize()))
+fn cid_of(bytes: &[u8]) -> ByteCid {
+    compute_bytes_cid(bytes)
 }
 
-/// Spawn a node. `holdings` maps content hashes to payload bytes the driver
+/// Spawn a node. `holdings` maps byte CIDs to payload bytes the driver
 /// serves; pass an empty map for a pure fetcher. `request_timeout` keeps
 /// dead-peer failures FAST — chaos tests assert bounded outcomes, so the
 /// timeout is part of the contract under test.
-async fn spawn_node(holdings: HashMap<String, Vec<u8>>, request_timeout: Duration) -> Node {
+async fn spawn_node(holdings: HashMap<ByteCid, Vec<u8>>, request_timeout: Duration) -> Node {
     let local_key = identity::Keypair::generate_ed25519();
     let local_peer_id = PeerId::from(local_key.public());
 
@@ -148,10 +143,10 @@ async fn spawn_node(holdings: HashMap<String, Vec<u8>>, request_timeout: Duratio
                         Cmd::Dial(addr, reply) => {
                             let _ = reply.send(swarm.dial(addr).map_err(|e| e.to_string()));
                         }
-                        Cmd::Fetch(peer, hash, reply) => {
+                        Cmd::Fetch(peer, cid, reply) => {
                             let req_id = swarm
                                 .behaviour_mut()
-                                .send_request(&peer, BlobFetchRequest { hash });
+                                .send_request(&peer, BlobFetchRequest { cid });
                             pending_fetches.insert(req_id, reply);
                         }
                         Cmd::WaitConnected(peer, reply) => {
@@ -184,7 +179,7 @@ async fn spawn_node(holdings: HashMap<String, Vec<u8>>, request_timeout: Duratio
                             request_response::Message::Request {
                                 request, channel, ..
                             } => {
-                                let resp = match holdings.get(&request.hash) {
+                                let resp = match holdings.get(&request.cid) {
                                     Some(bytes) => {
                                         elohim_storage::p2p::BlobFetchResponse::found(
                                             bytes.clone(),
@@ -259,8 +254,8 @@ fn payload(tag: &str, len: usize) -> Vec<u8> {
 #[tokio::test]
 async fn chaos_dead_provider_fails_fast_never_hangs() {
     let bytes = payload("chaos-a", 256 * 1024);
-    let hash = sha256_hex(&bytes);
-    let provider = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
+    let hash = cid_of(&bytes);
+    let provider = spawn_node(HashMap::from([(hash, bytes)]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
     fetcher.dial(provider.addr.clone()).await;
@@ -271,7 +266,7 @@ async fn chaos_dead_provider_fails_fast_never_hangs() {
         .await
         .expect("alive fetch bounded")
         .expect("alive fetch succeeds");
-    assert_eq!(sha256_hex(&ok), hash);
+    assert_eq!(cid_of(&ok), hash);
 
     // Kill the provider, then fetch again: must resolve to an ERROR within
     // the bound — never hang, never bytes.
@@ -285,10 +280,10 @@ async fn chaos_dead_provider_fails_fast_never_hangs() {
 #[tokio::test]
 async fn chaos_failover_to_surviving_provider() {
     let bytes = payload("chaos-b", 512 * 1024);
-    let hash = sha256_hex(&bytes);
+    let hash = cid_of(&bytes);
     // Two independent providers hold the same content-addressed bytes.
-    let provider_a = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
-    let provider_b = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
+    let provider_a = spawn_node(HashMap::from([(hash, bytes.clone())]), FAST_TIMEOUT).await;
+    let provider_b = spawn_node(HashMap::from([(hash, bytes)]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
     fetcher.dial(provider_a.addr.clone()).await;
@@ -307,7 +302,7 @@ async fn chaos_failover_to_surviving_provider() {
         .expect("survivor fetch bounded")
         .expect("survivor serves the bytes");
     assert_eq!(
-        sha256_hex(&from_b),
+        cid_of(&from_b),
         hash,
         "content-addressing must verify on the failover path"
     );
@@ -316,8 +311,8 @@ async fn chaos_failover_to_surviving_provider() {
 #[tokio::test]
 async fn chaos_returning_provider_serves_again() {
     let bytes = payload("chaos-c", 128 * 1024);
-    let hash = sha256_hex(&bytes);
-    let provider = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
+    let hash = cid_of(&bytes);
+    let provider = spawn_node(HashMap::from([(hash, bytes.clone())]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
     fetcher.dial(provider.addr.clone()).await;
@@ -327,23 +322,23 @@ async fn chaos_returning_provider_serves_again() {
     // The pod-restart shape: the peer returns with a fresh identity and
     // listen addr but the same content-addressed holdings. A fresh dial +
     // fetch must serve — churn is an inconvenience, not a loss.
-    let reborn = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
+    let reborn = spawn_node(HashMap::from([(hash, bytes)]), FAST_TIMEOUT).await;
     fetcher.dial(reborn.addr.clone()).await;
     fetcher.wait_connected(reborn.peer_id).await;
     let again = tokio::time::timeout(BOUNDED, fetcher.fetch(reborn.peer_id, &hash))
         .await
         .expect("post-churn fetch bounded")
         .expect("returning provider serves again");
-    assert_eq!(sha256_hex(&again), hash);
+    assert_eq!(cid_of(&again), hash);
 }
 
 #[tokio::test]
 async fn chaos_kill_during_transfer_is_bounded_and_failover_completes() {
     // Large enough that the kill lands mid-conversation on loopback.
     let bytes = payload("chaos-d", 8 * 1024 * 1024);
-    let hash = sha256_hex(&bytes);
-    let provider_a = spawn_node(HashMap::from([(hash.clone(), bytes.clone())]), FAST_TIMEOUT).await;
-    let provider_b = spawn_node(HashMap::from([(hash.clone(), bytes)]), FAST_TIMEOUT).await;
+    let hash = cid_of(&bytes);
+    let provider_a = spawn_node(HashMap::from([(hash, bytes.clone())]), FAST_TIMEOUT).await;
+    let provider_b = spawn_node(HashMap::from([(hash, bytes)]), FAST_TIMEOUT).await;
     let fetcher = spawn_node(HashMap::new(), FAST_TIMEOUT).await;
 
     fetcher.dial(provider_a.addr.clone()).await;
@@ -362,7 +357,7 @@ async fn chaos_kill_during_transfer_is_bounded_and_failover_completes() {
         .expect("mid-transfer kill must yield a bounded outcome (bytes or error), never a hang");
     if let Ok(data) = &inflight_result {
         // The transfer beat the kill — fine, but the bytes must verify.
-        assert_eq!(sha256_hex(data), hash);
+        assert_eq!(cid_of(data), hash);
     }
 
     // Either way the read completes from the survivor.
@@ -370,5 +365,5 @@ async fn chaos_kill_during_transfer_is_bounded_and_failover_completes() {
         .await
         .expect("survivor fetch bounded")
         .expect("survivor serves after mid-transfer chaos");
-    assert_eq!(sha256_hex(&from_b), hash);
+    assert_eq!(cid_of(&from_b), hash);
 }

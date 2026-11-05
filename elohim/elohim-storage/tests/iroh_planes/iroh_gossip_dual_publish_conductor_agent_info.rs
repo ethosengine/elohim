@@ -1,7 +1,7 @@
 //! Step zero: ConductorAgentInfo dual-publish byte-parity test.
 //!
 //! Verifies that publishing a `ConductorAgentInfo` through a
-//! `DualGossipPublisher` delivers byte-identical payloads to both the libp2p
+//! `FanoutGossipPublisher` delivers byte-identical payloads to both the libp2p
 //! mock and the iroh mock. The wire format is named-field MessagePack
 //! (`rmp_serde::to_vec_named`), matching the inventory + recovery payload
 //! convention (see CATALOG row #1, #2, #4).
@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use elohim_storage::p2p::conductor_agent_info_gossip::{
     ConductorAgentInfo, CONDUCTOR_AGENT_INFO_TOPIC,
 };
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 #[derive(Clone, Default)]
@@ -47,7 +47,7 @@ fn conductor_agent_info_dual_publish_byte_parity() {
     let libp2p_sub = CaptureMock::new();
     let iroh_sub = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -60,7 +60,7 @@ fn conductor_agent_info_dual_publish_byte_parity() {
 
     publisher
         .publish(CONDUCTOR_AGENT_INFO_TOPIC, bytes.clone())
-        .expect("DualGossipPublisher should succeed");
+        .expect("FanoutGossipPublisher should succeed");
 
     let lp_calls = libp2p_sub.calls();
     let iroh_calls = iroh_sub.calls();

@@ -32,16 +32,15 @@ fn now_ts() -> String {
     "2026-05-20T12:00:00Z".to_string()
 }
 
-fn insert_inventory(conn: &mut elohim_storage::db::PooledConn, peer_id: &str, blob_hash: &str) {
+fn insert_inventory(conn: &mut elohim_storage::db::PooledConn, peer_id: &str, blob_cid: &str) {
     use diesel::prelude::*;
     use elohim_storage::db::diesel_schema::peer_blob_inventory;
     let row = NewPeerBlobInventoryRow {
         peer_id: peer_id.to_string(),
-        blob_hash: blob_hash.to_string(),
+        blob_cid: blob_cid.to_string(),
         last_seen_at: now_ts(),
-        source: "gossip-snapshot".to_string(),
+        source: "gossip-delta".to_string(),
         sequence: 1,
-        blake3_hash: None,
     };
     diesel::replace_into(peer_blob_inventory::table)
         .values(&row)
@@ -162,8 +161,12 @@ fn resilience_hub_endpoint_returns_empty_for_unknown_content() {
         local_libp2p_peer_id: None,
     };
 
-    let hubs = resilience::hub_summary(&pool, &ctx, "sha256-unknown-blob-hash")
-        .expect("hub_summary should not error on unknown content");
+    let hubs = resilience::hub_summary(
+        &pool,
+        &ctx,
+        "bafkr4id264nlu2n5cgvyggwus7u2njyqv5rvmoei3picgev4okzcmcewsq",
+    )
+    .expect("hub_summary should not error on unknown content");
 
     assert!(
         hubs.is_empty(),
@@ -173,12 +176,15 @@ fn resilience_hub_endpoint_returns_empty_for_unknown_content() {
 
     // Verify wire-format round-trip via ResilienceHubView
     let view = ResilienceHubView {
-        content_id: "sha256-unknown-blob-hash".to_string(),
+        content_id: "bafkr4id264nlu2n5cgvyggwus7u2njyqv5rvmoei3picgev4okzcmcewsq".to_string(),
         hubs,
     };
     let json = serde_json::to_string(&view).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["contentId"], "sha256-unknown-blob-hash");
+    assert_eq!(
+        v["contentId"],
+        "bafkr4id264nlu2n5cgvyggwus7u2njyqv5rvmoei3picgev4okzcmcewsq"
+    );
     assert!(
         v["hubs"].as_array().unwrap().is_empty(),
         "hubs must be empty array in JSON"
@@ -195,15 +201,15 @@ fn resilience_hub_endpoint_handles_single_device_hub() {
         local_libp2p_peer_id: None,
     };
 
-    let blob_hash = "sha256-single-device-test";
+    let blob_cid = "bafkr4ibfzyz3yuolvfpm5pkuur7ovet6oxkh62e2is5q7lfmznbtmpxvty";
     let peer_id = "12D3KooWSingleDevice";
 
     // Inventory entry — no binding, no human row
-    insert_inventory(&mut conn, peer_id, blob_hash);
+    insert_inventory(&mut conn, peer_id, blob_cid);
     drop(conn);
 
     let hubs =
-        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
+        resilience::hub_summary(&pool, &ctx, blob_cid).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "expected exactly one hub");
     assert_eq!(hubs[0].hub_id, peer_id, "hub_id should be peer_id");
@@ -234,7 +240,7 @@ fn resilience_hub_endpoint_returns_polymorphic_hubs() {
         local_libp2p_peer_id: None,
     };
 
-    let blob_hash = "sha256-polymorphic-hub-test";
+    let blob_cid = "bafkr4ifiiwh3qokpgfs4y55zb2wbxbemm7tggipbekgw2m7rswdi6r3uxm";
 
     // Peer A: has identity binding → human with household_id → Dwelling
     let peer_a = "12D3KooWPeerAlice";
@@ -242,18 +248,18 @@ fn resilience_hub_endpoint_returns_polymorphic_hubs() {
     let human_a = "human-alice";
     let household_a = "household-alpha";
 
-    insert_inventory(&mut conn, peer_a, blob_hash);
+    insert_inventory(&mut conn, peer_a, blob_cid);
     insert_binding(&mut conn, peer_a, agent_a);
     insert_human(&mut conn, human_a, Some(agent_a), Some(household_a));
 
     // Peer B: no identity binding → Computed
     let peer_b = "12D3KooWPeerBob";
-    insert_inventory(&mut conn, peer_b, blob_hash);
+    insert_inventory(&mut conn, peer_b, blob_cid);
 
     drop(conn);
 
     let hubs =
-        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
+        resilience::hub_summary(&pool, &ctx, blob_cid).expect("hub_summary should not error");
 
     // We expect two distinct hub entries: one Dwelling (household-alpha) and one Computed (peer_b)
     assert_eq!(hubs.len(), 2, "expected 2 hubs (dwelling + computed)");
@@ -285,7 +291,7 @@ fn resilience_hub_endpoint_returns_polymorphic_hubs() {
 
     // Wire-format: mixed kinds in hubs[]
     let view = ResilienceHubView {
-        content_id: blob_hash.to_string(),
+        content_id: blob_cid.to_string(),
         hubs: hubs.clone(),
     };
     let json = serde_json::to_value(&view).unwrap();
@@ -315,13 +321,13 @@ fn resilience_hub_peer_with_collective_participation_is_collective() {
         local_libp2p_peer_id: None,
     };
 
-    let blob_hash = "sha256-collective-hub-test";
+    let blob_cid = "bafkr4iad6k5xqumteykjoh4ekbrgmyfmr7pycf3lvkucu2oja75m65ndb4";
     let peer_c = "12D3KooWPeerCarol";
     let agent_c = "uhCAkCarolPubKey";
     let human_c = "human-carol";
     let collective_c = "collective-dawn-runners";
 
-    insert_inventory(&mut conn, peer_c, blob_hash);
+    insert_inventory(&mut conn, peer_c, blob_cid);
     insert_binding(&mut conn, peer_c, agent_c);
     // No household_id (None)
     insert_human(&mut conn, human_c, Some(agent_c), None);
@@ -329,7 +335,7 @@ fn resilience_hub_peer_with_collective_participation_is_collective() {
     drop(conn);
 
     let hubs =
-        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
+        resilience::hub_summary(&pool, &ctx, blob_cid).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "expected exactly one hub");
     assert_eq!(hubs[0].kind, HubKind::Collective, "kind must be collective");
@@ -353,7 +359,7 @@ fn resilience_hub_same_household_grouped_with_summed_replica_count() {
         local_libp2p_peer_id: None,
     };
 
-    let blob_hash = "sha256-household-group-test";
+    let blob_cid = "bafkr4ibajvge4ajikfto6m6akfltn6vliuoygn2snoioit3yiwyf42a76a";
     let household = "household-beta";
 
     for i in 0..3u8 {
@@ -361,14 +367,14 @@ fn resilience_hub_same_household_grouped_with_summed_replica_count() {
         let agent_cid = format!("uhCAkHouseholdAgent{i}");
         let human_id = format!("human-household-{i}");
 
-        insert_inventory(&mut conn, &peer_id, blob_hash);
+        insert_inventory(&mut conn, &peer_id, blob_cid);
         insert_binding(&mut conn, &peer_id, &agent_cid);
         insert_human(&mut conn, &human_id, Some(&agent_cid), Some(household));
     }
     drop(conn);
 
     let hubs =
-        resilience::hub_summary(&pool, &ctx, blob_hash).expect("hub_summary should not error");
+        resilience::hub_summary(&pool, &ctx, blob_cid).expect("hub_summary should not error");
 
     assert_eq!(hubs.len(), 1, "all three peers in same household → one hub");
     assert_eq!(hubs[0].kind, HubKind::Dwelling);

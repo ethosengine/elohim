@@ -90,3 +90,24 @@ async fn two_node_distinct_payloads() {
     provider.shutdown().await.unwrap();
     fetcher.shutdown().await.unwrap();
 }
+
+/// The iroh-blobs key of a payload IS the digest its byte CID declares (raw +
+/// BLAKE3-256): the two address one set of bytes, with no translation table.
+#[tokio::test]
+async fn iroh_hash_equals_cid_digest() {
+    use elohim_epr::address::compute_bytes_cid;
+    use elohim_storage::p2p_iroh::blob_store::{cid_for, hash_for};
+
+    let dir = tempdir().unwrap();
+    let node = IrohNode::start(loopback_config(dir.path()))
+        .await
+        .expect("node starts");
+    let payload = b"one set of bytes, one address".to_vec();
+    let hash = node.add_bytes(payload.clone()).await.expect("add bytes");
+    let cid = compute_bytes_cid(&payload);
+
+    assert_eq!(hash, hash_for(&cid), "iroh key == byte CID digest");
+    assert_eq!(hash.as_bytes(), cid.digest());
+    assert_eq!(cid_for(&hash), cid, "and back");
+    node.shutdown().await.expect("shutdown");
+}

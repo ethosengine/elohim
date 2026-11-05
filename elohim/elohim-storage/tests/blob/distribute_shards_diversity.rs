@@ -217,9 +217,9 @@ async fn self_selection_records_self_held_location_and_never_pushes() {
             .expect("blob store"),
     );
 
-    // 4 KiB ≤ SINGLE_SHARD_MAX → encoding "none" → ONE shard whose hash IS the
-    // blob hash. Stocking the blob locally is therefore exactly "this node holds
-    // the shard's bytes" — the claim the self-held row makes.
+    // 4 KiB is one chunk, unstriped → ONE custody unit whose byte CID IS the
+    // blob's. Stocking the blob locally is therefore exactly "this node holds
+    // the unit's bytes" — the claim the self-held row makes.
     let blob = vec![7u8; 4096];
     let stored = store.store(&blob).await.expect("stock blob");
 
@@ -235,9 +235,11 @@ async fn self_selection_records_self_held_location_and_never_pushes() {
     assert_eq!(distributed, 1, "the self-held shard counts as placed");
 
     let mut conn = pool.get().unwrap();
-    let rows =
-        elohim_storage::db::shard_locations::get_locations_for_shard(&mut conn, &stored.hash)
-            .unwrap();
+    let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+        &mut conn,
+        &stored.cid.to_string(),
+    )
+    .unwrap();
     assert_eq!(
         rows.len(),
         1,
@@ -297,7 +299,7 @@ async fn self_selection_records_nothing_when_bytes_are_absent() {
     );
 
     let blob = vec![9u8; 4096];
-    let expected_shard_hash = elohim_storage::BlobStore::compute_hash(&blob);
+    let expected_shard_cid = elohim_epr::address::compute_bytes_cid(&blob).to_string();
 
     let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
         "uhCAkSelfAgent".to_string(),
@@ -313,7 +315,7 @@ async fn self_selection_records_nothing_when_bytes_are_absent() {
     let mut conn = pool.get().unwrap();
     let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
         &mut conn,
-        &expected_shard_hash,
+        &expected_shard_cid,
     )
     .unwrap();
     assert!(

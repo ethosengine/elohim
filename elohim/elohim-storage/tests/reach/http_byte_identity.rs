@@ -63,7 +63,8 @@ struct TierFixture {
     tier: &'static str,
     id: String,
     slug: String,
-    sha: String,
+    /// The sha2-256 raw CID of the same bytes — a retired spelling, refused.
+    sha2_cid: String,
     cid: String,
     blob_body: Vec<u8>,
     app_body: Vec<u8>,
@@ -131,13 +132,13 @@ async fn serve() -> Fixture {
         let slug = format!("reach-golden-app-{marker}");
         let blob_body = bundle(tier);
         let stored = blob_store.store(&blob_body).await.unwrap();
-        let digest = BlobStore::parse_content_address(&stored.hash).unwrap();
-        let cid = BlobStore::hash_to_cid(&digest).unwrap().to_string();
+        let cid = stored.cid.to_string();
+        let sha2_cid = elohim_epr::address::compute_raw_sha2_cid(&blob_body).to_string();
         fixtures.push(TierFixture {
             tier,
             id,
             slug,
-            sha: stored.hash,
+            sha2_cid,
             cid,
             blob_body,
             app_body: format!("<!doctype html><title>{tier}</title>").into_bytes(),
@@ -160,7 +161,6 @@ async fn serve() -> Fixture {
                     description: None,
                     content_type: "app".to_string(),
                     content_format: "html5-app".to_string(),
-                    blob_hash: Some(fixture.sha.clone()),
                     blob_cid: Some(fixture.cid.clone()),
                     content_size_bytes: None,
                     metadata_json: None,
@@ -319,15 +319,22 @@ async fn http_status_and_refusal_bytes_match_the_pre_extraction_golden() {
                 &format!("edges {label}"),
             );
 
-            let blob_sha = get(&fixture.base, &format!("/blob/{}", tier.sha), viewer).await;
             let blob_cid = get(&fixture.base, &format!("/blob/{}", tier.cid), viewer).await;
             assert_answer(
-                &blob_sha,
+                &blob_cid,
                 blob_refusal(tier.tier, viewer),
                 &tier.blob_body,
-                &format!("blob sha {label}"),
+                &format!("blob {label}"),
             );
-            assert_eq!(blob_cid, blob_sha, "blob address rendering {label}");
+            // A retired spelling of the same bytes is refused as no byte CID,
+            // before any reach decision — it discloses nothing about the row.
+            let blob_sha2 = get(&fixture.base, &format!("/blob/{}", tier.sha2_cid), viewer).await;
+            assert_eq!(blob_sha2.status, 400, "sha2 spelling {label}");
+            let refusal: serde_json::Value = serde_json::from_slice(&blob_sha2.body).unwrap();
+            assert_eq!(
+                refusal["error"], "invalid-byte-cid",
+                "sha2 spelling {label}"
+            );
 
             let app_slug = get(
                 &fixture.base,

@@ -147,7 +147,7 @@ async fn post_intake_only_kind_is_403_even_with_a_valid_payload() {
     let registry = ObservationKindRegistry::embedded();
     let payload = json!({
         "signal_kind": "undeclared-behaviour",
-        "content_address": "bafkreiexample",
+        "content_address": "bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy",
         "directive": "connect-src",
         "observed_at": "2026-10-29T00:00:00Z",
         "reported_by": "browser",
@@ -159,7 +159,7 @@ async fn post_intake_only_kind_is_403_even_with_a_valid_payload() {
         .expect("the forged payload is schema-valid, so only the intake rule refuses it");
     let body = serde_json::to_vec(&json!({
         "observationKind": "elohim:undeclared-behaviour",
-        "subjectCid": "bafkreiexample",
+        "subjectCid": "bafkr4iexszkgyzflcwvxi2fuphz3hqqnlbak6bnmb6mzvv5arfis2akxfy",
         "subjectKind": "content",
         "payloadJson": payload.to_string(),
     }))

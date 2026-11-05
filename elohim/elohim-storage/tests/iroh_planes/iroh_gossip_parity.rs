@@ -1,17 +1,17 @@
 //! Phase 4 acceptance test — iroh-gossip on the parallel stack.
 //!
-//! Two-node parity: provider broadcasts a MessagePack-encoded
-//! [`crate::p2p::inventory_gossip::BlobInventoryDelta`]-shaped payload on
-//! the iroh-gossip topic that maps from `INVENTORY_TOPIC`; fetcher
-//! subscribes to the same topic name and asserts byte-identical receipt
-//! within a bounded time.
+//! Two-node parity: provider broadcasts a signed inventory delta
+//! ([`elohim_storage::p2p::inventory_gossip::InventoryEnvelope`], built by
+//! `inventory_broadcaster::build_delta_pages`) on the iroh-gossip topic that maps
+//! from `INVENTORY_TOPIC`; fetcher subscribes to the same topic name and asserts
+//! byte-identical receipt within a bounded time.
 //!
 //! This test exercises:
 //! - `IrohGossip::topic_id_for` produces the same id on both peers
 //! - `iroh_gossip::ALPN` is mounted on the Router by default
 //! - subscribe / joined / broadcast round-trips on a single bootstrap
 //!
-//! Wire format and message schema is unchanged from libp2p — gossipsub
+//! Wire format and message schema are the same as on libp2p — gossipsub
 //! and iroh-gossip differ only on transport and topic-id encoding.
 //!
 //! Gated on `p2p-iroh`.
@@ -19,26 +19,15 @@
 use std::time::Duration;
 
 use anyhow::Result;
+use elohim_epr::address::compute_bytes_cid;
+use elohim_epr::proof::AgentKeypair;
+use elohim_storage::p2p::inventory_broadcaster::{build_delta_pages, SequenceAllocator};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, InventoryEnvelope, INVENTORY_TOPIC};
 use elohim_storage::p2p_iroh::{parity_harness::TwoNodeFixture, GossipEvent};
-use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 use tokio::time::timeout;
 
-const TOPIC_NAME: &str = "elohim/inventory/blob";
-
-/// Local copy of the libp2p inventory delta wire shape — kept in this
-/// test rather than importing because the production module is libp2p-
-/// gated and the test runs in p2p-iroh-only mode for some Phase-4 CI
-/// permutations. After cutover we'll consolidate.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct BlobInventoryDeltaWire {
-    peer_id: String,
-    added: Vec<String>,
-    removed: Vec<String>,
-    emitted_at: i64,
-    sequence: u64,
-    signature: Vec<u8>,
-}
+const TOPIC_NAME: &str = INVENTORY_TOPIC;
 
 #[tokio::test]
 async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
@@ -84,27 +73,30 @@ async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
     .await
     .map_err(|_| anyhow::anyhow!("fetcher never saw provider as neighbor"))?;
 
-    // Provider broadcasts a structurally-valid inventory delta payload.
-    // Use canonical sha256-<hex> wire format so any future structural verify
-    // on this path accepts the message.
-    let valid_hash = format!("sha256-{}", "0".repeat(64));
-    let delta = BlobInventoryDeltaWire {
-        peer_id: format!("{provider_id}"),
-        added: vec![valid_hash],
-        removed: vec![],
-        emitted_at: 1_700_000_000_000_000,
-        sequence: 1,
-        signature: vec![0u8; 1],
-    };
-    let payload = rmp_serde::to_vec_named(&delta)?;
+    // Provider broadcasts a signed inventory delta naming one byte CID.
+    let keypair = AgentKeypair::from_secret(&[9u8; 32]).unwrap();
+    let delta = build_delta_pages(
+        &keypair,
+        &provider_id.to_string(),
+        &[BlobAddress::from(compute_bytes_cid(
+            b"a blob the provider holds",
+        ))],
+        &[],
+        &SequenceAllocator::new(0),
+        1_700_000_000_000_000,
+        &[],
+    )
+    .remove(0);
+    let payload = delta.to_bytes();
     provider_sender.broadcast(payload.clone().into()).await?;
 
     // Fetcher receives the same MessagePack bytes within bounded time.
-    let received: BlobInventoryDeltaWire = timeout(Duration::from_secs(30), async {
+    let received: InventoryEnvelope = timeout(Duration::from_secs(30), async {
         loop {
             match fetcher_recv.next().await {
                 Some(Ok(GossipEvent::Received(msg))) => {
-                    return rmp_serde::from_slice(&msg.content).map_err(anyhow::Error::from);
+                    assert_eq!(msg.content.as_ref(), payload.as_slice(), "byte-identical");
+                    return InventoryEnvelope::from_bytes(&msg.content).map_err(anyhow::Error::msg);
                 }
                 Some(_) => continue,
                 None => return Err(anyhow::anyhow!("gossip stream closed")),

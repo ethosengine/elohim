@@ -1,8 +1,7 @@
 use diesel::RunQueryDsl;
 use elohim_storage::db;
 use elohim_storage::db::models::{
-    NewCollective, NewHuman, NewPlacementGap, NewReaCommitment, NewShardLocation, NewShardManifest,
-    NewStewardedNode,
+    NewCollective, NewHuman, NewPlacementGap, NewReaCommitment, NewShardLocation, NewStewardedNode,
 };
 use elohim_storage::db::peer_statuses::PeerStatusRow;
 use elohim_storage::db::placement_gaps;
@@ -61,9 +60,16 @@ fn seed_human_with_key(
         .unwrap();
 }
 
-fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_hash: &str, peer_id: &str) {
+/// The custody unit a fixture shard label names: the byte CID of the label's bytes
+/// (a payload this small is one chunk, so its manifest's one unit is the payload).
+fn unit(label: &str) -> String {
+    elohim_epr::address::compute_bytes_cid(label.as_bytes()).to_string()
+}
+
+fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_label: &str, peer_id: &str) {
+    let shard_cid = unit(shard_label);
     let loc = NewShardLocation {
-        shard_hash,
+        shard_cid: &shard_cid,
         peer_id,
         h_app_id: "lamad",
         status: "announced",
@@ -71,26 +77,29 @@ fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_hash: &str, pe
     db::shard_locations::upsert_location(conn, &loc).unwrap();
 }
 
+/// Record a real manifest for the one-unit payload a JSON list of one shard label
+/// names (the label's bytes), so the manifest's unit and `seed_shard_location`'s
+/// rows are the same byte CID.
 fn seed_shard_manifest(
     conn: &mut diesel::SqliteConnection,
     content_id: &str,
-    shard_hashes_json: &str,
+    shard_labels_json: &str,
 ) {
-    let manifest = NewShardManifest {
+    let labels: Vec<String> = serde_json::from_str(shard_labels_json).unwrap();
+    assert_eq!(labels.len(), 1, "fixtures seed one-unit manifests");
+    let row = db::shard_manifests::record_manifest_from_bytes(
+        conn,
         content_id,
-        h_app_id: "lamad",
-        blob_hash: "blob-hash-stub",
-        blob_cid: None,
-        encoding: "identity",
-        data_shard_count: 1,
-        parity_shard_count: 0,
-        shard_hashes_json,
-        total_size_bytes: 0,
-        shard_size_bytes: 0,
-        mime_type: "application/octet-stream",
-        reach: "commons",
-    };
-    db::shard_manifests::upsert_manifest(conn, &manifest).unwrap();
+        "lamad",
+        labels[0].as_bytes(),
+        "application/octet-stream",
+        "commons",
+    )
+    .unwrap();
+    assert_eq!(
+        db::shard_manifests::custody_unit_cids(&row),
+        vec![unit(&labels[0])]
+    );
 }
 
 /// Seed a peer-status projection row (D2 input). `status` is the wire value:
@@ -994,7 +1003,7 @@ fn distinct_households_counted_from_shard_locations() {
     seed_shard_location(&mut conn, "shard-x", "agent-ghost");
 
     // Seed the manifest so compute() follows the two-step manifest path:
-    // get_manifest -> parse shard_hashes_json -> filter shard_locations by eq_any.
+    // get_manifest -> parse shard_cids_json -> filter shard_locations by eq_any.
     // Without this, the prior fallback would aggregate across all shard_locations
     // for the h_app_id (inflated count), not the shards belonging to this content.
     seed_shard_manifest(&mut conn, "content-via-shard-x", r#"["shard-x"]"#);
@@ -1037,7 +1046,7 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
         &NewPlacementGap {
             id: "g1",
             content_id: "content-via-shard-x",
-            shard_hash: "shard-y",
+            shard_cid: "shard-y",
             h_app_id: "lamad",
             requested_steward_count: 3,
             achieved_steward_count: 0,
@@ -1390,7 +1399,7 @@ fn golden_resilience_snapshot_json_baseline() {
 const DOWELL_CID: &str = "collective:uhCkkD5Z9cTKCB9b2gbuAriONHz9TFBIoqP3WQoxn_dFVTaPMSpnD";
 const K_JESSICA: &str = "uhCAkbciV6YEVgcySQXakaQwzGQ0s_YAzNPvWYKt3U09p_fcZLCZq";
 const K_JAMES: &str = "uhCAkk2lvx1mkSBfCUlMRhusXMcKNl6-X6e_jXSOnTILn9KHsVEQ3";
-const SHARD: &str = "sha256-footprint-shard-1";
+const SHARD: &str = "bafkr4igo3ur3t6ofislj75xlowsqv4i42zo6fsshqlfyee2egygeeaukdq";
 const FOOTPRINT_CONTENT: &str = "elohim-host-landing";
 
 /// Seed the DHT-side facts every peer shares: the shard manifest, the custody

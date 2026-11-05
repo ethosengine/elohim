@@ -45,8 +45,9 @@ fn seed_content(conn: &mut SqliteConnection, id: &str) {
             description: Some("A test concept for derive_epr_head".to_string()),
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
-            blob_cid: Some("bafkreitest000000000000000000000000000000000000000000001".to_string()),
+            blob_cid: Some(
+                "bafkr4iflwrceqczvtslzwztw3akwuku3wys3pvsb6cj357i3iuxtqdmd6m".to_string(),
+            ),
             content_size_bytes: None,
             metadata_json: None,
             reach: "commons".to_string(),
@@ -68,10 +69,10 @@ fn mark_dht_notarised(conn: &mut SqliteConnection, id: &str) {
     .expect("mark_dht_notarised failed");
 }
 
-/// Seed a content row exactly like [`seed_content`], but with a `blob_hash`
+/// Seed a content row exactly like [`seed_content`], but with a `blob_cid`
 /// set — needed to key `peer_blob_inventory` rows (distribution facts) against
 /// the content for the epr-head-envelope tests.
-fn seed_content_with_blob_hash(conn: &mut SqliteConnection, id: &str, blob_hash: &str) {
+fn seed_content_with_blob_cid(conn: &mut SqliteConnection, id: &str, blob_cid: &str) {
     let ctx = AppContext::default_lamad();
     create_content(
         conn,
@@ -82,8 +83,7 @@ fn seed_content_with_blob_hash(conn: &mut SqliteConnection, id: &str, blob_hash:
             description: Some("A test concept for derive_epr_head".to_string()),
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: Some(blob_hash.to_string()),
-            blob_cid: Some("bafkreitest000000000000000000000000000000000000000000001".to_string()),
+            blob_cid: Some(blob_cid.to_string()),
             content_size_bytes: None,
             metadata_json: None,
             reach: "commons".to_string(),
@@ -145,11 +145,11 @@ fn set_updated_at(conn: &mut SqliteConnection, id: &str, value: &str) {
 }
 
 /// Seed a `peer_blob_inventory` row so a distribution-summary composition
-/// over `blob_hash` sees `peer_id` as a replica holder.
-fn seed_peer_blob_inventory(conn: &mut SqliteConnection, blob_hash: &str, peer_id: &str) {
+/// over `blob_cid` sees `peer_id` as a replica holder.
+fn seed_peer_blob_inventory(conn: &mut SqliteConnection, blob_cid: &str, peer_id: &str) {
     diesel::sql_query(format!(
-        "INSERT INTO peer_blob_inventory (peer_id, blob_hash, last_seen_at, source, sequence) \
-         VALUES ('{peer_id}', '{blob_hash}', '2026-09-21T00:00:00Z', 'gossip-snapshot', 1)"
+        "INSERT INTO peer_blob_inventory (peer_id, blob_cid, last_seen_at, source, sequence) \
+         VALUES ('{peer_id}', '{blob_cid}', '2026-09-21T00:00:00Z', 'gossip-delta', 1)"
     ))
     .execute(conn)
     .expect("seed_peer_blob_inventory failed");
@@ -560,7 +560,7 @@ fn epr_head_updated_renders_declared_head_at_in_rfc3339_seconds() {
 }
 
 /// Test 5 — the two-peer test, validator half. Same declared head as test 1,
-/// PLUS different `peer_blob_inventory` rows for the same `blob_hash` (3
+/// PLUS different `peer_blob_inventory` rows for the same `blob_cid` (3
 /// peers vs 2 — reproducing the finding's `replicaCount` 3-vs-2 divergence).
 /// The full JSON response body, composed through `compose_head_view`, must
 /// be byte-identical: `mint_served_head` is a pure function of these exact
@@ -573,24 +573,24 @@ fn epr_head_body_is_byte_identical_across_peers_differing_only_in_local_state() 
     let pool_b = test_pool();
     let mut conn_b = pool_b.get().expect("pool connection B");
     let ctx = AppContext::default_lamad();
-    let blob_hash = "sha256-shared-blob-test5";
+    let blob_cid = "bafkr4ibxcpm3wha2lrynjdnqtgixuz5hqijqmg5xnmoyjtacy2ffwwjtk4";
 
-    seed_content_with_blob_hash(&mut conn_a, "elohim-host-landing", blob_hash);
+    seed_content_with_blob_cid(&mut conn_a, "elohim-host-landing", blob_cid);
     mark_dht_notarised(&mut conn_a, "elohim-host-landing");
     set_declared_head_at(&mut conn_a, "elohim-host-landing", 1_700_000_000_000_000);
     set_updated_at(&mut conn_a, "elohim-host-landing", "2026-09-20T02:00:30Z");
     // Peer A observes 3 replicas for the shared blob.
-    seed_peer_blob_inventory(&mut conn_a, blob_hash, "peer-a1");
-    seed_peer_blob_inventory(&mut conn_a, blob_hash, "peer-a2");
-    seed_peer_blob_inventory(&mut conn_a, blob_hash, "peer-a3");
+    seed_peer_blob_inventory(&mut conn_a, blob_cid, "peer-a1");
+    seed_peer_blob_inventory(&mut conn_a, blob_cid, "peer-a2");
+    seed_peer_blob_inventory(&mut conn_a, blob_cid, "peer-a3");
 
-    seed_content_with_blob_hash(&mut conn_b, "elohim-host-landing", blob_hash);
+    seed_content_with_blob_cid(&mut conn_b, "elohim-host-landing", blob_cid);
     mark_dht_notarised(&mut conn_b, "elohim-host-landing");
     set_declared_head_at(&mut conn_b, "elohim-host-landing", 1_700_000_000_000_000);
     set_updated_at(&mut conn_b, "elohim-host-landing", "2026-09-20T02:00:31Z");
     // Peer B observes only 2 replicas — the finding's 3-vs-2 divergence.
-    seed_peer_blob_inventory(&mut conn_b, blob_hash, "peer-b1");
-    seed_peer_blob_inventory(&mut conn_b, blob_hash, "peer-b2");
+    seed_peer_blob_inventory(&mut conn_b, blob_cid, "peer-b1");
+    seed_peer_blob_inventory(&mut conn_b, blob_cid, "peer-b2");
 
     let view_a = compose_head_view(&mut conn_a, &ctx, "elohim-host-landing", true)
         .expect("no DB error on peer A")
@@ -620,11 +620,11 @@ fn epr_head_json_body_carries_no_distribution() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
     let ctx = AppContext::default_lamad();
-    let blob_hash = "sha256-test6-blob";
+    let blob_cid = "bafkr4ifxx5lljfg2hjvqmylvspeqasnjfbp6uktzr765d5o7iruig5t5gi";
 
-    seed_content_with_blob_hash(&mut conn, "content-no-dist", blob_hash);
+    seed_content_with_blob_cid(&mut conn, "content-no-dist", blob_cid);
     mark_dht_notarised(&mut conn, "content-no-dist");
-    seed_peer_blob_inventory(&mut conn, blob_hash, "peer-x1");
+    seed_peer_blob_inventory(&mut conn, blob_cid, "peer-x1");
 
     let view = compose_head_view(&mut conn, &ctx, "content-no-dist", true)
         .expect("no DB error")

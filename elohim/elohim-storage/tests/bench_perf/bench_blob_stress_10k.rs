@@ -257,7 +257,6 @@ mod libp2p_stress {
         swarm::SwarmEvent,
         tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
     };
-    use sha2::{Digest, Sha256};
     use std::collections::HashMap;
     use tokio::sync::{mpsc, oneshot};
 
@@ -275,10 +274,8 @@ mod libp2p_stress {
         cmd_tx: mpsc::Sender<Cmd>,
     }
 
-    fn sha256_hex(bytes: &[u8]) -> String {
-        let mut h = Sha256::new();
-        h.update(bytes);
-        format!("sha256-{}", hex::encode(h.finalize()))
+    fn byte_cid_text(bytes: &[u8]) -> String {
+        elohim_epr::address::compute_bytes_cid(bytes).to_string()
     }
 
     async fn spawn_node(holdings: HashMap<String, Vec<u8>>, max_resp_size: usize) -> Node {
@@ -337,7 +334,10 @@ mod libp2p_stress {
                             Cmd::Fetch(peer, hash, reply) => {
                                 let req_id = swarm
                                     .behaviour_mut()
-                                    .send_request(&peer, BlobFetchRequest { hash });
+                                    .send_request(&peer, BlobFetchRequest {
+                                        cid: elohim_epr::address::ByteCid::parse(&hash)
+                                            .expect("bench addresses are byte CIDs"),
+                                    });
                                 pending_fetches.insert(req_id, reply);
                             }
                             Cmd::WaitConnected(peer, reply) => {
@@ -374,7 +374,7 @@ mod libp2p_stress {
                                 },
                                 ..
                             }) => {
-                                let response = match holdings.get(&request.hash) {
+                                let response = match holdings.get(&request.cid.to_string()) {
                                     Some(bytes) => BlobFetchResponse::found(bytes.clone()),
                                     None => BlobFetchResponse::not_found(),
                                 };
@@ -455,7 +455,7 @@ mod libp2p_stress {
         let mut hashes: Vec<String> = Vec::with_capacity(payloads.len());
         let mut holdings: HashMap<String, Vec<u8>> = HashMap::with_capacity(payloads.len());
         for p in &payloads {
-            let h = sha256_hex(p);
+            let h = byte_cid_text(p);
             holdings.insert(h.clone(), p.clone());
             hashes.push(h);
         }
@@ -475,7 +475,7 @@ mod libp2p_stress {
         for h in &hashes[..warmup] {
             let bytes = fetch(&fetcher, provider.peer_id, h.clone()).await;
             assert_eq!(bytes.len(), payload_size, "warmup size mismatch");
-            let recv_hash = sha256_hex(&bytes);
+            let recv_hash = byte_cid_text(&bytes);
             assert_eq!(&recv_hash, h, "warmup hash mismatch");
         }
 
@@ -484,7 +484,7 @@ mod libp2p_stress {
         for h in &hashes[warmup..warmup + measured] {
             let t0 = Instant::now();
             let bytes = fetch(&fetcher, provider.peer_id, h.clone()).await;
-            let recv_hash = sha256_hex(&bytes);
+            let recv_hash = byte_cid_text(&bytes);
             let elapsed = t0.elapsed();
             assert_eq!(bytes.len(), payload_size, "measured size mismatch");
             assert_eq!(&recv_hash, h, "measured hash mismatch");

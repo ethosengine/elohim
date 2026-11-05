@@ -1,6 +1,6 @@
 //! Head-to-head perf comparison: iroh vs libp2p shard plane on loopback.
 //!
-//! Same workload — fetcher sends `ShardRequest::Get { hash }` and provider
+//! Same workload — fetcher sends `ShardRequest::Get { cid }` and provider
 //! answers with `ShardResponse::Data(bytes)` — driven through both transports
 //! under two scenarios:
 //!
@@ -119,7 +119,7 @@ fn fmt_size(bytes: usize) -> String {
     }
 }
 
-fn build_hashes(n: usize) -> Vec<String> {
+fn build_hashes(n: usize) -> Vec<elohim_epr::address::ByteCid> {
     let mut out = Vec::with_capacity(n);
     let mut state: u64 = 0xFACE_BABE_DEAD_BEEF;
     for _ in 0..n {
@@ -128,7 +128,10 @@ fn build_hashes(n: usize) -> Vec<String> {
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         z ^= z >> 31;
-        out.push(format!("sha256-{:016x}{:016x}", z, !z));
+        let mut label = [0u8; 16];
+        label[..8].copy_from_slice(&z.to_le_bytes());
+        label[8..].copy_from_slice(&(!z).to_le_bytes());
+        out.push(elohim_epr::address::compute_bytes_cid(&label));
     }
     out
 }
@@ -214,7 +217,7 @@ mod iroh_bench {
     /// Reuse-conn scenario: open the QUIC connection up front, issue every
     /// request as a fresh bidi stream on the same connection.
     pub async fn run_reuse_conn(
-        hashes: Vec<String>,
+        hashes: Vec<elohim_epr::address::ByteCid>,
         payload_size: usize,
         warmup: usize,
         measured: usize,
@@ -260,7 +263,7 @@ mod iroh_bench {
 
         // Warmup — discarded.
         for hash in &hashes[..warmup] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let res = send_one(&conn, &req).await;
             match res {
                 ShardResponse::Data(b) => assert_eq!(b.len(), payload_size),
@@ -271,7 +274,7 @@ mod iroh_bench {
         // Measured.
         let mut durations = Vec::with_capacity(measured);
         for hash in &hashes[warmup..warmup + measured] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let t0 = Instant::now();
             let res = send_one(&conn, &req).await;
             let elapsed = t0.elapsed();
@@ -292,7 +295,7 @@ mod iroh_bench {
     /// Fresh-conn scenario: open a new QUIC connection for every request,
     /// drop it after the response. Measured clock includes connection setup.
     pub async fn run_fresh_conn(
-        hashes: Vec<String>,
+        hashes: Vec<elohim_epr::address::ByteCid>,
         payload_size: usize,
         warmup: usize,
         measured: usize,
@@ -331,7 +334,7 @@ mod iroh_bench {
 
         // Warmup — discarded. Fresh connection each iteration.
         for hash in &hashes[..warmup] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let conn = fetcher
                 .endpoint()
                 .connect(provider_addr.clone(), SHARD_ALPN)
@@ -348,7 +351,7 @@ mod iroh_bench {
         // Measured. Each iteration's clock includes connection setup.
         let mut durations = Vec::with_capacity(measured);
         for hash in &hashes[warmup..warmup + measured] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let t0 = Instant::now();
             let conn = fetcher
                 .endpoint()
@@ -569,7 +572,7 @@ mod libp2p_bench {
     /// connection between them, request_response sends every iteration as
     /// a fresh substream on the existing connection.
     pub async fn run_reuse_conn(
-        hashes: Vec<String>,
+        hashes: Vec<elohim_epr::address::ByteCid>,
         payload_size: usize,
         warmup: usize,
         measured: usize,
@@ -591,7 +594,7 @@ mod libp2p_bench {
 
         // Warmup.
         for hash in &hashes[..warmup] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let res = request(&fetcher, provider.peer_id, req).await;
             match res {
                 ShardResponse::Data(b) => assert_eq!(b.len(), payload_size),
@@ -602,7 +605,7 @@ mod libp2p_bench {
         // Measured.
         let mut durations = Vec::with_capacity(measured);
         for hash in &hashes[warmup..warmup + measured] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let t0 = Instant::now();
             let res = request(&fetcher, provider.peer_id, req).await;
             let elapsed = t0.elapsed();
@@ -621,7 +624,7 @@ mod libp2p_bench {
     /// request, and drops. Iteration timing includes TCP+Noise+Yamux
     /// handshake cost.
     pub async fn run_fresh_conn(
-        hashes: Vec<String>,
+        hashes: Vec<elohim_epr::address::ByteCid>,
         payload_size: usize,
         warmup: usize,
         measured: usize,
@@ -642,7 +645,7 @@ mod libp2p_bench {
             let fetcher = spawn_node(Vec::new()).await;
             dial(&fetcher, provider.addr.clone()).await;
             wait_connected(&fetcher, provider.peer_id).await;
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let res = request(&fetcher, provider.peer_id, req).await;
             match res {
                 ShardResponse::Data(b) => assert_eq!(b.len(), payload_size),
@@ -655,7 +658,7 @@ mod libp2p_bench {
         // measurement captures full handshake cost.
         let mut durations = Vec::with_capacity(measured);
         for hash in &hashes[warmup..warmup + measured] {
-            let req = ShardRequest::Get { hash: hash.clone() };
+            let req = ShardRequest::Get { cid: *hash };
             let t0 = Instant::now();
             let fetcher = spawn_node(Vec::new()).await;
             dial(&fetcher, provider.addr.clone()).await;

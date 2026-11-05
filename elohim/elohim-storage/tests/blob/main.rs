@@ -19,10 +19,8 @@ mod compute_triptych;
 #[cfg(feature = "p2p")]
 mod distribute_shards_diversity;
 mod inventory_writer_smoke;
-#[cfg(feature = "p2p-iroh")]
 mod put_blob_dual_write;
 mod rs_blob_erasure_coded_put;
-#[cfg(feature = "p2p-iroh")]
 mod seed_e2e_dual_address;
 #[cfg(feature = "p2p")]
 mod shard_frame_budget;

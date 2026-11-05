@@ -21,10 +21,10 @@ async fn sync_manager(dir: &std::path::Path) -> Arc<SyncManager> {
     Arc::new(SyncManager::new(doc_store, Arc::new(StreamTracker::new())))
 }
 
-fn content_doc(blob_hash: &str) -> Vec<u8> {
+fn content_doc(blob_cid: &str) -> Vec<u8> {
     let mut doc = automerge::Automerge::new();
     let mut tx = doc.transaction();
-    tx.put(automerge::ROOT, "blobHash", blob_hash).unwrap();
+    tx.put(automerge::ROOT, "blobCid", blob_cid).unwrap();
     tx.commit();
     doc.save()
 }
@@ -41,7 +41,9 @@ async fn hand_filled_peer_book_converges_a_to_bs_document() -> Result<()> {
         .apply_changes(
             PROJECTION_NAMESPACE,
             "node:iroh-driver-proof",
-            vec![content_doc("blake3-driver-proof")],
+            vec![content_doc(
+                "bafkr4ig4n45urgwe5h6btha43k5jok7rut2v55rp5w6qvumfydhkwxx5se",
+            )],
         )
         .await?;
     let backend: Arc<dyn SyncBackend> = Arc::new(SyncManagerBackend::new(provider_sync.clone()));
@@ -78,9 +80,9 @@ async fn hand_filled_peer_book_converges_a_to_bs_document() -> Result<()> {
 
     assert_eq!(
         fetcher_sync
-            .get_doc_field(PROJECTION_NAMESPACE, "node:iroh-driver-proof", "blobHash")
+            .get_doc_field(PROJECTION_NAMESPACE, "node:iroh-driver-proof", "blobCid")
             .await?,
-        "blake3-driver-proof"
+        "bafkr4ig4n45urgwe5h6btha43k5jok7rut2v55rp5w6qvumfydhkwxx5se"
     );
     assert!(elohim_storage::metrics::IROH_SYNC_ROUNDS.get() > rounds_before);
     assert!(elohim_storage::metrics::IROH_SYNC_CHANGES_APPLIED.get() > changes_before);

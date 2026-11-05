@@ -148,12 +148,11 @@ fn resolver(pool: &DbPool) -> ProjectionCustodyStanding {
 
 fn record(reach: &str) -> ContentRecord {
     ContentRecord {
-        id: "bafkreiacquiredwitness".to_string(),
+        id: "bafkr4idn6d4briraghv5a4eqoq234ruenajxc73jey7g4ji4it7tergsj4".to_string(),
         title: "acquired".to_string(),
         description: None,
         content_type: "issue-report".to_string(),
         content_format: "json".to_string(),
-        blob_hash: None,
         blob_cid: None,
         content_size_bytes: None,
         metadata_json: None,

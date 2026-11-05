@@ -1,10 +1,12 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{Connection, SqliteConnection};
+use elohim_epr::address::compute_bytes_cid;
+use elohim_epr::proof::AgentKeypair;
 use elohim_storage::db::{run_migrations, DbPool};
 use elohim_storage::p2p::dedup::DedupLru;
 use elohim_storage::p2p::gossip_dispatch::{handle_gossip, GossipDispatchCtx, GossipSource};
 use elohim_storage::p2p::inventory_gossip::{
-    BlobAddress, BlobHint, BlobInventorySnapshot, INVENTORY_TOPIC,
+    BlobAddress, BlobHint, InventoryDelta, InventoryEnvelope, InventoryLevel, INVENTORY_TOPIC,
 };
 use elohim_storage::p2p::P2PCommand;
 use elohim_storage::p2p_iroh::IrohInventoryFetch;
@@ -19,6 +21,28 @@ fn test_pool(label: &str) -> DbPool {
         .build(ConnectionManager::<SqliteConnection>::new(&url))
         .expect("pool");
     run_migrations(&pool).expect("migrations");
+    pool
+}
+
+/// A pool whose transport manifest binds `author_peer` to an agent, so the author's
+/// signed inventory envelopes are admitted (the holder key is the one its PeerId
+/// embeds).
+fn bound_pool(label: &str, author_peer: &str) -> DbPool {
+    use diesel::prelude::*;
+    use elohim_storage::db::diesel_schema::peer_transport_manifest::dsl as t;
+    let pool = test_pool(label);
+    let mut conn = pool.get().unwrap();
+    diesel::insert_into(t::peer_transport_manifest)
+        .values((
+            t::agent_cid.eq("uhCAkTransportParityHolder"),
+            t::libp2p_peer_id.eq(author_peer),
+            t::discovery_methods_json.eq("[]"),
+            t::capability_level.eq(1),
+            t::last_observed.eq(1_i64),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+    drop(conn);
     pool
 }
 
@@ -37,23 +61,33 @@ fn dispatch(pool: &DbPool, fetch: &IrohInventoryFetch, source: GossipSource, pay
 
 #[test]
 fn iroh_and_libp2p_dispatch_queue_identical_inventory_work() {
-    let hash = format!("sha256-{}", "a".repeat(64));
+    let secret = [0x42u8; 32];
+    let author = libp2p::identity::Keypair::ed25519_from_bytes(secret)
+        .unwrap()
+        .public()
+        .to_peer_id()
+        .to_string();
+    let cid = compute_bytes_cid(b"a blob both planes hear about");
     let hint = BlobHint {
-        address: BlobAddress::new(hash.clone()).expect("address"),
+        address: BlobAddress::from(cid),
         size_bytes: Some(4096),
         recipient_hub_id: Some("hub:matthew".to_string()),
         epr_kind: Some("content".to_string()),
         tier: Some("dwelling".to_string()),
     };
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "12D3KooWTransportParity".to_string(),
-        hashes: vec![BlobAddress::new(hash.clone()).expect("address")],
-        hints: vec![hint],
-        snapshot_at: 1_700_000_000_000_000,
-        sequence: 7,
-        signature: vec![0x42],
-    };
-    let payload = snapshot.to_bytes().expect("snapshot bytes");
+    let envelope = InventoryEnvelope::sign(
+        &AgentKeypair::from_secret(&secret).unwrap(),
+        &author,
+        InventoryLevel::Full,
+        InventoryDelta {
+            added: vec![BlobAddress::from(cid)],
+            hints: vec![hint],
+            removed: vec![],
+            sequence: 1,
+            emitted_at: 1_700_000_000_000_000,
+        },
+    );
+    let payload = envelope.to_bytes();
 
     let (libp2p_tx, mut libp2p_rx) = tokio::sync::mpsc::channel(4);
     let (iroh_tx, mut iroh_rx) = tokio::sync::mpsc::channel(4);
@@ -61,16 +95,17 @@ fn iroh_and_libp2p_dispatch_queue_identical_inventory_work() {
     let iroh_fetch = IrohInventoryFetch::new(Some(iroh_tx));
 
     dispatch(
-        &test_pool("libp2p"),
+        &bound_pool("libp2p", &author),
         &libp2p_fetch,
         GossipSource::Libp2p {
             peer: "12D3KooWRelay".to_string(),
             message_id: "matrix-libp2p".to_string(),
+            author: Some(author.clone()),
         },
         &payload,
     );
     dispatch(
-        &test_pool("iroh"),
+        &bound_pool("iroh", &author),
         &iroh_fetch,
         GossipSource::Iroh {
             node: "iroh-node-matrix".to_string(),
@@ -85,18 +120,19 @@ fn iroh_and_libp2p_dispatch_queue_identical_inventory_work() {
             P2PCommand::InventoryAdvertisement {
                 source_peer_id: left_peer,
                 hints: left_hints,
-                hashes: left_hashes,
+                cids: left_cids,
             },
             P2PCommand::InventoryAdvertisement {
                 source_peer_id: right_peer,
                 hints: right_hints,
-                hashes: right_hashes,
+                cids: right_cids,
             },
         ) => {
             assert_eq!(left_peer, right_peer);
+            assert_eq!(left_peer, author);
             assert_eq!(left_hints, right_hints);
-            assert_eq!(left_hashes, right_hashes);
-            assert_eq!(left_hashes, vec![hash]);
+            assert_eq!(left_cids, right_cids);
+            assert_eq!(left_cids, vec![cid.to_string()]);
         }
         _ => panic!("both planes must queue InventoryAdvertisement work"),
     }
@@ -114,7 +150,7 @@ fn pure_iroh_absence_of_byte_fetcher_is_counted() {
         &mut conn,
         "12D3KooWNoLibp2pLeg",
         &[],
-        &[format!("sha256-{}", "b".repeat(64))],
+        &[compute_bytes_cid(b"no fetcher for this").to_string()],
     );
 
     assert_eq!(fetch.stats().unavailable, 1);

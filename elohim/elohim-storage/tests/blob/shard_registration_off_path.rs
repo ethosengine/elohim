@@ -40,7 +40,7 @@ impl ShardRegistrar for NeverRegistrar {
 
 async fn server_with_registrar(
     registrar: Arc<dyn ShardRegistrar>,
-) -> (HttpServer, Arc<ShardRegistrationQueue>) {
+) -> (HttpServer, Arc<ShardRegistrationQueue>, tempfile::TempDir) {
     let tmp = tempdir().unwrap();
     let blob_store = Arc::new(BlobStore::new(tmp.path().join("blobs")).await.unwrap());
     let pool = test_pool();
@@ -48,7 +48,8 @@ async fn server_with_registrar(
     let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
         .with_db_pool(pool)
         .with_shard_registration_queue(Arc::clone(&queue));
-    (server, queue)
+    // The store's directory lives as long as the server does.
+    (server, queue, tmp)
 }
 
 /// PUT returns success (and quickly) without ever waiting on a
@@ -62,10 +63,10 @@ async fn put_completes_without_waiting_on_a_never_answering_registrar() {
         release: Arc::clone(&release),
         calls: Arc::clone(&calls),
     });
-    let (server, queue) = server_with_registrar(registrar).await;
+    let (server, queue, _blob_dir) = server_with_registrar(registrar).await;
 
     let payload = b"put-off-path regression payload".to_vec();
-    let sha = BlobStore::compute_hash(&payload);
+    let sha = elohim_epr::address::compute_bytes_cid(&payload).to_string();
 
     let start = Instant::now();
     let resp = server
@@ -105,7 +106,7 @@ async fn second_put_still_succeeds_while_worker_is_stuck_on_the_first() {
         release: Arc::clone(&release),
         calls: Arc::clone(&calls),
     });
-    let (server, queue) = server_with_registrar(registrar).await;
+    let (server, queue, _blob_dir) = server_with_registrar(registrar).await;
 
     for (i, payload) in [
         b"first put, worker will hang on its registration".to_vec(),
@@ -114,7 +115,7 @@ async fn second_put_still_succeeds_while_worker_is_stuck_on_the_first() {
     .into_iter()
     .enumerate()
     {
-        let sha = BlobStore::compute_hash(&payload);
+        let sha = elohim_epr::address::compute_bytes_cid(&payload).to_string();
         let start = Instant::now();
         let resp = server
             .test_put_blob(&sha, &payload, "application/octet-stream")

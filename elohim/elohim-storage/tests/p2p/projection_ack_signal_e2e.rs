@@ -23,7 +23,7 @@ async fn ack_projection_signal_writes_projection_event() {
         &pool,
         "ack-projection",
         "agent-doorway-1",
-        "sha256-test-blob",
+        "bafkr4icy2zhwqmhxaqdyulgo6ky6ec5oghd65faxe6pvfnc5o6sp3m6bnq",
         "u-source-1",
         "2026-05-11T12:00:00Z",
     )
@@ -31,7 +31,12 @@ async fn ack_projection_signal_writes_projection_event() {
     .expect("handle");
 
     let mut conn = pool.get().expect("conn");
-    let recent = list_recent_for_blob(&mut conn, "sha256-test-blob", 10).expect("list");
+    let recent = list_recent_for_blob(
+        &mut conn,
+        "bafkr4icy2zhwqmhxaqdyulgo6ky6ec5oghd65faxe6pvfnc5o6sp3m6bnq",
+        10,
+    )
+    .expect("list");
     assert_eq!(recent.len(), 1);
     assert_eq!(recent[0].projector_agent_cid, "agent-doorway-1");
 }
@@ -44,7 +49,7 @@ async fn non_ack_projection_action_is_ignored() {
         &pool,
         "custody-blob", // NOT ack-projection
         "agent-bob",
-        "sha256-other",
+        "bafkr4ib7pfqwh27zi4mn4hgxlatflqas7gk4a3y6nfyouk64cw6nrcrsji",
         "u-source-2",
         "2026-05-11T12:00:00Z",
     )
@@ -52,7 +57,12 @@ async fn non_ack_projection_action_is_ignored() {
     .expect("handle");
 
     let mut conn = pool.get().expect("conn");
-    let recent = list_recent_for_blob(&mut conn, "sha256-other", 10).expect("list");
+    let recent = list_recent_for_blob(
+        &mut conn,
+        "bafkr4ib7pfqwh27zi4mn4hgxlatflqas7gk4a3y6nfyouk64cw6nrcrsji",
+        10,
+    )
+    .expect("list");
     assert!(
         recent.is_empty(),
         "non-ack-projection events must not write to projection_events"
@@ -75,11 +85,10 @@ async fn distribution_summary_returns_real_projector_count_after_ack() {
         )
         .values(&NewPeerBlobInventoryRow {
             peer_id: "12D3KooWreplica".to_string(),
-            blob_hash: "sha256-blob-A".to_string(),
+            blob_cid: "bafkr4iejpufl5a67s2djzdx346ufycwm5gv4awn4q7vl2avrr37n2vcgwe".to_string(),
             last_seen_at: "2026-05-11T12:00:00Z".to_string(),
-            source: "gossip-snapshot".to_string(),
+            source: "gossip-delta".to_string(),
             sequence: 1,
-            blake3_hash: None,
         })
         .execute(&mut conn)
         .expect("seed inventory");
@@ -90,7 +99,7 @@ async fn distribution_summary_returns_real_projector_count_after_ack() {
         &pool,
         "ack-projection",
         "agent-doorway-1",
-        "sha256-blob-A",
+        "bafkr4iejpufl5a67s2djzdx346ufycwm5gv4awn4q7vl2avrr37n2vcgwe",
         "u-source-A1",
         "2026-05-11T12:00:00Z",
     )
@@ -100,7 +109,7 @@ async fn distribution_summary_returns_real_projector_count_after_ack() {
         &pool,
         "ack-projection",
         "agent-doorway-2",
-        "sha256-blob-A",
+        "bafkr4iejpufl5a67s2djzdx346ufycwm5gv4awn4q7vl2avrr37n2vcgwe",
         "u-source-A2",
         "2026-05-11T12:01:00Z",
     )
@@ -108,10 +117,13 @@ async fn distribution_summary_returns_real_projector_count_after_ack() {
     .unwrap();
 
     // Assert: distribution view returns projector_count=2 (not stubbed 0).
-    let summary =
-        compose_distribution_summary(&pool, "sha256-blob-A", DistributionContext::Visitor)
-            .await
-            .expect("compose");
+    let summary = compose_distribution_summary(
+        &pool,
+        "bafkr4iejpufl5a67s2djzdx346ufycwm5gv4awn4q7vl2avrr37n2vcgwe",
+        DistributionContext::Visitor,
+    )
+    .await
+    .expect("compose");
 
     assert_eq!(
         summary.projector_count, 2,

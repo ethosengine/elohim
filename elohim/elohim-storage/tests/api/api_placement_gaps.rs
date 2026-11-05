@@ -29,7 +29,7 @@ fn make_gap<'a>(id: &'a str, kind: &'a str) -> NewPlacementGap<'a> {
     NewPlacementGap {
         id,
         content_id: id,
-        shard_hash: id,
+        shard_cid: id,
         h_app_id: "lamad",
         requested_steward_count: 3,
         achieved_steward_count: 1,

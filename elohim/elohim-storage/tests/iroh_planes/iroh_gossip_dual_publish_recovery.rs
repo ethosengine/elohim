@@ -2,7 +2,7 @@
 //!
 //! Verifies that `RecoveryInvitation` and `RecoveryRevocationMessage` payloads
 //! are published byte-identically to both libp2p and iroh mocks via
-//! `DualGossipPublisher`. Wire format is named MessagePack (`to_vec_named`),
+//! `FanoutGossipPublisher`. Wire format is named MessagePack (`to_vec_named`),
 //! unchanged from the existing libp2p path.
 //!
 //! Gated on `p2p-iroh`.
@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
@@ -51,7 +51,7 @@ fn recovery_invitation_dual_publish_byte_parity() {
     let libp2p_sub = CaptureMock::new();
     let iroh_sub = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -65,7 +65,7 @@ fn recovery_invitation_dual_publish_byte_parity() {
 
     publisher
         .publish(RECOVERY_INVITATION_TOPIC, payload_bytes.clone())
-        .expect("DualGossipPublisher should succeed");
+        .expect("FanoutGossipPublisher should succeed");
 
     let lp_calls = libp2p_sub.calls();
     let iroh_calls = iroh_sub.calls();
@@ -102,7 +102,7 @@ fn recovery_revocation_dual_publish_byte_parity() {
     let libp2p_sub = CaptureMock::new();
     let iroh_sub = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sub.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sub.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -121,7 +121,7 @@ fn recovery_revocation_dual_publish_byte_parity() {
 
     publisher
         .publish(RECOVERY_REVOCATION_TOPIC, payload_bytes.clone())
-        .expect("DualGossipPublisher should succeed");
+        .expect("FanoutGossipPublisher should succeed");
 
     let lp_calls = libp2p_sub.calls();
     let iroh_calls = iroh_sub.calls();

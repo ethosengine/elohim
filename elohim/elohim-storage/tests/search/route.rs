@@ -64,7 +64,6 @@ fn seed(
             description: None,
             content_type: content_type.into(),
             content_format: "markdown".into(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,

@@ -23,7 +23,8 @@ async fn compute_payload_lease_lifecycle_survives_real_iroh_fetches() -> Result<
     let fetcher_dir = tempdir()?;
     let payload_dir = tempdir()?;
     let data = b"native compute payload bytes";
-    let cid = BlobStore::compute_cid(data).to_string();
+    let byte_cid = elohim_epr::address::compute_bytes_cid(data);
+    let cid = byte_cid.to_string();
 
     payloads::put(payload_dir.path(), &cid, "task-a", 3600, data).await?;
 
@@ -44,7 +45,7 @@ async fn compute_payload_lease_lifecycle_survives_real_iroh_fetches() -> Result<
     let result = tokio::time::timeout(Duration::from_secs(15), async {
         let fetched = fixture
             .fetcher
-            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &cid)
+            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &byte_cid)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         assert_eq!(fetched, data);
@@ -52,7 +53,7 @@ async fn compute_payload_lease_lifecycle_survives_real_iroh_fetches() -> Result<
         payloads::release(payload_dir.path(), &cid, "task-a").await?;
         let missing = fixture
             .fetcher
-            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &cid)
+            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &byte_cid)
             .await;
         assert!(matches!(
             missing,
@@ -69,7 +70,7 @@ async fn compute_payload_lease_lifecycle_survives_real_iroh_fetches() -> Result<
 
         let refetched = fixture
             .fetcher
-            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &cid)
+            .fetch_blob_by_content_address(fixture.provider_addr.clone(), &byte_cid)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         assert_eq!(refetched, data);

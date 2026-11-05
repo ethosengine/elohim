@@ -25,11 +25,11 @@ impl ShardBackend for FixedShardBackend {
         req: ShardRequest,
     ) -> ShardResponse {
         match req {
-            ShardRequest::Get { hash: _ } => ShardResponse::Data(b"shard-bytes-phase7".to_vec()),
-            ShardRequest::Have { hash: _ } => ShardResponse::Have(true),
-            ShardRequest::Push { hash: _, data: _ } => ShardResponse::PushAck,
+            ShardRequest::Get { cid: _ } => ShardResponse::Data(b"shard-bytes-phase7".to_vec()),
+            ShardRequest::Have { cid: _ } => ShardResponse::Have(true),
+            ShardRequest::Push { cid: _, data: _ } => ShardResponse::PushAck,
             // A fixed whole-bytes backend holds no composite: the manifest pivot misses.
-            ShardRequest::GetManifest { hash: _ } => ShardResponse::NotFound,
+            ShardRequest::GetManifest { cid: _ } => ShardResponse::NotFound,
             ShardRequest::ListContent { .. } => ShardResponse::ContentList {
                 items: vec![],
                 total: 0,
@@ -57,7 +57,7 @@ async fn shard_get_round_trips_over_iroh_quic() -> Result<()> {
         TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), shard_protocols).await?;
 
     let req = ShardRequest::Get {
-        hash: "sha256-deadbeef".into(),
+        cid: elohim_epr::address::compute_bytes_cid(b"deadbeef"),
     };
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());
@@ -83,7 +83,7 @@ async fn shard_have_round_trips_over_iroh_quic() -> Result<()> {
         TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), shard_protocols).await?;
 
     let req = ShardRequest::Have {
-        hash: "sha256-cafebabe".into(),
+        cid: elohim_epr::address::compute_bytes_cid(b"cafebabe"),
     };
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());

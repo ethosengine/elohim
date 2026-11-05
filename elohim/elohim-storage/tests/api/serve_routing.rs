@@ -11,10 +11,10 @@ use diesel::prelude::*;
 use diesel::RunQueryDsl;
 
 use elohim_storage::db::diesel_schema::{
-    humans, node_stewardship, rea_commitments, shard_locations, shard_manifests, stewarded_nodes,
+    humans, node_stewardship, rea_commitments, shard_locations, stewarded_nodes,
 };
 use elohim_storage::db::models::{
-    NewHuman, NewNodeStewardship, NewShardLocation, NewStewardedNode,
+    NewHuman, NewNodeStewardship, NewShardLocation, NewShardManifest, NewStewardedNode,
 };
 use elohim_storage::services::serve_routing::{load_serve_rows, select_serve_peers};
 use elohim_storage::test_util::test_pool;
@@ -85,36 +85,61 @@ fn seed_node(conn: &mut SqliteConnection, node_id: &str, human_id: &str, cap: Op
         .expect("seed_node_stewardship");
 }
 
+/// The custody unit (or blob) a fixture label names: the byte CID of the label's
+/// bytes. Text that already is a byte CID passes through.
+fn unit(label: &str) -> String {
+    elohim_epr::address::ByteCid::parse(label)
+        .unwrap_or_else(|_| elohim_epr::address::compute_bytes_cid(label.as_bytes()))
+        .to_string()
+}
+
+/// A manifest row for `blob` whose custody units are the given chunk labels'
+/// byte CIDs (unstriped, each chunk the length of its label).
 fn seed_shard_manifest(
     conn: &mut SqliteConnection,
     content_id: &str,
-    blob_hash: &str,
-    shard_hashes: &[&str],
+    blob: &str,
+    shard_labels: &[&str],
 ) {
-    let hashes_json = serde_json::to_string(shard_hashes).unwrap();
-    diesel::insert_into(shard_manifests::table)
-        .values((
-            shard_manifests::content_id.eq(content_id),
-            shard_manifests::h_app_id.eq(H_APP_ID),
-            shard_manifests::blob_hash.eq(blob_hash),
-            shard_manifests::blob_cid.eq::<Option<&str>>(None),
-            shard_manifests::encoding.eq("RS(4,2)"),
-            shard_manifests::data_shard_count.eq(4i32),
-            shard_manifests::parity_shard_count.eq(2i32),
-            shard_manifests::shard_hashes_json.eq(hashes_json.as_str()),
-            shard_manifests::total_size_bytes.eq(1024i64),
-            shard_manifests::shard_size_bytes.eq(256i64),
-            shard_manifests::mime_type.eq("application/octet-stream"),
-            shard_manifests::reach.eq("commons"),
-        ))
-        .execute(conn)
-        .expect("seed_shard_manifest");
+    let chunks: Vec<serde_json::Value> = shard_labels
+        .iter()
+        .map(|label| serde_json::json!({ "cid": unit(label), "len": label.len() }))
+        .collect();
+    let byte_len: usize = shard_labels.iter().map(|l| l.len()).sum();
+    let profile = elohim_storage::db::shard_manifests::ManifestProfile {
+        chunker: elohim_storage::sharding::ChunkerDecl::of(
+            elohim_epr::profile::BYTE_PROFILE_0.chunker,
+        ),
+        erasure: elohim_storage::sharding::ErasureDecl::of(elohim_epr::profile::Erasure::None),
+    };
+    let profile_json = serde_json::to_string(&profile).unwrap();
+    let chunks_json = serde_json::to_string(&chunks).unwrap();
+    let blob_cid = unit(blob);
+    elohim_storage::db::shard_manifests::upsert_manifest(
+        conn,
+        &NewShardManifest {
+            content_id,
+            h_app_id: H_APP_ID,
+            blob_cid: &blob_cid,
+            byte_len: byte_len as i64,
+            mime_type: "application/octet-stream",
+            profile_json: &profile_json,
+            chunks_json: &chunks_json,
+            stripes_json: "[]",
+            reach: "commons",
+            author_id: None,
+            created_at: "2026-01-01T00:00:00Z",
+            verified_at: None,
+        },
+    )
+    .expect("seed_shard_manifest");
 }
 
-fn seed_shard_location(conn: &mut SqliteConnection, shard_hash: &str, agent_cid: &str) {
+fn seed_shard_location(conn: &mut SqliteConnection, shard_label: &str, agent_cid: &str) {
+    let shard_cid = unit(shard_label);
     diesel::insert_into(shard_locations::table)
         .values(&NewShardLocation {
-            shard_hash,
+            shard_cid: &shard_cid,
             peer_id: agent_cid, // shard_locations.peer_id stores agent_cid (uhCAk…)
             h_app_id: H_APP_ID,
             status: "verified",
@@ -145,9 +170,9 @@ fn seed_rea_provide(conn: &mut SqliteConnection, agent_cid: &str) {
 // ---------------------------------------------------------------------------
 
 /// Seed the 3-node, 2-household fixture used in T4 and T5 tests.
-/// Returns (blob_hash, [agent_cid_1, agent_cid_2, agent_cid_3]).
+/// Returns (blob_cid, [agent_cid_1, agent_cid_2, agent_cid_3]).
 fn seed_three_node_fixture(conn: &mut SqliteConnection) -> (String, Vec<String>) {
-    let blob_hash = "sha256-deadbeef01234567";
+    let blob_hash: &str = &unit("deadbeef01234567");
     let shard_a = "shard-aaa";
     let shard_b = "shard-bbb";
     let shard_c = "shard-ccc";
@@ -231,11 +256,11 @@ fn load_serve_rows_returns_three_rows_with_correct_fields() {
 }
 
 #[test]
-fn load_serve_rows_unknown_blob_hash_returns_empty() {
+fn load_serve_rows_unknown_blob_cid_returns_empty() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
 
-    let rows = load_serve_rows(&mut conn, "sha256-does-not-exist")
+    let rows = load_serve_rows(&mut conn, &unit("does-not-exist"))
         .expect("load_serve_rows should not error on unknown hash");
     assert!(rows.is_empty(), "unknown blob → empty (no manifest)");
 }
@@ -246,10 +271,10 @@ fn load_serve_rows_no_shard_locations_returns_empty() {
     let mut conn = pool.get().unwrap();
 
     // Manifest exists but no locations seeded.
-    seed_shard_manifest(&mut conn, "content-orphan", "sha256-orphan", &["shard-x"]);
+    seed_shard_manifest(&mut conn, "content-orphan", &unit("orphan"), &["shard-x"]);
 
     let rows =
-        load_serve_rows(&mut conn, "sha256-orphan").expect("load_serve_rows should not error");
+        load_serve_rows(&mut conn, &unit("orphan")).expect("load_serve_rows should not error");
     assert!(rows.is_empty(), "manifest with no locations → empty");
 }
 
@@ -290,7 +315,7 @@ fn select_serve_peers_empty_fixture_returns_empty_caller_sheds() {
     let mut conn = pool.get().unwrap();
 
     // No shard manifest → no candidates → empty result (caller sheds, no fanout).
-    let chosen = select_serve_peers(&mut conn, "sha256-nothing", 3)
+    let chosen = select_serve_peers(&mut conn, &unit("nothing"), 3)
         .expect("select_serve_peers on empty fixture should not error");
     assert!(
         chosen.is_empty(),
@@ -325,7 +350,7 @@ fn select_serve_peers_min_cap_zero_never_excludes_peers() {
 
     // Seed a peer with no capability_level in stewarded_nodes (no node row at all —
     // the agent is in shard_locations but not in humans/stewarded_nodes).
-    let blob_hash = "sha256-bare-peer";
+    let blob_hash: &str = &unit("bare-peer");
     seed_shard_manifest(&mut conn, "content-bare", blob_hash, &["shard-bare"]);
     seed_shard_location(&mut conn, "shard-bare", "uhCAk-bare-peer");
     // No humans row for this peer → household_id=None, capability_level=None in ServeRow.
@@ -356,7 +381,7 @@ fn load_serve_rows_feeds_attested_rtt_ms_from_transport_paths() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
 
-    let blob_hash = "sha256-rtt-story-3-2-load";
+    let blob_hash: &str = &unit("rtt-story-3-2-load");
     seed_shard_manifest(
         &mut conn,
         "content-rtt-story-3-2-load",
@@ -403,7 +428,7 @@ fn select_serve_peers_prefers_lower_rtt_when_capability_and_bond_are_equal() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
 
-    let blob_hash = "sha256-rtt-story-3-2-select";
+    let blob_hash: &str = &unit("rtt-story-3-2-select");
     seed_shard_manifest(
         &mut conn,
         "content-rtt-story-3-2-select",
@@ -451,7 +476,7 @@ fn select_serve_peers_stable_when_no_rtt_recorded_for_either_peer() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
 
-    let blob_hash = "sha256-rtt-story-3-2-noattest";
+    let blob_hash: &str = &unit("rtt-story-3-2-noattest");
     seed_shard_manifest(
         &mut conn,
         "content-rtt-story-3-2-noattest",

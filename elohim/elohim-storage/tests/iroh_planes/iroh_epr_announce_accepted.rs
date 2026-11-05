@@ -23,7 +23,7 @@ fn fresh_backend() -> EprServiceBackend {
 ///
 /// This test closes the gap that was documented in the original
 /// `announce_returns_unimplemented_in_iroh_mode` test. The gate is:
-/// identity-binding gossip publishes via DualGossipPublisher → iroh peers
+/// identity-binding gossip publishes via FanoutGossipPublisher → iroh peers
 /// can resolve EPR head→peer mapping → Announce is accepted.
 #[tokio::test]
 async fn announce_accepted_after_dual_publish_identity_binding() {

@@ -1,21 +1,21 @@
-//! Integration test — Plan 4 Task 4: inventory snapshot via DualGossipPublisher.
+//! Integration test: a signed inventory delta via `FanoutGossipPublisher`.
 //!
-//! Verifies that `P2PNode::broadcast_inventory_snapshot` (via the
-//! `DualGossipPublisher` wired through `set_gossip_publisher`) delivers
-//! byte-identical payloads to both the libp2p mock and the iroh mock.
+//! Verifies that a delta envelope built by `inventory_broadcaster::build_delta_pages`
+//! (the only inventory announcement there is: signed, sequenced, byte CIDs) and
+//! published through the `FanoutGossipPublisher` reaches both the libp2p mock and
+//! the iroh mock byte-identically on `elohim/inventory/blob/2`, and decodes back to
+//! the same signed envelope.
 //!
-//! This test uses synchronous mocks (not a live swarm) because:
-//! - Live two-stack tests run under Task 8 (cross-stack e2e soak).
-//! - The value here is validating that the correct bytes flow from
-//!   `BlobInventorySnapshot::to_bytes()` through `DualGossipPublisher`
-//!   to both transports.
-//!
-//! Gated on `p2p-iroh`.
+//! Synchronous mocks, not a live swarm: the live two-stack path runs in the
+//! cross-stack e2e. Gated on `p2p-iroh`.
 
 use std::sync::{Arc, Mutex};
 
-use elohim_storage::p2p::inventory_gossip::{BlobInventorySnapshot, INVENTORY_TOPIC};
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_epr::address::compute_bytes_cid;
+use elohim_epr::proof::AgentKeypair;
+use elohim_storage::p2p::inventory_broadcaster::{build_delta_pages, SequenceAllocator};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, InventoryEnvelope, INVENTORY_TOPIC};
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,10 @@ use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 #[derive(Clone, Default)]
 struct CapturePublisher {
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "a captured (topic, payload) log; a named alias adds nothing"
+    )]
     calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
 }
 
@@ -49,46 +52,48 @@ impl GossipPublisher for CapturePublisher {
 }
 
 // ---------------------------------------------------------------------------
-// Test: DualGossipPublisher delivers inventory snapshot byte-identically
+// Test: FanoutGossipPublisher delivers a signed delta byte-identically
 // ---------------------------------------------------------------------------
 
+fn signed_delta(added: &[&[u8]], sequence_from: u64) -> InventoryEnvelope {
+    let keypair = AgentKeypair::from_secret(&[7u8; 32]).unwrap();
+    let alloc = SequenceAllocator::new(sequence_from);
+    let added: Vec<BlobAddress> = added
+        .iter()
+        .map(|bytes| BlobAddress::from(compute_bytes_cid(bytes)))
+        .collect();
+    let mut pages = build_delta_pages(
+        &keypair,
+        "12D3KooWTestPeer",
+        &added,
+        &[],
+        &alloc,
+        1_700_000_000_000_000,
+        &[],
+    );
+    assert_eq!(pages.len(), 1, "three addresses fit one page");
+    pages.remove(0)
+}
+
 #[test]
-fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
+fn fanout_publisher_routes_a_signed_inventory_delta_to_both_transports() {
     let libp2p_mock = CapturePublisher::new();
     let iroh_mock = CapturePublisher::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_mock.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_mock.clone()) as Arc<dyn GossipPublisher>),
     );
 
-    // Build a realistic inventory snapshot with canonical wire-format addresses.
-    use elohim_storage::p2p::inventory_gossip::BlobAddress;
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "12D3KooWTestPeer".to_string(),
-        hashes: vec![
-            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
-            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
-            BlobAddress::new(format!("sha256-{}", "c".repeat(64))).unwrap(),
-        ],
-        hints: vec![],
-        sequence: 42,
-        snapshot_at: 1_700_000_000_000_000,
-        signature: vec![0u8; 32],
-    };
-
-    let bytes = snapshot
-        .to_bytes()
-        .expect("BlobInventorySnapshot should encode");
+    let envelope = signed_delta(&[b"blob a", b"blob b", b"blob c"], 41);
+    let bytes = envelope.to_bytes();
 
     publisher
         .publish(INVENTORY_TOPIC, bytes.clone())
-        .expect("DualGossipPublisher should succeed");
+        .expect("FanoutGossipPublisher should succeed");
 
-    // Both transports must receive exactly one call with byte-identical payload.
     let lp_calls = libp2p_mock.recorded_calls();
     let iroh_calls = iroh_mock.recorded_calls();
-
     assert_eq!(
         lp_calls.len(),
         1,
@@ -99,62 +104,44 @@ fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
         1,
         "iroh mock must receive exactly one publish"
     );
-
-    assert_eq!(
-        lp_calls[0].0, INVENTORY_TOPIC,
-        "libp2p topic must be INVENTORY_TOPIC"
-    );
-    assert_eq!(
-        iroh_calls[0].0, INVENTORY_TOPIC,
-        "iroh topic must be INVENTORY_TOPIC"
-    );
-
+    assert_eq!(lp_calls[0].0, INVENTORY_TOPIC);
+    assert_eq!(iroh_calls[0].0, INVENTORY_TOPIC);
     assert_eq!(
         lp_calls[0].1, bytes,
-        "libp2p payload must be byte-identical to original"
+        "libp2p payload must be byte-identical"
     );
     assert_eq!(
         iroh_calls[0].1, bytes,
-        "iroh payload must be byte-identical to original"
+        "iroh payload must be byte-identical"
     );
 
+    // The received bytes decode back to the same signed envelope.
+    let decoded = InventoryEnvelope::from_bytes(&lp_calls[0].1)
+        .expect("payload must decode to an InventoryEnvelope");
+    assert_eq!(decoded, envelope);
+    assert_eq!(decoded.author_peer, "12D3KooWTestPeer");
+    assert_eq!(decoded.body.sequence, 42);
+    assert_eq!(decoded.body.added.len(), 3);
     assert_eq!(
-        lp_calls[0].1, iroh_calls[0].1,
-        "both transports must receive byte-identical payloads"
+        decoded.body.added[0],
+        BlobAddress::from(compute_bytes_cid(b"blob a"))
     );
-
-    // Verify the received bytes decode back to the original struct.
-    let decoded = BlobInventorySnapshot::from_bytes(&lp_calls[0].1)
-        .expect("payload must decode to BlobInventorySnapshot");
-    assert_eq!(decoded.peer_id, snapshot.peer_id);
-    assert_eq!(decoded.hashes, snapshot.hashes);
-    assert_eq!(decoded.sequence, snapshot.sequence);
 }
 
 // ---------------------------------------------------------------------------
-// Test: With iroh transport absent, libp2p still receives inventory snapshot
+// Test: With iroh transport absent, libp2p still receives the delta
 // ---------------------------------------------------------------------------
 
 #[test]
-fn inventory_snapshot_reaches_libp2p_when_iroh_absent() {
+fn inventory_delta_reaches_libp2p_when_iroh_absent() {
     let libp2p_mock = CapturePublisher::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_mock.clone()) as Arc<dyn GossipPublisher>),
         None, // iroh not configured
     );
 
-    use elohim_storage::p2p::inventory_gossip::BlobAddress;
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "test-peer".to_string(),
-        hashes: vec![BlobAddress::new(format!("sha256-{}", "0".repeat(64))).unwrap()],
-        hints: vec![],
-        sequence: 1,
-        snapshot_at: 1_000_000,
-        signature: vec![],
-    };
-
-    let bytes = snapshot.to_bytes().expect("encode");
+    let bytes = signed_delta(&[b"only blob"], 0).to_bytes();
     publisher
         .publish(INVENTORY_TOPIC, bytes.clone())
         .expect("publish");

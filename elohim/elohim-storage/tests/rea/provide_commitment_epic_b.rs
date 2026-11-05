@@ -22,7 +22,7 @@
 
 use diesel::{ExpressionMethods, RunQueryDsl};
 use elohim_storage::db;
-use elohim_storage::db::models::{NewHuman, NewShardLocation, NewShardManifest};
+use elohim_storage::db::models::{NewHuman, NewShardLocation};
 use elohim_storage::mishpat_projection::CommitmentPayload;
 use elohim_storage::services::conductor_commitment_author::build_content_payload;
 use elohim_storage::services::household_resilience;
@@ -66,22 +66,18 @@ fn seed_content_with_steward(
     content_id: &str,
     steward_agent: &str,
 ) {
-    let shard = format!("shard-{content_id}");
-    let manifest = NewShardManifest {
+    // A one-chunk payload: its manifest's one custody unit is the payload's byte CID.
+    let payload = format!("shard-{content_id}");
+    let row = db::shard_manifests::record_manifest_from_bytes(
+        conn,
         content_id,
-        h_app_id: APP,
-        blob_hash: "blob-hash-stub",
-        blob_cid: None,
-        encoding: "identity",
-        data_shard_count: 1,
-        parity_shard_count: 0,
-        shard_hashes_json: &format!(r#"["{shard}"]"#),
-        total_size_bytes: 0,
-        shard_size_bytes: 0,
-        mime_type: "application/octet-stream",
-        reach: "commons",
-    };
-    db::shard_manifests::upsert_manifest(conn, &manifest).unwrap();
+        APP,
+        payload.as_bytes(),
+        "application/octet-stream",
+        "commons",
+    )
+    .unwrap();
+    let shard = db::shard_manifests::custody_unit_cids(&row).remove(0);
 
     // content row so snapshot's reach lookup returns "commons" explicitly.
     diesel::insert_into(db::diesel_schema::content::table)
@@ -96,7 +92,7 @@ fn seed_content_with_steward(
         .unwrap();
 
     let loc = NewShardLocation {
-        shard_hash: &shard,
+        shard_cid: &shard,
         peer_id: steward_agent,
         h_app_id: APP,
         status: "announced",
@@ -346,22 +342,18 @@ fn seed_content_with_steward_at_reach(
     steward_agent: &str,
     reach: &str,
 ) {
-    let shard = format!("shard-{content_id}");
-    let manifest = NewShardManifest {
+    // A one-chunk payload: its manifest's one custody unit is the payload's byte CID.
+    let payload = format!("shard-{content_id}");
+    let row = db::shard_manifests::record_manifest_from_bytes(
+        conn,
         content_id,
-        h_app_id: APP,
-        blob_hash: "blob-hash-stub",
-        blob_cid: None,
-        encoding: "identity",
-        data_shard_count: 1,
-        parity_shard_count: 0,
-        shard_hashes_json: &format!(r#"["{shard}"]"#),
-        total_size_bytes: 0,
-        shard_size_bytes: 0,
-        mime_type: "application/octet-stream",
+        APP,
+        payload.as_bytes(),
+        "application/octet-stream",
         reach,
-    };
-    db::shard_manifests::upsert_manifest(conn, &manifest).unwrap();
+    )
+    .unwrap();
+    let shard = db::shard_manifests::custody_unit_cids(&row).remove(0);
 
     diesel::insert_into(db::diesel_schema::content::table)
         .values((
@@ -375,7 +367,7 @@ fn seed_content_with_steward_at_reach(
         .unwrap();
 
     let loc = NewShardLocation {
-        shard_hash: &shard,
+        shard_cid: &shard,
         peer_id: steward_agent,
         h_app_id: APP,
         status: "announced",

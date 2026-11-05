@@ -158,7 +158,7 @@ impl TestSyncNode {
 
     /// Attach an SQL content projection (the serving DB) to this node. The B3
     /// serve-path heal proof needs node B to carry a real `content` table so the
-    /// reverse projector has somewhere to heal the converged `blob_hash` into.
+    /// reverse projector has somewhere to heal the converged `blob_cid` into.
     fn with_pool(mut self, pool: DbPool) -> Self {
         self.pool = Some(pool);
         self
@@ -616,7 +616,6 @@ fn sample_content(id: &str, title: &str) -> Content {
         description: None,
         content_type: "concept".to_string(),
         content_format: "markdown".to_string(),
-        blob_hash: None,
         blob_cid: None,
         content_size_bytes: None,
         metadata_json: Some("{}".to_string()),
@@ -630,7 +629,7 @@ fn sample_content(id: &str, title: &str) -> Content {
         content_body: Some("hello".to_string()),
         dht_anchor_hash: None,
         p2p_published_at: None,
-        server_blob_hash: None,
+        server_blob_cid: None,
         crdt_converged_at: None,
         declared_head_action_hash: None,
         declared_head_at: None,
@@ -748,23 +747,22 @@ async fn connect_and_converge(node_a: &TestSyncNode, node_b: &TestSyncNode, doc_
     assert!(converged, "node B did not converge {doc_id} within 30s");
 }
 
-/// B2 — the DocStore convergence carries the REAL `blobHash`, zero notary.
+/// B2 — the DocStore convergence carries the REAL `blobCid`, zero notary.
 ///
 /// A authors a content doc via the real producer (`project_content_doc`) carrying
-/// a non-empty `blob_hash`; it converges to B over a real libp2p swarm; B's
+/// a non-empty `blob_cid`; it converges to B over a real libp2p swarm; B's
 /// DocStore serves back the exact hash. RED if convergence drops or empties the
-/// serving-critical `blobHash` field. No conductor anywhere in the harness.
+/// serving-critical `blobCid` field. No conductor anywhere in the harness.
 #[tokio::test]
-async fn converges_real_blobhash_zero_notary() {
-    const REAL_HASH: &str =
-        "sha256-1111111111111111111111111111111111111111111111111111111111111111";
+async fn converges_real_blob_cid_zero_notary() {
+    const REAL_HASH: &str = "bafkr4ig7w4mlajch2gl34lfvqa3rkhyfwwxb655xpvw7hgeamnd23m7clm";
 
     let node_a = TestSyncNode::spawn("a").await;
     let node_b = TestSyncNode::spawn("b").await;
 
-    // Author on A a doc carrying a REAL, non-empty blob_hash.
+    // Author on A a doc carrying a REAL, non-empty blob_cid.
     let mut content = sample_content("edit-prop-1", "landing");
-    content.blob_hash = Some(REAL_HASH.to_string());
+    content.blob_cid = Some(REAL_HASH.to_string());
     project_content_doc(&node_a.sync, &content)
         .await
         .expect("project real-blob doc on A");
@@ -782,15 +780,15 @@ async fn converges_real_blobhash_zero_notary() {
 
     connect_and_converge(&node_a, &node_b, DOC_ID).await;
 
-    // The serving-critical blobHash converged intact (not dropped/emptied).
+    // The serving-critical blobCid converged intact (not dropped/emptied).
     let converged = node_b
         .sync
-        .get_doc_field(SYNC_NS, DOC_ID, "blobHash")
+        .get_doc_field(SYNC_NS, DOC_ID, "blobCid")
         .await
         .unwrap();
     assert_eq!(
         converged, REAL_HASH,
-        "converged blobHash must equal A's real hash"
+        "converged blobCid must equal A's real hash"
     );
 
     // Full CRDT convergence, not partial.
@@ -802,22 +800,21 @@ async fn converges_real_blobhash_zero_notary() {
 /// B3 — the serve-path heal proven end-to-end over real libp2p, zero notary.
 ///
 /// The elohim.host 404 as a red→green: node B's SQL projection carries a content
-/// row with `blob_hash = NULL` (the 404 case — SERVING reads SQL, not the
+/// row with `blob_cid = NULL` (the 404 case — SERVING reads SQL, not the
 /// DocStore). A authors the real-blob doc; it converges to B; the reverse
 /// projector heals B's SQL row at the amber tier so `get_content(Amber)` returns
 /// the converged hash — with `dht_anchor_hash` still NULL (no notary). RED without
 /// the reverse projector. This is the whole thesis proven with zero conductor.
 #[tokio::test]
 async fn converges_and_serves_zero_notary() {
-    const REAL_HASH: &str =
-        "sha256-2222222222222222222222222222222222222222222222222222222222222222";
+    const REAL_HASH: &str = "bafkr4iciihmbdhu4s6ncoh3qh2aiqbcchckkyt3yl7mvsbukc7orwcpvfy";
 
     let node_a = TestSyncNode::spawn("a").await;
     let node_b = TestSyncNode::spawn("b").await.with_pool(test_pool());
     let ctx = AppContext::default_lamad();
 
     // Seed node B's SQL projection with the elohim.host case: a content row whose
-    // blob_hash is NULL (so /blob serving 404s until a peer heals it), never
+    // blob_cid is NULL (so /blob serving 404s until a peer heals it), never
     // notarized (dht_anchor_hash NULL).
     {
         let pool = node_b.pool.as_ref().expect("node B carries a pool");
@@ -831,8 +828,7 @@ async fn converges_and_serves_zero_notary() {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None, // the 404 case
-                blob_cid: None,
+                blob_cid: None, // the 404 case
                 content_size_bytes: None,
                 metadata_json: None,
                 // Broadcast-tier: the sync plane's fail-closed reach gate excludes
@@ -849,7 +845,7 @@ async fn converges_and_serves_zero_notary() {
 
     // Author the real-blob doc on A and converge to B over real libp2p.
     let mut content = sample_content("edit-prop-1", "landing");
-    content.blob_hash = Some(REAL_HASH.to_string());
+    content.blob_cid = Some(REAL_HASH.to_string());
     project_content_doc(&node_a.sync, &content)
         .await
         .expect("project real-blob doc on A");
@@ -863,7 +859,7 @@ async fn converges_and_serves_zero_notary() {
         .expect("reverse-project must not error");
     assert!(
         healed,
-        "a real converged blob_hash into a NULL local row must heal"
+        "a real converged blob_cid into a NULL local row must heal"
     );
 
     // The serving read (amber tier) now returns the converged hash — the 404 fixed
@@ -873,9 +869,9 @@ async fn converges_and_serves_zero_notary() {
         .unwrap()
         .expect("row served at the amber tier");
     assert_eq!(
-        row.blob_hash.as_deref(),
+        row.blob_cid.as_deref(),
         Some(REAL_HASH),
-        "served blob_hash must be the converged hash"
+        "served blob_cid must be the converged CID"
     );
     assert!(
         row.crdt_converged_at.is_some(),

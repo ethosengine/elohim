@@ -1,27 +1,30 @@
 //! Plan 4 Task 5, Step 5.4 — byte-parity test across all gossip wire types.
 //!
 //! Constructs one sample of each gossip wire type, publishes it through a
-//! `DualGossipPublisher` wrapping two mock publishers, and asserts:
+//! `FanoutGossipPublisher` wrapping two mock publishers, and asserts:
 //! 1. Both mocks receive exactly one call per publish.
 //! 2. Both mocks receive byte-identical payloads for the same topic.
 //! 3. The payload decodes back to the original struct (round-trip sanity).
 //!
 //! This satisfies the plan requirement #6 third bullet (byte-parity test)
-//! covering: BlobInventorySnapshot, IdentityBindingGossip, RecoveryInvitation,
+//! covering: InventoryEnvelope (signed delta), IdentityBindingGossip, RecoveryInvitation,
 //! RecoveryRevocationMessage, FeedbackSignal.
 //!
 //! Gated on `p2p-iroh`.
 
 use std::sync::{Arc, Mutex};
 
+use elohim_epr::address::compute_bytes_cid;
+use elohim_epr::proof::AgentKeypair;
 use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
 use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTITY_BINDING_TOPIC};
-use elohim_storage::p2p::inventory_gossip::{BlobAddress, BlobInventorySnapshot, INVENTORY_TOPIC};
+use elohim_storage::p2p::inventory_broadcaster::{build_delta_pages, SequenceAllocator};
+use elohim_storage::p2p::inventory_gossip::{BlobAddress, InventoryEnvelope, INVENTORY_TOPIC};
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
 
 const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 // ---------------------------------------------------------------------------
@@ -30,7 +33,10 @@ use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
 #[derive(Clone, Default)]
 struct CaptureMock {
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "a captured (topic, payload) log; a named alias adds nothing"
+    )]
     calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
 }
 
@@ -97,46 +103,44 @@ fn assert_parity(
 }
 
 // ---------------------------------------------------------------------------
-// Test: BlobInventorySnapshot byte parity
+// Test: signed inventory delta byte parity
 // ---------------------------------------------------------------------------
 
 #[test]
-fn inventory_snapshot_byte_parity() {
+fn inventory_delta_byte_parity() {
     let libp2p = CaptureMock::new();
     let iroh = CaptureMock::new();
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh.clone()) as Arc<dyn GossipPublisher>),
     );
 
-    let snapshot = BlobInventorySnapshot {
-        peer_id: "12D3KooWPeer1".to_string(),
-        hashes: vec![
-            BlobAddress::new(format!("sha256-{}", "a".repeat(64))).unwrap(),
-            BlobAddress::new(format!("sha256-{}", "b".repeat(64))).unwrap(),
+    let keypair = AgentKeypair::from_secret(&[1u8; 32]).unwrap();
+    let envelope = build_delta_pages(
+        &keypair,
+        "12D3KooWPeer1",
+        &[
+            BlobAddress::from(compute_bytes_cid(b"blob a")),
+            BlobAddress::from(compute_bytes_cid(b"blob b")),
         ],
-        hints: vec![],
-        sequence: 7,
-        snapshot_at: 1_700_000_000_000_000,
-        signature: vec![1u8; 32],
-    };
-    let bytes = snapshot.to_bytes().expect("encode");
+        &[],
+        &SequenceAllocator::new(6),
+        1_700_000_000_000_000,
+        &[],
+    )
+    .remove(0);
+    let bytes = envelope.to_bytes();
 
     publisher
         .publish(INVENTORY_TOPIC, bytes.clone())
         .expect("publish");
-    assert_parity(
-        &libp2p,
-        &iroh,
-        INVENTORY_TOPIC,
-        &bytes,
-        "BlobInventorySnapshot",
-    );
+    assert_parity(&libp2p, &iroh, INVENTORY_TOPIC, &bytes, "InventoryEnvelope");
 
     // Round-trip decode sanity.
-    let decoded = BlobInventorySnapshot::from_bytes(&bytes).expect("decode");
-    assert_eq!(decoded.peer_id, snapshot.peer_id);
-    assert_eq!(decoded.sequence, snapshot.sequence);
+    let decoded = InventoryEnvelope::from_bytes(&bytes).expect("decode");
+    assert_eq!(decoded, envelope);
+    assert_eq!(decoded.author_peer, "12D3KooWPeer1");
+    assert_eq!(decoded.body.sequence, 7);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +151,7 @@ fn inventory_snapshot_byte_parity() {
 fn identity_binding_byte_parity() {
     let libp2p = CaptureMock::new();
     let iroh = CaptureMock::new();
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -187,7 +191,7 @@ fn identity_binding_byte_parity() {
 fn recovery_invitation_byte_parity() {
     let libp2p = CaptureMock::new();
     let iroh = CaptureMock::new();
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -222,7 +226,7 @@ fn recovery_invitation_byte_parity() {
 fn recovery_revocation_byte_parity() {
     let libp2p = CaptureMock::new();
     let iroh = CaptureMock::new();
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -263,7 +267,7 @@ fn recovery_revocation_byte_parity() {
 fn feedback_signal_byte_parity() {
     let libp2p = CaptureMock::new();
     let iroh = CaptureMock::new();
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh.clone()) as Arc<dyn GossipPublisher>),
     );

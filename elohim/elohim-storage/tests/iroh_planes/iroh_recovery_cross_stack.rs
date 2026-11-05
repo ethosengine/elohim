@@ -43,7 +43,7 @@
 //! The cross-stack delivery is exercised at the gossip-layer level using:
 //!   - Real `IrohNode`s (live QUIC gossip) for iroh-capable share-holders.
 //!   - `CaptureMock` stubs (thread-safe call capture) for libp2p-side delivery.
-//!   - `DualGossipPublisher` to fan-out to both simultaneously.
+//!   - `FanoutGossipPublisher` to fan-out to both simultaneously.
 //!
 //! Share-bytes custody is deterministically stubbed: a 32-byte "seed" is XOR-
 //! split into N shares (one per share-holder). This is NOT a real Shamir split
@@ -56,7 +56,7 @@
 //! # Gate #5 assertion contract
 //!
 //! Each test follows the same three-step contract:
-//!   1. `DualGossipPublisher` publishes `RecoveryInvitation` on both stacks.
+//!   1. `FanoutGossipPublisher` publishes `RecoveryInvitation` on both stacks.
 //!   2. Each share-holder receives via its supported transport.
 //!   3. Each share-holder fetches its stub share-blob via the same transport.
 //!
@@ -68,10 +68,10 @@ use anyhow::Result;
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
 use elohim_storage::p2p::RECOVERY_REVOCATION_TOPIC;
-use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
 use elohim_storage::p2p_iroh::multi_stack_fixture::{
     CaptureMock, MultiStackFixture, TransportProfile,
 };
+use elohim_storage::p2p_iroh::FanoutGossipPublisher;
 use elohim_storage::services::gossip_flood::GossipPublisher;
 use tempfile::tempdir;
 
@@ -136,10 +136,10 @@ fn expected_transport(profile: TransportProfile) -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
-// Test helper: assert gossip delivery via DualGossipPublisher mock
+// Test helper: assert gossip delivery via FanoutGossipPublisher mock
 // ---------------------------------------------------------------------------
 
-/// Assert that `DualGossipPublisher` delivers a `RecoveryInvitation` to both
+/// Assert that `FanoutGossipPublisher` delivers a `RecoveryInvitation` to both
 /// the libp2p mock AND the iroh mock (CaptureMock pattern from
 /// `iroh_gossip_cross_stack_e2e.rs`). This validates the dual-publish
 /// mechanics without requiring a live iroh swarm for the libp2p side.
@@ -147,7 +147,7 @@ fn assert_dual_publish_delivers_invitation(invitation: &RecoveryInvitation) {
     let libp2p_sink = CaptureMock::new();
     let iroh_sink = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sink.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sink.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -157,7 +157,7 @@ fn assert_dual_publish_delivers_invitation(invitation: &RecoveryInvitation) {
         .expect("invitation.to_bytes() must succeed");
     publisher
         .publish(RECOVERY_INVITATION_TOPIC, payload.clone())
-        .expect("DualGossipPublisher.publish must succeed");
+        .expect("FanoutGossipPublisher.publish must succeed");
 
     let lp_calls = libp2p_sink.calls();
     let iroh_calls = iroh_sink.calls();
@@ -183,7 +183,7 @@ fn assert_dual_publish_delivers_revocation(revocation: &RecoveryRevocationMessag
     let libp2p_sink = CaptureMock::new();
     let iroh_sink = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_sink.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_sink.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -193,7 +193,7 @@ fn assert_dual_publish_delivers_revocation(revocation: &RecoveryRevocationMessag
         .expect("revocation.to_bytes() must succeed");
     publisher
         .publish(RECOVERY_REVOCATION_TOPIC, payload.clone())
-        .expect("DualGossipPublisher.publish must succeed");
+        .expect("FanoutGossipPublisher.publish must succeed");
 
     let lp_calls = libp2p_sink.calls();
     let iroh_calls = iroh_sink.calls();
@@ -253,7 +253,7 @@ fn test_revocation(_request_hash: &str, revoker: &str) -> RecoveryRevocationMess
 //
 // Share-holders: Ben (iroh), Cara (iroh), Faye (dual → iroh preferred).
 // Asserts:
-//   - DualGossipPublisher delivers invitation byte-identically to both stacks.
+//   - FanoutGossipPublisher delivers invitation byte-identically to both stacks.
 //   - PeerTransportManifest for each share-holder shows iroh capability.
 //   - Stub share split + reconstruct is deterministic (3-of-3 trivial case).
 //   - All receipts are tagged transport=iroh.
@@ -284,7 +284,7 @@ async fn recovery_round_trip_all_iroh() -> Result<()> {
         );
     }
 
-    // 3. DualGossipPublisher delivers invitation to both transports.
+    // 3. FanoutGossipPublisher delivers invitation to both transports.
     let invitation = test_invitation("uhC_req_iroh_001");
     assert_dual_publish_delivers_invitation(&invitation);
 
@@ -324,7 +324,7 @@ async fn recovery_round_trip_all_iroh() -> Result<()> {
 //
 // Share-holders: Dan (libp2p), Evan (libp2p), Faye (dual → libp2p accepted).
 // Asserts:
-//   - DualGossipPublisher delivers to both stacks (libp2p side via CaptureMock).
+//   - FanoutGossipPublisher delivers to both stacks (libp2p side via CaptureMock).
 //   - PeerTransportManifest for Dan+Evan shows libp2p only.
 //   - All receipts are tagged transport=libp2p for Dan+Evan; Faye gets dual
 //     but libp2p is accepted (spec: dual prefers iroh, libp2p also receives).
@@ -354,7 +354,7 @@ async fn recovery_round_trip_all_libp2p() -> Result<()> {
         assert!(manifest.libp2p.is_some(), "{name}: expected libp2p profile");
     }
 
-    // DualGossipPublisher delivers to both stacks.
+    // FanoutGossipPublisher delivers to both stacks.
     let invitation = test_invitation("uhC_req_libp2p_001");
     assert_dual_publish_delivers_invitation(&invitation);
 
@@ -368,7 +368,7 @@ async fn recovery_round_trip_all_libp2p() -> Result<()> {
         );
     }
 
-    // Faye is dual — DualGossipPublisher delivers to both; iroh is preferred
+    // Faye is dual — FanoutGossipPublisher delivers to both; iroh is preferred
     // per spec (hub-to-hub path) but libp2p also receives (consumer-grade resilience).
     let faye_manifest = fixture.peer_transport_manifest_for("Faye");
     assert!(
@@ -394,7 +394,7 @@ async fn recovery_round_trip_all_libp2p() -> Result<()> {
 // This is the KEY cross-stack scenario — gate #5's core assertion.
 // Asserts:
 //   - The log contains at least one transport=iroh AND at least one transport=libp2p.
-//   - DualGossipPublisher delivers byte-identically to both stacks.
+//   - FanoutGossipPublisher delivers byte-identically to both stacks.
 //   - PeerTransportManifest correctly identifies each peer's capability.
 // ---------------------------------------------------------------------------
 
@@ -437,7 +437,7 @@ async fn recovery_round_trip_mixed() -> Result<()> {
         "Faye needs libp2p"
     );
 
-    // DualGossipPublisher delivers to both stacks byte-identically.
+    // FanoutGossipPublisher delivers to both stacks byte-identically.
     let invitation = test_invitation("uhC_req_mixed_001");
     assert_dual_publish_delivers_invitation(&invitation);
 
@@ -543,7 +543,7 @@ async fn recovery_threshold_with_one_offline() -> Result<()> {
 // Share-holders: Ben (iroh), Dan (libp2p), Faye (dual).
 // Ben submits a witness, then publishes a RecoveryRevocationMessage.
 // Asserts:
-//   - Revocation is delivered to both stacks via DualGossipPublisher.
+//   - Revocation is delivered to both stacks via FanoutGossipPublisher.
 //   - After revocation, the quorum set is incomplete (Ben's witness is invalid).
 //   - commit_key_rotation would be rejected by check_intimate_quorum_rules.
 //   (We simulate the rejection without a Holochain conductor by asserting the
@@ -592,10 +592,10 @@ async fn recovery_rejected_on_share_holder_revocation() -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Additional: libp2p-side capture assertion via DualGossipPublisher
+// Additional: libp2p-side capture assertion via FanoutGossipPublisher
 //
 // Verifies that libp2p-only peers (using CaptureMock) receive the same
-// payload as iroh peers when DualGossipPublisher is used — this is the
+// payload as iroh peers when FanoutGossipPublisher is used — this is the
 // gate #4 + gate #5 combined correctness proof at the publisher level.
 // ---------------------------------------------------------------------------
 
@@ -605,7 +605,7 @@ fn dual_publish_libp2p_capture_receives_invitation_for_libp2p_only_peer() {
     let dan_libp2p_cap = CaptureMock::new();
     let iroh_cap = CaptureMock::new(); // iroh subscriber (not Dan)
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(dan_libp2p_cap.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(iroh_cap.clone()) as Arc<dyn GossipPublisher>),
     );
@@ -646,7 +646,7 @@ fn dual_publish_iroh_capture_receives_invitation_for_iroh_only_peer() {
     let libp2p_cap = CaptureMock::new(); // libp2p subscriber (not Ben)
     let ben_iroh_cap = CaptureMock::new();
 
-    let publisher = DualGossipPublisher::new(
+    let publisher = FanoutGossipPublisher::new(
         Some(Arc::new(libp2p_cap.clone()) as Arc<dyn GossipPublisher>),
         Some(Arc::new(ben_iroh_cap.clone()) as Arc<dyn GossipPublisher>),
     );

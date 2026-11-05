@@ -3,7 +3,7 @@
 //! Before this, `/apps/{slug}` resolved through the in-memory slug index and
 //! `/apps/{address}` straight to the blob, and neither consulted a reach
 //! verdict: a restricted app bundle served to anyone who knew its slug or its
-//! address, and the capability probe disclosed its `X-Blob-Hash`. These tests
+//! address, and the capability probe disclosed its address header. These tests
 //! drive the REAL server over HTTP (`HttpServer::serve` on a loopback port) for
 //! an anonymous caller, against one restricted and one commons html5-app row.
 
@@ -37,16 +37,25 @@ struct Served {
     base: String,
     restricted_hash: String,
     open_hash: String,
+    /// The blob store's directory; dropped with the fixture, not before.
+    _blob_dir: tempfile::TempDir,
 }
 
 async fn serve() -> Served {
-    let blob_store = Arc::new(
-        BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-            .await
-            .unwrap(),
-    );
-    let restricted_hash = blob_store.store(&bundle("household")).await.unwrap().hash;
-    let open_hash = blob_store.store(&bundle("open")).await.unwrap().hash;
+    let blob_dir = tempfile::tempdir().unwrap();
+    let blob_store = Arc::new(BlobStore::new(blob_dir.path().to_path_buf()).await.unwrap());
+    let restricted_hash = blob_store
+        .store(&bundle("household"))
+        .await
+        .unwrap()
+        .cid
+        .to_string();
+    let open_hash = blob_store
+        .store(&bundle("open"))
+        .await
+        .unwrap()
+        .cid
+        .to_string();
 
     let pool = test_pool();
     {
@@ -64,8 +73,7 @@ async fn serve() -> Served {
                     description: None,
                     content_type: "app".into(),
                     content_format: "html5-app".into(),
-                    blob_hash: Some(hash.clone()),
-                    blob_cid: None,
+                    blob_cid: Some(hash.to_string()),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: reach.into(),
@@ -88,6 +96,7 @@ async fn serve() -> Served {
         base,
         restricted_hash,
         open_hash,
+        _blob_dir: blob_dir,
     }
 }
 
@@ -132,7 +141,10 @@ async fn the_capability_probe_does_not_disclose_a_restricted_bundle() {
             .await
             .unwrap();
         assert_eq!(resp.status(), 403, "{identifier}");
-        assert!(resp.headers().get("x-blob-hash").is_none(), "{identifier}");
+        assert!(
+            resp.headers().get("x-content-address").is_none(),
+            "{identifier}"
+        );
     }
     let open = client
         .head(format!("{}/apps/open-app/_capability", s.base))
@@ -141,7 +153,7 @@ async fn the_capability_probe_does_not_disclose_a_restricted_bundle() {
         .unwrap();
     assert_eq!(open.status(), 200);
     assert_eq!(
-        open.headers().get("x-blob-hash").unwrap(),
+        open.headers().get("x-content-address").unwrap(),
         s.open_hash.as_str()
     );
 }

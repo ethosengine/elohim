@@ -71,29 +71,28 @@ fn replica_target_commons_is_sixteen() {
 // Integration helpers
 // ============================================================================
 
-fn seed_inventory(conn: &mut SqliteConnection, peer_id: &str, blob_hash: &str) {
+fn seed_inventory(conn: &mut SqliteConnection, peer_id: &str, blob_cid: &str) {
     diesel::insert_or_ignore_into(peer_blob_inventory::table)
         .values(&NewPeerBlobInventoryRow {
             peer_id: peer_id.to_string(),
-            blob_hash: blob_hash.to_string(),
+            blob_cid: blob_cid.to_string(),
             last_seen_at: "2026-04-30T12:00:00Z".to_string(),
-            source: "gossip-snapshot".to_string(),
+            source: "gossip-delta".to_string(),
             sequence: 1,
-            blake3_hash: None,
         })
         .execute(conn)
         .expect("seed inventory");
 }
 
-fn seed_content_with_reach(conn: &mut SqliteConnection, blob_hash: &str, reach: &str) {
+fn seed_content_with_reach(conn: &mut SqliteConnection, blob_cid: &str, reach: &str) {
     diesel::insert_or_ignore_into(content::table)
         .values((
-            content::id.eq(format!("content-{blob_hash}")),
+            content::id.eq(format!("content-{blob_cid}")),
             content::h_app_id.eq("lamad"),
             content::title.eq("Test content"),
             content::content_type.eq("concept"),
             content::content_format.eq("markdown"),
-            content::blob_hash.eq(blob_hash),
+            content::blob_cid.eq(blob_cid),
             content::reach.eq(reach),
             content::validation_status.eq("valid"),
             content::created_at.eq("2026-04-30T00:00:00Z"),
@@ -443,12 +442,12 @@ async fn reciprocity_hint_steward_outflow_only() {
 // T24 seeding helpers
 // ============================================================================
 
-fn seed_placement_gap(conn: &mut SqliteConnection, id: &str, shard_hash: &str) {
+fn seed_placement_gap(conn: &mut SqliteConnection, id: &str, shard_cid: &str) {
     diesel::insert_or_ignore_into(placement_gaps::table)
         .values(&NewPlacementGap {
             id,
-            content_id: &format!("content-{shard_hash}"),
-            shard_hash,
+            content_id: &format!("content-{shard_cid}"),
+            shard_cid,
             h_app_id: "lamad",
             requested_steward_count: 6,
             achieved_steward_count: 2,
@@ -464,7 +463,7 @@ fn seed_placement_gap(conn: &mut SqliteConnection, id: &str, shard_hash: &str) {
 fn seed_rea_commitment_for_blob(
     conn: &mut SqliteConnection,
     id: &str,
-    blob_hash: &str,
+    blob_cid: &str,
     provider: &str,
     receiver: &str,
 ) {
@@ -476,7 +475,7 @@ fn seed_rea_commitment_for_blob(
             provider,
             receiver,
             resource_conforms_to: None,
-            resource_classified_as: Some(blob_hash),
+            resource_classified_as: Some(blob_cid),
             resource_quantity_value: Some(1024.0),
             resource_quantity_unit: Some("bytes"),
             effort_quantity_value: None,
@@ -684,7 +683,7 @@ async fn details_steward_includes_commitment_references() {
 /// `resource_classified_as` is a JSON list by contract (non-commons spec §11.2,
 /// Option A). A custody-blob row whose hash is **array-wrapped** (`["<hash>"]`)
 /// must still match the blob via membership. (RED before the membership fix —
-/// the scalar `.eq(blob_hash)` missed the `["<hash>"]` literal.)
+/// the scalar `.eq(blob_cid)` missed the `["<hash>"]` literal.)
 #[tokio::test]
 async fn details_steward_commitment_references_match_array_wrapped() {
     let pool = test_pool();
@@ -850,28 +849,28 @@ fn seed_human_with_household(
 
 /// Seed a single peer into `peer_blob_inventory` with no identity binding.
 /// The peer will be classified as a single `Computed` hub → 1 hub < 2 target → gap emitted.
-async fn seed_content_with_single_hub(pool: &elohim_storage::db::DbPool, blob_hash: &str) {
+async fn seed_content_with_single_hub(pool: &elohim_storage::db::DbPool, blob_cid: &str) {
     let mut conn = pool.get().unwrap();
-    seed_content_with_reach(&mut conn, blob_hash, "community");
+    seed_content_with_reach(&mut conn, blob_cid, "community");
     // One peer, no binding → hub_summary returns one Computed hub.
-    seed_inventory(&mut conn, "peer-single-hub-1", blob_hash);
+    seed_inventory(&mut conn, "peer-single-hub-1", blob_cid);
 }
 
 /// Seed content replicated across `hub_count` distinct households.
 /// Each household contributes one peer. hub_count must be >= 1.
 async fn seed_content_with_multi_hub(
     pool: &elohim_storage::db::DbPool,
-    blob_hash: &str,
+    blob_cid: &str,
     hub_count: usize,
 ) {
     let mut conn = pool.get().unwrap();
-    seed_content_with_reach(&mut conn, blob_hash, "community");
+    seed_content_with_reach(&mut conn, blob_cid, "community");
     for i in 0..hub_count {
-        let peer_id = format!("peer-multi-hub-{blob_hash}-{i}");
-        let agent_cid = format!("agent-multi-hub-{blob_hash}-{i}");
-        let human_id = format!("human-multi-hub-{blob_hash}-{i}");
-        let household_id = format!("household-multi-hub-{blob_hash}-{i}");
-        seed_inventory(&mut conn, &peer_id, blob_hash);
+        let peer_id = format!("peer-multi-hub-{blob_cid}-{i}");
+        let agent_cid = format!("agent-multi-hub-{blob_cid}-{i}");
+        let human_id = format!("human-multi-hub-{blob_cid}-{i}");
+        let household_id = format!("household-multi-hub-{blob_cid}-{i}");
+        seed_inventory(&mut conn, &peer_id, blob_cid);
         seed_binding(&mut conn, &peer_id, &agent_cid);
         seed_human_with_household(&mut conn, &human_id, &agent_cid, &household_id);
     }
@@ -887,11 +886,11 @@ async fn seed_content_with_multi_hub(
 #[tokio::test]
 async fn distribution_details_emits_hub_diversity_gap_when_single_hub() {
     let pool = test_pool();
-    let blob_hash = "hash-c4-single-hub-lonely";
+    let blob_cid = "hash-c4-single-hub-lonely";
 
-    seed_content_with_single_hub(&pool, blob_hash).await;
+    seed_content_with_single_hub(&pool, blob_cid).await;
 
-    let details = compose_distribution_details(&pool, blob_hash, DistributionContext::Visitor)
+    let details = compose_distribution_details(&pool, blob_cid, DistributionContext::Visitor)
         .await
         .expect("compose_distribution_details should succeed");
 
@@ -908,7 +907,7 @@ async fn distribution_details_emits_hub_diversity_gap_when_single_hub() {
         hub_diversity.shortfall.target
     );
     assert_eq!(
-        hub_diversity.content_id, blob_hash,
+        hub_diversity.content_id, blob_cid,
         "content_id must match the queried blob hash"
     );
     assert!(
@@ -922,11 +921,11 @@ async fn distribution_details_emits_hub_diversity_gap_when_single_hub() {
 #[tokio::test]
 async fn distribution_details_no_gap_when_multi_hub() {
     let pool = test_pool();
-    let blob_hash = "hash-c4-multi-hub-spread";
+    let blob_cid = "hash-c4-multi-hub-spread";
 
-    seed_content_with_multi_hub(&pool, blob_hash, 3).await;
+    seed_content_with_multi_hub(&pool, blob_cid, 3).await;
 
-    let details = compose_distribution_details(&pool, blob_hash, DistributionContext::Visitor)
+    let details = compose_distribution_details(&pool, blob_cid, DistributionContext::Visitor)
         .await
         .expect("compose_distribution_details should succeed");
 

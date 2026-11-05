@@ -24,7 +24,7 @@ fn setup_db() -> SqliteConnection {
         CREATE TABLE placement_gaps (
             id                      TEXT PRIMARY KEY NOT NULL,
             content_id              TEXT NOT NULL,
-            shard_hash              TEXT NOT NULL,
+            shard_cid              TEXT NOT NULL,
             h_app_id                TEXT NOT NULL,
             requested_steward_count INTEGER NOT NULL,
             achieved_steward_count  INTEGER NOT NULL,
@@ -34,7 +34,7 @@ fn setup_db() -> SqliteConnection {
             last_seen_at            TEXT NOT NULL
         );
         CREATE UNIQUE INDEX idx_placement_gaps_unique
-            ON placement_gaps(content_id, shard_hash, h_app_id, gap_kind);
+            ON placement_gaps(content_id, shard_cid, h_app_id, gap_kind);
         CREATE INDEX idx_placement_gaps_content  ON placement_gaps(content_id);
         CREATE INDEX idx_placement_gaps_kind     ON placement_gaps(gap_kind);
         CREATE INDEX idx_placement_gaps_last_seen ON placement_gaps(last_seen_at);
@@ -56,7 +56,7 @@ fn upsert_new_row_inserts() {
     let gap = NewPlacementGap {
         id: "gap-1",
         content_id: "content-alpha",
-        shard_hash: "shard-h1",
+        shard_cid: "shard-h1",
         h_app_id: "lamad",
         requested_steward_count: 3,
         achieved_steward_count: 1,
@@ -81,7 +81,7 @@ fn upsert_existing_bumps_last_seen_keeps_first_seen() {
     let gap_v1 = NewPlacementGap {
         id: "gap-2",
         content_id: "content-beta",
-        shard_hash: "shard-h2",
+        shard_cid: "shard-h2",
         h_app_id: "lamad",
         requested_steward_count: 3,
         achieved_steward_count: 2,
@@ -122,7 +122,7 @@ fn list_filters_by_kind() {
             &NewPlacementGap {
                 id,
                 content_id: id,
-                shard_hash: id,
+                shard_cid: id,
                 h_app_id: "lamad",
                 requested_steward_count: 3,
                 achieved_steward_count: 0,
@@ -151,7 +151,7 @@ fn gc_stale_removes_old_rows() {
     let fresh = NewPlacementGap {
         id: "fresh",
         content_id: "a",
-        shard_hash: "shard-fresh",
+        shard_cid: "shard-fresh",
         h_app_id: "lamad",
         requested_steward_count: 3,
         achieved_steward_count: 0,
@@ -160,11 +160,11 @@ fn gc_stale_removes_old_rows() {
         first_seen_at: "2026-04-19T00:00:00Z",
         last_seen_at: "2026-04-19T00:00:00Z",
     };
-    // Different shard_hash so the unique index (content_id, shard_hash, h_app_id, gap_kind)
+    // Different shard_cid so the unique index (content_id, shard_cid, h_app_id, gap_kind)
     // allows both rows to coexist in the table.
     let stale = NewPlacementGap {
         id: "stale",
-        shard_hash: "shard-stale",
+        shard_cid: "shard-stale",
         last_seen_at: "2026-04-17T00:00:00Z",
         ..fresh
     };

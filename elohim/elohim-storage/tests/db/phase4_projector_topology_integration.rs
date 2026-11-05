@@ -58,16 +58,15 @@ fn insert_binding(
         .expect("insert binding");
 }
 
-fn insert_inventory(conn: &mut diesel::SqliteConnection, blob_hash: &str, peer_id: &str) {
+fn insert_inventory(conn: &mut diesel::SqliteConnection, blob_cid: &str, peer_id: &str) {
     use elohim_storage::db::diesel_schema::peer_blob_inventory;
     diesel::insert_or_ignore_into(peer_blob_inventory::table)
         .values(&NewPeerBlobInventoryRow {
             peer_id: peer_id.to_string(),
-            blob_hash: blob_hash.to_string(),
+            blob_cid: blob_cid.to_string(),
             last_seen_at: "2026-05-11T12:00:00Z".to_string(),
-            source: "gossip-snapshot".to_string(),
+            source: "gossip-delta".to_string(),
             sequence: 1,
-            blake3_hash: None,
         })
         .execute(conn)
         .expect("insert inventory");
@@ -85,9 +84,21 @@ async fn end_to_end_projector_ack_surfaces_in_distribution_view() {
         insert_binding(&mut conn, "agent-replica-a", "12D3KooWa-e2e", "desktop");
         insert_binding(&mut conn, "agent-replica-b", "12D3KooWb-e2e", "mobile");
         insert_binding(&mut conn, "agent-replica-c", "12D3KooWc-e2e", "steward");
-        insert_inventory(&mut conn, "sha256-blobX-e2e", "12D3KooWa-e2e");
-        insert_inventory(&mut conn, "sha256-blobX-e2e", "12D3KooWb-e2e");
-        insert_inventory(&mut conn, "sha256-blobX-e2e", "12D3KooWc-e2e");
+        insert_inventory(
+            &mut conn,
+            "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
+            "12D3KooWa-e2e",
+        );
+        insert_inventory(
+            &mut conn,
+            "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
+            "12D3KooWb-e2e",
+        );
+        insert_inventory(
+            &mut conn,
+            "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
+            "12D3KooWc-e2e",
+        );
     }
 
     // Doorway acks projection.
@@ -95,7 +106,7 @@ async fn end_to_end_projector_ack_surfaces_in_distribution_view() {
         &pool,
         "ack-projection",
         "agent-doorway-e2e",
-        "sha256-blobX-e2e",
+        "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
         "u-action-X-e2e",
         "2026-05-11T12:00:00Z",
     )
@@ -103,10 +114,13 @@ async fn end_to_end_projector_ack_surfaces_in_distribution_view() {
     .unwrap();
 
     // Compose Visitor distribution summary.
-    let summary =
-        compose_distribution_summary(&pool, "sha256-blobX-e2e", DistributionContext::Visitor)
-            .await
-            .unwrap();
+    let summary = compose_distribution_summary(
+        &pool,
+        "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
+        DistributionContext::Visitor,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(summary.replica_count, 3, "3 replicas in inventory");
     assert_eq!(summary.projector_count, 1, "1 distinct doorway acked");
@@ -129,10 +143,13 @@ async fn end_to_end_projector_ack_surfaces_in_distribution_view() {
     }
 
     // Compose details — projector_identities should reflect the acking doorway.
-    let details =
-        compose_distribution_details(&pool, "sha256-blobX-e2e", DistributionContext::Visitor)
-            .await
-            .unwrap();
+    let details = compose_distribution_details(
+        &pool,
+        "bafkr4icrmizygpl5zwayqca3fypm63pyayimj6kcilphgar7qwagdliufa",
+        DistributionContext::Visitor,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         details.projector_identities.len(),
