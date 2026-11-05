@@ -716,6 +716,10 @@ fn derivation_unanswered(why: DerivationUnanswered) -> Unanswered<DerivationUnan
     }
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "derive_or_reuse's explicit policy and storage seams pass through unchanged to its lookup step"
+)]
 async fn accepted_output(
     index: &dyn DerivationIndex,
     trust: &dyn TrustPolicy,
