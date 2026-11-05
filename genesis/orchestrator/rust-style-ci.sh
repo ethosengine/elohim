@@ -2,6 +2,8 @@
 # The orchestrator runs this before it dispatches any downstream pipeline.
 set -euo pipefail
 style_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$style_root/genesis/orchestrator/rust-style-build-env.sh"
+rust_style_build_environment "$style_root" || exit $?
 cd "$style_root"
 if [[ -n "${CHANGE_TARGET:-}" ]]; then
   style_base="refs/remotes/origin/$CHANGE_TARGET"
@@ -30,7 +32,7 @@ if [[ "${1:-}" == --print-base ]]; then
   printf '%s\n' "$style_base"
   exit 0
 fi
-export CARGO_TARGET_DIR="$style_root/.rust-style-target" RUSTFLAGS="" RUSTC_WRAPPER="" CARGO_BUILD_JOBS=1
+export CARGO_TARGET_DIR="$style_root/.rust-style-target" RUSTFLAGS="" CARGO_BUILD_JOBS=1
 # The official Rust image uses the minimal profile.
 rustup component add rustfmt clippy
 cargo build --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml

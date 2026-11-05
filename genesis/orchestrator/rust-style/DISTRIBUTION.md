@@ -9,20 +9,19 @@ cites: []
 ## Addressed source holding
 
 The local Brit trial uses an explicit source-distribution mode, independent of
-registry publication. `source-distribution.py --out <directory>` produces a
-deterministic raw-CID-named tar.gz containing the unchanged checker source,
-manifests and lockfile plus its first-party dependencies (`eprfs-meta`,
-`eprfs-core`, `elohim-seam-contracts`). The dependencies retain their declared
-licenses; `LICENSE-NOTICES.txt` and their manifests travel with the sources.
+checker registry publication. `source-distribution.py --out <directory>` produces
+a deterministic raw-CID-named tar.gz containing the unchanged checker source,
+its path-only scanner crate, manifest, lockfile and checked-in Cargo registry
+configuration. The scanner has no EPRFS or seam-contract dependency. The archive does not carry
+source from the Elohim tree the checker polices. `eprfs-core =0.3.3`,
+`eprfs-meta =0.3.4` and transitive `elohim-seam-contracts` are immutable published
+packages from the `elohim` registry, pinned by checksums in `Cargo.lock`.
 
-The only projected build input is `elohim/eprfs/Cargo.toml`: its member list is
-reduced to core/meta, its inheritance tables remain verbatim, and unrelated
-members, the iroh patch and workspace-only profiles are omitted. The archive's
-`source-distribution.json` records that derivation, the original workspace CID,
-and every held file CID. This is an addressed local source holding, not a Cargo
-registry package or proof of publication. The third-party dependency versions and
-checksums remain locked to crates.io; initial installation requires their cache
-or network access. The installed checker can run offline.
+The archive's `source-distribution.json` records that registry closure and every
+held file CID. This is an addressed local source holding, not a Cargo registry
+package or proof of publication. Initial installation requires the pinned registry
+and crates.io dependencies to be cached or fetchable. The installed checker can
+then run offline.
 
 Brit holds the immutable archive under `.epr-meta/rust-style/objects/` and its
 locally adopted locator in `source.json`. Its Bash installer verifies the raw CID
@@ -44,19 +43,32 @@ final. A source change creates a new address; never overwrite an existing object
 The native method descriptor uses the exact compiled checker inputs, so the
 source distribution does not normalize the checker's own Cargo manifest.
 
-## Registry distribution is not supported by this method
+## Registry dependencies do not publish the checker
 
-The checker remains `publish = false`. Its compiled method includes the exact
-first-party dependency source inventory; an ordinary normalized Cargo package
-does not hold that sibling source layout. Merely publishing its dependencies
-would not make the checker package independently buildable. The earlier registry
-preparation was not a release and is superseded by the source-distribution mode.
+The checker remains `publish = false`. Publishing its dependencies makes the
+source archive independently buildable without any sibling checkout, but does not
+publish the checker or grant policy standing. The compiled method inventories the
+checker manifest and lockfile, not mutable copies of registry dependency sources.
 
-Future registry support would need an explicit packaging derivation that carries
-the same verified method inputs inside the package and a source-free qualification.
-Do not patch in local paths and call that registry qualification. The selected
-source archive already carries the original declared layout and can be built by
-a consumer with no Elohim checkout or registry credentials.
+Do not patch the dependencies back to local paths. A consumer builds the selected
+source archive with the registry endpoint declared by `.cargo/config.toml`. Cargo
+must be given `CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS=cargo:token` because the
+endpoint advertises `auth-required` even for anonymously served reads. The local
+and CI wrappers preserve an explicitly supplied `CARGO_REGISTRIES_ELOHIM_TOKEN`,
+or set its non-secret `anonymous` sentinel only when the variable is absent. That
+sentinel is repository precedent in `genesis/agentic/compute/Dockerfile.source`;
+publication credentials remain out of band and are never printed.
+
+The wrappers also pin Cargo's compiler and rustc-wrapper environment overrides,
+enter the repository root before invoking Cargo, refuse a legacy `.cargo/config`
+at the repository root or below it, and refuse `.cargo/config.toml` below the
+repository root through the checker directory. This is a contained defense for the
+compiled checker. It does not isolate user/global Cargo configuration such as
+`CARGO_HOME/config.toml` (normally `~/.cargo/config.toml`), or Cargo configuration
+in directories above the repository root. Those limitations, together with other
+unaccounted effective Cargo settings, remain out of scope and are tracked by
+[workspace-discipline backlog row 84](../../data/timeline/backlog/arch-workspace-discipline-backlog.md#row-84);
+no claim of full hostile-environment isolation is made here.
 
 Installation supplies a checker, not authority to apply a policy. The consuming
 space separately adopts an addressed rule and binds its scope, parameters and

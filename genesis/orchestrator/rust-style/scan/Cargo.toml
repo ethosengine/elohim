@@ -1,0 +1,15 @@
+[package]
+name = "elohim-rust-style-scan"
+version = "0.1.0"
+edition = "2021"
+publish = false
+build = false
+license = "Apache-2.0"
+description = "Syntax-only Rust suppression scanner"
+repository = "https://github.com/ethosengine/elohim"
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde = { version = "1", features = ["derive"] }
+syn = { version = "2", features = ["full", "visit"] }

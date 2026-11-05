@@ -3,22 +3,23 @@ name = "elohim-rust-style"
 version = "0.1.0"
 edition = "2021"
 publish = false
+build = false
 license = "Apache-2.0"
 description = "Repository Rust style diagnostics and monotonic debt gate"
 repository = "https://github.com/ethosengine/elohim"
-include = ["Cargo.toml", "Cargo.lock", "build.rs", "src/**", "tests/**", "DISTRIBUTION.md"]
+include = ["Cargo.toml", "Cargo.lock", "src/**", "tests/**", "scan/**", "DISTRIBUTION.md"]
 
 [workspace]
+members = ["scan"]
+resolver = "2"
 
 [dependencies]
-eprfs-core = { version = "=0.3.3", path = "../../../elohim/eprfs/eprfs-core", registry = "elohim" }
-eprfs-meta = { version = "=0.3.4", path = "../../../elohim/eprfs/eprfs-meta", registry = "elohim" }
-proc-macro2 = { version = "1", features = ["span-locations"] }
-quote = "1"
+elohim-rust-style-scan = { path = "scan" }
+eprfs-core = { version = "=0.3.3", registry = "elohim" }
+eprfs-meta = { version = "=0.3.4", registry = "elohim" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-syn = { version = "2", features = ["full", "visit"] }
 tempfile = "3"
 toml = "0.8"
 

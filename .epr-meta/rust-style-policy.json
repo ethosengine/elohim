@@ -9,16 +9,16 @@
   ],
   "discipline": {
     "policy": {
-      "cid": "bafkreifwkasecmtv5ttdzfueweybdfe7jsp6uqvdopfleus7cnuqpclmqy",
-      "path": ".epr-meta/rust-style/objects/bafkreifwkasecmtv5ttdzfueweybdfe7jsp6uqvdopfleus7cnuqpclmqy.json"
+      "cid": "bafkreib6zgok5h2gtmoz2zipvssjjzlzml2j53vu2xua3f6qevtbednsfy",
+      "path": ".epr-meta/rust-style/objects/bafkreib6zgok5h2gtmoz2zipvssjjzlzml2j53vu2xua3f6qevtbednsfy.json"
     },
     "guide": {
       "cid": "bafkreidv7yjl7bp5gls3uwbldjp5rdni3robbnbdfkxwsjvcnjn2wpt2j4",
       "path": "genesis/docs/rust-style-guide.md"
     },
     "method": {
-      "cid": "bafkreiewvto7v5fekguewshoryvmitmolyp5z7wxeutx7bs5bx5hgkn6za",
-      "path": ".epr-meta/rust-style/objects/bafkreiewvto7v5fekguewshoryvmitmolyp5z7wxeutx7bs5bx5hgkn6za.json"
+      "cid": "bafkreif2lxmrsvrqy2e3umw2auo5gq7oxkz3r6aqnwr2salcivq367uudm",
+      "path": ".epr-meta/rust-style/objects/bafkreif2lxmrsvrqy2e3umw2auo5gq7oxkz3r6aqnwr2salcivq367uudm.json"
     }
   }
 }

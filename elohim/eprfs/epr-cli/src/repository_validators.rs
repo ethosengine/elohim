@@ -68,7 +68,7 @@ impl ValidatorProvider for ElohimRepositoryValidators {
                 let Some(content) = request.write.content.as_deref() else {
                     return ValidatorOutcome::Unavailable;
                 };
-                match elohim_rust_style::scan::scan(&request.write.path, content) {
+                match elohim_rust_style_scan::scan(&request.write.path, content) {
                     Ok(findings) => (!findings.is_empty()).then(|| format!("RS-GOV-04 strict: {} unexplained suppression(s); add a meaningful reason", findings.len())),
                     Err(error) => Some(format!("Rust style UNMEASURED: {error}")),
                 }

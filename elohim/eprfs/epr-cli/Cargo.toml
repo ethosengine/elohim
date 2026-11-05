@@ -31,7 +31,7 @@ ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
 elohim-device-runtime = { path = "../device-runtime" }
 # `epr lsp`: the multiplexer, its attribution and its daemon.
 elohim-epr-lsp = { path = "../epr-lsp", optional = true }
-elohim-rust-style = { path = "../../../genesis/orchestrator/rust-style" }
+elohim-rust-style-scan = { path = "../../../genesis/orchestrator/rust-style/scan" }
 eprfs-core = { path = "../eprfs-core" }
 eprfs-agent = { path = "../eprfs-agent" }
 eprfs-host = { path = "../eprfs-host" }

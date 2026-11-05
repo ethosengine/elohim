@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the checker's declared first-party source closure, without publishing.
+"""Assemble the standalone checker's source, without vendoring registry crates.
 
 This is a checker-specific source distribution, not a Cargo registry package.
 The byte-addressed archive is a local holding; its CID confers no adoption authority.
@@ -16,13 +16,11 @@ import tomllib
 
 
 CHECKER = "genesis/orchestrator/rust-style"
-CRATES = (
-    CHECKER,
-    "elohim/eprfs/eprfs-meta",
-    "elohim/eprfs/eprfs-core",
-    "crates/seam-contracts",
-)
+SCAN = f"{CHECKER}/scan"
+CRATES = (CHECKER, SCAN)
 PREFIX = "rust-style-source/"
+CRATES_IO_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
+PUBLISHED_EPRFS = {"eprfs-core": "0.3.3", "eprfs-meta": "0.3.4"}
 
 
 def cid(data):
@@ -41,33 +39,11 @@ def read_file(root, relative):
     return path.read_bytes()
 
 
-def projected_workspace(original):
-    text = original.decode()
-    parsed = tomllib.loads(text)
-    required = {"eprfs-meta", "eprfs-core"}
-    if not required.issubset(parsed["workspace"]["members"]):
-        raise ValueError("expected eprfs members absent")
-    # Preserve inheritance declarations verbatim. Omitted members and the iroh-only
-    # patch cannot contribute to this closure; no crate source/manifest is patched.
-    sections = []
-    active = False
-    for line in text.splitlines(keepends=True):
-        if line.startswith("["):
-            active = line.strip() in ("[workspace.package]", "[workspace.dependencies]")
-        if active:
-            sections.append(line)
-    projected = '[workspace]\nresolver = "2"\nmembers = ["eprfs-core", "eprfs-meta"]\n\n' + "".join(sections)
-    result = tomllib.loads(projected)
-    for table in ("package", "dependencies"):
-        if result["workspace"][table] != parsed["workspace"][table]:
-            raise ValueError("workspace inheritance changed in projection")
-    return projected.encode()
-
-
 def source_files(root):
     root = root.resolve()
     files = {}
     known = {(root / crate).resolve() for crate in CRATES}
+    local_packages = set()
     licenses = []
     for crate in CRATES:
         directory = root / crate
@@ -81,9 +57,8 @@ def source_files(root):
                     if (directory / dependency["path"]).resolve() not in known:
                         raise ValueError(f"undeclared first-party dependency in {crate}")
         package = manifest["package"]
+        local_packages.add(package["name"])
         license_id = package.get("license", "Apache-2.0")
-        if isinstance(license_id, dict):
-            license_id = "Apache-2.0 (inherited from the included eprfs workspace)"
         licenses.append(f"{package['name']}: {license_id} (see its Cargo.toml)\n")
         paths = [directory / "Cargo.toml"]
         for name in ("Cargo.lock", "README.md", "DISTRIBUTION.md", "build.rs", "LICENSE", "LICENSE.txt", "COPYING"):
@@ -98,30 +73,45 @@ def source_files(root):
         for path in paths:
             relative = path.relative_to(root).as_posix()
             files[relative] = read_file(root, relative)
-    original = read_file(root, "elohim/eprfs/Cargo.toml")
-    files["elohim/eprfs/Cargo.toml"] = projected_workspace(original)
-    # Cargo resolves registry aliases even on versioned local path dependencies.
-    # This checked-in configuration declares endpoints/profiles, never credentials.
+    checker_manifest = tomllib.loads(files[f"{CHECKER}/Cargo.toml"].decode())
+    for name, version in PUBLISHED_EPRFS.items():
+        dependency = checker_manifest["dependencies"].get(name)
+        if not isinstance(dependency, dict) or dependency.get("version") != f"={version}":
+            raise ValueError(f"{name} must use exact published version {version}")
+        if dependency.get("registry") != "elohim" or "path" in dependency:
+            raise ValueError(f"{name} must resolve only from the elohim registry")
+    # This checked-in configuration declares the registry endpoint and profiles, never credentials.
     files[".cargo/config.toml"] = read_file(root, ".cargo/config.toml")
     for name in ("LICENSE", "LICENSE.txt", "LICENSE.md", "COPYING"):
         if (root / name).exists():
             files[name] = read_file(root, name)
     files["LICENSE-NOTICES.txt"] = ("Declared source licenses; this list does not relicense the component sources.\n" + "".join(licenses)).encode()
     lock = tomllib.loads(files[f"{CHECKER}/Cargo.lock"].decode())
-    names = {tomllib.loads(files[f"{crate}/Cargo.toml"].decode())["package"]["name"] for crate in CRATES}
+    registry = tomllib.loads(files[".cargo/config.toml"].decode())["registries"]["elohim"]["index"]
+    elohim_source = registry
+    packages = {(package["name"], package["version"]): package for package in lock["package"]}
     for package in lock["package"]:
-        if "source" not in package and package["name"] not in names:
+        if "source" not in package and package["name"] not in local_packages:
             raise ValueError(f"undeclared lockfile path package: {package['name']}")
-        if "source" in package and package["source"] != "registry+https://github.com/rust-lang/crates.io-index":
-            raise ValueError(f"unheld non-crates.io dependency: {package['name']}")
+        if "source" in package:
+            if package["source"] not in (CRATES_IO_SOURCE, elohim_source):
+                raise ValueError(f"unheld non-registry dependency: {package['name']}")
+            if not package.get("checksum"):
+                raise ValueError(f"registry dependency lacks checksum: {package['name']}")
+    for name, version in PUBLISHED_EPRFS.items():
+        package = packages.get((name, version))
+        if package is None or package.get("source") != elohim_source:
+            raise ValueError(f"lockfile does not pin {name} {version} from elohim")
+    seam = [package for package in lock["package"] if package["name"] == "elohim-seam-contracts"]
+    if len(seam) != 1 or seam[0].get("source") != elohim_source:
+        raise ValueError("lockfile does not pin elohim-seam-contracts from elohim")
     derivation = {
-        "format": "rust-style-source-distribution@1",
-        "purpose": "standalone source build; no registry publication or adoption asserted",
-        "workspaceProjection": {
-            "sourceCid": cid(original),
-            "members": ["eprfs-core", "eprfs-meta"],
-            "inheritance": "workspace.package and workspace.dependencies preserved verbatim",
-            "omitted": "unrelated members, iroh patch and workspace-only profiles",
+        "format": "rust-style-source-distribution@2",
+        "purpose": "standalone checker source build; no registry publication or adoption asserted",
+        "registryDependencies": {
+            "eprfs-core": "=0.3.3 from elohim, pinned by Cargo.lock checksum",
+            "eprfs-meta": "=0.3.4 from elohim, pinned by Cargo.lock checksum",
+            "elohim-seam-contracts": "transitive from elohim, pinned by Cargo.lock checksum",
         },
         "files": {path: cid(data) for path, data in sorted(files.items())},
     }

@@ -10,8 +10,6 @@ use std::{
     path::{Component, Path},
 };
 
-include!(concat!(env!("OUT_DIR"), "/method-dependencies.rs"));
-
 pub const MAX_OBJECT_BYTES: usize = eprfs_meta::MAX_REGISTRY_BYTES;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -70,11 +68,10 @@ fn terms() -> Value {
 }
 
 /// An installed checker identifies the source and dependency resolution it implements.
-/// Dependency source bytes are additionally pinned by its distribution archive.
+/// Cargo.lock pins registry dependency bytes by checksum.
 pub fn method_bytes() -> Result<Vec<u8>, String> {
     let sources: [(&str, &[u8]); 9] = [
         ("Cargo.toml", include_bytes!("../Cargo.toml")),
-        ("build.rs", include_bytes!("../build.rs")),
         (
             ".cargo/config.toml",
             include_bytes!(concat!(
@@ -86,37 +83,14 @@ pub fn method_bytes() -> Result<Vec<u8>, String> {
         ("src/lib.rs", include_bytes!("lib.rs")),
         ("src/main.rs", include_bytes!("main.rs")),
         ("src/repository.rs", include_bytes!("repository.rs")),
-        ("src/scan.rs", include_bytes!("scan.rs")),
         ("src/discipline.rs", include_bytes!("discipline.rs")),
+        ("scan/Cargo.toml", include_bytes!("../scan/Cargo.toml")),
+        ("scan/src/lib.rs", include_bytes!("../scan/src/lib.rs")),
     ];
-    let mut inventory: BTreeMap<_, _> = sources
+    let inventory: BTreeMap<_, _> = sources
         .into_iter()
-        .chain(DEPENDENCY_SOURCES.iter().copied())
         .map(|(name, bytes)| (name, BlobCid::compute_raw(bytes)))
         .collect();
-    // Distribution projects workspace membership but preserves these inherited
-    // package/dependency tables verbatim. Unrelated members are not method input.
-    let workspace = include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../../elohim/eprfs/Cargo.toml"
-    ));
-    let mut active = false;
-    let inheritance: String = workspace
-        .split_inclusive('\n')
-        .filter(|line| {
-            if line.starts_with('[') {
-                active = matches!(
-                    line.trim(),
-                    "[workspace.package]" | "[workspace.dependencies]"
-                );
-            }
-            active
-        })
-        .collect();
-    inventory.insert(
-        "eprfs-workspace-inheritance",
-        BlobCid::compute_raw(inheritance.as_bytes()),
-    );
     canonical(&json!({
         "format": "epr-rust-style-method@1",
         "checker": "elohim-rust-style",
