@@ -48,7 +48,7 @@ where
         action: ReaVerb::Produce,
         provider: AgentRef(put.manifest.record.computed_by.clone()),
         receiver: context.custodian.clone(),
-        resource: put.manifest.record.output.as_cid().clone(),
+        resource: *put.manifest.record.output.as_cid(),
         quantity: Magnitude::Count {
             value: put.manifest.byte_len as f64,
             unit: "bytes".into(),
@@ -67,7 +67,7 @@ where
     };
     flow.append(FlowRecord::Event(event))
         .map_err(|source| PeerError::LocalBlobUnrecorded {
-            manifest: put.manifest_cid.clone(),
+            manifest: Box::new(put.manifest_cid.clone()),
             source,
         })?;
     Ok(put)
@@ -94,18 +94,14 @@ where
     let draw = stream_tier_blob(store, manifest_cid, sink).await;
     let (resource, byte_len, outcome) = match &draw {
         TierBlobStreamDraw::Completed { manifest } => (
-            manifest.record.output.as_cid().clone(),
+            *manifest.record.output.as_cid(),
             manifest.byte_len as f64,
             "draw:hit".to_string(),
         ),
-        TierBlobStreamDraw::Miss { .. } => {
-            (manifest_cid.as_cid().clone(), 0.0, "draw:miss".to_string())
+        TierBlobStreamDraw::Miss { .. } => (*manifest_cid.as_cid(), 0.0, "draw:miss".to_string()),
+        TierBlobStreamDraw::Unavailable { .. } => {
+            (*manifest_cid.as_cid(), 0.0, "draw:unavailable".to_string())
         }
-        TierBlobStreamDraw::Unavailable { .. } => (
-            manifest_cid.as_cid().clone(),
-            0.0,
-            "draw:unavailable".to_string(),
-        ),
     };
     let mut classified_as = vec![
         "custody-blob".into(),
@@ -134,7 +130,7 @@ where
     };
     flow.append(FlowRecord::Event(event))
         .map_err(|source| PeerError::LocalBlobDrawUnrecorded {
-            manifest: manifest_cid.clone(),
+            manifest: Box::new(manifest_cid.clone()),
             source,
         })?;
     Ok(draw)

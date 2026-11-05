@@ -100,7 +100,7 @@ pub enum PeerError {
     /// manifest CID makes the partial state explicit so a caller can retry recording it.
     #[error("local tier blob {manifest} is persisted, unrecorded: {source}")]
     LocalBlobUnrecorded {
-        manifest: eprfs_core::BlobCid,
+        manifest: Box<eprfs_core::BlobCid>,
         #[source]
         source: elohim_epr_rea::FabricError,
     },
@@ -110,7 +110,7 @@ pub enum PeerError {
     /// instead of a completed draw.
     #[error("local tier blob draw for {manifest} is unrecorded: {source}")]
     LocalBlobDrawUnrecorded {
-        manifest: eprfs_core::BlobCid,
+        manifest: Box<eprfs_core::BlobCid>,
         #[source]
         source: elohim_epr_rea::FabricError,
     },
