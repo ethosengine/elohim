@@ -62,5 +62,5 @@ export async function verifyRawSha256(
   address: string
 ): Promise<boolean> {
   const form = addressForm(address);
-  return (form === 'raw' || form === 'legacy') && verifyAddress(address, bytes);
+  return form === 'raw' && verifyAddress(address, bytes);
 }
