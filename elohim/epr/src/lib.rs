@@ -55,7 +55,9 @@ pub use error::{EprError, Result};
 pub use kind::{CouplingLeg, EprKind};
 pub use proof::{sign, verify, AgentKeypair};
 pub use reach::Reach;
-pub use signature::{Multikey, Signature, SignatureCheck, SignatureEnvelope, SignatureScheme};
+pub use signature::{
+    Multikey, Signature, SignatureCheck, SignatureEnvelope, SignatureScheme, TranscriptError,
+};
 pub use validation::validate_coupling;
 pub use verdict::{
     CheckOutcome, CheckWitness, Decision, ReferQuestion, ReferReason, Verdict, Witness,

@@ -19,8 +19,9 @@ use chrono::{DateTime, Utc};
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 
-/// The exact bytes an Ed25519 signer of an EPR envelope signs: the scheme-0 transcript
-/// `EPR_SIGNATURE_DOMAIN ‖ u16be(EPR_SIGNATURE_EPOCH) ‖ 0000 ‖ (ed 01 ‖ public_key) ‖ canonical`.
+/// The exact bytes an Ed25519 signer of an EPR envelope signs: the scheme-0 transcript (v1)
+/// `000e ‖ EPR_SIGNATURE_DOMAIN ‖ u16be(EPR_SIGNATURE_EPOCH) ‖ 0000 ‖ 0022 ‖ (ed 01 ‖ public_key)
+/// ‖ canonical` ([`crate::signature::signing_transcript`]).
 /// For signers that hold the key elsewhere (a conductor's keystore): sign these bytes, then
 /// carry the result as `SignatureEnvelope::ed25519(public_key, sig)`.
 pub fn epr_signing_transcript(public_key: &[u8; 32], canonical: &[u8]) -> Vec<u8> {
@@ -31,6 +32,7 @@ pub fn epr_signing_transcript(public_key: &[u8; 32], canonical: &[u8]) -> Vec<u8
         Multikey::ed25519(public_key).as_bytes(),
         canonical,
     )
+    .expect("the EPR domain and a 34-byte Ed25519 multikey frame in transcript v1")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,7 +54,8 @@ impl Epr {
     /// 2. CID matches canonical-bytes hash
     /// 3. The proof's scheme is implemented (else [`EprError::SignatureHeld`])
     /// 4. The proof's key is `public_key` and its signature holds over the transcript
-    ///    `EPR_SIGNATURE_DOMAIN ‖ u16be(EPR_SIGNATURE_EPOCH) ‖ u16be(scheme) ‖ key ‖ canonical`
+    ///    of `(EPR_SIGNATURE_DOMAIN, EPR_SIGNATURE_EPOCH, scheme, key, canonical)` (transcript v1,
+    ///    [`crate::signature::signing_transcript`])
     pub fn verify_with_key(&self, public_key: &[u8; 32]) -> Result<()> {
         let canonical = self.envelope.canonical_bytes(&self.payload)?;
         let expected_cid = compute_cid(&canonical);

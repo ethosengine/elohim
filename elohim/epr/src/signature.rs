@@ -5,18 +5,29 @@
 //! context the envelope does not carry: its **domain** (the object type, e.g. `elohim:epr:v1:`)
 //! and its **object epoch**. Both are fixed by the verifier, never read from the attacker.
 //!
-//! # The signed transcript
+//! # The signed transcript (transcript version 1)
 //!
 //! ```text
-//! transcript = domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ key ‖ body
+//! transcript = u16be(len(domain)) ‖ domain
+//!            ‖ u16be(epoch) ‖ u16be(scheme)
+//!            ‖ u16be(len(key)) ‖ key
+//!            ‖ body
 //! ```
 //!
-//! `key` is the canonical multikey bytes (unsigned-varint codec, minimal, then the raw key) and
-//! `body` the object's exact signed bytes. Binding scheme and key into the transcript means a
-//! signature made under one scheme or key cannot be replayed as another; binding the epoch means
-//! an object cannot be reinterpreted under another epoch's rules. For scheme 0 the key is
-//! exactly 34 bytes (`ed 01 ‖ 32`), so the key/body boundary is fixed; domains are registered
-//! constants ending in `:` and the verifier supplies them.
+//! `domain` is the object type's registered tag (e.g. `elohim:epr:v1:`), `key` the canonical
+//! multikey bytes (unsigned-varint codec, minimal, then the raw key) and `body` the object's
+//! exact signed bytes. Every variable-length field before `body` is length-prefixed, so the
+//! transcript is injective in `(domain, epoch, scheme, key, body)`: no two distinct tuples
+//! produce the same bytes, whatever the domain spelling or key length. Binding scheme and key
+//! means a signature made under one scheme or key cannot be replayed as another; binding the
+//! epoch means an object cannot be reinterpreted under another epoch's rules. A domain or key
+//! longer than 65 535 bytes has no transcript ([`TranscriptError`]).
+//!
+//! This framing is **transcript version 1**. It replaced the unframed
+//! `domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ key ‖ body` of the first epoch-0 fixtures, in
+//! which `(D, K, ":" ‖ P ‖ B)` and `(D ‖ P ‖ ":", K, B)` collided; no signed object outside
+//! this sprint's regenerated fixtures was ever made under that framing. A future framing is a
+//! new transcript version, bound in by a new domain or epoch, never a silent change.
 //!
 //! # Outcomes
 //!
@@ -188,22 +199,47 @@ impl fmt::Display for Multikey {
     }
 }
 
-/// The bytes a signer signs and a verifier checks:
-/// `domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ key ‖ body`.
+/// Why a transcript cannot be framed: a length-prefixed field longer than `u16::MAX` bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum TranscriptError {
+    /// The domain is longer than 65 535 bytes.
+    #[error("signature domain is {len} bytes; at most 65535 frame")]
+    DomainTooLong {
+        /// The domain's length.
+        len: usize,
+    },
+    /// The key is longer than 65 535 bytes.
+    #[error("signature key is {len} bytes; at most 65535 frame")]
+    KeyTooLong {
+        /// The key's length.
+        len: usize,
+    },
+}
+
+/// The bytes a signer signs and a verifier checks (transcript version 1):
+/// `u16be(len(domain)) ‖ domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ u16be(len(key)) ‖ key ‖ body`.
+///
+/// Injective in its inputs; a domain or key longer than `u16::MAX` bytes is refused.
 pub fn signing_transcript(
     domain: &[u8],
     epoch: u16,
     scheme: u16,
     key: &[u8],
     body: &[u8],
-) -> Vec<u8> {
-    let mut t = Vec::with_capacity(domain.len() + 4 + key.len() + body.len());
+) -> Result<Vec<u8>, TranscriptError> {
+    let domain_len = u16::try_from(domain.len())
+        .map_err(|_| TranscriptError::DomainTooLong { len: domain.len() })?;
+    let key_len =
+        u16::try_from(key.len()).map_err(|_| TranscriptError::KeyTooLong { len: key.len() })?;
+    let mut t = Vec::with_capacity(2 + domain.len() + 6 + key.len() + body.len());
+    t.extend_from_slice(&domain_len.to_be_bytes());
     t.extend_from_slice(domain);
     t.extend_from_slice(&epoch.to_be_bytes());
     t.extend_from_slice(&scheme.to_be_bytes());
+    t.extend_from_slice(&key_len.to_be_bytes());
     t.extend_from_slice(key);
     t.extend_from_slice(body);
-    t
+    Ok(t)
 }
 
 /// The outcome of checking an envelope.
@@ -249,6 +285,11 @@ impl SignatureEnvelope {
     }
 
     /// Sign `body` under `domain` and `epoch` with scheme 0.
+    ///
+    /// # Panics
+    ///
+    /// When `domain` is longer than 65 535 bytes. Domains are registered constants a program
+    /// supplies, never wire input.
     pub fn sign_ed25519(kp: &AgentKeypair, domain: &[u8], epoch: u16, body: &[u8]) -> Self {
         let key = Multikey::ed25519(&kp.public_key_bytes());
         let transcript = signing_transcript(
@@ -257,13 +298,19 @@ impl SignatureEnvelope {
             SignatureScheme::Ed25519.code(),
             key.as_bytes(),
             body,
-        );
+        )
+        .expect("a registered domain and a 34-byte Ed25519 multikey frame in transcript v1");
         let sig = kp.signing_key().sign(&transcript).to_bytes();
         SignatureEnvelope::ed25519(&kp.public_key_bytes(), sig)
     }
 
     /// This envelope's transcript for `body` under `domain` and `epoch`.
-    pub fn transcript(&self, domain: &[u8], epoch: u16, body: &[u8]) -> Vec<u8> {
+    pub fn transcript(
+        &self,
+        domain: &[u8],
+        epoch: u16,
+        body: &[u8],
+    ) -> Result<Vec<u8>, TranscriptError> {
         signing_transcript(domain, epoch, self.scheme, &self.key, body)
     }
 
@@ -272,7 +319,7 @@ impl SignatureEnvelope {
         Multikey::from_bytes(self.key.clone())
     }
 
-    /// Check the signature over `domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ key ‖ body`.
+    /// Check the signature over the transcript-v1 bytes of `(domain, epoch, scheme, key, body)`.
     ///
     /// Unknown scheme → `Held`; scheme 0 with a key that is not a canonical 34-byte Ed25519
     /// multikey, a signature that is not 64 bytes, or a failing strict verification → `Invalid`.
@@ -292,15 +339,14 @@ impl SignatureEnvelope {
                 else {
                     return SignatureCheck::Invalid;
                 };
-                let (Ok(vk), Ok(sig)) =
-                    (VerifyingKey::from_bytes(&raw), EdSig::from_slice(&self.sig))
-                else {
+                let (Ok(vk), Ok(sig), Ok(transcript)) = (
+                    VerifyingKey::from_bytes(&raw),
+                    EdSig::from_slice(&self.sig),
+                    self.transcript(domain, epoch, body),
+                ) else {
                     return SignatureCheck::Invalid;
                 };
-                if vk
-                    .verify_strict(&self.transcript(domain, epoch, body), &sig)
-                    .is_ok()
-                {
+                if vk.verify_strict(&transcript, &sig).is_ok() {
                     SignatureCheck::Verified
                 } else {
                     SignatureCheck::Invalid

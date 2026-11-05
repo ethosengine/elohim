@@ -297,38 +297,72 @@ pub fn fastcdc_2020_table_digest() -> String {
         .collect()
 }
 
-/// Cut `bytes` into chunks under `profile`'s chunker: `(offset, length)` pairs in order,
-/// covering `bytes` exactly. Empty input yields no chunks.
+/// A [`ByteProfile`] that passed [`ByteProfile::validate`]: a known epoch, the epoch's
+/// address triple, and chunker and erasure parameters inside their admitted ranges.
 ///
-/// # Panics
-///
-/// When the profile's chunker parameters are outside the admitted ranges. A profile read from
-/// the wire goes through [`try_chunk_bytes`] (or [`ByteProfile::validate`]) first.
-pub fn chunk_bytes(profile: &ByteProfile, bytes: &[u8]) -> Vec<(usize, usize)> {
-    try_chunk_bytes(profile, bytes).expect("chunk_bytes requires admitted chunker parameters")
+/// The only ways to hold one are [`ValidatedProfile::new`] (which validates) and
+/// [`ValidatedProfile::EPOCH_0`]; a profile read from the wire cannot reach [`chunk_bytes`]
+/// without passing through validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ValidatedProfile(ByteProfile);
+
+impl ValidatedProfile {
+    /// The epoch-0 byte profile, validated (`epoch_zero_profiles_are_admitted` pins it).
+    pub const EPOCH_0: ValidatedProfile = ValidatedProfile(BYTE_PROFILE_0);
+
+    /// Admit `profile` by [`ByteProfile::validate`].
+    pub fn new(profile: ByteProfile) -> Result<ValidatedProfile, ProfileError> {
+        profile.validate()?;
+        Ok(ValidatedProfile(profile))
+    }
+
+    /// The validated profile.
+    pub fn profile(&self) -> &ByteProfile {
+        &self.0
+    }
 }
 
-/// [`chunk_bytes`], refusing chunker parameters outside the admitted ranges.
-pub fn try_chunk_bytes(
-    profile: &ByteProfile,
-    bytes: &[u8],
-) -> Result<Vec<(usize, usize)>, ProfileError> {
-    profile.chunker.validate()?;
+impl TryFrom<ByteProfile> for ValidatedProfile {
+    type Error = ProfileError;
+
+    fn try_from(profile: ByteProfile) -> Result<Self, Self::Error> {
+        ValidatedProfile::new(profile)
+    }
+}
+
+/// The fastcdc parameters of an admitted chunker, as the reference implementation takes them.
+fn fastcdc_parameters(chunker: &Chunker) -> (usize, usize, usize, Normalization) {
     let Chunker::Fastcdc2020 {
         min,
         avg,
         max,
         level,
-    } = profile.chunker;
-    Ok(FastCDC::with_level(
-        bytes,
+    } = *chunker;
+    (
         min as usize,
         avg as usize,
         max as usize,
         Chunker::normalization(level),
     )
-    .map(|c| (c.offset, c.length))
-    .collect())
+}
+
+/// Cut `bytes` into chunks under a validated profile's chunker: `(offset, length)` pairs in
+/// order, covering `bytes` exactly. Empty input yields no chunks.
+pub fn chunk_bytes(profile: &ValidatedProfile, bytes: &[u8]) -> Vec<(usize, usize)> {
+    let (min, avg, max, level) = fastcdc_parameters(&profile.0.chunker);
+    FastCDC::with_level(bytes, min, avg, max, level)
+        .map(|c| (c.offset, c.length))
+        .collect()
+}
+
+/// [`chunk_bytes`] for a profile that has not been validated (one read from the wire): the
+/// whole profile is validated first — epoch, address triple, chunker and erasure — and
+/// refused, never chunked, when any part is outside what this crate admits.
+pub fn try_chunk_bytes(
+    profile: &ByteProfile,
+    bytes: &[u8],
+) -> Result<Vec<(usize, usize)>, ProfileError> {
+    Ok(chunk_bytes(&ValidatedProfile::new(*profile)?, bytes))
 }
 
 /// One chunk cut from a stream.
@@ -361,26 +395,16 @@ impl<R: Read> Iterator for ChunkStream<R> {
 }
 
 /// Cut a reader's bytes into chunks under `profile`'s chunker, holding at most one maximum
-/// chunk in memory.
+/// chunk in memory. The whole profile is validated first (epoch, address triple, chunker and
+/// erasure); a profile outside what this crate admits is refused before any byte is read.
 pub fn chunk_stream<R: Read>(
     profile: &ByteProfile,
     reader: R,
 ) -> Result<ChunkStream<R>, ProfileError> {
-    profile.chunker.validate()?;
-    let Chunker::Fastcdc2020 {
-        min,
-        avg,
-        max,
-        level,
-    } = profile.chunker;
+    let profile = ValidatedProfile::new(*profile)?;
+    let (min, avg, max, level) = fastcdc_parameters(&profile.0.chunker);
     Ok(ChunkStream {
-        inner: StreamCDC::with_level(
-            reader,
-            min as usize,
-            avg as usize,
-            max as usize,
-            Chunker::normalization(level),
-        ),
+        inner: StreamCDC::with_level(reader, min, avg, max, level),
     })
 }
 
@@ -397,6 +421,11 @@ mod tests {
     #[test]
     fn epoch_zero_profiles_are_admitted() {
         BYTE_PROFILE_0.validate().unwrap();
+        assert_eq!(
+            ValidatedProfile::new(BYTE_PROFILE_0),
+            Ok(ValidatedProfile::EPOCH_0)
+        );
+        assert_eq!(ValidatedProfile::EPOCH_0.profile(), &BYTE_PROFILE_0);
         assert_eq!(BYTE_PROFILE_0.chunker.id(), "fastcdc-2020");
         assert_eq!(BYTE_PROFILE_0.erasure.id(), "rs-gf8-0x11d-v1");
         assert_eq!(Erasure::None.id(), "none");
@@ -454,9 +483,66 @@ mod tests {
         assert!(rs.validate().is_err());
     }
 
+    /// Every part of a wire profile is checked before either fallible entry point chunks:
+    /// an unknown epoch, a wrong address codec or multihash, and erasure parameters that build
+    /// no code are refused even when the chunker parameters themselves are admitted.
+    #[test]
+    fn fallible_chunking_validates_the_whole_profile() {
+        let mut epoch = BYTE_PROFILE_0;
+        epoch.epoch = 1;
+        let mut codec = BYTE_PROFILE_0;
+        codec.codec = 0x71;
+        let mut multihash = BYTE_PROFILE_0;
+        multihash.multihash = 0x12;
+        let mut erasure = BYTE_PROFILE_0;
+        erasure.erasure = Erasure::RsGf8x11dV1 { data: 0, parity: 3 };
+        let mut too_many = BYTE_PROFILE_0;
+        too_many.erasure = Erasure::RsGf8x11dV1 {
+            data: 200,
+            parity: 100,
+        };
+        let cases = [
+            (epoch, ProfileError::UnknownEpoch(1)),
+            (
+                codec,
+                ProfileError::AddressTriple {
+                    codec: 0x71,
+                    multihash: 0x1e,
+                },
+            ),
+            (
+                multihash,
+                ProfileError::AddressTriple {
+                    codec: 0x55,
+                    multihash: 0x12,
+                },
+            ),
+            (erasure, ProfileError::ErasureParameters(erasure.erasure)),
+            (too_many, ProfileError::ErasureParameters(too_many.erasure)),
+        ];
+        for (profile, expected) in cases {
+            assert!(
+                profile.chunker.validate().is_ok(),
+                "chunker itself admitted"
+            );
+            assert_eq!(try_chunk_bytes(&profile, b"abc"), Err(expected.clone()));
+            assert_eq!(
+                chunk_stream(&profile, &b"abc"[..]).err(),
+                Some(expected.clone())
+            );
+            assert_eq!(ValidatedProfile::new(profile), Err(expected.clone()));
+            assert_eq!(ValidatedProfile::try_from(profile), Err(expected));
+        }
+        // The admitted profile chunks through both entry points identically.
+        assert_eq!(
+            try_chunk_bytes(&BYTE_PROFILE_0, b"abc"),
+            Ok(chunk_bytes(&ValidatedProfile::EPOCH_0, b"abc"))
+        );
+    }
+
     #[test]
     fn empty_input_is_zero_chunks() {
-        assert!(chunk_bytes(&BYTE_PROFILE_0, b"").is_empty());
+        assert!(chunk_bytes(&ValidatedProfile::EPOCH_0, b"").is_empty());
         assert_eq!(chunk_stream(&BYTE_PROFILE_0, &b""[..]).unwrap().count(), 0);
     }
 }

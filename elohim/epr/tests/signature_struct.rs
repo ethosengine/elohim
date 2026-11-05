@@ -5,7 +5,7 @@ use cid::Cid;
 use elohim_epr::proof::AgentKeypair;
 use elohim_epr::signature::{
     signing_transcript, Multikey, MultikeyError, Signature, SignatureCheck, SignatureEnvelope,
-    SignatureScheme, ED25519_PUB_MULTICODEC,
+    SignatureScheme, TranscriptError, ED25519_PUB_MULTICODEC,
 };
 
 const DOMAIN: &[u8] = b"elohim:test:v0:";
@@ -18,13 +18,13 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// The envelope vector, derived outside this crate with @noble/ed25519 over the transcript
-/// `"elohim:test:v0:" ‖ 0000 ‖ 0000 ‖ ed01 ‖ pk ‖ "abc"`; the multikey text with a
-/// hand-written base58btc encoder.
+/// The envelope vector, derived outside this crate with @noble/ed25519 over the transcript-v1
+/// bytes `000f ‖ "elohim:test:v0:" ‖ 0000 ‖ 0000 ‖ 0022 ‖ ed01 ‖ pk ‖ "abc"`, framed by hand;
+/// the multikey text with a hand-written base58btc encoder.
 const VECTOR_PUBLIC_KEY: &str = "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61";
 const VECTOR_MULTIKEY: &str = "z6MkgAnvkP45uNxwCKeNdt6wrYkEjpYX4f7Nrd8MQqFL8Fbn";
-const VECTOR_TRANSCRIPT: &str = "656c6f68696d3a746573743a76303a00000000ed01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61616263";
-const VECTOR_SIG: &str = "c4fd4e360b90f5841f217ad29fe0e2e3661990cb059cd3569b1762e61a97197417ca8204213e5037a000a6b4a772c76d88d3aabad2ae21737b7be9239c769a06";
+const VECTOR_TRANSCRIPT: &str = "000f656c6f68696d3a746573743a76303a000000000022ed01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61616263";
+const VECTOR_SIG: &str = "e70b241c0e9a88696849cc40901f4856da3fab9909dda129358f56e0d15a27947fef04767fa469767eff6d2c24117f1ba691a3cc1edf761a5d711c0a582af90e";
 
 fn vector_key() -> AgentKeypair {
     AgentKeypair::from_secret(&[42u8; 32]).unwrap()
@@ -41,9 +41,12 @@ fn envelope_vector() {
     let env = SignatureEnvelope::sign_ed25519(&kp, DOMAIN, 0, b"abc");
     assert_eq!(env.scheme, 0);
     assert_eq!(env.key, key.as_bytes());
-    assert_eq!(hex(&env.transcript(DOMAIN, 0, b"abc")), VECTOR_TRANSCRIPT);
     assert_eq!(
-        hex(&signing_transcript(DOMAIN, 0, 0, key.as_bytes(), b"abc")),
+        hex(&env.transcript(DOMAIN, 0, b"abc").unwrap()),
+        VECTOR_TRANSCRIPT
+    );
+    assert_eq!(
+        hex(&signing_transcript(DOMAIN, 0, 0, key.as_bytes(), b"abc").unwrap()),
         VECTOR_TRANSCRIPT
     );
     assert_eq!(hex(&env.sig), VECTOR_SIG);
@@ -145,7 +148,7 @@ fn transcript_binds_epoch_and_scheme() {
     );
     // The scheme code is inside the transcript: the same bytes signed as if under another
     // scheme number do not verify as scheme 0.
-    let foreign = signing_transcript(DOMAIN, 0, 1, &env.key, b"abc");
+    let foreign = signing_transcript(DOMAIN, 0, 1, &env.key, b"abc").unwrap();
     let sig = elohim_epr::proof::sign(&kp, &foreign);
     let relabelled = SignatureEnvelope {
         scheme: 0,
@@ -160,6 +163,83 @@ fn transcript_binds_epoch_and_scheme() {
         sig: elohim_epr::proof::sign(&kp, b"abc"),
     };
     assert_eq!(bare.check(DOMAIN, 0, b"abc"), SignatureCheck::Invalid);
+}
+
+/// Transcript v1 is injective. The review's pair: with `K` a valid Ed25519 multikey,
+/// `P = 00000000 ‖ K`, `D = "elohim:test:v0:"` and `B = "abc"`, the unframed rule mapped
+/// `(D, K, ":" ‖ P ‖ B)` and `(D ‖ P ‖ ":", K, B)` to the same bytes at epoch/scheme 0.
+#[test]
+fn transcript_collision_regression_domain_and_body() {
+    let k = Multikey::ed25519(&vector_key().public_key_bytes());
+    let mut p = vec![0u8, 0, 0, 0];
+    p.extend_from_slice(k.as_bytes());
+    let mut body_a = b":".to_vec();
+    body_a.extend_from_slice(&p);
+    body_a.extend_from_slice(b"abc");
+    let mut domain_b = DOMAIN.to_vec();
+    domain_b.extend_from_slice(&p);
+    domain_b.extend_from_slice(b":");
+
+    // The old framing collided — the regression this test pins.
+    let unframed =
+        |d: &[u8], key: &[u8], body: &[u8]| -> Vec<u8> { [d, &[0, 0, 0, 0], key, body].concat() };
+    assert_eq!(
+        unframed(DOMAIN, k.as_bytes(), &body_a),
+        unframed(&domain_b, k.as_bytes(), b"abc")
+    );
+    let a = signing_transcript(DOMAIN, 0, 0, k.as_bytes(), &body_a).unwrap();
+    let b = signing_transcript(&domain_b, 0, 0, k.as_bytes(), b"abc").unwrap();
+    assert_ne!(a, b);
+
+    // And a signature over one never verifies as the other.
+    let kp = vector_key();
+    let env = SignatureEnvelope::sign_ed25519(&kp, DOMAIN, 0, &body_a);
+    assert_eq!(env.check(DOMAIN, 0, &body_a), SignatureCheck::Verified);
+    assert_eq!(env.check(&domain_b, 0, b"abc"), SignatureCheck::Invalid);
+}
+
+/// Unrestricted key lengths let `(D, K ‖ x, B)` and `(D, K, x ‖ B)` share bytes under the unframed
+/// rule; the key's length prefix separates them.
+#[test]
+fn transcript_collision_regression_key_length() {
+    let k = Multikey::ed25519(&vector_key().public_key_bytes());
+    let mut kx = k.as_bytes().to_vec();
+    kx.push(b'x');
+    let a = signing_transcript(DOMAIN, 0, 0, &kx, b"abc").unwrap();
+    let b = signing_transcript(DOMAIN, 0, 0, k.as_bytes(), b"xabc").unwrap();
+    assert_ne!(a, b);
+    // Every field boundary moves the bytes: the same concatenation split differently differs.
+    let c = signing_transcript(b"elohim:test:v0", 0, 0, k.as_bytes(), b":abc").unwrap();
+    let d = signing_transcript(DOMAIN, 0, 0, k.as_bytes(), b"abc").unwrap();
+    assert_ne!(c, d);
+}
+
+#[test]
+fn transcript_frames_lengths_and_refuses_overlong_fields() {
+    let t = signing_transcript(b"d", 0x0102, 0x0304, &[9, 9], b"zz").unwrap();
+    assert_eq!(t, [0, 1, b'd', 1, 2, 3, 4, 0, 2, 9, 9, b'z', b'z']);
+    let max = vec![0u8; usize::from(u16::MAX)];
+    assert!(signing_transcript(&max, 0, 0, &max, b"").is_ok());
+    let over = vec![0u8; usize::from(u16::MAX) + 1];
+    assert_eq!(
+        signing_transcript(&over, 0, 0, b"k", b""),
+        Err(TranscriptError::DomainTooLong { len: over.len() })
+    );
+    assert_eq!(
+        signing_transcript(DOMAIN, 0, 0, &over, b""),
+        Err(TranscriptError::KeyTooLong { len: over.len() })
+    );
+    // An envelope whose key cannot be framed is Invalid under scheme 0 and still Held under an
+    // unknown scheme; it never panics.
+    let mut env = SignatureEnvelope::sign_ed25519(&vector_key(), DOMAIN, 0, b"abc");
+    env.key = over.clone();
+    assert!(env.transcript(DOMAIN, 0, b"abc").is_err());
+    assert_eq!(env.check(DOMAIN, 0, b"abc"), SignatureCheck::Invalid);
+    env.scheme = 3;
+    assert_eq!(
+        env.check(DOMAIN, 0, b"abc"),
+        SignatureCheck::Held { scheme: 3 }
+    );
 }
 
 #[test]

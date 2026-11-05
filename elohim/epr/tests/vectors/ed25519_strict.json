@@ -1,0 +1,74 @@
+[
+  {
+    "label": "valid-torsion-free",
+    "about": "A = aB, R = rB, S = r + ka: both equations hold.",
+    "public_key_hex": "6a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a086",
+    "body_hex": "61626300",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed016a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a08661626300",
+    "signature_hex": "5d87aad5911f97c1ef4434b205526db92480ada8a320378349200554f26cff7b59eea9f274f87178826ccb46ed6a63955fbb10f9c0d119a341e18281490da10d",
+    "strict": "accept"
+  },
+  {
+    "label": "non-canonical-s",
+    "about": "The valid signature with S + L: S must be < L.",
+    "public_key_hex": "6a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a086",
+    "body_hex": "61626300",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed016a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a08661626300",
+    "signature_hex": "5d87aad5911f97c1ef4434b205526db92480ada8a320378349200554f26cff7b46c29f4f8f5b84d05809c3e9cb6442aa5fbb10f9c0d119a341e18281490da11d",
+    "strict": "reject"
+  },
+  {
+    "label": "small-order-r-cofactored-only",
+    "about": "A = B, R = (0,-1) of order 2, S = SHA512(R||A||M) mod L.",
+    "public_key_hex": "5866666666666666666666666666666666666666666666666666666666666666",
+    "body_hex": "616263",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed015866666666666666666666666666666666666666666666666666666666666666616263",
+    "signature_hex": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f94c526936f169a7605d7fa958ad6a0f819578b598e36badf65f44adfa84b7e05",
+    "strict": "reject"
+  },
+  {
+    "label": "small-order-r-equation-holds",
+    "about": "A = aB + T2, R = T2 = (0,-1), S = ka with k odd: [S]B - [k]A = R exactly; only the small-order R check refuses.",
+    "public_key_hex": "8366806ac99915b74465adb6fb7d1b5d98974bef708859205a9ba638dbb75f79",
+    "body_hex": "61626301",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed018366806ac99915b74465adb6fb7d1b5d98974bef708859205a9ba638dbb75f7961626301",
+    "signature_hex": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f1beb929902b1f3547f4a19a4887ab762cae85393abc7e0585a676e142980b306",
+    "strict": "reject"
+  },
+  {
+    "label": "small-order-a-identity",
+    "about": "A = identity, R = identity, S = 0: the equation holds; A is small-order.",
+    "public_key_hex": "0100000000000000000000000000000000000000000000000000000000000000",
+    "body_hex": "616263",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed010100000000000000000000000000000000000000000000000000000000000000616263",
+    "signature_hex": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "strict": "reject"
+  },
+  {
+    "label": "mixed-torsion-a",
+    "about": "A = aB + T8, R = rB, S = r + ka, k mod 8 != 0: only the cofactored equation holds.",
+    "public_key_hex": "2771d93ff41b1a3ef04b6ee65d40cfe750c6a4ee9903fc19033bebbed1002e60",
+    "body_hex": "61626302",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed012771d93ff41b1a3ef04b6ee65d40cfe750c6a4ee9903fc19033bebbed1002e6061626302",
+    "signature_hex": "5d87aad5911f97c1ef4434b205526db92480ada8a320378349200554f26cff7b57ce58b9b8acf9d6b4e53e68105f7ae7317473b0fde9847f255b5506859d8a0c",
+    "strict": "reject"
+  },
+  {
+    "label": "mixed-torsion-a-k-multiple-of-8",
+    "about": "A = aB + T8, k mod 8 == 0: [k]T8 vanishes, the uncofactored equation holds; dalek accepts a mixed-torsion key.",
+    "public_key_hex": "2771d93ff41b1a3ef04b6ee65d40cfe750c6a4ee9903fc19033bebbed1002e60",
+    "body_hex": "61626300",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed012771d93ff41b1a3ef04b6ee65d40cfe750c6a4ee9903fc19033bebbed1002e6061626300",
+    "signature_hex": "5d87aad5911f97c1ef4434b205526db92480ada8a320378349200554f26cff7b38e065b4323e5d86026bf46d05761746981939bbeebf93dcdd73180fbc1e480e",
+    "strict": "accept"
+  },
+  {
+    "label": "mixed-torsion-r",
+    "about": "A = aB, R = rB + T8, S = r + ka: only the cofactored equation holds.",
+    "public_key_hex": "6a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a086",
+    "body_hex": "61626300",
+    "transcript_hex": "000f656c6f68696d3a746573743a76303a000000000022ed016a997f953666ea48bb9a52490482e4a26768b4108f77a6dfa56459c72448a08661626300",
+    "signature_hex": "9c8eb6d467d823ebce6866618b01a5170ed52d1dc1b9a9b85e1b6f127180357f59b3a97ed058571bce38c63da9dabd6b5d8ed385a4e14d13b02c5bc17ff15002",
+    "strict": "reject"
+  }
+]

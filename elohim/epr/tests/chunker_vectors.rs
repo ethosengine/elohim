@@ -17,8 +17,8 @@ use std::path::PathBuf;
 
 use elohim_epr::cid::compute_bytes_cid;
 use elohim_epr::profile::{
-    chunk_bytes, chunk_stream, fastcdc_2020_table_digest, Chunker, BYTE_PROFILE_0,
-    FASTCDC_2020_TABLE_DIGEST,
+    chunk_bytes, chunk_stream, fastcdc_2020_table_digest, Chunker, ValidatedProfile,
+    BYTE_PROFILE_0, FASTCDC_2020_TABLE_DIGEST,
 };
 use serde_json::{json, Value};
 
@@ -230,7 +230,7 @@ fn chunker_vector_is_stable() {
         .iter()
         .map(|f| {
             let bytes = input(f);
-            let chunks = chunk_bytes(&BYTE_PROFILE_0, &bytes);
+            let chunks = chunk_bytes(&ValidatedProfile::EPOCH_0, &bytes);
             assert_eq!(
                 chunks,
                 spec_chunks(&bytes, MIN, AVG, MAX, 1),
@@ -305,7 +305,7 @@ fn fixture_shapes_hold() {
     let by_name = |name: &str| {
         let f = fixtures().into_iter().find(|f| f.name == name).unwrap();
         let bytes = input(&f);
-        chunk_bytes(&BYTE_PROFILE_0, &bytes)
+        chunk_bytes(&ValidatedProfile::EPOCH_0, &bytes)
     };
     assert!(by_name("empty").is_empty());
     assert_eq!(by_name("365B"), vec![(0, 365)]);
@@ -330,7 +330,7 @@ fn streaming_splits_equal_one_shot() {
             continue;
         }
         let bytes = input(&f);
-        let one_shot = chunk_bytes(&BYTE_PROFILE_0, &bytes);
+        let one_shot = chunk_bytes(&ValidatedProfile::EPOCH_0, &bytes);
         for split in [1024, 7 * 1024, 1024 * 1024 + 1] {
             let streamed: Vec<(usize, usize)> = chunk_stream(
                 &BYTE_PROFILE_0,
