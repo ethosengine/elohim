@@ -644,8 +644,16 @@ mod tests {
 
     #[test]
     fn two_runners_never_share_a_lease() {
-        let a = hosted_owner(RUNNER, "bafkrei-task").expect("owner");
-        let b = hosted_owner(RUNNER_B, "bafkrei-task").expect("owner");
+        let a = hosted_owner(
+            RUNNER,
+            "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+        )
+        .expect("owner");
+        let b = hosted_owner(
+            RUNNER_B,
+            "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+        )
+        .expect("owner");
         assert_ne!(a, b, "the same task CID names two different leases");
         assert!(a.starts_with("hosted:uhCAk-runner:"));
         assert_eq!(hosted_owner("", "t"), None);
@@ -669,10 +677,10 @@ mod tests {
     }
 
     fn completed_task(requester: &str) -> Value {
-        json!({"requester":requester,"provider":"uhCAk-jessica","taskCid":"bafkrei-task",
+        json!({"requester":requester,"provider":"uhCAk-jessica","taskCid":"bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
             "completion":{"receipt":{"logs":[
-                {"name":"stdout.log","chunks":[{"cid":"bafkrei-out-1"},{"cid":"bafkrei-out-2"}]},
-                {"name":"witness.json","chunks":[{"cid":"bafkrei-witness"}]}]}}})
+                {"name":"stdout.log","chunks":[{"cid":"bafkr4ifvtzjrxwgb6i5dsop2brrrzbazjteneq7kwqmqepsbkvim5u7hjm"},{"cid":"bafkr4igy6y2vhgs2a67kjtyatkoo4wnx5ybz6guovj2dawi2pzyi4kj7yu"}]},
+                {"name":"witness.json","chunks":[{"cid":"bafkr4ien63dvqlniu4fqyg6vwaenw7ft2lc46jkfxqwu37ftu7uq2sxkyq"}]}]}}})
     }
 
     #[test]
@@ -681,32 +689,47 @@ mod tests {
         assert!(task_output_admits(
             &task,
             RUNNER,
-            "bafkrei-task",
-            "bafkrei-out-2"
+            "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+            "bafkr4igy6y2vhgs2a67kjtyatkoo4wnx5ybz6guovj2dawi2pzyi4kj7yu"
         ));
         assert!(task_output_admits(
             &task,
             RUNNER,
-            "bafkrei-task",
-            "bafkrei-witness"
+            "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+            "bafkr4ien63dvqlniu4fqyg6vwaenw7ft2lc46jkfxqwu37ftu7uq2sxkyq"
         ));
         assert!(
-            !task_output_admits(&task, RUNNER_B, "bafkrei-task", "bafkrei-out-2"),
+            !task_output_admits(
+                &task,
+                RUNNER_B,
+                "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+                "bafkr4igy6y2vhgs2a67kjtyatkoo4wnx5ybz6guovj2dawi2pzyi4kj7yu"
+            ),
             "another runner cannot read this task's outputs"
         );
         assert!(
-            !task_output_admits(&task, RUNNER, "bafkrei-other-task", "bafkrei-out-2"),
+            !task_output_admits(
+                &task,
+                RUNNER,
+                "bafkr4ih36i2qo2u7wqmx22gfwmuqbk4gmrosskv34vtwk4azm5bfakdyuu",
+                "bafkr4igy6y2vhgs2a67kjtyatkoo4wnx5ybz6guovj2dawi2pzyi4kj7yu"
+            ),
             "the named owner must be this task"
         );
         assert!(
-            !task_output_admits(&task, RUNNER, "bafkrei-task", "bafkrei-anything"),
+            !task_output_admits(
+                &task,
+                RUNNER,
+                "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+                "bafkr4ifai6m2axly2xcpofjvbp3shrmicmqobyfty2mkxdetc7jcipykcm"
+            ),
             "an unlisted chunk is not an output of this task"
         );
         assert!(!task_output_admits(
-            &json!({"requester":RUNNER,"taskCid":"bafkrei-task"}),
+            &json!({"requester":RUNNER,"taskCid":"bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm"}),
             RUNNER,
-            "bafkrei-task",
-            "bafkrei-out-1"
+            "bafkr4icdwbv4mhq3jfj2l727asabs7d7nfeoccwikd3xz7lxwupuf5p5hm",
+            "bafkr4ifvtzjrxwgb6i5dsop2brrrzbazjteneq7kwqmqepsbkvim5u7hjm"
         ));
     }
 }

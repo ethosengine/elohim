@@ -129,8 +129,8 @@ impl EprService {
             }
             EprRequest::ResolveBatch { ids } => Some(self.handle_resolve_batch(ids)),
             EprRequest::GetDocument { id } => Some(self.handle_get_document(&id)),
-            EprRequest::QueryDelivery { blob_hash } => {
-                Some(self.handle_query_delivery(blob_hash).await)
+            EprRequest::QueryDelivery { blob_cid } => {
+                Some(self.handle_query_delivery(blob_cid).await)
             }
             EprRequest::Announce { .. } => None,
             // The device-consent carrier is answered by the libp2p event loop,
@@ -1126,7 +1126,8 @@ mod tests {
             lens_manifest_cid: "bafyreilens".to_string(),
             depth: crate::trust::VerificationDepth::FullChain,
             epoch: crate::trust::TrustEpoch("edge-set-token".to_string()),
-            edge_set_digest: "sha256-deadbeef".to_string(),
+            edge_set_digest: "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u"
+                .to_string(),
             outcome: crate::trust::memo::VerificationOutcome::Authorized,
         };
 
@@ -1242,7 +1243,6 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,

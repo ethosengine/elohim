@@ -12,18 +12,17 @@
 //! pool) and answers each request variant identically regardless of
 //! which transport carried it.
 //!
-//! Note: this service is **not** the same plane as the iroh-blobs
-//! BLAKE3-streamed blob fetch (registered separately on the iroh
-//! Router under `iroh_blobs::ALPN`). The iroh-side `ShardBackend`
-//! exists for legacy SHA-256 sharded fetches that the protocol still
-//! supports for libp2p-fallback peers; iroh-canonical blob distribution
-//! goes through iroh-blobs.
+//! Every address is a byte CID ([`ByteCid`], decoded by the protocol codec); the
+//! payload store is the one authoritative store (C10) — there is no iroh-blobs copy
+//! to fall back to.
 
 use std::sync::Arc;
 
 use tracing::{debug, error, info, warn};
 
-use crate::blob_store::BlobStore;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
+
+use crate::blob_store::{BlobStore, Exists};
 use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::p2p::shard_protocol::{self, ShardRequest, ShardResponse};
@@ -38,15 +37,6 @@ use crate::services::custody_standing::{CustodyStanding, Requester, RowFacts};
 pub struct ShardService {
     blob_store: Arc<BlobStore>,
     db_pool: Option<DbPool>,
-    /// The iroh (BLAKE3) blob store, bound after the iroh node exists. A blob
-    /// staged through the iroh cutover lives HERE, with only a sha256→blake3
-    /// alias in `peer_blob_inventory`; HTTP `/blob` resolves that alias, and
-    /// until 2026-08-28 this responder did not — so a peer could serve its own
-    /// landing bundle over HTTP and answer `NotFound` to every peer asking for
-    /// the same bytes over the shard protocol (measured: homo-iroh P2 red,
-    /// 349 iroh blob fetches `not_found` against a survivor holding the blob).
-    #[cfg(feature = "p2p-iroh")]
-    iroh_store: std::sync::OnceLock<Arc<crate::p2p_iroh::IrohBlobStore>>,
     /// Station 3b (M9) — resolves the custody facts
     /// [`private_serve_verdict`] decides on. Wired automatically whenever a
     /// content pool exists. Production injects one process-lifetime resolver at
@@ -69,8 +59,6 @@ impl ShardService {
         Self {
             blob_store,
             db_pool,
-            #[cfg(feature = "p2p-iroh")]
-            iroh_store: std::sync::OnceLock::new(),
             custody_standing: None,
         }
     }
@@ -89,13 +77,6 @@ impl ShardService {
         self.custody_standing.clone()
     }
 
-    /// Bind the iroh blob store once it exists (the shard responder is built
-    /// before the iroh node). Idempotent; the first binding wins.
-    #[cfg(feature = "p2p-iroh")]
-    pub fn set_iroh_store(&self, store: Arc<crate::p2p_iroh::IrohBlobStore>) {
-        let _ = self.iroh_store.set(store);
-    }
-
     /// Dispatch a [`ShardRequest`] on behalf of an identified `requester`.
     ///
     /// The requester's transport identity is what makes the custody gate
@@ -107,9 +88,9 @@ impl ShardService {
     /// requester must already name, and `Push` is inbound.
     pub async fn handle(&self, requester: &Requester, request: ShardRequest) -> ShardResponse {
         match request {
-            ShardRequest::Get { hash } => self.handle_get(requester, hash).await,
-            ShardRequest::Have { hash } => self.handle_have(hash).await,
-            ShardRequest::Push { hash, data } => self.handle_push(requester, hash, data).await,
+            ShardRequest::Get { cid } => self.handle_get(requester, cid).await,
+            ShardRequest::Have { cid } => self.handle_have(cid).await,
+            ShardRequest::Push { cid, data } => self.handle_push(requester, cid, data).await,
             ShardRequest::ListContent {
                 reach_filter,
                 offset,
@@ -119,7 +100,7 @@ impl ShardService {
                     .await
             }
             ShardRequest::GetContent { id } => self.handle_get_content(requester, id).await,
-            ShardRequest::GetManifest { hash } => self.handle_get_manifest(hash),
+            ShardRequest::GetManifest { cid } => self.handle_get_manifest(cid),
         }
     }
 
@@ -211,19 +192,9 @@ impl ShardService {
             .as_ref()
             .ok_or(WithholdReason::AuthorityUnavailable)?;
 
-        // All three accepted renderings of one digest — a row may store any of
-        // them, and a candidate set carrying only the request's own form misses
-        // the others (the address-form bypass blob_reach pins).
-        let mut candidates = vec![hash.to_string()];
-        if let Ok(hex) = BlobStore::parse_content_address(hash) {
-            candidates.push(hex.clone());
-            candidates.push(format!("sha256-{hex}"));
-            if let Ok(cid) = BlobStore::hash_to_cid(&hex) {
-                candidates.push(cid.to_string());
-            }
-        }
-        candidates.sort();
-        candidates.dedup();
+        // One address form: the codec admitted the request's byte CID by full
+        // decode, and every row records its payload by the same canonical text.
+        let candidates = vec![hash.to_string()];
 
         let (refs, rows) = {
             let mut conn = pool.get().map_err(|error| {
@@ -288,17 +259,9 @@ impl ShardService {
         Err(first.unwrap_or(WithholdReason::AuthorityUnavailable))
     }
 
-    async fn handle_get(&self, requester: &Requester, hash: String) -> ShardResponse {
-        // The wire may spell the address any way the protocol accepts (CIDv1
-        // `bafkrei…`, bare hex, `sha256-<hex>`); the blob store's key is only
-        // ever the last. Resolve ONCE here so the reach gate, the on-disk read
-        // and the iroh alias all agree. Before this, a release artifact asked
-        // for by its manifest CID was an honest `NotFound` on every holder —
-        // 2026-09-06, 7/7 alpha peers × 18 sweeps, while the workspace served
-        // the same bytes over HTTP (`/blob/<cid>` normalises, `/shard/<cid>`
-        // did not).
-        let hash = on_disk_key(&hash);
-        debug!(hash = %hash, "Handling shard Get request");
+    async fn handle_get(&self, requester: &Requester, cid: ByteCid) -> ShardResponse {
+        let hash = cid.to_string();
+        debug!(cid = %hash, "Handling shard Get request");
         // Station 3b: the bytes of a blob referenced ONLY by private rows leave
         // this peer only toward the ward or a standing custodian. A refusal is
         // never rendered as NotFound (C4) — a stranger learns "you may not have
@@ -321,17 +284,14 @@ impl ShardService {
                 return ShardResponse::Error(format!("reach-withheld: {reason}"));
             }
         }
-        // Size BEFORE bytes. A payload larger than one frame can never be
-        // served under this name, so reading it and hashing it only buys a
-        // refusal — at 231 MB of read + SHA-256 per ask, on a two-worker
-        // runtime, ~2 asks/minute, which is how matthew's HTTP listener came
-        // to answer /health in 8 s on 2026-09-13. An oversize whole-bytes ask
-        // is exactly the question `GetManifest` answers, so answer it.
-        if let Some(len) = self.declared_len(&hash).await {
+        // Size BEFORE bytes. A payload larger than one frame can never be served
+        // under this name, so reading and hashing it only buys a refusal. An
+        // oversize whole-bytes ask is exactly the question `GetManifest` answers.
+        if let Some(len) = self.declared_len(&cid).await {
             if !crate::p2p::shard_protocol::payload_fits_frame(len) {
-                let pivot = self.handle_get_manifest(hash.clone());
+                let pivot = self.handle_get_manifest(cid);
                 info!(
-                    hash = %hash,
+                    cid = %hash,
                     size = len,
                     max = crate::p2p::shard_protocol::SHARD_PAYLOAD_MAX_BYTES,
                     pivoted = !matches!(pivot, ShardResponse::NotFound),
@@ -342,154 +302,81 @@ impl ShardService {
             }
         }
 
-        match self.blob_store.get(&hash).await {
+        // The store verifies the whole payload against its CID before returning a
+        // byte (C5); a failure is quarantined, never served.
+        match self.blob_store.get(&cid).await {
             Ok(data) => {
-                info!(hash = %hash, size = data.len(), "Serving shard");
-                ShardResponse::Data(data)
+                info!(cid = %hash, size = data.len(), "Serving shard");
+                ShardResponse::Data(data.to_vec())
             }
             Err(_) => {
-                #[cfg(feature = "p2p-iroh")]
-                if let Some(data) = self.get_via_iroh_alias(&hash).await {
-                    info!(hash = %hash, size = data.len(), "Serving shard from the iroh store (sha256→blake3 alias)");
-                    return ShardResponse::Data(data);
+                // An unexpired compute attachment answers from its own store, which
+                // verifies it against the CID and its lease (C10: the payload store
+                // never falls back to it, so every serve site asks it explicitly).
+                match crate::compute_payload_store::get(self.blob_store.root_dir(), &hash).await {
+                    Ok(bytes) => {
+                        info!(cid = %hash, size = bytes.len(), "Serving compute payload chunk");
+                        ShardResponse::Data(bytes)
+                    }
+                    Err(_) => {
+                        debug!(cid = %hash, "Shard not found");
+                        ShardResponse::NotFound
+                    }
                 }
-                debug!(hash = %hash, "Shard not found");
-                ShardResponse::NotFound
             }
         }
     }
 
-    /// The payload size for `hash` without materialising the payload.
-    ///
-    /// The sha256 store answers from filesystem metadata; a composite that
-    /// lives here only as RS shards answers from its durable manifest's
-    /// `total_size`. `None` means this node cannot say — in which case the
-    /// ordinary read path runs and the frame budget is enforced where it
-    /// always was, at serialization.
-    async fn declared_len(&self, hash: &str) -> Option<u64> {
-        if let Ok(len) = self.blob_store.size(hash).await {
+    /// The payload size for `cid` without materialising the payload: the store's
+    /// own length, else the durable manifest's `byte_len`. `None` means this node
+    /// cannot say, and the frame budget is enforced at serialization.
+    async fn declared_len(&self, cid: &ByteCid) -> Option<u64> {
+        if let Ok(len) = self.blob_store.size(cid).await {
             return Some(len);
         }
         let pool = self.db_pool.as_ref()?;
         let mut conn = pool.get().ok()?;
-        let row = crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, hash)
-            .ok()
-            .flatten()?;
-        crate::db::shard_manifests::hydrate_manifest(&row)
-            .ok()
-            .map(|manifest| manifest.total_size)
-    }
-
-    /// Serve a sha256-addressed blob from the iroh store when the sha256 store
-    /// misses: resolve the alias `peer_blob_inventory` keeps for blobs staged
-    /// through the iroh cutover, then read the BLAKE3 object. `None` when there
-    /// is no iroh store, no pool, no alias, or no such object — never an error.
-    #[cfg(feature = "p2p-iroh")]
-    async fn get_via_iroh_alias(&self, hash: &str) -> Option<Vec<u8>> {
-        let iroh = self.iroh_store.get()?;
-        let pool = self.db_pool.as_ref()?;
-        let normalized = match BlobStore::parse_content_address(hash) {
-            Ok(h) => format!("sha256-{}", h),
-            Err(_) => return None,
-        };
-        let alias = {
-            let mut conn = pool.get().ok()?;
-            crate::db::peer_blob_inventory::lookup_blake3_for_sha256(&mut conn, &normalized)
-                .ok()
-                .flatten()?
-        };
-        let hex = alias.strip_prefix("blake3-").unwrap_or(&alias);
-        let iroh_hash: iroh_blobs::Hash = hex.parse().ok()?;
-        match iroh.get_bytes(iroh_hash).await {
-            Ok(bytes) => {
-                // Cheapest refusal first: bytes that cannot be framed must not
-                // be hashed. SHA-256 over a quarter-gigabyte is ~0.3 s of
-                // uninterruptible CPU, and this runtime has two worker threads.
-                if !crate::p2p::shard_protocol::payload_fits_frame(bytes.len() as u64) {
-                    debug!(
-                        hash = %hash,
-                        size = bytes.len(),
-                        "aliased bytes exceed one shard frame — not hashed, not served"
-                    );
-                    return None;
-                }
-                // Serve only bytes that ARE the requested address. An alias can
-                // point at a reassembled composite (RS-sharded bundle) whose
-                // sha256 is not the composite's name — those are healed through
-                // the shard manifest, never as whole bytes under this name.
-                //
-                // Hashing runs on the blocking pool: this is CPU measured in
-                // hundreds of milliseconds per ask, and holding a server worker
-                // for it starves every other request the runtime owes.
-                let verified = {
-                    let bytes = bytes.clone();
-                    let expected = normalized.clone();
-                    tokio::task::spawn_blocking(move || {
-                        crate::p2p::blob_fetch::verify_blob_hash(&bytes, &expected)
-                    })
-                    .await
-                    .unwrap_or(false)
-                };
-                if verified {
-                    Some(bytes.to_vec())
-                } else {
-                    debug!(hash = %hash, alias = %alias, "iroh alias bytes do not hash to the requested address (composite?) — not served");
-                    None
-                }
-            }
-            Err(e) => {
-                debug!(hash = %hash, alias = %alias, error = %e, "iroh store miss for aliased blob");
-                None
-            }
-        }
+        crate::db::shard_manifests::resolve_manifest_by_cid(&mut conn, cid).map(|m| m.byte_len)
     }
 
     /// The composite pivot: a peer that holds a blob only as RS shards (its
     /// whole-bytes `Get` misses) answers with the durable manifest so the
-    /// requester can shard-fetch — what the libp2p blob protocol has always done
-    /// with `BlobFetchReply::Manifest`; now on the shard protocol for BOTH planes.
-    fn handle_get_manifest(&self, hash: String) -> ShardResponse {
+    /// requester can shard-fetch.
+    fn handle_get_manifest(&self, cid: ByteCid) -> ShardResponse {
         let Some(pool) = self.db_pool.as_ref() else {
             return ShardResponse::NotFound;
         };
         let Ok(mut conn) = pool.get() else {
             return ShardResponse::NotFound;
         };
-        match crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, &hash) {
-            Ok(Some(row)) => match crate::db::shard_manifests::hydrate_manifest(&row) {
-                Ok(manifest) => {
-                    info!(hash = %hash, shards = manifest.shard_hashes.len(), "Serving shard manifest");
-                    ShardResponse::Manifest(Box::new(manifest))
-                }
-                Err(e) => {
-                    debug!(hash = %hash, error = %e, "shard manifest row failed to hydrate");
-                    ShardResponse::NotFound
-                }
-            },
-            _ => ShardResponse::NotFound,
+        match crate::db::shard_manifests::resolve_manifest_by_cid(&mut conn, &cid) {
+            Some(manifest) => {
+                info!(cid = %cid, units = manifest.custody_units().len(), "Serving shard manifest");
+                ShardResponse::Manifest(Box::new(manifest))
+            }
+            None => ShardResponse::NotFound,
         }
     }
 
-    async fn handle_have(&self, hash: String) -> ShardResponse {
-        debug!(hash = %hash, "Handling shard Have request");
-        let exists = self.blob_store.exists(&hash).await;
-        ShardResponse::Have(exists)
+    async fn handle_have(&self, cid: ByteCid) -> ShardResponse {
+        debug!(cid = %cid, "Handling shard Have request");
+        ShardResponse::Have(self.blob_store.exists(&cid).await == Exists::Verified)
     }
 
     async fn handle_push(
         &self,
         requester: &Requester,
-        hash: String,
+        cid: ByteCid,
         data: Vec<u8>,
     ) -> ShardResponse {
-        debug!(hash = %hash, size = data.len(), "Handling shard Push request");
-        // The bytes are checked against the name they were pushed under BEFORE
-        // they are stored. Storing first left mismatched bytes on disk under
-        // their real hash, with nothing to say how they got there.
-        let actual = BlobStore::compute_hash(&data);
-        if actual != hash {
-            warn!(expected = %hash, actual = %actual, "Shard hash mismatch; nothing stored");
-            return ShardResponse::Error("Hash mismatch".to_string());
+        let hash = cid.to_string();
+        debug!(cid = %hash, size = data.len(), "Handling shard Push request");
+        // The bytes are checked against the CID they were pushed under BEFORE
+        // they are stored.
+        let actual = compute_bytes_cid(&data);
+        if actual != cid {
+            warn!(expected = %hash, actual = %actual, "Shard CID mismatch; nothing stored");
+            return ShardResponse::Error("CID mismatch".to_string());
         }
         // Under the arrival gate from the record to the store, so the
         // retention pass cannot let these bytes go in between.
@@ -734,7 +621,6 @@ impl ShardService {
                     description: cwt.content.description,
                     content_type: cwt.content.content_type,
                     content_format: cwt.content.content_format,
-                    blob_hash: cwt.content.blob_hash,
                     blob_cid: cwt.content.blob_cid,
                     content_size_bytes: cwt.content.content_size_bytes,
                     metadata_json: cwt.content.metadata_json,
@@ -750,20 +636,11 @@ impl ShardService {
     }
 }
 
-/// The blob store's key for any accepted spelling of a SHA-256 content
-/// address. Unparseable input passes through unchanged so a genuinely unknown
-/// name still reads as an honest miss rather than a decode error.
-pub(crate) fn on_disk_key(addr: &str) -> String {
-    match crate::p2p::blob_fetch::content_address_hex(addr) {
-        Some(hex) => format!("sha256-{hex}"),
-        None => addr.to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blob_store::BlobStore;
+    use crate::blob_store::{BlobStore, Exists};
+    use elohim_epr::address::{compute_bytes_cid, ByteCid};
     use tempfile::tempdir;
 
     async fn fresh_service() -> ShardService {
@@ -772,31 +649,21 @@ mod tests {
         ShardService::new(blob_store, None)
     }
 
-    /// **The wire-spelling trap.** The release manifest names its artifact as a
-    /// CIDv1; the on-disk key is `sha256-<hex>`. A holder must serve the same
-    /// bytes whichever spelling arrives, or every peer pull in the fleet reads
-    /// as "none served it" while the bytes sit one hop away.
+    /// A holder serves a payload under its byte CID, the one spelling the wire
+    /// carries (`ShardRequest::Get` decodes it in full).
     #[tokio::test]
-    async fn get_by_cid_spelling_serves_the_same_bytes_as_the_on_disk_key() {
+    async fn get_by_byte_cid_serves_the_stored_bytes() {
         let dir = tempdir().unwrap();
         let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
         let stored = blob_store.store(b"release artifact bytes").await.unwrap();
-        assert!(stored.cid.starts_with("bafkrei"), "precondition: CIDv1 raw");
-        assert_ne!(stored.cid, stored.hash);
+        assert_eq!(stored.cid, compute_bytes_cid(b"release artifact bytes"));
         let svc = ShardService::new(blob_store, None);
-        for spelling in [stored.cid.clone(), stored.hash.clone()] {
-            match svc
-                .handle(
-                    &Requester::local(),
-                    ShardRequest::Get {
-                        hash: spelling.clone(),
-                    },
-                )
-                .await
-            {
-                ShardResponse::Data(bytes) => assert_eq!(bytes, b"release artifact bytes"),
-                other => panic!("{spelling} must serve the stored bytes, got {other:?}"),
-            }
+        match svc
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
+            .await
+        {
+            ShardResponse::Data(bytes) => assert_eq!(bytes, b"release artifact bytes"),
+            other => panic!("the byte CID must serve the stored bytes, got {other:?}"),
         }
     }
 
@@ -807,7 +674,7 @@ mod tests {
         let stored = blob_store.store(b"db-less peer blob").await.unwrap();
         let svc = ShardService::new(blob_store, None);
         match svc
-            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
             .await
         {
             ShardResponse::Data(bytes) => assert_eq!(bytes, b"db-less peer blob"),
@@ -825,7 +692,7 @@ mod tests {
             .unwrap();
         let service = ShardService::new(blob_store, Some(gate_test_pool()));
         match service
-            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
             .await
         {
             ShardResponse::Error(message) => {
@@ -842,7 +709,7 @@ mod tests {
             .handle(
                 &Requester::local(),
                 ShardRequest::Have {
-                    hash: "missing".into(),
+                    cid: compute_bytes_cid(b"missing"),
                 },
             )
             .await
@@ -931,7 +798,7 @@ mod tests {
         pool
     }
 
-    fn seed_row(pool: &crate::db::DbPool, id: &str, reach: &str, blob_hash: Option<&str>) {
+    fn seed_row(pool: &crate::db::DbPool, id: &str, reach: &str, blob_cid: Option<&str>) {
         let mut conn = pool.get().expect("conn");
         crate::db::content_diesel::create_content(
             &mut conn,
@@ -942,8 +809,7 @@ mod tests {
                 description: None,
                 content_type: "issue-report".to_string(),
                 content_format: "json".to_string(),
-                blob_hash: blob_hash.map(str::to_string),
-                blob_cid: None,
+                blob_cid: blob_cid.map(str::to_string),
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: reach.to_string(),
@@ -958,17 +824,22 @@ mod tests {
 
     /// A service holding one `private` witness row (bytes present) and one
     /// `public` row, gated by a fake resolver the test drives.
-    async fn gated_service(fake: Arc<FakeCustodyStanding>) -> (ShardService, String) {
+    async fn gated_service(fake: Arc<FakeCustodyStanding>) -> (ShardService, ByteCid) {
         let dir = tempdir().unwrap();
         let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
         Box::leak(Box::new(dir));
         let bytes = b"death witness bytes".to_vec();
         let stored = blob_store.store(&bytes).await.unwrap();
         let pool = gate_test_pool();
-        seed_row(&pool, "witness-private", "private", Some(&stored.hash));
+        seed_row(
+            &pool,
+            "witness-private",
+            "private",
+            Some(&stored.cid.to_string()),
+        );
         seed_row(&pool, "notice-public", "public", None);
         let svc = ShardService::new(blob_store, Some(pool)).with_custody_standing(fake);
-        (svc, stored.hash)
+        (svc, stored.cid)
     }
 
     #[tokio::test]
@@ -1099,12 +970,9 @@ mod tests {
         fake.bind(&stranger, STRANGER)
             .ward_of_content("witness-private", WARD);
         let (svc, hash) = gated_service(fake).await;
-        let digest = BlobStore::parse_content_address(&hash).unwrap();
+        let digest = hash.to_string();
         // The fake keys the ward by digest as well, mirroring production.
-        match svc
-            .handle(&stranger, ShardRequest::Get { hash: hash.clone() })
-            .await
-        {
+        match svc.handle(&stranger, ShardRequest::Get { cid: hash }).await {
             ShardResponse::Error(msg) => {
                 assert!(msg.starts_with("reach-withheld: "), "got {msg}");
             }
@@ -1119,7 +987,7 @@ mod tests {
         fake.bind(&ward, WARD)
             .ward_of_content("witness-private", WARD);
         let (svc, hash) = gated_service(fake).await;
-        match svc.handle(&ward, ShardRequest::Get { hash }).await {
+        match svc.handle(&ward, ShardRequest::Get { cid: hash }).await {
             ShardResponse::Data(bytes) => assert_eq!(bytes, b"death witness bytes".to_vec()),
             other => panic!("the ward must still get its bytes, got {other:?}"),
         }
@@ -1130,10 +998,13 @@ mod tests {
         let fake = Arc::new(FakeCustodyStanding::new());
         let custodian = Requester::libp2p("12D3KooWCustodian");
         let (svc, hash) = gated_service(fake.clone()).await;
-        let digest = BlobStore::parse_content_address(&hash).unwrap();
+        let digest = hash.to_string();
         fake.bind(&custodian, CUSTODIAN)
             .blob_custody(CUSTODIAN, &digest);
-        match svc.handle(&custodian, ShardRequest::Get { hash }).await {
+        match svc
+            .handle(&custodian, ShardRequest::Get { cid: hash })
+            .await
+        {
             ShardResponse::Data(bytes) => assert_eq!(bytes, b"death witness bytes".to_vec()),
             other => panic!("exact digest custody must stand without a ward, got {other:?}"),
         }
@@ -1159,37 +1030,13 @@ mod tests {
         let service = ShardService::new(blob_store, Some(pool))
             .with_custody_standing(Arc::new(FakeCustodyStanding::new()));
         match service
-            .handle(&Requester::local(), ShardRequest::Get { hash: stored.hash })
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
             .await
         {
             ShardResponse::Error(message) => {
                 assert_eq!(message, "reach-withheld: authority-unavailable")
             }
             other => panic!("query failure must fail closed, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn bare_hex_private_reference_is_matched_and_withheld() {
-        let dir = tempdir().unwrap();
-        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
-        let stored = blob_store.store(b"bare hex private bytes").await.unwrap();
-        let digest = BlobStore::parse_content_address(&stored.hash).unwrap();
-        let pool = gate_test_pool();
-        seed_row(&pool, "bare-hex-private", "private", Some(&digest));
-        let fake = Arc::new(FakeCustodyStanding::new());
-        let stranger = Requester::libp2p("12D3KooWStranger");
-        fake.bind(&stranger, STRANGER)
-            .ward_of_content("bare-hex-private", WARD);
-        let service = ShardService::new(blob_store, Some(pool)).with_custody_standing(fake);
-        match service
-            .handle(&stranger, ShardRequest::Get { hash: stored.cid })
-            .await
-        {
-            ShardResponse::Error(message) => {
-                assert!(message.starts_with("reach-withheld: "))
-            }
-            other => panic!("bare-hex private reference bypassed the gate: {other:?}"),
         }
     }
 
@@ -1203,7 +1050,7 @@ mod tests {
         let (svc, _hash) = gated_service(fake).await;
         let orphan = svc.blob_store.store(b"no row claims these").await.unwrap();
         match svc
-            .handle(&stranger, ShardRequest::Get { hash: orphan.hash })
+            .handle(&stranger, ShardRequest::Get { cid: orphan.cid })
             .await
         {
             ShardResponse::Data(bytes) => assert_eq!(bytes, b"no row claims these".to_vec()),
@@ -1228,7 +1075,7 @@ mod tests {
             let stored = blob_store.store(reach.as_bytes()).await.unwrap();
             let pool = gate_test_pool();
             let id = format!("row-{reach}");
-            seed_row(&pool, &id, reach, Some(&stored.hash));
+            seed_row(&pool, &id, reach, Some(&stored.cid.to_string()));
             let fake = Arc::new(FakeCustodyStanding::new());
             let stranger = Requester::libp2p("12D3KooWStranger");
             let service = ShardService::new(blob_store, Some(pool)).with_custody_standing(fake);
@@ -1260,7 +1107,7 @@ mod tests {
             ));
             assert!(matches!(
                 service
-                    .handle(&stranger, ShardRequest::Get { hash: stored.hash })
+                    .handle(&stranger, ShardRequest::Get { cid: stored.cid })
                     .await,
                 ShardResponse::Data(_)
             ));
@@ -1269,7 +1116,7 @@ mod tests {
 
     fn arrivals(svc: &ShardService, hash: &str) -> Vec<crate::db::blob_arrivals::Arrival> {
         let mut conn = svc.db_pool.as_ref().unwrap().get().unwrap();
-        crate::db::blob_arrivals::arrivals_by_hash(&mut conn)
+        crate::db::blob_arrivals::arrivals_by_cid(&mut conn)
             .unwrap()
             .remove(hash)
             .unwrap_or_default()
@@ -1285,13 +1132,13 @@ mod tests {
         let (svc, _) = gated_service(fake).await;
 
         let data = b"a shard another peer places".to_vec();
-        let hash = BlobStore::compute_hash(&data);
+        let hash = compute_bytes_cid(&data);
         for requester in [&placer, &stranger] {
             let res = svc
                 .handle(
                     requester,
                     ShardRequest::Push {
-                        hash: hash.clone(),
+                        cid: hash,
                         data: data.clone(),
                     },
                 )
@@ -1299,7 +1146,7 @@ mod tests {
             assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
         }
 
-        let mut placed: Vec<String> = arrivals(&svc, &hash)
+        let mut placed: Vec<String> = arrivals(&svc, &hash.to_string())
             .into_iter()
             .inspect(|a| assert_eq!(a.via, ArrivalVia::Placed))
             .map(|a| a.placed_by)
@@ -1320,23 +1167,24 @@ mod tests {
         let fake = Arc::new(FakeCustodyStanding::new());
         let (svc, _) = gated_service(fake).await;
         let data = b"not what the name says".to_vec();
-        let claimed = BlobStore::compute_hash(b"something else");
+        let claimed = compute_bytes_cid(b"something else");
         let res = svc
             .handle(
                 &Requester::libp2p("12D3KooWPlacer"),
                 ShardRequest::Push {
-                    hash: claimed.clone(),
+                    cid: claimed,
                     data: data.clone(),
                 },
             )
             .await;
         assert!(matches!(res, ShardResponse::Error(_)), "{res:?}");
-        assert!(!svc.blob_store.exists(&claimed).await);
-        assert!(
-            !svc.blob_store.exists(&BlobStore::compute_hash(&data)).await,
+        assert_ne!(svc.blob_store.exists(&claimed).await, Exists::Verified);
+        assert_ne!(
+            svc.blob_store.exists(&compute_bytes_cid(&data)).await,
+            Exists::Verified,
             "the mismatched bytes must not be left on disk under their real hash"
         );
-        assert!(arrivals(&svc, &claimed).is_empty());
+        assert!(arrivals(&svc, &claimed.to_string()).is_empty());
     }
 
     #[tokio::test]
@@ -1345,18 +1193,12 @@ mod tests {
         let fake = Arc::new(FakeCustodyStanding::new());
         let (svc, _) = gated_service(fake).await;
         let data = b"handed over in process".to_vec();
-        let hash = BlobStore::compute_hash(&data);
+        let hash = compute_bytes_cid(&data);
         let res = svc
-            .handle(
-                &Requester::local(),
-                ShardRequest::Push {
-                    hash: hash.clone(),
-                    data,
-                },
-            )
+            .handle(&Requester::local(), ShardRequest::Push { cid: hash, data })
             .await;
         assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
-        let recorded = arrivals(&svc, &hash);
+        let recorded = arrivals(&svc, &hash.to_string());
         assert_eq!(recorded.len(), 1);
         assert_eq!(recorded[0].via, ArrivalVia::SelfPut);
     }
@@ -1373,7 +1215,7 @@ mod tests {
             .handle(
                 &Requester::local(),
                 ShardRequest::Push {
-                    hash: stored.hash.clone(),
+                    cid: stored.cid,
                     data: data.clone(),
                 },
             )
@@ -1384,12 +1226,7 @@ mod tests {
         }
 
         match svc
-            .handle(
-                &Requester::local(),
-                ShardRequest::Get {
-                    hash: stored.hash.clone(),
-                },
-            )
+            .handle(&Requester::local(), ShardRequest::Get { cid: stored.cid })
             .await
         {
             ShardResponse::Data(bytes) => assert_eq!(bytes, data),

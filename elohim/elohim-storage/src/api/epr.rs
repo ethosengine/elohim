@@ -261,9 +261,11 @@ pub(crate) fn to_envelope_view(fetched: &FetchedEpr) -> EprEnvelopeView {
         issued_at: fetched.atom.issued_at.clone(),
         proof: EprSignatureView {
             signer: fetched.atom.signer_cid.clone(),
-            algorithm: fetched.atom.proof_algorithm.clone(),
-            key: hex::encode(&proof.key),
-            signature: hex::encode(&proof.sig),
+            envelope: elohim_views::EprSignatureEnvelopeView {
+                scheme: proof.scheme,
+                key: hex::encode(&proof.key),
+                sig: hex::encode(&proof.sig),
+            },
         },
     }
 }
@@ -621,15 +623,13 @@ async fn put_epr(
         .transpose()
         .map_err(|e| StorageError::InvalidInput(format!("bad supersedes cid: {e}")))?;
 
-    let sig_bytes = hex::decode(&input.envelope.proof.signature)
+    let sig_bytes = hex::decode(&input.envelope.proof.envelope.sig)
         .map_err(|e| StorageError::InvalidInput(format!("bad signature hex: {e}")))?;
-    let key_bytes = hex::decode(&input.envelope.proof.key)
+    let key_bytes = hex::decode(&input.envelope.proof.envelope.key)
         .map_err(|e| StorageError::InvalidInput(format!("bad proof key hex: {e}")))?;
-    let Some(scheme) =
-        crate::services::epr_service::scheme_from_label(&input.envelope.proof.algorithm)
-    else {
-        return Ok(response::bad_request("unrecognised proof algorithm label"));
-    };
+    // The scheme travels as its code; one this build does not implement is held
+    // (not accepted) at ingest, never refused here.
+    let scheme = input.envelope.proof.envelope.scheme;
     // Only the length of a scheme this build implements is checked here; a
     // held scheme travels on and is held (not accepted) at ingest.
     if scheme == 0 && sig_bytes.len() != 64 {
@@ -1279,20 +1279,12 @@ pub(crate) fn resolve_signal_subject(
             }),
         )));
     }
-    let Some(address) = record
-        .blob_hash
-        .as_deref()
-        .or(record.blob_cid.as_deref())
-        .and_then(facing::display_address)
-    else {
+    let Some(address) = record.blob_cid.as_deref().and_then(facing::display_address) else {
         return Ok(no_address());
     };
     // Every name a report's document path may give this content.
     let mut names = vec![address.clone(), record.id.clone()];
-    for addr in [record.blob_hash.as_deref(), record.blob_cid.as_deref()]
-        .into_iter()
-        .flatten()
-    {
+    if let Some(addr) = record.blob_cid.as_deref() {
         names.extend(facing::canonical_address(addr));
         names.push(addr.to_string());
     }
@@ -1448,7 +1440,9 @@ mod dedup_tests {
     #[test]
     fn chrome_and_signals_classifiers_match_only_their_routes() {
         assert!(is_chrome_facing_path("evolution-of-trust/chrome"));
-        assert!(is_chrome_facing_path("bafkreiabc/chrome"));
+        assert!(is_chrome_facing_path(
+            "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu/chrome"
+        ));
         assert!(
             !is_chrome_facing_path("chrome"),
             "bare `chrome` is a CID lookup"
@@ -1473,10 +1467,11 @@ mod signal_subject_tests {
     use crate::db::content_diesel;
     use crate::test_util::test_pool;
 
-    const HEX: &str = "a3f1c0b2d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f";
+    /// A bundle byte CID (`compute_bytes_cid(b"evolution-of-trust bundle")`).
+    const BUNDLE: &str = "bafkr4id3pqozc4vena2tgknk3ngx4llmg4jcqionp5tggl7aumv7rlsmxe";
 
     /// A servable html5-app record (amber floor: the libp2p publish marker).
-    fn insert(conn: &mut diesel::SqliteConnection, id: &str, reach: &str, hex: &str) {
+    fn insert(conn: &mut diesel::SqliteConnection, id: &str, reach: &str, cid: &str) {
         use crate::db::diesel_schema::content::dsl as c;
         use diesel::prelude::*;
         let ctx = AppContext::default_lamad();
@@ -1489,8 +1484,7 @@ mod signal_subject_tests {
                 description: None,
                 content_type: "simulation".to_string(),
                 content_format: "html5-app".to_string(),
-                blob_hash: Some(format!("sha256-{hex}")),
-                blob_cid: None,
+                blob_cid: Some(cid.to_string()),
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: reach.to_string(),
@@ -1525,16 +1519,16 @@ mod signal_subject_tests {
     fn a_commons_record_resolves_for_an_anonymous_report() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert(&mut conn, "evolution-of-trust", "commons", HEX);
+        insert(&mut conn, "evolution-of-trust", "commons", BUNDLE);
         let ctx = AppContext::default_lamad();
         let SignalSubjectResolution::Subject(subject) =
             resolve_signal_subject(&mut conn, &ctx, "evolution-of-trust", None).unwrap()
         else {
             panic!("a commons record is a signal subject for anyone");
         };
-        assert!(subject.content_address.starts_with("bafkrei"));
+        assert_eq!(subject.content_address, BUNDLE);
         assert_eq!(subject.record_id.as_deref(), Some("evolution-of-trust"));
-        assert!(subject.names.contains(&format!("sha256-{HEX}")));
+        assert!(subject.names.contains(&BUNDLE.to_string()));
         assert!(subject.names.contains(&"evo".to_string()));
     }
 
@@ -1544,17 +1538,14 @@ mod signal_subject_tests {
     async fn a_community_record_refuses_an_anonymous_report_without_its_address() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert(&mut conn, "household-notes", "community", HEX);
+        insert(&mut conn, "household-notes", "community", BUNDLE);
         let ctx = AppContext::default_lamad();
-        let address =
-            crate::services::content_chrome_facing::display_address(&format!("sha256-{HEX}"))
-                .unwrap();
+        let address = crate::services::content_chrome_facing::display_address(BUNDLE).unwrap();
         for id in ["household-notes", address.as_str()] {
             let (status, body) =
                 answer_of(resolve_signal_subject(&mut conn, &ctx, id, None).unwrap()).await;
             assert_eq!(status, StatusCode::FORBIDDEN, "{id}: {body}");
             assert!(!body.contains(&address), "{id}: the address leaked: {body}");
-            assert!(!body.contains(HEX), "{id}: the hash leaked: {body}");
         }
         // A caller that names itself may read community content.
         assert!(matches!(
@@ -1572,7 +1563,7 @@ mod signal_subject_tests {
     ) {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-        insert(&mut conn, "a-will", "private", HEX);
+        insert(&mut conn, "a-will", "private", BUNDLE);
         let ctx = AppContext::default_lamad();
         for caller in [None, Some("uhCAkreader")] {
             let (status, body) =
@@ -1583,7 +1574,7 @@ mod signal_subject_tests {
                 "{caller:?}: {body}"
             );
             assert!(!body.contains("this record's reach"), "{caller:?}: {body}");
-            assert!(!body.contains("bafkrei") && !body.contains(HEX), "{body}");
+            assert!(!body.contains(BUNDLE), "{body}");
         }
     }
 

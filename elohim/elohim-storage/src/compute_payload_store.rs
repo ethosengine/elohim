@@ -2,7 +2,8 @@
 //! Source of truth: local operational custody leases (C), reconstructable from
 //! the task/receipt retention policy and fetched bytes. Never a content head.
 //! A separate directory prevents cleanup deleting an independently retained blob.
-use crate::{blob_store::BlobStore, error::StorageError};
+use crate::error::StorageError;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -78,17 +79,18 @@ fn advance_frozen_clock(delta_secs: u64) {
     });
 }
 
+/// A compute chunk is addressed by its byte CID (full decode); anything else is refused.
+fn chunk_cid(address: &str) -> Result<ByteCid, StorageError> {
+    ByteCid::parse(address)
+        .map_err(|e| StorageError::InvalidInput(format!("invalid compute chunk address: {e}")))
+}
+
 fn paths(root: &Path, address: &str) -> Result<(PathBuf, PathBuf), StorageError> {
-    let hex = BlobStore::parse_content_address(address)?;
-    if hex.len() != 64 || !hex.bytes().all(|c| c.is_ascii_hexdigit()) {
-        return Err(StorageError::InvalidInput(
-            "invalid compute chunk address".into(),
-        ));
-    }
+    let cid = chunk_cid(address)?;
     let base = root.join("compute-payloads");
     Ok((
-        base.join(format!("{hex}.blob")),
-        base.join(format!("{hex}.json")),
+        base.join(format!("{cid}.blob")),
+        base.join(format!("{cid}.json")),
     ))
 }
 
@@ -142,10 +144,7 @@ pub async fn get(root: &Path, address: &str) -> Result<Vec<u8>, StorageError> {
     }
     let (data, _) = paths(root, address)?;
     let bytes = fs::read(data).await?;
-    if bytes.len() > CHUNK_LIMIT
-        || BlobStore::parse_content_address(address)?
-            != BlobStore::compute_hash(&bytes).trim_start_matches("sha256-")
-    {
+    if bytes.len() > CHUNK_LIMIT || compute_bytes_cid(&bytes) != chunk_cid(address)? {
         return Err(StorageError::InvalidInput("compute chunk corrupt".into()));
     }
     Ok(bytes)
@@ -180,7 +179,7 @@ pub async fn put(
             "invalid compute payload lease or chunk size".into(),
         ));
     }
-    if BlobStore::compute_cid(data).to_string() != address {
+    if compute_bytes_cid(data) != chunk_cid(address)? {
         return Err(StorageError::InvalidInput(
             "compute payload CID mismatch".into(),
         ));
@@ -280,23 +279,26 @@ async fn cleanup_inner(root: &Path) -> Result<(), StorageError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blob_store::BlobStore;
+
+    fn cid_of(bytes: &[u8]) -> String {
+        compute_bytes_cid(bytes).to_string()
+    }
+
     #[tokio::test]
     async fn expiry_never_deletes_independently_retained_content() {
         with_frozen_clock(async {
             let dir = tempfile::tempdir().unwrap();
             let store = BlobStore::new(dir.path()).await.unwrap();
             let retained = store.store(b"evidence").await.unwrap();
-            put(dir.path(), &retained.cid, "one", 60, b"evidence")
-                .await
-                .unwrap();
-            put(dir.path(), &retained.cid, "two", 60, b"evidence")
-                .await
-                .unwrap();
-            release(dir.path(), &retained.cid, "one").await.unwrap();
-            assert_eq!(get(dir.path(), &retained.cid).await.unwrap(), b"evidence");
-            release(dir.path(), &retained.cid, "two").await.unwrap();
-            assert!(get(dir.path(), &retained.cid).await.is_err());
-            assert_eq!(store.get(&retained.hash).await.unwrap(), b"evidence");
+            let cid = retained.cid.to_string();
+            put(dir.path(), &cid, "one", 60, b"evidence").await.unwrap();
+            put(dir.path(), &cid, "two", 60, b"evidence").await.unwrap();
+            release(dir.path(), &cid, "one").await.unwrap();
+            assert_eq!(get(dir.path(), &cid).await.unwrap(), b"evidence");
+            release(dir.path(), &cid, "two").await.unwrap();
+            assert!(get(dir.path(), &cid).await.is_err());
+            assert_eq!(&store.get(&retained.cid).await.unwrap()[..], b"evidence");
         })
         .await;
     }
@@ -317,7 +319,7 @@ mod tests {
     async fn expired_owner_stays_expired_when_identical_bytes_are_reused() {
         with_frozen_clock(async {
             let dir = tempfile::tempdir().unwrap();
-            let cid = BlobStore::compute_cid(b"shared").to_string();
+            let cid = cid_of(b"shared");
             put(dir.path(), &cid, "old", 60, b"shared").await.unwrap();
             release(dir.path(), &cid, "old").await.unwrap();
             cleanup(dir.path()).await.unwrap();
@@ -340,7 +342,7 @@ mod tests {
     async fn get_reports_not_found_once_frozen_clock_advances_past_ttl() {
         with_frozen_clock(async {
             let dir = tempfile::tempdir().unwrap();
-            let cid = BlobStore::compute_cid(b"clock-advance").to_string();
+            let cid = cid_of(b"clock-advance");
             put(dir.path(), &cid, "task", 60, b"clock-advance")
                 .await
                 .unwrap();
@@ -361,20 +363,24 @@ mod tests {
         .await;
     }
     #[tokio::test]
-    async fn native_blob_reads_serve_only_unexpired_chunks() {
+    async fn payload_reads_serve_only_unexpired_chunks_under_their_byte_cid() {
         with_frozen_clock(async {
             let dir = tempfile::tempdir().unwrap();
-            let store = BlobStore::new(dir.path()).await.unwrap();
-            let cid = BlobStore::compute_cid(b"payload").to_string();
+            let cid = cid_of(b"payload");
             put(dir.path(), &cid, "task", 60, b"payload").await.unwrap();
-            assert_eq!(store.get_by_address(&cid).await.unwrap(), b"payload");
+            assert!(contains(dir.path(), &cid).await);
+            assert_eq!(get(dir.path(), &cid).await.unwrap(), b"payload");
             let (_, meta) = paths(dir.path(), &cid).unwrap();
             fs::write(&meta, br#"{"owners":{"task":1}}"#).await.unwrap();
-            assert!(!store.exists_by_address(&cid).await.unwrap());
-            assert!(store.get_by_address(&cid).await.is_err());
+            assert!(!contains(dir.path(), &cid).await);
             cleanup(dir.path()).await.unwrap();
             assert!(get(dir.path(), &cid).await.is_err());
             assert!(put(dir.path(), &cid, "task", 60, b"wrong").await.is_err());
+            // Only a byte CID addresses a chunk: the cite profile of the same bytes is refused.
+            let cite = elohim_epr::address::compute_raw_sha2_cid(b"payload").to_string();
+            assert!(put(dir.path(), &cite, "task", 60, b"payload")
+                .await
+                .is_err());
         })
         .await;
     }

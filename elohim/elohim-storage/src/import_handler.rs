@@ -109,7 +109,7 @@ impl Default for ImportHandlerConfig {
 pub struct ImportBatchQueued {
     pub batch_id: String,
     pub batch_type: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub total_items: u32,
     pub schema_version: u32,
 }
@@ -862,18 +862,20 @@ impl ImportHandler {
         info!(
             batch_id = %payload.batch_id,
             batch_type = %payload.batch_type,
-            blob_hash = %payload.blob_hash,
+            blob_cid = %payload.blob_cid,
             total_items = payload.total_items,
             schema_version = payload.schema_version,
             "📥 BATCH_START: Processing ImportBatchQueued signal"
         );
 
         // Read blob from storage
+        let cid = elohim_epr::address::ByteCid::parse(&payload.blob_cid)
+            .map_err(|e| StorageError::InvalidInput(format!("blob_cid: {e}")))?;
         let blob_data = self
             .blob_store
-            .get(&payload.blob_hash)
+            .get(&cid)
             .await
-            .map_err(|e| StorageError::BlobNotFound(format!("{}: {}", payload.blob_hash, e)))?;
+            .map_err(|e| StorageError::BlobNotFound(format!("{}: {}", payload.blob_cid, e)))?;
 
         // Parse items
         let items: Vec<serde_json::Value> = serde_json::from_slice(&blob_data)

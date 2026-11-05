@@ -62,8 +62,7 @@ impl From<Content> for ContentView {
             description: c.description,
             content_type: c.content_type,
             content_format: c.content_format,
-            blob_hash: c.blob_hash,
-            server_blob_hash: c.server_blob_hash,
+            server_blob_cid: c.server_blob_cid,
             blob_cid: c.blob_cid,
             content_size_bytes: c.content_size_bytes,
             metadata: parse_json_opt(&c.metadata_json),
@@ -124,9 +123,8 @@ pub fn content_view_from_epr_head(head: &crate::epr_codec::EprHead) -> ContentVi
             .content_format
             .clone()
             .unwrap_or_else(|| "markdown".to_string()),
-        blob_hash: None,
         // EPR-head projection carries no SSR server bundle; CSR fallback applies.
-        server_blob_hash: None,
+        server_blob_cid: None,
         blob_cid: if head.content.is_empty() {
             None
         } else {
@@ -203,7 +201,7 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
             .as_deref()
             .zip(c.dht_anchor_hash.as_deref())
             .map(|(head, anchor)| head == anchor),
-        blob_hash: c.blob_hash.clone(),
+        blob_cid: c.blob_cid.clone(),
         updated_at: Some(c.updated_at.clone()),
         // The candidate is NOT in the SQLite row: it is a pure function of the
         // canonical-head link set, so only the conductor can answer it. This
@@ -212,7 +210,7 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         // its conductor answers. A projector that fabricated one here would be
         // synthesising election evidence from a projection (C5).
         staging_candidate: None,
-        staging_candidate_blob_hash: None,
+        staging_candidate_blob_cid: None,
         staging_candidate_state: None,
         // Only a live-election read (`?election=live`) names where `earned`
         // came from; a plain row → view mapping stays silent about it.
@@ -237,11 +235,11 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
 pub fn with_staging_candidate(
     mut view: ContentHeadView,
     staging_candidate: Option<String>,
-    staging_candidate_blob_hash: Option<String>,
+    staging_candidate_blob_cid: Option<String>,
     staging_candidate_state: elohim_views::lamad::StagingCandidateState,
 ) -> ContentHeadView {
     view.staging_candidate = staging_candidate;
-    view.staging_candidate_blob_hash = staging_candidate_blob_hash;
+    view.staging_candidate_blob_cid = staging_candidate_blob_cid;
     view.staging_candidate_state = Some(staging_candidate_state);
     view
 }
@@ -377,7 +375,6 @@ mod trust_label_tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -389,7 +386,7 @@ mod trust_label_tests {
             content_body: None,
             dht_anchor_hash: None,
             p2p_published_at: None,
-            server_blob_hash: None,
+            server_blob_cid: None,
             crdt_converged_at: None,
             declared_head_action_hash: None,
             declared_head_at: None,

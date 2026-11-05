@@ -134,16 +134,12 @@ async fn handle_get_resilience(
     let mut conn = get_conn(pool)?;
 
     // 1. Get shard manifest
-    let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
+    let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?
+        .map(|row| crate::db::shard_manifests::hydrate_manifest(&row))
+        .transpose()?;
 
     let encoding = match &manifest {
-        Some(m) => EncodingInfoView {
-            strategy: m.encoding.clone(),
-            data_shards: m.data_shard_count,
-            parity_shards: m.parity_shard_count,
-            total_size_bytes: m.total_size_bytes,
-            shard_size_bytes: m.shard_size_bytes,
-        },
+        Some(m) => encoding_view(m),
         None => EncodingInfoView {
             strategy: "unknown".to_string(),
             data_shards: 0,
@@ -160,20 +156,23 @@ async fn handle_get_resilience(
         content_id,
     )?;
 
-    let shard_hashes: Vec<String> = manifest
+    let shard_cids: Vec<String> = manifest
         .as_ref()
-        .map(|m| serde_json::from_str(&m.shard_hashes_json).unwrap_or_default())
+        .map(|m| m.custody_units().iter().map(ToString::to_string).collect())
         .unwrap_or_default();
 
-    let data_shard_count = manifest.as_ref().map(|m| m.data_shard_count).unwrap_or(0) as usize;
+    let data_shard_count = manifest
+        .as_ref()
+        .map(|m| usize::try_from(encoding_view(m).data_shards).unwrap_or(0))
+        .unwrap_or(0);
 
-    let shards: Vec<ShardInfoView> = shard_hashes
+    let shards: Vec<ShardInfoView> = shard_cids
         .iter()
         .enumerate()
         .map(|(i, hash)| {
             let peers: Vec<String> = locations
                 .iter()
-                .filter(|l| l.shard_hash == *hash)
+                .filter(|l| l.shard_cid == *hash)
                 .map(|l| l.peer_id.clone())
                 .collect();
             let status = if peers.is_empty() {
@@ -199,7 +198,7 @@ async fn handle_get_resilience(
     let shards_with_locations = shards.iter().filter(|s| !s.peer_ids.is_empty()).count() as i32;
 
     let distribution = DistributionView {
-        total_shards: shard_hashes.len() as i32,
+        total_shards: shard_cids.len() as i32,
         shards_with_locations,
         distinct_peers: distinct_peers.len() as i32,
         shards,
@@ -281,8 +280,13 @@ async fn handle_verify_resilience(
                 StorageError::NotFound(format!("No shard manifest for {}", content_id))
             })?;
 
-    let shard_hashes: Vec<String> =
-        serde_json::from_str(&manifest_row.shard_hashes_json).unwrap_or_default();
+    let manifest = crate::db::shard_manifests::hydrate_manifest(&manifest_row)?;
+    let shard_cids: Vec<String> = manifest
+        .custody_units()
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    let encoding_info = encoding_view(&manifest);
 
     // 2. Get shard locations to assess availability
     let locations = crate::db::shard_locations::get_locations_for_content(
@@ -295,16 +299,16 @@ async fn handle_verify_resilience(
     let mut available = 0i32;
 
     // Count shards that have at least one non-lost location
-    for hash in &shard_hashes {
+    for hash in &shard_cids {
         let has_location = locations
             .iter()
-            .any(|l| l.shard_hash == *hash && l.status != "lost");
+            .any(|l| l.shard_cid == *hash && l.status != "lost");
         if has_location {
             available += 1;
         }
     }
 
-    // 3. Look up original content to get blob_hash for comparison
+    // 3. Look up original content to get blob_cid for comparison
     // Internal resilience check — inspects local content regardless of publish state.
     let content = crate::db::content_diesel::get_content(
         &mut conn,
@@ -313,23 +317,22 @@ async fn handle_verify_resilience(
         crate::db::content_diesel::MinTrust::Invisible,
     )?;
 
-    let data_shards = manifest_row.data_shard_count;
-    let _parity_shards = manifest_row.parity_shard_count;
+    let data_shards = encoding_info.data_shards;
 
     // Availability check: verifies shard locations exist, does not fetch/reconstruct bytes
-    let total_shards = shard_hashes.len() as i32;
+    let total_shards = shard_cids.len() as i32;
     let missing = total_shards - available;
 
     let (verified, reconstructed_hash, shards_located, shards_missing, error_msg) =
         if let Some(ref content) = content {
-            if let Some(ref blob_hash) = content.blob_hash {
+            if let Some(ref blob_cid) = content.blob_cid {
                 // Check whether enough shards have known locations for
                 // reconstruction to be theoretically possible.
                 let data_shards_needed = data_shards;
                 let sufficient = available >= data_shards_needed;
 
                 if sufficient {
-                    (true, blob_hash.clone(), available, missing, None)
+                    (true, blob_cid.clone(), available, missing, None)
                 } else {
                     (
                         false,
@@ -366,17 +369,46 @@ async fn handle_verify_resilience(
     let result = VerificationResultView {
         content_id: content_id.to_string(),
         verified,
-        encoding: manifest_row.encoding,
+        encoding: encoding_info.strategy,
         shards_available: available,
         shards_needed: data_shards,
         shards_located,
         shards_missing,
         reconstruction_time_ms: elapsed.as_millis() as u64,
-        original_hash: manifest_row.blob_hash,
+        original_hash: manifest_row.blob_cid,
         reconstructed_hash,
         hash_match: verified,
         error: error_msg,
     };
 
     Ok(response::ok(&result))
+}
+
+/// The encoding summary of a manifest: its erasure id, the units that must all be
+/// present (every chunk under `none`, else `data` shards per stripe) and the parity
+/// it adds, its length, and its largest unit.
+fn encoding_view(m: &crate::sharding::ShardManifest) -> EncodingInfoView {
+    let units = m.custody_units().len();
+    let (data, parity) = if m.stripes.is_empty() {
+        (units, 0)
+    } else {
+        let stripes = m.stripes.len();
+        (
+            usize::from(m.erasure.data) * stripes,
+            usize::from(m.erasure.parity) * stripes,
+        )
+    };
+    let largest_unit = m
+        .shards()
+        .map(|(_, s)| i64::from(s.len))
+        .chain(m.chunks.iter().map(|c| i64::from(c.len)))
+        .max()
+        .unwrap_or(0);
+    EncodingInfoView {
+        strategy: m.erasure.id.clone(),
+        data_shards: i32::try_from(data).unwrap_or(i32::MAX),
+        parity_shards: i32::try_from(parity).unwrap_or(i32::MAX),
+        total_size_bytes: i64::try_from(m.byte_len).unwrap_or(i64::MAX),
+        shard_size_bytes: largest_unit,
+    }
 }

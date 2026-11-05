@@ -17,7 +17,7 @@
 //!
 //! ```text
 //!   GET /db/content/community-garden-club -> 403 {"requiredReach":"community"}
-//!   GET /blob/bafkrei…                    -> 200  (the same row's bytes)
+//!   GET /blob/<cid>                       -> 200  (the same row's bytes)
 //! ```
 //!
 //! Reproduced through both doorways (including a COLD one that had never cached
@@ -84,13 +84,11 @@ impl BlobReference {
 
 /// Every content row that references any of `hash_candidates`.
 ///
-/// The byte route receives a blob address in whichever form the caller had —
-/// `sha256-<hex>`, `blake3-<hex>`, or a `bafkrei…` CID — and the content row may
-/// record it in any of three columns (`blob_hash`, `blob_cid`,
-/// `server_blob_hash`), so the caller passes every form it has resolved and this
-/// matches across all three. A caller that resolved fewer forms gets a smaller
-/// reference set, which can only ever make the verdict MORE permissive — so the
-/// caller must pass the aliases it already looked up for backend selection.
+/// The byte route admits exactly one address form — the byte CID, by full decode —
+/// and a content row records its payloads in two columns (`blob_cid`,
+/// `server_blob_cid`) by the same canonical text, so one candidate matches every
+/// row that names the bytes. There is no second spelling a request could use to
+/// match fewer rows (the address-form bypass of 2026-08-24 is closed by type).
 ///
 /// bounded-work: one indexed SELECT over `content`, capped at
 /// [`MAX_REFERENCES`] rows. A blob referenced by more rows than that is
@@ -109,10 +107,9 @@ pub fn lookup_references(
 
     let rows: Vec<(String, String)> = c::content
         .filter(
-            c::blob_hash
+            c::blob_cid
                 .eq_any(hash_candidates)
-                .or(c::blob_cid.eq_any(hash_candidates))
-                .or(c::server_blob_hash.eq_any(hash_candidates)),
+                .or(c::server_blob_cid.eq_any(hash_candidates)),
         )
         .select((c::id, c::reach))
         .limit(MAX_REFERENCES)
@@ -221,30 +218,22 @@ mod tests {
         }
     }
 
-    /// Address-form independence (red-team 2026-08-24). The wiring in
-    /// `HttpServer::blob_reach_refusal` must enumerate BOTH renderings of a
-    /// digest — `sha256-<hex>` and the raw-codec `bafkrei…` CID — because a
-    /// content row may store either. This test pins the property the wiring
-    /// relies on: the two renderings of one digest are byte-distinct strings, so
-    /// a candidate set that includes only the request's own form misses a row
-    /// storing the other. (The construction itself is `BlobStore::hash_to_cid`,
-    /// round-trip-tested in blob_store.rs; here we assert they are NOT equal so a
-    /// future refactor that dropped one rendering would fail loudly.)
+    /// Address-form independence (red-team 2026-08-24), now by type: the only
+    /// admissible spelling of a payload address is its byte CID, so a request cannot
+    /// name the same bytes in a second form that matches fewer referencing rows.
+    /// The `sha256-<hex>`, `blake3-<hex>` and raw+sha2 (`bafkrei…`) spellings of
+    /// the same bytes are refused before any lookup.
     #[test]
-    fn the_two_renderings_of_one_digest_are_distinct_and_both_needed() {
-        let hex = "26d7ced97ee329025135f0ad4791b3e24d526b200b9147943450cb9141480406";
-        let sha_form = format!("sha256-{hex}");
-        let cid = crate::blob_store::BlobStore::hash_to_cid(hex).expect("valid sha256 hex");
-        let cid_form = cid.to_string();
-        assert!(
-            cid_form.starts_with("bafkrei"),
-            "raw-codec CID renders as bafkrei…, got {cid_form}"
-        );
-        assert_ne!(
-            sha_form, cid_form,
-            "the two renderings differ, so a candidate set MUST carry both to match a row \
-             storing either — this is the address-form bypass the wiring closes"
-        );
+    fn only_the_byte_cid_spelling_of_a_payload_is_admitted() {
+        use elohim_epr::address::{compute_bytes_cid, compute_raw_sha2_cid, ByteCid};
+        let bytes = b"community garden photo";
+        let cid = compute_bytes_cid(bytes);
+        assert_eq!(ByteCid::parse(&cid.to_string()), Ok(cid));
+        let hex = hex::encode(cid.digest());
+        assert!(ByteCid::parse(&format!("sha256-{hex}")).is_err());
+        assert!(ByteCid::parse(&format!("blake3-{hex}")).is_err());
+        assert!(ByteCid::parse(&compute_raw_sha2_cid(bytes).to_string()).is_err());
+        assert!(ByteCid::parse(&hex).is_err());
     }
 
     #[test]

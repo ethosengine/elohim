@@ -27,7 +27,7 @@ pub enum ShardStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShardAssignment {
     pub assignment_hash: Option<String>,
-    pub content_hash: String,
+    pub content_cid: String,
     pub custodian_did: String,
     pub shard_index: u32,
     pub strategy: ShardingStrategy,

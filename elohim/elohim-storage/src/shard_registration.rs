@@ -154,14 +154,14 @@ impl ShardRegistrationQueue {
         queue: &Arc<Self>,
     ) {
         let shard_index = assignment.shard_index;
-        let content_hash = assignment.content_hash.clone();
+        let content_cid = assignment.content_cid.clone();
         match tokio::time::timeout(REGISTRATION_TIMEOUT, registrar.register(assignment)).await {
             Ok(Ok(_)) => {
                 crate::metrics::inc_shard_registration("completed");
                 queue.completed.fetch_add(1, Ordering::Relaxed);
                 info!(
                     shard_index,
-                    content_hash = %content_hash,
+                    content_cid = %content_cid,
                     "Registered shard assignment with Node Registry (background)"
                 );
             }
@@ -171,7 +171,7 @@ impl ShardRegistrationQueue {
                 warn!(
                     error = %e,
                     shard_index,
-                    content_hash = %content_hash,
+                    content_cid = %content_cid,
                     "Background shard-assignment registration failed"
                 );
             }
@@ -180,7 +180,7 @@ impl ShardRegistrationQueue {
                 queue.failed.fetch_add(1, Ordering::Relaxed);
                 warn!(
                     shard_index,
-                    content_hash = %content_hash,
+                    content_cid = %content_cid,
                     timeout_secs = REGISTRATION_TIMEOUT.as_secs(),
                     "Background shard-assignment registration timed out"
                 );
@@ -216,7 +216,7 @@ mod tests {
     fn test_assignment(idx: u32) -> ShardAssignment {
         ShardAssignment {
             assignment_hash: None,
-            content_hash: format!("hash-{idx}"),
+            content_cid: format!("hash-{idx}"),
             custodian_did: "did:elohim:test".to_string(),
             shard_index: idx,
             strategy: crate::node_registry_api::ShardingStrategy::Geographic,

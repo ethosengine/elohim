@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn address_and_root_apply_their_distinct_no_record_rows() {
         let address = Subject::Address {
-            hash: "sha256-address".to_string(),
+            hash: "bafkr4iczfqi76fwmjg44v53ltf5o7nn6orjdejapiu7emtkku74gz7267m".to_string(),
         };
         assert!(no_record_verdict(EgressPlane::HttpBlob, &address).is_permit());
 
@@ -495,7 +495,7 @@ mod tests {
     #[test]
     fn identified_http_blob_refusal_reports_the_first_reference() {
         let subject = Subject::Address {
-            hash: "sha256-address".to_string(),
+            hash: "bafkr4iczfqi76fwmjg44v53ltf5o7nn6orjdejapiu7emtkku74gz7267m".to_string(),
         };
         let records = [
             crate::blob_reach::BlobReference::new("private-row", "private"),

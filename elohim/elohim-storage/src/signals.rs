@@ -17,8 +17,9 @@
 //! - `blob_chunk` - "Here's a chunk" (for small chunks only)
 //! - `blob_transfer_init` - "Let's do a direct transfer"
 
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::error::StorageError;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -134,12 +135,16 @@ impl SignalHandler {
         hash: &str,
         requester: &str,
     ) -> Result<Option<BlobSignal>, StorageError> {
-        if !self.store.exists(hash).await {
+        let Ok(cid) = ByteCid::parse(hash) else {
+            debug!(hash = %hash, "Blob request names no byte CID; ignored");
+            return Ok(None);
+        };
+        if self.store.exists(&cid).await != Exists::Verified {
             debug!(hash = %hash, "Blob request received but we don't have it");
             return Ok(None);
         }
 
-        let size_bytes = self.store.size(hash).await?;
+        let size_bytes = self.store.size(&cid).await?;
 
         info!(hash = %hash, requester = %requester, size = size_bytes, "Announcing blob availability");
 
@@ -221,7 +226,7 @@ impl SignalHandler {
                 }
 
                 // Verify hash
-                let computed_hash = BlobStore::compute_hash(&full_data);
+                let computed_hash = compute_bytes_cid(&full_data).to_string();
                 if computed_hash != hash {
                     return Err(StorageError::HashMismatch {
                         expected: hash.to_string(),
@@ -263,8 +268,10 @@ impl SignalHandler {
 
     /// Request a blob from the network
     pub async fn request_blob(&self, hash: &str) -> Result<(), StorageError> {
+        let cid = ByteCid::parse(hash)
+            .map_err(|e| StorageError::InvalidInput(format!("not a byte CID: {e}")))?;
         // Check if we already have it
-        if self.store.exists(hash).await {
+        if self.store.exists(&cid).await == Exists::Verified {
             debug!(hash = %hash, "Already have blob, skipping request");
             return Ok(());
         }
@@ -298,7 +305,9 @@ impl SignalHandler {
         hash: &str,
         _requester: &str,
     ) -> Result<Vec<BlobSignal>, StorageError> {
-        let data = self.store.get(hash).await?;
+        let cid = ByteCid::parse(hash)
+            .map_err(|e| StorageError::InvalidInput(format!("not a byte CID: {e}")))?;
+        let data = self.store.get(&cid).await?.to_vec();
         let size = data.len();
 
         if size <= MAX_SIGNAL_CHUNK_SIZE {
@@ -4163,7 +4172,7 @@ mod mishpat_replication_mirror_tests {
             "ratio_attestation": {
                 "commons_pct": 20, "dwelling_pct": 40,
                 "collective_pct": 25, "free_pct": 15,
-                "effective_ratio_cid": "bafkrei-x"
+                "effective_ratio_cid": "bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"
             }
         })
         .to_string()

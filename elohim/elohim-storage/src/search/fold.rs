@@ -43,7 +43,6 @@ use elohim_epr_index::store::{ChunkRow, LiveUnit, Store, UnitChunks, SCHEMA_VERS
 use elohim_epr_rea::{atom_cid, AgentRef, FoldAttestation, FoldState};
 
 use super::measure::Declared;
-use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 
 /// The directory under `storage_dir` every index lives in, one subdirectory per measure CID.
@@ -95,10 +94,10 @@ pub fn store_path(storage_dir: &Path, measure_cid: &str) -> PathBuf {
     store_dir(storage_dir, measure_cid).join(STORE_FILE)
 }
 
-/// The raw CID (`CIDv1`, raw codec, sha2-256) of `bytes`, as its string — the peer's one raw
-/// address ([`BlobStore::compute_cid`]), the same a blob's `blob_cid` is minted by.
+/// The byte CID (`CIDv1`, raw codec, BLAKE3-256) of `bytes`, as its string — the peer's one
+/// byte address, the same a blob's `blob_cid` is minted by.
 pub fn raw_cid(bytes: &[u8]) -> String {
-    BlobStore::compute_cid(bytes).to_string()
+    elohim_epr::address::compute_bytes_cid(bytes).to_string()
 }
 
 /// The fingerprint of a content row: its own CID — `blob_cid` when the row names one, else the

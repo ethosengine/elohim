@@ -223,23 +223,41 @@ mod tests {
     /// Verify the atoms/{cid}/{action} split produces the expected parts.
     #[test]
     fn path_split_resolved() {
-        let rest = "sha256-abc/resolved";
+        let rest = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu/resolved";
         let parts: Vec<&str> = rest.splitn(3, '/').collect();
-        assert_eq!(parts, ["sha256-abc", "resolved"]);
+        assert_eq!(
+            parts,
+            [
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "resolved"
+            ]
+        );
     }
 
     #[test]
     fn path_split_navigation() {
-        let rest = "sha256-abc/navigation";
+        let rest = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu/navigation";
         let parts: Vec<&str> = rest.splitn(3, '/').collect();
-        assert_eq!(parts, ["sha256-abc", "navigation"]);
+        assert_eq!(
+            parts,
+            [
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "navigation"
+            ]
+        );
     }
 
     #[test]
     fn path_split_version_chain() {
-        let rest = "sha256-abc/version-chain";
+        let rest = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu/version-chain";
         let parts: Vec<&str> = rest.splitn(3, '/').collect();
-        assert_eq!(parts, ["sha256-abc", "version-chain"]);
+        assert_eq!(
+            parts,
+            [
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "version-chain"
+            ]
+        );
     }
 
     /// Topology-overview has no sub-path; just the bare route.
@@ -252,7 +270,7 @@ mod tests {
     /// Extra segments should NOT match atoms/{cid}/{action}.
     #[test]
     fn path_rejects_extra_segments() {
-        let rest = "sha256-abc/resolved/extra";
+        let rest = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu/resolved/extra";
         let parts: Vec<&str> = rest.splitn(3, '/').collect();
         // splitn(3) produces ["sha256-abc", "resolved", "extra"] — 3 items,
         // so the 2-element match arms won't fire → falls through to 404.

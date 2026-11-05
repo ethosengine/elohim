@@ -3,9 +3,9 @@
 //! Provides REST endpoints for storing and retrieving shards:
 //!
 //! ## Shard API (Direct Shard Access)
-//! - `PUT /shard/{shard_hash}` - Store a shard
-//! - `GET /shard/{shard_hash}` - Retrieve a shard
-//! - `HEAD /shard/{shard_hash}` - Check if shard exists
+//! - `PUT /shard/{shard_cid}` - Store a shard
+//! - `GET /shard/{shard_cid}` - Retrieve a shard
+//! - `HEAD /shard/{shard_cid}` - Check if shard exists
 //!
 //! ## Blob API (Convenience - Auto-Sharding)
 //! - `PUT /blob/{blob_hash}` - Store blob, auto-create manifest
@@ -32,7 +32,7 @@
 //! curl http://localhost:8090/manifest/sha256-xyz789
 //! ```
 
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::db::content_diesel::ContentQuery;
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
@@ -109,6 +109,7 @@ use crate::views::{
 use bytes::Bytes;
 use doorway_client::{DoorwayRoutesBuilder, Route};
 use elohim_cache_core::extraction::ExtractionCache;
+use elohim_epr::address::{compute_bytes_cid, ByteCid};
 use http_body_util::{BodyExt, Either, Full};
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
@@ -591,7 +592,7 @@ pub struct HttpServer {
     /// declared in `/manifest` so a doorway's registry reaches them.
     content_chrome: bool,
     /// Whether an app bundle's bytes matched their content address, per
-    /// canonical `sha256-{hex}` key — recorded when the bundle is extracted
+    /// canonical byte-CID key — recorded when the bundle is extracted
     /// (`handle_app_request`'s slow path hashes the ZIP it is about to unpack)
     /// ONLY while [`Self::content_chrome`] is on; off, nothing is hashed or
     /// recorded. The peer-native shell reports `delivery.checked {by:"peer"}`
@@ -828,63 +829,78 @@ fn validate_schema_version_header(req: &Request<Incoming>) -> Result<Option<u32>
 /// (`content_reach_gate::reach_refusal`), never by a second one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SlugEntry {
-    blob_hash: String,
+    /// The bundle's canonical byte-CID text.
+    blob_cid: String,
     content_id: String,
 }
 
-/// Check whether an identifier is a content address rather than a
-/// human-readable slug. Used by `/apps/` routes to decide whether to resolve
-/// via `slug_index` or treat the identifier as a direct blob address.
-///
-/// TWO spellings of one address are accepted, and both are canonical inputs:
-///
-/// - **CIDv1 base32** (`bafkrei…` raw+sha2-256, `bafyrei…` dag-cbor) — the
-///   canonical protocol address (root CLAUDE.md / p2p-design-gate). This is
-///   what `X-Content-Address` reports, so a client that round-trips that header
-///   back into `/apps/{identifier}/…` MUST resolve; before this recognizer knew
-///   CIDv1, it fell through to slug lookup and 404'd `App not found: bafkrei…`.
-/// - **`sha256-{hex}`** — the legacy alias, and the on-disk blob-store key.
-///
-/// A CID candidate is validated with the `cid` crate rather than matched on its
-/// `baf` prefix, so a slug that merely starts with `baf` (`bafflegab-app`)
-/// stays a slug.
+/// Whether an `/apps/{identifier}` names a byte CID (`bafkr4i…`, admitted by full
+/// decode) rather than a human-readable slug. A slug that merely starts with `baf`
+/// (`bafflegab-app`) stays a slug; no other address spelling is recognized.
 fn is_content_address(identifier: &str) -> bool {
-    if identifier.starts_with("sha256-") && identifier.len() > 10 {
-        return true;
-    }
-    identifier.starts_with("baf") && cid::Cid::from_str(identifier).is_ok()
+    ByteCid::parse(identifier).is_ok()
 }
 
-/// Canonical `sha256-{hex}` form of a content address (CIDv1 or `sha256-…`),
-/// or `None` when the identifier is not an address at all.
-///
-/// Both spellings of one address normalize to a single key so `/apps/{cid}/…`
-/// and `/apps/{sha256-…}/…` share ONE extraction-cache entry (and one blob
-/// path) instead of extracting the same bundle twice under two names.
+/// The canonical byte-CID text of an `/apps/{identifier}` address, or `None` when the
+/// identifier is not a byte CID (a slug).
 fn canonical_content_address(identifier: &str) -> Option<String> {
-    BlobStore::parse_content_address(identifier)
-        .ok()
-        .map(|hex| format!("sha256-{}", hex))
+    ByteCid::parse(identifier).ok().map(|cid| cid.to_string())
 }
 
-/// The one spelling `X-Content-Address` reports: CIDv1 base32 (`bafkrei…`).
-///
-/// Internally an app is keyed by its blob-store key (`sha256-{hex}`) — the
-/// `/apps/{cid}/…` path normalizes to it, and a content row seeded before the
-/// CID-first migration still carries it as `blobHash`. Echoing that key on
-/// the wire made the SAME bundle answer `bafkrei…` on its slug URL and
-/// `sha256-…` on its CID URL (a2o `content-addressing.feature`, 2026-08-22),
-/// so a client could not compare the two addresses. Render every emission
-/// through here; an input that is neither spelling is passed through so a
-/// malformed key is still visible rather than silently dropped.
-fn content_address_header(blob_hash: &str) -> String {
-    if blob_hash.starts_with("sha256-") {
-        BlobStore::hash_to_cid(blob_hash)
-            .map(|cid| cid.to_string())
-            .unwrap_or_else(|_| blob_hash.to_string())
-    } else {
-        blob_hash.to_string()
+/// The typed 400 every byte route answers for a path segment that is not a byte CID:
+/// `{"error":"invalid-byte-cid","check":<failed check>,"detail":<reason>}`. No other
+/// spelling (`sha256-…`, `blake3-…`, `bafkrei…`, bare hex) is admitted.
+/// Read one IPFS/DAG block by its CID text through the lane its profile names: a
+/// dag-cbor record (`0x71 + sha2-256`) from the record lane, a byte CID from the
+/// payload store. Text that is no CID, or a CID of any other profile, is not held
+/// here (`NotFound`).
+async fn read_block_by_cid_text(store: &BlobStore, cid_text: &str) -> Result<Bytes, StorageError> {
+    let cid =
+        cid::Cid::from_str(cid_text).map_err(|_| StorageError::NotFound(cid_text.to_string()))?;
+    if cid.codec() == 0x71 {
+        return store.get_record(&cid).await;
     }
+    match ByteCid::try_from(cid) {
+        Ok(byte_cid) => store.get(&byte_cid).await,
+        Err(_) => Err(StorageError::NotFound(cid_text.to_string())),
+    }
+}
+
+fn invalid_byte_cid_response(error: &elohim_epr::address::AddressError) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "error": "invalid-byte-cid",
+        "check": error.check(),
+        "detail": error.to_string(),
+    });
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// The typed 400 for a body that does not hash to the byte CID its path names:
+/// `{"error":"cid-mismatch","expected":<cid>,"actual":<cid>}`. Nothing is stored.
+fn cid_mismatch_response(expected: &ByteCid, actual: &ByteCid) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "error": "cid-mismatch",
+        "expected": expected.to_string(),
+        "actual": actual.to_string(),
+    });
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Parse a byte route's path segment, or the typed 400 that refuses it.
+#[allow(
+    clippy::result_large_err,
+    reason = "the Err arm is the finished HTTP response the route returns as-is"
+)]
+fn parse_byte_cid_param(text: &str) -> Result<ByteCid, Response<Full<Bytes>>> {
+    ByteCid::parse(text).map_err(|e| invalid_byte_cid_response(&e))
 }
 
 /// Stamp the peer's deliverability verdict on an app surface. Additive: a
@@ -940,7 +956,7 @@ async fn deliverability_lookup(
 /// client can tell "syncing, retry" from "finalize failed, retry".
 fn syncing_blob_body(hash: &str) -> String {
     format!(
-        r#"{{"status":"syncing","blobHash":"{}","hint":"bytes are being pulled from peers; retry"}}"#,
+        r#"{{"status":"syncing","blobCid":"{}","hint":"bytes are being pulled from peers; retry"}}"#,
         hash
     )
 }
@@ -1108,7 +1124,7 @@ enum LocalBlobRead {
     MissingShard {
         manifest: Box<ShardManifest>,
         index: usize,
-        shard_hash: String,
+        shard_cid: String,
     },
     /// No manifest and no bytes under this address.
     Absent,
@@ -1122,78 +1138,6 @@ enum FinalizeFailure {
     PoolExhausted,
     /// Filesystem persist or the wrapping SQL transaction failed.
     Persist,
-}
-
-/// Why a blob write is refused before anything is persisted.
-///
-/// Both arms mean the same thing: the shard bytes about to be stored and the
-/// manifest hashes that name them disagree, so storing them would leave shards
-/// filed under addresses that do not describe their contents.
-#[derive(Debug, PartialEq, Eq)]
-enum ShardWriteRefusal {
-    /// The producer emitted a different number of shards than the manifest names.
-    CountMismatch { produced: usize, named: usize },
-    /// A shard's bytes do not hash to the address the manifest files it under.
-    HashMismatch {
-        index: usize,
-        named: String,
-        produced: String,
-    },
-}
-
-impl ShardWriteRefusal {
-    fn message(&self) -> String {
-        match self {
-            Self::CountMismatch { produced, named } => format!(
-                "shard count mismatch: producer emitted {produced}, manifest names {named} — nothing stored"
-            ),
-            Self::HashMismatch {
-                index,
-                named,
-                produced,
-            } => format!(
-                "shard hash mismatch at index {index}: manifest names {named}, produced {produced} — nothing stored"
-            ),
-        }
-    }
-}
-
-impl std::fmt::Display for ShardWriteRefusal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message())
-    }
-}
-
-/// The write-time agreement check between produced shard bytes and the manifest
-/// that names them.
-///
-/// Pure and total by design: it consumes the whole shard set before returning,
-/// so `put_blob_bytes` can run it entirely above its store loop. That ordering
-/// — not a review convention — is what makes a refused write leave zero shards
-/// behind.
-fn verify_shards_against_manifest(
-    shards: &[Vec<u8>],
-    shard_hashes: &[String],
-) -> Result<(), ShardWriteRefusal> {
-    if shards.len() != shard_hashes.len() {
-        return Err(ShardWriteRefusal::CountMismatch {
-            produced: shards.len(),
-            named: shard_hashes.len(),
-        });
-    }
-
-    for (index, (shard_data, named)) in shards.iter().zip(shard_hashes.iter()).enumerate() {
-        let produced = BlobStore::compute_hash(shard_data);
-        if produced != *named {
-            return Err(ShardWriteRefusal::HashMismatch {
-                index,
-                named: named.clone(),
-                produced,
-            });
-        }
-    }
-
-    Ok(())
 }
 
 /// Extract the `elohim_session` cookie value from a request's `Cookie` header.
@@ -2074,16 +2018,22 @@ impl HttpServer {
             ) {
                 Ok(items) => {
                     for item in items {
-                        let blob_hash = item.content.blob_hash.clone().unwrap_or_default();
-                        if blob_hash.is_empty() {
+                        // Only a byte CID (full decode) names a servable bundle.
+                        let Some(blob_cid) = item
+                            .content
+                            .blob_cid
+                            .as_deref()
+                            .and_then(|text| ByteCid::parse(text).ok())
+                            .map(|cid| cid.to_string())
+                        else {
                             continue;
-                        }
+                        };
                         // Index by row id (the slug the EPR router requests via
                         // /apps/{epr_id}) AND by the inner content_body slug, so a
                         // row whose inner slug differs from its id (lamad-spa's
                         // inner slug is "lamad") still resolves by either key.
                         let entry = SlugEntry {
-                            blob_hash: blob_hash.clone(),
+                            blob_cid: blob_cid.clone(),
                             content_id: item.content.id.clone(),
                         };
                         index.insert(item.content.id.clone(), entry.clone());
@@ -2095,7 +2045,7 @@ impl HttpServer {
                                 }
                             }
                         }
-                        info!(id = %item.content.id, blob_hash = %blob_hash, "Indexed app bundle");
+                        info!(id = %item.content.id, blob_cid = %blob_cid, "Indexed app bundle");
                     }
                 }
                 Err(e) => {
@@ -2890,21 +2840,6 @@ impl HttpServer {
                 } else {
                     Ok(response::service_unavailable("db pool not available"))
                 }
-            }
-
-            // Operator setter for per-object blob transport affinity
-            // (iroh-toggle sprint). POST /admin/blob-transport-affinity/{hash}
-            // body {"affinity":"iroh-only"|"libp2p-only"|"prefer-iroh"|
-            // "prefer-libp2p"|"auto"}. "auto" (or null) clears to default
-            // policy. Node-local; makes the choose_backend toggle usable for
-            // A/B without waiting on gossip. Inert in libp2p mode.
-            #[cfg(feature = "p2p-iroh")]
-            (Method::POST, p) if p.starts_with("/admin/blob-transport-affinity/") => {
-                let hash = p
-                    .strip_prefix("/admin/blob-transport-affinity/")
-                    .unwrap_or("")
-                    .to_string();
-                self.handle_set_blob_transport_affinity(&hash, req).await
             }
 
             // SSE event stream — must be matched before the /api/v1/ catch-all
@@ -3933,55 +3868,39 @@ impl HttpServer {
             .unwrap())
     }
 
-    /// PUT /shard/{hash} - Store a shard
+    /// `PUT /shard/{cid}` — store one shard. The path must be a byte CID (else the typed
+    /// 400) and the body must hash to it (else `cid-mismatch`, nothing stored).
     async fn handle_put_shard(
         &self,
         req: Request<Incoming>,
-        expected_hash: &str,
+        cid_text: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Read body
+        let expected = match parse_byte_cid_param(cid_text) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
         let body = req
             .collect()
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let data = body.to_bytes();
-
-        // Verify hash - normalize both to hex for comparison
-        // URL may contain raw hex, sha256-prefixed, or CID format
-        let computed_hash = BlobStore::compute_hash(&data);
-        let computed_hex = computed_hash
-            .strip_prefix("sha256-")
-            .unwrap_or(&computed_hash);
-        let expected_hex = expected_hash
-            .strip_prefix("sha256-")
-            .unwrap_or(expected_hash);
-
-        if !expected_hash.is_empty() && computed_hex != expected_hex {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from(format!(
-                    "Hash mismatch: expected {}, got {}",
-                    expected_hash, computed_hash
-                ))))
-                .unwrap());
+        let actual = compute_bytes_cid(&data);
+        if actual != expected {
+            return Ok(cid_mismatch_response(&expected, &actual));
         }
 
-        // Store shard
         let result = self.blob_store.store(&data).await?;
-
         info!(
-            hash = %result.hash,
-            size = result.size_bytes,
+            cid = %result.cid,
+            byte_len = result.byte_len,
             existed = result.already_existed,
             "Stored shard"
         );
-
         let body = serde_json::json!({
-            "hash": result.hash,
-            "sizeBytes": result.size_bytes,
+            "cid": result.cid.to_string(),
+            "byteLen": result.byte_len,
             "alreadyExisted": result.already_existed,
         });
-
         Ok(Response::builder()
             .status(if result.already_existed {
                 StatusCode::OK
@@ -3989,37 +3908,35 @@ impl HttpServer {
                 StatusCode::CREATED
             })
             .header(header::CONTENT_TYPE, "application/json")
+            .header("X-Content-Address", result.cid.to_string())
             .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
     }
 
-    /// GET /shard/{hash} - Retrieve a shard
-    async fn handle_get_shard(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
-        if hash.is_empty() {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Missing shard hash")))
-                .unwrap());
-        }
-        // Same key resolution as the wire shard plane (`ShardService::handle_get`):
-        // any accepted spelling reads the one on-disk key, so this route is a
-        // faithful local probe of what a peer's `ShardRequest::Get` will see.
-        let hash = &crate::shard_service::on_disk_key(hash);
-
-        match self.blob_store.get(hash).await {
+    /// `GET /shard/{cid}` — the same verified read the wire shard plane answers from.
+    async fn handle_get_shard(
+        &self,
+        cid_text: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let cid = match parse_byte_cid_param(cid_text) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
+        match self.blob_store.get(&cid).await {
             Ok(data) => {
-                info!(hash = %hash, size = data.len(), "Serving shard");
-
+                info!(cid = %cid, size = data.len(), "Serving shard");
                 Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/octet-stream")
                     .header(header::CONTENT_LENGTH, data.len())
-                    .header(header::ETAG, format!("\"{}\"", hash))
+                    .header(header::ETAG, format!("\"{}\"", cid))
+                    .header("X-Content-Address", cid.to_string())
                     .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                    .body(Full::new(Bytes::from(data)))
+                    .body(Full::new(data))
                     .unwrap())
             }
-            Err(StorageError::NotFound(_)) => Ok(Response::builder()
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_))
+            | Err(StorageError::HashMismatch { .. }) => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Full::new(Bytes::from("Shard not found")))
                 .unwrap()),
@@ -4027,88 +3944,91 @@ impl HttpServer {
         }
     }
 
-    /// HEAD /shard/{hash} - Check if shard exists
-    async fn handle_head_shard(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
-        if hash.is_empty() {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::new()))
-                .unwrap());
-        }
-
-        let hash = &crate::shard_service::on_disk_key(hash);
-        match self.blob_store.size(hash).await {
+    /// `HEAD /shard/{cid}` — structural presence (`Exists::Verified`) and length.
+    async fn handle_head_shard(
+        &self,
+        cid_text: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let cid = match parse_byte_cid_param(cid_text) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
+        // The length read first: it separates absence (404) from a storage failure
+        // (an error), which the structural `exists` probe folds together.
+        match self.blob_store.size(&cid).await {
+            Ok(_) if self.blob_store.exists(&cid).await != Exists::Verified => {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Full::new(Bytes::new()))
+                    .unwrap())
+            }
             Ok(size) => Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/octet-stream")
                 .header(header::CONTENT_LENGTH, size)
-                .header(header::ETAG, format!("\"{}\"", hash))
+                .header(header::ETAG, format!("\"{}\"", cid))
+                .header("X-Content-Address", cid.to_string())
                 .body(Full::new(Bytes::new()))
                 .unwrap()),
-            Err(StorageError::NotFound(_)) => Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Full::new(Bytes::new()))
-                .unwrap()),
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
+                Ok(Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(Full::new(Bytes::new()))
+                    .unwrap())
+            }
             Err(error) => Err(error),
         }
     }
 
-    /// PUT /blob/{hash} - Store blob with auto-sharding
+    /// `PUT /blob/{cid}` — store a payload. The path must be a byte CID (typed 400 else);
+    /// the body must hash to it (`cid-mismatch` 400 else, nothing stored).
     async fn handle_put_blob(
         &self,
         req: Request<Incoming>,
-        expected_hash: &str,
+        cid_text: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Get content type from header
+        let expected = match parse_byte_cid_param(cid_text) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
         let mime_type = req
             .headers()
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("application/octet-stream")
             .to_string();
-
         let agent_id =
             Self::extract_agent_id(&req).unwrap_or_else(|| "did:elohim:storage".to_string());
-
-        // Read body
         let body = req
             .collect()
             .await
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let data = body.to_bytes().to_vec();
-
-        self.put_blob_bytes(data, expected_hash, &mime_type, &agent_id)
+        self.put_blob_bytes(data, &expected, &mime_type, &agent_id)
             .await
     }
 
     /// Inner implementation of blob PUT — decoupled from `Request<Incoming>` so
     /// integration tests can call it directly without a live HTTP connection.
+    ///
+    /// The payload goes to the one authoritative payload store ([`BlobStore`], C10:
+    /// chunked under the byte profile, durable before it answers). Its manifest — the
+    /// declared chunker and erasure parameters, chunks and, above the RS threshold,
+    /// stripes — is minted by the same producer that cut it and answered as the
+    /// [`PutBlobResponseView`]. Stripe shards are derived for distribution; they are
+    /// not stored here under their own CIDs.
     async fn put_blob_bytes(
         &self,
         data: Vec<u8>,
-        expected_hash: &str,
+        expected: &ByteCid,
         mime_type: &str,
         agent_id: &str,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Verify hash if provided - normalize both to hex for comparison
-        // URL may contain raw hex, sha256-prefixed, or CID format
-        let computed_hash = BlobStore::compute_hash(&data);
-        let computed_hex = computed_hash
-            .strip_prefix("sha256-")
-            .unwrap_or(&computed_hash);
-        let expected_hex = expected_hash
-            .strip_prefix("sha256-")
-            .unwrap_or(expected_hash);
-
-        if !expected_hash.is_empty() && computed_hex != expected_hex {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from(format!(
-                    "Hash mismatch: expected {}, got {}",
-                    expected_hash, computed_hash
-                ))))
-                .unwrap());
+        let actual = compute_bytes_cid(&data);
+        if actual != *expected {
+            return Ok(cid_mismatch_response(expected, &actual));
         }
+        let cid_text = actual.to_string();
 
         // How these bytes got here, recorded BEFORE they are stored and under
         // the arrival gate, held until this put has answered: this peer was
@@ -4116,12 +4036,12 @@ impl HttpServer {
         // them, and a put of bytes it was about to let go stops it.
         let _arriving = crate::db::blob_arrivals::arrival_gate().read().await;
         if let Some(pool) = self.db_pool.clone() {
-            let sha = computed_hash.clone();
+            let cid = cid_text.clone();
             let recorded = tokio::task::spawn_blocking(move || {
                 let mut conn = pool.get().map_err(|e| e.to_string())?;
                 crate::db::blob_arrivals::record_arrival(
                     &mut conn,
-                    &sha,
+                    &cid,
                     crate::db::blob_arrivals::ArrivalVia::SelfPut,
                     None,
                     None,
@@ -4130,11 +4050,10 @@ impl HttpServer {
             })
             .await;
             if !matches!(recorded, Ok(Ok(()))) {
-                tracing::warn!(sha256 = %computed_hash, result = ?recorded, "blob arrival not recorded");
+                tracing::warn!(cid = %cid_text, result = ?recorded, "blob arrival not recorded");
             }
         }
 
-        // Create shard encoder and generate manifest
         let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
         let manifest = match encoder.create_manifest(&data, mime_type, "commons") {
             Ok(m) => m,
@@ -4148,97 +4067,37 @@ impl HttpServer {
             }
         };
 
-        // Produce the shard bytes with the SAME producer that hashed them.
-        //
-        // Hand-slicing the raw body as sequential chunks is only correct for
-        // the `"chunked"` band. An `"rs-4-7"` manifest names 4 data + 3 parity
-        // shards computed over PADDED data, so `shard_size = ceil(len/4)` and
-        // the slice arithmetic runs off the end of the body at index 4 — a
-        // panic that killed the HTTP task mid-PUT (and mis-hashed the unpadded
-        // tail shard at index 3 on the way there). Every artifact above
-        // `RS_THRESHOLD` was therefore un-PUT-able. `create_shards` is the
-        // producer `create_manifest` hashes and the p2p push path already
-        // uses; there is exactly one shard producer.
-        let shards = match encoder.create_shards(&data, &manifest.encoding) {
-            Ok(s) => s,
-            Err(e) => {
-                error!(
-                    blob_hash = %manifest.blob_hash,
-                    encoding = %manifest.encoding,
-                    error = %e,
-                    "Shard production failed during blob storage"
-                );
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Full::new(Bytes::from(format!(
-                        "shard production failed: {e}"
-                    ))))
-                    .unwrap());
-            }
-        };
+        let stored = self.blob_store.store(&data).await?;
 
-        // Every shard is checked BEFORE any of them is persisted. A mismatch
-        // means the bytes and the manifest that names them disagree; storing
-        // them anyway (the old `warn!`-and-continue) leaves silently-corrupt
-        // shards that a later read reassembles into garbage under a hash that
-        // promises otherwise. Refuse the whole write instead — the check is a
-        // total function that runs to completion above the store loop, which
-        // is what "no partial store" means structurally rather than by review.
-        if let Err(refusal) = verify_shards_against_manifest(&shards, &manifest.shard_hashes) {
-            error!(
-                blob_hash = %manifest.blob_hash,
-                encoding = %manifest.encoding,
-                refusal = %refusal.message(),
-                "Refusing blob write: produced shards disagree with the manifest naming them"
-            );
-            return Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Full::new(Bytes::from(refusal.message())))
-                .unwrap());
-        }
-
-        // Store each shard locally, then hand its (advisory) Node Registry
-        // registration off to the bounded background queue instead of
-        // awaiting the conductor call here. This response used to be held
-        // hostage on one `create_shard_assignment` zome call PER SHARD before
-        // it could answer — under conductor CPU saturation that blew the
-        // doorway's client timeout on every app-bundle PUT (alpha,
-        // 2026-09-23). See `crate::shard_registration`'s module doc.
-        for (i, shard_data) in shards.iter().enumerate() {
-            self.blob_store.store(shard_data).await?;
-
-            if let Some(ref queue) = self.shard_registration_queue {
-                let assignment = crate::node_registry_api::ShardAssignment {
+        // Hand each custody unit's (advisory) Node Registry registration off to the
+        // bounded background queue instead of awaiting the conductor call here (see
+        // `crate::shard_registration`'s module doc).
+        if let Some(ref queue) = self.shard_registration_queue {
+            for (i, _) in manifest.custody_units().iter().enumerate() {
+                let now = chrono::Utc::now().to_rfc3339();
+                queue.enqueue(crate::node_registry_api::ShardAssignment {
                     assignment_hash: None,
-                    content_hash: expected_hex.to_string(), // The full content hash
-                    // Ideally, use the actual agent ID (e.g. from X-Agent-Id header) if provided;
-                    // fallback to a generic placeholder or the configured connection's role for now.
+                    content_cid: cid_text.clone(),
                     custodian_did: agent_id.to_string(),
                     shard_index: i as u32,
                     strategy: crate::node_registry_api::ShardingStrategy::Geographic,
                     status: crate::node_registry_api::ShardStatus::Active,
                     verified_at: None,
-                    created_at: chrono::Utc::now().to_rfc3339(),
-                    updated_at: chrono::Utc::now().to_rfc3339(),
-                };
-                queue.enqueue(assignment);
+                    created_at: now.clone(),
+                    updated_at: now,
+                });
             }
         }
 
-        // Store manifest
         self.manifests
             .write()
             .await
-            .insert(manifest.blob_hash.clone(), manifest.clone());
+            .insert(cid_text.clone(), manifest.clone());
 
-        // Blob ingestion is also a producer for the operational
-        // shard->blob relation. The generated manifest used to remain only in
-        // this in-memory cache, leaving persisted shard locations impossible
-        // for the custody-facing fold to resolve after a restart. This is a
-        // Category-C projection of bytes we just verified and stored, not a
-        // new content record or a DHT write.
+        // Blob ingestion is also a producer for the operational shard->blob relation
+        // (a Category-C projection of bytes we just verified and stored).
         if let Some(pool) = self.db_pool.as_ref() {
-            let projection_id = format!("blob:{}", manifest.blob_cid);
+            let projection_id = format!("blob:{cid_text}");
             let mut conn = pool.get().map_err(|e| {
                 StorageError::Internal(format!("Failed to get manifest DB connection: {e}"))
             })?;
@@ -4248,95 +4107,48 @@ impl HttpServer {
                 "lamad",
                 &manifest,
             ) {
-                warn!(
-                    blob_hash = %manifest.blob_hash,
-                    error = %e,
-                    "Failed to persist generated shard manifest"
-                );
+                warn!(cid = %cid_text, error = %e, "Failed to persist generated shard manifest");
             }
         }
 
         info!(
-            blob_hash = %manifest.blob_hash,
-            total_size = manifest.total_size,
-            shards = manifest.shard_hashes.len(),
-            encoding = %manifest.encoding,
+            cid = %cid_text,
+            byte_len = manifest.byte_len,
+            chunks = manifest.chunks.len(),
+            stripes = manifest.stripes.len(),
+            existed = stored.already_existed,
             "Stored blob with manifest"
         );
 
-        // ── Cutover gate #3: dual-write to IrohBlobStore when wired ──────────
-        // Best-effort: if the iroh side fails, the SHA256 write already
-        // succeeded — return 201 with blake3_hash: null per the pre-flight
-        // invariant in the plan ("partial readiness is OK").
-        #[cfg(feature = "p2p-iroh")]
-        let blake3_hash_str: Option<String> = match self.iroh_blob_store.as_ref() {
-            Some(iroh) => match iroh.add_bytes(data.clone()).await {
-                Ok(hash) => {
-                    tracing::debug!(
-                        sha256 = %manifest.blob_hash,
-                        blake3 = %hash,
-                        "Dual-wrote blob bytes to IrohBlobStore"
-                    );
-                    // Store with the canonical "blake3-{hex}" prefix so the
-                    // GET handler and peer_blob_inventory queries can strip it
-                    // consistently (see handle_get_blob line that strips the prefix).
-                    Some(format!("blake3-{hash}"))
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        sha256 = %manifest.blob_hash,
-                        error = %e,
-                        "IrohBlobStore dual-write failed; SHA256 store still succeeded"
-                    );
-                    None
-                }
-            },
-            None => None,
-        };
-        #[cfg(not(feature = "p2p-iroh"))]
-        let blake3_hash_str: Option<String> = None;
-
-        // Stamp self-custody inventory row — best-effort; log on failure.
+        // Stamp the self-custody inventory row — best-effort; log on failure.
         if let Some(pool) = self.db_pool.as_ref() {
             let now = chrono::Utc::now().to_rfc3339();
-            let sha = manifest.blob_hash.clone();
-            let blake3_for_row = blake3_hash_str.clone();
+            let cid = cid_text.clone();
             let peer_id = self.self_peer_id.clone();
             let pool_clone = pool.clone();
             tokio::task::spawn_blocking(move || {
                 let mut conn = match pool_clone.get() {
                     Ok(c) => c,
                     Err(e) => {
-                        tracing::warn!(
-                            error = %e,
-                            "self-custody: db pool checkout failed"
-                        );
+                        tracing::warn!(error = %e, "self-custody: db pool checkout failed");
                         return;
                     }
                 };
                 if let Err(e) = crate::db::peer_blob_inventory::record_self_custody(
-                    &mut conn,
-                    &peer_id,
-                    &sha,
-                    blake3_for_row.as_deref(),
-                    &now,
+                    &mut conn, &peer_id, &cid, &now,
                 ) {
-                    tracing::warn!(
-                        error = %e,
-                        sha256 = %sha,
-                        "self-custody: inventory stamp failed"
-                    );
+                    tracing::warn!(error = %e, cid = %cid, "self-custody: inventory stamp failed");
                 }
             });
         }
 
-        let view = crate::views::put_blob_response_view_from_manifest(manifest, blake3_hash_str);
+        let view = crate::views::put_blob_response_view_from_manifest(manifest);
         let body =
             serde_json::to_string(&view).map_err(|e| StorageError::Internal(e.to_string()))?;
-
         Ok(Response::builder()
             .status(StatusCode::CREATED)
             .header(header::CONTENT_TYPE, "application/json")
+            .header("X-Content-Address", cid_text)
             .body(Full::new(Bytes::from(body)))
             .unwrap())
     }
@@ -4469,38 +4281,24 @@ impl HttpServer {
         })
     }
 
-    /// Resolve the shard manifest for a canonical `sha256-{hex}` blob hash.
+    /// Resolve the shard manifest for a payload's canonical byte-CID text.
     ///
-    /// The in-process `manifests` map only ever holds what THIS process minted:
-    /// a restart, or a peer whose shards arrived by replication rather than by
-    /// ingest, has no entry even though every shard sits on local disk. Since
-    /// `put_blob_bytes` never stores the composite under its own name, a
-    /// `>16MB` blob was unservable everywhere except its minting process.
-    ///
-    /// The durable projection (`shard_manifests`) is the fallback; a hit
-    /// hydrates the map so subsequent reads stay warm. Lazy — not a boot
-    /// reload — because the manifest is a Category-C projection: paying for it
-    /// on the first read of a given blob is cheaper and correct for blobs whose
-    /// rows land after startup (replication, backfill).
+    /// The in-process `manifests` map only ever holds what THIS process minted; the
+    /// durable projection (`shard_manifests`) is the fallback, and a hit hydrates the
+    /// map so subsequent reads stay warm (lazy — the manifest is a Category-C
+    /// projection, paid for on the first read of a given blob).
     async fn resolve_manifest(&self, hash: &str) -> Option<ShardManifest> {
         if let Some(manifest) = self.manifests.read().await.get(hash).cloned() {
             return Some(manifest);
         }
-
+        let cid = ByteCid::parse(hash).ok()?;
         let pool = self.db_pool.as_ref()?;
         let mut conn = pool.get().ok()?;
-        let row = crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, hash)
-            .map_err(|e| warn!(hash = %hash, error = %e, "shard manifest lookup failed"))
-            .ok()
-            .flatten()?;
-        let manifest = crate::db::shard_manifests::hydrate_manifest(&row)
-            .map_err(|e| warn!(hash = %hash, error = %e, "shard manifest hydration failed"))
-            .ok()?;
-
+        let manifest = crate::db::shard_manifests::resolve_manifest_by_cid(&mut conn, &cid)?;
         debug!(
-            hash = %hash,
-            encoding = %manifest.encoding,
-            shards = manifest.shard_hashes.len(),
+            cid = %cid,
+            chunks = manifest.chunks.len(),
+            stripes = manifest.stripes.len(),
             "shard manifest rehydrated from durable projection"
         );
         self.manifests
@@ -4510,203 +4308,116 @@ impl HttpServer {
         Some(manifest)
     }
 
-    /// Reassemble a manifest's blob from locally-stored shards.
+    /// Reconstruct a striped (erasure-coded) payload from the shards held locally.
     ///
-    /// On a local miss returns the offending `(index, shard_hash)` so callers
-    /// can name which shard is absent instead of reporting the composite as
-    /// simply "not found".
-    ///
-    /// Two bands, matching the encoder's own dispatch:
-    ///
-    /// - `"none"` / `"chunked"` — sequential concatenation. Every shard must be
-    ///   present; the first gap is terminal (and feeds the `MissingShard` heal
-    ///   contract unchanged).
-    /// - erasure-coded (`"rs-*"`) — reconstruction through
-    ///   [`ShardEncoder::reconstruct`]. Concatenating all seven shards happens
-    ///   to produce the right bytes only when every one of them is present,
-    ///   which retires the entire point of carrying parity: an RS blob must
-    ///   still serve with up to `total_shards - data_shards` shards absent.
-    async fn reassemble_from_local_shards(
+    /// Every stripe needs `data` of its `data + parity` shards; each present shard is
+    /// verified against its CID and the whole against the payload CID by
+    /// [`ShardEncoder::reconstruct`]. On failure the first absent shard is named,
+    /// `(stripe * shards_per_stripe + index, shard cid)`, so the eventual 404 says
+    /// which unit a peer heal must supply.
+    async fn reconstruct_from_local_shards(
         &self,
         manifest: &ShardManifest,
     ) -> Result<Vec<u8>, (usize, String)> {
-        if !matches!(manifest.encoding.as_str(), "none" | "chunked") {
-            return self.reconstruct_erasure_coded(manifest).await;
-        }
-
-        let mut data = Vec::with_capacity(manifest.total_size as usize);
-
-        for (index, shard_hash) in manifest.shard_hashes.iter().enumerate() {
-            match self.blob_store.get(shard_hash).await {
-                Ok(shard_data) => data.extend_from_slice(&shard_data),
-                Err(_) => return Err((index, shard_hash.clone())),
-            }
-        }
-
-        // Truncate to actual size (last shard may be padded)
-        data.truncate(manifest.total_size as usize);
-        Ok(data)
-    }
-
-    /// Reconstruct an erasure-coded blob from whatever shards are held locally.
-    ///
-    /// Collects every named shard as `Option`, then hands the sparse set to
-    /// [`ShardEncoder::reconstruct`], which rebuilds the data shards from
-    /// parity when fewer than `data_shards` are missing. Only when too few
-    /// remain (or reconstruction itself fails, which means the bytes on disk
-    /// disagree with the manifest) is the first gap reported — that is the
-    /// point where a peer heal is genuinely required.
-    async fn reconstruct_erasure_coded(
-        &self,
-        manifest: &ShardManifest,
-    ) -> Result<Vec<u8>, (usize, String)> {
-        let mut shards: Vec<Option<Vec<u8>>> = Vec::with_capacity(manifest.shard_hashes.len());
+        let mut stripes: Vec<Vec<Option<Vec<u8>>>> = Vec::with_capacity(manifest.stripes.len());
         let mut first_gap: Option<(usize, String)> = None;
-
-        for (index, shard_hash) in manifest.shard_hashes.iter().enumerate() {
-            match self.blob_store.get(shard_hash).await {
-                Ok(shard_data) => shards.push(Some(shard_data)),
-                Err(_) => {
-                    if first_gap.is_none() {
-                        first_gap = Some((index, shard_hash.clone()));
+        let mut position = 0usize;
+        for stripe in &manifest.stripes {
+            let mut shards = Vec::with_capacity(stripe.shards.len());
+            for shard in &stripe.shards {
+                match self.blob_store.get(&shard.cid).await {
+                    Ok(bytes) => shards.push(Some(bytes.to_vec())),
+                    Err(_) => {
+                        if first_gap.is_none() {
+                            first_gap = Some((position, shard.cid.to_string()));
+                        }
+                        shards.push(None);
                     }
-                    shards.push(None);
                 }
+                position += 1;
             }
+            stripes.push(shards);
         }
-
-        // A gap must be nameable on every failure leg. When every shard is
-        // present and reconstruction still fails, the bytes contradict the
-        // manifest — report shard 0 so the caller heals rather than serving
-        // garbage.
-        let gap = || {
-            first_gap.clone().unwrap_or_else(|| {
-                (
-                    0,
-                    manifest
-                        .shard_hashes
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| manifest.blob_hash.clone()),
-                )
-            })
-        };
-
-        let present = shards.iter().filter(|s| s.is_some()).count();
-        if present < manifest.data_shards as usize {
-            debug!(
-                hash = %manifest.blob_hash,
-                present,
-                needed = manifest.data_shards,
-                "erasure-coded blob: too few shards held locally to reconstruct"
-            );
-            return Err(gap());
-        }
-
-        let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
-        match encoder.reconstruct(manifest, &shards) {
-            Ok(data) => {
-                if present < manifest.shard_hashes.len() {
-                    debug!(
-                        hash = %manifest.blob_hash,
-                        present,
-                        total = manifest.shard_hashes.len(),
-                        "erasure-coded blob reconstructed through parity"
-                    );
-                }
-                Ok(data)
-            }
+        match ShardEncoder::reconstruct(manifest, &stripes) {
+            Ok(bytes) => Ok(bytes),
             Err(e) => {
-                warn!(
-                    hash = %manifest.blob_hash,
-                    present,
-                    error = %e,
-                    "erasure-coded reconstruction failed"
-                );
-                Err(gap())
+                debug!(cid = %manifest.blob_cid, error = %e, "striped payload not reconstructible locally");
+                Err(first_gap.unwrap_or_else(|| (0, manifest.blob_cid.to_string())))
             }
         }
     }
 
     /// Read a blob from local storage, whatever shape it is held in.
     ///
-    /// This is the single local-read seam behind `GET /blob/{hash}` and the
-    /// `/apps/{slug}` resolver (via `get_blob_or_heal`). Both shapes are tried:
-    /// the manifest's shards first (the shape `put_blob_bytes` leaves for
-    /// anything over `SINGLE_SHARD_MAX`, and the one that carries the recorded
-    /// mime type), then the composite under its own name (a small blob, or a
-    /// `>16MB` composite reassembled from peers and persisted by
-    /// `finalize_fetch_success`).
-    ///
-    /// Trying only one shape is exactly how the two routes came to disagree
-    /// about the same bytes: the `/blob` route resolved a manifest and 404'd on
-    /// a shard gap without ever reading the composite it held whole, while the
-    /// apps resolver read the composite and served it.
-    ///
-    /// `hash` MUST already be canonical `sha256-{hex}` (both callers normalize
-    /// first) — `resolve_manifest` and `peer_blob_inventory` are keyed on it.
+    /// The single local-read seam behind `GET /blob/{cid}` and the `/apps/{slug}`
+    /// resolver (via `get_blob_or_heal`): the payload itself first (the store's
+    /// verified read), then — for a striped payload held only as shards — a local
+    /// reconstruction. `hash` is canonical byte-CID text.
     async fn read_local_blob(&self, hash: &str) -> LocalBlobRead {
+        let Ok(cid) = ByteCid::parse(hash) else {
+            return LocalBlobRead::Absent;
+        };
         let manifest = self.resolve_manifest(hash).await.map(Box::new);
-
-        // `"none"` manifests name the composite itself, so reassembling one is
-        // just the direct read below with an extra copy.
-        let reassembled = match manifest.as_ref() {
-            Some(m) if m.encoding != "none" => Some(self.reassemble_from_local_shards(m).await),
-            _ => None,
-        };
-
-        let gap = match reassembled {
-            Some(Ok(bytes)) => {
-                debug!(
-                    hash = %hash,
-                    size = bytes.len(),
-                    "blob read locally by reassembling manifest shards"
-                );
-                return LocalBlobRead::Bytes { bytes, manifest };
-            }
-            Some(Err(gap)) => Some(gap),
-            None => None,
-        };
-
-        if let Ok(bytes) = self.blob_store.get(hash).await {
+        if let Ok(bytes) = self.blob_store.get(&cid).await {
+            return LocalBlobRead::Bytes {
+                bytes: bytes.to_vec(),
+                manifest,
+            };
+        }
+        // An unexpired compute attachment is served on the same route; its own
+        // store verifies it against the CID and its lease (never finalized into
+        // the payload store).
+        if let Ok(bytes) = crate::compute_payload_store::get(self.blob_store.root_dir(), hash).await
+        {
             return LocalBlobRead::Bytes { bytes, manifest };
         }
-
-        // A gap can only come from a manifest, so the two are always both
-        // present here; the `match` keeps that provable rather than asserted.
-        match (gap, manifest) {
-            (Some((index, shard_hash)), Some(manifest)) => LocalBlobRead::MissingShard {
-                manifest,
-                index,
-                shard_hash,
-            },
-            _ => LocalBlobRead::Absent,
+        match manifest {
+            Some(m) if !m.stripes.is_empty() => {
+                match self.reconstruct_from_local_shards(&m).await {
+                    Ok(bytes) => {
+                        debug!(cid = %cid, size = bytes.len(), "blob reconstructed from local shards");
+                        LocalBlobRead::Bytes {
+                            bytes,
+                            manifest: Some(m),
+                        }
+                    }
+                    Err((index, shard_cid)) => LocalBlobRead::MissingShard {
+                        manifest: m,
+                        index,
+                        shard_cid,
+                    },
+                }
+            }
+            // An unstriped payload is held whole or not at all: its first custody
+            // unit names the gap, and the manifest rides along to the heal so the
+            // healed response keeps the recorded mime type.
+            Some(m) => {
+                let shard_cid = m
+                    .custody_units()
+                    .first()
+                    .map_or_else(|| m.blob_cid.to_string(), ToString::to_string);
+                LocalBlobRead::MissingShard {
+                    manifest: m,
+                    index: 0,
+                    shard_cid,
+                }
+            }
+            None => LocalBlobRead::Absent,
         }
     }
 
-    /// Do we hold this blob locally, without reading it?
-    ///
-    /// The presence twin of [`Self::read_local_blob`]: metadata probes only, so
-    /// a caller that just needs "yes/no" does not pull an 18MB bundle into
-    /// memory. Same two shapes, same answer — a raw `exists_by_address` probe
-    /// on a sharded composite reports absence for bytes we fully hold, which
-    /// would silently exclude every oversized bundle from the declared-head
-    /// serve preference.
+    /// Do we hold this blob locally, without reading it? The presence twin of
+    /// [`Self::read_local_blob`]: the payload structurally verified, or — for a
+    /// striped payload — `data` verified shards of every stripe.
     async fn blob_available_locally(&self, address: &str) -> bool {
-        let hash = match crate::blob_store::BlobStore::parse_content_address(address) {
-            Ok(hex) => format!("sha256-{hex}"),
-            Err(_) => return false,
+        let Ok(cid) = ByteCid::parse(address) else {
+            return false;
         };
-
-        if self.blob_store.exists(&hash).await {
+        if self.blob_store.exists(&cid).await == Exists::Verified {
             return true;
         }
-
-        // Erasure-coded manifests are available once `data_shards` of them are
-        // held — that is what parity buys, and it is what
-        // `reassemble_from_local_shards` will actually serve.
-        match self.resolve_manifest(&hash).await {
-            Some(manifest) => self.blob_store.holds_as_shards(&manifest).await,
+        match self.resolve_manifest(address).await {
+            Some(manifest) => crate::sharding::holds_as_shards(&self.blob_store, &manifest).await,
             None => false,
         }
     }
@@ -4737,43 +4448,10 @@ impl HttpServer {
             }
         };
 
-        // The request hash and the stored columns disagree on FORM: a caller may
-        // ask by `bafkrei…` CID, `sha256-<hex>`, or bare hex, and a content row
-        // may record the SAME digest as a `bafkrei…` in `blob_cid` while another
-        // row records it as `sha256-<hex>` in `blob_hash`. Matching only the
-        // request's own form is an ADDRESS-FORM BYPASS: the community fixture
-        // stores its digest as a `bafkrei…` CID, so a request phrased as
-        // `sha256-<the-same-digest>` matched no row and served as "honest
-        // absence" (red-team finding, 2026-08-24). So: resolve the request to its
-        // canonical sha256 digest, then enumerate BOTH renderings of it —
-        // `sha256-<hex>` AND the raw-codec `bafkrei…` CID — plus blake3 aliases.
-        let mut candidates = vec![hash.to_string()];
-        if let Ok(h) = crate::blob_store::BlobStore::parse_content_address(hash) {
-            let sha = format!("sha256-{h}");
-            if !candidates.contains(&sha) {
-                candidates.push(sha);
-            }
-            // The reverse rendering: sha256 digest → raw-codec CIDv1 (`bafkrei…`),
-            // via the canonical `hash_to_cid` (round-trips `compute_addresses`).
-            // This is the leg whose absence was the bypass.
-            if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(&h) {
-                let cid_str = cid.to_string();
-                if !candidates.contains(&cid_str) {
-                    candidates.push(cid_str);
-                }
-            }
-        }
-        if let Ok(Some(alias)) =
-            crate::db::peer_blob_inventory::lookup_blake3_for_sha256(&mut conn, hash)
-        {
-            candidates.push(alias);
-        }
-        if let Ok(Some(alias)) =
-            crate::db::peer_blob_inventory::lookup_sha256_for_blake3(&mut conn, hash)
-        {
-            candidates.push(alias);
-        }
-
+        // One address form: the route admitted `hash` as a byte CID by full decode,
+        // and every content row records its payload by the same canonical text, so
+        // there is no second spelling a request could use to slip past the gate.
+        let candidates = vec![hash.to_string()];
         let refs = match lookup_references(&mut conn, &candidates) {
             Ok(records) => Ok(records),
             Err(e) => {
@@ -4804,12 +4482,14 @@ impl HttpServer {
         hash: &str,
         agent_id: Option<&str>,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
-        if hash.is_empty() {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Missing blob hash")))
-                .unwrap());
-        }
+        // The path segment is admitted by full decode as a byte CID, or refused with
+        // the typed 400 — before the reach gate, so no other spelling reaches a lookup.
+        let cid = match parse_byte_cid_param(hash) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
+        let cid_text = cid.to_string();
+        let hash = cid_text.as_str();
 
         // ── Reach gate for the BYTE route (BEFORE any backend serves) ────────
         // Reach lives on the CONTENT row, never on the blob: `PUT /blob/{hash}`
@@ -4820,9 +4500,7 @@ impl HttpServer {
         // blob-bearing rows, `/db/content/{id}` answered 403 for all 38 while
         // `/blob/{cid}` served 36 of them in full to an anonymous caller.
         //
-        // Placed before the iroh cutover AND the legacy path so BOTH backends
-        // are gated — an early `return` from either would otherwise bypass a
-        // gate placed after them. The decision is `blob_reach::blob_serve_verdict`
+        // Placed before any read so every path that serves is gated. The decision is `blob_reach::blob_serve_verdict`
         // (pure, unit-tested); this block only feeds it rows and renders refusal.
         // Fail-OPEN on a DB error is deliberate and bounded: an unavailable pool
         // must not dark every public blob, and the pre-existing posture for an
@@ -4831,139 +4509,6 @@ impl HttpServer {
         if let Some(refusal) = self.blob_reach_refusal(hash, agent_id).await {
             return Ok(refusal);
         }
-
-        // Cutover gate #2 (Phase 11, Plan 2): try iroh-side blob backend first
-        // when the caller is iroh-capable AND the blob has a known BLAKE3 alias.
-        // Falls through to the legacy SHA256 path on miss, libp2p-only caller,
-        // or no IrohBlobStore wired.
-        #[cfg(feature = "p2p-iroh")]
-        if let Some(ref iroh) = self.iroh_blob_store {
-            // Normalize to the router's expected form: sha256-{hex} or blake3-{hex}.
-            let normalized_for_router: String = if hash.starts_with("blake3-") {
-                hash.to_string()
-            } else {
-                match crate::blob_store::BlobStore::parse_content_address(hash) {
-                    Ok(h) => format!("sha256-{}", h),
-                    Err(_) => String::new(), // fall through to legacy parser below
-                }
-            };
-
-            if !normalized_for_router.is_empty() {
-                let mut conn_opt = self.db_pool.as_ref().and_then(|p| p.get().ok());
-                let blake3_alias = if !normalized_for_router.starts_with("blake3-") {
-                    conn_opt.as_mut().and_then(|c| {
-                        crate::db::peer_blob_inventory::lookup_blake3_for_sha256(
-                            c,
-                            &normalized_for_router,
-                        )
-                        .ok()
-                        .flatten()
-                    })
-                } else {
-                    None
-                };
-                let sha256_alias = if normalized_for_router.starts_with("blake3-") {
-                    conn_opt.as_mut().and_then(|c| {
-                        crate::db::peer_blob_inventory::lookup_sha256_for_blake3(
-                            c,
-                            &normalized_for_router,
-                        )
-                        .ok()
-                        .flatten()
-                    })
-                } else {
-                    None
-                };
-
-                let caller_manifest = match (agent_id, conn_opt.as_mut()) {
-                    (Some(cid), Some(c)) => crate::p2p_iroh::peer_map::lookup_by_agent_cid(c, cid)
-                        .ok()
-                        .flatten(),
-                    _ => None,
-                };
-
-                // Per-object transport affinity (Category C). NULL → Auto
-                // (today's behavior). Read from the same inventory row.
-                let affinity = conn_opt
-                    .as_mut()
-                    .and_then(|c| {
-                        crate::db::peer_blob_inventory::lookup_transport_affinity(
-                            c,
-                            &normalized_for_router,
-                        )
-                        .ok()
-                        .flatten()
-                    })
-                    .as_deref()
-                    .map(crate::http_blob_router::TransportAffinity::parse)
-                    .unwrap_or_default();
-
-                let choice = crate::http_blob_router::choose_backend(
-                    crate::http_blob_router::ChooseInputs {
-                        normalized_hash: &normalized_for_router,
-                        blake3_alias_for_sha256: blake3_alias,
-                        sha256_alias_for_blake3: sha256_alias,
-                        self_manifest: self.self_transport_manifest.as_deref(),
-                        caller_manifest: caller_manifest.as_ref(),
-                        affinity,
-                    },
-                );
-
-                if let crate::http_blob_router::BlobBackendChoice::IrohThenLibp2p {
-                    blake3_hash,
-                    ..
-                } = choice
-                {
-                    let blake3_hex = blake3_hash.strip_prefix("blake3-").unwrap_or(&blake3_hash);
-                    if let Ok(iroh_hash) = blake3_hex.parse::<iroh_blobs::Hash>() {
-                        match iroh.get_bytes(iroh_hash).await {
-                            Ok(data) => {
-                                self.blob_iroh_served_count
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                debug!(
-                                    hash = %hash,
-                                    backend = "iroh",
-                                    size = data.len(),
-                                    "blob served from iroh backend (cutover gate #2)"
-                                );
-                                return Ok(Self::with_cors_headers(Response::builder())
-                                    .status(StatusCode::OK)
-                                    .header(header::CONTENT_TYPE, "application/octet-stream")
-                                    .header(header::CONTENT_LENGTH, data.len())
-                                    .header(
-                                        header::CACHE_CONTROL,
-                                        "public, max-age=31536000, immutable",
-                                    )
-                                    .body(Full::new(Bytes::from(data.to_vec())))
-                                    .unwrap());
-                            }
-                            Err(e) => {
-                                debug!(
-                                    hash = %hash,
-                                    error = %e,
-                                    "iroh-side miss; falling through to legacy backend"
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Parse content address (accepts CID, sha256-prefixed hash, or raw hex)
-        let normalized_hash = match crate::blob_store::BlobStore::parse_content_address(hash) {
-            Ok(h) => format!("sha256-{}", h),
-            Err(_) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Full::new(Bytes::from(format!(
-                        "Invalid content address: {}",
-                        hash
-                    ))))
-                    .unwrap());
-            }
-        };
-        let hash = normalized_hash.as_str();
 
         // Check policy enforcement if enabled and agent_id is provided
         if let (Some(ref enforcement), Some(agent)) = (&self.policy_enforcement, agent_id) {
@@ -5024,7 +4569,7 @@ impl HttpServer {
                 info!(
                     hash = %hash,
                     size = bytes.len(),
-                    shards = manifest.as_ref().map(|m| m.shard_hashes.len()).unwrap_or(1),
+                    chunks = manifest.as_ref().map(|m| m.chunks.len()).unwrap_or(1),
                     "Serving reassembled blob"
                 );
                 debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (local)");
@@ -5040,16 +4585,16 @@ impl HttpServer {
             LocalBlobRead::MissingShard {
                 manifest,
                 index,
-                shard_hash,
+                shard_cid,
             } => {
                 warn!(
                     hash = %hash,
                     shard_index = index,
-                    shard_hash = %shard_hash,
-                    shards = manifest.shard_hashes.len(),
+                    shard_cid = %shard_cid,
+                    units = manifest.custody_units().len(),
                     "blob heal: manifest resolved but shard missing locally"
                 );
-                (Some((index, shard_hash)), Some(manifest))
+                (Some((index, shard_cid)), Some(manifest))
             }
             LocalBlobRead::Absent => (None, None),
         };
@@ -5080,11 +4625,11 @@ impl HttpServer {
         let builder = Self::with_cors_headers(Response::builder())
             .status(StatusCode::OK)
             .header(header::CONTENT_LENGTH, bytes.len())
-            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable");
+            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+            .header(header::ETAG, format!("\"{}\"", hash))
+            .header("X-Content-Address", hash);
         let builder = match manifest {
-            Some(m) => builder
-                .header(header::CONTENT_TYPE, &m.mime_type)
-                .header(header::ETAG, format!("\"{}\"", hash)),
+            Some(m) => builder.header(header::CONTENT_TYPE, &m.mime_type),
             None => builder.header(header::CONTENT_TYPE, "application/octet-stream"),
         };
         builder.body(Full::new(Bytes::from(bytes))).unwrap()
@@ -5148,12 +4693,12 @@ impl HttpServer {
             // a partially-replicated composite distinguishable from an unknown
             // blob — the peer race has now been tried either way.
             BlobHealOutcome::NotFound => match local_gap {
-                Some((index, shard_hash)) => {
-                    let total_shards = manifest.map(|m| m.shard_hashes.len()).unwrap_or(0);
+                Some((index, shard_cid)) => {
+                    let total_shards = manifest.map(|m| m.custody_units().len()).unwrap_or(0);
                     warn!(
                         hash = %hash,
                         shard_index = index,
-                        shard_hash = %shard_hash,
+                        shard_cid = %shard_cid,
                         shards = total_shards,
                         "Blob manifest resolved but a shard is missing locally and no peer served it"
                     );
@@ -5161,7 +4706,7 @@ impl HttpServer {
                         .status(StatusCode::NOT_FOUND)
                         .body(Full::new(Bytes::from(format!(
                             "Blob incomplete: shard {} of {} ({}) missing",
-                            index, total_shards, shard_hash
+                            index, total_shards, shard_cid
                         ))))
                         .unwrap()
                 }
@@ -5222,7 +4767,7 @@ impl HttpServer {
             LocalBlobRead::MissingShard {
                 manifest,
                 index,
-                shard_hash,
+                shard_cid,
             } => {
                 // Shards are ordinary content-addressed blobs, so the peer-heal
                 // below still has a path — it just races on the composite hash.
@@ -5230,8 +4775,8 @@ impl HttpServer {
                 warn!(
                     hash = %hash,
                     shard_index = index,
-                    shard_hash = %shard_hash,
-                    shards = manifest.shard_hashes.len(),
+                    shard_cid = %shard_cid,
+                    units = manifest.custody_units().len(),
                     "blob heal: manifest resolved but shard missing locally"
                 );
             }
@@ -5368,6 +4913,7 @@ impl HttpServer {
                     .collect(),
                 None => Vec::new(),
             };
+
             // Pure-iroh fallback: the book's dialable peers, by the label
             // `enrich_candidates` can join (libp2p id, agent cid, or node id).
             #[cfg(feature = "p2p-iroh")]
@@ -5391,7 +4937,6 @@ impl HttpServer {
             };
             #[cfg(not(feature = "p2p-iroh"))]
             let iroh_book_peers: Vec<String> = Vec::new();
-
             // Connected-fallback: when gossipsub inventory publish has failed
             // (alpha after pod restarts: `InsufficientPeers`, no fresh row for
             // a peer that is nonetheless connected and advertising the blob),
@@ -5454,6 +4999,9 @@ impl HttpServer {
                 // converges for a later request. Captures are cloned so the task
                 // outlives the borrow of `self`.
                 let hash_owned = hash.to_string();
+                let Ok(cid_owned) = ByteCid::parse(hash) else {
+                    return BlobHealOutcome::NotFound;
+                };
                 let hash_prefix_task = hash_prefix.clone();
                 let pool_bg = pool.clone();
                 let blob_store_bg = self.blob_store.clone();
@@ -5497,7 +5045,7 @@ impl HttpServer {
                         blob_store: &blob_store_bg,
                     };
                     let outcome = crate::p2p::blob_swarm::race_fetch_with_swarm(
-                        &hash_owned,
+                        &cid_owned,
                         candidates,
                         &mut conn,
                         &fresh_after_task,
@@ -5563,7 +5111,7 @@ impl HttpServer {
                             };
                             if let Err(e) = crate::p2p::blob_fetch::finalize_fetch_success(
                                 &mut conn,
-                                &hash_owned,
+                                &cid_owned,
                                 &source_peer,
                                 &bytes,
                                 &self_cid_bg,
@@ -5626,7 +5174,7 @@ impl HttpServer {
                         } => {
                             info!(
                                 hash_prefix = %hash_prefix_task,
-                                total_shards = manifest.shard_hashes.len(),
+                                total_shards = manifest.custody_units().len(),
                                 missing_shards,
                                 candidate_count,
                                 source = candidate_source,
@@ -5698,15 +5246,15 @@ impl HttpServer {
     }
 
     /// GET /manifest/{hash} - Get shard manifest
-    async fn handle_get_manifest(&self, hash: &str) -> Result<Response<Full<Bytes>>, StorageError> {
-        if hash.is_empty() {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Full::new(Bytes::from("Missing blob hash")))
-                .unwrap());
-        }
-
-        let manifest = self.resolve_manifest(hash).await;
+    async fn handle_get_manifest(
+        &self,
+        cid_text: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        let cid = match parse_byte_cid_param(cid_text) {
+            Ok(cid) => cid,
+            Err(refusal) => return Ok(refusal),
+        };
+        let manifest = self.resolve_manifest(&cid.to_string()).await;
 
         match manifest {
             Some(m) => {
@@ -6115,74 +5663,6 @@ impl HttpServer {
                 .body(Full::new(Bytes::from(json)))
                 .unwrap())
         }
-    }
-
-    /// POST /admin/blob-transport-affinity/{hash} — set the per-object blob
-    /// transport affinity (iroh-toggle sprint). Writes
-    /// `peer_blob_inventory.transport_affinity` for the addressed blob.
-    /// `"auto"` (the default) clears the column to NULL. Other values:
-    /// `prefer-iroh`, `prefer-libp2p`, `iroh-only`, `libp2p-only`.
-    ///
-    /// Feature-gated: references `http_blob_router::TransportAffinity`, which is
-    /// only compiled under `p2p-iroh`. The matching route arm is gated
-    /// identically, so the default/libp2p build never compiles or reaches this.
-    #[cfg(feature = "p2p-iroh")]
-    async fn handle_set_blob_transport_affinity(
-        &self,
-        hash: &str,
-        req: Request<Incoming>,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
-        // Normalize to the router's form: sha256-{hex} or blake3-{hex}.
-        let normalized: String = if hash.starts_with("blake3-") {
-            hash.to_string()
-        } else {
-            match crate::blob_store::BlobStore::parse_content_address(hash) {
-                Ok(h) => format!("sha256-{}", h),
-                Err(_) => return Ok(response::bad_request("Invalid content address")),
-            }
-        };
-
-        let body = req
-            .collect()
-            .await
-            .map_err(|e| StorageError::Internal(format!("read body: {e}")))?
-            .to_bytes();
-        #[derive(serde::Deserialize)]
-        struct AffinityReq {
-            affinity: String,
-        }
-        let parsed: AffinityReq = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(response::bad_request(&format!("Invalid JSON: {e}"))),
-        };
-
-        // Validate against the known vocabulary; unknown strings are rejected
-        // here (the read-path `parse` is lenient, but a setter should be
-        // strict). "auto" clears the column.
-        let affinity = crate::http_blob_router::TransportAffinity::parse(&parsed.affinity);
-        if affinity == crate::http_blob_router::TransportAffinity::Auto && parsed.affinity != "auto"
-        {
-            return Ok(response::bad_request(&format!(
-                "unknown affinity '{}'",
-                parsed.affinity
-            )));
-        }
-        let stored: Option<&str> = match affinity {
-            crate::http_blob_router::TransportAffinity::Auto => None, // clear → default
-            other => Some(other.as_str()),
-        };
-
-        let mut conn = self.get_diesel_conn()?;
-        let updated =
-            crate::db::peer_blob_inventory::set_transport_affinity(&mut conn, &normalized, stored)?;
-        Ok(response::json_response(
-            StatusCode::OK,
-            &serde_json::json!({
-                "hash": normalized,
-                "affinity": affinity.as_str(),
-                "rowsUpdated": updated,
-            }),
-        ))
     }
 
     /// Rung 1 of the upgrade-velocity debt snowball — the fleet coordinator
@@ -6976,9 +6456,9 @@ impl HttpServer {
             #[serde(default)]
             reach: Option<String>,
             #[serde(default)]
-            shard_hashes: Vec<String>,
+            shard_cids: Vec<String>,
             #[serde(default)]
-            blob_hash: Option<String>,
+            blob_cid: Option<String>,
             /// Stewards as agent_pub_key strings.
             stewards: Vec<String>,
             #[serde(default)]
@@ -6994,8 +6474,8 @@ impl HttpServer {
             h_app_id: body.h_app_id.unwrap_or_else(|| "lamad".to_string()),
             content_id: body.content_id,
             reach: body.reach.unwrap_or_else(|| "commons".to_string()),
-            shard_hashes: body.shard_hashes,
-            blob_hash: body.blob_hash,
+            shard_cids: body.shard_cids,
+            blob_cid: body.blob_cid,
             stewards: body
                 .stewards
                 .into_iter()
@@ -7247,44 +6727,18 @@ impl HttpServer {
     async fn handle_inventory_parity(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         use crate::p2p::inventory_broadcaster::{compute_parity, ParityReport};
 
-        // StoreAdapter satisfies LocalInventory by delegating to BlobStore::list_hashes,
-        // converting raw filenames to validated BlobAddress instances and dropping
-        // any non-canonical entries (logged once per session).
-        struct StoreAdapter<'a>(&'a crate::blob_store::BlobStore);
-        impl crate::p2p::inventory_broadcaster::LocalInventory for StoreAdapter<'_> {
-            fn current_hashes(&self) -> Vec<crate::p2p::inventory_gossip::BlobAddress> {
-                use crate::p2p::inventory_gossip::BlobAddress;
-                use std::sync::Once;
-                static WARN_ONCE: Once = Once::new();
+        use crate::p2p::inventory_broadcaster::StaticInventory;
+        use crate::p2p::inventory_gossip::BlobAddress;
 
-                let raw = self.0.list_hashes().unwrap_or_default();
-                let mut dropped = 0_usize;
-                let addresses: Vec<BlobAddress> = raw
-                    .into_iter()
-                    .filter_map(|s| match BlobAddress::new(s) {
-                        Ok(a) => Some(a),
-                        Err(_) => {
-                            dropped += 1;
-                            None
-                        }
-                    })
-                    .collect();
-
-                if dropped > 0 {
-                    WARN_ONCE.call_once(|| {
-                        tracing::warn!(
-                            target: "elohim_storage::inventory",
-                            dropped,
-                            "BlobStore::list_hashes returned non-canonical filenames; \
-                             dropped from inventory advertisement (logged once per session)"
-                        );
-                    });
-                }
-                addresses
-            }
-        }
-
-        let adapter = StoreAdapter(&self.blob_store);
+        // Byte CIDs held here, read first so an I/O failure answers 500 rather
+        // than reporting an empty inventory.
+        let adapter = StaticInventory::new(
+            self.blob_store
+                .list_cids()?
+                .into_iter()
+                .map(BlobAddress::from)
+                .collect(),
+        );
 
         #[cfg(feature = "p2p")]
         let gossiped: Vec<String> = self
@@ -8501,11 +7955,18 @@ impl HttpServer {
                 let input_view: CreateContentInputView = serde_json::from_slice(&body_bytes)
                     .map_err(|e| StorageError::Parse(format!("Invalid JSON: {}", e)))?;
 
+                // A declared payload address is a byte CID, admitted by full decode,
+                // or the create is refused with the typed 400.
+                let declared_cid = match input_view.blob_cid.as_deref().map(ByteCid::parse) {
+                    None => None,
+                    Some(Ok(cid)) => Some(cid),
+                    Some(Err(e)) => return Ok(invalid_byte_cid_response(&e)),
+                };
+
                 // Capture manifest-relevant data before consuming input_view
                 let manifest_data = (
                     input_view.id.clone(),
-                    input_view.blob_hash.clone(),
-                    input_view.blob_cid.clone(),
+                    declared_cid,
                     input_view.content_format.clone().unwrap_or_default(),
                     input_view
                         .reach
@@ -8525,21 +7986,17 @@ impl HttpServer {
 
                 // Capture distribution data before manifest recording consumes manifest_data
                 #[cfg(feature = "p2p")]
-                let distribution_data = (manifest_data.0.clone(), manifest_data.1.clone());
+                let distribution_data = (manifest_data.0.clone(), manifest_data.1);
 
-                // Record shard manifest if content has a blob. Shape-aware: a
-                // "chunked"/"rs-*" blob (e.g. an SPA bundle above
-                // sharding::SINGLE_SHARD_MAX) never stores its composite under
-                // its own hash — only its shards under theirs — so this must
-                // NOT gate on a bare blob_store read first. record_manifest_for_blob
-                // reuses the manifest ingest already produced when one is known.
-                if result.is_ok() && manifest_data.1.is_some() {
+                // Record the shard manifest if the content names a payload.
+                // record_manifest_for_blob reuses the manifest ingest already
+                // produced when one is known, else reads the verified payload.
+                if let (true, (content_id, Some(blob_cid), content_format, reach)) =
+                    (result.is_ok(), manifest_data)
+                {
                     if let Some(ref pool) = self.db_pool {
                         let blob_store = self.blob_store.clone();
                         let pool = pool.clone();
-                        let (content_id, blob_hash, blob_cid, content_format, reach) =
-                            manifest_data;
-                        let blob_hash = blob_hash.unwrap(); // Safe: checked above
                         tokio::spawn(async move {
                             if let Ok(mut conn) = pool.get() {
                                 match crate::db::shard_manifests::record_manifest_for_blob(
@@ -8547,8 +8004,7 @@ impl HttpServer {
                                     &blob_store,
                                     &content_id,
                                     "lamad",
-                                    &blob_hash,
-                                    blob_cid.as_deref(),
+                                    &blob_cid,
                                     &content_format,
                                     &reach,
                                 )
@@ -8556,7 +8012,7 @@ impl HttpServer {
                                 {
                                     Ok(row) => tracing::debug!(
                                         content_id = %content_id,
-                                        encoding = %row.encoding,
+                                        blob_cid = %row.blob_cid,
                                         "Recorded shard manifest"
                                     ),
                                     Err(e) => tracing::warn!(
@@ -8574,18 +8030,12 @@ impl HttpServer {
                 #[cfg(feature = "p2p")]
                 if result.is_ok() {
                     if let (Some(ref handle), Some(ref pool)) = (&self.p2p_handle, &self.db_pool) {
-                        if let (ref content_id, Some(ref blob_hash)) = distribution_data {
+                        if let (ref content_id, Some(blob_cid)) = distribution_data {
                             let handle = handle.clone();
                             let pool = pool.clone();
                             let content_id = content_id.clone();
                             let blob_store = self.blob_store.clone();
-                            let blob_hash = blob_hash.clone();
                             tokio::spawn(async move {
-                                // Shape-aware: a "chunked"/"rs-*" blob's composite
-                                // is never stored under its own hash, so a bare
-                                // blob_store read here would silently skip
-                                // distribution for it even though its shards (and
-                                // the manifest naming them) are already on disk.
                                 let Ok(mut conn) = pool.get() else {
                                     return;
                                 };
@@ -8593,7 +8043,7 @@ impl HttpServer {
                                     crate::db::shard_manifests::read_blob_bytes_for_manifest(
                                         &mut conn,
                                         &blob_store,
-                                        &blob_hash,
+                                        &blob_cid,
                                     )
                                     .await
                                 {
@@ -8656,19 +8106,23 @@ impl HttpServer {
             return Ok(response::error_response(StorageError::InvalidInput(msg)));
         }
 
-        // Capture manifest-relevant data before input_views are consumed
-        let manifest_inputs: Vec<_> = input_views
-            .iter()
-            .map(|v| {
-                (
-                    v.id.clone(),
-                    v.blob_hash.clone(),
-                    v.blob_cid.clone(),
-                    v.content_format.clone().unwrap_or_default(),
-                    v.reach.clone().unwrap_or_else(|| "commons".to_string()),
-                )
-            })
-            .collect();
+        // Every declared payload address is a byte CID (full decode), or the whole
+        // batch is refused with the typed 400 before anything is written.
+        let mut manifest_inputs: Vec<(String, Option<ByteCid>, String, String)> =
+            Vec::with_capacity(input_views.len());
+        for v in &input_views {
+            let cid = match v.blob_cid.as_deref().map(ByteCid::parse) {
+                None => None,
+                Some(Ok(cid)) => Some(cid),
+                Some(Err(e)) => return Ok(invalid_byte_cid_response(&e)),
+            };
+            manifest_inputs.push((
+                v.id.clone(),
+                cid,
+                v.content_format.clone().unwrap_or_default(),
+                v.reach.clone().unwrap_or_else(|| "commons".to_string()),
+            ));
+        }
 
         let items: Vec<db::content_diesel::CreateContentInput> =
             input_views.into_iter().map(|v| v.into()).collect();
@@ -8713,31 +8167,24 @@ impl HttpServer {
 
                 // Capture distribution data before manifest_inputs is consumed
                 #[cfg(feature = "p2p")]
-                let distribution_items: Vec<(String, String)> = manifest_inputs
+                let distribution_items: Vec<(String, ByteCid)> = manifest_inputs
                     .iter()
-                    .filter_map(|(id, bh, _, _, _)| bh.as_ref().map(|h| (id.clone(), h.clone())))
+                    .filter_map(|(id, cid, _, _)| cid.map(|c| (id.clone(), c)))
                     .collect();
 
-                // Record shard manifests for items with blobs. Routes through
-                // the same shape-aware `record_manifest_for_blob` helper the
-                // single-item create path uses (single source of truth) rather
-                // than re-deriving the encode-from-bytes logic inline: a
-                // "chunked"/"rs-*" blob's composite is never stored under its
-                // own hash, so gating on a bare blob_store read here silently
-                // dropped every such bundle from bulk manifest recording.
+                // Record shard manifests for items with payloads, through the
+                // same `record_manifest_for_blob` helper the single-item create
+                // path uses (single source of truth).
                 if let Some(ref pool) = self.db_pool {
                     let blob_store = self.blob_store.clone();
                     let pool = pool.clone();
-                    let items_with_blobs: Vec<_> = manifest_inputs
+                    let items_with_blobs: Vec<(String, ByteCid, String, String)> = manifest_inputs
                         .into_iter()
-                        .filter(|(_, blob_hash, _, _, _)| blob_hash.is_some())
+                        .filter_map(|(id, cid, format, reach)| cid.map(|c| (id, c, format, reach)))
                         .collect();
                     if !items_with_blobs.is_empty() {
                         tokio::spawn(async move {
-                            for (content_id, blob_hash, blob_cid, content_format, reach) in
-                                items_with_blobs
-                            {
-                                let blob_hash = blob_hash.unwrap(); // Safe: filtered above
+                            for (content_id, blob_cid, content_format, reach) in items_with_blobs {
                                 let Ok(mut conn) = pool.get() else {
                                     continue;
                                 };
@@ -8747,8 +8194,7 @@ impl HttpServer {
                                         &blob_store,
                                         &content_id,
                                         "lamad",
-                                        &blob_hash,
-                                        blob_cid.as_deref(),
+                                        &blob_cid,
                                         &content_format,
                                         &reach,
                                     )
@@ -8774,10 +8220,7 @@ impl HttpServer {
                         let pool = pool.clone();
                         let blob_store = self.blob_store.clone();
                         tokio::spawn(async move {
-                            for (content_id, blob_hash) in distribution_items {
-                                // Shape-aware read: falls back to reassembling
-                                // from a known manifest's shards when the
-                                // composite ("chunked"/"rs-*" blobs) is absent.
+                            for (content_id, blob_cid) in distribution_items {
                                 let Ok(mut conn) = pool.get() else {
                                     continue;
                                 };
@@ -8785,7 +8228,7 @@ impl HttpServer {
                                     crate::db::shard_manifests::read_blob_bytes_for_manifest(
                                         &mut conn,
                                         &blob_store,
-                                        &blob_hash,
+                                        &blob_cid,
                                     )
                                     .await
                                 {
@@ -9424,7 +8867,7 @@ impl HttpServer {
             &hc, channel_id, slug, deadline,
         )
         .await;
-        (bound.candidate, bound.blob_hash, bound.state)
+        (bound.candidate, bound.blob_cid, bound.state)
     }
 
     /// Resolve the blob named by an already-elected subordinate candidate.
@@ -9693,7 +9136,7 @@ impl HttpServer {
                             // Slice 2 (N4): a slug bound to a release channel is
                             // elected on its CHANNEL, so its candidate is the
                             // channel's staged release's browser bytes for this
-                            // slug — the same `stagingCandidateBlobHash` field the
+                            // slug — the same `stagingCandidateBlobCid` field the
                             // doorway's candidate channel already parses.
                             let bound_channel =
                                 crate::services::head_adoption::bound_release_channel(
@@ -10822,12 +10265,9 @@ impl HttpServer {
                                     .content_format
                                     .clone()
                                     .unwrap_or_else(|| "markdown".to_string()),
-                                blob_hash: blob_result.as_ref().ok().map(|r| r.hash.clone()),
-                                blob_cid: if head.content.is_empty() {
-                                    None
-                                } else {
-                                    Some(head.content.clone())
-                                },
+                                // The CID the bytes were stored under (resolve_and_fetch
+                                // already checked it equals the head's declared content).
+                                blob_cid: blob_result.as_ref().ok().map(|r| r.cid.to_string()),
                                 content_size_bytes: Some(content_bytes.len() as i32),
                                 metadata_json: Some(r#"{"resolved_via":"p2p"}"#.to_string()),
                                 reach: head
@@ -10962,7 +10402,7 @@ impl HttpServer {
                         crate::chain_write_gate::as_writer(
                             crate::chain_write_gate::WriterKind::HttpAuthor,
                             // DECLARE: this is a request-borne re-notarization —
-                            // a deploy PATCHing {blobHash, reach} IS the
+                            // a deploy PATCHing {blobCid, reach} IS the
                             // head-declaration act, and it must keep moving the
                             // head deliberately. The heal-class re-author sweeps
                             // preserve instead; see `HeadElection`.
@@ -11404,8 +10844,7 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Resolve identifier: content address bypasses slug_index lookup. A
-        // CIDv1 and its `sha256-{hex}` alias normalize to one canonical key.
+        // Resolve identifier: a byte CID bypasses slug_index lookup.
         let is_cid = is_content_address(identifier);
         let canonical = canonical_content_address(identifier)
             .filter(|_| is_cid)
@@ -11420,10 +10859,10 @@ impl HttpServer {
         let blob_hash = if is_cid {
             Some(canonical.clone())
         } else {
-            slug_entry.as_ref().map(|e| e.blob_hash.clone())
+            slug_entry.as_ref().map(|e| e.blob_cid.clone())
         };
         // A restricted bundle's address is not disclosed to a caller who may
-        // not read it: the probe is refused before `X-Blob-Hash` is written.
+        // not read it: the probe is refused before `X-Content-Address` is written.
         if let Some(refused) = self
             .app_reach_refusal(&canonical, is_cid, slug_entry.as_ref(), agent_cid)
             .await?
@@ -11451,9 +10890,7 @@ impl HttpServer {
             .header("X-Ready", if ready { "true" } else { "false" });
 
         if let Some(hash) = &blob_hash {
-            builder = builder
-                .header("X-Blob-Hash", hash.as_str())
-                .header("X-Content-Address", content_address_header(hash));
+            builder = builder.header("X-Content-Address", hash.as_str());
             let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
             builder = with_deliverability_headers(builder, &verdict);
         }
@@ -11670,7 +11107,7 @@ impl HttpServer {
         let checked = match (
             view.content_address.clone(),
             record
-                .blob_hash
+                .blob_cid
                 .as_deref()
                 .and_then(facing::canonical_address),
         ) {
@@ -11838,7 +11275,7 @@ impl HttpServer {
         let cached_blob_hash = if is_cid {
             Some(canonical.clone())
         } else {
-            slug_entry.as_ref().map(|e| e.blob_hash.clone())
+            slug_entry.as_ref().map(|e| e.blob_cid.clone())
         };
 
         // The reach gate sits BEFORE the extraction cache: a cache hit must
@@ -11868,7 +11305,7 @@ impl HttpServer {
                         .header(header::CONTENT_LENGTH, data.len())
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
                         .header("X-Cache", "HIT")
-                        .header("X-Content-Address", content_address_header(hash));
+                        .header("X-Content-Address", hash.to_string());
                     let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
                     builder = with_deliverability_headers(builder, &verdict);
                     if let Some(ref slug) = resolved_slug {
@@ -11894,7 +11331,7 @@ impl HttpServer {
                             .header(header::CACHE_CONTROL, "public, max-age=3600")
                             .header("X-Cache", "HIT")
                             .header("X-SPA-Fallback", "1")
-                            .header("X-Content-Address", content_address_header(hash));
+                            .header("X-Content-Address", hash.to_string());
                         let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
                         builder = with_deliverability_headers(builder, &verdict);
                         if let Some(ref slug) = resolved_slug {
@@ -11937,7 +11374,7 @@ impl HttpServer {
                         .header(header::CACHE_CONTROL, "public, max-age=3600")
                         .header("X-Cache", "HIT-COALESCED");
                     if let Some(ref hash) = cached_blob_hash {
-                        builder = builder.header("X-Content-Address", content_address_header(hash));
+                        builder = builder.header("X-Content-Address", hash.to_string());
                         let verdict = deliverability_lookup(&self.deliverability_memo, hash).await;
                         builder = with_deliverability_headers(builder, &verdict);
                     }
@@ -11963,8 +11400,7 @@ impl HttpServer {
                             .header("X-Cache", "HIT-COALESCED")
                             .header("X-SPA-Fallback", "1");
                         if let Some(ref hash) = cached_blob_hash {
-                            builder =
-                                builder.header("X-Content-Address", content_address_header(hash));
+                            builder = builder.header("X-Content-Address", hash.to_string());
                             let verdict =
                                 deliverability_lookup(&self.deliverability_memo, hash).await;
                             builder = with_deliverability_headers(builder, &verdict);
@@ -12079,14 +11515,9 @@ impl HttpServer {
         // live site exercised this exact path). On heal failure the existing 404
         // body is preserved unchanged.
         //
-        // `get_blob_or_heal` consults `peer_blob_inventory` keyed by the
-        // canonical `sha256-{hex}` form, so normalize first (falling back to the
-        // stored value if it doesn't parse — `BlobStore::get`'s `blob_path`
-        // tolerates either form, matching the prior direct `blob_store.get`).
-        let heal_hash = match crate::blob_store::BlobStore::parse_content_address(&blob_hash) {
-            Ok(h) => format!("sha256-{}", h),
-            Err(_) => blob_hash.clone(),
-        };
+        // The slug index holds canonical byte-CID text only (rows that do not
+        // decode are never indexed), the key `get_blob_or_heal` reads by.
+        let heal_hash = blob_hash.clone();
         let zip_data = match self.get_blob_or_heal(&heal_hash).await {
             BlobHealOutcome::Bytes { bytes, healed_from } => {
                 if let Some(ref peer) = healed_from {
@@ -12137,17 +11568,15 @@ impl HttpServer {
         // logged and the serve proceeds exactly as before (the shell then simply
         // claims no check). Off, nothing is hashed or recorded.
         if self.content_chrome {
-            if let Ok(expected) = crate::blob_store::BlobStore::parse_content_address(&blob_hash) {
-                use sha2::{Digest, Sha256};
-                let expected = expected.to_ascii_lowercase();
-                let matched = format!("{:x}", Sha256::digest(&zip_data)) == expected;
+            if let Ok(expected) = ByteCid::parse(&blob_hash) {
+                let matched = compute_bytes_cid(&zip_data) == expected;
                 if !matched {
-                    warn!(identifier = %identifier, blob_hash = %blob_hash, "app bundle bytes do not match their content address");
+                    warn!(identifier = %identifier, blob_cid = %blob_hash, "app bundle bytes do not match their content address");
                 }
                 self.content_checks
                     .write()
                     .await
-                    .insert(format!("sha256-{expected}"), matched);
+                    .insert(expected.to_string(), matched);
             }
         }
 
@@ -12264,7 +11693,7 @@ impl HttpServer {
                             .header(header::CACHE_CONTROL, "public, max-age=3600")
                             .header("X-Cache", "MISS")
                             .header("X-SPA-Fallback", "1")
-                            .header("X-Content-Address", content_address_header(&blob_hash));
+                            .header("X-Content-Address", blob_hash.as_str());
                         builder = with_deliverability_headers(builder, &verdict);
                         if let Some(ref slug) = resolved_slug {
                             builder = builder
@@ -12301,7 +11730,7 @@ impl HttpServer {
             .header(header::CONTENT_LENGTH, contents.len())
             .header(header::CACHE_CONTROL, "public, max-age=3600")
             .header("X-Cache", "MISS")
-            .header("X-Content-Address", content_address_header(&blob_hash));
+            .header("X-Content-Address", blob_hash.as_str());
         builder = with_deliverability_headers(builder, &verdict);
         if let Some(ref slug) = resolved_slug {
             builder = builder
@@ -12378,14 +11807,19 @@ impl HttpServer {
                 db::content_diesel::MinTrust::Amber,
             )?;
             for item in items {
-                let hash = item.content.blob_hash.clone().unwrap_or_default();
-                if hash.is_empty() {
+                // Only a parseable byte CID is indexed.
+                let Some(cid) = item
+                    .content
+                    .blob_cid
+                    .as_deref()
+                    .and_then(|c| ByteCid::parse(c).ok())
+                else {
                     continue;
-                }
+                };
                 // Resolve by row id (the EPR router requests /apps/{epr_id}) AND
                 // by the inner content_body slug, warming the index by both keys.
                 let entry = SlugEntry {
-                    blob_hash: hash.clone(),
+                    blob_cid: cid.to_string(),
                     content_id: item.content.id.clone(),
                 };
                 {
@@ -16271,7 +15705,7 @@ impl HttpServer {
         };
 
         // Store DAG-CBOR blob
-        let store_result = self.blob_store.store_dag_cbor(&cbor_bytes).await?;
+        let store_result = self.blob_store.store_record(&cbor_bytes).await?;
 
         // Build response
         let mut view: EprHeadView = head.into();
@@ -16279,9 +15713,8 @@ impl HttpServer {
 
         let response_body = serde_json::json!({
             "head": view,
-            "cid": store_result.cid,
-            "hash": store_result.hash,
-            "sizeBytes": store_result.size_bytes,
+            "cid": store_result.cid.to_string(),
+            "sizeBytes": store_result.byte_len,
             "alreadyExisted": store_result.already_existed,
         });
 
@@ -16424,14 +15857,14 @@ impl HttpServer {
                 .unwrap());
         }
 
-        match self.blob_store.get_by_address(cid_str).await {
+        match read_block_by_cid_text(&self.blob_store, cid_str).await {
             Ok(data) => Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/octet-stream")
                 .header(header::CONTENT_LENGTH, data.len().to_string())
-                .body(Full::new(Bytes::from(data)))
+                .body(Full::new(data))
                 .unwrap()),
-            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
                 Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -16456,16 +15889,23 @@ impl HttpServer {
                 .unwrap());
         }
 
-        match self.blob_store.exists_by_address(cid_str).await {
-            Ok(true) => {
-                let size = self.blob_store.size_by_address(cid_str).await.unwrap_or(0);
-                Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/octet-stream")
-                    .header(header::CONTENT_LENGTH, size.to_string())
-                    .body(Full::new(Bytes::new()))
-                    .unwrap())
+        let size = match ByteCid::parse(cid_str) {
+            Ok(byte_cid) if self.blob_store.exists(&byte_cid).await == Exists::Verified => {
+                self.blob_store.size(&byte_cid).await.ok()
             }
+            Ok(_) => None,
+            Err(_) => read_block_by_cid_text(&self.blob_store, cid_str)
+                .await
+                .ok()
+                .map(|b| b.len() as u64),
+        };
+        match size {
+            Some(size) => Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/octet-stream")
+                .header(header::CONTENT_LENGTH, size.to_string())
+                .body(Full::new(Bytes::new()))
+                .unwrap()),
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Full::new(Bytes::new()))
@@ -16489,9 +15929,9 @@ impl HttpServer {
                 .unwrap());
         }
 
-        let data = match self.blob_store.get_by_address(cid_str).await {
+        let data = match read_block_by_cid_text(&self.blob_store, cid_str).await {
             Ok(data) => data,
-            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
                 return Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -16553,9 +15993,9 @@ impl HttpServer {
             }
         };
 
-        let data = match self.blob_store.get_by_address(cid_str).await {
+        let data = match read_block_by_cid_text(&self.blob_store, cid_str).await {
             Ok(data) => data,
-            Err(StorageError::NotFound(_)) | Err(StorageError::InvalidContentAddress(_)) => {
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
                 return Ok(Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -17623,7 +17063,6 @@ impl HttpServer {
                 )),
                 content_type: "observation-report".to_string(),
                 content_format: "json".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: Some(report_body.len() as i32),
                 metadata_json: session.metadata_json.clone(),
@@ -17776,20 +17215,24 @@ impl HttpServer {
     // because integration test binaries in `tests/` compile the library without
     // `cfg(test)` set — only the binary itself carries that flag.
 
-    /// Drive `put_blob_bytes` directly without an HTTP server bind.
-    /// Used by integration tests in `tests/put_blob_dual_write.rs` and
-    /// `tests/seed_e2e_dual_address.rs`.
+    /// Drive `PUT /blob/{cid}` (path parse + `put_blob_bytes`) without an HTTP
+    /// server bind. `cid_text` is the path segment: a text that is not a byte CID
+    /// answers the route's typed 400.
     pub async fn test_put_blob(
         &self,
-        sha256: &str,
+        cid_text: &str,
         payload: &[u8],
         mime_type: &str,
     ) -> HttpTestResponse {
         let data = payload.to_vec();
-        match self
-            .put_blob_bytes(data, sha256, mime_type, "did:elohim:test")
-            .await
-        {
+        let answer = match parse_byte_cid_param(cid_text) {
+            Ok(expected) => {
+                self.put_blob_bytes(data, &expected, mime_type, "did:elohim:test")
+                    .await
+            }
+            Err(refusal) => Ok(refusal),
+        };
+        match answer {
             Ok(resp) => {
                 let status = resp.status().as_u16();
                 let body = http_body_util::BodyExt::collect(resp.into_body())
@@ -17896,8 +17339,8 @@ impl HttpServer {
             LocalBlobRead::MissingShard {
                 manifest,
                 index,
-                shard_hash,
-            } => (Some((index, shard_hash)), Some(manifest)),
+                shard_cid,
+            } => (Some((index, shard_cid)), Some(manifest)),
             LocalBlobRead::Absent => (None, None),
         };
         let outcome = BlobHealOutcome::Bytes {
@@ -18482,13 +17925,13 @@ fn version_patch_needs_conductor(
 }
 
 pub(crate) fn patch_needs_conductor(view: &UpdateContentInputView) -> bool {
-    view.blob_hash.is_some()
+    view.blob_cid.is_some()
         || view.reach.is_some()
-        || view.server_blob_hash.is_some()
+        || view.server_blob_cid.is_some()
         || view
             .metadata
             .as_ref()
-            .is_some_and(|metadata| metadata.0.get("serverBlobHash").is_some())
+            .is_some_and(|metadata| metadata.0.get("serverBlobCid").is_some())
 }
 
 /// Map a DB `AcquisitionPin` model to its wire view.
@@ -18548,9 +17991,13 @@ mod epr_pull_unmeasured_window_tests {
 
     async fn server_with_acquisition() -> HttpServer {
         let blob_store = Arc::new(
-            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            crate::blob_store::BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_db_pool(crate::test_util::test_pool())
@@ -21445,7 +20892,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
         let server = HttpServer::new(store.clone(), "127.0.0.1:0".parse().unwrap());
-        let hash = BlobStore::compute_hash(b"head presence witness");
+        let cid = compute_bytes_cid(b"head presence witness");
+        let hash = cid.to_string();
         assert_eq!(
             server.handle_head_shard(&hash).await.unwrap().status(),
             StatusCode::NOT_FOUND
@@ -21453,7 +20901,8 @@ mod tests {
 
         // An obstructing path component yields ENOTDIR even when tests run
         // as root; permission-bit tests would not exercise the failure.
-        let prefix = &hash.trim_start_matches("sha256-")[..4];
+        // The store's fan-out bucket: characters 7..11 of the CID text.
+        let prefix = &hash[7..11];
         let obstruction = dir.path().join("blobs").join(prefix);
         tokio::fs::create_dir_all(dir.path().join("blobs"))
             .await
@@ -21461,7 +20910,7 @@ mod tests {
         tokio::fs::write(&obstruction, b"not a directory")
             .await
             .unwrap();
-        assert!(matches!(store.size(&hash).await, Err(StorageError::Io(_))));
+        assert!(matches!(store.size(&cid).await, Err(StorageError::Io(_))));
         assert!(matches!(
             server.handle_head_shard(&hash).await,
             Err(StorageError::Io(_))
@@ -21559,10 +21008,10 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_format() {
-        let hash = BlobStore::compute_hash(b"test data");
-        assert!(hash.starts_with("sha256-"));
-        assert_eq!(hash.len(), 7 + 64); // "sha256-" + 64 hex chars
+    fn stored_address_is_the_byte_cid() {
+        let cid = compute_bytes_cid(b"test data");
+        assert_eq!(ByteCid::parse(&cid.to_string()).unwrap(), cid);
+        assert_eq!(cid.digest(), blake3::hash(b"test data").as_bytes());
     }
 
     // ── /chrome native-chrome asset route (default build, V8-free) ──────────
@@ -21679,10 +21128,10 @@ mod tests {
     }
 
     /// Construct an UpdateContentInputView with every field defaulted to None,
-    /// overriding only `reach` and `blob_hash`. UpdateContentInputView does not
+    /// overriding only `reach` and `blob_cid`. UpdateContentInputView does not
     /// derive Default (shared ts-rs-anchored view; adding a derive would touch
     /// every consumer), so build it explicitly.
-    fn patch_view(reach: Option<&str>, blob_hash: Option<&str>) -> UpdateContentInputView {
+    fn patch_view(reach: Option<&str>, blob_cid: Option<&str>) -> UpdateContentInputView {
         UpdateContentInputView {
             title: None,
             description: None,
@@ -21692,8 +21141,8 @@ mod tests {
             metadata: None,
             tags: None,
             reach: reach.map(str::to_string),
-            blob_hash: blob_hash.map(str::to_string),
-            server_blob_hash: None,
+            blob_cid: blob_cid.map(str::to_string),
+            server_blob_cid: None,
             p2p_published_at: None,
         }
     }
@@ -21731,16 +21180,18 @@ mod tests {
 
         // Server code selection must be witnessed, including server-only deploys.
         let ssr = UpdateContentInputView {
-            server_blob_hash: Some("sha256-ssrserver".into()),
+            server_blob_cid: Some(
+                "bafkr4icc4kmp2xgro7kh2l4p4eav2r6jiz5nhwgz4raph3dkcmq2b5buem".into(),
+            ),
             ..patch_view(None, None)
         };
         assert!(
             patch_needs_conductor(&ssr),
-            "serverBlobHash-only PATCH must author a witnessed Content snapshot"
+            "serverBlobCid-only PATCH must author a witnessed Content snapshot"
         );
         let metadata = UpdateContentInputView {
             metadata: Some(crate::views::JsonVal(
-                serde_json::json!({"serverBlobHash":"sha256-server"}),
+                serde_json::json!({"serverBlobCid":"bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m"}),
             )),
             ..patch_view(None, None)
         };
@@ -21858,7 +21309,6 @@ mod tests {
                     description: None,
                     content_type: "concept".into(),
                     content_format: "markdown".into(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -21873,9 +21323,13 @@ mod tests {
         }
 
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server =
             HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(pool.clone());
@@ -22254,9 +21708,13 @@ mod tests {
         use zip::write::SimpleFileOptions;
 
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
 
         let mut buf = Vec::new();
@@ -22273,7 +21731,7 @@ mod tests {
             zw.write_all(b"console.log('app')").unwrap();
             zw.finish().unwrap();
         }
-        let hash = blob_store.store(&buf).await.unwrap().hash;
+        let hash = blob_store.store(&buf).await.unwrap().cid.to_string();
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         (server, hash)
     }
@@ -22298,8 +21756,7 @@ mod tests {
                     description: None,
                     content_type: "app".into(),
                     content_format: "html5-app".into(),
-                    blob_hash: Some(hash.clone()),
-                    blob_cid: None,
+                    blob_cid: Some(hash.clone()),
                     content_size_bytes: None,
                     metadata_json: None,
                     reach: reach.into(),
@@ -22439,7 +21896,7 @@ mod tests {
         let html = String::from_utf8(body_bytes(again).await.to_vec()).unwrap();
         let checked = &island_of(&html)["content"]["delivery"]["checked"];
         assert_eq!(checked["by"], "peer");
-        assert!(checked["against"].as_str().unwrap().starts_with("bafkrei"));
+        assert!(checked["against"].as_str().unwrap().starts_with("bafkr4i"));
     }
 
     #[tokio::test]
@@ -22656,13 +22113,8 @@ mod tests {
     async fn apps_cid_of_a_restricted_row_is_refused_anonymously() {
         let (server, hash) =
             spa_bundle_server_with_row("household-app", "household", "community").await;
-        let cid = crate::blob_store::BlobStore::parse_content_address(&hash)
-            .ok()
-            .and_then(|h| crate::blob_store::BlobStore::hash_to_cid(&h).ok())
-            .map(|c| c.to_string())
-            .expect("the bundle's CIDv1 rendering");
-        // Both spellings of one address are refused alike.
-        for address in [hash.as_str(), cid.as_str()] {
+        // The bundle's byte CID is refused like its slug.
+        for address in [hash.as_str()] {
             let resp = server
                 .handle_app_request(&format!("/apps/{address}/index.html"), "", None)
                 .await
@@ -22696,8 +22148,10 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{identifier}");
-            assert!(resp.headers().get("X-Blob-Hash").is_none(), "{identifier}");
-            assert!(resp.headers().get("X-Content-Address").is_none());
+            assert!(
+                resp.headers().get("X-Content-Address").is_none(),
+                "{identifier}"
+            );
         }
         // A public bundle's probe still answers with its address.
         let (open, open_hash) = spa_bundle_server_with_row("open-app", "open", "commons").await;
@@ -22708,7 +22162,7 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            resp.headers().get("X-Blob-Hash").unwrap(),
+            resp.headers().get("X-Content-Address").unwrap(),
             open_hash.as_str()
         );
     }
@@ -22799,9 +22253,13 @@ mod blob_backend_wiring_tests {
     #[tokio::test]
     async fn http_server_defaults_iroh_blob_store_to_none() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         assert!(server.iroh_blob_store.is_none());
@@ -22813,9 +22271,13 @@ mod blob_backend_wiring_tests {
     #[tokio::test]
     async fn with_iroh_blob_store_sets_field() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let iroh_dir = tempfile::tempdir().unwrap();
         let iroh = Arc::new(
@@ -22831,9 +22293,13 @@ mod blob_backend_wiring_tests {
     #[tokio::test]
     async fn with_self_transport_manifest_sets_field() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let manifest =
             Arc::new(crate::p2p_iroh::peer_map::PeerTransportManifest::iroh_capable_for_test());
@@ -22845,9 +22311,13 @@ mod blob_backend_wiring_tests {
     #[tokio::test]
     async fn status_response_includes_blob_backend_counters() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         // Simulate 7 iroh-served and 13 libp2p-served blobs.
@@ -22910,9 +22380,13 @@ mod request_future_size_tests {
     #[tokio::test]
     async fn the_request_future_does_not_carry_the_conductor_call_inline() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         let size = returned_future_size(&|req: Request<Incoming>| server.handle_request(req));
@@ -22937,9 +22411,13 @@ mod apps_resolver_heal_tests {
 
     async fn test_server() -> HttpServer {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         // No p2p_handle and no db_pool wired → `get_blob_or_heal` cannot heal
         // and must degrade to `NotFound`, the pre-Fix-B 404 behaviour.
@@ -22969,21 +22447,18 @@ mod apps_resolver_heal_tests {
 
     /// Fix B core: a missing app ZIP, with NO peer-heal possible (no p2p handle
     /// / no db pool), still returns 404 with the exact pre-refactor body. The
-    /// identifier is a content address, so it bypasses slug resolution and goes
+    /// identifier is a byte CID, so it bypasses slug resolution and goes
     /// straight to the `get_blob_or_heal` arm.
     #[tokio::test]
     async fn apps_resolver_missing_blob_404s_with_identical_body_no_p2p() {
         let server = test_server().await;
-        // 64-hex sha256 content address → is_content_address() true → is_cid
-        // path, cached_blob_hash = Some(identifier).
-        let cid = format!("sha256-{}", "a".repeat(64));
+        let cid = compute_bytes_cid(b"an app zip nobody holds").to_string();
         let resp = server
             .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
             .await
             .unwrap();
         let (status, body) = body_string(resp).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
-        // Body byte-identical to the pre-Fix-B handler.
         assert_eq!(
             body,
             format!(r#"{{"error": "App ZIP blob not found: {cid}"}}"#)
@@ -22991,16 +22466,14 @@ mod apps_resolver_heal_tests {
     }
 
     /// The heal path's local-hit arm preserves normal serving: a blob present in
-    /// the local store is extracted and served (200) without any heal attempt.
+    /// the local store is extracted and served (200) under its byte CID.
     #[tokio::test]
     async fn apps_resolver_serves_local_hit() {
         let server = test_server().await;
         let zip = tiny_zip();
         let stored = server.blob_store.store(&zip).await.unwrap();
-        // `store` returns the canonical `sha256-{hex}` hash; the resolver accepts
-        // a content-address identifier in that form.
-        let cid = stored.hash.clone();
-        assert!(cid.starts_with("sha256-"), "store yields sha256- form");
+        let cid = stored.cid.to_string();
+        assert_eq!(stored.cid, compute_bytes_cid(&zip));
 
         let resp = server
             .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
@@ -23011,70 +22484,150 @@ mod apps_resolver_heal_tests {
         assert!(body.contains("<title>ok</title>"));
     }
 
-    /// The `GET /blob/{hash}` refactor is observably unchanged on a local miss
-    /// with no peer-heal possible: still 404 with the "Blob not found" body.
+    /// A local miss with no peer-heal possible: 404 with the "Blob not found" body.
     #[tokio::test]
     async fn blob_route_missing_blob_404s_with_identical_body_no_p2p() {
         let server = test_server().await;
-        let hash = format!("sha256-{}", "b".repeat(64));
-        let resp = server.handle_get_blob(&hash, None).await.unwrap();
+        let cid = compute_bytes_cid(b"a blob nobody holds").to_string();
+        let resp = server.handle_get_blob(&cid, None).await.unwrap();
         let (status, body) = body_string(resp).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body, "Blob not found");
     }
 
-    /// A blob write is refused — not warned about — when a produced shard does
-    /// not hash to the address the manifest files it under.
-    ///
-    /// The old ingest path logged `warn!` and stored the shard anyway, so a
-    /// disagreement between bytes and manifest became silently-corrupt shards
-    /// that a later read reassembles into garbage. This pins the refusal.
-    #[test]
-    fn shard_hash_disagreement_refuses_the_write() {
-        let shards = vec![b"first shard".to_vec(), b"second shard".to_vec()];
-        let mut hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
-        hashes[1] = format!("sha256-{}", "0".repeat(64));
-
-        let refusal = verify_shards_against_manifest(&shards, &hashes)
-            .expect_err("a mis-named shard must refuse the whole write");
-
-        match refusal {
-            ShardWriteRefusal::HashMismatch { index, .. } => assert_eq!(index, 1),
-            other => panic!("expected a hash mismatch, got {other:?}"),
-        }
-        assert!(
-            refusal.message().contains("nothing stored"),
-            "the refusal must say no partial store happened — got {}",
-            refusal.message()
-        );
-    }
-
-    /// A producer/manifest count disagreement is likewise terminal. This is the
-    /// arm the erasure-coded band would have hit had the old hand-slicing loop
-    /// merely mis-counted instead of panicking off the end of the body.
-    #[test]
-    fn shard_count_disagreement_refuses_the_write() {
-        let shards = vec![b"only one".to_vec()];
-        let hashes = vec![
-            BlobStore::compute_hash(&shards[0]),
-            format!("sha256-{}", "1".repeat(64)),
+    /// Every byte route refuses an address that is not a byte CID with the typed
+    /// 400 `{"error":"invalid-byte-cid","check","detail"}` before any lookup: a
+    /// legacy `sha256-<hex>`, a sha2-256 raw CID (`bafkrei…`), a malformed CID
+    /// header (multibase/version/codec bytes that do not decode) and a truncated
+    /// byte CID.
+    #[tokio::test]
+    async fn blob_route_refuses_sha256_bafkrei_and_malformed_header_400() {
+        let server = test_server().await;
+        let held = server.blob_store.store(b"held bytes").await.unwrap();
+        let sha2_raw = elohim_epr::address::compute_raw_sha2_cid(b"held bytes").to_string();
+        assert!(sha2_raw.starts_with("bafkrei"));
+        let truncated = {
+            let full = held.cid.to_string();
+            full[..full.len() - 4].to_string()
+        };
+        let refused = [
+            format!("sha256-{}", "a".repeat(64)),
+            sha2_raw,
+            // multibase 'b' + garbage that is not a CID header
+            "bzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz".to_string(),
+            // a valid CIDv1 header for dag-cbor, not raw
+            elohim_epr::address::compute_record_cid(b"\xa0").to_string(),
+            truncated,
         ];
-
+        for address in &refused {
+            for (route, resp) in [
+                (
+                    "GET /blob",
+                    server.handle_get_blob(address, None).await.unwrap(),
+                ),
+                (
+                    "GET /shard",
+                    server.handle_get_shard(address).await.unwrap(),
+                ),
+                (
+                    "HEAD /shard",
+                    server.handle_head_shard(address).await.unwrap(),
+                ),
+                (
+                    "GET /manifest",
+                    server.handle_get_manifest(address).await.unwrap(),
+                ),
+            ] {
+                let (status, body) = body_string(resp).await;
+                assert_eq!(status, StatusCode::BAD_REQUEST, "{route} {address}: {body}");
+                let v: serde_json::Value = serde_json::from_str(&body)
+                    .unwrap_or_else(|e| panic!("{route} {address}: typed JSON body ({e}): {body}"));
+                assert_eq!(v["error"], "invalid-byte-cid", "{route} {address}");
+                assert!(v["check"].is_string(), "{route} {address}: {body}");
+            }
+        }
+        // The held bytes still serve under their byte CID.
+        let resp = server
+            .handle_get_blob(&held.cid.to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
-            verify_shards_against_manifest(&shards, &hashes),
-            Err(ShardWriteRefusal::CountMismatch {
-                produced: 1,
-                named: 2
-            })
+            resp.headers().get("X-Content-Address").unwrap(),
+            held.cid.to_string().as_str()
         );
     }
 
-    /// The agreeing case: shards produced by the encoder that hashed them pass.
-    #[test]
-    fn shards_matching_their_manifest_are_accepted() {
-        let shards = vec![b"alpha".to_vec(), b"beta".to_vec(), b"gamma".to_vec()];
-        let hashes: Vec<String> = shards.iter().map(|s| BlobStore::compute_hash(s)).collect();
-        assert_eq!(verify_shards_against_manifest(&shards, &hashes), Ok(()));
+    /// `PUT /blob/{cid}` stores the bytes under their byte CID and answers the
+    /// declared byte profile (epoch, chunker, erasure) with the manifest's chunks;
+    /// a body that does not hash to the path's CID is refused (`cid-mismatch`) and
+    /// nothing is stored.
+    #[tokio::test]
+    async fn put_blob_returns_byte_cid_and_declared_profile() {
+        let server = test_server().await;
+        let data: Vec<u8> = (0..200_000u32).flat_map(|n| n.to_le_bytes()).collect();
+        let cid = compute_bytes_cid(&data);
+
+        let resp = server
+            .put_blob_bytes(
+                data.clone(),
+                &cid,
+                "application/octet-stream",
+                "did:elohim:test",
+            )
+            .await
+            .unwrap();
+        assert!(resp.status().is_success(), "status {}", resp.status());
+        assert_eq!(
+            resp.headers().get("X-Content-Address").unwrap(),
+            cid.to_string().as_str()
+        );
+        assert!(resp.headers().get("X-Blob-Hash").is_none());
+        let (_, body) = body_string(resp).await;
+        let v: serde_json::Value = serde_json::from_str(&body).expect("JSON body");
+        assert_eq!(v["blobCid"], cid.to_string());
+        assert_eq!(v["byteLen"], data.len() as u64);
+        assert_eq!(
+            v["profile"]["epoch"],
+            u64::from(elohim_epr::profile::BYTE_PROFILE_EPOCH)
+        );
+        assert_eq!(
+            v["profile"]["chunker"]["id"],
+            elohim_epr::profile::CHUNKER_FASTCDC_2020
+        );
+        assert_eq!(v["profile"]["erasure"]["id"], "none");
+        let chunks = v["chunks"].as_array().expect("chunks");
+        assert!(!chunks.is_empty());
+        let total: u64 = chunks.iter().map(|c| c["len"].as_u64().unwrap()).sum();
+        assert_eq!(total, data.len() as u64);
+        for chunk in chunks {
+            ByteCid::parse(chunk["cid"].as_str().unwrap()).expect("each chunk is a byte CID");
+        }
+        assert_eq!(
+            server.blob_store.get(&cid).await.unwrap().as_ref(),
+            data.as_slice()
+        );
+
+        // A body that does not hash to the path's CID: typed 400, nothing stored.
+        let other = b"not the bytes the path names".to_vec();
+        let resp = server
+            .put_blob_bytes(
+                other.clone(),
+                &compute_bytes_cid(b"claimed"),
+                "text/plain",
+                "x",
+            )
+            .await
+            .unwrap();
+        let (status, body) = body_string(resp).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["error"], "cid-mismatch");
+        assert_eq!(v["actual"], compute_bytes_cid(&other).to_string());
+        assert_ne!(
+            server.blob_store.exists(&compute_bytes_cid(&other)).await,
+            Exists::Verified
+        );
     }
 
     /// Pure decision logic: a local hit resolves to `Bytes { healed_from: None }`
@@ -23084,7 +22637,7 @@ mod apps_resolver_heal_tests {
         let server = test_server().await;
         let payload = b"hello quilt".to_vec();
         let stored = server.blob_store.store(&payload).await.unwrap();
-        match server.get_blob_or_heal(&stored.hash).await {
+        match server.get_blob_or_heal(&stored.cid.to_string()).await {
             BlobHealOutcome::Bytes { bytes, healed_from } => {
                 assert_eq!(bytes, payload);
                 assert!(
@@ -23101,23 +22654,22 @@ mod apps_resolver_heal_tests {
     #[tokio::test]
     async fn get_blob_or_heal_miss_no_p2p_returns_not_found() {
         let server = test_server().await;
-        let hash = format!("sha256-{}", "c".repeat(64));
-        match server.get_blob_or_heal(&hash).await {
+        let cid = compute_bytes_cid(b"absent").to_string();
+        match server.get_blob_or_heal(&cid).await {
             BlobHealOutcome::NotFound => {}
             other => panic!("expected NotFound on miss with no p2p, got {other:?}"),
         }
     }
 
     /// Fix B: the `/blob` syncing body is valid JSON with `status:"syncing"`,
-    /// echoes the blob hash, and is NOT a "not found" body — a client can
-    /// distinguish "retry, syncing" from a 404.
+    /// echoes the byte CID, and is NOT a "not found" body.
     #[test]
     fn syncing_blob_body_is_syncing_json() {
-        let hash = format!("sha256-{}", "d".repeat(64));
-        let body = syncing_blob_body(&hash);
+        let cid = compute_bytes_cid(b"syncing").to_string();
+        let body = syncing_blob_body(&cid);
         let v: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
         assert_eq!(v["status"], "syncing");
-        assert_eq!(v["blobHash"], hash);
+        assert_eq!(v["blobCid"], cid);
         assert!(v["hint"].as_str().unwrap().contains("peers"));
         assert!(!body.to_lowercase().contains("not found"));
     }
@@ -23148,23 +22700,17 @@ mod apps_resolver_heal_tests {
         }
     }
 
-    /// CIDv1 base32 (`bafkrei…` raw+sha2-256) is the CANONICAL content address
-    /// per the p2p-design-gate; bare `sha256-…` is the legacy alias. Both must
-    /// read as content addresses so `/apps/{address}/…` bypasses slug lookup.
-    /// A slug that merely starts with `baf` must stay a slug — the recognizer
-    /// validates with the `cid` crate rather than pattern-matching a prefix.
+    /// An `/apps/{identifier}` is a content address only when it decodes in full
+    /// as a byte CID; every other spelling (legacy `sha256-…`, a sha2-256 raw CID)
+    /// and a slug that merely starts with `baf` stay slugs.
     #[test]
-    fn is_content_address_recognizes_cidv1_and_rejects_slugs() {
-        let sha = format!("sha256-{}", "a".repeat(64));
-        assert!(is_content_address(&sha), "legacy sha256- form");
-
-        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
-        assert!(cid.starts_with("bafkrei"), "raw+sha2-256 CIDv1, got {cid}");
-        assert!(
-            is_content_address(&cid),
-            "CIDv1 base32 is a content address"
-        );
-
+    fn is_content_address_recognizes_only_the_byte_cid() {
+        let cid = compute_bytes_cid(b"bundle").to_string();
+        assert!(is_content_address(&cid), "byte CID");
+        assert!(!is_content_address(&format!("sha256-{}", "a".repeat(64))));
+        assert!(!is_content_address(
+            &elohim_epr::address::compute_raw_sha2_cid(b"bundle").to_string()
+        ));
         assert!(!is_content_address("evolution-of-trust"));
         assert!(
             !is_content_address("bafflegab-app"),
@@ -23207,80 +22753,48 @@ mod apps_resolver_heal_tests {
         use std::collections::HashMap;
         let memo: Arc<tokio::sync::RwLock<HashMap<String, DeliverabilityVerdict>>> =
             Default::default();
-        let v = deliverability_lookup(&memo, "sha256-deadbeef").await;
+        let v = deliverability_lookup(
+            &memo,
+            "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u",
+        )
+        .await;
         assert_eq!(v, DeliverabilityVerdict::NotJudged(NotJudgedWhy::NotHeld));
-        memo.write()
-            .await
-            .insert("sha256-deadbeef".into(), DeliverabilityVerdict::Boots);
+        memo.write().await.insert(
+            "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u".into(),
+            DeliverabilityVerdict::Boots,
+        );
         assert_eq!(
-            deliverability_lookup(&memo, "sha256-deadbeef").await,
+            deliverability_lookup(
+                &memo,
+                "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u"
+            )
+            .await,
             DeliverabilityVerdict::Boots
         );
     }
 
-    /// Both spellings of ONE content address normalize to the same canonical
-    /// `sha256-{hex}` blob key, so `/apps/{cid}/…` and `/apps/{sha256-…}/…`
-    /// share one extraction-cache entry instead of extracting the bundle twice.
+    /// The canonical key of a byte-CID identifier is its own text; no other
+    /// spelling maps onto it.
     #[test]
-    fn canonical_content_address_collapses_both_spellings() {
-        let sha = format!("sha256-{}", "b".repeat(64));
-        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+    fn canonical_content_address_is_the_byte_cid_text() {
+        let cid = compute_bytes_cid(b"bundle").to_string();
         assert_eq!(
             canonical_content_address(&cid).as_deref(),
-            Some(sha.as_str())
+            Some(cid.as_str())
         );
         assert_eq!(
-            canonical_content_address(&sha).as_deref(),
-            Some(sha.as_str())
+            canonical_content_address(&format!("sha256-{}", "b".repeat(64))),
+            None
         );
         assert_eq!(canonical_content_address("evolution-of-trust"), None);
     }
 
-    /// `X-Content-Address` reports ONE spelling whichever way the bundle was
-    /// addressed or seeded: the blob-store key renders as its CIDv1, a CID
-    /// passes through, and a malformed key is left visible.
-    #[test]
-    fn content_address_header_renders_cidv1_for_every_input_spelling() {
-        let sha = format!("sha256-{}", "b".repeat(64));
-        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
-        assert!(cid.starts_with("bafkrei"));
-        assert_eq!(content_address_header(&sha), cid);
-        assert_eq!(content_address_header(&cid), cid);
-        assert_eq!(content_address_header("sha256-not-hex"), "sha256-not-hex");
-    }
-
-    /// The regression: `GET /apps/bafkrei…/index.html` 404'd with
-    /// "App not found: bafkrei…" because `is_content_address()` knew only the
-    /// legacy prefix, so the canonical address fell through to slug lookup.
-    /// A locally-present blob must serve under its CIDv1 identifier.
+    /// The capability probe shares the recognizer: a byte-CID identifier is
+    /// reported in `X-Content-Address`, never resolved through `slug_index`.
     #[tokio::test]
-    async fn apps_resolver_serves_local_hit_via_cidv1_identifier() {
+    async fn app_capability_reports_content_address_for_byte_cid_identifier() {
         let server = test_server().await;
-        let zip = tiny_zip();
-        let stored = server.blob_store.store(&zip).await.unwrap();
-        let cid = BlobStore::hash_to_cid(&stored.hash).unwrap().to_string();
-        assert!(cid.starts_with("baf"), "CIDv1 identifier, got {cid}");
-
-        let resp = server
-            .handle_app_request(&format!("/apps/{cid}/index.html"), "", None)
-            .await
-            .unwrap();
-        let (status, body) = body_string(resp).await;
-        assert_eq!(
-            status,
-            StatusCode::OK,
-            "CID identifier must serve, body={body}"
-        );
-        assert!(body.contains("<title>ok</title>"));
-    }
-
-    /// The capability probe shares the recognizer: a CIDv1 identifier must be
-    /// reported as a blob hash, never resolved through `slug_index`.
-    #[tokio::test]
-    async fn app_capability_reports_blob_hash_for_cidv1_identifier() {
-        let server = test_server().await;
-        let sha = format!("sha256-{}", "c".repeat(64));
-        let cid = BlobStore::hash_to_cid(&sha).unwrap().to_string();
+        let cid = compute_bytes_cid(b"probed bundle").to_string();
         let resp = server
             .handle_app_capability(&format!("/apps/{cid}/_capability"), None)
             .await
@@ -23288,11 +22802,11 @@ mod apps_resolver_heal_tests {
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.headers()
-                .get("X-Blob-Hash")
+                .get("X-Content-Address")
                 .and_then(|v| v.to_str().ok()),
-            Some(sha.as_str()),
-            "CID identifier normalizes to the canonical sha256- blob key"
+            Some(cid.as_str())
         );
+        assert!(resp.headers().get("X-Blob-Hash").is_none());
         assert!(
             resp.headers().get("X-Content-Slug").is_none(),
             "a content address is never a slug"
@@ -23516,9 +23030,13 @@ mod sync_mode_control_tests {
 
     async fn test_server_with_pool(pool: crate::db::DbPool) -> HttpServer {
         let blob_store = Arc::new(
-            crate::blob_store::BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            crate::blob_store::BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_db_pool(pool)
@@ -23704,9 +23222,13 @@ mod candidate_head_state_tests {
     #[tokio::test]
     async fn missing_conductor_is_unavailable_not_authoritative_candidate_absence() {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
 
@@ -23761,7 +23283,7 @@ mod candidate_head_state_tests {
     async fn exact_verified_candidate_resolves_independently_of_the_public_head_scalar() {
         let (_root, server) = candidate_server().await;
         let stored = server.blob_store.store(b"candidate-b").await.unwrap();
-        let expected_blob = stored.hash.clone();
+        let expected_blob = stored.cid.to_string();
         let blob = server
             .resolve_exact_candidate_blob_with(
                 CONTENT_ID,
@@ -23774,7 +23296,7 @@ mod candidate_head_state_tests {
                 },
             )
             .await;
-        assert_eq!(blob.as_deref(), Some(stored.hash.as_str()));
+        assert_eq!(blob.as_deref(), Some(expected_blob.as_str()));
     }
 
     #[tokio::test]
@@ -23801,7 +23323,7 @@ mod candidate_head_state_tests {
                 |_| async {
                     Ok(Some(proven_candidate(
                         "uhCkko2IzF5WItm_q0nisrn80BFb0h39ChwvDYZbBGW-tjn-t3Mg9",
-                        "sha256-wrong-action",
+                        "bafkr4ihy33zus5qefbwrguutfv5uqfcp23yyeidsc7qum557dcfh2bpsve",
                     )))
                 },
             )
@@ -23832,7 +23354,10 @@ mod candidate_head_state_tests {
                 deadline,
                 || async { Ok(Some(carried(CANDIDATE))) },
                 |_| async {
-                    let mut proven = proven_candidate(CANDIDATE, "sha256-present");
+                    let mut proven = proven_candidate(
+                        CANDIDATE,
+                        "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+                    );
                     proven.content_id = "other".to_string();
                     Ok(Some(proven))
                 },
@@ -23847,7 +23372,10 @@ mod candidate_head_state_tests {
                 deadline,
                 || async { Ok(Some(carried(CANDIDATE))) },
                 |_| async {
-                    let mut proven = proven_candidate(CANDIDATE, "sha256-present");
+                    let mut proven = proven_candidate(
+                        CANDIDATE,
+                        "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
+                    );
                     proven.content.id = "other".to_string();
                     Ok(Some(proven))
                 },
@@ -23887,7 +23415,12 @@ mod candidate_head_state_tests {
                 CANDIDATE,
                 tokio::time::Instant::now() + std::time::Duration::from_secs(1),
                 || async { Ok(Some(carried(CANDIDATE))) },
-                |_| async { Ok(Some(proven_candidate(CANDIDATE, "sha256-not-local"))) },
+                |_| async {
+                    Ok(Some(proven_candidate(
+                        CANDIDATE,
+                        "bafkr4ieejsnfyq3pzhp6smlzrxedil3zl6nxgltjipfmtcs4krksdidqae",
+                    )))
+                },
             )
             .await;
         assert_eq!(blob, None);
@@ -23955,9 +23488,13 @@ mod head_record_trace_tests {
         let first = Arc::clone(&rendezvous);
         let second = Arc::clone(&rendezvous);
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
         let ctx = AppContext::default_lamad();
@@ -24045,9 +23582,13 @@ mod session_exchange_tests {
 
     async fn test_server() -> HttpServer {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
     }
@@ -24737,9 +24278,13 @@ mod head_declare_authority_precedes_catching_up_shed_tests {
 
     async fn test_server() -> HttpServer {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
     }
@@ -24879,9 +24424,13 @@ mod content_head_record_reach_gate_tests {
 
     async fn test_server() -> HttpServer {
         let blob_store = Arc::new(
-            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
-                .await
-                .unwrap(),
+            BlobStore::new(
+                Box::leak(Box::new(tempfile::tempdir().unwrap()))
+                    .path()
+                    .to_path_buf(),
+            )
+            .await
+            .unwrap(),
         );
         HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap()).with_db_pool(test_pool())
     }
@@ -24898,7 +24447,6 @@ mod content_head_record_reach_gate_tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,

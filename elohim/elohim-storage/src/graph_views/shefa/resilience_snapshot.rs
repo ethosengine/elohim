@@ -15,7 +15,7 @@
 //!   steward buckets `unknown`. This is an HONEST unknown (region unreachable), not a
 //!   fake zero — the diagnostic tell (`unknown == stewarding_count`) is preserved.
 //! - `placement_gaps`: the relational placement-gap projection is NOT reachable from
-//!   the Cozo graph context (no `shard_hash` / timestamps here to synthesize an
+//!   the Cozo graph context (no `shard_cid` / timestamps here to synthesize an
 //!   honest `PlacementGapView`). The deficit against the diversity floor is surfaced
 //!   instead as `coverage_shortfall` (below) — the graph-native gap signal.
 //!
@@ -113,7 +113,7 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
             global: 0,
             unknown: stewarding_count,
         },
-        // Unreachable from the graph context (no shard_hash/timestamps to build an
+        // Unreachable from the graph context (no shard_cid/timestamps to build an
         // honest PlacementGapView). The floor deficit is surfaced as
         // `coverage_shortfall` below — the graph-native gap signal.
         placement_gaps: vec![],

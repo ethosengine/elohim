@@ -38,7 +38,6 @@ impl From<CreateContentInputView> for CreateContentInput {
             description: v.description,
             content_type: v.content_type.unwrap_or_else(|| "concept".to_string()),
             content_format: v.content_format.unwrap_or_else(|| "markdown".to_string()),
-            blob_hash: v.blob_hash,
             blob_cid: v.blob_cid,
             content_size_bytes: v.content_size_bytes.map(|s| s as i32),
             metadata_json: serialize_json_opt(&v.metadata),
@@ -545,27 +544,30 @@ mod schema_version_tests {
         assert!(view.metadata.is_none());
     }
 
-    /// PATCH /db/content/{id} must accept a body that sets blobHash without
+    /// PATCH /db/content/{id} must accept a body that sets blobCid without
     /// touching any other field. This is the deploy-time stageSpaBlob path
     /// (see genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md).
     #[test]
-    fn test_update_content_input_view_blob_hash_only_patch() {
-        let json = r#"{"blobHash": "sha256-deadbeef"}"#;
+    fn test_update_content_input_view_blob_cid_only_patch() {
+        let json = r#"{"blobCid": "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u"}"#;
         let view: UpdateContentInputView = serde_json::from_str(json).unwrap();
-        assert_eq!(view.blob_hash.as_deref(), Some("sha256-deadbeef"));
+        assert_eq!(
+            view.blob_cid.as_deref(),
+            Some("bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u")
+        );
         assert!(view.title.is_none());
         assert!(view.description.is_none());
         assert!(view.metadata.is_none());
     }
 
-    /// blobHash absent from the body → field is None and other partial-update
+    /// blobCid absent from the body → field is None and other partial-update
     /// semantics still hold.
     #[test]
-    fn test_update_content_input_view_blob_hash_absent_when_not_provided() {
+    fn test_update_content_input_view_blob_cid_absent_when_not_provided() {
         let json = r#"{"title": "renamed"}"#;
         let view: UpdateContentInputView = serde_json::from_str(json).unwrap();
         assert_eq!(view.title.as_deref(), Some("renamed"));
-        assert!(view.blob_hash.is_none());
+        assert!(view.blob_cid.is_none());
     }
 
     /// PATCH /db/content/{id} must accept a body that stamps p2pPublishedAt
@@ -581,7 +583,7 @@ mod schema_version_tests {
             Some("2026-06-04T00:00:00Z")
         );
         assert!(view.title.is_none());
-        assert!(view.blob_hash.is_none());
+        assert!(view.blob_cid.is_none());
     }
 
     #[test]

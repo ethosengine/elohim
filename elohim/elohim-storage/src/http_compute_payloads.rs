@@ -47,9 +47,9 @@ impl HttpServer {
             },
             None => 86400,
         };
-        let hex = match BlobStore::parse_content_address(cid) {
-            Ok(h) if h.len() == 64 && cid.starts_with("bafk") => h,
-            _ => return Ok(response::bad_request("raw CID required")),
+        let chunk = match parse_byte_cid_param(cid) {
+            Ok(chunk) => chunk,
+            Err(refusal) => return Ok(refusal),
         };
         let root = self.blob_store.root_dir();
         let owner = match caller {
@@ -95,7 +95,7 @@ impl HttpServer {
                     .body(Full::new(Bytes::from(bytes)))
                     .unwrap());
             }
-            match self.fetch_compute_chunk(&format!("sha256-{hex}")).await {
+            match self.fetch_compute_chunk(&chunk.to_string()).await {
                 Some(bytes) => bytes,
                 None => {
                     return Ok(response::service_unavailable(
@@ -188,6 +188,7 @@ impl HttpServer {
     }
 
     async fn fetch_compute_chunk(&self, hash: &str) -> Option<Vec<u8>> {
+        let cid = elohim_epr::address::ByteCid::parse(hash).ok()?;
         // Bounded chunks allow reuse of the native blob protocol without the
         // permanent-content finalizer. Eight candidates, two in flight each.
         #[cfg(feature = "p2p")]
@@ -231,7 +232,7 @@ impl HttpServer {
             };
             if let crate::p2p::blob_fetch::FetchOutcome::Hit { bytes, .. } =
                 crate::p2p::blob_swarm::race_fetch_dual(
-                    hash,
+                    &cid,
                     candidates,
                     &sender,
                     |p| connected.contains(p),

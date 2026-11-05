@@ -403,7 +403,7 @@ impl From<crate::db::models::PlacementGapRow> for PlacementGapView {
         Self {
             id: r.id,
             content_id: r.content_id,
-            shard_hash: r.shard_hash,
+            shard_cid: r.shard_cid,
             requested_steward_count: r.requested_steward_count,
             achieved_steward_count: r.achieved_steward_count,
             contract_coverage: r.contract_coverage,
@@ -501,24 +501,60 @@ pub fn elohim_reputation_profile_view_from_result(
 // Blob Response View
 // ============================================================================
 
-/// Build a PutBlobResponseView from an existing ShardManifest plus optional BLAKE3 hash.
+/// Build a [`PutBlobResponseView`] from the manifest minted for the stored bytes: the
+/// byte CID, the profile (epoch, chunker, erasure) the bytes were cut under, the chunks
+/// and — when erasure-coded — the stripes. Every CID is rendered from its typed value.
 pub fn put_blob_response_view_from_manifest(
     m: crate::sharding::ShardManifest,
-    blake3_hash: Option<String>,
 ) -> PutBlobResponseView {
+    let chunker = elohim_views::BlobChunkerView {
+        id: elohim_epr::profile::CHUNKER_FASTCDC_2020.to_string(),
+        min: m.chunker.min,
+        avg: m.chunker.avg,
+        max: m.chunker.max,
+        level: m.chunker.level,
+    };
     PutBlobResponseView {
-        blob_hash: m.blob_hash,
-        total_size: m.total_size,
+        blob_cid: m.blob_cid.to_string(),
+        byte_len: m.byte_len,
         mime_type: m.mime_type,
-        encoding: m.encoding,
-        data_shards: m.data_shards,
-        total_shards: m.total_shards,
-        shard_size: m.shard_size,
-        shard_hashes: m.shard_hashes,
+        profile: elohim_views::BlobProfileView {
+            epoch: elohim_epr::profile::BYTE_PROFILE_EPOCH,
+            chunker,
+            erasure: elohim_views::BlobErasureView {
+                id: m.erasure.id,
+                data: m.erasure.data,
+                parity: m.erasure.parity,
+            },
+        },
+        chunks: m
+            .chunks
+            .iter()
+            .map(|c| elohim_views::BlobChunkRefView {
+                cid: c.cid.to_string(),
+                len: c.len,
+            })
+            .collect(),
+        stripes: m
+            .stripes
+            .iter()
+            .map(|s| elohim_views::BlobStripeView {
+                index: s.index,
+                byte_len: u64::from(s.byte_len),
+                shards: s
+                    .shards
+                    .iter()
+                    .map(|r| elohim_views::BlobShardRefView {
+                        cid: r.cid.to_string(),
+                        len: r.len,
+                        index: r.index,
+                    })
+                    .collect(),
+            })
+            .collect(),
         reach: m.reach,
         author_id: m.author_id,
         created_at: m.created_at,
         verified_at: m.verified_at,
-        blake3_hash,
     }
 }

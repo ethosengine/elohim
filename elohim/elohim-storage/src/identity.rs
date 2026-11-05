@@ -560,12 +560,19 @@ mod tests {
         let delivery = DeliveryCapabilities {
             serves_extracted: true,
             serves_compressed: false,
-            ready_content: vec!["bafkrei_abc123".to_string(), "bafkrei_def456".to_string()],
+            ready_content: vec![
+                "bafkr4idih3uu7t7vtigf6vb6zsx5nqqlgtzhdjt34qvlyxcefse2k5vwp4".to_string(),
+                "bafkr4ihonor45fds2kldvj4loyr3n67boy74mout7mjwxfcc4y7d2fczhi".to_string(),
+            ],
             cache_tier: CacheTier::Projection,
         };
         let strings = delivery.to_capability_strings();
-        assert!(strings.contains(&"warm:bafkrei_abc123".to_string()));
-        assert!(strings.contains(&"warm:bafkrei_def456".to_string()));
+        assert!(strings.contains(
+            &"warm:bafkr4idih3uu7t7vtigf6vb6zsx5nqqlgtzhdjt34qvlyxcefse2k5vwp4".to_string()
+        ));
+        assert!(strings.contains(
+            &"warm:bafkr4ihonor45fds2kldvj4loyr3n67boy74mout7mjwxfcc4y7d2fczhi".to_string()
+        ));
         assert!(strings.contains(&"cache_tier:projection".to_string()));
         assert!(!strings.contains(&"serves_compressed".to_string()));
     }

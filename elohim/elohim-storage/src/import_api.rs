@@ -64,14 +64,14 @@ pub struct QueueImportRequest {
     pub batch_type: String,
     /// Hash of blob containing items (if pre-uploaded)
     #[serde(default)]
-    pub blob_hash: Option<String>,
-    /// Total items count (required if blob_hash provided)
+    pub blob_cid: Option<String>,
+    /// Total items count (required if blob_cid provided)
     #[serde(default)]
     pub total_items: Option<u32>,
     /// Schema version
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
-    /// Inline items JSON (alternative to blob_hash)
+    /// Inline items JSON (alternative to blob_cid)
     #[serde(default)]
     pub items: Option<Vec<serde_json::Value>>,
     /// Items per chunk (optional, uses server default if not provided)
@@ -92,7 +92,7 @@ fn default_schema_version() -> u32 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueImportResponse {
     pub batch_id: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub total_items: u32,
     pub status: String,
     pub message: String,
@@ -128,7 +128,7 @@ pub struct BatchDiagnostics {
     /// Failed IDs with reasons
     pub failed_items: Vec<FailedItem>,
     /// Blob hash for re-reading original items
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub elapsed_ms: u64,
 }
 
@@ -196,7 +196,7 @@ struct ZomeQueueImportInput {
     /// Type of items: "content", "paths", "steps", "full"
     pub batch_type: String,
     /// Hash of the blob in elohim-store containing the items JSON
-    pub blob_hash: String,
+    pub blob_cid: String,
     /// Total number of items to be processed
     pub total_items: u32,
     /// Schema version for the items
@@ -245,7 +245,7 @@ enum ZomeResultWrapper {
 struct ImportBatch {
     batch_id: String,
     batch_type: String,
-    blob_hash: String,
+    blob_cid: String,
     total_items: u32,
     status: ImportStatus,
     processed_count: u32,
@@ -562,15 +562,17 @@ impl ImportApi {
         }
 
         // Get or store blob
-        let (blob_hash, items_json, total_items) = if let Some(items) = request.items {
+        let (blob_cid, items_json, total_items) = if let Some(items) = request.items {
             // Inline items - store as blob
             let items_json = serde_json::to_string(&items)?;
             let total_items = items.len() as u32;
             let blob_result = self.blob_store.store(items_json.as_bytes()).await?;
-            (blob_result.hash, items_json, total_items)
-        } else if let Some(hash) = request.blob_hash {
-            // Pre-uploaded blob - retrieve it
-            let blob_data = self.blob_store.get(&hash).await?;
+            (blob_result.cid.to_string(), items_json, total_items)
+        } else if let Some(hash) = request.blob_cid {
+            // Pre-uploaded blob - retrieve it (a byte CID, by full decode)
+            let cid = elohim_epr::address::ByteCid::parse(&hash)
+                .map_err(|e| StorageError::InvalidInput(format!("blob_cid: {e}")))?;
+            let blob_data = self.blob_store.get(&cid).await?.to_vec();
             let items_json = String::from_utf8(blob_data)
                 .map_err(|e| StorageError::Parse(format!("Invalid UTF-8 in blob: {}", e)))?;
             let total_items = request.total_items.unwrap_or_else(|| {
@@ -583,7 +585,7 @@ impl ImportApi {
         } else {
             return Ok(error_response(
                 StatusCode::BAD_REQUEST,
-                "Must provide either 'items' or 'blob_hash'",
+                "Must provide either 'items' or 'blob_cid'",
             ));
         };
 
@@ -592,7 +594,7 @@ impl ImportApi {
         let batch = ImportBatch {
             batch_id: batch_id.clone(),
             batch_type: request.batch_type.clone(),
-            blob_hash: blob_hash.clone(),
+            blob_cid: blob_cid.clone(),
             total_items,
             status: ImportStatus::Queued,
             processed_count: 0,
@@ -655,7 +657,7 @@ impl ImportApi {
         // Return response
         let response = QueueImportResponse {
             batch_id,
-            blob_hash,
+            blob_cid,
             total_items,
             status: "queued".to_string(),
             message: "Import batch queued for processing".to_string(),
@@ -788,7 +790,7 @@ impl ImportApi {
                     reason: reason.clone(),
                 })
                 .collect(),
-            blob_hash: batch.blob_hash.clone(),
+            blob_cid: batch.blob_cid.clone(),
             elapsed_ms: elapsed.as_millis() as u64,
         };
 
@@ -814,12 +816,16 @@ impl ImportApi {
         };
 
         // Read original items from blob
-        let blob_data = match self.blob_store.get(&batch.blob_hash).await {
-            Ok(data) => data,
+        let blob_read = match elohim_epr::address::ByteCid::parse(&batch.blob_cid) {
+            Ok(cid) => self.blob_store.get(&cid).await,
+            Err(e) => Err(StorageError::InvalidInput(format!("blob_cid: {e}"))),
+        };
+        let blob_data = match blob_read {
+            Ok(data) => data.to_vec(),
             Err(e) => {
                 return Ok(error_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    &format!("Failed to read blob {}: {}", batch.blob_hash, e),
+                    &format!("Failed to read blob {}: {}", batch.blob_cid, e),
                 ));
             }
         };
@@ -1013,7 +1019,7 @@ impl ImportApiProcessor {
         let queue_payload = ZomeQueueImportInput {
             id: batch_id.to_string(),
             batch_type: batch_type.to_string(),
-            blob_hash: format!("inline-{}", batch_id), // No blob for inline imports
+            blob_cid: format!("inline-{}", batch_id), // No blob for inline imports
             total_items: total as u32,
             schema_version: 1, // Current schema version
         };

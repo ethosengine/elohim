@@ -434,8 +434,6 @@ pub struct ContentEntry {
     pub blob_cid: Option<String>,
     #[serde(default)]
     pub content_size_bytes: Option<u64>,
-    #[serde(default)]
-    pub content_hash: Option<String>,
 }
 
 /// Mirror of DNA `EconomicEvent` entry shape.
@@ -1642,7 +1640,6 @@ mod tests {
                 description: Some("d".into()),
                 content_type: "concept".into(),
                 content_format: "markdown".into(),
-                blob_hash: Some(blob.into()),
                 blob_cid: Some(blob.into()),
                 content_size_bytes: None,
                 metadata_json: Some(format!(r#"{{"blob":"{blob}"}}"#)),
@@ -1831,7 +1828,6 @@ mod tests {
         );
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-head-b"));
         assert_eq!(row.blob_cid.as_deref(), Some("blob-b"));
-        assert_eq!(row.blob_hash.as_deref(), Some("blob-b"));
         assert_eq!(row.metadata_json.as_deref(), Some(r#"{"blob":"blob-b"}"#));
     }
 
@@ -2008,8 +2004,9 @@ mod tests {
                 description: None,
                 content_type: "concept".into(),
                 content_format: "markdown".into(),
-                blob_hash: Some("sha256-browser-b".into()),
-                blob_cid: Some("sha256-browser-b".into()),
+                blob_cid: Some(
+                    "bafkr4ibnhf3w5rasea7gqhs5zlds6u5oq5q64vvkp2xauc2todifdfud7u".into(),
+                ),
                 content_size_bytes: Some(10),
                 metadata_json: Some("{}".into()),
                 reach: "commons".into(),
@@ -2382,9 +2379,8 @@ mod tests {
                     "updated_at": "2026-05-26T13:30:00Z",
                     "schema_version": 1,
                     "validation_status": "Valid",
-                    "blob_cid": "sha256-deadbeefcafe1234",
-                    "content_size_bytes": 4096,
-                    "content_hash": "sha256-deadbeefcafe1234"
+                    "blob_cid": "bafkr4ifxnhxtpdvnwlkpraxx5eaijh4ojthd2q6gnjd4aiquneq6eper2y",
+                    "content_size_bytes": 4096
                 },
                 "author": "uhCAk-author"
             }
@@ -2401,7 +2397,10 @@ mod tests {
             } => {
                 assert_eq!(action_hash.0, "uhCkk-content-anchor");
                 assert_eq!(content.id, "elohim-host-landing");
-                assert_eq!(content.blob_cid.as_deref(), Some("sha256-deadbeefcafe1234"));
+                assert_eq!(
+                    content.blob_cid.as_deref(),
+                    Some("bafkr4ifxnhxtpdvnwlkpraxx5eaijh4ojthd2q6gnjd4aiquneq6eper2y")
+                );
                 assert_eq!(content.content_size_bytes, Some(4096));
                 assert_eq!(content.tags.len(), 2);
                 assert!((content.trust_score - 1.0).abs() < f64::EPSILON);

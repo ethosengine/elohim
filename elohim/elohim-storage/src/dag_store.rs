@@ -35,17 +35,25 @@ impl DagStore {
     pub async fn put<T: Serialize>(&self, value: &T) -> Result<Cid, StorageError> {
         let bytes = serde_ipld_dagcbor::to_vec(value)
             .map_err(|e| StorageError::Codec(format!("DAG-CBOR encode: {e}")))?;
-        let result = self.blob_store.store_dag_cbor(&bytes).await?;
-        let cid = result
-            .cid
-            .parse::<Cid>()
-            .map_err(|e| StorageError::Codec(format!("CID parse: {e}")))?;
-        Ok(cid)
+        Ok(self.blob_store.store_record(&bytes).await?.cid)
+    }
+
+    /// Read a block by CID through the store lane its profile names: a dag-cbor record
+    /// (`0x71 + sha2-256`) from the record lane, a byte CID from the payload store.
+    /// Any other CID is not held here (`NotFound`).
+    async fn read_block(&self, cid: &Cid) -> Result<Vec<u8>, StorageError> {
+        if cid.codec() == DAG_CBOR_CODEC {
+            return Ok(self.blob_store.get_record(cid).await?.to_vec());
+        }
+        match elohim_epr::address::ByteCid::try_from(*cid) {
+            Ok(byte_cid) => Ok(self.blob_store.get(&byte_cid).await?.to_vec()),
+            Err(_) => Err(StorageError::NotFound(cid.to_string())),
+        }
     }
 
     /// Retrieve and decode a DAG-CBOR value by CID.
     pub async fn get<T: DeserializeOwned>(&self, cid: &Cid) -> Result<T, StorageError> {
-        let data = self.blob_store.get_by_address(&cid.to_string()).await?;
+        let data = self.read_block(cid).await?;
         let value = serde_ipld_dagcbor::from_slice(&data)
             .map_err(|e| StorageError::Codec(format!("DAG-CBOR decode: {e}")))?;
         Ok(value)
@@ -53,21 +61,25 @@ impl DagStore {
 
     /// Retrieve raw block bytes by CID.
     pub async fn get_block(&self, cid: &Cid) -> Result<Option<Vec<u8>>, StorageError> {
-        match self.blob_store.get_by_address(&cid.to_string()).await {
+        match self.read_block(cid).await {
             Ok(data) => Ok(Some(data)),
-            Err(StorageError::NotFound(_)) => Ok(None),
+            Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => Ok(None),
             Err(e) => Err(e),
         }
     }
 
     /// Check if a block exists by CID.
     pub async fn has_block(&self, cid: &Cid) -> Result<bool, StorageError> {
-        self.blob_store.exists_by_address(&cid.to_string()).await
+        match self.read_block(cid).await {
+            Ok(_) => Ok(true),
+            Err(StorageError::NotFound(_)) | Err(StorageError::BlobNotFound(_)) => Ok(false),
+            Err(e) => Err(e),
+        }
     }
 
     /// List CIDs linked from a DAG-CBOR block.
     pub async fn links(&self, cid: &Cid) -> Result<Vec<Cid>, StorageError> {
-        let data = self.blob_store.get_by_address(&cid.to_string()).await?;
+        let data = self.read_block(cid).await?;
         Ok(extract_links(&data, cid.codec()))
     }
 
@@ -78,14 +90,14 @@ impl DagStore {
     ) -> Result<(Cid, Vec<Cid>), StorageError> {
         let (bytes, cid) = epr_codec::encode_epr_head(head)
             .map_err(|e| StorageError::Codec(format!("EPR encode: {e}")))?;
-        self.blob_store.store_dag_cbor(&bytes).await?;
+        self.blob_store.store_record(&bytes).await?;
         let links = extract_links(&bytes, DAG_CBOR_CODEC);
         Ok((cid, links))
     }
 
     /// Retrieve and decode an EPR Head by CID.
     pub async fn get_epr_head(&self, cid: &Cid) -> Result<epr_codec::EprHead, StorageError> {
-        let data = self.blob_store.get_by_address(&cid.to_string()).await?;
+        let data = self.read_block(cid).await?;
         epr_codec::decode_epr_head(&data)
             .map_err(|e| StorageError::Codec(format!("EPR decode: {e}")))
     }

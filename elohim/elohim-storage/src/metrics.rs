@@ -1827,8 +1827,8 @@ lazy_static! {
 
     /// Level-triggered heal of HALF content rows (declared `blob_cid`, no local
     /// `blob_hash`) from their converged sync docs. label: outcome = "scanned" |
-    /// "healed" (doc carried a blobHash the row lacked) | "no_doc_hash" (no doc,
-    /// or the doc has no blobHash either — the legitimate half state) |
+    /// "healed" (doc carried a blobCid the row lacked) | "no_doc_hash" (no doc,
+    /// or the doc has no blobCid either — the legitimate half state) |
     /// "failed". Pre-touched at zero. A `healed` that keeps climbing names a
     /// peer whose pull leg keeps landing half records; see backlog
     /// `pull-leg-drains-before-iroh-book-warms` (2026-08-29 measured section).
@@ -7921,12 +7921,24 @@ mod tests {
     #[test]
     fn classify_http_route_maps_representative_paths_and_stays_bounded() {
         let cases: &[(&str, &str)] = &[
-            ("/blob/sha256-abc", "blob"),
-            ("/shard/sha256-abc", "blob"),
-            ("/manifest/sha256-abc", "blob"),
+            (
+                "/blob/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "blob",
+            ),
+            (
+                "/shard/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "blob",
+            ),
+            (
+                "/manifest/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "blob",
+            ),
             ("/manifest", "blob"),
             ("/dag/bafyreiabc/links", "blob"),
-            ("/ipfs/bafkreiabc", "blob"),
+            (
+                "/ipfs/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "blob",
+            ),
             ("/apps/lamad", "apps"),
             ("/chrome/omnibar.js", "apps"),
             ("/spa/index.html", "apps"),
@@ -8106,7 +8118,7 @@ mod tests {
     #[test]
     fn request_metrics_guard_observes_a_success_finish() {
         let route_class = "blob";
-        let path = "/blob/sha256-abcdef";
+        let path = "/blob/bafkr4iftjnlaozys7v73tqdherngzbpbmf2lh3zogxpxwvvx6fsolq3eiy";
         assert_eq!(classify_http_route(path), route_class);
 
         let before_count = HTTP_REQUEST_DURATION_MS

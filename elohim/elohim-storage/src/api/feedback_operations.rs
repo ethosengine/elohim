@@ -465,7 +465,6 @@ async fn author_or_recover_evidence(
         thumbnail_url: None,
         blob_cid: None,
         content_size_bytes: None,
-        content_hash: None,
     };
     match crate::chain_write_gate::as_writer(
         crate::chain_write_gate::WriterKind::HttpAuthor,

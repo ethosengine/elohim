@@ -14,7 +14,7 @@
 //!
 //! ```ignore
 //! ContentServer {
-//!     content_hash: String,      // sha256-xxx
+//!     content_cid: String,      // sha256-xxx
 //!     capability: String,        // blob, html5_app, media_stream, etc.
 //!     serve_url: Option<String>, // HTTP endpoint for legacy access
 //!     online: bool,
@@ -77,7 +77,7 @@ pub struct StorageEndpointInput {
 pub struct RegisterContentServerInput {
     /// Content hash this server can provide (e.g., "sha256-abc123")
     /// Use "*" for wildcard registration (can serve any content of this capability)
-    pub content_hash: String,
+    pub content_cid: String,
     /// Capability: blob, html5_app, media_stream, learning_package, custom
     pub capability: String,
     /// URL where this server accepts content requests (DEPRECATED - use endpoints)
@@ -112,7 +112,7 @@ pub struct StorageEndpointInfo {
 /// ContentServer info (matches DNA entry)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentServerInfo {
-    pub content_hash: String,
+    pub content_cid: String,
     pub capability: String,
     pub serve_url: Option<String>,
     #[serde(default)]
@@ -129,7 +129,7 @@ pub struct ContentServerInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FindPublishersInput {
     /// Content hash to find publishers for
-    pub content_hash: String,
+    pub content_cid: String,
     /// Optional: filter by capability
     pub capability: Option<String>,
     /// Optional: prefer publishers in this region
@@ -144,7 +144,7 @@ pub struct FindPublishersInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FindPublishersOutput {
     /// Content hash queried
-    pub content_hash: String,
+    pub content_cid: String,
     /// Found publishers, sorted by priority
     pub publishers: Vec<ContentServerOutput>,
 }
@@ -163,7 +163,7 @@ pub struct ContentServerBridge {
         reason = "the constructor records the agent this bridge registers for; no method reads it yet"
     )]
     agent_pubkey: String,
-    /// Registered content servers (action_hash by content_hash)
+    /// Registered content servers (action_hash by content_cid)
     registrations: std::collections::HashMap<String, Vec<u8>>,
 }
 
@@ -212,10 +212,10 @@ impl ContentServerBridge {
     /// Register this node as serving a content hash (uses default serve_url)
     pub async fn register_content(
         &mut self,
-        content_hash: &str,
+        content_cid: &str,
         capability: &str,
     ) -> Result<Vec<u8>, StorageError> {
-        self.register_content_with_endpoints(content_hash, capability, None)
+        self.register_content_with_endpoints(content_cid, capability, None)
             .await
     }
 
@@ -224,7 +224,7 @@ impl ContentServerBridge {
     /// If endpoints is None, falls back to config.serve_url for backwards compatibility.
     pub async fn register_content_with_endpoints(
         &mut self,
-        content_hash: &str,
+        content_cid: &str,
         capability: &str,
         endpoints: Option<Vec<StorageEndpointInput>>,
     ) -> Result<Vec<u8>, StorageError> {
@@ -247,7 +247,7 @@ impl ContentServerBridge {
         });
 
         let input = RegisterContentServerInput {
-            content_hash: content_hash.to_string(),
+            content_cid: content_cid.to_string(),
             capability: capability.to_string(),
             serve_url: self.config.serve_url.clone(), // Keep for backwards compat
             endpoints,
@@ -260,7 +260,7 @@ impl ContentServerBridge {
             .map_err(|e| StorageError::Internal(format!("Failed to encode input: {}", e)))?;
 
         debug!(
-            content_hash = %content_hash,
+            content_cid = %content_cid,
             capability = %capability,
             "Registering content server"
         );
@@ -281,10 +281,10 @@ impl ContentServerBridge {
 
         // Cache the registration
         self.registrations
-            .insert(content_hash.to_string(), output.action_hash.clone());
+            .insert(content_cid.to_string(), output.action_hash.clone());
 
         info!(
-            content_hash = %content_hash,
+            content_cid = %content_cid,
             "Content server registered"
         );
 
@@ -294,13 +294,13 @@ impl ContentServerBridge {
     /// Find publishers for a content hash
     pub async fn find_publishers(
         &self,
-        content_hash: &str,
+        content_cid: &str,
         prefer_region: Option<&str>,
     ) -> Result<Vec<PublisherInfo>, StorageError> {
         let cell_id = self.get_cell_id()?;
 
         let input = FindPublishersInput {
-            content_hash: content_hash.to_string(),
+            content_cid: content_cid.to_string(),
             capability: None,
             prefer_region: prefer_region.map(|s| s.to_string()),
             limit: Some(10),
@@ -310,7 +310,7 @@ impl ContentServerBridge {
         let payload = rmp_serde::to_vec(&input)
             .map_err(|e| StorageError::Internal(format!("Failed to encode input: {}", e)))?;
 
-        debug!(content_hash = %content_hash, "Finding publishers");
+        debug!(content_cid = %content_cid, "Finding publishers");
 
         let result = self
             .conductor_client
@@ -331,12 +331,12 @@ impl ContentServerBridge {
     }
 
     /// Update heartbeat for a registered content
-    pub async fn heartbeat(&self, content_hash: &str) -> Result<(), StorageError> {
+    pub async fn heartbeat(&self, content_cid: &str) -> Result<(), StorageError> {
         let action_hash = self
             .registrations
-            .get(content_hash)
+            .get(content_cid)
             .ok_or_else(|| {
-                StorageError::Internal(format!("Content not registered: {}", content_hash))
+                StorageError::Internal(format!("Content not registered: {}", content_cid))
             })?
             .clone();
 
@@ -346,7 +346,7 @@ impl ContentServerBridge {
         let payload = rmp_serde::to_vec(&action_hash)
             .map_err(|e| StorageError::Internal(format!("Failed to encode input: {}", e)))?;
 
-        debug!(content_hash = %content_hash, "Sending heartbeat");
+        debug!(content_cid = %content_cid, "Sending heartbeat");
 
         self.conductor_client
             .call_zome(
@@ -361,12 +361,12 @@ impl ContentServerBridge {
     }
 
     /// Mark content as offline (graceful shutdown)
-    pub async fn go_offline(&self, content_hash: &str) -> Result<(), StorageError> {
+    pub async fn go_offline(&self, content_cid: &str) -> Result<(), StorageError> {
         let action_hash = self
             .registrations
-            .get(content_hash)
+            .get(content_cid)
             .ok_or_else(|| {
-                StorageError::Internal(format!("Content not registered: {}", content_hash))
+                StorageError::Internal(format!("Content not registered: {}", content_cid))
             })?
             .clone();
 
@@ -375,7 +375,7 @@ impl ContentServerBridge {
         let payload = rmp_serde::to_vec(&action_hash)
             .map_err(|e| StorageError::Internal(format!("Failed to encode input: {}", e)))?;
 
-        info!(content_hash = %content_hash, "Marking content offline");
+        info!(content_cid = %content_cid, "Marking content offline");
 
         self.conductor_client
             .call_zome(
@@ -391,9 +391,9 @@ impl ContentServerBridge {
 
     /// Mark all registered content as offline (shutdown)
     pub async fn go_offline_all(&self) -> Result<(), StorageError> {
-        for content_hash in self.registrations.keys() {
-            if let Err(e) = self.go_offline(content_hash).await {
-                warn!(content_hash = %content_hash, error = %e, "Failed to mark offline");
+        for content_cid in self.registrations.keys() {
+            if let Err(e) = self.go_offline(content_cid).await {
+                warn!(content_cid = %content_cid, error = %e, "Failed to mark offline");
             }
         }
         Ok(())
@@ -406,9 +406,9 @@ impl ContentServerBridge {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(interval) => {
-                    for content_hash in self.registrations.keys() {
-                        if let Err(e) = self.heartbeat(content_hash).await {
-                            warn!(content_hash = %content_hash, error = %e, "Heartbeat failed");
+                    for content_cid in self.registrations.keys() {
+                        if let Err(e) = self.heartbeat(content_cid).await {
+                            warn!(content_cid = %content_cid, error = %e, "Heartbeat failed");
                         }
                     }
                 }
@@ -460,7 +460,7 @@ mod tests {
     #[test]
     fn test_register_input_serialization() {
         let input = RegisterContentServerInput {
-            content_hash: "sha256-abc123".to_string(),
+            content_cid: "bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m".to_string(),
             capability: "blob".to_string(),
             serve_url: Some("http://localhost:8080".to_string()),
             endpoints: Some(vec![StorageEndpointInput {
@@ -476,7 +476,7 @@ mod tests {
         let bytes = rmp_serde::to_vec(&input).unwrap();
         let decoded: RegisterContentServerInput = rmp_serde::from_slice(&bytes).unwrap();
 
-        assert_eq!(decoded.content_hash, input.content_hash);
+        assert_eq!(decoded.content_cid, input.content_cid);
         assert_eq!(decoded.capability, input.capability);
         assert_eq!(decoded.priority, input.priority);
         assert!(decoded.endpoints.is_some());
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn test_find_publishers_input() {
         let input = FindPublishersInput {
-            content_hash: "sha256-abc123".to_string(),
+            content_cid: "bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m".to_string(),
             capability: None,
             prefer_region: Some("eu-central".to_string()),
             limit: Some(5),
@@ -496,7 +496,7 @@ mod tests {
         let bytes = rmp_serde::to_vec(&input).unwrap();
         let decoded: FindPublishersInput = rmp_serde::from_slice(&bytes).unwrap();
 
-        assert_eq!(decoded.content_hash, input.content_hash);
+        assert_eq!(decoded.content_cid, input.content_cid);
         assert_eq!(decoded.prefer_region, input.prefer_region);
     }
 }

@@ -206,11 +206,15 @@ mod tests {
     /// else (extra segments, missing hash, wrong final segment) must miss.
     #[test]
     fn path_shape_matches_distribution_details() {
-        let p = "/sha256-abc123/distribution/details";
+        let p = "/bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m/distribution/details";
         let parts: Vec<&str> = p.trim_start_matches('/').split('/').collect();
         assert_eq!(
             parts.as_slice(),
-            ["sha256-abc123", "distribution", "details"]
+            [
+                "bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m",
+                "distribution",
+                "details"
+            ]
         );
     }
 
@@ -246,11 +250,15 @@ mod tests {
     /// live at this existing blob-scoped route instead of a new one.
     #[test]
     fn path_shape_matches_distribution_summary() {
-        let p = "/sha256-abc123/distribution/summary";
+        let p = "/bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m/distribution/summary";
         let parts: Vec<&str> = p.trim_start_matches('/').split('/').collect();
         assert_eq!(
             parts.as_slice(),
-            ["sha256-abc123", "distribution", "summary"]
+            [
+                "bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m",
+                "distribution",
+                "summary"
+            ]
         );
     }
 }
