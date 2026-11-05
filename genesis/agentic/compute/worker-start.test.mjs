@@ -524,7 +524,9 @@ test(
     f.env.COMPUTE_GRANT_RETRY_INTERVAL_SECS = "2";
     run = f.run();
     assert.equal(run.status, 75);
-    assert.equal(attempts(f), 2);
+    // A slow first attempt may consume the deadline before any retry is due.
+    // Otherwise the two-second sleep consumes it before the second refusal.
+    assert.ok([1, 2].includes(attempts(f)));
     assert.equal(existsSync(join(f.state, "worker-starts")), false);
     // A permanent refusal is never retried.
     f = fixture(t);
