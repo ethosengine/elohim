@@ -1,0 +1,97 @@
+# universal-band-v1
+# See gate-client/src/dag/universal_band_v1.yaml for the canonical embedded source.
+# This seed entry makes the universal band discoverable as a ContentNode on the DHT.
+#
+# The authoritative YAML is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 3+).
+
+name: "universal-band-v1"
+version: "1.0.0"
+event_type: "*"
+
+input_schema:
+  type: "object"
+  description: "RelationalImpactEvent passed from the gate caller"
+output_schema:
+  type: "object"
+  description: "GateDecision produced by the record-decision or record-decline synthesize step"
+
+dag:
+  entrypoint: "authorize"
+
+  steps:
+    authorize:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "source-chain"
+            query: "agent.identity"
+            output_key: "agent_identity"
+          - from: "manifest"
+            query: "gate.event_kind"
+            output_key: "event_kind"
+      next: "assemble-context"
+
+    assemble-context:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "manifest"
+            query: "space.type"
+            output_key: "space_type"
+          - from: "manifest"
+            query: "gate.event_kind"
+            output_key: "event_kind_ctx"
+          - from: "source-chain"
+            query: "agent.trust_level"
+            output_key: "agent_trust"
+      next: "wisdom-primary"
+
+    wisdom-primary:
+      type: "wisdom-invoke"
+      params:
+        constitution_cid: "epr:constitution-v1"
+        framing_cid: "epr:universal-band-framing-v1"
+        context_keys:
+          - "agent_identity"
+          - "event_kind"
+          - "space_type"
+          - "agent_trust"
+        output_key: "wisdom_output"
+      edges:
+        - when: "wisdom_output.decision == 'allow'"
+          target: "record-decision"
+        - when: "wisdom_output.decision == 'decline'"
+          target: "record-decline"
+        - when: "wisdom_output.decision == 'escalate'"
+          target: "escalate-to-review"
+        - when: "wisdom_output.decision == 'need-deeper'"
+          target: "record-decision"
+
+    record-decision:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "wisdom_output"
+          - "agent_identity"
+          - "event_kind"
+        decision_builder: "allow-with-wisdom"
+        side_effects: []
+
+    record-decline:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "wisdom_output"
+          - "agent_identity"
+          - "event_kind"
+        decision_builder: "decline-from-wisdom"
+        side_effects: []
+
+    escalate-to-review:
+      type: "escalate-to-review"
+      params:
+        target_spec_cid: "epr:escalation-target-app-steward-v1"
+        severity: "medium"
+
+  terminals: {}

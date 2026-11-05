@@ -1,0 +1,77 @@
+# discernment-gate-v1-mechanical
+# See gate-client/src/dag/discernment_gate_v1.yaml for the canonical embedded source.
+# This seed entry makes the discernment gate discoverable as a ContentNode on the DHT.
+#
+# The authoritative YAML is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 5+).
+#
+# Three-node DAG:
+#   assemble (context-assemble)
+#     └─ next ──► rules (mechanical-ruleset, rules_cid: epr:rules:seven-valence-v1)
+#                     ├─ ruleDecision == null  ──► terminal: terminal-no-mint
+#                     └─ ruleDecision != null  ──► synthesize (synthesize, Terminate)
+#
+# Context pre-computation contract (Task 3.4 must implement):
+#   The context-assemble step must inject precomputed boolean fields:
+#     priorAttestations.witnessEligible
+#     priorAttestations.refinementEligible
+#   before the mechanical-ruleset step runs.
+
+name: "discernment-gate-v1-mechanical"
+version: "1.0.0"
+event_type: "attestation-write"
+
+dag:
+  entrypoint: "assemble"
+
+  steps:
+    assemble:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "source-chain"
+            query: "experience-moment.entry"
+            output_key: "moment"
+          - from: "elohim-storage"
+            query: "prior-attestations.for-experience-story"
+            output_key: "priorAttestations"
+      next: "rules"
+
+    rules:
+      type: "mechanical-ruleset"
+      params:
+        rules_cid: "epr:rules:seven-valence-v1"
+        input_keys:
+          - "moment"
+          - "priorAttestations"
+        output_key: "ruleDecision"
+      edges:
+        - when: "ruleDecision == null"
+          target: "terminal-no-mint"
+        - when: "ruleDecision != null"
+          target: "synthesize"
+
+    synthesize:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "ruleDecision"
+          - "moment"
+        decision_builder: "verdict-from-rule"
+        side_effects:
+          - type: "MintAttestation"
+            params_from_keys:
+              - "momentEntryHash"
+              - "ruleDecision"
+            shape: "StoryPointLink"
+          - type: "EmitEconomicEvent"
+            params_from_keys:
+              - "ruleDecision"
+
+  terminals:
+    terminal-no-mint:
+      decision:
+        status: "allow"
+        exempt: true
+        rationale: "steady-state-silence"
+      side_effects: []

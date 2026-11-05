@@ -1,0 +1,30 @@
+# seven-valence-rules-v1
+# See gate-client/src/dag/rules/seven_valence_v1.json for the canonical embedded source.
+# This seed entry makes the seven-valence rules discoverable as a ContentNode on the DHT.
+#
+# The authoritative JSON is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 5+).
+#
+# Context pre-computation contract (Task 3.4 must implement):
+# Rules 5 and 6 use precomputed boolean fields:
+#   priorAttestations.witnessEligible
+#   priorAttestations.refinementEligible
+# These must be injected by the context-assemble step before the mechanical-ruleset step runs.
+
+ruleSetName: "seven-valence-v1"
+version: "1.0.0"
+appliesToEventType: "attestation-write"
+inputKeysExpected:
+  - moment
+  - priorAttestations
+outputShape: StoryPointTag
+
+rules:
+  - rule-1-first-pass-green: progress/meaningful when passed with no priors
+  - rule-2a-novel-failure-class: discovery/meaningful when failed with new error class
+  - rule-2b-known-cause-recurrence: regression/meaningful when failed with known error class
+  - rule-3-validates-failure-mode: validation/meaningful when @validates-failure-mode tag fails
+  - rule-4-recovery: progress/meaningful when passed after prior failure
+  - rule-5-witness: witness/meaningful when different fingerprint attests same status
+  - rule-6-refinement: refinement/small when same fingerprint attests richer evidence
+  - rule-7 (implicit): no-mint when no rule matches (steady-state silence)

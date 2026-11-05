@@ -1,0 +1,21 @@
+# content-safety-gate-v1
+# See gate-client/src/dag/content_safety_gate_v1.yaml for the canonical embedded source.
+# This seed entry makes the content safety gate discoverable as a ContentNode on the DHT.
+#
+# The authoritative YAML is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 7+).
+#
+# Three-node DAG:
+#   assemble (context-assemble)
+#     └─ next ──► wisdom-safety (wisdom-invoke, constitution: epr:constitutions:content-safety-v1)
+#                     └─ next ──► synthesize (synthesize, Terminate)
+#   synthesize — allow-or-decline-from-wisdom builder
+#     └─ (Terminate) Allow | Decline{category:"content-safety"}
+#
+# governanceReach: protocol
+# handlesEvents: ContentPublish, AttestationWrite, PeerMessage
+# Runs BEFORE domain-specific gates (discernment-gate, reach-gate)
+
+name: "content-safety-gate-v1"
+version: "1.0.0"
+event_type: "*"

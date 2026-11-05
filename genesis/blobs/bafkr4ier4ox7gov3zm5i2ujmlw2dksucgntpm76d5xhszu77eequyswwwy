@@ -1,0 +1,26 @@
+# reach-gate-v1
+# See gate-client/src/dag/reach_gate_v1.yaml for the canonical embedded source.
+# This seed entry makes the reach gate discoverable as a ContentNode on the DHT.
+#
+# The authoritative YAML is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 6+).
+#
+# Four-node DAG:
+#   assemble (context-assemble)
+#     └─ next ──► aggregate (aggregate-attestations, spec_cid: epr:specs:reach-v1)
+#                     ├─ reachData.edge_case == true  ──► wisdom-edge (wisdom-invoke)
+#                     └─ reachData.edge_case == false ──► synthesize (synthesize, Terminate)
+#   wisdom-edge (wisdom-invoke) [Phase 5 DevContext: mocked Allow]
+#     └─ next ──► synthesize
+#   synthesize (synthesize) — verdict-from-reach builder
+#     └─ (Terminate) Verdict(ReachLevel)
+#
+# ReachLevel values:
+#   protocol   (≥50 attestations)
+#   public     (≥20 attestations)
+#   community  (≥5 attestations)
+#   self-reach (<5 attestations — default)
+
+name: "reach-gate-v1"
+version: "1.0.0"
+eventType: "capability-invoke"

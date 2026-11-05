@@ -1,0 +1,24 @@
+# reach-aggregation-v1
+# See gate-client/src/dag/specs/reach_aggregation_v1.json for the canonical embedded source.
+# This seed entry makes the reach aggregation spec discoverable as a ContentNode on the DHT.
+#
+# The authoritative JSON is embedded in the gate-client binary at compile time.
+# This seed is a reference copy for DHT-based governance lookup (Phase 6+).
+#
+# Threshold-ladder tiers:
+#   protocol  (≥50) — existential-boundary peers
+#   public    (≥20) — open audience endorsement
+#   community (≥5)  — known community recognition
+#   self-reach (<5) — default; content accessible only to contributors
+#
+# Attestation kinds feeding this aggregation:
+#   gate-decision   — a gate verdict referencing this content node
+#   witness         — a seven-valence witness attestation on an associated experience-story
+#   endorsement     — an explicit peer endorsement attestation
+#   content-approval — a steward-consent approval attestation
+
+specName: "reach-v1"
+version: "1.0.0"
+subjectScope: content-node
+timeWindow: P365D
+outputShape: ReachLevel

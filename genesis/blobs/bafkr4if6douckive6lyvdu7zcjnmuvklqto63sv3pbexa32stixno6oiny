@@ -1,0 +1,3 @@
+## Tech workers
+
+Practice redemption engineering: pick one algorithmic system in your reach and trace where it inherits bias — training data, proxies, edge-case handling — then design the correction, testing against the users most likely to be harmed first (Acts 10:34 as QA policy). Build real relationships with vulnerable users rather than personas of them. If you manage by dashboard, audit what your algorithmic management does to workers' agency and dignity.
