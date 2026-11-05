@@ -13,7 +13,7 @@
 //! ## Tables
 //!
 //! - `apps` - Registered apps for multi-tenancy
-//! - `content` - Content metadata (id, h_app_id, title, type, blob_hash)
+//! - `content` - Content metadata (id, h_app_id, title, type, blob_cid)
 //! - `content_tags` - Tag index for fast lookup
 
 // Diesel modules with app scoping
@@ -126,7 +126,10 @@ pub mod peer_identity_bindings;
 // Category-A2 link signal). Read-only; writes land via ReconcileController.
 pub mod hosted_agent_bindings;
 
-// T12 — peer_blob_inventory projection (libp2p gossipsub inventory, Category C operational)
+// Held inventory envelopes exist only where inventory gossip does.
+#[cfg(feature = "p2p")]
+pub mod held_envelopes;
+// T12 — peer_blob_inventory projection (signed inventory envelopes + recon, Category C operational)
 pub mod peer_blob_inventory;
 
 // Phase 3 — salvage_capacity projection (salvage-capacity gossip, Category C operational)

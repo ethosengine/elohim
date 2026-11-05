@@ -72,7 +72,6 @@ diesel::table! {
         description -> Nullable<Text>,
         content_type -> Text,
         content_format -> Text,
-        blob_hash -> Nullable<Text>,
         blob_cid -> Nullable<Text>,
         content_size_bytes -> Nullable<Integer>,
         metadata_json -> Nullable<Text>,
@@ -84,7 +83,7 @@ diesel::table! {
         content_body -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
         p2p_published_at -> Nullable<Text>,
-        server_blob_hash -> Nullable<Text>,
+        server_blob_cid -> Nullable<Text>,
         crdt_converged_at -> Nullable<Text>,
         declared_head_action_hash -> Nullable<Text>,
         declared_head_at -> Nullable<BigInt>,
@@ -433,8 +432,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    shard_locations (shard_hash, peer_id) {
-        shard_hash -> Text,
+    shard_locations (shard_cid, peer_id) {
+        shard_cid -> Text,
         peer_id -> Text,
         h_app_id -> Text,
         status -> Text,
@@ -447,17 +446,16 @@ diesel::table! {
     shard_manifests (content_id, h_app_id) {
         content_id -> Text,
         h_app_id -> Text,
-        blob_hash -> Text,
-        blob_cid -> Nullable<Text>,
-        encoding -> Text,
-        data_shard_count -> Integer,
-        parity_shard_count -> Integer,
-        shard_hashes_json -> Text,
-        total_size_bytes -> BigInt,
-        shard_size_bytes -> BigInt,
+        blob_cid -> Text,
+        byte_len -> BigInt,
         mime_type -> Text,
+        profile_json -> Text,
+        chunks_json -> Text,
+        stripes_json -> Text,
         reach -> Text,
+        author_id -> Nullable<Text>,
         created_at -> Text,
+        verified_at -> Nullable<Text>,
     }
 }
 
@@ -1195,7 +1193,7 @@ diesel::table! {
     placement_gaps (id) {
         id -> Text,
         content_id -> Text,
-        shard_hash -> Text,
+        shard_cid -> Text,
         h_app_id -> Text,
         requested_steward_count -> Integer,
         achieved_steward_count -> Integer,
@@ -1267,14 +1265,12 @@ diesel::table! {
 }
 
 diesel::table! {
-    peer_blob_inventory (peer_id, blob_hash) {
+    peer_blob_inventory (peer_id, blob_cid) {
         peer_id            -> Text,
-        blob_hash          -> Text,
+        blob_cid           -> Text,
         last_seen_at       -> Text,
         source             -> Text,
         sequence           -> BigInt,
-        blake3_hash        -> Nullable<Text>,
-        transport_affinity -> Nullable<Text>,
     }
 }
 
@@ -1283,7 +1279,18 @@ diesel::table! {
         peer_id           -> Text,
         last_sequence     -> BigInt,
         last_updated      -> Text,
-        last_content_hash -> Nullable<Text>,
+    }
+}
+
+// Category C, local — inventory envelopes under a scheme or epoch this build does
+// not implement, retained opaque and bounded; never projected, never counted.
+diesel::table! {
+    held_envelopes (id) {
+        id          -> Integer,
+        topic       -> Text,
+        reason      -> Text,
+        bytes       -> Binary,
+        received_at -> Text,
     }
 }
 
@@ -1426,7 +1433,7 @@ diesel::table! {
         custodian_cid         -> Text,
         share_index           -> Integer,
         share_data            -> Binary,
-        share_blob_hash       -> Text,
+        share_blob_cid        -> Text,
         created_at            -> Text,
         superseded_at         -> Nullable<Text>,
     }
@@ -1644,8 +1651,8 @@ diesel::table! {
 // by the retention pass to tell this peer's own bytes from bytes another peer
 // placed and from bytes with no record.
 diesel::table! {
-    blob_arrivals (blob_hash, arrived_via, placed_by) {
-        blob_hash -> Text,
+    blob_arrivals (blob_cid, arrived_via, placed_by) {
+        blob_cid -> Text,
         arrived_via -> Text,
         placed_by -> Text,
         named_for -> Nullable<Text>,
@@ -1657,8 +1664,8 @@ diesel::table! {
 // Category C, local — blobs the retention pass currently reads as this peer's
 // own and named by nothing, with the consecutive-pass count.
 diesel::table! {
-    blob_unnamed_watch (blob_hash) {
-        blob_hash -> Text,
+    blob_unnamed_watch (blob_cid) {
+        blob_cid -> Text,
         first_unnamed_at -> Text,
         passes -> Integer,
     }
@@ -1728,7 +1735,7 @@ diesel::table! {
 diesel::table! {
     projection_events (id) {
         id                   -> Integer,
-        blob_hash            -> Text,
+        blob_cid             -> Text,
         projector_agent_cid  -> Text,
         emitted_at           -> Text,
         source_action_hash   -> Text,
@@ -2173,6 +2180,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     peer_blob_inventory,
     peer_identity_bindings,
     peer_inventory_cursor,
+    held_envelopes,
     peer_statuses,
     placement_gaps,
     portal_hosts,

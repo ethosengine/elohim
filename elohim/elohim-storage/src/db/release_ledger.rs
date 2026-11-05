@@ -25,18 +25,10 @@ use crate::error::StorageError;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LedgerArtifact {
-    /// Hex sha2-256 of the bytes.
-    pub sha256: String,
+    /// The artifact's byte CID (`bafkr4i…`), the blob store's own address.
     pub blob_cid: String,
     pub bytes: u64,
     pub filename: String,
-}
-
-impl LedgerArtifact {
-    /// The blob store's own spelling of this artifact's hash.
-    pub fn blob_hash(&self) -> String {
-        format!("sha256-{}", self.sha256.to_ascii_lowercase())
-    }
 }
 
 /// One recorded release.
@@ -115,109 +107,70 @@ pub fn remove_release(conn: &mut SqliteConnection, seq: i32) -> Result<(), Stora
         .map_err(|e| StorageError::Database(format!("remove_release: {e}")))
 }
 
-/// How many content rows name `blob_hash` as something they serve: the browser
-/// bundle, the server bundle, the blob's CID, or anywhere in their metadata
-/// (which is where a channel row carries its current release manifest).
+/// How many content rows name `artifact` as something they serve: the browser
+/// bundle, the server bundle, or anywhere in their metadata (which is where a
+/// channel row carries its current release manifest).
 ///
-/// Deliberately across every app scope and deliberately loose: a hash that
+/// Deliberately across every app scope and deliberately loose: a byte CID that
 /// appears anywhere in any row counts as in use.
 pub fn content_rows_naming(
     conn: &mut SqliteConnection,
     artifact: &LedgerArtifact,
 ) -> Result<i64, StorageError> {
-    // The digest, wherever it appears and however it is spelled: `sha256-<hex>`,
-    // bare hex, or the CID that wraps it. SQLite's LIKE is case-insensitive
-    // for ASCII, so an upper-case hex spelling matches too.
-    let hex_anywhere = format!("%{}%", artifact.sha256.to_ascii_lowercase());
     let cid_anywhere = format!("%{}%", artifact.blob_cid);
-    let mut query = content::table
+    content::table
         .filter(
-            content::blob_hash
-                .like(&hex_anywhere)
-                .or(content::server_blob_hash.like(&hex_anywhere))
-                .or(content::blob_cid.like(&hex_anywhere))
-                .or(content::metadata_json.like(&hex_anywhere)),
+            content::blob_cid
+                .eq(&artifact.blob_cid)
+                .or(content::server_blob_cid.eq(&artifact.blob_cid))
+                .or(content::metadata_json.like(&cid_anywhere)),
         )
-        .into_boxed();
-    if !artifact.blob_cid.is_empty() {
-        query = query
-            .or_filter(content::blob_cid.like(&cid_anywhere))
-            .or_filter(content::blob_hash.like(&cid_anywhere))
-            .or_filter(content::server_blob_hash.like(&cid_anywhere))
-            .or_filter(content::metadata_json.like(&cid_anywhere));
-    }
-    query
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Database(format!("content_rows_naming: {e}")))
 }
 
-/// How many custody commitments still oblige someone to hold `blob_hash`.
+/// How many custody commitments still oblige someone to hold `blob_cid`.
 /// While one stands, the custody pass would fetch the bytes straight back.
 ///
-/// A commitment names its blob in more than one spelling (`sha256-<hex>`, bare
-/// hex, a CID, a CID behind a `sha256-` prefix) and either bare or as a JSON
-/// list. All of them contain the hex digest or the CID, so the match is on
-/// either appearing anywhere in the field: a pledge this read cannot spell is
-/// a blob it would let go.
+/// A commitment names its blob by byte CID, bare or inside a JSON list, so the
+/// match is on the CID appearing anywhere in the field.
 pub fn live_custody_pledges_naming(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<i64, StorageError> {
-    let hex = blob_hash.strip_prefix("sha256-").unwrap_or(blob_hash);
-    let hex_anywhere = format!("%{}%", hex.to_ascii_lowercase());
-    let mut query = rea_commitments::table
+    rea_commitments::table
         .filter(rea_commitments::action.eq("custody-blob"))
         .filter(rea_commitments::state.ne_all(super::models::commitment_withdrawn_states::ALL))
-        .filter(rea_commitments::resource_classified_as.like(hex_anywhere))
-        .into_boxed();
-    if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(hex) {
-        query = query.or_filter(
-            rea_commitments::action
-                .eq("custody-blob")
-                .and(rea_commitments::state.ne_all(super::models::commitment_withdrawn_states::ALL))
-                .and(rea_commitments::resource_classified_as.like(format!("%{cid}%"))),
-        );
-    }
-    query
+        .filter(rea_commitments::resource_classified_as.like(format!("%{blob_cid}%")))
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Database(format!("live_custody_pledges_naming: {e}")))
 }
 
-/// How many rows outside the content table name `blob_hash` as something this
+/// How many rows outside the content table name `blob_cid` as something this
 /// peer shows: today, a signed-in person's profile image.
-pub fn other_rows_naming(
-    conn: &mut SqliteConnection,
-    blob_hash: &str,
-) -> Result<i64, StorageError> {
-    let hex = blob_hash.strip_prefix("sha256-").unwrap_or(blob_hash);
-    let hex_anywhere = format!("%{}%", hex.to_ascii_lowercase());
-    let mut query = super::diesel_schema::local_sessions::table
-        .filter(super::diesel_schema::local_sessions::profile_image_hash.like(hex_anywhere))
-        .into_boxed();
-    if let Ok(cid) = crate::blob_store::BlobStore::hash_to_cid(hex) {
-        query = query.or_filter(
-            super::diesel_schema::local_sessions::profile_image_hash.like(format!("%{cid}%")),
-        );
-    }
-    query
+pub fn other_rows_naming(conn: &mut SqliteConnection, blob_cid: &str) -> Result<i64, StorageError> {
+    super::diesel_schema::local_sessions::table
+        .filter(
+            super::diesel_schema::local_sessions::profile_image_hash.like(format!("%{blob_cid}%")),
+        )
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Database(format!("other_rows_naming: {e}")))
 }
 
-/// Of `blob_hashes`, the ones another peer placed here and has not withdrawn.
+/// Of `blob_cids`, the ones another peer placed here and has not withdrawn.
 pub fn live_placements_among(
     conn: &mut SqliteConnection,
-    blob_hashes: &[String],
+    blob_cids: &[String],
 ) -> Result<HashSet<String>, StorageError> {
     use super::diesel_schema::blob_arrivals;
     let placed: Vec<String> = blob_arrivals::table
-        .filter(blob_arrivals::blob_hash.eq_any(blob_hashes))
+        .filter(blob_arrivals::blob_cid.eq_any(blob_cids))
         .filter(blob_arrivals::arrived_via.eq("placed"))
         .filter(blob_arrivals::withdrawn_at.is_null())
-        .select(blob_arrivals::blob_hash)
+        .select(blob_arrivals::blob_cid)
         .load(conn)
         .map_err(|e| StorageError::Database(format!("live_placements_among: {e}")))?;
     Ok(placed.into_iter().collect())
@@ -226,48 +179,40 @@ pub fn live_placements_among(
 /// What letting go of one blob touches.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ForgetBlobPlan {
-    pub blob_hash: String,
-    /// Blob-store files to delete: the blob itself and every shard of it that
-    /// no other blob's manifest names.
+    pub blob_cid: String,
+    /// Blob-store entries to delete: the blob itself and every custody unit of it
+    /// that no other blob's manifest names.
     pub files: Vec<String>,
-    /// The blob's BLAKE3 alias in the iroh store, when one was recorded.
-    pub blake3: Option<String>,
 }
 
-/// Read what letting go of `blob_hash` touches, changing nothing.
+/// Read what letting go of `blob_cid` touches, changing nothing.
 ///
-/// A shard hash is content-addressed, so another blob may legitimately share
-/// one. A shard is listed only when no manifest other than this blob's own
-/// names it, across every app scope.
+/// A custody unit is content-addressed, so another blob may legitimately share
+/// one. A unit is listed only when no manifest other than this blob's own names
+/// it, across every app scope.
 pub fn plan_forget_blob(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<ForgetBlobPlan, StorageError> {
-    let manifests: Vec<(String, String)> = shard_manifests::table
-        .select((
-            shard_manifests::blob_hash,
-            shard_manifests::shard_hashes_json,
-        ))
+    let manifests: Vec<super::models::ShardManifestRow> = shard_manifests::table
         .load(conn)
         .map_err(|e| StorageError::Database(format!("plan_forget_blob: {e}")))?;
-    let mut own: HashSet<String> = HashSet::from([blob_hash.to_string()]);
+    let mut own: HashSet<String> = HashSet::from([blob_cid.to_string()]);
     let mut others: HashSet<String> = HashSet::new();
-    for (manifest_blob, json) in &manifests {
-        let hashes: Vec<String> = serde_json::from_str(json).unwrap_or_default();
-        if manifest_blob == blob_hash {
-            own.extend(hashes);
+    for row in &manifests {
+        let units = super::shard_manifests::custody_unit_cids(row);
+        if row.blob_cid == blob_cid {
+            own.extend(units);
         } else {
-            others.extend(hashes);
-            others.insert(manifest_blob.clone());
+            others.extend(units);
+            others.insert(row.blob_cid.clone());
         }
     }
     let mut files: Vec<String> = own.into_iter().filter(|h| !others.contains(h)).collect();
     files.sort();
-    let blake3 = super::peer_blob_inventory::lookup_blake3_for_sha256(conn, blob_hash)?;
     Ok(ForgetBlobPlan {
-        blob_hash: blob_hash.to_string(),
+        blob_cid: blob_cid.to_string(),
         files,
-        blake3,
     })
 }
 
@@ -286,13 +231,11 @@ pub fn forget_blob_rows(
     self_ids: &[String],
 ) -> Result<(), StorageError> {
     conn.transaction(|conn| {
-        diesel::delete(
-            shard_manifests::table.filter(shard_manifests::blob_hash.eq(&plan.blob_hash)),
-        )
-        .execute(conn)?;
+        diesel::delete(shard_manifests::table.filter(shard_manifests::blob_cid.eq(&plan.blob_cid)))
+            .execute(conn)?;
         diesel::delete(
             shard_locations::table
-                .filter(shard_locations::shard_hash.eq_any(&plan.files))
+                .filter(shard_locations::shard_cid.eq_any(&plan.files))
                 .filter(
                     shard_locations::status
                         .eq(crate::services::self_stewardship::SELF_HELD_STATUS)
@@ -302,18 +245,18 @@ pub fn forget_blob_rows(
         .execute(conn)?;
         diesel::delete(
             peer_blob_inventory::table
-                .filter(peer_blob_inventory::blob_hash.eq_any(&plan.files))
+                .filter(peer_blob_inventory::blob_cid.eq_any(&plan.files))
                 .filter(peer_blob_inventory::source.eq("self-custody")),
         )
         .execute(conn)?;
         diesel::delete(
             super::diesel_schema::blob_arrivals::table
-                .filter(super::diesel_schema::blob_arrivals::blob_hash.eq_any(&plan.files)),
+                .filter(super::diesel_schema::blob_arrivals::blob_cid.eq_any(&plan.files)),
         )
         .execute(conn)?;
         diesel::delete(
             super::diesel_schema::blob_unnamed_watch::table
-                .filter(super::diesel_schema::blob_unnamed_watch::blob_hash.eq_any(&plan.files)),
+                .filter(super::diesel_schema::blob_unnamed_watch::blob_cid.eq_any(&plan.files)),
         )
         .execute(conn)?;
         Ok::<(), diesel::result::Error>(())
@@ -325,12 +268,11 @@ pub fn forget_blob_rows(
 mod tests {
     use super::*;
 
-    fn artifact(hex: &str) -> LedgerArtifact {
+    fn artifact(label: &str) -> LedgerArtifact {
         LedgerArtifact {
-            sha256: hex.to_string(),
-            blob_cid: format!("bafkrei{hex}"),
+            blob_cid: elohim_epr::address::compute_bytes_cid(label.as_bytes()).to_string(),
             bytes: 7,
-            filename: format!("{hex}.zip"),
+            filename: format!("{label}.zip"),
         }
     }
 
@@ -364,11 +306,12 @@ mod tests {
         let mut conn = pool.get().unwrap();
         let served = artifact("deadbeef");
         assert_eq!(content_rows_naming(&mut conn, &served).unwrap(), 0);
-        diesel::sql_query(
+        diesel::sql_query(format!(
             "INSERT INTO content (id, h_app_id, title, content_type, content_format, \
              metadata_json) VALUES ('app', 'lamad', 'App', 'app', 'html5-app', \
-             '{\"serverBlobHash\":\"sha256-deadbeef\"}')",
-        )
+             '{{\"serverBlobCid\":\"{}\"}}')",
+            served.blob_cid
+        ))
         .execute(&mut conn)
         .unwrap();
         assert_eq!(content_rows_naming(&mut conn, &served).unwrap(), 1);

@@ -93,12 +93,12 @@ pub fn arrival_gate() -> &'static tokio::sync::RwLock<()> {
     &GATE
 }
 
-/// Record that `blob_hash` arrived. Recording the same arrival again is a new
+/// Record that `blob_cid` arrived. Recording the same arrival again is a new
 /// arrival: someone brought the bytes here again, so its time is now, the
 /// watch on the blob starts over, and a withdrawal is cleared.
 pub fn record_arrival(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     via: ArrivalVia,
     placed_by: Option<&str>,
     named_for: Option<&str>,
@@ -107,7 +107,7 @@ pub fn record_arrival(
     conn.transaction(|conn| {
         let written = diesel::insert_or_ignore_into(blob_arrivals::table)
             .values((
-                blob_arrivals::blob_hash.eq(blob_hash),
+                blob_arrivals::blob_cid.eq(blob_cid),
                 blob_arrivals::arrived_via.eq(via.label()),
                 blob_arrivals::placed_by.eq(placed_by),
                 blob_arrivals::named_for.eq(named_for),
@@ -116,7 +116,7 @@ pub fn record_arrival(
             .execute(conn)?;
         if written == 0 {
             let row = blob_arrivals::table
-                .filter(blob_arrivals::blob_hash.eq(blob_hash))
+                .filter(blob_arrivals::blob_cid.eq(blob_cid))
                 .filter(blob_arrivals::arrived_via.eq(via.label()))
                 .filter(blob_arrivals::placed_by.eq(placed_by));
             diesel::update(row)
@@ -132,19 +132,17 @@ pub fn record_arrival(
             }
         }
         // Whatever the pass had counted against this blob no longer stands.
-        diesel::delete(
-            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq(blob_hash)),
-        )
-        .execute(conn)?;
+        diesel::delete(blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_cid.eq(blob_cid)))
+            .execute(conn)?;
         Ok::<(), diesel::result::Error>(())
     })
     .map_err(|e| StorageError::Database(format!("record_arrival: {e}")))
 }
 
-/// Every recorded arrival, by blob hash. Rows whose `arrived_via` this build
+/// Every recorded arrival, by byte CID. Rows whose `arrived_via` this build
 /// does not know are skipped: an arrival it cannot read is not a reason to let
 /// a blob go, and a blob left with no readable row reads as unrecorded.
-pub fn arrivals_by_hash(
+pub fn arrivals_by_cid(
     conn: &mut SqliteConnection,
 ) -> Result<HashMap<String, Vec<Arrival>>, StorageError> {
     type Row = (
@@ -157,7 +155,7 @@ pub fn arrivals_by_hash(
     );
     let rows: Vec<Row> = blob_arrivals::table
         .select((
-            blob_arrivals::blob_hash,
+            blob_arrivals::blob_cid,
             blob_arrivals::arrived_via,
             blob_arrivals::placed_by,
             blob_arrivals::named_for,
@@ -165,13 +163,13 @@ pub fn arrivals_by_hash(
             blob_arrivals::withdrawn_at,
         ))
         .load(conn)
-        .map_err(|e| StorageError::Database(format!("arrivals_by_hash: {e}")))?;
+        .map_err(|e| StorageError::Database(format!("arrivals_by_cid: {e}")))?;
     let mut out: HashMap<String, Vec<Arrival>> = HashMap::new();
-    for (blob_hash, via, placed_by, named_for, arrived_at, withdrawn_at) in rows {
+    for (blob_cid, via, placed_by, named_for, arrived_at, withdrawn_at) in rows {
         let Some(via) = ArrivalVia::from_label(&via) else {
             continue;
         };
-        out.entry(blob_hash).or_default().push(Arrival {
+        out.entry(blob_cid).or_default().push(Arrival {
             via,
             placed_by,
             named_for,
@@ -182,16 +180,16 @@ pub fn arrivals_by_hash(
     Ok(out)
 }
 
-/// Mark the placement of `blob_hash` by `placed_by` withdrawn. Returns whether
+/// Mark the placement of `blob_cid` by `placed_by` withdrawn. Returns whether
 /// a live placement by that peer existed.
 pub fn withdraw_placement(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     placed_by: &str,
 ) -> Result<bool, StorageError> {
     diesel::update(
         blob_arrivals::table
-            .filter(blob_arrivals::blob_hash.eq(blob_hash))
+            .filter(blob_arrivals::blob_cid.eq(blob_cid))
             .filter(blob_arrivals::arrived_via.eq(ArrivalVia::Placed.label()))
             .filter(blob_arrivals::placed_by.eq(placed_by))
             .filter(blob_arrivals::withdrawn_at.is_null()),
@@ -203,12 +201,12 @@ pub fn withdraw_placement(
 }
 
 /// Drop every arrival and watch row of blobs whose files are gone.
-pub fn forget(conn: &mut SqliteConnection, blob_hashes: &[String]) -> Result<(), StorageError> {
+pub fn forget(conn: &mut SqliteConnection, blob_cids: &[String]) -> Result<(), StorageError> {
     conn.transaction(|conn| {
-        diesel::delete(blob_arrivals::table.filter(blob_arrivals::blob_hash.eq_any(blob_hashes)))
+        diesel::delete(blob_arrivals::table.filter(blob_arrivals::blob_cid.eq_any(blob_cids)))
             .execute(conn)?;
         diesel::delete(
-            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes)),
+            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_cid.eq_any(blob_cids)),
         )
         .execute(conn)?;
         Ok::<(), diesel::result::Error>(())
@@ -228,7 +226,7 @@ pub struct UnnamedWatch {
 pub fn watched(conn: &mut SqliteConnection) -> Result<HashMap<String, UnnamedWatch>, StorageError> {
     let rows: Vec<(String, String, i32)> = blob_unnamed_watch::table
         .select((
-            blob_unnamed_watch::blob_hash,
+            blob_unnamed_watch::blob_cid,
             blob_unnamed_watch::first_unnamed_at,
             blob_unnamed_watch::passes,
         ))
@@ -248,27 +246,25 @@ pub fn watched(conn: &mut SqliteConnection) -> Result<HashMap<String, UnnamedWat
         .collect())
 }
 
-/// Count one more pass on which `blob_hash` read as unnamed, starting its
+/// Count one more pass on which `blob_cid` read as unnamed, starting its
 /// watch if this is the first. Returns the watch after counting.
 pub fn note_unnamed(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Result<UnnamedWatch, StorageError> {
     conn.transaction(|conn| {
         diesel::insert_or_ignore_into(blob_unnamed_watch::table)
             .values((
-                blob_unnamed_watch::blob_hash.eq(blob_hash),
+                blob_unnamed_watch::blob_cid.eq(blob_cid),
                 blob_unnamed_watch::first_unnamed_at.eq(current_timestamp()),
                 blob_unnamed_watch::passes.eq(0),
             ))
             .execute(conn)?;
-        diesel::update(
-            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq(blob_hash)),
-        )
-        .set(blob_unnamed_watch::passes.eq(blob_unnamed_watch::passes + 1))
-        .execute(conn)?;
+        diesel::update(blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_cid.eq(blob_cid)))
+            .set(blob_unnamed_watch::passes.eq(blob_unnamed_watch::passes + 1))
+            .execute(conn)?;
         let (first_unnamed_at, passes): (String, i32) = blob_unnamed_watch::table
-            .filter(blob_unnamed_watch::blob_hash.eq(blob_hash))
+            .filter(blob_unnamed_watch::blob_cid.eq(blob_cid))
             .select((
                 blob_unnamed_watch::first_unnamed_at,
                 blob_unnamed_watch::passes,
@@ -282,17 +278,17 @@ pub fn note_unnamed(
     .map_err(|e| StorageError::Database(format!("note_unnamed: {e}")))
 }
 
-/// Whether the watch on `blob_hash` still stands at `min_passes` or more, and
+/// Whether the watch on `blob_cid` still stands at `min_passes` or more, and
 /// no other peer's placement of it stands. The last look before a blob is let
 /// go: an arrival since the count clears the watch, and a placement makes the
 /// bytes someone else's.
 pub fn watch_stands(
     conn: &mut SqliteConnection,
-    blob_hash: &str,
+    blob_cid: &str,
     min_passes: u64,
 ) -> Result<bool, StorageError> {
     let passes: Option<i32> = blob_unnamed_watch::table
-        .filter(blob_unnamed_watch::blob_hash.eq(blob_hash))
+        .filter(blob_unnamed_watch::blob_cid.eq(blob_cid))
         .select(blob_unnamed_watch::passes)
         .first(conn)
         .optional()
@@ -302,7 +298,7 @@ pub fn watch_stands(
         return Ok(false);
     }
     let placed: i64 = blob_arrivals::table
-        .filter(blob_arrivals::blob_hash.eq(blob_hash))
+        .filter(blob_arrivals::blob_cid.eq(blob_cid))
         .filter(blob_arrivals::arrived_via.eq(ArrivalVia::Placed.label()))
         .filter(blob_arrivals::withdrawn_at.is_null())
         .count()
@@ -311,31 +307,31 @@ pub fn watch_stands(
     Ok(placed == 0)
 }
 
-/// Count one more pass for every blob in `blob_hashes`, in one transaction.
+/// Count one more pass for every blob in `blob_cids`, in one transaction.
 /// Returns each blob's count after counting.
 pub fn note_unnamed_many(
     conn: &mut SqliteConnection,
-    blob_hashes: &[String],
+    blob_cids: &[String],
 ) -> Result<HashMap<String, i32>, StorageError> {
     conn.transaction(|conn| {
         let now = current_timestamp();
-        for blob_hash in blob_hashes {
+        for blob_cid in blob_cids {
             diesel::insert_or_ignore_into(blob_unnamed_watch::table)
                 .values((
-                    blob_unnamed_watch::blob_hash.eq(blob_hash),
+                    blob_unnamed_watch::blob_cid.eq(blob_cid),
                     blob_unnamed_watch::first_unnamed_at.eq(&now),
                     blob_unnamed_watch::passes.eq(0),
                 ))
                 .execute(conn)?;
         }
         diesel::update(
-            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes)),
+            blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_cid.eq_any(blob_cids)),
         )
         .set(blob_unnamed_watch::passes.eq(blob_unnamed_watch::passes + 1))
         .execute(conn)?;
         let rows: Vec<(String, i32)> = blob_unnamed_watch::table
-            .filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes))
-            .select((blob_unnamed_watch::blob_hash, blob_unnamed_watch::passes))
+            .filter(blob_unnamed_watch::blob_cid.eq_any(blob_cids))
+            .select((blob_unnamed_watch::blob_cid, blob_unnamed_watch::passes))
             .load(conn)?;
         Ok::<HashMap<String, i32>, diesel::result::Error>(rows.into_iter().collect())
     })
@@ -343,21 +339,21 @@ pub fn note_unnamed_many(
 }
 
 /// Stop watching blobs that are named again: their count starts over.
-pub fn clear_watch(
-    conn: &mut SqliteConnection,
-    blob_hashes: &[String],
-) -> Result<(), StorageError> {
-    diesel::delete(
-        blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_hash.eq_any(blob_hashes)),
-    )
-    .execute(conn)
-    .map(|_| ())
-    .map_err(|e| StorageError::Database(format!("clear_watch: {e}")))
+pub fn clear_watch(conn: &mut SqliteConnection, blob_cids: &[String]) -> Result<(), StorageError> {
+    diesel::delete(blob_unnamed_watch::table.filter(blob_unnamed_watch::blob_cid.eq_any(blob_cids)))
+        .execute(conn)
+        .map(|_| ())
+        .map_err(|e| StorageError::Database(format!("clear_watch: {e}")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A real byte CID for a label (never a header-swapped spelling).
+    fn c(label: &str) -> String {
+        elohim_epr::address::compute_bytes_cid(label.as_bytes()).to_string()
+    }
 
     fn conn() -> diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<SqliteConnection>> {
         crate::test_util::test_pool().get().unwrap()
@@ -366,15 +362,15 @@ mod tests {
     #[test]
     fn an_arrival_recorded_again_is_a_new_arrival_and_starts_the_watch_over() {
         let mut conn = conn();
-        record_arrival(&mut conn, "sha256-aa", ArrivalVia::SelfPut, None, None).unwrap();
+        record_arrival(&mut conn, &c("aa"), ArrivalVia::SelfPut, None, None).unwrap();
         diesel::sql_query("UPDATE blob_arrivals SET arrived_at = '2026-01-01T00:00:00Z'")
             .execute(&mut conn)
             .unwrap();
-        note_unnamed(&mut conn, "sha256-aa").unwrap();
-        note_unnamed(&mut conn, "sha256-aa").unwrap();
+        note_unnamed(&mut conn, &c("aa")).unwrap();
+        note_unnamed(&mut conn, &c("aa")).unwrap();
 
-        record_arrival(&mut conn, "sha256-aa", ArrivalVia::SelfPut, None, None).unwrap();
-        let again = arrivals_by_hash(&mut conn).unwrap()["sha256-aa"][0].clone();
+        record_arrival(&mut conn, &c("aa"), ArrivalVia::SelfPut, None, None).unwrap();
+        let again = arrivals_by_cid(&mut conn).unwrap()[&c("aa")][0].clone();
         assert!(again.arrived_at.as_str() > "2026-01-01T00:00:00Z");
         assert!(watched(&mut conn).unwrap().is_empty());
     }
@@ -384,23 +380,23 @@ mod tests {
         let mut conn = conn();
         record_arrival(
             &mut conn,
-            "sha256-ab",
+            &c("ab"),
             ArrivalVia::Placed,
             Some("agent-x"),
             None,
         )
         .unwrap();
-        assert!(withdraw_placement(&mut conn, "sha256-ab", "agent-x").unwrap());
-        assert!(!arrivals_by_hash(&mut conn).unwrap()["sha256-ab"][0].is_live_placement());
+        assert!(withdraw_placement(&mut conn, &c("ab"), "agent-x").unwrap());
+        assert!(!arrivals_by_cid(&mut conn).unwrap()[&c("ab")][0].is_live_placement());
         record_arrival(
             &mut conn,
-            "sha256-ab",
+            &c("ab"),
             ArrivalVia::Placed,
             Some("agent-x"),
             None,
         )
         .unwrap();
-        assert!(arrivals_by_hash(&mut conn).unwrap()["sha256-ab"][0].is_live_placement());
+        assert!(arrivals_by_cid(&mut conn).unwrap()[&c("ab")][0].is_live_placement());
     }
 
     #[test]
@@ -408,29 +404,29 @@ mod tests {
         let mut conn = conn();
         record_arrival(
             &mut conn,
-            "sha256-bb",
+            &c("bb"),
             ArrivalVia::Placed,
             Some("agent-x"),
             None,
         )
         .unwrap();
-        assert!(!withdraw_placement(&mut conn, "sha256-bb", "agent-y").unwrap());
-        assert!(arrivals_by_hash(&mut conn).unwrap()["sha256-bb"][0].is_live_placement());
+        assert!(!withdraw_placement(&mut conn, &c("bb"), "agent-y").unwrap());
+        assert!(arrivals_by_cid(&mut conn).unwrap()[&c("bb")][0].is_live_placement());
     }
 
     #[test]
     fn a_blob_can_arrive_more_than_one_way_and_each_is_its_own_record() {
         let mut conn = conn();
-        record_arrival(&mut conn, "sha256-cc", ArrivalVia::SelfPut, None, None).unwrap();
+        record_arrival(&mut conn, &c("cc"), ArrivalVia::SelfPut, None, None).unwrap();
         record_arrival(
             &mut conn,
-            "sha256-cc",
+            &c("cc"),
             ArrivalVia::Adoption,
             None,
             Some("release-1"),
         )
         .unwrap();
-        let arrivals = &arrivals_by_hash(&mut conn).unwrap()["sha256-cc"];
+        let arrivals = &arrivals_by_cid(&mut conn).unwrap()[&c("cc")];
         assert_eq!(arrivals.len(), 2);
         assert!(arrivals.iter().all(|a| a.via.is_own_act()));
         assert!(arrivals
@@ -441,21 +437,21 @@ mod tests {
     #[test]
     fn the_watch_counts_consecutive_passes_and_starts_over_once_cleared() {
         let mut conn = conn();
-        assert_eq!(note_unnamed(&mut conn, "sha256-dd").unwrap().passes, 1);
-        let second = note_unnamed(&mut conn, "sha256-dd").unwrap();
+        assert_eq!(note_unnamed(&mut conn, &c("dd")).unwrap().passes, 1);
+        let second = note_unnamed(&mut conn, &c("dd")).unwrap();
         assert_eq!(second.passes, 2);
-        clear_watch(&mut conn, &["sha256-dd".to_string()]).unwrap();
+        clear_watch(&mut conn, &[c("dd")]).unwrap();
         assert!(watched(&mut conn).unwrap().is_empty());
-        assert_eq!(note_unnamed(&mut conn, "sha256-dd").unwrap().passes, 1);
+        assert_eq!(note_unnamed(&mut conn, &c("dd")).unwrap().passes, 1);
     }
 
     #[test]
     fn forgetting_a_blob_drops_its_arrivals_and_its_watch() {
         let mut conn = conn();
-        record_arrival(&mut conn, "sha256-ee", ArrivalVia::SelfFetch, None, None).unwrap();
-        note_unnamed(&mut conn, "sha256-ee").unwrap();
-        forget(&mut conn, &["sha256-ee".to_string()]).unwrap();
-        assert!(arrivals_by_hash(&mut conn).unwrap().is_empty());
+        record_arrival(&mut conn, &c("ee"), ArrivalVia::SelfFetch, None, None).unwrap();
+        note_unnamed(&mut conn, &c("ee")).unwrap();
+        forget(&mut conn, &[c("ee")]).unwrap();
+        assert!(arrivals_by_cid(&mut conn).unwrap().is_empty());
         assert!(watched(&mut conn).unwrap().is_empty());
     }
 }

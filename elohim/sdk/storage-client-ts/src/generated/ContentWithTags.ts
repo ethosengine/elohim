@@ -3,7 +3,11 @@
 /**
  * Content with tags attached (API response)
  */
-export type ContentWithTags = { tags: Array<string>, id: string, h_app_id: string, title: string, description: string | null, content_type: string, content_format: string, blob_hash: string | null, blob_cid: string | null, content_size_bytes: number | null, metadata_json: string | null, reach: string, validation_status: string, created_by: string | null, created_at: string, updated_at: string, content_body: string | null, 
+export type ContentWithTags = { tags: Array<string>, id: string, h_app_id: string, title: string, description: string | null, content_type: string, content_format: string, 
+/**
+ * The payload's byte CID (CIDv1 raw + BLAKE3, `bafkr4i…`).
+ */
+blob_cid: string | null, content_size_bytes: number | null, metadata_json: string | null, reach: string, validation_status: string, created_by: string | null, created_at: string, updated_at: string, content_body: string | null, 
 /**
  * Source of truth: DHT (Content entry in lamad DNA). Classification: A (Notarized).
  */
@@ -14,16 +18,16 @@ dht_anchor_hash: string | null,
  */
 p2p_published_at: string | null, 
 /**
- * Content-addressed hash of the Angular SSR *server* bundle this row projects.
- * Mirrors `blob_hash` (which carries the *browser* bundle) so the one
+ * Byte CID of the Angular SSR *server* bundle this row projects.
+ * Mirrors `blob_cid` (which carries the *browser* bundle) so the one
  * `elohim-host-landing` EPR node can carry its full SSR nature instead of a
  * sibling `-ssr` content row. Written at deploy-time by the Jenkins SSR PATCH.
  * NULL = SSR not materialized (CSR fallback). Classification: C (Operational
  * projection of the deploy artifact — not a DNA-notarized content-entry field).
  */
-server_blob_hash: string | null, 
+server_blob_cid: string | null, 
 /**
- * Timestamp when this row's serving-critical field (`blob_hash`) was populated by
+ * Timestamp when this row's serving-critical field (`blob_cid`) was populated by
  * CRDT convergence or the deploy-time non-notarized producer — the "amber" /
  * converged-but-unconfirmed trust tier (CRDT:HTTP :: CRDT+DHT-notary:HTTPS — amber
  * serves like HTTP "Not secure", distinct from notarized `dht_anchor_hash`/green and

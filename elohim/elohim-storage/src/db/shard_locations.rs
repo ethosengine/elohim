@@ -33,7 +33,7 @@ fn is_locally_witnessed(status: &str) -> bool {
 /// `elohim_custody_announce_total{direction}` metric at the call site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerAnnounceOutcome {
-    /// No prior row for `(shard_hash, holder)` — a `peer-announced` row was
+    /// No prior row for `(shard_cid, holder)` — a `peer-announced` row was
     /// inserted (absence filled).
     Inserted,
     /// An existing `peer-announced` row was strictly older — refreshed to the
@@ -91,7 +91,7 @@ fn rfc3339_to_ms(s: &str) -> Option<i64> {
 /// write (same race-tolerance contract as `peer_statuses::upsert_if_newer`).
 pub fn apply_peer_announced(
     conn: &mut SqliteConnection,
-    shard_hash: &str,
+    shard_cid: &str,
     holder_agent_cid: &str,
     h_app_id: &str,
     announced_at_ms: i64,
@@ -116,7 +116,7 @@ pub fn apply_peer_announced(
 
     crate::db::read_then_write_transaction(conn, |conn| {
         let existing: Option<(String, Option<String>)> = shard_locations::table
-            .filter(shard_locations::shard_hash.eq(shard_hash))
+            .filter(shard_locations::shard_cid.eq(shard_cid))
             .filter(shard_locations::peer_id.eq(holder_agent_cid))
             .select((shard_locations::status, shard_locations::last_verified))
             .first::<(String, Option<String>)>(conn)
@@ -126,7 +126,7 @@ pub fn apply_peer_announced(
             None => {
                 diesel::insert_into(shard_locations::table)
                     .values((
-                        shard_locations::shard_hash.eq(shard_hash),
+                        shard_locations::shard_cid.eq(shard_cid),
                         shard_locations::peer_id.eq(holder_agent_cid),
                         shard_locations::h_app_id.eq(h_app_id),
                         shard_locations::status.eq(PEER_ANNOUNCED_STATUS),
@@ -148,7 +148,7 @@ pub fn apply_peer_announced(
                 if is_newer {
                     diesel::update(
                         shard_locations::table
-                            .filter(shard_locations::shard_hash.eq(shard_hash))
+                            .filter(shard_locations::shard_cid.eq(shard_cid))
                             .filter(shard_locations::peer_id.eq(holder_agent_cid)),
                     )
                     .set((
@@ -196,7 +196,7 @@ pub fn apply_custody_inventory(
     for ann in entries {
         match apply_peer_announced(
             conn,
-            &ann.shard_hash,
+            &ann.shard_cid.to_string(),
             &ann.holder_agent_cid,
             &ann.h_app_id,
             ann.announced_at_ms,
@@ -212,7 +212,7 @@ pub fn apply_custody_inventory(
             ) => stats.dropped_weaker += 1,
             Err(e) => {
                 tracing::warn!(
-                    shard_hash = %ann.shard_hash,
+                    shard_cid = %ann.shard_cid,
                     holder = %ann.holder_agent_cid,
                     error = %e,
                     "custody catch-up: apply of one inventory entry failed; skipping"
@@ -236,7 +236,7 @@ pub fn upsert_location(
         // Row exists — just update status
         diesel::update(
             shard_locations::table
-                .filter(shard_locations::shard_hash.eq(location.shard_hash))
+                .filter(shard_locations::shard_cid.eq(location.shard_cid))
                 .filter(shard_locations::peer_id.eq(location.peer_id)),
         )
         .set(shard_locations::status.eq(location.status))
@@ -248,10 +248,10 @@ pub fn upsert_location(
 
 pub fn get_locations_for_shard(
     conn: &mut SqliteConnection,
-    shard_hash: &str,
+    shard_cid: &str,
 ) -> Result<Vec<ShardLocationRow>, StorageError> {
     shard_locations::table
-        .filter(shard_locations::shard_hash.eq(shard_hash))
+        .filter(shard_locations::shard_cid.eq(shard_cid))
         .load(conn)
         .map_err(StorageError::from)
 }
@@ -283,15 +283,14 @@ pub fn get_locations_for_content(
         return Ok(vec![]);
     };
 
-    let shard_hashes: Vec<String> =
-        serde_json::from_str(&manifest.shard_hashes_json).unwrap_or_default();
+    let shard_cids = super::shard_manifests::custody_unit_cids(&manifest);
 
-    if shard_hashes.is_empty() {
+    if shard_cids.is_empty() {
         return Ok(vec![]);
     }
 
     shard_locations::table
-        .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+        .filter(shard_locations::shard_cid.eq_any(&shard_cids))
         .load(conn)
         .map_err(StorageError::from)
 }
@@ -300,12 +299,12 @@ pub fn get_locations_for_content(
 ///
 /// # Why this exists (blob-rotation orphans)
 ///
-/// `shard_locations` is keyed by `shard_hash`; every per-content reader
+/// `shard_locations` is keyed by `shard_cid`; every per-content reader
 /// ([`get_locations_for_content`], `household_resilience::load_holder_relation`)
-/// reaches it THROUGH the stored `shard_manifests.shard_hashes_json`. When a
-/// content's blob rotates (an SSR bundle rebuild changes `content.blob_hash`) and
-/// the manifest is re-stamped from the new bytes, the previous manifest's shard
-/// hashes stop being named by anything — the rows keyed under them become
+/// reaches it THROUGH the custody units the stored manifest declares. When a
+/// content's blob rotates (an SSR bundle rebuild changes `content.blob_cid`) and
+/// the manifest is re-stamped from the new bytes, the previous manifest's units
+/// stop being named by anything — the rows keyed under them become
 /// unreachable through every manifest-keyed read.
 ///
 /// They are not, however, harmless: `operational_weave_facing::load_all_holder_relation`
@@ -317,8 +316,8 @@ pub fn get_locations_for_content(
 ///
 /// `candidates` are hashes we believe we just orphaned, but a shard hash is
 /// CONTENT-ADDRESSED: byte-identical content elsewhere legitimately names the same
-/// hash (with `encoding = "none"` the shard hash IS the blob hash, so two content
-/// rows over one blob share it outright). We therefore delete a candidate only when
+/// CID (an unstriped payload's custody units are its chunks, so two content rows over
+/// one blob share them outright). We therefore delete a candidate only when
 /// it appears in NO manifest at all — and the reference scan is deliberately
 /// **cross-app** (no `h_app_id` filter on `shard_manifests`), so a manifest in
 /// another app scope still protects the hash. The DELETE itself stays scoped to
@@ -337,17 +336,14 @@ pub fn prune_orphaned_locations(
         return Ok(0);
     }
 
-    // Every shard hash named by ANY manifest, across ALL app scopes.
-    let all_json: Vec<String> = shard_manifests::table
-        .select(shard_manifests::shard_hashes_json)
+    // Every custody unit named by ANY manifest, across ALL app scopes.
+    let all_rows: Vec<super::models::ShardManifestRow> = shard_manifests::table
         .load(conn)
         .map_err(StorageError::from)?;
-    let mut referenced: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for json in &all_json {
-        if let Ok(hashes) = serde_json::from_str::<Vec<String>>(json) {
-            referenced.extend(hashes);
-        }
-    }
+    let referenced: std::collections::HashSet<String> = all_rows
+        .iter()
+        .flat_map(super::shard_manifests::custody_unit_cids)
+        .collect();
 
     let doomed: Vec<String> = candidates
         .iter()
@@ -361,7 +357,7 @@ pub fn prune_orphaned_locations(
     let deleted = diesel::delete(
         shard_locations::table
             .filter(shard_locations::h_app_id.eq(h_app_id))
-            .filter(shard_locations::shard_hash.eq_any(&doomed)),
+            .filter(shard_locations::shard_cid.eq_any(&doomed)),
     )
     .execute(conn)
     .map_err(StorageError::from)?;
@@ -371,12 +367,12 @@ pub fn prune_orphaned_locations(
 
 pub fn mark_lost(
     conn: &mut SqliteConnection,
-    shard_hash: &str,
+    shard_cid: &str,
     peer_id: &str,
 ) -> Result<(), StorageError> {
     diesel::update(
         shard_locations::table
-            .filter(shard_locations::shard_hash.eq(shard_hash))
+            .filter(shard_locations::shard_cid.eq(shard_cid))
             .filter(shard_locations::peer_id.eq(peer_id)),
     )
     .set(shard_locations::status.eq("lost"))
@@ -386,13 +382,13 @@ pub fn mark_lost(
 
 pub fn update_verified(
     conn: &mut SqliteConnection,
-    shard_hash: &str,
+    shard_cid: &str,
     peer_id: &str,
 ) -> Result<(), StorageError> {
     let now = chrono::Utc::now().to_rfc3339();
     diesel::update(
         shard_locations::table
-            .filter(shard_locations::shard_hash.eq(shard_hash))
+            .filter(shard_locations::shard_cid.eq(shard_cid))
             .filter(shard_locations::peer_id.eq(peer_id)),
     )
     .set((
@@ -412,7 +408,7 @@ pub fn update_verified(
 /// moves — healing the human alone would otherwise strand its shard rows under
 /// the dead key.
 ///
-/// `peer_id` is part of the `(shard_hash, peer_id)` primary key, so a blind
+/// `peer_id` is part of the `(shard_cid, peer_id)` primary key, so a blind
 /// `UPDATE peer_id = new` can violate the UNIQUE PK when the SAME shard is already
 /// recorded under `new_peer_id` (the peer re-distributed under its live key while
 /// the fossil row lingered). We therefore move only non-colliding rows and DROP
@@ -436,7 +432,7 @@ pub fn rekey_peer_id(
     // Shards already held under the NEW key — a move onto these would collide.
     //
     // The collision pre-check MUST match the actual PK scope, which is
-    // `(shard_hash, peer_id)` with NO `h_app_id` (see the initial migration).
+    // `(shard_cid, peer_id)` with NO `h_app_id` (see the initial migration).
     // A same-shard row already held under `new_peer_id` in a DIFFERENT app scope
     // is still a PK collision for the `SET peer_id = new_peer_id` UPDATE below —
     // scoping this probe by `h_app_id` (as an earlier version did) hid such rows,
@@ -447,7 +443,7 @@ pub fn rekey_peer_id(
     // covered under the new key somewhere and the stale old-scope row is dropped.)
     let existing_new: std::collections::HashSet<String> = shard_locations::table
         .filter(shard_locations::peer_id.eq(new_peer_id))
-        .select(shard_locations::shard_hash)
+        .select(shard_locations::shard_cid)
         .load::<String>(conn)?
         .into_iter()
         .collect();
@@ -455,24 +451,24 @@ pub fn rekey_peer_id(
     let old_shards: Vec<String> = shard_locations::table
         .filter(shard_locations::h_app_id.eq(h_app_id))
         .filter(shard_locations::peer_id.eq(old_peer_id))
-        .select(shard_locations::shard_hash)
+        .select(shard_locations::shard_cid)
         .load::<String>(conn)?;
 
     // Per-row (N+1): one UPDATE/DELETE per shard the old key held. This runs at
     // boot, once per superseded human, over a single household's shard set — a
     // handful of rows — so the N+1 is acceptable here. If this ever moves to a
     // hot/bulk path, replace the loop with two set statements: an
-    // `UPDATE … SET peer_id=new WHERE peer_id=old AND shard_hash NOT IN (<new's shards>)`
+    // `UPDATE … SET peer_id=new WHERE peer_id=old AND shard_cid NOT IN (<new's shards>)`
     // followed by a `DELETE … WHERE peer_id=old` to collapse the colliding remainder.
     let mut moved = 0usize;
-    for shard_hash in old_shards {
-        if existing_new.contains(&shard_hash) {
+    for shard_cid in old_shards {
+        if existing_new.contains(&shard_cid) {
             // Collision: the shard is already covered under the new key — drop
             // the stale duplicate rather than violate the PK.
             diesel::delete(
                 shard_locations::table
                     .filter(shard_locations::h_app_id.eq(h_app_id))
-                    .filter(shard_locations::shard_hash.eq(&shard_hash))
+                    .filter(shard_locations::shard_cid.eq(&shard_cid))
                     .filter(shard_locations::peer_id.eq(old_peer_id)),
             )
             .execute(conn)?;
@@ -480,7 +476,7 @@ pub fn rekey_peer_id(
             moved += diesel::update(
                 shard_locations::table
                     .filter(shard_locations::h_app_id.eq(h_app_id))
-                    .filter(shard_locations::shard_hash.eq(&shard_hash))
+                    .filter(shard_locations::shard_cid.eq(&shard_cid))
                     .filter(shard_locations::peer_id.eq(old_peer_id)),
             )
             .set(shard_locations::peer_id.eq(new_peer_id))
@@ -508,7 +504,7 @@ mod rekey_tests {
         upsert_location(
             conn,
             &NewShardLocation {
-                shard_hash: shard,
+                shard_cid: shard,
                 peer_id: peer,
                 h_app_id: app,
                 status: "verified",
@@ -522,7 +518,7 @@ mod rekey_tests {
         let mut conn = setup();
         seed(&mut conn, "shard-a", "uhCAkOLD", "lamad");
         seed(&mut conn, "shard-b", "uhCAkOLD", "lamad");
-        // A different-scope row (distinct shard — the PK is (shard_hash, peer_id),
+        // A different-scope row (distinct shard — the PK is (shard_cid, peer_id),
         // no h_app_id, so a same-shard row would collide) must be untouched by a
         // lamad-scoped rekey. A different peer likewise.
         seed(&mut conn, "shard-q", "uhCAkOLD", "qahal");
@@ -573,7 +569,7 @@ mod rekey_tests {
 
     #[test]
     fn rekey_survives_cross_scope_collision_on_new_key() {
-        // The PK is (shard_hash, peer_id) with NO h_app_id: a same-shard row held
+        // The PK is (shard_cid, peer_id) with NO h_app_id: a same-shard row held
         // under the NEW key in a DIFFERENT app scope is still a PK collision for a
         // move onto the new key. An earlier h_app_id-scoped collision probe missed
         // it, so the UPDATE hit a UNIQUE violation and aborted the whole supersede
@@ -631,7 +627,7 @@ mod rekey_tests {
 #[cfg(test)]
 mod prune_orphaned_tests {
     use super::*;
-    use crate::db::models::{NewShardLocation, NewShardManifest};
+    use crate::db::models::NewShardLocation;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
@@ -646,7 +642,7 @@ mod prune_orphaned_tests {
         upsert_location(
             conn,
             &NewShardLocation {
-                shard_hash: shard,
+                shard_cid: shard,
                 peer_id: "uhCAkHolder",
                 h_app_id: app,
                 status: "announced",
@@ -655,26 +651,19 @@ mod prune_orphaned_tests {
         .expect("seed location");
     }
 
-    fn seed_manifest(conn: &mut SqliteConnection, content_id: &str, app: &str, shards: &[&str]) {
-        let json = serde_json::to_string(shards).expect("encode");
-        crate::db::shard_manifests::upsert_manifest(
-            conn,
-            &NewShardManifest {
-                content_id,
-                h_app_id: app,
-                blob_hash: "sha256-x",
-                blob_cid: None,
-                encoding: "rs",
-                data_shard_count: shards.len() as i32,
-                parity_shard_count: 0,
-                shard_hashes_json: &json,
-                total_size_bytes: 0,
-                shard_size_bytes: 0,
-                mime_type: "html5-app",
-                reach: "commons",
-            },
-        )
-        .expect("seed manifest");
+    /// A byte CID for a label (the label's own bytes, so a manifest minted over the
+    /// label declares exactly this CID as its single custody unit).
+    fn c(label: &str) -> String {
+        elohim_epr::address::compute_bytes_cid(label.as_bytes()).to_string()
+    }
+
+    fn seed_manifest(conn: &mut SqliteConnection, content_id: &str, app: &str, unit: &str) {
+        let manifest = crate::sharding::ShardEncoder::new(Default::default())
+            .create_manifest(unit.as_bytes(), "html5-app", "commons")
+            .expect("mint manifest");
+        assert_eq!(manifest.custody_units()[0].to_string(), c(unit));
+        crate::db::shard_manifests::record_generated_manifest(conn, content_id, app, &manifest)
+            .expect("seed manifest");
     }
 
     /// Only hashes that NO manifest names are deleted, and the delete is scoped to
@@ -682,22 +671,20 @@ mod prune_orphaned_tests {
     #[test]
     fn prunes_only_unreferenced_hashes_in_scope() {
         let mut conn = setup();
-        seed_loc(&mut conn, "s-orphan", "lamad");
-        seed_loc(&mut conn, "s-live", "lamad");
-        seed_manifest(&mut conn, "live-content", "lamad", &["s-live"]);
+        seed_loc(&mut conn, &c("s-orphan"), "lamad");
+        seed_loc(&mut conn, &c("s-live"), "lamad");
+        seed_manifest(&mut conn, "live-content", "lamad", "s-live");
 
         let candidates: std::collections::HashSet<String> =
-            ["s-orphan".to_string(), "s-live".to_string()]
-                .into_iter()
-                .collect();
+            [c("s-orphan"), c("s-live")].into_iter().collect();
         let n = prune_orphaned_locations(&mut conn, "lamad", &candidates).expect("prune");
 
         assert_eq!(n, 1, "only the unreferenced hash may be deleted");
-        assert!(get_locations_for_shard(&mut conn, "s-orphan")
+        assert!(get_locations_for_shard(&mut conn, &c("s-orphan"))
             .expect("query")
             .is_empty());
         assert_eq!(
-            get_locations_for_shard(&mut conn, "s-live")
+            get_locations_for_shard(&mut conn, &c("s-live"))
                 .expect("query")
                 .len(),
             1,
@@ -712,16 +699,15 @@ mod prune_orphaned_tests {
     #[test]
     fn a_hash_referenced_by_another_app_is_never_pruned() {
         let mut conn = setup();
-        seed_loc(&mut conn, "s-shared", "lamad");
-        seed_manifest(&mut conn, "qahal-content", "qahal", &["s-shared"]);
+        seed_loc(&mut conn, &c("s-shared"), "lamad");
+        seed_manifest(&mut conn, "qahal-content", "qahal", "s-shared");
 
-        let candidates: std::collections::HashSet<String> =
-            ["s-shared".to_string()].into_iter().collect();
+        let candidates: std::collections::HashSet<String> = [c("s-shared")].into_iter().collect();
         let n = prune_orphaned_locations(&mut conn, "lamad", &candidates).expect("prune");
 
         assert_eq!(n, 0, "a cross-app manifest reference must protect the hash");
         assert_eq!(
-            get_locations_for_shard(&mut conn, "s-shared")
+            get_locations_for_shard(&mut conn, &c("s-shared"))
                 .expect("query")
                 .len(),
             1
@@ -733,7 +719,7 @@ mod prune_orphaned_tests {
     #[test]
     fn unreferenced_hashes_outside_the_candidate_set_are_untouched() {
         let mut conn = setup();
-        seed_loc(&mut conn, "s-unrelated", "lamad");
+        seed_loc(&mut conn, &c("s-unrelated"), "lamad");
 
         let empty: std::collections::HashSet<String> = std::collections::HashSet::new();
         assert_eq!(
@@ -741,7 +727,7 @@ mod prune_orphaned_tests {
             0
         );
         assert_eq!(
-            get_locations_for_shard(&mut conn, "s-unrelated")
+            get_locations_for_shard(&mut conn, &c("s-unrelated"))
                 .expect("query")
                 .len(),
             1,
@@ -768,7 +754,7 @@ mod apply_peer_announced_tests {
         upsert_location(
             conn,
             &NewShardLocation {
-                shard_hash: shard,
+                shard_cid: shard,
                 peer_id: peer,
                 h_app_id: "lamad",
                 status,
@@ -779,7 +765,7 @@ mod apply_peer_announced_tests {
 
     fn row(conn: &mut SqliteConnection, shard: &str, peer: &str) -> Option<ShardLocationRow> {
         shard_locations::table
-            .filter(shard_locations::shard_hash.eq(shard))
+            .filter(shard_locations::shard_cid.eq(shard))
             .filter(shard_locations::peer_id.eq(peer))
             .first::<ShardLocationRow>(conn)
             .optional()
@@ -950,15 +936,20 @@ mod apply_peer_announced_tests {
         use crate::p2p::custody_announce::CustodyAnnouncement;
         let mut conn = setup();
         // Pre-seed a self-held row that a peer claim must not overwrite.
-        seed_local(&mut conn, "s-strong", "uhCAkH1", "self-held");
+        let unit = |label: &str| elohim_epr::address::compute_bytes_cid(label.as_bytes());
+        seed_local(
+            &mut conn,
+            &unit("s-strong").to_string(),
+            "uhCAkH1",
+            "self-held",
+        );
 
         let mk = |shard: &str, holder: &str, ms: i64| CustodyAnnouncement {
-            shard_hash: shard.to_string(),
+            shard_cid: unit(shard),
             holder_agent_cid: holder.to_string(),
             h_app_id: "lamad".to_string(),
             status: "announced".to_string(),
             announced_at_ms: ms,
-            signature: vec![0x00],
         };
         let entries = vec![
             mk("s-new", "uhCAkH2", 1_000),    // inserted

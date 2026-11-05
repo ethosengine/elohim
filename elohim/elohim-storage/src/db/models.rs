@@ -84,7 +84,7 @@ pub struct Content {
     pub description: Option<String>,
     pub content_type: String,
     pub content_format: String,
-    pub blob_hash: Option<String>,
+    /// The payload's byte CID (CIDv1 raw + BLAKE3, `bafkr4i…`).
     pub blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
     pub metadata_json: Option<String>,
@@ -99,14 +99,14 @@ pub struct Content {
     /// Timestamp when this content was successfully published to the libp2p Kademlia DHT by the seeder drain loop.
     /// NULL = not yet published. Classification: C (Operational).
     pub p2p_published_at: Option<String>,
-    /// Content-addressed hash of the Angular SSR *server* bundle this row projects.
-    /// Mirrors `blob_hash` (which carries the *browser* bundle) so the one
+    /// Byte CID of the Angular SSR *server* bundle this row projects.
+    /// Mirrors `blob_cid` (which carries the *browser* bundle) so the one
     /// `elohim-host-landing` EPR node can carry its full SSR nature instead of a
     /// sibling `-ssr` content row. Written at deploy-time by the Jenkins SSR PATCH.
     /// NULL = SSR not materialized (CSR fallback). Classification: C (Operational
     /// projection of the deploy artifact — not a DNA-notarized content-entry field).
-    pub server_blob_hash: Option<String>,
-    /// Timestamp when this row's serving-critical field (`blob_hash`) was populated by
+    pub server_blob_cid: Option<String>,
+    /// Timestamp when this row's serving-critical field (`blob_cid`) was populated by
     /// CRDT convergence or the deploy-time non-notarized producer — the "amber" /
     /// converged-but-unconfirmed trust tier (CRDT:HTTP :: CRDT+DHT-notary:HTTPS — amber
     /// serves like HTTP "Not secure", distinct from notarized `dht_anchor_hash`/green and
@@ -212,7 +212,6 @@ pub struct NewContent<'a> {
     pub description: Option<&'a str>,
     pub content_type: &'a str,
     pub content_format: &'a str,
-    pub blob_hash: Option<&'a str>,
     pub blob_cid: Option<&'a str>,
     pub content_size_bytes: Option<i32>,
     pub metadata_json: Option<&'a str>,
@@ -220,9 +219,9 @@ pub struct NewContent<'a> {
     pub created_by: Option<&'a str>,
     pub content_body: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
-    /// SSR *server* bundle hash — see `Content::server_blob_hash`. Deploy-PATCH
-    /// populated; `None` at create/seed time (mirrors the `blob_hash` insert wiring).
-    pub server_blob_hash: Option<&'a str>,
+    /// SSR *server* bundle byte CID — see `Content::server_blob_cid`. Deploy-PATCH
+    /// populated; `None` at create/seed time (mirrors the `blob_cid` insert wiring).
+    pub server_blob_cid: Option<&'a str>,
 }
 
 /// Content tag row
@@ -2922,36 +2921,38 @@ pub struct NewTokenDecayEvent<'a> {
 pub struct ShardManifestRow {
     pub content_id: String,
     pub h_app_id: String,
-    pub blob_hash: String,
-    pub blob_cid: Option<String>,
-    pub encoding: String,
-    pub data_shard_count: i32,
-    pub parity_shard_count: i32,
-    pub shard_hashes_json: String,
-    pub total_size_bytes: i64,
-    pub shard_size_bytes: i64,
+    /// The payload's byte CID.
+    pub blob_cid: String,
+    pub byte_len: i64,
     pub mime_type: String,
+    /// JSON `{chunker: ChunkerDecl, erasure: ErasureDecl}` the manifest was minted under.
+    pub profile_json: String,
+    /// JSON `[ChunkRef]`.
+    pub chunks_json: String,
+    /// JSON `[Stripe]`; empty when the erasure id is `none`.
+    pub stripes_json: String,
     pub reach: String,
+    pub author_id: Option<String>,
     pub created_at: String,
+    pub verified_at: Option<String>,
 }
 
-/// New shard manifest for INSERT/REPLACE.
-/// `created_at` is omitted — SQLite provides the default via `datetime('now')`.
+/// New shard manifest for INSERT/REPLACE (the manifest's own timestamps are carried).
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = shard_manifests)]
 pub struct NewShardManifest<'a> {
     pub content_id: &'a str,
     pub h_app_id: &'a str,
-    pub blob_hash: &'a str,
-    pub blob_cid: Option<&'a str>,
-    pub encoding: &'a str,
-    pub data_shard_count: i32,
-    pub parity_shard_count: i32,
-    pub shard_hashes_json: &'a str,
-    pub total_size_bytes: i64,
-    pub shard_size_bytes: i64,
+    pub blob_cid: &'a str,
+    pub byte_len: i64,
     pub mime_type: &'a str,
+    pub profile_json: &'a str,
+    pub chunks_json: &'a str,
+    pub stripes_json: &'a str,
     pub reach: &'a str,
+    pub author_id: Option<&'a str>,
+    pub created_at: &'a str,
+    pub verified_at: Option<&'a str>,
 }
 
 // ============================================================================
@@ -2965,7 +2966,7 @@ pub struct NewShardManifest<'a> {
 #[diesel(table_name = shard_locations)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct ShardLocationRow {
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub peer_id: String,
     pub h_app_id: String,
     pub status: String,
@@ -2978,7 +2979,7 @@ pub struct ShardLocationRow {
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = shard_locations)]
 pub struct NewShardLocation<'a> {
-    pub shard_hash: &'a str,
+    pub shard_cid: &'a str,
     pub peer_id: &'a str,
     pub h_app_id: &'a str,
     pub status: &'a str,
@@ -3061,7 +3062,7 @@ pub struct NewObservationEntry<'a> {
 pub struct PlacementGapRow {
     pub id: String,
     pub content_id: String,
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub h_app_id: String,
     pub requested_steward_count: i32,
     pub achieved_steward_count: i32,
@@ -3077,7 +3078,7 @@ pub struct PlacementGapRow {
 pub struct NewPlacementGap<'a> {
     pub id: &'a str,
     pub content_id: &'a str,
-    pub shard_hash: &'a str,
+    pub shard_cid: &'a str,
     pub h_app_id: &'a str,
     pub requested_steward_count: i32,
     pub achieved_steward_count: i32,
@@ -3410,30 +3411,22 @@ pub struct NewPortalHostRow {
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct PeerBlobInventoryRow {
     pub peer_id: String,
-    pub blob_hash: String,
+    /// The held blob's byte CID.
+    pub blob_cid: String,
     pub last_seen_at: String,
-    /// 'gossip-snapshot' | 'gossip-delta' | 'fetch-success'
+    /// 'gossip-delta' | 'recon' | 'fetch-success' | 'self-custody'
     pub source: String,
     pub sequence: i64,
-    /// iroh-side BLAKE3 hash (Phase 4). NULL during transition; cutover
-    /// (Phase 11) drops blob_hash and makes this required.
-    pub blake3_hash: Option<String>,
-    /// Per-object transport affinity (iroh-toggle sprint). NULL = Auto =
-    /// default policy. Operational, read by `choose_backend`, written by the
-    /// `/admin/blob-transport-affinity` setter. Kept coherent with the table
-    /// column so this row type can read back what the setter writes.
-    pub transport_affinity: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = peer_blob_inventory)]
 pub struct NewPeerBlobInventoryRow {
     pub peer_id: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub last_seen_at: String,
     pub source: String,
     pub sequence: i64,
-    pub blake3_hash: Option<String>,
 }
 
 // ============================================================================
@@ -3447,10 +3440,6 @@ pub struct PeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
-    /// SHA-256 fingerprint (hex) of the last-applied snapshot's blob set for this
-    /// peer. Drives receive-side snapshot idempotency. `None` = no fingerprint
-    /// recorded yet (fresh peer, or a cursor last advanced by a delta).
-    pub last_content_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -3459,7 +3448,6 @@ pub struct NewPeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
-    pub last_content_hash: Option<String>,
 }
 
 // ============================================================================
@@ -3691,7 +3679,7 @@ pub struct GovernanceActionTallyRow {
 /// Queryable row from the `custodian_shares` table.
 ///
 /// `share_data` is the raw Shamir share bytes as stored. Callers MUST verify
-/// `sha256(share_data) == share_blob_hash` before using the bytes — this
+/// `compute_bytes_cid(share_data) == share_blob_cid` before using the bytes — this
 /// detects SQLite-level corruption (bit-flip, partial write, etc.).
 ///
 /// ## At-rest encryption
@@ -3712,10 +3700,10 @@ pub struct CustodianShare {
     pub custodian_cid: String,
     /// 1-based index within the (m, n) Shamir scheme.
     pub share_index: i32,
-    /// Raw Shamir share bytes.  Verify integrity with `share_blob_hash` before use.
+    /// Raw Shamir share bytes.  Verify integrity with `share_blob_cid` before use.
     pub share_data: Vec<u8>,
-    /// Hex-encoded SHA-256 of `share_data`.  Integrity check on every read.
-    pub share_blob_hash: String,
+    /// Byte CID of `share_data`.  Integrity check on every read.
+    pub share_blob_cid: String,
     /// ISO 8601 creation timestamp.
     pub created_at: String,
     /// Non-null when this share has been superseded by a stewardship-rotation
@@ -3731,7 +3719,7 @@ pub struct NewCustodianShare {
     pub custodian_cid: String,
     pub share_index: i32,
     pub share_data: Vec<u8>,
-    pub share_blob_hash: String,
+    pub share_blob_cid: String,
     pub created_at: String,
     pub superseded_at: Option<String>,
 }

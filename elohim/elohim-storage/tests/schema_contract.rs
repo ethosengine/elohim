@@ -201,12 +201,14 @@ fn content_head_view_matches_schema() {
         ),
         trust: "notarized".to_string(),
         anchor_matches_head: Some(false),
-        blob_hash: Some("sha256-abc123".to_string()),
+        blob_cid: Some("bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m".to_string()),
         updated_at: Some("2026-07-04T00:00:00Z".to_string()),
         staging_candidate: Some(
             "uhCkkCANDIDATE012345678901234567890123456789012345678901234".to_string(),
         ),
-        staging_candidate_blob_hash: Some("bafkrei-candidate".to_string()),
+        staging_candidate_blob_cid: Some(
+            "bafkr4icfgmkdlzpceuxfm5elqkxkwml26ry7dzo6ja7ocx2ajwsd7tmecm".to_string(),
+        ),
         staging_candidate_state: Some(StagingCandidateState::Staged),
         earned_source: Some(EarnedSource::Live),
         canonical_declared_at: Some(1_791_446_400_123_456),
@@ -236,10 +238,10 @@ fn content_head_view_matches_schema() {
         ),
         trust: "notarized".to_string(),
         anchor_matches_head: None,
-        blob_hash: None,
+        blob_cid: None,
         updated_at: None,
         staging_candidate: None,
-        staging_candidate_blob_hash: None,
+        staging_candidate_blob_cid: None,
         staging_candidate_state: Some(StagingCandidateState::None),
         earned_source: None,
         // No election recorded: both fields serialize as null.
@@ -1447,7 +1449,7 @@ fn placement_gap_view_matches_schema() {
     let view = PlacementGapView {
         id: "gap-uuid-001".to_string(),
         content_id: "content-abc-001".to_string(),
-        shard_hash: "bafyreib2vq7shardABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789012345".to_string(),
+        shard_cid: "bafyreib2vq7shardABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789012345".to_string(),
         requested_steward_count: 4,
         achieved_steward_count: 2,
         contract_coverage: 0.5,
@@ -1483,7 +1485,7 @@ fn resilience_snapshot_view_matches_schema() {
         placement_gaps: vec![PlacementGapView {
             id: "gap-uuid-002".to_string(),
             content_id: "content-abc-001".to_string(),
-            shard_hash: "bafyreib2vq7shardXYZ0123456789012345678901234567890123456789".to_string(),
+            shard_cid: "bafyreib2vq7shardXYZ0123456789012345678901234567890123456789".to_string(),
             requested_steward_count: 4,
             achieved_steward_count: 3,
             contract_coverage: 0.75,
@@ -1659,7 +1661,9 @@ fn resilience_snapshot_view_with_coverage_shortfall_validates() {
 // ============================================================================
 
 fn sample_envelope_view() -> elohim_storage::EprEnvelopeView {
-    use elohim_storage::{EprCouplingView, EprEnvelopeView, EprSignatureView};
+    use elohim_storage::{
+        EprCouplingView, EprEnvelopeView, EprSignatureEnvelopeView, EprSignatureView,
+    };
     EprEnvelopeView {
         cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
         kind: "Manifest".into(),
@@ -1679,11 +1683,14 @@ fn sample_envelope_view() -> elohim_storage::EprEnvelopeView {
         issued_at: "2026-04-22T00:00:00Z".into(),
         proof: EprSignatureView {
             signer: "bafyreib2vq7agentcid01234567890123456789012345678901234567890".into(),
-            algorithm: "ed25519".into(),
-            // multikey: varint(0xed) || 32-byte key
-            key: format!("ed01{}", "0b".repeat(32)),
-            // 128 lowercase hex chars = 64 bytes
-            signature: "a".repeat(128),
+            envelope: EprSignatureEnvelopeView {
+                // scheme 0 = Ed25519
+                scheme: 0,
+                // multikey: varint(0xed) || 32-byte key
+                key: format!("ed01{}", "0b".repeat(32)),
+                // 128 lowercase hex chars = 64 bytes
+                sig: "a".repeat(128),
+            },
         },
     }
 }
@@ -1782,9 +1789,9 @@ fn epr_providers_view_conforms() {
     validate_against_schema("views/epr-providers-view.schema.json", &json);
 }
 
-/// Build a `ContentView` with every required field populated. `server_blob_hash`
+/// Build a `ContentView` with every required field populated. `server_blob_cid`
 /// is the field under test (SSR row-collapse T1) — varied by the caller.
-fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::ContentView {
+fn sample_content_view(server_blob_cid: Option<String>) -> elohim_views::ContentView {
     elohim_views::ContentView {
         id: "elohim-host-landing".into(),
         h_app_id: "lamad".into(),
@@ -1792,9 +1799,9 @@ fn sample_content_view(server_blob_hash: Option<String>) -> elohim_views::Conten
         description: None,
         content_type: "concept".into(),
         content_format: "spa-bundle".into(),
-        blob_hash: Some(format!("sha256-{}", "ab".repeat(32))),
-        server_blob_hash,
-        blob_cid: None,
+        // compute_bytes_cid(b"elohim-host-landing browser bundle")
+        blob_cid: Some("bafkr4ihcilnvb2tjuhnuioaqzcjeeoz5bkfgjqc3xj4ji4i7p7kujaok2y".into()),
+        server_blob_cid,
         content_size_bytes: None,
         metadata: None,
         reach: "commons".into(),
@@ -1836,37 +1843,38 @@ fn dead_anchor_state_conforms_and_is_camel_case() {
     validate_against_schema("views/content-view.schema.json", &json);
 }
 
-/// Round-trip: a `ContentView` carrying `serverBlobHash` conforms to the schema,
-/// and the wire key is exactly `serverBlobHash` (camelCase), mirroring `blobHash`.
+/// Round-trip: a `ContentView` carrying `serverBlobCid` conforms to the schema,
+/// and the wire key is exactly `serverBlobCid` (camelCase), mirroring `blobCid`.
 /// `content-view.schema.json` is `additionalProperties: false`, so this also
 /// proves the schema declares the new optional field.
 #[test]
-fn content_view_with_server_blob_hash_conforms() {
-    let v = sample_content_view(Some(format!("sha256-{}", "cd".repeat(32))));
+fn content_view_with_server_blob_cid_conforms() {
+    // compute_bytes_cid(b"elohim-host-landing server bundle")
+    let v = sample_content_view(Some(
+        "bafkr4ifkd536efc246eq36iyrz7iymaog3uvj3jddfypbwo7tm4qnktdg4".to_string(),
+    ));
     let json = serde_json::to_value(&v).unwrap();
     assert!(
-        json.get("serverBlobHash")
-            .and_then(|x| x.as_str())
-            .is_some(),
-        "serverBlobHash must surface on the wire as a camelCase string"
+        json.get("serverBlobCid").and_then(|x| x.as_str()).is_some(),
+        "serverBlobCid must surface on the wire as a camelCase string"
     );
     assert!(
-        json.get("server_blob_hash").is_none(),
-        "snake_case server_blob_hash must NOT leak to the wire"
+        json.get("server_blob_cid").is_none(),
+        "snake_case server_blob_cid must NOT leak to the wire"
     );
     validate_against_schema("views/content-view.schema.json", &json);
 }
 
-/// Absent `serverBlobHash` is the normal pre-deploy state — it serializes to
+/// Absent `serverBlobCid` is the normal pre-deploy state — it serializes to
 /// `null` and must still conform (the field is optional/nullable, not required).
 #[test]
-fn content_view_without_server_blob_hash_conforms() {
+fn content_view_without_server_blob_cid_conforms() {
     let v = sample_content_view(None);
     let json = serde_json::to_value(&v).unwrap();
     assert_eq!(
-        json.get("serverBlobHash"),
+        json.get("serverBlobCid"),
         Some(&serde_json::Value::Null),
-        "absent serverBlobHash serializes to null"
+        "absent serverBlobCid serializes to null"
     );
     validate_against_schema("views/content-view.schema.json", &json);
 }
@@ -1971,11 +1979,11 @@ fn epr_atom_wire_contract_validates_request_shapes() {
         jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     let examples = [
-        serde_json::json!({ "tag": "fetch", "cid": "bafkreiabc" }),
+        serde_json::json!({ "tag": "fetch", "cid": "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu" }),
         serde_json::json!({ "tag": "announce", "envelope_bytes": "AQID" }),
         serde_json::json!({
             "tag": "fetch_batch",
-            "cids": ["bafkreiabc", "bafkreidef"],
+            "cids": ["bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu", "bafkr4ifjn7bsgsxqtp65qvznx53z7p26hzo4tqps2wvcg3mo2cvcuhvdem"],
         }),
     ];
 
@@ -2036,7 +2044,9 @@ fn epr_atom_wire_contract_rejects_oversized_batch() {
         jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     // 129 cids — schema cap is 128
-    let cids: Vec<String> = (0..129).map(|i| format!("bafkrei_{}", i)).collect();
+    let cids: Vec<String> = (0..129u32)
+        .map(|i| elohim_epr::address::compute_bytes_cid(&i.to_le_bytes()).to_string())
+        .collect();
     let oversize = serde_json::json!({ "tag": "fetch_batch", "cids": cids });
 
     let has_errors = validator.iter_errors(&oversize).next().is_some();
@@ -2052,7 +2062,8 @@ fn epr_atom_wire_contract_rejects_missing_tag() {
     let validator =
         jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
-    let missing_tag = serde_json::json!({ "cid": "bafkreiabc" });
+    let missing_tag =
+        serde_json::json!({ "cid": "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu" });
 
     let has_errors = validator.iter_errors(&missing_tag).next().is_some();
     assert!(has_errors, "wire contract should require tag discriminator");
@@ -3525,53 +3536,65 @@ fn peer_transport_manifest_view_iroh_only() {
     validate_against_schema("views/peer-transport-manifest.schema.json", &json);
 }
 
-// ── PUT /blob/{hash} response — Cutover gate #3 ─────────────────────────────
+// ── PUT /blob/{cid} response — the byte profile it was stored under ─────────
 
+/// The view the PUT handler answers, built from a real manifest: an unstriped
+/// payload (erasure `none`, `stripes` empty) conforms.
 #[test]
-fn put_blob_response_view_matches_schema_with_blake3() {
-    use elohim_storage::PutBlobResponseView;
-
-    let sample = PutBlobResponseView {
-        blob_hash: format!("sha256-{}", "aa".repeat(32)),
-        total_size: 42,
-        mime_type: "application/octet-stream".to_string(),
-        encoding: "none".to_string(),
-        data_shards: 1,
-        total_shards: 1,
-        shard_size: 42,
-        shard_hashes: vec![format!("sha256-{}", "bb".repeat(32))],
-        reach: "commons".to_string(),
-        author_id: None,
-        created_at: "2026-05-10T00:00:00Z".to_string(),
-        verified_at: None,
-        blake3_hash: Some("a".repeat(64)),
-    };
-    let json = serde_json::to_value(&sample).unwrap();
+fn put_blob_response_view_matches_schema_unstriped() {
+    use elohim_storage::sharding::{ShardConfig, ShardEncoder};
+    let data = vec![0x5a_u8; 300_000];
+    let manifest = ShardEncoder::new(ShardConfig::default())
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .expect("manifest");
+    let view = elohim_storage::put_blob_response_view_from_manifest(manifest.clone());
+    assert_eq!(
+        view.blob_cid,
+        elohim_epr::address::compute_bytes_cid(&data).to_string()
+    );
+    assert!(view.stripes.is_empty());
+    assert_eq!(view.profile.erasure.id, "none");
+    let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/put-blob-response.schema.json", &json);
 }
 
+/// An erasure-coded payload (RS stripes with data + parity shards) conforms.
 #[test]
-fn put_blob_response_view_matches_schema_libp2p_only() {
-    use elohim_storage::PutBlobResponseView;
-
-    // libp2p-only deployment: blake3_hash is None → serialises as null
-    let sample = PutBlobResponseView {
-        blob_hash: format!("sha256-{}", "cc".repeat(32)),
-        total_size: 1024,
-        mime_type: "application/zip".to_string(),
-        encoding: "none".to_string(),
-        data_shards: 1,
-        total_shards: 1,
-        shard_size: 1024,
-        shard_hashes: vec![format!("sha256-{}", "dd".repeat(32))],
-        reach: "commons".to_string(),
-        author_id: Some("did:elohim:test".to_string()),
-        created_at: "2026-05-10T01:00:00Z".to_string(),
-        verified_at: Some("2026-05-10T01:00:01Z".to_string()),
-        blake3_hash: None,
-    };
-    let json = serde_json::to_value(&sample).unwrap();
+fn put_blob_response_view_matches_schema_striped() {
+    use elohim_storage::sharding::{ShardConfig, ShardEncoder};
+    let data: Vec<u8> = (0..70_000u32).flat_map(|n| n.to_le_bytes()).collect();
+    let manifest = ShardEncoder::new(ShardConfig {
+        rs_threshold: 0,
+        rs_data_shards: 4,
+        rs_parity_shards: 3,
+    })
+    .create_manifest(&data, "application/zip", "commons")
+    .expect("striped manifest");
+    let view = elohim_storage::put_blob_response_view_from_manifest(manifest);
+    assert!(!view.stripes.is_empty());
+    assert_eq!(view.stripes[0].shards.len(), 7);
+    let json = serde_json::to_value(&view).unwrap();
     validate_against_schema("views/put-blob-response.schema.json", &json);
+}
+
+/// A sha2-256 raw CID (`bafkrei…`) is not a byte CID: the schema refuses it as
+/// `blobCid`.
+#[test]
+fn put_blob_response_schema_refuses_a_sha256_blob_cid() {
+    use elohim_storage::sharding::{ShardConfig, ShardEncoder};
+    let data = b"refused spelling".to_vec();
+    let manifest = ShardEncoder::new(ShardConfig::default())
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .expect("manifest");
+    let mut json = serde_json::to_value(elohim_storage::put_blob_response_view_from_manifest(
+        manifest,
+    ))
+    .unwrap();
+    json["blobCid"] =
+        serde_json::json!(elohim_epr::address::compute_raw_sha2_cid(&data).to_string());
+    let schema = load_schema("views/put-blob-response.schema.json");
+    let compiled = jsonschema::validator_for(&schema).expect("schema compiles");
+    assert!(!compiled.is_valid(&json));
 }
 
 // ── Unified AttestationView (Category A — DHT source of truth) ──────────────
@@ -3812,7 +3835,7 @@ fn resilience_hub_view_empty_hubs_matches_schema() {
     let _ = (HubKind::Computed, HubSummary::default()); // ensure types are in scope
 
     let view = ResilienceHubView {
-        content_id: "sha256-empty-test".to_string(),
+        content_id: "bafkr4iam4lcuemu5gpeuqpm7ljdgjupjlzjxjhehgsya4qcywobushlsim".to_string(),
         hubs: vec![],
     };
     let json = serde_json::to_value(&view).unwrap();
@@ -3824,7 +3847,7 @@ fn resilience_hub_view_computed_hub_matches_schema() {
     use elohim_storage::views::{HubKind, HubSummary, ResilienceHubView};
 
     let view = ResilienceHubView {
-        content_id: "sha256-computed-test".to_string(),
+        content_id: "bafkr4idlucf6ajufal2ymqnywbxav2vgsxa5sdlkqwljcezcxv3dgwtw7y".to_string(),
         hubs: vec![HubSummary {
             hub_id: "12D3KooWSinglePeer".to_string(),
             kind: HubKind::Computed,
@@ -3849,7 +3872,7 @@ fn resilience_hub_view_all_kinds_validate() {
         (HubKind::Computed, "12D3KooWPeerSingle"),
     ] {
         let view = ResilienceHubView {
-            content_id: "sha256-all-kinds-test".to_string(),
+            content_id: "bafkr4icuotvnude57ytt6iuw3sgugrpzgkuiz2jaz7rfd5za7727ugbwkm".to_string(),
             hubs: vec![HubSummary {
                 hub_id: hub_id.to_string(),
                 kind,
@@ -4013,7 +4036,8 @@ fn element_registry_view_matches_schema() {
     // Exercises:
     //  - minimal valid registry (one element, no view_deps)
     //  - tagName satisfies ^[a-z][a-z0-9]*-[a-z0-9-]+$ pattern
-    //  - cid satisfies ^sha256- pattern
+    //  - cid satisfies ^sha256- pattern (the element-registry schema still declares it;
+    //    reported to T5 as a crossing gap, not changed here)
     //  - version satisfies ^\d+\.\d+\.\d+ pattern
     let view = ElementRegistryView {
         epr_id: "elohim-core-elements".into(),
@@ -4096,8 +4120,7 @@ fn epr_projection_view_cached_mode_matches_schema() {
     //  - gateHints with one entry (including label = null)
     //  - redirectsFrom non-empty
     let view = EprProjectionView {
-        commitment_id: "sha256-abc01234def56789abc01234def56789abc01234def56789abc01234def56789"
-            .into(),
+        commitment_id: "bafkr4ifobjilethuhw26hacpz3ehbira73debzm2ef5jj6wre55thdjgzq".into(),
         epr_id: "bafyreib2vq7lamadEPRcid0123456789012345678901234567890123456".into(),
         doorway_id: "doorway:alpha-elohim-host".into(),
         url_path: "/lamad".into(),
@@ -4150,7 +4173,7 @@ fn epr_projection_view_with_route_claims_matches_schema() {
     };
 
     let view = EprProjectionView {
-        commitment_id: "sha256-claims0123".into(),
+        commitment_id: "bafkr4ihnlxtkpvbd5mc52nyy7mbes5ynhtffofp347jzl33ccct623w3bq".into(),
         epr_id: "lamad-spa".into(),
         doorway_id: "doorway:alpha-elohim-host".into(),
         url_path: "/lamad".into(),
@@ -4213,8 +4236,7 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
     //  - gate_hints with multiple relations
     //  - dead_end = true
     let view = EprProjectionView {
-        commitment_id: "sha256-feed0123feed0123feed0123feed0123feed0123feed0123feed0123feed0123"
-            .into(),
+        commitment_id: "bafkr4ibjuzk2cqhdtmrpb2mi3btdme5cdw2tx6lrstnk5ikk6xrallgfhm".into(),
         epr_id: "bafyreib2vq7elohimAppEPR012345678901234567890123456789012345".into(),
         doorway_id: "doorway:shem-elohim-host".into(),
         url_path: "/elohim-app".into(),
@@ -5042,7 +5064,7 @@ fn recognition_participation_intent_minimal_validates() {
     // Minimal valid intent — all required fields, no optional ones.
     let minimal = serde_json::json!({
         "entityType": "content",
-        "entityId": "sha256-abc123",
+        "entityId": "bafkr4iaagb6o22ule6gv4ou7o6ytruhj2iqjof6j2rnsax2cpjzvmxgf7m",
         "humanId": "uhCAkSomeAgentPubKey",
         "mechanismLevel": 1,
         "participationType": "reaction"
@@ -5939,7 +5961,7 @@ fn replicates_dwelling_minimal_steward_mutual_validates() {
             "dwelling_pct": 40,
             "collective_pct": 25,
             "free_pct": 15,
-            "effective_ratio_cid": "bafkrei-manifest-abc"
+            "effective_ratio_cid": "bafkr4ibjaczh4775bmxi3k7zkds6inrxodjcctycnd2bjktey7qxpwnyqu"
         }
     });
     validate_against_schema("commitments/replicates-dwelling.schema.json", &payload);
@@ -5964,7 +5986,7 @@ fn replicates_dwelling_collective_steward_validates() {
             "dwelling_pct": 40,
             "collective_pct": 25,
             "free_pct": 15,
-            "effective_ratio_cid": "bafkrei-manifest-abc"
+            "effective_ratio_cid": "bafkr4ibjaczh4775bmxi3k7zkds6inrxodjcctycnd2bjktey7qxpwnyqu"
         }
     });
     validate_against_schema("commitments/replicates-dwelling.schema.json", &payload);
@@ -5985,7 +6007,7 @@ fn replicates_dwelling_rejects_unknown_provider_role() {
         "rotation_ttl_days": 90,
         "ratio_attestation": {
             "commons_pct": 20, "dwelling_pct": 40, "collective_pct": 25, "free_pct": 15,
-            "effective_ratio_cid": "bafkrei-manifest-abc"
+            "effective_ratio_cid": "bafkr4ibjaczh4775bmxi3k7zkds6inrxodjcctycnd2bjktey7qxpwnyqu"
         }
     });
     let schema = load_schema("commitments/replicates-dwelling.schema.json");
@@ -6014,7 +6036,7 @@ fn peer_capacity_view_minimal_validates() {
         "pledges": {"dwellingBytes": 0, "collectiveBytes": 0, "commonsBytes": 0, "totalPledgedBytes": 0},
         "actuallyHeld": {"uniqueShardBytes": 0, "freeBytesRemaining": 100_000_000_000u64, "fragmentationEstimate": 0.0},
         "ratioCompliance": {
-            "effectiveRatios": {"commonsPct": 20, "dwellingPct": 40, "collectivePct": 25, "freePct": 15, "manifestCid": "bafkrei-x"},
+            "effectiveRatios": {"commonsPct": 20, "dwellingPct": 40, "collectivePct": 25, "freePct": 15, "manifestCid": "bafkr4ib247mal5tytjsaflfxblkas2ufuvv7nacov4s4asj2y2lvjdjqwu"},
             "currentRatios": {"commonsPct": 0, "dwellingPct": 0, "collectivePct": 0, "freePct": 100},
             "compliantWithDonut": false,
             "violations": []
@@ -6055,7 +6077,7 @@ fn distribution_summary_with_projection_tier_validates() {
 #[test]
 fn household_resilience_with_commitment_backed_replication_validates() {
     let payload = serde_json::json!({
-        "contentId": "bafkrei-content-x",
+        "contentId": "bafkr4igyijrtb66vqis7usxjlxvkc2oc3d2gfezp2xg5qquuhtllfg54ni",
         "householdsStewarding": 3,
         "householdsReciprocated": 2,
         "protectionStatus": "protected",
@@ -6534,7 +6556,7 @@ fn epr_head_view_matches_schema() {
     let full = EprHeadView {
         version: 1,
         id: "elohim-host-landing".to_string(),
-        content: "bafkreitest000000000000000000000000000000000000000000001".to_string(),
+        content: "bafkr4iflwrceqczvtslzwztw3akwuku3wys3pvsb6cj357i3iuxtqdmd6m".to_string(),
         lamad: EprLamadContext {
             title: "Elohim Host Landing".to_string(),
             content_type: "concept".to_string(),
@@ -6554,7 +6576,9 @@ fn epr_head_view_matches_schema() {
         relationships: vec![EprRelationship {
             rel_type: "TEACHES".to_string(),
             target: "related-concept".to_string(),
-            target_cid: Some("bafkreirelated00000000000000000000000000000000000000001".to_string()),
+            target_cid: Some(
+                "bafkr4ieex6svhikt6o4tcmdykvo3g22nwd6yajkplikpsnhjxru7ezs6di".to_string(),
+            ),
         }],
         author: Some("did:key:z6Mk".to_string()),
         updated: Some("2026-09-20T02:00:30Z".to_string()),
@@ -6583,7 +6607,7 @@ fn epr_head_view_matches_schema() {
     let minimal = EprHeadView {
         version: 1,
         id: "content-minimal".to_string(),
-        content: "bafkreiminimal00000000000000000000000000000000000000001".to_string(),
+        content: "bafkr4icojqyg43depgbioxszsa3gvhgcuhlcdu445d6ffaolzb2vmq2wte".to_string(),
         lamad: EprLamadContext {
             title: "Minimal".to_string(),
             content_type: "concept".to_string(),

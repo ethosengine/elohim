@@ -160,12 +160,15 @@ mod classification_accessor_tests {
     #[test]
     fn primary_classification_first_element_or_none() {
         assert_eq!(
-            commitment_with(Some(r#"["sha256-deadbeef","sha256-cafe"]"#)).primary_classification(),
-            Some("sha256-deadbeef".to_string())
+            commitment_with(Some(r#"["bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u","bafkr4ie3732vf6ye5qbx64uutjttdoawlpjxqx6edrmssxq2h2lsl3wil4"]"#)).primary_classification(),
+            Some("bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u".to_string())
         );
         assert_eq!(
-            commitment_with(Some("sha256-bare")).primary_classification(),
-            Some("sha256-bare".to_string())
+            commitment_with(Some(
+                "bafkr4idy54xwl2twncqeqwa3xlyysocfd4ykhs5syqmuqzsyrhakfobdri"
+            ))
+            .primary_classification(),
+            Some("bafkr4idy54xwl2twncqeqwa3xlyysocfd4ykhs5syqmuqzsyrhakfobdri".to_string())
         );
         assert_eq!(commitment_with(None).primary_classification(), None);
     }
@@ -2335,7 +2338,7 @@ mod provide_reach_tests {
             Some("[]"),
             Some("content:"),
             Some("capacity:storage"),
-            Some("sha256-deadbeef"),
+            Some("bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u"),
         ]
         .into_iter()
         .enumerate()

@@ -474,8 +474,7 @@ pub struct CreateContentInput {
     pub content_type: String,
     #[serde(default = "default_content_format")]
     pub content_format: String,
-    #[serde(default)]
-    pub blob_hash: Option<String>,
+    /// The payload's byte CID (`bafkr4i…`).
     #[serde(default)]
     pub blob_cid: Option<String>,
     #[serde(default)]
@@ -514,28 +513,28 @@ pub struct UpdateContentInput {
     /// If provided, replaces all existing tags (delete all + insert new).
     pub tags: Option<Vec<String>>,
     pub reach: Option<String>,
-    /// Content-addressed SHA256 (e.g. "sha256-…") of the bundle this row
-    /// projects. Written by Jenkinsfile:stageSpaBlob at deploy time. None
-    /// means "no change" — preserves existing blob_hash on the row.
-    pub blob_hash: Option<String>,
-    /// Content-addressed hash of the Angular SSR *server* bundle this row
-    /// projects (the browser bundle is `blob_hash`). Written by the Jenkins SSR
+    /// Byte CID (`bafkr4i…`) of the bundle this row projects. Written by
+    /// Jenkinsfile:stageSpaBlob at deploy time. None
+    /// means "no change" — preserves existing blob_cid on the row.
+    pub blob_cid: Option<String>,
+    /// Byte CID of the Angular SSR *server* bundle this row
+    /// projects (the browser bundle is `blob_cid`). Written by the Jenkins SSR
     /// PATCH at deploy time. None means "no change" — preserves the existing
-    /// `server_blob_hash` on the row (no-clobber, mirrors `blob_hash`).
-    pub server_blob_hash: Option<String>,
+    /// `server_blob_cid` on the row (no-clobber, mirrors `blob_cid`).
+    pub server_blob_cid: Option<String>,
     /// RFC-3339 timestamp marking DHT publication. The drain loop is the
     /// canonical writer (see `mark_published`); this PATCH-path field lets the
     /// genesis seeder stamp it directly so household/local stacks with no DHT
     /// peers still satisfy the `require_provenance` read gate. None means
     /// "no change" — preserves the existing value on the row.
     pub p2p_published_at: Option<String>,
-    /// RFC-3339 timestamp marking the "amber" tier — `blob_hash` populated by
+    /// RFC-3339 timestamp marking the "amber" tier — `blob_cid` populated by
     /// the deploy-time non-notarized producer (A3) or CRDT convergence, NOT by
     /// DHT notarization. `Some(_)` switches this update into the AMBER path,
-    /// which additionally applies no-clobber precedence to `blob_hash`: the
-    /// amber `blob_hash` is written ONLY if the existing row's `blob_hash` is
-    /// NULL/empty, so a later notarized (green) `blob_hash` is never overwritten
-    /// by amber. `None` = normal update path (no amber stamp, blob_hash
+    /// which additionally applies no-clobber precedence to `blob_cid`: the
+    /// amber `blob_cid` is written ONLY if the existing row's `blob_cid` is
+    /// NULL/empty, so a later notarized (green) `blob_cid` is never overwritten
+    /// by amber. `None` = normal update path (no amber stamp, blob_cid
     /// coalesces as usual). NEVER pair this with a `dht_anchor_hash` write —
     /// amber must not launder into notarized provenance (Content is not in
     /// `is_integrity_kind`, so this diesel-direct write authors no DHT entry and
@@ -815,7 +814,6 @@ pub fn create_content(
             description: input.description.as_deref(),
             content_type: &input.content_type,
             content_format: &input.content_format,
-            blob_hash: input.blob_hash.as_deref(),
             blob_cid: input.blob_cid.as_deref(),
             content_size_bytes: input.content_size_bytes,
             metadata_json: input.metadata_json.as_deref(),
@@ -824,7 +822,7 @@ pub fn create_content(
             content_body: input.content_body.as_deref(),
             dht_anchor_hash: input.dht_anchor_hash.as_deref(),
             // SSR server bundle hash is deploy-PATCH populated, never at create time.
-            server_blob_hash: None,
+            server_blob_cid: None,
         };
 
         diesel::insert_into(content::table)
@@ -893,7 +891,6 @@ pub fn bulk_create_content(
                 description: input.description.as_deref(),
                 content_type: &input.content_type,
                 content_format: &input.content_format,
-                blob_hash: input.blob_hash.as_deref(),
                 blob_cid: input.blob_cid.as_deref(),
                 content_size_bytes: input.content_size_bytes,
                 metadata_json: input.metadata_json.as_deref(),
@@ -902,7 +899,7 @@ pub fn bulk_create_content(
                 content_body: input.content_body.as_deref(),
                 dht_anchor_hash: input.dht_anchor_hash.as_deref(),
                 // SSR server bundle hash is deploy-PATCH populated, never at seed time.
-                server_blob_hash: None,
+                server_blob_cid: None,
             };
 
             match diesel::insert_into(content::table)
@@ -978,46 +975,46 @@ pub fn update_content(
         .metadata_json
         .as_deref()
         .or(existing.content.metadata_json.as_deref());
-    // blob_hash resolution. Normal path: coalesce (provided value wins, else
+    // blob_cid resolution. Normal path: coalesce (provided value wins, else
     // keep existing). AMBER path (`crdt_converged_at.is_some()`): GREEN is
-    // inviolable — an amber write never overwrites a notarized blob_hash
+    // inviolable — an amber write never overwrites a notarized blob_cid
     // (`dht_anchor_hash` present); only the reverse (green overwrites amber).
-    // Amber MAY replace a non-green blob_hash: re-stages and CRDT heals must
+    // Amber MAY replace a non-green blob_cid: re-stages and CRDT heals must
     // converge set→set, else a peer holding a stale hash re-asserts it (and
     // re-serves a possibly-dead blob) forever. (Earlier write-iff-empty
     // semantics made the very first heal permanent — 2026-07-02 review
     // MAJOR-1, stale-restarter case.)
     let existing_is_green = existing.content.dht_anchor_hash.is_some();
     let is_amber_write = input.crdt_converged_at.is_some();
-    // A NULL is not a notarized hash: a green row whose blob_hash is absent (a
+    // A NULL is not a notarized hash: a green row whose blob_cid is absent (a
     // half row — declared blob_cid, bytes never derived here) is FILLED by an
     // amber heal, never guarded. Measured 2026-08-29 (household mesh): 72 green
     // half rows on matthew re-"healed" every sync round without changing because
     // this guard kept the NULL; jessica's warm recovery plateaued on the same
     // shape. Guarding an absent value is empty-wins, the inverse of the rule.
-    let green_hash_present = existing_is_green && existing.content.blob_hash.is_some();
+    let green_hash_present = existing_is_green && existing.content.blob_cid.is_some();
     // A slug a release channel owns takes its pointer from that channel's
     // vehicle alone (`crate::release_channel`); any other update keeps the
     // row's pointer, whatever it carries. Same guard the head stamp applies.
     let bound_to_release_channel =
         crate::release_channel::binding_in_metadata(existing.content.metadata_json.as_deref());
-    if let (Some(channel), Some(_)) = (&bound_to_release_channel, &input.blob_hash) {
+    if let (Some(channel), Some(_)) = (&bound_to_release_channel, &input.blob_cid) {
         tracing::debug!(
             content_id = %id, channel = %channel,
             "update_content: the slug is bound to a release channel, which owns its serving \
-             pointer — the update's blob_hash is not applied"
+             pointer — the update's blob_cid is not applied"
         );
     }
-    let new_blob_hash = if bound_to_release_channel.is_some() {
-        existing.content.blob_hash.as_deref()
+    let new_blob_cid = if bound_to_release_channel.is_some() {
+        existing.content.blob_cid.as_deref()
     } else if is_amber_write && green_hash_present {
-        // Amber must not clobber a notarized (green) blob_hash.
-        existing.content.blob_hash.as_deref()
+        // Amber must not clobber a notarized (green) blob_cid.
+        existing.content.blob_cid.as_deref()
     } else {
         input
-            .blob_hash
+            .blob_cid
             .as_deref()
-            .or(existing.content.blob_hash.as_deref())
+            .or(existing.content.blob_cid.as_deref())
     };
     // crdt_converged_at: no-clobber preserve on the normal path; stamp on the
     // amber path. Never touches dht_anchor_hash (this UPDATE has no anchor set).
@@ -1025,12 +1022,12 @@ pub fn update_content(
         .crdt_converged_at
         .as_deref()
         .or(existing.content.crdt_converged_at.as_deref());
-    // No-clobber: a serverBlobHash-only PATCH falls back to the existing
-    // server_blob_hash; a blob_hash-only PATCH leaves server_blob_hash untouched.
-    let new_server_blob_hash = input
-        .server_blob_hash
+    // No-clobber: a serverBlobCid-only PATCH falls back to the existing
+    // server_blob_cid; a blob_cid-only PATCH leaves server_blob_cid untouched.
+    let new_server_blob_cid = input
+        .server_blob_cid
         .as_deref()
-        .or(existing.content.server_blob_hash.as_deref());
+        .or(existing.content.server_blob_cid.as_deref());
     let new_p2p_published_at = input
         .p2p_published_at
         .as_deref()
@@ -1052,8 +1049,8 @@ pub fn update_content(
             content::content_type.eq(new_content_type),
             content::metadata_json.eq(new_metadata_json),
             content::reach.eq(new_reach),
-            content::blob_hash.eq(new_blob_hash),
-            content::server_blob_hash.eq(new_server_blob_hash),
+            content::blob_cid.eq(new_blob_cid),
+            content::server_blob_cid.eq(new_server_blob_cid),
             content::p2p_published_at.eq(new_p2p_published_at),
             content::crdt_converged_at.eq(new_crdt_converged_at),
             content::updated_at.eq(&now),
@@ -1367,7 +1364,7 @@ fn project_authored_edges(
 pub(crate) fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
     serde_json::from_str::<serde_json::Value>(metadata)
         .ok()?
-        .get("serverBlobHash")?
+        .get("serverBlobCid")?
         .as_str()
         .filter(|hash| !hash.is_empty())
         .map(str::to_owned)
@@ -1375,9 +1372,7 @@ pub(crate) fn server_bundle_from_metadata(metadata: &str) -> Option<String> {
 
 /// Apply the present fields of a `ContentProjectionPatch` to an EXISTING content
 /// row via targeted per-field UPDATEs (`None` fields preserve the existing
-/// column). Mirrors `blob_cid` into the legacy `blob_hash` column so downstream
-/// readers keyed on `blob_hash` (SSR fetch shim, list/get views) see the new
-/// content address (same SHA256 per the Phase 0 refactor).
+/// column). `blob_cid` is the row's one serving pointer (the byte CID).
 ///
 /// Shared by [`upsert_with_anchor`] and [`stamp_declared_head`] so the per-field
 /// projection semantics stay byte-identical between the two write paths — and,
@@ -1396,7 +1391,7 @@ pub(crate) fn apply_content_patch_fields(
                 .filter(content::h_app_id.eq(&ctx.h_app_id))
                 .filter(content::id.eq(id)),
         )
-        .set((content::blob_cid.eq(v), content::blob_hash.eq(v)))
+        .set(content::blob_cid.eq(v))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update blob_cid failed: {}", e)))?;
     }
@@ -1438,7 +1433,7 @@ pub(crate) fn apply_content_patch_fields(
         )
         .set((
             content::metadata_json.eq(v),
-            content::server_blob_hash.eq(server_bundle_from_metadata(v)),
+            content::server_blob_cid.eq(server_bundle_from_metadata(v)),
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
@@ -1531,9 +1526,7 @@ pub enum HeadElection {
 ///
 /// Behaviour:
 /// - If the row exists: UPDATE the columns present in `patch` (None →
-///   preserve existing) AND set `dht_anchor_hash`. Also mirrors `blob_cid`
-///   to the legacy `blob_hash` column so downstream readers that still
-///   key on `blob_hash` (e.g. SSR fetch shim) see the new content address.
+///   preserve existing) AND set `dht_anchor_hash`.
 /// - If the row does not exist: INSERT the minimum row using whatever the
 ///   patch provides, defaulting required-non-null columns. The substrate
 ///   should normally hit the "update existing" branch since seeded content
@@ -1690,7 +1683,7 @@ fn upsert_with_anchor_transaction(
         let content_type = patch.content_type.as_deref().unwrap_or(&default_ct);
         let content_format = patch.content_format.as_deref().unwrap_or(&default_cf);
         let reach = patch.reach.as_deref().unwrap_or(&default_re);
-        let server_blob_hash = patch
+        let server_blob_cid = patch
             .metadata_json
             .as_deref()
             .and_then(server_bundle_from_metadata);
@@ -1701,7 +1694,6 @@ fn upsert_with_anchor_transaction(
             description: patch.description.as_deref(),
             content_type,
             content_format,
-            blob_hash: patch.blob_cid.as_deref(),
             blob_cid: patch.blob_cid.as_deref(),
             content_size_bytes: patch.content_size_bytes,
             metadata_json: patch.metadata_json.as_deref(),
@@ -1709,7 +1701,7 @@ fn upsert_with_anchor_transaction(
             created_by: None,
             content_body: patch.content_body.as_ref().and_then(|b| b.as_deref()),
             dht_anchor_hash: None,
-            server_blob_hash: server_blob_hash.as_deref(),
+            server_blob_cid: server_blob_cid.as_deref(),
         };
 
         diesel::insert_into(content::table)
@@ -1838,7 +1830,7 @@ pub fn declared_head_for(
     Ok(found.flatten().filter(|h| !h.trim().is_empty()))
 }
 
-/// Read the content row's CURRENT blob pointer (`blob_hash`), if the row exists.
+/// Read the content row's CURRENT blob pointer (`blob_cid`), if the row exists.
 ///
 /// The T7 pointer-heal's one read (`head_adoption::pointer_heal_patch`). Kept as
 /// a targeted single-column SELECT rather than a `get_content` because the heal
@@ -1849,7 +1841,7 @@ pub fn declared_head_for(
 /// `Ok(None)` covers BOTH "no such row" and "row exists with a NULL/empty
 /// pointer". The caller treats them identically: neither can be the value the
 /// heal is trying to converge FROM, and a heal is existing-row-only anyway.
-pub fn blob_hash_for(
+pub fn blob_cid_for(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     id: &str,
@@ -1857,7 +1849,7 @@ pub fn blob_hash_for(
     let found: Option<Option<String>> = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(id))
-        .select(content::blob_hash)
+        .select(content::blob_cid)
         .first::<Option<String>>(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("blob hash lookup failed: {e}")))?;
@@ -1982,7 +1974,7 @@ pub fn declared_heads_for(
 ///   to `head_action_hash`. A verified stamp is a green write — it advances the
 ///   notary anchor, so green-overwrites-amber precedence holds for the value fields
 ///   supplied in `patch` (same per-field semantics as [`upsert_with_anchor`], via
-///   the shared [`apply_content_patch_fields`] — `blob_cid` mirrors to `blob_hash`).
+///   the shared [`apply_content_patch_fields`]).
 /// - Bumps `updated_at`.
 /// - Idempotent: re-stamping the same head with a no-change patch is a cheap
 ///   UPDATE that still returns `Ok(true)` (no no-op detection needed).
@@ -2679,7 +2671,7 @@ fn stamp_declared_head_mode_transaction(
             content::canonical_earned,
             content::canonical_link_hash,
             content::reach,
-            content::blob_hash,
+            content::blob_cid,
             content::metadata_json,
         ))
         .first(conn)
@@ -2693,7 +2685,7 @@ fn stamp_declared_head_mode_transaction(
         stored_canonical_earned,
         stored_canonical_link,
         stored_reach,
-        stored_blob_hash,
+        stored_blob_cid,
         stored_metadata_json,
     ) = match existing {
         None => return Ok((StampOutcome::NoRow, false, false)),
@@ -2940,7 +2932,7 @@ fn stamp_declared_head_mode_transaction(
                 .and_then(|body| body.as_deref())
                 .is_some_and(|body| !body.is_empty());
         let would_keep_old_blob = p.blob_cid.is_none()
-            && stored_blob_hash
+            && stored_blob_cid
                 .as_deref()
                 .is_some_and(|cid| !cid.trim().is_empty());
         carries_own_bytes
@@ -3121,8 +3113,8 @@ pub fn content_ids_present(
 /// SQLite's bound-variable limit (32766 on current builds, 999 on old ones).
 const PRESENCE_CHUNK: usize = 500;
 
-/// Ids of HALF rows — a declared blob (`blob_cid`) with no locally derived
-/// `blob_hash` — in id order after `after`, at most `limit`. The level-triggered
+/// Ids of HALF rows — a row naming no `blob_cid` (its doc may already carry one a
+/// peer converged) — in id order after `after`, at most `limit`. The level-triggered
 /// heal sweep (`sync::projector::heal_half_rows_from_docs`) pages through these
 /// with a keyset cursor so a corpus-sized set is visited round-robin, a bounded
 /// slice per tick, and the tail is never starved by the head.
@@ -3136,8 +3128,7 @@ pub fn list_half_blob_row_ids(
 ) -> QueryResult<Vec<String>> {
     let mut q = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::blob_cid.is_not_null())
-        .filter(content::blob_hash.is_null())
+        .filter(content::blob_cid.is_null())
         .into_boxed();
     if let Some(after) = after {
         q = q.filter(content::id.gt(after));
@@ -4093,9 +4084,8 @@ mod tests {
                 content_type TEXT NOT NULL DEFAULT 'concept',
                 content_format TEXT NOT NULL DEFAULT 'markdown',
                 content_body TEXT,
-                blob_hash TEXT,
-                server_blob_hash TEXT,
                 blob_cid TEXT,
+                server_blob_cid TEXT,
                 content_size_bytes INTEGER,
                 metadata_json TEXT,
                 reach TEXT NOT NULL DEFAULT 'public',
@@ -4164,7 +4154,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4183,7 +4172,6 @@ mod tests {
             description: None,
             content_type: "resource".to_string(),
             content_format: "json".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4240,7 +4228,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4299,7 +4286,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4351,7 +4337,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4420,7 +4405,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4552,7 +4536,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4598,7 +4581,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4639,7 +4621,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4692,7 +4673,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4754,7 +4734,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4802,7 +4781,6 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
@@ -4818,7 +4796,6 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
@@ -4841,7 +4818,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4869,7 +4845,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4942,7 +4917,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -4990,7 +4964,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5035,7 +5008,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5083,7 +5055,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5131,7 +5102,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5176,7 +5146,6 @@ mod tests {
                     description: None,
                     content_type: "concept".into(),
                     content_format: "markdown".into(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -5213,7 +5182,6 @@ mod tests {
                 description: None,
                 content_type: "concept".into(),
                 content_format: "markdown".into(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
@@ -5282,7 +5250,6 @@ mod tests {
                     description: None,
                     content_type: "concept".into(),
                     content_format: "markdown".into(),
-                    blob_hash: None,
                     blob_cid: None,
                     content_size_bytes: None,
                     metadata_json: None,
@@ -5318,8 +5285,8 @@ mod tests {
             metadata_json: None,
             tags: None,
             reach: None,
-            blob_hash: None,
-            server_blob_hash: None,
+            blob_cid: None,
+            server_blob_cid: None,
             p2p_published_at: None,
             crdt_converged_at: None,
         };
@@ -5343,7 +5310,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5383,22 +5349,21 @@ mod tests {
         );
     }
 
-    /// PATCH semantics: setting only blob_hash leaves other fields untouched.
+    /// PATCH semantics: setting only blob_cid leaves other fields untouched.
     /// This is the deploy-time stageSpaBlob path — see
     /// genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
     #[test]
-    fn test_update_content_blob_hash_only_preserves_other_fields() {
+    fn test_update_content_blob_cid_only_preserves_other_fields() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
 
-        // Seed a row with a known title + blob_hash="".
+        // Seed a row with a known title + blob_cid="".
         let create = CreateContentInput {
             id: "patch-bh-test".to_string(),
             title: "Original Title".to_string(),
             description: Some("Original Description".to_string()),
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: Some("".to_string()),
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5410,15 +5375,20 @@ mod tests {
         };
         bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
 
-        // PATCH only blob_hash.
+        // PATCH only blob_cid.
         let update = UpdateContentInput {
             id: "patch-bh-test".to_string(),
-            blob_hash: Some("sha256-deadbeef".to_string()),
+            blob_cid: Some(
+                "bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u".to_string(),
+            ),
             ..Default::default()
         };
         let result = update_content(&mut conn, &ctx, update).unwrap();
 
-        assert_eq!(result.content.blob_hash.as_deref(), Some("sha256-deadbeef"));
+        assert_eq!(
+            result.content.blob_cid.as_deref(),
+            Some("bafkr4igzdylhmq4rythogpcv6upov3znvbufxh6dbjd3rh5cb6iyqvli4u")
+        );
         // Other fields unchanged.
         assert_eq!(result.content.title, "Original Title");
         assert_eq!(
@@ -5427,26 +5397,27 @@ mod tests {
         );
     }
 
-    /// PATCH semantics (SSR row collapse T2): setting only `server_blob_hash`
+    /// PATCH semantics (SSR row collapse T2): setting only `server_blob_cid`
     /// persists it, returns it on the subsequent read, and does NOT clobber
-    /// `blob_hash` or other fields — and vice-versa, a later `blob_hash`-only
-    /// PATCH retains the previously-set `server_blob_hash`. This is the deploy-time
-    /// SSR PATCH path (browser bundle → blob_hash, server bundle → server_blob_hash,
+    /// `blob_cid` or other fields — and vice-versa, a later `blob_cid`-only
+    /// PATCH retains the previously-set `server_blob_cid`. This is the deploy-time
+    /// SSR PATCH path (browser bundle → blob_cid, server bundle → server_blob_cid,
     /// patched independently per host).
     #[test]
-    fn test_update_content_server_blob_hash_only_preserves_and_no_clobber() {
+    fn test_update_content_server_blob_cid_only_preserves_and_no_clobber() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
 
-        // Seed the one landing row with a browser blob_hash already set; no SSR yet.
+        // Seed the one landing row with a browser blob_cid already set; no SSR yet.
         let create = CreateContentInput {
             id: "elohim-host-landing".to_string(),
             title: "Landing".to_string(),
             description: Some("Landing desc".to_string()),
             content_type: "concept".to_string(),
             content_format: "spa-bundle".to_string(),
-            blob_hash: Some("sha256-browser".to_string()),
-            blob_cid: None,
+            blob_cid: Some(
+                "bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi".to_string(),
+            ),
             content_size_bytes: None,
             metadata_json: None,
             reach: "commons".to_string(),
@@ -5456,58 +5427,62 @@ mod tests {
             tags: vec![],
         };
         bulk_create_content(&mut conn, &ctx, vec![create]).unwrap();
-        // Pre-state: server_blob_hash absent (the normal pre-deploy state).
+        // Pre-state: server_blob_cid absent (the normal pre-deploy state).
         let pre =
             get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", MinTrust::Invisible)
                 .unwrap()
                 .unwrap();
-        assert_eq!(pre.content.server_blob_hash, None);
+        assert_eq!(pre.content.server_blob_cid, None);
 
-        // PATCH only server_blob_hash — must persist it and leave blob_hash/title alone.
+        // PATCH only server_blob_cid — must persist it and leave blob_cid/title alone.
         let update = UpdateContentInput {
             id: "elohim-host-landing".to_string(),
-            server_blob_hash: Some("sha256-ssrserver".to_string()),
+            server_blob_cid: Some(
+                "bafkr4icc4kmp2xgro7kh2l4p4eav2r6jiz5nhwgz4raph3dkcmq2b5buem".to_string(),
+            ),
             ..Default::default()
         };
         let result = update_content(&mut conn, &ctx, update).unwrap();
         assert_eq!(
-            result.content.server_blob_hash.as_deref(),
-            Some("sha256-ssrserver"),
-            "serverBlobHash-only PATCH persists serverBlobHash"
+            result.content.server_blob_cid.as_deref(),
+            Some("bafkr4icc4kmp2xgro7kh2l4p4eav2r6jiz5nhwgz4raph3dkcmq2b5buem"),
+            "serverBlobCid-only PATCH persists serverBlobCid"
         );
         assert_eq!(
-            result.content.blob_hash.as_deref(),
-            Some("sha256-browser"),
-            "serverBlobHash-only PATCH must NOT clobber blob_hash"
+            result.content.blob_cid.as_deref(),
+            Some("bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi"),
+            "serverBlobCid-only PATCH must NOT clobber blob_cid"
         );
         assert_eq!(result.content.title, "Landing");
 
-        // GET-equivalent re-read returns serverBlobHash (round-trip).
+        // GET-equivalent re-read returns serverBlobCid (round-trip).
         let got =
             get_content_with_tags(&mut conn, &ctx, "elohim-host-landing", MinTrust::Invisible)
                 .unwrap()
                 .unwrap();
         assert_eq!(
-            got.content.server_blob_hash.as_deref(),
-            Some("sha256-ssrserver")
+            got.content.server_blob_cid.as_deref(),
+            Some("bafkr4icc4kmp2xgro7kh2l4p4eav2r6jiz5nhwgz4raph3dkcmq2b5buem")
         );
 
-        // Now PATCH only blob_hash — must update blob_hash AND retain serverBlobHash.
+        // Now PATCH only blob_cid — must update blob_cid AND retain serverBlobCid.
         let update2 = UpdateContentInput {
             id: "elohim-host-landing".to_string(),
-            blob_hash: Some("sha256-browser-v2".to_string()),
+            blob_cid: Some(
+                "bafkr4id2xjdxrq4dkfu3cicwchbvdz4rvvwp6qkydx2bein522s4e7lpfe".to_string(),
+            ),
             ..Default::default()
         };
         let result2 = update_content(&mut conn, &ctx, update2).unwrap();
         assert_eq!(
-            result2.content.blob_hash.as_deref(),
-            Some("sha256-browser-v2"),
-            "blob_hash-only PATCH updates blob_hash"
+            result2.content.blob_cid.as_deref(),
+            Some("bafkr4id2xjdxrq4dkfu3cicwchbvdz4rvvwp6qkydx2bein522s4e7lpfe"),
+            "blob_cid-only PATCH updates blob_cid"
         );
         assert_eq!(
-            result2.content.server_blob_hash.as_deref(),
-            Some("sha256-ssrserver"),
-            "blob_hash-only PATCH must retain the previously-set serverBlobHash (no clobber)"
+            result2.content.server_blob_cid.as_deref(),
+            Some("bafkr4icc4kmp2xgro7kh2l4p4eav2r6jiz5nhwgz4raph3dkcmq2b5buem"),
+            "blob_cid-only PATCH must retain the previously-set serverBlobCid (no clobber)"
         );
     }
 
@@ -5528,7 +5503,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5598,7 +5572,7 @@ mod tests {
         );
     }
 
-    /// Build a bare SPA-bundle content row (no blob_hash, no provenance) — the
+    /// Build a bare SPA-bundle content row (no blob_cid, no provenance) — the
     /// exact pre-deploy state that 404s on the live host today.
     fn mk_bundle(id: &str) -> CreateContentInput {
         CreateContentInput {
@@ -5607,7 +5581,6 @@ mod tests {
             description: None,
             content_type: "app".to_string(),
             content_format: "spa-bundle".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5619,8 +5592,8 @@ mod tests {
         }
     }
 
-    /// The app-bundle slug query `lookup_slug_blob_hash` runs (content_format in
-    /// the app-bundle set, MinTrust::Amber). Returns the resolved blob_hash for
+    /// The app-bundle slug query `lookup_slug_blob_cid` runs (content_format in
+    /// the app-bundle set, MinTrust::Amber). Returns the resolved blob_cid for
     /// `id`, or None if the row is below the Amber floor / has no hash.
     fn slug_lookup_amber(
         conn: &mut SqliteConnection,
@@ -5636,12 +5609,12 @@ mod tests {
             .unwrap()
             .into_iter()
             .find(|c| c.content.id == id)
-            .and_then(|c| c.content.blob_hash.filter(|h| !h.is_empty()))
+            .and_then(|c| c.content.blob_cid.filter(|h| !h.is_empty()))
     }
 
-    /// Amber serving floor: a row at the amber tier (blob_hash + crdt_converged_at
+    /// Amber serving floor: a row at the amber tier (blob_cid + crdt_converged_at
     /// stamped, NEVER dht_anchor_hash) resolves through the SAME query
-    /// `lookup_slug_blob_hash` runs (MinTrust::Amber) — so the SPA mount serves
+    /// `lookup_slug_blob_cid` runs (MinTrust::Amber) — so the SPA mount serves
     /// 200 during the convergence window. Amber rows now arise ONLY from the
     /// DocStore reverse-projection drift-heal (`reverse_project_content_doc`),
     /// never from a deploy write (the per-host `deployTier=amber` write was
@@ -5664,21 +5637,26 @@ mod tests {
         );
 
         // An amber-tier write at the db layer — what the drift-heal
-        // (reverse_project_content_doc) emits: set blob_hash + stamp
+        // (reverse_project_content_doc) emits: set blob_cid + stamp
         // crdt_converged_at, never dht_anchor_hash.
         let amber = UpdateContentInput {
             id: id.to_string(),
-            blob_hash: Some("sha256-amberbundle".to_string()),
+            blob_cid: Some(
+                "bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi".to_string(),
+            ),
             crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
             ..Default::default()
         };
         update_content(&mut conn, &ctx, amber).unwrap();
 
-        // Row state: blob_hash + crdt_converged_at set, dht_anchor_hash STILL NULL.
+        // Row state: blob_cid + crdt_converged_at set, dht_anchor_hash STILL NULL.
         let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
             .unwrap()
             .unwrap();
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-amberbundle"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi")
+        );
         assert!(row.crdt_converged_at.is_some(), "amber tier stamped");
         assert!(
             row.dht_anchor_hash.is_none(),
@@ -5688,7 +5666,7 @@ mod tests {
         // GREEN: the amber row now resolves at the slug lookup → mount serves 200.
         assert_eq!(
             slug_lookup_amber(&mut conn, &ctx, id),
-            Some("sha256-amberbundle".to_string()),
+            Some("bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi".to_string()),
             "amber row resolves at the Amber-floor slug lookup → SPA mount serves 200"
         );
 
@@ -5710,25 +5688,28 @@ mod tests {
         );
     }
 
-    /// A3 precedence guard: once a row carries a notarized (green) blob_hash, a
+    /// A3 precedence guard: once a row carries a notarized (green) blob_cid, a
     /// later amber write must NOT overwrite it — green wins, amber never the
     /// reverse. The crdt marker may still be stamped (harmless), and the existing
     /// dht_anchor_hash is preserved.
     #[test]
-    fn amber_write_never_clobbers_notarized_blob_hash() {
+    fn amber_write_never_clobbers_notarized_blob_cid() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let id = "epr:pinned-landing";
 
         let mut green = mk_bundle(id);
-        green.blob_hash = Some("sha256-greenbundle".to_string());
+        green.blob_cid =
+            Some("bafkr4ih3i5nbafgdpoxkcviahqln4ymai6rqz2d2c67frci5fhcy7jrzhy".to_string());
         green.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
         create_content(&mut conn, &ctx, green).unwrap();
 
-        // Amber write tries to set a DIFFERENT blob_hash.
+        // Amber write tries to set a DIFFERENT blob_cid.
         let amber = UpdateContentInput {
             id: id.to_string(),
-            blob_hash: Some("sha256-amberbundle".to_string()),
+            blob_cid: Some(
+                "bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi".to_string(),
+            ),
             crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
             ..Default::default()
         };
@@ -5738,9 +5719,9 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-greenbundle"),
-            "amber must NOT clobber a present (notarized) blob_hash"
+            row.blob_cid.as_deref(),
+            Some("bafkr4ih3i5nbafgdpoxkcviahqln4ymai6rqz2d2c67frci5fhcy7jrzhy"),
+            "amber must NOT clobber a present (notarized) blob_cid"
         );
         assert_eq!(
             row.dht_anchor_hash.as_deref(),
@@ -5749,32 +5730,35 @@ mod tests {
         );
     }
 
-    /// The inverse guard: a GREEN row with NO blob_hash (a half row) is filled
+    /// The inverse guard: a GREEN row with NO blob_cid (a half row) is filled
     /// by an amber heal — a NULL is not a notarized hash, and keeping it is
     /// how 72 green half rows on a peer re-"healed" every round for nothing.
     #[test]
-    fn amber_write_fills_a_null_blob_hash_on_a_green_row() {
+    fn amber_write_fills_a_null_blob_cid_on_a_green_row() {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let id = "epr:green-half";
 
         let mut green_half = mk_bundle(id);
-        green_half.blob_hash = None;
-        green_half.blob_cid = Some("bafkrei-declared".to_string());
+        green_half.blob_cid = None;
+        green_half.blob_cid =
+            Some("bafkr4if364nvypcbneu7np4n7llwde4zzdyccptkkstxtq4pahmzsyusf4".to_string());
         green_half.dht_anchor_hash = Some("bafy-notarized-anchor".to_string());
         create_content(&mut conn, &ctx, green_half).unwrap();
 
         let amber = UpdateContentInput {
             id: id.to_string(),
-            blob_hash: Some("bafkrei-declared".to_string()),
+            blob_cid: Some(
+                "bafkr4if364nvypcbneu7np4n7llwde4zzdyccptkkstxtq4pahmzsyusf4".to_string(),
+            ),
             crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
             ..Default::default()
         };
         let updated = update_content(&mut conn, &ctx, amber).unwrap();
         assert_eq!(
-            updated.content.blob_hash.as_deref(),
-            Some("bafkrei-declared"),
-            "an amber heal FILLS an absent blob_hash on a green row"
+            updated.content.blob_cid.as_deref(),
+            Some("bafkr4if364nvypcbneu7np4n7llwde4zzdyccptkkstxtq4pahmzsyusf4"),
+            "an amber heal FILLS an absent blob_cid on a green row"
         );
         assert_eq!(
             updated.content.dht_anchor_hash.as_deref(),
@@ -5791,7 +5775,6 @@ mod tests {
             description: None,
             content_type: "concept".to_string(),
             content_format: "markdown".to_string(),
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -5815,8 +5798,8 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let mut bound = mk_plain("lamad-spa");
-        bound.blob_hash = Some("sha256-released-by-the-vehicle".to_string());
-        bound.blob_cid = Some("sha256-released-by-the-vehicle".to_string());
+        bound.blob_cid =
+            Some("bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu".to_string());
         bound.content_size_bytes = Some(3_097_083);
         bound.metadata_json =
             Some(r#"{"releaseChannel":"runtime:app-bundle:alpha:dev"}"#.to_string());
@@ -5842,7 +5825,9 @@ mod tests {
             "uhCkk-legacy-head",
             None,
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-named-by-the-legacy-head".to_string()),
+                blob_cid: Some(
+                    "bafkr4ierhab76jbvimllc53lxeh3qikvv34tbgpwg4azc6avqiiqtfnvc4".to_string(),
+                ),
                 content_size_bytes: Some(42),
                 ..Default::default()
             }),
@@ -5856,13 +5841,15 @@ mod tests {
             "the head itself is still recorded"
         );
 
-        // The converged-doc heal: a blob_hash a peer served before it took the release up.
+        // The converged-doc heal: a blob_cid a peer served before it took the release up.
         update_content(
             &mut conn,
             &ctx,
             UpdateContentInput {
                 id: "lamad-spa".to_string(),
-                blob_hash: Some("sha256-what-a-peer-served-before".to_string()),
+                blob_cid: Some(
+                    "bafkr4ieyxgutnbkk5cxfnrsac6ezdoc6gkmt3ru2dzikyaravzcs6egqim".to_string(),
+                ),
                 crdt_converged_at: Some("2026-10-07T21:08:41Z".to_string()),
                 ..Default::default()
             },
@@ -5873,12 +5860,12 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-released-by-the-vehicle")
+            row.blob_cid.as_deref(),
+            Some("bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu")
         );
         assert_eq!(
             row.blob_cid.as_deref(),
-            Some("sha256-released-by-the-vehicle")
+            Some("bafkr4igqvctnxf4w7s6fhhqqsgqwppqkrfhysnqm5c5kokkayq5g6yhweu")
         );
         assert_eq!(row.content_size_bytes, Some(3_097_083));
         assert_eq!(
@@ -5892,7 +5879,9 @@ mod tests {
             &ctx,
             "lamad-spa",
             &ContentProjectionPatch {
-                blob_cid: Some("sha256-the-next-release".to_string()),
+                blob_cid: Some(
+                    "bafkr4ibqihh6itogjs4fibq5ajs2gr3pvfofsuq44vhc45urzo3r5wluxq".to_string(),
+                ),
                 content_size_bytes: Some(7),
                 ..Default::default()
             },
@@ -5901,7 +5890,10 @@ mod tests {
         let row = get_content(&mut conn, &ctx, "lamad-spa", MinTrust::Invisible)
             .unwrap()
             .unwrap();
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-the-next-release"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ibqihh6itogjs4fibq5ajs2gr3pvfofsuq44vhc45urzo3r5wluxq")
+        );
 
         // An unbound row keeps the ordinary semantics: the heal lands.
         create_content(&mut conn, &ctx, mk_plain("plain")).unwrap();
@@ -5923,7 +5915,9 @@ mod tests {
             "uhCkk-P",
             None,
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-healed".to_string()),
+                blob_cid: Some(
+                    "bafkr4iallkqy464rfgndv6mytxk25w6pewk5drke4kecszersh7kdzjqpm".to_string(),
+                ),
                 content_size_bytes: Some(9),
                 ..Default::default()
             }),
@@ -5934,7 +5928,10 @@ mod tests {
         let row = get_content(&mut conn, &ctx, "plain", MinTrust::Invisible)
             .unwrap()
             .unwrap();
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-healed"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4iallkqy464rfgndv6mytxk25w6pewk5drke4kecszersh7kdzjqpm")
+        );
     }
 
     /// HEAD-election (i), `Declare` mode: unchanged behavior — the committed
@@ -5954,8 +5951,8 @@ mod tests {
                 &ctx,
                 id,
                 ContentProjectionPatch {
-                    blob_cid: Some("sha256-browser".into()),
-                    metadata_json: Some(r#"{"serverBlobHash":"sha256-server","keep":1}"#.into()),
+                    blob_cid: Some("bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi".into()),
+                    metadata_json: Some(r#"{"serverBlobCid":"bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m","keep":1}"#.into()),
                     ..Default::default()
                 },
                 "uhCkk-canonical",
@@ -5965,8 +5962,14 @@ mod tests {
             let row = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
                 .unwrap()
                 .unwrap();
-            assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser"));
-            assert_eq!(row.server_blob_hash.as_deref(), Some("sha256-server"));
+            assert_eq!(
+                row.blob_cid.as_deref(),
+                Some("bafkr4ibmdgpenv3fqaejon6uhzwxkret72mezrxhn356k7eogjqjzaaimi")
+            );
+            assert_eq!(
+                row.server_blob_cid.as_deref(),
+                Some("bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m")
+            );
             upsert_with_anchor(
                 &mut conn,
                 &ctx,
@@ -5983,7 +5986,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(
-                row.server_blob_hash, None,
+                row.server_blob_cid, None,
                 "canonical removal clears obsolete server code"
             );
         }
@@ -6097,7 +6100,7 @@ mod tests {
         let ctx = AppContext::new("lamad");
         let patch = |browser: &str, server: &str| ContentProjectionPatch {
             blob_cid: Some(browser.into()),
-            metadata_json: Some(format!(r#"{{"serverBlobHash":"{server}"}}"#)),
+            metadata_json: Some(format!(r#"{{"serverBlobCid":"{server}"}}"#)),
             ..Default::default()
         };
         upsert_with_anchor(
@@ -6122,8 +6125,8 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.declared_head_action_hash.as_deref(), Some("head-new"));
-        assert_eq!(row.blob_hash.as_deref(), Some("browser-new"));
-        assert_eq!(row.server_blob_hash.as_deref(), Some("server-new"));
+        assert_eq!(row.blob_cid.as_deref(), Some("browser-new"));
+        assert_eq!(row.server_blob_cid.as_deref(), Some("server-new"));
         assert!(row.metadata_json.unwrap().contains("server-new"));
 
         // Re-delivery of the elected snapshot may repair its projection.
@@ -6149,8 +6152,8 @@ mod tests {
         let fresh = get_content(&mut conn, &ctx, "fresh", MinTrust::Invisible)
             .unwrap()
             .unwrap();
-        assert_eq!(fresh.server_blob_hash.as_deref(), Some("server-first"));
-        assert_eq!(fresh.blob_hash.as_deref(), Some("browser-first"));
+        assert_eq!(fresh.server_blob_cid.as_deref(), Some("server-first"));
+        assert_eq!(fresh.blob_cid.as_deref(), Some("browser-first"));
         assert!(fresh.declared_head_action_hash.is_none());
     }
 
@@ -6254,12 +6257,19 @@ mod tests {
         );
 
         assert_eq!(
-            body_from_verified_entry("", Some("bafkreiblob")),
+            body_from_verified_entry(
+                "",
+                Some("bafkr4ibd7avcsuzi4eliah6f5o43qtb4de6tvdzmgfp7i6x3autnahy7sq")
+            ),
             Some(None)
         );
         assert_eq!(body_from_verified_entry("", Some("  ")), None);
         assert_eq!(
-            stamp_body(&mut conn, "", Some("bafkreiblob")),
+            stamp_body(
+                &mut conn,
+                "",
+                Some("bafkr4ibd7avcsuzi4eliah6f5o43qtb4de6tvdzmgfp7i6x3autnahy7sq")
+            ),
             None,
             "a version whose bytes live behind a blob clears the stale inline body"
         );
@@ -7174,7 +7184,7 @@ mod tests {
             "uhCkk-new",
             Some(2_000),
             Some(ContentProjectionPatch {
-                metadata_json: Some(r#"{"serverBlobHash":"sha256-new"}"#.into()),
+                metadata_json: Some(r#"{"serverBlobCid":"bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"}"#.into()),
                 ..Default::default()
             }),
             StampMode::HealCanonical,
@@ -7193,7 +7203,7 @@ mod tests {
             "uhCkk-old",
             Some(1_000),
             Some(ContentProjectionPatch {
-                metadata_json: Some(r#"{"serverBlobHash":"sha256-old"}"#.into()),
+                metadata_json: Some(r#"{"serverBlobCid":"bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"}"#.into()),
                 ..Default::default()
             }),
             StampMode::HealCanonical,
@@ -7211,8 +7221,8 @@ mod tests {
         assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-new"));
 
         assert_eq!(
-            row.server_blob_hash.as_deref(),
-            Some("sha256-new"),
+            row.server_blob_cid.as_deref(),
+            Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"),
             "refused stale metadata cannot select an older server executable"
         );
 
@@ -7359,9 +7369,9 @@ mod tests {
             "uhCkk-new",
             Some(2_000),
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-new".into()),
+                blob_cid: Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi".into()),
                 content_size_bytes: Some(20),
-                metadata_json: Some(r#"{"serverBlobHash":"sha256-new"}"#.into()),
+                metadata_json: Some(r#"{"serverBlobCid":"bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"}"#.into()),
                 ..Default::default()
             }),
             StampMode::HealCanonical,
@@ -7380,9 +7390,9 @@ mod tests {
             "uhCkk-old",
             Some(1_000),
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-old".into()),
+                blob_cid: Some("bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu".into()),
                 content_size_bytes: Some(10),
-                metadata_json: Some(r#"{"serverBlobHash":"sha256-old"}"#.into()),
+                metadata_json: Some(r#"{"serverBlobCid":"bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"}"#.into()),
                 ..Default::default()
             }),
             StampMode::HealCanonical,
@@ -7405,8 +7415,8 @@ mod tests {
             "the refused move must not advance the declared head"
         );
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-new"),
+            row.blob_cid.as_deref(),
+            Some("bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"),
             "T-1's richer patch must not be smuggled past canonical_move_verdict's \
              refusal (R2)"
         );
@@ -7435,7 +7445,7 @@ mod tests {
             "uhCkk-server-head",
             Some(2_000),
             Some(ContentProjectionPatch {
-                metadata_json: Some(r#"{"serverBlobHash":"sha256-server"}"#.into()),
+                metadata_json: Some(r#"{"serverBlobCid":"bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m"}"#.into()),
                 ..Default::default()
             }),
             StampMode::Declare,
@@ -7483,7 +7493,10 @@ mod tests {
             row.declared_head_action_hash.as_deref(),
             Some("uhCkk-server-head")
         );
-        assert_eq!(row.server_blob_hash.as_deref(), Some("sha256-server"));
+        assert_eq!(
+            row.server_blob_cid.as_deref(),
+            Some("bafkr4iefvth2jsdt7a22dqadp4ygyw2qhs65dirv6k775is65geyeaaf4m")
+        );
         assert_eq!(row.canonical_declared_at, Some(2_000));
     }
 
@@ -7591,7 +7604,9 @@ mod tests {
             "uhCkk-browser-b",
             Some(2_000),
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-browser-b".into()),
+                blob_cid: Some(
+                    "bafkr4ibnhf3w5rasea7gqhs5zlds6u5oq5q64vvkp2xauc2todifdfud7u".into(),
+                ),
                 ..Default::default()
             }),
             StampMode::HealCanonical,
@@ -7607,7 +7622,9 @@ mod tests {
             "uhCkk-browser-a",
             None,
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-browser-a".into()),
+                blob_cid: Some(
+                    "bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4".into(),
+                ),
                 ..Default::default()
             }),
             StampMode::LegacySignal,
@@ -7623,7 +7640,10 @@ mod tests {
             row.declared_head_action_hash.as_deref(),
             Some("uhCkk-browser-b")
         );
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser-b"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ibnhf3w5rasea7gqhs5zlds6u5oq5q64vvkp2xauc2todifdfud7u")
+        );
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-b"));
         assert_eq!(row.canonical_declared_at, Some(2_000));
 
@@ -7631,7 +7651,7 @@ mod tests {
         // This block used to be named "backward compatibility" and asserted
         // that, before a row has an election clock, its own legacy signal
         // could move the head with NO content behind it — it literally
-        // constructed a torn row (declared head B, `blob_hash` still from A)
+        // constructed a torn row (declared head B, `blob_cid` still from A)
         // and pinned that as correct. `stamp_declared_head_mode_transaction`
         // now declines a `LegacySignal`/`HealCanonical` MOVE that carries no
         // patch at all (`StaleReason::PointerAbsent`); the deliberate
@@ -7641,7 +7661,8 @@ mod tests {
         // §(b) R4, and `a_contentless_legacy_signal_declines_to_move_a_declared_row`
         // for the dedicated pin.
         let mut legacy = mk_plain("cid-legacy-signal");
-        legacy.blob_hash = Some("sha256-browser-a".into());
+        legacy.blob_cid =
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4".into());
         create_content(&mut conn, &ctx, legacy).unwrap();
         stamp_declared_head(
             &mut conn,
@@ -7675,15 +7696,15 @@ mod tests {
             "a pointerless legacy signal must not move the head it cannot back"
         );
         assert_eq!(
-            legacy_row.blob_hash.as_deref(),
-            Some("sha256-browser-a"),
+            legacy_row.blob_cid.as_deref(),
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4"),
             "a declined move must not disturb the existing pointer either"
         );
     }
 
     /// Story 1.4a T-2 (the backstop for T-1 `77cf2ba48`) — dedicated pin for
     /// the overturn above. A `LegacySignal` MOVE that carries no patch at all
-    /// must be declined, the row's head AND `blob_hash` must be untouched, and
+    /// must be declined, the row's head AND `blob_cid` must be untouched, and
     /// the refusal must be counted under its own reason
     /// (`StaleReason::PointerAbsent`). Design:
     /// genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md
@@ -7693,7 +7714,8 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let mut legacy = mk_plain("cid-pointerless-signal");
-        legacy.blob_hash = Some("sha256-browser-a".into());
+        legacy.blob_cid =
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4".into());
         create_content(&mut conn, &ctx, legacy).unwrap();
         stamp_declared_head(
             &mut conn,
@@ -7749,9 +7771,9 @@ mod tests {
             "head must not move without its pointer"
         );
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-browser-a"),
-            "blob_hash must not be disturbed by a declined move"
+            row.blob_cid.as_deref(),
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4"),
+            "blob_cid must not be disturbed by a declined move"
         );
     }
 
@@ -8012,7 +8034,8 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
         let mut original = mk_plain("cid-atomic-stamp");
-        original.blob_hash = Some("sha256-browser-a".into());
+        original.blob_cid =
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4".into());
         create_content(&mut conn, &ctx, original).unwrap();
         stamp_declared_head(
             &mut conn,
@@ -8040,7 +8063,9 @@ mod tests {
             "uhCkk-browser-b",
             Some(2_000),
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-browser-b".into()),
+                blob_cid: Some(
+                    "bafkr4ibnhf3w5rasea7gqhs5zlds6u5oq5q64vvkp2xauc2todifdfud7u".into(),
+                ),
                 ..Default::default()
             }),
             StampMode::Declare,
@@ -8055,7 +8080,10 @@ mod tests {
             row.declared_head_action_hash.as_deref(),
             Some("uhCkk-browser-a")
         );
-        assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser-a"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ib2qbk2p7f6dwfips4pqtf4lts5ondi7sbgnmxcaukiwtsbxf2ax4")
+        );
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-a"));
         assert!(row.canonical_declared_at.is_none());
     }
@@ -8076,8 +8104,9 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "html5-app".to_string(),
-                blob_hash: Some("sha256-a".to_string()),
-                blob_cid: Some("sha256-a".to_string()),
+                blob_cid: Some(
+                    "bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4".to_string(),
+                ),
                 content_size_bytes: None,
                 metadata_json: None,
                 reach: "commons".to_string(),
@@ -8106,7 +8135,12 @@ mod tests {
         };
         let g0 = pointer_generation();
         assert_eq!(
-            stamp(&mut conn, "uhCkkA", 1, Some("sha256-a")),
+            stamp(
+                &mut conn,
+                "uhCkkA",
+                1,
+                Some("bafkr4iaxoyx53wljurjzexlfof5mh3vccmqlm22ugqx54fisrvwk6ijbl4")
+            ),
             StampOutcome::Stamped
         );
         let g1 = pointer_generation();
@@ -8115,7 +8149,12 @@ mod tests {
         // Other tests run concurrently and may bump it; only assert what this
         // test's own stamps must have done.
         assert_eq!(
-            stamp(&mut conn, "uhCkkA", 1, Some("sha256-b")),
+            stamp(
+                &mut conn,
+                "uhCkkA",
+                1,
+                Some("bafkr4iaq4xht2pekj6pti2gizrmo5kciskrc7ww3ygwlejaqdeaejqovkm")
+            ),
             StampOutcome::Refreshed
         );
         assert!(
@@ -8258,7 +8297,6 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
@@ -8492,14 +8530,16 @@ mod tests {
         let ctx = AppContext::new("lamad");
         let id = "epr:amber-then-stamped";
 
-        // Amber row: converged blob_hash, no anchor, no declared head.
+        // Amber row: converged blob_cid, no anchor, no declared head.
         create_content(&mut conn, &ctx, mk_bundle(id)).unwrap();
         update_content(
             &mut conn,
             &ctx,
             UpdateContentInput {
                 id: id.to_string(),
-                blob_hash: Some("sha256-amberbundle".to_string()),
+                blob_cid: Some(
+                    "bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi".to_string(),
+                ),
                 crdt_converged_at: Some(chrono::Utc::now().to_rfc3339()),
                 ..Default::default()
             },
@@ -8509,7 +8549,10 @@ mod tests {
         let pre = get_content(&mut conn, &ctx, id, MinTrust::Invisible)
             .unwrap()
             .unwrap();
-        assert_eq!(pre.blob_hash.as_deref(), Some("sha256-amberbundle"));
+        assert_eq!(
+            pre.blob_cid.as_deref(),
+            Some("bafkr4ih3ojcvfq3ib7a6bmqanbmmtbx2tfwjmusaxb42s7ondz53h6ybqi")
+        );
         assert!(pre.dht_anchor_hash.is_none(), "amber row is not notarized");
         assert!(pre.declared_head_action_hash.is_none());
 
@@ -8521,7 +8564,9 @@ mod tests {
             "uhCkk-verified-head",
             None,
             Some(ContentProjectionPatch {
-                blob_cid: Some("sha256-greenbundle".to_string()),
+                blob_cid: Some(
+                    "bafkr4ih3i5nbafgdpoxkcviahqln4ymai6rqz2d2c67frci5fhcy7jrzhy".to_string(),
+                ),
                 ..Default::default()
             }),
         )
@@ -8532,11 +8577,14 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            row.blob_hash.as_deref(),
-            Some("sha256-greenbundle"),
-            "verified (green) stamp overwrites the amber blob_hash value field"
+            row.blob_cid.as_deref(),
+            Some("bafkr4ih3i5nbafgdpoxkcviahqln4ymai6rqz2d2c67frci5fhcy7jrzhy"),
+            "verified (green) stamp overwrites the amber blob_cid value field"
         );
-        assert_eq!(row.blob_cid.as_deref(), Some("sha256-greenbundle"));
+        assert_eq!(
+            row.blob_cid.as_deref(),
+            Some("bafkr4ih3i5nbafgdpoxkcviahqln4ymai6rqz2d2c67frci5fhcy7jrzhy")
+        );
         assert_eq!(
             row.declared_head_action_hash.as_deref(),
             Some("uhCkk-verified-head")
@@ -8571,7 +8619,6 @@ mod tests {
             description: None,
             content_type: "concept",
             content_format: "markdown",
-            blob_hash: None,
             blob_cid: None,
             content_size_bytes: None,
             metadata_json: None,
@@ -8579,7 +8626,7 @@ mod tests {
             created_by: None,
             content_body: None,
             dht_anchor_hash: anchor,
-            server_blob_hash: None,
+            server_blob_cid: None,
         };
         diesel::insert_into(content::table)
             .values(&new)
@@ -8839,7 +8886,6 @@ mod tests {
                 description: None,
                 content_type: "concept".to_string(),
                 content_format: "markdown".to_string(),
-                blob_hash: None,
                 blob_cid: None,
                 content_size_bytes: None,
                 metadata_json: None,
@@ -9193,7 +9239,7 @@ mod tests {
                 .filter(content::id.eq("blob-kept")),
         )
         .set((
-            content::blob_hash.eq(Some("bafk-private-old")),
+            content::blob_cid.eq(Some("bafk-private-old")),
             content::blob_cid.eq(Some("bafk-private-old")),
         ))
         .execute(&mut conn)
@@ -9213,7 +9259,7 @@ mod tests {
         );
         assert_eq!(f19_reaches(&mut conn, "blob-kept").0, "private");
         assert_eq!(
-            blob_hash_for(&mut conn, &ctx, "blob-kept")
+            blob_cid_for(&mut conn, &ctx, "blob-kept")
                 .unwrap()
                 .as_deref(),
             Some("bafk-private-old")

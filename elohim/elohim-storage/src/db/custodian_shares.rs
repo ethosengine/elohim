@@ -18,7 +18,7 @@
 //!
 //! ## Integrity check
 //!
-//! Every read helper verifies `sha256(share_data) == share_blob_hash`.
+//! Every read helper verifies `compute_bytes_cid(share_data) == share_blob_cid`.
 //! A mismatch indicates SQLite-level corruption and is surfaced as
 //! `StorageError::Internal`.
 //!
@@ -29,7 +29,7 @@
 //! post-M4 threat model and the remediation path.
 
 use diesel::prelude::*;
-use sha2::{Digest, Sha256};
+use elohim_epr::address::compute_bytes_cid;
 
 use crate::db::diesel_schema::custodian_shares;
 use crate::db::models::{CustodianShare, NewCustodianShare};
@@ -39,27 +39,25 @@ use crate::error::StorageError;
 // Hash helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Compute the hex-encoded SHA-256 of `bytes`.
+/// The byte CID text of `bytes` (raw + BLAKE3-256).
 ///
-/// Called both when inserting (`upsert_share` computes + stores the hash) and
-/// when reading (`verify_share_integrity` recomputes + compares).
-pub fn sha256_hex(bytes: &[u8]) -> String {
-    let mut h = Sha256::new();
-    h.update(bytes);
-    hex::encode(h.finalize())
+/// Called both when inserting (`upsert_share` computes + stores it) and when
+/// reading (`verify_share_integrity` recomputes + compares).
+pub fn share_cid(bytes: &[u8]) -> String {
+    compute_bytes_cid(bytes).to_string()
 }
 
-/// Verify that `share.share_data` matches `share.share_blob_hash`.
+/// Verify that `share.share_data` matches `share.share_blob_cid`.
 ///
 /// Returns `Ok(())` if the integrity check passes; `Err(StorageError::Internal)`
 /// if the hash does not match (indicates corruption).
 fn verify_share_integrity(share: &CustodianShare) -> Result<(), StorageError> {
-    let computed = sha256_hex(&share.share_data);
-    if computed != share.share_blob_hash {
+    let computed = share_cid(&share.share_data);
+    if computed != share.share_blob_cid {
         return Err(StorageError::Internal(format!(
             "custodian_shares integrity failure: row id={} governance_action_cid={} \
-             expected hash {} got {}",
-            share.id, share.governance_action_cid, share.share_blob_hash, computed
+             expected cid {} got {}",
+            share.id, share.governance_action_cid, share.share_blob_cid, computed
         )));
     }
     Ok(())
@@ -116,14 +114,14 @@ pub fn upsert_share(
         ))
     })?;
 
-    let blob_hash = sha256_hex(&share_data);
+    let blob_cid = share_cid(&share_data);
 
     let row = NewCustodianShare {
         governance_action_cid: governance_action_cid.to_string(),
         custodian_cid: custodian_cid.to_string(),
         share_index,
         share_data,
-        share_blob_hash: blob_hash,
+        share_blob_cid: blob_cid,
         created_at: now_iso.to_string(),
         superseded_at: None,
     };
@@ -156,7 +154,7 @@ pub fn upsert_share(
 /// "Active" means `superseded_at IS NULL`.  Returns `None` if no share has
 /// been installed for this `(custodian_cid, governance_action_cid)` pair.
 ///
-/// The integrity check (`sha256(share_data) == share_blob_hash`) is
+/// The integrity check (`compute_bytes_cid(share_data) == share_blob_cid`) is
 /// performed on every successful fetch.  A mismatch returns
 /// `Err(StorageError::Internal)` rather than silently returning corrupted bytes.
 ///
@@ -414,15 +412,14 @@ mod tests {
         );
     }
 
-    // ── sha256_hex helper ─────────────────────────────────────────────────────
+    // ── share_cid helper ──────────────────────────────────────────────────────
 
     #[test]
-    fn sha256_hex_known_vector() {
-        // SHA-256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-        let hash = sha256_hex(b"");
+    fn share_cid_matches_the_kernel_vector() {
+        // The empty input's byte CID (plan §2.1 shared vectors).
         assert_eq!(
-            hash,
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            share_cid(b""),
+            "bafkr4ifpcne3t5pzugtkaqcn5i3nzskjtpfslsnnyejlpte2spfoihzsmi"
         );
     }
 }

@@ -19,7 +19,7 @@ pub struct GapQuery {
 }
 
 /// Insert a new gap row or bump `last_seen_at` + current-state fields on the
-/// matching `(content_id, shard_hash, h_app_id, gap_kind)` row.
+/// matching `(content_id, shard_cid, h_app_id, gap_kind)` row.
 pub fn upsert_gap(conn: &mut SqliteConnection, gap: &NewPlacementGap) -> Result<(), StorageError> {
     // Try plain insert first; on unique-index conflict, update current-state.
     let inserted = diesel::insert_or_ignore_into(placement_gaps::table)
@@ -30,7 +30,7 @@ pub fn upsert_gap(conn: &mut SqliteConnection, gap: &NewPlacementGap) -> Result<
         diesel::update(
             placement_gaps::table
                 .filter(placement_gaps::content_id.eq(gap.content_id))
-                .filter(placement_gaps::shard_hash.eq(gap.shard_hash))
+                .filter(placement_gaps::shard_cid.eq(gap.shard_cid))
                 .filter(placement_gaps::h_app_id.eq(gap.h_app_id))
                 .filter(placement_gaps::gap_kind.eq(gap.gap_kind)),
         )

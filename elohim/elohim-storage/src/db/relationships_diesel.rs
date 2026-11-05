@@ -749,7 +749,6 @@ pub(crate) mod test_harness {
                 content_type TEXT NOT NULL DEFAULT 'concept',
                 content_format TEXT NOT NULL DEFAULT 'markdown',
                 content_body TEXT,
-                blob_hash TEXT,
                 blob_cid TEXT,
                 content_size_bytes INTEGER,
                 metadata_json TEXT,
