@@ -350,7 +350,7 @@ mod tests {
     fn test_replication_request_serialization() {
         let request = ReplicateContentRequest {
             content_id: "content-123".to_string(),
-            content_hash: "sha256-abc".to_string(),
+            content_hash: "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y".to_string(),
             from_custodians: vec!["node-a".to_string(), "node-b".to_string()],
             to_custodian: "node-c".to_string(),
             strategy: "full_replica".to_string(),

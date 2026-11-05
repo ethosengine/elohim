@@ -18,15 +18,14 @@
 //!
 //! Cache failures are logged at `warn!` and never fail the user response.
 //!
-//! ## Iroh / BLAKE3 dispatch — handled inside elohim-storage, NOT here
+//! ## Transport dispatch — handled inside elohim-storage, NOT here
 //!
-//! The parallel iroh P2P stack (cutover gate #2) selects between the BLAKE3-keyed
-//! `IrohBlobStore` and the SHA256-keyed legacy `BlobStore` per-request inside
-//! elohim-storage's `GET /blob/{hash}` handler. Doorway is intentionally unaware of
-//! this: it forwards the hash verbatim (sha256- or blake3- prefixed) with the
-//! `X-Agent-Cid` header so storage can look up the caller's transport manifest.
+//! There is one byte address, the byte CID (`bafkr4i…`, raw + BLAKE3-256), and one
+//! authoritative payload store in elohim-storage. Doorway admits the address by full
+//! decode, forwards it with the `X-Agent-Cid` header so storage can apply reach, and
+//! checks the bytes it is handed against the address before stocking or serving.
 //!
-//! This module must NEVER contain blake3/iroh dispatch logic. The three-layer truth
+//! This module must NEVER contain transport (iroh/libp2p) dispatch logic. The three-layer truth
 //! model places that decision in the P2P data-plane layer (elohim-storage), not the
 //! web2 projection layer (doorway).
 
@@ -1072,7 +1071,22 @@ where
     }
 }
 
-/// Forward a `/blob/<hash>` request to elohim-storage with local pantry caching.
+/// The refusal for a storage 200 whose body is not the bytes its address names:
+/// `502 {"error":"upstream-cid-mismatch","expected":<cid>,"actual":<cid>}`.
+fn upstream_cid_mismatch_response(expected: &str, actual: &str) -> Response<Full<Bytes>> {
+    let body = serde_json::json!({
+        "error": "upstream-cid-mismatch",
+        "expected": expected,
+        "actual": actual,
+    });
+    Response::builder()
+        .status(StatusCode::BAD_GATEWAY)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// Forward a `/blob/<cid>` request to elohim-storage with local pantry caching.
 ///
 /// Behaviour (pantry = local [`ContentCache`]):
 ///
@@ -1089,7 +1103,10 @@ where
 ///    failures.  In all skip cases the upstream response is still returned to
 ///    the caller.
 ///
-/// The `path` parameter must begin with `/blob/` (e.g. `/blob/sha256-abc123`).
+/// The `path` parameter must begin with `/blob/` (e.g. `/blob/bafkr4i…`). The address
+/// is admitted by full decode (typed 400 otherwise), and a 200 body is stocked and
+/// served only when it hashes to that address — a body that does not is a 502,
+/// never bytes and never a pantry entry (verify before serve).
 /// For any other path prefix the function falls through to [`forward_to_storage`]
 /// without any cache interaction.
 /// Generic over `B` for the same reason as [`forward_to_storage`] — tests pass
@@ -1108,13 +1125,17 @@ where
     B::Data: Send,
     B::Error: std::fmt::Display,
 {
-    // Extract the hash from "/blob/<hash>"
+    // Extract the byte CID from "/blob/<cid>"
     let hash = match path.strip_prefix("/blob/") {
         Some(h) if !h.is_empty() => h.to_string(),
         _ => {
             // Not a blob path — fall through to generic forwarder
             return forward_to_storage(req, storage_url, path, client, breakers, ctx).await;
         }
+    };
+    let blob_cid = match crate::routes::BlobAddress::parse(&hash) {
+        Ok(cid) => cid,
+        Err(error) => return crate::routes::invalid_byte_cid_response(&error),
     };
 
     // --- Skip caching for Range requests ----------------------------------------
@@ -1278,6 +1299,21 @@ where
                     // readable body. 404 = Neutral (normal blob miss under
                     // no-fanout) → ok, never opens; 5xx = failure.
                     trial.record(ProxyOutcome::classify(status_u16) != ProxyOutcome::Failure);
+                    // --- Verify before serve: a 200 body must be the addressed bytes ---
+                    if status == StatusCode::OK {
+                        let actual = elohim_address::compute_bytes_cid(&body);
+                        if actual != blob_cid {
+                            crate::metrics::inc_blob_pantry("skipped");
+                            warn!(
+                                cid = %hash,
+                                actual = %actual,
+                                storage_url = %storage_url,
+                                "storage served bytes that do not hash to the requested byte CID \
+                                 — refused, not stocked"
+                            );
+                            return upstream_cid_mismatch_response(&hash, &actual.to_string());
+                        }
+                    }
                     // --- Stock pantry on clean 200 -----------------------------------
                     let should_cache = blob_should_stock(
                         status.as_u16(),
@@ -1329,12 +1365,14 @@ where
                         debug!(hash = %hash, status = %status, "2xx non-200 — not stocking pantry");
                     }
 
-                    Response::builder()
+                    let mut builder = Response::builder()
                         .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
                         .header("Content-Type", content_type)
-                        .header("Cross-Origin-Resource-Policy", "cross-origin")
-                        .body(Full::new(body))
-                        .unwrap()
+                        .header("Cross-Origin-Resource-Policy", "cross-origin");
+                    if status == StatusCode::OK {
+                        builder = builder.header(crate::routes::CONTENT_ADDRESS_HEADER, &hash);
+                    }
+                    builder.body(Full::new(body)).unwrap()
                 }
                 Err(e) => {
                     warn!(error = %e, hash = %hash, "Failed to read blob response body from storage");
@@ -1373,7 +1411,9 @@ mod tests {
     /// node-local capability token never rides at all.
     #[test]
     fn compute_payload_headers_are_forwarded_on_that_prefix_only() {
-        let headers = compute_payload_forward_headers("/api/v1/compute/payloads/bafkreiabc");
+        let headers = compute_payload_forward_headers(
+            "/api/v1/compute/payloads/bafkr4ib6js33ihzoiymenu2ogip7x5r2cjwlcfm2rvhhidowgzg3r7wvrm",
+        );
         assert_eq!(
             headers,
             &[
@@ -2149,7 +2189,9 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccdd00112233";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         // Before: cache miss
@@ -2198,7 +2240,9 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000001";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         let req = make_get_request(&format!("http://doorway{path}"));
@@ -2232,7 +2276,9 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000002";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         let req = Request::builder()
@@ -2273,7 +2319,9 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000003";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         let req = make_get_request(&format!("http://doorway{path}"));
@@ -2352,7 +2400,9 @@ mod tests {
 
         let storage_url = format!("http://{addr}");
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000004";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(b"integration test blob").to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         // First request — cache miss, hits storage
@@ -2411,7 +2461,9 @@ mod tests {
         let storage_url = format!("http://{addr}");
 
         let cache = make_cache();
-        let hash = "sha256-aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccddff000404";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         let req = make_get_request(&format!("http://doorway{path}"));
@@ -2789,16 +2841,12 @@ mod tests {
             None,
             "knowledge amber is unremarked — the warn header is AmberWarn only"
         );
-        // The address is a CIDv1 base32-lower, raw codec + sha2-256 — the
-        // consumer can re-derive it from the body it just received.
+        // The address is the body's byte CID — the consumer can re-derive it
+        // from the body it just received, and the byte routes admit it.
         let head = header(&resp, X_ELOHIM_SERVED_HEAD).expect("amber must name its address");
         assert!(
-            head.starts_with("bafkrei")
-                && head
-                    .chars()
-                    .skip(1)
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
-            "served_head must be a lower-case base32 CIDv1, got {head}"
+            crate::routes::BlobAddress::parse(head).is_ok(),
+            "served_head must be a byte CID, got {head}"
         );
         assert_eq!(
             head,
@@ -3404,7 +3452,9 @@ mod tests {
             spawn_mock_storage(200, payload.clone(), "application/octet-stream").await;
         let storage_url = format!("http://{addr}");
         let cache = make_cache();
-        let hash = "sha256-1111111111111111111111111111111111111111111111111111111111111111";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         let req = Request::builder()
@@ -3444,7 +3494,9 @@ mod tests {
         let (addr, _handle) = spawn_mock_storage(200, payload.clone(), "text/plain").await;
         let storage_url = format!("http://{addr}");
         let cache = make_cache();
-        let hash = "sha256-2222222222222222222222222222222222222222222222222222222222222222";
+        // The address of the bytes storage serves, minted from them.
+        let hash_owned = elohim_address::compute_bytes_cid(&payload).to_string();
+        let hash = hash_owned.as_str();
         let path = format!("/blob/{hash}");
 
         // Prime the pantry with an anonymous fetch.

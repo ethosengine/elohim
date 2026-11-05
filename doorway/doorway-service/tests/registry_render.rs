@@ -31,7 +31,10 @@ async fn registry_marks_render_routes_for_ssr_dispatch() {
     );
 
     let matches2 = registry
-        .match_request(doorway_client::HttpMethod::Get, "/blob/sha256-x")
+        .match_request(
+            doorway_client::HttpMethod::Get,
+            "/blob/bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi",
+        )
         .await;
     let m2 = matches2.first().expect("matched blob route");
     assert_eq!(

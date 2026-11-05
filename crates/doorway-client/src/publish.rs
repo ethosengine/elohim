@@ -17,7 +17,7 @@
 //!
 //! // 1. Implement Publishable for blob-like content
 //! impl Publishable for Html5AppBlob {
-//!     fn content_hash(&self) -> String { self.hash.clone() }
+//!     fn content_cid(&self) -> String { self.cid.clone() }
 //!     fn content_type(&self) -> &'static str { "html5-app" }
 //!     fn mime_type(&self) -> &'static str { "application/zip" }
 //! }
@@ -30,7 +30,7 @@
 //!
 //!     // Register as publisher
 //!     let server = ContentServer::new(
-//!         input.blob.content_hash(),
+//!         input.blob.content_cid(),
 //!         ContentServerCapability::Html5App,
 //!     );
 //!     create_entry(&server)?;
@@ -53,8 +53,8 @@ use serde::{Deserialize, Serialize};
 /// Unlike `Cacheable` (which caches JSON API responses), `Publishable`
 /// content is served as raw bytes - files, media, zip archives, etc.
 pub trait Publishable {
-    /// The content-addressed hash of this content (e.g., "sha256-abc123")
-    fn content_hash(&self) -> String;
+    /// The content address of this content: a byte CID (`bafkr4i…`)
+    fn content_cid(&self) -> String;
 
     /// The content type category (e.g., "html5-app", "media", "document")
     fn content_type(&self) -> &'static str;
@@ -89,11 +89,11 @@ pub trait Publishable {
 ///
 /// When an agent stores content and wants to serve it, they create
 /// a ContentServer entry. Doorways query the DHT for these entries
-/// to discover who can serve specific content hashes.
+/// to discover who can serve specific content addresses.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ContentServer {
-    /// Content hash this server can provide (e.g., "sha256-abc123")
-    pub content_hash: String,
+    /// Byte CID (`bafkr4i…`) this server can provide
+    pub content_cid: String,
 
     /// What type of content serving this server supports
     pub capability: ContentServerCapability,
@@ -127,14 +127,14 @@ pub struct ContentServer {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentServerCapability {
-    /// Serve raw blob content (GET /blob/{hash})
+    /// Serve raw blob content (GET /blob/{cid})
     Blob,
 
     /// Serve HTML5 app from zip (GET /apps/{id}/{path})
     /// Doorway extracts files from cached zip on demand
     Html5App,
 
-    /// Serve media with streaming/range requests (GET /media/{hash})
+    /// Serve media with streaming/range requests (GET /media/{cid})
     MediaStream,
 
     /// Serve SCORM/xAPI learning packages
@@ -146,14 +146,14 @@ pub enum ContentServerCapability {
 
 impl ContentServer {
     /// Create a new content server registration
-    pub fn new(content_hash: impl Into<String>, capability: ContentServerCapability) -> Self {
+    pub fn new(content_cid: impl Into<String>, capability: ContentServerCapability) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
 
         Self {
-            content_hash: content_hash.into(),
+            content_cid: content_cid.into(),
             capability,
             serve_url: None,
             online: true,
@@ -226,8 +226,8 @@ pub struct PublishSignal {
     /// Signal type
     pub signal_type: PublishSignalType,
 
-    /// Content hash being published/unpublished
-    pub content_hash: String,
+    /// Byte CID being published/unpublished
+    pub content_cid: String,
 
     /// Content server details (for online signals)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -255,34 +255,34 @@ impl PublishSignal {
     pub fn online(server: &ContentServer) -> Self {
         Self {
             signal_type: PublishSignalType::Online,
-            content_hash: server.content_hash.clone(),
+            content_cid: server.content_cid.clone(),
             server: Some(server.clone()),
         }
     }
 
     /// Create an offline signal (agent stopping service)
-    pub fn offline(content_hash: impl Into<String>) -> Self {
+    pub fn offline(content_cid: impl Into<String>) -> Self {
         Self {
             signal_type: PublishSignalType::Offline,
-            content_hash: content_hash.into(),
+            content_cid: content_cid.into(),
             server: None,
         }
     }
 
     /// Create a heartbeat signal
-    pub fn heartbeat(content_hash: impl Into<String>) -> Self {
+    pub fn heartbeat(content_cid: impl Into<String>) -> Self {
         Self {
             signal_type: PublishSignalType::Heartbeat,
-            content_hash: content_hash.into(),
+            content_cid: content_cid.into(),
             server: None,
         }
     }
 
     /// Create a removed signal (content deleted)
-    pub fn removed(content_hash: impl Into<String>) -> Self {
+    pub fn removed(content_cid: impl Into<String>) -> Self {
         Self {
             signal_type: PublishSignalType::Removed,
-            content_hash: content_hash.into(),
+            content_cid: content_cid.into(),
             server: None,
         }
     }
@@ -320,8 +320,8 @@ impl DoorwayPublishSignal {
 /// This is stored alongside the blob to provide app-specific metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Html5AppBundle {
-    /// Content hash of the zip file
-    pub hash: String,
+    /// Byte CID of the zip file (`bafkr4i…`)
+    pub cid: String,
 
     /// App identifier (used in URL: /apps/{app_id}/...)
     pub app_id: String,
@@ -379,8 +379,8 @@ pub struct AuthorInfo {
 }
 
 impl Publishable for Html5AppBundle {
-    fn content_hash(&self) -> String {
-        self.hash.clone()
+    fn content_cid(&self) -> String {
+        self.cid.clone()
     }
 
     fn content_type(&self) -> &'static str {
@@ -407,8 +407,8 @@ impl Publishable for Html5AppBundle {
 /// Query input for finding content publishers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FindPublishersInput {
-    /// Content hash to find publishers for
-    pub content_hash: String,
+    /// Byte CID to find publishers for
+    pub content_cid: String,
 
     /// Optional: filter by capability
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -438,8 +438,8 @@ fn default_true() -> bool {
 /// Result from finding publishers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FindPublishersOutput {
-    /// Content hash queried
-    pub content_hash: String,
+    /// Byte CID queried
+    pub content_cid: String,
 
     /// Found publishers, sorted by priority/latency
     pub publishers: Vec<ContentServer>,
@@ -456,15 +456,18 @@ pub struct FindPublishersOutput {
 mod tests {
     use super::*;
 
+    /// The kernel vector: the byte CID of "hello world".
+    const HELLO_CID: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+
     #[test]
     fn test_content_server_creation() {
-        let server = ContentServer::new("sha256-abc123", ContentServerCapability::Html5App)
+        let server = ContentServer::new(HELLO_CID, ContentServerCapability::Html5App)
             .with_url("https://doorway.example.com")
             .with_region("us-west")
             .with_bandwidth(100)
             .with_priority(75);
 
-        assert_eq!(server.content_hash, "sha256-abc123");
+        assert_eq!(server.content_cid, HELLO_CID);
         assert_eq!(server.capability, ContentServerCapability::Html5App);
         assert_eq!(
             server.serve_url,
@@ -478,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_publish_signal_serialization() {
-        let server = ContentServer::new("sha256-abc123", ContentServerCapability::Html5App);
+        let server = ContentServer::new(HELLO_CID, ContentServerCapability::Html5App);
         let signal = PublishSignal::online(&server);
 
         let json = serde_json::to_string(&signal).unwrap();
@@ -490,7 +493,7 @@ mod tests {
     #[test]
     fn test_html5_app_bundle_publishable() {
         let bundle = Html5AppBundle {
-            hash: "sha256-abc123".to_string(),
+            cid: HELLO_CID.to_string(),
             app_id: "evolution-of-trust".to_string(),
             entry_point: "index.html".to_string(),
             size_bytes: 6_800_000,
@@ -498,7 +501,7 @@ mod tests {
             manifest: None,
         };
 
-        assert_eq!(bundle.content_hash(), "sha256-abc123");
+        assert_eq!(bundle.content_cid(), HELLO_CID);
         assert_eq!(bundle.content_type(), "html5-app");
         assert_eq!(bundle.mime_type(), "application/zip");
         assert_eq!(bundle.entry_point(), Some("index.html"));
@@ -506,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_stale_detection() {
-        let mut server = ContentServer::new("sha256-abc123", ContentServerCapability::Blob);
+        let mut server = ContentServer::new(HELLO_CID, ContentServerCapability::Blob);
 
         // Fresh server should not be stale
         assert!(!server.is_stale(60));

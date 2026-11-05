@@ -114,7 +114,7 @@ pub use storage_registration::{
     register_local_storage, StorageRegistrationConfig, StorageRegistrationResult,
 };
 pub use verification::{
-    compute_sha256, StreamingHasher, VerificationConfig, VerificationService, VerifyBlobRequest,
-    VerifyBlobResponse,
+    StreamingHasher, VerificationConfig, VerificationService, VerifyBlobRequest,
+    VerifyBlobResponse, VerifyOutcome,
 };
 pub use zome_caller::ZomeCaller;

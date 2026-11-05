@@ -411,8 +411,8 @@ async fn handle_event(
 
             if let Some(cache) = app_file_cache {
                 // clear_slug evicts both the per-file MongoDB cache entries AND the
-                // in-memory slug→blob_hash index for this content. The next request
-                // to /apps/{slug}/{file} will re-resolve through resolve_blob_hash's
+                // in-memory slug→blob_cid index for this content. The next request
+                // to /apps/{slug}/{file} will re-resolve through resolve_blob_cid's
                 // slow path (MongoDB query), then cache miss → fetch from storage.
                 //
                 // The projected_entries gap this comment used to only NAME is

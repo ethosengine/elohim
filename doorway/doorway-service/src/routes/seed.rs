@@ -23,6 +23,7 @@
 //! elohim-storage is the authoritative blob store.
 
 use bytes::Bytes;
+use elohim_address::{compute_bytes_cid, ByteCid};
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::{Request, Response, StatusCode};
@@ -102,7 +103,7 @@ pub(crate) fn require_seed_authority<B>(
     // property: the flag ALONE used to pass, and since every deployed manifest
     // sets it, this gate and the four `/admin/cache/*` mutation routes were
     // reachable with no credential from the open web (proven 2026-08-24 on the
-    // local mesh — an anonymous PUT with a deliberately wrong `X-Blob-Hash`
+    // local mesh — an anonymous PUT with a deliberately wrong blob address
     // answered `409 Hash mismatch`, i.e. it passed the gate and was stopped only
     // by content addressing).
     if pre_coordination && peer_is_loopback {
@@ -182,7 +183,8 @@ fn fleet_seed_authority_presented<B>(state: &AppState, req: &Request<B>) -> bool
 #[derive(Debug, Serialize)]
 pub struct BlobUploadResponse {
     pub success: bool,
-    pub hash: String,
+    /// The byte CID the upload was addressed by.
+    pub cid: String,
     /// Whether the blob was already present (in doorway cache)
     pub already_cached: bool,
     /// Whether blob was forwarded to elohim-storage
@@ -206,23 +208,26 @@ struct StorageResponse {
 // Route Handler
 // =============================================================================
 
-/// Handle PUT /admin/seed/blob
+/// Handle `PUT /admin/seed/blob` and `PUT /admin/seed/blob/{cid}`
 ///
 /// Expects:
 /// - Body: Raw blob data
-/// - Header `X-Blob-Hash`: Expected hash of the blob
+/// - The blob's byte CID (`bafkr4i…`), in the path (`/admin/seed/blob/{cid}`) or in
+///   the `X-Content-Address` header (the seeder's form); when both are given they
+///   must name the same CID. Admitted by full decode only.
 /// - Header `Content-Type`: MIME type of the blob
 /// - Header `X-Blob-Size`: Optional size hint
 ///
 /// Flow:
-/// 1. Verify hash matches body
+/// 1. Hash the body under the byte profile and compare it to the claimed CID
 /// 2. Cache locally (fast write-through cache)
-/// 3. Forward to elohim-storage (authoritative store)
+/// 3. Forward to elohim-storage (`PUT /blob/{cid}`, the authoritative store)
 ///
 /// Returns:
 /// - 200 OK with BlobUploadResponse on success
-/// - 400 Bad Request if missing required headers
-/// - 409 Conflict if hash mismatch
+/// - 400 Bad Request: no address, or `{"error":"invalid-byte-cid",…}` for one that is
+///   not a byte CID
+/// - 409 Conflict if the body does not hash to the claimed CID (nothing cached)
 pub async fn handle_seed_blob(
     req: Request<Incoming>,
     state: Arc<AppState>,
@@ -234,14 +239,11 @@ pub async fn handle_seed_blob(
         return resp;
     }
 
-    // Extract required headers
-    let expected_hash = match req.headers().get("X-Blob-Hash") {
-        Some(h) => match h.to_str() {
-            Ok(s) => s.to_string(),
-            Err(_) => return error_response(StatusCode::BAD_REQUEST, "Invalid X-Blob-Hash header"),
-        },
-        None => return error_response(StatusCode::BAD_REQUEST, "Missing X-Blob-Hash header"),
+    let claimed = match claimed_seed_cid(&req) {
+        Ok(cid) => cid,
+        Err(resp) => return resp,
     };
+    let expected_hash = claimed.to_string();
 
     let content_type = req
         .headers()
@@ -258,16 +260,16 @@ pub async fn handle_seed_blob(
 
     // Check if already cached locally
     if let Some(cached_size) = state.cache.blob_size(&expected_hash) {
-        info!(hash = %expected_hash, "Blob already in local cache");
+        info!(cid = %expected_hash, "Blob already in local cache");
 
         // Still try to forward to storage in case it's missing there
-        let forwarded = forward_to_storage(&state, &expected_hash, None).await;
+        let forwarded = forward_to_storage(&state, &claimed, None).await;
 
         return json_response(
             StatusCode::OK,
             &BlobUploadResponse {
                 success: true,
-                hash: expected_hash,
+                cid: expected_hash,
                 already_cached: true,
                 forwarded_to_storage: forwarded.is_ok(),
                 size: cached_size,
@@ -291,20 +293,20 @@ pub async fn handle_seed_blob(
     let blob_size = body.len();
     debug!(hash = %expected_hash, size = blob_size, "Received blob data");
 
-    // Verify hash matches
-    let computed_hash = compute_sha256(&body);
-    if computed_hash != expected_hash {
+    // Verify the body is the bytes the CID names (byte profile: raw + BLAKE3-256)
+    let computed = compute_bytes_cid(&body);
+    if computed != claimed {
         warn!(
             expected = %expected_hash,
-            computed = %computed_hash,
-            "Blob hash mismatch"
+            computed = %computed,
+            "Blob CID mismatch"
         );
-        let error_msg = format!("Hash mismatch: expected {expected_hash}, got {computed_hash}");
+        let error_msg = format!("CID mismatch: expected {expected_hash}, got {computed}");
         return json_response(
             StatusCode::CONFLICT,
             &BlobUploadResponse {
                 success: false,
-                hash: expected_hash,
+                cid: expected_hash,
                 already_cached: false,
                 forwarded_to_storage: false,
                 size: blob_size,
@@ -321,7 +323,7 @@ pub async fn handle_seed_blob(
     info!(hash = %expected_hash, size = blob_size, "Blob cached locally");
 
     // Forward to elohim-storage (authoritative store)
-    let forwarded = forward_to_storage(&state, &expected_hash, Some(&body)).await;
+    let forwarded = forward_to_storage(&state, &claimed, Some(&body)).await;
 
     match &forwarded {
         Ok(()) => info!(hash = %expected_hash, "Blob forwarded to elohim-storage"),
@@ -336,13 +338,54 @@ pub async fn handle_seed_blob(
         StatusCode::OK,
         &BlobUploadResponse {
             success: true,
-            hash: expected_hash,
+            cid: expected_hash,
             already_cached: false,
             forwarded_to_storage: forwarded.is_ok(),
             size: blob_size,
             error: forwarded.err(),
         },
     )
+}
+
+/// The byte CID a seed upload claims: the path segment of `/admin/seed/blob/{cid}`
+/// and/or the `X-Content-Address` header, each admitted by full decode; when both
+/// are present they must agree. Any other spelling is the typed 400 storage answers.
+fn claimed_seed_cid<B>(req: &Request<B>) -> Result<ByteCid, Response<Full<Bytes>>> {
+    let from_path = req
+        .uri()
+        .path()
+        .strip_prefix("/admin/seed/blob/")
+        .filter(|segment| !segment.is_empty())
+        .map(crate::routes::BlobAddress::parse);
+    let from_header = match req.headers().get(crate::routes::CONTENT_ADDRESS_HEADER) {
+        Some(value) => match value.to_str() {
+            Ok(text) => Some(crate::routes::BlobAddress::parse(text.trim())),
+            Err(_) => {
+                return Err(error_response(
+                    StatusCode::BAD_REQUEST,
+                    "Invalid X-Content-Address header",
+                ))
+            }
+        },
+        None => None,
+    };
+    let admit = |admitted: Result<ByteCid, elohim_address::AddressError>| {
+        admitted.map_err(|error| crate::routes::invalid_byte_cid_response(&error))
+    };
+    match (
+        from_path.map(admit).transpose()?,
+        from_header.map(admit).transpose()?,
+    ) {
+        (Some(path), Some(header)) if path != header => Err(error_response(
+            StatusCode::BAD_REQUEST,
+            &format!("path names {path} but X-Content-Address names {header}"),
+        )),
+        (Some(cid), _) | (None, Some(cid)) => Ok(cid),
+        (None, None) => Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "Missing blob address: PUT /admin/seed/blob/{cid} or X-Content-Address",
+        )),
+    }
 }
 
 /// Base seed-blob forward timeout in seconds, before size scaling.
@@ -495,9 +538,11 @@ const TRANSPORT_CAUSE_CHAIN_MAX: usize = 4;
 /// drop, 2026-09-02 shed), so the reason now rides the response.
 async fn forward_to_storage(
     state: &AppState,
-    hash: &str,
+    cid: &ByteCid,
     body: Option<&Bytes>,
 ) -> Result<(), String> {
+    let key = cid.to_string();
+    let hash = key.as_str();
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
@@ -518,7 +563,7 @@ async fn forward_to_storage(
         },
     };
 
-    // Build URL: PUT /blob/{hash}
+    // Build URL: PUT /blob/{cid}
     let url = format!("{}/blob/{}", storage_url.trim_end_matches('/'), hash);
 
     let timeout_secs = seed_forward_timeout_secs(data.len());
@@ -674,9 +719,14 @@ async fn forward_once(
     }
 }
 
-/// Check if a blob exists in the cache
-pub async fn handle_check_blob(hash: &str, state: Arc<AppState>) -> Response<Full<Bytes>> {
-    if state.cache.blob_size(hash).is_some() {
+/// Check if a blob exists in the cache (`HEAD /admin/seed/blob/{cid}`). The address
+/// is admitted by full decode; any other spelling is the typed 400.
+pub async fn handle_check_blob(address: &str, state: Arc<AppState>) -> Response<Full<Bytes>> {
+    let cid = match crate::routes::BlobAddress::parse(address) {
+        Ok(cid) => cid,
+        Err(error) => return crate::routes::invalid_byte_cid_response(&error),
+    };
+    if state.cache.blob_size(&cid.to_string()).is_some() {
         Response::builder()
             .status(StatusCode::OK)
             .body(Full::new(Bytes::new()))
@@ -692,16 +742,6 @@ pub async fn handle_check_blob(hash: &str, state: Arc<AppState>) -> Response<Ful
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/// Compute SHA256 hash of data (hex-encoded to match seeder convention)
-fn compute_sha256(data: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    // Use hex encoding to match seeder (blob-manager.ts) convention
-    format!("sha256-{result:x}")
-}
 
 /// Create JSON response
 fn json_response<T: Serialize>(status: StatusCode, data: &T) -> Response<Full<Bytes>> {
@@ -739,12 +779,66 @@ mod tests {
 
     const TEST_JWT_SECRET: &str = "test-secret-that-is-at-least-32-characters-long";
 
+    /// The kernel vector: the byte CID of "hello world".
+    const HELLO_CID: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+
     #[test]
-    fn test_compute_sha256() {
-        let data = b"hello world";
-        let hash = compute_sha256(data);
-        // SHA256 of "hello world" is well-known
-        assert!(hash.starts_with("sha256-"));
+    fn seed_body_is_hashed_under_the_byte_profile() {
+        assert_eq!(compute_bytes_cid(b"hello world").to_string(), HELLO_CID);
+    }
+
+    /// The claimed address comes from the path or `X-Content-Address`, is admitted by
+    /// full decode, and two claims must agree.
+    #[test]
+    fn seed_claims_are_admitted_by_full_decode() {
+        let req = |uri: &str, header: Option<&str>| {
+            let mut b = Request::builder().method("PUT").uri(uri);
+            if let Some(h) = header {
+                b = b.header("X-Content-Address", h);
+            }
+            b.body(Empty::<Bytes>::new()).unwrap()
+        };
+        let hello = ByteCid::parse(HELLO_CID).unwrap();
+        assert_eq!(
+            claimed_seed_cid(&req(&format!("/admin/seed/blob/{HELLO_CID}"), None)).unwrap(),
+            hello
+        );
+        assert_eq!(
+            claimed_seed_cid(&req("/admin/seed/blob", Some(HELLO_CID))).unwrap(),
+            hello
+        );
+        assert_eq!(
+            claimed_seed_cid(&req(
+                &format!("/admin/seed/blob/{HELLO_CID}"),
+                Some(HELLO_CID)
+            ))
+            .unwrap(),
+            hello
+        );
+        let abc = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu";
+        assert_eq!(
+            claimed_seed_cid(&req(&format!("/admin/seed/blob/{HELLO_CID}"), Some(abc)))
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            claimed_seed_cid(&req("/admin/seed/blob", None))
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        let legacy = format!("sha256-{}", "ab".repeat(32));
+        let bafkrei = elohim_address::compute_raw_sha2_cid(b"hello world").to_string();
+        for refused in [legacy.as_str(), bafkrei.as_str()] {
+            assert_eq!(
+                claimed_seed_cid(&req("/admin/seed/blob", Some(refused)))
+                    .unwrap_err()
+                    .status(),
+                StatusCode::BAD_REQUEST,
+                "{refused}"
+            );
+        }
     }
 
     /// Build an AppState with the given dev_mode and a configured prod JWT
@@ -780,7 +874,7 @@ mod tests {
         let mut builder = Request::builder()
             .method("PUT")
             .uri("/admin/seed/blob")
-            .header("X-Blob-Hash", "sha256-deadbeef");
+            .header("X-Content-Address", HELLO_CID);
         if let Some(t) = bearer {
             builder = builder.header(hyper::header::AUTHORIZATION, format!("Bearer {t}"));
         }
@@ -916,7 +1010,7 @@ mod tests {
     /// deployed doorway manifest (alpha, alpha-b, prod, staging, staging-read),
     /// so before the loopback conjunct a remote, credential-free caller passed
     /// this gate — proven 2026-08-24 against the local mesh, where an anonymous
-    /// `PUT /admin/seed/blob` with a wrong `X-Blob-Hash` answered `409 Hash
+    /// `PUT /admin/seed/blob` with a wrong blob address answered `409 Hash
     /// mismatch` (gate passed; only content addressing refused the write).
     /// A NON-loopback peer must now be REFUSED even with `dev_mode` on.
     ///
@@ -985,7 +1079,7 @@ mod tests {
         let req = Request::builder()
             .method("PUT")
             .uri("/admin/seed/blob")
-            .header("X-Blob-Hash", "sha256-deadbeef")
+            .header("X-Content-Address", HELLO_CID)
             .header("x-api-key", "test-admin-key")
             .body(Empty::<Bytes>::new())
             .unwrap();
@@ -1085,10 +1179,13 @@ mod tests {
         // to a hardcoded success instead of actually forwarding.
         state.args.storage_url = None;
 
-        let hash = "sha256-cachehit";
+        let bytes = b"seed blob bytes already in the pantry";
+        let cid = compute_bytes_cid(bytes);
+        let hash = cid.to_string();
+        let hash = hash.as_str();
         state.cache.set(
             hash,
-            b"seed blob bytes already in the pantry".to_vec(),
+            bytes.to_vec(),
             "application/octet-stream",
             std::time::Duration::from_secs(3600),
         );
@@ -1099,7 +1196,7 @@ mod tests {
 
         // Mirrors the `already_cached` branch in `handle_seed_blob`: body=None
         // forces forward_to_storage to read the bytes back out of the cache.
-        let forwarded = forward_to_storage(&state, hash, None).await;
+        let forwarded = forward_to_storage(&state, &cid, None).await;
         assert!(
             forwarded.is_err(),
             "no storage_url is configured, so the real forward must fail — \
@@ -1113,7 +1210,7 @@ mod tests {
         let mut state = test_state(true);
         state.args.storage_url = Some("http://127.0.0.1:1".to_string());
 
-        let forwarded = forward_to_storage(&state, "sha256-never-cached", None).await;
+        let forwarded = forward_to_storage(&state, &compute_bytes_cid(b"never cached"), None).await;
         assert!(
             forwarded.is_err(),
             "a hash with no cache entry and no supplied body has nothing to forward"
@@ -1129,7 +1226,7 @@ mod tests {
         let mut state = test_state(true);
         state.args.storage_url = None;
 
-        let reason = forward_to_storage(&state, "sha256-anything", None)
+        let reason = forward_to_storage(&state, &compute_bytes_cid(b"anything"), None)
             .await
             .expect_err("no storage_url must refuse");
         assert!(
@@ -1146,7 +1243,7 @@ mod tests {
     ///
     /// `elohim/dev` #1704/#1705 reported, verbatim and three times per host,
     /// `could not reach storage to forward the blob: error sending request for
-    /// url (http://elohim-adam-alpha…:8090/blob/sha256-…)`. That sentence names
+    /// url (http://elohim-adam-alpha…:8090/blob/<address>)`. That sentence names
     /// the leg (the 2026-09-02 cure) and withholds the one fact that routes the
     /// finding: whether the apex doorway could not RESOLVE adam, could not
     /// CONNECT to it, or waited and gave up. The cause chain is where that

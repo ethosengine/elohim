@@ -78,7 +78,8 @@ pub use apps::{handle_app_capability, handle_app_request};
 pub use auth_routes::handle_auth_request;
 pub use blob::{
     error_response as blob_error_response, handle_blob_request, handle_blob_request_with_fallback,
-    handle_blob_request_with_storage_proxy, BlobContext, BlobError,
+    handle_blob_request_with_storage_proxy, invalid_byte_cid_response, BlobAddress, BlobContext,
+    BlobError, CONTENT_ADDRESS_HEADER,
 };
 pub use chrome::handle_chrome_asset;
 pub use dashboard_ws::handle_dashboard_ws;

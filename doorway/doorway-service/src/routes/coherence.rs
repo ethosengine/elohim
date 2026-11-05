@@ -616,18 +616,25 @@ mod tests {
             served_bundle: served.map(str::to_string),
         };
         let mut none = vec![head(None)];
-        let mut one = vec![head(Some("sha256-aaa"))];
-        let mut two = vec![head(Some("sha256-bbb"))];
+        let mut one = vec![head(Some(
+            "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+        ))];
+        let mut two = vec![head(Some(
+            "bafkr4iargnjapmgkgmi5hvx5lft65ppqeebs22tbf47kkwuqzypnufrwga",
+        ))];
         let digest = mint_head_set_digest(&mut none);
         assert_eq!(digest, mint_head_set_digest(&mut one));
         assert_eq!(digest, mint_head_set_digest(&mut two));
         assert_eq!(
             one[0].served_bundle.as_deref(),
-            Some("sha256-aaa"),
+            Some("bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4"),
             "the bundle is kept"
         );
         let wire = serde_json::to_value(&one[0]).unwrap();
-        assert_eq!(wire["servedBundle"], "sha256-aaa");
+        assert_eq!(
+            wire["servedBundle"],
+            "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4"
+        );
         assert!(wire.get("declaredHead").is_none(), "{wire}");
         assert!(serde_json::to_value(&none[0])
             .unwrap()
@@ -635,10 +642,13 @@ mod tests {
             .is_none());
         // An older sibling mid-roll still writes `declaredHead`; it decodes.
         let older: EprHeadFingerprint = serde_json::from_str(
-            r#"{"urlPath":"/","eprId":"elohim-host-landing","declaredHead":"sha256-old"}"#,
+            r#"{"urlPath":"/","eprId":"elohim-host-landing","declaredHead":"bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu"}"#,
         )
         .unwrap();
-        assert_eq!(older.served_bundle.as_deref(), Some("sha256-old"));
+        assert_eq!(
+            older.served_bundle.as_deref(),
+            Some("bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu")
+        );
     }
 
     #[test]

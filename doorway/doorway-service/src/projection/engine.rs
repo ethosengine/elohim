@@ -54,7 +54,7 @@ use super::store::ProjectionStore;
 ///
 /// - `"commit"` / `"update"`: Store/update a document
 /// - `"delete"`: Soft-delete a document
-/// - `"update_endpoints"`: Update blob_endpoints for documents with matching blob_hash
+/// - `"update_endpoints"`: Update blob_endpoints for documents with matching blob_cid
 ///   (used by ContentServerCommitted signals from infrastructure DNA)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectionSignal {
@@ -63,7 +63,7 @@ pub struct ProjectionSignal {
     pub doc_type: String,
     /// Action ("commit", "delete", "update", "update_endpoints")
     pub action: String,
-    /// Document ID, or blob_hash for "update_endpoints" action
+    /// Document ID, or blob_cid for "update_endpoints" action
     pub id: String,
     /// Projected data. Doorway reads only its declared reach for cache admission.
     /// For "update_endpoints", this should be a JSON array of endpoint URLs
@@ -200,9 +200,9 @@ impl ProjectionEngine {
                 );
             }
             "update_endpoints" => {
-                // Update blob_endpoints for documents with matching blob_hash
-                // signal.id = blob_hash, signal.data = JSON array of endpoint URLs
-                let blob_hash = &signal.id;
+                // Update blob_endpoints for documents with matching blob_cid
+                // signal.id = blob_cid, signal.data = JSON array of endpoint URLs
+                let blob_cid = &signal.id;
                 let endpoints: Vec<String> = signal
                     .data
                     .as_array()
@@ -216,10 +216,10 @@ impl ProjectionEngine {
                 if !endpoints.is_empty() {
                     let count = self
                         .store
-                        .update_blob_endpoints(blob_hash, endpoints.clone())
+                        .update_blob_endpoints(blob_cid, endpoints.clone())
                         .await?;
                     debug!(
-                        blob_hash = blob_hash,
+                        blob_cid = blob_cid,
                         endpoints = ?endpoints,
                         updated_count = count,
                         "Updated blob endpoints in projection store"

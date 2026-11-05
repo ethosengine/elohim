@@ -52,7 +52,7 @@
 //! The event stream is lossy: storage's broadcast drops events for a lagging
 //! subscriber (it says so with a `: lagged` comment), events emitted while the
 //! SSE connection is down are gone, and some storage writes emit no event at
-//! all (the CRDT heal in `p2p/mod.rs` writes `blob_hash` directly). So a
+//! all (the CRDT heal in `p2p/mod.rs` writes `blob_cid` directly). So a
 //! **reconciliation sweep** runs every `DOORWAY_CACHE_RECONCILE_SECS`
 //! (default [`RECONCILE_DEFAULT_SECS`] = 10 min; `0` disables the timer only),
 //! and on demand after a reconnect, a `: lagged` notice, a bulk edge write or a

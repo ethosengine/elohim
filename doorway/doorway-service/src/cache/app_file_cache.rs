@@ -13,8 +13,8 @@
 //!
 //! ## Invalidation
 //!
-//! Files are keyed by `{slug}:{file_path}:{blob_hash}`. When a new
-//! blob_hash arrives (re-seed), the old entries become unreachable. MongoDB's
+//! Files are keyed by `{slug}:{file_path}:{blob_cid}`. When a new
+//! blob_cid arrives (re-seed), the old entries become unreachable. MongoDB's
 //! TTL index on `last_accessed` garbage-collects stale entries after 24h.
 //! `invalidate_app()` provides immediate bulk purge when needed.
 
@@ -43,9 +43,9 @@ pub struct CachedFile {
     /// MIME content type
     pub content_type: String,
     /// Blob hash of the source zip bundle
-    pub blob_hash: String,
+    pub blob_cid: String,
     /// See `AppFileCacheDoc::head_bound` — whether these bytes were fetched by
-    /// `blob_hash` rather than merely stocked under it. Legacy docs read
+    /// `blob_cid` rather than merely stocked under it. Legacy docs read
     /// `false`, and the warm-shell path refuses to call those at-head.
     pub head_bound: bool,
 }
@@ -61,13 +61,30 @@ pub struct CachedFile {
 /// Collection name for projected entries in MongoDB (the projection store).
 const PROJECTED_ENTRIES_COLLECTION: &str = "projected_entries";
 
+/// Is `identifier` a content address — a byte CID admitted by full decode
+/// (`ByteCid::parse`)? Anything else on `/apps/{identifier}/…` is a slug. There is no
+/// prefix or length heuristic: a `sha256-…` or `bafkrei…` identifier is a slug that
+/// resolves to nothing, never an address.
+pub fn is_content_address(identifier: &str) -> bool {
+    elohim_address::ByteCid::parse(identifier).is_ok()
+}
+
+/// A projected head value, admitted only when it is a byte CID. A projection row
+/// written under another spelling names no bundle this doorway can address.
+fn projected_head(data: &bson::Document, key: &str) -> Option<String> {
+    data.get_str(key)
+        .ok()
+        .filter(|h| is_content_address(h))
+        .map(str::to_string)
+}
+
 /// What the doorway's own content projection says about a bundled app: the
 /// facts the content-app chrome shell needs, read from the same projected
 /// document the slug index is built from. No storage round trip.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppDescriptor {
-    /// Blob hash of the current bundle head.
-    pub blob_hash: String,
+    /// Byte CID of the current bundle head.
+    pub blob_cid: String,
     /// The content node id (the EPR address is `/epr/{content_id}`).
     pub content_id: String,
     /// `html5-app`, `spa-bundle`, ...
@@ -80,9 +97,9 @@ pub struct AppDescriptor {
 
 impl AppDescriptor {
     /// Read a descriptor from a projected content `data` document (camelCase
-    /// on the wire). `None` when the document names no bundle blob.
+    /// on the wire). `None` when the document names no bundle blob by byte CID.
     pub fn from_data(data: &bson::Document) -> Option<Self> {
-        let blob_hash = data.get_str("blobHash").ok().filter(|s| !s.is_empty())?;
+        let blob_cid = projected_head(data, "blobCid")?;
         let non_empty = |key: &str| {
             data.get_str(key)
                 .ok()
@@ -90,7 +107,7 @@ impl AppDescriptor {
                 .map(str::to_string)
         };
         Some(Self {
-            blob_hash: blob_hash.to_string(),
+            blob_cid,
             content_id: non_empty("id").unwrap_or_default(),
             content_format: non_empty("contentFormat").unwrap_or_default(),
             entry_point: content_body_field(data, "entryPoint"),
@@ -121,7 +138,7 @@ pub struct AppFileCacheService {
     /// Key format: "apps:{slug}:{file_path}"
     in_flight: DashMap<String, broadcast::Sender<Option<CachedFile>>>,
 
-    /// slug -> blob_hash mapping (populated from content projection).
+    /// slug -> blob_cid mapping (populated from content projection).
     /// Used to construct cache keys for HTML5 app file lookups.
     slug_index: Arc<RwLock<HashMap<String, String>>>,
 
@@ -147,27 +164,27 @@ impl AppFileCacheService {
 
     /// Build the MongoDB `_id` for a cached file.
     ///
-    /// Format: `{slug}:{file_path}:{blob_hash}`
-    pub fn cache_key(slug: &str, file_path: &str, blob_hash: &str) -> String {
-        format!("{slug}:{file_path}:{blob_hash}")
+    /// Format: `{slug}:{file_path}:{blob_cid}`
+    pub fn cache_key(slug: &str, file_path: &str, blob_cid: &str) -> String {
+        format!("{slug}:{file_path}:{blob_cid}")
     }
 
     /// Build the in-flight coalescing key for a file being fetched.
     ///
     /// Format: `apps:{slug}:{file_path}`
     ///
-    /// Note: this is blob_hash-independent because we only ever fetch the
-    /// latest version of a file — the blob_hash is determined by the fetch.
+    /// Note: this is blob_cid-independent because we only ever fetch the
+    /// latest version of a file — the blob_cid is determined by the fetch.
     pub fn in_flight_key(slug: &str, file_path: &str) -> String {
         format!("apps:{slug}:{file_path}")
     }
 
-    /// Look up a cached file by slug, file_path, and blob_hash.
+    /// Look up a cached file by slug, file_path, and blob_cid.
     ///
     /// On cache hit, updates `last_accessed` in a fire-and-forget spawn
     /// to keep the TTL index fresh without blocking the caller.
-    pub async fn get(&self, slug: &str, file_path: &str, blob_hash: &str) -> Option<CachedFile> {
-        let mongo_id = Self::cache_key(slug, file_path, blob_hash);
+    pub async fn get(&self, slug: &str, file_path: &str, blob_cid: &str) -> Option<CachedFile> {
+        let mongo_id = Self::cache_key(slug, file_path, blob_cid);
 
         let db = self.mongo.inner().database(self.mongo.db_name());
         let collection = db.collection::<AppFileCacheDoc>(APP_FILE_CACHE_COLLECTION);
@@ -199,12 +216,12 @@ impl AppFileCacheService {
         Some(CachedFile {
             data: doc.data,
             content_type: doc.content_type,
-            blob_hash: doc.blob_hash,
+            blob_cid: doc.blob_cid,
             head_bound: doc.head_bound,
         })
     }
 
-    /// Look up the most recently cached copy of a file at ANY blob_hash.
+    /// Look up the most recently cached copy of a file at ANY blob_cid.
     ///
     /// The warm-boot shell cache's "last reconciled bundle" read: when the
     /// declared head is unknown, or known but not yet stocked, the newest
@@ -227,7 +244,7 @@ impl AppFileCacheService {
             Ok(Some(doc)) => Some(CachedFile {
                 data: doc.data,
                 content_type: doc.content_type,
-                blob_hash: doc.blob_hash,
+                blob_cid: doc.blob_cid,
                 head_bound: doc.head_bound,
             }),
             Ok(None) => None,
@@ -246,16 +263,16 @@ impl AppFileCacheService {
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         data: Vec<u8>,
     ) {
-        self.put_marked(slug, file_path, blob_hash, content_type, data, false)
+        self.put_marked(slug, file_path, blob_cid, content_type, data, false)
             .await
     }
 
-    /// [`Self::put`] for bytes that were FETCHED by `blob_hash` — a
-    /// hash-addressed `/apps/{blob_hash}/{file}` read, not a slug read.
+    /// [`Self::put`] for bytes that were FETCHED by `blob_cid` — a
+    /// hash-addressed `/apps/{blob_cid}/{file}` read, not a slug read.
     ///
     /// Only such a doc is proof of its own address, so only such a doc lets the
     /// warm-shell path classify a shell `AtHead`. See `AppFileCacheDoc::head_bound`.
@@ -263,11 +280,11 @@ impl AppFileCacheService {
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         data: Vec<u8>,
     ) {
-        self.put_marked(slug, file_path, blob_hash, content_type, data, true)
+        self.put_marked(slug, file_path, blob_cid, content_type, data, true)
             .await
     }
 
@@ -275,7 +292,7 @@ impl AppFileCacheService {
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         data: Vec<u8>,
         head_bound: bool,
@@ -283,7 +300,7 @@ impl AppFileCacheService {
         let doc = AppFileCacheDoc::new(
             slug.to_string(),
             file_path.to_string(),
-            blob_hash.to_string(),
+            blob_cid.to_string(),
             self.agreement_id.clone(),
             content_type.to_string(),
             data,
@@ -348,7 +365,7 @@ impl AppFileCacheService {
     ///
     /// Queries `projected_entries` for Content documents with
     /// `contentFormat == "html5-app"` or `contentFormat == "spa-bundle"` and
-    /// builds a HashMap of `slug -> blob_hash`. Called at startup and can be
+    /// builds a HashMap of `slug -> blob_cid`. Called at startup and can be
     /// called to refresh the entire index.
     pub async fn load_slug_index(&self) {
         let db = self.mongo.inner().database(self.mongo.db_name());
@@ -375,15 +392,15 @@ impl AppFileCacheService {
 
         while let Ok(Some(doc)) = cursor.try_next().await {
             if let Some(data) = doc.get("data").and_then(|v| v.as_document()) {
-                let blob_hash = data.get_str("blobHash").ok();
+                let blob_cid = projected_head(data, "blobCid");
 
                 // The HTML5 app's slug lives inside contentBody (a JSON string),
                 // NOT in data.hAppId (which is the Holochain app context, e.g. "lamad").
                 let app_slug = extract_app_slug_from_data(data);
 
-                if let (Some(slug), Some(blob_hash)) = (app_slug, blob_hash) {
-                    if !slug.is_empty() && !blob_hash.is_empty() {
-                        index.insert(slug.to_string(), blob_hash.to_string());
+                if let (Some(slug), Some(blob_cid)) = (app_slug, blob_cid) {
+                    if !slug.is_empty() && !blob_cid.is_empty() {
+                        index.insert(slug.to_string(), blob_cid.to_string());
                         if let Some(d) = AppDescriptor::from_data(data) {
                             descriptors.insert(slug.to_string(), d);
                         }
@@ -401,15 +418,15 @@ impl AppFileCacheService {
         info!(count = count, "Slug index loaded from projection store");
     }
 
-    /// Resolve the current blob_hash for an identifier (slug or content address).
+    /// Resolve the current blob_cid for an identifier (slug or content address).
     ///
-    /// Short-circuits for content addresses (`sha256-...`) — returns the
-    /// identifier directly since it IS the blob hash. For slugs, checks
+    /// Short-circuits for content addresses (a byte CID, `bafkr4i…`) — returns the
+    /// identifier directly since it IS the bundle's address. For slugs, checks
     /// the in-memory index first, then falls back to a lazy single-document
     /// query against MongoDB.
-    pub async fn resolve_blob_hash(&self, identifier: &str) -> Option<String> {
+    pub async fn resolve_blob_cid(&self, identifier: &str) -> Option<String> {
         // Short-circuit: if identifier is already a content address, return it directly
-        if identifier.starts_with("sha256-") && identifier.len() > 10 {
+        if is_content_address(identifier) {
             return Some(identifier.to_string());
         }
 
@@ -425,22 +442,18 @@ impl AppFileCacheService {
 
         // Slow path: lazy load from MongoDB for this specific app
         let data = self.scan_projected_app(slug).await?;
-        let blob_hash = data
-            .get_str("blobHash")
-            .ok()
-            .filter(|h| !h.is_empty())?
-            .to_string();
+        let blob_cid = projected_head(&data, "blobCid")?;
         self.slug_index
             .write()
             .await
-            .insert(slug.to_string(), blob_hash.clone());
+            .insert(slug.to_string(), blob_cid.clone());
         if let Some(d) = AppDescriptor::from_data(&data) {
             self.descriptor_index
                 .write()
                 .await
                 .insert(slug.to_string(), d);
         }
-        Some(blob_hash)
+        Some(blob_cid)
     }
 
     /// The projected `data` document of the bundled app whose slug is `slug`,
@@ -479,18 +492,18 @@ impl AppFileCacheService {
     /// content address, an unknown slug, or when the projection is
     /// unavailable — the caller then serves the bundle raw.
     pub async fn resolve_app_descriptor(&self, identifier: &str) -> Option<AppDescriptor> {
-        if identifier.starts_with("sha256-") {
+        if is_content_address(identifier) {
             return None;
         }
         if let Some(d) = self.descriptor_index.read().await.get(identifier) {
             return Some(d.clone());
         }
-        // Read the projection directly rather than through resolve_blob_hash:
+        // Read the projection directly rather than through resolve_blob_cid:
         // a head the reconciler declared (set_slug_head) or re-resolved after
         // refresh_app makes that fast path return before any scan, which would
         // leave the descriptor empty for as long as the head stays cached.
         // Only the descriptor is filled here — the head index belongs to the
-        // reconciler, and the projection's blobHash may be the stale one.
+        // reconciler, and the projection's blobCid may be the stale one.
         let data = self.scan_projected_app(identifier).await?;
         let descriptor = AppDescriptor::from_data(&data)?;
         self.descriptor_index
@@ -500,41 +513,41 @@ impl AppFileCacheService {
         Some(descriptor)
     }
 
-    /// Reverse the slug index: which app slug currently declares `blob_hash` as
+    /// Reverse the slug index: which app slug currently declares `blob_cid` as
     /// its head?
     ///
     /// The serving-eligibility fold needs this because a content-addressed read
-    /// (`/blob/{hash}`, `/apps/{sha256-…}/…`) names no slug and no mount, so
+    /// (`/blob/{cid}`, `/apps/{bafkr4i…}/…`) names no slug and no mount, so
     /// without it there is no way to ask which EPR's reach governs the bytes.
     /// Index-only by construction — never a Mongo scan — so an unknown hash is
     /// an immediate `None` and the caller passes it through unchanged rather
     /// than paying a read to learn nothing.
-    pub async fn slug_for_head(&self, blob_hash: &str) -> Option<String> {
-        if blob_hash.is_empty() {
+    pub async fn slug_for_head(&self, blob_cid: &str) -> Option<String> {
+        if blob_cid.is_empty() {
             return None;
         }
         let index = self.slug_index.read().await;
         index
             .iter()
-            .find(|(_, hash)| hash.as_str() == blob_hash)
+            .find(|(_, hash)| hash.as_str() == blob_cid)
             .map(|(slug, _)| slug.clone())
     }
 
-    /// Declare `blob_hash` as this doorway's head for `slug` in the in-memory
-    /// index — the fast path `resolve_blob_hash` reads first.
+    /// Declare `blob_cid` as this doorway's head for `slug` in the in-memory
+    /// index — the fast path `resolve_blob_cid` reads first.
     ///
     /// The write-through half of the bundle-heads reconciler. Distinct from
     /// [`Self::refresh_app`] on purpose: dropping the entry only sends the next
     /// request back to the SAME stale projection it was already reading, which
     /// is exactly why the storage `content.updated` bridge never moved the
     /// declared head (2026-09-08).
-    pub async fn set_slug_head(&self, slug: &str, blob_hash: &str) {
-        if blob_hash.is_empty() {
+    pub async fn set_slug_head(&self, slug: &str, blob_cid: &str) {
+        if blob_cid.is_empty() {
             return;
         }
         let mut index = self.slug_index.write().await;
-        index.insert(slug.to_string(), blob_hash.to_string());
-        debug!(slug = %slug, blob_hash = %blob_hash, "Slug head declared in the index");
+        index.insert(slug.to_string(), blob_cid.to_string());
+        debug!(slug = %slug, blob_cid = %blob_cid, "Slug head declared in the index");
     }
 
     /// Write the reconciled heads through to the DURABLE projected entry, so a
@@ -551,10 +564,10 @@ impl AppFileCacheService {
     ) -> bool {
         let mut set = bson::Document::new();
         if let Some(h) = browser.filter(|h| !h.is_empty()) {
-            set.insert("data.blobHash", h);
+            set.insert("data.blobCid", h);
         }
         if let Some(h) = server.filter(|h| !h.is_empty()) {
-            set.insert("data.serverBlobHash", h);
+            set.insert("data.serverBlobCid", h);
         }
         if set.is_empty() {
             return false;
@@ -576,7 +589,7 @@ impl AppFileCacheService {
         };
 
         // The app's slug lives inside contentBody (a JSON string), which Mongo
-        // cannot filter on — the same scan `resolve_blob_hash`'s slow path does.
+        // cannot filter on — the same scan `resolve_blob_cid`'s slow path does.
         while let Ok(Some(document)) = cursor.try_next().await {
             let matches = document
                 .get("data")
@@ -605,7 +618,7 @@ impl AppFileCacheService {
     }
 
     /// Remove a slug from the index so the next request re-resolves
-    /// with a fresh blob_hash from MongoDB.
+    /// with a fresh blob_cid from MongoDB.
     ///
     /// Called by the invalidation hook when a content update signal
     /// arrives for a bundled app (html5-app or spa-bundle).
@@ -643,13 +656,13 @@ impl AppFileCacheService {
         deleted as usize
     }
 
-    /// Check whether any cached files exist for the given slug and blob_hash.
+    /// Check whether any cached files exist for the given slug and blob_cid.
     ///
-    /// Returns true if at least one file with this `slug:*:blob_hash` key
+    /// Returns true if at least one file with this `slug:*:blob_cid` key
     /// exists in MongoDB. Used by the /health/startup endpoint to report
     /// whether the root app is ready to serve.
-    pub async fn has_cached_files(&self, slug: &str, blob_hash: &str) -> bool {
-        if blob_hash.is_empty() {
+    pub async fn has_cached_files(&self, slug: &str, blob_cid: &str) -> bool {
+        if blob_cid.is_empty() {
             return false;
         }
 
@@ -658,7 +671,7 @@ impl AppFileCacheService {
 
         let filter = doc! {
             "slug": slug,
-            "blob_hash": blob_hash,
+            "blob_cid": blob_cid,
         };
 
         match collection.count_documents(filter).await {
@@ -831,7 +844,7 @@ impl crate::render::bundle_heads::HeadProjection for AppFileCacheService {
 /// `contentFormat == "spa-bundle"`:
 /// 1. `invalidate_app(app_id)` — clears all cached files for that app
 /// 2. `refresh_app(app_id)` — clears the blob hash index entry so the next
-///    request re-resolves with the fresh blob_hash
+///    request re-resolves with the fresh blob_cid
 /// 3. `warm_shell.evict(app_id)` — drops the in-process warm shell. That hot
 ///    map is consulted BEFORE the archive, so without this step an invalidation
 ///    cleared Mongo and left the old shell serving (2026-09-04).
@@ -892,7 +905,7 @@ mod tests {
             "t".to_string(),
         );
         let d = super::AppDescriptor {
-            blob_hash: "sha256-old-head".into(),
+            blob_cid: "bafkr4ihyuzi4wqrm55obvuschyzp43epraesvedyt4pcncofhloatqng7e".into(),
             content_id: "quiz-1".into(),
             content_format: "html5-app".into(),
             entry_point: Some("old.html".into()),
@@ -915,20 +928,23 @@ mod tests {
         let data = bson::doc! {
             "id": "quiz-1",
             "contentFormat": "html5-app",
-            "blobHash": "sha256-abcdef123456",
+            "blobCid": "bafkr4ihm4wnjcf5lwxbys33uq6nv6atjh5hdtxnui35oc5fdl54rflgasy",
             "title": "A quiz",
             "contentBody": r#"{"slug":"quiz-1","entryPoint":"./game.html"}"#,
         };
         let d = super::AppDescriptor::from_data(&data).unwrap();
         assert_eq!(d.content_id, "quiz-1");
         assert_eq!(d.content_format, "html5-app");
-        assert_eq!(d.blob_hash, "sha256-abcdef123456");
+        assert_eq!(
+            d.blob_cid,
+            "bafkr4ihm4wnjcf5lwxbys33uq6nv6atjh5hdtxnui35oc5fdl54rflgasy"
+        );
         assert_eq!(d.title.as_deref(), Some("A quiz"));
         assert_eq!(d.entry_file(), "game.html");
 
         // contentBody as a BSON document
         let data = bson::doc! {
-            "id": "quiz-1", "contentFormat": "html5-app", "blobHash": "sha256-x",
+            "id": "quiz-1", "contentFormat": "html5-app", "blobCid": "bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi",
             "contentBody": { "slug": "quiz-1", "entryPoint": "game.html" },
         };
         assert_eq!(
@@ -937,13 +953,13 @@ mod tests {
         );
 
         // a top-level entryPoint is not where the wire carries it
-        let top = bson::doc! { "blobHash": "sha256-x", "entryPoint": "game.html" };
+        let top = bson::doc! { "blobCid": "bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi", "entryPoint": "game.html" };
         assert_eq!(
             super::AppDescriptor::from_data(&top).unwrap().entry_file(),
             "index.html"
         );
 
-        let bare = bson::doc! { "blobHash": "sha256-x", "contentFormat": "spa-bundle" };
+        let bare = bson::doc! { "blobCid": "bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi", "contentFormat": "spa-bundle" };
         let d = super::AppDescriptor::from_data(&bare).unwrap();
         assert_eq!(d.entry_point, None);
         assert_eq!(d.entry_file(), "index.html");
@@ -955,15 +971,25 @@ mod tests {
 
     #[test]
     fn test_cache_key_format() {
-        let key = AppFileCacheService::cache_key("app-123", "js/main.js", "sha256-abc");
-        assert_eq!(key, "app-123:js/main.js:sha256-abc");
+        let key = AppFileCacheService::cache_key(
+            "app-123",
+            "js/main.js",
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y",
+        );
+        assert_eq!(
+            key,
+            "app-123:js/main.js:bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+        );
     }
 
     #[test]
     fn test_cache_key_with_nested_path() {
-        let key =
-            AppFileCacheService::cache_key("app-xyz", "assets/css/theme.css", "sha256-def456");
-        assert_eq!(key, "app-xyz:assets/css/theme.css:sha256-def456");
+        let key = AppFileCacheService::cache_key(
+            "app-xyz",
+            "assets/css/theme.css",
+            "bafkr4ielkywifgr4zplce3h6nuflr7xnpjya4synzrmz3pmzn3tj4b3ljy",
+        );
+        assert_eq!(key, "app-xyz:assets/css/theme.css:bafkr4ielkywifgr4zplce3h6nuflr7xnpjya4synzrmz3pmzn3tj4b3ljy");
     }
 
     #[test]
@@ -1007,7 +1033,7 @@ mod tests {
                 "contentFormat": "html5-app",
                 "hAppId": "lamad",  // Holochain app context — NOT the HTML5 app slug
                 "contentBody": "{\"slug\":\"quiz-1\",\"entryPoint\":\"index.html\"}",
-                "blobHash": "sha256-abc"
+                "blobCid": "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
             }),
         );
         assert_eq!(extract_app_slug(&doc), Some("quiz-1".to_string()));
@@ -1023,7 +1049,7 @@ mod tests {
                 "contentFormat": "spa-bundle",
                 "hAppId": "lamad",
                 "contentBody": "{\"slug\":\"lamad\",\"entryPoint\":\"index.html\"}",
-                "blobHash": "sha256-xyz"
+                "blobCid": "bafkr4ic5ccvdzh6jpdcemmh6kl4zs4cb4k2mc4ptfsnmo6ptnjhn6qbvwq"
             }),
         );
         assert_eq!(extract_app_slug(&doc), Some("lamad".to_string()));
@@ -1037,7 +1063,7 @@ mod tests {
             serde_json::json!({
                 "contentFormat": "spa-bundle",
                 "id": "lamad-root",
-                "blobHash": "sha256-xyz"
+                "blobCid": "bafkr4ic5ccvdzh6jpdcemmh6kl4zs4cb4k2mc4ptfsnmo6ptnjhn6qbvwq"
             }),
         );
         assert_eq!(extract_app_slug(&doc), Some("lamad-root".to_string()));
@@ -1051,7 +1077,7 @@ mod tests {
             serde_json::json!({
                 "contentFormat": "html5-app",
                 "id": "simulation-phys",
-                "blobHash": "sha256-def"
+                "blobCid": "bafkr4iahsa4zvxtj2y3kc23afy5yuie5bg7igmuosdxo5sorushl6thveu"
             }),
         );
         assert_eq!(extract_app_slug(&doc), Some("simulation-phys".to_string()));
@@ -1090,7 +1116,7 @@ mod tests {
             "content-no-format",
             serde_json::json!({
                 "slug": "quiz-1",
-                "blobHash": "sha256-abc"
+                "blobCid": "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
             }),
         );
         assert_eq!(extract_app_slug(&doc), None);

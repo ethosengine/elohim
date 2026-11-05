@@ -141,7 +141,15 @@ elohim-views = { path = "../../crates/elohim-views" }
 
 # CID (Content Identifiers) - IPFS-compatible content addressing
 cid = "0.11"
-multihash-codetable = { version = "0.1", features = ["sha2"] }
+multihash-codetable = { version = "0.2", features = ["sha2", "blake3"] }
+# The addressing kernel (re-genesis 1): `ByteCid::parse` is the only byte-address
+# validator (full decode); `compute_bytes_cid` / `verify_cid_any` hash and check.
+elohim-address = { path = "../../crates/elohim-address", features = ["serde"] }
+# Reassembles an erasure-coded payload from its stripes (`rs-gf8-0x11d-v1`, the code
+# elohim-storage's sharding.rs mints) before the whole-artifact check.
+reed-solomon-erasure = "6"
+# Incremental BLAKE3 for streaming byte-CID computation (`StreamingHasher`).
+blake3 = "1.8"
 
 # IPLD codecs for EPR Head content-type detection
 serde_ipld_dagcbor = "0.6.3"

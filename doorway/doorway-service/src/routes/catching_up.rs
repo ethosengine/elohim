@@ -792,7 +792,7 @@ mod tests {
         for p in [
             "/db/content/elohim-host-landing",
             "/db/content",
-            "/blob/bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+            "/blob/bafkr4ietvtp2zqcco4z6hfvdejaaxzrznm6ck7c5ie7cvlsxb3k5e7lqtm",
             "/apps/lamad/main.js",
             "/api/v1/content/abc",
             "/api/v1/paths/intro",

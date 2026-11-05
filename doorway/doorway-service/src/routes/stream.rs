@@ -166,11 +166,11 @@ pub async fn handle_dash_mpd(
 /// Returns a chunk from the tiered cache or fetches from custodian.
 pub async fn handle_chunk(
     state: Arc<AppState>,
-    blob_hash: &str,
+    blob_cid: &str,
     chunk_index: usize,
 ) -> Response<Full<Bytes>> {
     // Try to get chunk from cache
-    if let Some(chunk_data) = state.tiered_cache.get_chunk(blob_hash, chunk_index) {
+    if let Some(chunk_data) = state.tiered_cache.get_chunk(blob_cid, chunk_index) {
         return Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "video/mp2t")
@@ -181,7 +181,7 @@ pub async fn handle_chunk(
 
     // Chunk not in cache - try to get from custodian
     let criteria = CustodianSelectionCriteria::default();
-    let urls = state.custodian.get_custodian_urls(blob_hash, &criteria);
+    let urls = state.custodian.get_custodian_urls(blob_cid, &criteria);
 
     if urls.is_empty() {
         return error_response(StatusCode::NOT_FOUND, "Chunk not available");
@@ -191,7 +191,7 @@ pub async fn handle_chunk(
     // In production, we would fetch and cache the chunk
     let chunk_url = format!(
         "{}/chunk/{}",
-        urls[0].trim_end_matches(&format!("/{blob_hash}")),
+        urls[0].trim_end_matches(&format!("/{blob_cid}")),
         chunk_index
     );
 
@@ -208,14 +208,14 @@ pub async fn handle_chunk(
 /// Returns a byte range from the blob for resumable downloads.
 pub async fn handle_blob_range(
     state: Arc<AppState>,
-    blob_hash: &str,
+    blob_cid: &str,
     range_start: usize,
     range_end: usize,
 ) -> Response<Full<Bytes>> {
     // Try to get range from tiered cache
     if let Some(data) = state
         .tiered_cache
-        .get_blob_range(blob_hash, range_start, range_end)
+        .get_blob_range(blob_cid, range_start, range_end)
     {
         let content_range = format!(
             "bytes {}-{}/{}",
@@ -285,13 +285,13 @@ pub fn generate_hls_master(metadata: &BlobMetadata, content_id: &str, base_url: 
 /// Generate HLS variant playlist with segments
 ///
 /// # Arguments
-/// * `blob_hash` - Hash of the blob for this variant
+/// * `blob_cid` - Hash of the blob for this variant
 /// * `duration_secs` - Total duration in seconds
 /// * `segment_duration` - Target segment duration
 /// * `base_url` - Base URL for chunk endpoints
 /// * `chunk_size` - Size of each chunk in bytes
 pub fn generate_hls_variant(
-    blob_hash: &str,
+    blob_cid: &str,
     duration_secs: u32,
     segment_duration: u32,
     base_url: &str,
@@ -329,7 +329,7 @@ pub fn generate_hls_variant(
         };
 
         playlist.push_str(&format!("#EXTINF:{seg_duration:.3},\n"));
-        playlist.push_str(&format!("{base_url}/api/stream/chunk/{blob_hash}/{i}\n"));
+        playlist.push_str(&format!("{base_url}/api/stream/chunk/{blob_cid}/{i}\n"));
     }
 
     // End marker

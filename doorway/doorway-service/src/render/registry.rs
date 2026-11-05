@@ -17,14 +17,14 @@
 //! ## Bundle-head reconciliation (Track-4 T4-1)
 //!
 //! The server bundle is materialized once at boot; the declared head (the
-//! storage content row's `serverBlobHash`) moves whenever CI re-deploys the
+//! storage content row's `serverBlobCid`) moves whenever CI re-deploys the
 //! app. Without reconciliation a running doorway serves the boot bundle
 //! forever — a restart is the only refresh. This registry now:
 //!
 //! 1. records a per-slug [`BundleHead`] attestation at materialize time
-//!    ({slug, serverBlobHash, materializedAt, status}), surfaced on
+//!    ({slug, serverBlobCid, materializedAt, status}), surfaced on
 //!    `/health/startup` as `servedBundleHeads`;
-//! 2. re-resolves each slug's declared `serverBlobHash` on a background tick
+//! 2. re-resolves each slug's declared `serverBlobCid` on a background tick
 //!    ([`reconcile`]) and, on mismatch, re-materializes into a FRESH directory,
 //!    builds a new isolate, and HOT-SWAPS the registry entry in place —
 //!    converge-to-declared-head without a process restart;
@@ -87,7 +87,7 @@ pub enum HeadStatus {
     /// The last re-materialize attempt failed; the OLD renderer is still served.
     Failed,
     /// The renderer loaded (bytes ARE on disk and serving) but the boot-time
-    /// `serverBlobHash` attestation could not be CONFIRMED — the declared-head
+    /// `serverBlobCid` attestation could not be CONFIRMED — the declared-head
     /// read failed, or the head MOVED across the materialize window so we cannot
     /// prove which hash the on-disk bytes verified against. The slug is kept in
     /// the head table (NOT dropped) precisely so `reconcile` retries it every
@@ -117,15 +117,15 @@ impl HeadStatus {
 pub struct BundleHead {
     /// The app slug (EPR node slug) this head belongs to.
     pub slug: String,
-    /// The `serverBlobHash` of the bundle CURRENTLY materialized + serving.
-    pub server_blob_hash: String,
+    /// The `serverBlobCid` of the bundle CURRENTLY materialized + serving.
+    pub server_blob_cid: String,
     /// When this bundle was materialized (boot or last successful swap).
     pub materialized_at: chrono::DateTime<chrono::Utc>,
     /// Lifecycle status.
     pub status: HeadStatus,
-    /// The declared `serverBlobHash` observed on the last reconcile check
+    /// The declared `serverBlobCid` observed on the last reconcile check
     /// (`None` until the first check runs).
-    pub declared_server_blob_hash: Option<String>,
+    pub declared_server_blob_cid: Option<String>,
     /// The error retained from the last failed re-materialize attempt.
     pub last_error: Option<String>,
 }
@@ -135,8 +135,8 @@ impl BundleHead {
         let mut obj = serde_json::Map::new();
         obj.insert("slug".into(), serde_json::Value::String(self.slug.clone()));
         obj.insert(
-            "serverBlobHash".into(),
-            serde_json::Value::String(self.server_blob_hash.clone()),
+            "serverBlobCid".into(),
+            serde_json::Value::String(self.server_blob_cid.clone()),
         );
         obj.insert(
             "materializedAt".into(),
@@ -146,10 +146,10 @@ impl BundleHead {
             "status".into(),
             serde_json::Value::String(self.status.as_str().to_string()),
         );
-        // declaredServerBlobHash only when known (from a reconcile check).
-        if let Some(ref d) = self.declared_server_blob_hash {
+        // declaredServerBlobCid only when known (from a reconcile check).
+        if let Some(ref d) = self.declared_server_blob_cid {
             obj.insert(
-                "declaredServerBlobHash".into(),
+                "declaredServerBlobCid".into(),
                 serde_json::Value::String(d.clone()),
             );
         }
@@ -171,11 +171,11 @@ pub struct SlugOutcome {
     /// `"failed"` (re-materialize failed, old kept), or `"unreachable"`
     /// (declared-head read failed, old kept).
     pub outcome: String,
-    /// The `serverBlobHash` now being served after this pass.
-    pub server_blob_hash: Option<String>,
-    /// The declared `serverBlobHash` observed this pass (`None` when the read
+    /// The `serverBlobCid` now being served after this pass.
+    pub server_blob_cid: Option<String>,
+    /// The declared `serverBlobCid` observed this pass (`None` when the read
     /// failed).
-    pub declared_server_blob_hash: Option<String>,
+    pub declared_server_blob_cid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -432,8 +432,8 @@ impl RendererRegistry {
         let mut default_materialized = default_app.is_none();
         if let Some(slug) = &default_app {
             // The server bundle is resolved from the EPR node's
-            // `serverBlobHash` field (not the browser `blobHash`). On resolve
-            // failure (e.g. serverBlobHash absent mid-migration) SSR for this
+            // `serverBlobCid` field (not the browser `blobCid`). On resolve
+            // failure (e.g. serverBlobCid absent mid-migration) SSR for this
             // app stays off → CSR fallback, never a crash.
             //
             // Single-resolve TOCTOU guard (Track-4): capture the declared head
@@ -461,7 +461,7 @@ impl RendererRegistry {
                 Err(e) => {
                     // Do NOT empty the registry: the head is very likely just not
                     // declared upstream YET (fresh mesh — the doorway can boot
-                    // before the deploy declares serverBlobHash). Boot proceeds
+                    // before the deploy declares serverBlobCid). Boot proceeds
                     // renderer-less for this app and the reconcile tick's
                     // adoption pass materializes it the moment it is declared.
                     // (MEASURED wave-2 2026-08-22: returning empty here left
@@ -600,7 +600,7 @@ impl RendererRegistry {
 
         // Reconcile is enabled only when at least one slug was configured (there
         // is a declared head to converge toward). An image-baked default with no
-        // slug has no `serverBlobHash` source, so it never reconciles.
+        // slug has no `serverBlobCid` source, so it never reconciles.
         let reconcile_ctx = if slugs.is_empty() {
             None
         } else {
@@ -797,7 +797,7 @@ impl RendererRegistry {
     }
 
     /// Run ONE reconcile pass over every served slug: re-resolve its declared
-    /// `serverBlobHash`, and on mismatch re-materialize + hot-swap. Returns a
+    /// `serverBlobCid`, and on mismatch re-materialize + hot-swap. Returns a
     /// per-slug outcome. No-op (empty) when reconcile is disabled.
     ///
     /// Concurrency: heavy work (declared-head resolve, materialize, isolate
@@ -826,7 +826,7 @@ impl RendererRegistry {
                 .values()
                 .map(|h| {
                     let is_default = inner.default_app.as_deref() == Some(h.slug.as_str());
-                    (h.slug.clone(), h.server_blob_hash.clone(), is_default)
+                    (h.slug.clone(), h.server_blob_cid.clone(), is_default)
                 })
                 .collect()
         };
@@ -857,8 +857,8 @@ impl RendererRegistry {
                     outcomes.push(SlugOutcome {
                         slug,
                         outcome: decision_class.label().into(),
-                        server_blob_hash: Some(materialized_hash),
-                        declared_server_blob_hash: None,
+                        server_blob_cid: Some(materialized_hash),
+                        declared_server_blob_cid: None,
                         error: Some(err),
                     });
                 }
@@ -867,8 +867,8 @@ impl RendererRegistry {
                     outcomes.push(SlugOutcome {
                         slug,
                         outcome: decision_class.label().into(),
-                        server_blob_hash: Some(materialized_hash),
-                        declared_server_blob_hash: Some(declared_hash),
+                        server_blob_cid: Some(materialized_hash),
+                        declared_server_blob_cid: Some(declared_hash),
                         error: None,
                     });
                 }
@@ -888,8 +888,8 @@ impl RendererRegistry {
                         outcomes.push(SlugOutcome {
                             slug,
                             outcome: "refreshing".into(),
-                            server_blob_hash: Some(materialized_hash),
-                            declared_server_blob_hash: Some(declared_hash),
+                            server_blob_cid: Some(materialized_hash),
+                            declared_server_blob_cid: Some(declared_hash),
                             error: None,
                         });
                         continue;
@@ -962,8 +962,8 @@ impl RendererRegistry {
                                     SlugOutcome {
                                         slug: slug.clone(),
                                         outcome: "refreshed".into(),
-                                        server_blob_hash: Some(declared_hash.clone()),
-                                        declared_server_blob_hash: Some(declared_hash.clone()),
+                                        server_blob_cid: Some(declared_hash.clone()),
+                                        declared_server_blob_cid: Some(declared_hash.clone()),
                                         error: None,
                                     }
                                 }
@@ -988,8 +988,8 @@ impl RendererRegistry {
                                     SlugOutcome {
                                         slug: slug.clone(),
                                         outcome: "stale".into(),
-                                        server_blob_hash: Some(materialized_hash.clone()),
-                                        declared_server_blob_hash: observed
+                                        server_blob_cid: Some(materialized_hash.clone()),
+                                        declared_server_blob_cid: observed
                                             .or(Some(declared_hash.clone())),
                                         error: None,
                                     }
@@ -1007,8 +1007,8 @@ impl RendererRegistry {
                             SlugOutcome {
                                 slug: slug.clone(),
                                 outcome: "failed".into(),
-                                server_blob_hash: Some(materialized_hash.clone()),
-                                declared_server_blob_hash: Some(declared_hash.clone()),
+                                server_blob_cid: Some(materialized_hash.clone()),
+                                declared_server_blob_cid: Some(declared_hash.clone()),
                                 error: Some(e),
                             }
                         }
@@ -1018,8 +1018,8 @@ impl RendererRegistry {
                             SlugOutcome {
                                 slug: slug.clone(),
                                 outcome: "failed".into(),
-                                server_blob_hash: Some(materialized_hash.clone()),
-                                declared_server_blob_hash: Some(declared_hash.clone()),
+                                server_blob_cid: Some(materialized_hash.clone()),
+                                declared_server_blob_cid: Some(declared_hash.clone()),
                                 error: Some(e),
                             }
                         }
@@ -1036,7 +1036,7 @@ impl RendererRegistry {
         // ── Adoption pass (T4-2): late-declared heads ────────────────────────
         // A configured slug with NO served head never entered `targets` above —
         // its boot materialize failed, almost always because the doorway booted
-        // BEFORE the deploy declared the slug's serverBlobHash. Re-check the
+        // BEFORE the deploy declared the slug's serverBlobCid. Re-check the
         // declared head here (one cheap GET per missing slug per tick) and
         // materialize + load the moment a declaration appears. Idempotent: with
         // no missing slug the loop body never runs; a still-undeclared head
@@ -1063,8 +1063,8 @@ impl RendererRegistry {
                     outcomes.push(SlugOutcome {
                         slug,
                         outcome: "undeclared".into(),
-                        server_blob_hash: None,
-                        declared_server_blob_hash: None,
+                        server_blob_cid: None,
+                        declared_server_blob_cid: None,
                         error: Some(err),
                     });
                     continue;
@@ -1078,8 +1078,8 @@ impl RendererRegistry {
                 outcomes.push(SlugOutcome {
                     slug,
                     outcome: "refreshing".into(),
-                    server_blob_hash: None,
-                    declared_server_blob_hash: Some(declared_hash),
+                    server_blob_cid: None,
+                    declared_server_blob_cid: Some(declared_hash),
                     error: None,
                 });
                 continue;
@@ -1135,8 +1135,8 @@ impl RendererRegistry {
                             SlugOutcome {
                                 slug: slug.clone(),
                                 outcome: "adopted".into(),
-                                server_blob_hash: Some(declared_hash.clone()),
-                                declared_server_blob_hash: Some(declared_hash.clone()),
+                                server_blob_cid: Some(declared_hash.clone()),
+                                declared_server_blob_cid: Some(declared_hash.clone()),
                                 error: None,
                             }
                         }
@@ -1155,8 +1155,8 @@ impl RendererRegistry {
                             SlugOutcome {
                                 slug: slug.clone(),
                                 outcome: "undeclared".into(),
-                                server_blob_hash: None,
-                                declared_server_blob_hash: other
+                                server_blob_cid: None,
+                                declared_server_blob_cid: other
                                     .ok()
                                     .or(Some(declared_hash.clone())),
                                 error: None,
@@ -1174,8 +1174,8 @@ impl RendererRegistry {
                     SlugOutcome {
                         slug: slug.clone(),
                         outcome: "failed".into(),
-                        server_blob_hash: None,
-                        declared_server_blob_hash: Some(declared_hash.clone()),
+                        server_blob_cid: None,
+                        declared_server_blob_cid: Some(declared_hash.clone()),
                         error: Some(e),
                     }
                 }
@@ -1184,8 +1184,8 @@ impl RendererRegistry {
                     SlugOutcome {
                         slug: slug.clone(),
                         outcome: "failed".into(),
-                        server_blob_hash: None,
-                        declared_server_blob_hash: Some(declared_hash.clone()),
+                        server_blob_cid: None,
+                        declared_server_blob_cid: Some(declared_hash.clone()),
                         error: Some(e),
                     }
                 }
@@ -1212,7 +1212,7 @@ impl RendererRegistry {
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Current;
-            h.declared_server_blob_hash = Some(declared.to_string());
+            h.declared_server_blob_cid = Some(declared.to_string());
             h.last_error = None;
         }
     }
@@ -1230,7 +1230,7 @@ impl RendererRegistry {
         inner.refreshing.insert(slug.to_string());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Refreshing;
-            h.declared_server_blob_hash = Some(declared.to_string());
+            h.declared_server_blob_cid = Some(declared.to_string());
         }
         true
     }
@@ -1249,7 +1249,7 @@ impl RendererRegistry {
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = inner.heads.get_mut(slug) {
             h.status = HeadStatus::Stale;
-            h.declared_server_blob_hash = Some(declared.to_string());
+            h.declared_server_blob_cid = Some(declared.to_string());
         }
     }
 
@@ -1280,10 +1280,10 @@ impl RendererRegistry {
             inner.default_renderer = Some(new_renderer);
         }
         if let Some(h) = inner.heads.get_mut(slug) {
-            h.server_blob_hash = new_hash.to_string();
+            h.server_blob_cid = new_hash.to_string();
             h.materialized_at = chrono::Utc::now();
             h.status = HeadStatus::Current;
-            h.declared_server_blob_hash = Some(new_hash.to_string());
+            h.declared_server_blob_cid = Some(new_hash.to_string());
             h.last_error = None;
         }
         old
@@ -1314,10 +1314,10 @@ impl RendererRegistry {
             slug.to_string(),
             BundleHead {
                 slug: slug.to_string(),
-                server_blob_hash: new_hash.to_string(),
+                server_blob_cid: new_hash.to_string(),
                 materialized_at: chrono::Utc::now(),
                 status: HeadStatus::Current,
-                declared_server_blob_hash: Some(new_hash.to_string()),
+                declared_server_blob_cid: Some(new_hash.to_string()),
                 last_error: None,
             },
         );
@@ -1369,7 +1369,7 @@ pub fn adoption_targets(configured: &[String], served: &HashSet<String>) -> Vec<
 /// Boot-time head record for a slug whose bundle just materialized.
 ///
 /// TOCTOU-guarded single-resolve attestation. `pre` is the declared
-/// `serverBlobHash` resolved BEFORE `materialize_server_bundle` ran; this
+/// `serverBlobCid` resolved BEFORE `materialize_server_bundle` ran; this
 /// re-resolves it AFTER and delegates the decision to [`decide_boot_head`]:
 /// a `current` head is attested ONLY when the declared head was unchanged
 /// across the whole materialize window (so the bytes on disk provably verified
@@ -1410,7 +1410,7 @@ fn boot_head(
 ///   same hash and the on-disk bytes verified against it → attest `current`.
 /// - any resolve failed, or `pre != post` (head moved mid-materialize): we
 ///   cannot prove which hash the served bytes match → `unresolved` head with an
-///   empty `server_blob_hash` (unknown until reconcile confirms), retained so
+///   empty `server_blob_cid` (unknown until reconcile confirms), retained so
 ///   reconcile converges.
 fn decide_boot_head(
     slug: &str,
@@ -1420,10 +1420,10 @@ fn decide_boot_head(
     match (pre, post) {
         (Ok(pre_hash), Ok(post_hash)) if pre_hash == post_hash => BundleHead {
             slug: slug.to_string(),
-            server_blob_hash: pre_hash,
+            server_blob_cid: pre_hash,
             materialized_at: chrono::Utc::now(),
             status: HeadStatus::Current,
-            declared_server_blob_hash: None,
+            declared_server_blob_cid: None,
             last_error: None,
         },
         (pre_r, post_r) => {
@@ -1439,19 +1439,19 @@ fn decide_boot_head(
                 // Unknown: materialize does not return the hash it verified, and
                 // the bracketing resolves disagree — leave empty until reconcile
                 // materializes + confirms a head.
-                server_blob_hash: String::new(),
+                server_blob_cid: String::new(),
                 materialized_at: chrono::Utc::now(),
                 status: HeadStatus::Unresolved,
                 // Surface the post-resolve when we HAVE it, so an operator sees
                 // the head reconcile will converge toward.
-                declared_server_blob_hash: post_r.ok(),
+                declared_server_blob_cid: post_r.ok(),
                 last_error: Some(err),
             }
         }
     }
 }
 
-/// Re-resolve a slug's declared `serverBlobHash` off the async runtime.
+/// Re-resolve a slug's declared `serverBlobCid` off the async runtime.
 /// Returns `Err(msg)` on any failure (storage unreachable, field absent, task
 /// panic) — the caller treats every `Err` as the safe-degrade "keep current" arm.
 async fn resolve_declared(storage_url: &str, slug: &str) -> std::result::Result<String, String> {
@@ -1485,8 +1485,9 @@ fn materialize_and_build(
 
     // Fresh directory keyed by the declared hash so we NEVER overwrite the live
     // bundle the current isolate loaded. `<parent>/.reconcile/<slug>/<hash16>`.
+    // The byte-CID prefix is header-determined; the digest bits follow it.
     let short = declared_hash
-        .strip_prefix("sha256-")
+        .strip_prefix(elohim_address::BYTE_CID_PREFIX)
         .unwrap_or(declared_hash);
     // Panic-proof slice: `get(..16)` yields None (→ full string) if shorter.
     let short = short.get(..16).unwrap_or(short);
@@ -1663,10 +1664,10 @@ mod tests {
     fn test_head(slug: &str, hash: &str, status: HeadStatus) -> BundleHead {
         BundleHead {
             slug: slug.to_string(),
-            server_blob_hash: hash.to_string(),
+            server_blob_cid: hash.to_string(),
             materialized_at: chrono::Utc::now(),
             status,
-            declared_server_blob_hash: None,
+            declared_server_blob_cid: None,
             last_error: None,
         }
     }
@@ -1776,14 +1777,25 @@ mod tests {
         assert_eq!(targets, configured);
 
         // …the guard admits exactly one concurrent adopter…
-        assert!(reg.try_begin_refresh("elohim-host-landing", "sha256-abc"));
+        assert!(reg.try_begin_refresh(
+            "elohim-host-landing",
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+        ));
         assert!(
-            !reg.try_begin_refresh("elohim-host-landing", "sha256-abc"),
+            !reg.try_begin_refresh(
+                "elohim-host-landing",
+                "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+            ),
             "concurrent adoption of the same slug must be refused"
         );
 
         // …and adoption installs renderer + head together.
-        let old = reg.adopt_renderer("elohim-host-landing", stub("landing"), "sha256-abc", true);
+        let old = reg.adopt_renderer(
+            "elohim-host-landing",
+            stub("landing"),
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y",
+            true,
+        );
         reg.end_refresh("elohim-host-landing");
         assert!(old.is_none(), "no prior renderer to displace");
         assert!(reg.any_loaded());
@@ -1796,11 +1808,14 @@ mod tests {
         let heads = reg.heads_snapshot();
         assert_eq!(heads.len(), 1);
         assert_eq!(heads[0].slug, "elohim-host-landing");
-        assert_eq!(heads[0].server_blob_hash, "sha256-abc");
+        assert_eq!(
+            heads[0].server_blob_cid,
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+        );
         assert_eq!(heads[0].status, HeadStatus::Current);
         assert_eq!(
-            heads[0].declared_server_blob_hash.as_deref(),
-            Some("sha256-abc")
+            heads[0].declared_server_blob_cid.as_deref(),
+            Some("bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y")
         );
 
         // Idempotent: once served, the slug is never re-adopted.
@@ -1815,7 +1830,12 @@ mod tests {
             Some("elohim-host-landing".into()),
             vec![],
         );
-        reg.adopt_renderer("lamad-spa", stub("lamad"), "sha256-def", false);
+        reg.adopt_renderer(
+            "lamad-spa",
+            stub("lamad"),
+            "bafkr4iahsa4zvxtj2y3kc23afy5yuie5bg7igmuosdxo5sorushl6thveu",
+            false,
+        );
         assert!(reg.select(Some("lamad-spa")).is_some());
         // The default renderer still serves the default app, untouched.
         assert!(reg.select(None).is_some(), "default renderer retained");
@@ -1899,21 +1919,40 @@ mod tests {
 
     #[test]
     fn decide_reconcile_equal_is_up_to_date() {
-        let d = decide_reconcile("sha256-aaa", Ok("sha256-aaa".to_string()));
-        assert_eq!(d, ReconcileDecision::UpToDate("sha256-aaa".to_string()));
+        let d = decide_reconcile(
+            "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+            Ok("bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4".to_string()),
+        );
+        assert_eq!(
+            d,
+            ReconcileDecision::UpToDate(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4".to_string()
+            )
+        );
     }
 
     #[test]
     fn decide_reconcile_different_is_stale() {
-        let d = decide_reconcile("sha256-aaa", Ok("sha256-bbb".to_string()));
-        assert_eq!(d, ReconcileDecision::Stale("sha256-bbb".to_string()));
+        let d = decide_reconcile(
+            "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+            Ok("bafkr4iargnjapmgkgmi5hvx5lft65ppqeebs22tbf47kkwuqzypnufrwga".to_string()),
+        );
+        assert_eq!(
+            d,
+            ReconcileDecision::Stale(
+                "bafkr4iargnjapmgkgmi5hvx5lft65ppqeebs22tbf47kkwuqzypnufrwga".to_string()
+            )
+        );
     }
 
     #[test]
     fn decide_reconcile_read_failure_is_unreachable_safe_degrade() {
         // Storage unreachable / declared-head read failed → never adopt an
         // unverifiable head; keep serving current.
-        let d = decide_reconcile("sha256-aaa", Err("storage GET failed".to_string()));
+        let d = decide_reconcile(
+            "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+            Err("storage GET failed".to_string()),
+        );
         assert_eq!(
             d,
             ReconcileDecision::Unreachable("storage GET failed".to_string())
@@ -1932,22 +1971,38 @@ mod tests {
         use seam_contracts::AnswerState;
 
         assert_eq!(
-            decide_reconcile("sha256-aaa", Err("boom".into())).answer_state(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Err("boom".into())
+            )
+            .answer_state(),
             AnswerState::Unreachable
         );
         assert_eq!(
-            decide_reconcile("sha256-aaa", Ok("sha256-aaa".into())).answer_state(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Ok("bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4".into())
+            )
+            .answer_state(),
             AnswerState::Present
         );
         assert_eq!(
-            decide_reconcile("sha256-aaa", Ok("sha256-bbb".into())).answer_state(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Ok("bafkr4iargnjapmgkgmi5hvx5lft65ppqeebs22tbf47kkwuqzypnufrwga".into())
+            )
+            .answer_state(),
             AnswerState::Present
         );
 
         // The distinction that matters: an unreachable read must NEVER read as
         // an absence — nothing about the declared head was established.
         assert_ne!(
-            decide_reconcile("sha256-aaa", Err("boom".into())).answer_state(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Err("boom".into())
+            )
+            .answer_state(),
             AnswerState::Absent
         );
     }
@@ -1967,15 +2022,27 @@ mod tests {
         // ...and each decision projects onto its own class, so the label pushed
         // at the call site cannot drift from the decision taken.
         assert_eq!(
-            decide_reconcile("sha256-aaa", Err("boom".into())).class(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Err("boom".into())
+            )
+            .class(),
             ReconcileClass::Unreachable
         );
         assert_eq!(
-            decide_reconcile("sha256-aaa", Ok("sha256-aaa".into())).class(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Ok("bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4".into())
+            )
+            .class(),
             ReconcileClass::Current
         );
         assert_eq!(
-            decide_reconcile("sha256-aaa", Ok("sha256-bbb".into())).class(),
+            decide_reconcile(
+                "bafkr4icc6oif4b5ucrdvylp43iq7fpefbmwutq6mqhpspk3insj237tft4",
+                Ok("bafkr4iargnjapmgkgmi5hvx5lft65ppqeebs22tbf47kkwuqzypnufrwga".into())
+            )
+            .class(),
             ReconcileClass::Stale
         );
     }
@@ -1985,18 +2052,30 @@ mod tests {
     #[test]
     fn swap_renderer_updates_head_to_current_and_returns_old() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        reg.insert_head_for_test(test_head("app", "sha256-old", HeadStatus::Stale));
+        reg.insert_head_for_test(test_head(
+            "app",
+            "bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu",
+            HeadStatus::Stale,
+        ));
 
-        let old = reg.swap_renderer("app", stub("v2"), "sha256-new", true);
+        let old = reg.swap_renderer(
+            "app",
+            stub("v2"),
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu",
+            true,
+        );
         assert!(old.is_some(), "swap must return the displaced renderer");
 
         let heads = reg.heads_snapshot();
         assert_eq!(heads.len(), 1);
-        assert_eq!(heads[0].server_blob_hash, "sha256-new");
+        assert_eq!(
+            heads[0].server_blob_cid,
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu"
+        );
         assert_eq!(heads[0].status, HeadStatus::Current);
         assert_eq!(
-            heads[0].declared_server_blob_hash.as_deref(),
-            Some("sha256-new")
+            heads[0].declared_server_blob_cid.as_deref(),
+            Some("bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu")
         );
         assert!(heads[0].last_error.is_none());
     }
@@ -2004,14 +2083,21 @@ mod tests {
     #[test]
     fn mark_failed_retains_error_and_keeps_old_hash() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        reg.insert_head_for_test(test_head("app", "sha256-old", HeadStatus::Refreshing));
+        reg.insert_head_for_test(test_head(
+            "app",
+            "bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu",
+            HeadStatus::Refreshing,
+        ));
 
         reg.mark_failed("app", "materialize failed: hash mismatch");
 
         let heads = reg.heads_snapshot();
         assert_eq!(heads[0].status, HeadStatus::Failed);
         // Old renderer kept — head hash unchanged.
-        assert_eq!(heads[0].server_blob_hash, "sha256-old");
+        assert_eq!(
+            heads[0].server_blob_cid,
+            "bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu"
+        );
         assert_eq!(
             heads[0].last_error.as_deref(),
             Some("materialize failed: hash mismatch")
@@ -2021,17 +2107,24 @@ mod tests {
     #[test]
     fn mark_current_records_declared_and_clears_error() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        let mut h = test_head("app", "sha256-x", HeadStatus::Failed);
+        let mut h = test_head(
+            "app",
+            "bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi",
+            HeadStatus::Failed,
+        );
         h.last_error = Some("prior failure".into());
         reg.insert_head_for_test(h);
 
-        reg.mark_current("app", "sha256-x");
+        reg.mark_current(
+            "app",
+            "bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi",
+        );
 
         let heads = reg.heads_snapshot();
         assert_eq!(heads[0].status, HeadStatus::Current);
         assert_eq!(
-            heads[0].declared_server_blob_hash.as_deref(),
-            Some("sha256-x")
+            heads[0].declared_server_blob_cid.as_deref(),
+            Some("bafkr4igwwrl7wk4pi4wpgpy7crozgrjle675jhco2s4xjtfhs4s5ivqpsi")
         );
         assert!(heads[0].last_error.is_none());
     }
@@ -2041,8 +2134,13 @@ mod tests {
     #[test]
     fn heads_json_serialization_shape_exact_fields() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        let mut h = test_head("app", "sha256-served", HeadStatus::Current);
-        h.declared_server_blob_hash = Some("sha256-served".into());
+        let mut h = test_head(
+            "app",
+            "bafkr4ifpfkj4it3bxi6y3cxzjtfm7xxvlrstlszv4a7s7keykeoj7ey7tm",
+            HeadStatus::Current,
+        );
+        h.declared_server_blob_cid =
+            Some("bafkr4ifpfkj4it3bxi6y3cxzjtfm7xxvlrstlszv4a7s7keykeoj7ey7tm".into());
         reg.insert_head_for_test(h);
 
         let json = reg.heads_json();
@@ -2050,11 +2148,14 @@ mod tests {
         assert_eq!(arr.len(), 1);
         let entry = &arr[0];
         assert_eq!(entry.get("slug").unwrap(), "app");
-        assert_eq!(entry.get("serverBlobHash").unwrap(), "sha256-served");
+        assert_eq!(
+            entry.get("serverBlobCid").unwrap(),
+            "bafkr4ifpfkj4it3bxi6y3cxzjtfm7xxvlrstlszv4a7s7keykeoj7ey7tm"
+        );
         assert_eq!(entry.get("status").unwrap(), "current");
         assert_eq!(
-            entry.get("declaredServerBlobHash").unwrap(),
-            "sha256-served"
+            entry.get("declaredServerBlobCid").unwrap(),
+            "bafkr4ifpfkj4it3bxi6y3cxzjtfm7xxvlrstlszv4a7s7keykeoj7ey7tm"
         );
         // materializedAt is an RFC3339 string.
         let mat = entry.get("materializedAt").unwrap().as_str().unwrap();
@@ -2069,15 +2170,19 @@ mod tests {
     #[test]
     fn heads_json_omits_declared_when_unknown_and_includes_error_when_failed() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        let mut h = test_head("app", "sha256-served", HeadStatus::Failed);
-        h.declared_server_blob_hash = None; // never checked yet
+        let mut h = test_head(
+            "app",
+            "bafkr4ifpfkj4it3bxi6y3cxzjtfm7xxvlrstlszv4a7s7keykeoj7ey7tm",
+            HeadStatus::Failed,
+        );
+        h.declared_server_blob_cid = None; // never checked yet
         h.last_error = Some("boom".into());
         reg.insert_head_for_test(h);
 
         let json = reg.heads_json();
         let entry = &json.as_array().unwrap()[0];
-        // declaredServerBlobHash omitted when unknown.
-        assert!(entry.get("declaredServerBlobHash").is_none());
+        // declaredServerBlobCid omitted when unknown.
+        assert!(entry.get("declaredServerBlobCid").is_none());
         // error present when failed.
         assert_eq!(entry.get("error").unwrap(), "boom");
         assert_eq!(entry.get("status").unwrap(), "failed");
@@ -2102,12 +2207,12 @@ mod tests {
         // on-disk bytes verified against it — safe to attest as the served head.
         let head = decide_boot_head(
             "app",
-            Ok("sha256-materialized".to_string()),
-            Ok("sha256-materialized".to_string()),
+            Ok("bafkr4iefvlafcooouez3a2ctpcvkxruv5iaospwjdduzfrlnurlk53rzyq".to_string()),
+            Ok("bafkr4iefvlafcooouez3a2ctpcvkxruv5iaospwjdduzfrlnurlk53rzyq".to_string()),
         );
         assert_eq!(head.status, HeadStatus::Current);
         assert_eq!(
-            head.server_blob_hash, "sha256-materialized",
+            head.server_blob_cid, "bafkr4iefvlafcooouez3a2ctpcvkxruv5iaospwjdduzfrlnurlk53rzyq",
             "attested head must be the hash whose bytes were materialized"
         );
         assert!(head.last_error.is_none());
@@ -2119,26 +2224,26 @@ mod tests {
         // We cannot prove which hash the on-disk bytes verified against, so we
         // must NOT attest a served head — the exact stale-certification this
         // guard exists to prevent. The slug becomes `unresolved` (retained), and
-        // crucially its server_blob_hash is NOT set to the drifted post-value.
+        // crucially its server_blob_cid is NOT set to the drifted post-value.
         let head = decide_boot_head(
             "app",
-            Ok("sha256-first".to_string()),
-            Ok("sha256-moved".to_string()),
+            Ok("bafkr4iffqfvi7qzo77s5ly4tvywa5n5q24r5laqpaby7ktgaqvzwf6okb4".to_string()),
+            Ok("bafkr4ifnqojt66uadbgmb5e7idnn2d2wqp4ikjiq4fg5tq435moxqzroce".to_string()),
         );
         assert_eq!(head.status, HeadStatus::Unresolved);
         assert_eq!(
-            head.server_blob_hash, "",
+            head.server_blob_cid, "",
             "an unconfirmed head must NOT attest any served hash"
         );
         assert_ne!(
-            head.server_blob_hash, "sha256-moved",
+            head.server_blob_cid, "bafkr4ifnqojt66uadbgmb5e7idnn2d2wqp4ikjiq4fg5tq435moxqzroce",
             "must never certify the hash whose bytes were never materialized"
         );
         // The observed post-value is surfaced only as the declared head to
         // converge toward — never as the served head.
         assert_eq!(
-            head.declared_server_blob_hash.as_deref(),
-            Some("sha256-moved")
+            head.declared_server_blob_cid.as_deref(),
+            Some("bafkr4ifnqojt66uadbgmb5e7idnn2d2wqp4ikjiq4fg5tq435moxqzroce")
         );
         assert!(head.last_error.is_some());
     }
@@ -2158,7 +2263,7 @@ mod tests {
             Err("storage GET failed".to_string()),
         );
         assert_eq!(head.status, HeadStatus::Unresolved);
-        assert_eq!(head.server_blob_hash, "");
+        assert_eq!(head.server_blob_cid, "");
         assert!(head.last_error.is_some());
     }
 
@@ -2182,10 +2287,15 @@ mod tests {
         // materialized hash vs a freshly-resolved declared head) is Stale — i.e.
         // it re-materializes + swaps, self-healing to a confirmed head on the
         // 300s tick. This is the link that closes the "excluded forever" gap.
-        let decision = decide_reconcile(&heads[0].server_blob_hash, Ok("sha256-real".to_string()));
+        let decision = decide_reconcile(
+            &heads[0].server_blob_cid,
+            Ok("bafkr4iecux625ziaucnfbk4ikvh6txqvh2sol2azzym7r2dzuhtcg7emji".to_string()),
+        );
         assert_eq!(
             decision,
-            ReconcileDecision::Stale("sha256-real".to_string())
+            ReconcileDecision::Stale(
+                "bafkr4iecux625ziaucnfbk4ikvh6txqvh2sol2azzym7r2dzuhtcg7emji".to_string()
+            )
         );
     }
 
@@ -2204,9 +2314,9 @@ mod tests {
         let entry = &json.as_array().unwrap()[0];
         assert_eq!(entry.get("slug").unwrap(), "app");
         assert_eq!(entry.get("status").unwrap(), "unresolved");
-        // serverBlobHash present but empty — an honest "not yet confirmed",
+        // serverBlobCid present but empty — an honest "not yet confirmed",
         // never a fabricated served head.
-        assert_eq!(entry.get("serverBlobHash").unwrap(), "");
+        assert_eq!(entry.get("serverBlobCid").unwrap(), "");
     }
 
     #[test]
@@ -2260,17 +2370,30 @@ mod tests {
     #[test]
     fn try_begin_refresh_is_exclusive_until_end_refresh() {
         let reg = RendererRegistry::with_entries(Some(stub("v1")), Some("app".into()), vec![]);
-        reg.insert_head_for_test(test_head("app", "sha256-old", HeadStatus::Current));
+        reg.insert_head_for_test(test_head(
+            "app",
+            "bafkr4if5dmyd5co3msuweq6hemwkfvhiwpyrawudmes3npkas73lbz33yu",
+            HeadStatus::Current,
+        ));
 
         // First caller claims the guard and sets Refreshing.
-        assert!(reg.try_begin_refresh("app", "sha256-new"));
+        assert!(reg.try_begin_refresh(
+            "app",
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu"
+        ));
         assert_eq!(reg.heads_snapshot()[0].status, HeadStatus::Refreshing);
         // A concurrent caller is refused while the first holds it.
-        assert!(!reg.try_begin_refresh("app", "sha256-new"));
+        assert!(!reg.try_begin_refresh(
+            "app",
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu"
+        ));
 
         // After the first releases, a subsequent pass may claim it again.
         reg.end_refresh("app");
-        assert!(reg.try_begin_refresh("app", "sha256-new"));
+        assert!(reg.try_begin_refresh(
+            "app",
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu"
+        ));
         reg.end_refresh("app");
     }
 }

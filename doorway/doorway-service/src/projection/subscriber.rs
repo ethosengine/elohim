@@ -90,7 +90,7 @@ pub struct StorageEndpointData {
 /// ContentServer data from infrastructure DNA
 #[derive(Debug, Clone, Deserialize)]
 pub struct ContentServerData {
-    pub content_hash: String,
+    pub content_cid: String,
     pub capability: String,
     pub serve_url: Option<String>,
     #[serde(default)]
@@ -283,7 +283,7 @@ impl SubscriberConfig {
 /// Content server registration event for blob cache
 #[derive(Debug, Clone)]
 pub struct ContentServerRegistration {
-    pub content_hash: String,
+    pub content_cid: String,
     pub endpoints: Vec<String>,
     pub capability: String,
     pub priority: u8,
@@ -843,7 +843,7 @@ impl SignalSubscriber {
     /// Process an infrastructure signal (ContentServer registrations, etc.)
     ///
     /// ContentServerCommitted signals now go to ProjectionStore via signal_tx,
-    /// updating the blob_endpoints field on documents with matching blob_hash.
+    /// updating the blob_endpoints field on documents with matching blob_cid.
     /// This is part of the metadata layer merge (ProjectionStore is single source
     /// of truth for blob metadata, TieredBlobCache is bytes-only).
     fn process_infrastructure_signal(&self, signal: InfrastructureSignal) {
@@ -871,11 +871,11 @@ impl SignalSubscriber {
 
                 // Only process if we have endpoints and server is online
                 if !endpoint_urls.is_empty() && server.online {
-                    // Clone content_hash before it's moved
-                    let content_hash = server.content_hash.clone();
+                    // Clone content_cid before it's moved
+                    let content_cid = server.content_cid.clone();
 
                     info!(
-                        content_hash = %content_hash,
+                        content_cid = %content_cid,
                         endpoints = ?endpoint_urls,
                         capability = %server.capability,
                         "ContentServer registered - updating projection store"
@@ -883,11 +883,11 @@ impl SignalSubscriber {
 
                     // Convert to ProjectionSignal with "update_endpoints" action
                     // This routes through the normal signal channel to ProjectionEngine,
-                    // which updates blob_endpoints on documents with matching blob_hash
+                    // which updates blob_endpoints on documents with matching blob_cid
                     let signal = ProjectionSignal {
                         doc_type: "BlobEndpoint".to_string(), // Metadata only, not stored as doc
                         action: "update_endpoints".to_string(),
-                        id: content_hash.clone(),           // blob_hash
+                        id: content_cid.clone(),            // blob_cid
                         data: json!(endpoint_urls.clone()), // Array of endpoint URLs
                         action_hash,
                         entry_hash: None,
@@ -907,7 +907,7 @@ impl SignalSubscriber {
                     // Also send to blob_registry_tx for backwards compatibility
                     // (in case any consumers still use it)
                     let registration = ContentServerRegistration {
-                        content_hash,
+                        content_cid,
                         endpoints: endpoint_urls,
                         capability: server.capability,
                         priority: server.priority,
@@ -919,7 +919,7 @@ impl SignalSubscriber {
                     let _ = self.blob_registry_tx.send(registration);
                 } else {
                     debug!(
-                        content_hash = %server.content_hash,
+                        content_cid = %server.content_cid,
                         online = server.online,
                         "Ignoring ContentServer (offline or no endpoints)"
                     );
@@ -1092,7 +1092,7 @@ mod tests {
                 "action_hash": "uhCkkABC123",
                 "entry_hash": "uhCEkDEF456",
                 "server": {
-                    "content_hash": "sha256-abc123def456",
+                    "content_cid": "bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe",
                     "capability": "blob",
                     "serve_url": "http://localhost:8080/store",
                     "endpoints": [
@@ -1122,7 +1122,10 @@ mod tests {
 
         match signal {
             InfrastructureSignal::ContentServerCommitted { server, author, .. } => {
-                assert_eq!(server.content_hash, "sha256-abc123def456");
+                assert_eq!(
+                    server.content_cid,
+                    "bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe"
+                );
                 assert_eq!(server.capability, "blob");
                 assert_eq!(server.endpoints.len(), 2);
                 assert_eq!(server.endpoints[0].url, "http://192.168.1.100:8080/store");
@@ -1148,7 +1151,7 @@ mod tests {
                 "action_hash": "uhCkkABC123",
                 "entry_hash": "uhCEkDEF456",
                 "server": {
-                    "content_hash": "sha256-test",
+                    "content_cid": "bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m",
                     "capability": "blob",
                     "endpoints": [{
                         "url": "http://localhost:8080/store",
@@ -1171,7 +1174,10 @@ mod tests {
         match signal_rx.try_recv() {
             Ok(signal) => {
                 assert_eq!(signal.action, "update_endpoints");
-                assert_eq!(signal.id, "sha256-test"); // blob_hash
+                assert_eq!(
+                    signal.id,
+                    "bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m"
+                ); // blob_cid
                 assert!(signal.data.as_array().is_some());
                 let endpoints = signal.data.as_array().unwrap();
                 assert_eq!(endpoints.len(), 1);
@@ -1186,7 +1192,10 @@ mod tests {
         // Check that registration was also emitted to blob registry (backwards compatibility)
         match blob_rx.try_recv() {
             Ok(registration) => {
-                assert_eq!(registration.content_hash, "sha256-test");
+                assert_eq!(
+                    registration.content_cid,
+                    "bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m"
+                );
                 assert_eq!(registration.endpoints.len(), 1);
                 assert_eq!(registration.endpoints[0], "http://localhost:8080/store");
             }

@@ -1213,8 +1213,8 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
     );
 
     // Served SSR bundle-head attestations (Track-4 T4-1). Each entry:
-    // {slug, serverBlobHash, materializedAt (rfc3339), status (current|stale|
-    // refreshing|failed)} plus declaredServerBlobHash when a reconcile check has
+    // {slug, serverBlobCid, materializedAt (rfc3339), status (current|stale|
+    // refreshing|failed)} plus declaredServerBlobCid when a reconcile check has
     // observed it. Empty on a non-SSR doorway. A parallel CI/probe consumes this
     // exact camelCase shape — see render::registry::BundleHead::to_json.
     let served_bundle_heads = state.renderer_registry.heads_json();

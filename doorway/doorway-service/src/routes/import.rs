@@ -38,7 +38,7 @@ use crate::services::ImportConfigStore;
 /// Import queue request from client
 ///
 /// Clients MUST upload their items blob to elohim-storage first,
-/// then pass the blob_hash here. The zome stores only the manifest,
+/// then pass the blob_cid here. The zome stores only the manifest,
 /// and elohim-storage orchestrates chunk processing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportQueueRequest {
@@ -47,7 +47,7 @@ pub struct ImportQueueRequest {
     pub batch_id: Option<String>,
     /// Hash of the blob in elohim-storage containing the items JSON
     /// This is REQUIRED - upload to storage first, then queue import
-    pub blob_hash: String,
+    pub blob_cid: String,
     /// Total number of items in the blob
     pub total_items: u32,
     /// Schema version for the import data
@@ -213,7 +213,7 @@ async fn forward_queue_import(
 
     info!(
         batch_type = batch_type,
-        blob_hash = %import_req.blob_hash,
+        blob_cid = %import_req.blob_cid,
         total_items = import_req.total_items,
         chunk_size = ?import_req.chunk_size,
         chunk_delay_ms = ?import_req.chunk_delay_ms,
@@ -224,7 +224,7 @@ async fn forward_queue_import(
     let storage_req = serde_json::json!({
         "batch_id": import_req.batch_id,
         "batch_type": batch_type,
-        "blob_hash": import_req.blob_hash,
+        "blob_cid": import_req.blob_cid,
         "total_items": import_req.total_items,
         "schema_version": import_req.schema_version,
         "chunk_size": import_req.chunk_size,

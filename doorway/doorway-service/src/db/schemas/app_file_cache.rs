@@ -5,8 +5,8 @@
 //! (30+ concurrent asset requests per page load) so elohim-storage stays
 //! focused on P2P.
 //!
-//! Files are keyed by `{slug}:{file_path}:{blob_hash}` for content-addressed
-//! invalidation — when a new blob_hash arrives (re-seed), old entries are
+//! Files are keyed by `{slug}:{file_path}:{blob_cid}` for content-addressed
+//! invalidation — when a new blob_cid arrives (re-seed), old entries are
 //! automatically superseded.
 
 use bson::{doc, DateTime, Document};
@@ -22,11 +22,11 @@ pub const APP_FILE_CACHE_COLLECTION: &str = "app_file_cache";
 /// Cached HTML5 app file stored in MongoDB
 ///
 /// Each document represents a single extracted file from an HTML5 app's
-/// zip bundle. The `_id` is a composite key of `{slug}:{file_path}:{blob_hash}`
+/// zip bundle. The `_id` is a composite key of `{slug}:{file_path}:{blob_cid}`
 /// which ensures content-addressed invalidation on re-seed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppFileCacheDoc {
-    /// MongoDB document ID (format: "{slug}:{file_path}:{blob_hash}")
+    /// MongoDB document ID (format: "{slug}:{file_path}:{blob_cid}")
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub mongo_id: Option<String>,
 
@@ -37,10 +37,10 @@ pub struct AppFileCacheDoc {
     pub file_path: String,
 
     /// Blob hash of the zip bundle — invalidation key
-    pub blob_hash: String,
+    pub blob_cid: String,
 
-    /// True when these bytes were FETCHED by `blob_hash` (a hash-addressed
-    /// `/apps/{blob_hash}/{file}` read), not merely stocked under whatever head
+    /// True when these bytes were FETCHED by `blob_cid` (a hash-addressed
+    /// `/apps/{blob_cid}/{file}` read), not merely stocked under whatever head
     /// the doorway happened to declare at the time.
     ///
     /// A slug is a moving pointer: the warm-shell path used to fetch
@@ -81,7 +81,7 @@ impl Default for AppFileCacheDoc {
             mongo_id: None,
             slug: String::new(),
             file_path: String::new(),
-            blob_hash: String::new(),
+            blob_cid: String::new(),
             head_bound: false,
             agreement_id: String::new(),
             content_type: String::new(),
@@ -98,17 +98,17 @@ impl AppFileCacheDoc {
     pub fn new(
         slug: String,
         file_path: String,
-        blob_hash: String,
+        blob_cid: String,
         agreement_id: String,
         content_type: String,
         data: Vec<u8>,
     ) -> Self {
         let now = DateTime::now();
         Self {
-            mongo_id: Some(format!("{slug}:{file_path}:{blob_hash}")),
+            mongo_id: Some(format!("{slug}:{file_path}:{blob_cid}")),
             slug,
             file_path,
-            blob_hash,
+            blob_cid,
             head_bound: false,
             agreement_id,
             content_type,
@@ -139,12 +139,12 @@ impl IntoIndexes for AppFileCacheDoc {
                         .build(),
                 ),
             ),
-            // Compound index on slug + blob_hash for invalidation on re-seed
+            // Compound index on slug + blob_cid for invalidation on re-seed
             (
-                doc! { "slug": 1, "blob_hash": 1 },
+                doc! { "slug": 1, "blob_cid": 1 },
                 Some(
                     IndexOptions::builder()
-                        .name("slug_blob_hash_index".to_string())
+                        .name("slug_blob_cid_index".to_string())
                         .build(),
                 ),
             ),
@@ -177,7 +177,7 @@ mod tests {
         let doc = AppFileCacheDoc::new(
             "app-123".to_string(),
             "index.html".to_string(),
-            "sha256-abc".to_string(),
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y".to_string(),
             "self-negotiated".to_string(),
             "text/html".to_string(),
             b"<html>hello</html>".to_vec(),
@@ -185,11 +185,17 @@ mod tests {
 
         assert_eq!(
             doc.mongo_id,
-            Some("app-123:index.html:sha256-abc".to_string())
+            Some(
+                "app-123:index.html:bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+                    .to_string()
+            )
         );
         assert_eq!(doc.slug, "app-123");
         assert_eq!(doc.file_path, "index.html");
-        assert_eq!(doc.blob_hash, "sha256-abc");
+        assert_eq!(
+            doc.blob_cid,
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+        );
         assert_eq!(doc.agreement_id, "self-negotiated");
         assert_eq!(doc.content_type, "text/html");
         assert_eq!(doc.data, b"<html>hello</html>");
@@ -209,7 +215,7 @@ mod tests {
         assert_eq!(
             indexes.len(),
             3,
-            "Expected 3 indexes (slug, slug+blob_hash, TTL)"
+            "Expected 3 indexes (slug, slug+blob_cid, TTL)"
         );
     }
 }

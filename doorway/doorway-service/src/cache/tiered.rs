@@ -54,7 +54,6 @@
 use bytes::Bytes;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -185,11 +184,9 @@ pub struct BlobMetadata {
 }
 
 impl BlobMetadata {
-    /// Compute SHA256 hash from data
-    pub fn compute_hash(data: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        hex::encode(hasher.finalize())
+    /// The byte CID (raw + BLAKE3-256) of `data` — the only blob address.
+    pub fn compute_cid(data: &[u8]) -> String {
+        elohim_address::compute_bytes_cid(data).to_string()
     }
 
     /// Get TTL based on reach level
@@ -482,7 +479,7 @@ impl TieredBlobCache {
     ///
     /// # Arguments
     ///
-    /// * `hash` - The blob hash (e.g., "abc123def456" - without "sha256-" prefix)
+    /// * `hash` - The blob's byte CID (`bafkr4i…`)
     /// * `endpoints` - List of endpoint URLs to try (from ProjectionStore.get_blob_endpoints())
     /// * `reach` - Reach level for TTL selection ("commons", "private", etc.)
     /// * `http_client` - reqwest client for fetching from endpoints
@@ -517,7 +514,7 @@ impl TieredBlobCache {
             match self.fetch_from_url(http_client, url).await {
                 Ok(data) => {
                     // 4. Verify hash matches
-                    let computed_hash = BlobMetadata::compute_hash(&data);
+                    let computed_hash = BlobMetadata::compute_cid(&data);
                     if computed_hash != hash {
                         warn!(
                             expected = hash,
@@ -949,7 +946,7 @@ mod tests {
     fn test_blob_cache() {
         let cache = TieredBlobCache::with_defaults();
         let data = vec![0u8; 1024 * 1024]; // 1 MB
-        let hash = "test_blob_hash";
+        let hash = "test_blob_cid";
 
         // Miss initially
         assert!(cache.get_blob(hash).is_none());

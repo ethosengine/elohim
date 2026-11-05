@@ -10,7 +10,7 @@
 //! signals, and those are **cell-local**: only a doorway subscribed to the
 //! AUTHORING conductor can ever receive one. The storage `content.updated`
 //! bridge deliberately clears only the app-file slug index — and
-//! `resolve_blob_hash`'s fallback then re-resolves out of the same stale
+//! `resolve_blob_cid`'s fallback then re-resolves out of the same stale
 //! projection. So on 2026-09-08 both fleet doorways served `/` at browser head
 //! `sha256-6899…` for 15 hours after storage had moved to `sha256-e0e2f7…`,
 //! serving a page that named a `main-*.js` the current bundle no longer holds.
@@ -20,8 +20,8 @@
 //! One reconciler owns the declaration. For every configured app slug it reads
 //! `GET {storage}/db/content/{slug}` — the same primary-scoped storage the shell
 //! path reads, under a 2s ceiling — every [`BUNDLE_HEADS_TICK_SECS`] AND on
-//! every `content.created|updated` event for that slug, and writes `blobHash` +
-//! `serverBlobHash` THROUGH to the doorway's own projected entry and in-memory
+//! every `content.created|updated` event for that slug, and writes `blobCid` +
+//! `serverBlobCid` THROUGH to the doorway's own projected entry and in-memory
 //! slug index. When the browser head moves it evicts the warm shell so the next
 //! lookup reclassifies against the new head; the reconciled server head is
 //! published for the SSR adoption pass to read.
@@ -67,7 +67,7 @@ pub struct BundleTarget {
 
 /// The heads a storage content row declares. Every field is optional because
 /// absence is an honest state, never an error: a browser-only app declares no
-/// `serverBlobHash`, and a peer mid-deploy may declare neither.
+/// `serverBlobCid`, and a peer mid-deploy may declare neither.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HeadDoc {
     pub browser: Option<String>,
@@ -198,7 +198,7 @@ pub fn parse_candidate_head(body: &str) -> Result<ChannelHead, String> {
         .filter(|c| !c.is_empty())
         .map(str::to_string);
     let blob = parsed
-        .get("stagingCandidateBlobHash")
+        .get("stagingCandidateBlobCid")
         .and_then(|c| c.as_str())
         .filter(|c| !c.is_empty())
         .map(str::to_string);
@@ -219,15 +219,15 @@ pub fn parse_candidate_head(body: &str) -> Result<ChannelHead, String> {
 /// Parse a `/db/content/{slug}` body into its declared heads.
 ///
 /// Reuses the ONE parse seam the SSR bundle source already owns
-/// (`crate::ssr::parse_blob_hash` / `parse_server_blob_hash`), so the doorway
+/// (`crate::ssr::parse_blob_cid` / `parse_server_blob_cid`), so the doorway
 /// cannot grow a second opinion about which JSON field is which head. A missing
 /// or empty field is `None` — honest absence, never an error and never a
 /// fabricated head.
 pub fn parse_head_doc(body: &str) -> HeadDoc {
     let non_empty = |h: String| if h.is_empty() { None } else { Some(h) };
     HeadDoc {
-        browser: crate::ssr::parse_blob_hash(body).ok().and_then(non_empty),
-        server: crate::ssr::parse_server_blob_hash(body)
+        browser: crate::ssr::parse_blob_cid(body).ok().and_then(non_empty),
+        server: crate::ssr::parse_server_blob_cid(body)
             .ok()
             .and_then(non_empty),
         // A converged read never carries one: the earned winner IS the head
@@ -379,12 +379,14 @@ impl HeadMove {
     }
 }
 
-/// Render a head for a log line: 12 significant characters, or `-` for absent.
+/// Render a head for a log line: 12 significant characters (after the fixed
+/// `bafkr4i` prefix), or `-` for absent.
 fn head12(head: Option<&str>) -> String {
     match head {
         None => "-".to_string(),
         Some(h) => {
-            let body = h.strip_prefix("sha256-").unwrap_or(h);
+            // The byte-CID prefix is header-determined; the digest starts after it.
+            let body = h.strip_prefix(elohim_address::BYTE_CID_PREFIX).unwrap_or(h);
             body.get(..12).unwrap_or(body).to_string()
         }
     }
@@ -586,7 +588,7 @@ impl BundleHeadsReconciler {
             // old shell keeps serving under the new declaration.
             //
             // The per-file archive documents are deliberately NOT purged: they
-            // are keyed `{slug}:{file}:{blob_hash}`, so old-head entries are
+            // are keyed `{slug}:{file}:{blob_cid}`, so old-head entries are
             // already unreachable by key and TTL out on their own — while
             // deleting them would destroy the last-reconciled bytes the Behind
             // path serves when the new head is not yet deliverable.
@@ -786,7 +788,9 @@ mod tests {
             }
             Ok(match answer {
                 Some(declaration) => ChannelHead::Resolved(HeadDoc {
-                    browser: Some("sha256-candidate-b".into()),
+                    browser: Some(
+                        "bafkr4ih65sltr32llo3qqoiwuw2axzr3u2baahcnexjt6zh7du6z66on3u".into(),
+                    ),
                     server: None,
                     staging_declaration: Some(declaration),
                 }),
@@ -904,7 +908,10 @@ mod tests {
     /// the doorway's declaration has not. One tick must move it.
     #[tokio::test]
     async fn a_moved_storage_head_advances_the_doorways_declaration_in_one_tick() {
-        let source = FakeSource::declaring(Some("sha256-6899aaaa"), Some("sha256-serverA"));
+        let source = FakeSource::declaring(
+            Some("bafkr4icaf7d7y4h44bpv5lsy4xnhpwlyr75434hxdbyeda45u5pzrs5fki"),
+            Some("bafkr4iaj6prgjbkwfrjm2qdj743obvxdvuzofekutxowyk2tn3rhly4piy"),
+        );
         let projection = Arc::new(FakeProjection::default());
         let warm = Arc::new(WarmShellStore::inert());
         let r = reconciler(source.clone(), projection.clone(), warm);
@@ -914,30 +921,45 @@ mod tests {
         assert_eq!(first.len(), 1);
         assert_eq!(
             r.heads().get("landing").unwrap().browser.as_deref(),
-            Some("sha256-6899aaaa")
+            Some("bafkr4icaf7d7y4h44bpv5lsy4xnhpwlyr75434hxdbyeda45u5pzrs5fki")
         );
 
         // Storage moves — exactly the 2026-09-08 shape.
-        source.declare(Some("sha256-e0e2f7bb"), Some("sha256-serverA"));
+        source.declare(
+            Some("bafkr4ibzcobc7wy7iefywi724rmk52utguwd4qdya335rqrip56qcefmci"),
+            Some("bafkr4iaj6prgjbkwfrjm2qdj743obvxdvuzofekutxowyk2tn3rhly4piy"),
+        );
         let moves = r.tick().await;
         assert_eq!(moves.len(), 1, "the tick must observe the move");
         let mv = &moves[0];
         assert!(mv.browser_moved());
         assert!(!mv.server_moved());
-        assert_eq!(mv.browser_from.as_deref(), Some("sha256-6899aaaa"));
-        assert_eq!(mv.browser_to.as_deref(), Some("sha256-e0e2f7bb"));
+        assert_eq!(
+            mv.browser_from.as_deref(),
+            Some("bafkr4icaf7d7y4h44bpv5lsy4xnhpwlyr75434hxdbyeda45u5pzrs5fki")
+        );
+        assert_eq!(
+            mv.browser_to.as_deref(),
+            Some("bafkr4ibzcobc7wy7iefywi724rmk52utguwd4qdya335rqrip56qcefmci")
+        );
 
         // …and it is written THROUGH to the doorway's own projection, which is
         // what the shell path re-resolves against.
         let writes = projection.writes.lock().unwrap().clone();
         assert_eq!(writes.len(), 2, "first observation + the move");
-        assert_eq!(writes[1].browser.as_deref(), Some("sha256-e0e2f7bb"));
+        assert_eq!(
+            writes[1].browser.as_deref(),
+            Some("bafkr4ibzcobc7wy7iefywi724rmk52utguwd4qdya335rqrip56qcefmci")
+        );
         assert_eq!(writes[1].slug, "landing");
     }
 
     #[tokio::test]
     async fn a_steady_head_repairs_projection_without_reporting_a_head_move() {
-        let source = FakeSource::declaring(Some("sha256-aaaa1111"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4iabjw4z4byh4zzrevavguplh6a7rxodao4u5auibbh5vnuj7rxgv4"),
+            None,
+        );
         let projection = Arc::new(FakeProjection::default());
         let r = reconciler(
             source.clone(),
@@ -975,7 +997,10 @@ mod tests {
                 *self.persisted.lock().unwrap() = browser.map(str::to_string);
             }
         }
-        let source = FakeSource::declaring(Some("sha256-current"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4igykvj24bxyldmt4ld7ialn5t5eaxbbmkphuqzxufkrg6czbtkjae"),
+            None,
+        );
         let projection = Arc::new(UnavailableOnce {
             calls: std::sync::atomic::AtomicUsize::new(0),
             persisted: Mutex::new(None),
@@ -990,14 +1015,15 @@ mod tests {
         assert!(r.tick().await.is_empty());
         assert_eq!(
             projection.persisted.lock().unwrap().as_deref(),
-            Some("sha256-current")
+            Some("bafkr4igykvj24bxyldmt4ld7ialn5t5eaxbbmkphuqzxufkrg6czbtkjae")
         );
         // A late stale projection must heal too, even after a successful write.
-        *projection.persisted.lock().unwrap() = Some("sha256-stale".into());
+        *projection.persisted.lock().unwrap() =
+            Some("bafkr4ian5jlcae2vwdnayhoyig6lqmr6sgd3r4tpc3iu6o4zifg2pw4f6a".into());
         assert!(r.tick().await.is_empty());
         assert_eq!(
             projection.persisted.lock().unwrap().as_deref(),
-            Some("sha256-current")
+            Some("bafkr4igykvj24bxyldmt4ld7ialn5t5eaxbbmkphuqzxufkrg6czbtkjae")
         );
     }
 
@@ -1005,7 +1031,10 @@ mod tests {
     /// un-declare.
     #[tokio::test]
     async fn an_unreachable_storage_keeps_the_last_declared_head() {
-        let source = FakeSource::declaring(Some("sha256-known999"), Some("sha256-srv"));
+        let source = FakeSource::declaring(
+            Some("bafkr4ifarrudyzsx7fdx2fvo7qdzij4pwgay2nptt2cna3blyyk46plkr4"),
+            Some("bafkr4id5justn7tol2nm6qersqhj5fdkfmbm4nqnkdgd2io2zwqeluyfvi"),
+        );
         let projection = Arc::new(FakeProjection::default());
         let r = reconciler(
             source.clone(),
@@ -1021,7 +1050,7 @@ mod tests {
         assert!(moves.is_empty(), "an unreachable peer reports no move");
         assert_eq!(
             r.heads().get("landing").unwrap().browser.as_deref(),
-            Some("sha256-known999"),
+            Some("bafkr4ifarrudyzsx7fdx2fvo7qdzij4pwgay2nptt2cna3blyyk46plkr4"),
             "the last known head survives the outage — it is never un-declared"
         );
         assert_eq!(
@@ -1033,7 +1062,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_content_event_reconciles_only_a_slug_this_doorway_declares() {
-        let source = FakeSource::declaring(Some("sha256-h1"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq"),
+            None,
+        );
         let r = reconciler(
             source.clone(),
             Arc::new(FakeProjection::default()),
@@ -1056,7 +1088,10 @@ mod tests {
 
     #[tokio::test]
     async fn the_shared_head_table_publishes_the_server_head_with_a_freshness_bound() {
-        let source = FakeSource::declaring(Some("sha256-b"), Some("sha256-serverXYZ"));
+        let source = FakeSource::declaring(
+            Some("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui"),
+            Some("bafkr4icxecs2kuvrp4rds4hmiqvgdlbg6tigll3c7bwf44mlmirxoy2u2e"),
+        );
         let r = reconciler(
             source,
             Arc::new(FakeProjection::default()),
@@ -1069,7 +1104,7 @@ mod tests {
             heads
                 .server_head_fresh("landing", Duration::from_secs(60))
                 .as_deref(),
-            Some("sha256-serverXYZ"),
+            Some("bafkr4icxecs2kuvrp4rds4hmiqvgdlbg6tigll3c7bwf44mlmirxoy2u2e"),
             "the SSR adoption pass reads the reconciled server head"
         );
         assert_eq!(
@@ -1081,25 +1116,36 @@ mod tests {
 
     #[test]
     fn an_absent_server_head_is_absence_not_an_error() {
-        let doc = parse_head_doc(r#"{"blobHash":"sha256-abc","id":"landing"}"#);
-        assert_eq!(doc.browser.as_deref(), Some("sha256-abc"));
+        let doc = parse_head_doc(
+            r#"{"blobCid":"bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y","id":"landing"}"#,
+        );
+        assert_eq!(
+            doc.browser.as_deref(),
+            Some("bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y")
+        );
         assert_eq!(
             doc.server, None,
-            "adam's row carried serverBlobHash: null on 2026-09-08 — absence, not failure"
+            "adam's row carried serverBlobCid: null on 2026-09-08 — absence, not failure"
         );
     }
 
     #[test]
     fn an_empty_head_string_is_absence_too() {
         // The live alpha shape the 2026-09-04 rails found: `head:""`.
-        let doc = parse_head_doc(r#"{"blobHash":"","serverBlobHash":""}"#);
+        let doc = parse_head_doc(r#"{"blobCid":"","serverBlobCid":""}"#);
         assert_eq!(doc.browser, None);
         assert_eq!(doc.server, None);
     }
 
     #[test]
     fn head_log_rendering_is_bounded_and_names_absence() {
-        assert_eq!(head12(Some("sha256-e0e2f7bbccdd1122")), "e0e2f7bbccdd");
+        // The fixed `bafkr4i` prefix is skipped; the digest characters are named.
+        assert_eq!(
+            head12(Some(
+                "bafkr4if5zivb4z3yrioylgb3iyzrqqckfsk776jw2tlsu5skearp6ybxkq"
+            )),
+            "f5zivb4z3yri"
+        );
         assert_eq!(head12(Some("short")), "short");
         assert_eq!(head12(None), "-");
     }
@@ -1116,7 +1162,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_candidate_with_nothing_staged_is_a_named_absence_never_the_converged_head() {
-        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            Some("bafkr4id5justn7tol2nm6qersqhj5fdkfmbm4nqnkdgd2io2zwqeluyfvi"),
+        );
         // No candidate staged — the default.
         let r = reconciler_with_targets(
             source.clone(),
@@ -1140,13 +1189,16 @@ mod tests {
         // …while the converged channel is untouched and complete.
         assert_eq!(
             heads.get("landing").unwrap().browser.as_deref(),
-            Some("sha256-production")
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq")
         );
     }
 
     #[tokio::test]
     async fn a_staged_candidate_resolves_its_own_declaration_beside_the_converged_head() {
-        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            Some("bafkr4id5justn7tol2nm6qersqhj5fdkfmbm4nqnkdgd2io2zwqeluyfvi"),
+        );
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
         let r = reconciler_with_targets(
             source.clone(),
@@ -1166,7 +1218,7 @@ mod tests {
         // Two keys, two independent answers, neither overwriting the other.
         assert_eq!(
             heads.get("landing").unwrap().browser.as_deref(),
-            Some("sha256-production")
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq")
         );
     }
 
@@ -1174,7 +1226,10 @@ mod tests {
     async fn a_candidate_observation_never_writes_the_doorways_own_declaration() {
         // The inversion this guards: publishing an unpromoted build as the
         // head every name this doorway serves resolves bytes from.
-        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            Some("bafkr4id5justn7tol2nm6qersqhj5fdkfmbm4nqnkdgd2io2zwqeluyfvi"),
+        );
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
         let projection = Arc::new(FakeProjection::default());
         let r = reconciler_with_targets(
@@ -1191,12 +1246,18 @@ mod tests {
             1,
             "exactly one write-through: the converged one"
         );
-        assert_eq!(writes[0].browser.as_deref(), Some("sha256-production"));
+        assert_eq!(
+            writes[0].browser.as_deref(),
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq")
+        );
     }
 
     #[tokio::test]
     async fn the_ssr_adoption_pass_only_ever_reads_the_converged_head() {
-        let source = FakeSource::declaring(Some("sha256-b"), Some("sha256-serverEARNED"));
+        let source = FakeSource::declaring(
+            Some("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui"),
+            Some("bafkr4ibmq7s3nihuteb7lfkh4raak42ike3qtk236ouinwj3byzjcuzp7u"),
+        );
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
         let r = reconciler_with_targets(
             source,
@@ -1209,14 +1270,17 @@ mod tests {
             r.heads()
                 .server_head_fresh("landing", Duration::from_secs(60))
                 .as_deref(),
-            Some("sha256-serverEARNED"),
+            Some("bafkr4ibmq7s3nihuteb7lfkh4raak42ike3qtk236ouinwj3byzjcuzp7u"),
             "server_head_fresh is converged by construction"
         );
     }
 
     #[tokio::test]
     async fn promoting_and_withdrawing_a_candidate_are_both_moves() {
-        let source = FakeSource::declaring(Some("sha256-production"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            None,
+        );
         let r = reconciler_with_targets(
             source.clone(),
             Arc::new(FakeProjection::default()),
@@ -1248,7 +1312,10 @@ mod tests {
     async fn an_unreachable_peer_is_not_an_absent_candidate() {
         // A transport failure must keep the last state — it is NOT the answer
         // "nothing staged", which a caller is allowed to act on.
-        let source = FakeSource::declaring(Some("sha256-production"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            None,
+        );
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
         let r = reconciler_with_targets(
             source.clone(),
@@ -1290,7 +1357,9 @@ mod tests {
                 "landing",
                 Channel::Candidate,
                 &ChannelHead::Resolved(HeadDoc {
-                    browser: Some("bafkreiCAND".into()),
+                    browser: Some(
+                        "bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm".into(),
+                    ),
                     server: None,
                     staging_declaration: Some("uhCkkCAND".into()),
                 }),
@@ -1324,7 +1393,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_content_event_reconciles_every_channel_that_slug_is_mounted_on() {
-        let source = FakeSource::declaring(Some("sha256-production"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4ifqf3kwohuy2zkrvfbzgjf4skieavigbii7wxnnmjinbj2txfxbiq"),
+            None,
+        );
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
         let r = reconciler_with_targets(
             source.clone(),
@@ -1386,7 +1458,10 @@ mod tests {
 
     #[tokio::test]
     async fn exact_target_pairs_are_deduplicated_but_channels_stay_distinct() {
-        let source = FakeSource::declaring(Some("sha256-a"), None);
+        let source = FakeSource::declaring(
+            Some("bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu"),
+            None,
+        );
         source.stage_candidate(Some("uhCkkB"));
         let reconciler = BundleHeadsReconciler::new(
             source.clone(),
@@ -1509,7 +1584,7 @@ mod tests {
             r#"{"stagingCandidate":null,"stagingCandidateState":"future"}"#,
             r#"{"stagingCandidate":null,"stagingCandidateState":"staged"}"#,
             r#"{"stagingCandidate":"uhCkkCAND","stagingCandidateState":"none"}"#,
-            r#"{"stagingCandidate":null,"stagingCandidateBlobHash":"bafkreiCAND","stagingCandidateState":"none"}"#,
+            r#"{"stagingCandidate":null,"stagingCandidateBlobCid":"bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm","stagingCandidateState":"none"}"#,
             "not json at all",
         ] {
             assert!(
@@ -1522,13 +1597,16 @@ mod tests {
     #[test]
     fn a_head_read_carrying_a_staging_candidate_resolves_the_declaration() {
         let head = parse_candidate_head(
-            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","stagingCandidate":"uhCkkCAND","stagingCandidateBlobHash":"bafkreiCAND","stagingCandidateState":"staged"}"#,
+            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","stagingCandidate":"uhCkkCAND","stagingCandidateBlobCid":"bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm","stagingCandidateState":"staged"}"#,
         )
         .unwrap();
         match head {
             ChannelHead::Resolved(doc) => {
                 assert_eq!(doc.staging_declaration.as_deref(), Some("uhCkkCAND"));
-                assert_eq!(doc.browser.as_deref(), Some("bafkreiCAND"));
+                assert_eq!(
+                    doc.browser.as_deref(),
+                    Some("bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm")
+                );
             }
             ChannelHead::NoCandidateStaged => panic!("expected a resolved candidate"),
         }
@@ -1537,7 +1615,7 @@ mod tests {
     #[test]
     fn candidate_declaration_without_local_blob_never_inherits_the_winner_blob() {
         let head = parse_candidate_head(
-            r#"{"blobHash":"bafkreiPUBLIC","stagingCandidate":"uhCkkCAND","stagingCandidateBlobHash":null,"stagingCandidateState":"staged"}"#,
+            r#"{"blobCid":"bafkr4ie6l5yrcrx4nc2gcuntmo7fmrjrcc5gzm6t2hz76diiwg7aedk7jm","stagingCandidate":"uhCkkCAND","stagingCandidateBlobCid":null,"stagingCandidateState":"staged"}"#,
         )
         .unwrap();
         match head {

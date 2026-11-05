@@ -24,7 +24,7 @@ use crate::db::schemas::Metadata;
 ///
 /// ```text
 /// Signal Flow:
-///   CacheSignal (content) → ProjectedDocument { blob_hash, ... }
+///   CacheSignal (content) → ProjectedDocument { blob_cid, ... }
 ///   ContentServerCommitted → updates blob_endpoints on existing doc
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,9 +61,9 @@ pub struct ProjectedDocument {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reach: Option<String>,
 
-    /// Blob hash if this content has an associated blob (e.g., "sha256-abc123")
+    /// Byte CID (`bafkr4i…`) if this content has an associated blob
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub blob_hash: Option<String>,
+    pub blob_cid: Option<String>,
 
     /// Endpoints where the blob can be fetched (populated by ContentServerCommitted)
     /// URLs point to elohim-storage instances that have the blob.
@@ -94,7 +94,7 @@ impl Default for ProjectedDocument {
             data: JsonValue::Null,
             search_tokens: Vec::new(),
             reach: None,
-            blob_hash: None,
+            blob_cid: None,
             blob_endpoints: Vec::new(),
             created_at: now,
             projected_at: now,
@@ -126,7 +126,7 @@ impl ProjectedDocument {
             data,
             search_tokens: Vec::new(),
             reach: None,
-            blob_hash: None,
+            blob_cid: None,
             blob_endpoints: Vec::new(),
             created_at: now,
             projected_at: now,
@@ -153,8 +153,8 @@ impl ProjectedDocument {
     }
 
     /// Set the blob hash (for content with associated binary data)
-    pub fn with_blob_hash(mut self, hash: impl Into<String>) -> Self {
-        self.blob_hash = Some(hash.into());
+    pub fn with_blob_cid(mut self, hash: impl Into<String>) -> Self {
+        self.blob_cid = Some(hash.into());
         self
     }
 
@@ -209,7 +209,7 @@ impl ProjectedDocument {
             data,
             search_tokens,
             reach,
-            blob_hash,
+            blob_cid,
             blob_endpoints,
             // Excluded by design (see doc comment): volatile timestamps, the
             // derived id, and metadata (soft-delete travels `invalidate`, not `set`).
@@ -227,7 +227,7 @@ impl ProjectedDocument {
             && *data == other.data
             && *search_tokens == other.search_tokens
             && *reach == other.reach
-            && *blob_hash == other.blob_hash
+            && *blob_cid == other.blob_cid
             && *blob_endpoints == other.blob_endpoints
     }
 }
@@ -244,10 +244,10 @@ impl IntoIndexes for ProjectedDocument {
                 doc! { "search_tokens": 1 },
                 Some(IndexOptions::builder().build()),
             ),
-            // Index by blob_hash for efficient endpoint lookups
+            // Index by blob_cid for efficient endpoint lookups
             // Used by TieredBlobCache.get_or_fetch() to find blob sources
             (
-                doc! { "blob_hash": 1 },
+                doc! { "blob_cid": 1 },
                 Some(IndexOptions::builder().sparse(true).build()),
             ),
         ]

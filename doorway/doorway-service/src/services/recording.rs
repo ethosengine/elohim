@@ -308,7 +308,7 @@ pub struct RecordingStatusResponse {
     /// Duration in seconds
     pub duration_secs: u64,
     /// Final blob hash (if completed)
-    pub blob_hash: Option<String>,
+    pub blob_cid: Option<String>,
 }
 
 // ============================================================================
@@ -448,7 +448,7 @@ impl RecordingService {
                 status: s.status,
                 bytes_received: s.bytes_received,
                 duration_secs: s.duration().as_secs(),
-                blob_hash: None, // Set when completed
+                blob_cid: None, // Set when completed
             })
     }
 

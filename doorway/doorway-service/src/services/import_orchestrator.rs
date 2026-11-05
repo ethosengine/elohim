@@ -30,7 +30,6 @@
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -90,7 +89,7 @@ pub struct ImportProgress {
     pub processed_count: u32,
     pub error_count: u32,
     pub errors: Vec<String>,
-    pub blob_hash: String,
+    pub blob_cid: String,
 }
 
 /// Input for starting an import
@@ -108,7 +107,7 @@ pub struct StartImportInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartImportOutput {
     pub batch_id: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub total_items: u32,
     pub status: ImportStatus,
 }
@@ -157,7 +156,7 @@ pub trait ZomeClient: Send + Sync {
         &self,
         batch_id: &str,
         batch_type: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         total_items: u32,
         schema_version: u32,
     ) -> Result<(), ImportError>;
@@ -207,7 +206,7 @@ pub trait BlobStore: Send + Sync {
 struct ActiveBatch {
     batch_id: String,
     _batch_type: String,
-    blob_hash: String,
+    blob_cid: String,
     total_items: u32,
     _items_json: String,
     status: ImportStatus,
@@ -283,17 +282,17 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
         );
 
         // 1. Write blob to store (blazing fast)
-        let blob_hash = self
+        let blob_cid = self
             .blob_store
             .write_blob(input.items_json.as_bytes())
             .await?;
-        debug!(batch_id = %input.batch_id, blob_hash = %blob_hash, "Blob written");
+        debug!(batch_id = %input.batch_id, blob_cid = %blob_cid, "Blob written");
 
         // 2. Create active batch record
         let batch = ActiveBatch {
             batch_id: input.batch_id.clone(),
             _batch_type: input.batch_type.clone(),
-            blob_hash: blob_hash.clone(),
+            blob_cid: blob_cid.clone(),
             total_items,
             _items_json: input.items_json.clone(),
             status: ImportStatus::Queuing,
@@ -312,7 +311,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
             .queue_import(
                 &input.batch_id,
                 &input.batch_type,
-                &blob_hash,
+                &blob_cid,
                 total_items,
                 1, // schema_version
             )
@@ -331,7 +330,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
             processed_count: 0,
             error_count: 0,
             errors: Vec::new(),
-            blob_hash: blob_hash.clone(),
+            blob_cid: blob_cid.clone(),
         });
 
         // 4. Spawn background task to process chunks
@@ -353,7 +352,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
 
         Ok(StartImportOutput {
             batch_id: input.batch_id,
-            blob_hash,
+            blob_cid,
             total_items,
             status: ImportStatus::Processing,
         })
@@ -369,7 +368,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
             processed_count: b.processed_count,
             error_count: b.error_count,
             errors: b.errors.clone(),
-            blob_hash: b.blob_hash.clone(),
+            blob_cid: b.blob_cid.clone(),
         })
     }
 
@@ -385,7 +384,7 @@ impl<Z: ZomeClient + 'static, B: BlobStore + 'static> ImportOrchestrator<Z, B> {
                 processed_count: b.processed_count,
                 error_count: b.error_count,
                 errors: b.errors.clone(),
-                blob_hash: b.blob_hash.clone(),
+                blob_cid: b.blob_cid.clone(),
             })
             .collect()
     }
@@ -466,7 +465,7 @@ impl<Z: ZomeClient + 'static> ImportOrchestratorHandle<Z> {
                     processed_count: b.processed_count,
                     error_count: b.error_count,
                     errors: b.errors.clone(),
-                    blob_hash: b.blob_hash.clone(),
+                    blob_cid: b.blob_cid.clone(),
                 })
             };
 
@@ -521,9 +520,7 @@ impl Default for InMemoryBlobStore {
 #[async_trait::async_trait]
 impl BlobStore for InMemoryBlobStore {
     async fn write_blob(&self, data: &[u8]) -> Result<String, ImportError> {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let hash = format!("sha256-{}", hex::encode(hasher.finalize()));
+        let hash = elohim_address::compute_bytes_cid(data).to_string();
 
         self.blobs
             .write()
@@ -563,7 +560,7 @@ mod tests {
             &self,
             _batch_id: &str,
             _batch_type: &str,
-            _blob_hash: &str,
+            _blob_cid: &str,
             _total_items: u32,
             _schema_version: u32,
         ) -> Result<(), ImportError> {
@@ -609,7 +606,7 @@ mod tests {
 
         assert_eq!(result.batch_id, "test-batch-1");
         assert_eq!(result.total_items, 3);
-        assert!(result.blob_hash.starts_with("sha256-"));
+        assert!(elohim_address::ByteCid::parse(&result.blob_cid).is_ok());
 
         // Wait for processing to complete
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -625,7 +622,10 @@ mod tests {
         let data = b"hello world";
         let hash = store.write_blob(data).await.unwrap();
 
-        assert!(hash.starts_with("sha256-"));
+        assert_eq!(
+            hash,
+            "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"
+        );
         assert!(store.blob_exists(&hash).await);
 
         let retrieved = store.read_blob(&hash).await.unwrap();

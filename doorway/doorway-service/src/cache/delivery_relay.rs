@@ -402,7 +402,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_coalescing() {
         let relay = DeliveryRelay::with_defaults();
-        let hash = "sha256-abc123";
+        let hash = "bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li";
 
         // First request registers
         let sender = relay.register_in_flight(hash).await;
@@ -428,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn test_shard_caching() {
         let relay = DeliveryRelay::with_defaults();
-        let hash = "sha256-abc123";
+        let hash = "bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li";
         let data = vec![1, 2, 3, 4, 5];
 
         // Initially not cached

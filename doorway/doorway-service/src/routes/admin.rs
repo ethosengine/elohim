@@ -944,7 +944,7 @@ pub struct SsrBundleRefreshResponse {
 /// Handle POST /admin/ssr-bundle/refresh — run ONE bundle-head reconcile pass
 /// immediately (the actuation twin of the background reconcile tick).
 ///
-/// For every served SSR slug, re-resolve its declared `serverBlobHash` from
+/// For every served SSR slug, re-resolve its declared `serverBlobCid` from
 /// storage; on a mismatch, re-materialize the bundle into a fresh directory,
 /// build a new isolate, and hot-swap the registry entry in place — converge to
 /// the declared head without a doorway restart. Idempotent and safe to repeat:

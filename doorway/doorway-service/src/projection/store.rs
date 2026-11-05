@@ -547,17 +547,17 @@ impl ProjectionStore {
         self.update_tx.subscribe()
     }
 
-    /// Update blob endpoints for documents with matching blob_hash
+    /// Update blob endpoints for documents with matching blob_cid
     ///
     /// This is called when ContentServerCommitted signals arrive from the
     /// infrastructure DNA, indicating a P2P agent is now serving a blob.
-    /// We find all projected documents with that blob_hash and add the
+    /// We find all projected documents with that blob_cid and add the
     /// new endpoints to their `blob_endpoints` list.
     ///
     /// Returns the number of documents updated.
     pub async fn update_blob_endpoints(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         endpoints: Vec<String>,
     ) -> Result<usize, DoorwayError> {
         if endpoints.is_empty() {
@@ -571,9 +571,9 @@ impl ProjectionStore {
             let db = mongo.inner().database(mongo.db_name());
             let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
 
-            // Find documents with matching blob_hash and add endpoints
+            // Find documents with matching blob_cid and add endpoints
             // Using $addToSet to avoid duplicates
-            let filter = doc! { "blob_hash": blob_hash };
+            let filter = doc! { "blob_cid": blob_cid };
             let update = doc! {
                 "$addToSet": {
                     "blob_endpoints": { "$each": &endpoints }
@@ -585,9 +585,9 @@ impl ProjectionStore {
                     count = result.modified_count as usize;
                     if count > 0 {
                         debug!(
-                            "Updated {} documents with blob_hash {} with {} new endpoints",
+                            "Updated {} documents with blob_cid {} with {} new endpoints",
                             count,
-                            blob_hash,
+                            blob_cid,
                             endpoints.len()
                         );
                     }
@@ -598,9 +598,9 @@ impl ProjectionStore {
             }
         }
 
-        // Update hot cache entries with matching blob_hash
+        // Update hot cache entries with matching blob_cid
         for mut entry in self.hot_cache.iter_mut() {
-            if entry.doc.blob_hash.as_deref() == Some(blob_hash) {
+            if entry.doc.blob_cid.as_deref() == Some(blob_cid) {
                 entry.doc.add_blob_endpoints(endpoints.clone());
                 count += 1;
             }
@@ -609,14 +609,14 @@ impl ProjectionStore {
         Ok(count)
     }
 
-    /// Get blob endpoints for a given blob_hash
+    /// Get blob endpoints for a given blob_cid
     ///
-    /// Looks up any projected document with this blob_hash and returns
+    /// Looks up any projected document with this blob_cid and returns
     /// its blob_endpoints. Used by TieredBlobCache.get_or_fetch().
-    pub async fn get_blob_endpoints(&self, blob_hash: &str) -> Option<Vec<String>> {
+    pub async fn get_blob_endpoints(&self, blob_cid: &str) -> Option<Vec<String>> {
         // Check hot cache first
         for entry in self.hot_cache.iter() {
-            if entry.doc.blob_hash.as_deref() == Some(blob_hash)
+            if entry.doc.blob_cid.as_deref() == Some(blob_cid)
                 && !entry.doc.blob_endpoints.is_empty()
             {
                 return Some(entry.doc.blob_endpoints.clone());
@@ -629,7 +629,7 @@ impl ProjectionStore {
             let collection = db.collection::<ProjectedDocument>(&self.config.collection_name);
 
             let filter = doc! {
-                "blob_hash": blob_hash,
+                "blob_cid": blob_cid,
                 "blob_endpoints": { "$exists": true, "$ne": [] }
             };
 

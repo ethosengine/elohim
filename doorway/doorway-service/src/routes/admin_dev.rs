@@ -900,7 +900,10 @@ mod tests {
     #[test]
     fn an_ordinary_content_path_is_not_exempt() {
         assert!(!dev_shed_exempt("/db/content/elohim-host-landing", false));
-        assert!(!dev_shed_exempt("/blob/sha256-deadbeef", false));
+        assert!(!dev_shed_exempt(
+            "/blob/bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq",
+            false
+        ));
     }
 
     /// Segment match, not substring — a content slug that merely CONTAINS

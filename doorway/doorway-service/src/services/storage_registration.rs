@@ -6,7 +6,7 @@
 //!
 //! When enabled (via `ELOHIM_STORAGE_AUTO_REGISTER=true`), this will:
 //! 1. Call `register_content_server` on the infrastructure zome
-//! 2. Register wildcard content_hash ("*") = can serve any content
+//! 2. Register wildcard content_cid ("*") = can serve any content
 //! 3. The registration emits a `ContentServerCommitted` signal
 //! 4. Other doorways pick up the signal and add fallback URLs
 //!
@@ -85,7 +85,7 @@ impl StorageRegistrationConfig {
 #[derive(Debug, Clone, Serialize)]
 pub struct RegisterContentServerInput {
     /// Content hash this server can provide ("*" for wildcard)
-    pub content_hash: String,
+    pub content_cid: String,
     /// Capability: blob, html5_app, media_stream, etc.
     pub capability: String,
     /// URL where this server accepts content requests (deprecated)
@@ -172,7 +172,7 @@ pub async fn register_local_storage(
 
     for capability in &config.capabilities {
         let input = RegisterContentServerInput {
-            content_hash: "*".to_string(), // Wildcard: can serve any content
+            content_cid: "*".to_string(), // Wildcard: can serve any content
             capability: capability.clone(),
             serve_url: Some(config.storage_url.clone()), // Deprecated but included for compat
             endpoints: Some(endpoints.clone()),
@@ -228,7 +228,7 @@ async fn register_with_conductor(
     info!(
         conductor_url = conductor_url,
         zome_name = zome_name,
-        content_hash = %input.content_hash,
+        content_cid = %input.content_cid,
         capability = %input.capability,
         "Storage registration skipped (zome call not yet implemented)"
     );
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_register_input_serialization() {
         let input = RegisterContentServerInput {
-            content_hash: "*".to_string(),
+            content_cid: "*".to_string(),
             capability: "blob".to_string(),
             serve_url: Some("http://localhost:8080".to_string()),
             endpoints: Some(vec![StorageEndpointInput {
@@ -266,7 +266,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&input).unwrap();
-        assert!(json.contains("\"content_hash\":\"*\""));
+        assert!(json.contains("\"content_cid\":\"*\""));
         assert!(json.contains("\"capability\":\"blob\""));
         assert!(json.contains("\"endpoints\""));
     }

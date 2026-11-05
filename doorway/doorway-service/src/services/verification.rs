@@ -1,24 +1,28 @@
-//! Blob Verification Service - Server-Side SHA256 Verification
+//! Blob Verification Service - server-side check of bytes against their CID
 //!
 //! Provides authoritative blob integrity verification for defense-in-depth:
 //! - Primary verification point for client-downloaded content
 //! - Fallback when client-side WASM/SubtleCrypto is unavailable
-//! - Streaming verification for large files
 //!
 //! ## Endpoint
 //!
-//! `POST /api/blob/verify`
+//! `POST /api/blob/verify` with `{"expected_cid", "data_base64" | "fetch_url"}`.
 //!
-//! ## Verification Flow
+//! ## What is checked
 //!
-//! 1. Client downloads blob from custodian/CDN
-//! 2. Client computes hash locally (WASM or SubtleCrypto)
-//! 3. If local verification unavailable, client sends to server
-//! 4. Server verifies and returns authoritative result
+//! The claim is a CID, and the CID names its own profile: the bytes are hashed under
+//! the `(codec, multihash, digest length)` the claimed CID declares, through
+//! [`elohim_address::verify_cid_any`] — raw + BLAKE3-256 (bytes), raw + sha2-256
+//! (citations), dag-cbor + sha2-256 (records). Any other profile is answered as a typed
+//! `unsupported-profile` outcome: neither verified nor refuted, and never `is_valid`.
+//! Text that is not a CID at all (`sha256-<hex>`, bare hex) is an error, not a
+//! mismatch.
 
 use bytes::Bytes;
+use cid::Cid;
+use elohim_address::{compute_bytes_cid, verify_cid_any, Verify};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use std::time::Instant;
 use tracing::{debug, warn};
 
@@ -29,8 +33,8 @@ use tracing::{debug, warn};
 /// Request for blob verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyBlobRequest {
-    /// Expected SHA256 hash (hex string, 64 chars)
-    pub expected_hash: String,
+    /// The CID the bytes are claimed to have (normally a byte CID, `bafkr4i…`)
+    pub expected_cid: String,
 
     /// Blob data as base64 (for small blobs)
     #[serde(default)]
@@ -45,17 +49,57 @@ pub struct VerifyBlobRequest {
     pub content_id: Option<String>,
 }
 
+/// What a verification established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+pub enum VerifyOutcome {
+    /// The bytes hash, under the claimed CID's own profile, to its digest.
+    Verified,
+    /// The profile is known and the digest differs.
+    Mismatch,
+    /// The claimed CID's profile is not one this doorway checks; nothing was decided.
+    UnsupportedProfile {
+        codec: u64,
+        multihash: u64,
+        len: usize,
+    },
+    /// No verification ran (bad request, unreadable data, fetch failure, …).
+    Error,
+}
+
+impl From<Verify> for VerifyOutcome {
+    fn from(value: Verify) -> Self {
+        match value {
+            Verify::Verified => VerifyOutcome::Verified,
+            Verify::Mismatch => VerifyOutcome::Mismatch,
+            Verify::UnsupportedProfile {
+                codec,
+                multihash,
+                len,
+            } => VerifyOutcome::UnsupportedProfile {
+                codec,
+                multihash,
+                len,
+            },
+        }
+    }
+}
+
 /// Response from blob verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyBlobResponse {
-    /// Whether the hash matches
+    /// `true` only when the outcome is [`VerifyOutcome::Verified`]
     pub is_valid: bool,
 
-    /// Computed SHA256 hash (hex string)
-    pub computed_hash: String,
+    /// What the check established
+    pub outcome: VerifyOutcome,
 
-    /// Expected hash (echoed back)
-    pub expected_hash: String,
+    /// The byte CID of the data received (byte profile), when data was read
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub computed_cid: Option<String>,
+
+    /// Expected CID (echoed back)
+    pub expected_cid: String,
 
     /// Size of data in bytes
     pub size_bytes: u64,
@@ -63,41 +107,49 @@ pub struct VerifyBlobResponse {
     /// Time taken to verify in milliseconds
     pub duration_ms: u64,
 
-    /// Error message if verification failed
+    /// Error message if verification failed to run
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
 impl VerifyBlobResponse {
-    /// Create a success response
-    pub fn success(
-        computed_hash: String,
-        expected_hash: String,
-        size_bytes: u64,
-        duration_ms: u64,
-    ) -> Self {
-        let is_valid = computed_hash.to_lowercase() == expected_hash.to_lowercase();
+    /// The response for a check that ran over `data`.
+    pub fn checked(expected: &Cid, data: &[u8], duration_ms: u64) -> Self {
+        let outcome = VerifyOutcome::from(verify_cid_any(expected, data));
         Self {
-            is_valid,
-            computed_hash,
-            expected_hash,
-            size_bytes,
+            is_valid: outcome == VerifyOutcome::Verified,
+            outcome,
+            computed_cid: Some(compute_bytes_cid(data).to_string()),
+            expected_cid: expected.to_string(),
+            size_bytes: data.len() as u64,
             duration_ms,
             error: None,
         }
     }
 
     /// Create an error response
-    pub fn error(expected_hash: String, error: String) -> Self {
+    pub fn error(expected_cid: String, error: String) -> Self {
         Self {
             is_valid: false,
-            computed_hash: String::new(),
-            expected_hash,
+            outcome: VerifyOutcome::Error,
+            computed_cid: None,
+            expected_cid,
             size_bytes: 0,
             duration_ms: 0,
             error: Some(error),
         }
     }
+}
+
+/// Parse the claimed CID, or answer the error response. A legacy `sha256-<hex>` or
+/// bare hex is not a CID and is refused here — never compared.
+fn parse_expected(expected_cid: &str) -> Result<Cid, VerifyBlobResponse> {
+    Cid::from_str(expected_cid).map_err(|e| {
+        VerifyBlobResponse::error(
+            expected_cid.to_string(),
+            format!("expected_cid is not a CID: {e}"),
+        )
+    })
 }
 
 // ============================================================================
@@ -152,15 +204,19 @@ impl VerificationService {
     }
 
     /// Verify a blob from inline base64 data
-    pub fn verify_base64(&self, data_base64: &str, expected_hash: &str) -> VerifyBlobResponse {
+    pub fn verify_base64(&self, data_base64: &str, expected_cid: &str) -> VerifyBlobResponse {
         let start = Instant::now();
+        let expected = match parse_expected(expected_cid) {
+            Ok(cid) => cid,
+            Err(response) => return response,
+        };
 
         // Decode base64
         let data = match base64_decode(data_base64) {
             Ok(d) => d,
             Err(e) => {
                 return VerifyBlobResponse::error(
-                    expected_hash.to_string(),
+                    expected_cid.to_string(),
                     format!("Base64 decode failed: {e}"),
                 );
             }
@@ -169,7 +225,7 @@ impl VerificationService {
         // Check size limit
         if data.len() as u64 > self.config.max_inline_bytes {
             return VerifyBlobResponse::error(
-                expected_hash.to_string(),
+                expected_cid.to_string(),
                 format!(
                     "Data too large: {} bytes exceeds {} byte limit",
                     data.len(),
@@ -178,60 +234,52 @@ impl VerificationService {
             );
         }
 
-        // Compute hash
-        let computed_hash = compute_sha256(&data);
-        let duration_ms = start.elapsed().as_millis() as u64;
-
+        let response =
+            VerifyBlobResponse::checked(&expected, &data, start.elapsed().as_millis() as u64);
         debug!(
-            expected = %expected_hash,
-            computed = %computed_hash,
+            expected = %expected_cid,
+            outcome = ?response.outcome,
             size = data.len(),
-            duration_ms = duration_ms,
+            duration_ms = response.duration_ms,
             "Blob verification completed"
         );
-
-        VerifyBlobResponse::success(
-            computed_hash,
-            expected_hash.to_string(),
-            data.len() as u64,
-            duration_ms,
-        )
+        response
     }
 
     /// Verify a blob from raw bytes
-    pub fn verify_bytes(&self, data: &[u8], expected_hash: &str) -> VerifyBlobResponse {
+    pub fn verify_bytes(&self, data: &[u8], expected_cid: &str) -> VerifyBlobResponse {
         let start = Instant::now();
-
-        let computed_hash = compute_sha256(data);
-        let duration_ms = start.elapsed().as_millis() as u64;
-
+        let expected = match parse_expected(expected_cid) {
+            Ok(cid) => cid,
+            Err(response) => return response,
+        };
+        let response =
+            VerifyBlobResponse::checked(&expected, data, start.elapsed().as_millis() as u64);
         debug!(
-            expected = %expected_hash,
-            computed = %computed_hash,
+            expected = %expected_cid,
+            outcome = ?response.outcome,
             size = data.len(),
-            duration_ms = duration_ms,
+            duration_ms = response.duration_ms,
             "Blob verification completed"
         );
-
-        VerifyBlobResponse::success(
-            computed_hash,
-            expected_hash.to_string(),
-            data.len() as u64,
-            duration_ms,
-        )
+        response
     }
 
     /// Verify a blob from Bytes
-    pub fn verify(&self, data: Bytes, expected_hash: &str) -> VerifyBlobResponse {
-        self.verify_bytes(&data, expected_hash)
+    pub fn verify(&self, data: Bytes, expected_cid: &str) -> VerifyBlobResponse {
+        self.verify_bytes(&data, expected_cid)
     }
 
     /// Verify a blob by fetching it from a URL
     ///
-    /// Fetches the blob via HTTP GET, computes SHA256, and compares to expected hash.
+    /// Fetches the blob via HTTP GET and checks it under the expected CID's profile.
     /// Respects max_blob_size_bytes configuration to prevent memory exhaustion.
-    pub async fn verify_from_url(&self, url: &str, expected_hash: &str) -> VerifyBlobResponse {
+    pub async fn verify_from_url(&self, url: &str, expected_cid: &str) -> VerifyBlobResponse {
         let start = Instant::now();
+        let expected = match parse_expected(expected_cid) {
+            Ok(cid) => cid,
+            Err(response) => return response,
+        };
 
         // Fetch the blob
         let response = match self.http_client.get(url).send().await {
@@ -239,7 +287,7 @@ impl VerificationService {
             Err(e) => {
                 warn!("Failed to fetch blob from {}: {}", url, e);
                 return VerifyBlobResponse::error(
-                    expected_hash.to_string(),
+                    expected_cid.to_string(),
                     format!("Failed to fetch blob: {e}"),
                 );
             }
@@ -248,7 +296,7 @@ impl VerificationService {
         // Check response status
         if !response.status().is_success() {
             return VerifyBlobResponse::error(
-                expected_hash.to_string(),
+                expected_cid.to_string(),
                 format!("HTTP {} fetching blob", response.status()),
             );
         }
@@ -257,7 +305,7 @@ impl VerificationService {
         if let Some(content_length) = response.content_length() {
             if content_length > self.config.max_fetch_bytes {
                 return VerifyBlobResponse::error(
-                    expected_hash.to_string(),
+                    expected_cid.to_string(),
                     format!(
                         "Blob too large: {} bytes (max: {})",
                         content_length, self.config.max_fetch_bytes
@@ -272,7 +320,7 @@ impl VerificationService {
             Err(e) => {
                 warn!("Failed to read blob body from {}: {}", url, e);
                 return VerifyBlobResponse::error(
-                    expected_hash.to_string(),
+                    expected_cid.to_string(),
                     format!("Failed to read blob body: {e}"),
                 );
             }
@@ -281,7 +329,7 @@ impl VerificationService {
         // Check size after reading (in case content-length was missing)
         if data.len() as u64 > self.config.max_fetch_bytes {
             return VerifyBlobResponse::error(
-                expected_hash.to_string(),
+                expected_cid.to_string(),
                 format!(
                     "Blob too large: {} bytes (max: {})",
                     data.len(),
@@ -290,43 +338,33 @@ impl VerificationService {
             );
         }
 
-        // Compute hash
-        let computed_hash = compute_sha256(&data);
-        let duration_ms = start.elapsed().as_millis() as u64;
-
+        let response =
+            VerifyBlobResponse::checked(&expected, &data, start.elapsed().as_millis() as u64);
         debug!(
             url = %url,
-            expected = %expected_hash,
-            computed = %computed_hash,
+            expected = %expected_cid,
+            outcome = ?response.outcome,
             size = data.len(),
-            duration_ms = duration_ms,
+            duration_ms = response.duration_ms,
             "URL blob verification completed"
         );
-
-        VerifyBlobResponse::success(
-            computed_hash,
-            expected_hash.to_string(),
-            data.len() as u64,
-            duration_ms,
-        )
+        response
     }
 
     /// Handle a verification request
     pub async fn handle_request(&self, request: VerifyBlobRequest) -> VerifyBlobResponse {
         // Check if we have inline data
         if let Some(ref data_base64) = request.data_base64 {
-            return self.verify_base64(data_base64, &request.expected_hash);
+            return self.verify_base64(data_base64, &request.expected_cid);
         }
 
         // Check if we should fetch from URL
         if let Some(ref fetch_url) = request.fetch_url {
-            return self
-                .verify_from_url(fetch_url, &request.expected_hash)
-                .await;
+            return self.verify_from_url(fetch_url, &request.expected_cid).await;
         }
 
         VerifyBlobResponse::error(
-            request.expected_hash,
+            request.expected_cid,
             "Either data_base64 or fetch_url must be provided".to_string(),
         )
     }
@@ -346,13 +384,6 @@ impl Default for VerificationService {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/// Compute SHA256 hash of data
-pub fn compute_sha256(data: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hex::encode(hasher.finalize())
-}
 
 /// Decode base64 data (supports both standard and URL-safe)
 fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
@@ -380,9 +411,9 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     Err("Invalid base64 encoding".to_string())
 }
 
-/// Compute SHA256 hash incrementally for streaming
+/// The byte CID (raw + BLAKE3-256) of a stream, computed incrementally.
 pub struct StreamingHasher {
-    hasher: Sha256,
+    hasher: blake3::Hasher,
     bytes_processed: u64,
 }
 
@@ -390,7 +421,7 @@ impl StreamingHasher {
     /// Create a new streaming hasher
     pub fn new() -> Self {
         Self {
-            hasher: Sha256::new(),
+            hasher: blake3::Hasher::new(),
             bytes_processed: 0,
         }
     }
@@ -401,10 +432,10 @@ impl StreamingHasher {
         self.bytes_processed += data.len() as u64;
     }
 
-    /// Finalize and return the hash
-    pub fn finalize(self) -> (String, u64) {
-        let hash = hex::encode(self.hasher.finalize());
-        (hash, self.bytes_processed)
+    /// Finalize and return the stream's byte CID and length
+    pub fn finalize(self) -> (elohim_address::ByteCid, u64) {
+        let cid = elohim_address::ByteCid::from_digest(*self.hasher.finalize().as_bytes());
+        (cid, self.bytes_processed)
     }
 
     /// Get bytes processed so far
@@ -428,38 +459,72 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compute_sha256() {
-        let data = b"Hello, World!";
-        let hash = compute_sha256(data);
-
-        // Known SHA256 hash of "Hello, World!"
+    fn verify_bytes_admits_the_kernel_vector() {
+        let service = VerificationService::with_defaults();
+        let result = service.verify_bytes(
+            b"hello world",
+            "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        );
+        assert!(result.is_valid);
+        assert_eq!(result.outcome, VerifyOutcome::Verified);
         assert_eq!(
-            hash,
-            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+            result.computed_cid.as_deref(),
+            Some("bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq")
+        );
+        assert_eq!(result.size_bytes, 11);
+    }
+
+    #[test]
+    fn verify_bytes_mismatch() {
+        let service = VerificationService::with_defaults();
+        let other = compute_bytes_cid(b"other bytes").to_string();
+        let result = service.verify_bytes(b"Test data", &other);
+        assert!(!result.is_valid);
+        assert_eq!(result.outcome, VerifyOutcome::Mismatch);
+    }
+
+    /// A CID names its own profile: a citation CID (raw + sha2-256) over the same
+    /// bytes verifies as itself, never as a byte address.
+    #[test]
+    fn verify_dispatches_on_the_claimed_profile() {
+        let service = VerificationService::with_defaults();
+        let cite = elohim_address::compute_raw_sha2_cid(b"hello world").to_string();
+        assert_eq!(
+            service.verify_bytes(b"hello world", &cite).outcome,
+            VerifyOutcome::Verified
         );
     }
 
+    /// An unknown profile is typed `unsupported-profile`, not a mismatch and never valid.
     #[test]
-    fn test_verify_bytes() {
+    fn unsupported_profile_is_typed_not_valid() {
         let service = VerificationService::with_defaults();
-        let data = b"Test data for verification";
-        let expected_hash = compute_sha256(data);
-
-        let result = service.verify_bytes(data, &expected_hash);
-        assert!(result.is_valid);
-        assert_eq!(result.computed_hash, expected_hash);
-        assert_eq!(result.size_bytes, data.len() as u64);
+        // raw + sha3-256 (0x16): a well-formed CID of a profile the kernel does not check.
+        let mh = cid::multihash::Multihash::<64>::wrap(0x16, &[7u8; 32]).unwrap();
+        let sha3 = Cid::new_v1(0x55, mh).to_string();
+        let result = service.verify_bytes(b"hello world", &sha3);
+        assert!(!result.is_valid);
+        assert!(
+            matches!(
+                result.outcome,
+                VerifyOutcome::UnsupportedProfile { codec: 0x55, .. }
+            ),
+            "{:?}",
+            result.outcome
+        );
+        let wire = serde_json::to_value(&result).unwrap();
+        assert_eq!(wire["outcome"]["kind"], "unsupported-profile");
     }
 
+    /// `sha256-<hex>` and bare hex are not CIDs: an error, never compared.
     #[test]
-    fn test_verify_bytes_mismatch() {
+    fn legacy_spellings_are_errors_not_mismatches() {
         let service = VerificationService::with_defaults();
-        let data = b"Test data";
-        let wrong_hash = "0000000000000000000000000000000000000000000000000000000000000000";
-
-        let result = service.verify_bytes(data, wrong_hash);
-        assert!(!result.is_valid);
-        assert_ne!(result.computed_hash, wrong_hash);
+        for legacy in [format!("sha256-{}", "00".repeat(32)), "00".repeat(32)] {
+            let result = service.verify_bytes(b"Test data", &legacy);
+            assert!(!result.is_valid);
+            assert_eq!(result.outcome, VerifyOutcome::Error, "{legacy}");
+        }
     }
 
     #[test]
@@ -469,27 +534,24 @@ mod tests {
         let service = VerificationService::with_defaults();
         let data = b"Base64 test data";
         let data_base64 = general_purpose::STANDARD.encode(data);
-        let expected_hash = compute_sha256(data);
+        let expected = compute_bytes_cid(data).to_string();
 
-        let result = service.verify_base64(&data_base64, &expected_hash);
+        let result = service.verify_base64(&data_base64, &expected);
         assert!(result.is_valid);
-        assert_eq!(result.computed_hash, expected_hash);
+        assert_eq!(result.computed_cid.as_deref(), Some(expected.as_str()));
     }
 
     #[test]
-    fn test_streaming_hasher() {
+    fn streaming_hasher_matches_the_one_shot_byte_cid() {
         let mut hasher = StreamingHasher::new();
-
-        hasher.update(b"Hello, ");
-        hasher.update(b"World!");
-
-        let (hash, size) = hasher.finalize();
-
+        hasher.update(b"hello ");
+        hasher.update(b"world");
+        let (cid, size) = hasher.finalize();
         assert_eq!(
-            hash,
-            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+            cid.to_string(),
+            "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"
         );
-        assert_eq!(size, 13);
+        assert_eq!(size, 11);
     }
 
     #[test]

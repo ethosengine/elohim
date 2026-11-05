@@ -1208,7 +1208,7 @@ impl AppState {
         // Initialize app file projection cache (MongoDB-backed)
         let app_file_cache = {
             let svc = AppFileCacheService::new(&mongo, "self-negotiated".to_string());
-            // Pre-populate the slug index (slug -> blob_hash) from projection store
+            // Pre-populate the slug index (slug -> blob_cid) from projection store
             svc.load_slug_index().await;
             info!("App file projection cache initialized");
             Some(Arc::new(svc))
@@ -2097,7 +2097,7 @@ mod compute_payload_performer_tests {
     #[test]
     fn compute_payload_performer_is_scoped_to_its_prefix_and_the_agent_key() {
         assert!(is_compute_payload_path(
-            "/api/v1/compute/payloads/bafkreiabc"
+            "/api/v1/compute/payloads/bafkr4ib6js33ihzoiymenu2ogip7x5r2cjwlcfm2rvhhidowgzg3r7wvrm"
         ));
         assert!(!is_compute_payload_path("/api/v1/compute/tasks"));
         assert!(!is_compute_payload_path("/api/v1/compute/grants"));
@@ -3817,6 +3817,16 @@ fn addressed_segment<'a>(path: &'a str, prefix: &str) -> Option<&'a str> {
     (!seg.is_empty()).then_some(seg)
 }
 
+/// The byte CID a `/blob/{address}` path names, admitted by full decode
+/// ([`routes::BlobAddress::parse`] = `ByteCid::parse`), or `None` when the path
+/// carries no address segment. `/apps/{identifier}` keeps [`addressed_segment`]:
+/// its identifier is a slug or a byte CID, and the fold resolves either.
+fn addressed_blob_cid(
+    path: &str,
+) -> Option<Result<elohim_address::ByteCid, elohim_address::AddressError>> {
+    addressed_segment(path, "/blob/").map(routes::BlobAddress::parse)
+}
+
 /// Re-ask the serving fold for a byte path addressed by an EPR ATOM (or by one
 /// of its heads) rather than by a mount path.
 ///
@@ -4244,7 +4254,7 @@ async fn serve_admitted_projection(
             .lookup_with_declared(&projection.epr_id, &projection.entry_file)
             .await;
         match warm {
-            Some(shell) if shell.head_bound && !shell.blob_hash.is_empty() => Some(shell.blob_hash),
+            Some(shell) if shell.head_bound && !shell.blob_cid.is_empty() => Some(shell.blob_cid),
             // These are the bytes the shell path may hold and serve, but they
             // prove no content address. A declaration beside them cannot safely
             // label them, so retain the moving-slug fallback for this legacy
@@ -4542,7 +4552,7 @@ mod epr_dispatch_breaker_tests {
 
     #[async_trait::async_trait]
     impl crate::render::warm_shell::ShellArchive for AssetBindingArchive {
-        async fn declared_blob_hash(&self, _slug: &str) -> Option<String> {
+        async fn declared_blob_cid(&self, _slug: &str) -> Option<String> {
             self.declared.clone()
         }
 
@@ -4550,18 +4560,18 @@ mod epr_dispatch_breaker_tests {
             &self,
             _slug: &str,
             _file_path: &str,
-            blob_hash: &str,
+            blob_cid: &str,
         ) -> Option<crate::render::warm_shell::ArchivedShell> {
             self.stored
                 .lock()
                 .unwrap()
                 .as_ref()
-                .filter(|shell| shell.blob_hash == blob_hash)
+                .filter(|shell| shell.blob_cid == blob_cid)
                 .cloned()
                 .or_else(|| {
                     self.latest
                         .as_ref()
-                        .filter(|shell| shell.blob_hash == blob_hash)
+                        .filter(|shell| shell.blob_cid == blob_cid)
                         .cloned()
                 })
         }
@@ -4578,12 +4588,12 @@ mod epr_dispatch_breaker_tests {
             &self,
             _slug: &str,
             _file_path: &str,
-            _blob_hash: &str,
+            _blob_cid: &str,
             _content_type: &str,
             _bytes: Vec<u8>,
         ) {
             *self.stored.lock().unwrap() = Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: _blob_hash.to_string(),
+                blob_cid: _blob_cid.to_string(),
                 content_type: _content_type.to_string(),
                 bytes: _bytes,
                 head_bound: true,
@@ -4661,7 +4671,7 @@ mod epr_dispatch_breaker_tests {
         let archive = Arc::new(AssetBindingArchive {
             declared: Some("head-warm".into()),
             latest: Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: "head-warm".into(),
+                blob_cid: "head-warm".into(),
                 content_type: "text/html".into(),
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
@@ -4774,7 +4784,7 @@ mod epr_dispatch_breaker_tests {
         let archive = Arc::new(AssetBindingArchive {
             declared: Some("head-warm".into()),
             latest: Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: "head-warm".into(),
+                blob_cid: "head-warm".into(),
                 content_type: "text/html".into(),
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
@@ -4829,20 +4839,49 @@ mod epr_dispatch_breaker_tests {
             addressed_segment("/apps/elohim-host-landing/index.html", "/apps/"),
             Some("elohim-host-landing")
         );
+        let cid = elohim_address::compute_bytes_cid(b"hello world").to_string();
         assert_eq!(
-            addressed_segment("/apps/sha256-abc/nested/deep.js", "/apps/"),
-            Some("sha256-abc")
+            addressed_segment(&format!("/apps/{cid}/nested/deep.js"), "/apps/"),
+            Some(cid.as_str())
         );
         assert_eq!(
-            addressed_segment("/blob/sha256-abc", "/blob/"),
-            Some("sha256-abc")
+            addressed_segment(&format!("/blob/{cid}"), "/blob/"),
+            Some(cid.as_str())
         );
         assert_eq!(
-            addressed_segment("/blob/sha256-abc?x=1", "/blob/"),
-            Some("sha256-abc")
+            addressed_segment(&format!("/blob/{cid}?x=1"), "/blob/"),
+            Some(cid.as_str())
         );
         assert_eq!(addressed_segment("/apps/", "/apps/"), None);
         assert_eq!(addressed_segment("/other/x", "/apps/"), None);
+    }
+
+    /// A `/blob/` segment is admitted by full decode: the byte CID passes, every other
+    /// spelling is refused with the check that failed, and an empty segment is no
+    /// address at all.
+    #[test]
+    fn addressed_blob_cid_admits_only_byte_cids() {
+        let cid = elohim_address::compute_bytes_cid(b"hello world");
+        assert_eq!(
+            addressed_blob_cid(&format!("/blob/{cid}?x=1")),
+            Some(Ok(cid))
+        );
+        let sha256 = format!("/blob/sha256-{}", "ab".repeat(32));
+        let bafkrei = format!(
+            "/blob/{}",
+            elohim_address::compute_raw_sha2_cid(b"hello world")
+        );
+        for refused in [
+            sha256,
+            bafkrei,
+            format!("/blob/{}", cid.to_string().to_uppercase()),
+        ] {
+            assert!(
+                matches!(addressed_blob_cid(&refused), Some(Err(_))),
+                "{refused} must be refused"
+            );
+        }
+        assert_eq!(addressed_blob_cid("/blob/"), None);
     }
 
     /// An address with no contract row is passed through untouched — refusing
@@ -4858,14 +4897,19 @@ mod epr_dispatch_breaker_tests {
         state.epr_router.replace_all(vec![shell_projection(true)]);
 
         let req = Request::builder()
-            .uri("/blob/sha256-unknown")
+            .uri("/blob/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu")
             .body(http_body_util::Empty::<Bytes>::new())
             .unwrap();
         assert!(
-            fold_for_addressed_serve(&state, &req, "/blob/sha256-unknown", "sha256-unknown")
-                .await
-                .expect("an unmounted address is not blocked")
-                .is_none(),
+            fold_for_addressed_serve(
+                &state,
+                &req,
+                "/blob/bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu"
+            )
+            .await
+            .expect("an unmounted address is not blocked")
+            .is_none(),
             "no contract row ⇒ no reach declaration to enforce ⇒ pass through"
         );
     }
@@ -5043,7 +5087,7 @@ mod epr_dispatch_breaker_tests {
         use wiremock::{Mock, MockServer, ResponseTemplate};
 
         let old_shell = crate::render::warm_shell::ArchivedShell {
-            blob_hash: "head-old".into(),
+            blob_cid: "head-old".into(),
             content_type: "text/html".into(),
             bytes: br#"<app-root></app-root><script src="main-OLD.js"></script>"#.to_vec(),
             head_bound: true,
@@ -5172,7 +5216,7 @@ mod epr_dispatch_breaker_tests {
         let archive = Arc::new(AssetBindingArchive {
             declared: Some("head-old".into()),
             latest: Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: "head-old".into(),
+                blob_cid: "head-old".into(),
                 content_type: "text/html".into(),
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
@@ -5213,7 +5257,7 @@ mod epr_dispatch_breaker_tests {
         let candidate_archive = Arc::new(AssetBindingArchive {
             declared: Some("head-public".into()),
             latest: Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: "head-public".into(),
+                blob_cid: "head-public".into(),
                 content_type: "text/html".into(),
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
@@ -5259,7 +5303,7 @@ mod epr_dispatch_breaker_tests {
             let archive = Arc::new(AssetBindingArchive {
                 declared: Some("head-new".into()),
                 latest: Some(crate::render::warm_shell::ArchivedShell {
-                    blob_hash: "head-old".into(),
+                    blob_cid: "head-old".into(),
                     content_type: "text/html".into(),
                     bytes: br#"<script src="main-OLD.js"></script>"#.to_vec(),
                     head_bound: latest_bound,
@@ -5303,13 +5347,17 @@ mod epr_dispatch_breaker_tests {
 
         let storage = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(path("/apps/bafkreiCAND/version.json"))
+            .and(path(
+                "/apps/bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm/version.json",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_bytes(br#"{"commit":"candidate"}"#))
             .expect(1)
             .mount(&storage)
             .await;
         Mock::given(method("GET"))
-            .and(path("/apps/bafkreiCAND/index.html"))
+            .and(path(
+                "/apps/bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm/index.html",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_bytes(b"candidate-B"))
             .expect(1)
             .mount(&storage)
@@ -5317,7 +5365,7 @@ mod epr_dispatch_breaker_tests {
         let archive = Arc::new(AssetBindingArchive {
             declared: Some("public-A".into()),
             latest: Some(crate::render::warm_shell::ArchivedShell {
-                blob_hash: "public-A".into(),
+                blob_cid: "public-A".into(),
                 content_type: "text/html".into(),
                 bytes: b"public-A".to_vec(),
                 head_bound: true,
@@ -5330,7 +5378,7 @@ mod epr_dispatch_breaker_tests {
             "elohim-host-landing",
             Channel::Candidate,
             &ChannelHead::Resolved(HeadDoc {
-                browser: Some("bafkreiCAND".into()),
+                browser: Some("bafkr4ifupjvjsg5ns6nudl5s5txad2apznf5hmzdinz5om2itzjirzbpcm".into()),
                 server: None,
                 staging_declaration: Some("uhCkkCAND".into()),
             }),
@@ -5382,7 +5430,7 @@ mod epr_dispatch_breaker_tests {
         .await;
         assert_eq!(public.declared.as_deref(), Some("public-A"));
         assert_eq!(
-            public.warm.as_ref().map(|warm| warm.blob_hash.as_str()),
+            public.warm.as_ref().map(|warm| warm.blob_cid.as_str()),
             Some("public-A")
         );
 
@@ -5442,13 +5490,13 @@ mod epr_dispatch_breaker_tests {
     fn projected_shell_url_binds_to_the_declared_head_not_the_moving_slug() {
         let p = shell_projection(true);
         assert_eq!(
-            projected_shell_url("http://storage:8090/", &p, Some("sha256-7725d4")),
-            "http://storage:8090/apps/sha256-7725d4/index.html"
+            projected_shell_url("http://storage:8090/", &p, Some("bafkr4ifd2pplrqr7krrcajzfcybvzaf553kwcju6cavdk3ryt5bov2frau")),
+            "http://storage:8090/apps/bafkr4ifd2pplrqr7krrcajzfcybvzaf553kwcju6cavdk3ryt5bov2frau/index.html"
         );
         let opted_out = shell_projection(false);
         assert_eq!(
-            projected_shell_url("http://storage:8090", &opted_out, Some("sha256-7725d4")),
-            "http://storage:8090/apps/sha256-7725d4/index.html?spaFallback=0"
+            projected_shell_url("http://storage:8090", &opted_out, Some("bafkr4ifd2pplrqr7krrcajzfcybvzaf553kwcju6cavdk3ryt5bov2frau")),
+            "http://storage:8090/apps/bafkr4ifd2pplrqr7krrcajzfcybvzaf553kwcju6cavdk3ryt5bov2frau/index.html?spaFallback=0"
         );
     }
 
@@ -6196,7 +6244,7 @@ async fn resolve_projected_shell(
             tracing::debug!(
                 target: "doorway::ssr",
                 app = %projection.epr_id,
-                head = %shell.blob_hash,
+                head = %shell.blob_cid,
                 "SSR shell served from the warm-boot cache — no upstream fetch"
             );
             Ok((shell.html(), ShellProvenance::LastReconciled))
@@ -6208,7 +6256,7 @@ async fn resolve_projected_shell(
             tracing::info!(
                 target: "doorway::ssr",
                 app = %projection.epr_id,
-                head = %shell.blob_hash,
+                head = %shell.blob_cid,
                 reason = %reason.class(),
                 "SSR shell served BEHIND — head not confirmed deliverable"
             );
@@ -8640,7 +8688,7 @@ async fn handle_request(
         }
 
         // SSR bundle-head reconcile actuation (Track-4 T4-1): run one pass that
-        // re-resolves each served slug's declared serverBlobHash and hot-swaps
+        // re-resolves each served slug's declared serverBlobCid and hot-swaps
         // the isolate on a mismatch — converge-to-declared-head without a
         // doorway restart. Actuation twin of the background reconcile tick;
         // same operator-seat class as /admin/steward-peers/refresh. Covered by
@@ -8820,16 +8868,17 @@ async fn handle_request(
         }
 
         // Admin seed routes for bulk upload
-        // PUT /admin/seed/blob - Upload blob to projection cache
-        (Method::PUT, "/admin/seed/blob") => {
+        // PUT /admin/seed/blob[/{cid}] - Upload blob to projection cache; the byte
+        // CID rides the path or `X-Content-Address` (see `handle_seed_blob`).
+        (Method::PUT, p) if p == "/admin/seed/blob" || p.starts_with("/admin/seed/blob/") => {
             to_boxed(
                 routes::handle_seed_blob(req, Arc::clone(&state), peer_is_loopback(&addr)).await,
             )
         }
-        // HEAD /admin/seed/blob/{hash} - Check if blob exists
+        // HEAD /admin/seed/blob/{cid} - Check if blob exists
         (Method::HEAD, p) if p.starts_with("/admin/seed/blob/") => {
-            let hash = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
-            to_boxed(routes::handle_check_blob(hash, Arc::clone(&state)).await)
+            let address = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
+            to_boxed(routes::handle_check_blob(address, Arc::clone(&state)).await)
         }
         // Admin cache control API — observe and toggle projection/app-file caches
         // Used by delivery diagnostics tests to prove fallback behavior
@@ -9109,7 +9158,7 @@ async fn handle_request(
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
             // THE NAMED GAP. `handle_app_request` answers by
-            // `{slug}:{file}:{blob_hash}` straight out of the Mongo-backed
+            // `{slug}:{file}:{blob_cid}` straight out of the Mongo-backed
             // app-file cache — bytes that outlive the pod and that no reach
             // check ever stood in front of. Re-ask the fold first, against the
             // CURRENT projection row for this address.
@@ -9453,9 +9502,19 @@ async fn handle_request(
                         // reached it. When the hash IS a head of something this
                         // doorway mounts, the fold governs it like any other
                         // serve of that EPR.
-                        if let Some(address) = addressed_segment(p, "/blob/") {
+                        if let Some(admitted) = addressed_blob_cid(p) {
+                            // Admission by full decode, before the fold or storage
+                            // sees it: the typed 400 storage answers, at the edge.
+                            let address = match admitted {
+                                Ok(cid) => cid.to_string(),
+                                Err(error) => {
+                                    return Ok(to_boxed(routes::invalid_byte_cid_response(
+                                        &error,
+                                    )))
+                                }
+                            };
                             let admitted_reach =
-                                match fold_for_addressed_serve(&state, &req, p, address).await {
+                                match fold_for_addressed_serve(&state, &req, p, &address).await {
                                     Ok(reach) => reach,
                                     Err(blocked) => return Ok(to_boxed(*blocked)),
                                 };
@@ -10006,7 +10065,8 @@ async fn handle_signal_request(
 
 /// Handle blob verification request (POST /api/blob/verify)
 ///
-/// This endpoint provides server-side SHA256 verification as part of defense-in-depth:
+/// This endpoint checks bytes against a claimed CID under the profile that CID
+/// declares (`verify_cid_any`), as part of defense-in-depth:
 /// - Primary: Client uses WASM or SubtleCrypto for local verification
 /// - Fallback: Client sends blob to server for authoritative verification
 async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Response<BoxBody> {
@@ -10045,7 +10105,7 @@ async fn handle_blob_verify(state: Arc<AppState>, req: Request<Incoming>) -> Res
     };
 
     debug!(
-        expected_hash = %request.expected_hash,
+        expected_cid = %request.expected_cid,
         has_data = request.data_base64.is_some(),
         has_url = request.fetch_url.is_some(),
         content_id = ?request.content_id,
@@ -11259,7 +11319,7 @@ mod dispatch_classification_tests {
         let dispo = classify_dispatch_with_breakers(
             &registry,
             &Method::GET,
-            "/blob/sha256-abcdef",
+            "/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
             Some(&breakers),
         )
         .await;
@@ -11284,7 +11344,7 @@ mod dispatch_classification_tests {
         let dispo = classify_dispatch_with_breakers(
             &registry,
             &Method::GET,
-            "/blob/sha256-abcdef",
+            "/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
             Some(&breakers),
         )
         .await;
@@ -11313,7 +11373,7 @@ mod dispatch_classification_tests {
         let dispo = classify_dispatch_with_breakers(
             &registry,
             &Method::GET,
-            "/blob/sha256-abcdef",
+            "/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
             Some(&breakers),
         )
         .await;
@@ -11359,7 +11419,7 @@ mod dispatch_classification_tests {
             let _ = classify_dispatch_with_breakers(
                 &registry,
                 &Method::GET,
-                "/blob/sha256-abcdef",
+                "/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
                 Some(&breakers),
             )
             .await;
@@ -11376,7 +11436,12 @@ mod dispatch_classification_tests {
         // The `None` delegation is behaviour-preserving: the EPR-router probe
         // site classifies exactly as it did before failover existed.
         let registry = two_peer_registry().await;
-        let dispo = classify_dispatch(&registry, &Method::GET, "/blob/sha256-abcdef").await;
+        let dispo = classify_dispatch(
+            &registry,
+            &Method::GET,
+            "/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
+        )
+        .await;
         assert_eq!(endpoint_of(&dispo), PRIMARY);
     }
 
@@ -11412,7 +11477,12 @@ mod dispatch_classification_tests {
         // the registry and be classified as StorageProxy, not fall through
         // to a SPA bootstrap path.
         let registry = registry_with_storage_route(HttpMethod::Get, "/blob/:hash").await;
-        let dispo = classify_dispatch(&registry, &Method::GET, "/blob/sha256-abcdef123456").await;
+        let dispo = classify_dispatch(
+            &registry,
+            &Method::GET,
+            "/blob/bafkr4ihm4wnjcf5lwxbys33uq6nv6atjh5hdtxnui35oc5fdl54rflgasy",
+        )
+        .await;
         assert!(
             matches!(&dispo, Disposition::StorageProxy { endpoint } if endpoint == "http://storage:8090"),
             "GET /blob/<hash> must classify as StorageProxy, got {dispo:?}"
@@ -11950,7 +12020,7 @@ mod admission_tests {
         for p in [
             "/api/v1/cache/x",
             "/db/content/y",
-            "/blob/sha256-z",
+            "/blob/bafkr4id7gieig6j2opbu2jn62lacqp3mhmgec4ikeclqk4lkaebbhkyw7i",
             "/apps/foo",
             "/lamad",
         ] {

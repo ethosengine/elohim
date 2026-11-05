@@ -30,12 +30,10 @@ use tracing::{debug, info, warn};
 use crate::cache::AppDescriptor;
 use crate::server::AppState;
 
-/// Check whether an identifier looks like a content address (CID) rather than a slug.
-///
-/// Content addresses use the `sha256-{hex}` format from the storage layer.
-/// The length check (>10) avoids false positives on short strings.
+/// Is the identifier a content address (a byte CID, admitted by full decode) rather
+/// than a slug? Same predicate as storage's `/apps/{identifier}`.
 fn is_content_address(identifier: &str) -> bool {
-    identifier.starts_with("sha256-") && identifier.len() > 10
+    crate::cache::app_file_cache::is_content_address(identifier)
 }
 
 /// Maximum retries for transient failures (502/connection errors).
@@ -121,8 +119,8 @@ async fn cached_app_reach_refusal(
 /// Handle app requests with cache-first resolution.
 ///
 /// 1. Parse path into slug and file_path
-/// 2. Resolve blob_hash from slug index (projection store lookup)
-/// 3. If cache available AND blob_hash known: try cache → coalesce → fetch
+/// 2. Resolve blob_cid from slug index (projection store lookup)
+/// 3. If cache available AND blob_cid known: try cache → coalesce → fetch
 /// 4. Otherwise: fall through to direct proxy (BYPASS)
 ///
 /// A person who opens an html5-app's entry file directly as a page
@@ -263,23 +261,23 @@ async fn serve_raw_app_file(
 ) -> Response<Full<Bytes>> {
     let storage_url = storage_url.to_string();
 
-    // Dual-path resolution: if the identifier is already a content address (sha256-...),
-    // use it directly as the blob_hash — no slug resolution needed.
+    // Dual-path resolution: if the identifier is already a content address (a byte
+    // CID), use it directly as the blob_cid — no slug resolution needed.
     let (resolved_hash, content_slug) = if is_content_address(slug) {
-        // CID path: /apps/{sha256-hash}/file — use hash directly
+        // CID path: /apps/{bafkr4i…}/file — use the CID directly
         (Some(slug.to_string()), None)
     } else {
         // Slug path: /apps/{slug}/file — resolve via cache
         let hash = if let Some(ref cache) = state.app_file_cache {
-            cache.resolve_blob_hash(slug).await
+            cache.resolve_blob_cid(slug).await
         } else {
             None
         };
         (hash, Some(slug))
     };
 
-    // Cache-first path: only active when cache service AND blob_hash are available.
-    // blob_hash is resolved from the slug index (populated from projection store)
+    // Cache-first path: only active when cache service AND blob_cid are available.
+    // blob_cid is resolved from the slug index (populated from projection store)
     // or directly from the content address in the URL.
     if let Some(ref cache) = state.app_file_cache {
         if let Some(ref hash) = resolved_hash {
@@ -350,7 +348,7 @@ async fn serve_raw_app_file(
         }
     }
 
-    // No cache or no blob_hash — direct proxy, of the parsed file (a directory URL
+    // No cache or no blob_cid — direct proxy, of the parsed file (a directory URL
     // has already been resolved to its index.html).
     let parsed_path = format!("/apps/{slug}/{file_path}");
     forward_app_request_with_header(&storage_url, &parsed_path, "BYPASS").await
@@ -583,8 +581,8 @@ fn parse_app_path(path: &str) -> Option<(&str, &str)> {
 /// miss must not ask storage to resolve the slug again: the pointer may have moved
 /// between the two reads, producing an HTML shell from one release and assets from
 /// another.
-fn resolved_app_path(blob_hash: &str, file_path: &str) -> String {
-    format!("/apps/{blob_hash}/{file_path}")
+fn resolved_app_path(blob_cid: &str, file_path: &str) -> String {
+    format!("/apps/{blob_cid}/{file_path}")
 }
 
 /// Fetch a file from storage, cache it, broadcast to waiters, and return the response.
@@ -593,9 +591,9 @@ async fn fetch_and_cache(
     storage_url: &str,
     slug: &str,
     file_path: &str,
-    blob_hash: &str,
+    blob_cid: &str,
 ) -> Response<Full<Bytes>> {
-    let resolved_path = resolved_app_path(blob_hash, file_path);
+    let resolved_path = resolved_app_path(blob_cid, file_path);
     let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), resolved_path);
     let client = reqwest::Client::new();
 
@@ -630,14 +628,14 @@ async fn fetch_and_cache(
                     if status.is_success() {
                         // Cache the file
                         cache
-                            .put(slug, file_path, blob_hash, &content_type, body.to_vec())
+                            .put(slug, file_path, blob_cid, &content_type, body.to_vec())
                             .await;
 
                         // Broadcast to coalesced waiters
                         let cached_file = crate::cache::CachedFile {
                             data: body.to_vec(),
                             content_type: content_type.clone(),
-                            blob_hash: blob_hash.to_string(),
+                            blob_cid: blob_cid.to_string(),
                             // Mirrors the `put` above, which writes an unmarked
                             // doc. This path IS hash-addressed
                             // (`resolved_app_path`), so it could mark; leaving it
@@ -649,7 +647,7 @@ async fn fetch_and_cache(
 
                         debug!(
                             slug = %slug,
-                            blob_hash = %blob_hash,
+                            blob_cid = %blob_cid,
                             file_path = %file_path,
                             size = body.len(),
                             "App file cached (MISS)"
@@ -715,7 +713,7 @@ fn build_app_response(
     data: &[u8],
     content_type: &str,
     cache_status: &str,
-    blob_hash: Option<&str>,
+    blob_cid: Option<&str>,
     content_slug: Option<&str>,
 ) -> Response<Full<Bytes>> {
     let mut builder = Response::builder()
@@ -726,7 +724,7 @@ fn build_app_response(
         .header("X-Cache", cache_status)
         .header("Cache-Control", "public, max-age=3600");
 
-    if let Some(hash) = blob_hash {
+    if let Some(hash) = blob_cid {
         builder = builder.header("X-Content-Address", hash);
     }
     if let Some(slug) = content_slug {
@@ -965,7 +963,7 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
     }
 
     // One value per header name. Storage's capability headers are forwarded, then the
-    // doorway's own values REPLACE them: an appended second X-Blob-Hash or
+    // doorway's own values REPLACE them: an appended second X-Content-Address or
     // X-Delivery-Mode reaches a browser as one comma-joined value ("h, h"), which
     // names no blob and no mode.
     let mut headers = HeaderMap::new();
@@ -989,8 +987,8 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
     // the client gets "extracted" from MongoDB even if storage's extraction
     // cache is cold, because doorway's projection cache sits in front.
     if let Some(ref cache) = state.app_file_cache {
-        let blob_hash = cache.resolve_blob_hash(slug).await;
-        let projection_ready = blob_hash.is_some();
+        let blob_cid = cache.resolve_blob_cid(slug).await;
+        let projection_ready = blob_cid.is_some();
 
         // Override: doorway's projection cache is the outermost layer
         set_header(&mut headers, "x-delivery-mode", "extracted");
@@ -1004,8 +1002,8 @@ pub async fn handle_app_capability(state: Arc<AppState>, path: &str) -> Response
         // Also include storage's extraction cache readiness (from forwarded headers)
         // so the client sees the full node picture. Storage's X-Ready becomes
         // X-Extraction-Ready; doorway adds X-Projection-Ready.
-        if let Some(hash) = &blob_hash {
-            set_header(&mut headers, "x-blob-hash", hash);
+        if let Some(hash) = &blob_cid {
+            set_header(&mut headers, "x-content-address", hash);
         }
     } else {
         // No doorway projection-cache layer. Storage still serves individual app
@@ -1081,7 +1079,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_capability_storage_refuses_is_refused_without_a_blob_hash() {
+    async fn a_capability_storage_refuses_is_refused_without_a_blob_cid() {
         use clap::Parser;
         use wiremock::matchers::method;
         use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -1095,7 +1093,7 @@ mod tests {
         let state = Arc::new(AppState::new(args));
         let resp = handle_app_capability(state, "/apps/household/_capability").await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
-        assert!(resp.headers().get("x-blob-hash").is_none());
+        assert!(resp.headers().get("x-content-address").is_none());
     }
 
     #[test]
@@ -1136,19 +1134,27 @@ mod tests {
 
     #[test]
     fn test_parse_app_path_content_address() {
-        let (slug, file_path) =
-            parse_app_path("/apps/sha256-abc123def456789012/index.html").unwrap();
-        assert_eq!(slug, "sha256-abc123def456789012");
+        let (slug, file_path) = parse_app_path(
+            "/apps/bafkr4ifhsryundv22fo6civgeek7xn5w4rpvklptgvckd2vdzzojuuls4q/index.html",
+        )
+        .unwrap();
+        assert_eq!(
+            slug,
+            "bafkr4ifhsryundv22fo6civgeek7xn5w4rpvklptgvckd2vdzzojuuls4q"
+        );
         assert_eq!(file_path, "index.html");
     }
 
     #[test]
     fn cache_miss_stays_pinned_to_the_resolved_release() {
-        let path = resolved_app_path("sha256-release-a", "assets/chunks/main-release-a.js");
+        let path = resolved_app_path(
+            "bafkr4ifypgerv4v3x5oq4ge7vqh3kibxh66gozgd2erp2lldvncfru7wwi",
+            "assets/chunks/main-release-a.js",
+        );
 
         assert_eq!(
             path,
-            "/apps/sha256-release-a/assets/chunks/main-release-a.js"
+            "/apps/bafkr4ifypgerv4v3x5oq4ge7vqh3kibxh66gozgd2erp2lldvncfru7wwi/assets/chunks/main-release-a.js"
         );
         assert!(!path.contains("elohim-host-landing"));
     }
@@ -1159,13 +1165,27 @@ mod tests {
 
     #[test]
     fn test_is_content_address_valid() {
-        assert!(is_content_address("sha256-abc123def456"));
+        // The kernel vector: the byte CID of "hello world".
+        assert!(is_content_address(
+            "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"
+        ));
     }
 
+    /// Every other spelling of an address is a slug here, never an address: no
+    /// prefix or length heuristic admits it.
     #[test]
-    fn test_is_content_address_too_short() {
-        // "sha256-" is 7 chars, need >10 total
-        assert!(!is_content_address("sha256-abc"));
+    fn test_is_content_address_refuses_legacy_spellings() {
+        let sha256 = format!("sha256-{}", "ab".repeat(32));
+        let bafkrei = elohim_address::compute_raw_sha2_cid(b"hello world").to_string();
+        let upper = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq".to_uppercase();
+        for legacy in [
+            sha256.as_str(),
+            bafkrei.as_str(),
+            upper.as_str(),
+            "sha256-abc",
+        ] {
+            assert!(!is_content_address(legacy), "{legacy}");
+        }
     }
 
     #[test]
@@ -1218,12 +1238,12 @@ mod tests {
             b"data",
             "text/html",
             "MISS",
-            Some("sha256-abc123def456"),
+            Some("bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe"),
             Some("my-app"),
         );
         assert_eq!(
             resp.headers().get("X-Content-Address").unwrap(),
-            "sha256-abc123def456"
+            "bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe"
         );
         assert_eq!(resp.headers().get("X-Content-Slug").unwrap(), "my-app");
     }
@@ -1234,12 +1254,12 @@ mod tests {
             b"data",
             "text/html",
             "HIT",
-            Some("sha256-abc123def456"),
+            Some("bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe"),
             None,
         );
         assert_eq!(
             resp.headers().get("X-Content-Address").unwrap(),
-            "sha256-abc123def456"
+            "bafkr4igmsvmk6eeyrv3rmxjyr4gn7rgwfajvhugyyji7kgkvgpwx3fp4oe"
         );
         assert!(resp.headers().get("X-Content-Slug").is_none());
     }
@@ -1268,15 +1288,22 @@ mod tests {
             HeaderValue::from_static("compressed"),
         );
         headers.insert(
-            HeaderName::from_static("x-blob-hash"),
-            HeaderValue::from_static("bafkreiabc"),
+            HeaderName::from_static("x-content-address"),
+            HeaderValue::from_static("bafkr4ib6js33ihzoiymenu2ogip7x5r2cjwlcfm2rvhhidowgzg3r7wvrm"),
         );
         set_header(&mut headers, "x-delivery-mode", "extracted");
-        set_header(&mut headers, "x-blob-hash", "bafkreiabc");
+        set_header(
+            &mut headers,
+            "x-content-address",
+            "bafkr4ib6js33ihzoiymenu2ogip7x5r2cjwlcfm2rvhhidowgzg3r7wvrm",
+        );
         let modes: Vec<_> = headers.get_all("x-delivery-mode").iter().collect();
-        let hashes: Vec<_> = headers.get_all("x-blob-hash").iter().collect();
+        let hashes: Vec<_> = headers.get_all("x-content-address").iter().collect();
         assert_eq!(modes, vec!["extracted"]);
-        assert_eq!(hashes, vec!["bafkreiabc"]);
+        assert_eq!(
+            hashes,
+            vec!["bafkr4ib6js33ihzoiymenu2ogip7x5r2cjwlcfm2rvhhidowgzg3r7wvrm"]
+        );
     }
 
     #[test]
@@ -1287,8 +1314,14 @@ mod tests {
 
     #[test]
     fn test_parse_capability_path_with_hash() {
-        let slug = parse_capability_path("/apps/bafkrei-abc123/_capability").unwrap();
-        assert_eq!(slug, "bafkrei-abc123");
+        let slug = parse_capability_path(
+            "/apps/bafkr4ibs3epcmuvaaungn3cabi3kg7nuahmzlfh5awqylegt37vl6g55gy/_capability",
+        )
+        .unwrap();
+        assert_eq!(
+            slug,
+            "bafkr4ibs3epcmuvaaungn3cabi3kg7nuahmzlfh5awqylegt37vl6g55gy"
+        );
     }
 
     #[test]
@@ -1337,7 +1370,7 @@ mod tests {
 
     fn descriptor(format: &str, title: &str) -> AppDescriptor {
         AppDescriptor {
-            blob_hash: "sha256-abcdef123456".into(),
+            blob_cid: "bafkr4ihm4wnjcf5lwxbys33uq6nv6atjh5hdtxnui35oc5fdl54rflgasy".into(),
             content_id: "quiz-1".into(),
             content_format: format.into(),
             entry_point: None,
@@ -1548,7 +1581,7 @@ mod tests {
         let desc = AppDescriptor::from_data(&bson::doc! {
             "id": "quiz-1",
             "contentFormat": "html5-app",
-            "blobHash": "sha256-abcdef123456",
+            "blobCid": "bafkr4ihm4wnjcf5lwxbys33uq6nv6atjh5hdtxnui35oc5fdl54rflgasy",
             "title": "A quiz",
             "contentBody": r#"{"slug":"quiz-1","entryPoint":"game.html"}"#,
         })

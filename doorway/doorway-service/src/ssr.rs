@@ -1094,7 +1094,7 @@ impl DoorwayBundleSource {
 impl DoorwayBundleSource {
     /// Shared thread-isolated `GET /db/content/{slug}` returning the raw body.
     ///
-    /// Both `resolve_blob_hash` and `resolve_server_blob_hash` hit the same
+    /// Both `resolve_blob_cid` and `resolve_server_blob_cid` hit the same
     /// endpoint and differ only in which JSON field they parse, so the blocking
     /// HTTP call (and its dedicated-OS-thread isolation) lives here once.
     fn fetch_content_body(&self, slug: &str) -> elohim_render::Result<String> {
@@ -1127,14 +1127,16 @@ impl DoorwayBundleSource {
 }
 
 impl elohim_render::BundleSource for DoorwayBundleSource {
+    // The trait's method names are elohim-render's (outside this crate's write set);
+    // both return a byte CID, admitted by `parse_blob_cid` / `parse_server_blob_cid`.
     fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
         let body = self.fetch_content_body(slug)?;
-        parse_blob_hash(&body)
+        parse_blob_cid(&body)
     }
 
     fn resolve_server_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
         let body = self.fetch_content_body(slug)?;
-        parse_server_blob_hash(&body)
+        parse_server_blob_cid(&body)
     }
 
     fn fetch_blob(&self, hash: &str) -> elohim_render::Result<Vec<u8>> {
@@ -1144,7 +1146,7 @@ impl elohim_render::BundleSource for DoorwayBundleSource {
                 "fetch_blob skipped: bundle pass budget exhausted before `{url}`"
             )));
         };
-        // Same thread-isolation rationale as resolve_blob_hash above.
+        // Same thread-isolation rationale as resolve_blob_cid above.
         std::thread::spawn(move || {
             let client = DoorwayBundleSource::make_client(timeout);
             let resp = client
@@ -1165,38 +1167,51 @@ impl elohim_render::BundleSource for DoorwayBundleSource {
     }
 }
 
-/// Parse the `blobHash` field from a JSON body returned by `GET /db/content/{slug}`.
+/// Parse the `blobCid` field from a JSON body returned by `GET /db/content/{slug}`.
 ///
-/// The storage boundary is camelCase, so the field is `blobHash`. This is the
+/// The storage boundary is camelCase, so the field is `blobCid`. This is the
 /// **browser** bundle pointer.
-pub fn parse_blob_hash(body: &str) -> elohim_render::Result<String> {
+pub fn parse_blob_cid(body: &str) -> elohim_render::Result<String> {
     let v: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| RenderError::Bootstrap(format!("parse_blob_hash: invalid JSON: {e}")))?;
-    v.get("blobHash")
-        .and_then(|h| h.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| RenderError::Bootstrap("parse_blob_hash: missing `blobHash` field".into()))
+        .map_err(|e| RenderError::Bootstrap(format!("parse_blob_cid: invalid JSON: {e}")))?;
+    byte_cid_field(&v, "blobCid", "parse_blob_cid")
 }
 
-/// Parse the `serverBlobHash` field from a JSON body returned by
+/// Read a bundle pointer field as a byte CID (admitted by full decode). A missing
+/// field, a non-string, or any other spelling (`sha256-…`, `bafkrei…`) is a clean
+/// `Err` naming the field — never a pointer this doorway would try to fetch.
+fn byte_cid_field(
+    v: &serde_json::Value,
+    field: &str,
+    caller: &str,
+) -> elohim_render::Result<String> {
+    let text = v
+        .get(field)
+        .and_then(|h| h.as_str())
+        .ok_or_else(|| RenderError::Bootstrap(format!("{caller}: missing `{field}` field")))?;
+    elohim_address::ByteCid::parse(text)
+        .map(|cid| cid.to_string())
+        .map_err(|e| {
+            RenderError::Bootstrap(format!(
+                "{caller}: `{field}` is not a byte CID ({}): {e}",
+                e.check()
+            ))
+        })
+}
+
+/// Parse the `serverBlobCid` field from a JSON body returned by
 /// `GET /db/content/{slug}`.
 ///
-/// The storage boundary is camelCase, so the field is `serverBlobHash`. This is
-/// the **server** bundle pointer — the deploy-time hash of the Angular SSR
+/// The storage boundary is camelCase, so the field is `serverBlobCid`. This is
+/// the **server** bundle pointer — the deploy-time byte CID of the Angular SSR
 /// *server* bundle on the one EPR node. The SSR runtime materializes this, not
-/// `blobHash`. Absence is an honest, non-fatal condition (the caller treats it
+/// `blobCid`. Absence is an honest, non-fatal condition (the caller treats it
 /// as "SSR not materializable → CSR fallback"), so a missing field is a clean
 /// `Err`, never a panic.
-pub fn parse_server_blob_hash(body: &str) -> elohim_render::Result<String> {
-    let v: serde_json::Value = serde_json::from_str(body).map_err(|e| {
-        RenderError::Bootstrap(format!("parse_server_blob_hash: invalid JSON: {e}"))
-    })?;
-    v.get("serverBlobHash")
-        .and_then(|h| h.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| {
-            RenderError::Bootstrap("parse_server_blob_hash: missing `serverBlobHash` field".into())
-        })
+pub fn parse_server_blob_cid(body: &str) -> elohim_render::Result<String> {
+    let v: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| RenderError::Bootstrap(format!("parse_server_blob_cid: invalid JSON: {e}")))?;
+    byte_cid_field(&v, "serverBlobCid", "parse_server_blob_cid")
 }
 
 // =============================================================================
@@ -1855,7 +1870,11 @@ mod tests {
     #[test]
     fn render_cache_key_different_fetched_hashes_produces_different_key() {
         let k1 = render_cache_key("/lamad/concept/abc", &[], "v1");
-        let k2 = render_cache_key("/lamad/concept/abc", &["sha256-deadbeef".to_string()], "v1");
+        let k2 = render_cache_key(
+            "/lamad/concept/abc",
+            &["bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq".to_string()],
+            "v1",
+        );
         assert_ne!(
             k1, k2,
             "different fetched hashes must produce different keys"
@@ -1883,102 +1902,114 @@ mod tests {
         assert_eq!(k.len(), 36, "key must be exactly 36 characters; got: {k}");
     }
 
-    // ── parse_blob_hash ─────────────────────────────────────────────────────
+    // ── parse_blob_cid ─────────────────────────────────────────────────────
 
     #[test]
-    fn parse_blob_hash_valid_returns_hash() {
-        let body = r#"{"blobHash":"sha256-abc"}"#;
-        let result = parse_blob_hash(body);
-        assert_eq!(result.unwrap(), "sha256-abc");
+    fn parse_blob_cid_valid_returns_hash() {
+        let body = r#"{"blobCid":"bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"}"#;
+        let result = parse_blob_cid(body);
+        assert_eq!(
+            result.unwrap(),
+            "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y"
+        );
     }
 
     #[test]
-    fn parse_blob_hash_missing_field_returns_err() {
+    fn parse_blob_cid_missing_field_returns_err() {
         let body = r#"{"someOtherField":"value"}"#;
-        let result = parse_blob_hash(body);
-        assert!(result.is_err(), "expected Err on missing blobHash field");
+        let result = parse_blob_cid(body);
+        assert!(result.is_err(), "expected Err on missing blobCid field");
         let msg = result.unwrap_err().to_string();
         assert!(
-            msg.contains("blobHash"),
+            msg.contains("blobCid"),
             "error should mention missing field"
         );
     }
 
     #[test]
-    fn parse_blob_hash_invalid_json_returns_err() {
+    fn parse_blob_cid_invalid_json_returns_err() {
         let body = "not json at all";
-        let result = parse_blob_hash(body);
+        let result = parse_blob_cid(body);
         assert!(result.is_err(), "expected Err on invalid JSON");
     }
 
     #[test]
-    fn parse_blob_hash_blob_hash_not_string_returns_err() {
-        let body = r#"{"blobHash":42}"#;
-        let result = parse_blob_hash(body);
-        assert!(
-            result.is_err(),
-            "expected Err when blobHash is not a string"
-        );
+    fn parse_blob_cid_blob_cid_not_string_returns_err() {
+        let body = r#"{"blobCid":42}"#;
+        let result = parse_blob_cid(body);
+        assert!(result.is_err(), "expected Err when blobCid is not a string");
     }
 
-    // ── parse_server_blob_hash ──────────────────────────────────────────────
+    // ── parse_server_blob_cid ──────────────────────────────────────────────
 
     #[test]
-    fn parse_server_blob_hash_returns_server_not_browser() {
+    fn parse_server_blob_cid_returns_server_not_browser() {
         // A body carrying BOTH pointers — must select the SERVER one. This is
         // the exact shape `GET /db/content/elohim-host-landing` returns after
         // the row collapse (one EPR node, both hashes).
-        let body = r#"{"blobHash":"sha256-browser","serverBlobHash":"sha256-server"}"#;
-        let result = parse_server_blob_hash(body);
+        let body = r#"{"blobCid":"bafkr4iabl43l5jjr3pv3q7x5cvfhccnsxkdfzscrztf3y7e3micx3il62m","serverBlobCid":"bafkr4iexty4cfh5ucxgqlt7egc2rzudjg3kcddu23mk6rqsghr4gqblx44"}"#;
+        let result = parse_server_blob_cid(body);
         assert_eq!(
             result.unwrap(),
-            "sha256-server",
-            "must return serverBlobHash, not blobHash"
+            "bafkr4iexty4cfh5ucxgqlt7egc2rzudjg3kcddu23mk6rqsghr4gqblx44",
+            "must return serverBlobCid, not blobCid"
         );
     }
 
     #[test]
-    fn parse_server_blob_hash_missing_field_returns_err() {
-        // `blobHash` present but `serverBlobHash` absent (the migration-safety
+    fn parse_server_blob_cid_missing_field_returns_err() {
+        // `blobCid` present but `serverBlobCid` absent (the migration-safety
         // shape: SSR simply isn't materializable yet → caller does CSR fallback).
-        let body = r#"{"blobHash":"sha256-browser"}"#;
-        let result = parse_server_blob_hash(body);
+        let body = r#"{"blobCid":"bafkr4iabl43l5jjr3pv3q7x5cvfhccnsxkdfzscrztf3y7e3micx3il62m"}"#;
+        let result = parse_server_blob_cid(body);
         assert!(
             result.is_err(),
-            "expected Err when serverBlobHash field is absent"
+            "expected Err when serverBlobCid field is absent"
         );
         let msg = result.unwrap_err().to_string();
         assert!(
-            msg.contains("serverBlobHash"),
+            msg.contains("serverBlobCid"),
             "error should mention the missing field; got: {msg}"
         );
     }
 
+    /// A legacy spelling in either pointer field is refused by full decode.
     #[test]
-    fn parse_server_blob_hash_invalid_json_returns_err() {
-        let result = parse_server_blob_hash("not json at all");
+    fn parse_blob_cids_refuse_legacy_spellings() {
+        let sha256 = format!("sha256-{}", "ab".repeat(32));
+        let bafkrei = elohim_address::compute_raw_sha2_cid(b"hello world").to_string();
+        for legacy in [sha256, bafkrei] {
+            let body = serde_json::json!({"blobCid": legacy, "serverBlobCid": legacy}).to_string();
+            assert!(parse_blob_cid(&body).is_err(), "{legacy}");
+            assert!(parse_server_blob_cid(&body).is_err(), "{legacy}");
+        }
+    }
+
+    #[test]
+    fn parse_server_blob_cid_invalid_json_returns_err() {
+        let result = parse_server_blob_cid("not json at all");
         assert!(result.is_err(), "expected Err on invalid JSON");
     }
 
     #[test]
-    fn parse_server_blob_hash_not_string_returns_err() {
-        let body = r#"{"serverBlobHash":42}"#;
-        let result = parse_server_blob_hash(body);
+    fn parse_server_blob_cid_not_string_returns_err() {
+        let body = r#"{"serverBlobCid":42}"#;
+        let result = parse_server_blob_cid(body);
         assert!(
             result.is_err(),
-            "expected Err when serverBlobHash is not a string"
+            "expected Err when serverBlobCid is not a string"
         );
     }
 
     #[tokio::test]
-    async fn bundle_source_resolve_server_blob_hash_ok_from_async_context() {
+    async fn bundle_source_resolve_server_blob_cid_ok_from_async_context() {
         use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
         let server = MockServer::start().await;
         Mock::given(matchers::method("GET"))
             .and(matchers::path("/db/content/elohim-host-landing"))
             .respond_with(ResponseTemplate::new(200).set_body_string(
-                r#"{"blobHash":"sha256-browser","serverBlobHash":"sha256-server"}"#,
+                r#"{"blobCid":"bafkr4iabl43l5jjr3pv3q7x5cvfhccnsxkdfzscrztf3y7e3micx3il62m","serverBlobCid":"bafkr4iexty4cfh5ucxgqlt7egc2rzudjg3kcddu23mk6rqsghr4gqblx44"}"#,
             ))
             .mount(&server)
             .await;
@@ -1987,8 +2018,8 @@ mod tests {
         // Thread-isolation regression: must not panic from within a tokio runtime.
         let result = src.resolve_server_blob_hash("elohim-host-landing");
         assert_eq!(
-            result.expect("resolve_server_blob_hash must succeed from async context"),
-            "sha256-server"
+            result.expect("resolve_server_blob_cid must succeed from async context"),
+            "bafkr4iexty4cfh5ucxgqlt7egc2rzudjg3kcddu23mk6rqsghr4gqblx44"
         );
     }
 
@@ -2007,14 +2038,14 @@ mod tests {
     // ── DoorwayBundleSource async-caller regression ─────────────────────────
     //
     // These tests run from WITHIN a tokio runtime (via #[tokio::test]) to prove
-    // that `DoorwayBundleSource::resolve_blob_hash` does NOT panic with "Cannot
+    // that `DoorwayBundleSource::resolve_blob_cid` does NOT panic with "Cannot
     // start a runtime from within a runtime." Before the thread-isolation fix the
     // blocking reqwest call would create its own tokio runtime on the tokio
     // worker thread — a nested-runtime panic.  After the fix the blocking call
     // runs on a dedicated OS thread with no ambient tokio context.
 
     #[tokio::test]
-    async fn bundle_source_resolve_blob_hash_ok_from_async_context() {
+    async fn bundle_source_resolve_blob_cid_ok_from_async_context() {
         use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
         // Start a wiremock server (runs its own tokio task — fine; we just call
@@ -2022,9 +2053,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(matchers::method("GET"))
             .and(matchers::path("/db/content/my-bundle-slug"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_string(r#"{"blobHash":"sha256-deadbeef"}"#),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{"blobCid":"bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq"}"#,
+            ))
             .mount(&server)
             .await;
 
@@ -2032,13 +2063,13 @@ mod tests {
         // This call PANICS before the thread-isolation fix; it must return Ok after.
         let result = src.resolve_blob_hash("my-bundle-slug");
         assert_eq!(
-            result.expect("resolve_blob_hash must succeed from async context"),
-            "sha256-deadbeef"
+            result.expect("resolve_blob_cid must succeed from async context"),
+            "bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq"
         );
     }
 
     #[tokio::test]
-    async fn bundle_source_resolve_blob_hash_404_returns_http_status_err() {
+    async fn bundle_source_resolve_blob_cid_404_returns_http_status_err() {
         use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
         let server = MockServer::start().await;
@@ -2054,7 +2085,7 @@ mod tests {
             .expect_err("404 must produce an Err");
         let msg = err.to_string();
         // The error must mention the HTTP status so callers get a useful message
-        // instead of a misleading "missing blobHash field".
+        // instead of a misleading "missing blobCid field".
         assert!(
             msg.contains("404"),
             "error message must mention the HTTP status; got: {msg}"

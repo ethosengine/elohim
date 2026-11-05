@@ -13,7 +13,7 @@
 //!
 //! ## The cure: cache-first, never a doomed hot-path fetch
 //!
-//! The Mongo-backed `app_file_cache` (keyed `{slug}:{file_path}:{blob_hash}`)
+//! The Mongo-backed `app_file_cache` (keyed `{slug}:{file_path}:{blob_cid}`)
 //! already holds the last reconciled bundle — derivable, content-addressed
 //! truth that OUTLIVES the pod, unlike the in-memory SSR hot cache. This module
 //! projects that archive as a warm shell store:
@@ -62,7 +62,7 @@
 //!    the poisoned era carries no marker, so it reads `Behind` and buys exactly
 //!    one hash-addressed upgrade: the fleet self-heals on deploy, with no
 //!    operator action;
-//! 3. **an unknown head is not a confirmed one** — `resolve_blob_hash`
+//! 3. **an unknown head is not a confirmed one** — `resolve_blob_cid`
 //!    answering `None` (the live alpha shape: `head:""`,
 //!    `x-projection-ready: false`) used to read `AtHead` and pin the shell
 //!    permanently. It is `Behind`, re-checked at most once per
@@ -96,10 +96,10 @@ use crate::render::coherence::{BehindReason, CoherenceOracle, CoherenceVerdict};
 /// A shell document read out of the persistent archive.
 #[derive(Debug, Clone)]
 pub struct ArchivedShell {
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub content_type: String,
     pub bytes: Vec<u8>,
-    /// These bytes were FETCHED by `blob_hash`, not merely stocked under it.
+    /// These bytes were FETCHED by `blob_cid`, not merely stocked under it.
     /// False for every doc written before the moving-pointer fix — such a doc
     /// is servable but is never proof of the head (see the module doc).
     pub head_bound: bool,
@@ -118,10 +118,10 @@ pub struct ArchivedShell {
 pub trait ShellArchive: Send + Sync {
     /// The blob hash the doorway's own projection currently declares for `slug`.
     /// `None` when the projection has never seen this app.
-    async fn declared_blob_hash(&self, slug: &str) -> Option<String>;
+    async fn declared_blob_cid(&self, slug: &str) -> Option<String>;
 
     /// Archived bytes for one specific (content-addressed) head.
-    async fn load(&self, slug: &str, file_path: &str, blob_hash: &str) -> Option<ArchivedShell>;
+    async fn load(&self, slug: &str, file_path: &str, blob_cid: &str) -> Option<ArchivedShell>;
 
     /// The most recently stocked copy at ANY head — the last reconciled bundle.
     /// Used when the declared head is unknown, or known but not yet stocked.
@@ -130,34 +130,34 @@ pub trait ShellArchive: Send + Sync {
     /// Stock a freshly-read shell so the NEXT pod can serve it warm.
     ///
     /// This trait method IS the head-bound stock path: `resolve_shell` only
-    /// reaches it with bytes fetched by `blob_hash`, so implementations mark
+    /// reaches it with bytes fetched by `blob_cid`, so implementations mark
     /// what they write.
     async fn store(
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         bytes: Vec<u8>,
     );
 }
 
 /// The live archive: the Mongo-backed `app_file_cache`, which already holds the
-/// last reconciled bundle keyed `{slug}:{file_path}:{blob_hash}`. Nothing new is
+/// last reconciled bundle keyed `{slug}:{file_path}:{blob_cid}`. Nothing new is
 /// stored — this projects what the delivery path already stocks.
 #[async_trait::async_trait]
 impl ShellArchive for crate::cache::AppFileCacheService {
-    async fn declared_blob_hash(&self, slug: &str) -> Option<String> {
+    async fn declared_blob_cid(&self, slug: &str) -> Option<String> {
         // Reads the doorway's OWN projection store (`projected_entries`), never
         // the storage upstream — the whole point of the cache-first path.
-        self.resolve_blob_hash(slug).await
+        self.resolve_blob_cid(slug).await
     }
 
-    async fn load(&self, slug: &str, file_path: &str, blob_hash: &str) -> Option<ArchivedShell> {
-        self.get(slug, file_path, blob_hash)
+    async fn load(&self, slug: &str, file_path: &str, blob_cid: &str) -> Option<ArchivedShell> {
+        self.get(slug, file_path, blob_cid)
             .await
             .map(|f| ArchivedShell {
-                blob_hash: f.blob_hash,
+                blob_cid: f.blob_cid,
                 content_type: f.content_type,
                 bytes: f.data,
                 head_bound: f.head_bound,
@@ -168,7 +168,7 @@ impl ShellArchive for crate::cache::AppFileCacheService {
         self.latest_file(slug, file_path)
             .await
             .map(|f| ArchivedShell {
-                blob_hash: f.blob_hash,
+                blob_cid: f.blob_cid,
                 content_type: f.content_type,
                 bytes: f.data,
                 head_bound: f.head_bound,
@@ -179,11 +179,11 @@ impl ShellArchive for crate::cache::AppFileCacheService {
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         bytes: Vec<u8>,
     ) {
-        self.put_head_bound(slug, file_path, blob_hash, content_type, bytes)
+        self.put_head_bound(slug, file_path, blob_cid, content_type, bytes)
             .await;
     }
 }
@@ -191,7 +191,7 @@ impl ShellArchive for crate::cache::AppFileCacheService {
 /// A shell document ready to serve, with the head it was stocked under.
 #[derive(Debug, Clone)]
 pub struct WarmShell {
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub content_type: String,
     pub bytes: Vec<u8>,
     /// See [`ArchivedShell::head_bound`]. `lookup_with_declared` requires it
@@ -458,7 +458,7 @@ impl WarmShellStore {
         {
             return observed.browser;
         }
-        archive.declared_blob_hash(slug).await
+        archive.declared_blob_cid(slug).await
     }
 
     /// True when this store can judge deliverability, not merely provenance.
@@ -667,7 +667,7 @@ impl WarmShellStore {
                     slug,
                     entry_file,
                     WarmShell {
-                        blob_hash: a.blob_hash,
+                        blob_cid: a.blob_cid,
                         content_type: a.content_type,
                         bytes: a.bytes,
                         // An unmarked doc hydrates as SERVABLE but never as
@@ -719,7 +719,7 @@ impl WarmShellStore {
             // STOCKED under `head` are not proof of it. Without that clause a
             // slug-addressed fetch from the wrong era serves `AtHead` forever.
             if let Some(hot) = self.hot_get(slug, file_path) {
-                if hot.blob_hash == head && hot.head_bound {
+                if hot.blob_cid == head && hot.head_bound {
                     self.clear_upgrade_attempt(slug, file_path);
                     return (WarmClass::AtHead, Some(hot), declared);
                 }
@@ -727,7 +727,7 @@ impl WarmShellStore {
             if let Some(a) = archive.load(slug, file_path, head).await {
                 if a.head_bound {
                     let shell = WarmShell {
-                        blob_hash: a.blob_hash,
+                        blob_cid: a.blob_cid,
                         content_type: a.content_type,
                         bytes: a.bytes,
                         head_bound: true,
@@ -745,7 +745,7 @@ impl WarmShellStore {
             Some(hot) => Some(hot),
             None => archive.load_latest(slug, file_path).await.map(|a| {
                 let shell = WarmShell {
-                    blob_hash: a.blob_hash,
+                    blob_cid: a.blob_cid,
                     content_type: a.content_type,
                     bytes: a.bytes,
                     head_bound: a.head_bound,
@@ -757,7 +757,7 @@ impl WarmShellStore {
         match behind {
             // Bytes in hand, but nothing here proves they are the declared
             // head — including the case where the projection declares NO head
-            // (live alpha, 2026-09-04: `resolve_blob_hash` → None). An unknown
+            // (live alpha, 2026-09-04: `resolve_blob_cid` → None). An unknown
             // head used to read `AtHead`, which pinned a stale shell for the
             // life of the pod. It is `Behind`: served warm, and re-checked at
             // most once per SHELL_UPGRADE_RETRY_SECS.
@@ -771,7 +771,7 @@ impl WarmShellStore {
         &self,
         slug: &str,
         file_path: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         content_type: &str,
         bytes: Vec<u8>,
     ) {
@@ -779,7 +779,7 @@ impl WarmShellStore {
             slug,
             file_path,
             WarmShell {
-                blob_hash: blob_hash.to_string(),
+                blob_cid: blob_cid.to_string(),
                 content_type: content_type.to_string(),
                 bytes: bytes.clone(),
                 // Only `resolve_shell`'s hash-addressed fetch reaches here.
@@ -788,7 +788,7 @@ impl WarmShellStore {
         );
         if let Some(archive) = self.archive.as_ref() {
             archive
-                .store(slug, file_path, blob_hash, content_type, bytes)
+                .store(slug, file_path, blob_cid, content_type, bytes)
                 .await;
         }
     }
@@ -812,7 +812,7 @@ impl WarmShellStore {
             slug,
             file_path,
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: content_type.to_string(),
                 bytes,
                 head_bound: false,
@@ -959,11 +959,11 @@ pub(crate) async fn serve_held(
 ) -> ShellOutcome {
     if let Some(shell) = warm.as_ref() {
         if store.is_coherence_judging() {
-            let rejected = if shell.blob_hash.is_empty() {
+            let rejected = if shell.blob_cid.is_empty() {
                 Some(BehindReason::HeadUnknown)
             } else {
                 store
-                    .judge_coherence(Some(&shell.blob_hash), shell, upstream_available)
+                    .judge_coherence(Some(&shell.blob_cid), shell, upstream_available)
                     .await
             };
             if let Some(reason) = rejected {
@@ -996,12 +996,12 @@ pub(crate) async fn stock_and_return(
     // head the fetch was necessarily slug-addressed; a coherence-judging store
     // keeps its last proven shell until a head can be verified.
     let shell = WarmShell {
-        blob_hash: declared.clone().unwrap_or_default(),
+        blob_cid: declared.clone().unwrap_or_default(),
         content_type: fresh.content_type.clone(),
         bytes: fresh.bytes.clone(),
         head_bound: declared.is_some(),
     };
-    if shell.blob_hash.is_empty() && store.is_coherence_judging() {
+    if shell.blob_cid.is_empty() && store.is_coherence_judging() {
         let (_, previous, _) = store.lookup_with_declared(slug, entry_file).await;
         return serve_held(
             store,
@@ -1013,9 +1013,9 @@ pub(crate) async fn stock_and_return(
     }
     // Judge before replacing either the hot shell or the archive's latest entry.
     // A broken new head must never erase the last version that actually worked.
-    if !shell.blob_hash.is_empty() {
+    if !shell.blob_cid.is_empty() {
         if let Some(reason) = store
-            .judge_coherence(Some(&shell.blob_hash), &shell, upstream_available)
+            .judge_coherence(Some(&shell.blob_cid), &shell, upstream_available)
             .await
         {
             let (_, previous, _) = store.lookup_with_declared(slug, entry_file).await;
@@ -1056,7 +1056,7 @@ mod tests {
             .stock(
                 "app",
                 "index.html",
-                "sha256-abc",
+                "bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y",
                 "text/html",
                 b"hi".to_vec(),
             )
@@ -1096,7 +1096,7 @@ mod tests {
     struct StockedFile {
         slug: String,
         file_path: String,
-        blob_hash: String,
+        blob_cid: String,
         bytes: Vec<u8>,
         head_bound: bool,
     }
@@ -1116,7 +1116,7 @@ mod tests {
             a.files.lock().unwrap().push(StockedFile {
                 slug: "landing".into(),
                 file_path: "index.html".into(),
-                blob_hash: declared.into(),
+                blob_cid: declared.into(),
                 bytes: bytes.as_bytes().to_vec(),
                 head_bound: true,
             });
@@ -1132,7 +1132,7 @@ mod tests {
             a.files.lock().unwrap().push(StockedFile {
                 slug: "landing".into(),
                 file_path: "index.html".into(),
-                blob_hash: declared.into(),
+                blob_cid: declared.into(),
                 bytes: bytes.as_bytes().to_vec(),
                 head_bound: false,
             });
@@ -1146,25 +1146,20 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ShellArchive for FakeArchive {
-        async fn declared_blob_hash(&self, _slug: &str) -> Option<String> {
+        async fn declared_blob_cid(&self, _slug: &str) -> Option<String> {
             self.declared.lock().unwrap().clone()
         }
 
-        async fn load(
-            &self,
-            slug: &str,
-            file_path: &str,
-            blob_hash: &str,
-        ) -> Option<ArchivedShell> {
+        async fn load(&self, slug: &str, file_path: &str, blob_cid: &str) -> Option<ArchivedShell> {
             self.loads.fetch_add(1, Ordering::SeqCst);
             self.files
                 .lock()
                 .unwrap()
                 .iter()
                 .rev()
-                .find(|f| f.slug == slug && f.file_path == file_path && f.blob_hash == blob_hash)
+                .find(|f| f.slug == slug && f.file_path == file_path && f.blob_cid == blob_cid)
                 .map(|f| ArchivedShell {
-                    blob_hash: f.blob_hash.clone(),
+                    blob_cid: f.blob_cid.clone(),
                     content_type: "text/html".into(),
                     bytes: f.bytes.clone(),
                     head_bound: f.head_bound,
@@ -1180,7 +1175,7 @@ mod tests {
                 .rev()
                 .find(|f| f.slug == slug && f.file_path == file_path)
                 .map(|f| ArchivedShell {
-                    blob_hash: f.blob_hash.clone(),
+                    blob_cid: f.blob_cid.clone(),
                     content_type: "text/html".into(),
                     bytes: f.bytes.clone(),
                     head_bound: f.head_bound,
@@ -1191,14 +1186,14 @@ mod tests {
             &self,
             slug: &str,
             file_path: &str,
-            blob_hash: &str,
+            blob_cid: &str,
             _content_type: &str,
             bytes: Vec<u8>,
         ) {
             self.files.lock().unwrap().push(StockedFile {
                 slug: slug.into(),
                 file_path: file_path.into(),
-                blob_hash: blob_hash.into(),
+                blob_cid: blob_cid.into(),
                 bytes,
                 // `ShellArchive::store` IS the head-bound stock path.
                 head_bound: true,
@@ -1280,11 +1275,11 @@ mod tests {
     #[tokio::test]
     async fn a_head_whose_entry_script_is_missing_is_never_at_head() {
         let archive = FakeArchive::with_shell(
-            "sha256-6899",
+            "bafkr4iafmmxhyqczfemleyil2mvypbxqnlvfkffqhcwm3mjmp2oadh3rxy",
             "<html><head><script src=\"main-AVSOD6V6.js\"></script></head><body></body></html>",
         );
         let oracle = FakeOracle::saying(
-            "sha256-6899",
+            "bafkr4iafmmxhyqczfemleyil2mvypbxqnlvfkffqhcwm3mjmp2oadh3rxy",
             CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
         );
         let store = WarmShellStore::with_oracle(Some(archive), Some(oracle.clone()));
@@ -1314,11 +1309,11 @@ mod tests {
     #[tokio::test]
     async fn an_incoherent_archived_head_is_unavailable_without_a_working_fallback() {
         let archive = FakeArchive::with_shell(
-            "sha256-6899",
+            "bafkr4iafmmxhyqczfemleyil2mvypbxqnlvfkffqhcwm3mjmp2oadh3rxy",
             "<html><script src=\"main-AVSOD6V6.js\"></script></html>",
         );
         let oracle = FakeOracle::saying(
-            "sha256-6899",
+            "bafkr4iafmmxhyqczfemleyil2mvypbxqnlvfkffqhcwm3mjmp2oadh3rxy",
             CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main-AVSOD6V6.js".into())),
         );
         let store = WarmShellStore::with_oracle(Some(archive), Some(oracle));
@@ -1353,10 +1348,14 @@ mod tests {
 
     #[tokio::test]
     async fn broken_fresh_head_preserves_last_working_shell_and_archive() {
-        let archive = FakeArchive::with_shell("sha256-good", "working");
-        *archive.declared.lock().unwrap() = Some("sha256-broken".into());
+        let archive = FakeArchive::with_shell(
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4",
+            "working",
+        );
+        *archive.declared.lock().unwrap() =
+            Some("bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu".into());
         let oracle = FakeOracle::saying(
-            "sha256-broken",
+            "bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu",
             CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main.js".into())),
         );
         let store = WarmShellStore::with_oracle(Some(archive.clone()), Some(oracle));
@@ -1364,7 +1363,7 @@ mod tests {
             &store,
             "landing",
             "index.html",
-            Some("sha256-broken".into()),
+            Some("bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu".into()),
             FetchedShell {
                 bytes: b"broken".to_vec(),
                 content_type: "text/html".into(),
@@ -1372,7 +1371,10 @@ mod tests {
             true,
         )
         .await;
-        assert_eq!(outcome.shell().unwrap().blob_hash, "sha256-good");
+        assert_eq!(
+            outcome.shell().unwrap().blob_cid,
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4"
+        );
         assert_eq!(archive.files.lock().unwrap().len(), 1);
         assert!(matches!(
             outcome,
@@ -1385,7 +1387,10 @@ mod tests {
 
     #[tokio::test]
     async fn unknown_fresh_head_cannot_replace_a_working_shell() {
-        let archive = FakeArchive::with_shell("sha256-good", "working");
+        let archive = FakeArchive::with_shell(
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4",
+            "working",
+        );
         *archive.declared.lock().unwrap() = None;
         let store = WarmShellStore::with_oracle(
             Some(archive.clone()),
@@ -1403,7 +1408,10 @@ mod tests {
             true,
         )
         .await;
-        assert_eq!(outcome.shell().unwrap().blob_hash, "sha256-good");
+        assert_eq!(
+            outcome.shell().unwrap().blob_cid,
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4"
+        );
         assert!(matches!(
             outcome,
             ShellOutcome::Behind {
@@ -1444,9 +1452,10 @@ mod tests {
     #[tokio::test]
     async fn broken_first_head_is_not_stocked_and_is_unavailable() {
         let archive = Arc::new(FakeArchive::default());
-        *archive.declared.lock().unwrap() = Some("sha256-broken".into());
+        *archive.declared.lock().unwrap() =
+            Some("bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu".into());
         let oracle = FakeOracle::saying(
-            "sha256-broken",
+            "bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu",
             CoherenceVerdict::Incoherent(BehindReason::MissingAsset("main.js".into())),
         );
         let store = WarmShellStore::with_oracle(Some(archive.clone()), Some(oracle));
@@ -1454,7 +1463,7 @@ mod tests {
             &store,
             "landing",
             "index.html",
-            Some("sha256-broken".into()),
+            Some("bafkr4icttxt2n2fn4dyvkexqytsqccble5vk4fhmfnf62gdhx6falwgkmu".into()),
             FetchedShell {
                 bytes: b"broken".to_vec(),
                 content_type: "text/html".into(),
@@ -1476,7 +1485,7 @@ mod tests {
     #[tokio::test]
     async fn a_confirmed_head_costs_exactly_one_probe_ever() {
         let archive = FakeArchive::with_shell(
-            "sha256-good",
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4",
             "<html><script src=\"main-A.js\"></script></html>",
         );
         let oracle = Arc::new(FakeOracle::default()); // default verdict: Coherent
@@ -1501,7 +1510,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreachable_upstream_cannot_un_prove_a_confirmed_head() {
         let archive = FakeArchive::with_shell(
-            "sha256-good",
+            "bafkr4ibuprbrv5z2rrg7ibotyeunf5d7krczcstm4ykftl7g3pmwcp4id4",
             "<html><script src=\"main-A.js\"></script></html>",
         );
         let oracle = Arc::new(FakeOracle::default());
@@ -1531,7 +1540,7 @@ mod tests {
     #[tokio::test]
     async fn a_never_confirmed_head_with_a_dark_upstream_is_behind_storage_unreachable() {
         let archive = FakeArchive::with_shell(
-            "sha256-new",
+            "bafkr4ieo467vx7uxmp32z3ysawc4ag6gyr533e2qmuqym5jgarsjrcxwwu",
             "<html><script src=\"main-A.js\"></script></html>",
         );
         let oracle = Arc::new(FakeOracle::default());
@@ -1549,7 +1558,7 @@ mod tests {
         archive.files.lock().unwrap().push(StockedFile {
             slug: "landing".into(),
             file_path: "index.html".into(),
-            blob_hash: "sha256-whatever".into(),
+            blob_cid: "bafkr4igdannwckvz5wnm56xgvxdzgg7vhoqvbs2d7q6jpffgzwfbpyjkqq".into(),
             bytes: b"<html>old</html>".to_vec(),
             head_bound: true,
         });
@@ -1567,7 +1576,10 @@ mod tests {
 
     #[tokio::test]
     async fn an_unmarked_doc_at_the_declared_head_is_behind_stale_projection() {
-        let archive = FakeArchive::with_unmarked_shell("sha256-h1", "<html>poisoned era</html>");
+        let archive = FakeArchive::with_unmarked_shell(
+            "bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq",
+            "<html>poisoned era</html>",
+        );
         let store =
             WarmShellStore::with_oracle(Some(archive), Some(Arc::new(FakeOracle::default())));
 
@@ -1580,7 +1592,7 @@ mod tests {
     #[tokio::test]
     async fn without_an_oracle_at_head_is_unchanged() {
         let archive = FakeArchive::with_shell(
-            "sha256-a",
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
             "<html><script src=\"main-A.js\"></script></html>",
         );
         let store = WarmShellStore::new(Some(archive));
@@ -1596,7 +1608,10 @@ mod tests {
     /// address its fetch by it. This is the seam between D1 and the shell path.
     #[tokio::test]
     async fn once_the_head_moves_and_the_shell_is_evicted_the_fetch_is_addressed_by_the_new_head() {
-        let archive = FakeArchive::with_shell("sha256-6899old", "<html>era-1</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4iegfnhzucypc5xpo5jnpl77irk4ond77sdg6mxh3slq3wnqwsynjy",
+            "<html>era-1</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
 
         // Steady state at the old head.
@@ -1606,7 +1621,7 @@ mod tests {
         );
 
         // The reconciler observes the move: declaration advances, hot shell out.
-        archive.declare("sha256-e0e2f7new");
+        archive.declare("bafkr4ib37i3rxhv2h6q33ewbzv5oxrhreuhosxxrdirjthphmjju54sny4");
         store.evict("landing");
 
         let seen: Arc<Mutex<Vec<Option<String>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -1630,12 +1645,14 @@ mod tests {
 
         assert_eq!(
             seen.lock().unwrap().clone(),
-            vec![Some("sha256-e0e2f7new".to_string())],
+            vec![Some(
+                "bafkr4ib37i3rxhv2h6q33ewbzv5oxrhreuhosxxrdirjthphmjju54sny4".to_string()
+            )],
             "the fetch must address the head the reconciler moved to, not the slug"
         );
         assert_eq!(
-            outcome.shell().map(|s| s.blob_hash.clone()),
-            Some("sha256-e0e2f7new".to_string())
+            outcome.shell().map(|s| s.blob_cid.clone()),
+            Some("bafkr4ib37i3rxhv2h6q33ewbzv5oxrhreuhosxxrdirjthphmjju54sny4".to_string())
         );
         assert!(outcome.shell().unwrap().html().contains("era-2"));
     }
@@ -1644,7 +1661,10 @@ mod tests {
 
     #[tokio::test]
     async fn boot_hydration_makes_the_shell_servable_with_zero_upstream_fetches() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html><app-root></app-root></html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html><app-root></app-root></html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
 
         let hydrated = store
@@ -1665,7 +1685,10 @@ mod tests {
         match outcome {
             ShellOutcome::Warm(shell) => {
                 assert!(shell.html().contains("app-root"));
-                assert_eq!(shell.blob_hash, "sha256-a");
+                assert_eq!(
+                    shell.blob_cid,
+                    "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu"
+                );
             }
             other => panic!("expected a warm shell, got {other:?}"),
         }
@@ -1684,7 +1707,7 @@ mod tests {
     #[tokio::test]
     async fn a_projection_advance_mid_fetch_does_not_relabel_old_bytes_as_the_new_head() {
         let archive = Arc::new(FakeArchive::default());
-        archive.declare("sha256-h1");
+        archive.declare("bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq");
         let store = WarmShellStore::new(Some(archive.clone()));
 
         let racing = archive.clone();
@@ -1696,7 +1719,7 @@ mod tests {
             move |_budget, _declared| {
                 Box::pin(async move {
                     // The declared head advances while the fetch is in flight.
-                    racing.declare("sha256-h2");
+                    racing.declare("bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e");
                     Some(FetchedShell {
                         bytes: b"<html>h1-era</html>".to_vec(),
                         content_type: "text/html".to_string(),
@@ -1708,7 +1731,7 @@ mod tests {
 
         match outcome {
             ShellOutcome::Fresh(shell) => assert_eq!(
-                shell.blob_hash, "sha256-h1",
+                shell.blob_cid, "bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq",
                 "bytes fetched under h1 must not be stocked as h2"
             ),
             other => panic!("expected a fresh shell, got {other:?}"),
@@ -1717,7 +1740,10 @@ mod tests {
         // The h1-era copy is honestly one-behind now, never AtHead under h2.
         let (class, warm) = store.lookup("landing", "index.html").await;
         assert_eq!(class, WarmClass::Behind);
-        assert_eq!(warm.unwrap().blob_hash, "sha256-h1");
+        assert_eq!(
+            warm.unwrap().blob_cid,
+            "bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq"
+        );
     }
 
     // ── the moving-pointer defect (2026-09-04) ───────────────────────────────
@@ -1730,9 +1756,12 @@ mod tests {
     /// on doorway-alpha and served `AtHead` forever.
     #[tokio::test]
     async fn the_fetch_closure_is_handed_the_head_the_bytes_will_be_stocked_under() {
-        let archive = FakeArchive::with_shell("sha256-h1", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4ibvn6lgbxhhzsjh5ryfd4tyl6bgh3f7qdizs7bm5pajsi4f66enbq",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
-        archive.declare("sha256-h2");
+        archive.declare("bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e");
 
         let seen: Arc<Mutex<Vec<Option<String>>>> = Arc::new(Mutex::new(Vec::new()));
         let seen_c = seen.clone();
@@ -1755,11 +1784,16 @@ mod tests {
 
         assert_eq!(
             *seen.lock().unwrap(),
-            vec![Some("sha256-h2".to_string())],
+            vec![Some(
+                "bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e".to_string()
+            )],
             "the fetch must be addressable by the head it will be stocked under"
         );
         match outcome {
-            ShellOutcome::Fresh(shell) => assert_eq!(shell.blob_hash, "sha256-h2"),
+            ShellOutcome::Fresh(shell) => assert_eq!(
+                shell.blob_cid,
+                "bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e"
+            ),
             other => panic!("expected a fresh shell, got {other:?}"),
         }
     }
@@ -1771,7 +1805,10 @@ mod tests {
     /// one hash-addressed upgrade fetch. No operator action, no eviction script.
     #[tokio::test]
     async fn an_unmarked_archive_doc_at_the_declared_head_is_not_at_head() {
-        let archive = FakeArchive::with_unmarked_shell("sha256-h2", "<html>h1-era</html>");
+        let archive = FakeArchive::with_unmarked_shell(
+            "bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e",
+            "<html>h1-era</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
 
         let (class, warm, declared) = store.lookup_with_declared("landing", "index.html").await;
@@ -1780,7 +1817,10 @@ mod tests {
             WarmClass::Behind,
             "an unmarked doc AT the declared head is not proof of the head"
         );
-        assert_eq!(declared.as_deref(), Some("sha256-h2"));
+        assert_eq!(
+            declared.as_deref(),
+            Some("bafkr4if5sxn5huidbky6omj3k65dhvey3stvhbpwtfvrcvo2fzpyzeui3e")
+        );
         assert!(!warm.expect("bytes are still servable").head_bound);
 
         let fetches = Arc::new(AtomicUsize::new(0));
@@ -1805,7 +1845,7 @@ mod tests {
     }
 
     /// The live alpha shape (Loki, 2026-09-04): `head:""`, `x-projection-ready:
-    /// false` — `resolve_blob_hash` answers `None`, so a hot shell stocked from
+    /// false` — `resolve_blob_cid` answers `None`, so a hot shell stocked from
     /// a slug-addressed fetch was classified `AtHead` on the `declared.is_none()`
     /// arm and served forever with no upstream re-check. An UNKNOWN head is not
     /// a confirmed one: it is `Behind`, and it re-checks.
@@ -1817,7 +1857,7 @@ mod tests {
             "landing",
             "index.html",
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: "text/html".into(),
                 bytes: b"<html>stale-era</html>".to_vec(),
                 head_bound: false,
@@ -1850,7 +1890,7 @@ mod tests {
             "landing",
             "index.html",
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: "text/html".into(),
                 bytes: b"<html>stale-era</html>".to_vec(),
                 head_bound: false,
@@ -1908,7 +1948,10 @@ mod tests {
     /// and every admin route. Nothing evicted it until 2026-09-04.
     #[tokio::test]
     async fn evicting_a_slug_drops_its_hot_shell() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
         store
             .hydrate(&[("landing".to_string(), "index.html".to_string())])
@@ -1939,7 +1982,7 @@ mod tests {
             "landing",
             "index.html",
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: "text/html".into(),
                 bytes: b"<html>stale-era</html>".to_vec(),
                 head_bound: false,
@@ -1990,7 +2033,7 @@ mod tests {
             "landing",
             "index.html",
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: "text/html".into(),
                 bytes: b"<html>held</html>".to_vec(),
                 head_bound: false,
@@ -2019,9 +2062,12 @@ mod tests {
     /// due and launch it together (a read-then-write pair did exactly that).
     #[tokio::test]
     async fn exactly_one_request_per_interval_claims_the_upgrade() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
-        archive.declare("sha256-b");
+        archive.declare("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui");
 
         let mut upgrades = 0;
         for _ in 0..5 {
@@ -2077,7 +2123,7 @@ mod tests {
             "landing",
             "index.html",
             WarmShell {
-                blob_hash: String::new(),
+                blob_cid: String::new(),
                 content_type: "text/html".into(),
                 bytes: b"<html>held</html>".to_vec(),
                 head_bound: false,
@@ -2107,12 +2153,15 @@ mod tests {
     /// long-lived pod does not accumulate one entry per app forever.
     #[tokio::test]
     async fn converging_to_at_head_releases_the_claim_slot() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
         store
             .hydrate(&[("landing".to_string(), "index.html".to_string())])
             .await;
-        archive.declare("sha256-b");
+        archive.declare("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui");
 
         let _ = resolve_shell(
             &store,
@@ -2141,7 +2190,10 @@ mod tests {
 
     #[tokio::test]
     async fn upstream_unavailable_with_a_warm_shell_serves_without_a_fetch() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html><app-root></app-root></html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html><app-root></app-root></html>",
+        );
         let store = WarmShellStore::new(Some(archive));
         let fetches = Arc::new(AtomicUsize::new(0));
 
@@ -2189,14 +2241,17 @@ mod tests {
 
     #[tokio::test]
     async fn once_the_upstream_answers_the_shell_upgrades_to_the_declared_head() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
         store
             .hydrate(&[("landing".to_string(), "index.html".to_string())])
             .await;
 
         // The reconcile loop lands a new declared head; no bytes for it yet.
-        archive.declare("sha256-b");
+        archive.declare("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui");
 
         let fetches = Arc::new(AtomicUsize::new(0));
         let outcome = resolve_shell(
@@ -2211,7 +2266,10 @@ mod tests {
         match outcome {
             ShellOutcome::Fresh(shell) => {
                 assert!(shell.html().contains("new"));
-                assert_eq!(shell.blob_hash, "sha256-b");
+                assert_eq!(
+                    shell.blob_cid,
+                    "bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui"
+                );
             }
             other => panic!("expected an upgraded (fresh) shell, got {other:?}"),
         }
@@ -2233,9 +2291,12 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_upgrade_falls_back_to_the_one_behind_shell_never_a_shed() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
-        archive.declare("sha256-b");
+        archive.declare("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui");
 
         let fetches = Arc::new(AtomicUsize::new(0));
         let outcome = resolve_shell(
@@ -2256,9 +2317,12 @@ mod tests {
 
     #[tokio::test]
     async fn an_upgrade_fetch_gets_the_tight_budget_a_cold_fetch_gets_the_full_one() {
-        let archive = FakeArchive::with_shell("sha256-a", "<html>old</html>");
+        let archive = FakeArchive::with_shell(
+            "bafkr4igd67z57ud6dceuflyifojo4vzl6txhny5uufi2pjadth2jhnxipu",
+            "<html>old</html>",
+        );
         let store = WarmShellStore::new(Some(archive.clone()));
-        archive.declare("sha256-b");
+        archive.declare("bafkr4iae6de24v7wbuzldjgcpdox6fr7j6iqq2y3fdljflrnfxxr2kleui");
 
         let seen = Arc::new(Mutex::new(Vec::<FetchBudget>::new()));
         let seen_c = seen.clone();

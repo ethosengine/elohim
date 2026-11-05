@@ -37,9 +37,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use cid::Cid;
 use hyper::Method;
-use multihash_codetable::{Code, MultihashDigest};
 use serde::Serialize;
 use tracing::{debug, warn};
 
@@ -150,7 +148,7 @@ pub struct PantryEntry {
     /// The same moment in wall-clock terms, for the `x-elohim-stocked-at`
     /// header a human or a client reads. Advisory; never the age source.
     pub stocked_at_rfc3339: String,
-    /// CIDv1, raw codec (`0x55`), sha2-256 over [`Self::body`] — the address a
+    /// The byte CID (CIDv1 raw `0x55` + BLAKE3-256) of [`Self::body`] — the address a
     /// consumer re-derives to check that amber bytes are the content they claim.
     pub served_head: String,
 }
@@ -162,14 +160,12 @@ impl PantryEntry {
     }
 }
 
-/// Mint the `served_head` address for a body: CIDv1, raw codec, sha2-256.
+/// Mint the `served_head` address for a body: its byte CID (raw + BLAKE3-256).
 ///
-/// NOT a bare sha256 hex: `/blob/<addr>` already accepts a CID and the doorway
-/// already parses one (`routes::blob::parse_content_address`), so the amber
+/// The byte profile `/blob/<cid>` admits (`routes::BlobAddress::parse`), so the amber
 /// answer advertises an address in the same vocabulary the substrate uses.
 pub fn mint_served_head(body: &[u8]) -> String {
-    let mh = Code::Sha2_256.digest(body);
-    Cid::new_v1(0x55, mh).to_string()
+    elohim_address::compute_bytes_cid(body).to_string()
 }
 
 /// The pantry key: path plus query, because two queries against one path are
@@ -693,11 +689,12 @@ mod tests {
         p.stock("/db/content/x".to_string(), entry(b"hello"));
         let drawn = p.draw("/db/content/x").expect("stocked entry must draw");
         assert_eq!(drawn.body.as_ref(), b"hello");
-        // The address is a CIDv1 raw/sha2-256, re-derivable from the bytes.
+        // The address is the byte CID, re-derivable from the bytes and admitted by
+        // the byte-route parser.
         assert_eq!(drawn.served_head, mint_served_head(b"hello"));
         assert!(
-            drawn.served_head.starts_with("bafkrei"),
-            "served_head must be a CIDv1 raw + sha2-256 address, got {}",
+            crate::routes::BlobAddress::parse(&drawn.served_head).is_ok(),
+            "served_head must be a byte CID, got {}",
             drawn.served_head
         );
         assert!(p.draw("/db/content/never-stocked").is_none());

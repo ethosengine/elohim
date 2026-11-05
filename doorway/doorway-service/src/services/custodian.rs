@@ -178,16 +178,16 @@ impl CustodianCapability {
     }
 
     /// Generate fallback URL for a content hash
-    pub fn blob_url(&self, blob_hash: &str) -> String {
-        format!("{}/blob/{}", self.base_url.trim_end_matches('/'), blob_hash)
+    pub fn blob_url(&self, blob_cid: &str) -> String {
+        format!("{}/blob/{}", self.base_url.trim_end_matches('/'), blob_cid)
     }
 
     /// Generate chunk URL for a content hash and chunk index
-    pub fn chunk_url(&self, blob_hash: &str, chunk_index: usize) -> String {
+    pub fn chunk_url(&self, blob_cid: &str, chunk_index: usize) -> String {
         format!(
             "{}/blob/{}/chunk/{}",
             self.base_url.trim_end_matches('/'),
-            blob_hash,
+            blob_cid,
             chunk_index
         )
     }
@@ -220,7 +220,7 @@ pub struct CustodianBlobCommitment {
     /// Content ID this blob belongs to
     pub content_id: String,
     /// SHA256 hash of the blob
-    pub blob_hash: String,
+    pub blob_cid: String,
     /// Custodian agent ID
     pub custodian_id: String,
     /// Commitment status
@@ -302,7 +302,7 @@ pub struct CustodianService {
     capabilities: DashMap<String, CustodianCapability>,
     /// Blob -> Custodian ID mappings
     blob_custodians: DashMap<String, Vec<String>>,
-    /// Active commitments by "content_id:blob_hash"
+    /// Active commitments by "content_id:blob_cid"
     commitments: DashMap<String, Vec<CustodianBlobCommitment>>,
     /// Service configuration
     config: CustodianServiceConfig,
@@ -404,23 +404,23 @@ impl CustodianService {
     /// Get custodian URLs for a blob based on selection criteria
     pub fn get_custodian_urls(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Vec<String> {
-        let custodians = self.select_custodians(blob_hash, criteria);
-        custodians.iter().map(|c| c.blob_url(blob_hash)).collect()
+        let custodians = self.select_custodians(blob_cid, criteria);
+        custodians.iter().map(|c| c.blob_url(blob_cid)).collect()
     }
 
     /// Select best custodians for a blob
     pub fn select_custodians(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Vec<CustodianCapability> {
         self.stats.total_selections.fetch_add(1, Ordering::Relaxed);
 
         // First, check if we have specific custodians for this blob
-        let known_custodians = self.blob_custodians.get(blob_hash);
+        let known_custodians = self.blob_custodians.get(blob_cid);
 
         // Get all custodians that match criteria
         let mut candidates: Vec<(CustodianCapability, f32)> = self
@@ -449,7 +449,7 @@ impl CustodianService {
             candidates.into_iter().take(max).map(|(c, _)| c).collect();
 
         debug!(
-            blob_hash = %blob_hash,
+            blob_cid = %blob_cid,
             count = selected.len(),
             "Selected custodians"
         );
@@ -460,11 +460,11 @@ impl CustodianService {
     /// Select the single best URL for a blob
     pub fn select_best_url(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Option<String> {
-        let custodians = self.select_custodians(blob_hash, criteria);
-        custodians.first().map(|c| c.blob_url(blob_hash))
+        let custodians = self.select_custodians(blob_cid, criteria);
+        custodians.first().map(|c| c.blob_url(blob_cid))
     }
 
     /// Check if a custodian matches selection criteria
@@ -580,12 +580,12 @@ impl CustodianService {
     /// When orchestrator isn't available, falls back to standard selection.
     pub async fn select_custodians_with_metrics(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Vec<CustodianCapability> {
         // If no orchestrator, use standard selection
         let Some(ref orchestrator) = self.orchestrator else {
-            return self.select_custodians(blob_hash, criteria);
+            return self.select_custodians(blob_cid, criteria);
         };
 
         self.stats.total_selections.fetch_add(1, Ordering::Relaxed);
@@ -603,7 +603,7 @@ impl CustodianService {
             .collect();
 
         // First, check if we have specific custodians for this blob
-        let known_custodians = self.blob_custodians.get(blob_hash);
+        let known_custodians = self.blob_custodians.get(blob_cid);
 
         // Score candidates including human-scale metrics
         let mut candidates: Vec<(CustodianCapability, f32)> = self
@@ -641,7 +641,7 @@ impl CustodianService {
             candidates.into_iter().take(max).map(|(c, _)| c).collect();
 
         debug!(
-            blob_hash = %blob_hash,
+            blob_cid = %blob_cid,
             count = selected.len(),
             reach_level = reach_level,
             "Selected custodians with human-scale metrics"
@@ -653,13 +653,13 @@ impl CustodianService {
     /// Select single best URL with human-scale metrics
     pub async fn select_best_url_with_metrics(
         &self,
-        blob_hash: &str,
+        blob_cid: &str,
         criteria: &CustodianSelectionCriteria,
     ) -> Option<String> {
         let custodians = self
-            .select_custodians_with_metrics(blob_hash, criteria)
+            .select_custodians_with_metrics(blob_cid, criteria)
             .await;
-        custodians.first().map(|c| c.blob_url(blob_hash))
+        custodians.first().map(|c| c.blob_url(blob_cid))
     }
 
     /// Get ranked custodians from orchestrator for a specific reach level
@@ -699,11 +699,11 @@ impl CustodianService {
 
     /// Register a blob commitment
     pub fn register_commitment(&self, commitment: CustodianBlobCommitment) {
-        let key = format!("{}:{}", commitment.content_id, commitment.blob_hash);
+        let key = format!("{}:{}", commitment.content_id, commitment.blob_cid);
 
         // Update blob_custodians mapping
         self.blob_custodians
-            .entry(commitment.blob_hash.clone())
+            .entry(commitment.blob_cid.clone())
             .or_default()
             .push(commitment.custodian_id.clone());
 
@@ -715,9 +715,9 @@ impl CustodianService {
     pub fn get_commitments(
         &self,
         content_id: &str,
-        blob_hash: &str,
+        blob_cid: &str,
     ) -> Vec<CustodianBlobCommitment> {
-        let key = format!("{content_id}:{blob_hash}");
+        let key = format!("{content_id}:{blob_cid}");
         self.commitments
             .get(&key)
             .map(|c| c.clone())
@@ -725,8 +725,8 @@ impl CustodianService {
     }
 
     /// Get active fallback URLs for a blob
-    pub fn get_fallback_urls(&self, content_id: &str, blob_hash: &str) -> Vec<String> {
-        self.get_commitments(content_id, blob_hash)
+    pub fn get_fallback_urls(&self, content_id: &str, blob_cid: &str) -> Vec<String> {
+        self.get_commitments(content_id, blob_cid)
             .into_iter()
             .filter(|c| c.status == CommitmentStatus::Active)
             .map(|c| c.fallback_url)
@@ -737,11 +737,11 @@ impl CustodianService {
     pub fn update_commitment_status(
         &self,
         content_id: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         custodian_id: &str,
         status: CommitmentStatus,
     ) -> bool {
-        let key = format!("{content_id}:{blob_hash}");
+        let key = format!("{content_id}:{blob_cid}");
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
             if let Some(commitment) = commitments
@@ -760,12 +760,12 @@ impl CustodianService {
     pub fn update_replication_progress(
         &self,
         content_id: &str,
-        blob_hash: &str,
+        blob_cid: &str,
         custodian_id: &str,
         progress: u8,
         bandwidth: f32,
     ) -> bool {
-        let key = format!("{content_id}:{blob_hash}");
+        let key = format!("{content_id}:{blob_cid}");
 
         if let Some(mut commitments) = self.commitments.get_mut(&key) {
             if let Some(commitment) = commitments
@@ -1107,7 +1107,7 @@ mod tests {
 
         let commitment = CustodianBlobCommitment {
             content_id: "content1".to_string(),
-            blob_hash: "hash123".to_string(),
+            blob_cid: "hash123".to_string(),
             custodian_id: "agent1".to_string(),
             status: CommitmentStatus::Pending,
             started_at: 1000,
@@ -1139,7 +1139,7 @@ mod tests {
         // Add two commitments, one active, one pending
         let c1 = CustodianBlobCommitment {
             content_id: "content1".to_string(),
-            blob_hash: "hash123".to_string(),
+            blob_cid: "hash123".to_string(),
             custodian_id: "agent1".to_string(),
             status: CommitmentStatus::Active,
             started_at: 1000,

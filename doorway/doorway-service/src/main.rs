@@ -1947,7 +1947,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     }
 
     // SSR bundle-head reconcile tick (Track-4 T4-1/T4-2): converge each served
-    // SSR slug toward its declared serverBlobHash without a restart, and ADOPT
+    // SSR slug toward its declared serverBlobCid without a restart, and ADOPT
     // configured slugs whose head was declared only after boot (wave-2
     // 2026-08-22: doorway up 02:12, head declared 02:13-02:20,
     // servedBundleHeads [] until an 02:24 restart). Interval is
