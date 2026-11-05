@@ -1,6 +1,8 @@
 use chrono::{TimeZone, Utc};
 use cid::Cid;
-use elohim_epr::{cid::compute_cid, Coupling, Envelope, EprKind, Reach, Signature};
+use elohim_epr::{
+    cid::compute_cid, Coupling, Envelope, EprKind, Reach, Signature, SignatureEnvelope,
+};
 
 fn test_cid(b: u8) -> Cid {
     compute_cid(&[b])
@@ -22,7 +24,10 @@ fn sample_envelope() -> Envelope {
         supersedes: None,
         superseded_by: None,
         issued_at: Utc.with_ymd_and_hms(2026, 4, 21, 12, 0, 0).unwrap(),
-        proof: Signature::ed25519(test_cid(6), vec![0u8; 64]),
+        proof: Signature::new(
+            test_cid(6),
+            SignatureEnvelope::ed25519(&[0u8; 32], [0u8; 64]),
+        ),
     }
 }
 

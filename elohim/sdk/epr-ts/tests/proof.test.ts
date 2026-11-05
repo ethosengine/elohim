@@ -23,9 +23,12 @@ describe('Ed25519 verify', () => {
 
     for (const v of vectors) {
       const pk = hexToBytes(v.public_key_hex);
-      const canonical = hexToBytes(v.canonical_bytes_hex);
+      // The signed bytes are the envelope transcript over the canonical bytes, not the
+      // canonical bytes alone (elohim/epr/src/signature.rs).
+      const transcript = hexToBytes(v.transcript_hex);
       const sig = hexToBytes(v.signature_hex);
-      expect(await verifyEd25519(pk, canonical, sig)).toBe(true);
+      expect(await verifyEd25519(pk, transcript, sig)).toBe(true);
+      expect(await verifyEd25519(pk, hexToBytes(v.canonical_bytes_hex), sig)).toBe(false);
     }
   });
 

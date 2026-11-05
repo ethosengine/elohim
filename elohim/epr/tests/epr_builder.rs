@@ -62,6 +62,6 @@ fn builder_cid_is_stable_for_same_inputs() {
     let a = mk(&kp1);
     let b = mk(&kp2);
     assert_eq!(a.envelope.cid, b.envelope.cid);
-    assert_eq!(a.envelope.proof.signature, b.envelope.proof.signature);
+    assert_eq!(a.envelope.proof.envelope, b.envelope.proof.envelope);
     let _ = agent_cid; // suppress unused warning
 }

@@ -232,19 +232,28 @@ pub struct Ask {
 }
 
 impl Ask {
+    /// What the ask's proof says, as sent from `transport_id`: `Verified`
+    /// when the device key the request names signed it, `Held` under a scheme
+    /// this build does not implement, `Invalid` when absent or not holding.
+    pub fn signature_from(&self, transport_id: &str) -> elohim_epr::SignatureCheck {
+        self.proof
+            .as_ref()
+            .map_or(elohim_epr::SignatureCheck::Invalid, |p| {
+                crate::carrier::proof_check(
+                    p,
+                    &self.request.device_key,
+                    crate::carrier::CarrierKind::Ask,
+                    &self.request.state,
+                    transport_id,
+                    &self.request.code_challenge,
+                )
+            })
+    }
+
     /// Whether the device key the request names signed this ask, as sent
-    /// from `transport_id`.
+    /// from `transport_id`. A held proof is not a signature.
     pub fn signed_from(&self, transport_id: &str) -> bool {
-        self.proof.as_ref().is_some_and(|p| {
-            crate::carrier::proof_holds(
-                p,
-                &self.request.device_key,
-                crate::carrier::CarrierKind::Ask,
-                &self.request.state,
-                transport_id,
-                &self.request.code_challenge,
-            )
-        })
+        self.signature_from(transport_id) == elohim_epr::SignatureCheck::Verified
     }
 }
 
@@ -294,6 +303,9 @@ pub enum Dropped {
     SourceOverLimit,
     /// The device key the request names did not sign it from where it came.
     Unsigned,
+    /// The ask's proof is made under a signature scheme this build does not
+    /// implement: held, not forged, and listed nowhere.
+    HeldScheme(u16),
     /// The same device's ask is already listed from another transport id; an
     /// ask is replaced only from where it was listed, by its own device.
     ListedFromElsewhere,
@@ -310,6 +322,7 @@ impl Dropped {
             Self::Full => "ask_list_full",
             Self::SourceOverLimit => "ask_source_over_limit",
             Self::Unsigned => "ask_unsigned",
+            Self::HeldScheme(_) => "ask_signature_scheme_held",
             Self::ListedFromElsewhere => "ask_listed_from_elsewhere",
         }
     }
@@ -371,8 +384,10 @@ impl PendingAsks {
     ) -> Result<AdmittedRequest, Dropped> {
         let admitted = admit_request(&ask.request, policy).map_err(Dropped::Malformed)?;
         // Adversarial review, high 4: the ask is the device's own, from here.
-        if !ask.signed_from(source) {
-            return Err(Dropped::Unsigned);
+        match ask.signature_from(source) {
+            elohim_epr::SignatureCheck::Verified => {}
+            elohim_epr::SignatureCheck::Held { scheme } => return Err(Dropped::HeldScheme(scheme)),
+            elohim_epr::SignatureCheck::Invalid => return Err(Dropped::Unsigned),
         }
         {
             let mut inner = self.lock();
@@ -598,20 +613,17 @@ pub(crate) mod tests {
 
     /// `ask`, signed by its device as sent from `transport_id`.
     pub(crate) fn signed(mut ask: Ask, device: u8, transport_id: &str) -> Ask {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
         let (key, agent) = keypair(device);
         assert_eq!(agent, ask.request.device_key);
-        let message = crate::carrier::statement(
+        ask.proof = crate::carrier::CarrierProof::sign(
+            &key,
+            agent,
             crate::carrier::CarrierKind::Ask,
             &ask.request.state,
             transport_id,
             &ask.request.code_challenge,
-        )
-        .unwrap();
-        ask.proof = Some(crate::carrier::CarrierProof {
-            signer: agent,
-            signature: URL_SAFE_NO_PAD.encode(elohim_epr::proof::sign(&key, &message)),
-        });
+        );
+        assert!(ask.proof.is_some());
         ask
     }
 
@@ -658,6 +670,39 @@ pub(crate) mod tests {
         let listed = list.list(NOW + 6);
         assert_eq!(listed.len(), 2);
         assert_eq!(listed[0].source, "peer-a");
+    }
+
+    /// An ask whose proof is under a scheme this build does not implement is
+    /// held: refused under its own reason, not as a forgery, and with zero
+    /// effect — nothing listed, nothing remembered against the device or the
+    /// source, so the same device's scheme-0 ask from there still lists.
+    #[test]
+    fn carrier_proof_unknown_scheme_is_held_with_zero_effect() {
+        let list = PendingAsks::new();
+        let mut held = ask_from(1, "peer-a");
+        held.proof.as_mut().unwrap().envelope.scheme = 5;
+        assert_eq!(
+            held.signature_from("peer-a"),
+            elohim_epr::SignatureCheck::Held { scheme: 5 }
+        );
+        assert!(!held.signed_from("peer-a"));
+        assert_eq!(
+            list.admit(held, "peer-a", None, &speaks(), &policy(), NOW),
+            Err(Dropped::HeldScheme(5))
+        );
+        assert_eq!(Dropped::HeldScheme(5).code(), "ask_signature_scheme_held");
+        assert_eq!(list.len(), 0);
+        assert_eq!(
+            list.admit(
+                ask_from(1, "peer-a"),
+                "peer-a",
+                None,
+                &speaks(),
+                &policy(),
+                NOW + 1
+            ),
+            Ok(Listed::New(1))
+        );
     }
 
     #[test]

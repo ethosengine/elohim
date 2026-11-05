@@ -36,6 +36,11 @@ impl AgentKeypair {
         self.0.verifying_key().to_bytes()
     }
 
+    /// The signing key, for the envelope signer in [`crate::signature`].
+    pub(crate) fn signing_key(&self) -> &SigningKey {
+        &self.0
+    }
+
     /// Return the raw 32-byte secret seed.
     pub fn secret_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()

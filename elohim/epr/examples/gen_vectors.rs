@@ -28,6 +28,8 @@ struct EprVector {
     canonical_bytes_hex: String,
     cid: String,
     signature_hex: String,
+    /// The exact bytes signed: the envelope transcript over the canonical bytes.
+    transcript_hex: String,
     public_key_hex: String,
 }
 
@@ -112,7 +114,11 @@ fn main() {
                 payload_hex: hex::encode(&payload),
                 canonical_bytes_hex: hex::encode(&canonical),
                 cid: epr.envelope.cid.to_string(),
-                signature_hex: hex::encode(&epr.envelope.proof.signature),
+                signature_hex: hex::encode(&epr.envelope.proof.envelope.sig),
+                transcript_hex: hex::encode(elohim_epr::epr::epr_signing_transcript(
+                    &kp.public_key_bytes(),
+                    &canonical,
+                )),
                 public_key_hex: hex::encode(kp.public_key_bytes()),
             }
         })

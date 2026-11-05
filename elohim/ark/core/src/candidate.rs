@@ -198,8 +198,8 @@ pub fn authenticate_candidate(
     if epr.payload.len() > MAX_CANDIDATE_BYTES
         || epr.envelope.claims.len() > 64
         || epr.envelope.schema_key.len() > 128
-        || epr.envelope.proof.signature.len() > 64
-        || epr.envelope.proof.algorithm.len() > 32
+        || epr.envelope.proof.envelope.sig.len() > 64
+        || epr.envelope.proof.envelope.key.len() > 34
     {
         return Err(TooLarge);
     }

@@ -25,6 +25,10 @@
 //! assert!(epr.verify_with_key(&kp.public_key_bytes()).is_ok());
 //! ```
 
+/// The addressing kernel: byte, record and citation CIDs, the full-decode byte-CID parser and
+/// the fail-closed verifier. Re-exported so consumers of `elohim-epr` share one kernel.
+pub use elohim_address as address;
+
 pub mod algedonic;
 pub mod cbor;
 pub mod cid;
@@ -36,6 +40,7 @@ pub mod generated;
 pub mod head;
 pub mod kind;
 pub mod measure;
+pub mod profile;
 pub mod proof;
 pub mod reach;
 pub mod signature;
@@ -50,7 +55,7 @@ pub use error::{EprError, Result};
 pub use kind::{CouplingLeg, EprKind};
 pub use proof::{sign, verify, AgentKeypair};
 pub use reach::Reach;
-pub use signature::Signature;
+pub use signature::{Multikey, Signature, SignatureCheck, SignatureEnvelope, SignatureScheme};
 pub use validation::validate_coupling;
 pub use verdict::{
     CheckOutcome, CheckWitness, Decision, ReferQuestion, ReferReason, Verdict, Witness,

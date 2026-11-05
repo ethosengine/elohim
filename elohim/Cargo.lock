@@ -420,6 +420,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 
 [[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1099,6 +1108,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
+name = "elohim-address"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "data-encoding",
+ "multihash-codetable",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-agent"
 version = "0.1.0"
 dependencies = [
@@ -1253,12 +1272,15 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
+ "bs58",
  "chrono",
  "cid",
  "ed25519-dalek",
+ "elohim-address",
+ "fastcdc",
  "hex",
  "ipld-core",
  "jsonschema",
@@ -1500,6 +1522,12 @@ dependencies = [
  "regex-automata",
  "regex-syntax",
 ]
+
+[[package]]
+name = "fastcdc"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0431c3132902a1bed6fe77dcfa5d03844e083f263b81288246a2d43dd7d4b2ad"
 
 [[package]]
 name = "fastrand"
@@ -4400,7 +4428,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

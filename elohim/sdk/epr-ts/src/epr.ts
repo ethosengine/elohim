@@ -2,6 +2,7 @@ import type { Envelope } from './generated/Envelope.js';
 import { canonicalEnvelopeBytes } from './envelope.js';
 import { computeCid } from './cid.js';
 import { verifyEd25519 } from './proof.js';
+import { ed25519Multikey, signingTranscript } from './signature.js';
 import { CID } from 'multiformats/cid';
 
 export interface Epr {
@@ -9,9 +10,14 @@ export interface Epr {
   payload: Uint8Array;
 }
 
+/** The domain an EPR envelope's signature is made under (elohim/epr/src/epr.rs). */
+export const EPR_SIGNATURE_DOMAIN = 'elohim:epr:v1:';
+/** The EPR envelope's signature epoch. */
+export const EPR_SIGNATURE_EPOCH = 0;
+
 export type VerifyError =
   | { kind: 'cid-mismatch'; message: string }
-  | { kind: 'algorithm-unsupported'; message: string }
+  | { kind: 'scheme-held'; message: string; scheme: number }
   | { kind: 'signature-invalid'; message: string };
 
 /** Parse a CID that may arrive as a string or byte array. */
@@ -50,25 +56,38 @@ export async function verifyEpr(
       error: { kind: 'cid-mismatch', message: `derived ${derived} != claimed ${claimed}` },
     };
   }
-  if (epr.envelope.proof.algorithm !== 'ed25519') {
+  const env = epr.envelope.proof.envelope;
+  // An unknown scheme is HELD, never Invalid: neither authentic nor forged to this reader.
+  if (env.scheme !== 0) {
     return {
       ok: false,
       error: {
-        kind: 'algorithm-unsupported',
-        message: `unsupported algorithm: ${epr.envelope.proof.algorithm}`,
+        kind: 'scheme-held',
+        message: `signature scheme ${env.scheme} is held: not implemented by this reader`,
+        scheme: env.scheme,
       },
     };
   }
 
-  const sigBytes = parseSignatureBytes(epr.envelope.proof.signature as unknown);
-  if (sigBytes === null) {
+  const keyBytes = parseSignatureBytes(env.key as unknown);
+  const sigBytes = parseSignatureBytes(env.sig as unknown);
+  if (keyBytes === null || sigBytes === null) {
     return {
       ok: false,
-      error: { kind: 'signature-invalid', message: 'signature bytes not parseable' },
+      error: { kind: 'signature-invalid', message: 'key or signature bytes not parseable' },
+    };
+  }
+  // Scheme 0: the key must be the Ed25519 multikey (ed 01 ‖ key) of the expected signer.
+  const expectedKey = ed25519Multikey(publicKey);
+  if (keyBytes.length !== expectedKey.length || !keyBytes.every((b, i) => b === expectedKey[i])) {
+    return {
+      ok: false,
+      error: { kind: 'signature-invalid', message: 'envelope key is not the expected signer' },
     };
   }
 
-  const ok = await verifyEd25519(publicKey, canonical, sigBytes);
+  const transcript = signingTranscript(EPR_SIGNATURE_DOMAIN, EPR_SIGNATURE_EPOCH, 0, keyBytes, canonical);
+  const ok = await verifyEd25519(publicKey, transcript, sigBytes);
   return ok
     ? { ok: true }
     : { ok: false, error: { kind: 'signature-invalid', message: 'signature verification failed' } };

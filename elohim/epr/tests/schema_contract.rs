@@ -14,6 +14,7 @@
 use chrono::{TimeZone, Utc};
 use elohim_epr::{
     cid::compute_cid, proof::AgentKeypair, Coupling, CouplingLeg, Epr, EprKind, Reach, Signature,
+    SignatureEnvelope,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -214,10 +215,54 @@ fn coupling_leg_values_conform() {
 #[test]
 fn signature_conforms() {
     let signer_cid = compute_cid(&[1u8]);
-    let sig = Signature::ed25519(signer_cid, vec![0u8; 64]);
+    let sig = Signature::new(
+        signer_cid,
+        SignatureEnvelope::ed25519(&[7u8; 32], [0u8; 64]),
+    );
     validate(
         "objects/signature.schema.json",
         &serde_json::to_value(&sig).unwrap(),
+    );
+}
+
+/// An unknown scheme is structurally admissible so a reader can HOLD it, not reject it as a
+/// malformed Ed25519 signature; scheme 0 keeps its exact key and signature lengths.
+#[test]
+fn signature_schema_admits_unknown_schemes_and_pins_scheme_zero() {
+    let signer = compute_cid(&[1u8]);
+    let held = Signature::new(
+        signer,
+        SignatureEnvelope {
+            scheme: 7,
+            key: vec![0x80, 0x24, 1, 2, 3],
+            sig: vec![9u8; 100],
+        },
+    );
+    validate(
+        "objects/signature.schema.json",
+        &serde_json::to_value(&held).unwrap(),
+    );
+    let schema = load_schema("objects/signature.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut short = serde_json::to_value(Signature::new(
+        signer,
+        SignatureEnvelope::ed25519(&[7u8; 32], [0u8; 64]),
+    ))
+    .unwrap();
+    short["envelope"]["sig"] = serde_json::json!(vec![0u8; 63]);
+    assert!(
+        !validator.is_valid(&short),
+        "scheme 0 requires a 64-byte signature"
+    );
+    let mut legacy = serde_json::to_value(Signature::new(
+        signer,
+        SignatureEnvelope::ed25519(&[7u8; 32], [0u8; 64]),
+    ))
+    .unwrap();
+    legacy["algorithm"] = serde_json::json!("ed25519");
+    assert!(
+        !validator.is_valid(&legacy),
+        "the pre-envelope shape is refused"
     );
 }
 

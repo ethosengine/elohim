@@ -12,6 +12,10 @@ pub enum EprError {
     InvalidCid { expected: String, actual: String },
     #[error("signature error: {0}")]
     Signature(String),
+    /// The signature uses a scheme this build does not implement. Not a forgery: the object
+    /// is held, confers no effect, and is re-read by a build that knows the scheme.
+    #[error("signature scheme {0} is held: not implemented by this build")]
+    SignatureHeld(u16),
     #[error("coupling requirement not met: {0}")]
     Coupling(String),
     #[error("invalid envelope: {0}")]

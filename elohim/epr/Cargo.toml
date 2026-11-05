@@ -1,6 +1,6 @@
 [package]
 name = "elohim-epr"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Elohim Protocol canonical EPR codec — CBOR + CIDv1 + Ed25519 for the graph substrate"
 license = "CAL-1.0"
@@ -14,7 +14,15 @@ publish = ["elohim"]
 ipld-core = "0.4"
 serde_ipld_dagcbor = "0.6"
 cid = { version = "0.11", features = ["serde-codec"] }
-multihash-codetable = { version = "0.2", features = ["sha2"] }
+multihash-codetable = { version = "0.2", features = ["sha2", "blake3"] }
+# The addressing kernel: byte, record and citation CIDs and the fail-closed verifier.
+# Path for the monorepo, registry for consumers of the published crate (brit).
+elohim-address = { path = "../../crates/elohim-address", version = "0.1.0", registry = "elohim" }
+# The byte profile's chunker. Pinned exactly: the v2020 gear tables and cut semantics ARE
+# the epoch-0 profile (src/profile.rs), and a minor bump must not move a chunk boundary.
+fastcdc = "=5.0.0"
+# Multikey Display (base58btc `z…`, the did:key method-specific identifier).
+bs58 = "0.5"
 ed25519-dalek = { version = "2.1", features = ["rand_core", "serde"] }
 rand_core = "0.6"
 serde = { workspace = true, features = ["derive"] }

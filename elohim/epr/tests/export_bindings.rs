@@ -6,7 +6,7 @@ use elohim_epr::witness::{
     ComputeSource, FrameClassification, FrameEvidence, FrameVerdict, Hop, Magnitude, ReaVerb,
     ResolutionProvenance, Span, WitnessId, WitnessedInteraction,
 };
-use elohim_epr::{Coupling, Envelope, EprKind, Reach, Signature};
+use elohim_epr::{Coupling, Envelope, EprKind, Reach, Signature, SignatureEnvelope};
 use ts_rs::TS;
 
 #[test]
@@ -16,6 +16,7 @@ fn export_bindings() {
     EprKind::export().unwrap();
     Reach::export().unwrap();
     Signature::export().unwrap();
+    SignatureEnvelope::export().unwrap();
     CouplingLeg::export().unwrap();
 
     // Frame/witness primitive (G1)

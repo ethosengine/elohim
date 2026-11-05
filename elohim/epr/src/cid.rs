@@ -4,7 +4,8 @@
 //! for arbitrary bytes and for checksums published outside the protocol (lockfiles, spec sheets).
 
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
+
+pub use elohim_address::{compute_bytes_cid, verify_cid_any, AddressError, ByteCid, Verify};
 
 /// Codec byte for dag-cbor per the IPLD multicodec table.
 ///
@@ -13,9 +14,10 @@ use multihash_codetable::{Code, MultihashDigest};
 pub const DAG_CBOR_CODEC: u64 = 0x71;
 
 /// Compute CIDv1(dag-cbor, sha2-256) over the given canonical bytes.
+///
+/// The record profile; delegates to [`elohim_address::compute_record_cid`], the one constructor.
 pub fn compute_cid(canonical_bytes: &[u8]) -> Cid {
-    let mh = Code::Sha2_256.digest(canonical_bytes);
-    Cid::new_v1(DAG_CBOR_CODEC, mh)
+    elohim_address::compute_record_cid(canonical_bytes)
 }
 
 /// Verify that a given CID matches the hash of the given canonical bytes.
@@ -70,10 +72,13 @@ pub enum ChecksumError {
     ConflictingDigests(&'static str),
 }
 
-/// Compute CIDv1(raw, sha2-256) over arbitrary bytes (`bafkrei…`). Byte-identical to
-/// `eprfs_core::BlobCid::compute_raw`.
+/// Compute CIDv1(raw, sha2-256) over bytes (`bafkrei…`): the citation profile, and the wrapper
+/// for sha256 checksums published outside the protocol. Byte-identical to
+/// `eprfs_core::BlobCid::compute_raw`; delegates to [`elohim_address::compute_raw_sha2_cid`].
+///
+/// Not the byte profile: payload bytes are addressed by [`compute_bytes_cid`] (raw + BLAKE3).
 pub fn compute_raw_cid(bytes: &[u8]) -> Cid {
-    Cid::new_v1(RAW_CODEC, Code::Sha2_256.digest(bytes))
+    elohim_address::compute_raw_sha2_cid(bytes)
 }
 
 fn wrap_raw(code: u64, algorithm: &'static str, digest: &[u8]) -> Result<Cid, ChecksumError> {
@@ -164,6 +169,7 @@ pub fn raw_cid_from_sri(integrity: &str) -> Result<Cid, ChecksumError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use multihash_codetable::{Code, MultihashDigest};
 
     // Vectors computed independently (Python hashlib + a hand-rolled CIDv1 encoder), never by
     // this crate, so a test cannot pass by agreeing with itself.

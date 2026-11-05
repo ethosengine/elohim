@@ -68,6 +68,315 @@
       "public": 4
     }
   },
+  "chunker": {
+    "about": "fastcdc-2020 chunker vectors, byte profile epoch 0 (elohim/epr/src/profile.rs). Written once by elohim/epr/tests/chunker_vectors.rs; compare-only after that: REGENERATE_VECTORS=1 may add an absent fixture and refuses to change an existing one. Chunk and whole CIDs are the byte profile (raw 0x55 + BLAKE3-256).",
+    "chunker": {
+      "avg": 1048576,
+      "id": "fastcdc-2020",
+      "level": 1,
+      "max": 4194304,
+      "min": 262144
+    },
+    "generator": {
+      "multiplier": "0x2545f4914f6cdd1d",
+      "name": "xorshift64*",
+      "output": "each step's 64-bit product as 8 little-endian bytes, the stream truncated to length; every xorshift64* fixture is a prefix of the same stream",
+      "seed": "0x454c4f48494d",
+      "shifts": [
+        12,
+        25,
+        27
+      ]
+    },
+    "profileEpoch": 0,
+    "reference": "fastcdc =5.0.0, v2020::FastCDC::with_level(bytes, min, avg, max, Normalization::Level1), seed 0",
+    "tableDigest": "3bd9b87949825cd9b2a592d199dc15d485812848535c9b1d2ff6979baf7a8001",
+    "tableDigestOf": "BLAKE3-256 of GEAR || GEAR_LS || MASKS, each u64 as 8 little-endian bytes",
+    "vectors": [
+      {
+        "chunks": [
+          [
+            0,
+            1148075,
+            "bafkr4iaftw3wd2lcaqlbtuajvxnyweg4c2esyliibl3r4lnwxxpsmhw7ui"
+          ],
+          [
+            1148075,
+            1823933,
+            "bafkr4iauwtpug6tvmayo7zlbh5fa5iml5oe3pf6r7qxhgjuy3hwsh3mhpu"
+          ],
+          [
+            2972008,
+            514581,
+            "bafkr4ia2nmu7ip5rm5adgsi5k64t6d2ij3pxtvll6nlzbjf6qb3p55fvqu"
+          ],
+          [
+            3486589,
+            1304351,
+            "bafkr4ibzxqhcfzbowlqy5a3cvqb4mynohs2ykexedly7axkjkwbgfp6vue"
+          ],
+          [
+            4790940,
+            1619082,
+            "bafkr4iexrnyjc54pv7lpqephtg2acl4isnn6xr4o5xzj5y7ublk6mkcftu"
+          ],
+          [
+            6410022,
+            365648,
+            "bafkr4idlepxnukehrtkuk243ltbt5a4adeeyyskevp5erqd5tynvhmtsem"
+          ],
+          [
+            6775670,
+            1120104,
+            "bafkr4ibet65eg5e4zlkicpxbttyycg5ev6v6f4bx3prg46ous6e6jgu7om"
+          ],
+          [
+            7895774,
+            1954667,
+            "bafkr4ibyxrqn7i5o46predyy6tgduearojrrviadegeakqmvmwek3bp33y"
+          ],
+          [
+            9850441,
+            635319,
+            "bafkr4iadfwocceikllabtzgql5ojkljzvz7cg3lmzwhyli6xvtzfqifl3i"
+          ]
+        ],
+        "inputBlake3": "b6f9a4da436a2f7277723b65ff255c30cd48fdf9864c5d2131c6174629fd6bfb",
+        "length": 10485760,
+        "name": "main-10MiB",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4ifw7gsnuq3kf5zho4r3mx7skxbqzvep36mgjroscmogc5dct7ll7m"
+      },
+      {
+        "chunks": [],
+        "inputBlake3": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+        "length": 0,
+        "name": "empty",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4ifpcne3t5pzugtkaqcn5i3nzskjtpfslsnnyejlpte2spfoihzsmi"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            365,
+            "bafkr4ice5ue55hxbrqomfeevbv6ylg265432jxp4dkbdor24mwqsointlm"
+          ]
+        ],
+        "inputBlake3": "44ed09de9ee18c1cc290950d7d859b5eef37a4ddfc1a8237475c65a12721b35b",
+        "length": 365,
+        "name": "365B",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4ice5ue55hxbrqomfeevbv6ylg265432jxp4dkbdor24mwqsointlm"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            262143,
+            "bafkr4id66lh3uvwn7oni7mqmiwr2yqwgkfia5af2hl5z56hahr2q4ql4du"
+          ]
+        ],
+        "inputBlake3": "7ef2cfba56cdfb9a8fb20c45a3ac42c651500e80ba3afb9ef8e03c750e417c1d",
+        "length": 262143,
+        "name": "min-1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4id66lh3uvwn7oni7mqmiwr2yqwgkfia5af2hl5z56hahr2q4ql4du"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            262145,
+            "bafkr4iapung6hrppimvrnjyqovys425p44gppig7yy3jjhad7asqvfgjie"
+          ]
+        ],
+        "inputBlake3": "0fa34de3c5ef432b16a71075712e6bafe70cf7a0dfc636949c03f8250a94c941",
+        "length": 262145,
+        "name": "min+1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4iapung6hrppimvrnjyqovys425p44gppig7yy3jjhad7asqvfgjie"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            1048575,
+            "bafkr4idn7fz4rkrtllemlaekvvd3rbrawyrudq5wlpxlr7vd3c3ar4ukcq"
+          ]
+        ],
+        "inputBlake3": "6df973c8aa335ac8c5808aad47b88620b62341c3b65beeb8fea3d8b608f28a14",
+        "length": 1048575,
+        "name": "avg-1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4idn7fz4rkrtllemlaekvvd3rbrawyrudq5wlpxlr7vd3c3ar4ukcq"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            1048577,
+            "bafkr4idc6on2ttbllntm27iwsl7moqmoaqczodht2hyzccxmdfhjkhlpwq"
+          ]
+        ],
+        "inputBlake3": "62f39ba9cc2b5b66cd7d1692fec7418e0405970cf3d1f1910aec194e951d6fb4",
+        "length": 1048577,
+        "name": "avg+1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4idc6on2ttbllntm27iwsl7moqmoaqczodht2hyzccxmdfhjkhlpwq"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            1148075,
+            "bafkr4iaftw3wd2lcaqlbtuajvxnyweg4c2esyliibl3r4lnwxxpsmhw7ui"
+          ],
+          [
+            1148075,
+            1823933,
+            "bafkr4iauwtpug6tvmayo7zlbh5fa5iml5oe3pf6r7qxhgjuy3hwsh3mhpu"
+          ],
+          [
+            2972008,
+            514581,
+            "bafkr4ia2nmu7ip5rm5adgsi5k64t6d2ij3pxtvll6nlzbjf6qb3p55fvqu"
+          ],
+          [
+            3486589,
+            707714,
+            "bafkr4ieliqgjudie57dh3t35g7n7umtvcayrvuyky24ht2zs3t6r7xi3re"
+          ]
+        ],
+        "inputBlake3": "c32d8d4fdd34d2b62bac6d31d30cf58badc476b8eb1bdf8a36db747799ebf3df",
+        "length": 4194303,
+        "name": "max-1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4igdfwgu7xju2k3cxldnghjqz5mlvxchnohldppyunw3or3zt27t34"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            1148075,
+            "bafkr4iaftw3wd2lcaqlbtuajvxnyweg4c2esyliibl3r4lnwxxpsmhw7ui"
+          ],
+          [
+            1148075,
+            1823933,
+            "bafkr4iauwtpug6tvmayo7zlbh5fa5iml5oe3pf6r7qxhgjuy3hwsh3mhpu"
+          ],
+          [
+            2972008,
+            514581,
+            "bafkr4ia2nmu7ip5rm5adgsi5k64t6d2ij3pxtvll6nlzbjf6qb3p55fvqu"
+          ],
+          [
+            3486589,
+            707716,
+            "bafkr4idlpt6fqwbdi2mn4jufzthokwdl6krsttnmwkk2jlpeil2ycc4foe"
+          ]
+        ],
+        "inputBlake3": "f3b39615fbd897434cca1e98226d5b441d5565e0477533c9c665986ad606b786",
+        "length": 4194305,
+        "name": "max+1",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4ihtwolbl66ys5buzsq6targ2w2edvkwlychouz4trtftbvnmbvxqy"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            1148075,
+            "bafkr4iaftw3wd2lcaqlbtuajvxnyweg4c2esyliibl3r4lnwxxpsmhw7ui"
+          ],
+          [
+            1148075,
+            1823933,
+            "bafkr4iauwtpug6tvmayo7zlbh5fa5iml5oe3pf6r7qxhgjuy3hwsh3mhpu"
+          ],
+          [
+            2972008,
+            361325,
+            "bafkr4icr5ipb67gsewte2xz4u64zvqe4hzife7wvjcg4qqzhkjckbdme6q"
+          ]
+        ],
+        "inputBlake3": "350136fd619b68ec8d66310ea9e8f9ca483ff26ce15d0b4aa33af088e2fc90b7",
+        "length": 3333333,
+        "name": "odd",
+        "source": "xorshift64*",
+        "wholeCid": "bafkr4ibvae3p2ym3ndwi2zrrb2u6r6okja77e3hblufuviz26ceof7eqw4"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            4194304,
+            "bafkr4ia3z33vjihbqewrvamx3st6ycuhjmiew5moa5ly47ohyoka4dy5ca"
+          ],
+          [
+            4194304,
+            805696,
+            "bafkr4iecpxwy77dixehez7tderiksbr5u6hrl3xai3t4glsi65feitarra"
+          ]
+        ],
+        "inputBlake3": "79650d23e010699e661017b596d25755f35351d3fc8f583b99fd2f5529b74d47",
+        "length": 5000000,
+        "name": "repetitive",
+        "pattern": "elohim-",
+        "source": "pattern",
+        "wholeCid": "bafkr4idzmugshyaqngpgmeaxwwlnev2v6njvdu74r5mdxgp5f5kstn2ni4"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            4194304,
+            "bafkr4iae4uwnfwtkbypthcyapa3jcmgzmwc4dxtfav62lxisqoys7oct4e"
+          ],
+          [
+            4194304,
+            4194304,
+            "bafkr4iae4uwnfwtkbypthcyapa3jcmgzmwc4dxtfav62lxisqoys7oct4e"
+          ],
+          [
+            8388608,
+            611392,
+            "bafkr4iblh5pamnon62vnwatmmjv4oi4w7pewyvsyzqfdkzal6mjifenlo4"
+          ]
+        ],
+        "inputBlake3": "c7d8edc2f408f1a7cacb1d1ab500877184b01c3aad675cda54f325d2fb382d87",
+        "length": 9000000,
+        "name": "forced-max",
+        "source": "zeros",
+        "wholeCid": "bafkr4igh3dw4f5ai6gt4vsy5dk2qbb3rqsybyovnm5onuvhtexjpwobnq4"
+      },
+      {
+        "chunks": [
+          [
+            0,
+            4194304,
+            "bafkr4iae4uwnfwtkbypthcyapa3jcmgzmwc4dxtfav62lxisqoys7oct4e"
+          ],
+          [
+            4194304,
+            4194304,
+            "bafkr4iae4uwnfwtkbypthcyapa3jcmgzmwc4dxtfav62lxisqoys7oct4e"
+          ],
+          [
+            8388608,
+            100,
+            "bafkr4ifmn6dp75rquvvcd5m5higby2ih7y7xzl6v7kiw7g3seazpmbm63e"
+          ]
+        ],
+        "inputBlake3": "984baefb300075e8a92b164d3d6c432fd366814707277b50df740171ce497ab1",
+        "length": 8388708,
+        "name": "short-tail",
+        "source": "zeros",
+        "wholeCid": "bafkr4ieyjoxpwmaaoxukskywju6wyqzp2nticryhe55vbx3uafy44sl2we"
+      }
+    ]
+  },
   "diff": [
     {
       "expect": [

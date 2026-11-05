@@ -23,7 +23,14 @@ export {
   type BlobHashVerdict,
 } from './blob-hash.js';
 export { canonicalEnvelopeBytes } from './envelope.js';
-export { verifyEpr, type Epr, type VerifyError } from './epr.js';
+export {
+  verifyEpr,
+  EPR_SIGNATURE_DOMAIN,
+  EPR_SIGNATURE_EPOCH,
+  type Epr,
+  type VerifyError,
+} from './epr.js';
+export { signingTranscript, ed25519Multikey, ED25519_PUB_MULTICODEC } from './signature.js';
 
 // Generated wire types
 export type { Coupling } from './generated/Coupling.js';
@@ -31,6 +38,7 @@ export type { Envelope } from './generated/Envelope.js';
 export type { EprKind } from './generated/EprKind.js';
 export type { Reach } from './generated/Reach.js';
 export type { Signature } from './generated/Signature.js';
+export type { SignatureEnvelope } from './generated/SignatureEnvelope.js';
 export type { CouplingLeg } from './generated/CouplingLeg.js';
 
 // Frame/witness primitive (G1)

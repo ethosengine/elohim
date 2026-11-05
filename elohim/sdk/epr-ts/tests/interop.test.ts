@@ -39,4 +39,32 @@ describe('Rust ↔ TS interop', () => {
     const result = await verifyEpr({ envelope, payload: tampered }, publicKey);
     expect(result.ok).toBe(false);
   });
+
+  it('holds an unknown signature scheme instead of calling it invalid', async () => {
+    const path = join(process.cwd(), '../../epr/tests/vectors/signed_eprs.json');
+    const vectors = JSON.parse(readFileSync(path, 'utf-8'));
+    const v = vectors[0];
+    const envelope = structuredClone(v.envelope) as Envelope;
+    envelope.proof.envelope.scheme = 9;
+    const result = await verifyEpr(
+      { envelope, payload: hexToBytes(v.payload_hex) },
+      hexToBytes(v.public_key_hex),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe('scheme-held');
+  });
+
+  it('refuses a vector checked against another signer', async () => {
+    const path = join(process.cwd(), '../../epr/tests/vectors/signed_eprs.json');
+    const vectors = JSON.parse(readFileSync(path, 'utf-8'));
+    const v = vectors[0];
+    const other = hexToBytes(v.public_key_hex);
+    other[0] ^= 0x01;
+    const result = await verifyEpr(
+      { envelope: v.envelope as Envelope, payload: hexToBytes(v.payload_hex) },
+      other,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe('signature-invalid');
+  });
 });
