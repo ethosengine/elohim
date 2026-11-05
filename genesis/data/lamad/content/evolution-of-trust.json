@@ -29,7 +29,7 @@
     "concept-trust-attestations",
     "fct-module-04-scaling-wisdom"
   ],
-  "blobHash": "ee5301c995967ff1e0a7b07a7f5e2de4f5f547bb3718547d33248453b77cb30f",
+  "blobCid": "bafkr4iezvi4vz7lbefuiqckictuov5cnvcivnc4563g6ufeadqffzvve5m",
   "metadata": {
     "category": "interactive-simulation",
     "author": "Nicky Case",
@@ -39,7 +39,7 @@
     "embedStrategy": "iframe",
     "localZipPath": "docs/content/fct/evolution-of-trust.zip",
     "localIndexPath": "docs/content/fct/evolution-of-trust/index.html",
-    "blobHash": "ee5301c995967ff1e0a7b07a7f5e2de4f5f547bb3718547d33248453b77cb30f",
+    "blobCid": "bafkr4iezvi4vz7lbefuiqckictuov5cnvcivnc4563g6ufeadqffzvve5m",
     "requiredCapabilities": [
       "javascript"
     ],

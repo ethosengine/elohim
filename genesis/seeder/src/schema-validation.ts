@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { ALL_CONTENT_TYPES } from './generated/schema-enums.js';
+import { isByteCid } from './byte-cid.js';
 
 // =============================================================================
 // Content Schema (matches what seed files should contain)
@@ -69,7 +70,7 @@ interface ContentSeedFile {
   estimatedMinutes?: number;
   thumbnailUrl?: string;
   // Blob reference fields (for content stored in projection cache)
-  blobHash?: string;      // SHA256 hash of blob content
+  blobCid?: string;      // SHA256 hash of blob content
   blobUrl?: string;       // URL to fetch blob from cache
   blobFile?: string;      // Local file path for blob
   entryPoint?: string;    // Entry point for compound content (e.g., "index.html")
@@ -300,18 +301,18 @@ export function validateContentFile(filePath: string): FileValidationResult {
   const BLOB_FORMATS = ['html5-app', 'perseus-quiz-json'];
   if (content.contentFormat && BLOB_FORMATS.includes(content.contentFormat)) {
     const hasInlineContent = content.content !== undefined && content.content !== null;
-    const hasBlobRef = content.blobHash !== undefined && content.blobHash !== null;
+    const hasBlobRef = content.blobCid !== undefined && content.blobCid !== null;
 
     // Warn if has neither
     if (!hasInlineContent && !hasBlobRef) {
-      result.warnings.push(`${content.contentFormat} content should have either 'content' or 'blobHash'`);
+      result.warnings.push(`${content.contentFormat} content should have either 'content' or 'blobCid'`);
     }
 
-    // Validate blob_hash format if present
+    // Validate blob_cid format if present
     if (hasBlobRef) {
-      const hash = content.blobHash as string;
-      if (!/^sha256-[a-f0-9]{64}$/.test(hash)) {
-        result.warnings.push(`Invalid blobHash format (expected sha256-{64 hex chars}): ${hash}`);
+      const cid = content.blobCid as string;
+      if (!isByteCid(cid)) {
+        result.warnings.push(`Invalid blobCid format (expected byte-profile CID bafkr4i…, 59 chars): ${cid}`);
       }
 
       // Warn about missing fallback_url
@@ -322,7 +323,7 @@ export function validateContentFile(filePath: string): FileValidationResult {
 
     // html5-app should have entry_point when using blob reference
     if (content.contentFormat === 'html5-app' && hasBlobRef && !content.entryPoint) {
-      result.warnings.push(`html5-app with blobHash should have 'entryPoint' (defaulting to 'index.html')`);
+      result.warnings.push(`html5-app with blobCid should have 'entryPoint' (defaulting to 'index.html')`);
     }
   }
 

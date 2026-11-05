@@ -35,7 +35,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
 import DoorwayClient, { readSeederCredentials } from './doorway-client.js';
-import StorageClient from './storage-client.js'; // Used for computing blob hash (thumbnails, HTML5 apps)
+import StorageClient from './storage-client.js'; // Used for computing blob CIDs (thumbnails, HTML5 apps)
 import BlobManager from './blob-manager.js';
 import { validateBatch, logValidationErrors, isStrictValidation } from './validators.js';
 import type { ContentFormat, ContentType } from './generated/schema-enums.js';
@@ -354,8 +354,8 @@ const STAKES_DECLARATION_PATH = path.join(SEEDER_DIR, STAKES_DECLARATION_FILE);
 
 // Genesis blob pack manifest (pre-computed content addresses)
 interface GenesisManifestEntry {
+  /** Byte-profile CID (bafkr4i…) — also the blob's filename under genesis/blobs/. */
   cid: string;
-  hash: string;
   sizeBytes: number;
   contentFormat: string;
 }
@@ -412,14 +412,14 @@ async function syncGenesisBlobs(storageUrl: string): Promise<{ synced: number; s
     for (const [id, entry] of batch) {
       try {
         // Check if blob exists
-        const checkRes = await fetch(`${storageUrl}/shard/${entry.hash}`, { method: 'HEAD' });
+        const checkRes = await fetch(`${storageUrl}/shard/${entry.cid}`, { method: 'HEAD' });
         if (checkRes.ok) {
           skipped++;
           continue;
         }
 
         // Read blob from genesis pack
-        const blobPath = path.join(BLOBS_DIR, entry.hash);
+        const blobPath = path.join(BLOBS_DIR, entry.cid);
         if (!fs.existsSync(blobPath)) {
           console.warn(`   ⚠️ Missing blob file: ${blobPath}`);
           failed++;
@@ -429,7 +429,7 @@ async function syncGenesisBlobs(storageUrl: string): Promise<{ synced: number; s
         const blobData = fs.readFileSync(blobPath);
 
         // Upload to storage
-        const uploadRes = await fetch(`${storageUrl}/shard/${entry.hash}`, {
+        const uploadRes = await fetch(`${storageUrl}/shard/${entry.cid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/octet-stream' },
           body: blobData,
@@ -619,8 +619,8 @@ interface ConceptJson {
   // Attention metadata
   estimatedMinutes?: number;  // Reading/viewing time in minutes
   thumbnailUrl?: string;      // Preview image for visual cards
-  // HTML5 app blob reference (pre-computed hash in JSON)
-  blobHash?: string;          // SHA256 hash (without sha256- prefix)
+  // HTML5 app blob reference (pre-computed byte-profile CID in JSON)
+  blobCid?: string;           // bafkr4i… (raw + blake3-256)
   // Authored reach grade — the audience this row has EARNED. Absent on most of
   // the corpus; `seedReach` decides what an ungraded row keeps.
   reach?: string;
@@ -833,10 +833,9 @@ function conceptToInput(concept: ConceptJson, sourcePath: string): CreateContent
     description: description,
     // Sparse: store hash reference, Full: store entire content
     // html5-app: always store the content object with slug/entryPoint
-    // Emit the canonical `sha256-{hex}` content-address form. The deprecated
-    // `sha256:` colon form is accept-on-input only — never produced (spec
-    // Appendix E; blobEntry.hash is bare 64-char hex from genesis-pack).
-    contentBody: useSparsePattern ? `sha256-${blobEntry.hash}` : contentString,
+    // Sparse rows carry the blob's byte-profile CID (blobEntry.cid from
+    // genesis-pack) — the only content-address spelling there is.
+    contentBody: useSparsePattern ? blobEntry.cid : contentString,
     contentFormat: normalizeContentFormat(concept.contentFormat, concept.contentType),
     tags: concept.tags || [],
     // Was a literal 'public' — it discarded the authored grade on every one of
@@ -992,7 +991,7 @@ async function connectForVerification(): Promise<HolochainConnection | null> {
  * Flow:
  * 1. Load content files from disk
  * 2. Upload blob to doorway → doorway forwards to elohim-storage
- * 3. Queue import with blob_hash → doorway calls zome
+ * 3. Queue import with blob_cid → doorway calls zome
  * 4. Poll for status → doorway calls zome
  *
  * @returns SeedResult with counts for post-flight verification
@@ -1180,8 +1179,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
   console.log('\n📦 Processing HTML5 app content...');
 
   // Initialize blob manager for HTML5 app processing
-  // forceUpload: true ensures blobs are uploaded even if blob_hash exists
-  // (needed for fresh deployments where content JSON has blob_hash but storage is empty)
+  // forceUpload: true ensures blobs are uploaded even if blob_cid exists
+  // (needed for fresh deployments where content JSON has blob_cid but storage is empty)
   const blobManager = new BlobManager({
     doorwayUrl: DOORWAY_URL!,
     apiKey: DOORWAY_API_KEY,
@@ -1190,8 +1189,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
     forceUpload: true, // Always upload blobs to ensure storage has them
   });
 
-  // Map to store blob_hash for each html5-app content ID
-  const html5AppBlobHashes = new Map<string, { hash: string; slug: string; entryPoint: string }>();
+  // Map to store blob_cid for each html5-app content ID
+  const html5AppBlobCids = new Map<string, { cid: string; slug: string; entryPoint: string }>();
 
   // Find and process all html5-app content
   const html5Apps = filteredConcepts.filter(({ concept }) =>
@@ -1212,8 +1211,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
           // Upload ZIP to storage via doorway
           const uploadResult = await timer.timeOperation('html5_app_upload', () =>
-            doorwayClient.pushBlob(processed.blobMetadata!.hash, processed.blob!, {
-              hash: processed.blobMetadata!.hash,
+            doorwayClient.pushBlob(processed.blobMetadata!.cid, processed.blob!, {
+              cid: processed.blobMetadata!.cid,
               mimeType: 'application/zip',
               sizeBytes: processed.blob!.length,
               entryPoint: processed.blobMetadata!.entryPoint,
@@ -1227,14 +1226,13 @@ async function seedViaDoorway(): Promise<SeedResult> {
             const slug = contentObj?.slug as string || concept.id;
             const entryPoint = contentObj?.entryPoint as string || 'index.html';
 
-            html5AppBlobHashes.set(concept.id, {
-              hash: processed.blobMetadata.hash,
+            html5AppBlobCids.set(concept.id, {
+              cid: processed.blobMetadata.cid,
               slug,
               entryPoint,
             });
 
-            const blake3Note = uploadResult.blake3Hash ? ` blake3=${uploadResult.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
-            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (slug: ${slug})${blake3Note}`);
+            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (slug: ${slug})`);
           } else {
             console.error(`   ❌ ${concept.id}: upload failed - ${uploadResult.error}`);
           }
@@ -1253,7 +1251,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }
     }
 
-    console.log(`   📊 Processed ${html5AppBlobHashes.size}/${html5Apps.length} HTML5 apps`);
+    console.log(`   📊 Processed ${html5AppBlobCids.size}/${html5Apps.length} HTML5 apps`);
   } else {
     console.log('   No HTML5 app content found');
   }
@@ -1272,11 +1270,11 @@ async function seedViaDoorway(): Promise<SeedResult> {
       const relativePath = file.replace(DATA_DIR + '/', '');
       const input = conceptToInput(concept, relativePath);
 
-      // For HTML5 apps, add the blob_hash from uploaded ZIP
-      const appInfo = html5AppBlobHashes.get(concept.id);
+      // For HTML5 apps, add the blob_cid from uploaded ZIP
+      const appInfo = html5AppBlobCids.get(concept.id);
       if (appInfo) {
-        // Set blob_hash to point to the uploaded ZIP
-        input.blobHash = appInfo.hash;
+        // Set blob_cid to point to the uploaded ZIP
+        input.blobCid = appInfo.cid;
 
         // Add slug to metadata so elohim-storage can look it up
         const meta = (input.metadata ?? {}) as Record<string, unknown>;
@@ -1453,8 +1451,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
   timer.startPhase('Path Thumbnails');
   console.log('\n🖼️  Processing path thumbnails...');
 
-  // Map to store blob_hash for each path ID
-  const pathThumbnailHashes = new Map<string, string>();
+  // Map to store blob_cid for each path ID
+  const pathThumbnailCids = new Map<string, string>();
 
   // Find paths with local thumbnails
   const pathsWithThumbnails = allPaths.filter(({ pathData }) => pathData.localThumbnailPath);
@@ -1471,7 +1469,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         }
 
         const imageData = fs.readFileSync(thumbnailPath);
-        const hash = StorageClient.computeHash(imageData);
+        const cid = StorageClient.computeCid(imageData);
 
         // Determine MIME type from extension
         const ext = path.extname(thumbnailPath).toLowerCase();
@@ -1487,16 +1485,15 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
         console.log(`   📦 Uploading ${pathData.id}: ${(imageData.length / 1024).toFixed(1)} KB (${mimeType})`);
 
-        const uploadResult = await doorwayClient.pushBlob(hash, imageData, {
-          hash,
+        const uploadResult = await doorwayClient.pushBlob(cid, imageData, {
+          cid,
           mimeType,
           sizeBytes: imageData.length,
         });
 
         if (uploadResult.success) {
-          pathThumbnailHashes.set(pathData.id, hash);
-          const blake3Note = uploadResult.blake3Hash ? ` blake3=${uploadResult.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
-          console.log(`   ✅ ${pathData.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'}${blake3Note}`);
+          pathThumbnailCids.set(pathData.id, cid);
+          console.log(`   ✅ ${pathData.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'}`);
         } else {
           console.error(`   ❌ ${pathData.id}: upload failed - ${uploadResult.error}`);
         }
@@ -1505,7 +1502,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }
     }
 
-    console.log(`   📊 Processed ${pathThumbnailHashes.size}/${pathsWithThumbnails.length} thumbnails`);
+    console.log(`   📊 Processed ${pathThumbnailCids.size}/${pathsWithThumbnails.length} thumbnails`);
   } else {
     console.log('   No paths with local thumbnails found');
   }
@@ -1861,12 +1858,12 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
     // Transform all paths into ContentNode inputs + step Relationships.
     // Thumbnail blob linkage is applied after transform so the path row gets
-    // both `blobHash` (storage-level linkage) and `metadata.thumbnailUrl`
+    // both `blobCid` (storage-level linkage) and `metadata.thumbnailUrl`
     // (UI-level rendering) pointing at the uploaded thumbnail.
     const pathContentItems = allPaths.map(({ pathData }) => {
       const input = pathToContent(pathData);
-      const thumbnailHash = pathThumbnailHashes.get(pathData.id);
-      return applyPathThumbnail(input, thumbnailHash);
+      const thumbnailCid = pathThumbnailCids.get(pathData.id);
+      return applyPathThumbnail(input, thumbnailCid);
     });
 
     const stepRelationships = allPaths.flatMap(({ pathData }) =>

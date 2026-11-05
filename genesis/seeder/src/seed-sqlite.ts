@@ -30,7 +30,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+import { byteCid, isByteCid } from './byte-cid.js';
 import { fileURLToPath } from 'url';
 
 import { REACH_OPENNESS, isReach } from './generated/schema-enums.js';
@@ -173,11 +173,11 @@ function assertResponseShape<T>(
 }
 
 /**
- * Compute SHA256 hash of data (matching elohim-storage format).
+ * Compute the byte-profile CID (raw + blake3-256) of data — the address
+ * elohim-storage verifies the body against.
  */
-function computeHash(data: Buffer): string {
-  const hash = crypto.createHash('sha256').update(data).digest('hex');
-  return `sha256-${hash}`;
+function computeBlobCid(data: Buffer): string {
+  return byteCid(data);
 }
 
 /**
@@ -186,15 +186,15 @@ function computeHash(data: Buffer): string {
  */
 async function uploadBlob(data: Buffer, mimeType: string, description?: string): Promise<string | null> {
   if (DRY_RUN) {
-    const hash = computeHash(data);
-    console.log(`   [DRY RUN] Would upload blob: ${hash} (${data.length} bytes)`);
-    return hash;
+    const cid = computeBlobCid(data);
+    console.log(`   [DRY RUN] Would upload blob: ${cid} (${data.length} bytes)`);
+    return cid;
   }
 
-  const hash = computeHash(data);
+  const cid = computeBlobCid(data);
 
   try {
-    const response = await fetch(`${STORAGE_URL}/blob/${hash}`, {
+    const response = await fetch(`${STORAGE_URL}/blob/${cid}`, {
       method: 'PUT',
       headers: {
         'Content-Type': mimeType,
@@ -204,13 +204,13 @@ async function uploadBlob(data: Buffer, mimeType: string, description?: string):
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`   ✗ Failed to upload ${description || hash}: ${response.status} - ${errorText}`);
+      console.error(`   ✗ Failed to upload ${description || cid}: ${response.status} - ${errorText}`);
       return null;
     }
 
-    return hash;
+    return cid;
   } catch (error) {
-    console.error(`   ✗ Failed to upload ${description || hash}: ${error}`);
+    console.error(`   ✗ Failed to upload ${description || cid}: ${error}`);
     return null;
   }
 }
@@ -218,9 +218,9 @@ async function uploadBlob(data: Buffer, mimeType: string, description?: string):
 /**
  * Check if a blob exists in storage.
  */
-async function blobExists(hash: string): Promise<boolean> {
+async function blobExists(cid: string): Promise<boolean> {
   try {
-    const response = await fetch(`${STORAGE_URL}/blob/${hash}`, {
+    const response = await fetch(`${STORAGE_URL}/blob/${cid}`, {
       method: 'HEAD',
     });
     return response.status === 200;
@@ -231,17 +231,11 @@ async function blobExists(hash: string): Promise<boolean> {
 
 /**
  * Find and load HTML5 app ZIP blob for content.
- * Returns the blob data and hash, or null if not found.
+ * Returns the blob data and CID, or null if not found.
  */
-function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buffer; hash: string } | null {
-  // Get existing hash (supports both camelCase and snake_case)
-  const existingHash = concept.blobHash || concept.blobHash;
-  // Legacy sha256- prefix ONLY on bare hex — CID-form (`baf…`) passes through
-  // untouched (double-wrapping mints an address no peer accepts; backlog
-  // blob-fetch-sha256-prefixed-cid-rejection).
-  const normalizedHash = existingHash
-    ? (/^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash)
-    : null;
+function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buffer; cid: string } | null {
+  // The row's declared blob address — only a byte-profile CID is an address.
+  const declaredCid = isByteCid(concept.blobCid) ? concept.blobCid : null;
 
   // Check metadata.localZipPath first
   const metadata = concept.metadata as Record<string, unknown> | undefined;
@@ -249,9 +243,9 @@ function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buf
     const zipPath = path.join(GENESIS_DIR, metadata.localZipPath as string);
     if (fs.existsSync(zipPath)) {
       const data = fs.readFileSync(zipPath);
-      const hash = normalizedHash || computeHash(data);
+      const cid = declaredCid || computeBlobCid(data);
       console.log(`   📦 Found ZIP via metadata.localZipPath: ${metadata.localZipPath}`);
-      return { data, hash };
+      return { data, cid };
     }
   }
 
@@ -259,12 +253,12 @@ function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buf
   const zipPath = path.join(contentDir, `${concept.id}.zip`);
   if (fs.existsSync(zipPath)) {
     const data = fs.readFileSync(zipPath);
-    const hash = normalizedHash || computeHash(data);
-    return { data, hash };
+    const cid = declaredCid || computeBlobCid(data);
+    return { data, cid };
   }
 
-  // If we have a hash reference but no local file, the blob should already be uploaded
-  if (normalizedHash) {
+  // If we have a CID reference but no local file, the blob should already be uploaded
+  if (declaredCid) {
     return null; // No local file to upload
   }
 
@@ -275,7 +269,7 @@ function findHtml5AppBlob(concept: ConceptJson, contentDir: string): { data: Buf
  * Find and load thumbnail image for a path.
  * Searches in genesis/assets/images/ directory.
  */
-function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; hash: string; mimeType: string } | null {
+function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; cid: string; mimeType: string } | null {
   if (!thumbnailUrl) return null;
 
   // Handle various path formats
@@ -300,7 +294,7 @@ function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; ha
   }
 
   const data = fs.readFileSync(imagePath);
-  const hash = computeHash(data);
+  const cid = computeBlobCid(data);
 
   // Determine MIME type from extension
   const ext = path.extname(imagePath).toLowerCase();
@@ -314,7 +308,7 @@ function findThumbnailBlob(thumbnailUrl: string | undefined): { data: Buffer; ha
   };
   const mimeType = mimeTypes[ext] || 'application/octet-stream';
 
-  return { data, hash, mimeType };
+  return { data, cid, mimeType };
 }
 
 // ============================================================================
@@ -466,7 +460,7 @@ function advisoryReachFor(contentId: string): string | undefined {
  *
  * Canonical byte selection (in priority order):
  *   1. `contentBody` UTF-8 bytes — the primary content payload.
- *   2. `blobHash`/`blobCid` as UTF-8 bytes — blob-backed / video items with
+ *   2. `blobCid` as UTF-8 bytes — blob-backed / video items with
  *      no inline body; the hash string itself is canonical per-item.
  *   3. `id + title` UTF-8 — ultimate fallback for placeholder entries.
  *
@@ -476,7 +470,6 @@ export async function deriveContentAnchor(input: {
   id: string;
   title: string;
   contentBody?: string;
-  blobHash?: string;
   blobCid?: string;
 }): Promise<string> {
   let bytes: Uint8Array;
@@ -484,8 +477,6 @@ export async function deriveContentAnchor(input: {
     bytes = new TextEncoder().encode(input.contentBody);
   } else if (input.blobCid) {
     bytes = new TextEncoder().encode(input.blobCid);
-  } else if (input.blobHash) {
-    bytes = new TextEncoder().encode(input.blobHash);
   } else {
     bytes = new TextEncoder().encode(`${input.id}\x00${input.title}`);
   }
@@ -500,7 +491,7 @@ export { contentBodyFor };
  * Build the `deriveContentAnchor` input for a raw content seed JSON, mirroring
  * exactly what `buildContentInput` feeds it during a seed run.
  *
- * CAVEAT: the live seed path injects `blobHash` from `uploadedContentBlobs`
+ * CAVEAT: the live seed path injects `blobCid` from `uploadedContentBlobs`
  * (see the `buildContentInput` call site) AFTER building this input; a raw
  * file can't see that. `deriveContentAnchor` prefers `contentBody`, so this
  * only matters for a content JSON with NO inline `content` that relies on an
@@ -512,14 +503,12 @@ export function contentAnchorInput(json: ConceptJson): {
   id: string;
   title: string;
   contentBody?: string;
-  blobHash?: string;
   blobCid?: string;
 } {
   return {
     id: json.id,
     title: json.title,
     contentBody: contentBodyFor(json),
-    blobHash: json.blobHash ?? json.blob_hash ?? undefined,
     blobCid: json.blobCid ?? undefined,
   };
 }
@@ -866,7 +855,7 @@ async function mapBounded<T, R>(items: T[], limit: number, fn: (item: T) => Prom
 /**
  * PATCH the authored, non-notarized fields of a changed row (diesel path:
  * title/description/contentBody/contentFormat/tags + metadata merge incl. the
- * new seedHash). Never carries reach/blobHash — see ContentFieldPatch.
+ * new seedHash). Never carries reach/blobCid — see ContentFieldPatch.
  */
 async function patchContentFields(id: string, patch: ContentFieldPatch): Promise<string | null> {
   let lastErr = 'unknown failure';
@@ -1297,34 +1286,32 @@ async function main() {
     for (const app of html5Apps) {
       const blob = findHtml5AppBlob(app, contentDir);
       if (blob) {
-        const exists = await blobExists(blob.hash);
+        const exists = await blobExists(blob.cid);
         if (exists) {
-          console.log(`   ✓ ${app.id}: already exists (${blob.hash.slice(0, 16)}...)`);
+          console.log(`   ✓ ${app.id}: already exists (${blob.cid.slice(0, 16)}...)`);
           blobsSkipped++;
-          recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'existed', hash: blob.hash });
+          recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'existed', cid: blob.cid });
         } else {
-          const hash = await uploadBlob(blob.data, 'application/zip', app.id);
-          if (hash) {
+          const uploaded = await uploadBlob(blob.data, 'application/zip', app.id);
+          if (uploaded) {
             console.log(`   ✓ ${app.id}: uploaded ${(blob.data.length / 1024 / 1024).toFixed(2)} MB`);
             blobsUploaded++;
-            recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'uploaded', hash: blob.hash });
+            recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'uploaded', cid: blob.cid });
           } else {
-            console.warn(`   ✗ ${app.id}: upload failed; skipping blobHash linkage`);
+            console.warn(`   ✗ ${app.id}: upload failed; skipping blobCid linkage`);
             blobsFailed++;
             recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'failed' });
           }
         }
       } else {
         // Check if there's a hash reference we should verify
-        const existingHash = app.blobHash || app.blob_hash;
-        if (existingHash) {
-          // Legacy sha256- prefix ONLY on bare hex — never double-wrap a CID.
-          const normalizedHash = /^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash;
-          const exists = await blobExists(normalizedHash);
+        const existingCid = isByteCid(app.blobCid) ? app.blobCid : null;
+        if (existingCid) {
+          const exists = await blobExists(existingCid);
           if (!exists) {
-            console.warn(`   ⚠️ ${app.id}: blob_hash exists but blob not found in storage`);
+            console.warn(`   ⚠️ ${app.id}: blobCid exists but blob not found in storage`);
           }
-          uploadedContentBlobs.set(app.id, normalizedHash);
+          uploadedContentBlobs.set(app.id, existingCid);
         }
       }
     }
@@ -1343,19 +1330,19 @@ async function main() {
 
       const thumbnail = findThumbnailBlob(pathItem.thumbnailUrl);
       if (thumbnail) {
-        const exists = await blobExists(thumbnail.hash);
+        const exists = await blobExists(thumbnail.cid);
         if (exists) {
           console.log(`   ✓ ${pathItem.id}: thumbnail already exists`);
           blobsSkipped++;
-          recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'existed', hash: thumbnail.hash });
+          recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'existed', cid: thumbnail.cid });
         } else {
-          const hash = await uploadBlob(thumbnail.data, thumbnail.mimeType, `${pathItem.id} thumbnail`);
-          if (hash) {
+          const uploaded = await uploadBlob(thumbnail.data, thumbnail.mimeType, `${pathItem.id} thumbnail`);
+          if (uploaded) {
             console.log(`   ✓ ${pathItem.id}: thumbnail uploaded ${(thumbnail.data.length / 1024).toFixed(1)} KB`);
             blobsUploaded++;
-            recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'uploaded', hash: thumbnail.hash });
+            recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'uploaded', cid: thumbnail.cid });
           } else {
-            console.warn(`   ✗ ${pathItem.id}: thumbnail upload failed; skipping blobHash linkage`);
+            console.warn(`   ✗ ${pathItem.id}: thumbnail upload failed; skipping blobCid linkage`);
             blobsFailed++;
             recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'failed' });
           }
@@ -1416,7 +1403,7 @@ async function main() {
       // one Phase 0 verified or uploaded.
       const input = buildContentInput(c, {
         advisoryReach: advisoryReachFor(c.id),
-        blobHash: uploadedContentBlobs.get(c.id),
+        blobCid: uploadedContentBlobs.get(c.id),
       });
       // Attach a content-derived CIDv1 anchor so the row satisfies the
       // require_provenance read gate at ingest (honest alternative to the
@@ -1491,11 +1478,11 @@ async function main() {
 
     console.log(`\nTransforming paths to content nodes...`);
     const pathContentInputs = await Promise.all(paths.map(async p => {
-      const thumbnailHash =
+      const thumbnailCid =
         p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)
           ? uploadedThumbnails.get(p.thumbnailUrl)
           : undefined;
-      const input = buildPathInput(p, { thumbnailHash });
+      const input = buildPathInput(p, { thumbnailCid });
       // Attach a content-derived CIDv1 anchor for the path row (same
       // require_provenance gate applies to paths seeded as content nodes).
       input.dhtAnchorHash = await deriveContentAnchor(input);

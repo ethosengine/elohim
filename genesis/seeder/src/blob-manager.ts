@@ -4,7 +4,7 @@
  * Handles the separation of metadata (DNA) from content blobs (projection cache).
  *
  * Content Architecture:
- * - DNA stores metadata with blobHash references
+ * - DNA stores metadata with blobCid references
  * - elohim-cache-core stores and serves actual blob content
  * - Clients use ContentResolver to find content across tiers
  *
@@ -22,21 +22,15 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+import { byteCid, isByteCid } from './byte-cid.js';
 
 // =============================================================================
 // Types
 // =============================================================================
 
 export interface BlobMetadata {
-  /** SHA256 hash of the blob content */
-  hash: string;
-  /**
-   * BLAKE3 hash populated post-upload when the server dual-wrote to IrohBlobStore.
-   * Undefined until the seeder records the value from the PUT /blob/{hash} response.
-   * Undefined in libp2p-only deployments where iroh is not configured.
-   */
-  blake3Hash?: string;
+  /** Byte-profile CID (raw + blake3-256, `bafkr4i…`) of the blob content */
+  cid: string;
   /** Size in bytes */
   sizeBytes: number;
   /** MIME type */
@@ -48,7 +42,7 @@ export interface BlobMetadata {
 }
 
 export interface ProcessedContent {
-  /** Metadata to store in DNA (blob_hash reference instead of inline content) */
+  /** Metadata to store in DNA (blob_cid reference instead of inline content) */
   metadata: Record<string, unknown>;
   /** Blob to push to projection cache (null if content stays inline) */
   blob: Buffer | null;
@@ -69,7 +63,7 @@ export interface BlobManagerConfig {
   cacheDir?: string;
   /** Dry run - don't actually push blobs */
   dryRun?: boolean;
-  /** Force upload blobs even if blob_hash already exists (for fresh deployments) */
+  /** Force upload blobs even if blob_cid already exists (for fresh deployments) */
   forceUpload?: boolean;
 }
 
@@ -80,8 +74,7 @@ export interface ContentFile {
   title?: string;
   description?: string;
   content?: string | object;
-  blobHash?: string;     // camelCase (JSON file format)
-  blob_hash?: string;    // snake_case (legacy API compat)
+  blobCid?: string;     // byte-profile CID (JSON file format)
   blobUrl?: string;
   entryPoint?: string;
   fallbackUrl?: string;
@@ -144,21 +137,15 @@ export class BlobManager {
       };
     }
 
-    // Get existing blob hash (supports both camelCase from JSON and snake_case)
-    const existingHash = content.blobHash || content.blobHash;
-
-    // Normalize hash format: legacy sha256- prefix ONLY on bare hex — a
-    // CID-form hash (`baf…`) must pass through untouched, or it becomes the
-    // double-wrapped `sha256-<cid>` address no peer accepts (T21 rejection;
-    // backlog blob-fetch-sha256-prefixed-cid-rejection).
-    const normalizedExistingHash = existingHash
-      ? (/^[0-9a-fA-F]{64}$/.test(existingHash) ? `sha256-${existingHash}` : existingHash)
-      : null;
+    // The row's declared blob address. Only a byte-profile CID is an address;
+    // any other spelling is not normalised into one (no dual-read) — it is
+    // treated as absent so the blob is re-derived from its bytes below.
+    const existingCid = isByteCid(content.blobCid) ? content.blobCid : null;
 
     // Check if content already has a blob reference
     // If forceUpload is true, we still extract and prepare the blob for upload
-    // (needed for fresh deployments where blob_hash exists but blob isn't in storage)
-    if (normalizedExistingHash && !this.config.forceUpload) {
+    // (needed for fresh deployments where blob_cid exists but blob isn't in storage)
+    if (existingCid && !this.config.forceUpload) {
       return {
         metadata: content,
         blob: null,
@@ -216,13 +203,13 @@ export class BlobManager {
       };
     }
 
-    // Use existing blob_hash if available (forceUpload mode), otherwise compute
-    // This ensures consistency between JSON and actual blob hash
-    const hash = normalizedExistingHash || this.computeHash(blob);
+    // Use existing blobCid if available (forceUpload mode), otherwise compute
+    // This ensures consistency between JSON and actual blob address
+    const cid = existingCid || this.computeCid(blob);
     const mimeType = FORMAT_MIME_TYPES[format] || 'application/octet-stream';
 
     const blobMetadata: BlobMetadata = {
-      hash,
+      cid,
       sizeBytes: blob.length,
       mimeType,
       entryPoint,
@@ -232,8 +219,8 @@ export class BlobManager {
     // Create metadata with blob reference (remove inline content)
     const metadata: Record<string, unknown> = {
       ...content,
-      blobHash: hash,
-      blobUrl: `${this.config.doorwayUrl}/blob/${hash}`,
+      blobCid: cid,
+      blobUrl: `${this.config.doorwayUrl}/blob/${cid}`,
     };
 
     if (entryPoint) {
@@ -244,8 +231,8 @@ export class BlobManager {
     delete metadata.content;
 
     // Cache blob locally
-    this.cacheBlob(hash, blob);
-    this.blobCache.set(hash, blobMetadata);
+    this.cacheBlob(cid, blob);
+    this.blobCache.set(cid, blobMetadata);
 
     return {
       metadata,
@@ -330,11 +317,10 @@ export class BlobManager {
   }
 
   /**
-   * Compute SHA256 hash of blob content.
+   * Compute the byte-profile CID (raw + blake3-256) of blob content.
    */
-  computeHash(data: Buffer): string {
-    const hash = crypto.createHash('sha256').update(data).digest('hex');
-    return `sha256-${hash}`;
+  computeCid(data: Buffer): string {
+    return byteCid(data);
   }
 
   /**
@@ -364,9 +350,9 @@ export class BlobManager {
   }
 
   /**
-   * Get all cached blob hashes.
+   * Get all cached blob CIDs.
    */
-  getCachedBlobHashes(): string[] {
+  getCachedBlobCids(): string[] {
     return Array.from(this.blobCache.keys());
   }
 
@@ -400,10 +386,10 @@ export class BlobManager {
 // =============================================================================
 
 /**
- * Validate blob hash format.
+ * Validate blob address format (byte-profile CID).
  */
-export function isValidBlobHash(hash: string): boolean {
-  return /^sha256-[a-f0-9]{64}$/.test(hash);
+export function isValidBlobCid(cid: string): boolean {
+  return isByteCid(cid);
 }
 
 /**
@@ -424,15 +410,15 @@ export function validateBlobReferences(content: ContentFile): {
 
   // For blob formats, should have either inline content OR blob reference
   const hasInlineContent = content.content !== undefined && content.content !== null;
-  const hasBlobRef = content.blobHash !== undefined && content.blobHash !== null;
+  const hasBlobRef = content.blobCid !== undefined && content.blobCid !== null;
 
   if (!hasInlineContent && !hasBlobRef) {
-    errors.push(`${format} content must have either 'content' or 'blobHash'`);
+    errors.push(`${format} content must have either 'content' or 'blobCid'`);
   }
 
   if (hasBlobRef) {
-    if (!isValidBlobHash(content.blobHash!)) {
-      errors.push(`Invalid blobHash format: ${content.blobHash}`);
+    if (!isValidBlobCid(content.blobCid!)) {
+      errors.push(`Invalid blobCid format: ${content.blobCid}`);
     }
 
     // Warn if no fallback URL for external content

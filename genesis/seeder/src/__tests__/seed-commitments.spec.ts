@@ -23,6 +23,7 @@ import {
   type ResolvedCustodyPair,
 } from '../seed-commitments.js';
 import { clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman } from '../peer-id.js';
+import { CID_A, CID_B, CID_C, CID_D, CID_E, CID_F } from './fixture-cids.js';
 
 describe('buildCustodyCommitmentBody', () => {
   const pair: ResolvedCustodyPair = {
@@ -30,7 +31,7 @@ describe('buildCustodyCommitmentBody', () => {
     providerArchetype: 'desktop',
     receiverHumanId: 'human-terrance-tutor',
     receiverArchetype: 'desktop',
-    blobHash: 'sha256-deadbeef',
+    blobCid: CID_A,
     blobSizeBytes: 12345,
   };
   const agentCids: CustodyPeerIds = {
@@ -53,12 +54,12 @@ describe('buildCustodyCommitmentBody', () => {
     expect(body.receiver).not.toMatch(/^12D3/);
   });
 
-  it('resourceClassifiedAs is a ValueFlows list holding the sha256- blob hash', () => {
+  it('resourceClassifiedAs is a ValueFlows list holding the byte-profile blob CID', () => {
     const body = buildCustodyCommitmentBody(pair, agentCids);
     // List shape per CreateReaCommitmentInputView (ValueFlows resourceClassifiedAs
     // is a classification list) — stored as a JSON array so ReaCommitmentView's
     // parse-as-array round-trips it.
-    expect(body.resourceClassifiedAs).toEqual(['sha256-deadbeef']);
+    expect(body.resourceClassifiedAs).toEqual([CID_A]);
   });
 
   it('resourceQuantity uses bytes-as-integer with hasUnit "B"', () => {
@@ -67,12 +68,12 @@ describe('buildCustodyCommitmentBody', () => {
     expect(body.resourceQuantity.hasUnit).toBe('B');
   });
 
-  it('id is distinct per (provider_peer, receiver_peer, blob_hash) tuple', () => {
+  it('id is distinct per (provider_peer, receiver_peer, blob_cid) tuple', () => {
     const a = buildCustodyCommitmentBody(pair, agentCids);
     const b = buildCustodyCommitmentBody(
       {
         ...pair,
-        blobHash: 'sha256-feedface',
+        blobCid: CID_D,
       },
       agentCids,
     );
@@ -203,7 +204,7 @@ describe('resolvePeerId (Stage 2)', () => {
         providerArchetype: 'desktop',
         receiverHumanId: 'human-jessica-spouse',
         receiverArchetype: 'desktop',
-        blobHash: 'sha256-deadbeef',
+        blobCid: CID_A,
         blobSizeBytes: 1,
       },
       { nodeIdentity },
@@ -224,7 +225,7 @@ describe('resolvePeerId (Stage 2)', () => {
           providerArchetype: 'desktop',
           receiverHumanId: 'human-jessica-spouse',
           receiverArchetype: 'desktop',
-          blobHash: 'sha256-deadbeef',
+          blobCid: CID_A,
           blobSizeBytes: 1,
         },
         { nodeIdentity },
@@ -235,7 +236,7 @@ describe('resolvePeerId (Stage 2)', () => {
 
 // =============================================================================
 // resolveCustodyBlobDescriptor — contentId + explicit artifact role.
-// A content row's blobHash (browser/primary artifact) and serverBlobHash
+// A content row's blobCid (browser/primary artifact) and serverBlobCid
 // (optional SSR server bundle) intentionally name different bytes. The
 // custody join uses the exact artifact selected by the caller; no fallback
 // can silently switch the pledge to a different artifact.
@@ -249,26 +250,26 @@ describe('resolveCustodyBlobDescriptor', () => {
     receiverArchetype: 'desktop' as const,
   };
 
-  it('blobHash pair: passes the declared hash/size through unchanged (back-compat, no fetch)', async () => {
+  it('blobCid pair: passes the declared hash/size through unchanged (back-compat, no fetch)', async () => {
     const fetchImpl = vi.fn();
     const resolved = await resolveCustodyBlobDescriptor(
-      { ...basePair, blobHash: 'sha256-deadbeef', blobSizeBytes: 42 },
+      { ...basePair, blobCid: CID_A, blobSizeBytes: 42 },
       { fetchImpl },
     );
     expect(resolved).toEqual({
-      blobHash: 'sha256-deadbeef',
+      blobCid: CID_A,
       blobSizeBytes: 42,
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('ssr-server pair: selects serverBlobHash even when blobHash is present', async () => {
+  it('ssr-server pair: selects serverBlobCid even when blobCid is present', async () => {
     const fetchImpl = vi.fn(async (url: string) => {
       expect(url).toBe(`${storageUrlForHuman('human-matthew-manager')}/db/content/elohim-host-landing`);
       return new Response(
         JSON.stringify({
-          serverBlobHash: 'sha256-56adaebb',
-          blobHash: 'sha256-a12218a5',
+          serverBlobCid: CID_C,
+          blobCid: CID_B,
           contentSizeBytes: 999,
         }),
         { status: 200 },
@@ -282,17 +283,17 @@ describe('resolveCustodyBlobDescriptor', () => {
       },
       { fetchImpl },
     );
-    expect(resolved.blobHash).toBe('sha256-56adaebb');
+    expect(resolved.blobCid).toBe(CID_C);
     expect(resolved.blobSizeBytes).toBe(999);
   });
 
-  it('content pair: selects blobHash even when serverBlobHash is present', async () => {
+  it('content pair: selects blobCid even when serverBlobCid is present', async () => {
     const fetchImpl = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
-            blobHash: 'sha256-a12218a5',
-            serverBlobHash: 'sha256-56adaebb',
+            blobCid: CID_B,
+            serverBlobCid: CID_C,
             contentSizeBytes: 10,
           }),
           { status: 200 },
@@ -306,7 +307,7 @@ describe('resolveCustodyBlobDescriptor', () => {
       },
       { fetchImpl },
     );
-    expect(resolved.blobHash).toBe('sha256-a12218a5');
+    expect(resolved.blobCid).toBe(CID_B);
   });
 
   it('contentId pair requires an explicit artifact role', async () => {
@@ -321,7 +322,7 @@ describe('resolveCustodyBlobDescriptor', () => {
   it('does not fall back from a missing selected artifact to the other field', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ blobHash: 'sha256-a12218a5', contentSizeBytes: 10 }), {
+        new Response(JSON.stringify({ blobCid: CID_B, contentSizeBytes: 10 }), {
           status: 200,
         }),
     );
@@ -334,7 +335,7 @@ describe('resolveCustodyBlobDescriptor', () => {
         },
         { fetchImpl },
       ),
-    ).rejects.toThrow(/has no serverBlobHash/);
+    ).rejects.toThrow(/has no serverBlobCid/);
   });
 
   it("contentId pair: an explicitly declared blobSizeBytes wins over the row's contentSizeBytes", async () => {
@@ -342,7 +343,7 @@ describe('resolveCustodyBlobDescriptor', () => {
       async () =>
         new Response(
           JSON.stringify({
-            serverBlobHash: 'sha256-56adaebb',
+            serverBlobCid: CID_C,
             contentSizeBytes: 999,
           }),
           { status: 200 },
@@ -360,20 +361,20 @@ describe('resolveCustodyBlobDescriptor', () => {
     expect(resolved.blobSizeBytes).toBe(5);
   });
 
-  it('declaring BOTH blobHash and contentId is a fail-fast authoring error', async () => {
+  it('declaring BOTH blobCid and contentId is a fail-fast authoring error', async () => {
     await expect(
       resolveCustodyBlobDescriptor({
         ...basePair,
-        blobHash: 'sha256-deadbeef',
+        blobCid: CID_A,
         blobSizeBytes: 1,
         contentId: 'x',
       }),
-    ).rejects.toThrow(/declares BOTH blobHash and contentId/);
+    ).rejects.toThrow(/declares BOTH blobCid and contentId/);
   });
 
-  it('declaring NEITHER blobHash nor contentId is a fail-fast authoring error', async () => {
+  it('declaring NEITHER blobCid nor contentId is a fail-fast authoring error', async () => {
     await expect(resolveCustodyBlobDescriptor({ ...basePair })).rejects.toThrow(
-      /declares NEITHER blobHash nor contentId/,
+      /declares NEITHER blobCid nor contentId/,
     );
   });
 
@@ -404,7 +405,7 @@ describe('resolveCustodyBlobDescriptor', () => {
         },
         { fetchImpl },
       ),
-    ).rejects.toThrow(/has no serverBlobHash/);
+    ).rejects.toThrow(/has no serverBlobCid/);
   });
 
   it('an unresolvable blobSizeBytes (no declared value, no contentSizeBytes on the row, no matching env, blob GET 404s) fails fast', async () => {
@@ -417,7 +418,7 @@ describe('resolveCustodyBlobDescriptor', () => {
     try {
       const fetchImpl = vi.fn(async (url: string) => {
         if (url.endsWith('/db/content/elohim-host-landing')) {
-          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+          return new Response(JSON.stringify({ serverBlobCid: CID_C }), { status: 200 });
         }
         if (url.includes('/blob/')) {
           return new Response('not found', { status: 404 });
@@ -447,12 +448,12 @@ describe('resolveCustodyBlobDescriptor', () => {
     let prevSize: string | undefined;
     prevHash = process.env.CONTENT_BLOB_HASH;
     prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
-    process.env.CONTENT_BLOB_HASH = 'sha256-56adaebb';
+    process.env.CONTENT_BLOB_HASH = CID_C;
     process.env.CONTENT_BLOB_SIZE_BYTES = '17905368';
     try {
       const fetchImpl = vi.fn(async (url: string) => {
         if (url.endsWith('/db/content/elohim-host-landing')) {
-          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+          return new Response(JSON.stringify({ serverBlobCid: CID_C }), { status: 200 });
         }
         throw new Error(`unexpected fetch (should not need /blob/): ${url}`);
       });
@@ -480,14 +481,14 @@ describe('resolveCustodyBlobDescriptor', () => {
     let prevSize: string | undefined;
     prevHash = process.env.CONTENT_BLOB_HASH;
     prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
-    process.env.CONTENT_BLOB_HASH = 'sha256-someOTHERblob';
+    process.env.CONTENT_BLOB_HASH = CID_E;
     process.env.CONTENT_BLOB_SIZE_BYTES = '999';
     try {
       const fetchImpl = vi.fn(async (url: string) => {
         if (url.endsWith('/db/content/elohim-host-landing')) {
-          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+          return new Response(JSON.stringify({ serverBlobCid: CID_C }), { status: 200 });
         }
-        if (url.includes('/blob/sha256-56adaebb')) {
+        if (url.includes(`/blob/${CID_C}`)) {
           return new Response(null, { status: 200, headers: { 'content-length': '17905368' } });
         }
         throw new Error(`unexpected fetch: ${url}`);
@@ -521,9 +522,9 @@ describe('resolveCustodyBlobDescriptor', () => {
     try {
       const fetchImpl = vi.fn(async (url: string) => {
         if (url.endsWith('/db/content/elohim-host-landing')) {
-          return new Response(JSON.stringify({ serverBlobHash: 'sha256-56adaebb' }), { status: 200 });
+          return new Response(JSON.stringify({ serverBlobCid: CID_C }), { status: 200 });
         }
-        if (url.includes('/blob/sha256-56adaebb')) {
+        if (url.includes(`/blob/${CID_C}`)) {
           // GET, not HEAD — content-addressed blob routes 404 on HEAD even
           // when GET 200s on this mesh; the resolver must never issue HEAD.
           return new Response(null, { status: 200, headers: { 'content-length': '17905368' } });
@@ -583,7 +584,7 @@ describe('activateCustodyCommitments (offline, injected client + agent-key probe
     providerArchetype: 'desktop',
     receiverHumanId: 'human-jessica-spouse',
     receiverArchetype: 'desktop',
-    blobHash: 'sha256-deadbeef',
+    blobCid: CID_A,
     blobSizeBytes: 1,
   };
 
@@ -674,15 +675,15 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
   beforeEach(() => clearPeerIdCache());
   afterEach(() => vi.restoreAllMocks());
 
-  it('resolves serverBlobHash via contentId, creates the commitment, then issues the activation PATCH', async () => {
+  it('resolves serverBlobCid via contentId, creates the commitment, then issues the activation PATCH', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.endsWith('/db/content/elohim-host-landing')) {
         return new Response(
           JSON.stringify({
-            serverBlobHash: 'sha256-56adaebb',
-            blobHash: 'sha256-a12218a5',
+            serverBlobCid: CID_C,
+            blobCid: CID_B,
             contentSizeBytes: 999,
           }),
           { status: 200 },
@@ -720,7 +721,7 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
     const sentBody = createCommitment.mock.calls[0][0] as {
       resourceClassifiedAs: string[];
     };
-    expect(sentBody.resourceClassifiedAs).toEqual(['sha256-56adaebb']);
+    expect(sentBody.resourceClassifiedAs).toEqual([CID_C]);
 
     // getCommitment runs TWICE: once as the create-phase pre-check (404 —
     // the row doesn't exist yet) and once as the activation-phase read (200
@@ -737,7 +738,7 @@ describe('seedCustodyCommitments (offline) — contentId pair drives create + ac
     const fetchImpl = vi.fn(async (url: string) => {
       if (url.endsWith('/db/content/elohim-host-landing')) {
         return new Response(
-          JSON.stringify({ serverBlobHash: 'sha256-56adaebb', contentSizeBytes: 999 }),
+          JSON.stringify({ serverBlobCid: CID_C, contentSizeBytes: 999 }),
           { status: 200 },
         );
       }
@@ -779,7 +780,7 @@ describe('defaultCustodyPairs triad fixture', () => {
   beforeAll(() => {
     prevHash = process.env.CONTENT_BLOB_HASH;
     prevSize = process.env.CONTENT_BLOB_SIZE_BYTES;
-    process.env.CONTENT_BLOB_HASH = 'sha256-cafebabe';
+    process.env.CONTENT_BLOB_HASH = CID_F;
     process.env.CONTENT_BLOB_SIZE_BYTES = '64';
   });
   afterAll(() => {
@@ -803,13 +804,13 @@ describe('defaultCustodyPairs triad fixture', () => {
     expect(nonFixturePairs).toHaveLength(3);
   });
 
-  it('includes the elohim-host-landing self-custody pair, resolved via contentId not a fixture blobHash', () => {
+  it('includes the elohim-host-landing self-custody pair, resolved via contentId not a fixture blobCid', () => {
     const pairs = defaultCustodyPairs();
     const selfCustody = pairs.find((p) => p.contentId === 'elohim-host-landing');
     expect(selfCustody).toBeDefined();
     expect(selfCustody?.providerHumanId).toBe('human-matthew-manager');
     expect(selfCustody?.receiverHumanId).toBe('human-matthew-manager');
-    expect(selfCustody?.blobHash).toBeUndefined();
+    expect(selfCustody?.blobCid).toBeUndefined();
     expect(selfCustody?.artifactRole).toBe('ssr-server');
   });
 
@@ -820,7 +821,7 @@ describe('defaultCustodyPairs triad fixture', () => {
         providerArchetype: 'desktop',
         receiverHumanId: 'human-james-son',
         receiverArchetype: 'mobile',
-        blobHash: 'sha256-deadbeef',
+        blobCid: CID_A,
         blobSizeBytes: 1,
         fixture: 'formation-output',
       },

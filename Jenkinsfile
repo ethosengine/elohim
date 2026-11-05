@@ -243,7 +243,7 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
     //                                     app/lamad dist at /lamad/...
     //
     // The JSON source for these content nodes intentionally omits
-    // blobHash; the seed-sqlite step does not overwrite the deploy-time
+    // blobCid; the seed-sqlite step does not overwrite the deploy-time
     // value written here.
     //
     // adminKey is passed for the PUT's X-API-Key (gated / non-DEV_MODE backends
@@ -309,7 +309,7 @@ def stageSpaBlobs(String doorwayEprUrl, List<Map> bundles, String adminKey, Map 
     }
 }
 
-// Author the single notarized head for ONE bundle, exactly once. The blobHash
+// Author the single notarized head for ONE bundle, exactly once. The blobCid
 // PATCH is a DNA-notarized write (patch_needs_conductor=true): the doorway
 // routes it to a storage backend whose CONDUCTOR authors the DHT entry — the
 // peer network (Holochain DHT) is the witness, the doorway is only the gateway.
@@ -485,7 +485,7 @@ def verifyEprMounts(String doorwayUrl, List<String> mounts) {
 // doorway to materialize it (400s adoption window). This leg asks what server
 // bundle head it has served and compares it to the hash authorHeadOnce just
 // authored (outcomes["hash|slug|kind"]). Only server-kind bundles are probed:
-// the T4-1 health-surface contract (servedBundleHeads[].serverBlobHash) only
+// the T4-1 health-surface contract (servedBundleHeads[].serverBlobCid) only
 // attests the SSR bundle — see verify-projected-head.sh header for the
 // browser-bundle limitation. Records one outcome per (host, slug, kind) so
 // emitAppDeployJunit can name each host's leg individually. Bash body lives in
@@ -542,7 +542,7 @@ def resolveDoorwayEprUrls() {
     // doorway B (elohim.host); the alpha serving pair behind them is matthew +
     // jessica, the pair appReleasePeers() names. Each must carry the SPA blob BYTES (bytes do not
     // auto-replicate P2P yet — legitimate per-host load-spread), but the
-    // notarized blobHash HEAD is authored ONCE via a live conductor bridge and
+    // notarized blobCid HEAD is authored ONCE via a live conductor bridge and
     // gossips to every peer (authorHeadOnce) — NOT a per-storage write (that
     // minted divergent, un-witnessed heads). This list is both the byte-seed set
     // and the failover order for the single head author.
@@ -587,11 +587,11 @@ def resolveStorageAdminKey() {
         echo "stageSpaBlobs auth: using credential '${credUsed}'"
     } else {
         // RC2 hardening (2026-05-28): fail loud instead of silently degrading
-        // to PUT-only. Without the admin credential the blobHash PATCH cannot
-        // run, db/content/lamad-spa keeps no blobHash, /apps/lamad-spa/ 404s,
+        // to PUT-only. Without the admin credential the blobCid PATCH cannot
+        // run, db/content/lamad-spa keeps no blobCid, /apps/lamad-spa/ 404s,
         // /lamad goes dark while the build reports green — exactly the drift
         // spa-blob-deploy-drift documented.
-        error("stageSpaBlobs auth: neither 'storage-api-key-admin' nor 'doorway-admin-bootstrap-key' is visible at this job's credential scope. The blobHash PATCH (db/content/{slug}) cannot run without it, which leaves lamad-spa blobless and /lamad 404ing. Provision one of these credentials at the App job/folder scope, then re-run. (To intentionally ship a no-content deploy, remove this guard deliberately.)")
+        error("stageSpaBlobs auth: neither 'storage-api-key-admin' nor 'doorway-admin-bootstrap-key' is visible at this job's credential scope. The blobCid PATCH (db/content/{slug}) cannot run without it, which leaves lamad-spa blobless and /lamad 404ing. Provision one of these credentials at the App job/folder scope, then re-run. (To intentionally ship a no-content deploy, remove this guard deliberately.)")
     }
     return adminKey
 }
@@ -1122,7 +1122,7 @@ def appDeployFailureMessage(String kind, String name, def detail) {
         return "Mount probe '${name}' failed: an EPR-routed mount ('/' or '/lamad') did not serve 200 through the router's self-heal window (scripts/ci/verify-epr-mount.sh) — the content row may point at a blob this host's storage no longer holds."
     }
     if (kind == 'projhead') {
-        return "Projected-head probe '${name}' failed: this host's health surface (/health/startup or /health) served a serverBlobHash that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
+        return "Projected-head probe '${name}' failed: this host's health surface (/health/startup or /health) served a serverBlobCid that does NOT match the just-authored declared head, or the host was unreachable after retries. The doorway has not proved the current SSR bundle at its declared render route. Missing attestation, a stale head, or a route that falls back to CSR fails this leg; inspect the probe's route, head, and response diagnostics."
     }
     if (kind == 'release') {
         return "App release '${name}' refused — ${detail}. scripts/ci/app-release-stage.sh names the refusal (channel absent → a steward runs release-ceremony.ts channel create once; a packager or publish failure → its output above)."
@@ -1660,7 +1660,7 @@ VEOF
             // Runs AFTER Build App because lamad's tsconfig path aliases
             // reference app/elohim-app codegen artifacts (B18). One ng build
             // emits BOTH dist/lamad/browser (the shell) and dist/lamad/server
-            // (the SSR bundle stageSpaBlobs seeds as lamad-spa serverBlobHash
+            // (the SSR bundle stageSpaBlobs seeds as lamad-spa serverBlobCid
             // — the peer-runtime render source; entry contract gated by
             // app/scripts/lint-ssr-entry.mjs).
             when {

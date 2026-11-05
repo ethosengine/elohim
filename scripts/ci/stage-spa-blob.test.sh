@@ -16,7 +16,7 @@
 # because the parsing is the thing under test; only the packaging `node` is fake.
 #
 # KIND=server is used for most cases so the deliverability gate (browser-only) is
-# skipped — the leg under test is the serverBlobHash PATCH, which takes the
+# skipped — the leg under test is the serverBlobCid PATCH, which takes the
 # identical ladder. Case (j) runs one browser leg against a gate shim to prove
 # the gate is still invoked exactly as it was.
 set -uo pipefail
@@ -33,6 +33,7 @@ if [ -z "${REAL_NODE}" ]; then
   exit 1
 fi
 export STAGE_JSON_NODE="${REAL_NODE}"
+export REAL_NODE
 
 # Fixture setup is fail-closed: an empty or non-directory root would make the
 # fixture destinations /bin/curl, /bin/node and /app, which a privileged runner
@@ -203,7 +204,7 @@ fi
 # Read-back of the row the PATCH just wrote.
 case "${url}" in
   */db/content/*)
-    printf '{"serverBlobHash":"%s","blobHash":"%s"}' \
+    printf '{"serverBlobCid":"%s","blobCid":"%s"}' \
       "$(cat "${FAKE_STATE}/hash" 2>/dev/null)" "$(cat "${FAKE_STATE}/hash" 2>/dev/null)"
     exit 0
     ;;
@@ -214,6 +215,8 @@ FAKE
 # --- fake node (SDK packaging only) ----------------------------------------
 cat > "${bin}/node" <<'FAKE'
 #!/bin/bash
+# The byte-CID mint (lib/byte-cid.mjs) is real; only the SDK packager is faked.
+case "$1" in *byte-cid.mjs) exec "${REAL_NODE}" "$@" ;; esac
 out=""
 kind="browser"
 while [ "$#" -gt 0 ]; do
@@ -305,7 +308,7 @@ OK_PUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_stor
 OK_PATCH='200|{"dhtAnchorHash":"uhCkkFAKEANCHOR"}|0|'
 CELL_BODY='{"error":"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(uhC0kFAKE))"}'
 SHED_CATCHUP='503|{"status":"catching-up","retryAfter":30,"cause":"upstream","circuit":"closed","errorStreak":1}|0|'
-FWD_TIMEOUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/sha256-abc): operation timed out"}|0|'
+FWD_TIMEOUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/bafkr4iabc): operation timed out"}|0|'
 
 # --- (a) catching-up x3 then 200 on the PATCH leg --------------------------
 # STAGE_BLOB_ATTEMPTS=1 and a 2s transport budget are the proof that the
@@ -352,14 +355,14 @@ check "(c) it is described as availability-unknown, never as storage being up" \
 
 new_case c2; cell_state="${root}/c2-cells"
 status="$(run_stage "http://doorway-c2" server \
-  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/sha256-abc): tcp connect error: Connection refused (os error 111)"}|0|' \
+  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/bafkr4iabc): tcp connect error: Connection refused (os error 111)"}|0|' \
   STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
 check "(c) connection-refused rides the transport ladder, never readiness" \
   "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}' && grep -q 'stage failed after 2 attempt' '${log}'"
 
 new_case c3; cell_state="${root}/c3-cells"
 status="$(run_stage "http://doorway-c3" server \
-  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://timeout-storage:8090/blob/sha256-abc): dns error: failed to lookup address information: Name or service not known"}|0|' \
+  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://timeout-storage:8090/blob/bafkr4iabc): dns error: failed to lookup address information: Name or service not known"}|0|' \
   STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
 check "(c) a DNS failure against a host NAMED timeout-storage is not the timeout face" \
   "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
@@ -590,7 +593,7 @@ check "(j) a structural 4xx is still immediate" \
 shim="${root}/shim"; mkdir -p "${shim}"
 cp "${script}" "${shim}/stage-spa-blob.sh"
 # The packaging recipe the script sources travels with it (lib/bundle-zip.sh).
-mkdir -p "${shim}/lib" && cp "$(dirname "${script}")/lib/bundle-zip.sh" "${shim}/lib/"
+mkdir -p "${shim}/lib" && cp "$(dirname "${script}")/lib/bundle-zip.sh" "${shim}/lib/" && ln -s "$(cd "$(dirname "${script}")/lib" && pwd)/byte-cid.mjs" "${shim}/lib/byte-cid.mjs"
 cat > "${shim}/deliverability-gate.sh" <<'GATE'
 #!/bin/bash
 printf '%s\n' "$*" >> "${FAKE_STATE}/gate-calls"
@@ -604,7 +607,7 @@ status="$(run_stage "http://doorway-j4" browser \
 stage_script=""
 check "(j) a browser leg still invokes the deliverability gate, once, unwrapped" \
   "[ '${status}' = '0' ] && [ \"\$(grep -c . '${state}/gate-calls')\" = '1' ] \
-   && grep -qx 'http://doorway-j4 sha256-.*' '${state}/gate-calls'"
+   && grep -qx 'http://doorway-j4 bafkr4i.*' '${state}/gate-calls'"
 
 # --- (k) an unusable deadline record degrades to THIS invocation -----------
 # The state dir is a regular FILE, so mkdir -p cannot create it (root included).

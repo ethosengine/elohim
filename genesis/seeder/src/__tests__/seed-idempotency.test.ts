@@ -11,6 +11,7 @@ import {
   type SeedDecision,
   type StoredContentRow,
 } from '../seed-idempotency.js';
+import { CID_A, CID_B, CID_C, CID_D } from './fixture-cids.js';
 
 const input: CreateContentInput = {
   id: 'fct-module-01-church-dilemma',
@@ -35,7 +36,7 @@ function storedFrom(i: CreateContentInput, extra: Partial<StoredContentRow> = {}
     contentType: i.contentType!,
     contentFormat: i.contentFormat ?? null,
     contentBody: i.contentBody ?? null,
-    blobHash: i.blobHash ?? null,
+    blobCid: i.blobCid ?? null,
     reach: i.reach ?? null,
     tags: [...(i.tags ?? [])].reverse(), // storage returns tags in its own order
     metadata: i.metadata ?? null,
@@ -73,7 +74,7 @@ describe('decideSeedAction', () => {
     expect(d.patch.contentBody).toBe('# Lament, revised');
     expect(d.patch.metadata[SEED_HASH_KEY]).toBe(seedHashFor(changed));
     expect(d.patch).not.toHaveProperty('reach');
-    expect(d.patch).not.toHaveProperty('blobHash');
+    expect(d.patch).not.toHaveProperty('blobCid');
     expect(d.reachPatch).toBeUndefined();
     expect(d.unpatchable).toEqual([]);
   });
@@ -87,8 +88,8 @@ describe('decideSeedAction', () => {
     const noDesc = { ...input, description: undefined };
     const row = storedFrom(noDesc, {
       description: '', // conductor bootstrap stores "" for an absent description
-      blobHash: 'sha256-deploy-staged', // deploy-owned: repository authors none
-      metadata: { ...input.metadata, releaseChannel: 'dev', serverBlobHash: 'sha256-ssr' }, // other writers' keys
+      blobCid: CID_A, // deploy-owned: repository authors none
+      metadata: { ...input.metadata, releaseChannel: 'dev', serverBlobCid: CID_B }, // other writers' keys
     });
     expect(decideSeedAction(noDesc, found(row)).kind).toBe('unchanged');
   });
@@ -112,13 +113,13 @@ describe('decideSeedAction', () => {
   });
 
   it('names differences a PATCH cannot carry and never writes deploy-owned metadata', () => {
-    const authored = { ...input, blobHash: 'sha256-new', metadata: { ...input.metadata, serverBlobHash: 'x' } };
-    const row = storedFrom(input, { contentType: 'concept', blobHash: 'sha256-old' });
+    const authored = { ...input, blobCid: CID_C, metadata: { ...input.metadata, serverBlobCid: 'x' } };
+    const row = storedFrom(input, { contentType: 'concept', blobCid: CID_D });
     const d = decideSeedAction(authored, found(row));
     expect(d.kind).toBe('update');
     if (d.kind !== 'update') return;
-    expect(d.unpatchable).toEqual(['contentType', 'blobHash']);
-    expect(d.patch.metadata).not.toHaveProperty('serverBlobHash');
+    expect(d.unpatchable).toEqual(['contentType', 'blobCid']);
+    expect(d.patch.metadata).not.toHaveProperty('serverBlobCid');
   });
 
   it('unreadable (403 reach gate) → unverified, nothing written', () => {

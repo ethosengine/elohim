@@ -142,7 +142,7 @@ export interface CeremonyCustodyParams {
   providerArchetype: Archetype;
   receiverHumanId: string;
   receiverArchetype: Archetype;
-  blobHash: string;
+  blobCid: string;
   blobSizeBytes: number;
   collectiveCid: string;
 }
@@ -152,7 +152,7 @@ export interface CeremonyCustodyParams {
  * custody-blob pair (conductor boundary — MessagePack maps, NOT camelCase HTTP).
  *
  * `id` is a deterministic content-address of (provider_peer, receiver_peer,
- * blob_hash) so re-runs produce identical ids (DHT-level idempotent). The pair
+ * blob_cid) so re-runs produce identical ids (DHT-level idempotent). The pair
  * is scoped to the household collective via `in_scope_of`, and carries
  * `seedGeneration: 'ceremony'` provenance so views can distinguish ceremony
  * output from the retiring interim fixtures (spec §7).
@@ -172,7 +172,7 @@ export function buildCeremonyCustodyInput(p: CeremonyCustodyParams, peerIds?: Cu
   const provider = peerIds?.provider ?? deterministicPeerId(p.providerHumanId, p.providerArchetype);
   const receiver = peerIds?.receiver ?? deterministicPeerId(p.receiverHumanId, p.receiverArchetype);
   const idDigest = createHash('sha256')
-    .update(`${provider}|${receiver}|${p.blobHash}`)
+    .update(`${provider}|${receiver}|${p.blobCid}`)
     .digest('hex')
     .slice(0, 16);
   return {
@@ -180,14 +180,14 @@ export function buildCeremonyCustodyInput(p: CeremonyCustodyParams, peerIds?: Cu
     action: 'custody-blob',
     provider,
     receiver,
-    resource_classified_as: [p.blobHash],
+    resource_classified_as: [p.blobCid],
     resource_quantity_value: p.blobSizeBytes,
     resource_quantity_unit: 'B',
     in_scope_of: [p.collectiveCid],
     note: `household custody: ${p.providerHumanId} -> ${p.receiverHumanId}`,
     metadata_json: JSON.stringify({
       seedGeneration: 'ceremony',
-      blobHash: p.blobHash,
+      blobCid: p.blobCid,
       providerHumanId: p.providerHumanId,
       receiverHumanId: p.receiverHumanId,
     }),
@@ -881,7 +881,7 @@ async function main(): Promise<void> {
   const appIdPrefix = process.env.INSTALLED_APP_ID ?? 'elohim';
   const salt = process.env.HOUSEHOLD_SALT ?? 'f00df00df00df00df00df00df00df00d';
   const noncePrefix = process.env.HOUSEHOLD_NONCE_PREFIX ?? 'genesis';
-  const blobHash = process.env.CONTENT_BLOB_HASH ?? '';
+  const blobCid = process.env.CONTENT_BLOB_HASH ?? '';
   const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES ?? '0', 10);
 
   const conductorUrls = parseHouseholdConductorUrls(conductorUrlsRaw);
@@ -1185,7 +1185,7 @@ async function main(): Promise<void> {
   let custodyOk = 0;
   let custodyFail = 0;
 
-  const haveBlob = blobHash.length > 0 && blobSizeBytes > 0;
+  const haveBlob = blobCid.length > 0 && blobSizeBytes > 0;
   if (!haveBlob) {
     console.warn('[!] CONTENT_BLOB_HASH / CONTENT_BLOB_SIZE_BYTES unset — skipping custody mesh.');
   } else {
@@ -1215,7 +1215,7 @@ async function main(): Promise<void> {
           providerArchetype: provider.archetype,
           receiverHumanId: receiver.humanId,
           receiverArchetype: receiver.archetype,
-          blobHash,
+          blobCid,
           blobSizeBytes,
           collectiveCid,
         }, peerIds);

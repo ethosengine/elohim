@@ -21,7 +21,7 @@ export interface StoredContentRow {
   contentType: string;
   contentFormat?: string | null;
   contentBody?: string | null;
-  blobHash?: string | null;
+  blobCid?: string | null;
   reach?: string | null;
   tags?: string[] | null;
   metadata?: unknown;
@@ -85,7 +85,7 @@ export function deferToSteward(decision: SeedDecision, head: StoredHead | undefi
 
 /**
  * PATCH /db/content/{id} body for the authored fields that storage writes
- * diesel-direct. It must NEVER carry `reach`, `blobHash` or `serverBlobHash`:
+ * diesel-direct. It must NEVER carry `reach`, `blobCid` or `serverBlobCid`:
  * any of those routes the whole PATCH through the conductor
  * (`patch_needs_conductor`), which re-notarizes the entry — and on that path the
  * body and tags are not written at all.
@@ -101,7 +101,7 @@ export interface ContentFieldPatch {
 }
 
 /** Metadata keys a deploy (not the seeder) owns; never written by a seed PATCH. */
-const DEPLOY_OWNED_METADATA_KEYS = new Set(['serverBlobHash']);
+const DEPLOY_OWNED_METADATA_KEYS = new Set(['serverBlobCid']);
 
 function asObject(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -122,7 +122,7 @@ export function seedHashInputOf(input: CreateContentInput): SeedHashInput {
     contentType: input.contentType ?? 'concept',
     contentFormat: input.contentFormat ?? null,
     contentBody: input.contentBody ?? null,
-    blobHash: input.blobHash ?? null,
+    blobCid: input.blobCid ?? null,
     reach: input.reach ?? null,
     tags: input.tags ?? [],
     metadata: asObject(input.metadata),
@@ -145,7 +145,7 @@ export function seedHashFor(input: CreateContentInput): string {
  *
  * - `description` / `contentBody`: '' ⇄ null. A row re-published through the
  *   conductor bootstrap stores `description: ""` for an absent one.
- * - `blobHash`: when the repository authors none, a stored hash was linked by a
+ * - `blobCid`: when the repository authors none, a stored hash was linked by a
  *   deploy (stageSpaBlob) and is not the seeder's to compare.
  * - `metadata`: only the keys the repository authors are compared. A PATCH
  *   shallow-merges, so the seeder could never remove a key another writer
@@ -166,7 +166,7 @@ export function legacyHashInputOf(stored: StoredContentRow, authored: CreateCont
     contentType: stored.contentType,
     contentFormat: stored.contentFormat ?? null,
     contentBody: emptyToNull(stored.contentBody),
-    blobHash: authored.blobHash ? stored.blobHash ?? null : null,
+    blobCid: authored.blobCid ? stored.blobCid ?? null : null,
     reach: stored.reach ?? null,
     tags: stored.tags ?? [],
     metadata,
@@ -191,11 +191,11 @@ function fieldPatchFor(input: CreateContentInput, seedHash: string): ContentFiel
   return patch;
 }
 
-/** Authored differences no PATCH can write (contentType is not patchable; blobHash is deploy/conductor-owned). */
+/** Authored differences no PATCH can write (contentType is not patchable; blobCid is deploy/conductor-owned). */
 function unpatchableDiffs(input: CreateContentInput, stored: StoredContentRow): string[] {
   const diffs: string[] = [];
   if ((input.contentType ?? 'concept') !== stored.contentType) diffs.push('contentType');
-  if (input.blobHash && input.blobHash !== (stored.blobHash ?? undefined)) diffs.push('blobHash');
+  if (input.blobCid && input.blobCid !== (stored.blobCid ?? undefined)) diffs.push('blobCid');
   return diffs;
 }
 

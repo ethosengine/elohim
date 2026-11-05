@@ -299,14 +299,14 @@ done
 # ── 6. dht-fetch / head convergence (ADVISORY until scenario 2 is stable) ───
 # Compares the notarized head AND the bytes served under it. The head alone is
 # not the visitor's truth: on alpha (2026-09-19, edge/dev 1465) both doorways
-# reported one notarized headActionHash while serving two different blobHashes,
+# reported one notarized headActionHash while serving two different blobCids,
 # and this seam printed CONVERGED.
-read_head() { # doorway-url -> "<headActionHash>\t<blobHash>\t<updatedAt>", "?" for an unread field
+read_head() { # doorway-url -> "<headActionHash>\t<blobCid>\t<updatedAt>", "?" for an unread field
   curl -sS -m 20 "$1/db/content/elohim-host-landing/head" 2>/dev/null | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
-    print('\t'.join(str(d.get(k) or '?') for k in ('headActionHash', 'blobHash', 'updatedAt')))
+    print('\t'.join(str(d.get(k) or '?') for k in ('headActionHash', 'blobCid', 'updatedAt')))
 except Exception:
     print('?\t?\t?')
 " 2>/dev/null || printf '?\t?\t?\n'
@@ -316,7 +316,7 @@ IFS=$'\t' read -r hb bb_blob ub < <(read_head "$B")
 if [ "$ha" = "?" ] || [ "$hb" = "?" ] || [ "$ha" != "$hb" ]; then
   note dht-fetch "ADVISORY-DIVERGENT — A=$ha B=$hb (scenario-2 gap; gate this once green ×2)"
 elif [ "$ba_blob" = "?" ] || [ "$bb_blob" = "?" ]; then
-  note dht-fetch "ADVISORY-UNREAD-BYTES — head CONVERGED ($ha) but a served blobHash was unreadable (A=$ba_blob B=$bb_blob)"
+  note dht-fetch "ADVISORY-UNREAD-BYTES — head CONVERGED ($ha) but a served blobCid was unreadable (A=$ba_blob B=$bb_blob)"
 elif [ "$ba_blob" != "$bb_blob" ]; then
   note dht-fetch "ADVISORY-SAME-HEAD-DIFFERENT-BYTES — one notarized head ($ha), two blobs: A=$ba_blob ($ua) B=$bb_blob ($ub)"
 else
@@ -328,7 +328,7 @@ fi
 # doorways to EACH OTHER; this compares each doorway to its OWN ground truth:
 # `GET /db/content/{id}/head-record` (http.rs:9152-9304) serves THIS peer's
 # local DHT `Record` for its declared head, fetched through its own
-# conductor. A doorway can agree with its neighbor on head+blobHash at the
+# conductor. A doorway can agree with its neighbor on head+blobCid at the
 # projection layer while its own DHT entry never named that blob at all —
 # that is the shape 1.4a exists to make legible.
 #
@@ -400,7 +400,7 @@ if served.encode('utf-8') in decoded:
     raise SystemExit(0)
 candidates = sorted(set(
     m.decode('ascii', 'replace')
-    for m in re.findall(rb'sha256-[0-9a-fA-F]+', decoded)
+    for m in re.findall(rb'bafkr4i[a-z2-7]{52}', decoded)
     if m.decode('ascii', 'replace') != served
 ))
 if candidates:

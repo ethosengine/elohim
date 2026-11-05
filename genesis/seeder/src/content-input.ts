@@ -48,9 +48,7 @@ export interface ConceptJson {
   thumbnailUrl?: string;
   metadata?: Record<string, unknown>;
   // Blob references for html5-app and large content
-  blobHash?: string;       // Pre-computed hash (camelCase from JSON) — legacy sha256-<hex> /blob key
-  blob_hash?: string;      // Alternative snake_case format
-  blobCid?: string;        // Canonical CIDv1 (bafkrei… raw codec) address for the blob bytes
+  blobCid?: string;        // Byte-profile CIDv1 (bafkr4i… raw + blake3-256) address for the blob bytes
   entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
   stewardedBy?: Array<{ humanId: string; affinity: number; role: string }>;
 }
@@ -227,11 +225,11 @@ export interface BuildContentOptions {
   /** Account-package archetype advisory; may only RAISE the authored reach. */
   advisoryReach?: string;
   /**
-   * The blob hash actually linked for this row (uploaded or already present on
-   * the peer). Overrides the JSON's own `blobHash` when set — the seeder links
-   * the NORMALIZED hash of the blob it verified, not the raw JSON string.
+   * The blob CID actually linked for this row (uploaded or already present on
+   * the peer). Overrides the JSON's own `blobCid` when set — the seeder links
+   * the CID of the blob it verified, not the raw JSON string.
    */
-  blobHash?: string;
+  blobCid?: string;
 }
 
 /**
@@ -288,8 +286,7 @@ export function buildContentInput(json: ConceptJson, opts: BuildContentOptions =
     contentType: (json.contentType ?? 'concept') as ContentType,
     contentFormat: normalizeContentFormat(json.contentFormat),
     contentBody: contentBody ?? undefined,
-    blobHash: opts.blobHash ?? json.blobHash ?? json.blob_hash ?? undefined,
-    blobCid: json.blobCid ?? undefined,
+    blobCid: opts.blobCid ?? json.blobCid ?? undefined,
     contentSizeBytes: contentSizeBytes,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     reach: resolveContentReach(json, opts.advisoryReach),
@@ -412,8 +409,8 @@ export function chaptersToSections(json: PathJson): Section[] {
 }
 
 export interface BuildPathOptions {
-  /** Hash of the thumbnail blob actually linked for this path (uploaded or present). */
-  thumbnailHash?: string;
+  /** CID of the thumbnail blob actually linked for this path (uploaded or present). */
+  thumbnailCid?: string;
 }
 
 /**
@@ -450,7 +447,7 @@ export function buildPathInput(json: PathJson, opts: BuildPathOptions = {}): Cre
     reach: earnedReach({ authored: json.reach ?? json.visibility, advisory: undefined }),
     tags: json.tags || [],
   };
-  return applyPathThumbnail(input, opts.thumbnailHash);
+  return applyPathThumbnail(input, opts.thumbnailCid);
 }
 
 /** Count total items across a sections tree (for logging). */

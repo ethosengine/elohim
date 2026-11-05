@@ -230,10 +230,11 @@ cmd_mesh() {
 # ===========================================================================
 # upload — stage content blob + build-unique propagation probe blob
 # ===========================================================================
-upload_one() { # upload_one <file> <label> -> sets UP_HASH / UP_SIZE
+upload_one() { # upload_one <file> <label> -> sets UP_CID / UP_SIZE
   local file="$1" label="$2" status
   UP_SIZE="$(wc -c <"$file")"
-  UP_HASH="sha256-$(sha256sum "$file" | awk '{print $1}')"
+  # The byte-profile CID (bafkr4i…) — the one mint every CI script shares.
+  UP_CID="$(node "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/ci/lib/byte-cid.mjs" "$file")"
   # Bearer-gate (jenkins-seed-bearer-gate plan, Task 1): non-dev doorway requires
   # an Admin bearer on PUT /admin/seed/blob. The Jenkinsfile mints SEED_DOORWAY_TOKEN
   # (doorway-seed-ensure.sh) and exports it; dev/local runs leave it empty → no header →
@@ -245,12 +246,12 @@ upload_one() { # upload_one <file> <label> -> sets UP_HASH / UP_SIZE
   status="$(curl -s -o "$STATE_DIR/upload-$label.out" -w '%{http_code}' -m 30 \
     -X PUT "http://${INTERNAL_DOORWAY_URL}/admin/seed/blob" \
     "${auth_header[@]}" \
-    -H "X-Blob-Hash: $UP_HASH" \
+    -H "X-Content-Address: $UP_CID" \
     -H 'Content-Type: application/octet-stream' \
     --data-binary @"$file")"
   case "$status" in
-    200|201) pass "upload.$label" "$UP_HASH ($UP_SIZE bytes) → HTTP $status" ;;
-    409)     pass "upload.$label" "$UP_HASH ($UP_SIZE bytes) → HTTP 409 (already present, idempotent)" ;;
+    200|201) pass "upload.$label" "$UP_CID ($UP_SIZE bytes) → HTTP $status" ;;
+    409)     pass "upload.$label" "$UP_CID ($UP_SIZE bytes) → HTTP 409 (already present, idempotent)" ;;
     *)       fail "upload.$label" "HTTP $status — $(head -c 300 "$STATE_DIR/upload-$label.out" 2>/dev/null)" ;;
   esac
 }
@@ -266,7 +267,7 @@ cmd_upload() {
 
   [ -f "$content_path" ] || { fail "upload.content" "$content_path missing"; finish upload; return; }
   upload_one "$content_path" content
-  echo "$UP_HASH" >"$STATE_DIR/content_blob_hash"
+  echo "$UP_CID" >"$STATE_DIR/content_blob_cid"
   echo "$UP_SIZE" >"$STATE_DIR/content_blob_size"
 
   # Build-unique probe blob: its hash has never existed before this build, so
@@ -280,15 +281,15 @@ cmd_upload() {
     echo "nonce: $(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   } >"$probe"
   upload_one "$probe" probe
-  echo "$UP_HASH" >"$STATE_DIR/probe_blob_hash"
+  echo "$UP_CID" >"$STATE_DIR/probe_blob_cid"
   echo "$UP_SIZE" >"$STATE_DIR/probe_blob_size"
   note "probe blob is build-unique — a fossil copy on the target is impossible by construction"
 
   finish upload "$(jq -cn \
-    --arg c "$(cat "$STATE_DIR/content_blob_hash")" \
-    --arg p "$(cat "$STATE_DIR/probe_blob_hash")" \
+    --arg c "$(cat "$STATE_DIR/content_blob_cid")" \
+    --arg p "$(cat "$STATE_DIR/probe_blob_cid")" \
     --arg t "$(cat "$STATE_DIR/build_start_iso")" \
-    '{contentBlobHash:$c, probeBlobHash:$p, buildStartIso:$t}')"
+    '{contentBlobCid:$c, probeBlobCid:$p, buildStartIso:$t}')"
 }
 
 # ===========================================================================
@@ -296,8 +297,8 @@ cmd_upload() {
 # ===========================================================================
 cmd_propagation() {
   local source_peer="${SOURCE_PEER:-matthew}" target_peer="${TARGET_PEER:-jessica}"
-  local content_hash="${CONTENT_BLOB_HASH:-$(cat "$STATE_DIR/content_blob_hash" 2>/dev/null)}"
-  local probe_hash="${PROBE_BLOB_HASH:-$(cat "$STATE_DIR/probe_blob_hash" 2>/dev/null)}"
+  local content_hash="${CONTENT_BLOB_HASH:-$(cat "$STATE_DIR/content_blob_cid" 2>/dev/null)}"
+  local probe_hash="${PROBE_BLOB_HASH:-$(cat "$STATE_DIR/probe_blob_cid" 2>/dev/null)}"
   local timeout_secs="${PROPAGATION_TIMEOUT_SECS:-300}" poll_secs="${PROPAGATION_POLL_SECS:-15}"
   local src_url tgt_url
 
@@ -397,7 +398,7 @@ cmd_propagation() {
 
   finish propagation "$(jq -cn --arg c "$content_hash" --arg p "$probe_hash" \
     --arg w "$waited" --arg a "$attempts" --arg mm "${manifest_missing# }" \
-    '{contentBlobHash:$c, probeBlobHash:$p, waitedSecs:($w|tonumber), attempts:($a|tonumber), custodyManifestMissingOn:($mm|split(" ")|map(select(length>0)))}')"
+    '{contentBlobCid:$c, probeBlobCid:$p, waitedSecs:($w|tonumber), attempts:($a|tonumber), custodyManifestMissingOn:($mm|split(" ")|map(select(length>0)))}')"
 }
 
 # ===========================================================================

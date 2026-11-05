@@ -55,7 +55,7 @@ fail() { echo "not ok - $*" >&2; exit 1; }
 # The publish stub: STUB_PUBLISH selects the answer.
 cat > "${TEST_ROOT}/publish.sh" <<'SH'
 echo "publish $*" >> "${STUB_LOG}"
-echo "  · elohim-host-landing (browser): sha256-aaa (1K)"
+echo "  · elohim-host-landing (browser): bafkr4iaaa (1K)"
 case "${STUB_PUBLISH}" in
     published) echo "APP-RELEASE-PUBLISHED channel=runtime:app-bundle:alpha:dev release=bafyRelease1" ;;
     current)   echo "APP-RELEASE-CURRENT channel=runtime:app-bundle:alpha:dev release=uhCkkCurrent1" ;;

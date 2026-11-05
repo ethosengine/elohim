@@ -65,7 +65,7 @@
  *   (a) already measured with >= 1 stewarding collective → nothing to do
  *       (idempotent re-run, the common case).
  *   (b) `POST /db/content/bulk` re-declaring the SAME row with its existing
- *       `blobHash`. The bulk handler builds its `distribution_items` from the
+ *       `blobCid`. The bulk handler builds its `distribution_items` from the
  *       INPUT views before the "row exists → skip" branch, so an existing row
  *       is not touched (verified live: `{"inserted":0,"skipped":1}`) while the
  *       shard-manifest recorder and `distribute_shards` still run. This is the
@@ -79,7 +79,7 @@
  *
  * KNOWN CEILING of rung (b), measured on the household mesh 2026-08-21: every
  * manifest producer (`POST /db/content`, `/db/content/bulk`, `distribute_shards`,
- * `services::shard_manifest_backfill`) reads the blob via `blob_store.get(blob_hash)`
+ * `services::shard_manifest_backfill`) reads the blob via `blob_store.get(blob_cid)`
  * — the COMPOSITE object — but `PUT /admin/seed/blob` stores a blob larger than
  * `sharding::SINGLE_SHARD_MAX` as `encoding: "chunked"` shards with NO composite
  * under the blob hash. Only the serve path (`read_local_blob`) understands both
@@ -372,7 +372,7 @@ async function readCard(
   return (await response.json()) as HouseholdCard;
 }
 
-/** Read one content row (the source of the blobHash + reach leg 1 re-declares). */
+/** Read one content row (the source of the blobCid + reach leg 1 re-declares). */
 async function readContentRow(
   doorwayUrl: string,
   contentId: string,
@@ -478,9 +478,9 @@ export interface DistributionLegResult {
  * node records its shard manifest and runs `distribute_shards`.
  *
  * Deliberately re-declares only the fields the bulk handler reads for
- * distribution (`id`, `blobHash`, `blobCid`, `contentFormat`, `reach`) plus the
+ * distribution (`id`, `blobCid`, `contentFormat`, `reach`) plus the
  * NOT-NULL columns its insert path requires. The existing row is skipped, never
- * updated, so no field — notably the deploy-time `serverBlobHash`, which
+ * updated, so no field — notably the deploy-time `serverBlobCid`, which
  * `CreateContentInputView` cannot even express — can be clobbered by this call.
  */
 async function redeclareForDistribution(
@@ -494,15 +494,14 @@ async function redeclareForDistribution(
     title: row['title'] ?? String(row['id']),
     contentType: row['contentType'],
     contentFormat: row['contentFormat'],
-    blobHash: row['blobHash'],
     blobCid: row['blobCid'],
     reach: row['reach'] ?? 'commons',
   };
   for (const key of Object.keys(item)) {
     if (item[key] === null || item[key] === undefined) delete item[key];
   }
-  if (!item['blobHash']) {
-    return { ok: false, detail: 'content row declares no blobHash — nothing to distribute' };
+  if (!item['blobCid']) {
+    return { ok: false, detail: 'content row declares no blobCid — nothing to distribute' };
   }
 
   const response = await fetchImpl(`${storageUrl.replace(/\/+$/, '')}/db/content/bulk`, {
@@ -527,7 +526,7 @@ async function driveSeedShardManifestLever(
   storageUrl: string,
   contentId: string,
   reach: string,
-  blobHash: string,
+  blobCid: string,
   stewards: string[],
   totalSizeBytes: number,
   apiKey: string | undefined,
@@ -539,7 +538,7 @@ async function driveSeedShardManifestLever(
       'Content-Type': 'application/json',
       ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
     },
-    body: JSON.stringify({ contentId, reach, blobHash, stewards, totalSizeBytes }),
+    body: JSON.stringify({ contentId, reach, blobCid, stewards, totalSizeBytes }),
     signal: AbortSignal.timeout(30_000),
   });
   const text = await response.text();
@@ -613,12 +612,12 @@ export async function ensureDistributionMeasured(opts: {
     humans as { id?: string; agentPubKey?: string | null; householdId?: string | null }[],
     liveKeys,
   );
-  const blobHash = String(row['blobHash'] ?? '');
+  const blobCid = String(row['blobCid'] ?? '');
   const lever = await driveSeedShardManifestLever(
     opts.storageUrl,
     opts.contentId,
     String(row['reach'] ?? 'commons'),
-    blobHash,
+    blobCid,
     stewards,
     Number(row['contentSizeBytes'] ?? 0) || 0,
     opts.apiKey,

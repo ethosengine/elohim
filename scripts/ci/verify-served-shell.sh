@@ -14,7 +14,7 @@
 # the doorway, the head, the asset and the x-elohim-bundle marker it served.
 #
 # usage: verify-served-shell.sh <doorway-url> <mount-path> <slug> <expected-browser-head>
-#   e.g. verify-served-shell.sh https://elohim.host / elohim-host-landing sha256-e0e2f7…
+#   e.g. verify-served-shell.sh https://elohim.host / elohim-host-landing bafkr4ixxxx…
 set -euo pipefail
 DOORWAY="${1:?doorway url}"; MOUNT="${2:?mount path}"; SLUG="${3:?slug}"; HEAD_HASH="${4:?expected browser head}"
 DEADLINE_SECS="${DEADLINE_SECS:-90}"
@@ -35,8 +35,8 @@ CURL="python3 $ROOT/scripts/ci/same-doorway-curl.py -sS -m 15"
 # `auto` = read the declared browser head from the doorway's own content row (the edge
 # pipeline authors no head; it verifies whatever storage declares is what the doorway serves).
 if [ "$HEAD_HASH" = "auto" ]; then
-  HEAD_HASH=$($CURL "$DOORWAY/db/content/$SLUG" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("blobHash") or "")' 2>/dev/null || true)
-  [ -n "$HEAD_HASH" ] || { echo "✗ [$SLUG] $DOORWAY declares no browser head (/db/content/$SLUG has no blobHash)" >&2; exit 2; }
+  HEAD_HASH=$($CURL "$DOORWAY/db/content/$SLUG" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("blobCid") or "")' 2>/dev/null || true)
+  [ -n "$HEAD_HASH" ] || { echo "✗ [$SLUG] $DOORWAY declares no browser head (/db/content/$SLUG has no blobCid)" >&2; exit 2; }
 fi
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 

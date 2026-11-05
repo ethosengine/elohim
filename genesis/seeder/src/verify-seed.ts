@@ -23,6 +23,7 @@
 
 import { AdminWebsocket, AppWebsocket, type CellId } from '@holochain/client';
 import { SeedingVerification, ContentStats, PathIndex } from './verification.js';
+import { isByteCid } from './byte-cid.js';
 
 // =============================================================================
 // Configuration
@@ -234,7 +235,7 @@ async function main(): Promise<void> {
         const body = content.content.content;
 
         // Check if content body is a blob reference
-        if (body && (body.startsWith('sha256:') || body.startsWith('sha256-'))) {
+        if (isByteCid(body)) {
           blobRefsFound++;
           // Verify the blob exists via get_blob zome call
           try {
@@ -242,7 +243,7 @@ async function main(): Promise<void> {
               cell_id: cellId,
               zome_name: ZOME_NAME,
               fn_name: 'get_blob',
-              payload: { hash: body },
+              payload: { cid: body },
             });
             if (blob) {
               console.log(`   ✓ ${id} blob ref ${body.slice(0, 20)}... resolved`);

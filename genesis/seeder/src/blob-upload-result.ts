@@ -2,10 +2,10 @@
  * Blob-upload outcome bookkeeping.
  *
  * The seeder pre-uploads blob bytes (HTML5 apps, path thumbnails) before
- * stamping content rows with `blobHash` references. If we record the hash
+ * stamping content rows with `blobCid` references. If we record the CID
  * mapping for an upload that didn't actually land, downstream rows get
- * stamped with a dangling `blobHash` — the UI then tries to fetch
- * `/blob/<hash>` and 404s.
+ * stamped with a dangling `blobCid` — the UI then tries to fetch
+ * `/blob/<cid>` and 404s.
  *
  * The rule is simple: record the mapping only when the bytes are confirmed
  * present on the server (either pre-existing or just-uploaded). On failure,
@@ -14,8 +14,8 @@
  */
 
 export type BlobUploadOutcome =
-  | { kind: 'existed'; hash: string }
-  | { kind: 'uploaded'; hash: string }
+  | { kind: 'existed'; cid: string }
+  | { kind: 'uploaded'; cid: string }
   | { kind: 'failed' };
 
 /**
@@ -30,6 +30,6 @@ export function recordBlobUploadOutcome(
   if (outcome.kind === 'failed') {
     return false;
   }
-  map.set(key, outcome.hash);
+  map.set(key, outcome.cid);
   return true;
 }

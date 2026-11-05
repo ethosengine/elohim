@@ -42,7 +42,7 @@
     "evolution-of-trust",
     "manifesto"
   ],
-  "blobHash": "sha256-39aa132316c048afe4d5477b93221dd432effb78f565b3eb867016a383b66a4a",
+  "blobCid": "bafkr4ig3nzvfz2hly4hlpjignqc6eeidwbx56sqmgdoytwc75ysu4zn6ve",
   "metadata": {
     "category": "course-bundle",
     "author": "Matthew Dowell",
@@ -52,7 +52,7 @@
     "embedStrategy": "iframe",
     "localZipPath": "docs/content/fct/fct-course.zip",
     "localSourcePath": "docs/content/fct/fct-course",
-    "blobHash": "sha256-39aa132316c048afe4d5477b93221dd432effb78f565b3eb867016a383b66a4a",
+    "blobCid": "bafkr4ig3nzvfz2hly4hlpjignqc6eeidwbx56sqmgdoytwc75ysu4zn6ve",
     "requiredCapabilities": [],
     "securityPolicy": {
       "sandbox": [

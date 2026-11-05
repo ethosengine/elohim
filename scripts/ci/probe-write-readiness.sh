@@ -4,7 +4,7 @@
 #
 # WHY THIS EXISTS
 #   The app deploy stages each SPA bundle per host (PUT /admin/seed/blob then
-#   PATCH /db/content/{slug} to set blobHash -> the SPA mount). When a host's
+#   PATCH /db/content/{slug} to set blobCid -> the SPA mount). When a host's
 #   storage backend is wedged — the conductor's DHT get_links timing out, the
 #   notarize write path 503ing — every stage leg fails and the host is left
 #   serving a STALE bundle (the elohim.host-404 class). /health is too SHALLOW

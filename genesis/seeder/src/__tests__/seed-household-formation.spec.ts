@@ -7,6 +7,7 @@ import {
 import {
   clearPeerIdCache, deterministicPeerId, resolvePeerId, storageUrlForHuman,
 } from '../peer-id.js';
+import { CID_A } from './fixture-cids.js';
 
 describe('parseHouseholdConductorUrls', () => {
   it('resolves named CONDUCTOR_URLS entries (local just-mesh form) to bare URLs', () => {
@@ -56,7 +57,7 @@ describe('buildCeremonyCustodyInput', () => {
     const input = buildCeremonyCustodyInput({
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
-      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      blobCid: CID_A, blobSizeBytes: 64,
       collectiveCid: 'collective:uhCkkFAKE',
     });
     expect(input.action).toBe('custody-blob');
@@ -78,13 +79,13 @@ describe('buildCeremonyCustodyInput', () => {
     const input = buildCeremonyCustodyInput({
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
-      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      blobCid: CID_A, blobSizeBytes: 64,
       collectiveCid: 'collective:uhCkkFAKE',
     }, peerIds);
     expect(input.provider).toBe(peerIds.provider);
     expect(input.receiver).toBe(peerIds.receiver);
     const expectedDigest = createHash('sha256')
-      .update(`${peerIds.provider}|${peerIds.receiver}|sha256-deadbeef`)
+      .update(`${peerIds.provider}|${peerIds.receiver}|${CID_A}`)
       .digest('hex')
       .slice(0, 16);
     expect(input.id).toBe(`custody-blob-${expectedDigest}`);
@@ -125,7 +126,7 @@ describe('buildCeremonyCustodyInput', () => {
     const input = buildCeremonyCustodyInput({
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
-      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      blobCid: CID_A, blobSizeBytes: 64,
       collectiveCid: 'collective:uhCkkFAKE',
     }, custodyPeerIds);
 
@@ -150,7 +151,7 @@ describe('buildCeremonyCustodyInput', () => {
     const input = buildCeremonyCustodyInput({
       providerHumanId: 'human-jessica-spouse', providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager', receiverArchetype: 'desktop',
-      blobHash: 'sha256-deadbeef', blobSizeBytes: 64,
+      blobCid: CID_A, blobSizeBytes: 64,
       collectiveCid: 'collective:uhCkkFAKE',
     });
     expect(input.provider).toBe(deterministicPeerId('human-jessica-spouse', 'desktop'));

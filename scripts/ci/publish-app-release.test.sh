@@ -23,6 +23,7 @@ SCRIPT="${REPO_ROOT}/scripts/ci/publish-app-release.sh"
 TEST_ROOT="$(mktemp -d)"
 SERVER_PID=""
 CHANNEL="runtime:app-bundle:alpha:dev"
+export BYTE_CID_MJS="${REPO_ROOT}/scripts/ci/lib/byte-cid.mjs"
 
 cleanup() {
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
@@ -73,7 +74,7 @@ bundle_zip() {
     mkdir -p "$3"
     BUNDLE_ZIP_ARCHIVE="$3/$2.zip"
     printf 'zip of %s' "$1" > "${BUNDLE_ZIP_ARCHIVE}"
-    BUNDLE_ZIP_HASH="sha256-$(sha256sum "${BUNDLE_ZIP_ARCHIVE}" | awk '{print $1}')"
+    BUNDLE_ZIP_CID="$(node "${BYTE_CID_MJS}" "${BUNDLE_ZIP_ARCHIVE}")"
     BUNDLE_ZIP_SIZE="1K"
 }
 SH
@@ -108,11 +109,12 @@ grep -q "channel create ${CHANNEL}" <<<"$out" || fail "absent channel: the refus
 [ ! -e "${TEST_ROOT}/tsx.log" ] || fail "absent channel: nothing may be packaged or published"
 echo "ok 1 - an absent channel is refused before anything is packaged"
 
-# The digests this build produces, as the stub zips them.
+# The byte CIDs this build produces, as the stub zips them.
 shas=""
 for spec in ${BUNDLES}; do
   IFS=':' read -r _ kind dist _ <<<"${spec}"
-  shas="${shas}\"$(printf 'zip of %s' "${dist}" | sha256sum | awk '{print $1}')\","
+  printf 'zip of %s' "${dist}" > "${TEST_ROOT}/probe.bin"
+  shas="${shas}\"$(node "${BYTE_CID_MJS}" "${TEST_ROOT}/probe.bin")\","
 done
 shas="[${shas%,}]"
 
@@ -121,7 +123,7 @@ node -e '
   const shas = JSON.parse(process.argv[1]);
   process.stdout.write(JSON.stringify({ id: process.argv[2], reach: "commons",
     metadata: { kind: "release-manifest", manifest: { artifactClass: "app-bundle",
-      artifacts: shas.map(sha256 => ({ sha256 })) } } }));
+      artifacts: shas.map(blobCid => ({ blobCid })) } } }));
 ' "${shas}" "${CHANNEL}" > "${TEST_ROOT}/routes/${CHANNEL//:/_}.json"
 echo '{"headActionHash":"uhCkkCurrentRelease"}' > "${TEST_ROOT}/routes/${CHANNEL//:/_}.head.json"
 rm -f "${TEST_ROOT}/tsx.log"
@@ -135,7 +137,7 @@ echo "ok 2 - a release carrying exactly these digests is current, and nothing is
 node -e '
   process.stdout.write(JSON.stringify({ id: process.argv[1], reach: "commons",
     metadata: { kind: "release-manifest", manifest: { artifactClass: "app-bundle",
-      artifacts: [{ sha256: "0".repeat(64) }] } } }));
+      artifacts: [{ blobCid: "bafkr4i" + "a".repeat(52) }] } } }));
 ' "${CHANNEL}" > "${TEST_ROOT}/routes/${CHANNEL//:/_}.json"
 rm -f "${TEST_ROOT}/tsx.log"
 out="$(run 2>&1)" || fail "new release: expected exit 0: $out"

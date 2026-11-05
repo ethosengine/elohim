@@ -1,7 +1,7 @@
 // sync-cid-artifacts.ts
 //
 // Re-earns the reach of every CID-addressed content artifact by re-deriving its
-// three source-tracked fields (content, blobHash, blobCid) from the current
+// two source-tracked fields (content, blobCid) from the current
 // source .md — the fix side of the guard in cid-artifact-integrity.spec.ts.
 //
 // Authoring happens freely in the working tree (edit the source .md). This tool
@@ -42,7 +42,7 @@ for (const a of scanCidArtifacts(CONTENT_DIR, DOCS_ROOT)) {
     process.exitCode = 1;
     continue;
   }
-  const fields = (['content', 'blobHash', 'blobCid'] as const).filter((k) => a.drift[k]);
+  const fields = (['content', 'blobCid'] as const).filter((k) => a.drift[k]);
   if (fields.length === 0) {
     console.log(`  ${a.file}: in sync ✓`);
     continue;

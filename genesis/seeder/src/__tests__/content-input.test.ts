@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildContentInput, buildPathInput, chaptersToSections, type PathJson } from '../content-input.js';
+import { CID_A, CID_B } from './fixture-cids.js';
 
 describe('chaptersToSections', () => {
   it('Shape 1: chapters -> modules -> sections -> conceptIds (lessons from sections)', () => {
@@ -124,7 +125,7 @@ describe('buildPathInput', () => {
   it('builds an epr-composite path row and links the thumbnail it is given', () => {
     const input = buildPathInput(
       { id: 'p', title: 'P', reach: 'commons', thumbnailUrl: '/images/p.png', tags: ['t'], conceptIds: ['a'] },
-      { thumbnailHash: 'sha256-abc' },
+      { thumbnailCid: CID_A },
     );
     expect(input).toMatchObject({
       id: 'p',
@@ -132,8 +133,8 @@ describe('buildPathInput', () => {
       contentFormat: 'epr-composite',
       reach: 'commons',
       tags: ['t'],
-      blobHash: 'sha256-abc',
-      metadata: { thumbnailUrl: '/blob/sha256-abc' },
+      blobCid: CID_A,
+      metadata: { thumbnailUrl: `/blob/${CID_A}` },
     });
     expect(JSON.parse(input.contentBody!).sections).toHaveLength(1);
   });
@@ -144,12 +145,12 @@ describe('buildPathInput', () => {
 });
 
 describe('buildContentInput', () => {
-  it('prefers the linked blob hash over the JSON string and lets an advisory raise reach', () => {
+  it('prefers the linked blob CID over the JSON string and lets an advisory raise reach', () => {
     const input = buildContentInput(
-      { id: 'app', title: 'App', contentFormat: 'html5-app', blobHash: 'abc', reach: 'community' },
-      { blobHash: 'sha256-abc', advisoryReach: 'commons' },
+      { id: 'app', title: 'App', contentFormat: 'html5-app', blobCid: CID_B, reach: 'community' },
+      { blobCid: CID_A, advisoryReach: 'commons' },
     );
-    expect(input.blobHash).toBe('sha256-abc');
+    expect(input.blobCid).toBe(CID_A);
     expect(input.reach).toBe('commons');
     expect(input.contentFormat).toBe('html5-app');
   });

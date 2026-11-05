@@ -924,9 +924,9 @@ if ! bundle_zip "$DIST_DIR" "$KIND" "$package_dir"; then
     exit 2
 fi
 SPA_ARCHIVE="$BUNDLE_ZIP_ARCHIVE"
-SPA_HASH="$BUNDLE_ZIP_HASH"
+SPA_CID="$BUNDLE_ZIP_CID"
 SPA_SIZE="$BUNDLE_ZIP_SIZE"
-echo "[${SLUG}] blob hash: ${SPA_HASH}"
+echo "[${SLUG}] blob CID: ${SPA_CID}"
 echo "[${SLUG}] blob size: ${SPA_SIZE}"
 
 # Optional hand-off for the caller (Track-4 T4-2 verify-projected-head.sh):
@@ -936,7 +936,7 @@ echo "[${SLUG}] blob size: ${SPA_SIZE}"
 # authoring host already established is byte-reproducible across calls given
 # an unchanged dist dir — see authorHeadOnce/stageSpaBlobs commentary).
 if [ -n "${HASH_OUTPUT_FILE:-}" ]; then
-    echo "${SPA_HASH}" > "${HASH_OUTPUT_FILE}"
+    echo "${SPA_CID}" > "${HASH_OUTPUT_FILE}"
 fi
 
 # Publish the content-addressed hash for the post-stage serve-verify (deploy
@@ -948,22 +948,22 @@ fi
 # and continues (the serve-verify degrades) — it must never abort a stage that
 # would otherwise land, even under set -e.
 if [ -n "${STAGE_HASH_OUT:-}" ]; then
-    if ! printf '%s\n' "${SPA_HASH}" > "${STAGE_HASH_OUT}" 2>/dev/null; then
+    if ! printf '%s\n' "${SPA_CID}" > "${STAGE_HASH_OUT}" 2>/dev/null; then
         echo "  ⊘ WARN: could not publish staged hash to STAGE_HASH_OUT='${STAGE_HASH_OUT}' — serve-verify will degrade to serves-200 + non-null checks" >&2
     fi
 fi
 
-# Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobHash on
+# Field-by-kind (SSR row collapse): KIND=server PATCHes/reads serverBlobCid on
 # the ONE elohim-host-landing EPR node (not a separate -ssr row); KIND=browser
-# stays blobHash. Both ride db/content/{slug} with identical partial-update
+# stays blobCid. Both ride db/content/{slug} with identical partial-update
 # semantics — PATCHing one field never clobbers the other.
 if [ "$KIND" = "server" ]; then
-    HASH_FIELD="serverBlobHash"
+    CID_FIELD="serverBlobCid"
 else
-    HASH_FIELD="blobHash"
+    CID_FIELD="blobCid"
 fi
 
-# Single notarized head. The blobHash PATCH is a DNA-notarized write
+# Single notarized head. The blobCid PATCH is a DNA-notarized write
 # (storage's patch_needs_conductor=true). The head is authored ONCE: this PATCH
 # is routed through a doorway to a storage backend that has a live conductor
 # bridge; the CONDUCTOR authors the DHT entry and the peer network (the
@@ -986,7 +986,7 @@ PATCH_PATH="/db/content/${SLUG}"
 # `|| return 1`, letting the retry loop below catch transient failures.
 #
 # 1. Upload ZIP as blob via doorway's seed-blob route.
-#    Why /admin/seed/blob and not /blob/{hash}: doorway's forward_blob_to_storage
+#    Why /admin/seed/blob and not /blob/{cid}: doorway's forward_blob_to_storage
 #    (storage_proxy.rs) is a read-through cache that hardcodes client.get() — PUT
 #    requests get silently downgraded to GET, storage returns 404 on the
 #    not-yet-uploaded hash, the build fails with curl exit 22. /admin/seed/blob
@@ -1030,7 +1030,7 @@ stage_once() {
     : > "${put_headers_file}"
     put_status="$(curl -sS -D "${put_headers_file}" -o "${put_body_file}" -w '%{http_code}' -X PUT \
         -H 'Content-Type: application/zip' \
-        -H "X-Blob-Hash: ${SPA_HASH}" \
+        -H "X-Content-Address: ${SPA_CID}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary "@$SPA_ARCHIVE" \
         "${DOORWAY_EPR_URL}/admin/seed/blob" 2>/dev/null)" || put_rc=$?
@@ -1092,7 +1092,7 @@ stage_once() {
         echo "  ✓ [${SLUG}] blob uploaded and storage forward CONFIRMED (via /admin/seed/blob)"
     elif [ "${put_rc}" -eq 55 ] || [ "${put_rc}" -eq 56 ]; then
         # AFFIRMATIVE STORAGE EVIDENCE ONLY (2026-09-21). This arm used to accept
-        # a successful `GET /blob/{hash}` as proof the bytes were stored. They are
+        # a successful `GET /blob/{cid}` as proof the bytes were stored. They are
         # not the same claim: that GET is cache-first (routes/blob.rs tries
         # `ctx.cache` before ever asking storage), so the doorway's own cache
         # answers it. The only affirmative evidence reachable from CI is the
@@ -1102,8 +1102,8 @@ stage_once() {
         #      the doorway answers before reading the body — the very behaviour
         #      that breaks the big upload — so the empty probe cannot break the
         #      same way, and it re-runs the forward and reports it. If the doorway
-        #      does NOT hold the bytes, the empty body fails the hash check and
-        #      answers 409 BEFORE anything is cached (seed.rs checks the hash
+        #      does NOT hold the bytes, the empty body fails the CID check and
+        #      answers 409 BEFORE anything is cached (seed.rs checks the CID
         #      before `cache.set`), so the probe is side-effect-free.
         #   3. Anything else re-offers. Never exit 0 on cache-only evidence.
         if ! forward_confirmed "${put_body_file}"; then
@@ -1112,7 +1112,7 @@ stage_once() {
             : > "${probe_body_file}"
             probe_status="$(curl -sS -o "${probe_body_file}" -w '%{http_code}' -X PUT \
                 -H 'Content-Type: application/zip' \
-                -H "X-Blob-Hash: ${SPA_HASH}" \
+                -H "X-Content-Address: ${SPA_CID}" \
                 -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
                 --data-binary '' \
                 "${DOORWAY_EPR_URL}/admin/seed/blob" 2>/dev/null)" || probe_rc=$?
@@ -1136,7 +1136,7 @@ stage_once() {
             fi
         fi
         if forward_confirmed "${put_body_file}"; then
-            echo "  ✓ [${SLUG}] blob stored (re-PUT short-circuited by the doorway cache; storage forward CONFIRMED for ${SPA_HASH})"
+            echo "  ✓ [${SLUG}] blob stored (re-PUT short-circuited by the doorway cache; storage forward CONFIRMED for ${SPA_CID})"
         else
             put_face="$(not_ready_face "${put_status}" "${put_body_file}" "${put_response}")"
             if [ -n "${put_face}" ]; then
@@ -1144,7 +1144,7 @@ stage_once() {
                 CELL_FACE="${put_face}"; CELL_RETRY_AFTER=""
                 return 4
             fi
-            echo "  ✗ [${SLUG}] PUT broke (curl ${put_rc}) and no answer CONFIRMS storage accepted ${SPA_HASH} — a doorway cache hit is not that proof; re-offering" >&2
+            echo "  ✗ [${SLUG}] PUT broke (curl ${put_rc}) and no answer CONFIRMS storage accepted ${SPA_CID} — a doorway cache hit is not that proof; re-offering" >&2
             return 1
         fi
     else
@@ -1160,9 +1160,9 @@ stage_once() {
     # bundles are judged by the renderer, slice 2.
     if [ "${KIND}" = "browser" ]; then
         local gate_rc=0
-        bash "$(dirname "$0")/deliverability-gate.sh" "${DOORWAY_EPR_URL}" "${SPA_HASH}" || gate_rc=$?
+        bash "$(dirname "$0")/deliverability-gate.sh" "${DOORWAY_EPR_URL}" "${SPA_CID}" || gate_rc=$?
         if [ "${gate_rc}" -eq 2 ] || [ "${gate_rc}" -eq 3 ]; then
-            echo "BROKEN_HEAD ${SLUG} ${KIND} ${SPA_HASH}" > "${DELIVERABILITY_VERDICT_FILE:-/dev/null}" 2>/dev/null || true
+            echo "BROKEN_HEAD ${SLUG} ${KIND} ${SPA_CID}" > "${DELIVERABILITY_VERDICT_FILE:-/dev/null}" 2>/dev/null || true
             return 2
         elif [ "${gate_rc}" -ne 0 ]; then
             echo "  ⚠ [${SLUG}] deliverability gate could not run (rc=${gate_rc}) — proceeding unjudged (advisory)" >&2
@@ -1194,9 +1194,9 @@ stage_once() {
         if ! patch_status=$(curl -sS -D "${patch_headers_file}" -o "${patch_body_file}" -w '%{http_code}' -X PATCH \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
-            -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
+            -d "{\"${CID_FIELD}\":\"${SPA_CID}\"}" \
             "${DOORWAY_EPR_URL}${PATCH_PATH}" 2>"${STAGE_TMP_DIR}/patch-stderr"); then
-            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} curl error: $(cat "${STAGE_TMP_DIR}/patch-stderr" 2>/dev/null)" >&2
+            echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH via ${DOORWAY_EPR_URL} curl error: $(cat "${STAGE_TMP_DIR}/patch-stderr" 2>/dev/null)" >&2
             return 1
         fi
         case "${patch_status}" in
@@ -1238,58 +1238,58 @@ stage_once() {
                     if [ -n "${retry_after}" ]; then
                         RETRY_AFTER_HINT="${retry_after}"
                     fi
-                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} shed (HTTP ${patch_status}${retry_after:+, retryAfter=${retry_after}s}): ${patch_body}" >&2
+                    echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH via ${DOORWAY_EPR_URL} shed (HTTP ${patch_status}${retry_after:+, retryAfter=${retry_after}s}): ${patch_body}" >&2
                     return 1
                     ;;
                 4*)
                     if printf '%s' "${patch_body}" | grep -q "not retrievable"; then
-                        echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} — target not retrievable yet (HTTP ${patch_status}): ${patch_body}" >&2
+                        echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH via ${DOORWAY_EPR_URL} — target not retrievable yet (HTTP ${patch_status}): ${patch_body}" >&2
                         return 1
                     fi
-                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed structurally (HTTP ${patch_status}): ${patch_body}" >&2
+                    echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH via ${DOORWAY_EPR_URL} failed structurally (HTTP ${patch_status}): ${patch_body}" >&2
                     return 3
                     ;;
                 *)
-                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed (HTTP ${patch_status}): ${patch_body}" >&2
+                    echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH via ${DOORWAY_EPR_URL} failed (HTTP ${patch_status}): ${patch_body}" >&2
                     return 1
                     ;;
             esac
         fi
-        echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
+        echo "  ✓ patched ${SLUG} (${CID_FIELD})"
         local authored_action
         authored_action=$(printf '%s' "${patch_body}" \
             | sed -n 's/.*"dhtAnchorHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
         if [ -z "${authored_action}" ]; then
-            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH returned no dhtAnchorHash: ${patch_body}" >&2
+            echo "  ✗ [${SLUG}] ${CID_FIELD} PATCH returned no dhtAnchorHash: ${patch_body}" >&2
             return 3
         fi
         echo "[${SLUG}] authored action: ${authored_action}"
 
         local actual
         actual=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
-            | HASH_FIELD="${HASH_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['HASH_FIELD'],''))") || return 1
-        if [ "${actual}" != "${SPA_HASH}" ]; then
+            | CID_FIELD="${CID_FIELD}" python3 -c "import os, sys, json; print(json.load(sys.stdin).get(os.environ['CID_FIELD'],''))") || return 1
+        if [ "${actual}" != "${SPA_CID}" ]; then
             local earned_head=""
             earned_head=$(curl -fSs \
                 -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
                 "${DOORWAY_EPR_URL}/db/content/${SLUG}/head" \
                 2>/dev/null \
-                | AUTHORED_ACTION="${authored_action}" SPA_HASH="${SPA_HASH}" python3 -c '
+                | AUTHORED_ACTION="${authored_action}" SPA_CID="${SPA_CID}" python3 -c '
 import os, sys, json
 head = json.load(sys.stdin)
 if (head.get("earned") is True
         and head.get("stagingCandidate") == os.environ["AUTHORED_ACTION"]
-        and head.get("stagingCandidateBlobHash") == os.environ["SPA_HASH"]):
+        and head.get("stagingCandidateBlobCid") == os.environ["SPA_CID"]):
     print(head.get("headActionHash") or "")
 ' 2>/dev/null) || earned_head=""
             if [ -n "${earned_head}" ]; then
-                echo "  ✓ [${SLUG}] staged beneath earned head ${earned_head}; candidate ${authored_action} carries ${SPA_HASH}"
+                echo "  ✓ [${SLUG}] staged beneath earned head ${earned_head}; candidate ${authored_action} carries ${SPA_CID}"
             else
-                echo "  ✗ [${SLUG}] ${HASH_FIELD} drift after PATCH: expected ${SPA_HASH}, got ${actual:-<empty>}" >&2
+                echo "  ✗ [${SLUG}] ${CID_FIELD} drift after PATCH: expected ${SPA_CID}, got ${actual:-<empty>}" >&2
                 return 1
             fi
         else
-            echo "  ✓ verified ${SLUG} ${HASH_FIELD} = ${SPA_HASH}"
+            echo "  ✓ verified ${SLUG} ${CID_FIELD} = ${SPA_CID}"
         fi
 
         # 3. Declare the CROSS-ROOT canonical head (staging tier) — ADVISORY.
@@ -1383,7 +1383,7 @@ if (head.get("earned") is True
         echo "  ⊘ [${SLUG}] byte-seed only (DO_PATCH!=1) — no head PATCH from this call."
         echo "    The single notarized head is authored once via a conductor-bridged"
         echo "    doorway; this peer converges it via run_content_sweep. Blob bytes"
-        echo "    uploaded and content-addressable via PUT /blob/${SPA_HASH}."
+        echo "    uploaded and content-addressable via PUT /blob/${SPA_CID}."
     fi
     return 0
 }
@@ -1393,7 +1393,7 @@ if (head.get("earned") is True
 # — the old fixed-3-attempts ladder (5s, 10s backoff) spent only 15s total
 # before declaring the host STALE, inside the single ~30s catching-up window
 # the peer advertised (elohim #1710, 2026-09-13: byte upload succeeded, the
-# blobHash/serverBlobHash PATCH shed with {"status":"catching-up",
+# blobCid/serverBlobCid PATCH shed with {"status":"catching-up",
 # "retryAfter":30,...} on both alpha and elohim.host, and the ladder gave up
 # before the window it was told about even closed). STAGE_BLOB_ATTEMPTS is a
 # safety-net CEILING on attempt count on top of the budget (default 60 — see
@@ -1417,7 +1417,7 @@ while true; do
     # still managed to dispatch at 0, 10 and 40s. With no window open this is
     # always true and this loop behaves exactly as it did.
     if ! readiness_may_start; then
-        cell_ready_exhausted "${CELL_FACE:-not-ready} re-offer (${HASH_FIELD} leg)" \
+        cell_ready_exhausted "${CELL_FACE:-not-ready} re-offer (${CID_FIELD} leg)" \
             "${CELL_STATUS}" "${CELL_BODY}" "${CELL_FACE}" \
             "$(( $(date +%s) - CELL_READY_FIRST_SEEN ))"
         echo "ERROR: [${SLUG}] this run's readiness deadline was reached before another attempt could be offered to ${DOORWAY_EPR_URL} — host left STALE" >&2
@@ -1442,7 +1442,7 @@ while true; do
     # mode) is not a transport blip — retrying re-asks a question the peer has
     # already answered. Terminal, immediately, never counted against the budget.
     if [ "${rc}" -eq 2 ]; then
-        echo "ERROR: [${SLUG}] the peer judged ${SPA_HASH} BROKEN — not retrying a deterministic verdict" >&2
+        echo "ERROR: [${SLUG}] the peer judged ${SPA_CID} BROKEN — not retrying a deterministic verdict" >&2
         exit 2
     fi
     # A structural 4xx (not 429, not the "not retrievable" DHT-lag class) is
@@ -1461,7 +1461,7 @@ while true; do
     # nap still let a slow readiness probe eat the transport budget it was
     # supposed to be separate from.
     if [ "${rc}" -eq 4 ]; then
-        if cell_ready_wait "${CELL_FACE:-not-ready} re-offer (${HASH_FIELD} leg)" \
+        if cell_ready_wait "${CELL_FACE:-not-ready} re-offer (${CID_FIELD} leg)" \
             "${CELL_STATUS}" "${CELL_BODY}" "${CELL_FACE}" "${CELL_RETRY_AFTER}"; then
             start_ts=$(( start_ts + $(date +%s) - attempt_start_ts ))
             continue

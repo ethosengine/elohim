@@ -18,6 +18,7 @@ import {
   seedNetworkStakes,
 } from '../corpus-trust.js';
 import { findCorpusDirs, validateCorpora } from '../validate-corpora.js';
+import { CID_A, CID_B } from './fixture-cids.js';
 
 const SRC = '/fixture/corpus.json';
 
@@ -141,7 +142,7 @@ describe('parseCorpusDeclaration — fail-closed on absent grant', () => {
     expect(d.trustBootstrap).toBeUndefined();
 
     const artifact = buildStakesDeclaration(
-      { declaration: d, sourcePath: SRC, sha256: 'a'.repeat(64) },
+      { declaration: d, sourcePath: SRC, cid: CID_A },
       { seedTarget: 'http://localhost:8888', declaredBy: 'genesis/data/lamad/corpus.json' },
     );
     expect(artifact).toBeNull();
@@ -248,13 +249,13 @@ describe('loadCorpusDeclaration', () => {
     const loaded = loadCorpusDeclaration(dir)!;
     expect(loaded.declaration.id).toBe('genesis-lamad');
     expect(loaded.sourcePath).toBe(path.join(dir, CORPUS_DECLARATION_FILE));
-    expect(loaded.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(loaded.cid).toMatch(/^bafkr4i[a-z2-7]{52}$/);
   });
 
   it('fingerprint changes when the bytes change', () => {
     const a = loadCorpusDeclaration(tempCorpus(decl()))!;
     const b = loadCorpusDeclaration(tempCorpus(decl({ title: 'Other' })))!;
-    expect(a.sha256).not.toBe(b.sha256);
+    expect(a.cid).not.toBe(b.cid);
   });
 
   it('throws (never silently downgrades) when an existing declaration is invalid', () => {
@@ -271,7 +272,7 @@ describe('buildStakesDeclaration / emitStakesDeclaration', () => {
   const loaded = () => ({
     declaration: parseCorpusDeclaration(decl(), SRC),
     sourcePath: SRC,
-    sha256: 'b'.repeat(64),
+    cid: CID_B,
   });
 
   it('builds the artifact on the Q6 contract', () => {
@@ -285,7 +286,7 @@ describe('buildStakesDeclaration / emitStakesDeclaration', () => {
     expect(artifact).toEqual({
       schemaVersion: '1',
       manifestKind: 'network-stakes',
-      manifestCid: `stakes:genesis-lamad:sha256-${'b'.repeat(64)}`,
+      manifestCid: `stakes:genesis-lamad:${CID_B}`,
       stakes: {
         stage: 'simulacra',
         scope: 'genesis-lamad',
@@ -295,7 +296,7 @@ describe('buildStakesDeclaration / emitStakesDeclaration', () => {
       corpus: { corpusId: 'genesis-lamad', title: 'Genesis Lamad Corpus', realismRung: 0, itemsDeclared: 3432 },
       provenance: {
         declaredBy: 'genesis/data/lamad/corpus.json',
-        declarationSha256: 'b'.repeat(64),
+        declarationCid: CID_B,
         mintedBy: 'genesis-seeder',
         mintedAt: '2026-08-16T12:00:00.000Z',
         seedTarget: 'http://localhost:8888',
@@ -422,7 +423,7 @@ describe('seedNetworkStakes — the Q6 write-route fan-out', () => {
       {
         declaration: parseCorpusDeclaration(decl(), SRC),
         sourcePath: SRC,
-        sha256: 'b'.repeat(64),
+        cid: CID_B,
       },
       {
         seedTarget: 'http://localhost:8888',

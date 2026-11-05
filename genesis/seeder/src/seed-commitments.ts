@@ -6,7 +6,7 @@
  * the custody-facing fold expects:
  *   action = "custody-blob"
  *   provider, receiver = Holochain agent keys (uhCAk…)
- *   resource_classified_as = "sha256-<blob_hash>"
+ *   resource_classified_as = "<blob_cid>"  (byte-profile CID, bafkr4i…)
  *   resource_quantity_value = bytes count
  *
  * Drift in any of these fields = views silently filter out the row.
@@ -41,6 +41,7 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DoorwayClient } from './doorway-client.js';
+import { byteCid, isByteCid } from './byte-cid.js';
 import { storageUrlForHuman, type Archetype, type ResolvePeerIdOptions } from './peer-id.js';
 import { resolveNodeIdentity, type NodeIdentityResolver } from './node-identity.js';
 
@@ -109,22 +110,23 @@ export interface CustodyPair {
   receiverHumanId: string;
   receiverArchetype: Archetype;
   /**
-   * Exact blob-store address — raw hex (no prefix), or full "sha256-<hex>".
+   * Exact blob-store address — the byte-profile CID (`bafkr4i…`); no other
+   * spelling is accepted.
    * Mutually exclusive with `contentId`: declare exactly one. This is the
    * canonical custody join key when the caller already knows the artifact.
    */
-  blobHash?: string;
+  blobCid?: string;
   /**
    * Content id to resolve at seed time against the PROVIDER's storage pod.
    * `artifactRole` is mandatory with this field because a content row may
-   * intentionally name two DIFFERENT artifacts: `blobHash` is the browser /
-   * primary content blob; `serverBlobHash` is the optional Angular SSR server
+   * intentionally name two DIFFERENT artifacts: `blobCid` is the browser /
+   * primary content blob; `serverBlobCid` is the optional Angular SSR server
    * bundle. Neither is an alias for the other.
    *
    * DRIFT GUARD: the seeded commitment id is a content-addressed hash of
    * (provider_peer, receiver_peer, RESOLVED blob hash) — see
    * `buildCustodyCommitmentBody`. A content re-upload that mints a new
-   * `serverBlobHash` therefore mints a NEW commitment id on the next seed
+   * `serverBlobCid` therefore mints a NEW commitment id on the next seed
    * run; it does not update the old one in place. The old pledge is not
    * superseded automatically — that reconcile pass (recognize + retire the
    * stale commitment id for a re-uploaded contentId) is out of scope here.
@@ -133,16 +135,16 @@ export interface CustodyPair {
   artifactRole?: 'content' | 'ssr-server';
   /**
    * Optional when `contentId` is set (resolved from the content row's
-   * `contentSizeBytes`); required when `blobHash` is set.
+   * `contentSizeBytes`); required when `blobCid` is set.
    */
   blobSizeBytes?: number;
   /** Formation provenance marker — present only on interim fixtures. */
   fixture?: string;
 }
 
-/** A `CustodyPair` with `blobHash`/`blobSizeBytes` resolved to concrete values. */
+/** A `CustodyPair` with `blobCid`/`blobSizeBytes` resolved to concrete values. */
 export type ResolvedCustodyPair = CustodyPair & {
-  blobHash: string;
+  blobCid: string;
   blobSizeBytes: number;
 };
 
@@ -184,16 +186,15 @@ export interface CapacityPledgeBody {
 // =============================================================================
 
 /**
- * Apply the legacy `sha256-` marker ONLY to bare 64-hex input. CID-form
- * (`baf…`) and already-marked addresses pass through untouched: prefixing a
- * CID-form blob hash mints a double-wrapped `sha256-<cid>` address that NO
- * peer accepts — the responder's strict parse rejects it (T21) on every
- * fetch retry forever, so the blob can never replicate (backlog
- * blob-fetch-sha256-prefixed-cid-rejection; live rows minted by the
- * pre-fix version of this exact function).
+ * Require a byte-profile CID (`bafkr4i…`). There is no normalisation: a
+ * legacy `sha256-<hex>` / bare-hex spelling is refused, never rewritten into
+ * an address (the address crossing deleted every legacy spelling).
  */
-function normalizeBlobHash(input: string): string {
-  return /^[0-9a-fA-F]{64}$/.test(input) ? `sha256-${input}` : input;
+function requireByteCid(input: string, label: string): string {
+  if (!isByteCid(input)) {
+    throw new Error(`${label}: "${input}" is not a byte-profile CID (expected bafkr4i…, 59 chars).`);
+  }
+  return input;
 }
 
 /** Resolved provider/receiver agent-CID pair for one custody commitment. */
@@ -225,14 +226,14 @@ export async function resolveCustodyPeerIds(
 }
 
 /**
- * Resolve a `CustodyPair`'s `blobHash`/`blobSizeBytes` to concrete values,
+ * Resolve a `CustodyPair`'s `blobCid`/`blobSizeBytes` to concrete values,
  * following the pair's declared source:
  *
- * - `blobHash` declared: pass through unchanged (back-compat fixture path).
+ * - `blobCid` declared: pass through unchanged (back-compat fixture path).
  *   `blobSizeBytes` must already be declared — there is no row to fall back
  *   to for size.
  * - `contentId` declared: `artifactRole` MUST select the exact row field:
- *   `content` → `blobHash`; `ssr-server` → `serverBlobHash`. There is no
+ *   `content` → `blobCid`; `ssr-server` → `serverBlobCid`. There is no
  *   fallback between them because they address different bytes. The
  *   custody-facing join key is whichever exact artifact the manifest and
  *   `shard_locations` describe, not a preferred content-row column.
@@ -240,7 +241,7 @@ export async function resolveCustodyPeerIds(
  *   `contentSizeBytes` (callers pledging an SSR server bundle should declare
  *   its exact size when it differs from the content row's primary artifact).
  *
- * Exactly one of `blobHash`/`contentId` must be declared — declaring both or
+ * Exactly one of `blobCid`/`contentId` must be declared — declaring both or
  * neither is a fail-fast authoring error, same posture as the no-fallback
  * rule in `resolveCustodyPeerIds`: an unresolvable content row is an honest
  * seed failure, not a decision this function papers over.
@@ -248,27 +249,27 @@ export async function resolveCustodyPeerIds(
 export async function resolveCustodyBlobDescriptor(
   pair: CustodyPair,
   opts: ResolvePeerIdOptions = {},
-): Promise<{ blobHash: string; blobSizeBytes: number }> {
+): Promise<{ blobCid: string; blobSizeBytes: number }> {
   const label = `${pair.providerHumanId}→${pair.receiverHumanId}`;
-  const hasBlobHash = typeof pair.blobHash === 'string' && pair.blobHash.length > 0;
+  const hasBlobCid = typeof pair.blobCid === 'string' && pair.blobCid.length > 0;
   const hasContentId = typeof pair.contentId === 'string' && pair.contentId.length > 0;
 
-  if (hasBlobHash && hasContentId) {
-    throw new Error(`${label}: pair declares BOTH blobHash and contentId — declare exactly one.`);
+  if (hasBlobCid && hasContentId) {
+    throw new Error(`${label}: pair declares BOTH blobCid and contentId — declare exactly one.`);
   }
-  if (!hasBlobHash && !hasContentId) {
-    throw new Error(`${label}: pair declares NEITHER blobHash nor contentId — declare exactly one.`);
+  if (!hasBlobCid && !hasContentId) {
+    throw new Error(`${label}: pair declares NEITHER blobCid nor contentId — declare exactly one.`);
   }
-  if (hasBlobHash && pair.artifactRole) {
+  if (hasBlobCid && pair.artifactRole) {
     throw new Error(`${label}: artifactRole is only valid with contentId.`);
   }
 
-  if (hasBlobHash) {
+  if (hasBlobCid) {
     if (typeof pair.blobSizeBytes !== 'number' || pair.blobSizeBytes <= 0) {
-      throw new Error(`${label}: blobHash pair requires a positive blobSizeBytes.`);
+      throw new Error(`${label}: blobCid pair requires a positive blobSizeBytes.`);
     }
     return {
-      blobHash: normalizeBlobHash(pair.blobHash as string),
+      blobCid: requireByteCid(pair.blobCid as string, `${label}: blobCid`),
       blobSizeBytes: pair.blobSizeBytes,
     };
   }
@@ -296,20 +297,20 @@ export async function resolveCustodyBlobDescriptor(
   }
 
   const row = (await response.json()) as {
-    serverBlobHash?: unknown;
-    blobHash?: unknown;
+    serverBlobCid?: unknown;
+    blobCid?: unknown;
     contentSizeBytes?: unknown;
   };
 
-  const field = pair.artifactRole === 'ssr-server' ? 'serverBlobHash' : 'blobHash';
+  const field = pair.artifactRole === 'ssr-server' ? 'serverBlobCid' : 'blobCid';
   const candidate = row[field];
-  const resolvedHash = typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
-  if (!resolvedHash) {
+  const declaredCid = typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
+  if (!declaredCid) {
     throw new Error(
       `${label}: content row "${pair.contentId}" at ${endpoint} has no ${field} for artifactRole "${pair.artifactRole}".`,
     );
   }
-  const normalizedResolvedHash = normalizeBlobHash(resolvedHash);
+  const resolvedCid = requireByteCid(declaredCid, `${label}: content row "${pair.contentId}" ${field}`);
 
   // blobSizeBytes resolution order: declared pair value → the content row's
   // own contentSizeBytes → CONTENT_BLOB_SIZE_BYTES when CONTENT_BLOB_HASH
@@ -317,7 +318,7 @@ export async function resolveCustodyBlobDescriptor(
   // staged under) → GET /blob/<hash> and read its Content-Length (GET, never
   // HEAD — content-addressed blob routes 404 on HEAD even when GET 200s,
   // matching DoorwayClient.blobExists()'s existing note; no Range, for the
-  // same reason). A deploy-time-only field like serverBlobHash routinely
+  // same reason). A deploy-time-only field like serverBlobCid routinely
   // lands on the content row with contentSizeBytes still null (a PATCH sets
   // only the hash field), so this mesh needs a real fallback, not just a
   // row-field read.
@@ -325,15 +326,15 @@ export async function resolveCustodyBlobDescriptor(
     pair.blobSizeBytes ?? (typeof row.contentSizeBytes === 'number' ? row.contentSizeBytes : undefined);
 
   if (blobSizeBytes === undefined) {
-    const envHash = process.env.CONTENT_BLOB_HASH;
+    const envCid = process.env.CONTENT_BLOB_HASH;
     const envSize = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '', 10);
-    if (envHash && Number.isFinite(envSize) && envSize > 0 && normalizeBlobHash(envHash) === normalizedResolvedHash) {
+    if (envCid && Number.isFinite(envSize) && envSize > 0 && envCid === resolvedCid) {
       blobSizeBytes = envSize;
     }
   }
 
   if (blobSizeBytes === undefined) {
-    const blobEndpoint = `${storageUrl}/blob/${normalizedResolvedHash}`;
+    const blobEndpoint = `${storageUrl}/blob/${resolvedCid}`;
     try {
       const blobResponse = await fetchImpl(blobEndpoint, {
         signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
@@ -355,18 +356,18 @@ export async function resolveCustodyBlobDescriptor(
     throw new Error(
       `${label}: cannot resolve blobSizeBytes for contentId "${pair.contentId}" — pair didn't declare it, the ` +
         `row's contentSizeBytes is missing/invalid, CONTENT_BLOB_SIZE_BYTES doesn't name this blob, and GET ` +
-        `${storageUrl}/blob/${normalizedResolvedHash} had no usable Content-Length.`,
+        `${storageUrl}/blob/${resolvedCid} had no usable Content-Length.`,
     );
   }
 
-  return { blobHash: normalizedResolvedHash, blobSizeBytes };
+  return { blobCid: resolvedCid, blobSizeBytes };
 }
 
 /**
  * Build a CreateReaCommitmentInputView body for a single custody-blob pair.
  *
  * `id` is a deterministic content-addressed hash of the (provider_peer,
- * receiver_peer, blob_hash) tuple — re-runs produce identical ids and the
+ * receiver_peer, blob_cid) tuple — re-runs produce identical ids and the
  * doorway POST handler returns 409 (idempotent). Distinct tuples produce
  * distinct ids so genuine shape drift surfaces as 400 (fail-fast).
  *
@@ -378,7 +379,7 @@ export async function resolveCustodyBlobDescriptor(
 export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: CustodyPeerIds): CommitmentBody {
   const providerPeerId = peerIds.provider;
   const receiverPeerId = peerIds.receiver;
-  const blob = normalizeBlobHash(pair.blobHash);
+  const blob = requireByteCid(pair.blobCid, 'custody pair blobCid');
 
   const idDigest = createHash('sha256')
     .update(`${providerPeerId}|${receiverPeerId}|${blob}`, 'utf8')
@@ -396,7 +397,7 @@ export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: C
     note: `${pair.providerHumanId} commits to host ${blob} for ${pair.receiverHumanId}`,
     metadata: {
       seedGeneration: 'genesis',
-      blobHash: blob,
+      blobCid: blob,
       providerHumanId: pair.providerHumanId,
       receiverHumanId: pair.receiverHumanId,
       ...(pair.contentId ? { contentId: pair.contentId, artifactRole: pair.artifactRole } : {}),
@@ -412,12 +413,12 @@ export function buildCustodyCommitmentBody(pair: ResolvedCustodyPair, peerIds: C
 /**
  * Self-custody pledge for the saga ch07 carrier content (2026-07-30):
  * resolved via contentId + the explicit `ssr-server` artifact role, not a
- * fixture blobHash. The live custody evidence for this saga carrier names
+ * fixture blobCid. The live custody evidence for this saga carrier names
  * the SSR server-bundle manifest; the browser bundle is a different
  * artifact and must never be selected by fallback. The deterministic id
  * derivation from (provider|receiver|resolved-blob) keeps re-runs
  * idempotent. DRIFT GUARD: a server-bundle re-upload mints a new
- * serverBlobHash and therefore a NEW commitment id; the old pledge is not
+ * serverBlobCid and therefore a NEW commitment id; the old pledge is not
  * superseded automatically (that reconcile pass remains out of scope).
  *
  * Hoisted out of `defaultCustodyPairs()` so it can be read WITHOUT the
@@ -442,15 +443,15 @@ export const LANDING_SELF_CUSTODY_PLEDGE: CustodyPair = {
  * from tests, never at module initialisation).
  */
 export function defaultCustodyPairs(): CustodyPair[] {
-  const blobHash = process.env.CONTENT_BLOB_HASH || '';
+  const blobCid = process.env.CONTENT_BLOB_HASH || '';
   const blobSizeBytes = parseInt(process.env.CONTENT_BLOB_SIZE_BYTES || '0', 10);
 
-  if (!blobHash || blobSizeBytes <= 0) {
+  if (!blobCid || blobSizeBytes <= 0) {
     console.error('ERROR: CONTENT_BLOB_HASH and CONTENT_BLOB_SIZE_BYTES must be set (or pass CUSTODY_PAIRS_JSON).');
     process.exit(1);
   }
 
-  const m1 = { blobHash, blobSizeBytes };
+  const m1 = { blobCid, blobSizeBytes };
   const fixture = { ...m1, fixture: 'formation-output' as const };
 
   return [
@@ -659,16 +660,16 @@ export async function seedCustodyCommitments(
   for (const pair of pairs) {
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
-    // Resolve the blob descriptor (blobHash pass-through, or contentId +
+    // Resolve the blob descriptor (blobCid pass-through, or contentId +
     // explicit artifactRole → exact row field) and the real peer ids from the
     // live storage pods — per-host cached, so the activate phase below
     // recomputes the SAME content-addressed body.id. A pair unresolvable on
-    // THIS mesh (e.g. LANDING_SELF_CUSTODY_PLEDGE's serverBlobHash, which is
+    // THIS mesh (e.g. LANDING_SELF_CUSTODY_PLEDGE's serverBlobCid, which is
     // only minted at deploy time — "absent beats fabricated", same posture
     // seed-epr-atom.ts already takes on this exact artifact) is skipped
     // loudly rather than crashing the whole leg: one pair's resolution gap
     // must never cost the rest of the household its custody commitments.
-    let blob: { blobHash: string; blobSizeBytes: number };
+    let blob: { blobCid: string; blobSizeBytes: number };
     let peerIds: CustodyPeerIds;
     try {
       blob = await resolveCustodyBlobDescriptor(pair, opts);
@@ -713,7 +714,7 @@ export async function seedCustodyCommitments(
     const response = await pairClient.createCommitment(body);
 
     if (response.ok) {
-      console.log(`  [+] ${label} ${blob.blobHash.slice(0, 16)}...`);
+      console.log(`  [+] ${label} ${blob.blobCid.slice(0, 16)}...`);
       created += 1;
       continue;
     }
@@ -976,9 +977,9 @@ async function provisionDevFixtureBlob(client: CommitmentClient): Promise<void> 
       'no CONTENT_BLOB_HASH env, no substrate-verify upload stage)\n',
     'utf8',
   );
-  const blobHash = `sha256-${createHash('sha256').update(data).digest('hex')}`;
+  const blobCid = byteCid(data);
 
-  const push = await client.pushBlob(blobHash, data, { hash: blobHash, sizeBytes: data.length, mimeType: 'text/plain' });
+  const push = await client.pushBlob(blobCid, data, { cid: blobCid, sizeBytes: data.length, mimeType: 'text/plain' });
   if (!push.success) {
     console.error(
       `ERROR: CONTENT_BLOB_HASH/CONTENT_BLOB_SIZE_BYTES unset and the mesh-local dev-fixture ` +
@@ -988,11 +989,11 @@ async function provisionDevFixtureBlob(client: CommitmentClient): Promise<void> 
     process.exit(1);
   }
 
-  process.env.CONTENT_BLOB_HASH = blobHash;
+  process.env.CONTENT_BLOB_HASH = blobCid;
   process.env.CONTENT_BLOB_SIZE_BYTES = String(data.length);
   console.log(
     `[seed-commitments] CONTENT_BLOB_HASH/SIZE unset — uploaded mesh-local dev-fixture blob ` +
-      `${blobHash} (${data.length} bytes)`,
+      `${blobCid} (${data.length} bytes)`,
   );
 }
 

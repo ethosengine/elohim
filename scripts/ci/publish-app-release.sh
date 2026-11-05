@@ -95,7 +95,7 @@ curl_get() {
 
 # ── 1. zip every (app, kind) with the one recipe ─────────────────────────────
 declare -a APP_ARGS=()
-declare -a OUR_SHAS=()
+declare -a OUR_CIDS=()
 for spec in ${BUNDLES}; do
     IFS=':' read -r slug kind dist mount <<<"${spec}"
     if [ -z "${slug}" ] || [ -z "${kind}" ] || [ -z "${dist}" ]; then
@@ -114,10 +114,10 @@ for spec in ${BUNDLES}; do
             *) APP_ARGS+=(--app-mount "${slug}=${mount}") ;;
         esac
     fi
-    OUR_SHAS+=("${BUNDLE_ZIP_HASH#sha256-}")
-    echo "  · ${slug} (${kind}): ${BUNDLE_ZIP_HASH} (${BUNDLE_ZIP_SIZE})"
+    OUR_CIDS+=("${BUNDLE_ZIP_CID}")
+    echo "  · ${slug} (${kind}): ${BUNDLE_ZIP_CID} (${BUNDLE_ZIP_SIZE})"
 done
-OUR_SET="$(printf '%s\n' "${OUR_SHAS[@]}" | sort | tr '\n' ' ')"
+OUR_SET="$(printf '%s\n' "${OUR_CIDS[@]}" | sort | tr '\n' ' ')"
 
 # ── 2. the channel behind the doorway ───────────────────────────────────────
 channel_json="${WORK_DIR}/channel.json"
@@ -139,8 +139,8 @@ if [ "${head_status}" = "200" ]; then
     current_head="$(json_ask "${head_json}" 'b.headActionHash')"
 fi
 
-# Idempotent by CONTENT: the current release carries exactly these digests.
-current_set="$(json_ask "${channel_json}" '(() => { const m = (b.metadata && b.metadata.manifest) || null; if (!m || m.artifactClass !== "app-bundle") return null; return m.artifacts.map(a => a.sha256).sort().join(" ") + " "; })()')"
+# Idempotent by CONTENT: the current release carries exactly these byte CIDs.
+current_set="$(json_ask "${channel_json}" '(() => { const m = (b.metadata && b.metadata.manifest) || null; if (!m || m.artifactClass !== "app-bundle") return null; return m.artifacts.map(a => a.blobCid).sort().join(" ") + " "; })()')"
 if [ -n "${current_set}" ] && [ "${current_set}" = "${OUR_SET}" ]; then
     echo "APP-RELEASE-CURRENT channel=${CHANNEL_ID} release=${current_head:-unknown}"
     exit 0

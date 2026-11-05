@@ -21,6 +21,7 @@ if [ -z "${REAL_NODE}" ]; then
   exit 1
 fi
 export READINESS_JSON_NODE="${REAL_NODE}"
+export REAL_NODE
 
 root="$(mktemp -d 2>/dev/null)" || root=""
 if [ -z "${root}" ] || [ ! -d "${root}" ]; then
@@ -77,6 +78,8 @@ FAKE
 # --- fake node (SDK packager only; the classifier uses the REAL node) -------
 cat > "${bin}/node" <<'FAKE'
 #!/bin/bash
+# The byte-CID mint (lib/byte-cid.mjs) is real; only the SDK packager is faked.
+case "$1" in *byte-cid.mjs) exec "${REAL_NODE}" "$@" ;; esac
 out="" kind=browser
 while [ "$#" -gt 0 ]; do
   case "$1" in --out) out="$2"; shift 2 ;; --kind) kind="$2"; shift 2 ;; *) shift ;; esac
@@ -102,7 +105,7 @@ check() {
 
 OK_HEALTH='200|{"shedding":false,"degrading":false,"upstreams":[],"rolesDiscovered":5,"warmupEmpty":false,"storageServing":{"status":"serving","httpStatus":200}}|0|'
 OK_READ='404|{"error":"Content not found"}|0|'
-OK_PUT='409|{"success":false,"hash":"sha256-0000","already_cached":false,"forwarded_to_storage":false,"size":0,"error":"Hash mismatch"}|0|'
+OK_PUT='409|{"success":false,"cid":"bafkr4i0000","already_cached":false,"forwarded_to_storage":false,"size":0,"error":"Hash mismatch"}|0|'
 
 new_case() {
   FAKE_DIR="${root}/$1"; log="${root}/$1.log"; out="${root}/$1.out"
@@ -133,7 +136,7 @@ check "ready: names the host READY" "grep -qx 'FLEET-READY https://doorway-a' '$
 check "ready: asks each of the three questions exactly once" \
   "[ \"\$(calls_to /health/serving)\" = '1' ] && [ \"\$(calls_to /db/content/)\" = '1' ] && [ \"\$(calls_to /admin/seed/blob)\" = '1' ]"
 check "ready: the write probe is a ZERO-byte PUT on the never-held sentinel, with the admin key" \
-  "grep -q -- '--data-binary  https://doorway-a/admin/seed/blob' '${FAKE_DIR}/calls' && grep -q 'X-Blob-Hash: sha256-0000000000000000000000000000000000000000000000000000000000000000' '${FAKE_DIR}/calls' && grep -q 'X-API-Key: test-key' '${FAKE_DIR}/calls'"
+  "grep -q -- '--data-binary  https://doorway-a/admin/seed/blob' '${FAKE_DIR}/calls' && grep -q 'X-Content-Address: bafkr4iaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' '${FAKE_DIR}/calls' && grep -q 'X-API-Key: test-key' '${FAKE_DIR}/calls'"
 check "ready: every request carries a --max-time bound" \
   "[ \"\$(grep -c -- '--max-time' '${FAKE_DIR}/calls')\" = '3' ]"
 check "ready: the result file carries the line" "grep -qx 'FLEET-READY https://doorway-a' '${out}'"
@@ -331,8 +334,9 @@ fixture doorway-b health '503|{"shedding":true,"degrading":false,"upstreams":[]}
 intent="${root}/intent/deploy-intent.json"
 status="$(run DEPLOY_INTENT_OUT="${intent}" DEPLOY_INTENT_COMMIT=abc123 DEPLOY_INTENT_ENV=dev \
   DEPLOY_INTENT_BUNDLES="landing:browser:${root}/app/pkg/dist/browser landing:server:${root}/app/pkg/dist/server")"
-browser_sha="sha256-$(printf 'fake-browser-package' | sha256sum | awk '{print $1}')"
-server_sha="sha256-$(printf 'fake-server-package' | sha256sum | awk '{print $1}')"
+printf 'fake-browser-package' > "${root}/b.bin"; printf 'fake-server-package' > "${root}/s.bin"
+browser_cid="$("${REAL_NODE}" "${here}/../lib/byte-cid.mjs" "${root}/b.bin")"
+server_cid="$("${REAL_NODE}" "${here}/../lib/byte-cid.mjs" "${root}/s.bin")"
 q() { "${REAL_NODE}" -e 'const o=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(eval(process.argv[2])))' "${intent}" "$1" 2>/dev/null; }
 check "intent: refusal still exits 3" "[ '${status}' = '3' ]"
 check "intent: written, and it is JSON" "[ -f '${intent}' ] && [ \"\$(q 'typeof o')\" = 'object' ]"
@@ -340,8 +344,8 @@ check "intent: commit, env, doorway, face, retryAfter" \
   "[ \"\$(q o.commit)\" = 'abc123' ] && [ \"\$(q o.env)\" = 'dev' ] && [ \"\$(q o.doorway)\" = 'https://doorway-b' ] && [ \"\$(q o.face)\" = 'shedding' ] && [ \"\$(q o.retryAfter)\" = '90' ]"
 check "intent: every probed doorway URL is carried for the re-dispatch" \
   "[ \"\$(q 'o.doorways.join(\" \")')\" = 'https://doorway-a https://doorway-b' ]"
-check "intent: bundle sha256s are the archive CIDs the stage leg would upload" \
-  "[ \"\$(q 'o.bundles[0].sha256')\" = '${browser_sha}' ] && [ \"\$(q 'o.bundles[1].sha256')\" = '${server_sha}' ] && [ \"\$(q 'o.bundles[1].kind')\" = 'server' ]"
+check "intent: bundle blobCids are the archive byte CIDs the stage leg would upload" \
+  "[ \"\$(q 'o.bundles[0].blobCid')\" = '${browser_cid}' ] && [ \"\$(q 'o.bundles[1].blobCid')\" = '${server_cid}' ] && [ \"\$(q 'o.bundles[1].kind')\" = 'server' ]"
 check "intent: never sleeps" "never_slept"
 
 new_case nointent; HOSTS="https://doorway-a"

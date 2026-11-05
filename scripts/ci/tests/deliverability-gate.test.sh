@@ -33,10 +33,10 @@ trap 'kill $srv' EXIT
 sleep 1
 base="http://127.0.0.1:$port"
 
-bash "$gate" "$base" "sha256-boots" 1 && echo "PASS boots"
-if bash "$gate" "$base" "sha256-broken" 1; then echo "FAIL broken should exit 2"; exit 1; else rc=$?; [ "$rc" -eq 2 ] && echo "PASS broken rc=2"; fi
-bash "$gate" "$base" "sha256-unjudged" 1 && echo "PASS not-judged is advisory"
-if DELIVERABILITY_GATE=strict bash "$gate" "$base" "sha256-unjudged" 1; then echo "FAIL strict not-judged should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict rc=3"; fi
-bash "$gate" "$base" "sha256-absent" 1 && echo "PASS absent header is advisory"
-if DELIVERABILITY_GATE=strict bash "$gate" "$base" "sha256-absent" 1; then echo "FAIL strict absent header should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict absent rc=3"; fi
+bash "$gate" "$base" "bafkr4iboots" 1 && echo "PASS boots"
+if bash "$gate" "$base" "bafkr4ibroken" 1; then echo "FAIL broken should exit 2"; exit 1; else rc=$?; [ "$rc" -eq 2 ] && echo "PASS broken rc=2"; fi
+bash "$gate" "$base" "bafkr4iunjudged" 1 && echo "PASS not-judged is advisory"
+if DELIVERABILITY_GATE=strict bash "$gate" "$base" "bafkr4iunjudged" 1; then echo "FAIL strict not-judged should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict rc=3"; fi
+bash "$gate" "$base" "bafkr4iabsent" 1 && echo "PASS absent header is advisory"
+if DELIVERABILITY_GATE=strict bash "$gate" "$base" "bafkr4iabsent" 1; then echo "FAIL strict absent header should exit 3"; exit 1; else rc=$?; [ "$rc" -eq 3 ] && echo "PASS strict absent rc=3"; fi
 echo "ALL PASS"

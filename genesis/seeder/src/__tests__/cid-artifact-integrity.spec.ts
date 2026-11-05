@@ -2,16 +2,15 @@
  * Deterministic-floor guard for CID-addressed artifacts that import into the
  * protocol runtime (supersedes the manifesto-only guard, genesis #1182 Cluster D).
  *
- * Any content node carrying a `blobHash` + a `sourcePath` .md is uploaded to
- * `/blob/<hash>` and addressed by `blobCid`. Reaching the shared repo/runtime is
+ * Any content node carrying a `blobCid` + a `sourcePath` .md is uploaded to
+ * `/blob/<cid>` and addressed by that `blobCid`. Reaching the shared repo/runtime is
  * a reach-earning act: the CID address must be *attested* against its source.
  * If the source .md is edited without re-syncing the node, the reference dangles
- * SILENTLY (the row seeds, but /blob/<old-hash> 404s in the running protocol).
+ * SILENTLY (the row seeds, but /blob/<old-cid> 404s in the running protocol).
  *
- * The contract (all three, for every CID-addressed artifact):
+ * The contract (both, for every CID-addressed artifact):
  *   content  === frontmatter-stripped source .md
- *   blobHash === sha256(source .md bytes)
- *   blobCid  === CIDv1-raw-sha256(source .md bytes)
+ *   blobCid  === byte-profile CID (raw + blake3-256, bafkr4i…) of the source .md bytes
  *
  * Re-earn the reach after editing a source .md:
  *   pnpm --filter holochain-seeder run sync:cid-artifacts
@@ -48,15 +47,7 @@ describe('CID-addressed artifact integrity', () => {
     ).toBe(a.want!.content);
   });
 
-  it.each(artifacts)('$file — blobHash == sha256(source bytes)', (a) => {
-    if (!a.mdExists) return;
-    expect(
-      a.actual.blobHash,
-      `${a.file}.blobHash drifted from ${a.sourcePath} — /blob/<hash> would 404. Re-sync: ${resync}`,
-    ).toBe(a.want!.blobHash);
-  });
-
-  it.each(artifacts)('$file — blobCid == CIDv1-raw-sha256(source bytes)', (a) => {
+  it.each(artifacts)('$file — blobCid == byte-profile CID of the source bytes', (a) => {
     if (!a.mdExists) return;
     expect(
       a.actual.blobCid,

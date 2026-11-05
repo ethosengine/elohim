@@ -17,12 +17,12 @@
     "imagodei",
     "oauth"
   ],
-  "blobHash": "",
+  "blobCid": "",
   "reach": "commons",
   "metadata": {
     "category": "application",
     "embedStrategy": "root",
-    "blobPopulatedBy": "Jenkinsfile:stageSpaBlob — the imagodei-portal bundle is built from app/imagodei-portal/ (Angular 19, no SSR, base href /auth/portal/) and uploaded as a separate blob. This content row's blobHash is patched at deploy time via PATCH /db/content/imagodei-portal."
+    "blobPopulatedBy": "Jenkinsfile:stageSpaBlob — the imagodei-portal bundle is built from app/imagodei-portal/ (Angular 19, no SSR, base href /auth/portal/) and uploaded as a separate blob. This content row's blobCid is patched at deploy time via PATCH /db/content/imagodei-portal."
   },
   "createdAt": "2026-05-25T00:00:00.000000",
   "updatedAt": "2026-05-25T00:00:00.000000"

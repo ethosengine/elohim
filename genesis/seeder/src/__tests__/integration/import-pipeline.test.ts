@@ -363,7 +363,7 @@ describe('Content Import Pipeline Integration', () => {
 
       expect(pushResult.success).toBe(true);
       expect(pushResult.manifest).toBeDefined();
-      expect(pushResult.manifest!.blob_hash).toBeDefined();
+      expect(pushResult.manifest!.blob_cid).toBeDefined();
 
       // Create content referencing blob
       const result = await doorwayClient.bulkCreateContent([{
@@ -371,8 +371,7 @@ describe('Content Import Pipeline Integration', () => {
         title: 'Large Content Test',
         contentType: 'concept',
         contentFormat: 'markdown',
-        blobHash: pushResult.manifest!.blob_hash,
-        blobCid: pushResult.manifest!.blob_hash,
+        blobCid: pushResult.manifest!.blob_cid,
         description: 'Large content stored as blob',
         tags: ['test', 'blob'],
         reach: 'commons',

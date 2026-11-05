@@ -17,6 +17,7 @@ import {
   type ShardManifest,
 } from './storage-client.js';
 import * as crypto from 'crypto';
+import { CID_A, CID_B, CID_C, CID_D, CID_E } from './__tests__/fixture-cids.js';
 
 // Mock global fetch
 global.fetch = vi.fn();
@@ -64,18 +65,18 @@ describe('StorageClient', () => {
     });
   });
 
-  describe('computeHash()', () => {
-    it('should compute SHA256 hash of data', () => {
+  describe('computeCid()', () => {
+    it('should compute the byte-profile CID of data', () => {
       const data = Buffer.from('test data');
-      const hash = StorageClient.computeHash(data);
+      const hash = StorageClient.computeCid(data);
 
-      expect(hash).toMatch(/^sha256-[0-9a-f]{64}$/);
+      expect(hash).toMatch(/^bafkr4i[a-z2-7]{52}$/);
     });
 
     it('should produce consistent hashes for same data', () => {
       const data = Buffer.from('test data');
-      const hash1 = StorageClient.computeHash(data);
-      const hash2 = StorageClient.computeHash(data);
+      const hash1 = StorageClient.computeCid(data);
+      const hash2 = StorageClient.computeCid(data);
 
       expect(hash1).toBe(hash2);
     });
@@ -83,17 +84,17 @@ describe('StorageClient', () => {
     it('should produce different hashes for different data', () => {
       const data1 = Buffer.from('test data 1');
       const data2 = Buffer.from('test data 2');
-      const hash1 = StorageClient.computeHash(data1);
-      const hash2 = StorageClient.computeHash(data2);
+      const hash1 = StorageClient.computeCid(data1);
+      const hash2 = StorageClient.computeCid(data2);
 
       expect(hash1).not.toBe(hash2);
     });
 
     it('should handle empty buffer', () => {
       const data = Buffer.from('');
-      const hash = StorageClient.computeHash(data);
+      const hash = StorageClient.computeCid(data);
 
-      expect(hash).toMatch(/^sha256-[0-9a-f]{64}$/);
+      expect(hash).toMatch(/^bafkr4i[a-z2-7]{52}$/);
     });
   });
 
@@ -146,11 +147,11 @@ describe('StorageClient', () => {
         status: 200,
       });
 
-      const exists = await client.shardExists('sha256-abc123');
+      const exists = await client.shardExists(CID_A);
 
       expect(exists).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/shard/sha256-abc123',
+        `http://localhost:8090/shard/${CID_A}`,
         expect.objectContaining({ method: 'HEAD' })
       );
     });
@@ -160,7 +161,7 @@ describe('StorageClient', () => {
         status: 404,
       });
 
-      const exists = await client.shardExists('sha256-nonexistent');
+      const exists = await client.shardExists(CID_B);
 
       expect(exists).toBe(false);
     });
@@ -168,7 +169,7 @@ describe('StorageClient', () => {
     it('should return false on network error', async () => {
       (global.fetch as any).mockRejectedValue(new Error('Network error'));
 
-      const exists = await client.shardExists('sha256-abc123');
+      const exists = await client.shardExists(CID_A);
 
       expect(exists).toBe(false);
     });
@@ -177,12 +178,12 @@ describe('StorageClient', () => {
   describe('pushShard()', () => {
     it('should upload shard successfully', async () => {
       const data = Buffer.from('test shard data');
-      const hash = StorageClient.computeHash(data);
+      const hash = StorageClient.computeCid(data);
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
-          hash,
+          cid: hash,
           size_bytes: data.length,
           already_existed: false,
         }),
@@ -191,19 +192,19 @@ describe('StorageClient', () => {
       const result = await client.pushShard(data);
 
       expect(result.success).toBe(true);
-      expect(result.hash).toBe(hash);
+      expect(result.cid).toBe(hash);
       expect(result.sizeBytes).toBe(data.length);
       expect(result.alreadyExisted).toBe(false);
     });
 
     it('should handle already existing shard', async () => {
       const data = Buffer.from('test data');
-      const hash = StorageClient.computeHash(data);
+      const hash = StorageClient.computeCid(data);
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
-          hash,
+          cid: hash,
           size_bytes: data.length,
           already_existed: true,
         }),
@@ -243,12 +244,12 @@ describe('StorageClient', () => {
 
     it('should use provided hash if given', async () => {
       const data = Buffer.from('test data');
-      const expectedHash = 'sha256-custom';
+      const expectedHash = CID_C;
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
-          hash: expectedHash,
+          cid: expectedHash,
           size_bytes: data.length,
           already_existed: false,
         }),
@@ -256,7 +257,7 @@ describe('StorageClient', () => {
 
       const result = await client.pushShard(data, expectedHash);
 
-      expect(result.hash).toBe(expectedHash);
+      expect(result.cid).toBe(expectedHash);
     });
 
     it('should skip upload in dry run mode', async () => {
@@ -273,17 +274,17 @@ describe('StorageClient', () => {
   describe('pushBlob()', () => {
     it('should upload blob and return manifest', async () => {
       const data = Buffer.from('test blob data');
-      const hash = StorageClient.computeHash(data);
+      const hash = StorageClient.computeCid(data);
 
       const mockManifest: Partial<ShardManifest> = {
-        blob_hash: hash,
+        blob_cid: hash,
         total_size: data.length,
         mime_type: 'text/plain',
         encoding: 'none',
         data_shards: 1,
         total_shards: 1,
         shard_size: data.length,
-        shard_hashes: [hash],
+        shard_cids: [hash],
         created_at: new Date().toISOString(),
       };
 
@@ -296,7 +297,7 @@ describe('StorageClient', () => {
 
       expect(result.success).toBe(true);
       expect(result.manifest).toBeDefined();
-      expect(result.manifest?.blob_hash).toBe(hash);
+      expect(result.manifest?.blob_cid).toBe(hash);
       expect(result.manifest?.reach).toBe('commons');
     });
 
@@ -332,9 +333,9 @@ describe('StorageClient', () => {
       (global.fetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
-          blob_hash: 'sha256-test',
+          blob_cid: CID_D,
           total_size: data.length,
-          shard_hashes: [],
+          shard_cids: [],
         }),
       });
 
@@ -343,54 +344,16 @@ describe('StorageClient', () => {
       expect(result.manifest?.reach).toBe('commons');
     });
 
-    it('returns blake3Hash from server response when present', async () => {
-      const mockManifest = {
-        blobHash: 'sha256-aa',
-        totalSize: 4,
-        mimeType: 'text/plain',
-        encoding: 'none',
-        dataShards: 1,
-        totalShards: 1,
-        shardSize: 4,
-        shardHashes: ['sha256-aa'],
-        reach: 'commons',
-        createdAt: new Date().toISOString(),
-        blake3Hash: 'b'.repeat(64),
-      };
+    it('does not surface any legacy second-hash field', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 201,
-        json: async () => mockManifest,
+        json: async () => ({ blobCid: CID_E, reach: 'commons' }),
       });
 
       const result = await client.pushBlob(Buffer.from('test'), 'text/plain');
       expect(result.success).toBe(true);
-      expect(result.blake3Hash).toBe('b'.repeat(64));
-    });
-
-    it('handles libp2p-only response with null blake3Hash', async () => {
-      const mockManifest = {
-        blobHash: 'sha256-aa',
-        totalSize: 4,
-        mimeType: 'text/plain',
-        encoding: 'none',
-        dataShards: 1,
-        totalShards: 1,
-        shardSize: 4,
-        shardHashes: ['sha256-aa'],
-        reach: 'commons',
-        createdAt: new Date().toISOString(),
-        blake3Hash: null,
-      };
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => mockManifest,
-      });
-
-      const result = await client.pushBlob(Buffer.from('test'), 'text/plain');
-      expect(result.success).toBe(true);
-      expect(result.blake3Hash).toBeUndefined();
+      expect(Object.keys(result)).toEqual(['success', 'manifest']);
     });
   });
 
@@ -405,7 +368,7 @@ describe('StorageClient', () => {
         arrayBuffer: async () => arrayBuffer,
       });
 
-      const result = await client.getShard('sha256-abc123');
+      const result = await client.getShard(CID_A);
 
       expect(result).toBeInstanceOf(Buffer);
       expect(result?.toString()).toBe('shard data');
@@ -417,7 +380,7 @@ describe('StorageClient', () => {
         status: 404,
       });
 
-      const result = await client.getShard('sha256-nonexistent');
+      const result = await client.getShard(CID_B);
 
       expect(result).toBeNull();
     });
@@ -425,7 +388,7 @@ describe('StorageClient', () => {
     it('should return null on network error', async () => {
       (global.fetch as any).mockRejectedValue(new Error('Network error'));
 
-      const result = await client.getShard('sha256-abc123');
+      const result = await client.getShard(CID_A);
 
       expect(result).toBeNull();
     });
@@ -434,14 +397,14 @@ describe('StorageClient', () => {
   describe('getManifest()', () => {
     it('should retrieve blob manifest', async () => {
       const mockManifest: ShardManifest = {
-        blob_hash: 'sha256-test',
+        blob_cid: CID_D,
         total_size: 1024,
         mime_type: 'text/plain',
         encoding: 'none',
         data_shards: 1,
         total_shards: 1,
         shard_size: 1024,
-        shard_hashes: ['sha256-test'],
+        shard_cids: [CID_D],
         reach: 'commons',
         created_at: new Date().toISOString(),
       };
@@ -451,7 +414,7 @@ describe('StorageClient', () => {
         json: async () => mockManifest,
       });
 
-      const result = await client.getManifest('sha256-test');
+      const result = await client.getManifest(CID_D);
 
       expect(result).toEqual(mockManifest);
     });
@@ -462,7 +425,7 @@ describe('StorageClient', () => {
         status: 404,
       });
 
-      const result = await client.getManifest('sha256-nonexistent');
+      const result = await client.getManifest(CID_B);
 
       expect(result).toBeNull();
     });
@@ -478,9 +441,9 @@ describe('StorageClient', () => {
       (global.fetch as any).mockResolvedValue({
         ok: true,
         json: async () => ({
-          blob_hash: 'sha256-test',
+          blob_cid: CID_D,
           total_size: 5,
-          shard_hashes: [],
+          shard_cids: [],
         }),
       });
 
@@ -505,9 +468,9 @@ describe('StorageClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            blob_hash: 'sha256-test',
+            blob_cid: CID_D,
             total_size: 5,
-            shard_hashes: [],
+            shard_cids: [],
           }),
         })
         .mockResolvedValueOnce({
@@ -541,7 +504,7 @@ describe('StorageClient', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            hash: 'sha256-test',
+            cid: CID_D,
             size_bytes: 4,
             already_existed: false,
           }),

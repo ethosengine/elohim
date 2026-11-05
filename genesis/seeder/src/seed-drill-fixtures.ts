@@ -25,7 +25,7 @@
  * household peer, or the mesh's belief is already corrupt at t=0:
  *
  *   1. a `custody-blob` commitment naming that peer's agent key as `provider`
- *      for the content's blob hash — the promise, on record; and
+ *      for the content's blob CID — the promise, on record; and
  *   2. the bytes actually present in that peer's local blob store — the promise,
  *      kept.
  *
@@ -43,7 +43,7 @@
  * ## Why the ZIP is built byte-deterministically here
  *
  * The fixture's identity IS its hash: an idempotent re-seed must produce the
- * same `blobHash`, or every run mints a new blob, a new content row mismatch,
+ * same `blobCid`, or every run mints a new blob, a new content row mismatch,
  * and a new custody commitment id (the drift guard seed-commitments.ts already
  * documents for re-uploaded bundles). A shell `zip` embeds the file mtime, so
  * two runs a second apart hash differently — measured while building this. The
@@ -59,12 +59,11 @@
  * 2 = partial, 1 = total failure.
  */
 
-import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CommitmentClient } from './seed-commitments.js';
-import { computeContentAddresses } from './doorway-client.js';
+import { byteCid } from './byte-cid.js';
 import { parseNamedCsv } from './peer-id.js';
 import { defaultNodeIdentityResolver, type NodeIdentityResolver } from './node-identity.js';
 
@@ -210,14 +209,14 @@ export const DRILL_FIXTURES: DrillFixture[] = [
   },
 ];
 
-/** The blob bytes + hash for one fixture — a pure function of its declaration. */
-export function fixtureBlob(fixture: DrillFixture): { data: Buffer; hash: string } {
+/** The blob bytes + byte-profile CID for one fixture — a pure function of its declaration. */
+export function fixtureBlob(fixture: DrillFixture): { data: Buffer; cid: string } {
   const html =
     `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8">` +
     `<title>${fixture.title}</title></head>\n` +
     `<body><h1>${fixture.title}</h1><p>${fixture.page}</p></body>\n</html>\n`;
   const data = buildDeterministicZip([{ name: 'index.html', data: Buffer.from(html, 'utf8') }]);
-  return { data, hash: `sha256-${createHash('sha256').update(data).digest('hex')}` };
+  return { data, cid: byteCid(data) };
 }
 
 // =============================================================================
@@ -229,7 +228,7 @@ export function fixtureBlob(fixture: DrillFixture): { data: Buffer; hash: string
  *
  * Both surfaces, deliberately: the doorway's `PUT /admin/seed/blob` (which
  * forwards to the doorway's own primary storage and is the path
- * seed-commitments.ts already uses) AND each peer's own `PUT /blob/{hash}`.
+ * seed-commitments.ts already uses) AND each peer's own `PUT /blob/{cid}`.
  * The doorways front only their primaries — on the Act I mesh that is matthew
  * and jessica — so a doorway-only push leaves the third peer without the bytes,
  * and `assertUnderCustody` checks EVERY peer's local store. Waiting for
@@ -240,7 +239,7 @@ export function fixtureBlob(fixture: DrillFixture): { data: Buffer; hash: string
 async function pushToAllHolders(
   doorwayUrls: string[],
   storageUrls: string[],
-  blob: { data: Buffer; hash: string },
+  blob: { data: Buffer; cid: string },
   mimeType: string,
   apiKey: string | undefined,
   entryPoint?: string,
@@ -250,7 +249,7 @@ async function pushToAllHolders(
 
   const headers = (): Record<string, string> => ({
     'Content-Type': mimeType,
-    'X-Blob-Hash': blob.hash,
+    'X-Content-Address': blob.cid,
     'X-Blob-Size': String(blob.data.length),
     ...(entryPoint ? { 'X-Entry-Point': entryPoint } : {}),
     ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
@@ -261,7 +260,7 @@ async function pushToAllHolders(
       const response = await fetch(`${url.replace(/\/+$/, '')}/admin/seed/blob`, {
         method: 'PUT',
         headers: headers(),
-        body: blob.data,
+        body: new Uint8Array(blob.data),
         signal: AbortSignal.timeout(60_000),
       });
       if (response.ok) placed += 1;
@@ -276,17 +275,17 @@ async function pushToAllHolders(
       const base = url.replace(/\/+$/, '');
       // Recognize bytes already held before re-PUTting them: a peer that the
       // doorway push already reached does not need a second copy pushed at it.
-      const existing = await fetch(`${base}/blob/${blob.hash}`, {
+      const existing = await fetch(`${base}/blob/${blob.cid}`, {
         signal: AbortSignal.timeout(30_000),
       });
       if (existing.ok) {
         placed += 1;
         continue;
       }
-      const response = await fetch(`${base}/blob/${blob.hash}`, {
+      const response = await fetch(`${base}/blob/${blob.cid}`, {
         method: 'PUT',
         headers: headers(),
-        body: blob.data,
+        body: new Uint8Array(blob.data),
         signal: AbortSignal.timeout(60_000),
       });
       if (response.ok) placed += 1;
@@ -311,7 +310,7 @@ async function pushToAllHolders(
 async function declareContent(
   storageUrl: string,
   fixture: DrillFixture,
-  blob: { data: Buffer; hash: string },
+  blob: { data: Buffer; cid: string },
   apiKey: string | undefined,
 ): Promise<'created' | 'exists' | string> {
   const base = storageUrl.replace(/\/+$/, '');
@@ -333,14 +332,14 @@ async function declareContent(
       description: fixture.description,
       contentType: 'collective',
       contentFormat: 'html5-app',
-      blobHash: blob.hash,
+      blobCid: blob.cid,
       contentSizeBytes: blob.data.length,
       reach: 'commons',
       // Content-derived provenance anchor set at INGEST so the row satisfies
       // the `require_provenance` read gate on a mesh whose libp2p publish drain
       // may not have run yet — the honest alternative to stamping
       // p2pPublishedAt, which would assert a DHT publication that never happened.
-      dhtAnchorHash: blob.hash,
+      dhtAnchorHash: blob.cid,
       metadata: {
         seedGeneration: 'genesis',
         fixture: 'household-drill',
@@ -367,7 +366,7 @@ export interface DrillCustodyPair {
   providerArchetype: 'desktop';
   receiverHumanId: string;
   receiverArchetype: 'desktop';
-  blobHash: string;
+  blobCid: string;
   blobSizeBytes: number;
   fixture: string;
 }
@@ -375,7 +374,7 @@ export interface DrillCustodyPair {
 /** One fixture's identity on the mesh: what to hold, and how much of it. */
 export interface CustodySubject {
   contentId: string;
-  hash: string;
+  cid: string;
   sizeBytes: number;
 }
 
@@ -385,7 +384,7 @@ export interface CustodySubject {
  * peer is pledging its OWN custody of the bytes, not a favour to a named
  * counterparty, and `assertUnderCustody` only reads the provider side.
  *
- * Emitted as `blobHash` + `blobSizeBytes` pairs (never `contentId` +
+ * Emitted as `blobCid` + `blobSizeBytes` pairs (never `contentId` +
  * `artifactRole`): the fixture's exact artifact is already resolved here, and
  * the contentId form would re-resolve it against the provider's own pod and
  * could select a different artifact than the one just pushed.
@@ -402,7 +401,7 @@ export function buildCustodyPairs(
         providerArchetype: 'desktop',
         receiverHumanId: humanId,
         receiverArchetype: 'desktop',
-        blobHash: subject.hash,
+        blobCid: subject.cid,
         blobSizeBytes: subject.sizeBytes,
         fixture: 'household-drill',
       });
@@ -449,8 +448,8 @@ export async function canonicalHumanIdFor(
  *
  *   1. a peer that already holds the blob — the bytes are on the mesh, so
  *      pushing them to the rest is replication, not fabrication;
- *   2. the row's own `contentBody`, but ONLY when its CIDv1/raw/sha256 digest
- *      EXACTLY equals the declared `blobHash`. That equality is a proof, not a
+ *   2. the row's own `contentBody`, but ONLY when its byte-profile CID (raw + blake3-256)
+ *      EXACTLY equals the declared `blobCid`. That equality is a proof, not a
  *      heuristic: content addressing means matching bytes ARE the artifact.
  *
  * Neither available → return undefined and say so. A markdown row whose blob
@@ -475,14 +474,14 @@ async function resolveExistingSubject(
     return { reason: `GET /db/content/${contentId} failed: ${String(error)}` };
   }
 
-  const declaredHash = typeof row['blobHash'] === 'string' ? row['blobHash'] : '';
-  if (!declaredHash) return { reason: `"${contentId}" declares no blobHash` };
+  const declaredCid = typeof row['blobCid'] === 'string' ? row['blobCid'] : '';
+  if (!declaredCid) return { reason: `"${contentId}" declares no blobCid` };
 
   // Source 1 — a peer that already holds it.
   let bytes: Buffer | undefined;
   for (const url of storageUrls) {
     try {
-      const response = await fetch(`${url}/blob/${encodeURIComponent(declaredHash)}`, {
+      const response = await fetch(`${url}/blob/${encodeURIComponent(declaredCid)}`, {
         signal: AbortSignal.timeout(30_000),
       });
       if (response.ok) {
@@ -497,13 +496,13 @@ async function resolveExistingSubject(
   // Source 2 — the row's own body, admitted ONLY on an exact content-address match.
   if (!bytes && typeof row['contentBody'] === 'string' && row['contentBody'].length > 0) {
     const candidate = Buffer.from(row['contentBody'], 'utf8');
-    const { cid, hash } = await computeContentAddresses(new Uint8Array(candidate));
-    if (declaredHash === cid || declaredHash === hash || declaredHash === `sha256-${hash}`) {
+    const cid = byteCid(new Uint8Array(candidate));
+    if (declaredCid === cid) {
       bytes = candidate;
     } else {
       return {
         reason:
-          `"${contentId}" declares blobHash ${declaredHash} but its contentBody addresses to ` +
+          `"${contentId}" declares blobCid ${declaredCid} but its contentBody addresses to ` +
           `${cid} — the body is NOT the declared artifact, so seeding custody for it would be ` +
           'a promise to hold bytes nobody has. Refusing.',
       };
@@ -513,7 +512,7 @@ async function resolveExistingSubject(
   if (!bytes) {
     return {
       reason:
-        `no household peer holds ${declaredHash} for "${contentId}" and the row carries no ` +
+        `no household peer holds ${declaredCid} for "${contentId}" and the row carries no ` +
         'contentBody that addresses to it — there are no bytes on this mesh to be under custody of.',
     };
   }
@@ -523,13 +522,13 @@ async function resolveExistingSubject(
   const push = await pushToAllHolders(
     doorways,
     storageUrls,
-    { data: bytes, hash: declaredHash },
+    { data: bytes, cid: declaredCid },
     String(row['mimeType'] ?? 'application/octet-stream'),
     apiKey,
   );
 
   return {
-    subject: { contentId, hash: declaredHash, sizeBytes: bytes.length },
+    subject: { contentId, cid: declaredCid, sizeBytes: bytes.length },
     pushed: push.placed,
   };
 }
@@ -567,7 +566,7 @@ if (isMain) {
 
   for (const fixture of DRILL_FIXTURES) {
     const blob = fixtureBlob(fixture);
-    console.log(`\n-- ${fixture.id} (${blob.hash.slice(0, 22)}..., ${blob.data.length} bytes) --`);
+    console.log(`\n-- ${fixture.id} (${blob.cid.slice(0, 22)}..., ${blob.data.length} bytes) --`);
 
     const push = await pushToAllHolders(
       doorways,
@@ -601,7 +600,7 @@ if (isMain) {
     const landed = outcomes.filter(o => o === 'created' || o === 'exists').length;
     if (landed > 0) {
       console.log(`  [+] content row on ${landed}/${declareTargets.length} peer(s)`);
-      seeded.push({ contentId: fixture.id, hash: blob.hash, sizeBytes: blob.data.length });
+      seeded.push({ contentId: fixture.id, cid: blob.cid, sizeBytes: blob.data.length });
     } else {
       console.error(`  [X] content declare failed everywhere: ${outcomes.join(' | ')}`);
       failed += 1;
@@ -622,7 +621,7 @@ if (isMain) {
   const existing = await resolveExistingSubject(doorways, peerUrls, commonsEprId, apiKey);
   if ('subject' in existing) {
     console.log(
-      `  [+] recovered ${existing.subject.sizeBytes} bytes for ${existing.subject.hash.slice(0, 22)}... ` +
+      `  [+] recovered ${existing.subject.sizeBytes} bytes for ${existing.subject.cid.slice(0, 22)}... ` +
         `and placed them on ${existing.pushed} holder(s)`,
     );
     seeded.push(existing.subject);

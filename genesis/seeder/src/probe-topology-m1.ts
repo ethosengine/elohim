@@ -10,7 +10,7 @@
  *   ALPHA_BASE_URL=https://app.elohim.host \
  *   MATTHEW_USERNAME=matthew.dowell@alpha.elohim.host \
  *   MATTHEW_PASSWORD=TestAdmin2026! \
- *   CONTENT_BLOB_HASH=sha256-... \
+ *   CONTENT_BLOB_HASH=bafkr4i... \
  *   npx tsx src/probe-topology-m1.ts
  */
 

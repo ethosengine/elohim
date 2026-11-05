@@ -29,9 +29,9 @@
 #      re-ask stage-spa-blob.sh uses after a broken PUT. It is the auth and
 #      storage-forward question, and it draws from the doorway's WRITE admission
 #      pool (a GET draws from the read pool), so a real write-admission shed is
-#      seen here (503 {"status":"catching-up"}). A routed probe on a hash the
+#      seen here (503 {"status":"catching-up"}). A routed probe on a CID the
 #      doorway does not hold answers 409 before anything is cached (seed.rs
-#      checks the hash before `cache.set`). With READINESS_PROBE_HASH naming a
+#      checks the CID before `cache.set`). With READINESS_PROBE_CID naming a
 #      blob the doorway DOES hold, the doorway re-runs the storage forward and
 #      reports it, which is how a storage-forward timeout is seen.
 #   An answer carrying CellDisabled on question 2 or 3 is cell-not-running.
@@ -57,9 +57,9 @@
 # Env:
 #   STORAGE_API_KEY_ADMIN  X-API-Key for the write probe (a gated, non-DEV_MODE
 #                          doorway answers 401 without it — reported, exit 2).
-#   READINESS_PROBE_HASH   X-Blob-Hash for the zero-byte probe (default: a
-#                          never-held all-zero sha256, which asks the admission
-#                          gate only and cannot be cached).
+#   READINESS_PROBE_CID    X-Content-Address for the zero-byte probe (default: a
+#                          never-held all-zero-digest byte CID, which asks the
+#                          admission gate only and cannot be cached).
 #   READINESS_PROBE_CONTENT_ID
 #                          the content id question 2 reads (default
 #                          fleet-write-readiness-probe — never authored).
@@ -76,11 +76,11 @@
 #   READINESS_OUT          also write the per-doorway lines to this file.
 #   DEPLOY_INTENT_OUT      on NOT READY, write the deploy intent JSON here:
 #                          {commit, env, doorway, face, retryAfter, doorways,
-#                          notReady[], bundles[{slug,kind,sha256}]}. An
+#                          notReady[], bundles[{slug,kind,blobCid}]}. An
 #                          Ephemeral CI artifact, reconstructable from the build.
 #   DEPLOY_INTENT_COMMIT, DEPLOY_INTENT_ENV
 #   DEPLOY_INTENT_BUNDLES  whitespace-separated `slug:kind:dist-dir` triples;
-#                          each sha256 is the archive CID lib/bundle-zip.sh
+#                          each blobCid is the archive CID lib/bundle-zip.sh
 #                          produces — the same bytes stage-spa-blob.sh uploads.
 #
 # Requires: bash, coreutils, curl, node (JSON + the SDK packager for intents).
@@ -95,7 +95,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 JSON_NODE="${READINESS_JSON_NODE:-node}"
 MAX_TIME="${READINESS_MAX_TIME:-20}"
 DEFAULT_RETRY_AFTER="${READINESS_DEFAULT_RETRY_AFTER:-60}"
-PROBE_HASH="${READINESS_PROBE_HASH:-sha256-0000000000000000000000000000000000000000000000000000000000000000}"
+PROBE_CID="${READINESS_PROBE_CID:-bafkr4iaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
 PROBE_CONTENT_ID="${READINESS_PROBE_CONTENT_ID:-fleet-write-readiness-probe}"
 FACES_FILE="${READINESS_FACES_FILE:-${HERE}/lib/readiness-faces.json}"
 
@@ -329,7 +329,7 @@ for url in "$@"; do
 
     leg "${n}" put -X PUT \
         -H 'Content-Type: application/zip' \
-        -H "X-Blob-Hash: ${PROBE_HASH}" \
+        -H "X-Content-Address: ${PROBE_CID}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary '' "${base}/admin/seed/blob"
     settle "${origin}" "zero-byte PUT /admin/seed/blob" \
@@ -377,10 +377,10 @@ write_intent() {
             slug="${item%%:*}"; rest="${item#*:}"
             kind="${rest%%:*}"; dist="${rest#*:}"
             if bundle_zip "${dist}" "${kind}" "${TMP_DIR}/bundle-${i}" >&2; then
-                bundles+="${sep}{\"slug\":$(json_str "${slug}"),\"kind\":$(json_str "${kind}"),\"sha256\":$(json_str "${BUNDLE_ZIP_HASH}")}"
+                bundles+="${sep}{\"slug\":$(json_str "${slug}"),\"kind\":$(json_str "${kind}"),\"blobCid\":$(json_str "${BUNDLE_ZIP_CID}")}"
             else
-                echo "  ⊘ WARN: ${slug} (${kind}): could not package ${dist} for the intent — sha256 recorded as null" >&2
-                bundles+="${sep}{\"slug\":$(json_str "${slug}"),\"kind\":$(json_str "${kind}"),\"sha256\":null}"
+                echo "  ⊘ WARN: ${slug} (${kind}): could not package ${dist} for the intent — blobCid recorded as null" >&2
+                bundles+="${sep}{\"slug\":$(json_str "${slug}"),\"kind\":$(json_str "${kind}"),\"blobCid\":null}"
             fi
             sep=","
         done

@@ -12,9 +12,9 @@
 #   GET /health/startup (preferred), falling back to GET /health
 #   {
 #     "servedBundleHeads": [
-#       { "slug": "...", "serverBlobHash": "...", "materializedAt": "...",
+#       { "slug": "...", "serverBlobCid": "...", "materializedAt": "...",
 #         "status": "current|stale|refreshing|failed",
-#         "declaredServerBlobHash": "..." }
+#         "declaredServerBlobCid": "..." }
 #     ]
 #   }
 # Missing attestation enters the same bounded convergence window as a stale
@@ -28,9 +28,9 @@
 # Usage: verify-projected-head.sh <doorway-base-url> <slug> <expected-server-blob-hash> [expected-git-commit] [ssr-path=/]
 # ssr-path must be a declared SSR-renderable route; a browser mount need not render.
 # Exit codes:
-#   0 = MATCH (served serverBlobHash == expected, either immediately or after
+#   0 = MATCH (served serverBlobCid == expected, either immediately or after
 #       convergence retries)
-#   1 = STILL-DIVERGENT (served serverBlobHash != expected after the full
+#   1 = STILL-DIVERGENT (served serverBlobCid != expected after the full
 #       convergence window) or UNREACHABLE (neither /health/startup nor
 #       /health answered 200 after retries)
 #
@@ -80,14 +80,14 @@ import json, sys
 try:
     row = json.load(open(sys.argv[1]))
     if not isinstance(row, dict): raise ValueError("not an object")
-    head = row.get("serverBlobHash")
+    head = row.get("serverBlobCid")
     if head is not None and not isinstance(head, str): raise ValueError("not a hash")
     print(head or "")
 except Exception:
     sys.exit(1)
 ' "$PROBE_BODY") || { declaration_reason="malformed-row"; return 0; }
-    declaration_reason="missing-serverBlobHash"
-    [ -z "$observed_hash" ] || declaration_reason="different-serverBlobHash"
+    declaration_reason="missing-serverBlobCid"
+    [ -z "$observed_hash" ] || declaration_reason="different-serverBlobCid"
 }
 
 declaration_start=$SECONDS
@@ -137,7 +137,7 @@ else:
 " 2>/dev/null || echo no
 }
 
-# Prints the serverBlobHash for SLUG's servedBundleHeads[] entry, or empty.
+# Prints the serverBlobCid for SLUG's servedBundleHeads[] entry, or empty.
 extract_served_hash() {
     SLUG="${SLUG}" python3 -c "
 import json, os
@@ -149,7 +149,7 @@ else:
     slug = os.environ['SLUG']
     for entry in data.get('servedBundleHeads') or []:
         if isinstance(entry, dict) and entry.get('slug') == slug:
-            print((entry.get('serverBlobHash') or '') if entry.get('status') == 'current' else '')
+            print((entry.get('serverBlobCid') or '') if entry.get('status') == 'current' else '')
             break
     else:
         print('')
@@ -219,7 +219,7 @@ else
     #
     # `POST /admin/ssr-bundle/refresh` is documented as "the actuation twin of
     # the background reconcile tick": it re-resolves each slug's declared
-    # serverBlobHash, re-materializes on mismatch, and hot-swaps the registry
+    # serverBlobCid, re-materializes on mismatch, and hot-swaps the registry
     # entry IN PLACE — converging without a doorway restart. It is idempotent
     # (an already-current slug reports `current` and does no work), degrades
     # safely (`failed`/`unreachable` keep the old bundle), and is the same

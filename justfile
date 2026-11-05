@@ -840,6 +840,16 @@ _gate-constants-sync:
     pnpm run schema:codegen:ts -- --verify
     cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts
 
+# Durable address-profile lint (re-genesis 1). WARN-CLASS: prints violations, never fails the
+# gate, until Phase 3. The flip to refuse is this recipe's body becoming just
+# `bash scripts/ci/address-profile-lint.sh`.
+_gate-address-profile-lint:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    if ! bash scripts/ci/address-profile-lint.sh; then
+        echo "address-profile-lint: WARN-CLASS (not yet refusing) — see violations above"
+    fi
+
 _gate-genesis-a2o:
     cd genesis/a2o && pnpm run lint && pnpm run format:check && pnpm run typecheck
 

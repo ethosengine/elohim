@@ -434,7 +434,7 @@ say "corpus rows under grant: ${ROWS}"
 # purpose: the edge pipeline does not build the Angular SPA (that is the app
 # pipeline), and the bundle's BYTES are irrelevant to this measure — what
 # matters is that a real content-addressed blob is PUT and a real DNA-notarized
-# blobHash PATCH is authored through the conductor bridge, which a one-file
+# blobCid PATCH is authored through the conductor bridge, which a one-file
 # bundle exercises identically.
 # ---------------------------------------------------------------------------
 banner "PHASE 1 QUIESCE · step 4: stage landing blob (notarized head)"

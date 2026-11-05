@@ -17,7 +17,7 @@
  *   // Then register manifest in DNA via Holochain
  */
 
-import * as crypto from 'crypto';
+import { byteCid } from './byte-cid.js';
 
 // =============================================================================
 // Types
@@ -35,20 +35,18 @@ export interface StorageClientConfig {
 }
 
 export interface ShardManifest {
-  blob_hash: string;
+  blob_cid: string;
   total_size: number;
   mime_type: string;
   encoding: string;
   data_shards: number;
   total_shards: number;
   shard_size: number;
-  shard_hashes: string[];
+  shard_cids: string[];
   reach: string;
   author_id?: string;
   created_at: string;
   verified_at?: string;
-  /** BLAKE3 hash populated by server-side dual-write (iroh). Null when iroh is not configured. */
-  blake3Hash?: string | null;
 }
 
 export interface StorageHealthStatus {
@@ -62,14 +60,12 @@ export interface StorageHealthStatus {
 export interface PushBlobResult {
   success: boolean;
   manifest?: ShardManifest;
-  /** BLAKE3 hash from server-side dual-write (iroh). Undefined when iroh not configured (libp2p-only). */
-  blake3Hash?: string;
   error?: string;
 }
 
 export interface PushShardResult {
   success: boolean;
-  hash: string;
+  cid: string;
   sizeBytes: number;
   alreadyExisted: boolean;
   error?: string;
@@ -92,11 +88,11 @@ export class StorageClient {
   }
 
   /**
-   * Compute SHA256 hash of data (matching elohim-storage format).
+   * Compute the byte-profile CID (raw + blake3-256) of data — the address
+   * elohim-storage verifies the body against.
    */
-  static computeHash(data: Buffer): string {
-    const hash = crypto.createHash('sha256').update(data).digest('hex');
-    return `sha256-${hash}`;
+  static computeCid(data: Buffer): string {
+    return byteCid(data);
   }
 
   /**
@@ -134,9 +130,9 @@ export class StorageClient {
   /**
    * Check if a shard exists in storage.
    */
-  async shardExists(hash: string): Promise<boolean> {
+  async shardExists(cid: string): Promise<boolean> {
     try {
-      const response = await this.fetch(`/shard/${hash}`, {
+      const response = await this.fetch(`/shard/${cid}`, {
         method: 'HEAD',
       });
       return response.status === 200;
@@ -148,16 +144,16 @@ export class StorageClient {
   /**
    * Push a shard to storage.
    */
-  async pushShard(data: Buffer, expectedHash?: string): Promise<PushShardResult> {
-    const hash = expectedHash || StorageClient.computeHash(data);
+  async pushShard(data: Buffer, expectedCid?: string): Promise<PushShardResult> {
+    const cid = expectedCid || StorageClient.computeCid(data);
 
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would push shard: ${hash} (${data.length} bytes)`);
-      return { success: true, hash, sizeBytes: data.length, alreadyExisted: false };
+      console.log(`[DRY RUN] Would push shard: ${cid} (${data.length} bytes)`);
+      return { success: true, cid, sizeBytes: data.length, alreadyExisted: false };
     }
 
     try {
-      const response = await this.fetch(`/shard/${hash}`, {
+      const response = await this.fetch(`/shard/${cid}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/octet-stream',
@@ -169,7 +165,7 @@ export class StorageClient {
         const errorText = await response.text();
         return {
           success: false,
-          hash,
+          cid,
           sizeBytes: data.length,
           alreadyExisted: false,
           error: `HTTP ${response.status}: ${errorText}`,
@@ -179,14 +175,14 @@ export class StorageClient {
       const result = await response.json();
       return {
         success: true,
-        hash: result.hash,
+        cid: result.cid,
         sizeBytes: result.size_bytes,
         alreadyExisted: result.already_existed,
       };
     } catch (error) {
       return {
         success: false,
-        hash,
+        cid,
         sizeBytes: data.length,
         alreadyExisted: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -204,22 +200,22 @@ export class StorageClient {
     mimeType: string,
     reach: string = 'commons'
   ): Promise<PushBlobResult> {
-    const hash = StorageClient.computeHash(data);
+    const cid = StorageClient.computeCid(data);
 
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would push blob: ${hash} (${data.length} bytes)`);
+      console.log(`[DRY RUN] Would push blob: ${cid} (${data.length} bytes)`);
       // Return a mock manifest for dry run
       return {
         success: true,
         manifest: {
-          blob_hash: hash,
+          blob_cid: cid,
           total_size: data.length,
           mime_type: mimeType,
           encoding: 'none',
           data_shards: 1,
           total_shards: 1,
           shard_size: data.length,
-          shard_hashes: [hash],
+          shard_cids: [cid],
           reach,
           created_at: new Date().toISOString(),
           verified_at: new Date().toISOString(),
@@ -228,7 +224,7 @@ export class StorageClient {
     }
 
     try {
-      const response = await this.fetch(`/blob/${hash}`, {
+      const response = await this.fetch(`/blob/${cid}`, {
         method: 'PUT',
         headers: {
           'Content-Type': mimeType,
@@ -245,17 +241,12 @@ export class StorageClient {
       }
 
       const manifest = await response.json();
-      // Extract blake3Hash from the server response (present when iroh dual-write succeeded).
-      // The server returns camelCase JSON; we surface it at PushBlobResult level so callers
-      // don't have to cast through ShardManifest's snake_case fields.
-      const blake3Hash: string | undefined = (manifest as any).blake3Hash || undefined;
       return {
         success: true,
         manifest: {
           ...manifest,
           reach, // Storage doesn't know about reach, we set it
         },
-        blake3Hash,
       };
     } catch (error) {
       return {
@@ -266,11 +257,11 @@ export class StorageClient {
   }
 
   /**
-   * Get shard data by hash.
+   * Get shard data by CID.
    */
-  async getShard(hash: string): Promise<Buffer | null> {
+  async getShard(cid: string): Promise<Buffer | null> {
     try {
-      const response = await this.fetch(`/shard/${hash}`);
+      const response = await this.fetch(`/shard/${cid}`);
       if (!response.ok) return null;
       return Buffer.from(await response.arrayBuffer());
     } catch {
@@ -281,9 +272,9 @@ export class StorageClient {
   /**
    * Get manifest for a blob.
    */
-  async getManifest(blobHash: string): Promise<ShardManifest | null> {
+  async getManifest(blobCid: string): Promise<ShardManifest | null> {
     try {
-      const response = await this.fetch(`/manifest/${blobHash}`);
+      const response = await this.fetch(`/manifest/${blobCid}`);
       if (!response.ok) return null;
       return await response.json();
     } catch {
@@ -300,25 +291,25 @@ export class StorageClient {
     success: number;
     failed: number;
     manifests: ShardManifest[];
-    errors: Array<{ hash: string; error: string }>;
+    errors: Array<{ cid: string; error: string }>;
   }> {
     let success = 0;
     let failed = 0;
     const manifests: ShardManifest[] = [];
-    const errors: Array<{ hash: string; error: string }> = [];
+    const errors: Array<{ cid: string; error: string }> = [];
 
     for (const blob of blobs) {
-      const hash = StorageClient.computeHash(blob.data);
+      const cid = StorageClient.computeCid(blob.data);
       const result = await this.pushBlob(blob.data, blob.mimeType, blob.reach || 'commons');
 
       if (result.success && result.manifest) {
         success++;
         manifests.push(result.manifest);
-        console.log(`  ✓ ${hash} (${blob.data.length} bytes, ${result.manifest.total_shards} shards)`);
+        console.log(`  ✓ ${cid} (${blob.data.length} bytes, ${result.manifest.total_shards} shards)`);
       } else {
         failed++;
-        errors.push({ hash, error: result.error || 'Unknown error' });
-        console.error(`  ✗ ${hash}: ${result.error}`);
+        errors.push({ cid, error: result.error || 'Unknown error' });
+        console.error(`  ✗ ${cid}: ${result.error}`);
       }
     }
 

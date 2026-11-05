@@ -14,8 +14,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DoorwayClient, readSeederCredentials } from '../doorway-client.js';
 import type { BlobMetadata } from '../blob-manager.js';
+import { byteCid } from '../byte-cid.js';
 
-const META: BlobMetadata = { hash: 'sha256-abc', sizeBytes: 4, mimeType: 'text/plain' };
+const DATA = Buffer.from('data');
+const DATA_CID = byteCid(DATA);
+const META: BlobMetadata = { cid: DATA_CID, sizeBytes: 4, mimeType: 'text/plain' };
 
 /** A fetch mock that records every call and returns scripted responses by path. */
 function mockFetch(handlers: Record<string, () => Response>) {
@@ -98,17 +101,16 @@ describe('DoorwayClient bearer authentication', () => {
   it('attaches Authorization: Bearer <jwt> to the gated blob PUT after login', async () => {
     const { impl, calls } = mockFetch({
       '/auth/login': () => jsonResponse({ token: 'jwt-xyz' }),
-      // blobExists checks (CID + hash) → 404 so we reach the PUT
-      '/blob/sha256-abc': () => new Response('', { status: 404 }),
-      '/admin/seed/blob': () => jsonResponse({ blake3Hash: 'b3-1' }),
+      // blobExists check → 404 so we reach the PUT
+      [`/blob/${DATA_CID}`]: () => new Response('', { status: 404 }),
+      '/admin/seed/blob': () => jsonResponse({}),
     });
-    // CID-based blobExists path hits a bafkrei* path — default 404 from mock.
     globalThis.fetch = impl as unknown as typeof fetch;
 
     const client = new DoorwayClient({ baseUrl: 'https://doorway-alpha.elohim.host' });
     await client.login({ identifier: 'jenkins-ci@alpha.elohim.host', password: 'pw' });
 
-    const result = await client.pushBlob('sha256-abc', Buffer.from('data'), META);
+    const result = await client.pushBlob(DATA_CID, DATA, META);
     expect(result.success).toBe(true);
 
     const putCall = calls.find((c) => c.url.endsWith('/admin/seed/blob'));
@@ -118,7 +120,7 @@ describe('DoorwayClient bearer authentication', () => {
 
   it('attaches NO JWT bearer when not authenticated (dev-mode skip path)', async () => {
     const { impl, calls } = mockFetch({
-      '/admin/seed/blob': () => jsonResponse({ blake3Hash: 'b3-1' }),
+      '/admin/seed/blob': () => jsonResponse({}),
     });
     globalThis.fetch = impl as unknown as typeof fetch;
 
@@ -126,7 +128,7 @@ describe('DoorwayClient bearer authentication', () => {
     const client = new DoorwayClient({ baseUrl: 'http://localhost:8888' });
     expect(client.bearerToken).toBeNull();
 
-    await client.pushBlob('sha256-abc', Buffer.from('data'), META);
+    await client.pushBlob(DATA_CID, DATA, META);
 
     const putCall = calls.find((c) => c.url.endsWith('/admin/seed/blob'));
     expect(putCall?.headers['Authorization']).toBeUndefined();
@@ -134,7 +136,7 @@ describe('DoorwayClient bearer authentication', () => {
 
   it('setBearerToken() lets a sibling client adopt a pre-obtained JWT', async () => {
     const { impl, calls } = mockFetch({
-      '/admin/seed/blob': () => jsonResponse({ blake3Hash: 'b3-1' }),
+      '/admin/seed/blob': () => jsonResponse({}),
     });
     globalThis.fetch = impl as unknown as typeof fetch;
 
@@ -142,7 +144,7 @@ describe('DoorwayClient bearer authentication', () => {
     client.setBearerToken('shared-jwt');
     expect(client.bearerToken).toBe('shared-jwt');
 
-    await client.pushBlob('sha256-abc', Buffer.from('data'), META);
+    await client.pushBlob(DATA_CID, DATA, META);
     const putCall = calls.find((c) => c.url.endsWith('/admin/seed/blob'));
     expect(putCall?.headers['Authorization']).toBe('Bearer shared-jwt');
   });
@@ -168,7 +170,7 @@ describe('DoorwayClient bearer authentication', () => {
 
     // No login — simulates a non-dev doorway rejecting an unauthenticated seed.
     const client = new DoorwayClient({ baseUrl: 'https://doorway-alpha.elohim.host' });
-    const result = await client.pushBlob('sha256-abc', Buffer.from('data'), META);
+    const result = await client.pushBlob(DATA_CID, DATA, META);
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/SEED_DOORWAY_IDENTIFIER/);
@@ -183,9 +185,39 @@ describe('DoorwayClient bearer authentication', () => {
 
     const client = new DoorwayClient({ baseUrl: 'https://doorway-alpha.elohim.host' });
     client.setBearerToken('jwt-but-not-admin');
-    const result = await client.pushBlob('sha256-abc', Buffer.from('data'), META);
+    const result = await client.pushBlob(DATA_CID, DATA, META);
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/under-privileged|Admin/);
+  });
+
+  it('sends the single X-Content-Address header (no X-Blob-Hash / X-Blob-Cid)', async () => {
+    const { impl, calls } = mockFetch({
+      '/admin/seed/blob': () => jsonResponse({}),
+    });
+    globalThis.fetch = impl as unknown as typeof fetch;
+
+    const client = new DoorwayClient({ baseUrl: 'http://localhost:8888' });
+    const result = await client.pushBlob(DATA_CID, DATA, META);
+
+    expect(result.success).toBe(true);
+    expect(result.cid).toBe(DATA_CID);
+    const putCall = calls.find((c) => c.url.endsWith('/admin/seed/blob'));
+    expect(putCall?.headers['X-Content-Address']).toBe(DATA_CID);
+    expect(putCall?.headers['X-Blob-Hash']).toBeUndefined();
+    expect(putCall?.headers['X-Blob-Cid']).toBeUndefined();
+  });
+
+  it('refuses a declared CID that the bytes do not address to, before any request', async () => {
+    const { impl, calls } = mockFetch({});
+    globalThis.fetch = impl as unknown as typeof fetch;
+
+    const client = new DoorwayClient({ baseUrl: 'http://localhost:8888' });
+    const other = byteCid(Buffer.from('other'));
+    const result = await client.pushBlob(other, DATA, META);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/CID mismatch/);
+    expect(calls).toHaveLength(0);
   });
 });

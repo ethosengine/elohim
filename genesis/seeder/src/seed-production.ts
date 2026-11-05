@@ -2,7 +2,7 @@
  * Production Seeder - Dual-path seeding for DNA + Projection Cache
  *
  * Seeds content to both:
- * 1. Holochain DNA (metadata with blobHash references)
+ * 1. Holochain DNA (metadata with blobCid references)
  * 2. Doorway Projection Cache (actual blob content)
  *
  * Architecture:
@@ -24,7 +24,7 @@
  * ┌───────────────────────┐           ┌───────────────────────────┐
  * │  Holochain DNA        │           │  Doorway Projection Cache │
  * │  - Metadata entries   │           │  - Blob content           │
- * │  - blobHash refs     │           │  - Fast delivery          │
+ * │  - blobCid refs     │           │  - Fast delivery          │
  * │  - Path entries       │           │  - CDN-like serving       │
  * └───────────────────────┘           └───────────────────────────┘
  *
@@ -271,7 +271,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
   });
 
   const processedContents: Array<{ id: string; metadata: Record<string, unknown> }> = [];
-  const blobsToPush: Array<{ hash: string; data: Buffer; metadata: { hash: string; sizeBytes: number; mimeType: string; entryPoint?: string } }> = [];
+  const blobsToPush: Array<{ cid: string; data: Buffer; metadata: { cid: string; sizeBytes: number; mimeType: string; entryPoint?: string } }> = [];
 
   console.log(`\nProcessing ${contentFiles.length} content files...`);
 
@@ -286,12 +286,12 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
       if (processed.extracted && processed.blob && processed.blobMetadata) {
         results.blobsExtracted++;
         blobsToPush.push({
-          hash: processed.blobMetadata.hash,
+          cid: processed.blobMetadata.cid,
           data: processed.blob,
           metadata: processed.blobMetadata,
         });
         if (config.verbose) {
-          console.log(`  📦 ${file} → blob ${processed.blobMetadata.hash.slice(0, 20)}...`);
+          console.log(`  📦 ${file} → blob ${processed.blobMetadata.cid.slice(0, 20)}...`);
         }
       }
 
@@ -353,7 +353,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
 
       for (const blob of blobsToPush) {
         // Determine reach based on content metadata
-        const content = processedContents.find(c => c.metadata.blob_hash === blob.hash);
+        const content = processedContents.find(c => c.metadata.blobCid === blob.cid);
         const reach = (content?.metadata.reach as string) || 'commons';
 
         const result = await storageClient.pushBlob(blob.data, blob.metadata.mimeType, reach);
@@ -363,12 +363,11 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           manifestsToRegister.push({ manifest: result.manifest, reach });
 
           if (config.verbose) {
-            const blake3Note = result.blake3Hash ? ` blake3=${result.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
-            console.log(`  ✓ ${blob.hash} → ${result.manifest.total_shards} shards${blake3Note}`);
+            console.log(`  ✓ ${blob.cid} → ${result.manifest.total_shards} shards`);
           }
         } else {
           results.shardErrors++;
-          console.error(`  ✗ ${blob.hash}: ${result.error}`);
+          console.error(`  ✗ ${blob.cid}: ${result.error}`);
         }
       }
 
@@ -450,7 +449,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
                 related_node_ids: metadata.relatedNodeIds || [],
                 reach: resolveDnaCreateContentReach(metadata.reach, corpusDeclaredReach, `content ${id}`),
                 metadata_json: JSON.stringify({
-                  blob_hash: metadata.blob_hash,
+                  blob_cid: metadata.blob_cid,
                   blob_url: metadata.blob_url,
                   entry_point: metadata.entry_point,
                   fallback_url: metadata.fallback_url,
@@ -553,14 +552,14 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
                 zome_name: 'content_store',
                 fn_name: 'register_shard_manifest',
                 payload: {
-                  blob_hash: manifest.blob_hash,
+                  blob_cid: manifest.blob_cid,
                   total_size: manifest.total_size,
                   mime_type: manifest.mime_type,
                   encoding: manifest.encoding,
                   data_shards: manifest.data_shards,
                   total_shards: manifest.total_shards,
                   shard_size: manifest.shard_size,
-                  shard_hashes: manifest.shard_hashes,
+                  shard_cids: manifest.shard_cids,
                   reach: reach,
                   author_id: null, // Seeder doesn't have author info
                 },
@@ -568,17 +567,17 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
               results.manifestsRegistered++;
 
               if (config.verbose) {
-                console.log(`  ✓ ${manifest.blob_hash.slice(0, 20)}... (${manifest.total_shards} shards)`);
+                console.log(`  ✓ ${manifest.blob_cid.slice(0, 20)}... (${manifest.total_shards} shards)`);
               }
             } catch (e) {
               results.manifestErrors++;
               const error = e instanceof Error ? e.message : 'Unknown error';
               if (error.includes('already exists')) {
                 if (config.verbose) {
-                  console.log(`  ⏭️  ${manifest.blob_hash.slice(0, 20)}... (already registered)`);
+                  console.log(`  ⏭️  ${manifest.blob_cid.slice(0, 20)}... (already registered)`);
                 }
               } else {
-                console.error(`  ❌ ${manifest.blob_hash.slice(0, 20)}...: ${error}`);
+                console.error(`  ❌ ${manifest.blob_cid.slice(0, 20)}...: ${error}`);
               }
             }
           }

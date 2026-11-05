@@ -497,7 +497,7 @@ export async function buildLandingAtomGraph(): Promise<LandingAtomGraph> {
         note:
           'Asserts that a custody-blob REA commitment is pledged for this content and ' +
           'artifact role. The resolved blob hash is deliberately NOT part of this claim: ' +
-          'it is minted at deploy time (serverBlobHash), so binding it here would make the ' +
+          'it is minted at deploy time (serverBlobCid), so binding it here would make the ' +
           'claim CID move on every SSR bundle rebuild. The commitment row carries the hash.',
       })
     ),

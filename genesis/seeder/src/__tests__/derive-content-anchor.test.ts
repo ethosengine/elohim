@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveContentAnchor } from '../seed-sqlite.js';
+import { CID_A } from './fixture-cids.js';
 
 describe('deriveContentAnchor', () => {
   it('produces a CIDv1 starting with bafk for content with a body', async () => {
@@ -15,16 +16,7 @@ describe('deriveContentAnchor', () => {
     const anchor = await deriveContentAnchor({
       id: 'blob-content',
       title: 'Blob Content',
-      blobCid: 'bafkreiabcdef1234',
-    });
-    expect(anchor).toMatch(/^bafk/);
-  });
-
-  it('produces a CIDv1 starting with bafk for content with a blobHash fallback', async () => {
-    const anchor = await deriveContentAnchor({
-      id: 'blob-hash-content',
-      title: 'Blob Hash Content',
-      blobHash: 'sha256-abcdef1234',
+      blobCid: CID_A,
     });
     expect(anchor).toMatch(/^bafk/);
   });
@@ -55,7 +47,7 @@ describe('deriveContentAnchor', () => {
       id: 'x',
       title: 'X',
       contentBody: 'body bytes',
-      blobCid: 'bafkreiabcdef1234',
+      blobCid: CID_A,
     });
     const bodyOnly = await deriveContentAnchor({
       id: 'x',
@@ -65,18 +57,8 @@ describe('deriveContentAnchor', () => {
     expect(withBody).toBe(bodyOnly);
   });
 
-  it('prefers blobCid over blobHash when contentBody absent', async () => {
-    const withCid = await deriveContentAnchor({
-      id: 'x',
-      title: 'X',
-      blobCid: 'bafkreiabcdef1234',
-      blobHash: 'sha256-deadbeef',
-    });
-    const cidOnly = await deriveContentAnchor({
-      id: 'x',
-      title: 'X',
-      blobCid: 'bafkreiabcdef1234',
-    });
-    expect(withCid).toBe(cidOnly);
+  it('derives the byte-profile anchor (bafkr4i…) for blob-backed content', async () => {
+    const anchor = await deriveContentAnchor({ id: 'x', title: 'X', blobCid: CID_A });
+    expect(anchor).toMatch(/^bafkr4i[a-z2-7]{52}$/);
   });
 });

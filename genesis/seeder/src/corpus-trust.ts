@@ -34,9 +34,9 @@
  * machine-readable, with the trust grant living in the same block as the rung.
  */
 
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { byteCid } from './byte-cid.js';
 import { isReach } from './generated/schema-enums.js';
 
 /** Canonical filename of a corpus declaration, at the corpus directory root. */
@@ -103,8 +103,8 @@ export interface LoadedCorpusDeclaration {
   declaration: CorpusDeclaration;
   /** Absolute path of the `corpus.json` that was read. */
   sourcePath: string;
-  /** sha256 of the declaration file's exact bytes — the provenance fingerprint. */
-  sha256: string;
+  /** Byte-profile CID (bafkr4i…) of the declaration file's exact bytes — the provenance fingerprint. */
+  cid: string;
 }
 
 /**
@@ -282,7 +282,7 @@ export function loadCorpusDeclaration(corpusDir: string): LoadedCorpusDeclaratio
   return {
     declaration,
     sourcePath,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
+    cid: byteCid(bytes),
   };
 }
 
@@ -303,7 +303,7 @@ export function loadCorpusDeclaration(corpusDir: string): LoadedCorpusDeclaratio
 // {
 //   "schemaVersion": "1",
 //   "manifestKind": "network-stakes",
-//   "manifestCid": "stakes:genesis-lamad:sha256-<64 hex>",
+//   "manifestCid": "stakes:genesis-lamad:<bafkr4i… byte CID of corpus.json>",
 //   "stakes": {
 //     "stage": "simulacra",              // NetworkStage variant, lowercase
 //     "scope": "genesis-lamad",          // == StakesResolver::stage_for(scope)
@@ -314,7 +314,7 @@ export function loadCorpusDeclaration(corpusDir: string): LoadedCorpusDeclaratio
 //                "realismRung": 0, "itemsDeclared": 3432 },
 //   "provenance": {
 //     "declaredBy": "genesis/data/lamad/corpus.json",
-//     "declarationSha256": "<64 hex>",   // sha256 of the corpus.json bytes
+//     "declarationCid": "<bafkr4i…>",    // byte-profile CID of the corpus.json bytes
 //     "mintedBy": "genesis-seeder",
 //     "mintedAt": "2026-08-16T12:00:00.000Z",
 //     "seedTarget": "http://localhost:8888"
@@ -357,7 +357,7 @@ export interface StakesDeclarationArtifact {
   };
   provenance: {
     declaredBy: string;
-    declarationSha256: string;
+    declarationCid: string;
     mintedBy: 'genesis-seeder';
     mintedAt: string;
     seedTarget: string;
@@ -385,14 +385,14 @@ export function buildStakesDeclaration(
   loaded: LoadedCorpusDeclaration,
   ctx: MintContext,
 ): StakesDeclarationArtifact | null {
-  const { declaration, sha256 } = loaded;
+  const { declaration, cid } = loaded;
   const grant = declaration.trustBootstrap;
   if (!grant) return null;
 
   return {
     schemaVersion: '1',
     manifestKind: 'network-stakes',
-    manifestCid: `stakes:${grant.scope}:sha256-${sha256}`,
+    manifestCid: `stakes:${grant.scope}:${cid}`,
     stakes: {
       stage: grant.stage,
       scope: grant.scope,
@@ -407,7 +407,7 @@ export function buildStakesDeclaration(
     },
     provenance: {
       declaredBy: ctx.declaredBy,
-      declarationSha256: sha256,
+      declarationCid: cid,
       mintedBy: 'genesis-seeder',
       mintedAt: ctx.mintedAt ?? new Date().toISOString(),
       seedTarget: ctx.seedTarget,

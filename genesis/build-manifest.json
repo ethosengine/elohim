@@ -150,6 +150,24 @@
         "function": null
       }
     },
+    "address-profile-lint": {
+      "description": "Refuse legacy blob-address spellings (sha256-/blake3- hex, legacy raw+sha2 CID gates on byte surfaces, *_hash identifiers on the blob plane) — warn-class until Phase 3 of re-genesis 1",
+      "inputs": {
+        "sources": [
+          "scripts/ci/address-profile-lint.sh"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Address Profile Lint",
+        "function": null
+      }
+    },
     "gate-genesis": {
       "description": "Catch-all trigger for genesis directory quality gate (excludes orchestrator CI glue)",
       "inputs": {
@@ -190,6 +208,14 @@
         "run": {
           "kind": "just",
           "recipe": "gate"
+        }
+      },
+      "address-profile-lint": {
+        "dir": ".",
+        "steps": ["address-profile-lint"],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-address-profile-lint"
         }
       },
       "schema-validate": {

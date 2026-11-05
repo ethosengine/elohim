@@ -7,68 +7,40 @@
  * - Validating cache availability
  *
  * Architecture:
- * - Doorway exposes /blob/{address} for blob serving (CID or hash)
+ * - Doorway exposes /blob/{cid} for blob serving (byte-profile CID only)
  * - Seeding uses admin API to push blobs
  * - Cache is eventually consistent with DHT
  *
  * Content Addressing:
- * - CID (IPFS-compatible): bafkrei... - preferred, future-proof
- * - SHA256 prefixed: sha256-abc123... - legacy compatibility
- * - Raw SHA256 hex: abc123... - legacy compatibility
+ * - Every blob is addressed by ONE spelling: the byte-profile CIDv1 (raw codec
+ *   0x55 + blake3-256), `bafkr4i…` (59 chars). There is no legacy spelling.
  *
  * Usage:
  *   const client = new DoorwayClient({ baseUrl: 'https://doorway.example.com', apiKey: 'xxx' });
  *   await client.checkHealth();
- *   const result = await client.pushBlob(hash, blob, metadata);
- *   console.log(result.cid); // bafkrei...
+ *   const result = await client.pushBlob(cid, blob, metadata);
+ *   console.log(result.cid); // bafkr4i...
  */
 
 import { BlobMetadata } from './blob-manager.js';
+import { byteCid } from './byte-cid.js';
 import type { ContentFormat, ContentType, MasteryLevel, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
-import * as raw from 'multiformats/codecs/raw';
 
 // =============================================================================
 // CID Utilities
 // =============================================================================
 
 /**
- * Compute a CID (Content Identifier) for raw data.
+ * Compute the byte-profile CID (raw 0x55 + blake3-256) for raw data.
  *
- * Uses CIDv1 with raw codec (0x55) and SHA256 multihash.
- * This is IPFS-compatible for raw binary content.
+ * Kept async for caller compatibility; the mint itself is `byteCid`.
  *
  * @param data - Raw bytes to compute CID for
- * @returns CID string (e.g., "bafkreihdwdcefgh...")
+ * @returns CID string (`bafkr4i…`)
  */
 export async function computeCid(data: Uint8Array): Promise<string> {
-  const hash = await sha256.digest(data);
-  const cid = CID.create(1, raw.code, hash);
-  return cid.toString();
-}
-
-/**
- * Compute both CID and SHA256 hash for backward compatibility.
- *
- * @param data - Raw bytes
- * @returns Object with cid and hash strings
- */
-export async function computeContentAddresses(data: Uint8Array): Promise<{
-  cid: string;
-  hash: string;
-}> {
-  const hash = await sha256.digest(data);
-  const cid = CID.create(1, raw.code, hash);
-
-  // Extract raw SHA256 bytes from multihash and format as sha256-{hex}
-  const hashHex = Buffer.from(hash.digest).toString('hex');
-
-  return {
-    cid: cid.toString(),
-    hash: `sha256-${hashHex}`,
-  };
+  return byteCid(data);
 }
 
 // =============================================================================
@@ -169,20 +141,16 @@ export interface DoorwayStatus {
 
 export interface PushResult {
   success: boolean;
-  /** CID (Content Identifier) - IPFS-compatible, preferred */
+  /** Byte-profile CID (`bafkr4i…`) of the pushed bytes */
   cid: string;
-  /** SHA256 hash - legacy format for backward compatibility */
-  hash: string;
   cached: boolean;
-  /** BLAKE3 hash from server-side iroh dual-write. Undefined when iroh not configured (libp2p-only). */
-  blake3Hash?: string;
   error?: string;
 }
 
 export interface BatchPushResult {
   success: number;
   failed: number;
-  errors: Array<{ hash: string; error: string }>;
+  errors: Array<{ cid: string; error: string }>;
 }
 
 /** Result from bulk content/path creation */
@@ -226,7 +194,7 @@ export interface ImportQueueRequest {
   batchId?: string;
   /** Hash of the blob in elohim-storage containing the items JSON
    *  REQUIRED - upload to storage first, then queue import */
-  blobHash: string;
+  blobCid: string;
   /** Total number of items in the blob */
   totalItems: number;
   /** Schema version for the import data */
@@ -663,10 +631,10 @@ export class DoorwayClient {
   /**
    * Check if a blob exists in the cache.
    */
-  async blobExists(hash: string): Promise<boolean> {
+  async blobExists(cid: string): Promise<boolean> {
     try {
       // Use GET (not HEAD) — content-addressed routes 404 on HEAD even when GET 200s.
-      const response = await this.fetch(`/blob/${hash}`, {
+      const response = await this.fetch(`/blob/${cid}`, {
         method: 'GET',
       });
       return response.status === 200;
@@ -679,35 +647,37 @@ export class DoorwayClient {
    * Push a blob to the projection cache.
    *
    * Uses the admin seed endpoint which accepts blobs for caching.
-   * Computes CID (Content Identifier) for the data and returns it.
+   * The CID is recomputed from the bytes; a caller-supplied CID that does not
+   * match them is refused before any request is made.
    *
-   * @param hash - Legacy SHA256 hash (sha256-... or raw hex)
+   * @param cid - Byte-profile CID the caller expects the bytes to have
    * @param data - Blob data as Buffer
    * @param metadata - Blob metadata including mime type
-   * @returns PushResult with both cid and hash
+   * @returns PushResult carrying the CID
    */
   async pushBlob(
-    hash: string,
+    cid: string,
     data: Buffer,
     metadata: BlobMetadata
   ): Promise<PushResult> {
-    // Compute CID for the data
-    const addresses = await computeContentAddresses(new Uint8Array(data));
-    const cid = addresses.cid;
+    const actual = byteCid(data);
+    if (cid !== actual) {
+      return {
+        success: false,
+        cid: actual,
+        cached: false,
+        error: `blob CID mismatch: caller declared ${cid} but the bytes address to ${actual}`,
+      };
+    }
 
     if (this.config.dryRun) {
       console.log(`[DRY RUN] Would push blob: ${cid} (${data.length} bytes)`);
-      return { success: true, cid, hash, cached: false };
+      return { success: true, cid, cached: false };
     }
 
-    // Check if already cached (try CID first, then legacy hash)
-    const existsByCid = await this.blobExists(cid);
-    if (existsByCid) {
-      return { success: true, cid, hash, cached: true };
-    }
-    const existsByHash = await this.blobExists(hash);
-    if (existsByHash) {
-      return { success: true, cid, hash, cached: true };
+    // Check if already cached
+    if (await this.blobExists(cid)) {
+      return { success: true, cid, cached: true };
     }
 
     try {
@@ -715,8 +685,7 @@ export class DoorwayClient {
         method: 'PUT',
         headers: {
           'Content-Type': metadata.mimeType,
-          'X-Blob-Hash': hash,
-          'X-Blob-Cid': cid,
+          'X-Content-Address': cid,
           'X-Blob-Size': String(metadata.sizeBytes),
           ...(metadata.entryPoint && { 'X-Entry-Point': metadata.entryPoint }),
           ...(metadata.fallbackUrl && { 'X-Fallback-Url': metadata.fallbackUrl }),
@@ -730,29 +699,16 @@ export class DoorwayClient {
         return {
           success: false,
           cid,
-          hash,
           cached: false,
           error: authMessage ?? `HTTP ${response.status}: ${errorText}`,
         };
       }
 
-      // Read response JSON to extract blake3Hash from server-side dual-write.
-      // Best-effort: if JSON parse fails (e.g. unexpected response shape), we
-      // still report success — the bytes were accepted.
-      let blake3Hash: string | undefined;
-      try {
-        const body = await response.json();
-        blake3Hash = (body as any)?.blake3Hash || undefined;
-      } catch {
-        // Doorway may return an empty body or non-JSON response; ignore.
-      }
-
-      return { success: true, cid, hash, cached: false, blake3Hash };
+      return { success: true, cid, cached: false };
     } catch (error) {
       return {
         success: false,
         cid,
-        hash,
         cached: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -766,14 +722,14 @@ export class DoorwayClient {
    * Returns CIDs for all successfully pushed blobs.
    */
   async pushBlobs(
-    blobs: Array<{ hash: string; data: Buffer; metadata: BlobMetadata }>
+    blobs: Array<{ cid: string; data: Buffer; metadata: BlobMetadata }>
   ): Promise<BatchPushResult> {
     let success = 0;
     let failed = 0;
-    const errors: Array<{ hash: string; error: string }> = [];
+    const errors: Array<{ cid: string; error: string }> = [];
 
     for (const blob of blobs) {
-      const result = await this.pushBlob(blob.hash, blob.data, blob.metadata);
+      const result = await this.pushBlob(blob.cid, blob.data, blob.metadata);
 
       if (result.success) {
         success++;
@@ -784,8 +740,8 @@ export class DoorwayClient {
         }
       } else {
         failed++;
-        errors.push({ hash: blob.hash, error: result.error || 'Unknown error' });
-        console.error(`  ✗ ${result.cid || blob.hash}: ${result.error}`);
+        errors.push({ cid: blob.cid, error: result.error || 'Unknown error' });
+        console.error(`  ✗ ${result.cid || blob.cid}: ${result.error}`);
       }
     }
 
@@ -799,12 +755,12 @@ export class DoorwayClient {
    */
   async registerApp(
     slug: string,
-    blobHash: string,
+    blobCid: string,
     entryPoint: string = 'index.html',
     fallbackUrl?: string
   ): Promise<{ success: boolean; error?: string }> {
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would register app: ${slug} -> ${blobHash}`);
+      console.log(`[DRY RUN] Would register app: ${slug} -> ${blobCid}`);
       return { success: true };
     }
 
@@ -816,7 +772,7 @@ export class DoorwayClient {
         },
         body: JSON.stringify({
           slug: slug,
-          blobHash: blobHash,
+          blobCid: blobCid,
           entryPoint: entryPoint,
           fallbackUrl: fallbackUrl,
         }),
@@ -864,7 +820,7 @@ export class DoorwayClient {
    * Queue content items for import via doorway.
    *
    * @param batchType - Type of content to import (e.g., 'content', 'paths')
-   * @param request - Import request with items or blobHash
+   * @param request - Import request with items or blobCid
    * @returns Import queue response with batchId
    */
   async queueImport(
@@ -872,7 +828,7 @@ export class DoorwayClient {
     request: ImportQueueRequest
   ): Promise<ImportQueueResponse> {
     if (this.config.dryRun) {
-      console.log(`[DRY RUN] Would queue import: ${batchType} (${request.totalItems} items, blob: ${request.blobHash.slice(0, 20)}...)`);
+      console.log(`[DRY RUN] Would queue import: ${batchType} (${request.totalItems} items, blob: ${request.blobCid.slice(0, 20)}...)`);
       return {
         batchId: `dry-run-${Date.now()}`,
         queuedCount: request.totalItems,

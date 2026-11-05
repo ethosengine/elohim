@@ -1390,7 +1390,7 @@ spec:
         booleanParam(
             name: 'RESET_STORAGE',
             defaultValue: false,
-            description: 'Reset storage databases before seeding (deletes content.db and restarts pods to run fresh migrations)'
+            description: 'Recast storage before seeding (genesis/scripts/ci/recast-storage-pod.sh: removes content.db, blobs, iroh store, graph.db, sync.sled; restarts pods; verifies a fresh byte-profile store). Operator-owned cluster op.'
         )
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
         string(name: 'PEER_STAGE_FEATURE', defaultValue: '', description: 'Override: one features/...feature to execute on a granted provider. Empty uses the checked-in jenkins-peer-stage.json enabled/feature declaration.')
@@ -1573,7 +1573,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 ═══════════════════════════════════════════════════════════
 """
                         for (human in humans) {
-                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/reset-storage-pod.sh' '${human.service}' '${human.namespace}' '${human.humanId}'"
+                            sh "bash '${env.WORKSPACE}/genesis/scripts/ci/recast-storage-pod.sh' '${human.service}' '${human.namespace}' '${human.humanId}' recast"
                         }
 
                         // Wait for pods to begin restarting
@@ -1594,11 +1594,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                 echo "Waiting for ${human.service}..."
                                 if kubectl wait --for=condition=Ready pod/${human.service}-0 -n ${human.namespace} --timeout=600s 2>/dev/null; then
                                     echo "   ✅ ${human.service} ready (600s: embedded-HC cold start, see #1055)"
+                                    bash '${env.WORKSPACE}/genesis/scripts/ci/recast-storage-pod.sh' '${human.service}' '${human.namespace}' '${human.humanId}' verify || exit 3
                                     exit 0
                                 fi
                                 echo "   ⏭️  ${human.service} not Ready within 600s — skipping (reconcile to available compute)"
                                 exit 1
                             """)
+                            if (rc == 3) { error("Reset Storage: ${human.humanId} came back Ready but is NOT a fresh byte-profile store (recast-storage-pod.sh verify refused)") }
                             if (rc != 0) { resetUnreachable << human.humanId }
                         }
                         if (!resetUnreachable.isEmpty()) {
@@ -1980,7 +1982,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        def blobHash = env.CONTENT_BLOB_HASH
+                        def blobCid = env.CONTENT_BLOB_HASH
                         def blobSize = env.CONTENT_BLOB_SIZE_BYTES ?: '0'
                         // Gate custody seeding on the projector being caught up (not
                         // just healthy): the Upload-Blob + earlier seed waves backlog
@@ -1998,7 +2000,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             def custodyConductorUrls = getConductorAppUrls() ?: ''
                             dir('genesis/seeder') {
                                 withEnv(["CONDUCTOR_URLS=${custodyConductorUrls}"]) {
-                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobHash}' '${blobSize}'"
+                                    sh "bash '${env.WORKSPACE}/genesis/scripts/ci/seed-custody-commitments.sh' '${doorwayHost}' '${blobCid}' '${blobSize}'"
                                 }
                             }
                         }

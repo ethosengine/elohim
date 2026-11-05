@@ -8,7 +8,7 @@
  * Output Structure:
  *   genesis/blobs/
  *   ├── {cid}/         # Raw content body files
- *   └── manifest.json  # Maps content_id → { cid, size_bytes, hash }
+ *   └── manifest.json  # Maps content_id → { cid, size_bytes, content_format }
  *
  * Usage:
  *   npm run genesis:pack           # Build blob pack from data/lamad/
@@ -22,7 +22,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
+import { byteCid } from './byte-cid.js';
 import { fileURLToPath } from 'url';
 
 // ES module compatibility
@@ -47,8 +47,8 @@ interface ContentJson {
 }
 
 interface BlobManifestEntry {
+  /** Byte-profile CID (bafkr4i…) — also the blob's filename under genesis/blobs/. */
   cid: string;
-  hash: string;
   size_bytes: number;
   content_format: string;
 }
@@ -59,69 +59,6 @@ interface GenesisManifest {
   total_blobs: number;
   total_bytes: number;
   entries: Record<string, BlobManifestEntry>;  // content_id → blob info
-}
-
-/**
- * Compute SHA256 hash of data
- */
-function computeHash(data: Buffer): string {
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-/**
- * Compute CIDv1 from SHA256 hash (IPFS-compatible)
- * Format: bafkrei... (base32-encoded CIDv1 with raw codec)
- */
-function hashToCid(sha256Hex: string): string {
-  // Build multihash: varint(sha2-256 code) + varint(digest length) + digest
-  const digestBytes = Buffer.from(sha256Hex, 'hex');
-  const SHA256_CODE = 0x12;  // sha2-256 in multihash
-  const DIGEST_LENGTH = 32;
-
-  // Multihash encoding
-  const multihash = Buffer.alloc(2 + DIGEST_LENGTH);
-  multihash[0] = SHA256_CODE;
-  multihash[1] = DIGEST_LENGTH;
-  digestBytes.copy(multihash, 2);
-
-  // CIDv1 with raw codec (0x55)
-  const RAW_CODEC = 0x55;
-  const CID_VERSION = 1;
-
-  // CIDv1: version + codec + multihash
-  const cidBytes = Buffer.concat([
-    Buffer.from([CID_VERSION, RAW_CODEC]),
-    multihash
-  ]);
-
-  // Base32 encode with "b" prefix (rfc4648)
-  return 'b' + base32Encode(cidBytes).toLowerCase();
-}
-
-/**
- * RFC 4648 base32 encoding (no padding)
- */
-function base32Encode(data: Buffer): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = 0;
-  let value = 0;
-  let output = '';
-
-  for (let i = 0; i < data.length; i++) {
-    value = (value << 8) | data[i];
-    bits += 8;
-
-    while (bits >= 5) {
-      output += alphabet[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-
-  if (bits > 0) {
-    output += alphabet[(value << (5 - bits)) & 31];
-  }
-
-  return output;
 }
 
 // Root directory for resolving relative paths (genesis/)
@@ -249,12 +186,11 @@ async function buildGenesisPack(dryRun: boolean = false): Promise<void> {
       }
 
       const { body, format } = extracted;
-      const hash = computeHash(body);
-      const cid = hashToCid(hash);
+      const cid = byteCid(body);
 
       // Store blob
       if (!dryRun) {
-        const blobPath = path.join(BLOBS_DIR, hash);
+        const blobPath = path.join(BLOBS_DIR, cid);
         if (!fs.existsSync(blobPath)) {
           fs.writeFileSync(blobPath, body);
         }
@@ -263,7 +199,6 @@ async function buildGenesisPack(dryRun: boolean = false): Promise<void> {
       // Add to manifest
       manifest.entries[json.id] = {
         cid,
-        hash,
         size_bytes: body.length,
         content_format: format
       };

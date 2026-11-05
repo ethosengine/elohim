@@ -24,7 +24,7 @@ export interface SeedHashInput {
   contentType: string;
   contentFormat?: string | null;
   contentBody?: string | null;
-  blobHash?: string | null;
+  blobCid?: string | null;
   reach?: string | null;
   tags?: string[] | null;
   metadata?: Record<string, unknown> | null;
@@ -56,7 +56,14 @@ function canonicalBody(body: string | null | undefined): unknown {
   }
 }
 
-/** `sha256-<hex>` over the authored fields. Tags are a set; metadata excludes the hash itself. */
+/**
+ * `sha256-<hex>` over the authored fields. Tags are a set; metadata excludes the hash itself.
+ *
+ * RECORD HASH, not a blob address: this is an idempotency fingerprint of an authored
+ * record (a change detector stored in row metadata). It is never a storage address, is
+ * never fetched via `/blob/`, and deliberately stays sha2-256 — the byte-profile CID
+ * (`byte-cid.ts`) names blob BYTES; this names a record's authored fields.
+ */
 export function canonicalSeedHash(input: SeedHashInput): string {
   const { [SEED_HASH_KEY]: _ignored, ...metadata } = input.metadata ?? {};
   const authored = {
@@ -66,7 +73,7 @@ export function canonicalSeedHash(input: SeedHashInput): string {
     contentType: input.contentType,
     contentFormat: input.contentFormat ?? null,
     contentBody: canonicalBody(input.contentBody),
-    blobHash: input.blobHash ?? null,
+    blobCid: input.blobCid ?? null,
     reach: input.reach ?? null,
     tags: [...new Set(input.tags ?? [])].sort(),
     metadata,

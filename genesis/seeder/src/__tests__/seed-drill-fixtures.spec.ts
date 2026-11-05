@@ -12,6 +12,7 @@ import {
   DRILL_FIXTURES,
   type CustodySubject,
 } from '../seed-drill-fixtures.js';
+import { CID_A, CID_B } from './fixture-cids.js';
 
 describe('drillCustodyPairsPath', () => {
   it('defaults the reusable handoff to the canonical Genesis household', () => {
@@ -89,14 +90,14 @@ describe('buildDeterministicZip', () => {
 
 describe('fixtureBlob', () => {
   it('gives each declared fixture a stable, distinct hash', () => {
-    const hashes = DRILL_FIXTURES.map(f => fixtureBlob(f).hash);
+    const hashes = DRILL_FIXTURES.map(f => fixtureBlob(f).cid);
     expect(new Set(hashes).size).toBe(DRILL_FIXTURES.length);
-    for (const hash of hashes) expect(hash).toMatch(/^sha256-[0-9a-f]{64}$/);
+    for (const hash of hashes) expect(hash).toMatch(/^bafkr4i[a-z2-7]{52}$/);
   });
 
   it('is a pure function of the declaration (idempotent re-seed)', () => {
     for (const fixture of DRILL_FIXTURES) {
-      expect(fixtureBlob(fixture).hash).toBe(fixtureBlob(fixture).hash);
+      expect(fixtureBlob(fixture).cid).toBe(fixtureBlob(fixture).cid);
     }
   });
 
@@ -107,8 +108,8 @@ describe('fixtureBlob', () => {
 
 describe('buildCustodyPairs', () => {
   const subjects: CustodySubject[] = [
-    { contentId: 'chaos-ladder', hash: 'sha256-aaa', sizeBytes: 158 },
-    { contentId: 'manifesto', hash: 'sha256-bbb', sizeBytes: 4096 },
+    { contentId: 'chaos-ladder', cid: CID_A, sizeBytes: 158 },
+    { contentId: 'manifesto', cid: CID_B, sizeBytes: 4096 },
   ];
   const humans = ['human-matthew-manager', 'human-jessica-spouse', 'human-james-son'];
 
@@ -126,7 +127,7 @@ describe('buildCustodyPairs', () => {
     // A contentId + artifactRole pair re-resolves against the provider's own
     // pod and can select a DIFFERENT artifact than the one just pushed.
     const pair = buildCustodyPairs(humans, subjects)[0];
-    expect(pair['blobHash']).toBe('sha256-aaa');
+    expect(pair['blobCid']).toBe(CID_A);
     expect(pair['blobSizeBytes']).toBe(158);
     expect(pair).not.toHaveProperty('contentId');
   });
