@@ -1,217 +1,7 @@
 {
- "poll_index": 238,
+ "poll_index": 239,
  "windows": {
   "alpha": [
-   {
-    "upstreams": [
-     {
-      "endpoint": "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090",
-      "circuit": "closed",
-      "errorStreak": 0,
-      "recentFailures": 0,
-      "lastGood": null,
-      "skipped": false
-     }
-    ],
-    "admission": {
-     "maxInflight": 256,
-     "available": 256,
-     "shedTotal": 0
-    },
-    "projector": {
-     "lagSeconds": null,
-     "caughtUp": false,
-     "divergentAnchor": 105
-    },
-    "render": {
-     "total": 5,
-     "rendered": 4,
-     "renderedEmpty": 0,
-     "stalled": 1,
-     "timedOut": 0,
-     "errored": 0,
-     "avgWallMs": 388,
-     "maxWallMs": 1275,
-     "degenerateRate": 0.2
-    },
-    "p2p_status": {
-     "peerId": "12D3KooWPF5cZVENSwj6bu1pPqmwL4EDWNC24dTK1B11Gspe857H",
-     "listenAddresses": [
-      "/ip4/127.0.0.1/tcp/9876",
-      "/ip4/10.1.19.144/tcp/9876"
-     ],
-     "connectedPeers": 6,
-     "bootstrapNodes": [
-      "/dns4/elohim-adam-alpha-0.elohim-adam-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
-      "/dns4/elohim-jessica-alpha-0.elohim-jessica-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
-      "/dns4/elohim-james-alpha-0.elohim-james-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
-      "/dns4/elohim-gertrude-alpha-0.elohim-gertrude-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
-      "/dns4/elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
-      "/dns4/elohim-eve-alpha-0.elohim-eve-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
-     ],
-     "syncDocuments": 626,
-     "natStatus": "unknown",
-     "relayReservations": 0,
-     "announceAddresses": [],
-     "relayMode": "server",
-     "replication": {
-      "pending": 0,
-      "completed": 5,
-      "failed": 0,
-      "caughtUp": true
-     },
-     "drain": {
-      "total": 3672,
-      "published": 3672,
-      "pending": 0
-     },
-     "pull": {
-      "total": 78,
-      "fetched": 78,
-      "pending": 0,
-      "failed": 0,
-      "caughtUp": true,
-      "state": "caughtUp"
-     },
-     "projectionReconcile": {
-      "pending": 14,
-      "completed": 79,
-      "failed": 0,
-      "caughtUp": false,
-      "peersAsked": 5,
-      "divergentAnchor": 105,
-      "healedTotal": 2220,
-      "sweeps": 124,
-      "exhausted": 0,
-      "converged": false
-     },
-     "syncPaused": false,
-     "syncMode": "sync",
-     "networkClass": "unknown",
-     "syncReasons": [],
-     "dedupUniqueLen": 1024,
-     "dedupTotalSeen": 14725,
-     "reconcilePassesTotal": 325,
-     "kicksFiredTotal": 0,
-     "placementGapsEmittedTotal": 160,
-     "provideLoop": {
-      "selfCidSource": "derived-libp2p-peer-id",
-      "active": true,
-      "reanchorPending": 0,
-      "reanchorCompleted": 0,
-      "reanchorFailed": 0,
-      "reanchorCaughtUp": true,
-      "reanchorDeadRemaining": 0,
-      "stuckSweeps": 0,
-      "deadRemainingStuck": false,
-      "reanchorSkippedReach": 0,
-      "reanchorSkippedContentType": 0,
-      "reanchorAdopted": 0,
-      "reanchorHeld": 0,
-      "reanchorHeldBackoff": 0,
-      "reanchorHeldUnbacked": 0,
-      "reanchorHeldUnanswered": 0,
-      "deadSettledByDeclaration": 0,
-      "reanchorAwaitingChannel": 0,
-      "reanchorSweepsAbandoned": 0
-     },
-     "irohNodeId": "333004af5fb7be06a4fcf74c42e9f84b08cc4a0c2697269cb2c93474afc4c873",
-     "transportPaths": [
-      {
-       "peer": "12D3KooWBRnycXytNn8VMiB7aATMHkUrAicz7rSm7kunsp4zgBtf",
-       "transport": "libp2p",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 355.6603161,
-       "successRate": 1.0,
-       "lastSampleAgeS": 20239,
-       "saturationHint": false,
-       "attempts": 2
-      },
-      {
-       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
-       "transport": "iroh",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 109.52754900000001,
-       "successRate": 1.0,
-       "lastSampleAgeS": 2544,
-       "saturationHint": false,
-       "attempts": 1
-      },
-      {
-       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
-       "transport": "libp2p",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 102.99907599999999,
-       "successRate": 1.0,
-       "lastSampleAgeS": 23359,
-       "saturationHint": false,
-       "attempts": 1
-      },
-      {
-       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
-       "transport": "iroh",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 1.5454290000000002,
-       "successRate": 1.0,
-       "lastSampleAgeS": 20239,
-       "saturationHint": false,
-       "attempts": 1
-      },
-      {
-       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
-       "transport": "libp2p",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 4.6810599999999996,
-       "successRate": 1.0,
-       "lastSampleAgeS": 29779,
-       "saturationHint": false,
-       "attempts": 1
-      },
-      {
-       "peer": "12D3KooWRsMEjr4n3fjcRcM8E51eU5YfaiEHZoKcMZxjxdTVvqct",
-       "transport": "iroh",
-       "opClass": "bulk",
-       "state": "sampled",
-       "rttEwmaMs": 10.265244999999998,
-       "successRate": 1.0,
-       "lastSampleAgeS": 29784,
-       "saturationHint": false,
-       "attempts": 1
-      }
-     ],
-     "irohPeers": [
-      {
-       "nodeId": "14cc423161865fc69f8d672b8ae4758039fcaf3e9ab6973c735095b541a7387a",
-       "userAgent": "elohim-storage/0.1.0+04ef84c"
-      },
-      {
-       "nodeId": "5ff8614a8d63721e6b6e4014c201a780099ea29e6eacb404f8b3aa9ff238d193",
-       "userAgent": null
-      },
-      {
-       "nodeId": "97809fbcd9750a7884ccea359d9b87c672036aff2e35d392e82b57f3ce711dbe",
-       "userAgent": "elohim-storage/0.1.0+04ef84c"
-      },
-      {
-       "nodeId": "ae3cafe573d72bce04d70a1a3a4d85025bf90e0bf8249d93e414b50c8d438d17",
-       "userAgent": "elohim-storage/0.1.0+04ef84c"
-      },
-      {
-       "nodeId": "d31e2206caa2d001d82c22d561504243940c5ba1e5033711daa9ff5fe4649a92",
-       "userAgent": null
-      },
-      {
-       "nodeId": "fc62f20074cdfb4f4a353dc9d1e21a0f84d183939e624d646c980df7eef434f2",
-       "userAgent": "elohim-storage/0.1.0+04ef84c"
-      }
-     ]
-    }
-   },
    {
     "upstreams": [
      {
@@ -1837,9 +1627,7 @@
       }
      ]
     }
-   }
-  ],
-  "alpha-b": [
+   },
    {
     "upstreams": [
      {
@@ -1849,14 +1637,6 @@
       "recentFailures": 0,
       "lastGood": null,
       "skipped": false
-     },
-     {
-      "endpoint": "http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090",
-      "circuit": "open",
-      "errorStreak": 128,
-      "recentFailures": 0,
-      "lastGood": null,
-      "skipped": true
      }
     ],
     "admission": {
@@ -1866,21 +1646,267 @@
     },
     "projector": {
      "lagSeconds": null,
-     "caughtUp": null,
-     "divergentAnchor": null
+     "caughtUp": true,
+     "divergentAnchor": 38
     },
     "render": {
-     "total": 0,
-     "rendered": 0,
+     "total": 10,
+     "rendered": 10,
      "renderedEmpty": 0,
      "stalled": 0,
      "timedOut": 0,
      "errored": 0,
-     "avgWallMs": 0,
-     "maxWallMs": 0,
+     "avgWallMs": 105,
+     "maxWallMs": 364,
      "degenerateRate": 0.0
+    },
+    "p2p_status": {
+     "peerId": "12D3KooWPF5cZVENSwj6bu1pPqmwL4EDWNC24dTK1B11Gspe857H",
+     "listenAddresses": [
+      "/ip4/127.0.0.1/tcp/9876",
+      "/ip4/10.1.19.190/tcp/9876"
+     ],
+     "connectedPeers": 6,
+     "bootstrapNodes": [
+      "/dns4/elohim-adam-alpha-0.elohim-adam-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-jessica-alpha-0.elohim-jessica-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-james-alpha-0.elohim-james-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-gertrude-alpha-0.elohim-gertrude-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-eve-alpha-0.elohim-eve-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+     ],
+     "syncDocuments": 738,
+     "natStatus": "unknown",
+     "relayReservations": 0,
+     "announceAddresses": [],
+     "relayMode": "server",
+     "replication": {
+      "pending": 0,
+      "completed": 1,
+      "failed": 0,
+      "caughtUp": true
+     },
+     "drain": {
+      "total": 3782,
+      "published": 3782,
+      "pending": 0
+     },
+     "pull": {
+      "total": 136,
+      "fetched": 136,
+      "pending": 0,
+      "failed": 0,
+      "caughtUp": true,
+      "state": "caughtUp"
+     },
+     "projectionReconcile": {
+      "pending": 0,
+      "completed": 0,
+      "failed": 0,
+      "caughtUp": true,
+      "peersAsked": 6,
+      "divergentAnchor": 38,
+      "healedTotal": 286,
+      "sweeps": 123,
+      "exhausted": 0,
+      "converged": true
+     },
+     "syncPaused": false,
+     "syncMode": "sync",
+     "networkClass": "unknown",
+     "syncReasons": [],
+     "dedupUniqueLen": 1024,
+     "dedupTotalSeen": 14624,
+     "reconcilePassesTotal": 329,
+     "kicksFiredTotal": 0,
+     "placementGapsEmittedTotal": 200,
+     "provideLoop": {
+      "selfCidSource": "derived-libp2p-peer-id",
+      "active": true,
+      "reanchorPending": 29,
+      "reanchorCompleted": 0,
+      "reanchorFailed": 0,
+      "reanchorCaughtUp": false,
+      "reanchorDeadRemaining": 0,
+      "stuckSweeps": 0,
+      "deadRemainingStuck": false,
+      "reanchorSkippedReach": 0,
+      "reanchorSkippedContentType": 0,
+      "reanchorAdopted": 0,
+      "reanchorHeld": 0,
+      "reanchorHeldBackoff": 0,
+      "reanchorHeldUnbacked": 0,
+      "reanchorHeldUnanswered": 0,
+      "deadSettledByDeclaration": 0,
+      "reanchorAwaitingChannel": 0,
+      "reanchorDeadHeldNotAuthor": 0,
+      "reanchorSweepsAbandoned": 0
+     },
+     "irohNodeId": "333004af5fb7be06a4fcf74c42e9f84b08cc4a0c2697269cb2c93474afc4c873",
+     "transportPaths": [
+      {
+       "peer": "12D3KooWBRnycXytNn8VMiB7aATMHkUrAicz7rSm7kunsp4zgBtf",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 26.599199256339716,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25989,
+       "saturationHint": false,
+       "attempts": 28
+      },
+      {
+       "peer": "12D3KooWBRnycXytNn8VMiB7aATMHkUrAicz7rSm7kunsp4zgBtf",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 318.03834780743097,
+       "successRate": 1.0,
+       "lastSampleAgeS": 2052,
+       "saturationHint": false,
+       "attempts": 7
+      },
+      {
+       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 68.77356251015755,
+       "successRate": 1.0,
+       "lastSampleAgeS": 1808,
+       "saturationHint": false,
+       "attempts": 23
+      },
+      {
+       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 320.269278463963,
+       "successRate": 1.0,
+       "lastSampleAgeS": 33492,
+       "saturationHint": false,
+       "attempts": 10
+      },
+      {
+       "peer": "12D3KooWKYTRqozp96kk32eUL4EEa3vfftLyuu9y4Gc1AHF3MACk",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 24.90441423025456,
+       "successRate": 1.0,
+       "lastSampleAgeS": 1933,
+       "saturationHint": false,
+       "attempts": 27
+      },
+      {
+       "peer": "12D3KooWKYTRqozp96kk32eUL4EEa3vfftLyuu9y4Gc1AHF3MACk",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 922.2987176092639,
+       "successRate": 1.0,
+       "lastSampleAgeS": 29411,
+       "saturationHint": false,
+       "attempts": 7
+      },
+      {
+       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 189.9146151673614,
+       "successRate": 1.0,
+       "lastSampleAgeS": 1873,
+       "saturationHint": false,
+       "attempts": 32
+      },
+      {
+       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 2111.5623635999996,
+       "successRate": 1.0,
+       "lastSampleAgeS": 33551,
+       "saturationHint": false,
+       "attempts": 2
+      },
+      {
+       "peer": "12D3KooWRNv7kLR2Ggq2e9Jz6FwaLBGSpux4JUhX67SFmwnvH5Rw",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 772.264002929841,
+       "successRate": 1.0,
+       "lastSampleAgeS": 33972,
+       "saturationHint": false,
+       "attempts": 19
+      },
+      {
+       "peer": "12D3KooWRNv7kLR2Ggq2e9Jz6FwaLBGSpux4JUhX67SFmwnvH5Rw",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 469.4006674263213,
+       "successRate": 1.0,
+       "lastSampleAgeS": 2112,
+       "saturationHint": false,
+       "attempts": 16
+      },
+      {
+       "peer": "12D3KooWRsMEjr4n3fjcRcM8E51eU5YfaiEHZoKcMZxjxdTVvqct",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 101.50574551516583,
+       "successRate": 1.0,
+       "lastSampleAgeS": 1993,
+       "saturationHint": false,
+       "attempts": 29
+      },
+      {
+       "peer": "12D3KooWRsMEjr4n3fjcRcM8E51eU5YfaiEHZoKcMZxjxdTVvqct",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 1591.1722178043997,
+       "successRate": 1.0,
+       "lastSampleAgeS": 34026,
+       "saturationHint": false,
+       "attempts": 5
+      }
+     ],
+     "irohPeers": [
+      {
+       "nodeId": "14cc423161865fc69f8d672b8ae4758039fcaf3e9ab6973c735095b541a7387a",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "5ff8614a8d63721e6b6e4014c201a780099ea29e6eacb404f8b3aa9ff238d193",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "97809fbcd9750a7884ccea359d9b87c672036aff2e35d392e82b57f3ce711dbe",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "ae3cafe573d72bce04d70a1a3a4d85025bf90e0bf8249d93e414b50c8d438d17",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "d31e2206caa2d001d82c22d561504243940c5ba1e5033711daa9ff5fe4649a92",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "fc62f20074cdfb4f4a353dc9d1e21a0f84d183939e624d646c980df7eef434f2",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      }
+     ]
     }
-   },
+   }
+  ],
+  "alpha-b": [
    {
     "upstreams": [
      {
@@ -3312,6 +3338,250 @@
        "rttEwmaMs": 46.870363,
        "successRate": 1.0,
        "lastSampleAgeS": 23006,
+       "saturationHint": false,
+       "attempts": 1
+      }
+     ],
+     "irohPeers": [
+      {
+       "nodeId": "333004af5fb7be06a4fcf74c42e9f84b08cc4a0c2697269cb2c93474afc4c873",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "5ff8614a8d63721e6b6e4014c201a780099ea29e6eacb404f8b3aa9ff238d193",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "97809fbcd9750a7884ccea359d9b87c672036aff2e35d392e82b57f3ce711dbe",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "ae3cafe573d72bce04d70a1a3a4d85025bf90e0bf8249d93e414b50c8d438d17",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "d31e2206caa2d001d82c22d561504243940c5ba1e5033711daa9ff5fe4649a92",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      },
+      {
+       "nodeId": "fc62f20074cdfb4f4a353dc9d1e21a0f84d183939e624d646c980df7eef434f2",
+       "userAgent": "elohim-storage/0.1.0+7cc777e"
+      }
+     ]
+    }
+   },
+   {
+    "upstreams": [
+     {
+      "endpoint": "http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090",
+      "circuit": "closed",
+      "errorStreak": 0,
+      "recentFailures": 0,
+      "lastGood": null,
+      "skipped": false
+     }
+    ],
+    "admission": {
+     "maxInflight": 256,
+     "available": 256,
+     "shedTotal": 0
+    },
+    "projector": {
+     "lagSeconds": null,
+     "caughtUp": false,
+     "divergentAnchor": 109
+    },
+    "render": {
+     "total": 16,
+     "rendered": 16,
+     "renderedEmpty": 0,
+     "stalled": 0,
+     "timedOut": 0,
+     "errored": 0,
+     "avgWallMs": 328,
+     "maxWallMs": 1499,
+     "degenerateRate": 0.0
+    },
+    "p2p_status": {
+     "peerId": "12D3KooWRsMEjr4n3fjcRcM8E51eU5YfaiEHZoKcMZxjxdTVvqct",
+     "listenAddresses": [
+      "/ip4/127.0.0.1/tcp/9876",
+      "/ip4/10.1.79.13/tcp/9876"
+     ],
+     "connectedPeers": 6,
+     "bootstrapNodes": [
+      "/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-jessica-alpha-0.elohim-jessica-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-james-alpha-0.elohim-james-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-gertrude-alpha-0.elohim-gertrude-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876",
+      "/dns4/elohim-eve-alpha-0.elohim-eve-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+     ],
+     "syncDocuments": 738,
+     "natStatus": "unknown",
+     "relayReservations": 0,
+     "announceAddresses": [],
+     "relayMode": "server",
+     "replication": {
+      "pending": 0,
+      "completed": 1,
+      "failed": 0,
+      "caughtUp": true
+     },
+     "drain": {
+      "total": 3782,
+      "published": 3782,
+      "pending": 0
+     },
+     "pull": {
+      "total": 6,
+      "fetched": 6,
+      "pending": 0,
+      "failed": 0,
+      "caughtUp": true,
+      "state": "caughtUp"
+     },
+     "projectionReconcile": {
+      "pending": 84,
+      "completed": 0,
+      "failed": 2,
+      "caughtUp": false,
+      "peersAsked": 6,
+      "divergentAnchor": 109,
+      "healedTotal": 255,
+      "sweeps": 111,
+      "exhausted": 0,
+      "converged": false
+     },
+     "syncPaused": false,
+     "syncMode": "sync",
+     "networkClass": "unknown",
+     "syncReasons": [],
+     "dedupUniqueLen": 1024,
+     "dedupTotalSeen": 14614,
+     "reconcilePassesTotal": 334,
+     "kicksFiredTotal": 0,
+     "placementGapsEmittedTotal": 0,
+     "provideLoop": {
+      "selfCidSource": "derived-libp2p-peer-id",
+      "active": true,
+      "reanchorPending": 97,
+      "reanchorCompleted": 58,
+      "reanchorFailed": 0,
+      "reanchorCaughtUp": false,
+      "reanchorDeadRemaining": 66,
+      "stuckSweeps": 53,
+      "deadRemainingStuck": true,
+      "reanchorSkippedReach": 0,
+      "reanchorSkippedContentType": 0,
+      "reanchorAdopted": 0,
+      "reanchorHeld": 1,
+      "reanchorHeldBackoff": 3,
+      "reanchorHeldUnbacked": 0,
+      "reanchorHeldUnanswered": 4,
+      "deadSettledByDeclaration": 0,
+      "reanchorAwaitingChannel": 0,
+      "reanchorDeadHeldNotAuthor": 62,
+      "reanchorSweepsAbandoned": 5
+     },
+     "irohNodeId": "14cc423161865fc69f8d672b8ae4758039fcaf3e9ab6973c735095b541a7387a",
+     "transportPaths": [
+      {
+       "peer": "12D3KooWBRnycXytNn8VMiB7aATMHkUrAicz7rSm7kunsp4zgBtf",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 3.815025,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25692,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 2.811855,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25808,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWJuoYrTo6VFLRWBdL8GUjcMh6DHizhHSu26ia8gMTxv3H",
+       "transport": "iroh",
+       "opClass": "small",
+       "state": "sampled",
+       "rttEwmaMs": 6.571207,
+       "successRate": 1.0,
+       "lastSampleAgeS": 34194,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWKYTRqozp96kk32eUL4EEa3vfftLyuu9y4Gc1AHF3MACk",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 162.882485,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25572,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWPF5cZVENSwj6bu1pPqmwL4EDWNC24dTK1B11Gspe857H",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 12.546728,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25628,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWPF5cZVENSwj6bu1pPqmwL4EDWNC24dTK1B11Gspe857H",
+       "transport": "libp2p",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 226.83483700000002,
+       "successRate": 1.0,
+       "lastSampleAgeS": 33932,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 66.252528,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25872,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWQMrAD2Z3ETizmmgCjvDkNNpxyg66QQX2LXbABzEL3xZY",
+       "transport": "iroh",
+       "opClass": "small",
+       "state": "sampled",
+       "rttEwmaMs": 10.561091,
+       "successRate": 1.0,
+       "lastSampleAgeS": 34194,
+       "saturationHint": false,
+       "attempts": 1
+      },
+      {
+       "peer": "12D3KooWRNv7kLR2Ggq2e9Jz6FwaLBGSpux4JUhX67SFmwnvH5Rw",
+       "transport": "iroh",
+       "opClass": "bulk",
+       "state": "sampled",
+       "rttEwmaMs": 46.870363,
+       "successRate": 1.0,
+       "lastSampleAgeS": 25752,
        "saturationHint": false,
        "attempts": 1
       }
