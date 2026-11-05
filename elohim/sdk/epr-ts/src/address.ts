@@ -1,60 +1,89 @@
 /**
- * `verifyAddress`: the one TypeScript verifier (rail R-T3, interfaces spec §1.3 and §H.1).
+ * `verifyAddress`: the one TypeScript verifier (rail R-T3, interfaces spec §1.3 and §H.1), the
+ * twin of the Rust kernel `elohim-address` (`ByteCid::parse` + `verify_cid_any`).
  *
- * Rust has one verifier, `eprfs_core::BlobCid::verifies`; TypeScript has this one. Both answer
- * the receiver's question "do these bytes match the address I was told to expect?" and never mint
- * an address (minting stays in Rust). The agreement is pinned by the shared vectors in
- * `elohim/eprfs/fixtures/tree-vectors.json`, which Rust wrote and `tests/address.test.ts` reads.
+ * Both answer the receiver's question "do these bytes match the address I was told to expect?"
+ * and never mint an address (minting stays in Rust). The agreement is pinned by the kernel's
+ * vectors, `crates/elohim-address/vectors/address-vectors.json`, which `tests/address.test.ts`
+ * reads: every positive row verifies here and every negative row is refused.
  *
- * Accepted:
- * - CIDv1 with a sha2-256 multihash (32-byte digest) and codec raw (`0x55`, `bafkrei…`) or
- *   DAG-CBOR (`0x71`, `bafyrei…`): the bytes verify when their sha2-256 digest equals the CID's.
- *   This is exactly `BlobCid::verifies`, which recomputes the CID under the declared codec.
- * - The legacy markers `sha256-<64 lowercase hex>` and `sha256:<64 lowercase hex>`, for reads
- *   only: an old row names its bytes this way, so a reader may check them, but nothing new is
- *   addressed by a legacy marker.
+ * Admitted — exactly three `(codec, multihash, digest length)` triples, each a CIDv1:
+ * - `(raw 0x55, BLAKE3-256 0x1e, 32)`, form `bytes`: the byte profile, `bafkr4i…`, 59 characters.
+ * - `(raw 0x55, sha2-256 0x12, 32)`, form `raw`: citation fingerprints, `bafkrei…`.
+ * - `(dag-cbor 0x71, sha2-256 0x12, 32)`, form `dag-cbor`: records, `bafyrei…`.
  *
- * Everything else fails closed: CIDv0, any other codec (dag-pb, dag-json, …), any other hash
- * function or digest length, uppercase or short hex, and strings that do not parse.
+ * Admission is a FULL DECODE, never a prefix check: the text must parse as a CID; its binary
+ * form must be the canonical encoding of its own parts (minimal varints — a version spelled
+ * `81 00` is refused — and no bytes past the digest), so a byte CID is exactly
+ * `01 55 1e 20 ‖ digest`; and the canonical base32-lower text of those bytes must equal the input
+ * (non-zero padding bits, upper case, other multibases are refused). The legacy markers
+ * `sha256-<hex>`, `sha256:<hex>` and `blake3-<hex>` are not addresses and are refused.
  *
- * `raw-cid-verify.ts` is a thin raw-only wrapper: its callers depend on a DAG-CBOR address
- * failing closed there, so it checks `addressForm(...)` before delegating here.
+ * Everything else fails closed: CIDv0, any other codec or hash, any other digest length, and
+ * strings that do not parse. A digest match proves the bytes are the named bytes; it never grants
+ * authorization.
  */
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
+import { blake3 } from "@noble/hashes/blake3";
+import { base32 } from "multiformats/bases/base32";
+import { CID } from "multiformats/cid";
+import { create as createDigest } from "multiformats/hashes/digest";
+import { from as hasherFrom } from "multiformats/hashes/hasher";
+import { sha256 } from "multiformats/hashes/sha2";
 
 /** Multicodec codes this verifier accepts. */
 export const RAW_CODEC = 0x55;
 export const DAG_CBOR_CODEC = 0x71;
-const SHA2_256_CODE = 0x12;
-const SHA2_256_BYTES = 32;
-const LEGACY = /^sha256[-:]([0-9a-f]{64})$/;
+export const SHA2_256_CODE = 0x12;
+export const BLAKE3_256_CODE = 0x1e;
+const DIGEST_BYTES = 32;
 
-/** Which accepted form an address takes, or `null` when it is not one this verifier checks. */
-export type AddressForm = 'raw' | 'dag-cbor' | 'legacy';
+/** BLAKE3-256 (unkeyed, 32-byte output) as a multiformats hasher, multihash code `0x1e`. */
+const blake3Hasher = hasherFrom({
+  name: "blake3",
+  code: BLAKE3_256_CODE,
+  encode: (input: Uint8Array) => blake3(input, { dkLen: DIGEST_BYTES }),
+});
+
+/**
+ * Which accepted form an address takes, or `null` when it is not one this verifier checks:
+ * `bytes` (raw + BLAKE3-256), `raw` (raw + sha2-256, citations), `dag-cbor` (records).
+ */
+export type AddressForm = "bytes" | "raw" | "dag-cbor";
 
 interface Parsed {
   form: AddressForm;
   digest: Uint8Array;
 }
 
-function fromCid(cid: CID): Parsed | null {
-  if (cid.version !== 1) return null;
-  if (cid.multihash.code !== SHA2_256_CODE || cid.multihash.size !== SHA2_256_BYTES) return null;
-  if (cid.multihash.digest.length !== SHA2_256_BYTES) return null;
-  if (cid.code === RAW_CODEC) return { form: 'raw', digest: cid.multihash.digest };
-  if (cid.code === DAG_CBOR_CODEC) return { form: 'dag-cbor', digest: cid.multihash.digest };
-  return null;
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
 }
 
-function unhex(text: string): Uint8Array {
-  const out = new Uint8Array(text.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(text.slice(2 * i, 2 * i + 2), 16);
-  return out;
+/**
+ * The CID's form, when its binary form is the canonical encoding of one of the three triples.
+ * multiformats keeps the bytes it decoded (its varint reader admits `81 00` for 1), so the CID is
+ * rebuilt from its decoded parts and the bytes compared.
+ */
+function fromCid(cid: CID): Parsed | null {
+  if (cid.version !== 1) return null;
+  const { code: mh, size, digest } = cid.multihash;
+  if (size !== DIGEST_BYTES || digest.length !== DIGEST_BYTES) return null;
+  let form: AddressForm;
+  if (cid.code === RAW_CODEC && mh === BLAKE3_256_CODE) form = "bytes";
+  else if (cid.code === RAW_CODEC && mh === SHA2_256_CODE) form = "raw";
+  else if (cid.code === DAG_CBOR_CODEC && mh === SHA2_256_CODE)
+    form = "dag-cbor";
+  else return null;
+  const canonical = CID.createV1(cid.code, createDigest(mh, digest));
+  if (!sameBytes(canonical.bytes, cid.bytes)) return null;
+  return { form, digest };
 }
 
 function parse(address: CID | string): Parsed | null {
-  if (typeof address !== 'string') {
+  if (typeof address !== "string") {
     // A CID instance from any copy of multiformats, read through `CID.asCID`, which accepts
     // structurally compatible objects and returns null for anything else. `asCID` rebuilds such an
     // object from its own `multihash` without checking it against its `bytes`, and `toString()`
@@ -63,23 +92,26 @@ function parse(address: CID | string): Parsed | null {
     // the digest checked is always the one the CID's text names.
     const cid = CID.asCID(address);
     if (cid === null) return null;
-    let canon: CID;
+    let decoded: CID;
     try {
-      canon = CID.decode(cid.bytes);
+      decoded = CID.decode(cid.bytes);
     } catch {
       return null;
     }
-    return canon.equals(cid) ? fromCid(canon) : null;
+    return decoded.equals(cid) ? fromCid(decoded) : null;
   }
-  const legacy = LEGACY.exec(address);
-  if (legacy) return { form: 'legacy', digest: unhex(legacy[1]) };
   let cid: CID;
   try {
     cid = CID.parse(address);
   } catch {
     return null;
   }
-  return fromCid(cid);
+  const parsed = fromCid(cid);
+  if (parsed === null) return null;
+  // Canonical text equality: the one accepted spelling is the base32-lower text of the canonical
+  // binary form. `cid.toString()` is not used — multiformats caches the parsed string as the
+  // CID's text, so comparing against it would be vacuous.
+  return base32.encode(cid.bytes) === address ? parsed : null;
 }
 
 /** The accepted form of `address`, or `null` when `verifyAddress` would fail it closed. */
@@ -92,8 +124,8 @@ function viewOf(bytes: Uint8Array | ArrayBuffer): Uint8Array {
 }
 
 /**
- * True iff `bytes` hash to the digest `address` commits to under an accepted form. Never throws:
- * an address this verifier does not accept answers `false`.
+ * True iff `bytes` hash, under the hash `address` itself declares, to the digest it commits to.
+ * Never throws: an address this verifier does not accept answers `false`.
  */
 export async function verifyAddress(
   address: CID | string,
@@ -101,10 +133,10 @@ export async function verifyAddress(
 ): Promise<boolean> {
   const parsed = parse(address);
   if (parsed === null) return false;
-  const digest = await sha256.digest(viewOf(bytes));
-  const got = digest.digest;
-  if (got.length !== parsed.digest.length) return false;
-  let diff = 0;
-  for (let i = 0; i < got.length; i++) diff |= got[i] ^ parsed.digest[i];
-  return diff === 0;
+  const input = viewOf(bytes);
+  const hashed =
+    parsed.form === "bytes"
+      ? await blake3Hasher.digest(input)
+      : await sha256.digest(input);
+  return sameBytes(hashed.digest, parsed.digest);
 }
