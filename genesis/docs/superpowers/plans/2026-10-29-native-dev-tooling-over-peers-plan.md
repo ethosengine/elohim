@@ -301,9 +301,10 @@ for the hardening lane, on `blob-durability`. No new habit is minted; `materiali
   store beside its channel store; a `serve-blob` `Use` writer; the gate checks root and object CIDs
   against the requester's grant (`eprfs-peer/src/gate.rs:14,64` ignores both today). Receipt: an
   admitted carrier asks for an unrelated CID and is refused.
-- **E4 — one byte store per device**: `BlobStoreTier` composed under the tier on a device that runs
-  elohim-storage; the directory store elsewhere; a test that the same CID is never held twice on one
-  device by the two paths. No new table, entry type or route: the bytes are Ephemeral (C), rebuildable
+- **E4 — one authoritative payload store per device** (gated by H2, R3.3): `BlobStoreTier` composed
+  under the tier on a device that runs elohim-storage; the directory store elsewhere; a test that the
+  same CID is never held twice on one device by the two paths; transport indexes and bao outboards may
+  reference the payload, never copy it (R1.4). No new table, entry type or route: the bytes are Ephemeral (C), rebuildable
   by re-running the method; the `DerivationRecord` is Attested-Private (B2) in brit notes and the tier
   manifest; the custody pledge is a local `custody-blob` commitment (B, born `self`) that graduates to
   the existing elohim-DNA `CustodianCommitment` / `BlobToReplicas` links only at release reach (D6).
@@ -313,19 +314,41 @@ for the hardening lane, on `blob-durability`. No new habit is minted; `materiali
   `record.output`, and records `Use` (fetch) against the builder's `Produce`. Receipt: fetch versus
   rebuild as `Use` versus `Produce`, the 454 MB case, in each transport mode the tier supports, with a
   mode that cannot deliver reported as a typed gap.
-- **Stories first.** The lesson-1 and lesson-11 a2o scenarios are written `@wip` under
-  `@concern:artifact-custody` beside the F2 scenarios, so the release-plane gate is specified now.
+- **Stories first.** The R2 and R4 a2o scenarios are written `@wip` under `@concern:artifact-custody`
+  beside the F2 scenarios, so the release-plane gate is specified now: custody admission at Trusted
+  reach, `pending-election` with its reason, `under-custodied` and repair, quarantine versus refuse,
+  consent withdrawal, `no-eligible-head`, and the mixed-version refusal of a policy epoch a reader
+  cannot interpret.
+- **`adoptionDiscipline` gains a policy epoch** (D7) before any restrictive field — custody admission
+  (R2) or lifecycle cells (R4) — is read; an older reader that cannot interpret the epoch cannot admit
+  an election under it.
 
-**Hardening lane (elohim-storage write-set; runs beside, lands independently).**
-- H1 holder-identity binding: payload `peer_id` must equal gossipsub's signed `message.source` (not
-  `propagation_source`); on iroh the payload carries the holder's signature; custody counts read only
-  bound, unexpired claims. Tests: a spoofed-holder snapshot is refused and changes no custody count; a
-  replayed old snapshot does not re-base the cursor; relayed snapshots still apply.
-- H2 `BlobStore` atomicity: temp + fsync + rename; "already exists" means "exists and verifies";
-  verify-on-read for inline blobs; a corrupt object is quarantined and the node keeps serving the
-  rest. Tests kept distinct: crash mid-write, `ENOSPC`, cleanup failure.
+**Hardening lane (elohim-storage write-set; runs beside, with explicit acceptance dependencies —
+R3).** E2 and directory-backed E3 do not wait on it; H2 gates E4's `BlobStore` composition and every
+F2 receipt that rides it; H1 gates every use of remotely advertised holdings as custody evidence.
+- H1 holder-identity binding, every ingress: on libp2p the payload's holder identity must equal
+  gossipsub's signed `message.source` (threaded through dispatch, which carries only the relaying
+  `propagation_source` today; relays preserved); on iroh the payload carries end-to-end holder
+  authentication; snapshots, deltas, custody announcements (`gossip_dispatch.rs:795` projects
+  `holder_agent_cid` unbound) and salvage ads all enforce binding, freshness and replay before any
+  projection changes; custody counts read only bound, unexpired claims plus R2's commitment and
+  verified-fetch evidence. The authenticated envelope lands here under a declared level and D7 epoch;
+  universal rejection of legacy advertisements follows measured adoption, and until then legacy rows
+  are fetch hints that never satisfy a custody floor. Claude-family adversarial review before landing.
+  Tests: a spoofed-holder snapshot is refused and changes no custody count; a replayed old snapshot
+  does not re-base the cursor; relayed snapshots still apply; a forged iroh snapshot naming another
+  holder is refused.
+- H2 `BlobStore` durable, verified publication across representations: inline (temp + fsync +
+  rename), chunked (chunks and `.chunks` index prepared and synced before the `CHUNKED` marker;
+  directory entries synced), shards (verified against shard hashes, never the composite); "already
+  exists" means "exists and verifies"; verify-on-read for inline blobs; a corrupt object is quarantined
+  and the node keeps serving the rest; staging and quarantine files are excluded from `list_hashes`,
+  tallies and serving; existing identities and layouts stay readable. Tests kept distinct: crash
+  mid-write, competing writers, deletion race, `ENOSPC`, cleanup failure, power loss after the marker.
 - H3 fetch budgets: drop-equals-cancel racing; a per-artifact budget with stall and total deadlines;
   a manifest size cap before allocation; wasted bytes metered.
+- H4 `parse_content_address` refuses a CID whose multihash is not sha2-256 instead of reinterpreting
+  its digest (`blob_store.rs:228-232`; R1.6); new surfaces refuse the legacy `sha256-<hex>` spelling.
 
 **Acceptance.** I1–I7 and §10 items 1–15 as written, plus: the swap test (`manifest_cid` for
 `record.output` and back is refused); the interrupted fetch resumes only missing chunks from the
@@ -337,20 +360,28 @@ stale-replay and wrong-channel refusals; the epoch refusal; a schema that reject
 the read-only OCI gateway (ngit H8, held); gate jobs as requests and offers (row 77); the release-head
 custody gate's implementation (F5); Radicle 2.0 on iroh (survey W1).
 
-### 7.4 Rulings the sprint needs from the steward (integrity-class; Claude-ruled)
+### 7.4 Rulings (2026-11-05; integrity-class, ruled by the session model after an Astra challenge)
 
-- **R1 — the BLAKE3 `IrohBlobStore`.** Either it becomes a transport-side cache that never holds a
-  CID the device's one store does not, or pure-iroh delivery of artifacts waits until it is retired.
-  Recommendation: the former, so the per-mode F2 receipt can run.
-- **R2 — the custody gate's shape per reach rung.** The invariant (k non-publisher custodians, d
-  failure domains, freshness TTL, no conscription) is fixed; the numbers are policy per rung (`self`:
-  the local pledge; `intimate`: a second device of the same person; `community`: k ≥ 3, d ≥ 2 as a
-  starting proposal). Lands at F5; the numbers go in the release manifest's `adoptionDiscipline`.
-- **R3 — ordering of the hardening lane.** Recommendation: H1 and H2 land during this sprint on their
-  own write-set and do not gate Track E; they gate any artifact riding `BlobStore` custody.
-- **R4 — the yank / supersede / revoke matrix.** The cells (advertise, serve, retain, purge, per
-  operation; revocation distinct from validity) are the channel's standing body's call. Today that
-  body has one member, which is a fact about the network, not an authority claim.
+> **Operator direction (2026-11-05).** "Make the calls on these … with a reminder that Elohim Protocol
+> is trying to be generational architecture; we do not mind doing the rework to get the foundations
+> right. You can dispatch Astra agents to challenge your conclusions."
+
+Method: a draft of all four was challenged by four independent gpt-6-astra legs, one per ruling, each
+briefed to refute (`genesis/local-dev/radicle-survey/astra-challenge-R{1..4}.md`). All four returned
+REFUTED. The session model re-read every code claim the rulings rest on and accepted the findings
+that held; the full record with the findings accepted and the one claim rejected (a schema regex
+that does not exist) is `genesis/local-dev/radicle-survey/rulings-final.md`. Where a ruling below and
+an earlier line of §7.3 disagreed, §7.3 was amended.
+
+| Ruling | Decision | Rework accepted | Note |
+|---|---|---|---|
+| **R1 — address and the BLAKE3 store** | The address is CIDv1, self-describing; each object class declares a **canonical emission profile per epoch** (today raw + sha2-256 for bytes and chunks, dag-cbor + sha2-256 for records). **BLAKE3 is an allowed transport and storage hash, not an identity** for artifacts, chunk manifests or `DerivationRecord.output`; admitting a new identity hash is a governed migration. Output identity is canonicalized at production; a locally verified hash equivalence is a rebuildable index that locates payloads and never rewrites records, merges principals, transfers reach or manufactures agreement. Bao verifies the transfer; acceptance verifies the canonical CID. **One authoritative payload store per device**; the iroh-blobs `FsStore` may be that store only after receipts for canonical answer, atomic recovery, index reconstruction, daemon-independent operation, scoped serving and retention across every live reference (its tag-based `forget` must never collect committed bytes); until then pure-iroh artifact delivery waits. Address resolution is not authorization. | Yes: `parse_content_address` reinterprets any CID digest as SHA-256 (`blob_store.rs:228-232`) — lane H4; the "Phase 11 cutover" comment is intent, not a ruling; DNA custody strings migrate with digests preserved; rakia's `blobCid` + `sha256` pair stays until a coordinated transition. | Draft had admitted BLAKE3 as an interchangeable identity and a "transport cache" that was a second copy; both refuted on D5 convergence, D7 and plan §7.2 |
+| **R2 — custody admission** | Private, SelfScope and **Intimate create zero DHT heads and require no quorum**; a second device's copy is shown per copy, never a prerequisite. At **Trusted and above** a channel's election is admitted under a **versioned custody admission policy** in `adoptionDiscipline` (own policy epoch, D7) naming the closure, coding parameters, the **tolerated failures** it promises to survive, evidence ages and the retention window; admission demonstrates reconstructibility under those failures; whole-copy custodians and RS shard holders are counted differently; the 64 MiB shard threshold applies to the artifact, never to tier chunks. Evidence that counts = an authorized commitment **and** authenticated, replay-resistant availability (H1) **and** a bounded-age verified fetch attributable to the serving holder; inventory rows alone never count; the publisher's devices never satisfy external custody. Failure domain = a **declared dimension with provenance** (household first); unknown is never independence. Liveness is honest: missing consent or evidence yields a durable `pending-election` reason, blocks no local work, conscripts nobody; later loss yields `unknown` / `under-custodied`, never a head move by itself. | **Profile 0, experimental, to be measured:** Trusted/Familiar survive one whole-copy loss (k ≥ 2, two households); Community/Public survive two (k ≥ 3, two households) or RS 4+3 with four distinct shard indices over two households; Commons survive four (k ≥ 5, three households); inventory horizon 600 s; **repair within 900 s is a measured objective**, missed deadlines reported with cause. Commitments bind to bounded windows; no per-chunk DHT heads. | Draft contradicted D6 and itself at Intimate, lacked a failure model, treated dwelling hub as proven independence, and promised repair the kick limits cannot deliver |
+| **R3 — hardening lane** | H1–H4 are mandatory in this sprint on their own write-set with explicit acceptance dependencies: **E2 and directory-backed E3 do not wait; H2 gates E4's `BlobStore` composition and every F2 receipt riding it; H1 gates every use of remotely advertised holdings as custody evidence at every reach and transport.** H1 covers snapshots, deltas, custody announcements and salvage ads, libp2p by signed author, iroh end-to-end, with freshness and replay before projection; the authenticated envelope lands with H1 under a declared level and epoch, and only universal rejection of legacy advertisements waits on adoption. H2 is representation-aware (inline, chunked, shards; staging excluded). Roster admission never authorizes general blob access (E3 keeps its scope gate). | Yes: the draft's "H1/H2 do not gate Track E" recorded the wrong architecture for E4 | Draft refuted on E4's dependency, iroh coverage, the custody-announce ingress, and H2's representations |
+| **R4 — release lifecycle** | Lifecycle, current eligibility, serving authorization and custody retention are **separate decisions composed under the constitutional floor**, each act binding subject, scope, issuer, authority evidence, interval, reason and policy epoch. **Supersede**: an authorized election chose another release; re-eligibility only by current qualification and a new election. **Withdraw (yank)**: channel-scoped under verified delegation or the channel's standing rule; prevents new adoption; elects no replacement; grants no serving authority; pinned recovery only under current reach, grant and safety policy. **Standing revocation**: records whose authority ended, when, for which acts; prior releases stay assessable against publication-time standing; a compromise finding names its affected interval. **Security and harm override the defaults** through the existing pair, **quarantine** (expiring hold; blocks adoption, serving, redistribution) and **refuse** (terminal; mandated local destruction); **subject consent withdrawal** removes replication and serving authority; nothing overrides these floors; global recall is never promised. **Heads move only through the election** among presently qualifying candidates; `no-eligible-head` is explicit, `unreachable` is never absence. Custody follows bounded obligations; audit evidence is kept apart from payload availability; **deprecation** is advisory, **expiry** explicit. | Yes: the draft's "yank keeps serving pinned peers", "head moves to the prior winner" and "revoke retains for audit, never purges" are all withdrawn; cells live under a policy epoch with a mixed-version refusal test; general enforcement waits on the standing design (§13) | Draft refuted on the swarm spec's quarantine/refuse contract, the inalienable spec's consent withdrawal, the election design's ceremony, and D7 |
+
+What the challenge changed in §7.3: E4 gated by H2; H1's scope widened; H4 added; the R2/R4 stories
+named; `adoptionDiscipline` gains a policy epoch before any restrictive field is read.
 
 ### 7.5 Mint pass
 
