@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@elohim/epr": "workspace:*",
+    "@noble/hashes": "^1.5.0",
     "multiformats": "^13.3.0"
   },
   "devDependencies": {

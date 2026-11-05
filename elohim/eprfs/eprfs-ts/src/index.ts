@@ -5,9 +5,15 @@
  * app.
  */
 export {
+  BLAKE3_256,
+  blake3Hasher,
+  byteCidOf,
   decodeTree,
   DEFAULT_LIMITS,
+  parseByteCid,
+  SHA2_256,
   TreeError,
+  verifiesCid,
   type TreeEntry,
   type TreeEntryKind,
   type TreeErrorKind,
@@ -50,6 +56,7 @@ export {
 export { decodeTreeView, encodeTreeView, parseTreeViewJson, treeViewCid, treeViewJson } from './view.js';
 export {
   absence,
+  isByteProfile,
   isItemAbsence,
   isTierId,
   isTierRecord,
@@ -64,5 +71,21 @@ export {
   type TierClass,
   type TierRecord,
   type TierSource,
+  type ByteProfile,
+  type Chunker,
+  type Erasure,
   type Unanswered,
 } from './wire.js';
+export {
+  chunkBytes,
+  ChunkerError,
+  CHUNKER_FASTCDC_2020,
+  FASTCDC_2020_EPOCH_0,
+  FASTCDC_2020_GEAR,
+  FASTCDC_2020_GEAR_LS,
+  FASTCDC_2020_MASKS,
+  FASTCDC_2020_TABLE_DIGEST,
+  fastcdc2020TableDigest,
+  validateFastcdc2020,
+  type Fastcdc2020,
+} from './chunker.js';

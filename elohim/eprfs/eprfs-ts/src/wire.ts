@@ -243,3 +243,39 @@ export function isTierRecord(value: unknown): value is TierRecord {
       (px.lastSeenMs === null || typeof px.lastSeenMs === 'number'));
   return sourcesOk && endpointOk && standingOk && proximityOk;
 }
+
+/**
+ * A byte profile as every layout record persists it (`elohim_epr::profile::ByteProfile`; the tier
+ * blob manifest's `profile`, the store index). Pinned by `wire.byteProfile` in the shared vectors.
+ * Readers act on the recorded parameters, never on current defaults.
+ */
+export type Chunker = { id: 'fastcdc-2020'; min: number; avg: number; max: number; level: number };
+export type Erasure = { id: 'none' } | { id: 'rs-gf8-0x11d-v1'; data: number; parity: number };
+export interface ByteProfile {
+  epoch: number;
+  codec: number;
+  multihash: number;
+  chunker: Chunker;
+  erasure: Erasure;
+}
+
+/** Structural guard: unknown chunker or erasure ids are refused, so a reader can hold them. */
+export function isByteProfile(value: unknown): value is ByteProfile {
+  if (!isRecord(value)) return false;
+  const { chunker: c, erasure: e } = value;
+  const chunkerOk =
+    isRecord(c) &&
+    c.id === 'fastcdc-2020' &&
+    [c.min, c.avg, c.max, c.level].every((v) => typeof v === 'number' && Number.isInteger(v));
+  const erasureOk =
+    isRecord(e) &&
+    (e.id === 'none' ||
+      (e.id === 'rs-gf8-0x11d-v1' && typeof e.data === 'number' && typeof e.parity === 'number'));
+  return (
+    typeof value.epoch === 'number' &&
+    typeof value.codec === 'number' &&
+    typeof value.multihash === 'number' &&
+    chunkerOk &&
+    erasureOk
+  );
+}

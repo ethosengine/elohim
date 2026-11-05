@@ -1,15 +1,36 @@
 // The shared vectors, reproduced in TypeScript: tree bytes and CIDs, the walk and diff results,
 // the TreeView normalization and CID, and the wire shapes Rust's serializer wrote.
 import { encodeCanonical, verifyAddress as verifiesAddress } from '@elohim/epr';
+import { blake3 } from '@noble/hashes/blake3';
 import { CID } from 'multiformats/cid';
+import { create as createDigest } from 'multiformats/hashes/digest';
 import { describe, expect, it } from 'vitest';
 
+import {
+  ChunkerError,
+  chunkBytes,
+  FASTCDC_2020_EPOCH_0,
+  FASTCDC_2020_TABLE_DIGEST,
+  fastcdc2020TableDigest,
+} from '../src/chunker.js';
+
 import { MemoryTier, proximityOrder, standingPolicy } from '../src/tier.js';
-import { decodeTree, encodeTree } from '../src/tree.js';
+import {
+  BLAKE3_256,
+  byteCidOf,
+  cidOf,
+  DAG_CBOR_CODEC,
+  decodeTree,
+  encodeTree,
+  parseByteCid,
+  RAW_CODEC,
+  SHA2_256,
+  verifiesCid,
+} from '../src/tree.js';
 import { decodeTreeView, encodeTreeView, parseTreeViewJson, treeViewCid, treeViewJson } from '../src/view.js';
 import { collectWalk, diffTrees, View, type WalkedView } from '../src/walk.js';
-import { isItemAbsence, isTierRecord, isUnanswered } from '../src/wire.js';
-import { build, hex, kindJson, unhex, vectors, vpath, vtext } from './fixture.js';
+import { isByteProfile, isItemAbsence, isTierRecord, isUnanswered } from '../src/wire.js';
+import { build, chunkerInput, hex, kindJson, unhex, vectors, vpath, vtext } from './fixture.js';
 
 function walkedJson(w: WalkedView): unknown {
   return {
@@ -139,5 +160,78 @@ describe('the shared tree vectors', () => {
     expect(vectors.wire.unanswered.escalation.asked).toBe(2);
     // `own` never crosses the wire.
     expect(isItemAbsence({ kind: 'unreachable', tier: 'own' })).toBe(false);
+  });
+});
+
+describe('the byte profile (re-genesis 1, amended R1)', () => {
+  const encoder = new TextEncoder();
+
+  it('mints and verifies the byte-CID positives under each declared profile', async () => {
+    for (const row of vectors.address.positive) {
+      const bytes = encoder.encode(row.input);
+      const byte = await byteCidOf(bytes);
+      expect(byte.toString()).toBe(row.byteCid);
+      expect((await cidOf(bytes, RAW_CODEC)).toString()).toBe(row.citeCid);
+      expect((await cidOf(bytes, DAG_CBOR_CODEC)).toString()).toBe(row.recordCid);
+      for (const text of [row.byteCid, row.citeCid, row.recordCid]) {
+        expect(await verifiesCid(CID.parse(text), bytes)).toBe(true);
+        expect(await verifiesCid(CID.parse(text), encoder.encode(`${row.input}!`))).toBe(false);
+      }
+      expect(parseByteCid(row.byteCid)).toBeInstanceOf(CID);
+    }
+  });
+
+  it('refuses every byte-surface negative by full decode', () => {
+    expect(vectors.address.negative.length).toBeGreaterThan(0);
+    for (const row of vectors.address.negative) {
+      expect(parseByteCid(row.input), row.name).toHaveProperty('refused');
+    }
+  });
+
+  it('never verifies a sha2 CID carrying a BLAKE3 digest, nor the reverse', async () => {
+    const bytes = encoder.encode('hello world');
+    const blake3Digest = (await byteCidOf(bytes)).multihash.digest;
+    const sha2Digest = (await cidOf(bytes, RAW_CODEC)).multihash.digest;
+    const forged = (code: number, digest: Uint8Array) =>
+      CID.create(1, RAW_CODEC, createDigest(code, digest));
+    expect(await verifiesCid(forged(SHA2_256, blake3Digest), bytes)).toBe(false);
+    expect(await verifiesCid(forged(BLAKE3_256, sha2Digest), bytes)).toBe(false);
+  });
+
+  it('carries the byte profile wire shape Rust wrote', () => {
+    expect(isByteProfile(vectors.wire.byteProfile)).toBe(true);
+    expect(vectors.wire.byteProfile.chunker).toEqual(FASTCDC_2020_EPOCH_0);
+    expect(isByteProfile({ ...vectors.wire.byteProfile, chunker: { id: 'fastcdc-2016' } })).toBe(false);
+  });
+
+  it('rebuilds the fastcdc-2020 tables from the pinned digest', () => {
+    expect(vectors.chunker.tableDigest).toBe(FASTCDC_2020_TABLE_DIGEST);
+    expect(fastcdc2020TableDigest()).toBe(FASTCDC_2020_TABLE_DIGEST);
+    expect(vectors.chunker.chunker).toEqual(FASTCDC_2020_EPOCH_0);
+  });
+
+  it('reproduces every chunker vector exactly', { timeout: 600_000 }, async () => {
+    const section = vectors.chunker;
+    expect(section.vectors.length).toBeGreaterThan(0);
+    for (const vector of section.vectors) {
+      const bytes = chunkerInput(section, vector);
+      expect(hex(blake3(bytes)), vector.name).toBe(vector.inputBlake3);
+      expect((await byteCidOf(bytes)).toString(), vector.name).toBe(vector.wholeCid);
+      const chunks = chunkBytes(bytes, section.chunker);
+      const named = await Promise.all(
+        chunks.map(async ([offset, len]) => [
+          offset,
+          len,
+          (await byteCidOf(bytes.subarray(offset, offset + len))).toString(),
+        ]),
+      );
+      expect(named, vector.name).toEqual(vector.chunks);
+    }
+  });
+
+  it('refuses chunker parameters outside the specification', () => {
+    expect(() => chunkBytes(new Uint8Array(1), { ...FASTCDC_2020_EPOCH_0, min: 3 })).toThrow(ChunkerError);
+    expect(() => chunkBytes(new Uint8Array(1), { ...FASTCDC_2020_EPOCH_0, level: 4 })).toThrow(ChunkerError);
+    expect(chunkBytes(new Uint8Array(0))).toEqual([]);
   });
 });

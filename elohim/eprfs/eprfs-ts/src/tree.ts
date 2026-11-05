@@ -8,12 +8,25 @@
  * fields and noncanonical bytes by re-encoding and comparing, as `decode_tree` does.
  */
 import { decodeCanonical, encodeCanonical } from '@elohim/epr';
+import { blake3 } from '@noble/hashes/blake3';
 import { CID } from 'multiformats/cid';
+import { from as hasherFrom } from 'multiformats/hashes/hasher';
 import { sha256 } from 'multiformats/hashes/sha2';
 
 export const TREE_VERSION = 1;
 export const RAW_CODEC = 0x55;
 export const DAG_CBOR_CODEC = 0x71;
+/** Multihash code of sha2-256 (record and citation profiles). */
+export const SHA2_256 = 0x12;
+/** Multihash code of BLAKE3-256: the byte profile's hash (raw 0x55 + BLAKE3-256, `bafkr4i…`). */
+export const BLAKE3_256 = 0x1e;
+
+/** `@noble/hashes/blake3` as a multiformats hasher (32-byte unkeyed BLAKE3, multihash 0x1e). */
+export const blake3Hasher = hasherFrom({
+  name: 'blake3',
+  code: BLAKE3_256,
+  encode: (bytes: Uint8Array) => blake3(bytes),
+});
 
 export type TreeEntryKind =
   | { file: { blob: CID; executable: boolean } }
@@ -137,9 +150,52 @@ export function treeNode(entries: readonly TreeEntry[]): TreeNode {
   return node;
 }
 
-/** CIDv1 over sha2-256 with the given codec. */
+/** CIDv1 over sha2-256 with the given codec (the record and citation profiles). */
 export async function cidOf(bytes: Uint8Array, codec: number): Promise<CID> {
   return CID.create(1, codec, await sha256.digest(bytes));
+}
+
+/** The byte-profile CID of payload bytes: CIDv1(raw 0x55, BLAKE3-256), `bafkr4i…`. */
+export async function byteCidOf(bytes: Uint8Array): Promise<CID> {
+  return CID.create(1, RAW_CODEC, await blake3Hasher.digest(bytes));
+}
+
+/**
+ * Whether `cid` addresses `bytes` under the profile it declares — codec, multihash and digest
+ * length together, as the kernel's `verify_cid_any` dispatches. An undeclared profile fails closed.
+ */
+export async function verifiesCid(cid: CID, bytes: Uint8Array): Promise<boolean> {
+  const { code, size } = cid.multihash;
+  let recomputed: CID;
+  if (cid.version !== 1 || size !== 32) return false;
+  if (cid.code === RAW_CODEC && code === BLAKE3_256) recomputed = await byteCidOf(bytes);
+  else if ((cid.code === RAW_CODEC || cid.code === DAG_CBOR_CODEC) && code === SHA2_256) {
+    recomputed = await cidOf(bytes, cid.code);
+  } else return false;
+  return recomputed.equals(cid);
+}
+
+/**
+ * Admit a byte-surface address by full decode: the string must decode to exactly
+ * `01 55 1e 20 ‖ 32 digest bytes` and re-encode to itself (canonical base32, zero padding bits).
+ * Returns the name of the failed check — the kernel's vocabulary for the checks this decode can
+ * tell apart — or the CID.
+ */
+export function parseByteCid(text: string): CID | { refused: string } {
+  let cid: CID;
+  try {
+    cid = CID.parse(text);
+  } catch {
+    return { refused: 'decode' };
+  }
+  if (cid.version !== 1) return { refused: 'version' };
+  if (cid.code !== RAW_CODEC) return { refused: 'codec' };
+  if (cid.multihash.code !== BLAKE3_256) return { refused: 'multihash' };
+  if (cid.multihash.size !== 32 || cid.multihash.digest.length !== 32) {
+    return { refused: 'digest-length' };
+  }
+  if (cid.bytes.length !== 36 || cid.toString() !== text) return { refused: 'non-canonical' };
+  return cid;
 }
 
 /** `encode_tree`: the canonical bytes and their DAG-CBOR CID. */

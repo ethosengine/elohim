@@ -96,3 +96,43 @@ export function kindJson(kind: TreeEntryKind | undefined): unknown {
   if ('symlink' in kind) return { symlink: { target: kind.symlink.target.toString() } };
   return { external: { kind: kind.external.kind, reference: Array.from(kind.external.reference) } };
 }
+
+/**
+ * The chunker fixtures' frozen generator (design gate CDC 2), read from the `chunker` section's
+ * header: xorshift64* (shifts 12/25/27) from the seed, each step's 64-bit product emitted
+ * little-endian, the stream truncated to `len`. BigInt, masked to 64 bits.
+ */
+export function xorshiftBytes(seedHex: string, multiplierHex: string, len: number): Uint8Array {
+  const m64 = (1n << 64n) - 1n;
+  const multiplier = BigInt(multiplierHex);
+  let state = BigInt(seedHex);
+  const out = new Uint8Array(Math.ceil(len / 8) * 8);
+  const view = new DataView(out.buffer);
+  for (let at = 0; at < len; at += 8) {
+    state ^= state >> 12n;
+    state = (state ^ (state << 25n)) & m64;
+    state ^= state >> 27n;
+    view.setBigUint64(at, (state * multiplier) & m64, true);
+  }
+  return out.subarray(0, len);
+}
+
+/** The input bytes of one `chunker.vectors` row. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function chunkerInput(section: any, vector: any): Uint8Array {
+  const len: number = vector.length;
+  switch (vector.source) {
+    case 'xorshift64*':
+      return xorshiftBytes(section.generator.seed, section.generator.multiplier, len);
+    case 'zeros':
+      return new Uint8Array(len);
+    case 'pattern': {
+      const pattern = encoder.encode(vector.pattern as string);
+      const out = new Uint8Array(len);
+      for (let i = 0; i < len; i++) out[i] = pattern[i % pattern.length];
+      return out;
+    }
+    default:
+      throw new Error(`unknown chunker fixture source ${vector.source}`);
+  }
+}
