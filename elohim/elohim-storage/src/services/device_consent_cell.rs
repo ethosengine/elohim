@@ -174,7 +174,10 @@ struct IdentityDeviceWire {
 /// The mishpat coordinator's `IdentityDevices`.
 #[derive(Deserialize, Debug)]
 struct IdentityDevicesWire {
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "wire field kept so the coordinator payload deserializes whole; not read"
+    )]
     identity_root: ActionHash,
     roots: Vec<AgentPubKey>,
     devices: Vec<IdentityDeviceWire>,

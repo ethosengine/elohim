@@ -1027,7 +1027,10 @@ mod head_corpus_digest_wire_compat_tests {
     #[serde(rename_all = "camelCase")]
     struct OldProjectionInventoryPayload {
         table: String,
-        #[allow(dead_code)]
+        #[allow(
+            dead_code,
+            reason = "present to model the old wire shape; the test never reads it"
+        )]
         total: usize,
         entries: Vec<ProjectionInventoryEntry>,
     }
