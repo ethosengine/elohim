@@ -681,6 +681,13 @@ class NativeHostSession(unittest.TestCase):
         import shift as launcher
         executable = os.environ.get('EPR_BIN') or shutil.which('epr')
         self.assertTrue(executable, 'native EPR_BIN required for session adaptation proof')
+        if Path(executable).resolve().name == 'bin-launch':
+            # `epr` on PATH is the bin-store launcher symlink; resolving it yields
+            # `bin-launch`, which resolves 0 tools under that name (exit 127). Ask the
+            # store for the current `epr` binary instead of the launcher.
+            executable = subprocess.check_output(
+                [executable, 'bin', 'resolve', '--tool', 'epr', '--current'],
+                cwd=ROOT, text=True).strip()
         with tempfile.TemporaryDirectory(prefix='shift-native-session-') as base, \
                 patch.object(native, 'BINARY', Path(executable).resolve()):
             fixture = native.Fixture(base)
