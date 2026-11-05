@@ -28,7 +28,7 @@ roles:
     dna:
       path: "lamad.dna"
       modifiers:
-        network_seed: "elohim_lamad_alpha"
+        network_seed: "elohim_lamad_alpha2"
         properties:
           progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~
@@ -42,7 +42,7 @@ roles:
     dna:
       path: "infrastructure.dna"
       modifiers:
-        network_seed: "elohim_infrastructure_alpha"
+        network_seed: "elohim_infrastructure_alpha2"
         properties: ~
       installed_hash: ~
       clone_limit: 0
@@ -55,7 +55,7 @@ roles:
     dna:
       path: "imagodei.dna"
       modifiers:
-        network_seed: "elohim_imagodei_alpha"
+        network_seed: "elohim_imagodei_alpha2"
         properties:
           progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~
@@ -69,7 +69,7 @@ roles:
     dna:
       path: "mishpat.dna"
       modifiers:
-        network_seed: "elohim_mishpat_alpha"
+        network_seed: "elohim_mishpat_alpha2"
         properties:
           progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~
@@ -83,7 +83,7 @@ roles:
     dna:
       path: "../../node-registry/node-registry.dna"
       modifiers:
-        network_seed: "elohim_node_registry_alpha"
+        network_seed: "elohim_node_registry_alpha2"
         properties:
           progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~

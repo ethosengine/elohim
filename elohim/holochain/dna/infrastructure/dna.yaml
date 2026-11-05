@@ -2,7 +2,7 @@
 #
 # Manifest hygiene (Wave 1 / §7):
 # - manifest_version "0": Holochain 0.6 schema.
-# - network_seed "elohim_infrastructure_alpha": stability contract. _alpha suffix
+# - network_seed "elohim_infrastructure_alpha2": stability contract. _alpha suffix
 #   means "we WILL reset this network on breaking changes; do not treat as production."
 # - lineage: omitted pending HC 0.6 unstable-migration stabilization.
 # - clone_limit is per-role in happ.yaml (default-deny 0).
@@ -18,7 +18,7 @@
 manifest_version: "0"
 name: infrastructure
 integrity:
-  network_seed: "elohim_infrastructure_alpha"
+  network_seed: "elohim_infrastructure_alpha2"
   properties: ~
   zomes:
     - name: infrastructure_integrity

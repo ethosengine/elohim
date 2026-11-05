@@ -2,7 +2,7 @@
 #
 # Manifest hygiene (Wave 1 / §7):
 # - manifest_version "0": Holochain 0.6 schema.
-# - network_seed "elohim_imagodei_alpha": stability contract. _alpha suffix means
+# - network_seed "elohim_imagodei_alpha2": stability contract. _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
 # - lineage: currently omitted (HC 0.6 gates the field behind unstable-migration;
 #   hc CLI rejects it). Upgrade paths are git-tracked until the feature stabilizes.
@@ -17,7 +17,7 @@
 manifest_version: "0"
 name: imagodei
 integrity:
-  network_seed: "elohim_imagodei_alpha"
+  network_seed: "elohim_imagodei_alpha2"
   properties: ~
   zomes:
     - name: imagodei_integrity

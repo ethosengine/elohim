@@ -52,14 +52,20 @@ struct IntegritySection {
     )]
     properties: Option<serde_yaml::Value>,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "parsed so the manifest's zome list deserializes; no assertion reads it"
+    )]
     zomes: Option<serde_yaml::Value>,
 }
 
 #[derive(Debug, Deserialize)]
 struct HappManifest {
     manifest_version: String,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "the hApp name is a required manifest key, deserialized but never asserted"
+    )]
     name: String,
     roles: Vec<HappRole>,
 }
@@ -123,7 +129,7 @@ fn load_happ_manifest() -> Result<HappManifest> {
 }
 
 fn expected_network_seed(dna_name: &str) -> String {
-    format!("elohim_{dna_name}_alpha")
+    format!("elohim_{dna_name}_alpha2")
 }
 
 // -----------------------------------------------------------------------------
