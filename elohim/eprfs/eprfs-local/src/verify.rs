@@ -34,9 +34,9 @@ pub async fn verify_projection(
 
         let (actual, status) = match tokio::fs::read(&path).await {
             Ok(bytes) => {
-                let actual = expected.recompute_for_codec(&bytes).ok_or_else(|| {
+                let actual = expected.recompute_for_profile(&bytes).ok_or_else(|| {
                     eprfs_core::EprfsError::Storage(format!(
-                        "unsupported blob codec for projection path {}",
+                        "unsupported blob address profile for projection path {}",
                         entry.path.as_path().display()
                     ))
                 })?;
@@ -146,7 +146,7 @@ mod tests {
             manifest.entries[0].blob = Some(expected.clone());
             let drifts = verify_projection(&manifest, dir.path()).await.unwrap();
             assert_eq!(drifts[0].status, LocalOverlayStatus::Dirty);
-            assert_eq!(drifts[0].actual, expected.recompute_for_codec(b"changed"));
+            assert_eq!(drifts[0].actual, expected.recompute_for_profile(b"changed"));
         }
     }
 }

@@ -1,5 +1,110 @@
 {
   "about": "Shared vectors for eprfs-core (Rust) and @elohim/eprfs (TypeScript). Inputs are written by hand; every computed field is written by eprfs-core/tests/vectors.rs (EPRFS_WRITE_VECTORS=1) and checked by both suites.",
+  "address": {
+    "about": "Byte-CID vectors (re-genesis 1, amended R1). byteCid = raw 0x55 + BLAKE3-256 (payload bytes); citeCid = raw 0x55 + sha2-256 (citations only; the short fingerprint renders it); recordCid = dag-cbor 0x71 + sha2-256. Positive inputs are the elohim-address kernel's plus the cite-fingerprint body; negatives are the kernel's byte-surface refusals with the check that fails. Compare-only.",
+    "negative": [
+      {
+        "check": "digest-length",
+        "input": "bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        "name": "declared-33-byte-digest"
+      },
+      {
+        "check": "padding",
+        "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6er",
+        "name": "non-zero-padding-bits"
+      },
+      {
+        "check": "multihash",
+        "input": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+        "name": "cite-profile-on-byte-surface"
+      },
+      {
+        "check": "codec",
+        "input": "bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+        "name": "record-profile-on-byte-surface"
+      },
+      {
+        "check": "codec",
+        "input": "bafyb4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        "name": "dag-pb-codec"
+      },
+      {
+        "check": "length",
+        "input": "bafkr4qgxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6etlutappu4fazcalrwgbtboqoxn4x5tzxgnf7giu4wvps24ddkpci",
+        "name": "64-byte-digest"
+      },
+      {
+        "check": "multibase",
+        "input": "BAFKR4IGXJGA67JYKBSEAXDMMDGC5A5O3ZP3HTOM2L6MRJZNK7FVYGGU6EQ",
+        "name": "uppercase"
+      },
+      {
+        "check": "alphabet",
+        "input": "bAFKR4IGXJGA67JYKBSEAXDMMDGC5A5O3ZP3HTOM2L6MRJZNK7FVYGGU6EQ",
+        "name": "uppercase-body"
+      },
+      {
+        "check": "length",
+        "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6e",
+        "name": "length-58"
+      },
+      {
+        "check": "length",
+        "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eqa",
+        "name": "length-60"
+      },
+      {
+        "check": "multibase",
+        "input": "zafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        "name": "base58-multibase"
+      },
+      {
+        "check": "version",
+        "input": "babkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        "name": "cidv0-version-byte"
+      },
+      {
+        "check": "length",
+        "input": "",
+        "name": "empty"
+      },
+      {
+        "check": "multibase",
+        "input": "sha256-0000000000000000000000000000000000000000000000000000",
+        "name": "legacy-sha256-spelling-59"
+      }
+    ],
+    "positive": [
+      {
+        "byteCid": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        "citeCid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+        "input": "hello world",
+        "recordCid": "bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+        "shortFingerprint": "sha256:b94d27b9934d3e08"
+      },
+      {
+        "byteCid": "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+        "citeCid": "bafkreif2pall7dybz7vecqka3zo24irdwabwdi4wc55jznaq75q7eaavvu",
+        "input": "abc",
+        "recordCid": "bafyreif2pall7dybz7vecqka3zo24irdwabwdi4wc55jznaq75q7eaavvu",
+        "shortFingerprint": "sha256:ba7816bf8f01cfea"
+      },
+      {
+        "byteCid": "bafkr4ifpcne3t5pzugtkaqcn5i3nzskjtpfslsnnyejlpte2spfoihzsmi",
+        "citeCid": "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+        "input": "",
+        "recordCid": "bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+        "shortFingerprint": "sha256:e3b0c44298fc1c14"
+      },
+      {
+        "byteCid": "bafkr4iepn3fgbdowgxemk7cxxls645eh3pt6vwqkqgbbxs5nh7d2ouxtze",
+        "citeCid": "bafkreicoolg62plk77jwnjfzwl77xozc64jtthwz5vpfaozqwckigxgtc4",
+        "input": "ok target body",
+        "recordCid": "bafyreicoolg62plk77jwnjfzwl77xozc64jtthwz5vpfaozqwckigxgtc4",
+        "shortFingerprint": "sha256:4e72cded3d6affd3"
+      }
+    ]
+  },
   "ask": {
     "cases": [
       {
@@ -1020,6 +1125,23 @@
     }
   },
   "wire": {
+    "byteProfile": {
+      "chunker": {
+        "avg": 1048576,
+        "id": "fastcdc-2020",
+        "level": 1,
+        "max": 4194304,
+        "min": 262144
+      },
+      "codec": 85,
+      "epoch": 0,
+      "erasure": {
+        "data": 4,
+        "id": "rs-gf8-0x11d-v1",
+        "parity": 3
+      },
+      "multihash": 30
+    },
     "itemAbsences": [
       {
         "kind": "not-held",

@@ -89,7 +89,13 @@ fn run_cid(args: &[String]) -> ExitCode {
 
     let cid = BlobCid::compute_raw(&bytes);
     if short {
-        println!("{}", cid.short_fingerprint());
+        match cid.short_fingerprint() {
+            Ok(fingerprint) => println!("{fingerprint}"),
+            Err(error) => {
+                eprintln!("eprfs: no short fingerprint for {cid}: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
     } else {
         println!("{cid}");
     }
@@ -123,6 +129,6 @@ mod tests {
         let body = canonical_body("---\nid: target-ok\n---\nok target body\n");
         assert_eq!(body, "ok target body");
         let cid = BlobCid::compute_raw(body.as_bytes());
-        assert_eq!(cid.short_fingerprint(), "sha256:4e72cded3d6affd3");
+        assert_eq!(cid.short_fingerprint().unwrap(), "sha256:4e72cded3d6affd3");
     }
 }

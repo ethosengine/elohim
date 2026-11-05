@@ -267,7 +267,9 @@ async fn unsupported_codec_refuses_materialization_and_drift_verification() {
     let error = verify_projection(&projection, dir.path())
         .await
         .unwrap_err();
-    assert!(error.to_string().contains("unsupported blob codec"));
+    assert!(error
+        .to_string()
+        .contains("unsupported blob address profile"));
 }
 
 #[cfg(unix)]

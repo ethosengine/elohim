@@ -70,7 +70,9 @@ fn cite_fingerprints_match_the_rust_body_encoder() {
         let target = root.join(&path);
         let body = std::fs::read_to_string(&target)
             .unwrap_or_else(|e| panic!("cite target {path} readable: {e}"));
-        let computed = BlobCid::compute_raw(canonical_body(&body).as_bytes()).short_fingerprint();
+        let computed = BlobCid::compute_raw(canonical_body(&body).as_bytes())
+            .short_fingerprint()
+            .unwrap();
         assert_eq!(
             computed, sealed,
             "fingerprint drift for {path}: rust {computed} != sealed {sealed}"

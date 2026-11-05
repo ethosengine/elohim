@@ -1,5 +1,6 @@
 use super::{Refusal, Result};
-use eprfs_core::BlobCid;
+use elohim_epr::address::{RECORD_CODEC, SHA2_256};
+use eprfs_core::{BlobCid, ByteCid};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::BTreeMap,
@@ -46,23 +47,34 @@ pub(super) fn absolute(path: &Path) -> Result<PathBuf> {
     }
     Ok(result)
 }
+/// A bin-store address: a file's byte-profile CID (raw 0x55 + BLAKE3-256, admitted by the
+/// kernel's full decode) or a release's record CID (canonical dag-cbor + sha2-256).
 pub(crate) fn require_cid(text: &str) -> Result<BlobCid> {
+    if let Ok(byte) = ByteCid::parse(text) {
+        return Ok(byte.into());
+    }
     let cid = BlobCid::parse(text).map_err(|_| Refusal::new("invalid-cid", text))?;
-    if cid.to_string() != text || !(text.starts_with("bafkrei") || text.starts_with("bafyrei")) {
+    let hash = cid.as_cid().hash();
+    let record = cid.as_cid().codec() == RECORD_CODEC
+        && hash.code() == SHA2_256
+        && usize::from(hash.size()) == 32;
+    if cid.to_string() != text || !record {
         return Err(Refusal::new("invalid-cid", text));
     }
     Ok(cid)
 }
-/// Compute the canonical raw CID of a file's exact bytes.
+/// Compute the byte-profile CID of a file's exact bytes.
 pub fn file_cid(path: &Path) -> Result<String> {
-    Ok(BlobCid::compute_raw(&fs::read(path)?).to_string())
+    Ok(BlobCid::compute_bytes(&fs::read(path)?).to_string())
 }
-/// Canonical DAG-CBOR mapping from release file names to their raw CID strings.
+/// Canonical DAG-CBOR mapping from release file names to their byte-profile CID strings.
 pub fn sums_manifest(sums: &BTreeMap<String, String>) -> Result<Vec<u8>> {
     for cid in sums.values() {
-        require_cid(cid)?;
-        if !cid.starts_with("bafkrei") {
-            return Err(Refusal::new("invalid-cid", "file sums require raw CIDs"));
+        if ByteCid::parse(cid).is_err() {
+            return Err(Refusal::new(
+                "invalid-cid",
+                "file sums require byte-profile CIDs",
+            ));
         }
     }
     BlobCid::encode_manifest(sums)

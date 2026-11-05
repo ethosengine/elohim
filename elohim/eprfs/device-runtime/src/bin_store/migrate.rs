@@ -120,13 +120,16 @@ impl Store {
                 names = vec!["epr".into()];
             }
             names.sort();
+            let mut legacy_raw = Vec::with_capacity(names.len());
             for name in &names {
                 let path = dir.join(name);
                 if !files::executable(&path) {
                     return Err(Refusal::new("binary-unusable", path.display().to_string()));
                 }
+                // The byte-profile CID is the file's native identity; the legacy record's
+                // `sha256:` sum is external evidence, checked under its own (sha2) construction.
                 let cid = files::file_cid(&path)?;
-                let raw = files::require_cid(&cid)?;
+                let raw = eprfs_core::BlobCid::compute_raw(&fs::read(&path)?);
                 let digest: String = raw
                     .as_cid()
                     .hash()
@@ -148,9 +151,10 @@ impl Store {
                 }
                 legacy_sums.push_str(&format!("{digest}  {name}\n"));
                 sums.insert(name.clone(), cid);
+                legacy_raw.push(raw);
             }
             let legacy_hash = if names.len() == 1 {
-                files::require_cid(&sums[&names[0]])?
+                legacy_raw.remove(0)
             } else {
                 eprfs_core::BlobCid::compute_raw(legacy_sums.as_bytes())
             };

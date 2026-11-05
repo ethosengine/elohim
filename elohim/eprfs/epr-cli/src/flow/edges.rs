@@ -121,7 +121,9 @@ pub fn derive_verdict(edge: &IndexedEdge, current: Option<&BlobCid>) -> Verdict 
     };
     let conformant = match &edge.seal {
         SealForm::Full(sealed) => current.as_cid() == sealed,
-        SealForm::Short(sealed) => &current.short_fingerprint() == sealed,
+        SealForm::Short(sealed) => current
+            .short_fingerprint()
+            .is_ok_and(|current| &current == sealed),
         // A cite-seal edge with no seal is malformed — treat as dangling rather than panic.
         SealForm::None => return Verdict::Dangling,
     };
@@ -399,7 +401,7 @@ mod tests {
     #[test]
     fn doc_envelope_matching_short_form_is_ok() {
         let upstream = blob("the upstream body");
-        let edge = doc_edge(SealForm::Short(upstream.short_fingerprint()), None);
+        let edge = doc_edge(SealForm::Short(upstream.short_fingerprint().unwrap()), None);
         assert_eq!(derive_verdict(&edge, Some(&upstream)), Verdict::Ok);
     }
 
@@ -407,7 +409,7 @@ mod tests {
     fn doc_envelope_drifted_upstream_is_stale() {
         let sealed = blob("the upstream body at seal time");
         let drifted = blob("the upstream body AFTER an edit");
-        let edge = doc_edge(SealForm::Short(sealed.short_fingerprint()), None);
+        let edge = doc_edge(SealForm::Short(sealed.short_fingerprint().unwrap()), None);
         assert_eq!(derive_verdict(&edge, Some(&drifted)), Verdict::Stale);
     }
 
@@ -434,7 +436,7 @@ mod tests {
         let sealed = blob("v1");
         let drifted = blob("v2"); // upstream has moved on — would be Stale if not held
         let edge = doc_edge(
-            SealForm::Short(sealed.short_fingerprint()),
+            SealForm::Short(sealed.short_fingerprint().unwrap()),
             Some("read-legacy, write-canonical — transitional".into()),
         );
         match derive_verdict(&edge, Some(&drifted)) {

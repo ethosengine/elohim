@@ -228,7 +228,7 @@ pub fn concerns_with(
             verdict: verdict.word().into(),
             sealed_evidence,
             current_evidence: current.as_ref().map(|c| c.as_cid().to_string()),
-            current_fingerprint: current.as_ref().map(|c| c.short_fingerprint()),
+            current_fingerprint: current.as_ref().and_then(|c| c.short_fingerprint().ok()),
             source_readable: current.is_some(),
             consumer_readable: consumer.is_some(),
             consumer_evidence: consumer.map(|cid| cid.to_string()),

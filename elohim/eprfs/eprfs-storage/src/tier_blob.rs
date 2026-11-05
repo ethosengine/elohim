@@ -1,20 +1,41 @@
 //! Local chunked custody for derivation artifacts.
 //!
-//! The manifest and every chunk use the existing [`BlobCid`] codec. This module writes only to
-//! the caller's [`EprfsStorage`]; it creates no network head, publication, or daemon dependency.
+//! Chunks are cut by the byte profile's content-defined chunker (`fastcdc-2020`, epoch 0) and
+//! each is addressed under the byte profile (`CIDv1(raw 0x55, BLAKE3-256)`); the manifest is a
+//! canonical DAG-CBOR record (`CIDv1(dag-cbor 0x71, sha2-256)`) that records the profile it was
+//! cut under, so a reader uses the recorded parameters, never the current defaults. This module
+//! writes only to the caller's [`EprfsStorage`]; it creates no network head, publication, or
+//! daemon dependency.
+//!
+//! Epoch-1 manifests (fixed 1 MiB chunks, raw sha2 chunk CIDs, no recorded profile) stay in
+//! custody: the reader reads the epoch before it deserializes the epoch-2 schema and answers
+//! them [`TierBlobUnavailable::UnsupportedEpoch`], never a hit and never a parse error
+//! (re-genesis 1 design gate, dna-blast 4).
 
 use std::fmt;
 
 use bytes::{Bytes, BytesMut};
+use elohim_epr::address::{
+    BYTE_CODEC, BYTE_DIGEST_LEN, BYTE_MULTIHASH, CITE_CODEC, RECORD_CODEC, SHA2_256,
+};
+use elohim_epr::profile::{chunk_bytes, ByteProfile, Chunker, Erasure, BYTE_PROFILE_0};
 use eprfs_core::{BlobCid, DerivationRecord, EprfsError, EprfsStorage, FetchPolicy, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// The largest raw chunk named by a tier blob manifest.
-pub const TIER_BLOB_CHUNK_BYTES: usize = 1024 * 1024;
-
 /// The local manifest epoch. An unknown epoch is retained in custody but never read as a hit.
-pub const TIER_BLOB_MANIFEST_EPOCH: u32 = 1;
+/// Epoch 2 is the byte-profile layout: content-defined chunks under BLAKE3 and a recorded
+/// [`ByteProfile`].
+pub const TIER_BLOB_MANIFEST_EPOCH: u32 = 2;
+
+/// The profile every new tier blob is cut and addressed under: the epoch-0 byte profile's address
+/// triple and chunker. The local tier store holds plain chunks, so the recorded erasure is
+/// `none` — a manifest records the representation it actually is (representation is not
+/// identity; the payload CID never depends on it).
+pub const TIER_BLOB_PROFILE: ByteProfile = ByteProfile {
+    erasure: Erasure::None,
+    ..BYTE_PROFILE_0
+};
 
 /// One raw chunk named by a local tier blob manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,18 +45,28 @@ pub struct TierBlobChunk {
     pub byte_len: u32,
 }
 
-/// The canonical DAG-CBOR record for one chunked derivation output.
+/// The canonical DAG-CBOR record for one chunked derivation output (epoch 2).
 ///
-/// `record.output` is the raw CID of the complete artifact. A reader verifies every chunk and
-/// then that complete CID before returning bytes. The record names the closure and signer claim;
-/// accepting its witness or widening its reach remains the caller's decision.
+/// `record.output` is the CID of the complete artifact under its own declared profile (a byte
+/// CID, or a sha2 record/citation CID). A reader verifies every chunk and then that complete CID
+/// before returning bytes. `profile` is the byte profile the chunks were cut and addressed under;
+/// readers bound chunk lengths by it. The record names the closure and signer claim; accepting
+/// its witness or widening its reach remains the caller's decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TierBlobManifest {
     pub epoch: u32,
+    pub profile: ByteProfile,
     pub record: DerivationRecord,
     pub byte_len: u64,
     pub chunks: Vec<TierBlobChunk>,
+}
+
+/// The one field every manifest epoch shares. Read before the epoch-2 schema so an older (or
+/// newer) object is answered by its epoch, never by the first field its schema lacks.
+#[derive(Deserialize)]
+struct ManifestEpoch {
+    epoch: u32,
 }
 
 /// A completed local put. The manifest itself is stored under `manifest_cid`.
@@ -65,6 +96,7 @@ pub enum TierBlobUnavailable {
     ManifestCorrupt,
     ManifestInvalid { reason: String },
     UnsupportedEpoch { epoch: u32 },
+    UnsupportedProfile { cid: BlobCid },
     ChunkMissing { cid: BlobCid },
     ChunkCorrupt { cid: BlobCid },
     BlobCorrupt { cid: BlobCid },
@@ -79,6 +111,9 @@ impl fmt::Display for TierBlobUnavailable {
             Self::ManifestInvalid { reason } => write!(f, "manifest is invalid: {reason}"),
             Self::UnsupportedEpoch { epoch } => {
                 write!(f, "manifest epoch {epoch} is unsupported")
+            }
+            Self::UnsupportedProfile { cid } => {
+                write!(f, "complete blob address profile is unsupported: {cid}")
             }
             Self::ChunkMissing { cid } => write!(f, "chunk is missing: {cid}"),
             Self::ChunkCorrupt { cid } => write!(f, "chunk is corrupt: {cid}"),
@@ -193,19 +228,20 @@ pub async fn put_tier_blob<S: EprfsStorage + ?Sized>(
         )));
     }
 
-    let mut chunks = Vec::with_capacity(bytes.len().div_ceil(TIER_BLOB_CHUNK_BYTES));
-    for chunk in bytes.chunks(TIER_BLOB_CHUNK_BYTES) {
-        let cid = BlobCid::compute_raw(chunk);
-        store
-            .put_blob_verified(&cid, Bytes::copy_from_slice(chunk))
-            .await?;
-        chunks.push(TierBlobChunk {
-            cid,
-            byte_len: chunk.len() as u32,
-        });
+    let layout = chunk_bytes(&TIER_BLOB_PROFILE, &bytes);
+    let mut chunks = Vec::with_capacity(layout.len());
+    for (offset, len) in layout {
+        let chunk = bytes.slice(offset..offset + len);
+        let cid = BlobCid::compute_bytes(&chunk);
+        let byte_len = u32::try_from(len).map_err(|_| {
+            EprfsError::Storage(format!("tier blob chunk of {len} bytes exceeds u32"))
+        })?;
+        store.put_blob_verified(&cid, chunk).await?;
+        chunks.push(TierBlobChunk { cid, byte_len });
     }
     let manifest = TierBlobManifest {
         epoch: TIER_BLOB_MANIFEST_EPOCH,
+        profile: TIER_BLOB_PROFILE,
         record,
         byte_len: bytes.len() as u64,
         chunks,
@@ -260,25 +296,23 @@ where
             };
         }
     };
-    let manifest: TierBlobManifest = match serde_ipld_dagcbor::from_slice(&manifest_handle.bytes) {
+    let manifest = match decode_manifest(&manifest_handle.bytes) {
         Ok(manifest) => manifest,
-        Err(error) => {
+        Err(why) => {
             return TierBlobStreamDraw::Unavailable {
                 manifest_cid: manifest_cid.clone(),
-                why: TierBlobUnavailable::ManifestInvalid {
-                    reason: error.to_string(),
-                },
+                why,
             };
         }
     };
-    if let Err(why) = validate_manifest(&manifest) {
+    let Some(mut complete_digest) = CompleteDigest::for_output(&manifest.record.output) else {
         return TierBlobStreamDraw::Unavailable {
             manifest_cid: manifest_cid.clone(),
-            why,
+            why: TierBlobUnavailable::UnsupportedProfile {
+                cid: manifest.record.output.clone(),
+            },
         };
-    }
-
-    let mut complete_digest = Sha256::new();
+    };
     for chunk in &manifest.chunks {
         match store.fetch_blob(&chunk.cid, FetchPolicy::LocalOnly).await {
             Ok(handle)
@@ -322,8 +356,7 @@ where
             }
         }
     }
-    let digest = complete_digest.finalize();
-    if !matches_complete_digest(&manifest.record.output, &digest) {
+    if !complete_digest.matches(&manifest.record.output) {
         return TierBlobStreamDraw::Unavailable {
             manifest_cid: manifest_cid.clone(),
             why: TierBlobUnavailable::BlobCorrupt {
@@ -361,17 +394,60 @@ pub async fn read_tier_blob<S: EprfsStorage + ?Sized>(
     }
 }
 
-fn matches_complete_digest(cid: &BlobCid, digest: &[u8]) -> bool {
-    // BlobCid verifies only these codecs with SHA2-256. Comparing the incremental digest keeps
-    // the same fail-closed contract without retaining the artifact merely to call `verifies`.
-    const RAW_CODEC: u64 = 0x55;
-    const DAG_CBOR_CODEC: u64 = 0x71;
-    const SHA2_256: u64 = 0x12;
+/// The complete-artifact digest, computed incrementally under the output CID's declared profile
+/// so a reader proves the whole artifact without retaining it. Byte-profile outputs hash with
+/// BLAKE3; record and citation outputs stay sha2-256. Any other profile has no digest here and
+/// the draw is `Unavailable`, never a passing match.
+enum CompleteDigest {
+    Blake3(Box<blake3::Hasher>),
+    Sha2(Sha256),
+}
 
-    let cid = cid.as_cid();
-    matches!(cid.codec(), RAW_CODEC | DAG_CBOR_CODEC)
-        && cid.hash().code() == SHA2_256
-        && cid.hash().digest() == digest
+impl CompleteDigest {
+    fn for_output(output: &BlobCid) -> Option<Self> {
+        let cid = output.as_cid();
+        let hash = cid.hash();
+        match (cid.codec(), hash.code(), usize::from(hash.size())) {
+            (BYTE_CODEC, BYTE_MULTIHASH, BYTE_DIGEST_LEN) => {
+                Some(Self::Blake3(Box::new(blake3::Hasher::new())))
+            }
+            (CITE_CODEC | RECORD_CODEC, SHA2_256, 32) => Some(Self::Sha2(Sha256::new())),
+            _ => None,
+        }
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        match self {
+            Self::Blake3(hasher) => {
+                hasher.update(bytes);
+            }
+            Self::Sha2(hasher) => hasher.update(bytes),
+        }
+    }
+
+    fn matches(self, output: &BlobCid) -> bool {
+        let digest = output.as_cid().hash().digest();
+        match self {
+            Self::Blake3(hasher) => hasher.finalize().as_bytes().as_slice() == digest,
+            Self::Sha2(hasher) => hasher.finalize().as_slice() == digest,
+        }
+    }
+}
+
+/// Read the epoch, then — only for the epoch this reader knows — the epoch-2 schema.
+fn decode_manifest(bytes: &[u8]) -> std::result::Result<TierBlobManifest, TierBlobUnavailable> {
+    let invalid = |error: serde_ipld_dagcbor::DecodeError<std::convert::Infallible>| {
+        TierBlobUnavailable::ManifestInvalid {
+            reason: error.to_string(),
+        }
+    };
+    let ManifestEpoch { epoch } = serde_ipld_dagcbor::from_slice(bytes).map_err(invalid)?;
+    if epoch != TIER_BLOB_MANIFEST_EPOCH {
+        return Err(TierBlobUnavailable::UnsupportedEpoch { epoch });
+    }
+    let manifest: TierBlobManifest = serde_ipld_dagcbor::from_slice(bytes).map_err(invalid)?;
+    validate_manifest(&manifest)?;
+    Ok(manifest)
 }
 
 fn validate_manifest(manifest: &TierBlobManifest) -> std::result::Result<(), TierBlobUnavailable> {
@@ -380,9 +456,25 @@ fn validate_manifest(manifest: &TierBlobManifest) -> std::result::Result<(), Tie
             epoch: manifest.epoch,
         });
     }
+    let profile = &manifest.profile;
+    profile
+        .validate()
+        .map_err(|error| TierBlobUnavailable::ManifestInvalid {
+            reason: format!("recorded profile is unusable: {error}"),
+        })?;
+    let Chunker::Fastcdc2020 { max, .. } = profile.chunker;
     let mut total = 0u64;
     for chunk in &manifest.chunks {
-        if chunk.byte_len == 0 || chunk.byte_len as usize > TIER_BLOB_CHUNK_BYTES {
+        let cid = chunk.cid.as_cid();
+        if (cid.codec(), cid.hash().code()) != (profile.codec, profile.multihash) {
+            return Err(TierBlobUnavailable::ManifestInvalid {
+                reason: format!(
+                    "chunk {} is not addressed under the recorded profile",
+                    chunk.cid
+                ),
+            });
+        }
+        if chunk.byte_len == 0 || chunk.byte_len > max {
             return Err(TierBlobUnavailable::ManifestInvalid {
                 reason: format!(
                     "chunk {} has invalid byte length {}",

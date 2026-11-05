@@ -155,7 +155,7 @@ async fn oversized_raw_object_refuses_before_staging_even_with_raised_tree_budge
     use eprfs_core::{encode_tree, BlobLink, TreeEntry, TreeNode};
     let store = eprfs_storage::MemoryStorage::default();
     let bytes = Bytes::from(vec![0; 64 * 1024 * 1024 + 1]);
-    let cid = BlobCid::compute_raw(&bytes);
+    let cid = BlobCid::compute_bytes(&bytes);
     store.insert_blob(cid.clone(), bytes).await;
     let node = TreeNode::new(vec![TreeEntry {
         name: b"large".to_vec(),

@@ -1568,8 +1568,9 @@ dependencies = [
  "async-trait",
  "bytes",
  "cid",
+ "elohim-address",
+ "elohim-epr",
  "elohim-seam-contracts",
- "multihash-codetable",
  "serde",
  "serde_bytes",
  "serde_ipld_dagcbor",
@@ -1587,7 +1588,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-local"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1658,10 +1659,12 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "async-trait",
+ "blake3",
  "bytes",
+ "elohim-epr",
  "eprfs-core",
  "eprfs-serve",
  "serde",

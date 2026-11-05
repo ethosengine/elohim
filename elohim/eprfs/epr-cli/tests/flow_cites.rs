@@ -975,3 +975,82 @@ fn assign_id_is_idempotent_and_inserts_after_the_title() {
     );
     assert_eq!(sha256_of(&doc), before, "assign-id is not idempotent");
 }
+
+// ---------------------------------------------------------------------------
+// The citation profile survives the address crossing (re-genesis 1)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cite_fingerprint_stays_the_citation_profile_after_the_address_crossing() {
+    // The byte profile moved payload addresses to BLAKE3; cite fingerprints keep their raw +
+    // sha2 construction by design (`compute_raw`'s bytes are frozen). The Python oracle's value
+    // for the body "ok target body" is `sha256:4e72cded3d6affd3`: a cite sealed with it stays
+    // `ok`, and one digit off is `stale`.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let docs = root.join("genesis/docs/superpowers/specs");
+    std::fs::create_dir_all(&docs).unwrap();
+    std::fs::write(
+        docs.join("target.md"),
+        "---\ntitle: Target\nid: target-ok\n---\nok target body\n",
+    )
+    .unwrap();
+    for (name, fingerprint, verdict) in [
+        ("sealed.md", "sha256:4e72cded3d6affd3", "ok"),
+        ("drifted.md", "sha256:4e72cded3d6affd4", "stale"),
+    ] {
+        let citer = docs.join(name);
+        std::fs::write(
+            &citer,
+            format!(
+                "---\ntitle: Citer\nid: citer-{verdict}\ncites:\n  - \"target-ok | the target | {fingerprint}\"\n---\n\nBody.\n"
+            ),
+        )
+        .unwrap();
+        let (code, out) = run_cites(root, &["stamp", citer.to_str().unwrap(), "--json"]);
+        assert_eq!(code, 0, "{out}");
+        let outcome: serde_json::Value = serde_json::from_str(&out).expect("stamp --json");
+        assert_eq!(
+            outcome["by_verdict"][verdict], 1,
+            "{fingerprint} must read {verdict}:\n{out}"
+        );
+        std::fs::remove_file(&citer).unwrap();
+    }
+}
+
+#[test]
+fn research_corpus_has_no_dead_cite_after_the_address_crossing() {
+    // gate-reads: genesis/research
+    let root = repo_root();
+    let research = root.join("genesis/research");
+    if !research.is_dir() {
+        return; // not a live checkout; the fixture legs carry the parity claim
+    }
+    let mut docs: Vec<String> = std::fs::read_dir(&research)
+        .expect("read genesis/research")
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "md"))
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    docs.sort();
+    assert!(!docs.is_empty(), "genesis/research holds no documents");
+    let mut args: Vec<&str> = vec!["stamp"];
+    args.extend(docs.iter().map(String::as_str));
+    args.push("--json");
+    let (code, out) = run_cites(&root, &args);
+    assert_eq!(code, 0, "{out}");
+    let outcome: serde_json::Value = serde_json::from_str(&out).expect("stamp --json");
+    assert_eq!(
+        outcome["by_verdict"]["dead"].as_u64().unwrap_or(0),
+        0,
+        "a DEAD-CITE in genesis/research:\n{out}"
+    );
+    for doc in &docs {
+        let (_, verified) = run_cites(&root, &["verify", doc]);
+        assert!(
+            !verified.contains("DEAD-CITE"),
+            "{doc} carries a DEAD-CITE:\n{verified}"
+        );
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "eprfs-storage"
-version = "0.3.5"
+version = "0.3.6"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -12,6 +12,11 @@ publish = ["elohim"]
 async-trait.workspace = true
 bytes.workspace = true
 eprfs-core = { version = "0.3.3", path = "../eprfs-core", registry = "elohim" }
+# The byte profile (re-genesis 1, amended R1): the `fastcdc-2020` chunker and `ByteProfile` a
+# tier blob manifest records. Addresses come through eprfs-core's kernel-backed `BlobCid`.
+elohim-epr = { version = "0.2", path = "../../epr", registry = "elohim" }
+# Incremental complete-artifact digest for byte-profile (BLAKE3) outputs.
+blake3 = "1"
 serde.workspace = true
 serde_json.workspace = true
 serde_ipld_dagcbor = "0.6"

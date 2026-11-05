@@ -37,7 +37,7 @@ mod test_support;
 #[cfg(test)]
 mod whole_tree_tests;
 
-pub use address::{BlobCid, BlobLink, EprRef, ProjectionId};
+pub use address::{AddressError, BlobCid, BlobLink, ByteCid, EprRef, ProjectionId};
 pub use attestation::{AttestationDraft, AttestationKind};
 pub use awareness::{
     BytePresence, EprCard, EprResiliency, LocalOverlayStatus, PeerVisibility, ProjectionAwareness,
@@ -126,7 +126,10 @@ mod boundary {
     /// `[dependencies.<name>]` in either form, and a rename by its package. Dev- and
     /// build-dependencies are not R-E1's. `elohim-seam-contracts` is admitted because ruling 7's
     /// shared type must be nameable by every seam, and it is a std/alloc leaf with zero
-    /// first-party dependencies whose own boundary test keeps it one.
+    /// first-party dependencies whose own boundary test keeps it one. `elohim-address` is
+    /// admitted because every address eprfs names is minted and checked by the one Rust
+    /// addressing kernel (re-genesis 1, amended R1); its own lockfile test keeps it a wasm-safe
+    /// leaf with no runtime, no ts-rs and no JSON.
     ///
     /// Open licence question (C4 review, for the operator before 0.2.0 publishes): seam-contracts
     /// is AGPL-3.0 and this crate is Apache-2.0, and brit (MIT OR Apache-2.0) pins this crate from
@@ -146,8 +149,8 @@ mod boundary {
             "async-trait",
             "bytes",
             "cid",
+            "elohim-address",
             "elohim-seam-contracts",
-            "multihash-codetable",
             "serde",
             "serde_bytes",
             "serde_ipld_dagcbor",

@@ -3,7 +3,7 @@ use super::{
     source::{copy_executable, CommandSpec},
     IngestOptions, Provenance, Refusal, Release, Result, Store,
 };
-use eprfs_core::BlobCid;
+use eprfs_core::{BlobCid, ByteCid};
 use serde_json::Value;
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -317,10 +317,12 @@ impl Store {
             if !files::executable(&dir.join(name)) {
                 return false;
             }
-            let (Ok(cid), Ok(bytes)) = (BlobCid::parse(sum), fs::read(dir.join(name))) else {
+            // A release file is payload bytes: its sum must be a byte-profile CID, admitted by
+            // the kernel's full decode, never a prefix test.
+            let (Ok(cid), Ok(bytes)) = (ByteCid::parse(sum), fs::read(dir.join(name))) else {
                 return false;
             };
-            if !sum.starts_with("bafkrei") || !cid.verifies(&bytes) {
+            if !BlobCid::from(cid).verifies(&bytes) {
                 return false;
             }
         }

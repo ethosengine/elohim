@@ -1,7 +1,10 @@
 use std::fmt;
 
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
+pub use elohim_address::{AddressError, ByteCid};
+use elohim_address::{
+    Verify, BYTE_CODEC, BYTE_DIGEST_LEN, BYTE_MULTIHASH, CITE_CODEC, RECORD_CODEC, SHA2_256,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Protocol-level reference to an EPR record — the permanent, human-readable **identity** (a slug,
@@ -37,22 +40,22 @@ impl From<&str> for EprRef {
     }
 }
 
-/// Codec byte for dag-cbor per the IPLD multicodec table — the canonical EPR CID codec.
-const DAG_CBOR_CODEC: u64 = 0x71;
-/// Codec byte for raw bytes per the IPLD multicodec table — for file/body/arbitrary bytes that
-/// are NOT already canonical dag-cbor atoms.
-const RAW_CODEC: u64 = 0x55;
-
-/// Content-addressed blob identifier — a real `CIDv1(dag-cbor, sha2-256)`: the protocol's canonical
-/// **fingerprint**. Byte-identical to the canonical codec `elohim-epr` (`elohim/epr/src/cid.rs`),
-/// which is the single source of the format; this consumes the same base crates (`cid`,
-/// `multihash-codetable`) rather than the heavy atom codec, keeping `eprfs-core` lean. The
-/// `cid_matches_canonical_format` vector test pins the shared format.
+/// Content-addressed blob identifier: a parsed CIDv1 under one of the protocol's declared address
+/// profiles, the canonical **fingerprint**. eprfs mints no address of its own: every constructor
+/// below delegates to the one Rust addressing kernel ([`elohim_address`], re-genesis 1 amended R1),
+/// so a profile is declared once and every consumer agrees by construction.
 ///
-/// A `BlobCid` can ONLY be constructed by hashing bytes ([`BlobCid::compute`]) or parsing a valid
-/// CID string ([`BlobCid::parse`]). There is deliberately no `From<&str>`/`new` that would let an
-/// arbitrary non-CID string masquerade as a fingerprint — that stringly-typed placeholder is the
-/// drift this type replaces. Wire form is the canonical base32 CID string, validated on deserialize.
+/// | Constructor | Profile | Renders | Use |
+/// |---|---|---|---|
+/// | [`BlobCid::compute_bytes`] | raw `0x55` + BLAKE3-256 `0x1e` (the byte profile, epoch 0) | `bafkr4i…` | newly produced payload bytes and chunks |
+/// | [`BlobCid::compute`] | dag-cbor `0x71` + sha2-256 (the record profile) | `bafyrei…` | canonical DAG-CBOR records |
+/// | [`BlobCid::compute_raw`] | raw `0x55` + sha2-256 (the citation profile) | `bafkrei…` | citation fingerprints; its bytes never change |
+///
+/// A `BlobCid` can ONLY be constructed by hashing bytes or parsing a valid CID string
+/// ([`BlobCid::parse`]). There is deliberately no `From<&str>`/`new` that would let an arbitrary
+/// non-CID string masquerade as a fingerprint. Wire form is the canonical base32 CID string,
+/// validated on deserialize. A CID names its own multihash, so objects addressed under an older
+/// profile stay verifiable under it ([`BlobCid::verifies`] dispatches on the declared profile).
 ///
 /// `PartialOrd`/`Ord` follow `cid::Cid`'s own order (interfaces spec §0 finding 3): keys such as
 /// `DerivationKey` and the `BTreeMap`s keyed by CID need a total order, and the order carries no
@@ -62,40 +65,44 @@ const RAW_CODEC: u64 = 0x55;
 pub struct BlobCid(Cid);
 
 impl BlobCid {
-    /// Content-address **already-canonical dag-cbor** bytes: `CIDv1(dag-cbor 0x71, sha2-256)`
-    /// (`bafyrei…`). Matches `elohim_epr::cid::compute_cid`. This labels the input as dag-cbor —
-    /// only use it for CBOR-encoded atoms. Arbitrary file/body/blob bytes are NOT dag-cbor and must
-    /// use [`BlobCid::compute_raw`] (codec 0x55) so the codec tag tells the truth about the bytes.
-    pub fn compute(bytes: &[u8]) -> Self {
-        Self(Cid::new_v1(DAG_CBOR_CODEC, Code::Sha2_256.digest(bytes)))
+    /// Content-address **payload bytes** under the byte profile: `CIDv1(raw 0x55, BLAKE3-256)`
+    /// (`bafkr4i…`, [`elohim_address::compute_bytes_cid`]). Every newly produced native payload
+    /// (artifact, chunk, shard) is addressed this way; payload size never selects a hash.
+    pub fn compute_bytes(bytes: &[u8]) -> Self {
+        Self(elohim_address::compute_bytes_cid(bytes).into())
     }
 
-    /// Content-address **raw** bytes: `CIDv1(raw 0x55, sha2-256)` (`bafkrei…`). The codec for
-    /// arbitrary file bytes, blob contents, and canonical document bodies — anything that is not a
-    /// canonical dag-cbor atom. Byte-identical to brit's `BritCid::compute_raw` (same golden
-    /// vectors); the `raw_codec_matches_brit_vector` test pins the shared format.
-    ///
-    /// The cite fingerprint `sha256:hex16` is, mathematically, the [`short_fingerprint`] of the
-    /// `compute_raw` CID over the same canonical-body bytes — one sha2-256 digest, two renderings
-    /// (see `2026-07-12-cite-fingerprint-cid-convergence-design.md`).
+    /// Content-address **already-canonical dag-cbor** bytes: `CIDv1(dag-cbor 0x71, sha2-256)`
+    /// (`bafyrei…`, [`elohim_address::compute_record_cid`]; equal to `elohim_epr::cid::compute_cid`).
+    /// This labels the input as dag-cbor — only use it for CBOR-encoded records.
+    pub fn compute(bytes: &[u8]) -> Self {
+        Self(elohim_address::compute_record_cid(bytes))
+    }
+
+    /// Content-address bytes under the **citation profile**: `CIDv1(raw 0x55, sha2-256)`
+    /// (`bafkrei…`, [`elohim_address::compute_raw_sha2_cid`]). Its output bytes are frozen: the
+    /// cite fingerprint `sha256:hex16` is, mathematically, the [`short_fingerprint`] of this CID
+    /// over a document's canonical body (`2026-07-12-cite-fingerprint-cid-convergence-design.md`),
+    /// and brit's `BritCid::compute_raw` pins the same golden vector. New payload bytes use
+    /// [`BlobCid::compute_bytes`]; this constructor stays for citations and for objects already
+    /// addressed under it.
     ///
     /// [`short_fingerprint`]: BlobCid::short_fingerprint
     pub fn compute_raw(bytes: &[u8]) -> Self {
-        Self(Cid::new_v1(RAW_CODEC, Code::Sha2_256.digest(bytes)))
+        Self(elohim_address::compute_raw_sha2_cid(bytes))
     }
 
-    /// The declared cite **short-form**: `"sha256:" + hex(multihash digest)[:16]`. This is the same
-    /// first-16-hex-of-sha2-256 that the Python cite oracle (`cite_graph.fingerprint_text`) and
-    /// brit's `drift_fingerprint` emit — a short projection of THIS CID's digest. For a
-    /// `compute_raw` CID over a canonical body, it equals the doc's cite fingerprint exactly.
-    pub fn short_fingerprint(&self) -> String {
-        // First 8 digest bytes render to the 16 hex chars of the short form (no `hex` dep needed).
-        let mut s = String::with_capacity("sha256:".len() + 16);
-        s.push_str("sha256:");
-        for b in self.0.hash().digest().iter().take(8) {
-            s.push_str(&format!("{b:02x}"));
-        }
-        s
+    /// The declared cite **short-form**: `"sha256:" + hex(multihash digest)[:16]`, the same
+    /// first-16-hex-of-sha2-256 the Python cite oracle (`cite_graph.fingerprint_text`) and brit's
+    /// `drift_fingerprint` emit. For a [`BlobCid::compute_raw`] CID over a canonical body it equals
+    /// the doc's cite fingerprint exactly.
+    ///
+    /// # Errors
+    ///
+    /// [`AddressError::NotSha2`] for a CID whose multihash is not sha2-256: a `sha256:` label
+    /// over a BLAKE3 digest would be a false fingerprint.
+    pub fn short_fingerprint(&self) -> Result<String, AddressError> {
+        elohim_address::short_fingerprint(&self.0)
     }
 
     /// Encode a serializable manifest as canonical DAG-CBOR and address those exact bytes.
@@ -108,30 +115,48 @@ impl BlobCid {
     }
 
     /// Parse a canonical CID string (base32 `bafy…` / `bafk…`). Errors on a non-CID string — the
-    /// boundary guard against a stringly-typed fingerprint re-entering.
+    /// boundary guard against a stringly-typed fingerprint re-entering. This admits any CID; a
+    /// byte-payload surface narrows it with [`BlobCid::byte_cid`].
     pub fn parse(s: &str) -> Result<Self, cid::Error> {
         Ok(Self(s.parse::<Cid>()?))
+    }
+
+    /// This CID as a byte-profile address, refused unless it is exactly `CIDv1(raw 0x55,
+    /// BLAKE3-256, 32-byte digest)`. This checks the profile of an already-parsed CID; TEXT
+    /// arriving at a byte surface is admitted by [`ByteCid::parse`] (full decode and canonical
+    /// re-encoding), because [`BlobCid::parse`] accepts non-canonical spellings such as an
+    /// uppercase multibase.
+    ///
+    /// # Errors
+    ///
+    /// The kernel's [`AddressError`], naming the first check that failed (codec, multihash, ...).
+    pub fn byte_cid(&self) -> Result<ByteCid, AddressError> {
+        ByteCid::try_from(self.0)
     }
 
     /// True iff this fingerprint is the content hash of `bytes` (tamper detection) — the property a
     /// String newtype could never provide.
     ///
-    /// Recomputation dispatches on the codec THIS CID declares, because the codec tag is a claim
-    /// about what the bytes are: a `compute_raw` fingerprint (0x55, the codec of every document
-    /// body and file blob) and a `compute` fingerprint (0x71, canonical dag-cbor atoms) over the
-    /// same bytes are different CIDs, and each must verify only against its own construction.
-    /// An unrecognized codec fails closed — a fingerprint we cannot recompute is an unverified
+    /// Recomputation dispatches on the profile THIS CID declares — codec, multihash and digest
+    /// length together ([`elohim_address::verify_cid_any`]) — because the CID is a claim about how
+    /// the bytes were addressed: a sha2 CID never verifies BLAKE3-addressed bytes and the reverse.
+    /// An unsupported profile fails closed — a fingerprint we cannot recompute is an unverified
     /// claim, never a passing one.
     pub fn verifies(&self, bytes: &[u8]) -> bool {
-        self.recompute_for_codec(bytes).as_ref() == Some(self)
+        matches!(
+            elohim_address::verify_cid_any(&self.0, bytes),
+            Verify::Verified
+        )
     }
 
-    /// Recompute the fingerprint of bytes with this CID's declared codec. Returns `None` for
-    /// unsupported codecs so a caller cannot turn an unknown format into a passing projection.
-    pub fn recompute_for_codec(&self, bytes: &[u8]) -> Option<Self> {
-        match self.0.codec() {
-            RAW_CODEC => Some(Self::compute_raw(bytes)),
-            DAG_CBOR_CODEC => Some(Self::compute(bytes)),
+    /// Recompute the fingerprint of bytes under this CID's declared profile. Returns `None` for an
+    /// unsupported profile so a caller cannot turn an unknown format into a passing projection.
+    pub fn recompute_for_profile(&self, bytes: &[u8]) -> Option<Self> {
+        let hash = self.0.hash();
+        match (self.0.codec(), hash.code(), usize::from(hash.size())) {
+            (BYTE_CODEC, BYTE_MULTIHASH, BYTE_DIGEST_LEN) => Some(Self::compute_bytes(bytes)),
+            (CITE_CODEC, SHA2_256, 32) => Some(Self::compute_raw(bytes)),
+            (RECORD_CODEC, SHA2_256, 32) => Some(Self::compute(bytes)),
             _ => None,
         }
     }
@@ -139,6 +164,12 @@ impl BlobCid {
     /// The underlying canonical CID.
     pub fn as_cid(&self) -> &Cid {
         &self.0
+    }
+}
+
+impl From<ByteCid> for BlobCid {
+    fn from(value: ByteCid) -> Self {
+        Self(value.into())
     }
 }
 
@@ -247,6 +278,27 @@ mod tests {
         0x53, 0x80, 0xee, 0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9,
     ];
     const RAW_HELLO_CID: &str = "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e";
+    // The kernel's byte-profile vector for "hello world" (`crates/elohim-address/vectors/
+    // address-vectors.json`, derived there with @noble/hashes/blake3 and a hand-written CIDv1
+    // encoder): raw 0x55 + BLAKE3-256. Hard-coded so this pin never runs through the code under
+    // test.
+    const HELLO_BYTE_CID: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+
+    /// A dag-pb (0x70) CID over sha2-256 of `bytes`: a valid multicodec no profile admits.
+    fn dag_pb(bytes: &[u8]) -> BlobCid {
+        BlobCid(Cid::new_v1(
+            0x70,
+            *BlobCid::compute_raw(bytes).as_cid().hash(),
+        ))
+    }
+
+    /// A CID that declares `(codec, multihash)` over a digest it did not compute.
+    fn forged(codec: u64, multihash: u64, digest: &[u8]) -> BlobCid {
+        BlobCid(Cid::new_v1(
+            codec,
+            cid::multihash::Multihash::<64>::wrap(multihash, digest).unwrap(),
+        ))
+    }
 
     #[test]
     fn blob_link_has_explicit_human_and_canonical_forms() {
@@ -335,7 +387,10 @@ mod tests {
         assert!(raw.to_string().starts_with("bafkrei"));
         assert!(cbor.to_string().starts_with("bafyrei"));
         // But the underlying sha2-256 digest — hence the short form — is identical.
-        assert_eq!(raw.short_fingerprint(), cbor.short_fingerprint());
+        assert_eq!(
+            raw.short_fingerprint().unwrap(),
+            cbor.short_fingerprint().unwrap()
+        );
     }
 
     // The convergence pin: the cite fingerprint `sha256:hex16` IS the short-form of the raw-codec
@@ -345,12 +400,14 @@ mod tests {
     fn short_fingerprint_equals_python_cite_fingerprint() {
         let body = b"ok target body";
         let cid = BlobCid::compute_raw(body);
-        assert_eq!(cid.short_fingerprint(), "sha256:4e72cded3d6affd3");
+        assert_eq!(cid.short_fingerprint().unwrap(), "sha256:4e72cded3d6affd3");
     }
 
     #[test]
     fn short_fingerprint_shape() {
-        let f = BlobCid::compute_raw(b"anything").short_fingerprint();
+        let f = BlobCid::compute_raw(b"anything")
+            .short_fingerprint()
+            .unwrap();
         assert!(f.starts_with("sha256:"));
         assert_eq!(f.len(), "sha256:".len() + 16);
     }
@@ -392,17 +449,20 @@ mod tests {
     }
 
     #[test]
-    fn recompute_preserves_requested_codec_and_external_raw_vector() {
+    fn recompute_preserves_declared_profile_and_external_vectors() {
         let raw =
             BlobCid::parse("bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e").unwrap();
-        assert_eq!(raw.recompute_for_codec(b"hello world"), Some(raw));
+        assert_eq!(raw.recompute_for_profile(b"hello world"), Some(raw));
 
         let cbor =
             BlobCid::parse("bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e").unwrap();
-        assert_eq!(cbor.recompute_for_codec(b"hello world"), Some(cbor));
+        assert_eq!(cbor.recompute_for_profile(b"hello world"), Some(cbor));
 
-        let unsupported = BlobCid(Cid::new_v1(0x70, Code::Sha2_256.digest(b"hello world")));
-        assert_eq!(unsupported.recompute_for_codec(b"hello world"), None);
+        let byte = BlobCid::parse(HELLO_BYTE_CID).unwrap();
+        assert_eq!(byte.recompute_for_profile(b"hello world"), Some(byte));
+
+        let unsupported = dag_pb(b"hello world");
+        assert_eq!(unsupported.recompute_for_profile(b"hello world"), None);
     }
 
     // An unrecognized codec must fail closed. Verification is the tamper-detection primitive; a
@@ -410,8 +470,7 @@ mod tests {
     #[test]
     fn verifies_fails_closed_on_unknown_codec() {
         // 0x70 = dag-pb, a valid multicodec this type never mints.
-        let dag_pb = BlobCid(Cid::new_v1(0x70, Code::Sha2_256.digest(b"hello world")));
-        assert!(!dag_pb.verifies(b"hello world"));
+        assert!(!dag_pb(b"hello world").verifies(b"hello world"));
     }
 
     #[test]
@@ -429,5 +488,88 @@ mod tests {
         assert_eq!(serde_json::from_str::<BlobCid>(&json).unwrap(), cid);
         // a non-CID string is rejected at the wire boundary
         assert!(serde_json::from_str::<BlobCid>("\"bafk-test\"").is_err());
+    }
+
+    #[test]
+    fn compute_bytes_matches_kernel_vector() {
+        let cid = BlobCid::compute_bytes(b"hello world");
+        assert_eq!(cid.to_string(), HELLO_BYTE_CID);
+        assert!(cid.verifies(b"hello world"));
+        assert!(!cid.verifies(b"hello w0rld"));
+        // The byte profile and the citation profile never share an address over the same bytes.
+        assert_ne!(cid, BlobCid::compute_raw(b"hello world"));
+        assert_eq!(
+            cid.byte_cid().unwrap().to_string(),
+            HELLO_BYTE_CID,
+            "a minted byte CID is admitted by the full-decode byte surface"
+        );
+    }
+
+    #[test]
+    fn verifies_rejects_sha2_cid_over_blake3_bytes() {
+        // A citation-profile (sha2) CID carrying the BLAKE3 digest of the bytes, and a byte-profile
+        // (BLAKE3) CID carrying their sha2 digest: each claims bytes it does not address under its
+        // own declared multihash, so neither verifies.
+        let bytes = b"hello world";
+        let blake3 = *BlobCid::compute_bytes(bytes).as_cid().hash();
+        let sha2 = *BlobCid::compute_raw(bytes).as_cid().hash();
+        assert!(!forged(CITE_CODEC, SHA2_256, blake3.digest()).verifies(bytes));
+        assert!(!forged(BYTE_CODEC, BYTE_MULTIHASH, sha2.digest()).verifies(bytes));
+        // And the honest constructors each verify only under their own profile.
+        assert!(BlobCid::compute_raw(bytes).verifies(bytes));
+        assert!(BlobCid::compute_bytes(bytes).verifies(bytes));
+    }
+
+    #[test]
+    fn short_fingerprint_refuses_blake3() {
+        let err = BlobCid::compute_bytes(b"ok target body")
+            .short_fingerprint()
+            .unwrap_err();
+        assert_eq!(err.check(), "not-sha2");
+        // The citation profile still renders the frozen fingerprint.
+        assert_eq!(
+            BlobCid::compute_raw(b"ok target body")
+                .short_fingerprint()
+                .unwrap(),
+            "sha256:4e72cded3d6affd3"
+        );
+    }
+
+    // The kernel's malformed-header negatives: `BlobCid::parse` admits any well-formed CID, so the
+    // byte surface (`byte_cid`) is where each is refused, with the check the kernel names.
+    #[test]
+    fn byte_surface_refuses_the_negative_header_vectors() {
+        for (input, check) in [
+            // a raw+sha2 citation CID offered as payload bytes
+            (RAW_HELLO_CID, "multihash"),
+            // a dag-cbor record CID offered as payload bytes
+            (
+                "bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+                "codec",
+            ),
+            // dag-pb codec over the BLAKE3 digest
+            (
+                "bafyb4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+                "codec",
+            ),
+        ] {
+            let parsed = BlobCid::parse(input).unwrap();
+            assert_eq!(parsed.byte_cid().unwrap_err().check(), check, "{input}");
+            assert_eq!(ByteCid::parse(input).unwrap_err().check(), check, "{input}");
+        }
+        // A header declaring a 33-byte digest over 32 supplied bytes, and non-zero padding bits:
+        // refused by the full decode before any CID exists.
+        assert_eq!(
+            ByteCid::parse("bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq")
+                .unwrap_err()
+                .check(),
+            "digest-length"
+        );
+        assert_eq!(
+            ByteCid::parse("bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6er")
+                .unwrap_err()
+                .check(),
+            "padding"
+        );
     }
 }

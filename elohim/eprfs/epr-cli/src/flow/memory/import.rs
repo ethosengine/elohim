@@ -843,6 +843,8 @@ pub(super) fn lineage_for(root: &Path, slot: &str, resource: &str) -> Option<Lin
         .next()?
         .trim();
     let text = std::fs::read_to_string(root.join(LINEAGE_DIR).join(format!("{cid}.json"))).ok()?;
+    // citation-profile object, verified under its own multihash: memory lineage is named by its
+    // raw + sha2 CID (re-genesis 1 KEEP list), never re-addressed under the byte profile.
     if BlobCid::compute_raw(text.as_bytes()).to_string() != cid
         || crate::flow::body_cid(&text).to_string() != resource
     {

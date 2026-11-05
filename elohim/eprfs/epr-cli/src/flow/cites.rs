@@ -757,7 +757,11 @@ fn rel_locator(root: &Path, path: &Path) -> String {
 /// The declared short-form fingerprint of a document's canonical body.
 fn fingerprint_of(path: &Path) -> Option<String> {
     let text = read_lossy(path)?;
-    Some(BlobCid::compute_raw(canonical_body(&text).as_bytes()).short_fingerprint())
+    // The citation profile (raw + sha2) always renders a short fingerprint; `ok()` only adapts
+    // the kernel's sha2-only `Result`, the fingerprint bytes are unchanged.
+    BlobCid::compute_raw(canonical_body(&text).as_bytes())
+        .short_fingerprint()
+        .ok()
 }
 
 /// The first segment of a target's title (or its filename stem) — the migration-default description.
@@ -2059,6 +2063,19 @@ mod tests {
         assert_eq!(
             yaml_cite_item("a | b | path: x.md"),
             "\"a | b | path: x.md\""
+        );
+    }
+
+    #[test]
+    fn fingerprint_of_is_the_frozen_citation_profile() {
+        // The cite fingerprint is the short form of the raw + sha2 CID over the canonical body;
+        // the address crossing leaves it byte-identical (Python oracle value).
+        let dir = tempfile::tempdir().unwrap();
+        let doc = dir.path().join("target.md");
+        std::fs::write(&doc, "---\nid: target-ok\n---\nok target body\n").unwrap();
+        assert_eq!(
+            fingerprint_of(&doc).as_deref(),
+            Some("sha256:4e72cded3d6affd3")
         );
     }
 }

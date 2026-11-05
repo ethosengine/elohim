@@ -10,7 +10,7 @@ fn readonly_object_can_be_fetched_but_cannot_claim_fresh_custody() {
     let temp = tempfile::tempdir().unwrap();
     let store = DirectoryStorage::create(temp.path().join("store")).unwrap();
     let bytes = Bytes::from_static(b"read-only verified object");
-    let cid = BlobCid::compute_raw(&bytes);
+    let cid = BlobCid::compute_bytes(&bytes);
     store.put_object(&cid, bytes.clone()).unwrap();
     let path = store.object_path(&cid);
     let original = std::fs::metadata(&path).unwrap().permissions();
@@ -83,7 +83,7 @@ fn new_existing_and_concurrent_objects_sync_the_actual_inode_before_directories(
         let temp = tempfile::tempdir().unwrap();
         let store = DirectoryStorage::create(temp.path().join("store")).unwrap();
         let bytes = Bytes::from_static(b"durable candidate");
-        let cid = BlobCid::compute_raw(&bytes);
+        let cid = BlobCid::compute_bytes(&bytes);
         let object = store.object_path(&cid);
         if state == "existing" {
             store.put_object(&cid, bytes.clone()).unwrap();
@@ -151,10 +151,10 @@ fn every_object_write_sync_and_promotion_failure_refuses_without_losing_candidat
             let temp = tempfile::tempdir().unwrap();
             let store = DirectoryStorage::create(temp.path().join("store")).unwrap();
             let prior = Bytes::from_static(b"prior candidate");
-            let prior_cid = BlobCid::compute_raw(&prior);
+            let prior_cid = BlobCid::compute_bytes(&prior);
             store.put_object(&prior_cid, prior.clone()).unwrap();
             let bytes = Bytes::from_static(b"new candidate");
-            let cid = BlobCid::compute_raw(&bytes);
+            let cid = BlobCid::compute_bytes(&bytes);
             if state == "existing" {
                 store.put_object(&cid, bytes.clone()).unwrap();
             }
@@ -196,7 +196,7 @@ fn losing_writer_cannot_succeed_when_winner_sync_fails() {
     let temp = tempfile::tempdir().unwrap();
     let store = DirectoryStorage::create(temp.path().join("store")).unwrap();
     let bytes = Bytes::from_static(b"same candidate");
-    let cid = BlobCid::compute_raw(&bytes);
+    let cid = BlobCid::compute_bytes(&bytes);
     let object = store.object_path(&cid);
     let error = store
         .put_object_with_hook(&cid, bytes.clone(), &mut |step, path| {
@@ -226,7 +226,7 @@ fn actual_parallel_puts_converge_without_temporary_residue() {
                 let store = DirectoryStorage::create(&root).unwrap();
                 let bytes = Bytes::from_static(b"concurrent");
                 store
-                    .put_object(&BlobCid::compute_raw(&bytes), bytes)
+                    .put_object(&BlobCid::compute_bytes(&bytes), bytes)
                     .unwrap();
             });
         }
@@ -235,7 +235,7 @@ fn actual_parallel_puts_converge_without_temporary_residue() {
     let store = DirectoryStorage::open(&root).unwrap();
     assert_eq!(
         store
-            .read_object(&BlobCid::compute_raw(b"concurrent"))
+            .read_object(&BlobCid::compute_bytes(b"concurrent"))
             .unwrap()
             .as_ref(),
         b"concurrent"
@@ -249,7 +249,7 @@ fn object_cap_cannot_be_raised() {
         .unwrap()
         .with_max_blob_bytes(usize::MAX);
     let oversized = Bytes::from(vec![0; 64 * 1024 * 1024 + 1]);
-    let cid = BlobCid::compute_raw(&oversized);
+    let cid = BlobCid::compute_bytes(&oversized);
     let error = store.put_object(&cid, oversized).unwrap_err();
     assert!(error.to_string().contains("exceeds byte limit"));
     assert_eq!(std::fs::read_dir(&store.root).unwrap().count(), 0);
@@ -259,9 +259,9 @@ fn object_cap_cannot_be_raised() {
 fn process_interruption_retains_objects_and_allows_verified_retry() {
     const CHILD: &str = "EPRFS_STORE_DURABILITY_CHILD";
     let bytes = Bytes::from_static(b"interrupted candidate");
-    let cid = BlobCid::compute_raw(&bytes);
+    let cid = BlobCid::compute_bytes(&bytes);
     let prior = Bytes::from_static(b"prior");
-    let prior_cid = BlobCid::compute_raw(&prior);
+    let prior_cid = BlobCid::compute_bytes(&prior);
     if let Some(root) = std::env::var_os(CHILD) {
         let store = DirectoryStorage::open(root).unwrap();
         let after = std::env::var_os("EPRFS_STORE_AFTER_PUBLISH").is_some();

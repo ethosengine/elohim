@@ -6,8 +6,12 @@ use eprfs_core::{BlobCid, DerivationBasis, DerivationKey, DerivationRecord, KeyI
 use eprfs_peer::{put_local_blob, read_local_blob, stream_local_blob, LocalBlobContext};
 use eprfs_storage::{
     DirectoryStorage, TierBlobChunk, TierBlobDraw, TierBlobSink, TierBlobStreamDraw,
-    TierBlobUnavailable, TIER_BLOB_CHUNK_BYTES,
+    TierBlobUnavailable,
 };
+
+/// The byte profile's largest chunk (`fastcdc-2020` max, epoch 0). A run of one repeated byte
+/// never satisfies a chunker mask, so each run of this length is cut at `max` — one chunk.
+const TIER_BLOB_CHUNK_BYTES: usize = 4_194_304;
 
 fn record_for(bytes: &[u8]) -> DerivationRecord {
     DerivationRecord {
@@ -15,7 +19,7 @@ fn record_for(bytes: &[u8]) -> DerivationRecord {
             method: BlobCid::compute_raw(b"local-build-method"),
             input: KeyInput::Raw(BlobCid::compute_raw(b"local-build-input")),
         },
-        output: BlobCid::compute_raw(bytes),
+        output: BlobCid::compute_bytes(bytes),
         computed_by: "uhCAkLocalBuilder".into(),
         basis: DerivationBasis::Computed,
         deterministic: true,

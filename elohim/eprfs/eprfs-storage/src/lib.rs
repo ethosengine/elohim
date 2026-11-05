@@ -22,7 +22,7 @@ mod tier_blob;
 pub use tier_blob::{
     put_tier_blob, read_tier_blob, stream_tier_blob, TierBlobChunk, TierBlobDraw, TierBlobManifest,
     TierBlobMiss, TierBlobPut, TierBlobSink, TierBlobStreamDraw, TierBlobUnavailable,
-    TIER_BLOB_CHUNK_BYTES, TIER_BLOB_MANIFEST_EPOCH,
+    TIER_BLOB_MANIFEST_EPOCH, TIER_BLOB_PROFILE,
 };
 
 #[cfg(windows)]

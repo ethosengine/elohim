@@ -111,7 +111,7 @@ fn merges_doc_and_sidecar_without_conflating_shared_source_edges() {
     std::fs::create_dir(root.join("docs")).unwrap();
     std::fs::write(root.join(".claude/epr-meta/recipes.yaml"), "version: 1\nrecipes:\n  - id: fixture\n    version: 1\n    stages:\n      - name: spec\n        artifactKind: document\n        paths: ['docs/*.md']\n").unwrap();
     std::fs::write(root.join("docs/up.md"), "new").unwrap();
-    let pin = BlobCid::compute_raw(b"old").short_fingerprint();
+    let pin = BlobCid::compute_raw(b"old").short_fingerprint().unwrap();
     std::fs::write(root.join("docs/down.md"), format!("---\ncites:\n  - \"up | first assertion | {pin} | path: docs/up.md\"\n  - \"up | second assertion | {pin} | path: docs/up.md\"\n---\nconsumer\n")).unwrap();
     std::fs::write(root.join("docs/unreadable.md"), [255, 254]).unwrap();
     edge(root, "docs/down.md", "docs/up.md", Governor::CiteSeal, 0);
