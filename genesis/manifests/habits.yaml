@@ -1678,10 +1678,10 @@ habits:
       - "a2o tag lane: `just test mesh '@concern:addresses-are-declared-profiles'`"
       - "scripts/ci/address-profile-lint.sh: no native address spelled outside the kernel's constructors"
     evidence: >
-      DELTA 2026-11-05 (T3): declared red, not unwired — the census refuses `unwired` beside declared checks, and the L0 checks now run: eprfs-core `tests/vectors.rs` re-derives the `address` and `chunker` sections and eprfs-ts reproduces both. Red because the a2o lane has no `@concern:addresses-are-declared-profiles` scenario yet and `scripts/ci/address-profile-lint.sh` does not exist (T0b). Evidence: genesis/docs/superpowers/plans/task-rg1-eprfs-report.md.
-    evidence-fingerprint: sha256:8ac17b798382bf07
-    evidence-bytes: 534
-    evidence-entries: 2
+      DELTA 2026-11-05 (T3 hand-back, a3315d6da): still red. L0 runs green on the eprfs side — `just gate eprfs` EXIT=0, eprfs workspace 2059 passed, eprfs-ts 34 passed (address + chunker sections reproduced in Rust and TypeScript); the a2o lane and the address-profile lint are still absent. Evidence: genesis/docs/superpowers/plans/task-rg1-eprfs-report.md.
+    evidence-fingerprint: sha256:08648229709fecca
+    evidence-bytes: 890
+    evidence-entries: 3
     refs:
       - genesis/local-dev/regenesis-1/plan.md
       - genesis/local-dev/regenesis-1/design-gate.md

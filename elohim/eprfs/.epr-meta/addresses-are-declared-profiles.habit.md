@@ -25,3 +25,4 @@ retire-when: >
 ---
 DELTA 2026-11-05: born 2026-11-05 unwired; L0 vectors red until T0/T3 land.
 DELTA 2026-11-05 (T3): declared red, not unwired — the census refuses `unwired` beside declared checks, and the L0 checks now run: eprfs-core `tests/vectors.rs` re-derives the `address` and `chunker` sections and eprfs-ts reproduces both. Red because the a2o lane has no `@concern:addresses-are-declared-profiles` scenario yet and `scripts/ci/address-profile-lint.sh` does not exist (T0b). Evidence: genesis/docs/superpowers/plans/task-rg1-eprfs-report.md.
+DELTA 2026-11-05 (T3 hand-back, a3315d6da): still red. L0 runs green on the eprfs side — `just gate eprfs` EXIT=0, eprfs workspace 2059 passed, eprfs-ts 34 passed (address + chunker sections reproduced in Rust and TypeScript); the a2o lane and the address-profile lint are still absent. Evidence: genesis/docs/superpowers/plans/task-rg1-eprfs-report.md.
