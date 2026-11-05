@@ -7,7 +7,7 @@
   "properties": {
     "cid": {
       "type": "string",
-      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      "pattern": "^(bafkr4i|bafyrei)[a-z2-7]{52}$"
     },
     "rcid": {
       "type": "string"
@@ -19,7 +19,7 @@
       "type": "object",
       "additionalProperties": {
         "type": "string",
-        "pattern": "^bafkr4i[a-z2-7]+$"
+        "pattern": "^bafkr4i[a-z2-7]{52}$"
       }
     },
     "version": {
