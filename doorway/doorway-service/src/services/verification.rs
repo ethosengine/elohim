@@ -143,12 +143,12 @@ impl VerifyBlobResponse {
 
 /// Parse the claimed CID, or answer the error response. A legacy `sha256-<hex>` or
 /// bare hex is not a CID and is refused here — never compared.
-fn parse_expected(expected_cid: &str) -> Result<Cid, VerifyBlobResponse> {
+fn parse_expected(expected_cid: &str) -> Result<Cid, Box<VerifyBlobResponse>> {
     Cid::from_str(expected_cid).map_err(|e| {
-        VerifyBlobResponse::error(
+        Box::new(VerifyBlobResponse::error(
             expected_cid.to_string(),
             format!("expected_cid is not a CID: {e}"),
-        )
+        ))
     })
 }
 
@@ -208,7 +208,7 @@ impl VerificationService {
         let start = Instant::now();
         let expected = match parse_expected(expected_cid) {
             Ok(cid) => cid,
-            Err(response) => return response,
+            Err(response) => return *response,
         };
 
         // Decode base64
@@ -251,7 +251,7 @@ impl VerificationService {
         let start = Instant::now();
         let expected = match parse_expected(expected_cid) {
             Ok(cid) => cid,
-            Err(response) => return response,
+            Err(response) => return *response,
         };
         let response =
             VerifyBlobResponse::checked(&expected, data, start.elapsed().as_millis() as u64);
@@ -278,7 +278,7 @@ impl VerificationService {
         let start = Instant::now();
         let expected = match parse_expected(expected_cid) {
             Ok(cid) => cid,
-            Err(response) => return response,
+            Err(response) => return *response,
         };
 
         // Fetch the blob

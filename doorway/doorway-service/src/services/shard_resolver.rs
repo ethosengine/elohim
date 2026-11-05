@@ -1065,8 +1065,8 @@ mod tests {
         let encoded = stripes_of(&bytes, 4, 3, 20_000);
         let server = MockServer::start().await;
         let (stripe, shards) = &encoded[0];
-        for i in 0..3 {
-            serve(&server, &stripe.shards[i].cid, shards[i].clone()).await;
+        for (shard_ref, shard) in stripe.shards.iter().zip(shards).take(3) {
+            serve(&server, &shard_ref.cid, shard.clone()).await;
         }
         let chunks: Vec<ChunkRef> = chunks_of(&bytes, 1).into_iter().map(|(c, _)| c).collect();
         let m = manifest(

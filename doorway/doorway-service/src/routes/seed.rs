@@ -241,7 +241,7 @@ pub async fn handle_seed_blob(
 
     let claimed = match claimed_seed_cid(&req) {
         Ok(cid) => cid,
-        Err(resp) => return resp,
+        Err(resp) => return *resp,
     };
     let expected_hash = claimed.to_string();
 
@@ -350,7 +350,7 @@ pub async fn handle_seed_blob(
 /// The byte CID a seed upload claims: the path segment of `/admin/seed/blob/{cid}`
 /// and/or the `X-Content-Address` header, each admitted by full decode; when both
 /// are present they must agree. Any other spelling is the typed 400 storage answers.
-fn claimed_seed_cid<B>(req: &Request<B>) -> Result<ByteCid, Response<Full<Bytes>>> {
+fn claimed_seed_cid<B>(req: &Request<B>) -> Result<ByteCid, Box<Response<Full<Bytes>>>> {
     let from_path = req
         .uri()
         .path()
@@ -361,30 +361,30 @@ fn claimed_seed_cid<B>(req: &Request<B>) -> Result<ByteCid, Response<Full<Bytes>
         Some(value) => match value.to_str() {
             Ok(text) => Some(crate::routes::BlobAddress::parse(text.trim())),
             Err(_) => {
-                return Err(error_response(
+                return Err(Box::new(error_response(
                     StatusCode::BAD_REQUEST,
                     "Invalid X-Content-Address header",
-                ))
+                )))
             }
         },
         None => None,
     };
     let admit = |admitted: Result<ByteCid, elohim_address::AddressError>| {
-        admitted.map_err(|error| crate::routes::invalid_byte_cid_response(&error))
+        admitted.map_err(|error| Box::new(crate::routes::invalid_byte_cid_response(&error)))
     };
     match (
         from_path.map(admit).transpose()?,
         from_header.map(admit).transpose()?,
     ) {
-        (Some(path), Some(header)) if path != header => Err(error_response(
+        (Some(path), Some(header)) if path != header => Err(Box::new(error_response(
             StatusCode::BAD_REQUEST,
             &format!("path names {path} but X-Content-Address names {header}"),
-        )),
+        ))),
         (Some(cid), _) | (None, Some(cid)) => Ok(cid),
-        (None, None) => Err(error_response(
+        (None, None) => Err(Box::new(error_response(
             StatusCode::BAD_REQUEST,
             "Missing blob address: PUT /admin/seed/blob/{cid} or X-Content-Address",
-        )),
+        ))),
     }
 }
 
