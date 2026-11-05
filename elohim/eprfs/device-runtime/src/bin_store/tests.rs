@@ -1559,6 +1559,9 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
     f.store.config.bins.push("bin-launch".into());
     let bytes = b"#!/bin/sh\nexit 0\n";
     let raw = eprfs_core::BlobCid::compute_raw(bytes);
+    // The native release is addressed under the byte profile; the legacy `sha256:` label stays
+    // external evidence under sha2.
+    let native_cid = eprfs_core::BlobCid::compute_bytes(bytes);
     let old = format!(
         "sha256:{}",
         raw.as_cid()
@@ -1581,7 +1584,7 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
     .unwrap();
     atomic_json(&f.store.root.join("sessions/s"),&json!({"cid":old,"session":"s","pinned_at":"2026-10-23T00:00:00Z","owner_pid":5,"owner_starttime":"123"})).unwrap();
     // An already-native release may have newer custody evidence than the old record.
-    let native = f.store.root.join(raw.to_string());
+    let native = f.store.root.join(native_cid.to_string());
     fs::create_dir_all(&native).unwrap();
     touch(&native.join(".used")).unwrap();
     let recent = fs::metadata(native.join(".used"))
@@ -1611,7 +1614,7 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
         read_json::<Value>(&f.store.root.join("sessions/s")).unwrap()["cid"],
         old
     );
-    assert!(f.store.verified(&raw.to_string()));
+    assert!(f.store.verified(&native_cid.to_string()));
     let first = f.store.migrate().unwrap();
     assert!(!f.store.root.join("migration.pending").exists());
     assert_eq!(
@@ -1622,7 +1625,7 @@ fn migration_is_idempotent_and_preserves_provenance_and_pins() {
         recent
     );
     assert_eq!(f.store.migrate().unwrap(), first);
-    let cid = raw.to_string();
+    let cid = native_cid.to_string();
     assert_eq!(f.store.head("current"), Some(cid.clone()));
     assert_eq!(f.store.head("previous"), Some(cid.clone()));
     assert!(f.store.verified(&cid));

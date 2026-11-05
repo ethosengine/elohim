@@ -16,7 +16,7 @@
   "properties": {
     "cid": {
       "type": "string",
-      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      "pattern": "^(bafkr4i|bafyrei)[a-z2-7]{52}$"
     },
     "session": {
       "type": "string"
@@ -43,7 +43,7 @@
     },
     "runningCid": {
       "type": "string",
-      "pattern": "^baf[k-y]rei[a-z2-7]+$"
+      "pattern": "^(bafkr4i|bafyrei)[a-z2-7]{52}$"
     },
     "source": {
       "type": "string",

@@ -14,7 +14,7 @@
       "type": "object",
       "additionalProperties": {
         "type": "string",
-        "pattern": "^baf[k-y]rei[a-z2-7]+$"
+        "pattern": "^(bafkr4i|bafyrei)[a-z2-7]{52}$"
       }
     },
     "legacyRetained": {
