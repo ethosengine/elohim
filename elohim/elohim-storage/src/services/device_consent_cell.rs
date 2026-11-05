@@ -227,11 +227,18 @@ async fn sign_carrier_with(
     let proof: ProofWire = ExternIO::from(answer)
         .decode()
         .map_err(|e| CellFailure::Unavailable(format!("statement proof decode: {e}")))?;
+    let key: [u8; 32] = proof.agent.get_raw_32().try_into().map_err(|_| {
+        CellFailure::Unavailable("statement proof signer is not a 32-byte agent key".into())
+    })?;
     let proof = self::proof(proof);
-    Ok(consent_grant::CarrierProof {
-        signer: proof.agent,
-        signature: proof.signature,
-    })
+    let sig: [u8; 64] = URL_SAFE_NO_PAD
+        .decode(&proof.signature)
+        .ok()
+        .and_then(|b| b.try_into().ok())
+        .ok_or_else(|| {
+            CellFailure::Unavailable("statement proof signature is not 64 bytes".into())
+        })?;
+    Ok(consent_grant::CarrierProof::ed25519(proof.agent, &key, sig))
 }
 
 /// The qahal `VerifyDeviceInput` that `affirm_identity_device` takes. Field

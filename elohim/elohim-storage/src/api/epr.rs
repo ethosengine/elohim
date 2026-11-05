@@ -244,6 +244,10 @@ pub(crate) fn to_envelope_view(fetched: &FetchedEpr) -> EprEnvelopeView {
             .collect::<Vec<_>>(),
     );
 
+    let proof = crate::services::epr_service::unpack_proof(
+        &fetched.atom.proof_bytes,
+        &fetched.atom.proof_algorithm,
+    );
     EprEnvelopeView {
         cid: fetched.atom.cid.clone(),
         kind: fetched.atom.kind.clone(),
@@ -258,7 +262,8 @@ pub(crate) fn to_envelope_view(fetched: &FetchedEpr) -> EprEnvelopeView {
         proof: EprSignatureView {
             signer: fetched.atom.signer_cid.clone(),
             algorithm: fetched.atom.proof_algorithm.clone(),
-            signature: hex::encode(&fetched.atom.proof_bytes),
+            key: hex::encode(&proof.key),
+            signature: hex::encode(&proof.sig),
         },
     }
 }
@@ -519,7 +524,7 @@ async fn put_epr(
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
     fan_out_ctx: Option<Arc<EprFanOutCtx>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    use elohim_epr::{Coupling, Envelope, Epr, EprKind, Reach, Signature};
+    use elohim_epr::{Coupling, Envelope, Epr, EprKind, Reach, Signature, SignatureEnvelope};
     use std::str::FromStr;
 
     let input: crate::views::EprPublishInput = super::parse_body(req).await?;
@@ -618,7 +623,16 @@ async fn put_epr(
 
     let sig_bytes = hex::decode(&input.envelope.proof.signature)
         .map_err(|e| StorageError::InvalidInput(format!("bad signature hex: {e}")))?;
-    if sig_bytes.len() != 64 {
+    let key_bytes = hex::decode(&input.envelope.proof.key)
+        .map_err(|e| StorageError::InvalidInput(format!("bad proof key hex: {e}")))?;
+    let Some(scheme) =
+        crate::services::epr_service::scheme_from_label(&input.envelope.proof.algorithm)
+    else {
+        return Ok(response::bad_request("unrecognised proof algorithm label"));
+    };
+    // Only the length of a scheme this build implements is checked here; a
+    // held scheme travels on and is held (not accepted) at ingest.
+    if scheme == 0 && sig_bytes.len() != 64 {
         return Ok(response::bad_request("signature must decode to 64 bytes"));
     }
 
@@ -638,7 +652,14 @@ async fn put_epr(
         supersedes,
         superseded_by: None, // server-derived
         issued_at,
-        proof: Signature::ed25519(signer, sig_bytes),
+        proof: Signature::new(
+            signer,
+            SignatureEnvelope {
+                scheme,
+                key: key_bytes,
+                sig: sig_bytes,
+            },
+        ),
     };
 
     // Capture `signer` field BEFORE the envelope is moved into Epr.

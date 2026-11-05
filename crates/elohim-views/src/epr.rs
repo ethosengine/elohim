@@ -40,8 +40,12 @@ pub struct EprCouplingView {
 pub struct EprSignatureView {
     /// CIDv1 base32 of the signer's Agent EPR.
     pub signer: String,
+    /// `ed25519` for scheme 0; `scheme-<code>` for a scheme this build holds.
     pub algorithm: String,
-    /// Hex-encoded 64 bytes (128 hex chars).
+    /// Hex-encoded canonical multikey bytes of the signing key. The signing
+    /// transcript commits to the key, so a verifier needs it with the signature.
+    pub key: String,
+    /// Hex-encoded signature bytes (128 hex chars for ed25519).
     pub signature: String,
 }
 

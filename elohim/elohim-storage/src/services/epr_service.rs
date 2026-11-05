@@ -5,10 +5,10 @@
 
 use chrono::Utc;
 use diesel::prelude::*;
-use ed25519_dalek::{Signature as EdSig, VerifyingKey};
-use elohim_epr::{
-    cid::compute_cid, proof::verify as verify_ed25519, validate_coupling, Epr, EprError,
-};
+use ed25519_dalek::VerifyingKey;
+use elohim_epr::epr::{EPR_SIGNATURE_DOMAIN, EPR_SIGNATURE_EPOCH};
+use elohim_epr::{cid::compute_cid, validate_coupling, Epr, EprError};
+use elohim_epr::{Multikey, SignatureCheck, SignatureEnvelope};
 use serde::{Deserialize, Serialize};
 
 use crate::db::epr_atoms::{self, EprAtom, EprClaimRow, EprCouplingRow, EprListQuery};
@@ -66,17 +66,7 @@ pub fn ingest(conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, 
     // Stage 2: signature — validate algorithm + length structurally.
     // PHASE 2a ACCEPTANCE: trust the proof bytes structurally (64 bytes ed25519).
     // Full resolver-based verify lands in Phase 3 when the manifest graph exists.
-    if epr.envelope.proof.algorithm != "ed25519" {
-        return Err(StorageError::InvalidInput(format!(
-            "unsupported proof algorithm: {}",
-            epr.envelope.proof.algorithm
-        )));
-    }
-    if epr.envelope.proof.signature.len() != 64 {
-        return Err(StorageError::InvalidInput(
-            "ed25519 signature must be 64 bytes".into(),
-        ));
-    }
+    check_proof_structure(&epr.envelope.proof.envelope)?;
 
     // Stage 3: coupling — verify all kind-required legs are present
     validate_coupling(&epr.envelope)
@@ -149,17 +139,7 @@ pub fn ingest_with_cache(
     }
 
     // Stage 2: structural check (algorithm + length)
-    if epr.envelope.proof.algorithm != "ed25519" {
-        return Err(StorageError::InvalidInput(format!(
-            "unsupported proof algorithm: {}",
-            epr.envelope.proof.algorithm
-        )));
-    }
-    if epr.envelope.proof.signature.len() != 64 {
-        return Err(StorageError::InvalidInput(
-            "ed25519 signature must be 64 bytes".into(),
-        ));
-    }
+    check_proof_structure(&epr.envelope.proof.envelope)?;
 
     // Stage 3: coupling
     validate_coupling(&epr.envelope)
@@ -187,20 +167,32 @@ pub fn ingest_with_cache(
         VerifyingKey::from_bytes(&pubkey_bytes).map_err(|e| StorageError::VerifyFailed {
             reason: format!("invalid pubkey bytes for signer {signer_cid_str}: {e}"),
         })?;
-    let sig = EdSig::from_slice(&epr.envelope.proof.signature).map_err(|e| {
-        StorageError::VerifyFailed {
-            reason: format!("invalid signature encoding: {e}"),
+    match epr.envelope.proof.envelope.check_for(
+        &Multikey::ed25519(verifying_key.as_bytes()),
+        EPR_SIGNATURE_DOMAIN,
+        EPR_SIGNATURE_EPOCH,
+        &canonical,
+    ) {
+        SignatureCheck::Verified => {}
+        // A scheme this build does not implement is held, never accepted and
+        // never reported as tampered.
+        SignatureCheck::Held { scheme } => {
+            return Err(StorageError::VerifyFailed {
+                reason: format!(
+                    "signature scheme {scheme} held (not implemented here) for signer {signer_cid_str}"
+                ),
+            });
         }
-    })?;
-    verifying_key
-        .verify_strict(&canonical, &sig)
-        .map_err(|_| StorageError::VerifyFailed {
-            reason: format!(
-                "Ed25519 signature mismatch for signer {} at {}",
-                signer_cid_str,
-                issued_at.to_rfc3339()
-            ),
-        })?;
+        SignatureCheck::Invalid => {
+            return Err(StorageError::VerifyFailed {
+                reason: format!(
+                    "Ed25519 signature mismatch for signer {} at {}",
+                    signer_cid_str,
+                    issued_at.to_rfc3339()
+                ),
+            });
+        }
+    }
 
     // Compute blake3-128-prefix fingerprint (first 16 bytes = 32 hex chars)
     let hash = blake3::hash(&pubkey_bytes);
@@ -235,6 +227,81 @@ pub fn ingest_with_cache(
     })
 }
 
+/// Wire label stored beside the proof bytes: `ed25519` for scheme 0, otherwise
+/// `scheme-<code>` so a held scheme stays visible rather than mislabelled.
+pub(crate) fn scheme_label(scheme: u16) -> String {
+    match scheme {
+        0 => "ed25519".to_string(),
+        other => format!("scheme-{other}"),
+    }
+}
+
+/// Persisted proof layout: `u8 key_len ‖ key (canonical multikey) ‖ sig`. The
+/// signing transcript commits to the key, so it is stored beside the signature
+/// (the scheme travels in `proof_algorithm`).
+pub(crate) fn pack_proof(envelope: &SignatureEnvelope) -> Vec<u8> {
+    let key_len = u8::try_from(envelope.key.len()).unwrap_or(0);
+    let mut out = Vec::with_capacity(1 + envelope.key.len() + envelope.sig.len());
+    out.push(key_len);
+    out.extend_from_slice(&envelope.key[..usize::from(key_len)]);
+    out.extend_from_slice(&envelope.sig);
+    out
+}
+
+/// Inverse of [`pack_proof`]; the scheme comes from the `proof_algorithm` label.
+/// Bytes too short for their declared key length yield an empty key and the
+/// whole blob as the signature, which fails closed at verification.
+pub(crate) fn unpack_proof(bytes: &[u8], algorithm: &str) -> SignatureEnvelope {
+    let (key, sig) = match bytes.split_first() {
+        Some((&len, rest)) if usize::from(len) <= rest.len() => {
+            let (key, sig) = rest.split_at(usize::from(len));
+            (key.to_vec(), sig.to_vec())
+        }
+        _ => (Vec::new(), bytes.to_vec()),
+    };
+    SignatureEnvelope {
+        scheme: scheme_from_label(algorithm).unwrap_or(u16::MAX),
+        key,
+        sig,
+    }
+}
+
+/// Parse a `proof_algorithm` label back to its scheme code.
+pub(crate) fn scheme_from_label(label: &str) -> Option<u16> {
+    match label {
+        "ed25519" => Some(0),
+        other => other.strip_prefix("scheme-")?.parse().ok(),
+    }
+}
+
+/// Structural proof check for the unresolved stages: a known scheme must carry
+/// a well-formed key and signature. An unknown scheme is held (refused as
+/// unverifiable), never accepted.
+fn check_proof_structure(envelope: &SignatureEnvelope) -> Result<(), StorageError> {
+    if envelope.scheme != 0 {
+        return Err(StorageError::InvalidInput(format!(
+            "signature scheme {} held (not implemented here)",
+            envelope.scheme
+        )));
+    }
+    if envelope.sig.len() != 64 {
+        return Err(StorageError::InvalidInput(
+            "ed25519 signature must be 64 bytes".into(),
+        ));
+    }
+    if envelope
+        .multikey()
+        .ok()
+        .and_then(|k| k.ed25519_key())
+        .is_none()
+    {
+        return Err(StorageError::InvalidInput(
+            "ed25519 proof key must be a 32-byte multikey".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn to_atom(
     epr: &Epr,
     canonical: &[u8],
@@ -255,8 +322,8 @@ fn to_atom(
         supersedes: epr.envelope.supersedes.map(|c| c.to_string()),
         canonical_bytes: canonical.to_vec(),
         payload_bytes: epr.payload.clone(),
-        proof_bytes: epr.envelope.proof.signature.clone(),
-        proof_algorithm: epr.envelope.proof.algorithm.clone(),
+        proof_bytes: pack_proof(&epr.envelope.proof.envelope),
+        proof_algorithm: scheme_label(epr.envelope.proof.envelope.scheme),
         verified_at,
         verified_signer_fingerprint,
     }
@@ -429,11 +496,27 @@ pub fn verify(
 
     // Stage 2: signature verifies under provided public key
     stages_run.push("signature".into());
-    if !verify_ed25519(
-        public_key,
+    let stored_proof = unpack_proof(&fetched.atom.proof_bytes, &fetched.atom.proof_algorithm);
+    let signature_check = stored_proof.check_for(
+        &Multikey::ed25519(public_key),
+        EPR_SIGNATURE_DOMAIN,
+        EPR_SIGNATURE_EPOCH,
         &fetched.atom.canonical_bytes,
-        &fetched.atom.proof_bytes,
-    ) {
+    );
+    if let SignatureCheck::Held { scheme } = signature_check {
+        // A scheme this build does not implement is held, not failed.
+        return Ok(EprVerifyReport {
+            cid: cid.into(),
+            verified: false,
+            stages_run,
+            stages_skipped,
+            error: Some(EprVerifyError {
+                stage: "signature".into(),
+                message: format!("signature scheme {scheme} held (not implemented here)"),
+            }),
+        });
+    }
+    if !matches!(signature_check, SignatureCheck::Verified) {
         return Ok(EprVerifyReport {
             cid: cid.into(),
             verified: false,
@@ -642,11 +725,10 @@ fn reconstruct_epr(fetched: &FetchedEpr) -> Result<elohim_epr::Epr, StorageError
         supersedes,
         superseded_by: None,
         issued_at,
-        proof: Signature {
+        proof: Signature::new(
             signer,
-            algorithm: fetched.atom.proof_algorithm.clone(),
-            signature: fetched.atom.proof_bytes.clone(),
-        },
+            unpack_proof(&fetched.atom.proof_bytes, &fetched.atom.proof_algorithm),
+        ),
     };
 
     Ok(Epr {

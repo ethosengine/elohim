@@ -1680,6 +1680,8 @@ fn sample_envelope_view() -> elohim_storage::EprEnvelopeView {
         proof: EprSignatureView {
             signer: "bafyreib2vq7agentcid01234567890123456789012345678901234567890".into(),
             algorithm: "ed25519".into(),
+            // multikey: varint(0xed) || 32-byte key
+            key: format!("ed01{}", "0b".repeat(32)),
             // 128 lowercase hex chars = 64 bytes
             signature: "a".repeat(128),
         },

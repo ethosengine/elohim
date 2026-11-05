@@ -59,7 +59,10 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use cid::Cid;
-use elohim_epr::{cid::compute_cid, Coupling, Envelope, Epr, EprKind, Reach, Signature};
+use elohim_epr::epr::epr_signing_transcript;
+use elohim_epr::{
+    cid::compute_cid, Coupling, Envelope, Epr, EprKind, Reach, Signature, SignatureEnvelope,
+};
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, header, Method, Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -276,7 +279,7 @@ pub fn prepare_signing_request(
         supersedes: None,
         superseded_by: None,
         issued_at,
-        proof: Signature::ed25519(agent_cid, vec![0u8; 64]),
+        proof: Signature::new(agent_cid, SignatureEnvelope::ed25519(&[0u8; 32], [0u8; 64])),
     };
 
     let canonical_bytes = provisional
@@ -307,13 +310,18 @@ pub fn prepare_signing_request(
 pub fn assemble_signed_epr(
     prepared: PreparedSigningRequest,
     signature: Vec<u8>,
+    signer_pubkey: [u8; 32],
 ) -> Result<Epr, SignalEmitError> {
-    if signature.len() != 64 {
-        return Err(SignalEmitError::BadSignatureLength(signature.len()));
-    }
+    let signature: [u8; 64] = signature
+        .as_slice()
+        .try_into()
+        .map_err(|_| SignalEmitError::BadSignatureLength(signature.len()))?;
 
     let cid = compute_cid(&prepared.canonical_bytes);
-    let signature = Signature::ed25519(prepared.agent_cid, signature);
+    let signature = Signature::new(
+        prepared.agent_cid,
+        SignatureEnvelope::ed25519(&signer_pubkey, signature),
+    );
 
     let envelope = Envelope {
         cid,
@@ -444,10 +452,18 @@ pub async fn handle(
         "signal_emit: requesting conductor signature"
     );
 
-    let sig_response = match signing_client
-        .sign(&intent.agent_cid, prepared.canonical_bytes.clone())
-        .await
-    {
+    // The signature is over the EPR signing transcript, which commits to the
+    // signer's key, so the key is resolved first.
+    let signer_pubkey = match signing_client.signer_pubkey(&intent.agent_cid).await {
+        Ok(k) => k,
+        Err(e) => {
+            warn!(error = %e, "signal_emit: conductor signer key unavailable");
+            return Ok(error_response(SignalEmitError::Sign(e)));
+        }
+    };
+    let transcript = epr_signing_transcript(&signer_pubkey, &prepared.canonical_bytes);
+
+    let sig_response = match signing_client.sign(&intent.agent_cid, transcript).await {
         Ok(s) => s,
         Err(e) => {
             warn!(error = %e, "signal_emit: conductor signing failed");
@@ -455,7 +471,7 @@ pub async fn handle(
         }
     };
 
-    let epr = match assemble_signed_epr(prepared, sig_response.signature) {
+    let epr = match assemble_signed_epr(prepared, sig_response.signature, signer_pubkey) {
         Ok(e) => e,
         Err(e) => return Ok(error_response(e)),
     };
@@ -659,7 +675,7 @@ mod tests {
     fn assemble_rejects_wrong_signature_length() {
         let registry = ManifestRegistry::with_shefa_economic_event();
         let prepared = prepare_signing_request(&sample_intent(), &registry).unwrap();
-        let err = assemble_signed_epr(prepared, vec![0; 32]).unwrap_err();
+        let err = assemble_signed_epr(prepared, vec![0; 32], [7u8; 32]).unwrap_err();
         assert!(matches!(err, SignalEmitError::BadSignatureLength(32)));
     }
 
@@ -668,14 +684,14 @@ mod tests {
         let registry = ManifestRegistry::with_shefa_economic_event();
         let prepared = prepare_signing_request(&sample_intent(), &registry).unwrap();
         let canonical = prepared.canonical_bytes.clone();
-        let epr = assemble_signed_epr(prepared, vec![0xAB; 64]).expect("assemble");
+        let epr = assemble_signed_epr(prepared, vec![0xAB; 64], [7u8; 32]).expect("assemble");
         // CID is derived from the same canonical bytes the conductor signed.
         assert_eq!(
             epr.envelope.cid.to_string(),
             compute_cid(&canonical).to_string()
         );
-        assert_eq!(epr.envelope.proof.signature.len(), 64);
-        assert_eq!(epr.envelope.proof.algorithm, "ed25519");
+        assert_eq!(epr.envelope.proof.envelope.sig.len(), 64);
+        assert_eq!(epr.envelope.proof.envelope.scheme, 0);
     }
 
     #[test]

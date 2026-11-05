@@ -39,6 +39,7 @@ const coupling: EprCouplingView = {
 const signature: EprSignatureView = {
   signer: EXAMPLE_CID,
   algorithm: 'ed25519',
+  key: 'ed01' + '0b'.repeat(32), // multikey: varint(0xed) || 32-byte key
   signature: EXAMPLE_SIG_HEX,
 };
 
@@ -84,6 +85,7 @@ describe('EprSignatureView', () => {
     // These field accesses would be TypeScript errors if the field names were wrong
     expect(typeof s.signer).toBe('string');
     expect(typeof s.algorithm).toBe('string');
+    expect(typeof s.key).toBe('string');
     expect(typeof s.signature).toBe('string');
     // Verify snake_case field does NOT exist at runtime
     expect((s as unknown as Record<string, unknown>)['signer_cid']).toBeUndefined();

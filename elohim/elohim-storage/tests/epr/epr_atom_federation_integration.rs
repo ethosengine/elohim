@@ -495,7 +495,7 @@ async fn fetch_batch_rejects_oversized_request() {
 //
 //   1. CID recompute — detects tampering of any field in the canonical bytes
 //      (payload and all envelope fields, including the signature).
-//   2. Structural signature check — algorithm must be "ed25519", signature
+//   2. Structural signature check — scheme must be 0 (ed25519), signature
 //      must be 64 bytes.
 //   3. Coupling validator.
 //
@@ -558,8 +558,8 @@ async fn announce_with_wrong_signature_length_is_rejected() {
     let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
     let cid = epr.envelope.cid.to_string();
 
-    epr.envelope.proof.signature.pop();
-    assert_eq!(epr.envelope.proof.signature.len(), 63);
+    epr.envelope.proof.envelope.sig.pop();
+    assert_eq!(epr.envelope.proof.envelope.sig.len(), 63);
 
     let wire = node_a.encode_envelope(&epr).await;
 
@@ -608,9 +608,9 @@ async fn announce_with_tampered_signature_bytes_accepted_phase_2c_limitation() {
     connect(&node_a, &node_b).await;
 
     let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
-    epr.envelope.proof.signature[0] ^= 0x01;
-    assert_eq!(epr.envelope.proof.signature.len(), 64);
-    assert_eq!(epr.envelope.proof.algorithm, "ed25519");
+    epr.envelope.proof.envelope.sig[0] ^= 0x01;
+    assert_eq!(epr.envelope.proof.envelope.sig.len(), 64);
+    assert_eq!(epr.envelope.proof.envelope.scheme, 0);
 
     let wire = node_a.encode_envelope(&epr).await;
 

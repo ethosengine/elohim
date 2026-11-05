@@ -1177,7 +1177,10 @@ impl Carrier {
                         );
                         return None;
                     }
-                    Dropped::Malformed(_)
+                    // A signature scheme this build does not implement is held:
+                    // dropped like an unsigned ask, counting nothing.
+                    Dropped::HeldScheme(_)
+                    | Dropped::Malformed(_)
                     | Dropped::NotForThisApprover
                     | Dropped::AlreadyDecided
                     | Dropped::Unsigned
@@ -2008,13 +2011,8 @@ mod tests {
 
     /// Key `n`'s proof over a carrier statement.
     fn proof_by(n: u8, kind: CarrierKind, state: &str, tid: &str, challenge: &str) -> CarrierProof {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
         let (kp, agent) = real(n);
-        let message = consent_grant::statement(kind, state, tid, challenge).unwrap();
-        CarrierProof {
-            signer: agent,
-            signature: URL_SAFE_NO_PAD.encode(elohim_epr::proof::sign(&kp, &message)),
-        }
+        CarrierProof::sign(&kp, agent, kind, state, tid, challenge).unwrap()
     }
 
     /// `request` asked by its device (key `n`), signed as sent from `tid`.

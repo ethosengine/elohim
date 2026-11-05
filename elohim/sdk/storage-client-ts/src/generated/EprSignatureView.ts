@@ -7,8 +7,17 @@ export type EprSignatureView = {
 /**
  * CIDv1 base32 of the signer's Agent EPR.
  */
-signer: string, algorithm: string, 
+signer: string, 
 /**
- * Hex-encoded 64 bytes (128 hex chars).
+ * `ed25519` for scheme 0; `scheme-<code>` for a scheme this build holds.
+ */
+algorithm: string, 
+/**
+ * Hex-encoded canonical multikey bytes of the signing key. The signing
+ * transcript commits to the key, so a verifier needs it with the signature.
+ */
+key: string, 
+/**
+ * Hex-encoded signature bytes (128 hex chars for ed25519).
  */
 signature: string, };

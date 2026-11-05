@@ -115,6 +115,9 @@ pub struct SignForAgentOutput {
 pub struct ConductorSigningClient {
     app_ws: AppWebsocket,
     cell_id: CellId,
+    /// Signer public keys learned per agent, so the transcript (which commits
+    /// to the key) can be built before the signing call.
+    pubkeys: std::sync::Mutex<std::collections::HashMap<String, [u8; 32]>>,
 }
 
 impl ConductorSigningClient {
@@ -230,7 +233,41 @@ impl ConductorSigningClient {
             "ConductorSigningClient: connected"
         );
 
-        Ok(Self { app_ws, cell_id })
+        Ok(Self {
+            app_ws,
+            cell_id,
+            pubkeys: std::sync::Mutex::new(std::collections::HashMap::new()),
+        })
+    }
+
+    /// The 32-byte Ed25519 public key of the agent identified by `agent_cid`.
+    ///
+    /// The EPR signing transcript commits to the signer's key, so the key must
+    /// be known before the bytes to sign exist, yet the zome only reports it
+    /// alongside a signature. The first request per agent therefore signs a
+    /// fixed probe message whose signature is discarded; the key is cached.
+    pub async fn signer_pubkey(&self, agent_cid: &str) -> Result<[u8; 32], SigningError> {
+        if let Some(key) = self
+            .pubkeys
+            .lock()
+            .ok()
+            .and_then(|m| m.get(agent_cid).copied())
+        {
+            return Ok(key);
+        }
+        let probe = self
+            .sign(agent_cid, b"elohim:signer-pubkey-probe".to_vec())
+            .await?;
+        let key: [u8; 32] = probe.signer_pubkey.as_slice().try_into().map_err(|_| {
+            SigningError::Decode(format!(
+                "signer_pubkey must be 32 bytes; got {}",
+                probe.signer_pubkey.len()
+            ))
+        })?;
+        if let Ok(mut m) = self.pubkeys.lock() {
+            m.insert(agent_cid.to_string(), key);
+        }
+        Ok(key)
     }
 
     /// Request a signature over `canonical_bytes` under the agent identified

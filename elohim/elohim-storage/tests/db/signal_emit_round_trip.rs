@@ -124,7 +124,7 @@ fn signal_intent_flows_through_to_economic_events_row() {
     let mock_signature = vec![0xAB; 64];
 
     // Step 6 — assemble final EPR.
-    let epr = assemble_signed_epr(prepared, mock_signature).expect("assemble ok");
+    let epr = assemble_signed_epr(prepared, mock_signature, [0x07; 32]).expect("assemble ok");
     let epr_cid = epr.envelope.cid.to_string();
 
     // Step 7 — ingest (real, structural-only verify).

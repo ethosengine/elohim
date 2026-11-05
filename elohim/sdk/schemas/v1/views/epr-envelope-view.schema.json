@@ -31,11 +31,12 @@
     "proof": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["signer", "algorithm", "signature"],
+      "required": ["signer", "algorithm", "key", "signature"],
       "properties": {
         "signer": { "type": "string", "description": "CIDv1 base32 of Agent EPR" },
-        "algorithm": { "type": "string", "const": "ed25519" },
-        "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$", "description": "Hex-encoded 64 bytes" }
+        "algorithm": { "type": "string", "pattern": "^(ed25519|scheme-[0-9]+)$", "description": "ed25519 for scheme 0; scheme-<code> for a held scheme" },
+        "key": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded canonical multikey bytes of the signing key" },
+        "signature": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded signature bytes (128 hex chars for ed25519)" }
       }
     }
   }

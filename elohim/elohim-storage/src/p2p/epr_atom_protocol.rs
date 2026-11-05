@@ -291,15 +291,24 @@ pub fn verify_incoming_epr(wire_bytes: &[u8]) -> Result<(elohim_epr::Epr, cid::C
     }
 
     // Stage 3: structural signature check (algorithm + length only).
-    if epr.envelope.proof.algorithm != "ed25519" {
-        return Err(VerifyError::Signature(format!(
-            "unsupported algorithm: {}",
-            epr.envelope.proof.algorithm
-        )));
+    // An unknown scheme is held (unverifiable here), never accepted.
+    let proof = &epr.envelope.proof.envelope;
+    if proof.scheme != 0 {
+        return Err(VerifyError::SignatureHeld(proof.scheme));
     }
-    if epr.envelope.proof.signature.len() != 64 {
+    if proof.sig.len() != 64 {
         return Err(VerifyError::Signature(
             "ed25519 signature must be 64 bytes".to_string(),
+        ));
+    }
+    if proof
+        .multikey()
+        .ok()
+        .and_then(|k| k.ed25519_key())
+        .is_none()
+    {
+        return Err(VerifyError::Signature(
+            "ed25519 proof key must be a 32-byte multikey".to_string(),
         ));
     }
 
@@ -322,6 +331,8 @@ pub enum VerifyError {
     CidMismatch { claimed: String, computed: String },
     #[error("signature: {0}")]
     Signature(String),
+    #[error("signature scheme {0} held (not implemented here)")]
+    SignatureHeld(u16),
     #[error("validation: {0}")]
     Validation(String),
 }
