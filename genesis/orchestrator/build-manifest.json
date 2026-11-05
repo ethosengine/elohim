@@ -23,6 +23,7 @@
           "elohim/elohim-settings/**",
           "elohim/elohim-cache-core/**",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/Cargo.toml",

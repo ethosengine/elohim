@@ -12,6 +12,7 @@
           ".claude/epr-meta/recipes.yaml",
           ".epr-meta/collective.json",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/eprfs/**",
           "elohim/ark/core/**",

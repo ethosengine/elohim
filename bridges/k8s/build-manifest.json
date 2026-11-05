@@ -13,6 +13,7 @@
           "elohim/eprfs/Cargo.toml",
           "elohim/eprfs/eprfs-core/**",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/elohim-compute/**",
           "elohim/Cargo.toml",

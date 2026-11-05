@@ -41,7 +41,8 @@
           "bridges/did/did-types/**",
           "doorway/relay-addr-beacon/**",
           "doorway/iroh-relay/**",
-          "elohim/epr/**"
+          "elohim/epr/**",
+          "crates/elohim-address/**"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile",
@@ -78,6 +79,7 @@
           "vendor/**",
           "elohim/sdk/**",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/elohim-error/**",
           "elohim/elohim-settings/**",
           "crates/elohim-views/**",
@@ -210,6 +212,7 @@
           "crates/elohim-views/**",
           "scripts/ci/elohim-sdk-feature-matrix.sh",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/Cargo.toml"
         ],
         "buildProcess": [
@@ -412,6 +415,7 @@
             "elohim/sdk/storage-client-ts/src/generated/Epr*",
             "elohim/Cargo.toml",
             "elohim/epr/**",
+            "crates/elohim-address/**",
             "elohim/epr-rea/**",
             "elohim/epr-index/**",
             "elohim/ark/core/**",

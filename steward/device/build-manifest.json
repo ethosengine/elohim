@@ -27,6 +27,7 @@
           "elohim/constitution/**",
           "elohim/Cargo.toml",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/ark/core/**",

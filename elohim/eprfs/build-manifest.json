@@ -28,6 +28,7 @@
           "genesis/orchestrator/rust-style/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/epr/**",
+          "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/Cargo.toml",
