@@ -1,16 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
 import { describe, expect, it, vi } from 'vitest';
+
+import { byteCidOfText } from '@app/testing/byte-cid';
 
 import { DeclaredViewService, PROJECTION_FEED } from './declared-view.service';
 import { OfflineViewRepository } from './offline-view.repository';
 
-const address = async (text: string) =>
-  CID.createV1(
-    0x55,
-    await sha256.digest(new Uint8Array(new TextEncoder().encode(text)))
-  ).toString();
+const address = async (text: string) => byteCidOfText(text);
 describe('replaceable projection feed', () => {
   it('captures once on open and manual refresh, reads history after failed capture, and never captures on selection', async () => {
     const source = JSON.stringify({

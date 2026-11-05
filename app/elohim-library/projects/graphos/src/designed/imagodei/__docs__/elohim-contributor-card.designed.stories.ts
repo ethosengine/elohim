@@ -154,15 +154,15 @@ function darkDecorator(story: () => unknown) {
 //   genesis/data/presences/ingrid-robeyns.md (presence-ingrid-robeyns)
 //   genesis/data/presences/valueflows.md     (presence-valueflows)
 //
-// CIDs are sha256- + 64 hex chars (mock-data discipline).
+// CIDs are real byte CIDs (bafkr4i…) minted from real bytes (mock-data discipline).
 // ---------------------------------------------------------------------------
 
 // Ingrid Robeyns — philosopher, limitarian, named in the elohim.host manifesto
 // "Inspired by" acknowledgements. presenceState = 'unclaimed' because she has
 // been observed but no household member has yet taken up the stewardship.
 const INGRID_ROBEYNS: ContributorPresenceView = {
-  id: 'sha256-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
-  hAppId: 'sha256-fffe000000000000000000000000000000000000000000000000000000000001',
+  id: 'bafkr4ifb6yxo2e7lgxg2wfakdxu5gsdmizfyxdxdxiefnel2ir3oyavmga',
+  hAppId: 'bafkr4idrnle6sgc63o2sps2pvrg7wtjz4c5gfi7235fzqsq43hdtuyzmfi',
   displayName: 'Ingrid Robeyns',
   presenceState: 'unclaimed',
   externalIdentifiers: null,
@@ -195,8 +195,8 @@ const INGRID_ROBEYNS: ContributorPresenceView = {
 // Valueflows — protocol/collective presence, stewarded by matthew-manager
 // The Valueflows vocabulary is the economic substrate of the elohim protocol.
 const VALUEFLOWS_ORG: ContributorPresenceView = {
-  id: 'sha256-b3c4d5e6f7a8b3c4d5e6f7a8b3c4d5e6f7a8b3c4d5e6f7a8b3c4d5e6f7a8b3c4',
-  hAppId: 'sha256-fffe000000000000000000000000000000000000000000000000000000000001',
+  id: 'bafkr4ibcxklbq43mhr52q4ewkimynick5nrifvy5voitsshp6mf3kzfc5u',
+  hAppId: 'bafkr4idrnle6sgc63o2sps2pvrg7wtjz4c5gfi7235fzqsq43hdtuyzmfi',
   displayName: 'Valueflows',
   presenceState: 'stewarded',
   externalIdentifiers: [{ type: 'homepage', value: 'https://valueflo.ws/' }],
@@ -207,7 +207,7 @@ const VALUEFLOWS_ORG: ContributorPresenceView = {
   recognitionScore: 182.0,
   recognitionByContent: null,
   lastRecognitionAt: '2026-05-01T00:00:00Z',
-  stewardId: 'sha256-steward00000000000000000000000000000000000000000000000000000001',
+  stewardId: 'bafkr4ie2u6xb4mnlbjjbj3w2lpzxrglpaxb3lkiofg5xhb3rjetu6udhg4',
   stewardshipStartedAt: '2021-08-07T00:00:00Z',
   stewardshipCommitmentId: null,
   stewardshipQualityScore: 0.91,
@@ -223,7 +223,7 @@ const VALUEFLOWS_ORG: ContributorPresenceView = {
   metadata: null,
   createdAt: '2021-08-07T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
-  dhtAnchorHash: 'sha256-dht00000000000000000000000000000000000000000000000000000000001',
+  dhtAnchorHash: 'bafkr4iasc3rs2rhvkt2jguwadi6lr33xyeojd4goikxpvrjycvqjo7qbcu',
 };
 
 // ---------------------------------------------------------------------------

@@ -318,7 +318,7 @@ export const UnresolvedEprOnly: Story = {
     >
       This provision references
       <elohim-mention-base
-        epr="epr:shefa-commitment-sha256-4a7b9c2d1e8f3a5b6c0d9e2f1a4b7c8d9e0f1a2b"
+        epr="epr:shefa-commitment-bafkr4icowqlnqpnitezzta4lactsqgpk6xuhpk45ffced6ig22s4q5mt6m"
       ></elohim-mention-base>
       — the pillar bundle has not yet loaded so only the EPR identifier is shown.
     </p>
@@ -348,7 +348,7 @@ export const Light: Story = {
       <elohim-mention-base epr="epr:shefa-household-aleph" label="Aleph household" pillar="shefa"></elohim-mention-base>
       <elohim-mention-base epr="epr:qahal-covenant-of-care" label="covenant-of-care" pillar="qahal"></elohim-mention-base>
       <elohim-mention-base epr="epr:lamad-concept-fair-exchange" label="fair-exchange" pillar="lamad"></elohim-mention-base>
-      <elohim-mention-base epr="epr:shefa-commitment-sha256-4a7b9c2d1e8f3a5b6c0d9e2f1a4b7c8d9e0f1a2b"></elohim-mention-base>
+      <elohim-mention-base epr="epr:shefa-commitment-bafkr4icowqlnqpnitezzta4lactsqgpk6xuhpk45ffced6ig22s4q5mt6m"></elohim-mention-base>
     </div>
   `,
   parameters: {
@@ -372,7 +372,7 @@ export const Dark: Story = {
       <elohim-mention-base epr="epr:shefa-household-aleph" label="Aleph household" pillar="shefa"></elohim-mention-base>
       <elohim-mention-base epr="epr:qahal-covenant-of-care" label="covenant-of-care" pillar="qahal"></elohim-mention-base>
       <elohim-mention-base epr="epr:lamad-concept-fair-exchange" label="fair-exchange" pillar="lamad"></elohim-mention-base>
-      <elohim-mention-base epr="epr:shefa-commitment-sha256-4a7b9c2d1e8f3a5b6c0d9e2f1a4b7c8d9e0f1a2b"></elohim-mention-base>
+      <elohim-mention-base epr="epr:shefa-commitment-bafkr4icowqlnqpnitezzta4lactsqgpk6xuhpk45ffced6ig22s4q5mt6m"></elohim-mention-base>
     </div>
   `,
   parameters: {
@@ -459,7 +459,7 @@ export const InlineInProse: Story = {
       "
     >
       The Aleph household's stewardship of the commons is documented in the
-      <elohim-mention-base epr="epr:shefa-commitment-sha256-4a7b9c2d1e8f3a5b6c0d9e2f1a4b7c8d9e0f1a2b" label="harvest-bounty commitment" pillar="shefa"></elohim-mention-base>.
+      <elohim-mention-base epr="epr:shefa-commitment-bafkr4icowqlnqpnitezzta4lactsqgpk6xuhpk45ffced6ig22s4q5mt6m" label="harvest-bounty commitment" pillar="shefa"></elohim-mention-base>.
       The lamad pathway
       <elohim-mention-base epr="epr:lamad-concept-fair-exchange" label="fair-exchange" pillar="lamad"></elohim-mention-base>
       was the prerequisite before

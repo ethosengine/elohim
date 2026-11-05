@@ -38,7 +38,7 @@ import type {
  */
 export interface IEprUriResolver {
   /** Resolve an epr: URI to a transport-specific URL and route. */
-  resolveUrl(input: string, blobHash?: string): ResolvedEpr;
+  resolveUrl(input: string, blobCid?: string): ResolvedEpr;
 
   /** Resolve a blob hash to a full URL via the current connection strategy. */
   resolveBlobUrl(hash: string): string;

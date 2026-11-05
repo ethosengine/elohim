@@ -119,7 +119,11 @@ describe('explicit anonymous sibling reads', () => {
     let now = 100000;
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     const request = () =>
-      new HttpRequest('GET', `${primary}/blob/sha256-abc`, { context: context() });
+      new HttpRequest(
+        'GET',
+        `${primary}/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y`,
+        { context: context() }
+      );
     await read(request());
     now += 20000;
     expect((await read(request()))[0].url.startsWith(sibling)).toBe(true);

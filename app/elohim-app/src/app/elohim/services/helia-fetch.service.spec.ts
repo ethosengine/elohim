@@ -64,7 +64,7 @@ describe('HeliaFetchService (mock)', () => {
   });
 
   it('should build correct blob URL from StorageClientService', () => {
-    const cid = 'sha256-test1234test1234test1234test1234test1234test1234test1234test1234';
+    const cid = 'bafkr4ichqz3c2fywkwlfyk3sstcvmqy22bw4a7twn2iuuxpy2xcnyqobsm';
     service.fetchVerified(cid).catch(() => {
       /* expected: fetch mock not available */
     });
@@ -80,7 +80,7 @@ describe('HeliaFetchService (mock)', () => {
   });
 
   it('should return URL with /blob/ prefix', () => {
-    const hash = 'sha256-abc123def456abc123def456abc123def456abc123def456abc123def456abc1';
+    const hash = 'bafkr4igw3xatlz4e2dsqewk5mpkp32qvvc2sdirm2jyclsze7ihvcje2vu';
     const url = mockStorageClient.getBlobUrl(hash);
     expect(url).toBe(`http://localhost:8888/blob/${hash}`);
   });

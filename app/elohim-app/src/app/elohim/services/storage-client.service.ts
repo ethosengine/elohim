@@ -54,7 +54,6 @@ export interface StorageContentNode {
   description: string;
   contentBody: string | null;
   contentFormat: ContentFormat;
-  blobHash: string | null;
   blobCid: string | null;
   metadataJson: string | null;
   tags: string[];
@@ -127,20 +126,20 @@ export class StorageClientService {
    * Get full URL for a blob by hash.
    * Routes based on connection strategy (doorway vs direct).
    */
-  getBlobUrl(blobHash: string): string {
-    if (!blobHash) return '';
+  getBlobUrl(blobCid: string): string {
+    if (!blobCid) return '';
 
     // Both doorway and direct modes serve blobs at /blob/{hash}. Doorway's
     // RouteRegistry exposes this from storage's manifest; direct mode hits
     // elohim-storage directly.
-    return `${this.getStorageBaseUrl()}/blob/${blobHash}`;
+    return `${this.getStorageBaseUrl()}/blob/${blobCid}`;
   }
 
   /**
    * Fetch blob data by hash.
    */
-  fetchBlob(blobHash: string, anonymousPublicRead = false): Observable<ArrayBuffer> {
-    const url = this.getBlobUrl(blobHash);
+  fetchBlob(blobCid: string, anonymousPublicRead = false): Observable<ArrayBuffer> {
+    const url = this.getBlobUrl(blobCid);
     return this.http
       .get(url, {
         responseType: 'arraybuffer',
@@ -155,8 +154,8 @@ export class StorageClientService {
   /**
    * Check if a blob exists in storage.
    */
-  blobExists(blobHash: string): Observable<boolean> {
-    const url = this.getBlobUrl(blobHash);
+  blobExists(blobCid: string): Observable<boolean> {
+    const url = this.getBlobUrl(blobCid);
     return this.http.head(url, { observe: 'response' }).pipe(
       timeout(5000),
       map(response => response.status === 200),

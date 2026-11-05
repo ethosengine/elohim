@@ -44,7 +44,6 @@ interface RawNode {
   id: string;
   contentType: string;
   contentFormat: string;
-  blobHash: string | null;
   blobCid: string | null;
   contentSizeBytes: number | null;
   metadata: Record<string, unknown> | null;
@@ -76,7 +75,6 @@ function toRawNode(raw: Record<string, unknown>): RawNode {
     id: String(raw['id'] ?? ''),
     contentType: String(raw['contentType'] ?? ''),
     contentFormat: String(raw['contentFormat'] ?? ''),
-    blobHash: (raw['blobHash'] as string | null) ?? null,
     blobCid: (raw['blobCid'] as string | null) ?? null,
     contentSizeBytes: (raw['contentSizeBytes'] as number | null) ?? null,
     metadata: (raw['metadata'] as Record<string, unknown> | null) ?? null,

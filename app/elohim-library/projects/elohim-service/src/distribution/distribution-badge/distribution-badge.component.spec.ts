@@ -71,13 +71,13 @@ describe('DistributionBadgeComponent (elohim-library)', () => {
     expect(el?.textContent?.trim()).toBe('3');
   });
 
-  it('lazy-fetches details on first expand when blobHash is set', async () => {
-    fixture.componentRef.setInput('blobHash', 'sha256-xyz');
+  it('lazy-fetches details on first expand when blobCid is set', async () => {
+    fixture.componentRef.setInput('blobCid', 'bafkr4ic5ccvdzh6jpdcemmh6kl4zs4cb4k2mc4ptfsnmo6ptnjhn6qbvwq');
     fixture.detectChanges();
     const root = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
     root.dispatchEvent(new MouseEvent('mouseenter'));
     await fixture.whenStable();
-    const req = http.expectOne('/api/v1/blob/sha256-xyz/distribution/details');
+    const req = http.expectOne('/api/v1/blob/bafkr4ic5ccvdzh6jpdcemmh6kl4zs4cb4k2mc4ptfsnmo6ptnjhn6qbvwq/distribution/details');
     req.flush({
       summary: mockSummary,
       replicaPeers: [],
@@ -87,7 +87,7 @@ describe('DistributionBadgeComponent (elohim-library)', () => {
     });
   });
 
-  it('does not fetch when blobHash is absent', async () => {
+  it('does not fetch when blobCid is absent', async () => {
     const root = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
     root.dispatchEvent(new MouseEvent('mouseenter'));
     await fixture.whenStable();

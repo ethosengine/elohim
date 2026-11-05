@@ -41,7 +41,7 @@ describe('ProjectionAPIService', () => {
     reach: 'commons',
     trustScore: 0.95,
     estimatedMinutes: 10,
-    thumbnailUrl: 'blob/sha256-thumb123',
+    thumbnailUrl: 'blob/bafkr4ieex5mrf62ipirenkrzbxsflkjiykpgrjvcop6brrugufzzh2zzty',
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-02T00:00:00Z',
   };
@@ -56,7 +56,7 @@ describe('ProjectionAPIService', () => {
     estimatedDuration: '2 hours',
     visibility: 'public',
     pathType: 'course',
-    thumbnailUrl: 'blob/sha256-paththumb',
+    thumbnailUrl: 'blob/bafkr4ih56z24go2sbegn2skboc54jlr7lajfuw3uvr24pi63ni5zcsbozy',
     thumbnailAlt: 'Path thumbnail',
     tags: ['learning', 'test'],
     createdBy: 'author-1',
@@ -880,7 +880,10 @@ describe('ProjectionAPIService', () => {
     }));
 
     it('should delegate blob URL handling to ContentService transform', fakeAsync(() => {
-      const data = { ...mockContentData, thumbnailUrl: '/blob/sha256-abc' };
+      const data = {
+        ...mockContentData,
+        thumbnailUrl: '/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y',
+      };
       let result: ContentNode | null = null;
 
       service.getContentNode('test').subscribe(d => {

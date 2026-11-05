@@ -7,10 +7,10 @@ import { firstValueFrom } from 'rxjs';
 import {
   EprResolverService,
   isContentAddress,
-  normalizeContentAddress,
   type StepRef,
   type CrossPathMatch,
 } from './epr-resolver.service';
+import { byteCidOfText } from '@app/testing/byte-cid';
 import { StorageClientService } from './storage-client.service';
 import { BUNDLE_ROUTE_CONTEXT, type EprRef } from '@elohim/service';
 import { vi } from 'vitest';
@@ -92,78 +92,39 @@ describe('EprResolverService', () => {
   // ── isContentAddress ────────────────────────────────────────────────────
 
   describe('isContentAddress', () => {
-    it('recognizes CIDv1 base32', () => {
+    it('recognizes a byte CID (bafkr4i…)', () => {
+      expect(isContentAddress(byteCidOfText('a blob'))).toBe(true);
+    });
+
+    it('recognizes a citation fingerprint (bafkrei…) and a record CID (bafyrei…)', () => {
       expect(isContentAddress('bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku')).toBe(
+        true
+      );
+      expect(isContentAddress('bafyreigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi')).toBe(
         true
       );
     });
 
-    it('recognizes CIDv0 base58', () => {
-      expect(isContentAddress('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')).toBe(true);
+    it('refuses CIDv0 base58 (not an admitted form)', () => {
+      expect(isContentAddress('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')).toBe(false);
     });
 
-    it('recognizes sha256-{hex}', () => {
-      expect(
-        isContentAddress('sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
-      ).toBe(true);
-    });
-
-    it('recognizes sha256:{hex}', () => {
-      expect(
-        isContentAddress('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
-      ).toBe(true);
-    });
-
-    it('recognizes raw 64-char hex', () => {
-      expect(
-        isContentAddress('abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')
-      ).toBe(true);
-    });
-
-    it('rejects empty string', () => {
-      expect(isContentAddress('')).toBe(false);
-    });
-
-    it('rejects plain text', () => {
-      expect(isContentAddress('hello world')).toBe(false);
-    });
-
-    it('rejects short hex', () => {
-      expect(isContentAddress('abcdef123')).toBe(false);
-    });
-  });
-
-  // ── normalizeContentAddress ─────────────────────────────────────────────
-
-  describe('normalizeContentAddress', () => {
-    it('passes through CIDv1 base32 unchanged', () => {
-      const cid = 'bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku';
-      expect(normalizeContentAddress(cid)).toBe(cid);
-    });
-
-    it('passes through CIDv0 base58 unchanged', () => {
-      const cid = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
-      expect(normalizeContentAddress(cid)).toBe(cid);
-    });
-
-    it('passes through sha256-{hex} unchanged', () => {
-      const hash = 'sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
-      expect(normalizeContentAddress(hash)).toBe(hash);
-    });
-
-    it('converts sha256:{hex} to sha256-{hex}', () => {
-      const input = 'sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
-      const expected = 'sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
-      expect(normalizeContentAddress(input)).toBe(expected);
-    });
-
-    it('adds sha256- prefix to raw 64-char hex', () => {
+    it('refuses the retired sha256-{hex}, sha256:{hex} and bare 64-char hex spellings', () => {
       const hex = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
-      expect(normalizeContentAddress(hex)).toBe(`sha256-${hex}`);
+      expect(isContentAddress(`sha256-${hex}`)).toBe(false);
+      expect(isContentAddress(`sha256:${hex}`)).toBe(false);
+      expect(isContentAddress(hex)).toBe(false);
     });
 
-    it('returns unrecognized input unchanged', () => {
-      expect(normalizeContentAddress('some-content-id')).toBe('some-content-id');
+    it('refuses a prefix-only imitation (full decode, not a prefix check)', () => {
+      expect(isContentAddress('bafkr4i')).toBe(false);
+      expect(isContentAddress(`${byteCidOfText('a blob')}x`)).toBe(false);
+    });
+
+    it('rejects empty string, plain text and short hex', () => {
+      expect(isContentAddress('')).toBe(false);
+      expect(isContentAddress('hello world')).toBe(false);
+      expect(isContentAddress('abcdef123')).toBe(false);
     });
   });
 
@@ -185,8 +146,8 @@ describe('EprResolverService', () => {
       expect(result.route).toBeNull();
     });
 
-    it('includes blob hash in url when provided', () => {
-      const hash = 'sha256-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+    it('includes the byte CID in url when provided', () => {
+      const hash = byteCidOfText('a blob');
       storageSpy.getBlobUrl.mockReturnValue(`https://doorway.host/blob/${hash}`);
       const result = service.resolveUrl('epr:manifesto-foundations/blob', hash);
       expect(result.url).toContain('/blob/');

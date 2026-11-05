@@ -791,11 +791,11 @@ async function loadWasmModule(wasmPath?: string): Promise<WasmModule | null> {
  * });
  *
  * // Add content (reach level 7 = commons)
- * cache.put('sha256-abc123', BigInt(1024), 7, 'elohim', 'governance', 50);
+ * cache.put('bafkr4iexampleexampleexampleexampleexampleexampleexampleexample', BigInt(1024), 7, 'elohim', 'governance', 50);
  *
  * // Check existence
- * if (cache.has('sha256-abc123', 7)) {
- *   cache.touch('sha256-abc123', 7);
+ * if (cache.has('bafkr4iexampleexampleexampleexampleexampleexampleexampleexample', 7)) {
+ *   cache.touch('bafkr4iexampleexampleexampleexampleexampleexampleexampleexample', 7);
  * }
  * ```
  */

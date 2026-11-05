@@ -8,7 +8,7 @@
  *
  * This type mirrors the IPLD DAG-CBOR schema defined in
  * protocol-specification.md Appendix F. When serialized as DAG-CBOR:
- * - `content` becomes an IPLD CID link: { "/": "bafkrei..." }
+ * - `content` becomes an IPLD CID link: { "/": "bafkr4i…" }
  * - `relationships[].target` become IPLD CID links
  * - All other fields serialize as standard CBOR
  *
@@ -17,8 +17,8 @@
 
 // ── IPLD Content Address ─────────────────────────────────────────────────────
 
-// Content addresses are plain strings: CIDv1 (bafkrei...) or legacy sha256-{hex}.
-// In IPLD DAG-CBOR, these serialize as CID links: { "/": "bafkrei..." }.
+// Content addresses are plain strings: CIDv1 (bafkr4i… for bytes, bafyrei… for records).
+// In IPLD DAG-CBOR, these serialize as CID links: { "/": "bafkr4i…" }.
 // In our current JSON wire format, they're plain strings.
 
 // ── Three-Pillar Context ─────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export interface EprHead {
 /**
  * An IPLD link — the canonical DAG-CBOR representation of a CID reference.
  *
- * In DAG-CBOR, CID references serialize as `{ "/": "bafkrei..." }`.
+ * In DAG-CBOR, CID references serialize as `{ "/": "bafkr4i…" }`.
  * This interface enables type-safe IPLD link construction.
  */
 export interface IpldLink {

@@ -235,7 +235,7 @@ export class EprHomeComponent {
 
   private readonly distributionSummary = toSignal<CopiesSummary | null>(
     toObservable(this.atom).pipe(
-      map(a => a?.blobHash ?? null),
+      map(a => a?.blobCid ?? null),
       distinctUntilChanged(),
       switchMap(hash =>
         hash
@@ -519,7 +519,7 @@ export class EprHomeComponent {
   });
 
   readonly downloadHref = computed(() => {
-    const hash = this.atom()?.blobHash;
+    const hash = this.atom()?.blobCid;
     // getBlobUrl resolves the base URL through the connection strategy, which
     // logs; the logger keeps its recent lines in a signal, and a signal write
     // inside a computed throws NG0600 (seen signed in, where debug logging is

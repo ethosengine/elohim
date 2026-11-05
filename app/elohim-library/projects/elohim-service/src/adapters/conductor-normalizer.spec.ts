@@ -31,11 +31,10 @@ const createConductorResponse = (
     summary: 'Genesis reading overview',
     sourcePath: 'elohim-protocol/genesis/reading',
     estimatedMinutes: 15,
-    thumbnailUrl: 'sha256-abc123',
+    thumbnailUrl: 'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li',
     bloomsLevel: 'understand',
   }),
   blob_cid: null,
-  blob_hash: null,
   content_size_bytes: null,
   created_at: '2026-03-15T10:00:00Z',
   updated_at: '2026-03-20T14:30:00Z',
@@ -123,22 +122,16 @@ describe('normalizeConductorContent', () => {
     expect(result.contentSizeBytes).toBeUndefined();
   });
 
-  it('should map blob_hash and blob_cid', () => {
-    const raw = createConductorResponse({
-      blob_hash: 'sha256-abc123',
-      blob_cid: 'bafkrei-xyz789',
-    });
-    const result = normalizeConductorContent(raw);
+  it('should map blob_cid (a byte CID, bafkr4i…)', () => {
+    const cid = 'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li';
+    const result = normalizeConductorContent(createConductorResponse({ blob_cid: cid }));
 
-    expect(result.blobHash).toBe('sha256-abc123');
-    expect(result.blobCid).toBe('bafkrei-xyz789');
+    expect(result.blobCid).toBe(cid);
   });
 
-  it('should set blob fields to undefined when null', () => {
-    const raw = createConductorResponse({ blob_hash: null, blob_cid: null });
-    const result = normalizeConductorContent(raw);
+  it('should set blob_cid to undefined when null', () => {
+    const result = normalizeConductorContent(createConductorResponse({ blob_cid: null }));
 
-    expect(result.blobHash).toBeUndefined();
     expect(result.blobCid).toBeUndefined();
   });
 
@@ -173,13 +166,12 @@ describe('normalizeConductorContent', () => {
   it('should handle content null (blob-only nodes)', () => {
     const raw = createConductorResponse({
       content: null,
-      blob_hash: 'sha256-abc',
-      blob_cid: 'bafkrei-xyz',
+      blob_cid: 'bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y',
     });
     const result = normalizeConductorContent(raw);
 
     expect(result.contentBody).toBeUndefined();
-    expect(result.blobHash).toBe('sha256-abc');
+    expect(result.blobCid).toBe('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y');
   });
 
   it('should preserve reach value', () => {
@@ -205,7 +197,7 @@ describe('normalizeConductorContent', () => {
       metadata_json: JSON.stringify({
         pathType: 'course',
         difficulty: 'intermediate',
-        thumbnailUrl: 'sha256-thumb',
+        thumbnailUrl: 'bafkr4ifx2ukbzhkm3bgw3firkibukrkpofdcjpkrklwkmkvfdoifry4afm',
       }),
     });
     const result = normalizeConductorContent(raw);
@@ -215,7 +207,7 @@ describe('normalizeConductorContent', () => {
     expect(result.metadata).toEqual({
       pathType: 'course',
       difficulty: 'intermediate',
-      thumbnailUrl: 'sha256-thumb',
+      thumbnailUrl: 'bafkr4ifx2ukbzhkm3bgw3firkibukrkpofdcjpkrklwkmkvfdoifry4afm',
     });
   });
 

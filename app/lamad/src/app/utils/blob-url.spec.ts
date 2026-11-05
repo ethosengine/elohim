@@ -23,42 +23,42 @@ function sidecarDelegate(): ILamadStorageClient {
 
 describe('resolveBlobHref', () => {
   it('returns an origin-relative blob URL in doorway mode, never the local sidecar address', () => {
-    const url = resolveBlobHref('sha256-abc', sidecarDelegate(), {
+    const url = resolveBlobHref('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y', sidecarDelegate(), {
       mode: 'doorway',
       origin: 'https://example.test',
     });
 
-    expect(url).toBe('https://example.test/blob/sha256-abc');
+    expect(url).toBe('https://example.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y');
     expect(url).not.toContain('localhost:8090');
   });
 
   it('falls back to a root-relative path when the serving origin is unknown (SSR)', () => {
-    const url = resolveBlobHref('sha256-abc', sidecarDelegate(), {
+    const url = resolveBlobHref('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y', sidecarDelegate(), {
       mode: 'doorway',
       origin: undefined,
     });
 
     // Root-relative resolves against whichever doorway served the page.
-    expect(url).toBe('/blob/sha256-abc');
+    expect(url).toBe('/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y');
     expect(url).not.toContain('localhost:8090');
   });
 
   it('never emits the sidecar address for a doorway page, whatever the delegate says', () => {
-    const url = resolveBlobHref('sha256-c5dcc24c', sidecarDelegate(), {
+    const url = resolveBlobHref('bafkr4igckfxmosdgohuhruvuv7ug2x7nf4jn3j4x6f6brgm6toxo2cvgxi', sidecarDelegate(), {
       mode: 'doorway',
       origin: 'https://alpha.elohim.host',
     });
 
-    expect(url).toBe('https://alpha.elohim.host/blob/sha256-c5dcc24c');
+    expect(url).toBe('https://alpha.elohim.host/blob/bafkr4igckfxmosdgohuhruvuv7ug2x7nf4jn3j4x6f6brgm6toxo2cvgxi');
   });
 
   it('keeps the configured sidecar URL in direct mode (Tauri / native)', () => {
-    const url = resolveBlobHref('sha256-abc', sidecarDelegate(), {
+    const url = resolveBlobHref('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y', sidecarDelegate(), {
       mode: 'direct',
       origin: 'https://example.test',
     });
 
-    expect(url).toBe(`${SIDECAR}/blob/sha256-abc`);
+    expect(url).toBe(`${SIDECAR}/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y`);
   });
 
   it('returns an empty string for an empty hash', () => {
@@ -102,7 +102,7 @@ describe('withOriginRelativeBlobUrls', () => {
       origin: 'https://example.test',
     }));
 
-    expect(client.getBlobUrl('sha256-abc')).toBe('https://example.test/blob/sha256-abc');
+    expect(client.getBlobUrl('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y')).toBe('https://example.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y');
   });
 
   it('leaves the API base URL and engagement projection on the delegate', () => {

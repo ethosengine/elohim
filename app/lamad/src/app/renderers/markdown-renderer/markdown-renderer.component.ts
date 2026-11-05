@@ -241,14 +241,14 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
 
     // Handle /blob/{hash} format
     if (url.startsWith('/blob/')) {
-      const blobHash = url.slice(6);
-      return this.storageClient.getBlobUrl(blobHash);
+      const blobCid = url.slice(6);
+      return this.storageClient.getBlobUrl(blobCid);
     }
 
     // Handle blob/{hash} format (no leading slash)
     if (url.startsWith('blob/')) {
-      const blobHash = url.slice(5);
-      return this.storageClient.getBlobUrl(blobHash);
+      const blobCid = url.slice(5);
+      return this.storageClient.getBlobUrl(blobCid);
     }
 
     // Not a blob URL, return as-is

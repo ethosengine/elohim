@@ -53,7 +53,6 @@ export interface EprHomeAtom {
   dhtAnchorHash: string | null;
   dhtAnchorState: string | null;
   validationStatus: string | null;
-  blobHash: string | null;
   blobCid: string | null;
   contentSizeBytes: number | null;
   createdAt: string;
@@ -95,7 +94,6 @@ export function toAtom(raw: Record<string, unknown>): EprHomeAtom {
     dhtAnchorHash: str(raw['dhtAnchorHash']),
     dhtAnchorState: str(raw['dhtAnchorState']),
     validationStatus: str(raw['validationStatus']),
-    blobHash: str(raw['blobHash']),
     blobCid: str(raw['blobCid']),
     contentSizeBytes: typeof raw['contentSizeBytes'] === 'number' ? raw['contentSizeBytes'] : null,
     createdAt: String(raw['createdAt'] ?? ''),

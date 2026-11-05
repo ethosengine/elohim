@@ -178,7 +178,7 @@ export interface ResolutionError {
 export interface AppResolutionResult {
   url: string | null;
   sourceId: string | null;
-  blobHash: string | null;
+  blobCid: string | null;
   fallbackUrl: string | null;
 }
 
@@ -236,7 +236,7 @@ export interface IContentResolver {
   getResolutionChain(contentType: string): SourceInfo[];
 
   /** Register an HTML5 app */
-  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void;
+  registerApp(slug: string, blobCid: string, entryPoint: string, fallbackUrl?: string): void;
 
   /** Unregister an app */
   unregisterApp(slug: string): void;
@@ -299,12 +299,7 @@ interface WasmContentResolver {
   clear_source_locations(sourceId: string): void;
   resolve(contentType: string, contentId: string): string;
   get_resolution_chain(contentType: string): string;
-  register_app(
-    slug: string,
-    blobHash: string,
-    entryPoint: string,
-    fallbackUrl: string | null
-  ): void;
+  register_app(slug: string, blobCid: string, entryPoint: string, fallbackUrl: string | null): void;
   unregister_app(slug: string): void;
   has_app(slug: string): boolean;
   get_app_blob_hash(slug: string): string | null;
@@ -342,7 +337,7 @@ interface ContentSource {
 }
 
 interface AppRegistration {
-  blobHash: string;
+  blobCid: string;
   entryPoint: string;
   fallbackUrl: string | null;
   registeredAt: number;
@@ -516,9 +511,9 @@ export class TsContentResolver implements IContentResolver {
       }));
   }
 
-  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
+  registerApp(slug: string, blobCid: string, entryPoint: string, fallbackUrl?: string): void {
     this.appRegistry.set(slug, {
-      blobHash,
+      blobCid,
       entryPoint,
       fallbackUrl: fallbackUrl ?? null,
       registeredAt: Date.now(),
@@ -535,7 +530,7 @@ export class TsContentResolver implements IContentResolver {
 
   // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
   getAppBlobHash(slug: string): string | null {
-    return this.appRegistry.get(slug)?.blobHash ?? null;
+    return this.appRegistry.get(slug)?.blobCid ?? null;
   }
 
   resolveAppUrl(slug: string, path?: string): string {
@@ -569,7 +564,7 @@ export class TsContentResolver implements IContentResolver {
     return {
       url: url || null,
       sourceId,
-      blobHash: reg?.blobHash ?? null,
+      blobCid: reg?.blobCid ?? null,
       fallbackUrl: reg?.fallbackUrl ?? null,
     };
   }
@@ -680,8 +675,8 @@ class WasmContentResolverWrapper implements IContentResolver {
     }));
   }
 
-  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
-    this.wasm.register_app(slug, blobHash, entryPoint, fallbackUrl ?? null);
+  registerApp(slug: string, blobCid: string, entryPoint: string, fallbackUrl?: string): void {
+    this.wasm.register_app(slug, blobCid, entryPoint, fallbackUrl ?? null);
   }
 
   unregisterApp(slug: string): void {
@@ -707,7 +702,7 @@ class WasmContentResolverWrapper implements IContentResolver {
     return {
       url: parsed.url ?? null,
       sourceId: parsed.source_id ?? null,
-      blobHash: parsed.blob_hash ?? null,
+      blobCid: parsed.blob_hash ?? null,
       fallbackUrl: parsed.fallback_url ?? null,
     };
   }

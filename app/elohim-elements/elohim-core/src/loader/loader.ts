@@ -29,6 +29,8 @@
  *   (P2P transport added later — does not require a Loader change)
  */
 
+import { byteCidDigest, byteCidOfBytes } from './byte-cid';
+
 export interface LoaderTransport {
   /** Source name for telemetry and debugging. Appears in LoaderResolution.source. */
   readonly name: string;
@@ -102,25 +104,18 @@ export class Loader {
     return { bytes: null, source: 'unresolved', cid };
   }
 
+  /**
+   * Admit only the byte profile: the requested address must be a canonical byte CID
+   * (`bafkr4i…`, a full decode) and the bytes must BLAKE3-256 to the digest it commits to.
+   * Every other spelling — legacy `sha256-<hex>`, a citation or record CID — is rejected by name.
+   */
   private async verifyCidMatches(cid: string, bytes: Uint8Array): Promise<void> {
-    const dashIndex = cid.indexOf('-');
-    if (dashIndex === -1) {
-      throw new Error(`Malformed CID (no algorithm prefix): ${cid}`);
+    if (byteCidDigest(cid) === null) {
+      throw new Error(`Unsupported address (only byte CIDs, bafkr4i…, are admitted): ${cid}`);
     }
-    const algo = cid.slice(0, dashIndex);
-    const expected = cid.slice(dashIndex + 1);
-
-    if (algo !== 'sha256') {
-      throw new Error(`Unsupported CID algo: ${algo}`);
-    }
-
-    const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-    const actual = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
-    if (actual !== expected) {
-      throw new Error(`CID mismatch: expected ${expected}, got ${actual}`);
+    const actual = byteCidOfBytes(bytes);
+    if (actual !== cid) {
+      throw new Error(`CID mismatch: expected ${cid}, got ${actual}`);
     }
   }
 }

@@ -508,10 +508,13 @@ describe('EprHomeLegsComponent', () => {
   it('Where it came from: the download link only when there is a blob', () => {
     fixture.detectChanges();
     expect(q(fixture, 'epr-home-download')).toBeNull();
-    fixture.componentRef.setInput('downloadHref', 'https://doorway.test/blob/sha256-abc');
+    fixture.componentRef.setInput(
+      'downloadHref',
+      'https://doorway.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y'
+    );
     fixture.detectChanges();
     expect(q(fixture, 'epr-home-download')?.getAttribute('href')).toBe(
-      'https://doorway.test/blob/sha256-abc'
+      'https://doorway.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y'
     );
   });
 

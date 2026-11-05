@@ -5,6 +5,7 @@ import { sha256 } from 'multiformats/hashes/sha2';
 import { CID } from 'multiformats/cid';
 import { create as createDigest } from 'multiformats/hashes/digest';
 
+import { byteCidOf, byteCidOfText } from '@app/testing/byte-cid';
 import { ContentBackendService, ContentFilters, PathFilters } from './content.service';
 import { StorageClientService } from './storage-client.service';
 import { BLOB_FETCHER } from '../interfaces/blob-fetcher.interface';
@@ -19,6 +20,12 @@ import { provideHttpClient } from '@angular/common/http';
  *
  * Tests content fetching, blob resolution, caching, and query operations.
  */
+const BLOB_A = byteCidOfText('blob a');
+const BLOB_B = byteCidOfText('blob b');
+const BLOB_C = byteCidOfText('blob c');
+const FAIL_BLOB = byteCidOfText('failblob');
+const THUMB = byteCidOfText('thumbnail');
+
 describe('ContentBackendService', () => {
   let service: ContentBackendService;
   let httpMock: HttpTestingController;
@@ -39,8 +46,8 @@ describe('ContentBackendService', () => {
 
   it('loads an anonymous body through the marked storage path and verifies its hash without reusing SDK cache', async () => {
     const bytes = new Uint8Array(Array.from('# Authentic public body', c => c.charCodeAt(0)));
-    const digest = await sha256.digest(bytes);
-    const cid = CID.createV1(0x55, digest).toString();
+    const cid = byteCidOf(bytes).toString();
+    expect(cid.startsWith('bafkr4i')).toBe(true);
     mockStorageClient.getContent = vi
       .fn()
       .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: cid }));
@@ -69,20 +76,24 @@ describe('ContentBackendService', () => {
     expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
   });
 
-  it('rejects a CID claiming a different hash algorithm even when its digest bytes match SHA256', async () => {
+  it('rejects every real CID that is not the byte profile, even when the bytes match its digest', async () => {
     const bytes = new Uint8Array([116, 101, 115, 116]);
-    const digest = await sha256.digest(bytes);
-    const valid = CID.createV1(0x55, digest).toString();
-    const wrongAlgorithm = CID.createV1(0x55, createDigest(0x13, digest.digest)).toString();
+    const sha2 = await sha256.digest(bytes);
+    const valid = byteCidOf(bytes).toString();
+    const citation = CID.createV1(0x55, sha2).toString(); // bafkrei… (raw + sha2-256)
+    const record = CID.createV1(0x71, sha2).toString(); // bafyrei… (dag-cbor + sha2-256)
+    const wrongAlgorithm = CID.createV1(0x55, createDigest(0x13, sha2.digest)).toString();
     mockStorageClient.getContent = vi
       .fn()
       .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: valid }));
     mockStorageClient.fetchBlob = vi.fn().mockReturnValue(of(bytes.buffer));
     expect((await firstValueFrom(service.getContent('manifesto', true)))?.content).toBe('test');
-    mockStorageClient.getContent.mockReturnValue(
-      of({ ...mockContentNode, contentBody: null, blobCid: wrongAlgorithm })
-    );
-    expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
+    for (const refused of [citation, record, wrongAlgorithm]) {
+      mockStorageClient.getContent.mockReturnValue(
+        of({ ...mockContentNode, contentBody: null, blobCid: refused })
+      );
+      expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
+    }
   });
 
   const mockPathData = {
@@ -123,7 +134,7 @@ describe('ContentBackendService', () => {
       fetchVerified: vi.fn(),
     };
     mockBlobFetcher.fetchVerified.mockImplementation((cid: string) => {
-      if (cid.includes('failblob')) {
+      if (cid === FAIL_BLOB) {
         return Promise.reject(new Error('Blob not found'));
       }
       return Promise.resolve(new TextEncoder().encode(`# Blob content for ${cid}`));
@@ -208,11 +219,11 @@ describe('ContentBackendService', () => {
       expect(mockClient.get).toHaveBeenCalledTimes(1);
     }));
 
-    it('should resolve sha256: blob references', fakeAsync(() => {
+    it('should resolve a byte-CID blob reference in contentBody', fakeAsync(() => {
       const contentWithBlobRef = {
         ...mockContentNode,
-        contentBody: 'sha256:abc123def456',
-        blobCid: 'sha256:abc123def456',
+        contentBody: BLOB_A,
+        blobCid: BLOB_A,
       };
       mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
 
@@ -223,15 +234,12 @@ describe('ContentBackendService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
+      expect(result!.content).toBe(`# Blob content for ${BLOB_A}`);
     }));
 
-    it('should resolve sha256- blob references', fakeAsync(() => {
-      const contentWithBlobRef = {
-        ...mockContentNode,
-        contentBody: 'sha256-abc123def456',
-      };
-      mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
+    it('does not treat a legacy sha256- spelling in contentBody as a blob reference', fakeAsync(() => {
+      const legacy = { ...mockContentNode, contentBody: 'sha256-abc123def456' };
+      mockClient.get.mockReturnValue(Promise.resolve(legacy));
 
       let result: ContentNode | null = null;
       service.getContent('blob-content-2').subscribe(content => {
@@ -240,14 +248,15 @@ describe('ContentBackendService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Blob content for sha256-abc123def456');
+      // Not a blob reference: the body stays the literal text, nothing is fetched.
+      expect(result!.content).toBe('sha256-abc123def456');
     }));
 
     it('should fetch blob when contentBody is empty but blobCid exists', fakeAsync(() => {
       const contentWithBlobCid = {
         ...mockContentNode,
         contentBody: '',
-        blobCid: 'sha256-xyz789',
+        blobCid: BLOB_B,
       };
       mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobCid));
 
@@ -258,13 +267,13 @@ describe('ContentBackendService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(result!.content).toBe('# Blob content for sha256-xyz789');
+      expect(result!.content).toBe(`# Blob content for ${BLOB_B}`);
     }));
 
     it('should fall back gracefully when blob fetch fails', fakeAsync(() => {
       const contentWithBlobRef = {
         ...mockContentNode,
-        contentBody: 'sha256:failblob',
+        contentBody: FAIL_BLOB,
       };
       mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobRef));
 
@@ -274,7 +283,7 @@ describe('ContentBackendService', () => {
       });
       tick();
 
-      // Blob fetcher mock rejects for 'failblob' — service should fall back
+      // Blob fetcher mock rejects for the failing blob — service should fall back
       expect(result).toBeTruthy();
       expect(result!.id).toBe('test-content-1');
     }));
@@ -858,7 +867,7 @@ describe('ContentBackendService', () => {
     it('should resolve blob URLs using storage client', fakeAsync(() => {
       const contentWithThumbnail = {
         ...mockContentNode,
-        thumbnailUrl: 'sha256-thumbnail123',
+        thumbnailUrl: THUMB,
       };
       mockClient.get.mockReturnValue(Promise.resolve(contentWithThumbnail));
 
@@ -869,8 +878,8 @@ describe('ContentBackendService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(result.thumbnailUrl).toBe('/blob/sha256-thumbnail123');
-      expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith('sha256-thumbnail123');
+      expect(result.thumbnailUrl).toBe(`/blob/${THUMB}`);
+      expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith(THUMB);
     }));
 
     it('should pass through full URLs unchanged', fakeAsync(() => {
@@ -893,7 +902,7 @@ describe('ContentBackendService', () => {
     it('should handle /blob/ prefix in thumbnail URLs', fakeAsync(() => {
       const contentWithBlobPath = {
         ...mockContentNode,
-        thumbnailUrl: '/blob/sha256-abc',
+        thumbnailUrl: `/blob/${BLOB_C}`,
       };
       mockClient.get.mockReturnValue(Promise.resolve(contentWithBlobPath));
 
@@ -904,7 +913,7 @@ describe('ContentBackendService', () => {
       tick();
 
       expect(result).toBeTruthy();
-      expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith('sha256-abc');
+      expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith(BLOB_C);
     }));
   });
 });

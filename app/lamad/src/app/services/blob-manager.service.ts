@@ -156,12 +156,12 @@ export class BlobManagerService {
    * - **Doorway mode**: `https://doorway-alpha.elohim.host/blob/{hash}`
    * - **Direct mode**: `http://localhost:8090/blob/{hash}`
    *
-   * @param blobHash SHA256 hash of the blob
+   * @param blobCid SHA256 hash of the blob
    * @returns URL string for the blob storage endpoint
    */
-  getBlobUrl(blobHash: string): string {
+  getBlobUrl(blobCid: string): string {
     const client = this.getStorageClient();
-    return client.getBlobUrl(blobHash);
+    return client.getBlobUrl(blobCid);
   }
 
   /**
@@ -567,13 +567,13 @@ export class BlobManagerService {
    * or for verifying blob existence in the DHT.
    *
    * @param contentId Content node ID that owns the blob
-   * @param blobHash SHA256 hash of blob to retrieve
+   * @param blobCid SHA256 hash of blob to retrieve
    * @returns Observable with ContentBlob metadata or null if not found
    */
-  getBlobMetadata(contentId: string, blobHash: string): Observable<ContentBlob | null> {
+  getBlobMetadata(contentId: string, blobCid: string): Observable<ContentBlob | null> {
     return this.getBlobsForContent(contentId).pipe(
       map(blobs => {
-        const found = blobs.find(b => b.hash === blobHash);
+        const found = blobs.find(b => b.hash === blobCid);
         return found ?? null;
       })
     );
@@ -583,11 +583,11 @@ export class BlobManagerService {
    * Check if a blob exists in Holochain DHT for a given content.
    *
    * @param contentId Content node ID
-   * @param blobHash SHA256 hash of blob
+   * @param blobCid SHA256 hash of blob
    * @returns Observable with boolean indicating existence
    */
-  blobExists(contentId: string, blobHash: string): Observable<boolean> {
-    return this.getBlobMetadata(contentId, blobHash).pipe(map(metadata => metadata !== null));
+  blobExists(contentId: string, blobCid: string): Observable<boolean> {
+    return this.getBlobMetadata(contentId, blobCid).pipe(map(metadata => metadata !== null));
   }
 
   /**

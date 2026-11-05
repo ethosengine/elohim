@@ -61,7 +61,6 @@ export interface ConductorContentResponse {
   reach: string;
   metadata_json: string | null;
   blob_cid: string | null;
-  blob_hash: string | null;
   content_size_bytes: number | null;
   created_at: string;
   updated_at: string;
@@ -98,7 +97,6 @@ export function normalizeConductorContent(raw: ConductorContentResponse): Conten
     contentType: raw.content_type as ContentType,
     contentFormat: raw.content_format as ContentFormat,
     contentBody: raw.content ?? undefined,
-    blobHash: raw.blob_hash ?? undefined,
     blobCid: raw.blob_cid ?? undefined,
     contentSizeBytes: raw.content_size_bytes ?? undefined,
     metadata: parseMetadataJson(raw.metadata_json),

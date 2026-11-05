@@ -7,9 +7,8 @@
  * whether that means GET https://doorway.host/db/content/... or
  * GET http://localhost:8090/db/content/... based on runtime context.
  *
- * Content addressing uses IPFS-compatible CIDv1 as the canonical format.
- * Legacy sha256-{hex} is accepted on input and passed through — the
- * Rust backend (blob_store.rs:parse_content_address) handles all formats.
+ * Content addressing is CIDv1 only: blob bytes are named by byte CIDs
+ * (raw + BLAKE3-256, `bafkr4i…`). No legacy spelling is accepted or passed through.
  *
  * See: protocol-specification.md Appendix E (Resolution Matrix)
  */
@@ -28,6 +27,7 @@ import {
   eprToUniversalHref,
   BUNDLE_ROUTE_CONTEXT,
 } from '@elohim/service';
+import { addressForm } from '@elohim/epr';
 
 import {
   type IEprContentResolver,
@@ -197,16 +197,16 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    *   // → "https://doorway.host/db/content/manifesto-foundations" (doorway mode)
    *   // → "http://localhost:8090/db/content/manifesto-foundations" (P2P-native)
    *
-   *   const blobUrl = resolver.resolveUrl('epr:manifesto-foundations/blob', 'sha256-abc...');
-   *   // → "https://doorway.host/blob/sha256-abc..." (doorway)
-   *   // → "http://localhost:8090/blob/sha256-abc..." (P2P-native)
+   *   const blobUrl = resolver.resolveUrl('epr:manifesto-foundations/blob', 'bafkr4i…');
+   *   // → "https://doorway.host/blob/bafkr4i…" (doorway)
+   *   // → "http://localhost:8090/blob/bafkr4i…" (P2P-native)
    */
-  resolveUrl(input: string, blobHash?: string): ResolvedEpr {
+  resolveUrl(input: string, blobCid?: string): ResolvedEpr {
     const ref = parseEpr(input);
     const res = eprToRoute(ref, this.routeCtx);
     return {
       ref,
-      url: this.buildUrl(ref, blobHash),
+      url: this.buildUrl(ref, blobCid),
       route: res?.commands ?? null,
       href: res?.href ?? eprToUniversalHref(ref),
     };
@@ -297,11 +297,11 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
   }
 
   /**
-   * Resolve just the blob URL for a known hash.
+   * Resolve just the blob URL for a known byte CID.
    * Delegates to StorageClientService which handles doorway vs P2P-native routing.
    */
   resolveBlobUrl(hash: string): string {
-    return this.storage.getBlobUrl(normalizeContentAddress(hash));
+    return this.storage.getBlobUrl(hash);
   }
 
   /**
@@ -407,12 +407,12 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
 
   // ── Internal ──────────────────────────────────────────────────────────────
 
-  private buildUrl(ref: EprRef, blobHash?: string): string {
+  private buildUrl(ref: EprRef, blobCid?: string): string {
     const base = this.storage.getStorageBaseUrl();
 
     switch (ref.tier) {
       case 'blob': {
-        const hash = blobHash ?? '';
+        const hash = blobCid ?? '';
         return hash ? this.storage.getBlobUrl(hash) : '';
       }
       case 'doc':
@@ -478,38 +478,11 @@ function degradedOutcome(
 }
 
 /**
- * Check if a string looks like a content address (CID, sha256-{hex}, sha256:, or raw hex).
+ * True iff `input` is an admitted content address: a canonical CIDv1 of one of the three
+ * admitted forms (byte CID `bafkr4i…`, citation fingerprint `bafkrei…`, record `bafyrei…`).
+ * Admission is a full decode (`@elohim/epr` `addressForm`), never a prefix check; the legacy
+ * `sha256-<hex>`, `sha256:<hex>`, bare-hex and CIDv0 spellings are not addresses.
  */
 export function isContentAddress(input: string): boolean {
-  if (!input) return false;
-  // CIDv1 base32 (bafkrei...) or base58 (Qm...)
-  if (input.startsWith('bafk') || input.startsWith('Qm')) return true;
-  // SHA256 with prefix
-  if (input.startsWith('sha256-') || input.startsWith('sha256:')) return true;
-  // Raw 64-char hex
-  if (input.length === 64 && /^[\da-f]+$/i.test(input)) return true;
-  return false;
-}
-
-/**
- * Normalize a content address for use in blob URLs.
- *
- * CIDv1 strings (bafkrei...) pass through unchanged — the Rust backend's
- * parse_content_address() handles all formats. Legacy sha256 formats are
- * normalized to sha256-{hex} for backward compatibility.
- *
- * See: blob_store.rs:parse_content_address(), protocol-specification.md Appendix E.5
- */
-export function normalizeContentAddress(input: string): string {
-  // CIDv1 base32 — pass through (canonical IPLD format)
-  if (input.startsWith('bafk')) return input;
-  // CIDv0 base58 — pass through (backend handles conversion)
-  if (input.startsWith('Qm')) return input;
-  // sha256-{hex} — already in legacy canonical form
-  if (input.startsWith('sha256-') && input.length === 71) return input;
-  // sha256:{hex} — normalize colon to hyphen
-  if (input.startsWith('sha256:')) return `sha256-${input.slice(7)}`;
-  // Raw 64-char hex — add sha256- prefix
-  if (input.length === 64 && /^[\da-f]+$/i.test(input)) return `sha256-${input}`;
-  return input;
+  return !!input && addressForm(input) !== null;
 }

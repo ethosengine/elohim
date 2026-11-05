@@ -74,19 +74,25 @@ describe('StorageClientService', () => {
       // Doorway serves blobs via the storage-manifest-registered /blob/{hash}
       // route through the RouteRegistry; both doorway and direct modes use
       // the same canonical path.
-      const url = service.getBlobUrl('sha256-abc123');
-      expect(url).toBe('http://localhost:8888/blob/sha256-abc123');
+      const url = service.getBlobUrl('bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li');
+      expect(url).toBe(
+        'http://localhost:8888/blob/bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'
+      );
     });
 
     it('should construct direct blob URL when strategy is direct', () => {
       strategyMock.mode = 'direct';
-      const url = service.getBlobUrl('sha256-def456');
-      expect(url).toBe('http://localhost:8888/blob/sha256-def456');
+      const url = service.getBlobUrl('bafkr4ielkywifgr4zplce3h6nuflr7xnpjya4synzrmz3pmzn3tj4b3ljy');
+      expect(url).toBe(
+        'http://localhost:8888/blob/bafkr4ielkywifgr4zplce3h6nuflr7xnpjya4synzrmz3pmzn3tj4b3ljy'
+      );
     });
 
     it('should handle blob hash with special characters', () => {
-      const url = service.getBlobUrl('sha256-abc_123-xyz');
-      expect(url).toContain('sha256-abc_123-xyz');
+      const url = service.getBlobUrl(
+        'bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y_123-xyz'
+      );
+      expect(url).toContain('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y_123-xyz');
     });
   });
 
@@ -95,11 +101,15 @@ describe('StorageClientService', () => {
       const mockBuffer = new ArrayBuffer(8);
       let result: ArrayBuffer | undefined;
 
-      service.fetchBlob('sha256-test').subscribe(buffer => {
-        result = buffer;
-      });
+      service
+        .fetchBlob('bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m')
+        .subscribe(buffer => {
+          result = buffer;
+        });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-test');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m'
+      );
       expect(req.request.method).toBe('GET');
       expect(req.request.responseType).toBe('arraybuffer');
       req.flush(mockBuffer);
@@ -111,7 +121,7 @@ describe('StorageClientService', () => {
     it('should handle fetch errors gracefully', fakeAsync(() => {
       let errorThrown = false;
 
-      service.fetchBlob('sha256-missing').subscribe({
+      service.fetchBlob('bafkr4ibhc7mn2e2gdyfykumxlqaogxbttsbcuhb2rxjy42tqs4cq2ydlsq').subscribe({
         next: () => {
           throw new Error('Should have errored');
         },
@@ -120,7 +130,9 @@ describe('StorageClientService', () => {
         },
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-missing');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4ibhc7mn2e2gdyfykumxlqaogxbttsbcuhb2rxjy42tqs4cq2ydlsq'
+      );
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
@@ -130,13 +142,15 @@ describe('StorageClientService', () => {
     it('should timeout after default timeout', fakeAsync(() => {
       let timedOut = false;
 
-      service.fetchBlob('sha256-slow').subscribe({
+      service.fetchBlob('bafkr4iazcfhr5jldk5zvdewvhcllpytjhkwz34kdptgx52i37jnhkbiyue').subscribe({
         error: () => {
           timedOut = true;
         },
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-slow');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4iazcfhr5jldk5zvdewvhcllpytjhkwz34kdptgx52i37jnhkbiyue'
+      );
       tick(31000); // > 30s default timeout
       expect(timedOut).toBe(true);
 
@@ -151,11 +165,15 @@ describe('StorageClientService', () => {
     it('should return true if blob exists', fakeAsync(() => {
       let exists: boolean | undefined;
 
-      service.blobExists('sha256-exists').subscribe(result => {
-        exists = result;
-      });
+      service
+        .blobExists('bafkr4ifpu764xtixe4ndmclf2rgv24eeo5hgue2vz24iwmu2umgm2pidna')
+        .subscribe(result => {
+          exists = result;
+        });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-exists');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4ifpu764xtixe4ndmclf2rgv24eeo5hgue2vz24iwmu2umgm2pidna'
+      );
       expect(req.request.method).toBe('HEAD');
       req.flush(null, { status: 200, statusText: 'OK' });
 
@@ -166,11 +184,15 @@ describe('StorageClientService', () => {
     it('should return false if blob does not exist', fakeAsync(() => {
       let exists: boolean | undefined;
 
-      service.blobExists('sha256-missing').subscribe(result => {
-        exists = result;
-      });
+      service
+        .blobExists('bafkr4ibhc7mn2e2gdyfykumxlqaogxbttsbcuhb2rxjy42tqs4cq2ydlsq')
+        .subscribe(result => {
+          exists = result;
+        });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-missing');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4ibhc7mn2e2gdyfykumxlqaogxbttsbcuhb2rxjy42tqs4cq2ydlsq'
+      );
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
@@ -180,11 +202,15 @@ describe('StorageClientService', () => {
     it('should return false on network error', fakeAsync(() => {
       let exists: boolean | undefined;
 
-      service.blobExists('sha256-error').subscribe(result => {
-        exists = result;
-      });
+      service
+        .blobExists('bafkr4ienwyl5x2tcpgtcc25p5imbcbretq7s57dxfmnjiqz2urhynomwxm')
+        .subscribe(result => {
+          exists = result;
+        });
 
-      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-error');
+      const req = httpMock.expectOne(
+        'http://localhost:8888/blob/bafkr4ienwyl5x2tcpgtcc25p5imbcbretq7s57dxfmnjiqz2urhynomwxm'
+      );
       req.error(new ProgressEvent('error'));
 
       tick();
@@ -201,7 +227,7 @@ describe('StorageClientService', () => {
         description: 'Test description',
         contentBody: 'Test body',
         contentFormat: 'markdown',
-        blobHash: null,
+        blobCid: null,
         blobCid: null,
         metadataJson: null,
         tags: ['test'],

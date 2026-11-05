@@ -21,7 +21,7 @@ export interface IBlobFetcher {
   /**
    * Fetch blob bytes by content address with optional timeout.
    *
-   * @param cidStr - CID (bafk...) or legacy hash (sha256-...)
+   * @param cidStr - byte CID (bafkr4i…)
    * @param timeoutMs - Timeout before fallback (default: implementation-specific)
    * @returns Raw bytes of the blob
    */

@@ -48,7 +48,9 @@ describe('packaged app runtime doorway', () => {
     const http = TestBed.inject(HttpTestingController);
     storage.getContent('elohim-manifesto').subscribe();
     http.expectOne(`${origin}/db/content/elohim-manifesto`).flush({ id: 'elohim-manifesto' });
-    expect(storage.getBlobUrl('sha256-content')).toBe(`${origin}/blob/sha256-content`);
+    expect(storage.getBlobUrl('bafkr4igtvfnlp2taalzb6wssqa3dqhqgmqpwewgwtyl4vbqktt3hepiaqm')).toBe(
+      `${origin}/blob/bafkr4igtvfnlp2taalzb6wssqa3dqhqgmqpwewgwtyl4vbqktt3hepiaqm`
+    );
     expect(resolveDoorwayUrl('https://doorway.elohim.host')).toBe(origin);
     TestBed.inject(DoorwayCacheService).isHealthy().subscribe();
     http.expectOne(`${origin}/health`).flush('ok');

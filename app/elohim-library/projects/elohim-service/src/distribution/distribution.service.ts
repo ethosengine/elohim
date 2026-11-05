@@ -16,9 +16,9 @@ import type { DistributionDetails } from '../generated/distribution-details';
 export class DistributionService {
   private readonly http = inject(HttpClient);
 
-  async getDetails(blobHash: string): Promise<DistributionDetails> {
+  async getDetails(blobCid: string): Promise<DistributionDetails> {
     return firstValueFrom(
-      this.http.get<DistributionDetails>(`/api/v1/blob/${blobHash}/distribution/details`)
+      this.http.get<DistributionDetails>(`/api/v1/blob/${blobCid}/distribution/details`)
     );
   }
 }

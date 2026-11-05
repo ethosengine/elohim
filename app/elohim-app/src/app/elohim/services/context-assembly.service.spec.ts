@@ -115,7 +115,7 @@ const buildElohimAgent = () => ({
   name: 'Test Elohim',
   layer: 'community' as const,
   constitutionalBinding: {
-    constitutionHash: 'sha256-abc123',
+    constitutionHash: 'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li',
     lastVerified: '2026-01-01T00:00:00.000Z',
   },
 });
@@ -395,7 +395,9 @@ describe('ContextAssemblyService', () => {
   describe('constitutional layer', () => {
     it('should use constitutionalBinding hash from selected elohim', fakeAsync(() => {
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
-        expect(result.createContext.constitutional.stackHash).toBe('sha256-abc123');
+        expect(result.createContext.constitutional.stackHash).toBe(
+          'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'
+        );
       });
       tick(5000);
     }));
@@ -649,7 +651,9 @@ describe('ContextAssemblyService', () => {
 
     it('should derive birth context from negotiation result', fakeAsync(() => {
       service.assembleAndNegotiate(buildPayload(), { timeoutMs: 5000 }).subscribe(result => {
-        expect(result.birthContext.constitutionalStackHash).toBe('sha256-abc123');
+        expect(result.birthContext.constitutionalStackHash).toBe(
+          'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'
+        );
         expect(result.birthContext.createdAt).toBeTruthy();
         expect(result.birthContext.sourceContextHash).toBeTruthy();
       });

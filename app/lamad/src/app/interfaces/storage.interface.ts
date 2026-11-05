@@ -145,7 +145,7 @@ export interface LamadObservationStreamQuery {
 }
 
 export interface ILamadStorageClient {
-  getBlobUrl(blobHash: string): string;
+  getBlobUrl(blobCid: string): string;
   getStorageBaseUrl(): string;
   // M-AGGR-3: server-side ContentEngagementStatsView projection
   getContentEngagement(contentId: string): Observable<ContentEngagementStatsView>;

@@ -252,7 +252,7 @@ const rawSimulation = {
   trust: 'notarized',
   dhtAnchorHash: 'uhCkk_D-fLh9hgcSAk4ZE6375dJuKrzf4Y9CDEOoX4e9fKujiEm8f',
   dhtAnchorState: 'unverified',
-  blobHash: 'sha256-abc',
+  blobCid: 'bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y',
   createdAt: '2026-05-27 20:46:37',
   updatedAt: '2026-08-05 18:40:53',
   tags: ['game-theory', 'trust'],
@@ -480,9 +480,11 @@ describe('EprHomeComponent', () => {
     });
     await mount('evolution-of-trust');
     expect(q(fixture, 'epr-home-download')?.getAttribute('href')).toBe(
-      'https://doorway.test/blob/sha256-abc'
+      'https://doorway.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y'
     );
-    expect(recentLogs()).toEqual(['resolve sha256-abc']);
+    expect(recentLogs()).toEqual([
+      'resolve bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y',
+    ]);
   });
 
   it('shows the tags under the lede and the version in the eyebrow', async () => {
@@ -976,7 +978,9 @@ describe('EprHomeComponent', () => {
   it('links the download to the blob', async () => {
     await mount('evolution-of-trust');
     const dl = q(fixture, 'epr-home-download')!;
-    expect(dl.getAttribute('href')).toBe('https://doorway.test/blob/sha256-abc');
+    expect(dl.getAttribute('href')).toBe(
+      'https://doorway.test/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y'
+    );
     expect(dl.hasAttribute('download')).toBe(true);
     expect(dl.textContent).toContain('Download (html5-app)');
   });

@@ -38,17 +38,17 @@ const mockProtected: FeltStatusView = {
   reassurance: 'protected',
   heldBy: [
     {
-      id: 'sha256-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      id: 'bafkr4ifb6yxo2e7lgxg2wfakdxu5gsdmizfyxdxdxiefnel2ir3oyavmga',
       kind: 'household',
       label: 'the Dowells',
     },
     {
-      id: 'sha256-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
+      id: 'bafkr4igf7fwypwu5skwhn5ddaigb3kg6xaewl6rlf5o7mixsovkhzr5xui',
       kind: 'household',
       label: 'Aunt Ruth',
     },
     {
-      id: 'sha256-c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+      id: 'bafkr4ias4txpax4sb4qnt4xl7iym45w5ma7qrkidbh4f4kgpsnlcfz4eua',
       kind: 'church',
       label: 'First Church',
     },
@@ -67,12 +67,12 @@ const mockWatching: FeltStatusView = {
   reassurance: 'watching',
   heldBy: [
     {
-      id: 'sha256-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      id: 'bafkr4ifb6yxo2e7lgxg2wfakdxu5gsdmizfyxdxdxiefnel2ir3oyavmga',
       kind: 'household',
       label: 'the Dowells',
     },
     {
-      id: 'sha256-c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+      id: 'bafkr4ias4txpax4sb4qnt4xl7iym45w5ma7qrkidbh4f4kgpsnlcfz4eua',
       kind: 'church',
       label: 'First Church',
     },
@@ -91,7 +91,7 @@ const mockNeedsHelp: FeltStatusView = {
   reassurance: 'needs-help',
   heldBy: [
     {
-      id: 'sha256-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      id: 'bafkr4ifb6yxo2e7lgxg2wfakdxu5gsdmizfyxdxdxiefnel2ir3oyavmga',
       kind: 'household',
       label: 'the Dowells',
     },
@@ -132,17 +132,17 @@ const mockVaultFloor: FeltStatusView = {
   reassurance: 'watching',
   heldBy: [
     {
-      id: 'sha256-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+      id: 'bafkr4ifb6yxo2e7lgxg2wfakdxu5gsdmizfyxdxdxiefnel2ir3oyavmga',
       kind: 'household',
       label: 'the Dowells',
     },
     {
-      id: 'sha256-b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
+      id: 'bafkr4igf7fwypwu5skwhn5ddaigb3kg6xaewl6rlf5o7mixsovkhzr5xui',
       kind: 'household',
       label: 'Aunt Ruth',
     },
     {
-      id: 'sha256-c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+      id: 'bafkr4ias4txpax4sb4qnt4xl7iym45w5ma7qrkidbh4f4kgpsnlcfz4eua',
       kind: 'church',
       label: 'First Church',
     },

@@ -105,7 +105,12 @@ describe('apiBaseUrlInterceptor', () => {
     });
 
     it('prefixes /db/, /blob/, /apps/, /health', () => {
-      const cases = ['/db/content/123', '/blob/sha256-abc', '/apps/foo/index.html', '/health'];
+      const cases = [
+        '/db/content/123',
+        '/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y',
+        '/apps/foo/index.html',
+        '/health',
+      ];
       for (const path of cases) {
         const { handler, received } = captureUrl();
         apiBaseUrlInterceptor(new HttpRequest('GET', path), handler).subscribe();

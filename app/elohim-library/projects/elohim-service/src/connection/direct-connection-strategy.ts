@@ -116,11 +116,11 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
     return url;
   }
 
-  getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string {
+  getBlobStorageUrl(config: ConnectionConfig, blobCid: string): string {
     // Direct to elohim-storage sidecar - NOT through Doorway
     // elohim-storage provides caching and R/W protection for the conductor
     const storageUrl = config.storageUrl || `http://localhost:${DEFAULT_STORAGE_PORT}`;
-    return `${storageUrl}/blob/${encodeURIComponent(blobHash)}`;
+    return `${storageUrl}/blob/${encodeURIComponent(blobCid)}`;
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {

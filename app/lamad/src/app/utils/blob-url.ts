@@ -40,6 +40,8 @@
  * visitor-visible hole in lamad without changing the shell's behaviour.
  */
 
+import { isByteCid } from './byte-cid';
+
 import type { ILamadStorageClient } from '../interfaces/storage.interface';
 
 /** Where blobs are served from for the current runtime. */
@@ -75,23 +77,23 @@ export function currentBlobUrlContext(): BlobUrlContext {
 /**
  * Resolve the href a browser should use to load a blob.
  *
- * @param blobHash Content address (`sha256-…`, `bafk…`)
+ * @param blobCid Byte CID (`bafkr4i…`); any other spelling resolves to '' (fail closed)
  * @param sidecarClient Client that knows the native sidecar URL (direct mode only)
  * @param context Connection mode + serving origin; defaults to runtime detection
  */
 export function resolveBlobHref(
-  blobHash: string,
+  blobCid: string,
   sidecarClient: Pick<ILamadStorageClient, 'getBlobUrl'>,
   context: BlobUrlContext = currentBlobUrlContext()
 ): string {
-  if (!blobHash) return '';
+  if (!isByteCid(blobCid)) return '';
 
   // Native shell: the sidecar address is the right answer and the delegate owns it.
   if (context.mode === 'direct') {
-    return sidecarClient.getBlobUrl(blobHash);
+    return sidecarClient.getBlobUrl(blobCid);
   }
 
-  const path = `/blob/${blobHash}`;
+  const path = `/blob/${blobCid}`;
   const origin = context.origin;
 
   // Browser: absolute-on-this-origin (an <img src> outside the Angular router
@@ -109,7 +111,7 @@ export function withOriginRelativeBlobUrls(
   context: () => BlobUrlContext = currentBlobUrlContext
 ): ILamadStorageClient {
   return {
-    getBlobUrl: (blobHash: string) => resolveBlobHref(blobHash, delegate, context()),
+    getBlobUrl: (blobCid: string) => resolveBlobHref(blobCid, delegate, context()),
     getStorageBaseUrl: () => delegate.getStorageBaseUrl(),
     getContentEngagement: (contentId: string) => delegate.getContentEngagement(contentId),
     getObservationStream: query => delegate.getObservationStream(query),

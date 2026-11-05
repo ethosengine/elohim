@@ -26,8 +26,8 @@ import 'elohim-imagodei/register';
 // ---------------------------------------------------------------------------
 
 const PERSON_UNCLAIMED: ContributorPresenceView = {
-  id: 'sha256-0000000000000000000000000000000000000000000000000000000000000001',
-  hAppId: 'sha256-app0000000000000000000000000000000000000000000000000000000000001',
+  id: 'bafkr4idtdzdwfdlupw4y5xhjqhz22eukqnslg4iqhlqa2gvziwghbj65ta',
+  hAppId: 'bafkr4icibx2zqbf4ypyyqzkva5qkh5ttgpxr4d6zdzg6liehziules3bku',
   displayName: 'Ada Lovelace',
   presenceState: 'unclaimed',
   externalIdentifiers: null,
@@ -64,7 +64,7 @@ const AVATAR_DATA_URI =
 
 const PERSON_CLAIMED: ContributorPresenceView = {
   ...PERSON_UNCLAIMED,
-  id: 'sha256-0000000000000000000000000000000000000000000000000000000000000002',
+  id: 'bafkr4ih5mnwxft5j4khpz5bj6wxag4z7k3xezba4ixazzr3z2yzq7tdn5u',
   displayName: 'Grace Hopper',
   presenceState: 'claimed',
   image: AVATAR_DATA_URI,
@@ -77,14 +77,14 @@ const PERSON_CLAIMED: ContributorPresenceView = {
 
 const ORG_STEWARDED: ContributorPresenceView = {
   ...PERSON_UNCLAIMED,
-  id: 'sha256-0000000000000000000000000000000000000000000000000000000000000003',
+  id: 'bafkr4idt3svxpsi7svw5csrjiarvigrmqkfiui7igufwkwuvybvrojhy6a',
   displayName: 'Open Source Collective',
   presenceState: 'stewarded',
   recognitionScore: 305.0,
   citationCount: 47,
   affinityTotal: 120.0,
   uniqueEngagers: 28,
-  stewardId: 'sha256-steward00000000000000000000000000000000000000000000000000000001',
+  stewardId: 'bafkr4ie2u6xb4mnlbjjbj3w2lpzxrglpaxb3lkiofg5xhb3rjetu6udhg4',
   stewardshipStartedAt: '2026-02-01T00:00:00Z',
 };
 

@@ -63,7 +63,7 @@ export interface Html5AppInfo {
   loadedAt: number;
 
   /** SHA256 hash of the source zip blob */
-  blobHash?: string;
+  blobCid?: string;
 
   /** App manifest if present */
   manifest?: Html5AppManifest;

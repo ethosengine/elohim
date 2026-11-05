@@ -434,9 +434,12 @@ describe('ConnectionStrategyProvider', () => {
         appId: 'elohim',
       };
 
-      const blobUrl = strategy.getBlobStorageUrl(mockConfig, 'sha256-abc123');
+      const blobUrl = strategy.getBlobStorageUrl(
+        mockConfig,
+        'bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'
+      );
       expect(typeof blobUrl).toBe('string');
-      expect(blobUrl).toContain('sha256-abc123');
+      expect(blobUrl).toContain('bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li');
     });
 
     it('should resolve admin URL from config', () => {

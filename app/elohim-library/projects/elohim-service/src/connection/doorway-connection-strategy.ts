@@ -266,7 +266,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     return url;
   }
 
-  getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string {
+  getBlobStorageUrl(config: ConnectionConfig, blobCid: string): string {
     // Convert WebSocket URL to HTTPS for blob API
     const baseUrl = config.adminUrl
       .replace('wss://', 'https://')
@@ -278,7 +278,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       ? `?apiKey=${encodeURIComponent(config.proxyApiKey)}`
       : '';
 
-    return `${baseUrl}/blob/${encodeURIComponent(blobHash)}${apiKeyParam}`;
+    return `${baseUrl}/blob/${encodeURIComponent(blobCid)}${apiKeyParam}`;
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {

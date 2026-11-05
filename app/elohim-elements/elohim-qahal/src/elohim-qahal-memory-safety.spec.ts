@@ -22,9 +22,9 @@ const PROTECTED: FeltStatusView = {
   headline: 'Held by 3 households: the Dowells, Aunt Ruth, First Church',
   reassurance: 'protected',
   heldBy: [
-    { id: 'sha256-aabbcc', kind: 'household', label: 'the Dowells' },
-    { id: 'sha256-ddeeff', kind: 'household', label: 'Aunt Ruth' },
-    { id: 'sha256-112233', kind: 'church', label: 'First Church' },
+    { id: 'bafkr4ib2bjuj6ezlfnzffmgeynw2if3ahok7klw37zozjfawx6u4apnr6q', kind: 'household', label: 'the Dowells' },
+    { id: 'bafkr4ibashbaj7dujfrplujbq2bjusdw32iqbpm3a5jlryzqiy3lm7oxwi', kind: 'household', label: 'Aunt Ruth' },
+    { id: 'bafkr4if5ek4gnnp7tswbc7l27osh43r4mfhnnwglatflpnbpfr7axvtnqe', kind: 'church', label: 'First Church' },
   ],
   floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 3 },
 };
@@ -33,8 +33,8 @@ const WATCHING: FeltStatusView = {
   headline: 'These photos are safe — 2 households still hold a complete copy',
   reassurance: 'watching',
   heldBy: [
-    { id: 'sha256-aabbcc', kind: 'household', label: 'the Dowells' },
-    { id: 'sha256-112233', kind: 'church', label: 'First Church' },
+    { id: 'bafkr4ib2bjuj6ezlfnzffmgeynw2if3ahok7klw37zozjfawx6u4apnr6q', kind: 'household', label: 'the Dowells' },
+    { id: 'bafkr4if5ek4gnnp7tswbc7l27osh43r4mfhnnwglatflpnbpfr7axvtnqe', kind: 'church', label: 'First Church' },
   ],
   floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 2 },
 };
@@ -42,7 +42,7 @@ const WATCHING: FeltStatusView = {
 const NEEDS_HELP: FeltStatusView = {
   headline: 'Only 1 household is holding these photos',
   reassurance: 'needs-help',
-  heldBy: [{ id: 'sha256-aabbcc', kind: 'household', label: 'the Dowells' }],
+  heldBy: [{ id: 'bafkr4ib2bjuj6ezlfnzffmgeynw2if3ahok7klw37zozjfawx6u4apnr6q', kind: 'household', label: 'the Dowells' }],
   floor: { tier: 'standard', tierDeclared: false, wantsHouseholds: 3, hasHouseholds: 1 },
   suggestedAction: 'Invite a household to help hold these',
 };
@@ -59,9 +59,9 @@ const VAULT_FLOOR: FeltStatusView = {
   headline: 'Held by 3 households: the Dowells, Aunt Ruth, First Church',
   reassurance: 'watching',
   heldBy: [
-    { id: 'sha256-aabbcc', kind: 'household', label: 'the Dowells' },
-    { id: 'sha256-ddeeff', kind: 'household', label: 'Aunt Ruth' },
-    { id: 'sha256-112233', kind: 'church', label: 'First Church' },
+    { id: 'bafkr4ib2bjuj6ezlfnzffmgeynw2if3ahok7klw37zozjfawx6u4apnr6q', kind: 'household', label: 'the Dowells' },
+    { id: 'bafkr4ibashbaj7dujfrplujbq2bjusdw32iqbpm3a5jlryzqiy3lm7oxwi', kind: 'household', label: 'Aunt Ruth' },
+    { id: 'bafkr4if5ek4gnnp7tswbc7l27osh43r4mfhnnwglatflpnbpfr7axvtnqe', kind: 'church', label: 'First Church' },
   ],
   floor: { tier: 'vault', tierDeclared: true, wantsHouseholds: 5, hasHouseholds: 3 },
 };
@@ -124,8 +124,8 @@ describe('<elohim-qahal-memory-safety>', () => {
     const statusWithUnlabelled: FeltStatusView = {
       ...WATCHING,
       heldBy: [
-        { id: 'sha256-aabbcc', kind: 'household' }, // no label
-        { id: 'sha256-ddeeff', kind: 'household', label: 'Aunt Ruth' },
+        { id: 'bafkr4ib2bjuj6ezlfnzffmgeynw2if3ahok7klw37zozjfawx6u4apnr6q', kind: 'household' }, // no label
+        { id: 'bafkr4ibashbaj7dujfrplujbq2bjusdw32iqbpm3a5jlryzqiy3lm7oxwi', kind: 'household', label: 'Aunt Ruth' },
       ],
     };
     const el = await fixture<ElohimQahalMemorySafety>(html`

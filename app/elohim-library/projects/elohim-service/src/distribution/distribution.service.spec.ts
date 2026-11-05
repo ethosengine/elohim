@@ -20,8 +20,12 @@ describe('DistributionService', () => {
   afterEach(() => http.verify());
 
   it('GETs /api/v1/blob/{hash}/distribution/details', async () => {
-    const promise = service.getDetails('sha256-abc');
-    const req = http.expectOne('/api/v1/blob/sha256-abc/distribution/details');
+    const promise = service.getDetails(
+      'bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y'
+    );
+    const req = http.expectOne(
+      '/api/v1/blob/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y/distribution/details'
+    );
     expect(req.request.method).toBe('GET');
     req.flush({
       summary: {

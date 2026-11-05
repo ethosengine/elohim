@@ -18,6 +18,7 @@ import { of } from 'rxjs';
 
 import { EprRawNodeComponent } from './epr-raw-node.component';
 import { StorageClientService } from '../../services/storage-client.service';
+import { byteCidOfText } from '@app/testing/byte-cid';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,8 @@ function text(fixture: ComponentFixture<EprRawNodeComponent>): string {
 }
 
 // Raw wire shape (ContentView), with the relations augmentation the inspector reads.
+const BLOB_CID = byteCidOfText('fair exchange blob');
+
 function makeNode(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'fair-exchange',
@@ -45,8 +48,7 @@ function makeNode(overrides: Record<string, unknown> = {}): Record<string, unkno
     description: 'A concept node',
     contentType: 'concept',
     contentFormat: 'markdown',
-    blobHash: 'sha256-abc123',
-    blobCid: 'bafkreiabc',
+    blobCid: BLOB_CID,
     contentSizeBytes: 2048,
     metadata: { difficulty: 'intro', author: 'matthew' },
     reach: 'commons',
@@ -123,17 +125,17 @@ describe('EprRawNodeComponent', () => {
       expect(body).toContain('fair-exchange'); // id / address
       expect(body).toContain('concept'); // contentType
       expect(body).toContain('markdown'); // contentFormat
-      expect(body).toContain('sha256-abc123'); // blobHash
+      expect(body).toContain(BLOB_CID); // blobCid
       expect(body).toContain('commons'); // reach
       expect(body).toContain('valid'); // validationStatus
     });
 
-    it('links the blobHash to /blob/{hash}', () => {
+    it('links the blobCid to /blob/{hash}', () => {
       const { fixture } = setup(makeNode());
       const link = query(fixture, 'epr-raw-blob-link') as HTMLAnchorElement | null;
 
       expect(link).toBeTruthy();
-      expect(link!.getAttribute('href')).toBe('/blob/sha256-abc123');
+      expect(link!.getAttribute('href')).toBe(`/blob/${BLOB_CID}`);
       // discernible link text for a11y
       expect((link!.textContent ?? '').trim().length).toBeGreaterThan(0);
     });

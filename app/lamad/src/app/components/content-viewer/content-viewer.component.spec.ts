@@ -1639,7 +1639,7 @@ describe('ContentViewerComponent', () => {
           ...mockContentNode,
           blobs: [
             {
-              hash: 'sha256-content-viewer-test',
+              hash: 'bafkr4igtvfnlp2taalzb6wssqa3dqhqgmqpwewgwtyl4vbqktt3hepiaqm-viewer-test',
               mimeType: 'application/json',
               sizeBytes: 0,
               fallbackUrls: [],

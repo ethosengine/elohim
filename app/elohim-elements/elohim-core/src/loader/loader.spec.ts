@@ -27,8 +27,12 @@ class FakeTransport implements LoaderTransport {
 // ---------------------------------------------------------------------------
 
 const SAMPLE_BYTES = new Uint8Array([1, 2, 3, 4]);
-// sha256 of [0x01, 0x02, 0x03, 0x04]
-const SAMPLE_CID = 'sha256-9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';
+// Byte CID (CIDv1 raw + BLAKE3-256) of [0x01, 0x02, 0x03, 0x04], minted from the real bytes.
+const SAMPLE_CID = 'bafkr4iddpaorofbfunrrf6qfrwdrfvoqke22tepmea2rz2owltnrticugi';
+// A well-formed byte CID of different bytes ([9, 9, 9]): admitted by form, wrong for SAMPLE_BYTES.
+const OTHER_CID = 'bafkr4iavye722q542l6rhzqmpzryv3pzkciiikkwomxhibtkfuvxz4k4vi';
+// The same four bytes under the retired spelling: not an address.
+const LEGACY_SHA256 = 'sha256-9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';
 
 // ---------------------------------------------------------------------------
 // Loader — transport fallback chain
@@ -117,13 +121,25 @@ describe('Loader — CID verification', () => {
     let threw = false;
     let message = '';
     try {
-      await loader.resolve('sha256-wrongwrongwrong');
+      await loader.resolve(OTHER_CID);
     } catch (err) {
       threw = true;
       message = err instanceof Error ? err.message : String(err);
     }
     expect(threw).to.be.true;
     expect(message).to.contain('CID mismatch');
+  });
+
+  it('rejects the retired sha256-<hex> spelling by name, even for matching bytes', async () => {
+    const loader = new Loader([new FakeTransport('doorway', SAMPLE_BYTES)], { verifyCid: true });
+    let message = '';
+    try {
+      await loader.resolve(LEGACY_SHA256);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).to.contain('Unsupported address');
+    expect(message).to.contain(LEGACY_SHA256);
   });
 
   it('does not fall through to next transport on CID mismatch', async () => {
@@ -143,7 +159,7 @@ describe('Loader — CID verification', () => {
     });
     let threw = false;
     try {
-      await loader.resolve('sha256-wrongwrongwrong');
+      await loader.resolve(OTHER_CID);
     } catch {
       threw = true;
     }

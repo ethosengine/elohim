@@ -79,7 +79,7 @@ export function isDagCborCid(cid: CID): boolean {
 /**
  * Check if a CID string represents a DAG-CBOR encoded document.
  *
- * DAG-CBOR CIDs start with 'bafyr' in base32 encoding (vs 'bafkrei' for raw).
+ * DAG-CBOR CIDs start with 'bafyr' in base32 encoding (vs 'bafkr4i' for byte CIDs).
  */
 export function isDagCborCidString(cidStr: string): boolean {
   return cidStr.startsWith('bafyr');

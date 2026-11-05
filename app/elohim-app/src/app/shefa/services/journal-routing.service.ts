@@ -112,7 +112,6 @@ export class JournalRoutingService {
           contentType: card.destinationType,
           contentFormat: 'markdown',
           contentBody: this._journalText(),
-          blobHash: null,
           blobCid: null,
           contentSizeBytes: null,
           metadata: { sourceJournalId: this._contentId() },

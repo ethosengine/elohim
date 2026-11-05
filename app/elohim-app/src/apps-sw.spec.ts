@@ -3,9 +3,9 @@
 // caches only bytes that verify (put checks them), verifies every hit, and lives outside
 // activate's purge.
 //
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
+import type { CID } from 'multiformats/cid';
 
+import { byteCidOf } from '@app/testing/byte-cid';
 import { absence } from '@elohim/eprfs';
 
 import type { BatchItem, TierAnswer } from '@elohim/eprfs';
@@ -34,7 +34,7 @@ const ORIGIN = 'https://doorway.example';
 const enc = new TextEncoder();
 
 async function rawCid(bytes: Uint8Array): Promise<CID> {
-  return CID.create(1, 0x55, await sha256.digest(bytes));
+  return byteCidOf(bytes);
 }
 
 type SwModule = typeof import('./apps-sw');
@@ -185,9 +185,24 @@ describe('the eprfs-objects cache outlives a worker update (H19)', () => {
   it('activate drops older apps-* caches and never CacheTier’s', async () => {
     const sw = await loadWorker();
     expect(sw.EPRFS_CACHE_NAME).toBe('eprfs-objects');
-    expect(sw.staleAppCaches(['apps-v1', 'apps-v2', 'apps-v3', 'eprfs-objects', 'other'])).toEqual([
-      'apps-v1',
-      'apps-v2',
+    expect(sw.CACHE_NAME).toBe('apps-v4');
+    expect(
+      sw.staleAppCaches(['apps-v1', 'apps-v2', 'apps-v3', 'apps-v4', 'eprfs-objects', 'other'])
+    ).toEqual(['apps-v1', 'apps-v2', 'apps-v3']);
+  });
+
+  it('the address crossing: apps-v3 (sha256- keyed) is evicted, so no sha256- key survives', async () => {
+    const sw = await loadWorker();
+    const legacyKey = `${ORIGIN}/apps/sha256-${'ab'.repeat(32)}/index.html`;
+    const caches = new Map<string, FakeCache>([
+      ['apps-v3', new FakeCache()],
+      ['apps-v4', new FakeCache()],
+      ['eprfs-objects', new FakeCache()],
     ]);
+    await caches.get('apps-v3')?.put(legacyKey, new Response('old'));
+    for (const name of sw.staleAppCaches([...caches.keys()])) caches.delete(name);
+    const surviving = [...caches.values()].flatMap(c => [...c.entries.keys()]);
+    expect([...caches.keys()].sort()).toEqual(['apps-v4', 'eprfs-objects']);
+    expect(surviving.some(key => key.includes('sha256-'))).toBe(false);
   });
 });

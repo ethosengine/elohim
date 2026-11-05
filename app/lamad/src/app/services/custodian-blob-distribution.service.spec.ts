@@ -98,7 +98,7 @@ describe('CustodianBlobDistributionService', () => {
 
         service.createBlobCommitment('content_123', blob, custodianId).subscribe(commitment => {
           expect(commitment.contentId).toBe('content_123');
-          expect(commitment.blobHash).toBe(blob.hash);
+          expect(commitment.blobCid).toBe(blob.hash);
           expect(commitment.custodianId).toBe(custodianId);
           expect(commitment.commitmentStatus).toBe('pending');
           expect(commitment.replicationProgress).toBe(0);
@@ -184,7 +184,7 @@ describe('CustodianBlobDistributionService', () => {
         service.createBlobCommitment('content_123', blob, 'custodian_1').subscribe(() => {
           service.createBlobCommitment('content_123', blob, 'custodian_2').subscribe(() => {
             service.getBlobReplicationStatus('content_123', blob.hash).subscribe(status => {
-              expect(status.blobHash).toBe(blob.hash);
+              expect(status.blobCid).toBe(blob.hash);
               expect(status.custodianCount).toBe(2);
               done();
             });

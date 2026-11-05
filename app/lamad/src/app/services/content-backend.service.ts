@@ -30,6 +30,7 @@ import { BLOB_FETCHER, type IBlobFetcher } from '@elohim/service';
 import { ELOHIM_CLIENT, ElohimClient } from '@elohim/service';
 
 import { LAMAD_STORAGE_CLIENT } from '../interfaces/storage.interface';
+import { isByteCid } from '../utils/byte-cid';
 
 import type { KnowledgeMap, KnowledgeMapType } from '../models/knowledge-map.model';
 import type { PathExtension, UpstreamProposal } from '../models/path-extension.model';
@@ -392,11 +393,8 @@ export class ContentBackendService {
    * 2. Doorway HTTP (`/blob/{cid}`)
    */
   private fetchBlobContent(blobCid: string): Observable<string> {
-    // Normalize content address: CIDv1 (bafkrei...) passes through,
-    // legacy formats normalized to sha256-{hex}. Backend handles all formats.
-    const normalizedCid = blobCid.startsWith('bafk')
-      ? blobCid
-      : blobCid.replace('sha256:', 'sha256-');
+    // A byte CID is the only blob address; there is nothing to normalize.
+    const normalizedCid = blobCid;
 
     // Check cache first
     const cached = this.blobCache.get(normalizedCid);
@@ -740,10 +738,7 @@ export class ContentBackendService {
   hydrateRawContent(data: Record<string, unknown>): Observable<ContentNode> {
     const raw = data as unknown as RawContentData;
     const contentBody = raw.contentBody ?? '';
-    const isBlobReference =
-      contentBody.startsWith('sha256:') ||
-      contentBody.startsWith('sha256-') ||
-      contentBody.startsWith('bafk');
+    const isBlobReference = isByteCid(contentBody);
     const blobCid = isBlobReference ? contentBody : (raw.blobCid ?? undefined);
     const needsBlobFetch = isBlobReference || (!contentBody && raw.blobCid);
 
@@ -893,8 +888,8 @@ export class ContentBackendService {
    * Handles multiple formats:
    * - Full URL (https://...): pass through unchanged
    * - Relative asset path (/images/..., /assets/...): pass through unchanged
-   * - Relative path (/blob/sha256-...): extract hash, build URL
-   * - Blob hash (sha256-...): build URL directly
+   * - Relative path (/blob/bafkr4i…): extract the byte CID, build URL
+   * - Byte CID (bafkr4i…): build URL directly
    * - Null/undefined: return undefined
    *
    * Uses StorageClientService for strategy-aware URL construction
@@ -915,29 +910,25 @@ export class ContentBackendService {
     }
 
     // Extract blob hash from various formats
-    let blobHash = value;
+    let blobCid = value;
 
     // Handle /blob/{hash} format
     if (value.startsWith('/blob/')) {
-      blobHash = value.slice(6);
+      blobCid = value.slice(6);
     }
     // Handle blob/{hash} format (no leading slash)
     else if (value.startsWith('blob/')) {
-      blobHash = value.slice(5);
+      blobCid = value.slice(5);
     }
 
     // Only convert to blob URL if it looks like a content address
-    // (CIDv1 bafk..., sha256-..., or sha256:...). Other relative paths pass through.
-    if (
-      !blobHash.startsWith('sha256-') &&
-      !blobHash.startsWith('sha256:') &&
-      !blobHash.startsWith('bafk')
-    ) {
+    // (a byte CID, fully decoded). Other relative paths pass through.
+    if (!isByteCid(blobCid)) {
       return value;
     }
 
     // Build full URL using strategy-aware service
-    return this.storageClient.getBlobUrl(blobHash);
+    return this.storageClient.getBlobUrl(blobCid);
   }
 
   /**

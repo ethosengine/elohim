@@ -9,7 +9,7 @@
     "*.css",
     "*.scss"
   ],
-  "description": "Protocol substrate — tokens, light-DOM globals, and atomic Custom Elements.",
+  "description": "Protocol substrate \u2014 tokens, light-DOM globals, and atomic Custom Elements.",
   "style": "./index.scss",
   "sass": "./index.scss",
   "main": "./dist/index.js",
@@ -55,6 +55,7 @@
     "@elohim/storage-client": "workspace:*",
     "@lit/context": "^1.1.6",
     "@lit/localize": "^0.12.2",
+    "@noble/hashes": "^1.5.0",
     "lit": "^3.2.1"
   },
   "devDependencies": {

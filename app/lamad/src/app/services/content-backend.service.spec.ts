@@ -37,12 +37,12 @@ describe('ContentBackendService SSR stability', () => {
         id: 'manifesto',
         contentType: 'epic',
         contentFormat: 'markdown',
-        contentBody: 'sha256-deadbeef',
+        contentBody: 'bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq',
         blobCid: 'bafk-unused-when-content-body-addressed',
       });
     const result = await resultPromise;
 
-    expect(fetchVerified).toHaveBeenCalledWith('sha256-deadbeef');
+    expect(fetchVerified).toHaveBeenCalledWith('bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq');
     expect(result?.content).toBe(manifesto);
   });
 

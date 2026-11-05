@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 
-import { verifyRawSha256 } from '@app/elohim/utils/raw-cid-verify';
+import { verifyByteCid } from '@app/elohim/utils/raw-cid-verify';
 
 import type { Observation, Projection, SnapshotBundle } from './view-contract';
 
@@ -27,7 +27,7 @@ export function decodeObject(encoded: string): Uint8Array {
   return Uint8Array.from(atob(encoded), c => c.codePointAt(0) ?? 0);
 }
 export async function verifyBundle(bundle: SnapshotBundle): Promise<Projection> {
-  if (!(await verifyRawSha256(new TextEncoder().encode(bundle.envelope), bundle.snapshotCid))) {
+  if (!(await verifyByteCid(new TextEncoder().encode(bundle.envelope), bundle.snapshotCid))) {
     throw new Error('Corrupt snapshot envelope');
   }
   const snapshot = JSON.parse(bundle.envelope) as { version: number; projection: Projection };
@@ -43,7 +43,7 @@ export async function verifyBundle(bundle: SnapshotBundle): Promise<Projection> 
     if (
       object === undefined ||
       p.input_versions[path] !== cid ||
-      !(await verifyRawSha256(decodeObject(object), cid))
+      !(await verifyByteCid(decodeObject(object), cid))
     ) {
       throw new Error(`Corrupt or missing captured source: ${path}`);
     }
@@ -153,12 +153,12 @@ export class OfflineViewRepository {
         });
         if (
           !fetched.ok ||
-          !(await verifyRawSha256(await fetched.clone().arrayBuffer(), asset.address))
+          !(await verifyByteCid(await fetched.clone().arrayBuffer(), asset.address))
         )
           throw new Error('Build asset verification failed');
         await cache.put(url, fetched);
         const stored = await cache.match(url);
-        if (!stored || !(await verifyRawSha256(await stored.arrayBuffer(), asset.address)))
+        if (!stored || !(await verifyByteCid(await stored.arrayBuffer(), asset.address)))
           throw new Error('Build persistence failed');
       }
       return name;

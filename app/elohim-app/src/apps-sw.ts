@@ -13,7 +13,7 @@ import JSZip from 'jszip';
 import { verifyAddress } from '@elohim/epr';
 import { absence } from '@elohim/eprfs';
 
-import { verifyRawSha256 } from './app/elohim/utils/raw-cid-verify';
+import { verifyByteCid } from './app/elohim/utils/raw-cid-verify';
 
 import type {
   BatchItem,
@@ -29,18 +29,21 @@ import type { DeliveryPeer } from '@elohim/storage-client/generated';
 import type { CID } from 'multiformats/cid';
 
 // Bumped v1→v2 (2026-05-30): the prior cache held a stale index.html keyed to an
-// old bundle hash (zip-non-determinism rotated the blobHash), which referenced new
+// old bundle hash (zip-non-determinism rotated the blobCid), which referenced new
 // chunk filenames that 404'd → white screen. A new cache name forces fresh fetches
 // against the current bundle. (Deterministic-hash + auto cache-invalidation are Sprint 2.)
 // Bumped v2→v3 (2026-09-26): v2 entries were cached without verification; v3 holds
 // only bytes extracted from an archive that hashed to its content address.
-const CACHE_NAME = 'apps-v3';
+// Bumped v3→v4 (re-genesis 1, the address crossing): every address is now a byte CID
+// (`bafkr4i…`); v3 held entries keyed `/apps/sha256-…/`, which no address names any more.
+// `activate` evicts every older `apps-*` cache, so no `sha256-` key survives the upgrade.
+export const CACHE_NAME = 'apps-v4';
 
 /*
- * Remembered heads — `/apps/_heads/{slug}` in the same cache holds the blobHash of the
+ * Remembered heads — `/apps/_heads/{slug}` in the same cache holds the blobCid of the
  * last archive this worker verified and fully extracted for that slug. The leading
  * underscore reserves the path the way `_capability` is reserved: a slug never starts
- * with `_`, and CID-keyed entries live under `/apps/sha256-…/`, so no app path collides.
+ * with `_`, and CID-keyed entries live under `/apps/bafkr4i…/`, so no app path collides.
  * Pages cannot read it (the fetch handler answers 404); only this worker uses it.
  */
 const HEADS_SEGMENT = '_heads';
@@ -49,7 +52,7 @@ function headKey(slug: string): Request {
   return new Request(`${self.location.origin}/apps/${HEADS_SEGMENT}/${slug}`);
 }
 
-/** The blobHash this worker last verified for `slug`, or '' when it never has. */
+/** The blobCid this worker last verified for `slug`, or '' when it never has. */
 async function recallHead(cache: Cache, slug: string): Promise<string> {
   const remembered = await cache.match(headKey(slug));
   return remembered ? (await remembered.text()).trim() : '';
@@ -60,10 +63,10 @@ async function recallHead(cache: Cache, slug: string): Promise<string> {
  * once every entry of a verified archive is in the cache, so a recalled head names a complete,
  * verified bundle.
  */
-async function rememberHead(cache: Cache, slug: string, blobHash: string): Promise<void> {
+async function rememberHead(cache: Cache, slug: string, blobCid: string): Promise<void> {
   await cache.put(
     headKey(slug),
-    new Response(blobHash, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    new Response(blobCid, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   );
 }
 
@@ -84,7 +87,7 @@ export function staleAppCaches(names: readonly string[]): string[] {
 
 /**
  * The zip path's writer for bundles that are not yet trees (interfaces spec §H.3, H1). Only
- * `extractZip` constructs and calls it, after `verifyRawSha256` passed on the whole archive; the
+ * `extractZip` constructs and calls it, after `verifyByteCid` passed on the whole archive; the
  * R-T2 lint rule keeps every other `cache.put` out of this file.
  */
 export class ArchiveWriter {
@@ -307,7 +310,7 @@ function scorePeerForSw(peer: DeliveryPeerResponse, contentHash: string): Scored
 let peerCache: { peers: ScoredPeer[]; fetchedAt: number } | null = null;
 const PEER_CACHE_TTL = 30000; // 30s
 
-async function getDeliveryPeers(blobHash: string): Promise<ScoredPeer[]> {
+async function getDeliveryPeers(blobCid: string): Promise<ScoredPeer[]> {
   if (peerCache && Date.now() - peerCache.fetchedAt < PEER_CACHE_TTL) {
     return peerCache.peers;
   }
@@ -318,7 +321,7 @@ async function getDeliveryPeers(blobHash: string): Promise<ScoredPeer[]> {
     const peers: DeliveryPeerResponse[] = await resp.json();
 
     const scored = peers
-      .map(p => scorePeerForSw(p, blobHash))
+      .map(p => scorePeerForSw(p, blobCid))
       .filter(p => p.baseUrl) // only peers with reachable URLs
       .sort((a, b) => b.score - a.score);
 
@@ -335,7 +338,7 @@ async function getDeliveryPeers(blobHash: string): Promise<ScoredPeer[]> {
 
 interface DeliveryInfo {
   deliveryMode: string; // 'extracted' | 'compressed' | 'blob-only'
-  blobHash: string;
+  blobCid: string;
   cacheTier: string; // 'projection' | 'extraction' | 'blob-only'
   ready: boolean;
 }
@@ -349,7 +352,7 @@ const deliveryCache = new Map<string, DeliveryInfo>();
 
 const NO_DELIVERY_INFO: DeliveryInfo = {
   deliveryMode: 'compressed',
-  blobHash: '',
+  blobCid: '',
   cacheTier: 'unknown',
   ready: false,
 };
@@ -363,12 +366,12 @@ async function probeCapability(slug: string): Promise<DeliveryInfo> {
     if (!resp.ok) return NO_DELIVERY_INFO;
     const info: DeliveryInfo = {
       deliveryMode: resp.headers.get('X-Delivery-Mode') ?? 'compressed',
-      blobHash: resp.headers.get('X-Blob-Hash') ?? '',
+      blobCid: resp.headers.get('X-Content-Address') ?? '',
       cacheTier: resp.headers.get('X-Cache-Tier') ?? 'unknown',
       ready:
         resp.headers.get('X-Ready') === 'true' || resp.headers.get('X-Projection-Ready') === 'true',
     };
-    if (info.blobHash) deliveryCache.set(slug, info);
+    if (info.blobCid) deliveryCache.set(slug, info);
     return info;
   } catch {
     return NO_DELIVERY_INFO;
@@ -387,11 +390,11 @@ async function probeCapability(slug: string): Promise<DeliveryInfo> {
  * every failure just advances to the next candidate.
  */
 async function tryDeliveryPeers(
-  blobHash: string,
+  blobCid: string,
   identifier: string,
   filePath: string
 ): Promise<Response | null> {
-  const peers = await getDeliveryPeers(blobHash);
+  const peers = await getDeliveryPeers(blobCid);
   for (const peer of peers) {
     if (!peer.baseUrl) continue;
     if (!peer.servesExtracted || !peer.warm) continue;
@@ -417,7 +420,7 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   const request = event.request;
   const url = new URL(request.url);
   const pathParts = url.pathname.replace('/apps/', '').split('/');
-  const identifier = pathParts[0]; // Could be slug or blob_hash
+  const identifier = pathParts[0]; // Could be slug or byte CID
   // A directory address (`/apps/<slug>/`, `/apps/<slug>/sub/`) is the doorway's
   // name for its index.html; the cache holds the file, not the directory, so a
   // navigation that falls back offline must look up what was extracted.
@@ -429,31 +432,31 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
 
   const cache = await caches.open(CACHE_NAME);
 
-  // 1. Probe peer capability to get the blob_hash for CID-based caching
+  // 1. Probe peer capability to get the byte CID for CID-based caching
   const capability = await probeCapability(identifier);
-  let blobHash = capability.blobHash;
+  let blobCid = capability.blobCid;
 
   console.log(
-    `[apps-sw] capability: ${identifier} deliveryMode=${capability.deliveryMode} ready=${capability.ready} blobHash=${capability.blobHash.slice(0, 12)}...`
+    `[apps-sw] capability: ${identifier} deliveryMode=${capability.deliveryMode} ready=${capability.ready} blobCid=${capability.blobCid.slice(0, 12)}...`
   );
 
   // 1b. No address from the network (offline, error, non-OK): fall back to the version
   // this worker last verified for the slug. The bytes under it proved themselves
-  // against their address; the NAME slug → blobHash is only as good as the doorway's
-  // X-Blob-Hash header at the time it was verified — the election is not consulted
+  // against their address; the NAME slug → blobCid is only as good as the doorway's
+  // X-Content-Address header at the time it was verified — the election is not consulted
   // yet (known gap), so this can serve a superseded version, never unverified bytes.
-  const recalled = blobHash ? '' : await recallHead(cache, identifier);
+  const recalled = blobCid ? '' : await recallHead(cache, identifier);
   if (recalled) {
-    blobHash = recalled;
+    blobCid = recalled;
     console.log(`[apps-sw] head-recalled: ${identifier} → ${recalled}`);
   }
 
   // 2. Try cache under CID key first (immutable content address)
-  if (blobHash) {
-    const cidKey = new Request(`${self.location.origin}/apps/${blobHash}/${filePath}`);
+  if (blobCid) {
+    const cidKey = new Request(`${self.location.origin}/apps/${blobCid}/${filePath}`);
     const cached = await cache.match(cidKey);
     if (cached) {
-      console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash}`);
+      console.log(`[apps-sw] cache-hit: ${filePath} key=${blobCid}`);
       return cached;
     }
   }
@@ -461,7 +464,7 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   // 3. Also check under the original URL (backwards compat)
   const cached = await cache.match(request);
   if (cached) {
-    console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash || identifier}`);
+    console.log(`[apps-sw] cache-hit: ${filePath} key=${blobCid || identifier}`);
     return cached;
   }
 
@@ -473,7 +476,7 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   }
 
   // 4. Try LAN/WAN peers in scored order (best-effort P2P delivery)
-  const fromPeer = await tryDeliveryPeers(blobHash, identifier, filePath);
+  const fromPeer = await tryDeliveryPeers(blobCid, identifier, filePath);
   if (fromPeer) return fromPeer;
 
   // 5. Fall back to default path (doorway — the safety net)
@@ -483,11 +486,11 @@ async function handleAppFetch(event: FetchEvent): Promise<Response> {
   if (capability.deliveryMode === 'extracted' || capability.ready) {
     // Doorway can serve individual files — serve this one now, and fill the cache
     // from the verified archive in the background so the next load can go offline.
-    if (blobHash) event.waitUntil(ensureVerifiedExtraction(cache, identifier, blobHash));
+    if (blobCid) event.waitUntil(ensureVerifiedExtraction(cache, identifier, blobCid));
     return fetchIndividual(request, identifier, filePath);
   } else {
     // Doorway serves compressed only — fetch ZIP, extract, serve from cache
-    return fetchViaZip(cache, identifier, blobHash, filePath);
+    return fetchViaZip(cache, identifier, blobCid, filePath);
   }
 }
 
@@ -521,21 +524,21 @@ const zipExtracting = new Map<string, Promise<void>>();
 async function fetchViaZip(
   cache: Cache,
   slug: string,
-  blobHash: string,
+  blobCid: string,
   filePath: string
 ): Promise<Response> {
   // Without a content address nothing can be verified, so nothing is cached:
   // pass the request through to the network instead of failing the app.
-  if (!blobHash) {
+  if (!blobCid) {
     console.warn(`[apps-sw] verify-skip: no address for ${slug} — serving uncached`);
     return fetchIndividual(new Request(`/apps/${slug}/${filePath}`), slug, filePath);
   }
 
-  await ensureVerifiedExtraction(cache, slug, blobHash);
+  await ensureVerifiedExtraction(cache, slug, blobCid);
 
   // Now serve from cache under the CID key
   const cached = await cache.match(
-    new Request(`${self.location.origin}/apps/${blobHash}/${filePath}`)
+    new Request(`${self.location.origin}/apps/${blobCid}/${filePath}`)
   );
   if (cached) return cached;
 
@@ -547,27 +550,27 @@ async function fetchViaZip(
 async function ensureVerifiedExtraction(
   cache: Cache,
   slug: string,
-  blobHash: string
+  blobCid: string
 ): Promise<void> {
   // Already verified and extracted for this slug — nothing to fetch again.
-  if ((await recallHead(cache, slug)) === blobHash) return;
-  let pending = zipExtracting.get(blobHash);
+  if ((await recallHead(cache, slug)) === blobCid) return;
+  let pending = zipExtracting.get(blobCid);
   if (!pending) {
-    pending = extractZip(cache, slug, blobHash).finally(() => zipExtracting.delete(blobHash));
-    zipExtracting.set(blobHash, pending);
+    pending = extractZip(cache, slug, blobCid).finally(() => zipExtracting.delete(blobCid));
+    zipExtracting.set(blobCid, pending);
   }
   await pending;
 }
 
-async function extractZip(cache: Cache, slug: string, blobHash: string): Promise<void> {
+async function extractZip(cache: Cache, slug: string, blobCid: string): Promise<void> {
   // Nothing is cached until the archive proves itself against its content address,
   // so without an address there is nothing worth fetching.
-  if (!blobHash) {
+  if (!blobCid) {
     console.warn(`[apps-sw] verify-skip: no address for ${slug} — not caching`);
     return;
   }
   // Fetch the raw ZIP blob — unreachable is an ordinary outcome (offline), not an error.
-  const blobUrl = `/blob/${blobHash}`;
+  const blobUrl = `/blob/${blobCid}`;
   let resp: Response;
   try {
     resp = await fetch(blobUrl);
@@ -579,11 +582,11 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
 
   const data = await resp.arrayBuffer();
   console.log(`[apps-sw] zip-fetch: ${blobUrl} size=${data.byteLength}`);
-  if (!(await verifyRawSha256(data, blobHash))) {
-    console.warn(`[apps-sw] verify-fail: ${blobUrl} does not hash to ${blobHash} — not caching`);
+  if (!(await verifyByteCid(data, blobCid))) {
+    console.warn(`[apps-sw] verify-fail: ${blobUrl} does not hash to ${blobCid} — not caching`);
     return;
   }
-  console.log(`[apps-sw] verify-ok: ${blobHash}`);
+  console.log(`[apps-sw] verify-ok: ${blobCid}`);
   // Archive-expansion review: this archive is fetched from the household's own
   // blob store by content address, for an app the peer explicitly installed, and
   // is expanded into a private Cache Storage entry rather than onto a filesystem.
@@ -593,7 +596,7 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
   const zip = await JSZip.loadAsync(data);
 
   // Cache under CID (immutable) when available, slug as fallback
-  const cachePrefix = blobHash || slug;
+  const cachePrefix = blobCid || slug;
 
   // Bundles are often zipped with one top-level folder (`evolution-of-trust/index.html`)
   // while pages ask for `/apps/{slug}/index.html`; the peer's server matches by suffix.
@@ -616,9 +619,9 @@ async function extractZip(cache: Cache, slug: string, blobHash: string): Promise
 
   // Remember the head only once every entry is in the cache: a recalled head then names
   // a complete, verified bundle. A request made by CID has no slug to remember.
-  if (slug !== blobHash) {
-    await rememberHead(cache, slug, blobHash);
-    console.log(`[apps-sw] head-remembered: ${slug} → ${blobHash}`);
+  if (slug !== blobCid) {
+    await rememberHead(cache, slug, blobCid);
+    console.log(`[apps-sw] head-remembered: ${slug} → ${blobCid}`);
   }
 }
 
@@ -664,15 +667,15 @@ function guessContentType(path: string): string {
 
 const channel = new BroadcastChannel('apps-sw');
 channel.onmessage = async (event: MessageEvent) => {
-  const { type, slug, blobHash } = event.data;
-  if (type === 'invalidate' && (slug || blobHash)) {
+  const { type, slug, blobCid } = event.data;
+  if (type === 'invalidate' && (slug || blobCid)) {
     const cache = await caches.open(CACHE_NAME);
     const keys = await cache.keys();
 
     // Build prefix list — clear both slug-keyed and CID-keyed entries
     const prefixes: string[] = [];
     if (slug) prefixes.push(`/apps/${slug}/`);
-    if (blobHash) prefixes.push(`/apps/${blobHash}/`);
+    if (blobCid) prefixes.push(`/apps/${blobCid}/`);
 
     const toDelete = keys.filter(req => {
       const pathname = new URL(req.url).pathname;
@@ -685,7 +688,7 @@ channel.onmessage = async (event: MessageEvent) => {
     // Clear delivery probe cache for this slug
     if (slug) deliveryCache.delete(slug);
     console.log(
-      `[apps-sw] invalidated ${toDelete.length} files for ${[slug, blobHash].filter(Boolean).join(' / ')}`
+      `[apps-sw] invalidated ${toDelete.length} files for ${[slug, blobCid].filter(Boolean).join(' / ')}`
     );
   }
 };

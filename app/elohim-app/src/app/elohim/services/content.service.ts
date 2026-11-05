@@ -23,7 +23,7 @@ import { PathView, parsePathView } from '@app/lamad/models/learning-path.model';
 
 import { BLOB_FETCHER, type IBlobFetcher } from '../interfaces/blob-fetcher.interface';
 import { ELOHIM_CLIENT, ElohimClient } from '../providers/elohim-client.provider';
-import { expectedSha256Hex, verifyRawSha256 } from '../utils/raw-cid-verify';
+import { isByteCid, verifyByteCid } from '../utils/raw-cid-verify';
 
 import { StorageClientService } from './storage-client.service';
 
@@ -271,13 +271,10 @@ export class ContentBackendService {
         if (!data) return of(null);
 
         // Check if we need to fetch blob content
-        // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
+        // contentBody may be a blob reference (a byte CID, bafkr4i…) instead of actual content
         const contentBody = data.contentBody ?? '';
 
-        const isBlobReference =
-          contentBody.startsWith('sha256:') ||
-          contentBody.startsWith('sha256-') ||
-          contentBody.startsWith('bafk');
+        const isBlobReference = isByteCid(contentBody);
         const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
         const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
 
@@ -318,22 +315,17 @@ export class ContentBackendService {
     if (anonymousPublicRead) {
       return this.storageClient.fetchBlob(blobCid, true).pipe(
         switchMap(async bytes => {
-          if (blobCid.startsWith('bafk') && expectedSha256Hex(blobCid) === null) {
-            throw new Error('Public content requires a raw SHA256 CID');
+          if (!isByteCid(blobCid)) {
+            throw new Error('Public content requires a byte CID');
           }
-          // A bare 64-hex digest has always been accepted here; give it the prefix the util reads.
-          const address = /^[0-9a-f]{64}$/.test(blobCid) ? `sha256-${blobCid}` : blobCid;
-          if (!(await verifyRawSha256(bytes, address)))
+          if (!(await verifyByteCid(bytes, blobCid)))
             throw new Error('Public content blob failed integrity verification');
           return new TextDecoder().decode(bytes);
         })
       );
     }
-    // Normalize content address: CIDv1 (bafkrei...) passes through,
-    // legacy formats normalized to sha256-{hex}. Backend handles all formats.
-    const normalizedCid = blobCid.startsWith('bafk')
-      ? blobCid
-      : blobCid.replace('sha256:', 'sha256-');
+    // A byte CID is the only blob address; there is nothing to normalize.
+    const normalizedCid = blobCid;
 
     // Check cache first
     const cached = this.blobCache.get(normalizedCid);
@@ -774,8 +766,8 @@ export class ContentBackendService {
    * Handles multiple formats:
    * - Full URL (https://...): pass through unchanged
    * - Relative asset path (/images/..., /assets/...): pass through unchanged
-   * - Relative path (/blob/sha256-...): extract hash, build URL
-   * - Blob hash (sha256-...): build URL directly
+   * - Relative path (/blob/bafkr4i…): extract the byte CID, build URL
+   * - Byte CID (bafkr4i…): build URL directly
    * - Null/undefined: return undefined
    *
    * Uses StorageClientService for strategy-aware URL construction
@@ -796,29 +788,25 @@ export class ContentBackendService {
     }
 
     // Extract blob hash from various formats
-    let blobHash = value;
+    let blobCid = value;
 
     // Handle /blob/{hash} format
     if (value.startsWith('/blob/')) {
-      blobHash = value.slice(6);
+      blobCid = value.slice(6);
     }
     // Handle blob/{hash} format (no leading slash)
     else if (value.startsWith('blob/')) {
-      blobHash = value.slice(5);
+      blobCid = value.slice(5);
     }
 
     // Only convert to blob URL if it looks like a content address
-    // (CIDv1 bafk..., sha256-..., or sha256:...). Other relative paths pass through.
-    if (
-      !blobHash.startsWith('sha256-') &&
-      !blobHash.startsWith('sha256:') &&
-      !blobHash.startsWith('bafk')
-    ) {
+    // (a byte CID, fully decoded). Other relative paths pass through.
+    if (!isByteCid(blobCid)) {
       return value;
     }
 
     // Build full URL using strategy-aware service
-    return this.storageClient.getBlobUrl(blobHash);
+    return this.storageClient.getBlobUrl(blobCid);
   }
 
   /**

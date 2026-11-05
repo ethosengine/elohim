@@ -48,13 +48,13 @@
 
             <dt>Content hash</dt>
             <dd>
-              @if (n.blobHash) {
+              @if (n.blobCid) {
                 <a
                   class="epr-raw__link"
                   data-testid="epr-raw-blob-link"
-                  [href]="blobHref(n.blobHash)"
+                  [href]="blobHref(n.blobCid)"
                 >
-                  <code class="epr-raw__code">{{ n.blobHash }}</code>
+                  <code class="epr-raw__code">{{ n.blobCid }}</code>
                 </a>
               } @else {
                 <span class="epr-raw__muted">no blob</span>

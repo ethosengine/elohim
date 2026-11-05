@@ -319,7 +319,7 @@ export const L4Unreachable: Story = {
     >
       The provision references
       <elohim-epr-link
-        epr="epr:shefa-commitment-sha256-4a7b9c2d1e8f3a5b6c0d9e2f1a4b7c8d9e0f1a2b"
+        epr="epr:shefa-commitment-bafkr4icowqlnqpnitezzta4lactsqgpk6xuhpk45ffced6ig22s4q5mt6m"
         ${ref(
           withResolution(4, {
             unreachable: true,
@@ -359,7 +359,7 @@ export const L4NoPreview: Story = {
     >
       This reference
       <elohim-epr-link
-        epr="epr:lamad-concept-sha256-9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d"
+        epr="epr:lamad-concept-bafkr4ig5xxsgfneg6t3hxqyzarfghccytbfomg74d4zmzx3rn3gnfygyky"
         ${ref(withResolution(4, { unreachable: true }))}
       ></elohim-epr-link>
       has never resolved on this device. The EPR identifier is the fallback label.

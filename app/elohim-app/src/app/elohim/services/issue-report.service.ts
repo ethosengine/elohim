@@ -42,7 +42,6 @@ export class IssueReportService {
       contentType: ISSUE_REPORT_TYPE,
       contentFormat: 'text',
       contentBody: '',
-      blobHash: null,
       blobCid: null,
       contentSizeBytes: null,
       tags: [ISSUE_REPORT_TYPE, category],

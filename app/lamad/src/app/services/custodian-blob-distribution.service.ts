@@ -35,7 +35,7 @@ export interface CustodianSelectionCriteria {
  */
 export interface CustodianBlobCommitment {
   contentId: string;
-  blobHash: string;
+  blobCid: string;
   custodianId: string;
   commitmentStatus: 'active' | 'pending' | 'failed' | 'expired';
   startedAt: number;
@@ -65,7 +65,7 @@ export interface CustodianCapability {
  * Blob replication status
  */
 export interface BlobReplicationStatus {
-  blobHash: string;
+  blobCid: string;
   contentId: string;
   totalSize: number;
   primaryUrl: string;
@@ -148,7 +148,7 @@ export class CustodianBlobDistributionService {
 
     const commitment: CustodianBlobCommitment = {
       contentId,
-      blobHash: blob.hash,
+      blobCid: blob.hash,
       custodianId,
       commitmentStatus: 'pending',
       startedAt: now,
@@ -184,7 +184,7 @@ export class CustodianBlobDistributionService {
     bandwidth: number
   ): Observable<CustodianBlobCommitment> {
     // Find the commitment in storage and update it
-    const key = `${commitment.contentId}_${commitment.blobHash}`;
+    const key = `${commitment.contentId}_${commitment.blobCid}`;
     const commitments = this.blobCommitments.get(key) ?? [];
     const index = commitments.findIndex(c => c.custodianId === commitment.custodianId);
 
@@ -218,11 +218,11 @@ export class CustodianBlobDistributionService {
    * Aggregates commitment status from all custodians.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash to check
+   * @param blobCid Blob hash to check
    * @returns Observable with replication status
    */
-  getBlobReplicationStatus(contentId: string, blobHash: string): Observable<BlobReplicationStatus> {
-    const key = `${contentId}_${blobHash}`;
+  getBlobReplicationStatus(contentId: string, blobCid: string): Observable<BlobReplicationStatus> {
+    const key = `${contentId}_${blobCid}`;
     const commitments = this.blobCommitments.get(key) ?? [];
 
     const activeReplicas = commitments.filter(c => c.commitmentStatus === 'active').length;
@@ -239,7 +239,7 @@ export class CustodianBlobDistributionService {
     }
 
     const status: BlobReplicationStatus = {
-      blobHash,
+      blobCid,
       contentId,
       totalSize: 0, // Would come from blob metadata
       primaryUrl: commitments[0]?.fallbackUrl ?? '',
@@ -258,11 +258,11 @@ export class CustodianBlobDistributionService {
    * Returns which custodians are replicating this blob.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @returns Array of custodian commitments
    */
-  getCommitmentsForBlob(contentId: string, blobHash: string): CustodianBlobCommitment[] {
-    const key = `${contentId}_${blobHash}`;
+  getCommitmentsForBlob(contentId: string, blobCid: string): CustodianBlobCommitment[] {
+    const key = `${contentId}_${blobCid}`;
     return this.blobCommitments.get(key) ?? [];
   }
 
@@ -271,12 +271,12 @@ export class CustodianBlobDistributionService {
    * Signals end of responsibility for blob replication.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @param custodianId Custodian ID
    * @returns Observable with success status
    */
-  revokeCommitment(contentId: string, blobHash: string, custodianId: string): Observable<boolean> {
-    const key = `${contentId}_${blobHash}`;
+  revokeCommitment(contentId: string, blobCid: string, custodianId: string): Observable<boolean> {
+    const key = `${contentId}_${blobCid}`;
     const commitments = this.blobCommitments.get(key) ?? [];
 
     const index = commitments.findIndex(c => c.custodianId === custodianId);
@@ -293,11 +293,11 @@ export class CustodianBlobDistributionService {
    * These are URLs where custodians are seeding the blob.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @returns Array of fallback URLs from custodians
    */
-  getCustomerFallbackUrls(contentId: string, blobHash: string): string[] {
-    const commitments = this.getCommitmentsForBlob(contentId, blobHash);
+  getCustomerFallbackUrls(contentId: string, blobCid: string): string[] {
+    const commitments = this.getCommitmentsForBlob(contentId, blobCid);
 
     return commitments
       .filter(c => c.commitmentStatus === 'active')
@@ -391,11 +391,11 @@ export class CustodianBlobDistributionService {
    * Get average replication progress across all custodians.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @returns Progress percentage (0-100)
    */
-  getAverageReplicationProgress(contentId: string, blobHash: string): number {
-    const commitments = this.getCommitmentsForBlob(contentId, blobHash);
+  getAverageReplicationProgress(contentId: string, blobCid: string): number {
+    const commitments = this.getCommitmentsForBlob(contentId, blobCid);
 
     if (commitments.length === 0) {
       return 0;
@@ -408,11 +408,11 @@ export class CustodianBlobDistributionService {
    * Get number of active replicas.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @returns Number of active custodians
    */
-  getActiveReplicaCount(contentId: string, blobHash: string): number {
-    const commitments = this.getCommitmentsForBlob(contentId, blobHash);
+  getActiveReplicaCount(contentId: string, blobCid: string): number {
+    const commitments = this.getCommitmentsForBlob(contentId, blobCid);
     return commitments.filter(c => c.commitmentStatus === 'active').length;
   }
 
@@ -421,11 +421,11 @@ export class CustodianBlobDistributionService {
    * Picks custodian with best bandwidth and lowest latency.
    *
    * @param contentId Content ID
-   * @param blobHash Blob hash
+   * @param blobCid Blob hash
    * @returns Fallback URL to best custodian, or null if none available
    */
-  getBestCustodianUrl(contentId: string, blobHash: string): string | null {
-    const activeCommitments = this.getCommitmentsForBlob(contentId, blobHash).filter(
+  getBestCustodianUrl(contentId: string, blobCid: string): string | null {
+    const activeCommitments = this.getCommitmentsForBlob(contentId, blobCid).filter(
       c => c.commitmentStatus === 'active'
     );
 
@@ -498,9 +498,9 @@ export class CustodianBlobDistributionService {
   /**
    * Generate fallback URL for custodian blob endpoint.
    */
-  private generateFallbackUrl(custodianId: string, blobHash: string): string {
+  private generateFallbackUrl(custodianId: string, blobCid: string): string {
     // Would generate URL based on custodian's endpoint
-    return `https://custodian-${custodianId}.example.com/blob/${blobHash}`;
+    return `https://custodian-${custodianId}.example.com/blob/${blobCid}`;
   }
 
   /**

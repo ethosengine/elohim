@@ -1,7 +1,9 @@
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
 
-import { expectedSha256Hex, verifyRawSha256 } from './raw-cid-verify';
+import { byteCidOf } from '@app/testing/byte-cid';
+
+import { isByteCid, verifyByteCid } from './raw-cid-verify';
 
 const RAW = 0x55;
 const DAG_CBOR = 0x71;
@@ -16,44 +18,53 @@ async function hexOf(data: Uint8Array): Promise<string> {
     .join('');
 }
 
-describe('raw-cid-verify', () => {
-  it('refuses a legacy sha256-<hex> spelling even when the bytes match (addresses are self-describing)', async () => {
-    const address = `sha256-${await hexOf(bytes)}`;
-    expect(await verifyRawSha256(bytes, address)).toBe(false);
-    expect(await verifyRawSha256(bytes.buffer, address)).toBe(false);
-  });
-
-  it('verifies bytes against a CIDv1 raw sha2-256 address (bafkrei…)', async () => {
-    const cid = CID.create(1, RAW, await sha256.digest(bytes)).toString();
-    expect(cid.startsWith('bafkrei')).toBe(true);
-    expect(await verifyRawSha256(bytes, cid)).toBe(true);
-    expect(expectedSha256Hex(cid)).toBe(await hexOf(bytes));
+describe('raw-cid-verify (byte plane)', () => {
+  it('verifies bytes against their byte CID (bafkr4i…, raw + BLAKE3-256)', async () => {
+    const cid = byteCidOf(bytes).toString();
+    expect(cid.startsWith('bafkr4i')).toBe(true);
+    expect(cid).toHaveLength(59);
+    expect(isByteCid(cid)).toBe(true);
+    expect(await verifyByteCid(bytes, cid)).toBe(true);
+    expect(await verifyByteCid(bytes.buffer.slice(0) as ArrayBuffer, cid)).toBe(true);
   });
 
   it('rejects bytes that do not match the address', async () => {
     const other = new Uint8Array(new TextEncoder().encode('bytes that lie'));
-    const cid = CID.create(1, RAW, await sha256.digest(bytes)).toString();
-    expect(await verifyRawSha256(other, cid)).toBe(false);
-    expect(await verifyRawSha256(other, `sha256-${await hexOf(bytes)}`)).toBe(false);
+    expect(await verifyByteCid(other, byteCidOf(bytes).toString())).toBe(false);
   });
 
-  it('fails closed on a CID whose codec is not raw (dag-cbor bafyrei…)', async () => {
-    const cid = CID.create(1, DAG_CBOR, await sha256.digest(bytes)).toString();
-    expect(cid.startsWith('bafyrei')).toBe(true);
-    expect(expectedSha256Hex(cid)).toBeNull();
-    expect(await verifyRawSha256(bytes, cid)).toBe(false);
+  it('refuses a legacy sha256-<hex> / sha256:<hex> spelling even when the bytes match', async () => {
+    const hex = await hexOf(bytes);
+    for (const address of [`sha256-${hex}`, `sha256:${hex}`, hex]) {
+      expect(isByteCid(address)).toBe(false);
+      expect(await verifyByteCid(bytes, address)).toBe(false);
+    }
   });
 
-  it('fails closed on malformed addresses', async () => {
+  it('refuses a real CID that is not the byte profile (sha2-256 raw bafkrei…, dag-cbor bafyrei…)', async () => {
+    const digest = await sha256.digest(bytes);
+    const citation = CID.create(1, RAW, digest).toString();
+    const record = CID.create(1, DAG_CBOR, digest).toString();
+    expect(citation.startsWith('bafkrei')).toBe(true);
+    expect(record.startsWith('bafyrei')).toBe(true);
+    for (const address of [citation, record]) {
+      expect(isByteCid(address)).toBe(false);
+      expect(await verifyByteCid(bytes, address)).toBe(false);
+    }
+  });
+
+  it('fails closed on malformed addresses (full decode, never a prefix check)', async () => {
+    const good = byteCidOf(bytes).toString();
     for (const address of [
       '',
-      'bafkreinotacid',
-      'sha256-deadbeef',
-      `sha256-${'A'.repeat(64)}`,
+      'bafkr4inotacid',
+      good.slice(0, -1),
+      `${good}a`,
+      good.toUpperCase(),
       'my-app-slug',
     ]) {
-      expect(expectedSha256Hex(address)).toBeNull();
-      expect(await verifyRawSha256(bytes, address)).toBe(false);
+      expect(isByteCid(address)).toBe(false);
+      expect(await verifyByteCid(bytes, address)).toBe(false);
     }
   });
 });

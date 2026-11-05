@@ -227,9 +227,9 @@ describe('DoorwayClientService', () => {
     it('should fetch blob by hash', async () => {
       const mockBlob = new ArrayBuffer(1024);
 
-      const promise = firstValueFrom(service.getBlob('sha256-abc123'));
+      const promise = firstValueFrom(service.getBlob('bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'));
 
-      const req = httpMock.expectOne('/blob/sha256-abc123');
+      const req = httpMock.expectOne('/blob/bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li');
       expect(req.request.method).toBe('GET');
       expect(req.request.responseType).toBe('arraybuffer');
       req.flush(mockBlob);
@@ -242,9 +242,9 @@ describe('DoorwayClientService', () => {
     it('should support byte range requests', async () => {
       const mockBlob = new ArrayBuffer(512);
 
-      const promise = firstValueFrom(service.getBlob('sha256-abc123', { start: 0, end: 511 }));
+      const promise = firstValueFrom(service.getBlob('bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li', { start: 0, end: 511 }));
 
-      const req = httpMock.expectOne('/blob/sha256-abc123');
+      const req = httpMock.expectOne('/blob/bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li');
       expect(req.request.headers.get('Range')).toBe('bytes=0-511');
       req.flush(mockBlob);
 
@@ -254,9 +254,9 @@ describe('DoorwayClientService', () => {
     it('should handle blob fetch errors', async () => {
       service.setMaxRetries(0);
 
-      const promise = firstValueFrom(service.getBlob('sha256-notfound'));
+      const promise = firstValueFrom(service.getBlob('bafkr4igl5t5xiyb2npruvrrlj6fndoouplr26e7sukfp3bezcq3wvzmsqu'));
 
-      const req = httpMock.expectOne('/blob/sha256-notfound');
+      const req = httpMock.expectOne('/blob/bafkr4igl5t5xiyb2npruvrrlj6fndoouplr26e7sukfp3bezcq3wvzmsqu');
       req.error(new ProgressEvent('error'), { status: 404, statusText: 'Not Found' });
 
       await expect(promise).rejects.toThrow('getBlob failed');
@@ -279,8 +279,8 @@ describe('DoorwayClientService', () => {
     });
 
     it('should generate chunk URL', () => {
-      const url = service.getChunkUrl('sha256-abc', 10);
-      expect(url).toBe('https://doorway.example.com/api/stream/chunk/sha256-abc/10');
+      const url = service.getChunkUrl('bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y', 10);
+      expect(url).toBe('https://doorway.example.com/api/stream/chunk/bafkr4idez22xnaj2qzvh3cqw6r2zy4xx2bc47s3w6rbdfgafr7565p2n4y/10');
     });
   });
 
@@ -326,9 +326,9 @@ describe('DoorwayClientService', () => {
         },
       ];
 
-      const promise = firstValueFrom(service.getCustodiansForBlob('sha256-abc123'));
+      const promise = firstValueFrom(service.getCustodiansForBlob('bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li'));
 
-      const req = httpMock.expectOne('/api/custodian/blob/sha256-abc123');
+      const req = httpMock.expectOne('/api/custodian/blob/bafkr4ig7y4zsfs34ipqsgpbu5ipqctjkiuj67rfr2mr5djgee5mt2ad2li');
       expect(req.request.method).toBe('GET');
       req.flush({ custodians: mockCustodians });
 
@@ -357,8 +357,8 @@ describe('DoorwayClientService', () => {
     it('should use configured base URL for all requests', async () => {
       service.setBaseUrl('https://custom-doorway.example.com');
 
-      const promise = firstValueFrom(service.getBlob('sha256-test'));
-      const req = httpMock.expectOne('https://custom-doorway.example.com/blob/sha256-test');
+      const promise = firstValueFrom(service.getBlob('bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m'));
+      const req = httpMock.expectOne('https://custom-doorway.example.com/blob/bafkr4ihoggwjrcoigoqxjcdcbjikzuvmbqdyiljjmubobcq5lfwnnjmo7m');
       req.flush(new ArrayBuffer(0));
       await promise;
     });

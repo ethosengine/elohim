@@ -466,13 +466,13 @@ export class ContentResolverService implements OnDestroy {
    * Register an HTML5 app.
    *
    * @param slug - Unique app identifier
-   * @param blobHash - Content hash of the app bundle
+   * @param blobCid - Content hash of the app bundle
    * @param entryPoint - Entry point file (default: index.html)
    * @param fallbackUrl - Fallback URL if app cannot be served locally
    */
-  registerApp(slug: string, blobHash: string, entryPoint: string, fallbackUrl?: string): void {
+  registerApp(slug: string, blobCid: string, entryPoint: string, fallbackUrl?: string): void {
     this.ensureReady();
-    this.resolver!.registerApp(slug, blobHash, entryPoint, fallbackUrl);
+    this.resolver!.registerApp(slug, blobCid, entryPoint, fallbackUrl);
   }
 
   /**

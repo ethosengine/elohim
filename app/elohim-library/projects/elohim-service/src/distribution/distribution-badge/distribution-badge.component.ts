@@ -63,13 +63,13 @@ const REACH_ICONS: Record<string, string> = {
 })
 export class DistributionBadgeComponent implements OnChanges {
   @Input({ required: true }) summary!: DistributionSummary;
-  @Input() blobHash?: string;
+  @Input() blobCid?: string;
 
   /**
    * Optional pre-fetched distribution details. When provided, placement-gaps
    * and per-peer rows render directly from this input without a lazy fetch.
    * Use this when the parent already holds full details (e.g. a resilience
-   * panel). When absent with a blobHash, details are fetched lazily on expand.
+   * panel). When absent with a blobCid, details are fetched lazily on expand.
    */
   @Input() detailsInput?: DistributionDetails;
 
@@ -95,10 +95,10 @@ export class DistributionBadgeComponent implements OnChanges {
 
   async onTooltipExpand(): Promise<void> {
     this.expanded.set(true);
-    if (!this.blobHash || this.details()) return;
+    if (!this.blobCid || this.details()) return;
     this.loadingDetails.set(true);
     try {
-      const d = await this.distribution.getDetails(this.blobHash);
+      const d = await this.distribution.getDetails(this.blobCid);
       this.details.set(d);
     } finally {
       this.loadingDetails.set(false);

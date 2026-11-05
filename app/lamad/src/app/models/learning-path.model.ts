@@ -639,7 +639,7 @@ export function parsePathView(node: ContentNode): PathView {
     difficulty: meta.difficulty ?? undefined,
     estimatedDuration: meta.estimatedDuration ?? undefined,
     // Prefer resolved thumbnailUrl from ContentService (set at runtime on the node)
-    // over raw metadata value (which is an unresolved /blob/sha256-... path)
+    // over raw metadata value (which is an unresolved /blob/bafkr4i… path)
     thumbnailUrl:
       (node as unknown as Record<string, string>)['thumbnailUrl'] ?? meta.thumbnailUrl ?? undefined,
     thumbnailAlt: meta.thumbnailAlt ?? undefined,

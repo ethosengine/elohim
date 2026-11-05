@@ -99,7 +99,7 @@
           @if (node.distribution) {
             <elohim-distribution-badge
               [summary]="node.distribution"
-              [blobHash]="node.blobs?.[0]?.hash"
+              [blobCid]="node.blobs?.[0]?.hash"
               tooltipAlign="end"
               data-testid="viewer-distribution-info"
             ></elohim-distribution-badge>

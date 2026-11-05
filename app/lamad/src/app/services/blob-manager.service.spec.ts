@@ -280,12 +280,12 @@ describe('BlobManagerService', () => {
 
   describe('Strategy-Aware Blob URL Methods', () => {
     it('should get blob URL', () => {
-      const blobHash = 'test_hash_123';
+      const blobCid = 'test_hash_123';
       vi.spyOn(service as any, 'getStorageClient').mockReturnValue({
         getBlobUrl: vi.fn().mockReturnValue('https://doorway.host/blob/test_hash_123'),
       });
 
-      const url = service.getBlobUrl(blobHash);
+      const url = service.getBlobUrl(blobCid);
       expect(url).toBe('https://doorway.host/blob/test_hash_123');
     });
 
@@ -435,8 +435,8 @@ describe('BlobManagerService', () => {
 
     it('getBlobMetadata should return Observable', () => {
       const contentId = 'content_123';
-      const blobHash = 'hash_123';
-      const result = service.getBlobMetadata(contentId, blobHash);
+      const blobCid = 'hash_123';
+      const result = service.getBlobMetadata(contentId, blobCid);
 
       expect(result).toBeDefined();
       expect(typeof result.subscribe).toBe('function');
@@ -444,8 +444,8 @@ describe('BlobManagerService', () => {
 
     it('blobExists should return Observable', () => {
       const contentId = 'content_123';
-      const blobHash = 'hash_123';
-      const result = service.blobExists(contentId, blobHash);
+      const blobCid = 'hash_123';
+      const result = service.blobExists(contentId, blobCid);
 
       expect(result).toBeDefined();
       expect(typeof result.subscribe).toBe('function');
@@ -610,9 +610,9 @@ describe('BlobManagerService', () => {
     it('should retrieve specific blob metadata by hash', () =>
       new Promise<void>(done => {
         const contentId = 'content_123';
-        const blobHash = 'test_hash_123';
+        const blobCid = 'test_hash_123';
 
-        service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+        service.getBlobMetadata(contentId, blobCid).subscribe(metadata => {
           expect(metadata === null || metadata instanceof Object).toBe(true);
           done();
         });
@@ -621,9 +621,9 @@ describe('BlobManagerService', () => {
     it('should check if blob exists in DHT', () =>
       new Promise<void>(done => {
         const contentId = 'content_123';
-        const blobHash = 'test_hash_123';
+        const blobCid = 'test_hash_123';
 
-        service.blobExists(contentId, blobHash).subscribe(exists => {
+        service.blobExists(contentId, blobCid).subscribe(exists => {
           expect(typeof exists).toBe('boolean');
           done();
         });
@@ -985,9 +985,9 @@ describe('BlobManagerService', () => {
     it('getBlobMetadata should return Observable of ContentBlob or null', () =>
       new Promise<void>(done => {
         const contentId = 'content_123';
-        const blobHash = 'test_hash_123';
+        const blobCid = 'test_hash_123';
 
-        service.getBlobMetadata(contentId, blobHash).subscribe(metadata => {
+        service.getBlobMetadata(contentId, blobCid).subscribe(metadata => {
           expect(metadata === null || metadata instanceof Object).toBe(true);
           done();
         });
@@ -996,9 +996,9 @@ describe('BlobManagerService', () => {
     it('blobExists should return Observable of boolean', () =>
       new Promise<void>(done => {
         const contentId = 'content_123';
-        const blobHash = 'test_hash_123';
+        const blobCid = 'test_hash_123';
 
-        service.blobExists(contentId, blobHash).subscribe(exists => {
+        service.blobExists(contentId, blobCid).subscribe(exists => {
           expect(typeof exists).toBe('boolean');
           done();
         });

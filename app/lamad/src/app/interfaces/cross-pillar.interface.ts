@@ -364,7 +364,7 @@ export const LAMAD_AFFINITY_TRACKING = new InjectionToken<ILamadAffinityTracking
 // ============================================================================
 
 export interface ILamadEprResolver {
-  resolveUrl(input: string, blobHash?: string): LamadResolvedEpr;
+  resolveUrl(input: string, blobCid?: string): LamadResolvedEpr;
   resolve(input: string): Observable<LamadResolvedContent | null>;
   resolveBlobUrl(hash: string): string;
   resolveInContext(
