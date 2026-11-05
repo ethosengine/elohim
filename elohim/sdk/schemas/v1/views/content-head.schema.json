@@ -35,7 +35,7 @@
       "type": ["boolean", "null"],
       "description": "Whether the row's DHT anchor is its declared HEAD: true when they are the same action, false when they differ, null when the row lacks either. A false does not by itself mean the served bytes are wrong (an anchor can advance without the pointer moving), but a torn row — declared head A, pointer written from action B — reads false here while trust still says 'notarized'. Additive: absent from older serving nodes."
     },
-    "blobHash": {
+    "blobCid": {
       "type": ["string", "null"],
       "description": "The serving blob hash of the resolved row (browser bundle), if any."
     },
@@ -47,9 +47,9 @@
       "type": ["string", "null"],
       "description": "The STAGING canonical-head declaration standing beneath the earned winner — the next version awaiting promotion, addressed by the ActionHash of its DECLARATION (not by a CID). Derived by content_store::select_staging_candidate as a pure function of the same link set every peer holds. Present only when the winner is EARNED and a staging declaration postdates it; stagingCandidateState distinguishes authoritative absence from an unavailable ask."
     },
-    "stagingCandidateBlobHash": {
+    "stagingCandidateBlobCid": {
       "type": ["string", "null"],
-      "description": "The blob content address named by stagingCandidate when this peer can resolve that exact declaration through its content projection and holds the bytes locally. Absent/null never authorizes fallback to the converged blobHash."
+      "description": "The blob content address named by stagingCandidate when this peer can resolve that exact declaration through its content projection and holds the bytes locally. Absent/null never authorizes fallback to the converged blobCid."
     },
     "stagingCandidateState": {
       "type": ["string", "null"],

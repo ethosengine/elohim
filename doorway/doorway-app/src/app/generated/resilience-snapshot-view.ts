@@ -150,7 +150,7 @@ export interface PlacementGapView {
    */
   id: string;
   contentId: string;
-  shardHash: string;
+  shardCid: string;
   /**
    * Target number of distinct stewarding collectives (any kind) the placement should reach.
    */

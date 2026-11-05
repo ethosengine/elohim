@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 // MessagePack for canonical bytes (ViewFederationRequest, ViewSlice signing)
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use rmp_serde;
 
 // ============================================================================
@@ -1029,7 +1032,7 @@ mod head_corpus_digest_wire_compat_tests {
         table: String,
         #[allow(
             dead_code,
-            reason = "present to model the old wire shape; the test never reads it"
+            reason = "decode-only fixture of the old wire shape: the field must exist to deserialize it but is never read"
         )]
         total: usize,
         entries: Vec<ProjectionInventoryEntry>,

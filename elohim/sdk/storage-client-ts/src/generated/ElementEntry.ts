@@ -9,7 +9,7 @@ export type ElementEntry = {
  */
 tagName: string, 
 /**
- * Content address of the element bundle (e.g. "sha256-...").
+ * Content address of the element bundle (a byte CID, e.g. "bafkr4i…").
  */
 cid: string, 
 /**

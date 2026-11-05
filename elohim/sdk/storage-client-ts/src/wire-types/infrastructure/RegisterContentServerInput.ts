@@ -4,4 +4,4 @@ import type { StorageEndpointInput } from "./StorageEndpointInput";
 /**
  * Input for infrastructure::register_content_server.
  */
-export type RegisterContentServerInput = { content_hash: string, capability: string, serve_url: string | null, endpoints: Array<StorageEndpointInput> | null, priority: number | null, region: string | null, bandwidth_mbps: number | null, };
+export type RegisterContentServerInput = { content_cid: string, capability: string, serve_url: string | null, endpoints: Array<StorageEndpointInput> | null, priority: number | null, region: string | null, bandwidth_mbps: number | null, };

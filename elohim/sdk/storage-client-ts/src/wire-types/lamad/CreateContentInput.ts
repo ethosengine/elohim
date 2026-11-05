@@ -3,4 +3,4 @@
 /**
  * Input for content_store::create_content coordinator function.
  */
-export type CreateContentInput = { id: string, content_type: string, title: string, description: string, summary: string | null, content: string, content_format: string, tags: Array<string>, source_path: string | null, related_node_ids: Array<string>, reach: string, estimated_minutes: number | null, thumbnail_url: string | null, metadata_json: string, blob_cid: string | null, content_size_bytes: bigint | null, content_hash: string | null, };
+export type CreateContentInput = { id: string, content_type: string, title: string, description: string, summary: string | null, content: string, content_format: string, tags: Array<string>, source_path: string | null, related_node_ids: Array<string>, reach: string, estimated_minutes: number | null, thumbnail_url: string | null, metadata_json: string, blob_cid: string | null, content_size_bytes: bigint | null, };

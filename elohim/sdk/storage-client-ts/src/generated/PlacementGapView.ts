@@ -8,4 +8,4 @@
  *
  * Wire format: `elohim/sdk/schemas/v1/views/placement-gap-view.schema.json`
  */
-export type PlacementGapView = { id: string, contentId: string, shardHash: string, requestedStewardCount: number, achievedStewardCount: number, contractCoverage: number, gapKind: string, firstSeenAt: string, lastSeenAt: string, };
+export type PlacementGapView = { id: string, contentId: string, shardCid: string, requestedStewardCount: number, achievedStewardCount: number, contractCoverage: number, gapKind: string, firstSeenAt: string, lastSeenAt: string, };

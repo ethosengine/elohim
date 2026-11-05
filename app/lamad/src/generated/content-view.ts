@@ -103,8 +103,7 @@ export interface ContentView {
   description?: string | null;
   contentType: ContentType;
   contentFormat: ContentFormat;
-  blobHash?: string | null;
-  serverBlobHash?: string | null;
+  serverBlobCid?: string | null;
   blobCid?: string | null;
   contentSizeBytes?: number | null;
   metadata?: unknown;

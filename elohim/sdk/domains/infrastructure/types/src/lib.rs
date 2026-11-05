@@ -159,7 +159,7 @@ pub struct HealthAttestationOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct RegisterContentServerInput {
-    pub content_hash: String,
+    pub content_cid: String,
     pub capability: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub serve_url: Option<String>,
@@ -196,7 +196,7 @@ pub struct StorageEndpoint {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ContentServer {
-    pub content_hash: String,
+    pub content_cid: String,
     pub capability: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub serve_url: Option<String>,
@@ -224,7 +224,7 @@ pub struct ContentServerOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FindPublishersInput {
-    pub content_hash: String,
+    pub content_cid: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -239,7 +239,7 @@ pub struct FindPublishersInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FindPublishersOutput {
-    pub content_hash: String,
+    pub content_cid: String,
     pub publishers: Vec<ContentServerOutput>,
 }
 
@@ -308,14 +308,17 @@ mod tests {
     #[test]
     fn find_publishers_input_msgpack_roundtrip() {
         let input = FindPublishersInput {
-            content_hash: "bafkrei123".to_string(),
+            content_cid: "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq".to_string(),
             capability: Some("serve".to_string()),
             prefer_region: None,
             limit: Some(10),
             online_only: Some(true),
         };
         let decoded = roundtrip(&input);
-        assert_eq!(decoded.content_hash, "bafkrei123");
+        assert_eq!(
+            decoded.content_cid,
+            "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"
+        );
         assert_eq!(decoded.limit, Some(10));
     }
 }

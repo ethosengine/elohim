@@ -64,23 +64,20 @@ pub struct CreateContentInput {
     pub blob_cid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_size_bytes: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_hash: Option<String>,
 }
 
 /// Input for content_store::update_content coordinator function.
 ///
 /// Patch semantics: only fields present in the input are applied; absent
 /// fields preserve the previous entry's value. Primary use case is the
-/// post-deploy blobHash update from stageSpaBlobs in Jenkinsfile, which
+/// post-deploy blobCid update from stageSpaBlobs in Jenkinsfile, which
 /// today bypasses Holochain entirely and breaks cross-peer replication
 /// (see 2026-05-26-substrate-rea-replication-fix.md, Task 8).
 ///
 /// Field naming note: this uses `blob_cid` to match the DNA Content entry's
 /// field name (Phase 0 refactor; see content_store_integrity/src/lib.rs).
-/// The HTTP wire surface and storage diesel column use `blob_hash` semantically
-/// meaning the same thing; the service layer (ContentService::update_via_conductor)
-/// translates between the two.
+/// The HTTP wire surface and the storage diesel column use the same name, so the
+/// service layer (ContentService::update_via_conductor) translates nothing.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct UpdateContentInput {
@@ -89,8 +86,6 @@ pub struct UpdateContentInput {
     pub blob_cid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_size_bytes: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -162,8 +157,6 @@ pub struct Content {
     pub blob_cid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_size_bytes: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_hash: Option<String>,
 }
 
 /// Output from content_store::get_content coordinator function.
@@ -950,7 +943,7 @@ pub struct QueryPathExtensionInput {
 pub struct QueueImportInput {
     pub id: String,
     pub batch_type: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub total_items: u32,
     pub schema_version: u32,
 }
@@ -971,7 +964,7 @@ pub struct ImportChunkInput {
 pub struct ImportStatusOutput {
     pub id: String,
     pub batch_type: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub total_items: u32,
     pub status: String,
     pub processed_count: u32,
@@ -1054,7 +1047,6 @@ mod tests {
             metadata_json: "{}".to_string(),
             blob_cid: None,
             content_size_bytes: None,
-            content_hash: None,
         };
 
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
@@ -1068,16 +1060,20 @@ mod tests {
     fn update_content_input_msgpack_roundtrip() {
         let input = UpdateContentInput {
             id: "elohim-host-landing".to_string(),
-            blob_cid: Some("sha256-deadbeefcafe".to_string()),
+            blob_cid: Some(
+                "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq".to_string(),
+            ),
             content_size_bytes: Some(2_048),
-            content_hash: Some("sha256-deadbeefcafe".to_string()),
             ..Default::default()
         };
 
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: UpdateContentInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.id, "elohim-host-landing");
-        assert_eq!(decoded.blob_cid.as_deref(), Some("sha256-deadbeefcafe"));
+        assert_eq!(
+            decoded.blob_cid.as_deref(),
+            Some("bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq")
+        );
         assert_eq!(decoded.content_size_bytes, Some(2_048));
         assert!(decoded.title.is_none());
     }
@@ -1178,7 +1174,6 @@ mod tests {
             validation_status: String::new(),
             blob_cid: None,
             content_size_bytes: None,
-            content_hash: None,
         };
 
         let bytes = rmp_serde::to_vec_named(&content).unwrap();
@@ -1353,7 +1348,7 @@ mod tests {
         let input = QueueImportInput {
             id: "import-001".to_string(),
             batch_type: "content".to_string(),
-            blob_hash: "sha256-abc123".to_string(),
+            blob_cid: "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu".to_string(),
             total_items: 50,
             schema_version: 1,
         };

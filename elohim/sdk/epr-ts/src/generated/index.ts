@@ -12,6 +12,7 @@ export * from './Reach';
 export * from './ReaVerb';
 export * from './ResolutionProvenance';
 export * from './Signature';
+export * from './SignatureEnvelope';
 export * from './Span';
 export * from './WitnessId';
 export * from './WitnessedInteraction';

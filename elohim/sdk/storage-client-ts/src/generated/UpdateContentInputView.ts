@@ -27,24 +27,24 @@ metadata: JsonValue | null,
  */
 tags: Array<string> | null, reach: string | null, 
 /**
- * Content-addressed SHA256 of the bundle/asset this row projects.
+ * Byte CID of the bundle/asset this row projects.
  * Set at deploy-time by Jenkinsfile:stageSpaBlob — see
  * genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
  * Deliberately optional: PATCH callers MAY set this without touching
  * any other field.
  */
-blobHash: string | null, 
+blobCid: string | null, 
 /**
- * Content-addressed SHA256 of the Angular SSR *server* bundle this row
- * projects (wire: `serverBlobHash`). Set at deploy-time by the Jenkins SSR
- * PATCH (mirrors `blob_hash`, the browser bundle). Deliberately optional:
+ * Byte CID of the Angular SSR *server* bundle this row
+ * projects (wire: `serverBlobCid`). Set at deploy-time by the Jenkins SSR
+ * PATCH (mirrors `blob_cid`, the browser bundle). Deliberately optional:
  * PATCH callers MAY set this without touching any other field — and a
- * `serverBlobHash`-only PATCH must NOT clobber `blob_hash` or other fields.
- * Unlike `blob_hash`/`reach`, this is a deploy-projection artifact, not a
+ * `serverBlobCid`-only PATCH must NOT clobber `blob_cid` or other fields.
+ * Unlike `blob_cid`/`reach`, this is a deploy-projection artifact, not a
  * DNA-notarized content-entry field, so it takes the diesel-direct PATCH
  * path (see `patch_needs_conductor`), like `p2p_published_at`.
  */
-serverBlobHash: string | null, 
+serverBlobCid: string | null, 
 /**
  * RFC-3339 timestamp marking when this row was published to the libp2p
  * Kad DHT. Stamping this satisfies the `require_provenance` read gate

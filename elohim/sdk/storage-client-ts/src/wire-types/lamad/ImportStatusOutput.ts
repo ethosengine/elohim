@@ -3,4 +3,4 @@
 /**
  * Output for import status.
  */
-export type ImportStatusOutput = { id: string, batch_type: string, blob_hash: string, total_items: number, status: string, processed_count: number, error_count: number, errors_json: string, created_at: string, started_at: string | null, completed_at: string | null, author_id: string | null, schema_version: number, };
+export type ImportStatusOutput = { id: string, batch_type: string, blob_cid: string, total_items: number, status: string, processed_count: number, error_count: number, errors_json: string, created_at: string, started_at: string | null, completed_at: string | null, author_id: string | null, schema_version: number, };

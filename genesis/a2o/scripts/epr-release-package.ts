@@ -36,7 +36,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { blake3 } from '@noble/hashes/blake3';
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -128,8 +128,8 @@ app-bundle (slice 2 of the elected-content spec, §12.8):
                                 stage over each other
   --app-mount <slug>=<path>     the URL mount an app is served under (e.g. lamad-spa=/lamad/);
                                 recorded on the receipt, never used to address bytes
-  --put-via <storage|doorway>   storage (default): PUT /blob/sha256-<hex> on --peer. doorway: PUT
-                                /admin/seed/blob with X-Blob-Hash and X-API-Key from
+  --put-via <storage|doorway>   storage (default): PUT /blob/<bafkr4i…> on --peer. doorway: PUT
+                                /admin/seed/blob with X-Blob-Cid and X-API-Key from
                                 STORAGE_API_KEY_ADMIN — the one admin route a CI doorway exposes
 
 Channel and reach:
@@ -250,20 +250,22 @@ export function base32Encode(bytes: Uint8Array): string {
   return out;
 }
 
+/** The byte-profile epoch this tool mints under (epoch 0: raw + blake3-256, FastCDC-2020, rs-gf8). */
+export const BYTE_PROFILE_EPOCH = 0;
+
+/** CIDv1 header for the byte profile: version 1, raw codec 0x55, multihash blake3-256 0x1e, 32-byte digest. */
+const BYTE_CID_HEADER = Buffer.from([0x01, 0x55, 0x1e, 0x20]);
+
 /**
- * The canonical blob address: `Cid::new_v1(0x55, Sha2_256(bytes))` rendered as
- * multibase base32-lower — the same `bafkrei…` form `elohim-storage/src/epr_codec.rs`
- * mints. A bare `sha256-<hex>` is the legacy blob-path form and never an address.
+ * The canonical blob address: `Cid::new_v1(0x55, Blake3_256(bytes))` rendered as multibase
+ * base32-lower — the `bafkr4i…` byte CID (59 characters) that `elohim-address` mints and every
+ * reader fully decodes. This tool is a CI packager, not a runtime verifier: it mints the address
+ * it then PUTs and re-checks on the round-trip. Pinned by the kernel vectors in
+ * `__tests__/epr-release-package.spec.ts`. No `sha256-<hex>` or `bafkrei…` spelling is an address.
  */
 export function blobCid(bytes: Buffer): string {
-  const digest = createHash('sha256').update(bytes).digest();
-  const multihash = Buffer.concat([Buffer.from([0x12, 0x20]), digest]);
-  const cidBytes = Buffer.concat([Buffer.from([0x01, 0x55]), multihash]);
-  return `b${base32Encode(cidBytes)}`;
-}
-
-export function sha256Hex(bytes: Buffer): string {
-  return createHash('sha256').update(bytes).digest('hex');
+  const digest = Buffer.from(blake3(bytes, { dkLen: 32 }));
+  return `b${base32Encode(Buffer.concat([BYTE_CID_HEADER, digest]))}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -720,7 +722,8 @@ function validateAppBundleArgs(options: Options): void {
 interface ArtifactEntry {
   blobCid: string;
   bytes: number;
-  sha256: string;
+  /** The byte profile the blobCid was minted under. */
+  profile: { epoch: number };
   filename: string;
   mimeType?: string;
   /** app-bundle only: the app slug this artifact is one half of. */
@@ -760,7 +763,7 @@ interface RoleBinding {
 
 interface ReleaseManifest {
   kind: 'release-manifest';
-  manifestVersion: '1.0';
+  manifestVersion: '2.0';
   channelId: string;
   artifactClass: ArtifactClass;
   artifacts: ArtifactEntry[];
@@ -1171,17 +1174,17 @@ async function putAndVerify(
 ): Promise<BlobResult> {
   // A storage peer takes the blob at its own address; a CI doorway exposes the
   // admin seed route instead (the one route stage-spa-blob.sh has always used),
-  // which forwards to the storage peer behind it and checks X-Blob-Hash.
+  // which forwards to the storage peer behind it and checks X-Blob-Cid.
   const viaDoorway = options.putVia === 'doorway';
   const putPath = viaDoorway
     ? `${options.peer}/admin/seed/blob`
-    : `${options.peer}/blob/sha256-${entry.sha256}`;
+    : `${options.peer}/blob/${entry.blobCid}`;
   const headers: Record<string, string> = {
     'content-type': entry.mimeType ?? 'application/octet-stream',
     'x-agent-id': options.agentId,
   };
   if (viaDoorway) {
-    headers['x-blob-hash'] = `sha256-${entry.sha256}`;
+    headers['x-blob-cid'] = entry.blobCid;
     headers['x-api-key'] = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
   }
   const putResponse = await reach(putPath, {
@@ -1196,9 +1199,17 @@ async function putAndVerify(
       [(await putResponse.text()).slice(0, 400)]
     );
   }
-  const putBody = (await putResponse.json()) as { blobHash?: unknown };
-  const storedAs =
-    typeof putBody.blobHash === 'string' ? putBody.blobHash : `sha256-${entry.sha256}`;
+  // The server derives the address from the bytes it received; it must be the one this tool
+  // minted. Any other answer (a legacy spelling, a different CID) is a typed failure, never a
+  // silent substitution.
+  const putBody = (await putResponse.json()) as { blobCid?: unknown };
+  if (putBody.blobCid !== entry.blobCid) {
+    throw new PackagingFailure(`blob PUT for ${path.basename(file)} answered a different address`, [
+      `expected ${entry.blobCid}`,
+      `observed ${String(putBody.blobCid)}`,
+    ]);
+  }
+  const storedAs = putBody.blobCid;
 
   // The interface contract: the bytes must be fetchable by address from the peer
   // they were PUT to BEFORE this tool exits 0. Nothing downstream can recover a
@@ -1212,11 +1223,11 @@ async function putAndVerify(
     );
   }
   const fetched = Buffer.from(await getResponse.arrayBuffer());
-  const fetchedSha = sha256Hex(fetched);
-  if (fetchedSha !== entry.sha256) {
+  const fetchedCid = blobCid(fetched);
+  if (fetchedCid !== entry.blobCid) {
     throw new PackagingFailure(
       `blob round-trip for ${path.basename(file)} returned different bytes`,
-      [`expected sha256 ${entry.sha256}`, `observed sha256 ${fetchedSha}`]
+      [`expected ${entry.blobCid}`, `observed ${fetchedCid}`]
     );
   }
   return { entry, putStatus: putResponse.status, storedAs, roundTripBytes: fetched.length };
@@ -1234,7 +1245,7 @@ async function packageArtifact(
   const entry: ArtifactEntry = {
     blobCid: blobCid(bytes),
     bytes: bytes.length,
-    sha256: sha256Hex(bytes),
+    profile: { epoch: BYTE_PROFILE_EPOCH },
     // Both apps' browser halves are `browser.zip` on disk; the adopting peer
     // stages artifacts by filename, so an app half is named for its pair.
     filename: half ? `${half.app}-${half.kind}${path.extname(file)}` : path.basename(file),
@@ -1727,7 +1738,7 @@ async function assembleManifest(options: Options): Promise<{
 
   const manifest: ReleaseManifest = {
     kind: 'release-manifest',
-    manifestVersion: '1.0',
+    manifestVersion: '2.0',
     channelId,
     artifactClass,
     artifacts: blobs.map(blob => blob.entry),
@@ -1821,7 +1832,7 @@ async function runPackage(options: Options): Promise<void> {
     }
     console.error(
       `round-trip ${blob.entry.filename}: PUT ${blob.putStatus} as ${blob.storedAs}; ` +
-        `GET returned ${blob.roundTripBytes} bytes matching sha256 ${blob.entry.sha256.slice(0, 12)}…; cid ${blob.entry.blobCid}`
+        `GET returned ${blob.roundTripBytes} bytes matching cid ${blob.entry.blobCid}`
     );
   }
   console.error(

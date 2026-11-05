@@ -300,7 +300,7 @@ async function main() {
       trust: 'unconfirmed',
       tags: [],
       description: null,
-      blobHash: null,
+      blobCid: null,
       dhtAnchorHash: null,
     }),
     'ContentView accepts null for nullable fields',

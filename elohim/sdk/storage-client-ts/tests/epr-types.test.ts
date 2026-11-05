@@ -29,6 +29,7 @@ const EXAMPLE_CID = 'bafyreib2rxk3rybk3aobmv5cjuql3bm2twh4vsfdxnu5ybhq5rnaxrfnqe
 const EXAMPLE_CID2 = 'bafyreib2rxk3rybk3aobmv5cjuql3bm2twh4vsfdxnu5ybhq5rnaxrfnqf';
 const EXAMPLE_RFC3339 = '2026-04-21T12:00:00Z';
 const EXAMPLE_SIG_HEX = 'a'.repeat(128); // 64 bytes as 128 hex chars
+const EXAMPLE_KEY_HEX = `ed01${'b'.repeat(64)}`; // Multikey: varint(0xed) ++ 32 raw bytes
 
 const coupling: EprCouplingView = {
   knowledge: EXAMPLE_CID,
@@ -38,9 +39,7 @@ const coupling: EprCouplingView = {
 
 const signature: EprSignatureView = {
   signer: EXAMPLE_CID,
-  algorithm: 'ed25519',
-  key: 'ed01' + '0b'.repeat(32), // multikey: varint(0xed) || 32-byte key
-  signature: EXAMPLE_SIG_HEX,
+  envelope: { scheme: 0, key: EXAMPLE_KEY_HEX, sig: EXAMPLE_SIG_HEX },
 };
 
 const envelope: EprEnvelopeView = {
@@ -84,12 +83,15 @@ describe('EprSignatureView', () => {
     const s: EprSignatureView = signature;
     // These field accesses would be TypeScript errors if the field names were wrong
     expect(typeof s.signer).toBe('string');
-    expect(typeof s.algorithm).toBe('string');
-    expect(typeof s.key).toBe('string');
-    expect(typeof s.signature).toBe('string');
+    expect(typeof s.envelope.scheme).toBe('number');
+    expect(typeof s.envelope.key).toBe('string');
+    expect(typeof s.envelope.sig).toBe('string');
     // Verify snake_case field does NOT exist at runtime
     expect((s as unknown as Record<string, unknown>)['signer_cid']).toBeUndefined();
     expect((s as unknown as Record<string, unknown>)['proof_algorithm']).toBeUndefined();
+    // The retired flat fields are gone: scheme/key/sig live in the envelope.
+    expect((s as unknown as Record<string, unknown>)['algorithm']).toBeUndefined();
+    expect((s as unknown as Record<string, unknown>)['signature']).toBeUndefined();
   });
 });
 
@@ -119,7 +121,7 @@ describe('EprEnvelopeView', () => {
 
   it('proof is nested (not flattened)', () => {
     expect(typeof envelope.proof).toBe('object');
-    expect(envelope.proof.algorithm).toBe('ed25519');
+    expect(envelope.proof.envelope.scheme).toBe(0);
   });
 });
 

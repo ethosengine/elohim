@@ -35,7 +35,7 @@
     },
     "method": {
       "type": "string",
-      "pattern": "^bafkrei[a-z2-7]{52}$",
+      "pattern": "^bafkr4i[a-z2-7]{52}$",
       "description": "The ranking method in force (MethodId, raw codec)."
     },
     "parameters": {

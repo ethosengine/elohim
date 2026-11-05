@@ -22,8 +22,8 @@
     },
     "method": {
       "type": "string",
-      "pattern": "^bafkrei[a-z2-7]{52}$",
-      "description": "The ranking method's id (MethodId): a CIDv1 with the raw codec (0x55) over sha2-256 of the UTF-8 method name `<namespace>:<area>:<name>@<version>`, e.g. elohim:placement:xor-distance@1; the `elohim` namespace is reserved for built-ins, and a method whose behaviour changes takes a new version and so a new id. Raw codec, so the string begins `bafkrei`."
+      "pattern": "^bafkr4i[a-z2-7]{52}$",
+      "description": "The ranking method's id (MethodId): a CIDv1 with the raw codec (0x55) over BLAKE3-256 (a byte CID, bafkr4i…) of the UTF-8 method name `<namespace>:<area>:<name>@<version>`, e.g. elohim:placement:xor-distance@1; the `elohim` namespace is reserved for built-ins, and a method whose behaviour changes takes a new version and so a new id. Raw codec, so the string begins `bafkr4i`."
     },
     "weights": {
       "type": "object",

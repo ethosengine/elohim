@@ -1,18 +1,36 @@
 //! infrastructure view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::epr::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::imagodei::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::lamad::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::qahal::*;
 use crate::shared::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::shefa::*;
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use serde_json::Value;
 use ts_rs::TS;
 
@@ -1418,7 +1436,7 @@ pub struct HouseholdResilienceDetails {
 pub struct PlacementGapView {
     pub id: String,
     pub content_id: String,
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub requested_steward_count: i32,
     pub achieved_steward_count: i32,
     pub contract_coverage: f32,
@@ -2230,35 +2248,96 @@ pub struct PeerTransportManifestView {
     pub last_observed: i64,
 }
 
-/// Response view for `PUT /blob/{hash}`.
+/// Response view for `PUT /blob/{cid}`.
 ///
-/// Wire-compatible superset of the legacy `ShardManifest` JSON (all pre-existing
-/// fields retained). Adds `blake3_hash` as an optional field populated by the
-/// iroh dual-write path. Clients on the libp2p-only path receive `blake3_hash: null`.
+/// Declares the byte CID the bytes were stored under and the full byte profile
+/// (chunker and erasure parameters) that produced the stored representation, so a
+/// reader never consults the server's current thresholds. `stripes` is empty when
+/// `profile.erasure.id` is `"none"`.
 ///
-/// Source of truth: `BlobStore` filesystem (SHA256-keyed, Category C operational)
-/// and `IrohBlobStore` filesystem (BLAKE3-keyed, Category C operational). This
-/// view is a projection of both for the single PUT response.
+/// Source of truth: the `BlobStore` filesystem (byte-CID-keyed, Category C
+/// operational) and the DNA-notarized `ShardManifest`. This view is a projection
+/// of both for the single PUT response.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
 pub struct PutBlobResponseView {
-    pub blob_hash: String,
-    pub total_size: u64,
+    /// Byte CID (raw 0x55 + blake3-256 0x1e) of the stored bytes.
+    pub blob_cid: String,
+    pub byte_len: u64,
     pub mime_type: String,
-    pub encoding: String,
-    pub data_shards: u8,
-    pub total_shards: u8,
-    pub shard_size: u64,
-    pub shard_hashes: Vec<String>,
+    pub profile: BlobProfileView,
+    /// Content-defined chunks in order; empty for an empty blob.
+    pub chunks: Vec<BlobChunkRefView>,
+    /// Erasure stripes in order; empty when `profile.erasure.id == "none"`.
+    pub stripes: Vec<BlobStripeView>,
     pub reach: String,
     pub author_id: Option<String>,
     pub created_at: String,
     pub verified_at: Option<String>,
-    /// BLAKE3 hash the same bytes were written to in `IrohBlobStore`.
-    /// `None` (serialises as `null`) when the iroh side is not configured or
-    /// the dual-write failed — the SHA256 write still succeeded in that case.
-    pub blake3_hash: Option<String>,
+}
+
+/// The byte profile a blob representation was produced under.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobProfileView {
+    /// Byte-profile epoch; a reader that does not know it HELDs the blob.
+    pub epoch: u16,
+    pub chunker: BlobChunkerView,
+    pub erasure: BlobErasureView,
+}
+
+/// Declared chunker parameters (e.g. id `fastcdc-2020`).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobChunkerView {
+    pub id: String,
+    pub min: u32,
+    pub avg: u32,
+    pub max: u32,
+    pub level: u8,
+}
+
+/// Declared erasure code (`"none"` or e.g. `rs-gf8-0x11d-v1`).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobErasureView {
+    pub id: String,
+    pub data: u8,
+    pub parity: u8,
+}
+
+/// One chunk of a blob: its byte CID and length.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobChunkRefView {
+    pub cid: String,
+    pub len: u32,
+}
+
+/// One erasure stripe (at most 16 MiB of original bytes) and its shards.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobStripeView {
+    pub index: u32,
+    /// Original (unpadded) bytes this stripe covers.
+    pub byte_len: u64,
+    pub shards: Vec<BlobShardRefView>,
+}
+
+/// One shard of a stripe: byte CID, length and shard index within the stripe.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../../elohim/sdk/storage-client-ts/src/generated/")]
+pub struct BlobShardRefView {
+    pub cid: String,
+    pub len: u32,
+    pub index: u8,
 }
 
 /// HTTP view of a single row from the `observations` table.

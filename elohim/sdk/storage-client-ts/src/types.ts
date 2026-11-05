@@ -1,3 +1,5 @@
+import type { PutBlobResponseView } from "./generated/PutBlobResponseView.js";
+
 /**
  * Storage client configuration
  */
@@ -109,28 +111,10 @@ export interface BlobResult {
 }
 
 /**
- * Blob manifest (for sharded blobs)
+ * Blob manifest: the `PUT /blob/{cid}` response shape (camelCase, byte CID, declared byte
+ * profile, chunks and erasure stripes). Generated from the Rust view; never hand-edited.
  */
-export interface BlobManifest {
-  /** Blob hash */
-  blob_hash: string;
-  /** Blob CID */
-  blob_cid?: string;
-  /** MIME type */
-  mime_type: string;
-  /** Total size in bytes */
-  total_size: number;
-  /** Shard size */
-  shard_size: number;
-  /** Encoding method */
-  encoding: string;
-  /** List of shard hashes */
-  shard_hashes: string[];
-  /** Data parity shards */
-  data_parity: [number, number];
-  /** Reach level */
-  reach: string;
-}
+export type BlobManifest = PutBlobResponseView;
 
 /**
  * Options for list documents

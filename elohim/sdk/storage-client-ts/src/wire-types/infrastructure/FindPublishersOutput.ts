@@ -4,4 +4,4 @@ import type { ContentServerOutput } from "./ContentServerOutput";
 /**
  * Output from infrastructure::find_publishers.
  */
-export type FindPublishersOutput = { content_hash: string, publishers: Array<ContentServerOutput>, };
+export type FindPublishersOutput = { content_cid: string, publishers: Array<ContentServerOutput>, };

@@ -3,4 +3,4 @@
 /**
  * Input for queuing an import batch.
  */
-export type QueueImportInput = { id: string, batch_type: string, blob_hash: string, total_items: number, schema_version: number, };
+export type QueueImportInput = { id: string, batch_type: string, blob_cid: string, total_items: number, schema_version: number, };

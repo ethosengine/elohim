@@ -3,4 +3,4 @@
 /**
  * Input for infrastructure::find_publishers.
  */
-export type FindPublishersInput = { content_hash: string, capability: string | null, prefer_region: string | null, limit: number | null, online_only: boolean | null, };
+export type FindPublishersInput = { content_cid: string, capability: string | null, prefer_region: string | null, limit: number | null, online_only: boolean | null, };

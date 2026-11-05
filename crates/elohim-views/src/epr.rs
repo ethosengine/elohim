@@ -33,7 +33,9 @@ pub struct EprCouplingView {
     pub governance: Option<String>,
 }
 
-/// Detached Ed25519 proof on the EPR canonical bytes.
+/// Detached proof on the EPR canonical bytes: the signer plus a scheme-tagged
+/// envelope. A reader that does not know `scheme` HELDs the proof (neither valid
+/// nor invalid), so `scheme` is a plain `u16` here and never an enum.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(
@@ -43,13 +45,23 @@ pub struct EprCouplingView {
 pub struct EprSignatureView {
     /// CIDv1 base32 of the signer's Agent EPR.
     pub signer: String,
-    /// `ed25519` for scheme 0; `scheme-<code>` for a scheme this build holds.
-    pub algorithm: String,
-    /// Hex-encoded canonical multikey bytes of the signing key. The signing
-    /// transcript commits to the key, so a verifier needs it with the signature.
+    pub envelope: EprSignatureEnvelopeView,
+}
+
+/// The scheme-tagged part of a signature: `{ scheme, key, sig }`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(
+    export,
+    export_to = "../../../elohim/sdk/storage-client-ts/src/generated/"
+)]
+pub struct EprSignatureEnvelopeView {
+    /// Signature scheme code; 0 = Ed25519. Unknown codes are HELD by readers.
+    pub scheme: u16,
+    /// Hex-encoded Multikey bytes (minimal-varint multicodec followed by the raw key).
     pub key: String,
-    /// Hex-encoded signature bytes (128 hex chars for ed25519).
-    pub signature: String,
+    /// Hex-encoded signature bytes (scheme 0: 64 bytes).
+    pub sig: String,
 }
 
 /// Wire-string projection of an EPR Envelope for HTTP consumers.

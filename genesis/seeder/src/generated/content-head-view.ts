@@ -36,7 +36,7 @@ export interface ContentHeadView {
   /**
    * The serving blob hash of the resolved row (browser bundle), if any.
    */
-  blobHash?: string | null;
+  blobCid?: string | null;
   /**
    * When the resolved row was last written (mirrors ContentView.updatedAt).
    */
@@ -46,9 +46,9 @@ export interface ContentHeadView {
    */
   stagingCandidate?: string | null;
   /**
-   * The blob content address named by stagingCandidate when this peer can resolve that exact declaration through its content projection and holds the bytes locally. Absent/null never authorizes fallback to the converged blobHash.
+   * The blob content address named by stagingCandidate when this peer can resolve that exact declaration through its content projection and holds the bytes locally. Absent/null never authorizes fallback to the converged blobCid.
    */
-  stagingCandidateBlobHash?: string | null;
+  stagingCandidateBlobCid?: string | null;
   /**
    * Epistemic status of the staging-candidate read. staged names an authoritative declaration, none is an authoritative withdrawal/absence, and unavailable means the conductor ask could not be put. Missing is an older-peer response and is not authoritative absence.
    */

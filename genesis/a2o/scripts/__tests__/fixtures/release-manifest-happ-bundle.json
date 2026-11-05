@@ -1,13 +1,15 @@
 {
   "kind": "release-manifest",
-  "manifestVersion": "1.0",
+  "manifestVersion": "2.0",
   "channelId": "runtime:happ:elohim:commons",
   "artifactClass": "happ-bundle",
   "artifacts": [
     {
-      "blobCid": "bafkreie7bmyi6srdkummlem5rmxh4nqfg4suwdxkkppwa5yvvyy2dcrvie",
+      "blobCid": "bafkr4iamdi7fqu7wbpmhc565t6wnzpeeakiyiilhhlmdr7jz5wo6grj6cy",
       "bytes": 10897977,
-      "sha256": "9f0b308f4a235518c5919d8b2e7e360537254b0eea53df607715ae31a18a3541",
+      "profile": {
+        "epoch": 0
+      },
       "filename": "elohim.happ",
       "mimeType": "application/octet-stream"
     }

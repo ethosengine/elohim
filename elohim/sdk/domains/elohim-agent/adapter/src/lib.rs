@@ -282,6 +282,11 @@ fn collect_compose_kind(
             }
 
             let proj_bytes = read_bytes(&mirror)?;
+            // CITATION CLASS, unchanged by the address crossing: a projection CID names a
+            // document by its sha2-256 fingerprint (`compute_raw`, `bafkrei…`) or a composed
+            // record by dag-cbor + sha2-256 (`compute`, `bafyrei…`). It is never a byte CID
+            // (`bafkr4i…`, raw + blake3-256), because nothing here addresses payload bytes for
+            // storage or transport. Pinned by `projection_cids_stay_cite_profile`.
             // Verbatim-passthrough projections ARE raw document bytes, so they take
             // the raw codec (bafkrei…): the node's own CID is then `compute_raw` over
             // its bytes and — when projection == source doc — equals `source_doc_cid`.
@@ -809,6 +814,24 @@ mod tests {
         assert_eq!(graph.nodes.len(), 1, "package node only");
         assert!(graph.edges.is_empty(), "no projections => no edges");
         assert!(graph.validate().is_ok());
+    }
+
+    /// Projection CIDs are citation-class: raw + sha2-256 (`bafkrei…`) for verbatim
+    /// passthrough, dag-cbor + sha2-256 (`bafyrei…`) for composed records. The byte-profile
+    /// crossing (raw + blake3-256, `bafkr4i…`) must not reach them.
+    #[test]
+    fn projection_cids_stay_cite_profile() {
+        let raw = BlobCid::compute_raw(b"hello world").to_string();
+        assert_eq!(
+            raw, "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+            "verbatim projection fingerprint is the pinned raw+sha2 citation CID"
+        );
+        assert!(raw.starts_with("bafkrei") && !raw.starts_with("bafkr4i"));
+        let record = BlobCid::compute(b"hello world").to_string();
+        assert!(
+            record.starts_with("bafyrei"),
+            "composed projection CIDs are dag-cbor + sha2-256 records, got {record}"
+        );
     }
 
     #[test]

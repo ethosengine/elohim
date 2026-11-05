@@ -28,9 +28,6 @@ const ALLOWED: Record<string, string> = {
   'elohim/sdk/epr-ts/src/address.ts': 'the verifier itself',
   'elohim/sdk/epr-ts/src/cid.ts':
     'computeCid names test and envelope bytes; verifyCid delegates to verifyAddress',
-  'elohim/sdk/epr-ts/src/blob-hash.ts':
-    'the reader: three answers about a row-declared blob hash (match | mismatch | unverifiable), ' +
-    'over forms verifyAddress refuses; a reporting question, not admission',
   'elohim/eprfs/eprfs-ts/src/tree.ts': 'cidOf mints a node CID for the walk; it checks nothing',
   'app/elohim-app/src/app/elohim/utils/epr-codec.ts': 'encodeEprHead mints a head CID; it checks nothing',
   'app/elohim-app/src/app/shefa/services/duplicate-detection.service.ts':

@@ -74,10 +74,19 @@ export interface EprEnvelopeView {
      * CIDv1 base32 of Agent EPR
      */
     signer: string;
-    algorithm: 'ed25519';
-    /**
-     * Hex-encoded 64 bytes
-     */
-    signature: string;
+    envelope: {
+      /**
+       * Signature scheme code (u16). 0 = Ed25519. Unknown values are HELD by readers, never malformed.
+       */
+      scheme: number;
+      /**
+       * Hex-encoded Multikey bytes (minimal-varint multicodec ++ raw key; scheme 0: ed01 + 32 bytes)
+       */
+      key: string;
+      /**
+       * Hex-encoded signature bytes (scheme 0: 64 bytes)
+       */
+      sig: string;
+    };
   };
 }

@@ -116,11 +116,7 @@ export interface CreateContentInput {
    */
   contentBody?: string;
   /**
-   * SHA-256 hash of associated blob
-   */
-  blobHash?: string;
-  /**
-   * CIDv1 content address of associated blob
+   * Byte CID (raw 0x55 + blake3-256 0x1e) of the associated blob
    */
   blobCid?: string;
   /**

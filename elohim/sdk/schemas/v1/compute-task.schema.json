@@ -32,11 +32,8 @@
       "properties": {
         "cid": {
           "type": "string",
-          "minLength": 1
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^bafkr4i[a-z2-7]{52}$",
+          "description": "Byte CID (raw 0x55 + blake3-256 0x1e) of the artifact bytes; readers fully decode (elohim-address)."
         },
         "bytes": {
           "type": "integer",
@@ -49,16 +46,13 @@
             "additionalProperties": false,
             "required": [
               "cid",
-              "sha256",
               "bytes"
             ],
             "properties": {
               "cid": {
-                "type": "string"
-              },
-              "sha256": {
                 "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
+                "pattern": "^bafkr4i[a-z2-7]{52}$",
+                "description": "Byte CID (raw 0x55 + blake3-256 0x1e) of the artifact bytes; readers fully decode (elohim-address)."
               },
               "bytes": {
                 "type": "integer",
@@ -71,7 +65,6 @@
       },
       "required": [
         "cid",
-        "sha256",
         "bytes"
       ]
     },
@@ -81,11 +74,8 @@
       "properties": {
         "cid": {
           "type": "string",
-          "minLength": 1
-        },
-        "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^bafkr4i[a-z2-7]{52}$",
+          "description": "Byte CID (raw 0x55 + blake3-256 0x1e) of the artifact bytes; readers fully decode (elohim-address)."
         },
         "bytes": {
           "type": "integer",
@@ -98,16 +88,13 @@
             "additionalProperties": false,
             "required": [
               "cid",
-              "sha256",
               "bytes"
             ],
             "properties": {
               "cid": {
-                "type": "string"
-              },
-              "sha256": {
                 "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
+                "pattern": "^bafkr4i[a-z2-7]{52}$",
+                "description": "Byte CID (raw 0x55 + blake3-256 0x1e) of the artifact bytes; readers fully decode (elohim-address)."
               },
               "bytes": {
                 "type": "integer",
@@ -120,7 +107,6 @@
       },
       "required": [
         "cid",
-        "sha256",
         "bytes"
       ]
     },

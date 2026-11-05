@@ -64,6 +64,11 @@ const ARTIFACT_CLASS_COORDINATOR_BUNDLE = 'coordinator-bundle';
 
 type JsonObject = Record<string, unknown>;
 
+/** Kernel vectors (plan section 2.1; re-derived with @noble/hashes blake3): byte CIDs of fixed inputs. */
+const KERNEL_HELLO_WORLD_CID = 'bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq';
+const KERNEL_ABC_CID = 'bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu';
+const KERNEL_EMPTY_CID = 'bafkr4ifpcne3t5pzugtkaqcn5i3nzskjtpfslsnnyejlpte2spfoihzsmi';
+
 function loadSchema(): JsonObject {
   return JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')) as JsonObject;
 }
@@ -82,13 +87,15 @@ function validateManifest(manifest: unknown): { ok: boolean; errors: string[] } 
 function baseManifest(overrides: JsonObject = {}): JsonObject {
   return {
     kind: 'release-manifest',
+    manifestVersion: '2.0',
     channelId: 'runtime:happ:elohim:commons',
     artifactClass: ARTIFACT_CLASS_COORDINATOR_BUNDLE,
     artifacts: [
       {
-        blobCid: 'bafkrei' + 'a'.repeat(52),
-        bytes: 100,
-        sha256: 'a'.repeat(64),
+        // Kernel vector: blake3("hello world") as a byte CID.
+        blobCid: KERNEL_HELLO_WORLD_CID,
+        bytes: 11,
+        profile: { epoch: 0 },
         filename: 'artifact.wasm',
       },
     ],
@@ -906,5 +913,56 @@ void describe('epr-release-package.ts CLI — app-bundle', () => {
       () => runPackager([...appBundleArgs(), FLAG_APPLIES_TO, appliesToLiteral()]),
       64
     );
+  });
+});
+
+void describe('epr-release-package.ts — byte-profile addressing (re-genesis 1)', () => {
+  /** Package `content` as a coordinator-bundle through the real CLI (--no-put, first release). */
+  function packageBytes(content: string): JsonObject {
+    const file = tempArtifact();
+    writeFileSync(file, content);
+    const stdout = runPackager([
+      FLAG_ARTIFACT,
+      file,
+      FLAG_ARTIFACT_CLASS,
+      ARTIFACT_CLASS_COORDINATOR_BUNDLE,
+      FLAG_APPLIES_TO,
+      appliesToLiteral(),
+      FLAG_SOAK_SECS,
+      '900',
+      FLAG_ATTESTATION_THRESHOLD,
+      '2',
+      '--no-put',
+      '--first-release',
+      '--compact',
+      '--strict',
+    ]);
+    return JSON.parse(stdout) as JsonObject;
+  }
+
+  void it('mints the kernel byte CIDs (raw 0x55 + blake3-256 0x1e, bafkr4i, 59 chars) with no sha256', () => {
+    for (const [input, expected] of [
+      ['hello world', KERNEL_HELLO_WORLD_CID],
+      ['abc', KERNEL_ABC_CID],
+      ['', KERNEL_EMPTY_CID],
+    ] as const) {
+      const manifest = packageBytes(input);
+      assert.equal(manifest['manifestVersion'], '2.0');
+      const artifact = (manifest['artifacts'] as JsonObject[])[0];
+      assert.equal(artifact['blobCid'], expected, `blobCid for ${JSON.stringify(input)}`);
+      assert.equal((artifact['blobCid'] as string).length, 59);
+      assert.equal(artifact['bytes'], input.length);
+      assert.deepEqual(artifact['profile'], { epoch: 0 });
+      assert.equal('sha256' in artifact, false, 'the manifest carries no sha256');
+      assert.equal(validateManifest(manifest).ok, true);
+    }
+  });
+
+  void it('schema refuses a 1.0 manifest and an artifact without a profile', () => {
+    const legacy = baseManifest({ manifestVersion: '1.0' });
+    assert.equal(validateManifest(legacy).ok, false);
+    const noProfile = baseManifest();
+    delete (noProfile['artifacts'] as JsonObject[])[0]['profile'];
+    assert.equal(validateManifest(noProfile).ok, false);
   });
 });

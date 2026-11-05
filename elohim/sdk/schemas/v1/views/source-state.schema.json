@@ -10,7 +10,7 @@
     "head": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
     "clean": {"type": "boolean"},
     "status": {"type": "string"},
-    "closureCid": {"type": "string", "pattern": "^bafkrei[a-z2-7]{52}$", "description": "Raw CIDv1 of sorted UTF-8 path, TAB, Git tree object id, LF lines."},
+    "closureCid": {"type": "string", "pattern": "^bafkr4i[a-z2-7]{52}$", "description": "Raw CIDv1 of sorted UTF-8 path, TAB, Git tree object id, LF lines."},
     "closure": {
       "type": "array", "minItems": 1,
       "description": "Sorted repository-relative paths and committed tree identities; a gitlink uses its pinned commit object id. A dot path means the complete checkout.",

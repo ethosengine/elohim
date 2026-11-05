@@ -10,14 +10,18 @@ import type { JsonValue } from "./JsonValue";
  * tags field belongs to `ContentView`; this type stays as the name its one write surface
  * (`PATCH /db/content/{id}`) and the TS consumers already use, and the wire shape is unchanged.
  */
-export type ContentWithTagsView = { id: string, hAppId: string, title: string, description: string | null, contentType: string, contentFormat: string, blobHash: string | null, 
+export type ContentWithTagsView = { id: string, hAppId: string, title: string, description: string | null, contentType: string, contentFormat: string, 
 /**
- * Content-addressed hash of the Angular SSR *server* bundle (wire:
- * `serverBlobHash`). Mirrors `blob_hash` (the *browser* bundle) so the one
+ * Byte CID of the *browser* bundle (raw 0x55 + blake3-256 0x1e).
+ */
+blobCid: string | null, 
+/**
+ * Byte CID of the Angular SSR *server* bundle (wire:
+ * `serverBlobCid`). Mirrors `blob_cid` (the *browser* bundle) so the one
  * EPR node carries its full SSR nature. `None` ⇒ SSR not materialized (CSR
  * fallback). Deploy-PATCH populated; absent is the normal pre-deploy state.
  */
-serverBlobHash: string | null, blobCid: string | null, contentSizeBytes: number | null, 
+serverBlobCid: string | null, contentSizeBytes: number | null, 
 /**
  * Parsed metadata object (was metadata_json string in storage)
  */

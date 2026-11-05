@@ -1,12 +1,21 @@
 //! lamad view types — migrated from elohim-storage/src/views.rs (VIEWS.T2).
 
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::infrastructure::*;
 use crate::shared::*;
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use crate::shefa::*;
 use serde::{Deserialize, Serialize};
-#[allow(unused_imports)]
+#[allow(
+    unused_imports,
+    reason = "each migrated view module glob-imports its sibling modules so moved types resolve; not every module uses every sibling"
+)]
 use serde_json::Value;
 use ts_rs::TS;
 
@@ -20,13 +29,13 @@ pub struct ContentView {
     pub description: Option<String>,
     pub content_type: String,
     pub content_format: String,
-    pub blob_hash: Option<String>,
-    /// Content-addressed hash of the Angular SSR *server* bundle (wire:
-    /// `serverBlobHash`). Mirrors `blob_hash` (the *browser* bundle) so the one
+    /// Byte CID of the *browser* bundle (raw 0x55 + blake3-256 0x1e).
+    pub blob_cid: Option<String>,
+    /// Byte CID of the Angular SSR *server* bundle (wire:
+    /// `serverBlobCid`). Mirrors `blob_cid` (the *browser* bundle) so the one
     /// EPR node carries its full SSR nature. `None` ⇒ SSR not materialized (CSR
     /// fallback). Deploy-PATCH populated; absent is the normal pre-deploy state.
-    pub server_blob_hash: Option<String>,
-    pub blob_cid: Option<String>,
+    pub server_blob_cid: Option<String>,
     pub content_size_bytes: Option<i32>,
     /// Parsed metadata object (was metadata_json string in storage)
     pub metadata: Option<JsonVal>,
@@ -131,8 +140,8 @@ pub struct ContentHeadView {
     /// check is the head record's own `blob_cid` (seam 6, pointer audit).
     #[ts(optional)]
     pub anchor_matches_head: Option<bool>,
-    /// The serving blob hash of the resolved row, if any (browser bundle).
-    pub blob_hash: Option<String>,
+    /// The serving byte CID of the resolved row, if any (browser bundle).
+    pub blob_cid: Option<String>,
     /// When the resolved row was last written (mirrors `ContentView.updatedAt`).
     pub updated_at: Option<String>,
     /// The STAGING canonical-head declaration standing BENEATH the earned
@@ -152,9 +161,9 @@ pub struct ContentHeadView {
     pub staging_candidate: Option<String>,
     /// Blob content address named by `staging_candidate`, when this peer's projection can
     /// resolve that exact declaration and the bytes are locally present.
-    /// Absence never falls back to `blob_hash`.
+    /// Absence never falls back to `blob_cid`.
     #[ts(optional)]
-    pub staging_candidate_blob_hash: Option<String>,
+    pub staging_candidate_blob_cid: Option<String>,
     /// Whether the conductor authoritatively reported a staged declaration,
     /// authoritatively reported none, or could not answer the ask. Consumers
     /// must only interpret `None` as withdrawal when this says `none`.
@@ -358,8 +367,6 @@ pub struct CreateContentInputView {
     #[serde(default)]
     pub content_body: Option<String>,
     #[serde(default)]
-    pub blob_hash: Option<String>,
-    #[serde(default)]
     pub blob_cid: Option<String>,
     #[serde(default)]
     pub content_size_bytes: Option<i64>,
@@ -416,23 +423,23 @@ pub struct UpdateContentInputView {
     pub tags: Option<Vec<String>>,
     #[serde(default)]
     pub reach: Option<String>,
-    /// Content-addressed SHA256 of the bundle/asset this row projects.
+    /// Byte CID of the bundle/asset this row projects.
     /// Set at deploy-time by Jenkinsfile:stageSpaBlob — see
     /// genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md.
     /// Deliberately optional: PATCH callers MAY set this without touching
     /// any other field.
     #[serde(default)]
-    pub blob_hash: Option<String>,
-    /// Content-addressed SHA256 of the Angular SSR *server* bundle this row
-    /// projects (wire: `serverBlobHash`). Set at deploy-time by the Jenkins SSR
-    /// PATCH (mirrors `blob_hash`, the browser bundle). Deliberately optional:
+    pub blob_cid: Option<String>,
+    /// Byte CID of the Angular SSR *server* bundle this row
+    /// projects (wire: `serverBlobCid`). Set at deploy-time by the Jenkins SSR
+    /// PATCH (mirrors `blob_cid`, the browser bundle). Deliberately optional:
     /// PATCH callers MAY set this without touching any other field — and a
-    /// `serverBlobHash`-only PATCH must NOT clobber `blob_hash` or other fields.
-    /// Unlike `blob_hash`/`reach`, this is a deploy-projection artifact, not a
+    /// `serverBlobCid`-only PATCH must NOT clobber `blob_cid` or other fields.
+    /// Unlike `blob_cid`/`reach`, this is a deploy-projection artifact, not a
     /// DNA-notarized content-entry field, so it takes the diesel-direct PATCH
     /// path (see `patch_needs_conductor`), like `p2p_published_at`.
     #[serde(default)]
-    pub server_blob_hash: Option<String>,
+    pub server_blob_cid: Option<String>,
     /// RFC-3339 timestamp marking when this row was published to the libp2p
     /// Kad DHT. Stamping this satisfies the `require_provenance` read gate
     /// (content_diesel: `dht_anchor_hash IS NOT NULL OR p2p_published_at IS

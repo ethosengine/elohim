@@ -66,9 +66,9 @@ trust: string,
  */
 anchorMatchesHead?: boolean, 
 /**
- * The serving blob hash of the resolved row, if any (browser bundle).
+ * The serving byte CID of the resolved row, if any (browser bundle).
  */
-blobHash: string | null, 
+blobCid: string | null, 
 /**
  * When the resolved row was last written (mirrors `ContentView.updatedAt`).
  */
@@ -92,9 +92,9 @@ stagingCandidate?: string,
 /**
  * Blob content address named by `staging_candidate`, when this peer's projection can
  * resolve that exact declaration and the bytes are locally present.
- * Absence never falls back to `blob_hash`.
+ * Absence never falls back to `blob_cid`.
  */
-stagingCandidateBlobHash?: string, 
+stagingCandidateBlobCid?: string, 
 /**
  * Whether the conductor authoritatively reported a staged declaration,
  * authoritatively reported none, or could not answer the ask. Consumers

@@ -4,4 +4,4 @@ import type { StorageEndpoint } from "./StorageEndpoint";
 /**
  * ContentServer entry fields (mirrors integrity zome).
  */
-export type ContentServer = { content_hash: string, capability: string, serve_url: string | null, endpoints: Array<StorageEndpoint>, online: boolean, priority: number, region: string | null, bandwidth_mbps: number | null, registered_at: bigint, last_heartbeat: bigint, };
+export type ContentServer = { content_cid: string, capability: string, serve_url: string | null, endpoints: Array<StorageEndpoint>, online: boolean, priority: number, region: string | null, bandwidth_mbps: number | null, registered_at: bigint, last_heartbeat: bigint, };

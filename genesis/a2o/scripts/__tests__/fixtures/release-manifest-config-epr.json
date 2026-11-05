@@ -1,13 +1,15 @@
 {
   "kind": "release-manifest",
-  "manifestVersion": "1.0",
+  "manifestVersion": "2.0",
   "channelId": "runtime:config:elohim:commons",
   "artifactClass": "config-epr",
   "artifacts": [
     {
-      "blobCid": "bafkreigx5jdmfj3ob6b3mqfcsq5higrp2jgdxczyjpy2mtf7pwgzkqzubq",
+      "blobCid": "bafkr4ibbxp4ghi7j5abg27mnwgqhlbra3nmj5w2gpxhxpa4orgcbrwiqva",
       "bytes": 127,
-      "sha256": "d7ea46c2a76e0f83b640a2943a741a2fd24c3b8b384bf1a64cbf7d8d9543340c",
+      "profile": {
+        "epoch": 0
+      },
       "filename": "runtime-config.json",
       "mimeType": "application/json"
     }

@@ -1200,6 +1200,9 @@ importers:
       '@elohim/storage-client':
         specifier: workspace:*
         version: link:../../elohim/sdk/storage-client-ts
+      '@noble/hashes':
+        specifier: ^1.5.0
+        version: 1.8.0
       ajv:
         specifier: ^8.17.1
         version: 8.18.0

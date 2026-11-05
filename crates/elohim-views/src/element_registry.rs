@@ -28,7 +28,7 @@ pub struct ElementRegistryView {
 pub struct ElementEntry {
     /// Custom-element tag name (e.g. "elohim-button", "qahal-attestation-chip").
     pub tag_name: String,
-    /// Content address of the element bundle (e.g. "sha256-...").
+    /// Content address of the element bundle (a byte CID, e.g. "bafkr4i…").
     pub cid: String,
     /// Semver version string (e.g. "1.0.0").
     pub version: String,
@@ -47,7 +47,7 @@ mod tests {
             pillar: "elohim-core".into(),
             elements: vec![ElementEntry {
                 tag_name: "elohim-button".into(),
-                cid: "sha256-abc".into(),
+                cid: "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq".into(),
                 version: "1.0.0".into(),
                 view_deps: vec![],
             }],
@@ -62,7 +62,7 @@ mod tests {
     fn element_entry_serializes_all_fields() {
         let entry = ElementEntry {
             tag_name: "shefa-balance-card".into(),
-            cid: "sha256-deadbeef".into(),
+            cid: "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu".into(),
             version: "2.1.3".into(),
             view_deps: vec!["ShefaBalanceView".into(), "AccountView".into()],
         };

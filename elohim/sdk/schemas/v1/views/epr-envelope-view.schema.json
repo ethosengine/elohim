@@ -31,12 +31,19 @@
     "proof": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["signer", "algorithm", "key", "signature"],
+      "required": ["signer", "envelope"],
       "properties": {
         "signer": { "type": "string", "description": "CIDv1 base32 of Agent EPR" },
-        "algorithm": { "type": "string", "pattern": "^(ed25519|scheme-[0-9]+)$", "description": "ed25519 for scheme 0; scheme-<code> for a held scheme" },
-        "key": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded canonical multikey bytes of the signing key" },
-        "signature": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded signature bytes (128 hex chars for ed25519)" }
+        "envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "key", "sig"],
+          "properties": {
+            "scheme": { "type": "integer", "minimum": 0, "maximum": 65535, "description": "Signature scheme code (u16). 0 = Ed25519. Unknown values are HELD by readers, never malformed." },
+            "key": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded Multikey bytes (minimal-varint multicodec ++ raw key; scheme 0: ed01 + 32 bytes)" },
+            "sig": { "type": "string", "pattern": "^([0-9a-f]{2})+$", "description": "Hex-encoded signature bytes (scheme 0: 64 bytes)" }
+          }
+        }
       }
     }
   }

@@ -18,12 +18,7 @@ export {
   type AddressForm,
 } from "./address.js";
 export { verifyEd25519, verifyEd25519Strict } from "./proof.js";
-export {
-  contentAddressHex,
-  sha256BlobHash,
-  verifyBlobHash,
-  type BlobHashVerdict,
-} from "./blob-hash.js";
+export { verifyBlobHash, type BlobHashVerdict } from "./blob-hash.js";
 export { canonicalEnvelopeBytes } from "./envelope.js";
 export {
   verifyEpr,

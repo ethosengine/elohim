@@ -1,13 +1,15 @@
 {
   "kind": "release-manifest",
-  "manifestVersion": "1.0",
+  "manifestVersion": "2.0",
   "channelId": "runtime:storage-binary:elohim:household",
   "artifactClass": "storage-binary",
   "artifacts": [
     {
-      "blobCid": "bafkreidybjt3ccgs6i5up43vegwm2afnstdwyvt2dgnz6tn6n4h667wsiu",
+      "blobCid": "bafkr4ihneha54efgq2h7wz4cdkeferjjpd7wzcyhtwy2c54an3pyvgyawi",
       "bytes": 381123176,
-      "sha256": "780a67b108d2f23b47f37521accd00ad94c76c567a199b9f4dbe6f0fef7ed245",
+      "profile": {
+        "epoch": 0
+      },
       "filename": "elohim-storage",
       "mimeType": "application/octet-stream"
     }
