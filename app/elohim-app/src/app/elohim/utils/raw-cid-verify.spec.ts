@@ -17,10 +17,10 @@ async function hexOf(data: Uint8Array): Promise<string> {
 }
 
 describe('raw-cid-verify', () => {
-  it('verifies bytes against a sha256-<hex> address', async () => {
+  it('refuses a legacy sha256-<hex> spelling even when the bytes match (addresses are self-describing)', async () => {
     const address = `sha256-${await hexOf(bytes)}`;
-    expect(await verifyRawSha256(bytes, address)).toBe(true);
-    expect(await verifyRawSha256(bytes.buffer, address)).toBe(true);
+    expect(await verifyRawSha256(bytes, address)).toBe(false);
+    expect(await verifyRawSha256(bytes.buffer, address)).toBe(false);
   });
 
   it('verifies bytes against a CIDv1 raw sha2-256 address (bafkrei…)', async () => {

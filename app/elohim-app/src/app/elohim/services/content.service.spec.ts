@@ -40,6 +40,25 @@ describe('ContentBackendService', () => {
   it('loads an anonymous body through the marked storage path and verifies its hash without reusing SDK cache', async () => {
     const bytes = new Uint8Array(Array.from('# Authentic public body', c => c.charCodeAt(0)));
     const digest = await sha256.digest(bytes);
+    const cid = CID.createV1(0x55, digest).toString();
+    mockStorageClient.getContent = vi
+      .fn()
+      .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: cid }));
+    mockStorageClient.fetchBlob = vi.fn().mockReturnValue(of(bytes.buffer));
+    const node = await firstValueFrom(service.getContent('manifesto', true));
+    expect(node?.content).toBe('# Authentic public body');
+    expect(mockStorageClient.getContent).toHaveBeenCalledWith('manifesto', true);
+    expect(mockStorageClient.fetchBlob).toHaveBeenCalledWith(cid, true);
+    expect(mockClient.get).not.toHaveBeenCalled();
+    mockStorageClient.fetchBlob.mockReturnValue(of(new TextEncoder().encode('tampered').buffer));
+    expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
+  });
+
+  it('refuses a legacy sha256-<hex> spelling as a blob address even when the bytes match', async () => {
+    // The address profile is self-describing (re-genesis 1): a bare digest spelling names no
+    // multihash, so it is never verified against — fail closed, never dual-read.
+    const bytes = new Uint8Array(Array.from('# Authentic public body', c => c.charCodeAt(0)));
+    const digest = await sha256.digest(bytes);
     const hash = Array.from(digest.digest)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
@@ -47,12 +66,6 @@ describe('ContentBackendService', () => {
       .fn()
       .mockReturnValue(of({ ...mockContentNode, contentBody: null, blobCid: `sha256-${hash}` }));
     mockStorageClient.fetchBlob = vi.fn().mockReturnValue(of(bytes.buffer));
-    const node = await firstValueFrom(service.getContent('manifesto', true));
-    expect(node?.content).toBe('# Authentic public body');
-    expect(mockStorageClient.getContent).toHaveBeenCalledWith('manifesto', true);
-    expect(mockStorageClient.fetchBlob).toHaveBeenCalledWith(`sha256-${hash}`, true);
-    expect(mockClient.get).not.toHaveBeenCalled();
-    mockStorageClient.fetchBlob.mockReturnValue(of(new TextEncoder().encode('tampered').buffer));
     expect(await firstValueFrom(service.getContent('manifesto', true))).toBeNull();
   });
 
