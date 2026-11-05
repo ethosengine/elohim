@@ -90,6 +90,7 @@ struct State {
     calls: Vec<CommandSpec>,
     install_fail: bool,
     metadata: Option<Value>,
+    download: Option<PathBuf>,
     distances: BTreeMap<String, u64>,
 }
 struct Fake {
@@ -136,6 +137,21 @@ impl Runner for Fake {
             }
         } else if c.program.ends_with("/cargo-pool") && c.args == ["key"] {
             out = format!("slot_dev={}\n", self.root.join("target").display());
+        } else if c.program == "gh" && c.args.starts_with(&["release".into(), "download".into()]) {
+            if let Some(source) = &s.download {
+                let index = c
+                    .args
+                    .iter()
+                    .position(|arg| arg == "--dir")
+                    .expect("download directory");
+                let destination = Path::new(&c.args[index + 1]);
+                for entry in fs::read_dir(source)? {
+                    let entry = entry?;
+                    fs::copy(entry.path(), destination.join(entry.file_name()))?;
+                }
+            } else {
+                success = false;
+            }
         } else if c.program == "rustc" {
             out = "rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n".into();
         } else if c.program == "cargo" {
@@ -1289,11 +1305,11 @@ fn test_brit_multibin_ingest_uses_canonical_sums_rcid() {
     let r = f.release("a");
     assert!(r.cid.starts_with("bafyrei"));
     assert_eq!(r.cid, r.rcid);
-    assert_eq!(r.bins.len(), 4);
+    assert_eq!(r.bins.len(), 5);
     assert_eq!(r.bins["rakia"], r.bins["brit"]);
     assert!(f.store.verified(&r.cid));
     let bytes = fs::read(f.store.root.join(&r.cid).join("sums.cbor")).unwrap();
-    assert_eq!(bytes[0], 0xa4);
+    assert_eq!(bytes[0], 0xa5);
     assert_eq!(&bytes[1..6], b"\x64brit");
     for name in r.bins.keys() {
         assert_eq!(
@@ -2636,3 +2652,6 @@ fn repeated_landings_preserve_the_head_and_notice_only_transitions() {
     assert_eq!(notice(), 1);
     assert_eq!(notice(), 0);
 }
+
+#[path = "tests_retained.rs"]
+mod retained;

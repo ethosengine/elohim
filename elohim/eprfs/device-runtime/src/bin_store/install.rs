@@ -301,6 +301,17 @@ impl Store {
                             })
                             .unwrap_or_else(|| current.join(bin))
                     };
+                    // Preserve the historical Brit inventory when adopting a plain
+                    // executable beside a release that predates the retained helper.
+                    if self.tool == "brit"
+                        && bin == "brit-rebase-retained"
+                        && file == current.join(bin)
+                        && file
+                            .symlink_metadata()
+                            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+                    {
+                        continue;
+                    }
                     copy_executable(&file, &stage.join(bin))?;
                     sums.insert(bin.clone(), files::file_cid(&stage.join(bin))?);
                 }

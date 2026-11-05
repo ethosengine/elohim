@@ -44,6 +44,7 @@
       "bins": [
         "brit",
         "brit-build-ref",
+        "brit-rebase-retained",
         "brit-verify"
       ],
       "aliases": {
@@ -56,6 +57,9 @@
         "brit-build-ref": [
           "BRIT_BUILD_REF_BIN",
           "BRIT_BUILD_REF"
+        ],
+        "brit-rebase-retained": [
+          "BRIT_REBASE_RETAINED_BIN"
         ],
         "brit-verify": [
           "BRIT_VERIFY_BIN"

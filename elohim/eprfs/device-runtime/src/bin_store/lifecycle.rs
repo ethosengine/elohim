@@ -418,6 +418,8 @@ impl Store {
                             "brit-cli",
                             "--bin",
                             "brit",
+                            "--bin",
+                            "brit-rebase-retained",
                             "-p",
                             "brit-build-ref",
                             "--bin",
@@ -533,6 +535,12 @@ impl Store {
             }
             use std::os::unix::fs::PermissionsExt;
             for bin in &self.config.bins {
+                if self.tool == "brit"
+                    && bin == "brit-rebase-retained"
+                    && !download.join(bin).try_exists()?
+                {
+                    continue;
+                }
                 fs::set_permissions(download.join(bin), fs::Permissions::from_mode(0o555))?;
             }
             self.ingest(

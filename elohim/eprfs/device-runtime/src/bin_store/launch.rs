@@ -138,20 +138,31 @@ impl Store {
     /// Resolve the device head without consulting a session or override.
     pub fn resolve_current(&self, bin: Option<&str>) -> Result<Resolution> {
         let bin = self.bin_name(bin)?;
-        let cid = self
-            .head("current")
-            .filter(|cid| self.usable(cid, bin))
-            .ok_or_else(|| {
-                Refusal::new(
-                    "head-absent",
-                    "store has no executable current head; run epr bin bootstrap",
-                )
-            })?;
+        let cid = self.head("current").ok_or_else(|| {
+            Refusal::new(
+                "head-absent",
+                "store has no executable current head; run epr bin bootstrap",
+            )
+        })?;
+        if self.tool == "brit" && bin == "brit-rebase-retained" {
+            self.require_binary(&cid, bin)?;
+        } else if !self.usable(&cid, bin) {
+            return Err(Refusal::new(
+                "head-absent",
+                "store has no executable current head; run epr bin bootstrap",
+            ));
+        }
         Ok(Resolution {
             path: self.artifact(&cid)?.join(bin),
             source: "current".into(),
             cid: Some(cid),
         })
+    }
+    fn require_binary(&self, cid: &str, bin: &str) -> Result<()> {
+        if self.usable(cid, bin) {
+            return Ok(());
+        }
+        Err(Refusal::new("candidate-absent", format!("release {cid} has no executable {bin}; select a release that includes it with epr bin")))
     }
     fn bin_name<'a>(&'a self, bin: Option<&'a str>) -> Result<&'a str> {
         let bin = bin.unwrap_or(&self.config.bins[0]);
@@ -229,12 +240,7 @@ impl Store {
         {
             let cid = cid.trim();
             files::require_cid(cid)?;
-            if !self.usable(cid, bin) {
-                return Err(Refusal::new(
-                    "candidate-absent",
-                    "explicit pin is not executable",
-                ));
-            }
+            self.require_binary(cid, bin)?;
             return Ok(Resolution {
                 path: self.artifact(cid)?.join(bin),
                 source: "explicit-pin".into(),
@@ -276,12 +282,7 @@ impl Store {
                     Err(e) => return Err(e),
                 }
             };
-            if !self.usable(&pin.cid, bin) {
-                return Err(Refusal::new(
-                    "candidate-absent",
-                    "session pin is not executable",
-                ));
-            }
+            self.require_binary(&pin.cid, bin)?;
             return Ok(Resolution {
                 path: self.artifact(&pin.cid)?.join(bin),
                 source: "session-pin".into(),

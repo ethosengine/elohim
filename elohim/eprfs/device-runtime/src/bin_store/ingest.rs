@@ -81,6 +81,7 @@ impl Store {
         let stage = files::temporary(&self.root.join("staging"));
         fs::create_dir(&stage)?;
         let result = (|| {
+            let mut sums = BTreeMap::new();
             for name in &self.config.bins {
                 let file = if source.is_file() && self.config.bins.first() == Some(name) {
                     source.to_owned()
@@ -92,6 +93,16 @@ impl Store {
                 } else {
                     source.join(name)
                 };
+                // Historical followed Brit releases declare exactly the original trio.
+                // A missing helper is accepted only if the checksum manifest also omits it.
+                if self.tool == "brit"
+                    && name == "brit-rebase-retained"
+                    && file
+                        .symlink_metadata()
+                        .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+                {
+                    continue;
+                }
                 if !files::executable(&file) {
                     return Err(Refusal::new(
                         "binary-unusable",
@@ -99,9 +110,6 @@ impl Store {
                     ));
                 }
                 copy_executable(&file, &stage.join(name))?;
-            }
-            let mut sums = BTreeMap::new();
-            for name in &self.config.bins {
                 sums.insert(name.clone(), files::file_cid(&stage.join(name))?);
             }
             // Existing release downloads supply SHA256SUMS. It remains a checksum transport,
@@ -292,6 +300,7 @@ impl Store {
             || record.cid != cid
             || record.rcid != cid
             || (names != record.bins.keys().collect()
+                && !self.historical_brit_inventory(&record.bins)
                 && !(self.tool == "epr"
                     && names.len() == 2
                     && names.iter().any(|name| name.as_str() == "epr")
@@ -318,15 +327,48 @@ impl Store {
         self.release_cid(&record.bins)
             .is_ok_and(|computed| computed == cid)
     }
-    /// Admission requires the complete declared inventory; old session custody does not.
+    // The only Brit compatibility inventory: the original three executables plus rakia.
+    // Do not admit arbitrary subsets or ignore a checksum for a declared helper.
+    fn historical_brit_inventory(&self, bins: &BTreeMap<String, String>) -> bool {
+        self.tool == "brit"
+            && bins.keys().map(String::as_str).eq([
+                "brit",
+                "brit-build-ref",
+                "brit-verify",
+                "rakia",
+            ])
+            && self
+                .config
+                .bins
+                .iter()
+                .map(String::as_str)
+                .collect::<std::collections::BTreeSet<_>>()
+                == [
+                    "brit",
+                    "brit-build-ref",
+                    "brit-rebase-retained",
+                    "brit-verify",
+                ]
+                .into_iter()
+                .collect()
+            && self.config.aliases.len() == 1
+            && self
+                .config
+                .aliases
+                .get("rakia")
+                .is_some_and(|target| target == "brit")
+    }
+    /// Admission requires the complete inventory or the historical followed Brit release.
     pub(super) fn admissible(&self, cid: &str) -> bool {
         self.verified(cid)
             && self.record(cid).is_some_and(|record| {
-                self.config
-                    .bins
-                    .iter()
-                    .chain(self.config.aliases.keys())
-                    .all(|bin| record.bins.contains_key(bin))
+                self.historical_brit_inventory(&record.bins)
+                    || self
+                        .config
+                        .bins
+                        .iter()
+                        .chain(self.config.aliases.keys())
+                        .all(|bin| record.bins.contains_key(bin))
             })
     }
     pub(super) fn usable(&self, cid: &str, bin: &str) -> bool {
