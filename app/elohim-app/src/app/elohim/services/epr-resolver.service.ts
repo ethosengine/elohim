@@ -20,6 +20,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { Observable, of, map, catchError } from 'rxjs';
 
+import { addressForm } from '@elohim/epr';
 import {
   type EprRef,
   parseEpr,
@@ -27,7 +28,6 @@ import {
   eprToUniversalHref,
   BUNDLE_ROUTE_CONTEXT,
 } from '@elohim/service';
-import { addressForm } from '@elohim/epr';
 
 import {
   type IEprContentResolver,
