@@ -770,7 +770,17 @@ _gate-seam-contracts:
     cd crates/seam-contracts && cargo test --all-features
     cd crates/seam-contracts && cargo clippy --all-features -- -D warnings
     cd crates/seam-contracts && cargo fmt --check
-    cd crates/seam-contracts && cargo build --target wasm32-unknown-unknown --no-default-features
+    cd crates/seam-contracts && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
+
+# The addressing kernel links into the DNA zomes and browser builds: the wasm build is part
+# of the gate, and tests/boundary.rs reads the crate's own lockfile. The wasm leg drops the
+# gate's RUSTUP_TOOLCHAIN pin (the pinned toolchain carries no wasm32 std here), as the LSP's
+# env_wasm_roots does in genesis/agentic/pool-policy.json.
+_gate-elohim-address:
+    cd crates/elohim-address && cargo test --all-features
+    cd crates/elohim-address && cargo clippy --all-features --all-targets -- -D warnings
+    cd crates/elohim-address && cargo fmt --check
+    cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
 _gate-consent-grant:
     cd crates/consent-grant && cargo test

@@ -60,6 +60,18 @@
           "cargo": { "workspace": "elohim", "profile": "dev", "rustflags": "" }
         }
       },
+      "elohim-address": {
+        "dir": "crates/elohim-address",
+        "inputs": {
+          "sources": ["crates/elohim-address/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-address",
+          "cargo": { "workspace": "crates/elohim-address", "profile": "dev", "rustflags": "" }
+        }
+      },
       "epr-ts": {
         "dir": "elohim/sdk/epr-ts",
         "steps": ["ts-test"],

@@ -1,0 +1,44 @@
+# crates/elohim-address — the one Rust addressing kernel (re-genesis 1, amended R1).
+#
+# Nested single-crate workspace root like its `crates/` siblings: the explicit
+# `[workspace]` table gives this crate its OWN Cargo.lock, which
+# `tests/boundary.rs` reads — the lockfile IS the wasm-safe leaf boundary.
+# Consumers: elohim-epr (path), the DNA zomes (path), eprfs-core, brit-epr
+# (registry), elohim-storage, doorway, rakia-executor, steward.
+[workspace]
+
+[package]
+name = "elohim-address"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Elohim Protocol addressing kernel: the epoch-0 byte profile (CIDv1 raw + BLAKE3-256), record and citation CIDs, a full-decode byte-CID parser and a fail-closed verifier. wasm32-safe; no runtime, no JSON."
+authors = ["Elohim Protocol"]
+license = "CAL-1.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "cid", "blake3", "content-addressing", "wasm"]
+categories = ["encoding", "cryptography"]
+publish = ["elohim"]
+
+[lib]
+name = "elohim_address"
+path = "src/lib.rs"
+
+[features]
+# Nothing by default: a zome or a browser build links only the hashing kernel.
+default = []
+# String-form (de)serialization of `ByteCid`. No serde_json, ever.
+serde = ["dep:serde"]
+
+[dependencies]
+cid = { version = "0.11", default-features = false, features = ["alloc"] }
+multihash-codetable = { version = "0.2", default-features = false, features = ["sha2", "blake3"] }
+data-encoding = { version = "2", default-features = false, features = ["alloc"] }
+thiserror = { version = "2", default-features = false }
+serde = { version = "1", default-features = false, features = ["alloc"], optional = true }
+
+[dev-dependencies]
+# Independent oracles for the conformance tests: the digests are recomputed with
+# the hash crates directly, never through the multihash code table under test.
+blake3 = { version = "1.8", default-features = false }
+sha2 = { version = "0.10", default-features = false }

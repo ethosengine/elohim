@@ -1,0 +1,104 @@
+{
+  "about": "elohim-address conformance vectors, epoch 0. Positive rows were derived outside this crate: sha2-256 by coreutils sha256sum, BLAKE3 by @noble/hashes/blake3, and the CID strings by a hand-written Python CIDv1 encoder (version 1, codec, multihash code, digest length, digest; multibase 'b' + RFC 4648 base32 lower, no padding). byteCid = raw 0x55 + blake3 0x1e (the byte profile); citeCid = raw 0x55 + sha2-256 0x12 (citations only); recordCid = dag-cbor 0x71 + sha2-256 0x12. Negative rows are byte-surface inputs ByteCid::parse must refuse; `check` names the first check that fails. Compare-only: a changed expectation needs review and, on behaviour change, a new profile epoch.",
+  "positive": [
+    {
+      "input": "hello world",
+      "blake3": "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24",
+      "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "byteCid": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+      "citeCid": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+      "recordCid": "bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+      "shortFingerprint": "sha256:b94d27b9934d3e08"
+    },
+    {
+      "input": "abc",
+      "blake3": "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "byteCid": "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu",
+      "citeCid": "bafkreif2pall7dybz7vecqka3zo24irdwabwdi4wc55jznaq75q7eaavvu",
+      "recordCid": "bafyreif2pall7dybz7vecqka3zo24irdwabwdi4wc55jznaq75q7eaavvu",
+      "shortFingerprint": "sha256:ba7816bf8f01cfea"
+    },
+    {
+      "input": "",
+      "blake3": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byteCid": "bafkr4ifpcne3t5pzugtkaqcn5i3nzskjtpfslsnnyejlpte2spfoihzsmi",
+      "citeCid": "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+      "recordCid": "bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+      "shortFingerprint": "sha256:e3b0c44298fc1c14"
+    }
+  ],
+  "negative": [
+    {
+      "name": "declared-33-byte-digest",
+      "input": "bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+      "check": "digest-length"
+    },
+    {
+      "name": "non-zero-padding-bits",
+      "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6er",
+      "check": "padding"
+    },
+    {
+      "name": "cite-profile-on-byte-surface",
+      "input": "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+      "check": "multihash"
+    },
+    {
+      "name": "record-profile-on-byte-surface",
+      "input": "bafyreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+      "check": "codec"
+    },
+    {
+      "name": "dag-pb-codec",
+      "input": "bafyb4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+      "check": "codec"
+    },
+    {
+      "name": "64-byte-digest",
+      "input": "bafkr4qgxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6etlutappu4fazcalrwgbtboqoxn4x5tzxgnf7giu4wvps24ddkpci",
+      "check": "length"
+    },
+    {
+      "name": "uppercase",
+      "input": "BAFKR4IGXJGA67JYKBSEAXDMMDGC5A5O3ZP3HTOM2L6MRJZNK7FVYGGU6EQ",
+      "check": "multibase"
+    },
+    {
+      "name": "uppercase-body",
+      "input": "bAFKR4IGXJGA67JYKBSEAXDMMDGC5A5O3ZP3HTOM2L6MRJZNK7FVYGGU6EQ",
+      "check": "alphabet"
+    },
+    {
+      "name": "length-58",
+      "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6e",
+      "check": "length"
+    },
+    {
+      "name": "length-60",
+      "input": "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eqa",
+      "check": "length"
+    },
+    {
+      "name": "base58-multibase",
+      "input": "zafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+      "check": "multibase"
+    },
+    {
+      "name": "cidv0-version-byte",
+      "input": "babkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+      "check": "version"
+    },
+    {
+      "name": "empty",
+      "input": "",
+      "check": "length"
+    },
+    {
+      "name": "legacy-sha256-spelling-59",
+      "input": "sha256-0000000000000000000000000000000000000000000000000000",
+      "check": "multibase"
+    }
+  ]
+}
