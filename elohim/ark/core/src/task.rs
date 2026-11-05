@@ -247,14 +247,15 @@ impl TaskChild {
             ));
         }
         if let Some(cid) = cid {
-            // `ArtifactRef::Pinned` is the raw CID of the digest (spec §F, first instances).
-            let raw = elohim_epr::cid::raw_cid_from_sha256_hex(sha256)
-                .map_err(|error| ManifestError::Invalid(error.to_string()))?;
-            if cid != &raw.to_string() {
-                return Err(ManifestError::Invalid(format!(
-                    "task child artifact cid {cid} is not the raw CID of its sha256 ({raw})"
-                )));
-            }
+            // The pin's native identity is the byte CID (CIDv1 raw + BLAKE3-256), admitted only
+            // by `ByteCid::parse`; the sha256 above is externally supplied evidence that the
+            // driver verifies against the bytes on ingestion. Any other spelling, a sha2 raw
+            // CID included, is refused as an identity.
+            elohim_epr::cid::ByteCid::parse(cid).map_err(|error| {
+                ManifestError::Invalid(format!(
+                    "task child artifact cid {cid} is not a canonical byte CID: {error}"
+                ))
+            })?;
         }
         if !self.env_scrub {
             return Err(ManifestError::Invalid(

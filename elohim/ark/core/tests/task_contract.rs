@@ -483,6 +483,7 @@ fn the_child_is_temporary_scrubbed_pinned_and_writes_only_under_output() {
     let mut c = child();
     c.argv.clear();
     assert!(refuse(c, vec![]));
+    // A record CID is not an artifact identity.
     let mut c = child();
     c.artifact = ArtifactRef::Pinned {
         cid: Some(elohim_epr::cid::compute_cid(b"not-the-digest").to_string()),
@@ -490,6 +491,7 @@ fn the_child_is_temporary_scrubbed_pinned_and_writes_only_under_output() {
         bytes: None,
     };
     assert!(refuse(c, vec![]));
+    // task_pin_refuses_sha2_raw_cid_as_identity
     let mut c = child();
     c.artifact = ArtifactRef::Pinned {
         cid: Some(
@@ -497,6 +499,14 @@ fn the_child_is_temporary_scrubbed_pinned_and_writes_only_under_output() {
                 .unwrap()
                 .to_string(),
         ),
+        sha256: SHA.into(),
+        bytes: None,
+    };
+    assert!(refuse(c, vec!["report/summary".into()]));
+    // task_pin_accepts_byte_cid
+    let mut c = child();
+    c.artifact = ArtifactRef::Pinned {
+        cid: Some(elohim_epr::cid::compute_bytes_cid(b"artifact bytes").to_string()),
         sha256: SHA.into(),
         bytes: None,
     };

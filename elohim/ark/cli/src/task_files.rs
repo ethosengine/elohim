@@ -116,7 +116,7 @@ pub(crate) fn retain_artifact(
     run: &Path,
     artifact: &ArtifactRef,
 ) -> Result<PathBuf, Failure> {
-    let ArtifactRef::Pinned { sha256, .. } = artifact else {
+    let ArtifactRef::Pinned { cid, sha256, .. } = artifact else {
         return Err(failure("artifact must be pinned"));
     };
     let mut source = OpenOptions::new()
@@ -146,6 +146,16 @@ pub(crate) fn retain_artifact(
             code: crate::EXIT_ARTIFACT,
             message: "native task: artifact digest mismatch".into(),
         });
+    }
+    // The byte CID is the native identity; the sha256 above is evidence, checked too.
+    if let Some(cid) = cid {
+        let claimed = elohim_epr::cid::ByteCid::parse(cid).map_err(failure)?;
+        if elohim_epr::cid::compute_bytes_cid(&bytes) != claimed {
+            return Err(Failure {
+                code: crate::EXIT_ARTIFACT,
+                message: "native task: artifact byte CID mismatch".into(),
+            });
+        }
     }
     let target = run.join("artifact");
     let mut copy = OpenOptions::new()
@@ -509,6 +519,34 @@ mod tests {
         file.set_len(MAX_CAPTURE_OBJECT_BYTES as u64 + 1)
             .expect("sparse oversize");
         assert!(retain_artifact(&source, &wrong, &artifact).is_err());
+    }
+
+    #[test]
+    fn sha256_evidence_is_verified_when_present() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let source = temp.path().join("source");
+        let bytes = b"original executable bytes";
+        fs::write(&source, bytes).expect("artifact");
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o700)).expect("mode");
+        let cid = elohim_epr::cid::compute_bytes_cid(bytes).to_string();
+        let pin = |cid: &str, sha: String| -> ArtifactRef {
+            serde_json::from_value(serde_json::json!({"pinned": {"cid": cid, "sha256": sha}}))
+                .expect("pinned artifact")
+        };
+        let good = hex::encode(Sha256::digest(bytes));
+        let run = temp.path().join("ok");
+        private_dir(&run).expect("run");
+        assert!(retain_artifact(&source, &run, &pin(&cid, good.clone())).is_ok());
+        // Wrong sha256 evidence is refused even with a right byte CID.
+        let bad = temp.path().join("bad");
+        private_dir(&bad).expect("run");
+        assert!(retain_artifact(&source, &bad, &pin(&cid, "0".repeat(64))).is_err());
+        // A byte CID of other bytes is refused even with right sha256 evidence.
+        let other = elohim_epr::cid::compute_bytes_cid(b"other").to_string();
+        let mismatch = temp.path().join("mismatch");
+        private_dir(&mismatch).expect("run");
+        assert!(retain_artifact(&source, &mismatch, &pin(&other, good)).is_err());
+        assert!(!mismatch.join("artifact").exists());
     }
 
     #[test]
