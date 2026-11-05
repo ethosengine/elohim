@@ -43,10 +43,14 @@ use crate::p2p::inventory_gossip::BlobHint;
 pub enum GossipSource {
     /// Received over the libp2p gossipsub plane.
     Libp2p {
-        /// `propagation_source` PeerId (base58) — for logging only.
+        /// `propagation_source` PeerId (base58): the neighbour that relayed it.
+        /// Logging only — never an authority.
         peer: String,
         /// gossipsub `message_id` — for logging only.
         message_id: String,
+        /// gossipsub `message.source`: the author, authenticated by gossipsub's
+        /// `Signed` validation. The only libp2p author witness consumers bind to.
+        author: Option<String>,
     },
     /// Received over the iroh-gossip plane.
     Iroh {
@@ -74,11 +78,12 @@ pub trait InventoryFetch {
         conn: &mut diesel::SqliteConnection,
         source_peer_id: &str,
         hints: &[BlobHint],
-        hashes: &[String],
+        cids: &[String],
     );
 
-    /// Request a fresh snapshot from a peer after a delta sequence gap.
-    fn request_snapshot_for_gap(&self, peer_id: &str);
+    /// Reconcile with a peer (`inventory_recon`) after a gap the reorder window could
+    /// not close; the session re-bases that peer's cursor.
+    fn request_recon(&self, peer_id: &str);
 }
 
 /// Where a VERIFIED `elohim/transport/manifest` announcement goes so the
@@ -246,8 +251,10 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
             crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
             true,
         );
-    } else if topic == crate::p2p::inventory_gossip::INVENTORY_TOPIC {
-        handle_inventory(ctx, data, source);
+    } else if topic == crate::p2p::inventory_gossip::INVENTORY_TOPIC
+        || topic == crate::p2p::inventory_gossip::LEGACY_INVENTORY_TOPIC
+    {
+        handle_inventory(ctx, topic, data, source);
     } else if topic == crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC {
         handle_salvage(ctx, data, source);
     } else if topic == crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC {
@@ -343,50 +350,144 @@ fn handle_revocation_message(
     }
 }
 
-/// Inventory snapshot/delta projection into `peer_blob_inventory`. The
-/// commitment-driven active fetch + delta-gap snapshot-request run only when
-/// `ctx.inventory_fetch` is `Some` (both active receive planes; see module docs).
-/// Apply every held page that is now contiguous with the cursor, in order.
-/// bounded-work: at most the per-peer window (`MAX_PENDING_PER_PEER`) applies
-/// per call, each one indexed replace/delete work already bounded by page size.
+/// The holder key a receiver expects for a transport author: admitted only when
+/// `peer_transport_manifest` binds the peer (libp2p PeerId or iroh NodeId column), and
+/// derived from the peer id itself (both embed the node's ed25519 key).
+pub struct ManifestHolderResolver<'c, 'a> {
+    conn: &'c std::cell::RefCell<&'a mut diesel::SqliteConnection>,
+}
+
+impl crate::p2p::inventory_gossip::HolderResolver for ManifestHolderResolver<'_, '_> {
+    fn expected_holder(&self, author_peer: &str) -> Option<elohim_epr::signature::Multikey> {
+        bound_agent_for_author(&mut self.conn.borrow_mut(), author_peer)?;
+        transport_key(author_peer)
+    }
+}
+
+/// The `agent_cid` the transport manifest binds to `author_peer`, if any.
+pub fn bound_agent_for_author(
+    conn: &mut diesel::SqliteConnection,
+    author_peer: &str,
+) -> Option<String> {
+    use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+    use diesel::prelude::*;
+    t::peer_transport_manifest
+        .filter(
+            t::libp2p_peer_id
+                .eq(author_peer)
+                .or(t::iroh_node_id.eq(author_peer)),
+        )
+        .select(t::agent_cid)
+        .first::<String>(conn)
+        .optional()
+        .ok()
+        .flatten()
+}
+
+/// The ed25519 key a transport peer id embeds: a libp2p PeerId's identity multihash
+/// carries the protobuf public key; an iroh NodeId is the key (64 lowercase hex).
+pub fn transport_key(author_peer: &str) -> Option<elohim_epr::signature::Multikey> {
+    use elohim_epr::signature::Multikey;
+    if author_peer.len() == 64 && author_peer.bytes().all(|b| b.is_ascii_hexdigit()) {
+        let bytes: [u8; 32] = hex::decode(author_peer).ok()?.try_into().ok()?;
+        return Some(Multikey::ed25519(&bytes));
+    }
+    let peer: libp2p::PeerId = author_peer.parse().ok()?;
+    let multihash = peer.as_ref();
+    if multihash.code() != 0x00 {
+        return None; // a hashed (non-identity) PeerId does not embed its key
+    }
+    let key = libp2p::identity::PublicKey::try_decode_protobuf(multihash.digest()).ok()?;
+    let ed = key.try_into_ed25519().ok()?;
+    Some(Multikey::ed25519(&ed.to_bytes()))
+}
+
+/// `peer_blob_inventory` + `held_envelopes` behind the transport-neutral sink.
+struct DbInventorySink<'c, 'a> {
+    conn: &'c std::cell::RefCell<&'a mut diesel::SqliteConnection>,
+}
+
+impl crate::p2p::inventory_gossip::InventorySink for DbInventorySink<'_, '_> {
+    fn apply_delta(
+        &mut self,
+        peer: &str,
+        delta: &crate::p2p::inventory_gossip::InventoryDelta,
+    ) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
+        apply_delta_row(&mut self.conn.borrow_mut(), peer, delta)
+    }
+
+    fn retain_held(&mut self, held: crate::p2p::inventory_gossip::HeldEnvelope) {
+        let reason = match held.reason {
+            crate::p2p::inventory_gossip::HeldReason::Epoch(epoch) => format!("epoch:{epoch}"),
+            crate::p2p::inventory_gossip::HeldReason::Scheme(scheme) => format!("scheme:{scheme}"),
+        };
+        if let Err(e) = crate::db::held_envelopes::retain(
+            &mut self.conn.borrow_mut(),
+            held.topic,
+            &reason,
+            &held.bytes,
+        ) {
+            warn!(target: "elohim_storage::inventory", error = %e, "held envelope not retained");
+        }
+    }
+
+    fn mark_unavailable(&mut self, peer: &str, reason: &'static str) {
+        crate::p2p::inventory_gossip::mark_unavailable(peer, reason);
+    }
+}
+
+fn apply_delta_row(
+    conn: &mut diesel::SqliteConnection,
+    peer: &str,
+    delta: &crate::p2p::inventory_gossip::InventoryDelta,
+) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
+    use crate::db::peer_blob_inventory::DeltaApplyOutcome as Db;
+    use crate::p2p::inventory_gossip::DeltaOutcome;
+    let added: Vec<String> = delta.added.iter().map(|a| a.to_string()).collect();
+    let removed: Vec<String> = delta.removed.iter().map(|a| a.to_string()).collect();
+    let when = crate::p2p::micros_to_iso(delta.emitted_at)
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
+    match crate::db::peer_blob_inventory::apply_delta(
+        conn,
+        peer,
+        &added,
+        &removed,
+        delta.sequence as i64,
+        &when,
+    ) {
+        Ok(Db::Applied) => Ok(DeltaOutcome::Applied),
+        Ok(Db::Replay) => Ok(DeltaOutcome::Replay),
+        Ok(Db::Gap { expected, .. }) => Ok(DeltaOutcome::Gap {
+            expected: expected.max(0) as u64,
+        }),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Apply every held page that is now contiguous with the cursor, in order. Held pages
+/// were admitted (signature-verified) before they were stashed.
+/// bounded-work: at most the per-peer window (`MAX_PENDING_PER_PEER`) applies per call.
 fn flush_held_pages(
     ctx: &GossipDispatchCtx<'_>,
     conn: &mut diesel::SqliteConnection,
     peer_id: &str,
     mut next_seq: i64,
 ) {
+    use crate::p2p::inventory_gossip::DeltaOutcome;
     use crate::p2p::inventory_reorder::with_reorder;
     let mut flushed = 0usize;
     while let Some(held) = with_reorder(|r| r.take_next(peer_id, next_seq)) {
-        let added_str: Vec<String> = held.added.iter().map(|a| a.to_string()).collect();
-        let removed_str: Vec<String> = held.removed.iter().map(|a| a.to_string()).collect();
-        let when = chrono::DateTime::from_timestamp_micros(held.emitted_at)
-            .unwrap_or_else(chrono::Utc::now)
-            .to_rfc3339();
-        match crate::db::peer_blob_inventory::apply_delta(
-            conn,
-            peer_id,
-            &added_str,
-            &removed_str,
-            held.sequence as i64,
-            &when,
-        ) {
-            Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
+        match apply_delta_row(conn, peer_id, &held.body) {
+            Ok(DeltaOutcome::Applied) => {
                 flushed += 1;
                 crate::metrics::inc_inventory_page("delta", "flushed");
-                if !held.added.is_empty() {
-                    if let Some(fetch) = ctx.inventory_fetch {
-                        fetch.score_and_enqueue(conn, peer_id, &held.hints, &added_str);
-                    }
-                }
-                next_seq = held.sequence as i64 + 1;
+                enqueue_fetch(ctx, conn, peer_id, &held);
+                next_seq = held.body.sequence as i64 + 1;
             }
             Ok(other) => {
-                // Replay/Gap on a page we chose by exact sequence: the cursor
-                // moved under us (other plane). Stop; the next apply re-drains.
                 debug!(
                     target: "elohim_storage::inventory",
-                    peer_id = %peer_id, sequence = held.sequence, outcome = ?other,
+                    peer_id = %peer_id, sequence = held.body.sequence, outcome = ?other,
                     "held inventory page no longer contiguous — left for the next apply"
                 );
                 break;
@@ -407,249 +508,130 @@ fn flush_held_pages(
     }
 }
 
-fn handle_inventory(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
-    use crate::p2p::inventory_gossip::{BlobInventoryDelta, BlobInventorySnapshot};
-
-    if let Ok(snapshot) = BlobInventorySnapshot::from_bytes(data) {
-        if let Err(e) = snapshot.verify_structural() {
-            warn!(
-                target: "elohim_storage::inventory",
-                from = %source,
-                error = ?e,
-                "Inventory snapshot failed structural verify — dropped"
-            );
-        } else if let Some(pool) = ctx.db_pool {
-            match pool.get() {
-                Ok(mut conn) => {
-                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-                    let when = crate::p2p::micros_to_iso(snapshot.snapshot_at).unwrap_or(now_iso);
-                    let hashes_str: Vec<String> = snapshot
-                        .hashes
-                        .iter()
-                        .map(|b| b.as_str().to_string())
-                        .collect();
-                    match crate::db::peer_blob_inventory::apply_snapshot(
-                        &mut conn,
-                        &snapshot.peer_id,
-                        &hashes_str,
-                        snapshot.sequence as i64,
-                        &when,
-                    ) {
-                        Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Applied) => {
-                            crate::metrics::inc_inventory_page("snapshot", "applied");
-                            let (epoch, counter) =
-                                crate::p2p::sync_state::split_sequence(snapshot.sequence);
-                            info!(
-                                target: "elohim_storage::inventory",
-                                from = %source,
-                                peer_id = %snapshot.peer_id,
-                                count = snapshot.hashes.len(),
-                                sequence = snapshot.sequence,
-                                epoch,
-                                counter,
-                                "Inventory snapshot applied"
-                            );
-                            if let Some(fetch) = ctx.inventory_fetch {
-                                fetch.score_and_enqueue(
-                                    &mut conn,
-                                    &snapshot.peer_id,
-                                    &snapshot.hints,
-                                    &hashes_str,
-                                );
-                            }
-                            flush_held_pages(
-                                ctx,
-                                &mut conn,
-                                &snapshot.peer_id,
-                                snapshot.sequence as i64 + 1,
-                            );
-                        }
-                        Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Rebased) => {
-                            crate::metrics::inc_inventory_page("snapshot", "rebased");
-                            info!(
-                                target: "elohim_storage::inventory",
-                                from = %source,
-                                peer_id = %snapshot.peer_id,
-                                sequence = snapshot.sequence,
-                                "Inventory publisher restarted — cursor re-based to its new sequence"
-                            );
-                            flush_held_pages(
-                                ctx,
-                                &mut conn,
-                                &snapshot.peer_id,
-                                snapshot.sequence as i64 + 1,
-                            );
-                        }
-                        Ok(crate::db::peer_blob_inventory::SnapshotApplyOutcome::Deduplicated) => {
-                            crate::metrics::inc_inventory_page("snapshot", "deduplicated");
-                            // The cursor advanced to this sequence even though the
-                            // set did not change — pages held past it apply now.
-                            flush_held_pages(
-                                ctx,
-                                &mut conn,
-                                &snapshot.peer_id,
-                                snapshot.sequence as i64 + 1,
-                            );
-                            debug!(
-                                target: "elohim_storage::inventory",
-                                from = %source,
-                                peer_id = %snapshot.peer_id,
-                                sequence = snapshot.sequence,
-                                "Inventory snapshot deduplicated (identical content)"
-                            );
-                        }
-                        Err(e) => warn!(
-                            target: "elohim_storage::inventory",
-                            from = %source,
-                            error = %e,
-                            "apply_snapshot failed"
-                        ),
-                    }
-                }
-                Err(e) => warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    "inventory: db pool exhausted"
-                ),
-            }
-        }
-    } else if let Ok(delta) = BlobInventoryDelta::from_bytes(data) {
-        if let Err(e) = delta.verify_structural() {
-            warn!(
-                target: "elohim_storage::inventory",
-                from = %source,
-                error = ?e,
-                "Inventory delta failed structural verify — dropped"
-            );
-        } else if let Some(pool) = ctx.db_pool {
-            match pool.get() {
-                Ok(mut conn) => {
-                    let when = crate::p2p::micros_to_iso(delta.emitted_at).unwrap_or_else(|| {
-                        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-                    });
-                    let added_str: Vec<String> =
-                        delta.added.iter().map(|b| b.as_str().to_string()).collect();
-                    let removed_str: Vec<String> = delta
-                        .removed
-                        .iter()
-                        .map(|b| b.as_str().to_string())
-                        .collect();
-                    match crate::db::peer_blob_inventory::apply_delta(
-                        &mut conn,
-                        &delta.peer_id,
-                        &added_str,
-                        &removed_str,
-                        delta.sequence as i64,
-                        &when,
-                    ) {
-                        Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
-                            crate::metrics::inc_inventory_page("delta", "applied");
-                            debug!(
-                                target: "elohim_storage::inventory",
-                                peer_id = %delta.peer_id,
-                                sequence = delta.sequence,
-                                added = delta.added.len(),
-                                removed = delta.removed.len(),
-                                "Inventory delta applied"
-                            );
-                            if !delta.added.is_empty() {
-                                if let Some(fetch) = ctx.inventory_fetch {
-                                    fetch.score_and_enqueue(
-                                        &mut conn,
-                                        &delta.peer_id,
-                                        &delta.hints,
-                                        &added_str,
-                                    );
-                                }
-                            }
-                            flush_held_pages(
-                                ctx,
-                                &mut conn,
-                                &delta.peer_id,
-                                delta.sequence as i64 + 1,
-                            );
-                        }
-                        Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
-                            crate::metrics::inc_inventory_page("delta", "replay");
-                            debug!(
-                                target: "elohim_storage::inventory",
-                                peer_id = %delta.peer_id,
-                                sequence = delta.sequence,
-                                "Inventory delta replay — dropped silently"
-                            );
-                        }
-                        Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Gap {
-                            expected,
-                            received,
-                        }) => {
-                            // An early page is HELD, not dropped: the cursor
-                            // reaches it when its predecessor lands (often the
-                            // other plane's copy). Only a page beyond the window
-                            // is a real loss worth a snapshot request.
-                            use crate::p2p::inventory_reorder::{with_reorder, StashOutcome};
-                            let peer = delta.peer_id.clone();
-                            let outcome = with_reorder(|r| r.stash(delta));
-                            match outcome {
-                                StashOutcome::Buffered => {
-                                    crate::metrics::inc_inventory_page("delta", "buffered");
-                                    debug!(
-                                        target: "elohim_storage::inventory",
-                                        peer_id = %peer, expected, received,
-                                        "Inventory delta ahead of the cursor — held for in-order apply"
-                                    );
-                                    // `expected` IS the cursor + 1: a page held there
-                                    // (an earlier apply that failed transiently, or the
-                                    // other plane's copy) applies now, and everything
-                                    // contiguous behind it.
-                                    flush_held_pages(ctx, &mut conn, &peer, expected);
-                                }
-                                StashOutcome::Duplicate => {
-                                    crate::metrics::inc_inventory_page("delta", "duplicate");
-                                }
-                                StashOutcome::Overflow => {
-                                    crate::metrics::inc_inventory_page("delta", "overflow");
-                                    warn!(
-                                        target: "elohim_storage::inventory",
-                                        peer_id = %peer, expected, received,
-                                        "Inventory delta gap beyond the reorder window — requesting snapshot"
-                                    );
-                                    if let Some(fetch) = ctx.inventory_fetch {
-                                        fetch.request_snapshot_for_gap(&peer);
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            // A transient failure (SQLite busy under a burst) must
-                            // not lose the page: held like an early one, it is
-                            // retried by the next arrival's flush from `expected`.
-                            crate::metrics::inc_inventory_page("delta", "failed");
-                            warn!(
-                                target: "elohim_storage::inventory",
-                                error = %e,
-                                "apply_delta failed — page held for retry"
-                            );
-                            crate::p2p::inventory_reorder::with_reorder(|r| r.stash(delta));
-                        }
-                    }
-                }
-                Err(e) => warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    "inventory: db pool exhausted"
-                ),
-            }
-        }
-    } else {
-        debug!(
-            target: "elohim_storage::inventory",
-            from = %source,
-            "Inventory message decoded as neither snapshot nor delta — dropped"
-        );
+fn enqueue_fetch(
+    ctx: &GossipDispatchCtx<'_>,
+    conn: &mut diesel::SqliteConnection,
+    peer_id: &str,
+    envelope: &crate::p2p::inventory_gossip::InventoryEnvelope,
+) {
+    if envelope.body.added.is_empty() {
+        return;
+    }
+    if let Some(fetch) = ctx.inventory_fetch {
+        let added: Vec<String> = envelope.body.added.iter().map(|a| a.to_string()).collect();
+        fetch.score_and_enqueue(conn, peer_id, &envelope.body.hints, &added);
     }
 }
 
-/// Salvage-capacity advertisement projection into `salvage_capacity`.
+/// Inventory envelopes (and the legacy topic) into `peer_blob_inventory`. Admission is
+/// [`crate::p2p::inventory_gossip::receive`]; this binds it to the DB, the reorder
+/// window and the fetch hook.
+fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], source: &GossipSource) {
+    use crate::p2p::inventory_gossip::{receive, AuthorWitness, Receipt};
+    use crate::p2p::inventory_reorder::{with_reorder, StashOutcome};
+
+    let witness = match source {
+        GossipSource::Libp2p { author, .. } => AuthorWitness::Gossipsub(author.as_deref()),
+        GossipSource::Iroh { .. } => AuthorWitness::EndToEnd,
+    };
+    let peer_hint = source.to_string();
+    let Some(pool) = ctx.db_pool else {
+        return;
+    };
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            warn!(target: "elohim_storage::inventory", error = %e, "inventory: db pool exhausted");
+            return;
+        }
+    };
+    let conn_ref: &mut diesel::SqliteConnection = &mut conn;
+    let cell = std::cell::RefCell::new(conn_ref);
+    let resolver = ManifestHolderResolver { conn: &cell };
+    let mut sink = DbInventorySink { conn: &cell };
+    let receipt = receive(topic, data, witness, &peer_hint, &resolver, &mut sink);
+    let conn: &mut diesel::SqliteConnection = cell.into_inner();
+    match receipt {
+        Receipt::Applied { peer, envelope } => {
+            crate::metrics::inc_inventory_page("delta", "applied");
+            debug!(
+                target: "elohim_storage::inventory",
+                from = %source, peer_id = %peer, sequence = envelope.body.sequence,
+                added = envelope.body.added.len(), removed = envelope.body.removed.len(),
+                "Inventory delta applied"
+            );
+            crate::p2p::inventory_gossip::clear_unavailable(&peer);
+            enqueue_fetch(ctx, conn, &peer, &envelope);
+            flush_held_pages(ctx, conn, &peer, envelope.body.sequence as i64 + 1);
+        }
+        Receipt::HintsOnly { peer, .. } => {
+            crate::metrics::inc_inventory_page("delta", "hints");
+            debug!(target: "elohim_storage::inventory", peer_id = %peer, "inventory hints received");
+        }
+        Receipt::Replay { peer } => {
+            crate::metrics::inc_inventory_page("delta", "replay");
+            debug!(target: "elohim_storage::inventory", peer_id = %peer, "Inventory delta replay — dropped");
+        }
+        Receipt::Gap {
+            peer,
+            expected,
+            envelope,
+        } => {
+            let received = envelope.body.sequence;
+            match with_reorder(|r| r.stash(envelope)) {
+                StashOutcome::Buffered => {
+                    crate::metrics::inc_inventory_page("delta", "buffered");
+                    debug!(
+                        target: "elohim_storage::inventory",
+                        peer_id = %peer, expected, received,
+                        "Inventory delta ahead of the cursor — held for in-order apply"
+                    );
+                }
+                StashOutcome::Duplicate => crate::metrics::inc_inventory_page("delta", "duplicate"),
+                StashOutcome::Overflow => {
+                    crate::metrics::inc_inventory_page("delta", "overflow");
+                    warn!(
+                        target: "elohim_storage::inventory",
+                        peer_id = %peer, expected, received,
+                        "Inventory delta gap beyond the reorder window — requesting recon"
+                    );
+                    if let Some(fetch) = ctx.inventory_fetch {
+                        fetch.request_recon(&peer);
+                    }
+                }
+            }
+        }
+        Receipt::Held(reason) => {
+            crate::metrics::inc_inventory_page("delta", "held");
+            info!(
+                target: "elohim_storage::inventory",
+                from = %source, ?reason,
+                "Inventory envelope held (unknown epoch or scheme) — retained, not projected"
+            );
+        }
+        Receipt::Refused(reason) => {
+            crate::metrics::inc_inventory_page("delta", reason.label());
+            warn!(
+                target: "elohim_storage::inventory",
+                from = %source, ?reason,
+                "Inventory envelope refused"
+            );
+        }
+        Receipt::Unavailable { peer } => {
+            crate::metrics::inc_inventory_page("legacy", "unavailable");
+            debug!(
+                target: "elohim_storage::inventory",
+                peer_id = %peer,
+                "peer publishes on the retired inventory topic — reported unavailable"
+            );
+        }
+        Receipt::SinkFailed(e) => {
+            crate::metrics::inc_inventory_page("delta", "failed");
+            warn!(target: "elohim_storage::inventory", error = %e, "apply_delta failed");
+        }
+    }
+}
+
 fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
     use crate::p2p::salvage_gossip::SalvageCapacityAd;
 
@@ -822,13 +804,13 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
     // monotone refresh can still land.
     let dedup_key = format!(
         "Custody:{}:{}:{}",
-        ann.shard_hash, ann.holder_agent_cid, ann.announced_at_ms
+        ann.shard_cid, ann.holder_agent_cid, ann.announced_at_ms
     );
     if !ctx.dedup.insert(&dedup_key) {
         debug!(
             target: "elohim_storage::dedup",
             from = %source,
-            shard_hash = %ann.shard_hash,
+            shard_cid = %ann.shard_cid,
             holder = %ann.holder_agent_cid,
             "duplicate custody announcement — dropped"
         );
@@ -856,6 +838,25 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
         }
     };
 
+    // C1: the holder must be the agent the transport manifest binds to the
+    // authenticated author. iroh-gossip has no authenticated author for an
+    // unsigned announcement, so it carries no custody claim.
+    let author = match source {
+        GossipSource::Libp2p { author, .. } => author.as_deref(),
+        GossipSource::Iroh { .. } => None,
+    };
+    let bound = author.and_then(|a| bound_agent_for_author(&mut conn, a));
+    if let Err(reason) = ann.check_binding(author, bound.as_deref()) {
+        crate::metrics::inc_custody_announce("refused_binding");
+        warn!(
+            target: "elohim_storage::custody",
+            from = %source,
+            %reason,
+            "custody announcement not bound to its author — refused"
+        );
+        return;
+    }
+
     // Resolve THIS node's own agent_cid from the active session (best-effort);
     // when known it powers the self-drop guard. `None` still projects safely —
     // a self-claim about a shard we actually hold hits our stronger self-held /
@@ -864,7 +865,7 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
 
     match crate::db::shard_locations::apply_peer_announced(
         &mut conn,
-        &ann.shard_hash,
+        &ann.shard_cid.to_string(),
         &ann.holder_agent_cid,
         &ann.h_app_id,
         ann.announced_at_ms,
@@ -881,7 +882,7 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
             debug!(
                 target: "elohim_storage::custody",
                 from = %source,
-                shard_hash = %ann.shard_hash,
+                shard_cid = %ann.shard_cid,
                 holder = %ann.holder_agent_cid,
                 status = %ann.status,
                 ?outcome,
@@ -983,6 +984,7 @@ mod tests {
         let src = GossipSource::Libp2p {
             peer: "12D3KooWpeer".to_string(),
             message_id: "m1".to_string(),
+            author: Some("12D3KooWpeer".to_string()),
         };
         let secret = [5u8; 32];
         let ann = TransportManifestAnnouncement::sign(
@@ -1044,6 +1046,7 @@ mod tests {
     #[test]
     fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
         use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        use diesel::prelude::*;
         let pool = crate::test_util::test_pool();
         let dedup = crate::p2p::dedup::DedupLru::new();
         let ctx = GossipDispatchCtx {
@@ -1054,24 +1057,65 @@ mod tests {
             transport_manifest_sink: None,
             self_iroh_node_id: None,
         };
-        let src = GossipSource::Iroh {
-            node: "peer-a".to_string(),
+        {
+            use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(t::peer_transport_manifest)
+                .values((
+                    t::agent_cid.eq("uhCAkRemoteHolder"),
+                    t::libp2p_peer_id.eq("12D3KooWHolder"),
+                    t::discovery_methods_json.eq("[]"),
+                    t::capability_level.eq(1),
+                    t::last_observed.eq(1_i64),
+                ))
+                .execute(&mut conn)
+                .expect("bind author");
+        }
+        let shard = elohim_epr::address::compute_bytes_cid(b"shard xyz");
+        let shard_text = shard.to_string();
+        let src = |author: Option<&str>| GossipSource::Libp2p {
+            peer: "12D3KooWRelay".to_string(),
+            message_id: "m1".to_string(),
+            author: author.map(str::to_string),
         };
         let ann = CustodyAnnouncement {
-            shard_hash: "sha256-xyz".to_string(),
+            shard_cid: shard,
             holder_agent_cid: "uhCAkRemoteHolder".to_string(),
             h_app_id: "lamad".to_string(),
             status: "self-held".to_string(),
             announced_at_ms: 1_700_000_000_000,
-            signature: vec![0x00],
         };
         let bytes = ann.to_bytes().expect("encode");
+        let rows_now = || {
+            let mut conn = pool.get().expect("conn");
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &shard_text).unwrap()
+        };
 
-        // First arrival projects a peer-announced row.
-        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src);
-        let mut conn = pool.get().expect("conn");
-        let rows =
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, "sha256-xyz").unwrap();
+        // Unbound or unauthenticated authors project nothing.
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &src(Some("12D3KooWStranger")),
+        );
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src(None));
+        let iroh = GossipSource::Iroh {
+            node: "peer-a".to_string(),
+        };
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &iroh);
+        assert!(
+            rows_now().is_empty(),
+            "no claim lands without its bound author"
+        );
+
+        // The bound author's claim, relayed by another peer, projects one row.
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &src(Some("12D3KooWHolder")),
+        );
+        let rows = rows_now();
         assert_eq!(rows.len(), 1, "one peer-announced row projected");
         assert_eq!(rows[0].peer_id, "uhCAkRemoteHolder");
         assert_eq!(
@@ -1079,11 +1123,111 @@ mod tests {
             crate::db::shard_locations::PEER_ANNOUNCED_STATUS
         );
 
-        // An exact replay is deduped — still exactly one row (no churn, no panic).
-        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src);
-        let rows =
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, "sha256-xyz").unwrap();
-        assert_eq!(rows.len(), 1, "replay deduped — no duplicate row");
+        // An exact replay is deduped — still exactly one row.
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &src(Some("12D3KooWHolder")),
+        );
+        assert_eq!(rows_now().len(), 1, "replay deduped — no duplicate row");
+    }
+
+    #[test]
+    fn transport_key_is_the_key_a_peer_id_embeds() {
+        use elohim_epr::signature::Multikey;
+        let kp = libp2p::identity::Keypair::ed25519_from_bytes([7u8; 32]).unwrap();
+        let ed = kp.public().try_into_ed25519().unwrap().to_bytes();
+        let peer = kp.public().to_peer_id().to_string();
+        assert_eq!(transport_key(&peer), Some(Multikey::ed25519(&ed)));
+        assert_eq!(
+            transport_key(&hex::encode(ed)),
+            Some(Multikey::ed25519(&ed))
+        );
+        assert_eq!(transport_key("not-a-peer"), None);
+    }
+
+    /// End to end on libp2p: a delta signed by the key the author's PeerId embeds,
+    /// from an author the transport manifest binds, projects into
+    /// `peer_blob_inventory`; the same bytes claimed by another author project
+    /// nothing.
+    #[test]
+    fn a_bound_authors_signed_delta_projects_and_a_relabelled_one_does_not() {
+        use crate::p2p::inventory_gossip::{
+            BlobAddress, InventoryDelta, InventoryEnvelope, InventoryLevel, INVENTORY_TOPIC,
+        };
+        use diesel::prelude::*;
+        let secret = [7u8; 32];
+        let peer = libp2p::identity::Keypair::ed25519_from_bytes(secret)
+            .unwrap()
+            .public()
+            .to_peer_id()
+            .to_string();
+        let pool = crate::test_util::test_pool();
+        {
+            use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+            let mut conn = pool.get().unwrap();
+            diesel::insert_into(t::peer_transport_manifest)
+                .values((
+                    t::agent_cid.eq("uhCAkInventoryHolder"),
+                    t::libp2p_peer_id.eq(peer.as_str()),
+                    t::discovery_methods_json.eq("[]"),
+                    t::capability_level.eq(1),
+                    t::last_observed.eq(1_i64),
+                ))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = GossipDispatchCtx {
+            db_pool: Some(&pool),
+            dedup: &dedup,
+            agent_info_inbound_tx: None,
+            inventory_fetch: None,
+            transport_manifest_sink: None,
+            self_iroh_node_id: None,
+        };
+        let cid = elohim_epr::address::compute_bytes_cid(b"advertised payload");
+        let keypair = elohim_epr::AgentKeypair::from_secret(&secret).unwrap();
+        let envelope = InventoryEnvelope::sign(
+            &keypair,
+            &peer,
+            InventoryLevel::Full,
+            InventoryDelta {
+                added: vec![BlobAddress::from(cid)],
+                hints: vec![],
+                removed: vec![],
+                sequence: 1,
+                emitted_at: 1_700_000_000_000_000,
+            },
+        );
+        let hosts = || {
+            let mut conn = pool.get().unwrap();
+            crate::db::peer_blob_inventory::lookup_hosts(
+                &mut conn,
+                &cid.to_string(),
+                "2000-01-01T00:00:00Z",
+            )
+            .unwrap()
+        };
+        let from = |author: &str| GossipSource::Libp2p {
+            peer: "12D3KooWRelay".to_string(),
+            message_id: "m".to_string(),
+            author: Some(author.to_string()),
+        };
+
+        handle_gossip(
+            &ctx,
+            INVENTORY_TOPIC,
+            &envelope.to_bytes(),
+            &from("12D3KooWOther"),
+        );
+        assert!(hosts().is_empty(), "author mismatch projects nothing");
+
+        handle_gossip(&ctx, INVENTORY_TOPIC, &envelope.to_bytes(), &from(&peer));
+        let rows = hosts();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].peer_id, peer);
     }
 
     #[test]
@@ -1091,6 +1235,7 @@ mod tests {
         let l = GossipSource::Libp2p {
             peer: "12D3Koo".to_string(),
             message_id: "m1".to_string(),
+            author: None,
         };
         let i = GossipSource::Iroh {
             node: "node123".to_string(),

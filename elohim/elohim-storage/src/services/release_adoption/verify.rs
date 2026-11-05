@@ -50,6 +50,8 @@
 //! length is a corruption/substitution story, and folding them loses the only
 //! signal that tells those apart.
 
+use elohim_epr::address::ByteCid;
+use elohim_epr::profile::BYTE_PROFILE_EPOCH;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -239,27 +241,15 @@ fn is_role_name(s: &str) -> bool {
     chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
-/// `^bafkrei[a-z2-7]{52}$` — CIDv1, raw codec, sha2-256, base32-lower.
-///
-/// The address form the blob plane is canonical on. A bare `sha256-<hex>` is
-/// the LEGACY blob-path form and is refused here by construction: sha2-256 is
-/// the multihash INSIDE a CID, never a standalone address.
+/// Whether `s` is a byte CID, by full decode ([`ByteCid::parse`]): CIDv1, raw codec,
+/// BLAKE3-256, 36 bytes, canonical spelling. A `sha256-<hex>`, a `bafkrei…` (sha2)
+/// citation CID or any malformed text fails; there is no prefix check.
 pub fn is_blob_cid(s: &str) -> bool {
-    let Some(rest) = s.strip_prefix("bafkrei") else {
-        return false;
-    };
-    rest.len() == 52
-        && rest
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || ('2'..='7').contains(&c))
+    ByteCid::parse(s).is_ok()
 }
 
-/// `^[0-9a-f]{64}$`
-pub fn is_sha256_hex(s: &str) -> bool {
-    s.len() == 64
-        && s.chars()
-            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
-}
+/// The release-manifest version this build reads.
+pub const RELEASE_MANIFEST_VERSION: &str = "2.0";
 
 /// `^uhC0k[A-Za-z0-9_-]{48}$` — a Holochain DnaHash.
 pub fn is_dna_hash(s: &str) -> bool {
@@ -306,13 +296,14 @@ pub fn verify_shape(body: &serde_json::Value) -> Result<ReleaseManifest, Adoptio
             ),
         ));
     }
-    if let Some(v) = manifest.manifest_version.as_deref() {
-        if v != "1.0" {
-            return Err(refuse(
-                RefusalReason::ManifestSchemaInvalid,
-                format!("manifestVersion must be '1.0' (absent means 1.0), got '{v}'"),
-            ));
-        }
+    if manifest.manifest_version.as_deref() != Some(RELEASE_MANIFEST_VERSION) {
+        return Err(refuse(
+            RefusalReason::ManifestSchemaInvalid,
+            format!(
+                "manifestVersion must be '{RELEASE_MANIFEST_VERSION}', got {:?}",
+                manifest.manifest_version
+            ),
+        ));
     }
     if !is_channel_id(&manifest.channel_id) {
         return Err(refuse(
@@ -571,22 +562,23 @@ fn verify_app_bundle_shape(manifest: &ReleaseManifest) -> Result<(), AdoptionRef
 }
 
 fn verify_artifact_shape(artifact: &Artifact) -> Result<(), AdoptionRefusal> {
-    if !is_blob_cid(&artifact.blob_cid) {
+    if let Err(error) = ByteCid::parse(&artifact.blob_cid) {
         return Err(refuse(
             RefusalReason::ManifestSchemaInvalid,
             format!(
-                "artifact blobCid '{}' is not a raw-codec CIDv1 (bafkrei…). A bare \
-                 sha256-<hex> is the LEGACY blob-path form and is never an address.",
-                artifact.blob_cid
+                "artifact blobCid '{}' is not a byte CID ({}): only raw + BLAKE3-256 \
+                 (bafkr4i…) addresses bytes",
+                artifact.blob_cid,
+                error.check()
             ),
         ));
     }
-    if !is_sha256_hex(&artifact.sha256) {
+    if artifact.profile.epoch != BYTE_PROFILE_EPOCH {
         return Err(refuse(
-            RefusalReason::ManifestSchemaInvalid,
+            RefusalReason::WireEpochUnsupported,
             format!(
-                "artifact sha256 '{}' is not 64 lowercase hex",
-                artifact.sha256
+                "artifact '{}' declares byte profile epoch {}; this build reads {}",
+                artifact.filename, artifact.profile.epoch, BYTE_PROFILE_EPOCH
             ),
         ));
     }
@@ -1468,8 +1460,8 @@ pub struct FetchedArtifact {
     pub path: PathBuf,
     /// Actual byte length.
     pub bytes: u64,
-    /// Actual sha2-256, lowercase hex.
-    pub sha256: String,
+    /// The byte CID recomputed over the served bytes.
+    pub served_cid: ByteCid,
 }
 
 /// Match fetched bytes to the manifest, in manifest order.
@@ -1504,12 +1496,12 @@ pub fn verify_artifacts(
                 ),
             ));
         }
-        if !actual.sha256.eq_ignore_ascii_case(&declared.sha256) {
+        if ByteCid::parse(&declared.blob_cid).ok() != Some(actual.served_cid) {
             return Err(refuse(
                 RefusalReason::ArtifactDigestMismatch,
                 format!(
-                    "'{}' ({}): manifest declares sha256 {}, source served {}",
-                    declared.filename, declared.blob_cid, declared.sha256, actual.sha256
+                    "'{}': manifest declares {}, the served bytes hash to {}",
+                    declared.filename, declared.blob_cid, actual.served_cid
                 ),
             ));
         }
@@ -2016,6 +2008,17 @@ mod tests {
 
     /// A `sha256-<hex>` in a `cid` field is the legacy-address confusion the
     /// addressing canon exists to refuse. Serde would accept it happily.
+    #[test]
+    fn a_sha2_citation_cid_and_padding_are_not_byte_cids() {
+        let cite = elohim_epr::address::compute_raw_sha2_cid(b"hello world").to_string();
+        assert!(cite.starts_with("bafkrei"));
+        assert!(!is_blob_cid(&cite));
+        let byte = elohim_epr::address::compute_bytes_cid(b"hello world").to_string();
+        assert!(is_blob_cid(&byte));
+        assert!(!is_blob_cid(&format!("{byte}=")));
+        assert!(!is_blob_cid(&byte.to_uppercase()));
+    }
+
     #[test]
     fn a_legacy_sha256_address_is_not_a_blob_cid() {
         let mut body = fixture("release-manifest-coordinator-bundle.json");
@@ -3577,7 +3580,7 @@ mod tests {
                 blob_cid: declared.blob_cid.clone(),
                 path: PathBuf::from("/tmp/a"),
                 bytes: declared.bytes - 1,
-                sha256: declared.sha256.clone(),
+                served_cid: ByteCid::parse(&declared.blob_cid).unwrap(),
             }],
         )
         .expect_err("short read");
@@ -3592,7 +3595,7 @@ mod tests {
                 blob_cid: declared.blob_cid.clone(),
                 path: PathBuf::from("/tmp/a"),
                 bytes: declared.bytes,
-                sha256: "0".repeat(64),
+                served_cid: elohim_epr::address::compute_bytes_cid(b"substituted bytes"),
             }],
         )
         .expect_err("substituted bytes");
@@ -3607,10 +3610,10 @@ mod tests {
                 blob_cid: declared.blob_cid.clone(),
                 path: PathBuf::from("/tmp/a"),
                 bytes: declared.bytes,
-                sha256: declared.sha256.to_ascii_uppercase(),
+                served_cid: ByteCid::parse(&declared.blob_cid).unwrap(),
             }],
         )
-        .expect("digest comparison is case-insensitive hex");
+        .expect("the served bytes hash to the declared byte CID");
         assert_eq!(ok, vec![PathBuf::from("/tmp/a")]);
     }
 
@@ -3656,7 +3659,7 @@ mod tests {
             blob_cid: declared.blob_cid.clone(),
             path: PathBuf::from("/var/lib/elohim/release-staging/x/content_store.wasm"),
             bytes: declared.bytes,
-            sha256: declared.sha256.clone(),
+            served_cid: ByteCid::parse(&declared.blob_cid).unwrap(),
         }];
         let evidence = QualifyingEvidence {
             qualifying: 2,
@@ -3715,7 +3718,7 @@ mod tests {
             blob_cid: declared.blob_cid.clone(),
             path: PathBuf::from("/var/lib/elohim/release-staging/x/content_store.wasm"),
             bytes: declared.bytes,
-            sha256: declared.sha256.clone(),
+            served_cid: ByteCid::parse(&declared.blob_cid).unwrap(),
         }];
         let evidence = QualifyingEvidence {
             qualifying: 2,
@@ -3793,7 +3796,7 @@ mod tests {
             blob_cid: declared.blob_cid.clone(),
             path: PathBuf::from("/var/lib/elohim/release-staging/x/content_store.wasm"),
             bytes: declared.bytes,
-            sha256: declared.sha256.clone(),
+            served_cid: ByteCid::parse(&declared.blob_cid).unwrap(),
         }];
         let unmet = QualifyingEvidence {
             qualifying: 0,
@@ -4103,7 +4106,7 @@ mod tests {
                 blob_cid: a.blob_cid.clone(),
                 path: PathBuf::from(format!("/var/lib/elohim/release-staging/x/{}", a.filename)),
                 bytes: a.bytes,
-                sha256: a.sha256.clone(),
+                served_cid: ByteCid::parse(&a.blob_cid).unwrap(),
             })
             .collect()
     }

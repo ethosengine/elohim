@@ -226,14 +226,14 @@ impl AppArtifactKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Artifact {
-    /// CIDv1, raw codec, sha2-256, base32-lower. The ADDRESS. A bare
-    /// `sha256-<hex>` here is a schema violation, not a legacy tolerance.
+    /// The byte CID (raw 0x55 + BLAKE3-256, `bafkr4i…`): the ADDRESS and the
+    /// digest at once. Admitted by full decode (`ByteCid::parse`) in `verify_shape`.
     pub blob_cid: String,
     /// Exact byte length. A fetch that yields a different length is a typed
     /// refusal, never a retry.
     pub bytes: u64,
-    /// sha2-256 hex of the same bytes — byte-equality verification only.
-    pub sha256: String,
+    /// The byte profile the address was minted under.
+    pub profile: ArtifactProfile,
     /// Base name the artifact is applied under. Never a path.
     pub filename: String,
     #[serde(default)]
@@ -249,6 +249,14 @@ pub struct Artifact {
     /// with [`Self::app`] it names exactly one artifact per (app, kind) pair.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<AppArtifactKind>,
+}
+
+/// An artifact's byte profile declaration (release-manifest 2.0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactProfile {
+    /// Byte profile epoch (`elohim_epr::profile::BYTE_PROFILE_EPOCH`).
+    pub epoch: u16,
 }
 
 /// The installed reality one role of a release binds to.
@@ -477,7 +485,8 @@ pub struct Provenance {
 pub struct ReleaseManifest {
     /// Always `release-manifest` — the `metadata_json` discriminator.
     pub kind: String,
-    /// Absent means `1.0`. Bumps only on a NON-additive shape change.
+    /// `"2.0"` (required since the address crossing). Bumps only on a
+    /// NON-additive shape change.
     #[serde(default)]
     pub manifest_version: Option<String>,
     pub channel_id: String,

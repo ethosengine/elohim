@@ -1,92 +1,48 @@
-//! Inventory broadcaster — snapshot timer + delta emitter + sequence allocator.
+//! Inventory broadcaster: signed delta pages, sequence allocation, hints and parity.
 //!
-//! Responsibilities:
-//! - Periodically (per archetype-tunable cadence) compute the local set of
-//!   hosted blob hashes and publish a `BlobInventorySnapshot` to
-//!   `elohim/inventory/blob`.
-//! - On local blob add/remove events, emit a `BlobInventoryDelta` (with a
-//!   small batching window to coalesce bursts).
-//! - Allocate per-this-peer monotonic sequence numbers for both message types.
+//! - On local blob add/remove events, emit signed [`InventoryEnvelope`] pages (each at
+//!   most [`INVENTORY_PAGE_LIMIT`] encoded bytes, its own sequence) on
+//!   [`crate::p2p::inventory_gossip::INVENTORY_TOPIC`].
+//! - Full-state convergence is range reconciliation
+//!   ([`crate::p2p::inventory_recon`]); the periodic cadence ([`resolved_cadence`]) now
+//!   paces recon sessions. There is no snapshot.
+//! - Allocate this peer's monotonic sequence numbers.
 //!
-//! Source of truth for "what blobs do I host": the local blob store; the
-//! enumeration is delegated to `LocalInventory` so it can be mocked in tests.
+//! Source of truth for "what blobs do I host": the local blob store
+//! ([`crate::blob_store::BlobStore::list_cids`]), enumerated through
+//! [`LocalInventory`] so it can be mocked.
 //!
-//! ## Wave 3: gather_hints
-//!
-//! `gather_hints(conn, hashes, local_peer_id)` enriches a set of local blob
-//! hashes with per-blob metadata derived from the `content` projection:
-//! - `epr_kind`: canonical EprKind entry-type (`"Content"`), matching the
-//!   `scope_filter.epr_kinds` schema vocabulary.
-//! - `size_bytes`: `content_size_bytes` (uncompressed).
-//! - `recipient_hub_id`: the ADVERTISING peer's dwelling hub via
-//!   `hub_resolver::resolve_peer_dwelling_hub` (custody chain, once per call).
-//! - `tier`: left `None` (TierController is a separate epic).
-//!
-//! A hint is emitted for every hash with a matching `content` row. The join is
-//! inline Diesel (read-side) over the `content` projection; no
-//! ReconcileController writes are performed here.
+//! `gather_hints(conn, addresses, local_peer_id)` enriches local addresses with
+//! advisory metadata from the `content` projection (`epr_kind`, `size_bytes`, the
+//! advertising peer's dwelling hub as `recipient_hub_id`).
 
-use crate::p2p::inventory_gossip::{
-    BlobAddress, BlobHint, BlobInventoryDelta, BlobInventorySnapshot,
-};
+pub use crate::p2p::inventory_gossip::INVENTORY_PAGE_LIMIT;
+use crate::p2p::inventory_gossip::{signed_pages, BlobAddress, BlobHint, InventoryEnvelope};
+use elohim_epr::proof::AgentKeypair;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Conservative payload ceiling below iroh-gossip 0.92's 4096-byte encoded
-/// message cap. The remaining headroom covers the transport's postcard
-/// envelope; libp2p accepts the same byte-identical pages.
-pub const INVENTORY_GOSSIP_PAYLOAD_BUDGET: usize = 3_500;
-
-/// One bounded publication in a full inventory refresh. The first page is a
-/// replacement snapshot; subsequent pages are contiguous additive deltas.
-/// Existing receive-side sequence/gap handling therefore reassembles the full
-/// set without a new staging table or transport-specific payload.
-#[derive(Debug, Clone)]
-pub enum InventoryPublication {
-    Snapshot(BlobInventorySnapshot),
-    Delta(BlobInventoryDelta),
-}
-
-impl InventoryPublication {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, rmp_serde::encode::Error> {
-        match self {
-            Self::Snapshot(snapshot) => snapshot.to_bytes(),
-            Self::Delta(delta) => delta.to_bytes(),
-        }
-    }
-
-    pub fn sequence(&self) -> u64 {
-        match self {
-            Self::Snapshot(snapshot) => snapshot.sequence,
-            Self::Delta(delta) => delta.sequence,
-        }
-    }
-}
-
-/// Trait for enumerating the local blob inventory. Production: walks the
-/// blob store. Tests: returns a fixed set.
+/// Enumerates the local blob inventory. Production: [`StaticInventory`] over
+/// `BlobStore::list_cids()`. Tests: a fixed set.
 pub trait LocalInventory: Send + Sync {
-    fn current_hashes(&self) -> Vec<BlobAddress>;
+    fn current_addresses(&self) -> Vec<BlobAddress>;
 }
 
-/// T22 review fix #1: wraps a pre-fetched list of hashes for `LocalInventory`.
+/// A pre-fetched list of addresses.
 ///
-/// Production callers fetch via `BlobStore::list_hashes()` first and pass the
-/// result here so I/O failure can return early *before* ever entering
-/// `build_snapshot`. Previously `BlobStoreInventory` swallowed the error and
-/// returned an empty `Vec`, which caused `apply_snapshot` on every remote peer
-/// to evict this peer's inventory entries during a transient I/O blip.
+/// Production callers fetch via `BlobStore::list_cids()` first and pass the result
+/// here, so an I/O failure returns early instead of announcing an empty inventory.
 pub struct StaticInventory(Vec<BlobAddress>);
 
 impl StaticInventory {
-    pub fn new(hashes: Vec<BlobAddress>) -> Self {
-        Self(hashes)
+    pub fn new(addresses: Vec<BlobAddress>) -> Self {
+        Self(addresses)
     }
 }
 
 impl LocalInventory for StaticInventory {
-    fn current_hashes(&self) -> Vec<BlobAddress> {
+    fn current_addresses(&self) -> Vec<BlobAddress> {
         self.0.clone()
     }
 }
@@ -114,45 +70,28 @@ impl SequenceAllocator {
     }
 }
 
-/// Gather per-blob hints for the given set of hashes.
+/// Gather advisory hints for local addresses from the `content` projection.
 ///
-/// For each hash, joins the `content` projection on `blob_hash` to derive:
-/// - `epr_kind`: the canonical EprKind entry-type string — always `"Content"`
-///   for rows sourced from the `content` projection. Must stay in the
-///   `scope_filter.epr_kinds` schema vocabulary (EprKind names), NOT the lamad
-///   `content_format` vocabulary (storage-tier review 2026-06-04, finding #2).
-/// - `size_bytes`: `content_size_bytes` (uncompressed byte count).
-/// - `recipient_hub_id`: the ADVERTISING peer's dwelling hub via
-///   `hub_resolver::resolve_peer_dwelling_hub(local_peer_id)` — the
-///   `peer_id → agent_cid → dwelling_hub_id` custody chain (dwelling-hub spec
-///   §8.2), resolved ONCE per call since every advertised blob is in this
-///   peer's custody. NOT the content author's hub: a blob authored elsewhere
-///   but custodied here belongs to THIS dwelling for replication-matching
-///   (storage-tier review 2026-06-04, finding #3).
-/// - `tier`: `None` — TierController is a separate epic.
+/// - `epr_kind`: the canonical EprKind entry-type (`"Content"`), the
+///   `scope_filter.epr_kinds` vocabulary, never `content_format`.
+/// - `size_bytes`: `content_size_bytes`.
+/// - `recipient_hub_id`: the ADVERTISING peer's dwelling hub, resolved once per call.
+/// - `tier`: `None`.
 ///
-/// A hint is emitted for every hash with a matching `content` row.
-/// This is a read-side inline Diesel query — no writes, no ReconcileController.
-///
-/// # Errors
-///
-/// Database errors are logged at `warn` level and the affected hint is dropped.
-/// An empty `Vec` is always valid (hints are advisory; absence does not block gossip).
+/// Database errors are logged and yield fewer (or no) hints; hints never block gossip.
 pub fn gather_hints(
     conn: &mut diesel::SqliteConnection,
-    hashes: &[BlobAddress],
+    addresses: &[BlobAddress],
     local_peer_id: &str,
 ) -> Vec<BlobHint> {
     use crate::db::diesel_schema::content::dsl as ct;
     use crate::services::hub_resolver;
     use diesel::prelude::*;
 
-    if hashes.is_empty() {
+    if addresses.is_empty() {
         return Vec::new();
     }
 
-    // Custody chain, once per call: all advertised blobs are in this peer's
-    // custody, so they all carry the same dwelling hub.
     let now_iso = chrono::Utc::now().to_rfc3339();
     let recipient_hub_id: Option<String> = match hub_resolver::resolve_peer_dwelling_hub(
         conn,
@@ -171,13 +110,12 @@ pub fn gather_hints(
         }
     };
 
-    // Collect hash strings for the IN query.
-    let hash_strs: Vec<&str> = hashes.iter().map(|a| a.as_str()).collect();
+    let cid_strs: Vec<String> = addresses.iter().map(|a| a.to_string()).collect();
 
-    // One query for all matching content rows — avoids N+1.
+    // One query for all matching content rows.
     let rows: Vec<(String, Option<i32>)> = match ct::content
-        .filter(ct::blob_hash.eq_any(&hash_strs))
-        .select((ct::blob_hash.assume_not_null(), ct::content_size_bytes))
+        .filter(ct::blob_cid.eq_any(&cid_strs))
+        .select((ct::blob_cid.assume_not_null(), ct::content_size_bytes))
         .load::<(String, Option<i32>)>(conn)
     {
         Ok(r) => r,
@@ -192,229 +130,49 @@ pub fn gather_hints(
     };
 
     let mut hints = Vec::with_capacity(rows.len());
-    for (blob_hash, size_bytes) in rows {
-        let Ok(address) = BlobAddress::new(blob_hash) else {
+    for (blob_cid, size_bytes) in rows {
+        let Ok(address) = BlobAddress::parse(&blob_cid) else {
             continue;
         };
-
-        // Canonical EprKind entry-type, NOT content_format: the scorer matches
-        // this against commitment scope_filter.epr_kinds, whose schema enum is
-        // EprKind names ("Content", "Manifest", …). Everything in the content
-        // projection is a Content entry, so the kind is always populated and
-        // every matched row emits a hint (the old sparse-skip is unreachable).
         let epr_kind = Some(
             crate::services::epr_kind::kind_canonical_str(elohim_epr::EprKind::Content).to_string(),
         );
-        let size: Option<u64> = size_bytes.map(|s| s.max(0) as u64);
-
         hints.push(BlobHint {
+            tier: None,
             address,
-            recipient_hub_id: recipient_hub_id.clone(),
             epr_kind,
-            size_bytes: size,
-            tier: None, // TierController is a separate epic
+            size_bytes: size_bytes.map(|s| s.max(0) as u64),
+            recipient_hub_id: recipient_hub_id.clone(),
         });
     }
     hints
 }
 
-/// Build a snapshot for the given peer id with the given inventory and optional hints.
-///
-/// Wave 3: `hints` are gathered by the caller via `gather_hints(conn, &hashes, local_peer_id)`
-/// before construction so the DB call can be skipped on I/O failure.
-pub fn build_snapshot<I: LocalInventory>(
-    peer_id: &str,
-    inventory: &I,
+/// Build the signed pages announcing `added`/`removed`, each with the next sequence
+/// from `seq`, signed by `keypair` as `author_peer` (whose embedded key it must be).
+pub fn build_delta_pages(
+    keypair: &AgentKeypair,
+    author_peer: &str,
+    added: &[BlobAddress],
+    removed: &[BlobAddress],
     seq: &SequenceAllocator,
     now_micros: i64,
-    hints: Vec<BlobHint>,
-) -> BlobInventorySnapshot {
-    BlobInventorySnapshot {
-        peer_id: peer_id.to_string(),
-        hashes: inventory.current_hashes(),
-        hints,
-        snapshot_at: now_micros,
-        sequence: seq.next(),
-        signature: vec![0x00], // Stage 1 structural non-empty
-    }
-}
-
-fn candidate_publication_len(
-    peer_id: &str,
-    hashes: &[BlobAddress],
     hints: &[BlobHint],
-    now_micros: i64,
-    first: bool,
-) -> Result<usize, rmp_serde::encode::Error> {
-    if first {
-        BlobInventorySnapshot {
-            peer_id: peer_id.to_string(),
-            hashes: hashes.to_vec(),
-            hints: hints.to_vec(),
-            snapshot_at: now_micros,
-            sequence: u64::MAX,
-            signature: vec![0x00],
-        }
-        .to_bytes()
-        .map(|bytes| bytes.len())
-    } else {
-        BlobInventoryDelta {
-            peer_id: peer_id.to_string(),
-            added: hashes.to_vec(),
-            removed: vec![],
-            hints: hints.to_vec(),
-            emitted_at: now_micros,
-            sequence: u64::MAX,
-            signature: vec![0x00],
-        }
-        .to_bytes()
-        .map(|bytes| bytes.len())
-    }
-}
-
-/// Build a full refresh as one bounded snapshot plus zero or more bounded
-/// additive deltas. Hashes remain the local blob-store inventory, which already
-/// includes individually held shards; this function fixes the frame-size leg
-/// that previously made those facts disappear on iroh.
-pub fn build_bounded_inventory_publications<I: LocalInventory>(
-    peer_id: &str,
-    inventory: &I,
-    seq: &SequenceAllocator,
-    now_micros: i64,
-    hints: Vec<BlobHint>,
-    payload_budget: usize,
-) -> Result<Vec<InventoryPublication>, rmp_serde::encode::Error> {
-    use std::collections::HashMap;
-
-    let hashes = inventory.current_hashes();
-    if hashes.is_empty() {
-        return Ok(vec![InventoryPublication::Snapshot(build_snapshot(
-            peer_id, inventory, seq, now_micros, hints,
-        ))]);
-    }
-
-    let mut hints_by_address: HashMap<String, Vec<BlobHint>> = HashMap::new();
-    for hint in hints {
-        hints_by_address
-            .entry(hint.address.as_str().to_string())
-            .or_default()
-            .push(hint);
-    }
-
-    let mut chunks: Vec<(Vec<BlobAddress>, Vec<BlobHint>)> = Vec::new();
-    let mut current_hashes: Vec<BlobAddress> = Vec::new();
-    let mut current_hints: Vec<BlobHint> = Vec::new();
-
-    // bounded-work: hashes.len() with at most one retry after closing a page;
-    // optional hints may be dropped, but every hosted address is retained.
-    for hash in hashes {
-        let item_hints = hints_by_address.remove(hash.as_str()).unwrap_or_default();
-        let mut trial_hashes = current_hashes.clone();
-        trial_hashes.push(hash.clone());
-        let mut trial_hints = current_hints.clone();
-        trial_hints.extend(item_hints.clone());
-        let first = chunks.is_empty();
-
-        let with_hints =
-            candidate_publication_len(peer_id, &trial_hashes, &trial_hints, now_micros, first)?;
-        if with_hints <= payload_budget {
-            current_hashes = trial_hashes;
-            current_hints = trial_hints;
-            continue;
-        }
-
-        // Hints are advisory. Preserve the shard/blob address first when a
-        // large enrichment would push an otherwise-valid page over the cap.
-        let without_item_hints =
-            candidate_publication_len(peer_id, &trial_hashes, &current_hints, now_micros, first)?;
-        if without_item_hints <= payload_budget {
-            current_hashes = trial_hashes;
-            tracing::warn!(
-                target: "elohim_storage::inventory",
-                address = %hash.as_str(),
-                dropped_hints = item_hints.len(),
-                "inventory hint omitted to preserve bounded gossip frame"
-            );
-            continue;
-        }
-
-        if !current_hashes.is_empty() {
-            chunks.push((current_hashes, current_hints));
-            current_hashes = vec![hash.clone()];
-            current_hints = item_hints;
-            let next_len = candidate_publication_len(
-                peer_id,
-                &current_hashes,
-                &current_hints,
-                now_micros,
-                false,
-            )?;
-            if next_len > payload_budget {
-                current_hints.clear();
-            }
-        } else {
-            // A canonical address alone is far below the budget. If an
-            // unexpectedly large peer id/envelope violates that invariant,
-            // retain the address so publication fails visibly at the caller
-            // instead of silently omitting custody evidence.
-            current_hashes.push(hash);
-        }
-    }
-    if !current_hashes.is_empty() {
-        chunks.push((current_hashes, current_hints));
-    }
-
-    let mut publications = Vec::with_capacity(chunks.len());
-    for (index, (hashes, hints)) in chunks.into_iter().enumerate() {
-        if index == 0 {
-            publications.push(InventoryPublication::Snapshot(BlobInventorySnapshot {
-                peer_id: peer_id.to_string(),
-                hashes,
-                hints,
-                snapshot_at: now_micros,
-                sequence: seq.next(),
-                signature: vec![0x00],
-            }));
-        } else {
-            publications.push(InventoryPublication::Delta(BlobInventoryDelta {
-                peer_id: peer_id.to_string(),
-                added: hashes,
-                removed: vec![],
-                hints,
-                emitted_at: now_micros,
-                sequence: seq.next(),
-                signature: vec![0x00],
-            }));
-        }
-    }
-    Ok(publications)
-}
-
-/// Build a delta for the given add/remove batch and optional hints.
-///
-/// Wave 3: `hints` are gathered by the caller via `gather_hints(conn, &added_hashes, local_peer_id)`.
-pub fn build_delta(
-    peer_id: &str,
-    added: Vec<BlobAddress>,
-    removed: Vec<BlobAddress>,
-    seq: &SequenceAllocator,
-    now_micros: i64,
-    hints: Vec<BlobHint>,
-) -> BlobInventoryDelta {
-    BlobInventoryDelta {
-        peer_id: peer_id.to_string(),
+) -> Vec<InventoryEnvelope> {
+    signed_pages(
+        keypair,
+        author_peer,
         added,
         removed,
         hints,
-        emitted_at: now_micros,
-        sequence: seq.next(),
-        signature: vec![0x00], // Stage 1 structural non-empty
-    }
+        now_micros,
+        || seq.next(),
+    )
 }
 
-/// Compute the resolved cadence for this peer's archetype, honoring the
-/// 4-layer override pattern (archetype default ← policy.toml ← env/CLI ←
-/// admin trigger). Returns `None` to mean "broadcasting disabled."
+/// The resolved cadence for this peer's archetype, honoring the 4-layer override
+/// pattern (archetype default ← policy.toml ← env/CLI ← admin trigger). `None` means
+/// disabled. It paces recon sessions with known holders.
 pub fn resolved_cadence(archetype: Option<&str>, config_override: Option<u64>) -> Option<u64> {
     if let Some(seconds) = config_override {
         if seconds == 0 {
@@ -430,16 +188,13 @@ mod tests {
     use super::*;
     use crate::p2p::inventory_gossip::BlobAddress;
 
-    fn sha256_wire(byte: char) -> String {
-        format!(
-            "sha256-{}",
-            std::iter::repeat_n(byte, 64).collect::<String>()
-        )
+    fn cid_wire(byte: char) -> String {
+        elohim_epr::address::compute_bytes_cid(&[byte as u8]).to_string()
     }
 
     struct MockInventory(Vec<BlobAddress>);
     impl LocalInventory for MockInventory {
-        fn current_hashes(&self) -> Vec<BlobAddress> {
+        fn current_addresses(&self) -> Vec<BlobAddress> {
             self.0.clone()
         }
     }
@@ -451,40 +206,6 @@ mod tests {
         assert_eq!(alloc.next(), 2);
         assert_eq!(alloc.next(), 3);
         assert_eq!(alloc.current(), 3);
-    }
-
-    #[test]
-    fn snapshot_includes_inventory_and_advances_sequence() {
-        let inv = MockInventory(vec![
-            BlobAddress::new(sha256_wire('a')).unwrap(),
-            BlobAddress::new(sha256_wire('b')).unwrap(),
-        ]);
-        let alloc = SequenceAllocator::new(10);
-        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1_700_000_000_000_000, vec![]);
-
-        assert_eq!(snapshot.peer_id, "12D3KooWtest");
-        assert_eq!(snapshot.hashes.len(), 2);
-        assert_eq!(snapshot.sequence, 11);
-        assert_eq!(snapshot.signature, vec![0x00]);
-        assert!(snapshot.hints.is_empty(), "no hints provided → empty");
-    }
-
-    #[test]
-    fn delta_carries_added_and_removed() {
-        let alloc = SequenceAllocator::new(0);
-        let delta = build_delta(
-            "12D3KooWtest",
-            vec![BlobAddress::new(sha256_wire('a')).unwrap()],
-            vec![BlobAddress::new(sha256_wire('b')).unwrap()],
-            &alloc,
-            1_700_000_001_000_000,
-            vec![],
-        );
-
-        assert_eq!(delta.added.len(), 1);
-        assert_eq!(delta.removed.len(), 1);
-        assert_eq!(delta.sequence, 1);
-        assert!(delta.hints.is_empty(), "no hints provided → empty");
     }
 
     #[test]
@@ -505,18 +226,15 @@ mod tests {
         assert_eq!(resolved_cadence(Some("node"), Some(0)), None);
     }
 
-    /// T22 review fix #1: `StaticInventory` round-trips its provided hashes
-    /// through `LocalInventory::current_hashes`. The production caller fetches
-    /// hashes via `BlobStore::list_hashes()` *before* constructing this and
-    /// returns early on I/O failure; the adapter itself is intentionally
-    /// dumb so the failure path can never reach `build_snapshot`. BlobStore's
-    /// own `list_hashes` tests cover the I/O behavior.
+    /// `StaticInventory` returns the addresses it was given; the production caller
+    /// fetches them via `BlobStore::list_cids()` first and returns early on I/O
+    /// failure.
     #[test]
-    fn static_inventory_returns_provided_hashes() {
-        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
-        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
+    fn static_inventory_returns_provided_addresses() {
+        let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
+        let addr_b = BlobAddress::parse(&cid_wire('b')).unwrap();
         let inv = StaticInventory::new(vec![addr_a.clone(), addr_b.clone()]);
-        let hashes = inv.current_hashes();
+        let hashes = inv.current_addresses();
         assert_eq!(hashes, vec![addr_a, addr_b]);
     }
 
@@ -542,7 +260,7 @@ mod tests {
 
     fn seed_content_with_blob(
         conn: &mut diesel::SqliteConnection,
-        blob_hash: &str,
+        blob_cid: &str,
         content_format: &str,
         size_bytes: Option<i32>,
         created_by: Option<&str>,
@@ -551,12 +269,12 @@ mod tests {
         use diesel::prelude::*;
         diesel::insert_into(ct::content)
             .values((
-                ct::id.eq(format!("content-{blob_hash}")),
+                ct::id.eq(format!("content-{blob_cid}")),
                 ct::h_app_id.eq("test-app"),
                 ct::title.eq("test"),
                 ct::content_type.eq("Concept"),
                 ct::content_format.eq(content_format),
-                ct::blob_hash.eq(blob_hash),
+                ct::blob_cid.eq(blob_cid),
                 ct::content_size_bytes.eq(size_bytes),
                 ct::created_by.eq(created_by),
                 ct::reach.eq("commons"),
@@ -574,7 +292,7 @@ mod tests {
         let pool = test_db_pool();
         let mut conn = pool.get().expect("conn");
         // Use 'f' — valid lowercase hex char not used in other gather_hints tests.
-        let addr = BlobAddress::new(sha256_wire('f')).unwrap();
+        let addr = BlobAddress::parse(&cid_wire('f')).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWUnboundPeer");
         assert!(hints.is_empty(), "no matching content → no hints");
     }
@@ -585,10 +303,10 @@ mod tests {
         let pool = test_db_pool();
         let mut conn = pool.get().expect("conn");
 
-        let hash = sha256_wire('a');
+        let hash = cid_wire('a');
         seed_content_with_blob(&mut conn, &hash, "sophia-quiz-json", Some(8192), None);
 
-        let addr = BlobAddress::new(hash.clone()).unwrap();
+        let addr = BlobAddress::parse(&hash.clone()).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWUnboundPeer");
 
         assert_eq!(hints.len(), 1);
@@ -619,9 +337,9 @@ mod tests {
         let pool = test_db_pool();
         let mut conn = pool.get().expect("conn");
         // Use 'd' — valid lowercase hex char not used in other gather_hints tests.
-        let hash = sha256_wire('d');
+        let hash = cid_wire('d');
         seed_content_with_blob(&mut conn, &hash, "markdown", Some(1024), None);
-        let addr = BlobAddress::new(hash).unwrap();
+        let addr = BlobAddress::parse(&hash).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWUnboundPeer");
         assert_eq!(hints.len(), 1);
         assert_eq!(
@@ -645,16 +363,16 @@ mod tests {
         let pool = test_db_pool();
         let mut conn = pool.get().expect("conn");
         // Use 'e' — valid lowercase hex char not used in other gather_hints tests.
-        let hash = sha256_wire('e');
+        let hash = cid_wire('e');
         seed_content_with_blob(&mut conn, &hash, "markdown", Some(2048), None);
-        let addr = BlobAddress::new(hash).unwrap();
+        let addr = BlobAddress::parse(&hash).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWUnboundPeer");
         assert_eq!(hints.len(), 1);
         let h = &hints[0];
 
         // Mirror the receive-arm BlobHint → AdvertisedBlob mapping (p2p/mod.rs).
         let advertised = AdvertisedBlob {
-            blob_cid: h.address.as_str().to_string(),
+            blob_cid: h.address.to_string(),
             source_peer_cid: "peer:source".into(),
             blob_size_bytes: h.size_bytes,
             recipient_hub_id_hint: Some("collective:hubH".into()),
@@ -782,7 +500,7 @@ mod tests {
 
         // Blob authored by Y (household A) but custodied by THIS peer (household H).
         // Use 'c' — valid lowercase hex char not used in other gather_hints tests.
-        let hash = sha256_wire('c');
+        let hash = cid_wire('c');
         seed_content_with_blob(
             &mut conn,
             &hash,
@@ -791,7 +509,7 @@ mod tests {
             Some("agent:uhCAkAuthorY0001"),
         );
 
-        let addr = BlobAddress::new(hash).unwrap();
+        let addr = BlobAddress::parse(&hash).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWHostPeer");
         assert_eq!(hints.len(), 1);
         assert_eq!(
@@ -886,7 +604,7 @@ mod tests {
                 .expect("seed binding");
         }
 
-        let hash = sha256_wire('b');
+        let hash = cid_wire('b');
         seed_content_with_blob(
             &mut conn,
             &hash,
@@ -895,7 +613,7 @@ mod tests {
             Some("agent:uhCAkHintsAuthor001"),
         );
 
-        let addr = BlobAddress::new(hash).unwrap();
+        let addr = BlobAddress::parse(&hash).unwrap();
         let hints = gather_hints(&mut conn, &[addr], "12D3KooWHintsPeer");
 
         assert_eq!(hints.len(), 1);
@@ -929,182 +647,127 @@ mod tests {
         assert_eq!(resolved_cadence(Some("nod"), None), Some(60));
     }
 
-    /// Sprint 0 Task 0.5: producer-to-verifier round-trip from real BlobStore.
-    ///
-    /// Proves the full produce→encode→decode→verify pipeline works end-to-end
-    /// for VALID data: uses real `BlobStore` to write blobs, lists them via
-    /// `list_hashes`, wraps as `BlobAddress` instances, builds a snapshot,
-    /// MessagePack-round-trips, and asserts `verify_structural() == Ok(())`.
-    ///
-    /// After this test, producer/verifier wire-format drift becomes impossible
-    /// to land green.
+    /// Producer to verifier, end to end: real BlobStore listing, signed pages,
+    /// admission under the receiver's rules, projection into the real
+    /// `peer_blob_inventory` cursor.
     #[tokio::test]
-    async fn snapshot_built_from_real_blobstore_decodes_with_valid_addresses() {
+    async fn pages_from_a_real_blobstore_are_admitted_and_projected() {
         use crate::blob_store::BlobStore;
-        use crate::p2p::inventory_gossip::BlobInventorySnapshot;
+        use crate::p2p::inventory_gossip::{
+            admit, Admission, AuthorWitness, HolderResolver, INVENTORY_PAGE_LIMIT,
+        };
+        use elohim_epr::signature::Multikey;
+
+        struct Expect(Multikey);
+        impl HolderResolver for Expect {
+            fn expected_holder(&self, author_peer: &str) -> Option<Multikey> {
+                (author_peer == "12D3KooWtest").then(|| self.0.clone())
+            }
+        }
 
         let temp = tempfile::TempDir::new().unwrap();
         let store = BlobStore::new(temp.path()).await.unwrap();
         store.store(b"payload-a").await.unwrap();
         store.store(b"payload-b").await.unwrap();
-
-        let hashes: Vec<BlobAddress> = store
-            .list_hashes()
+        let addresses: Vec<BlobAddress> = store
+            .list_cids()
             .unwrap()
             .into_iter()
-            .map(|s| {
-                BlobAddress::new(s).expect("BlobStore::list_hashes returns canonical wire format")
-            })
+            .map(BlobAddress::from)
             .collect();
-        assert_eq!(hashes.len(), 2, "two blobs stored, two hashes listed");
+        assert_eq!(addresses.len(), 2);
 
-        let inv = StaticInventory::new(hashes);
-        let alloc = SequenceAllocator::new(0);
-        let snapshot = build_snapshot("12D3KooWtest", &inv, &alloc, 1, vec![]);
-
-        // Round-trip through MessagePack — the wire path real gossip takes.
-        let bytes = snapshot.to_bytes().unwrap();
-        let decoded = BlobInventorySnapshot::from_bytes(&bytes).unwrap();
-        assert_eq!(decoded.hashes.len(), 2);
-        assert_eq!(
-            decoded.verify_structural(),
-            Ok(()),
-            "real-BlobStore snapshot must pass structural verify"
-        );
-    }
-
-    #[test]
-    fn large_inventory_refresh_is_bounded_and_reassembles_via_snapshot_plus_deltas() {
-        let addresses: Vec<BlobAddress> = (0..120u64)
-            .map(|i| BlobAddress::new(format!("sha256-{i:064x}")).unwrap())
-            .collect();
-        let expected: std::collections::HashSet<String> = addresses
-            .iter()
-            .map(|address| address.as_str().to_string())
-            .collect();
-        let inv = StaticInventory::new(addresses);
-        let seq = SequenceAllocator::new(0);
-        let publications = build_bounded_inventory_publications(
-            "12D3KooWBoundedInventoryPeer",
-            &inv,
-            &seq,
-            1_787_443_200_000_000,
-            vec![],
-            INVENTORY_GOSSIP_PAYLOAD_BUDGET,
-        )
-        .unwrap();
-
-        assert!(publications.len() > 1, "large inventory must be paged");
-        assert!(matches!(
-            publications.first(),
-            Some(InventoryPublication::Snapshot(_))
-        ));
-        assert!(publications
-            .iter()
-            .skip(1)
-            .all(|page| matches!(page, InventoryPublication::Delta(_))));
-        assert!(publications
-            .iter()
-            .all(|page| { page.to_bytes().unwrap().len() <= INVENTORY_GOSSIP_PAYLOAD_BUDGET }));
+        let keypair = AgentKeypair::from_secret(&[3u8; 32]).unwrap();
+        let resolver = Expect(Multikey::ed25519(&keypair.public_key_bytes()));
+        let seq = SequenceAllocator::new(10);
+        let pages = build_delta_pages(&keypair, "12D3KooWtest", &addresses, &[], &seq, 1, &[]);
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].body.sequence, 11);
 
         let pool = test_db_pool();
         let mut conn = pool.get().unwrap();
-        let when = "2026-08-23T00:00:00Z";
-        for publication in publications {
-            match publication {
-                InventoryPublication::Snapshot(snapshot) => {
-                    let hashes: Vec<String> = snapshot
-                        .hashes
-                        .iter()
-                        .map(|address| address.as_str().to_string())
-                        .collect();
-                    crate::db::peer_blob_inventory::apply_snapshot(
-                        &mut conn,
-                        &snapshot.peer_id,
-                        &hashes,
-                        snapshot.sequence as i64,
-                        when,
-                    )
-                    .unwrap();
-                }
-                InventoryPublication::Delta(delta) => {
-                    let added: Vec<String> = delta
-                        .added
-                        .iter()
-                        .map(|address| address.as_str().to_string())
-                        .collect();
-                    crate::db::peer_blob_inventory::apply_delta(
-                        &mut conn,
-                        &delta.peer_id,
-                        &added,
-                        &[],
-                        delta.sequence as i64,
-                        when,
-                    )
-                    .unwrap();
-                }
-            }
+        for page in pages {
+            let bytes = page.to_bytes();
+            assert!(bytes.len() <= INVENTORY_PAGE_LIMIT);
+            let Admission::Admitted(env) = admit(
+                &bytes,
+                AuthorWitness::Gossipsub(Some("12D3KooWtest")),
+                &resolver,
+            ) else {
+                panic!("a page this node signs must be admitted");
+            };
+            let added: Vec<String> = env.body.added.iter().map(|a| a.to_string()).collect();
+            crate::db::peer_blob_inventory::apply_delta(
+                &mut conn,
+                &env.author_peer,
+                &added,
+                &[],
+                env.body.sequence as i64,
+                "2026-11-05T00:00:00Z",
+            )
+            .unwrap();
         }
+        for address in &addresses {
+            let hosts = crate::db::peer_blob_inventory::lookup_hosts(
+                &mut conn,
+                &address.to_string(),
+                "2026-11-04T00:00:00Z",
+            )
+            .unwrap();
+            assert_eq!(hosts.len(), 1);
+        }
+    }
 
-        let projected: std::collections::HashSet<String> = expected
-            .iter()
-            .filter(|hash| {
-                crate::db::peer_blob_inventory::lookup_hosts(
-                    &mut conn,
-                    hash,
-                    "2026-08-22T00:00:00Z",
-                )
-                .unwrap()
-                .iter()
-                .any(|row| row.peer_id == "12D3KooWBoundedInventoryPeer")
-            })
-            .cloned()
-            .collect();
-        assert_eq!(projected, expected);
+    #[test]
+    fn delta_pages_carry_added_and_removed_in_sequence() {
+        let keypair = AgentKeypair::from_secret(&[3u8; 32]).unwrap();
+        let alloc = SequenceAllocator::new(0);
+        let pages = build_delta_pages(
+            &keypair,
+            "12D3KooWtest",
+            &[BlobAddress::parse(&cid_wire('a')).unwrap()],
+            &[BlobAddress::parse(&cid_wire('b')).unwrap()],
+            &alloc,
+            1_700_000_001_000_000,
+            &[],
+        );
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].body.added.len(), 1);
+        assert_eq!(pages[0].body.removed.len(), 1);
+        assert_eq!(pages[0].body.sequence, 1);
+        assert_eq!(pages[0].author_peer, "12D3KooWtest");
     }
 
     #[test]
     fn shard_only_inventory_makes_that_peer_specific_to_the_matching_shard() {
-        let shard_hashes: Vec<String> = (0..3u64).map(|i| format!("sha256-{i:064x}")).collect();
-        let inv = StaticInventory::new(vec![BlobAddress::new(shard_hashes[2].clone()).unwrap()]);
-        let seq = SequenceAllocator::new(0);
-        let publications = build_bounded_inventory_publications(
-            "peer-B",
-            &inv,
-            &seq,
-            1,
-            vec![],
-            INVENTORY_GOSSIP_PAYLOAD_BUDGET,
-        )
-        .unwrap();
-        let InventoryPublication::Snapshot(snapshot) = &publications[0] else {
-            panic!("first publication must be a snapshot");
-        };
-
+        let shard_cids: Vec<String> = (0..3u64)
+            .map(|i| elohim_epr::address::compute_bytes_cid(&i.to_le_bytes()).to_string())
+            .collect();
         let pool = test_db_pool();
         let mut conn = pool.get().unwrap();
-        crate::db::peer_blob_inventory::apply_snapshot(
+        crate::db::peer_blob_inventory::apply_delta(
             &mut conn,
-            &snapshot.peer_id,
-            &[shard_hashes[2].clone()],
-            snapshot.sequence as i64,
+            "peer-B",
+            &[shard_cids[2].clone()],
+            &[],
+            1,
             "2026-08-23T00:00:00Z",
         )
         .unwrap();
 
         let rows = crate::db::peer_blob_inventory::lookup_hosts(
             &mut conn,
-            &shard_hashes[2],
+            &shard_cids[2],
             "2026-08-22T00:00:00Z",
         )
         .unwrap();
         let mut per_shard = std::collections::HashMap::new();
         per_shard.insert(
-            shard_hashes[2].clone(),
+            shard_cids[2].clone(),
             rows.into_iter().map(|row| row.peer_id).collect(),
         );
         let plan = crate::p2p::blob_swarm::plan_shard_holders(
-            &shard_hashes,
+            &shard_cids,
             &["peer-A".to_string()],
             &per_shard,
         );
@@ -1123,22 +786,22 @@ mod tests {
 /// diverge before blob mobility does.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct ParityReport {
-    /// Hashes that were included in the last gossiped snapshot but are absent
+    /// Hashes that were included in the last published inventory but are absent
     /// from the local filesystem.  Non-empty means gossip over-reports custody.
     pub gossiped_but_missing: Vec<String>,
-    /// Hashes present on the local filesystem that were not in the last gossiped
-    /// snapshot.  Non-empty means gossip under-reports custody.
+    /// Hashes present on the local filesystem that were not in the last published
+    /// inventory.  Non-empty means gossip under-reports custody.
     pub local_but_not_gossiped: Vec<String>,
     /// Number of blobs actually on the local filesystem at time of check.
     pub filesystem_count: usize,
-    /// Number of hashes in the last gossiped snapshot (0 when no snapshot has
+    /// Number of addresses in the last published inventory (0 when nothing has
     /// been published yet — Stage 1 baseline).
     pub gossiped_count: usize,
     /// ISO-8601 timestamp of when this report was generated.
     pub checked_at: String,
 }
 
-/// Compute a `ParityReport` by diffing `local_store.current_hashes()` against
+/// Compute a `ParityReport` by diffing `local_store.current_addresses()` against
 /// `last_gossiped`.
 ///
 /// Uses `HashSet::difference` for O(n) comparison; the returned vecs are
@@ -1149,9 +812,9 @@ pub fn compute_parity<I: LocalInventory>(
     now_iso: &str,
 ) -> ParityReport {
     let local: HashSet<String> = local_store
-        .current_hashes()
+        .current_addresses()
         .into_iter()
-        .map(|a| a.as_str().to_string())
+        .map(|a| a.to_string())
         .collect();
     let gossiped: HashSet<String> = last_gossiped.iter().cloned().collect();
 
@@ -1175,25 +838,22 @@ mod parity_tests {
     use super::*;
     use crate::p2p::inventory_gossip::BlobAddress;
 
-    fn sha256_wire(byte: char) -> String {
-        format!(
-            "sha256-{}",
-            std::iter::repeat_n(byte, 64).collect::<String>()
-        )
+    fn cid_wire(byte: char) -> String {
+        elohim_epr::address::compute_bytes_cid(&[byte as u8]).to_string()
     }
 
     struct MockInventory(Vec<BlobAddress>);
     impl LocalInventory for MockInventory {
-        fn current_hashes(&self) -> Vec<BlobAddress> {
+        fn current_addresses(&self) -> Vec<BlobAddress> {
             self.0.clone()
         }
     }
 
     #[test]
     fn parity_clean_when_sets_match() {
-        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
-        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
-        let hashes_str = vec![addr_a.as_str().to_string(), addr_b.as_str().to_string()];
+        let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
+        let addr_b = BlobAddress::parse(&cid_wire('b')).unwrap();
+        let hashes_str = vec![addr_a.to_string(), addr_b.to_string()];
         let inv = MockInventory(vec![addr_a, addr_b]);
         let report = compute_parity(&inv, &hashes_str, "2026-05-02T00:00:00Z");
 
@@ -1206,16 +866,12 @@ mod parity_tests {
 
     #[test]
     fn parity_detects_gossiped_but_missing() {
-        // Gossip claims sha256_wire('c') is hosted but filesystem only has 'a' and 'b'.
-        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
-        let addr_b = BlobAddress::new(sha256_wire('b')).unwrap();
-        let addr_c_str = sha256_wire('c');
+        // Gossip claims cid_wire('c') is hosted but filesystem only has 'a' and 'b'.
+        let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
+        let addr_b = BlobAddress::parse(&cid_wire('b')).unwrap();
+        let addr_c_str = cid_wire('c');
         let local = MockInventory(vec![addr_a.clone(), addr_b.clone()]);
-        let gossiped = vec![
-            addr_a.as_str().to_string(),
-            addr_b.as_str().to_string(),
-            addr_c_str.clone(),
-        ];
+        let gossiped = vec![addr_a.to_string(), addr_b.to_string(), addr_c_str.clone()];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 
         assert_eq!(report.gossiped_but_missing, vec![addr_c_str]);
@@ -1226,18 +882,15 @@ mod parity_tests {
 
     #[test]
     fn parity_detects_local_but_not_gossiped() {
-        // Filesystem has sha256_wire('d') that was never included in the gossip snapshot.
-        let addr_a = BlobAddress::new(sha256_wire('a')).unwrap();
-        let addr_d = BlobAddress::new(sha256_wire('d')).unwrap();
+        // Filesystem has cid_wire('d') that was never included in the published inventory.
+        let addr_a = BlobAddress::parse(&cid_wire('a')).unwrap();
+        let addr_d = BlobAddress::parse(&cid_wire('d')).unwrap();
         let local = MockInventory(vec![addr_a.clone(), addr_d.clone()]);
-        let gossiped = vec![addr_a.as_str().to_string()];
+        let gossiped = vec![addr_a.to_string()];
         let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
 
         assert!(report.gossiped_but_missing.is_empty());
-        assert_eq!(
-            report.local_but_not_gossiped,
-            vec![addr_d.as_str().to_string()]
-        );
+        assert_eq!(report.local_but_not_gossiped, vec![addr_d.to_string()]);
         assert_eq!(report.filesystem_count, 2);
         assert_eq!(report.gossiped_count, 1);
     }

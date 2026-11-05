@@ -1,11 +1,14 @@
 //! Thin wrapper over [`iroh_blobs::store::fs::FsStore`].
 //!
-//! Phase 2 surface for content-addressed blob storage on the iroh path.
-//! BLAKE3-keyed (iroh-blobs native); disjoint on disk from the legacy
-//! SHA256-keyed [`crate::blob_store::BlobStore`].
+//! The iroh key of a byte CID is its BLAKE3 digest: [`hash_for`] is
+//! `Hash::from_bytes(*cid.digest())`, and [`cid_for`] the inverse. One digest, two
+//! spellings, no second hash.
 //!
-//! Cutover (Phase 11) will replace legacy `BlobStore` call sites with this
-//! type uniformly. For now both stores coexist, runtime config selects one.
+//! **Not a payload store.** [`crate::blob_store::BlobStore`] is the one authoritative
+//! payload store (C10); persistent iroh-blobs delivery is off this sprint (no
+//! dual-write from the HTTP put path). A node in pure-iroh mode therefore has no byte
+//! path and answers [`NoBytePath`] ("unavailable(no byte path)"), typed, rather than
+//! a silent miss. FsStore as the store is a later item behind its receipts.
 //!
 //! API drift chokepoint: any breakage when bumping iroh-blobs versions
 //! lands here, not in callers.
@@ -23,6 +26,34 @@ use iroh_blobs::{
     },
     Hash,
 };
+
+/// The iroh-blobs key of a byte CID: its BLAKE3-256 digest.
+pub fn hash_for(cid: &elohim_epr::address::ByteCid) -> Hash {
+    Hash::from_bytes(*cid.digest())
+}
+
+/// The byte CID an iroh-blobs key names.
+pub fn cid_for(hash: &Hash) -> elohim_epr::address::ByteCid {
+    elohim_epr::address::ByteCid::from_digest(*hash.as_bytes())
+}
+
+/// What a pure-iroh node answers for any byte request this sprint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("unavailable(no byte path) for {cid}")]
+pub struct NoBytePath {
+    pub cid: elohim_epr::address::ByteCid,
+}
+
+impl NoBytePath {
+    /// The stable reason string carried on the wire.
+    pub const REASON: &'static str = "unavailable(no byte path)";
+}
+
+/// The pure-iroh byte answer: always [`NoBytePath`] while persistent iroh-blobs
+/// delivery is off.
+pub fn pure_iroh_byte_answer(cid: &elohim_epr::address::ByteCid) -> Result<Bytes, NoBytePath> {
+    Err(NoBytePath { cid: *cid })
+}
 
 /// How often the store collects blobs no tag names.
 const GC_INTERVAL: Duration = Duration::from_secs(600);
@@ -112,6 +143,27 @@ impl IrohBlobStore {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn the_iroh_key_is_the_byte_cid_digest() {
+        let bytes = b"one digest, two spellings".to_vec();
+        let cid = elohim_epr::address::compute_bytes_cid(&bytes);
+        let dir = tempdir().unwrap();
+        let store = IrohBlobStore::load(&dir.path().join("blobs_iroh"))
+            .await
+            .unwrap();
+        let hash = store.add_bytes(bytes).await.unwrap();
+        assert_eq!(hash, hash_for(&cid));
+        assert_eq!(cid_for(&hash), cid);
+    }
+
+    #[test]
+    fn pure_iroh_mode_answers_no_byte_path_typed() {
+        let cid = elohim_epr::address::compute_bytes_cid(b"wanted");
+        let err = pure_iroh_byte_answer(&cid).unwrap_err();
+        assert_eq!(err, NoBytePath { cid });
+        assert!(err.to_string().starts_with(NoBytePath::REASON));
+    }
 
     #[tokio::test]
     async fn a_forgotten_blob_leaves_on_the_next_collection_and_a_kept_one_stays() {

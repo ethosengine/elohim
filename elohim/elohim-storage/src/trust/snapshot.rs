@@ -50,6 +50,7 @@
 
 use base64::Engine;
 use cid::Cid;
+use elohim_epr::signature::{Multikey, SignatureCheck, SignatureEnvelope, SignatureScheme};
 use seam_contracts::ReasonLabel;
 use serde::{Deserialize, Serialize};
 
@@ -300,42 +301,45 @@ impl HeadSetSnapshot {
 /// A detached authorship proof over a snapshot's [`HeadSetSnapshot::canonical_bytes`].
 ///
 /// The signer's identity is NOT repeated here — it is
-/// [`HeadSetSnapshot::signer_agent_cid`], and the verifying key is read out of
-/// it, so a proof cannot name a different signer than the snapshot does.
+/// [`HeadSetSnapshot::signer_agent_cid`], and the verifying key is derived from it
+/// independently, so a proof cannot name a different signer than the snapshot does:
+/// the envelope's key must equal that expected key.
 ///
-/// Field order is DAG-CBOR canonical (`algorithm` 9, `signature` 9,
-/// `schemeVersion` 13).
+/// The signed transcript is
+/// `SNAPSHOT_SIGNING_DOMAIN ‖ u16be(scheme_version) ‖ u16be(scheme) ‖ key ‖ canonical`.
+/// Field order is DAG-CBOR canonical (`envelope` 8, `schemeVersion` 13).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotProof {
-    /// Signing algorithm identifier. Only `ed25519` verifies today; anything
-    /// else refuses as [`SnapshotRefusal::UnknownSigner`] rather than being
-    /// waved through.
-    pub algorithm: String,
-    #[serde(with = "serde_bytes")]
-    pub signature: Vec<u8>,
-    /// Must equal [`SNAPSHOT_SCHEME_VERSION`]. Bump only on a breaking change
-    /// to the signing preimage or the snapshot layout.
+    /// Scheme-agile signature: `{scheme, key, sig}`. An unknown scheme is HELD.
+    pub envelope: SignatureEnvelope,
+    /// Must equal [`SNAPSHOT_SCHEME_VERSION`]; another value is HELD. Bump only on a
+    /// breaking change to the transcript or the snapshot layout.
     pub scheme_version: u16,
 }
 
-/// The snapshot scheme version carried in every proof.
-pub const SNAPSHOT_SCHEME_VERSION: u16 = 1;
-
-/// Domain separator prefixed to the canonical bytes before signing, so a
-/// snapshot signature can never be lifted into another elohim signing slot
-/// (the same discipline as `p2p::binding_cross_signature`'s domain tags).
-pub const SNAPSHOT_SIGNING_DOMAIN: &[u8] = b"elohim:head-set-snapshot:v1";
-
-/// The exact bytes a signer signs: domain tag followed by the snapshot's
-/// canonical dag-cbor bytes.
-#[must_use]
-pub fn signing_preimage(canonical_bytes: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(SNAPSHOT_SIGNING_DOMAIN.len() + canonical_bytes.len());
-    out.extend_from_slice(SNAPSHOT_SIGNING_DOMAIN);
-    out.extend_from_slice(canonical_bytes);
-    out
+impl SnapshotProof {
+    /// Sign a snapshot's canonical bytes with an ed25519 agent key.
+    #[must_use]
+    pub fn sign(keypair: &elohim_epr::AgentKeypair, canonical_bytes: &[u8]) -> Self {
+        Self {
+            envelope: SignatureEnvelope::sign_ed25519(
+                keypair,
+                SNAPSHOT_SIGNING_DOMAIN,
+                SNAPSHOT_SCHEME_VERSION,
+                canonical_bytes,
+            ),
+            scheme_version: SNAPSHOT_SCHEME_VERSION,
+        }
+    }
 }
+
+/// The snapshot scheme version carried in every proof (2: the envelope transcript).
+pub const SNAPSHOT_SCHEME_VERSION: u16 = 2;
+
+/// Signature domain of a head-set snapshot proof. Its own domain keeps a snapshot
+/// signature from being lifted into another elohim signing slot.
+pub const SNAPSHOT_SIGNING_DOMAIN: &[u8] = b"elohim:head-set-snapshot:v2:";
 
 /// What actually rides the wire: a snapshot plus its optional proof.
 ///
@@ -490,6 +494,28 @@ impl ReasonLabel for SnapshotAcceptance {
 pub enum SnapshotVerdict {
     Accepted(SnapshotAcceptance),
     Refused(SnapshotRefusal),
+    /// A proof is attached in a scheme or scheme version this build cannot read.
+    /// Not accepted (a proof that cannot be checked is not "unproven" — someone
+    /// claimed provenance), not refused (it may be valid): held, with no effect.
+    Held(SnapshotHold),
+}
+
+/// Why a snapshot verdict is held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotHold {
+    /// The envelope's signature scheme is unknown.
+    Scheme(u16),
+    /// The proof's scheme version is not [`SNAPSHOT_SCHEME_VERSION`].
+    SchemeVersion(u16),
+}
+
+impl SnapshotHold {
+    fn label(&self) -> &'static str {
+        match self {
+            SnapshotHold::Scheme(_) => "scheme",
+            SnapshotHold::SchemeVersion(_) => "scheme_version",
+        }
+    }
 }
 
 impl SnapshotVerdict {
@@ -500,6 +526,7 @@ impl SnapshotVerdict {
         match self {
             SnapshotVerdict::Accepted(a) => format!("accepted_{}", a.label()),
             SnapshotVerdict::Refused(r) => format!("refused_{}", r.label()),
+            SnapshotVerdict::Held(h) => format!("held_{}", h.label()),
         }
     }
 
@@ -703,15 +730,15 @@ pub fn verify_snapshot(input: &VerifyInput<'_>) -> SnapshotVerdict {
         }
     }
 
-    // (3) Proof, when one is attached.
+    // (3) Proof, when one is attached. An attached proof this build cannot read is
+    // HELD — never downgraded to "no proof" (UnprovenSigner).
     let acceptance = match &input.carried.proof {
         None => SnapshotAcceptance::UnprovenSigner,
-        Some(proof) => {
-            if !proof_verifies(snapshot, proof) {
-                return SnapshotVerdict::Refused(SnapshotRefusal::UnknownSigner);
-            }
-            SnapshotAcceptance::ProvenSigner
-        }
+        Some(proof) => match proof_check(snapshot, proof) {
+            ProofCheck::Verified => SnapshotAcceptance::ProvenSigner,
+            ProofCheck::Invalid => return SnapshotVerdict::Refused(SnapshotRefusal::UnknownSigner),
+            ProofCheck::Held(hold) => return SnapshotVerdict::Held(hold),
+        },
     };
 
     // (4) The zero-cost digest path: the receiver's OWN digest is the oracle.
@@ -721,25 +748,39 @@ pub fn verify_snapshot(input: &VerifyInput<'_>) -> SnapshotVerdict {
     SnapshotVerdict::Accepted(acceptance)
 }
 
-/// Verify a detached proof against the key read out of the snapshot's own
-/// `signer_agent_cid`. Uses the canonical [`elohim_epr::proof::verify`] rather
-/// than a second ed25519 call site.
-///
-/// (Non-strict ed25519 verification is deliberate here: the canonical helper
-/// is the reuse target, and nothing on this plane is keyed on signature bytes,
-/// so malleability grants an attacker no distinct artifact — unlike
-/// `p2p::binding_cross_signature`, where the proof itself is the entry.)
-fn proof_verifies(snapshot: &HeadSetSnapshot, proof: &SnapshotProof) -> bool {
-    if proof.scheme_version != SNAPSHOT_SCHEME_VERSION || proof.algorithm != "ed25519" {
-        return false;
+enum ProofCheck {
+    Verified,
+    Invalid,
+    Held(SnapshotHold),
+}
+
+/// Check a detached proof against the key derived from the snapshot's own
+/// `signer_agent_cid` (not the key the envelope carries): the envelope's key must
+/// equal it, and the strict ed25519 check runs over the transcript.
+fn proof_check(snapshot: &HeadSetSnapshot, proof: &SnapshotProof) -> ProofCheck {
+    if proof.scheme_version != SNAPSHOT_SCHEME_VERSION {
+        return ProofCheck::Held(SnapshotHold::SchemeVersion(proof.scheme_version));
+    }
+    if SignatureScheme::from_code(proof.envelope.scheme).is_none() {
+        return ProofCheck::Held(SnapshotHold::Scheme(proof.envelope.scheme));
     }
     let Some(pubkey) = ed25519_pubkey_from_agent_cid(&snapshot.signer_agent_cid) else {
-        return false;
+        return ProofCheck::Invalid;
     };
     let Ok(canonical) = snapshot.canonical_bytes() else {
-        return false;
+        return ProofCheck::Invalid;
     };
-    elohim_epr::proof::verify(&pubkey, &signing_preimage(&canonical), &proof.signature)
+    let expected = Multikey::ed25519(&pubkey);
+    match proof.envelope.check_for(
+        &expected,
+        SNAPSHOT_SIGNING_DOMAIN,
+        SNAPSHOT_SCHEME_VERSION,
+        &canonical,
+    ) {
+        SignatureCheck::Verified => ProofCheck::Verified,
+        SignatureCheck::Invalid => ProofCheck::Invalid,
+        SignatureCheck::Held { scheme } => ProofCheck::Held(SnapshotHold::Scheme(scheme)),
+    }
 }
 
 /// Decode a wire-carried snapshot and verify it in one step — the receiver-side
@@ -1342,7 +1383,7 @@ mod tests {
 
         // Tamper with the signature bytes.
         if let Some(proof) = minted.carried.proof.as_mut() {
-            proof.signature[0] ^= 0xFF;
+            proof.envelope.sig[0] ^= 0xFF;
         }
         assert_eq!(
             verify_snapshot(&VerifyInput {
@@ -1680,6 +1721,65 @@ mod tests {
         assert_ne!(
             verdict,
             SnapshotVerdict::Accepted(SnapshotAcceptance::ProvenSigner)
+        );
+    }
+
+    fn signed_minted() -> (MintedSnapshot, elohim_epr::AgentKeypair) {
+        let kp = test_keypair();
+        let agent_cid = test_agent_cid(&kp.public_key_bytes());
+        let mut minted = mint_unsigned(entries(&[("c:a", "anc-a")]), &agent_cid);
+        minted.carried.proof = Some(SnapshotProof::sign(&kp, &minted.canonical_bytes));
+        (minted, kp)
+    }
+
+    fn verdict_of(minted: &MintedSnapshot) -> SnapshotVerdict {
+        verify_snapshot(&VerifyInput {
+            carried: &minted.carried,
+            local_corpus_digest: &minted.carried.snapshot.corpus_digest,
+            last_verified_epoch: None,
+        })
+    }
+
+    #[test]
+    fn an_envelope_proof_from_the_signers_own_key_is_proven() {
+        let (minted, _) = signed_minted();
+        assert_eq!(
+            verdict_of(&minted),
+            SnapshotVerdict::Accepted(SnapshotAcceptance::ProvenSigner)
+        );
+    }
+
+    #[test]
+    fn an_unsupported_attached_proof_is_held_never_unproven() {
+        let (mut minted, _) = signed_minted();
+        if let Some(proof) = minted.carried.proof.as_mut() {
+            proof.envelope.scheme = 9;
+        }
+        let verdict = verdict_of(&minted);
+        assert_eq!(verdict, SnapshotVerdict::Held(SnapshotHold::Scheme(9)));
+        assert!(!verdict.is_accepted());
+        assert_eq!(verdict.label(), "held_scheme");
+
+        let (mut minted, _) = signed_minted();
+        if let Some(proof) = minted.carried.proof.as_mut() {
+            proof.scheme_version = 1;
+        }
+        assert_eq!(
+            verdict_of(&minted),
+            SnapshotVerdict::Held(SnapshotHold::SchemeVersion(1))
+        );
+    }
+
+    #[test]
+    fn a_valid_envelope_under_another_key_is_refused() {
+        let (mut minted, _) = signed_minted();
+        let other = elohim_epr::AgentKeypair::from_secret(&[9u8; 32]).unwrap();
+        // A perfectly valid signature over the same bytes, by a key the signer cid
+        // does not name.
+        minted.carried.proof = Some(SnapshotProof::sign(&other, &minted.canonical_bytes));
+        assert_eq!(
+            verdict_of(&minted),
+            SnapshotVerdict::Refused(SnapshotRefusal::UnknownSigner)
         );
     }
 }

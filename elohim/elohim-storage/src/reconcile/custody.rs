@@ -8,7 +8,7 @@
 //! Each trigger calls `reconcile_pass`, which is idempotent.
 //!
 //! For each `custody-blob` commitment in `rea_commitments`:
-//! - If this peer is the provider AND blob_hash is missing locally:
+//! - If this peer is the provider AND blob_cid is missing locally:
 //!   query `peer_blob_inventory` for hosts; if any candidates exist,
 //!   kick a fetch via `blob_fetch::race_fetch` (T17). When the inventory
 //!   is EMPTY, fall back to racing the currently-connected peers (capped
@@ -23,41 +23,38 @@
 //! Local store presence is queried via the trait `LocalBlobStore` so the
 //! reconcile pass can be unit-tested without a real blob store.
 
-use crate::blob_store::BlobStore;
+use crate::blob_store::{BlobStore, Exists};
 use crate::db::diesel_schema::{economic_events, peer_blob_inventory, rea_commitments};
 use crate::db::models::{NewEconomicEvent, ReaCommitment};
 use crate::error::StorageError;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
+use elohim_epr::address::ByteCid;
 
 use super::placement::{PlacementCandidate, PlacementStrategy};
 
 /// Trait for checking whether a blob exists in this peer's local store.
 /// Production: queries the blob_store. Tests: returns a fixed set.
 pub trait LocalBlobStore: Send + Sync {
-    fn has(&self, blob_hash: &str) -> bool;
+    fn has(&self, blob_cid: &ByteCid) -> bool;
 }
 
 /// Trait for kicking a fetch. Production: calls `blob_fetch::race_fetch` (T17).
 /// Tests: records the kick request.
 pub trait FetchKicker: Send + Sync {
-    fn kick(&self, blob_hash: &str, candidates: Vec<String>);
+    fn kick(&self, blob_cid: &ByteCid, candidates: Vec<String>);
 }
 
 /// Snapshot of the local blob store taken at reconcile-pass start.
 ///
 /// Implements [`LocalBlobStore`] for the duration of a single pass by
-/// pre-fetching the full hash set once via [`crate::blob_store::BlobStore::list_hashes`]
+/// pre-fetching the full CID set once via [`crate::blob_store::BlobStore::list_cids`]
 /// and answering `has` from a [`std::collections::HashSet`]. This is cheaper
 /// (and avoids holding the blob store across diesel queries) than calling
-/// `BlobStore::exists` per commitment.
-///
-/// Hash format: matches whatever `list_hashes` returns (currently
-/// `sha256-<hex>`); reconcile_pass does string-equality lookups against
-/// `rea_commitments.resource_classified_as`, so the two stores must share a
-/// canonical form. T17 / T22 already standardised on `sha256-<hex>`.
+/// `BlobStore::exists` per commitment. Comparison is by [`ByteCid`] value (C4):
+/// a commitment marker is parsed by full decode before it is compared.
 pub struct BlobStoreSnapshot {
-    hashes: std::collections::HashSet<String>,
+    cids: std::collections::HashSet<ByteCid>,
 }
 
 impl BlobStoreSnapshot {
@@ -65,24 +62,24 @@ impl BlobStoreSnapshot {
     /// [`StorageError`] if the directory walk fails; the caller should skip
     /// the reconcile tick rather than running with a partial view.
     pub fn from_store(store: &crate::blob_store::BlobStore) -> Result<Self, StorageError> {
-        let hashes = store.list_hashes()?.into_iter().collect();
-        Ok(Self { hashes })
+        let cids = store.list_cids()?.into_iter().collect();
+        Ok(Self { cids })
     }
 
-    /// Number of hashes captured in the snapshot. Useful for tests + tracing.
+    /// Number of CIDs captured in the snapshot. Useful for tests + tracing.
     pub fn len(&self) -> usize {
-        self.hashes.len()
+        self.cids.len()
     }
 
-    /// `true` when the snapshot captured no hashes.
+    /// `true` when the snapshot captured no CIDs.
     pub fn is_empty(&self) -> bool {
-        self.hashes.is_empty()
+        self.cids.is_empty()
     }
 }
 
 impl LocalBlobStore for BlobStoreSnapshot {
-    fn has(&self, blob_hash: &str) -> bool {
-        self.hashes.contains(blob_hash)
+    fn has(&self, blob_cid: &ByteCid) -> bool {
+        self.cids.contains(blob_cid)
     }
 }
 
@@ -100,7 +97,7 @@ pub struct ReconcileOutcome {
     pub placement_gaps_emitted: u32,
     pub commitments_examined: u32,
     /// Commitments whose blob marker is not a valid content address in ANY
-    /// accepted form (`blob_fetch::normalize_fetch_address` refused it).
+    /// byte CID (`ByteCid::parse` refused it).
     /// These are skipped WITHOUT a fetch kick: no responder can accept the
     /// address, so retrying every sweep tick would drum the wire forever
     /// (the T21 rejection drumbeat). The count is the honest failure record
@@ -202,54 +199,32 @@ pub fn reconcile_pass(
             continue;
         };
 
-        // Address hygiene BEFORE any fetch decision. Markers arrive in three
-        // legitimate forms (bare hex, `sha256-<hex>`, CID) plus one known
-        // defect: seed-side normalizeBlobHash double-wrapped CID-form blob
-        // hashes as `sha256-<cid>` (backlog
-        // blob-fetch-sha256-prefixed-cid-rejection) — those rows made every
-        // sweep tick kick a wire request no responder accepts (T21 rejection,
-        // ~2min drumbeat, no give-up). normalize_fetch_address repairs the
-        // double-wrap and refuses anything unrecognizable, so a malformed row
-        // is counted + skipped instead of drummed.
-        if crate::p2p::blob_fetch::normalize_fetch_address(&raw_marker).is_err() {
-            outcome.invalid_markers += 1;
-            tracing::warn!(
-                target: "elohim_storage::reconcile",
-                commitment_id = %commitment.id,
-                marker = %raw_marker,
-                "T23: custody-blob marker is not a valid content address in any \
-                 form; skipping (no fetch kick — the row needs healing, retries \
-                 cannot succeed)"
-            );
-            continue;
-        }
-        // Hex-form markers (bare hex or `sha256-<hex>`) keep their exact
-        // stored spelling — they were always wire-acceptable and are the form
-        // the local snapshot + gossip inventory speak. CID-form and repaired
-        // double-wrapped markers are RE-KEYED to the canonical on-disk key
-        // (`sha256-<wrapped digest hex>`): that is what the blob store files
-        // bytes under and what inventory advertises, so the presence check
-        // stops re-kicking once the bytes land instead of drumming forever.
-        let is_hex_form = {
-            let bare = raw_marker.strip_prefix("sha256-").unwrap_or(&raw_marker);
-            bare.len() == 64 && bare.chars().all(|c| c.is_ascii_hexdigit())
-        };
-        let blob_hash = if is_hex_form {
-            raw_marker
-        } else {
-            match crate::p2p::blob_fetch::content_address_hex(&raw_marker) {
-                Some(hex) => format!("sha256-{hex}"),
-                // Unreachable given normalize_fetch_address succeeded, but
-                // never panic a sweep on it.
-                None => raw_marker,
+        // Address hygiene BEFORE any fetch decision: a marker is a byte CID by
+        // full decode or it is nothing. A `sha256-…`, bare hex, double-wrapped or
+        // sha2 CID marker cannot name bytes this plane serves, so it is counted
+        // and skipped (the row needs re-minting, retries cannot succeed) — never
+        // kicked, never re-keyed.
+        let blob_cid = match ByteCid::parse(&raw_marker) {
+            Ok(cid) => cid,
+            Err(error) => {
+                outcome.invalid_markers += 1;
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    commitment_id = %commitment.id,
+                    marker = %raw_marker,
+                    check = error.check(),
+                    "custody-blob marker is not a byte CID; skipping (no fetch kick)"
+                );
+                continue;
             }
         };
+        let blob_key = blob_cid.to_string();
 
         if is_self(&commitment.provider) {
             // Own commitment — act if missing.
-            if !local_store.has(&blob_hash) {
+            if !local_store.has(&blob_cid) {
                 let candidates =
-                    crate::db::peer_blob_inventory::lookup_hosts(conn, &blob_hash, &stale_before)?;
+                    crate::db::peer_blob_inventory::lookup_hosts(conn, &blob_key, &stale_before)?;
                 if !candidates.is_empty() {
                     let inventory: Vec<String> =
                         candidates.into_iter().map(|c| c.peer_id).collect();
@@ -263,7 +238,7 @@ pub fn reconcile_pass(
                     let score_prefix: Vec<String> =
                         crate::services::serve_routing::select_serve_peers(
                             conn,
-                            &blob_hash,
+                            &blob_key,
                             inventory.len().max(8),
                         )
                         .unwrap_or_default()
@@ -292,7 +267,7 @@ pub fn reconcile_pass(
                         merged
                     };
 
-                    fetch_kicker.kick(&blob_hash, candidate_peers);
+                    fetch_kicker.kick(&blob_cid, candidate_peers);
                     outcome.kicks_fired += 1;
                 } else if !connected_peers.is_empty() {
                     // Inventory-blind fallback: gossip inventory publish dies
@@ -305,7 +280,7 @@ pub fn reconcile_pass(
                         .take(FALLBACK_CANDIDATE_CAP)
                         .cloned()
                         .collect();
-                    fetch_kicker.kick(&blob_hash, fallback);
+                    fetch_kicker.kick(&blob_cid, fallback);
                     outcome.kicks_fired += 1;
                     outcome.fallback_kicks += 1;
                 }
@@ -314,7 +289,7 @@ pub fn reconcile_pass(
             // Other peer's commitment to me — observe; signal on stale.
             let last_seen: Option<String> = peer_blob_inventory::table
                 .filter(peer_blob_inventory::peer_id.eq(&commitment.provider))
-                .filter(peer_blob_inventory::blob_hash.eq(&blob_hash))
+                .filter(peer_blob_inventory::blob_cid.eq(&blob_key))
                 .select(peer_blob_inventory::last_seen_at)
                 .first::<String>(conn)
                 .optional()
@@ -356,7 +331,7 @@ pub fn reconcile_pass(
                 provider: &commitment.provider,
                 receiver: &commitment.receiver,
                 resource_conforms_to: commitment.resource_conforms_to.as_deref(),
-                resource_inventoried_as: Some(blob_hash.as_str()),
+                resource_inventoried_as: Some(blob_key.as_str()),
                 resource_classified_as_json: None,
                 resource_quantity_value: None,
                 resource_quantity_unit: None,
@@ -454,7 +429,10 @@ pub struct SalvageOutcome {
 /// legacy transport-id row and a new agent_cid row both count), but every WRITE
 /// uses `self_write_cid`. `run_salvage_pass` guarantees `self_write_cid` is a
 /// valid agent_cid (it skips the tick otherwise).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is an independent seam (two identities, strategy, author, pool, config, clock) the tests substitute; a bundling struct would only rename them"
+)]
 pub fn salvage_pass(
     conn: &mut SqliteConnection,
     self_read_cid: &str,
@@ -491,7 +469,13 @@ pub fn salvage_pass(
     }
     let mut wants: BTreeMap<String, BlobWant> = BTreeMap::new();
     for c in &custody_rows {
-        let Some(blob) = c.primary_classification() else {
+        // Only a byte-CID marker names bytes; anything else is skipped here as it
+        // is in `reconcile_pass`.
+        let Some(blob) = c
+            .primary_classification()
+            .and_then(|m| ByteCid::parse(&m).ok())
+            .map(|cid| cid.to_string())
+        else {
             continue;
         };
         let entry = wants.entry(blob).or_insert_with(|| BlobWant {
@@ -505,6 +489,9 @@ pub fn salvage_pass(
         outcome.blobs_examined += 1;
 
         // honored = distinct committed providers currently hosting (fresh inventory).
+        // Only admitted, projected inventory counts: a HELD envelope (unknown epoch
+        // or scheme) is never projected into `peer_blob_inventory`, so it can never
+        // inflate this count.
         // Joins provider against `peer_blob_inventory.peer_id` exactly as the
         // receiver-role check in `reconcile_pass` does; the pool is resolved to
         // `agent_cid` upstream (P3-6) so the namespaces line up.
@@ -512,7 +499,7 @@ pub fn salvage_pass(
         for provider in &want.providers {
             let fresh: i64 = peer_blob_inventory::table
                 .filter(peer_blob_inventory::peer_id.eq(provider))
-                .filter(peer_blob_inventory::blob_hash.eq(&blob))
+                .filter(peer_blob_inventory::blob_cid.eq(&blob))
                 .filter(peer_blob_inventory::last_seen_at.gt(&fresh_before))
                 .count()
                 .get_result(conn)
@@ -563,12 +550,12 @@ pub fn salvage_pass(
 // Custody manifest + self-held evidence backfill.
 //
 // `services::shard_manifest_backfill` heals CONTENT rows (walks the `content`
-// table for a `blob_hash` with no matching `shard_manifests` row). That leaves
+// table for a `blob_cid` with no matching `shard_manifests` row). That leaves
 // a gap: blobs stored through the raw blob-plane ingest path (`PUT /blob/{hash}`
 // → `http.rs::put_blob_bytes`) that predate the manifest producer (commit
 // 123fd4bd5) have NO content row to anchor on at all, so the content-table scan
 // can never see them. This pass instead enumerates the BLOB STORE directly
-// (`BlobStore::list_hashes`) — the same surface the inventory broadcaster and
+// (`BlobStore::list_cids`) — the same surface the inventory broadcaster and
 // `BlobStoreSnapshot` already use — so it also catches those content-less
 // legacy blobs.
 //
@@ -589,8 +576,8 @@ pub fn salvage_pass(
 
 /// Per-pass cap on blobs actually ENCODED + PERSISTED (the missing-manifest
 /// candidate set), not on the raw scan. The candidacy pre-filter
-/// (`hash → CID → existing-manifest?`) is a cheap DB-only check with no byte
-/// I/O, so it walks every hash the store reports; only the genuine gap is
+/// (`cid → existing-manifest?`) is a cheap DB-only check with no byte
+/// I/O, so it walks every CID the store reports; only the genuine gap is
 /// capped. This mirrors `shard_manifest_backfill::REDISTRIBUTE_CAP_PER_BOOT`'s
 /// reasoning: a huge already-manifested pantry can never starve later hashes
 /// across ticks, because the cap only ever bites the real candidates.
@@ -619,37 +606,82 @@ pub struct ManifestBackfillOutcome {
     pub errors: usize,
 }
 
-/// Trivial [`LocalBlobStore`] naming exactly one hash: the bytes this pass just
-/// read and hash-verified. Avoids a second full store listing — the candidate
-/// bytes are already in hand and proven authentic by the time self-held
-/// evidence is considered.
-struct VerifiedShardProbe<'a>(&'a str);
+/// [`LocalBlobStore`] naming exactly the units this pass just verified: the chunks of
+/// a payload whose whole BLAKE3 the store has recomputed. Avoids a second listing.
+struct VerifiedUnits<'a>(&'a [ByteCid]);
 
-impl LocalBlobStore for VerifiedShardProbe<'_> {
-    fn has(&self, hash: &str) -> bool {
-        hash == self.0
+impl LocalBlobStore for VerifiedUnits<'_> {
+    fn has(&self, cid: &ByteCid) -> bool {
+        self.0.contains(cid)
     }
 }
 
-/// Run one bounded custody-backfill pass. Idempotent — safe to call on every
-/// tick; a blob that gained a manifest on a prior pass is no longer a *manifest*
-/// candidate on the next.
+/// The custody units of a persisted manifest row this node holds whole: the chunks of
+/// an unstriped payload (a striped payload's shards are derived bytes the local store
+/// does not hold under their own CIDs, so they are never self-claimed here).
+fn unstriped_units(row: &crate::db::models::ShardManifestRow) -> Option<Vec<ByteCid>> {
+    let manifest = crate::db::shard_manifests::hydrate_manifest(row).ok()?;
+    manifest
+        .stripes
+        .is_empty()
+        .then(|| manifest.custody_units())
+}
+
+/// Record self-held evidence for each unit not already claimed under `agent_cid`.
+/// Returns how many rows were recorded; failures are counted into `errors`.
+fn claim_units(
+    conn: &mut SqliteConnection,
+    units: &[ByteCid],
+    agent_cid: &str,
+    h_app_id: &str,
+    errors: &mut usize,
+) -> usize {
+    let probe = VerifiedUnits(units);
+    let mut recorded = 0;
+    for unit in units {
+        let already = crate::db::shard_locations::get_locations_for_shard(conn, &unit.to_string())
+            .map(|rows| rows.iter().any(|l| l.peer_id == agent_cid))
+            .unwrap_or(false);
+        if already {
+            continue;
+        }
+        match crate::services::self_stewardship::record_self_held_shard(
+            conn, &probe, unit, agent_cid, h_app_id,
+        ) {
+            Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => recorded += 1,
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::reconcile",
+                    unit = %unit,
+                    error = %e,
+                    "custody-backfill: self-held recording failed"
+                );
+                *errors += 1;
+            }
+        }
+    }
+    recorded
+}
+
+/// Run one bounded custody-backfill pass. Idempotent — safe to call on every tick.
 ///
-/// It IS still a self-held candidate. Manifest-existence does not imply the
-/// self-held claim is current: this node's `agent_cid` changes across a non-prod
-/// DNA reinstall, and a manifest written by the ingest path never recorded a
-/// self-held row at all. The pre-filter therefore carries a RE-CLAIM ARM that
-/// re-asserts custody under the node's live identity for already-manifested
-/// blobs (`self_held_reclaimed`), so the resilience holder join keeps finding
-/// this node after a re-key instead of stranding it behind a fossil key.
+/// For every payload the local store lists with no `shard_manifests` row under
+/// `blob:{cid}`, read it (the store recomputes the whole BLAKE3 before returning, and
+/// quarantines on mismatch — unverified bytes are never manifested), mint the manifest
+/// the way the ingest path does (`ShardEncoder::encode`), persist it, and record
+/// self-held evidence for its custody units when it is unstriped.
 ///
-/// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`), obtained by
-/// the caller EXACTLY the way `distribute_shards` does
-/// (`reconcile::custody::resolve_self_agent_cid`, re-resolved fresh every
-/// tick — see `p2p/mod.rs`'s self-stewardship seam). `None` skips self-held
-/// recording for the pass (manifests are still backfilled); `record_self_held_shard`
-/// itself refuses anything that is not a well-formed `agent_cid`, so a
-/// transport id passed here is inert, never written.
+/// RE-CLAIM ARM: a payload that already has a manifest is still a self-held
+/// candidate. This node's `agent_cid` changes across a non-prod DNA reinstall, and a
+/// manifest written by the ingest path records no self-held row, so the claim is
+/// re-asserted under the live identity (`self_held_reclaimed`) when the store still
+/// holds the payload structurally whole ([`Exists::Verified`]). Steady state writes
+/// nothing.
+///
+/// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`); `None` skips
+/// self-held recording for the pass. `record_self_held_shard` refuses anything that is
+/// not a well-formed `agent_cid`.
 pub async fn manifest_backfill_pass(
     conn: &mut SqliteConnection,
     blob_store: &BlobStore,
@@ -658,121 +690,43 @@ pub async fn manifest_backfill_pass(
     batch_cap: usize,
 ) -> Result<ManifestBackfillOutcome, StorageError> {
     let mut outcome = ManifestBackfillOutcome::default();
+    let cids = blob_store.list_cids()?;
+    outcome.blobs_scanned = cids.len();
+    let agent = self_agent_cid.filter(|c| crate::identity_namespace::is_agent_cid(c));
 
-    let hashes = blob_store.list_hashes()?;
-    outcome.blobs_scanned = hashes.len();
-
-    // Cheap pre-filter: derive the blob CID from the hash string ALONE (no byte
-    // I/O — `hash_to_cid` is a pure function of the sha256 digest already
-    // encoded in the filename) and check for an existing manifest under the
-    // same `blob:{cid}` key `put_blob_bytes` writes. Only hashes that are
-    // genuinely missing a manifest become candidates for the (comparatively
-    // expensive) read + encode + persist below.
-    let mut candidates: Vec<(String, String)> = Vec::new(); // (hash, content_id)
-                                                            // Re-claim work is capped independently of `candidates` so a store full of
-                                                            // already-manifested blobs cannot make one pass unbounded.
+    let mut candidates: Vec<(ByteCid, String)> = Vec::new();
+    // Re-claim work is capped independently so a store full of already-manifested
+    // payloads cannot make one pass unbounded.
     let mut reclaims: usize = 0;
-    for hash in &hashes {
+    for cid in &cids {
         if candidates.len() >= batch_cap {
             break;
         }
-        let cid = match BlobStore::hash_to_cid(hash) {
-            Ok(c) => c.to_string(),
-            Err(e) => {
-                tracing::warn!(
-                    target: "elohim_storage::reconcile",
-                    hash = %hash,
-                    error = %e,
-                    "custody-backfill: hash→CID derivation failed; skipping"
-                );
-                outcome.errors += 1;
-                continue;
-            }
-        };
         let content_id = format!("blob:{cid}");
         match crate::db::shard_manifests::get_manifest(conn, h_app_id, &content_id) {
             Ok(Some(existing)) => {
                 outcome.skipped_existing += 1;
-                // RE-CLAIM ARM — the repair for a node that re-keyed.
-                //
-                // Manifest-existence used to imply "self-held evidence was
-                // already recorded on the pass that created it". That holds only
-                // while this node's `agent_cid` never changes. It does change: a
-                // non-prod DNA reinstall mints a NEW AgentPubKey per pod, and a
-                // manifest written by the INGEST path (`put_blob_bytes`) records
-                // no self-held row at all. Either way the blob is filtered out
-                // here as `skipped_existing` FOREVER, so the node holds bytes it
-                // never claims under its live key: the resilience holder join
-                // (`shard_locations.peer_id == humans.agent_pub_key`) sees only
-                // fossil-keyed rows and the card reads `stewardingCollectives: 0`
-                // while the bytes are demonstrably local. Observed live on both
-                // alpha doorways 2026-07-31 (holder key matched no `humans` row
-                // and no live conductor agent, yet `GET /blob/{hash}` served the
-                // full object).
-                //
-                // So: re-assert the claim under the CURRENT identity every pass.
-                // `upsert_location` is keyed `(shard_hash, peer_id)`, so this is
-                // idempotent — steady state writes nothing, and the fossil row is
-                // left untouched (removing it is `membership_identity_reconcile`'s
-                // rekey cascade, not ours; a stale row is inert, never a lie about
-                // the live key).
-                //
-                // Honesty gate, three ways: only `encoding == "none"` (where the
-                // single shard IS the whole blob), only when the manifest's shard
-                // hash equals the blob hash we are iterating, and only for a hash
-                // the local store just listed — the same listing-based custody
-                // evidence `BlobStoreSnapshot` supplies to the main reconcile
-                // pass. `record_self_held_shard` independently refuses any
-                // identity that is not a well-formed `agent_cid`.
-                if let Some(agent_cid) =
-                    self_agent_cid.filter(|c| crate::identity_namespace::is_agent_cid(c))
-                {
-                    if reclaims < batch_cap && existing.encoding == "none" {
-                        let first_shard: Option<String> =
-                            serde_json::from_str::<Vec<String>>(&existing.shard_hashes_json)
-                                .ok()
-                                .and_then(|v| v.into_iter().next());
-                        // Steady state must be a true no-op: once the claim
-                        // exists under the live key there is nothing to repair,
-                        // so skip the write (and the counter) rather than
-                        // re-asserting an identical row on every tick. Without
-                        // this the pass would log a non-zero `self_held_reclaimed`
-                        // forever and read as perpetual churn.
-                        let already_claimed = first_shard.as_deref() == Some(hash.as_str())
-                            && crate::db::shard_locations::get_locations_for_shard(conn, hash)
-                                .map(|rows| rows.iter().any(|l| l.peer_id == agent_cid))
-                                .unwrap_or(false);
-                        if first_shard.as_deref() == Some(hash.as_str()) && !already_claimed {
-                            reclaims += 1;
-                            let probe = VerifiedShardProbe(hash.as_str());
-                            match crate::services::self_stewardship::record_self_held_shard(
-                                conn, &probe, hash, agent_cid, h_app_id,
-                            ) {
-                                Ok(
-                                    crate::services::self_stewardship::SelfHeldOutcome::Recorded,
-                                ) => {
-                                    outcome.self_held_reclaimed += 1;
-                                }
-                                Ok(_) => {}
-                                Err(e) => {
-                                    tracing::warn!(
-                                        target: "elohim_storage::reconcile",
-                                        hash = %hash,
-                                        error = %e,
-                                        "custody-backfill: self-held re-claim failed"
-                                    );
-                                    outcome.errors += 1;
-                                }
-                            }
-                        }
-                    }
+                let Some(agent_cid) = agent else {
+                    continue;
+                };
+                if reclaims >= batch_cap {
+                    continue;
                 }
+                let Some(units) = unstriped_units(&existing) else {
+                    continue;
+                };
+                if blob_store.exists(cid).await != Exists::Verified {
+                    continue;
+                }
+                reclaims += 1;
+                outcome.self_held_reclaimed +=
+                    claim_units(conn, &units, agent_cid, h_app_id, &mut outcome.errors);
             }
-            Ok(None) => candidates.push((hash.clone(), content_id)),
+            Ok(None) => candidates.push((*cid, content_id)),
             Err(e) => {
                 tracing::warn!(
                     target: "elohim_storage::reconcile",
-                    hash = %hash,
+                    cid = %cid,
                     error = %e,
                     "custody-backfill: manifest lookup failed; skipping"
                 );
@@ -783,49 +737,30 @@ pub async fn manifest_backfill_pass(
 
     let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
 
-    for (hash, content_id) in candidates {
-        let data = match blob_store.get(&hash).await {
+    for (cid, content_id) in candidates {
+        // `get` recomputes the whole BLAKE3 and refuses (quarantining) on mismatch.
+        let data = match blob_store.get(&cid).await {
             Ok(d) => d,
             Err(e) => {
                 tracing::warn!(
                     target: "elohim_storage::reconcile",
-                    hash = %hash,
+                    cid = %cid,
                     error = %e,
-                    "custody-backfill: blob bytes unreadable; skipping"
+                    "custody-backfill: payload unreadable or failed verification; skipping"
                 );
                 outcome.errors += 1;
                 continue;
             }
         };
 
-        // Never manifest unverified bytes: recompute the hash and require it
-        // to match the filename before deriving anything from the content.
-        let recomputed = BlobStore::compute_hash(&data);
-        if recomputed != hash {
-            tracing::warn!(
-                target: "elohim_storage::reconcile",
-                hash = %hash,
-                recomputed = %recomputed,
-                "custody-backfill: local bytes FAILED hash verification; skipping \
-                 (never manifesting unverified/corrupt bytes)"
-            );
-            outcome.errors += 1;
-            continue;
-        }
-
-        // Same derivation `put_blob_bytes` uses — same `ShardEncoder`, same
-        // config, same `create_manifest` call — so the encoding decision and
-        // shard hashes can never drift between the ingest path and this
-        // backfill. Mime type is unknown for a raw enumerate (no request
-        // header to read); this is metadata only and does not affect encoding
-        // or shard-hash derivation (`ShardEncoder::determine_encoding` is
-        // purely size-based).
+        // Same derivation as the ingest path; the mime type is unknown for a raw
+        // enumerate and does not affect chunking or erasure.
         let manifest = match encoder.create_manifest(&data, "application/octet-stream", "commons") {
             Ok(m) => m,
             Err(e) => {
                 tracing::warn!(
                     target: "elohim_storage::reconcile",
-                    hash = %hash,
+                    cid = %cid,
                     error = %e,
                     "custody-backfill: manifest encoding failed; skipping"
                 );
@@ -834,8 +769,7 @@ pub async fn manifest_backfill_pass(
             }
         };
 
-        // Defensive re-check: a concurrent writer (a fresh PUT, another pass)
-        // may have raced a manifest into existence since the pre-filter above.
+        // Defensive re-check: a concurrent writer may have raced a manifest in.
         match crate::db::shard_manifests::get_manifest(conn, h_app_id, &content_id) {
             Ok(Some(_)) => {
                 outcome.skipped_existing += 1;
@@ -845,7 +779,7 @@ pub async fn manifest_backfill_pass(
             Err(e) => {
                 tracing::warn!(
                     target: "elohim_storage::reconcile",
-                    hash = %hash,
+                    cid = %cid,
                     error = %e,
                     "custody-backfill: manifest re-check failed; skipping"
                 );
@@ -862,7 +796,7 @@ pub async fn manifest_backfill_pass(
         ) {
             tracing::warn!(
                 target: "elohim_storage::reconcile",
-                hash = %hash,
+                cid = %cid,
                 error = %e,
                 "custody-backfill: manifest persist failed"
             );
@@ -871,35 +805,10 @@ pub async fn manifest_backfill_pass(
         }
         outcome.manifests_written += 1;
 
-        // Self-held evidence — only for `encoding == "none"`, where the single
-        // shard IS the whole blob: bytes this node has just read and
-        // hash-verified. Larger (`chunked` / `rs-*`) encodings produce derived
-        // shard payloads that are NOT present in the local store under their
-        // own hash (see `services::self_stewardship` module docs), so no
-        // self-held claim is made for them here.
-        if manifest.encoding == "none" {
-            if let (Some(agent_cid), Some(shard_hash)) =
-                (self_agent_cid, manifest.shard_hashes.first())
-            {
-                let probe = VerifiedShardProbe(shard_hash.as_str());
-                match crate::services::self_stewardship::record_self_held_shard(
-                    conn, &probe, shard_hash, agent_cid, h_app_id,
-                ) {
-                    Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => {
-                        outcome.self_held_recorded += 1;
-                    }
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::warn!(
-                            target: "elohim_storage::reconcile",
-                            hash = %hash,
-                            error = %e,
-                            "custody-backfill: self-held recording failed"
-                        );
-                        outcome.errors += 1;
-                    }
-                }
-            }
+        if let (Some(agent_cid), true) = (agent, manifest.stripes.is_empty()) {
+            let units = manifest.custody_units();
+            outcome.self_held_recorded +=
+                claim_units(conn, &units, agent_cid, h_app_id, &mut outcome.errors);
         }
     }
 
@@ -922,7 +831,24 @@ mod tests {
     use super::*;
     use crate::db::diesel_schema::rea_commitments;
     use crate::db::models::NewReaCommitment;
-    use crate::db::peer_blob_inventory::apply_snapshot;
+
+    /// A byte-CID marker for a fixture label (the CID of the label's bytes).
+    fn cid_of(label: char) -> String {
+        elohim_epr::address::compute_bytes_cid(&[label as u8]).to_string()
+    }
+
+    /// The peer's inventory is exactly `cids`: a fresh peer's first delta (snapshots
+    /// are gone; recon or a first delta establishes a peer's set).
+    fn apply_snapshot(
+        conn: &mut SqliteConnection,
+        peer: &str,
+        cids: &[String],
+        sequence: i64,
+        when: &str,
+    ) -> Result<(), StorageError> {
+        crate::db::peer_blob_inventory::apply_delta(conn, peer, cids, &[], sequence, when)
+            .map(|_| ())
+    }
     use crate::db::{run_migrations, DbPool};
     use diesel::r2d2::{ConnectionManager, Pool};
     use std::sync::Mutex;
@@ -950,8 +876,8 @@ mod tests {
 
     struct StaticStore(Vec<String>);
     impl LocalBlobStore for StaticStore {
-        fn has(&self, hash: &str) -> bool {
-            self.0.iter().any(|h| h == hash)
+        fn has(&self, cid: &ByteCid) -> bool {
+            self.0.iter().any(|h| *h == cid.to_string())
         }
     }
 
@@ -959,11 +885,11 @@ mod tests {
         kicks: Mutex<Vec<(String, Vec<String>)>>,
     }
     impl FetchKicker for RecordingKicker {
-        fn kick(&self, blob_hash: &str, candidates: Vec<String>) {
+        fn kick(&self, blob_cid: &ByteCid, candidates: Vec<String>) {
             self.kicks
                 .lock()
                 .unwrap()
-                .push((blob_hash.to_string(), candidates));
+                .push((blob_cid.to_string(), candidates));
         }
     }
 
@@ -1009,7 +935,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &"a".repeat(64));
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &cid_of('a'));
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1018,7 +944,7 @@ mod tests {
             &mut conn,
             "self_cid",
             None,
-            &StaticStore(vec!["a".repeat(64)]),
+            &StaticStore(vec![cid_of('a')]),
             &kicker,
             default_cfg(),
             chrono::Utc::now(),
@@ -1035,7 +961,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         // Use a fresh timestamp so the inventory entry is within freshness window.
@@ -1125,7 +1051,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "b".repeat(64);
+        let blob_hash = cid_of('b');
         insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         let now = chrono::Utc::now();
@@ -1173,7 +1099,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "c".repeat(64);
+        let blob_hash = cid_of('c');
         insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         let now = chrono::Utc::now();
@@ -1206,111 +1132,25 @@ mod tests {
         assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_hash);
     }
 
-    /// Backlog `blob-fetch-sha256-prefixed-cid-rejection`: a custody row whose
-    /// marker is a CIDv1 double-wrapped in the legacy `sha256-` prefix (the
-    /// seed-side normalizeBlobHash defect) must be REPAIRED and re-keyed to
-    /// the canonical on-disk form (`sha256-<wrapped digest hex>`) before any
-    /// fetch decision — the kick goes out under an address peers accept and
-    /// inventory actually advertises, never the double-wrapped literal that
-    /// every responder rejects (T21) on a ~2min drumbeat.
-    #[test]
-    fn double_wrapped_cid_marker_is_repaired_before_kick() {
-        let pool = test_pool();
-        let mut conn = pool.get().unwrap();
-
-        let bytes = b"evolution-of-trust-bundle";
-        let (cid, store_key) = crate::blob_store::BlobStore::compute_addresses(bytes);
-        let double_wrapped = format!("sha256-{cid}");
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &double_wrapped);
-
-        // Inventory advertises the canonical on-disk key (what list_hashes /
-        // the broadcaster actually publish).
-        let now = chrono::Utc::now();
-        let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-        apply_snapshot(
-            &mut conn,
-            "peer_X",
-            std::slice::from_ref(&store_key),
-            1,
-            &when,
-        )
-        .unwrap();
-
-        let kicker = RecordingKicker {
-            kicks: Mutex::new(Vec::new()),
-        };
-        let outcome = reconcile_pass(
-            &mut conn,
-            "self_cid",
-            None,
-            &StaticStore(vec![]),
-            &kicker,
-            default_cfg(),
-            now,
-            &[],
-        )
-        .unwrap();
-
-        assert_eq!(outcome.kicks_fired, 1, "repaired marker must still heal");
-        assert_eq!(outcome.invalid_markers, 0);
-        let kicks = kicker.kicks.lock().unwrap();
-        assert_eq!(
-            kicks[0].0, store_key,
-            "kick must use the canonical store key, never the double-wrapped literal"
-        );
-        assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
-    }
-
-    /// The drum-stop half of the repair: once the bytes land (filed under the
-    /// canonical `sha256-<hex>` key), a double-wrapped marker must read as
-    /// PRESENT — no further kicks, ever.
-    #[test]
-    fn double_wrapped_cid_marker_stops_kicking_once_bytes_land() {
-        let pool = test_pool();
-        let mut conn = pool.get().unwrap();
-
-        let bytes = b"evolution-of-trust-bundle";
-        let (cid, store_key) = crate::blob_store::BlobStore::compute_addresses(bytes);
-        let double_wrapped = format!("sha256-{cid}");
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &double_wrapped);
-
-        let kicker = RecordingKicker {
-            kicks: Mutex::new(Vec::new()),
-        };
-        let outcome = reconcile_pass(
-            &mut conn,
-            "self_cid",
-            None,
-            &StaticStore(vec![store_key]),
-            &kicker,
-            default_cfg(),
-            chrono::Utc::now(),
-            &["peer_A".to_string()],
-        )
-        .unwrap();
-
-        assert_eq!(
-            outcome.kicks_fired, 0,
-            "bytes present under the canonical key must stop the drum"
-        );
-        assert!(kicker.kicks.lock().unwrap().is_empty());
-    }
-
-    /// Retry hygiene: a marker that is no content address in ANY form is
-    /// counted and skipped — never kicked (a kick could only be rejected by
+    /// Retry hygiene: a marker that is not a byte CID — a `sha256-<hex>`, bare hex,
+    /// a CID double-wrapped in `sha256-`, a sha2 citation CID — is counted and
+    /// skipped, never kicked and never re-keyed (a kick could only be refused by
     /// every responder on every sweep tick forever).
     #[test]
-    fn invalid_marker_is_counted_and_never_kicked() {
+    fn legacy_spellings_are_invalid_markers_never_kicked() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
-
-        insert_custody_commitment(
-            &mut conn,
-            "c1",
-            "self_cid",
-            "other_cid",
-            "sha256-not-hex-not-a-cid",
-        );
+        let byte_cid = cid_of('z');
+        let markers = [
+            format!("sha256-{}", "a".repeat(64)),
+            "a".repeat(64),
+            format!("sha256-{byte_cid}"),
+            elohim_epr::address::compute_raw_sha2_cid(b"z").to_string(),
+            "sha256-not-hex-not-a-cid".to_string(),
+        ];
+        for (i, marker) in markers.iter().enumerate() {
+            insert_custody_commitment(&mut conn, &format!("c{i}"), "self_cid", "other_cid", marker);
+        }
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1327,7 +1167,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(outcome.invalid_markers, 1);
+        assert_eq!(outcome.invalid_markers, markers.len() as u32);
         assert_eq!(outcome.kicks_fired, 0);
         assert!(kicker.kicks.lock().unwrap().is_empty());
     }
@@ -1337,7 +1177,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &"a".repeat(64));
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &cid_of('a'));
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1365,7 +1205,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         let kicker = RecordingKicker {
@@ -1399,7 +1239,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         let kicker = RecordingKicker {
@@ -1431,7 +1271,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
 
         let now = chrono::Utc::now();
@@ -1471,7 +1311,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
 
         let kicker = RecordingKicker {
@@ -1508,7 +1348,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
 
         // Fresh inventory entry from other_cid.
@@ -1546,7 +1386,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
 
         // First pass: emit gap.
@@ -1595,7 +1435,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         // provider = agent_cid (NOT the transport self_cid).
         insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_hash);
 
@@ -1639,7 +1479,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         // provider = transport self_cid (legacy write).
         insert_custody_commitment(
             &mut conn,
@@ -1688,7 +1528,7 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = "a".repeat(64);
+        let blob_hash = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_hash);
 
         let kicker = RecordingKicker {
@@ -1788,13 +1628,12 @@ mod tests {
         let snapshot = BlobStoreSnapshot::from_store(&store).expect("snapshot");
 
         assert!(
-            snapshot.has(&result.hash),
-            "snapshot must report stored hash present"
+            snapshot.has(&result.cid),
+            "snapshot must report the stored cid present"
         );
         assert!(
-            !snapshot
-                .has("sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
-            "snapshot must report unknown hash absent"
+            !snapshot.has(&elohim_epr::address::compute_bytes_cid(b"never stored")),
+            "snapshot must report an unknown cid absent"
         );
         assert_eq!(snapshot.len(), 1, "snapshot captured one hash");
         assert!(!snapshot.is_empty(), "snapshot is non-empty after store");
@@ -1866,7 +1705,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "b".repeat(64);
+        let blob = cid_of('b');
         // One existing custodian, target 2 → under-replicated.
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         mark_hosting(&mut conn, "prov-A", &blob, now);
@@ -1900,7 +1739,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "c".repeat(64);
+        let blob = cid_of('c');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
         mark_hosting(&mut conn, "prov-A", &blob, now);
@@ -1933,7 +1772,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "d".repeat(64);
+        let blob = cid_of('d');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         mark_hosting(&mut conn, "prov-A", &blob, now);
 
@@ -1962,7 +1801,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "e".repeat(64);
+        let blob = cid_of('e');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         mark_hosting(&mut conn, "prov-A", &blob, now);
 
@@ -1990,7 +1829,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "f".repeat(64);
+        let blob = cid_of('f');
         // self is already a provider (not yet hosting → honored 0 → under-replicated),
         // so it must NOT author a duplicate adopt.
         insert_custody_commitment(&mut conn, "c1", "self", "steward-Z", &blob);
@@ -2025,7 +1864,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "a".repeat(64);
+        let blob = cid_of('a');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         mark_hosting(&mut conn, "prov-A", &blob, now);
 
@@ -2061,7 +1900,7 @@ mod tests {
         let p = test_pool();
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
-        let blob = "a".repeat(64);
+        let blob = cid_of('a');
         // Legacy row: provider is the transport id this node used to write.
         insert_custody_commitment(&mut conn, "c1", "12D3KooTransportSelf", "steward-Z", &blob);
 
@@ -2104,9 +1943,9 @@ mod tests {
         let mut conn = pool.get().expect("conn");
         let store = BlobStore::new_memory();
 
-        // Small payload → `encoding == "none"`, so the single shard IS the blob.
+        // Small, unstriped payload: its single chunk IS the payload.
         let stored = store.store(b"the landing page bytes").await.expect("store");
-        let hash = stored.hash.clone();
+        let hash = stored.cid.to_string();
 
         // Pass 1 — under the OLD identity: manifests the blob and claims it.
         let first = manifest_backfill_pass(&mut conn, &store, Some(OLD_KEY), "lamad", 16)
@@ -2194,7 +2033,7 @@ mod tests {
         );
 
         let holders: Vec<String> =
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, &stored.hash)
+            crate::db::shard_locations::get_locations_for_shard(&mut conn, &stored.cid.to_string())
                 .expect("load locations")
                 .into_iter()
                 .map(|l| l.peer_id)

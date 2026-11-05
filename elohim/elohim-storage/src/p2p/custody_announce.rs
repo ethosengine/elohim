@@ -30,17 +30,21 @@
 //! row is a self-asserted custody claim, kept distinguishable by its `status` so
 //! future resilience folds can weight by evidence class.
 //!
-//! ## Stage 1 signature
+//! ## Authentication: the holder is bound to the signed gossip author
 //!
-//! The announcement carries a `signature: Vec<u8>` that is structurally non-empty
-//! (a single null byte suffices at Stage 1). Stage 2 will enforce Ed25519
-//! verification over canonical bytes; the non-empty gate is the forward-compatible
-//! placeholder, mirroring `salvage_gossip` / `inventory_gossip`.
+//! A receiver projects an announcement only when its `holder_agent_cid` is the agent
+//! `peer_transport_manifest` binds to the message's authenticated author (gossipsub
+//! `message.source` under `Signed` validation, never the relaying
+//! `propagation_source`) — [`CustodyAnnouncement::check_binding`]. A plane with no
+//! authenticated author (iroh-gossip's `delivered_from` is only the neighbour) cannot
+//! carry a custody claim until the announcement itself is signed. The Stage-1 null
+//! signature placeholder is gone; the wire break moved the topic to `/2`.
 
+use elohim_epr::address::ByteCid;
 use serde::{Deserialize, Serialize};
 
-/// Gossipsub topic for custody announcements.
-pub const CUSTODY_ANNOUNCE_TOPIC: &str = "elohim/storage/custody";
+/// Gossipsub topic for custody announcements (v2: byte-CID shards, author-bound).
+pub const CUSTODY_ANNOUNCE_TOPIC: &str = "elohim/storage/custody/2";
 
 /// The `shard_locations` projection table for the `ProjectionInventory` catch-up
 /// arm. The `ViewKind::ProjectionInventory { table }` discriminator is the seam;
@@ -50,12 +54,12 @@ pub const CUSTODY_ANNOUNCE_TOPIC: &str = "elohim/storage/custody";
 pub const PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS: &str = "shard_locations";
 
 /// A single self-asserted custody claim: "`holder_agent_cid` holds the bytes of
-/// `shard_hash` in app scope `h_app_id`, recorded with `status` at
+/// `shard_cid` in app scope `h_app_id`, recorded with `status` at
 /// `announced_at_ms`."
 ///
-/// The storage identity is `(shard_hash, holder_agent_cid)` — the
+/// The storage identity is `(shard_cid, holder_agent_cid)` — the
 /// `shard_locations` primary key. `content_id` is intentionally NOT carried: it
-/// is derivable from `shard_hash` via `shard_manifests`, and the row keys on the
+/// is derivable from `shard_cid` via `shard_manifests`, and the row keys on the
 /// shard, not the content unit.
 ///
 /// `holder_agent_cid` is an `agent_cid` (`uhCAk…`) — the same join key
@@ -64,8 +68,10 @@ pub const PROJECTION_INVENTORY_TABLE_SHARD_LOCATIONS: &str = "shard_locations";
 /// a cross-namespace value can never land in the join-key column.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CustodyAnnouncement {
-    /// Content-addressed shard identifier (`sha256-…` today; CID-first later).
-    pub shard_hash: String,
+    /// The custody unit's byte CID (a shard, or a chunk of an unstriped payload),
+    /// parsed by full decode on read.
+    #[serde(with = "crate::blob_store::byte_cid_serde")]
+    pub shard_cid: ByteCid,
     /// Canonical agent identity (`uhCAk…`) of the holder. The resilience join is
     /// `humans.agent_pub_key == shard_locations.peer_id`, both `agent_cid`.
     pub holder_agent_cid: String,
@@ -81,23 +87,28 @@ pub struct CustodyAnnouncement {
     /// `upsert_if_newer` guard so a stale re-announce never regresses a fresher
     /// peer-announced row.
     pub announced_at_ms: i64,
-    /// Structural non-empty signature (Stage 1). Ed25519 in Stage 2.
-    pub signature: Vec<u8>,
 }
 
 /// Reasons a custody announcement can fail structural verification.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum VerifyError {
-    #[error("shard_hash cannot be empty")]
-    EmptyShardHash,
     #[error("holder_agent_cid cannot be empty")]
     EmptyHolder,
     #[error("h_app_id cannot be empty")]
     EmptyAppId,
     #[error("status cannot be empty")]
     EmptyStatus,
-    #[error("signature cannot be empty")]
-    EmptySignature,
+}
+
+/// Why an announcement is not bound to its author.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum BindingError {
+    #[error("no authenticated author on this plane")]
+    NoAuthenticatedAuthor,
+    #[error("the author is not bound to an agent in peer_transport_manifest")]
+    UnboundAuthor,
+    #[error("holder {holder} is not the author's bound agent {bound}")]
+    HolderMismatch { holder: String, bound: String },
 }
 
 impl CustodyAnnouncement {
@@ -111,17 +122,13 @@ impl CustodyAnnouncement {
         rmp_serde::from_slice(bytes)
     }
 
-    /// Structural verification — Stage 1 gate. Rejects empty required fields
-    /// (an empty shard/holder would corrupt the projection join) and an empty
-    /// signature (Stage 1 non-empty placeholder; Ed25519 in Stage 2).
+    /// Structural verification: rejects empty required fields (an empty holder would
+    /// corrupt the projection join). The shard CID was validated at decode.
     ///
     /// The `is_agent_cid` shape check is NOT done here — it lives in the apply
     /// path, which distinguishes a malformed holder (`NotAgentCid`) from a
     /// self-claim (`DroppedSelf`) as distinct projection outcomes.
     pub fn verify_structural(&self) -> Result<(), VerifyError> {
-        if self.shard_hash.is_empty() {
-            return Err(VerifyError::EmptyShardHash);
-        }
         if self.holder_agent_cid.is_empty() {
             return Err(VerifyError::EmptyHolder);
         }
@@ -131,8 +138,28 @@ impl CustodyAnnouncement {
         if self.status.is_empty() {
             return Err(VerifyError::EmptyStatus);
         }
-        if self.signature.is_empty() {
-            return Err(VerifyError::EmptySignature);
+        Ok(())
+    }
+
+    /// Bind the claim to its author: `author` is the authenticated gossip author (if
+    /// the plane has one) and `bound_agent` the agent `peer_transport_manifest` binds
+    /// to it. The holder must be exactly that agent.
+    pub fn check_binding(
+        &self,
+        author: Option<&str>,
+        bound_agent: Option<&str>,
+    ) -> Result<(), BindingError> {
+        if author.is_none() {
+            return Err(BindingError::NoAuthenticatedAuthor);
+        }
+        let Some(bound) = bound_agent else {
+            return Err(BindingError::UnboundAuthor);
+        };
+        if bound != self.holder_agent_cid {
+            return Err(BindingError::HolderMismatch {
+                holder: self.holder_agent_cid.clone(),
+                bound: bound.to_string(),
+            });
         }
         Ok(())
     }
@@ -164,12 +191,11 @@ mod tests {
 
     fn sample() -> CustodyAnnouncement {
         CustodyAnnouncement {
-            shard_hash: "sha256-abc".to_string(),
+            shard_cid: elohim_epr::address::compute_bytes_cid(b"shard"),
             holder_agent_cid: "uhCAkHolder".to_string(),
             h_app_id: "lamad".to_string(),
             status: "self-held".to_string(),
             announced_at_ms: 1_700_000_000_000,
-            signature: vec![0x00],
         }
     }
 
@@ -189,10 +215,6 @@ mod tests {
     #[test]
     fn verify_structural_rejects_each_empty_field() {
         let mut a = sample();
-        a.shard_hash.clear();
-        assert_eq!(a.verify_structural(), Err(VerifyError::EmptyShardHash));
-
-        let mut a = sample();
         a.holder_agent_cid.clear();
         assert_eq!(a.verify_structural(), Err(VerifyError::EmptyHolder));
 
@@ -203,10 +225,48 @@ mod tests {
         let mut a = sample();
         a.status.clear();
         assert_eq!(a.verify_structural(), Err(VerifyError::EmptyStatus));
+    }
 
-        let mut a = sample();
-        a.signature.clear();
-        assert_eq!(a.verify_structural(), Err(VerifyError::EmptySignature));
+    #[test]
+    fn a_sha256_shard_spelling_does_not_decode() {
+        #[derive(Serialize)]
+        struct Legacy {
+            shard_cid: String,
+            holder_agent_cid: String,
+            h_app_id: String,
+            status: String,
+            announced_at_ms: i64,
+        }
+        let bytes = rmp_serde::to_vec_named(&Legacy {
+            shard_cid: format!("sha256-{}", "a".repeat(64)),
+            holder_agent_cid: "uhCAkHolder".into(),
+            h_app_id: "lamad".into(),
+            status: "self-held".into(),
+            announced_at_ms: 1,
+        })
+        .unwrap();
+        assert!(CustodyAnnouncement::from_bytes(&bytes).is_err());
+    }
+
+    #[test]
+    fn holder_must_be_the_authors_bound_agent() {
+        let ann = sample();
+        assert_eq!(
+            ann.check_binding(Some("12D3KooWa"), Some("uhCAkHolder")),
+            Ok(())
+        );
+        assert_eq!(
+            ann.check_binding(None, Some("uhCAkHolder")),
+            Err(BindingError::NoAuthenticatedAuthor)
+        );
+        assert_eq!(
+            ann.check_binding(Some("12D3KooWa"), None),
+            Err(BindingError::UnboundAuthor)
+        );
+        assert!(matches!(
+            ann.check_binding(Some("12D3KooWa"), Some("uhCAkSomeoneElse")),
+            Err(BindingError::HolderMismatch { .. })
+        ));
     }
 
     /// Additive-compat: a map-keyed encoding of the CURRENT struct decodes on a
