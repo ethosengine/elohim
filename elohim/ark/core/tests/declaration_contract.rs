@@ -118,7 +118,10 @@ fn release_pin_requires_the_content_identity_even_when_the_head_exists() {
 /// did. The expected child is written out by hand here, independent of `RunLaunch::child`.
 #[test]
 fn a_run_act_without_launch_detail_keeps_its_historical_manifest_cid() {
-    let base = base();
+    // Freeze the pre-helper input from b05a282be142: today's device tool inventory
+    // can evolve without changing the historical RunLaunch wire contract.
+    let base = RuntimeManifest::from_json(include_str!("workspace-device-run-launch.json"))
+        .expect("historical device manifest decodes");
     let mut historical: serde_json::Value =
         serde_json::to_value(&base).expect("base manifest encodes");
     historical["supersedes"] = serde_json::Value::String(base.cid().unwrap());

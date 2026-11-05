@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "kind": "runtime-manifest",
+  "reach": "private",
+  "processes": [],
+  "follows": [
+    {
+      "channel": "bin:epr",
+      "mode": "apply"
+    },
+    {
+      "channel": "bin:brit",
+      "mode": "apply"
+    }
+  ],
+  "tools": {
+    "epr": {
+      "bins": [
+        "epr",
+        "bin-launch"
+      ],
+      "aliases": {},
+      "candidateEnv": {
+        "epr": [
+          "EPR_BIN"
+        ]
+      },
+      "longRunning": [
+        [
+          "peer",
+          "serve"
+        ]
+      ],
+      "source": {
+        "kind": "repository",
+        "manifest": "elohim/eprfs/Cargo.toml",
+        "publishedRef": [
+          "refs/heads/dev",
+          "refs/remotes/origin/dev"
+        ]
+      }
+    },
+    "brit": {
+      "bins": [
+        "brit",
+        "brit-build-ref",
+        "brit-verify"
+      ],
+      "aliases": {
+        "rakia": "brit"
+      },
+      "candidateEnv": {
+        "brit": [
+          "BRIT_BIN"
+        ],
+        "brit-build-ref": [
+          "BRIT_BUILD_REF_BIN",
+          "BRIT_BUILD_REF"
+        ],
+        "brit-verify": [
+          "BRIT_VERIFY_BIN"
+        ]
+      },
+      "source": {
+        "kind": "gitlink",
+        "path": "elohim/brit",
+        "publishedRef": [
+          "refs/heads/dev",
+          "refs/remotes/origin/dev"
+        ],
+        "repo": "ethosengine/brit",
+        "releasePrefix": "brit-build-",
+        "attestation": {
+          "provider": "github-checks",
+          "repo": "ethosengine/brit",
+          "check": "Tests pass"
+        }
+      }
+    }
+  }
+}
