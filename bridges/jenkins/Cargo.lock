@@ -478,6 +478,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-address"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "data-encoding",
+ "multihash-codetable",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "elohim-ark-core"
 version = "0.1.0"
 dependencies = [
@@ -547,12 +557,15 @@ dependencies = [
 
 [[package]]
 name = "elohim-epr"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
+ "bs58",
  "chrono",
  "cid",
  "ed25519-dalek",
+ "elohim-address",
+ "fastcdc",
  "hex",
  "ipld-core",
  "multihash-codetable",
@@ -744,6 +757,12 @@ name = "fallible-streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
+
+[[package]]
+name = "fastcdc"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0431c3132902a1bed6fe77dcfa5d03844e083f263b81288246a2d43dd7d4b2ad"
 
 [[package]]
 name = "fastrand"
