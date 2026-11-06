@@ -154,7 +154,7 @@ test('witness is derived from the anchor', () => {
 
 test('content is built from a record when the island had none', () => {
   const c = contentFromRecord({
-    id: 'evo', blobHash: 'sha256-abc', contentFormat: 'html5-app', reach: 'commons', dhtAnchorHash: null,
+    id: 'evo', blobCid: 'bafkr4ihfyv7teufgeide2hw2gjnfuusa7llnofhefsl5mlnao7h3fl5owu', contentFormat: 'html5-app', reach: 'commons', dhtAnchorHash: null,
     contentBody: JSON.stringify({ entryPoint: 'app.html', capabilities: ['popups', 'teleport'] })
   });
   assert.equal(c.recordId, 'evo');
@@ -163,7 +163,7 @@ test('content is built from a record when the island had none', () => {
   assert.equal(JSON.stringify(c.capabilities), '["popups"]');
   assert.equal(c.frame, undefined);
   assert.equal(contentFromRecord({ id: 'x' }), null);
-  assert.equal('witness' in contentFromRecord({ id: 'x', blobHash: 'h', contentFormat: 'markdown' }), false);
+  assert.equal('witness' in contentFromRecord({ id: 'x', blobCid: 'h', contentFormat: 'markdown' }), false);
 });
 
 test('viewer.kind supersedes the deprecated boolean', () => {

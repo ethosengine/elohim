@@ -2312,7 +2312,7 @@
   // what the record says, never what a delivery did.
   function contentFromRecord(node) {
     if (!node || typeof node !== 'object') return null;
-    var addr = str(node.blobHash) || str(node.serverBlobHash) || str(node.blobCid);
+    var addr = str(node.blobCid) || str(node.serverBlobCid);
     if (!addr || !str(node.id)) return null;
     var fmt = str(node.contentFormat);
     var body = null;
@@ -2607,7 +2607,7 @@
   function contextFromContentNode(slug, node) {
     var meta = (node && node.metadata) || {};
     var theme = meta.theme || null;
-    var buildMarker = node && (node.blobHash || node.serverBlobHash) ? node.blobHash || node.serverBlobHash : '';
+    var buildMarker = node && (node.blobCid || node.serverBlobCid) ? node.blobCid || node.serverBlobCid : '';
     return {
       slug: slug,
       title: (node && node.title) || '',

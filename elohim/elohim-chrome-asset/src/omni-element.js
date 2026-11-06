@@ -1111,7 +1111,7 @@
   function contextFromContentNode(slug, node) {
     var meta = (node && node.metadata) || {};
     var theme = meta.theme || null;
-    var buildMarker = node && (node.blobHash || node.serverBlobHash) ? node.blobHash || node.serverBlobHash : '';
+    var buildMarker = node && (node.blobCid || node.serverBlobCid) ? node.blobCid || node.serverBlobCid : '';
     return {
       slug: slug,
       title: (node && node.title) || '',
