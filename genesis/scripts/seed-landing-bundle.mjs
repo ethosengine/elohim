@@ -11,6 +11,8 @@
  *
  * Usage:
  *   STORAGE_URL=http://localhost:8090 node genesis/scripts/seed-landing-bundle.mjs
+ *   DRY_RUN=1 [BUNDLE_DIR=<dir>] node genesis/scripts/seed-landing-bundle.mjs
+ *     (zips and mints the CID only: no upload, no seed-file write)
  */
 
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -24,7 +26,10 @@ import { byteCid } from '../seeder/src/byte-cid.ts';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const BUNDLE_DIR = resolve(REPO_ROOT, 'app/elohim-app/dist/elohim-app/browser');
+const BUNDLE_DIR = process.env.BUNDLE_DIR
+  ? resolve(process.env.BUNDLE_DIR)
+  : resolve(REPO_ROOT, 'app/elohim-app/dist/elohim-app/browser');
+const DRY_RUN = process.env.DRY_RUN === '1';
 const SEED_PATH = resolve(REPO_ROOT, 'genesis/data/lamad/content/elohim-host-landing.json');
 const STORAGE_URL = process.env.STORAGE_URL ?? 'http://localhost:8090';
 
@@ -83,6 +88,10 @@ async function main() {
 
   const localCid = byteCid(zipBytes);
   console.log(`[seed-landing-bundle] local CID: ${localCid}`);
+  if (DRY_RUN) {
+    console.log('[seed-landing-bundle] DRY_RUN=1: no upload, seed file untouched');
+    return;
+  }
 
   console.log(`[seed-landing-bundle] uploading to ${STORAGE_URL}/blob/${localCid}…`);
   const remoteCid = await uploadBlob(zipBytes, localCid);
