@@ -150,7 +150,8 @@ const DEAD_PEER = '127.0.0.1:1';
 // single place to change a persona / window when the fixtures evolve).
 const PID_MATTHEW = 'pid-matthew';
 const PID_JESSICA = 'pid-jessica';
-const PROBE_HASH = 'sha256-probe';
+// Byte CIDs minted from the label bytes ("probe", "content", …) — opaque to the runner.
+const PROBE_HASH = 'bafkr4ihfyv7teufgeide2hw2gjnfuusa7llnofhefsl5mlnao7h3fl5owu';
 const AFTER_ISO = '2026-08-15T00:00:00Z';
 const N_MESH_VERSION_PARITY = 'mesh.version-parity';
 const N_PROJECTION_STUCK_STREAMS = 'projection.stuck.streams';
@@ -232,13 +233,9 @@ class FixtureDoorway implements DoorwayLike {
   async getHealth(): Promise<unknown> {
     return getJson(this.base, '/health');
   }
-  async seedBlob(args: {
-    hash: string;
-    data: Uint8Array;
-    token?: string;
-  }): Promise<SeedBlobResult> {
+  async seedBlob(args: { cid: string; data: Uint8Array; token?: string }): Promise<SeedBlobResult> {
     const headers: Record<string, string> = {
-      'X-Blob-Hash': args.hash,
+      'X-Content-Address': args.cid,
       'Content-Type': 'application/octet-stream',
     };
     // No token ⇒ NO Authorization header at all (dev-mode doorway accepts).
@@ -396,7 +393,10 @@ const P2P_STATUS_HEALTHY = (
 const CUSTODY_ROWS = (hash: string) => ({
   json: [
     { action: 'custody-blob', resourceClassifiedAs: [hash] },
-    { action: 'something-else', resourceClassifiedAs: ['sha256-other'] },
+    {
+      action: 'something-else',
+      resourceClassifiedAs: ['bafkr4ib7pfqwh27zi4mn4hgxlatflqas7gk4a3y6nfyouk64cw6nrcrsji'],
+    },
   ],
 });
 
@@ -603,15 +603,15 @@ async function uploadCases(): Promise<void> {
       } else {
         check(detail.endsWith('(12 bytes) → HTTP 201'), '201 carries size + status', detail);
         check(
-          detail.startsWith('sha256-'),
-          'blob hash is sha256-prefixed hex from node:crypto',
+          /^bafkr4i[a-z2-7]{52} /.test(detail),
+          'blob address is the byte-profile CID (raw + BLAKE3-256)',
           detail
         );
         // STATE_DIR handoff — Jenkins `cat`s these files between stages.
         for (const f of [
-          'content_blob_hash',
+          'content_blob_cid',
           'content_blob_size',
-          'probe_blob_hash',
+          'probe_blob_cid',
           'probe_blob_size',
           'build_start_iso',
         ]) {
@@ -629,7 +629,7 @@ async function uploadCases(): Promise<void> {
         check(/nonce: [0-9a-f]{32}\n$/.test(probe), 'probe carries a 16-byte random nonce');
         eqDeep(
           Object.keys(h.report.context),
-          ['contentBlobHash', 'probeBlobHash', 'buildStartIso'],
+          ['contentBlobCid', 'probeBlobCid', 'buildStartIso'],
           'upload context payload keys match bash'
         );
       }
@@ -731,7 +731,7 @@ async function propagationPeer(opts: {
 
 async function propagationHappyPath(): Promise<void> {
   testCase('propagation — happy path (probe served immediately, manifest converged)');
-  const CONTENT = 'sha256-content';
+  const CONTENT = 'bafkr4ib7xjjfbpu2yjm4k3tskdcsnpedxlfux2bf6j4z2pkz4w2ipdoxjy';
   const PROBE = PROBE_HASH;
   const src = await propagationPeer({
     blobs: new Set([CONTENT, PROBE]),
@@ -768,8 +768,8 @@ async function propagationHappyPath(): Promise<void> {
     eqDeep(
       h.report.context,
       {
-        contentBlobHash: CONTENT,
-        probeBlobHash: PROBE,
+        contentBlobCid: CONTENT,
+        probeBlobCid: PROBE,
         waitedSecs: 0,
         attempts: 1,
         custodyManifestMissingOn: [],
@@ -794,7 +794,7 @@ async function propagationHappyPath(): Promise<void> {
 
 async function propagationSharedBudget(): Promise<void> {
   testCase('propagation — both polls share ONE timeout budget (custody gets the REMAINDER)');
-  const CONTENT = 'sha256-content';
+  const CONTENT = 'bafkr4ib7xjjfbpu2yjm4k3tskdcsnpedxlfux2bf6j4z2pkz4w2ipdoxjy';
   const PROBE = PROBE_HASH;
   const src = await propagationPeer({ blobs: new Set([CONTENT, PROBE]), custodyFor: CONTENT });
   // Target never serves the probe and never sees the custody row.
@@ -862,8 +862,8 @@ async function propagationSharedBudget(): Promise<void> {
 
 async function propagationStatePrecedence(): Promise<void> {
   testCase('propagation — env var overrides the STATE_DIR file; state file is the fallback');
-  const ENV_HASH = 'sha256-from-env';
-  const FILE_HASH = 'sha256-from-state-file';
+  const ENV_HASH = 'bafkr4ibdvco3ot7wq6glfbrjd5hn6gueczry5227iq2fajtxypbx7gpyoe';
+  const FILE_HASH = 'bafkr4icldnvcmht64s3ispa5o3rztuywc4yt45xb5phr6ilyf7xxm6l33a';
   const PROBE = PROBE_HASH;
   const src = await propagationPeer({
     blobs: new Set([ENV_HASH, FILE_HASH, PROBE]),
@@ -871,8 +871,8 @@ async function propagationStatePrecedence(): Promise<void> {
   });
   const tgt = await propagationPeer({ blobs: new Set([ENV_HASH, FILE_HASH, PROBE]) });
   const stateDir = mkdtempSync(join(tmpdir(), 'sv-state-'));
-  writeFileSync(join(stateDir, 'content_blob_hash'), `${FILE_HASH}\n`);
-  writeFileSync(join(stateDir, 'probe_blob_hash'), `${PROBE}\n`);
+  writeFileSync(join(stateDir, 'content_blob_cid'), `${FILE_HASH}\n`);
+  writeFileSync(join(stateDir, 'probe_blob_cid'), `${PROBE}\n`);
   const base = {
     PEER_STORAGE_URLS: `matthew=${src.baseUrl},jessica=${tgt.baseUrl}`,
     STATE_DIR: stateDir,
@@ -882,25 +882,25 @@ async function propagationStatePrecedence(): Promise<void> {
   try {
     const withEnv = await run('propagation', { ...base, CONTENT_BLOB_HASH: ENV_HASH });
     check(
-      withEnv.report.context['contentBlobHash'] === ENV_HASH,
+      withEnv.report.context['contentBlobCid'] === ENV_HASH,
       'CONTENT_BLOB_HASH env wins over the state file',
-      String(withEnv.report.context['contentBlobHash'])
+      String(withEnv.report.context['contentBlobCid'])
     );
     check(
-      withEnv.report.context['probeBlobHash'] === PROBE,
+      withEnv.report.context['probeBlobCid'] === PROBE,
       'PROBE_BLOB_HASH falls back to the state file when unset'
     );
 
     const fromFile = await run('propagation', base);
     check(
-      fromFile.report.context['contentBlobHash'] === FILE_HASH,
+      fromFile.report.context['contentBlobCid'] === FILE_HASH,
       'state file is used when the env var is unset',
-      String(fromFile.report.context['contentBlobHash'])
+      String(fromFile.report.context['contentBlobCid'])
     );
 
     const emptyEnv = await run('propagation', { ...base, CONTENT_BLOB_HASH: '' });
     check(
-      emptyEnv.report.context['contentBlobHash'] === FILE_HASH,
+      emptyEnv.report.context['contentBlobCid'] === FILE_HASH,
       'an EMPTY env var also falls back (bash ${VAR:-...} semantics)'
     );
   } finally {
@@ -963,7 +963,7 @@ async function deliveryCases(): Promise<void> {
   testCase('delivery — PROBE_BLOB_HASH is read from the ENV ONLY (bash:425), never the state file');
   const noProbe = await propagationPeer({ blobs: new Set(), events: 1 });
   const stateDir = mkdtempSync(join(tmpdir(), 'sv-state-'));
-  writeFileSync(join(stateDir, 'probe_blob_hash'), `${PROBE}\n`);
+  writeFileSync(join(stateDir, 'probe_blob_cid'), `${PROBE}\n`);
   writeFileSync(join(stateDir, 'build_start_iso'), '2026-08-15T00:00:00Z\n');
   try {
     const h = await run('delivery', {

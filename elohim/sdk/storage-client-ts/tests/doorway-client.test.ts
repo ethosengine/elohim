@@ -74,6 +74,8 @@ describe('DoorwayClient', () => {
 
   describe('seedBlob', () => {
     const data = new Uint8Array([1, 2, 3]);
+    // A byte CID (minted from the bytes "probe"); the client passes it through untouched.
+    const CID = 'bafkr4ihfyv7teufgeide2hw2gjnfuusa7llnofhefsl5mlnao7h3fl5owu';
 
     it.each([
       { status: 200, expected: { ok: true, alreadyPresent: false } },
@@ -83,7 +85,7 @@ describe('DoorwayClient', () => {
     ])('treats HTTP $status as $expected', async ({ status, expected }) => {
       fetchMock.mockResolvedValueOnce(new Response('server said no', { status }));
 
-      const result = await doorway.seedBlob({ hash: 'sha256-abc', data });
+      const result = await doorway.seedBlob({ cid: CID, data });
 
       expect(result).toMatchObject({ status, ...expected });
       if (status === 500) {
@@ -97,22 +99,23 @@ describe('DoorwayClient', () => {
       const longBody = 'x'.repeat(1000);
       fetchMock.mockResolvedValueOnce(new Response(longBody, { status: 500 }));
 
-      const result = await doorway.seedBlob({ hash: 'sha256-abc', data });
+      const result = await doorway.seedBlob({ cid: CID, data });
 
       expect(result.ok).toBe(false);
       expect(result.errorBody).toHaveLength(300);
     });
 
-    it('sends X-Blob-Hash and Content-Type, and OMITS Authorization when no token is given', async () => {
+    it('sends X-Content-Address (never X-Blob-Hash) and Content-Type, and OMITS Authorization when no token is given', async () => {
       fetchMock.mockResolvedValueOnce(new Response('', { status: 200 }));
 
-      await doorway.seedBlob({ hash: 'sha256-abc', data });
+      await doorway.seedBlob({ cid: CID, data });
 
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(`${baseUrl}/admin/seed/blob`);
       expect(init?.method).toBe('PUT');
       const headers = init?.headers as Record<string, string>;
-      expect(headers['X-Blob-Hash']).toBe('sha256-abc');
+      expect(headers['X-Content-Address']).toBe(CID);
+      expect('X-Blob-Hash' in headers).toBe(false);
       expect(headers['Content-Type']).toBe('application/octet-stream');
       expect(headers['Authorization']).toBeUndefined();
       expect('Authorization' in headers).toBe(false);
@@ -121,7 +124,7 @@ describe('DoorwayClient', () => {
     it('sends Authorization: Bearer <token> when a token is given', async () => {
       fetchMock.mockResolvedValueOnce(new Response('', { status: 200 }));
 
-      await doorway.seedBlob({ hash: 'sha256-abc', data, token: 'tok-123' });
+      await doorway.seedBlob({ cid: CID, data, token: 'tok-123' });
 
       const [, init] = fetchMock.mock.calls[0];
       const headers = init?.headers as Record<string, string>;
@@ -131,7 +134,7 @@ describe('DoorwayClient', () => {
     it('never sends Authorization: Bearer  with an empty value', async () => {
       fetchMock.mockResolvedValueOnce(new Response('', { status: 200 }));
 
-      await doorway.seedBlob({ hash: 'sha256-abc', data, token: '' });
+      await doorway.seedBlob({ cid: CID, data, token: '' });
 
       const [, init] = fetchMock.mock.calls[0];
       const headers = init?.headers as Record<string, string>;

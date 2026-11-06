@@ -100,10 +100,8 @@ export interface ApplyChangesResponse {
  * Blob storage result
  */
 export interface BlobResult {
-  /** Content identifier (CID) */
+  /** Byte CID (`bafkr4i…`, raw + BLAKE3-256) — the blob's one address */
   cid: string;
-  /** SHA256 hash */
-  hash: string;
   /** Size in bytes */
   size_bytes: number;
   /** Whether blob already existed */

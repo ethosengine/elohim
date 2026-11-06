@@ -31,7 +31,7 @@ export interface SeedBlobResult {
  * standalone peer client, not a `StorageClient` extension):
  * ```typescript
  * const doorway = new DoorwayClient({ baseUrl: 'https://doorway.example' });
- * const result = await doorway.seedBlob({ hash, data });
+ * const result = await doorway.seedBlob({ cid, data });
  * ```
  */
 export class DoorwayClient {
@@ -49,7 +49,9 @@ export class DoorwayClient {
   /**
    * `PUT /admin/seed/blob` — idempotent blob upload.
    *
-   * Sends `X-Blob-Hash` and `Content-Type: application/octet-stream`
+   * Sends `X-Content-Address: <byte CID>` (the one content header; the doorway
+   * admits it by full decode and hashes the body against it) and
+   * `Content-Type: application/octet-stream`
    * headers. When `opts.token` is provided, sends
    * `Authorization: Bearer <token>`; when omitted, the `Authorization`
    * header is entirely ABSENT — never sent as `Bearer ` with an empty
@@ -61,13 +63,14 @@ export class DoorwayClient {
    * `{ ok: false, errorBody: <first ~300 chars of response body> }`.
    */
   async seedBlob(opts: {
-    hash: string;
+    /** Byte CID (`bafkr4i…`) of `data`. */
+    cid: string;
     data: Uint8Array;
     token?: string;
   }): Promise<SeedBlobResult> {
     const url = `${this.config.baseUrl}/admin/seed/blob`;
     const headers: Record<string, string> = {
-      'X-Blob-Hash': opts.hash,
+      'X-Content-Address': opts.cid,
       'Content-Type': 'application/octet-stream',
     };
     if (opts.token) {

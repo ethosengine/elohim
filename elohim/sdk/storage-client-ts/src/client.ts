@@ -1,3 +1,5 @@
+import { byteCidOf } from '@elohim/eprfs';
+
 import {
   StorageConfig,
   StorageError,
@@ -223,10 +225,14 @@ export class StorageClient {
    *
    * @param data Blob data
    * @param mimeType MIME type (default: application/octet-stream)
-   * @returns Blob result with CID and hash
+   * The blob is stored at its own address: the byte CID (`bafkr4i…`, raw + BLAKE3-256)
+   * of `data`, minted here and re-derived by storage, which refuses a mismatch.
+   *
+   * @returns The stored blob's manifest (`blobCid`, profile, chunks, stripes)
    */
   async putBlob(data: Uint8Array, mimeType = 'application/octet-stream'): Promise<BlobManifest> {
-    const url = `${this.config.baseUrl}/blob/`;
+    const cid = (await byteCidOf(data)).toString();
+    const url = `${this.config.baseUrl}/blob/${cid}`;
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
     };
@@ -262,9 +268,9 @@ export class StorageClient {
   }
 
   /**
-   * Get a blob by hash or CID
+   * Get a blob by its byte CID
    *
-   * @param hashOrCid SHA256 hash or CID
+   * @param hashOrCid byte CID (`bafkr4i…`)
    * @returns Blob data
    */
   async getBlob(hashOrCid: string): Promise<Uint8Array> {
@@ -307,7 +313,7 @@ export class StorageClient {
   /**
    * Check if a blob exists
    *
-   * @param hashOrCid SHA256 hash or CID
+   * @param hashOrCid byte CID (`bafkr4i…`)
    * @returns true if blob exists
    */
   async blobExists(hashOrCid: string): Promise<boolean> {
@@ -339,7 +345,7 @@ export class StorageClient {
   /**
    * Get blob manifest
    *
-   * @param hashOrCid SHA256 hash or CID
+   * @param hashOrCid byte CID (`bafkr4i…`)
    * @returns Blob manifest with shard info
    */
   async getManifest(hashOrCid: string): Promise<BlobManifest> {

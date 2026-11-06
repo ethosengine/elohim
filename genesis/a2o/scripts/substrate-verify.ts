@@ -48,10 +48,14 @@
  */
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { blake3 } from '@noble/hashes/blake3';
+import { CID } from 'multiformats/cid';
+import { create as createDigest } from 'multiformats/hashes/digest';
 
 // Type-only import: erased at runtime, so this file loads even before the
 // facade package is built. The runtime binding is the dynamic import in
@@ -109,7 +113,7 @@ export interface SeedBlobResult {
 
 export interface DoorwayLike {
   getHealth(): Promise<unknown>;
-  seedBlob(args: { hash: string; data: Uint8Array; token?: string }): Promise<SeedBlobResult>;
+  seedBlob(args: { cid: string; data: Uint8Array; token?: string }): Promise<SeedBlobResult>;
   listFederationDoorways(): Promise<unknown>;
   listFederationP2pPeers(): Promise<unknown>;
 }
@@ -444,8 +448,12 @@ function headBytes(s: string, n: number): string {
   return buf.length <= n ? s : buf.subarray(0, n).toString('utf8');
 }
 
-function sha256Hex(data: Uint8Array): string {
-  return createHash('sha256').update(data).digest('hex');
+/**
+ * The byte-profile address of `data`: CIDv1 raw (0x55) + BLAKE3-256 (0x1e), base32-lower
+ * (`bafkr4i…`, 59 chars) — the same mint as `scripts/ci/lib/byte-cid.mjs` (bash parity).
+ */
+function byteCid(data: Uint8Array): string {
+  return CID.createV1(0x55, createDigest(0x1e, blake3(data, { dkLen: 32 }))).toString();
 }
 
 /**
@@ -715,13 +723,13 @@ async function cmdMesh(run: Run): Promise<RunResult> {
 // ===========================================================================
 
 interface UploadOutcome {
-  hash: string;
+  cid: string;
   size: number;
 }
 
 async function uploadOne(run: Run, data: Uint8Array, label: string): Promise<UploadOutcome> {
   const size = data.byteLength;
-  const hash = `sha256-${sha256Hex(data)}`;
+  const cid = byteCid(data);
   // Bearer-gate (jenkins-seed-bearer-gate plan, Task 1): non-dev doorway requires
   // an Admin bearer on PUT /admin/seed/blob. The Jenkinsfile mints SEED_DOORWAY_TOKEN
   // and exports it; dev/local runs leave it empty → NO Authorization header at all
@@ -730,7 +738,7 @@ async function uploadOne(run: Run, data: Uint8Array, label: string): Promise<Upl
 
   let result: SeedBlobResult;
   try {
-    result = await run.doorway().seedBlob({ hash, data, token });
+    result = await run.doorway().seedBlob({ cid, data, token });
   } catch (e) {
     // parity: curl transport failure yields status "000" in bash.
     result = {
@@ -743,13 +751,13 @@ async function uploadOne(run: Run, data: Uint8Array, label: string): Promise<Upl
 
   const { status } = result;
   if (status === 200 || status === 201) {
-    run.pass(`upload.${label}`, `${hash} (${size} bytes) → HTTP ${status}`);
+    run.pass(`upload.${label}`, `${cid} (${size} bytes) → HTTP ${status}`);
   } else if (status === 409 || result.alreadyPresent) {
-    run.pass(`upload.${label}`, `${hash} (${size} bytes) → HTTP 409 (already present, idempotent)`);
+    run.pass(`upload.${label}`, `${cid} (${size} bytes) → HTTP 409 (already present, idempotent)`);
   } else {
     run.fail(`upload.${label}`, `HTTP ${status} — ${headBytes(result.errorBody ?? '', 300)}`);
   }
-  return { hash, size };
+  return { cid, size };
 }
 
 /**
@@ -794,7 +802,7 @@ async function cmdUpload(run: Run): Promise<RunResult> {
   }
 
   const contentUp = await uploadOne(run, readFileSync(absContent), 'content');
-  run.writeState('content_blob_hash', contentUp.hash);
+  run.writeState('content_blob_cid', contentUp.cid);
   run.writeState('content_blob_size', String(contentUp.size));
 
   const probeBytes = buildProbeBlob(env, buildStartIso);
@@ -802,15 +810,15 @@ async function cmdUpload(run: Run): Promise<RunResult> {
   writeFileSync(join(run.stateDir, 'propagation-probe.txt'), probeBytes);
 
   const probeUp = await uploadOne(run, probeBytes, 'probe');
-  run.writeState('probe_blob_hash', probeUp.hash);
+  run.writeState('probe_blob_cid', probeUp.cid);
   run.writeState('probe_blob_size', String(probeUp.size));
   run.note(
     'probe blob is build-unique — a fossil copy on the target is impossible by construction'
   );
 
   return run.finish('upload', {
-    contentBlobHash: contentUp.hash,
-    probeBlobHash: probeUp.hash,
+    contentBlobCid: contentUp.cid,
+    probeBlobCid: probeUp.cid,
     buildStartIso,
   });
 }
@@ -835,8 +843,8 @@ function propagationPreflight(
 ): PropagationTargets {
   const env = run.ctx.env;
   // Env override wins; the STATE_DIR file is the cross-stage fallback.
-  const contentHash = env['CONTENT_BLOB_HASH'] || run.readState('content_blob_hash');
-  const probeHash = env['PROBE_BLOB_HASH'] || run.readState('probe_blob_hash');
+  const contentHash = env['CONTENT_BLOB_HASH'] || run.readState('content_blob_cid');
+  const probeHash = env['PROBE_BLOB_HASH'] || run.readState('probe_blob_cid');
   const blocked = { ok: false, contentHash, probeHash };
 
   if (!contentHash) {
@@ -1104,8 +1112,8 @@ async function cmdPropagation(run: Run): Promise<RunResult> {
   }
 
   return run.finish('propagation', {
-    contentBlobHash: contentHash,
-    probeBlobHash: probeHash,
+    contentBlobCid: contentHash,
+    probeBlobCid: probeHash,
     waitedSecs: custody.waited,
     attempts: probe.attempts,
     custodyManifestMissingOn: custody.missing,
@@ -1174,7 +1182,7 @@ async function cmdDelivery(run: Run): Promise<RunResult> {
 
   // parity: bash reads PROBE_BLOB_HASH from the ENVIRONMENT ONLY here
   // (`local probe="${PROBE_BLOB_HASH:-}"`, bash:425) — unlike cmd_propagation
-  // it does NOT fall back to $STATE_DIR/probe_blob_hash. Reproduced as-is.
+  // it does NOT fall back to $STATE_DIR/probe_blob_cid. Reproduced as-is.
   const probe = env['PROBE_BLOB_HASH'] || '';
   if (probe) {
     await syntheticHeal(run, probe, numEnv(env['DELIVERY_HEAL_SETTLE_SECS'], 12));
