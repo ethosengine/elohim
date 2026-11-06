@@ -28,6 +28,33 @@ if [[ "$style_base" == "$(git rev-parse HEAD)" && "${GIT_PREVIOUS_SUCCESSFUL_COM
   # never the fallback for a first build or missing history.
   style_base="$(git rev-parse --verify 'HEAD~1^{commit}')"
 fi
+# A discipline-method bootstrap pins a new method at HEAD that the trusted
+# baseline does not pin. The checker built from HEAD then refuses to read the
+# baseline's policy ("discipline method differs from this installed checker"),
+# and an integration job whose baseline advances only on success can never
+# advance past it (orchestrator/dev #2220 onward). The earliest first-parent
+# ancestor of HEAD that already pins HEAD's method is the oldest commit the
+# installed checker can measure from: measure from it and say so. Commits
+# before it were measured by the checker they pinned.
+style_method_of() {
+  git show "$1:.epr-meta/rust-style-policy.json" 2>/dev/null \
+    | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin)["discipline"]["method"]["cid"])
+except Exception:
+    print("")' 2>/dev/null || true
+}
+style_head_method="$(style_method_of HEAD)"
+style_base_method="$(style_method_of "$style_base")"
+if [[ -n "$style_head_method" && "$style_base_method" != "$style_head_method" ]]; then
+  for style_candidate in $(git rev-list --first-parent --reverse "$style_base..HEAD"); do
+    if [[ "$(style_method_of "$style_candidate")" == "$style_head_method" ]]; then
+      echo "Rust style baseline moved: $style_base pins discipline method ${style_base_method:-(none)}; HEAD pins $style_head_method, first pinned at $style_candidate (a method bootstrap landed between). Measuring $style_candidate..HEAD." >&2
+      style_base="$style_candidate"
+      break
+    fi
+  done
+fi
 if [[ "${1:-}" == --print-base ]]; then
   printf '%s\n' "$style_base"
   exit 0
