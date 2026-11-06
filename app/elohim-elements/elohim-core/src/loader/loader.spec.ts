@@ -167,7 +167,7 @@ describe('Loader — CID verification', () => {
     expect(fallbackFetched).to.be.false;
   });
 
-  it('rejects unsupported CID algorithm', async () => {
+  it('rejects an address that is not a byte CID', async () => {
     const loader = new Loader([new FakeTransport('doorway', SAMPLE_BYTES)], { verifyCid: true });
     let threw = false;
     let message = '';
@@ -178,7 +178,7 @@ describe('Loader — CID verification', () => {
       message = err instanceof Error ? err.message : String(err);
     }
     expect(threw).to.be.true;
-    expect(message).to.contain('Unsupported CID algo');
+    expect(message).to.contain('only byte CIDs, bafkr4i');
   });
 
   it('defaults verifyCid to true when options are omitted', async () => {
