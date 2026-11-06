@@ -262,7 +262,7 @@ impl Store {
             let lines = format!("{path}\t{sha}\n");
             return Ok(json!({"head":sha,"clean":dirty.is_empty(),"status":dirty,
                 "closure":[{"path":path,"tree":sha}],
-                "closureCid":BlobCid::compute_raw(lines.as_bytes()).to_string()}));
+                "closureCid":BlobCid::compute_bytes(lines.as_bytes()).to_string()}));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
         let paths = self.source_paths(repo);
@@ -282,7 +282,7 @@ impl Store {
             closure.push(json!({"path":path,"tree":tree}));
         }
         Ok(json!({"head":head,"clean":dirty.is_empty(),"status":dirty,
-            "closure":closure,"closureCid":BlobCid::compute_raw(lines.as_bytes()).to_string()}))
+            "closure":closure,"closureCid":BlobCid::compute_bytes(lines.as_bytes()).to_string()}))
     }
     pub(super) fn require_published(&self, repo: &Path, commit: &str) -> Result<()> {
         let published = self.config.source["publishedRef"]

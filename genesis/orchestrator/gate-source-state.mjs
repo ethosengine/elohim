@@ -35,7 +35,7 @@ export function nativeGateState(project, { root, env = process.env, run = spawnS
     /** @type {import('../../elohim/sdk/storage-client-ts/src/generated/source-state.js').SourceState} */
     state = JSON.parse(evaluated.stdout);
   } catch { return { miss: `native evaluator ${bin} printed no source state` }; }
-  if (state.clean !== true || state.status !== '' || !/^bafkrei[a-z2-7]{52}$/.test(state.closureCid)
+  if (state.clean !== true || state.status !== '' || !/^bafkr4i[a-z2-7]{52}$/.test(state.closureCid)
     || !Array.isArray(state.closure) || !state.closure.length) return { miss: 'source closure dirty' };
   if (state.head !== git(['rev-parse', `${commit}^{commit}`])?.trim()) return { miss: 'source closure is not at the gated commit' };
   const manifestPath = project.manifestPath || `${project.dir}/build-manifest.json`;

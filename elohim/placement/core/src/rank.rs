@@ -39,14 +39,15 @@ pub fn is_method_name(spec: &str) -> bool {
 }
 
 impl MethodId {
-    /// CIDv1, codec raw (0x55), sha2-256 over the UTF-8 bytes of `spec`: the construction of
-    /// `BlobCid::compute_raw` (here `elohim_epr::cid::compute_raw_cid`, the same mint). A name is
+    /// The byte CID of the UTF-8 bytes of `spec`: CIDv1, codec raw (0x55), BLAKE3-256 (0x1e),
+    /// `bafkr4i…` — the kernel's one byte mint (`elohim_epr::cid::compute_bytes_cid`, re-exported
+    /// from `elohim-address`), as the placement-parameter-set schema declares. A name is
     /// `<namespace>:<area>:<name>@<version>`, matching `^[a-z0-9-]+(:[a-z0-9-]+)+@[1-9][0-9]*$`, e.g.
     /// `"elohim:placement:xor-distance@1"`. A method whose behaviour changes takes a new version, and
     /// so a new `MethodId`. `named` hashes whatever it is given; a unit test checks every built-in
     /// name against the grammar, including the legacy custody scope (§D.2).
     pub fn named(spec: &str) -> Self {
-        Self(elohim_epr::cid::compute_raw_cid(spec.as_bytes()))
+        Self(*elohim_epr::cid::compute_bytes_cid(spec.as_bytes()).as_cid())
     }
     pub fn cid(&self) -> &Cid {
         &self.0
@@ -718,11 +719,15 @@ mod tests {
     }
 
     #[test]
-    fn method_id_is_the_raw_sha256_cid_of_its_name() {
-        let digest = Sha256::digest(b"elohim:placement:xor-distance@1");
-        let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-        let expected = elohim_epr::cid::raw_cid_from_sha256_hex(&hex).unwrap();
-        assert_eq!(*XorDistance.method().cid(), expected);
+    fn method_id_is_the_byte_cid_of_its_name() {
+        let expected = elohim_epr::cid::compute_bytes_cid(b"elohim:placement:xor-distance@1");
+        assert_eq!(*XorDistance.method().cid(), *expected.as_cid());
+        assert_eq!(XorDistance.method().cid().hash().code(), 0x1e);
+        assert!(XorDistance
+            .method()
+            .cid()
+            .to_string()
+            .starts_with("bafkr4i"));
     }
 
     // --- Compatibility, by golden test (§D.5) ------------------------------------------------

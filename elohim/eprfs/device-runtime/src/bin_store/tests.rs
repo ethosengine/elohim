@@ -1990,7 +1990,7 @@ fn source_closure_cid_covers_sorted_path_dependencies() {
     );
     assert_eq!(
         state["closureCid"],
-        BlobCid::compute_raw(lines.as_bytes()).to_string()
+        BlobCid::compute_bytes(lines.as_bytes()).to_string()
     );
 }
 
@@ -2052,7 +2052,7 @@ fn source_state_schema_contract() {
         }
         assert_eq!(
             value["closureCid"],
-            BlobCid::compute_raw(lines.as_bytes()).to_string()
+            BlobCid::compute_bytes(lines.as_bytes()).to_string()
         );
     }
 }
