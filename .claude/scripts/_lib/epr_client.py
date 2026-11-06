@@ -208,13 +208,61 @@ def _candidate(value: str) -> tuple[str | None, str | None]:
     path = _candidate_path(value)
     if path is None:
         return None, None
+    key = _candidate_key(path)
+    cached = _CANDIDATE_CIDS.get(key) or _cached_candidate_cid(key)
+    if cached:
+        _CANDIDATE_CIDS[key] = cached
+        return path, cached
     digest = hashlib.sha256()
     with open(path, "rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     # CIDv1, codec raw (0x55), sha2-256 (0x12, 32 bytes): the store's spelling of one binary.
     raw = bytes([0x01, 0x55, 0x12, 0x20]) + digest.digest()
-    return path, "b" + base64.b32encode(raw).decode("ascii").lower().rstrip("=")
+    cid = "b" + base64.b32encode(raw).decode("ascii").lower().rstrip("=")
+    _CANDIDATE_CIDS[key] = cid
+    _store_candidate_cid(key, cid)
+    return path, cid
+
+
+# Hashing an explicit candidate costs ~0.9 s for a 120 MB debug `epr` (measured 2026-11-06), and
+# one hook resolved it twice: 2.5 s against the 2 s PostToolUse budget, so every Write timed out.
+# The CID is memoized per process and in a small file keyed on the file's stat (device, inode,
+# size, mtime_ns): any rewrite of the candidate changes the key and pays the hash again.
+# EPR_CLIENT_CACHE_TTL=0 disables the file half, as it does for the resolution cache.
+_CANDIDATE_CIDS: dict[str, str] = {}
+
+
+def _candidate_key(path: str) -> str:
+    st = os.stat(path)
+    return f"{path}|{st.st_dev}|{st.st_ino}|{st.st_size}|{st.st_mtime_ns}"
+
+
+def _candidate_cache_file() -> Path:
+    return _cache_file().with_name(f"epr-client-candidate-{os.getuid()}.json")
+
+
+def _cached_candidate_cid(key: str) -> str | None:
+    if _cache_ttl() <= 0:
+        return None
+    try:
+        entry = json.loads(_candidate_cache_file().read_text())
+        cid = entry.get(key)
+        return cid if isinstance(cid, str) and cid.startswith("bafkrei") else None
+    except Exception:  # noqa: BLE001 — a missing or torn cache is a miss, never an answer
+        return None
+
+
+def _store_candidate_cid(key: str, cid: str) -> None:
+    if _cache_ttl() <= 0:
+        return
+    try:
+        target = _candidate_cache_file()
+        tmp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps({key: cid}))
+        os.replace(tmp, target)
+    except Exception:  # noqa: BLE001 — failing to cache only costs the next caller a hash
+        pass
 
 
 def bootstrap(environment: dict[str, str]) -> None:
