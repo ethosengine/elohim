@@ -20,6 +20,7 @@ because a validator that fires on everything is exactly as useless as one that f
 
 Run: python3 .claude/scripts/_lib/__tests__/concern_validators_test.py   (exit 0 = pass)
 """
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -283,7 +284,12 @@ with tempfile.TemporaryDirectory() as _td:
     check("DNA fixture precondition: dna.yaml has both integrity: and coordinator: keys",
           "\nintegrity:" in _dna_yaml_pre and "\ncoordinator:" in _dna_yaml_pre)
 
-    post_modifiers = _dna_yaml_pre.replace('"elohim_lamad_alpha"', '"elohim_lamad_beta"')
+    # Rewrite whatever the current seed is (the re-genesis moved `_alpha` → `_alpha2`, and a
+    # literal-spelling replace silently became a no-op), and prove the edit changed the slice.
+    post_modifiers = re.sub(r'(network_seed:\s*")[^"]*(")', r"\1elohim_lamad_fixture_rollover\2",
+                            _dna_yaml_pre, count=1)
+    check("DNA fixture precondition: the network_seed rewrite actually changed the manifest",
+          post_modifiers != _dna_yaml_pre)
     v = verdict(M_DNA, {"path": str(_dna_yaml_path), "content": post_modifiers, "is_new": False})
     check("DNA POSITIVE: a dna.yaml edit to the hashed `integrity:` slice (modifiers) is "
           "labelled hash-moving",
