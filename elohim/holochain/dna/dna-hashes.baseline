@@ -31,8 +31,19 @@
 # genesis/docs/superpowers/plans/2026-09-02-holochain-0-7-upgrade-guide.md; operator runbook
 # 2026-09-03-holochain-0-7-fleet-cutover-runbook.md). Every 0.6 chain is orphaned by design — the
 # fleet is wiped clean and re-genesised onto these five (operator authorization 2026-09-03).
-lamad=uhC0ka1Tpt-_mtrGKILPnCAWTINwdtoRlYreoQM9GWsdVnbDgshr9
-imagodei=uhC0kRTnoJojlGSinY8Ko3BWUG55YHQYODF00tZahrxwqJ1cuz9r7
-infrastructure=uhC0k5a385O0UxmKsi0DinnaLOOirNrV0B0CPQG0f-X-_n-PDHnFb
-node_registry=uhC0k3wIqzPHIBDyUp_UdTq7BsvnYT9h8ZA9-igXlQ_V7tQRj9xb6
-mishpat=uhC0kJOs8Qf5Vs1WDNqj2AWVZRqPbAKzZL9kwrPL4AR3JMF3OaOGD
+# 2026-11-06 — RE-GENESIS 1, the address crossing (sprint hub
+# genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/). Values are elohim-holochain #1527's
+# packed hashes on dev 2fb2f93c5: byte addresses are CIDv1 raw+BLAKE3 (`bafkr4i…`) in every
+# integrity zome that names bytes (content_store ShardManifest/BlobEntry/Content, infrastructure
+# ContentServer, node_registry CustodianAssignment/ShardAssignment + the custody-unit shard_index
+# ceiling), network seeds `_alpha` → `_alpha2` on all five roles (so imagodei and mishpat move too),
+# no migration of the old chains: every alpha peer is re-genesised under DNA_MIGRATION_INTENT with
+# these five (operator act, plan §5 A2–A4). The commits that moved the fleet are tagged [dna:migrate]
+# (shem's DNA series on dev e85eeeee5..6a31ed270 and 2fb2f93c5); this line set is the fix-forward
+# from the first CI pack. (node-registry-v2 is packed and printed by the pipeline but is not a
+# happ role and is not guarded here.)
+lamad=uhC0kSqUabWtcTutc2yiS427eoSQyOiNRWOU_iv2ArwsPOmD_mEhm
+imagodei=uhC0k1H75suIKjhK72DxzsytGAN8CFwL4fFkI_awVpFdMjOwNe1E0
+infrastructure=uhC0kVl3RQECBGTPvhGSUr8T1KfR_75c0t0-gRNmEk1empvGp9Dbz
+node_registry=uhC0k4LRrO1TD2KSf2R0YZZGso1qVO3oN_yVJWtw95Zp2OUEyhx1p
+mishpat=uhC0kZaF2K_K5egDe-fy-ggn3Tji8U6kcYQ19Yg8GSXOE3ASEmXZW
