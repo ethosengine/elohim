@@ -134,6 +134,15 @@ Removed constant: `SHARD_ENCODINGS` (`none`, `chunked`, `rs-4-7`, `rs-8-12`), re
 - `BlobToReplicas` **deleted** (never created by any coordinator). Every later `LinkTypes` discriminant shifts down by one.
 - `IdToBlob`, `BlobToManifest`, `ShardToLocations` keep their names; their anchors are now keyed by CID: `StringAnchor("blob_cid", <blob_cid>)` for `BlobToManifest` / `IdToBlob` lookups and `StringAnchor("shard_cid", <cid>)` for `ShardToLocations` (v1: `"blob_hash"` / `"shard_hash"`).
 
+### node-registry: `ShardAssignment.shard_index` (2026-11-06, same `_alpha2` epoch)
+
+`shard_index` is the **custody-unit index** in the blob's `ShardManifest::custody_units()` order:
+the chunk index when `erasure.id == "none"`, otherwise `stripe * (data + parity) + shard`. Storage
+registers one assignment per custody unit, so a single striped blob produces indices past 6. The
+integrity bound `MAX_SHARD_INDEX` moves from `6` (one 4+3 stripe) to an epoch-0 ceiling of `65535`;
+whether an index names a unit of its own manifest is a storage-projection check this epoch, not a
+DNA one. Hash-moving for node-registry (and its `lineage-witness` variant).
+
 ### Coordinator surface (no hash effect)
 
 - `register_shard_manifest` input mirrors the v2 `ShardManifest` minus `created_at` / `verified_at`; shape checks moved to the integrity validator.
@@ -180,3 +189,4 @@ When planning v2, consider:
 |---------|------|---------|
 | v1 | 2024-12 | Initial schema with full Lamad + Shefa types |
 | v2 | 2026-11-05 | Re-genesis 1 address crossing: byte CIDs (BLAKE3) validated by full decode; `ShardManifest` recast to chunks + erasure stripes; `Content.content_hash` and `BlobToReplicas` deleted |
+| v2 (node-registry) | 2026-11-06 | `ShardAssignment.shard_index` is the custody-unit index; ceiling 6 → 65535 |
