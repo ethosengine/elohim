@@ -22,6 +22,26 @@ import { CID_A, CID_B, CID_C, CID_D, CID_E } from './__tests__/fixture-cids.js';
 // Mock global fetch
 global.fetch = vi.fn();
 
+/** Storage's `PUT /blob/{cid}` answer (PutBlobResponseView) for an unstriped blob. */
+function putAnswer(cid: string, len: number, mimeType = 'text/plain') {
+  return {
+    blobCid: cid,
+    byteLen: len,
+    mimeType,
+    profile: {
+      epoch: 0,
+      chunker: { id: 'fastcdc-2020', min: 65536, avg: 262144, max: 1048576, level: 1 },
+      erasure: { id: 'none', data: 0, parity: 0 },
+    },
+    chunks: [{ cid, len }],
+    stripes: [],
+    reach: 'commons',
+    authorId: null,
+    createdAt: '2026-11-06T00:00:00Z',
+    verifiedAt: null,
+  };
+}
+
 describe('StorageClient', () => {
   let client: StorageClient;
   let config: StorageClientConfig;
@@ -276,21 +296,9 @@ describe('StorageClient', () => {
       const data = Buffer.from('test blob data');
       const hash = StorageClient.computeCid(data);
 
-      const mockManifest: Partial<ShardManifest> = {
-        blob_cid: hash,
-        total_size: data.length,
-        mime_type: 'text/plain',
-        encoding: 'none',
-        data_shards: 1,
-        total_shards: 1,
-        shard_size: data.length,
-        shard_cids: [hash],
-        created_at: new Date().toISOString(),
-      };
-
       (global.fetch as any).mockResolvedValue({
         ok: true,
-        json: async () => mockManifest,
+        json: async () => putAnswer(hash, data.length),
       });
 
       const result = await client.pushBlob(data, 'text/plain', 'commons');
@@ -298,6 +306,9 @@ describe('StorageClient', () => {
       expect(result.success).toBe(true);
       expect(result.manifest).toBeDefined();
       expect(result.manifest?.blob_cid).toBe(hash);
+      expect(result.manifest?.byte_len).toBe(data.length);
+      expect(result.manifest?.chunks).toEqual([{ cid: hash, len: data.length }]);
+      expect(result.manifest?.stripes).toEqual([]);
       expect(result.manifest?.reach).toBe('commons');
     });
 
@@ -332,11 +343,7 @@ describe('StorageClient', () => {
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({
-          blob_cid: CID_D,
-          total_size: data.length,
-          shard_cids: [],
-        }),
+        json: async () => putAnswer(CID_D, data.length),
       });
 
       const result = await client.pushBlob(data, 'text/plain');
@@ -348,7 +355,7 @@ describe('StorageClient', () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 201,
-        json: async () => ({ blobCid: CID_E, reach: 'commons' }),
+        json: async () => putAnswer(CID_E, 4),
       });
 
       const result = await client.pushBlob(Buffer.from('test'), 'text/plain');
@@ -398,15 +405,16 @@ describe('StorageClient', () => {
     it('should retrieve blob manifest', async () => {
       const mockManifest: ShardManifest = {
         blob_cid: CID_D,
-        total_size: 1024,
+        byte_len: 1024,
         mime_type: 'text/plain',
-        encoding: 'none',
-        data_shards: 1,
-        total_shards: 1,
-        shard_size: 1024,
-        shard_cids: [CID_D],
+        chunker: { id: 'fastcdc-2020', min: 65536, avg: 262144, max: 1048576, level: 1 },
+        chunks: [{ cid: CID_D, len: 1024 }],
+        erasure: { id: 'none', data: 0, parity: 0 },
+        stripes: [],
         reach: 'commons',
+        author_id: null,
         created_at: new Date().toISOString(),
+        verified_at: null,
       };
 
       (global.fetch as any).mockResolvedValue({
@@ -440,11 +448,7 @@ describe('StorageClient', () => {
 
       (global.fetch as any).mockResolvedValue({
         ok: true,
-        json: async () => ({
-          blob_cid: CID_D,
-          total_size: 5,
-          shard_cids: [],
-        }),
+        json: async () => putAnswer(CID_D, 5),
       });
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -467,11 +471,7 @@ describe('StorageClient', () => {
       (global.fetch as any)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({
-            blob_cid: CID_D,
-            total_size: 5,
-            shard_cids: [],
-          }),
+          json: async () => putAnswer(CID_D, 5),
         })
         .mockResolvedValueOnce({
           ok: false,

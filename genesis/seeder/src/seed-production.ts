@@ -49,7 +49,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { BlobManager, validateBlobReferences, ContentFile } from './blob-manager.js';
 import { DoorwayClient, validateSeedingPrerequisites } from './doorway-client.js';
-import { StorageClient, validateStorageNode, ShardManifest } from './storage-client.js';
+import { StorageClient, validateStorageNode, ShardManifest, shardCount } from './storage-client.js';
 import { validateContentFile, validateAllContent, printValidationReport } from './schema-validation.js';
 import { loadCorpusDeclaration } from './corpus-trust.js';
 import { resolveDnaCreateContentReach } from './reach-resolver.js';
@@ -363,7 +363,7 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           manifestsToRegister.push({ manifest: result.manifest, reach });
 
           if (config.verbose) {
-            console.log(`  ✓ ${blob.cid} → ${result.manifest.total_shards} shards`);
+            console.log(`  ✓ ${blob.cid} → ${shardCount(result.manifest)} shards`);
           }
         } else {
           results.shardErrors++;
@@ -551,23 +551,13 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
                 cell_id: cellId,
                 zome_name: 'content_store',
                 fn_name: 'register_shard_manifest',
-                payload: {
-                  blob_cid: manifest.blob_cid,
-                  total_size: manifest.total_size,
-                  mime_type: manifest.mime_type,
-                  encoding: manifest.encoding,
-                  data_shards: manifest.data_shards,
-                  total_shards: manifest.total_shards,
-                  shard_size: manifest.shard_size,
-                  shard_cids: manifest.shard_cids,
-                  reach: reach,
-                  author_id: null, // Seeder doesn't have author info
-                },
+                // The DNA ShardManifest shape (storage sharding.rs), reach set by the seeder.
+                payload: { ...manifest, reach, author_id: null },
               });
               results.manifestsRegistered++;
 
               if (config.verbose) {
-                console.log(`  ✓ ${manifest.blob_cid.slice(0, 20)}... (${manifest.total_shards} shards)`);
+                console.log(`  ✓ ${manifest.blob_cid.slice(0, 20)}... (${shardCount(manifest)} shards)`);
               }
             } catch (e) {
               results.manifestErrors++;

@@ -34,19 +34,70 @@ export interface StorageClientConfig {
   dryRun?: boolean;
 }
 
+/**
+ * The DNA `ShardManifest` (elohim `content_store` integrity), snake_case — the shape
+ * elohim-storage serves at `GET /manifest/{cid}` (`sharding.rs` `ShardManifest`) and the
+ * seeder registers through `register_shard_manifest`. Every CID is a byte CID.
+ */
 export interface ShardManifest {
   blob_cid: string;
-  total_size: number;
+  byte_len: number;
   mime_type: string;
-  encoding: string;
-  data_shards: number;
-  total_shards: number;
-  shard_size: number;
-  shard_cids: string[];
+  chunker: { id: string; min: number; avg: number; max: number; level: number };
+  chunks: Array<{ cid: string; len: number }>;
+  erasure: { id: string; data: number; parity: number };
+  /** Empty iff `erasure.id === 'none'`. */
+  stripes: Array<{
+    index: number;
+    byte_len: number;
+    shards: Array<{ cid: string; len: number; index: number }>;
+  }>;
   reach: string;
-  author_id?: string;
+  author_id: string | null;
   created_at: string;
-  verified_at?: string;
+  verified_at: string | null;
+}
+
+/** Storage's `PUT /blob/{cid}` answer (`PutBlobResponseView`, camelCase). */
+interface PutBlobResponse {
+  blobCid: string;
+  byteLen: number;
+  mimeType: string;
+  profile: {
+    chunker: ShardManifest['chunker'];
+    erasure: ShardManifest['erasure'];
+  };
+  chunks: ShardManifest['chunks'];
+  stripes: Array<{
+    index: number;
+    byteLen: number;
+    shards: Array<{ cid: string; len: number; index: number }>;
+  }>;
+  authorId: string | null;
+  createdAt: string;
+  verifiedAt: string | null;
+}
+
+/** The DNA manifest a stored blob registers, read off storage's PUT answer. */
+export function manifestFromPut(put: PutBlobResponse, reach: string): ShardManifest {
+  return {
+    blob_cid: put.blobCid,
+    byte_len: put.byteLen,
+    mime_type: put.mimeType,
+    chunker: put.profile.chunker,
+    chunks: put.chunks,
+    erasure: put.profile.erasure,
+    stripes: put.stripes.map(s => ({ index: s.index, byte_len: s.byteLen, shards: s.shards })),
+    reach,
+    author_id: put.authorId ?? null,
+    created_at: put.createdAt,
+    verified_at: put.verifiedAt ?? null,
+  };
+}
+
+/** Shards a manifest declares (0 when the blob is not erasure-coded). */
+export function shardCount(manifest: ShardManifest): number {
+  return manifest.stripes.reduce((n, s) => n + s.shards.length, 0);
 }
 
 export interface StorageHealthStatus {
@@ -209,14 +260,14 @@ export class StorageClient {
         success: true,
         manifest: {
           blob_cid: cid,
-          total_size: data.length,
+          byte_len: data.length,
           mime_type: mimeType,
-          encoding: 'none',
-          data_shards: 1,
-          total_shards: 1,
-          shard_size: data.length,
-          shard_cids: [cid],
+          chunker: { id: 'fastcdc-2020', min: 0, avg: 0, max: 0, level: 1 },
+          chunks: [{ cid, len: data.length }],
+          erasure: { id: 'none', data: 0, parity: 0 },
+          stripes: [],
           reach,
+          author_id: null,
           created_at: new Date().toISOString(),
           verified_at: new Date().toISOString(),
         },
@@ -240,13 +291,11 @@ export class StorageClient {
         };
       }
 
-      const manifest = await response.json();
+      const put = (await response.json()) as PutBlobResponse;
       return {
         success: true,
-        manifest: {
-          ...manifest,
-          reach, // Storage doesn't know about reach, we set it
-        },
+        // Storage doesn't know about reach; the seeder sets it.
+        manifest: manifestFromPut(put, reach),
       };
     } catch (error) {
       return {
@@ -305,7 +354,7 @@ export class StorageClient {
       if (result.success && result.manifest) {
         success++;
         manifests.push(result.manifest);
-        console.log(`  ✓ ${cid} (${blob.data.length} bytes, ${result.manifest.total_shards} shards)`);
+        console.log(`  ✓ ${cid} (${blob.data.length} bytes, ${shardCount(result.manifest)} shards)`);
       } else {
         failed++;
         errors.push({ cid, error: result.error || 'Unknown error' });
