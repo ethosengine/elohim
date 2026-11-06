@@ -83,8 +83,8 @@ Large content stored as blob, reference in `contentBody`:
 ```json
 {
   "id": "article-456",
-  "contentBody": "sha256-abc123...",
-  "blobCid": "sha256-abc123...",
+  "contentBody": "bafkr4i...",
+  "blobCid": "bafkr4i...",
   "contentFormat": "markdown"
 }
 ```
@@ -92,7 +92,7 @@ Large content stored as blob, reference in `contentBody`:
 The `ContentService` automatically detects blob references and fetches:
 ```typescript
 // content.service.ts
-const isBlobReference = contentBody.startsWith('sha256:') || contentBody.startsWith('sha256-');
+const isBlobReference = isByteCid(contentBody); // full-decode bafkr4i… check
 if (isBlobReference) {
   return this.fetchBlobContent(contentBody);
 }
@@ -152,7 +152,7 @@ curl http://localhost:4200/db/content/quiz-manifesto-foundations | jq
 curl http://localhost:8888/db/content/quiz-manifesto-foundations | jq
 
 # Check blob content
-curl http://localhost:8888/blob/sha256-abc123...
+curl http://localhost:8888/blob/bafkr4i...
 ```
 
 ### Common Issues
@@ -160,7 +160,7 @@ curl http://localhost:8888/blob/sha256-abc123...
 | Symptom | Likely Cause | Solution |
 |---------|--------------|----------|
 | CORS errors | Che proxy stripping headers | Use Angular proxy (same-origin) |
-| Content shows `sha256:...` | Blob reference not resolved | Check `fetchBlobContent` in content.service.ts |
+| Content shows `bafkr4i...` | Blob reference not resolved | Check `fetchBlobContent` in content.service.ts |
 | Thumbnail not loading | Relative URL needs base | Check `getStorageBaseUrl()` returns origin |
 | HTML5 app shows metadata | Sparse pattern used for html5-app | Ensure html5-app keeps original content object |
 

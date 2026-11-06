@@ -16,8 +16,8 @@ names the driver; `elohim-render::Renderer` is the trait a runtime drives).
 
 ## What makes an app an EPR app
 
-1. **A ContentNode** (e.g. `lamad-spa`) whose `blobHash` is the zipped browser bundle and —
-   when the app is SSR-capable — whose `serverBlobHash` is the zipped server bundle. The
+1. **A ContentNode** (e.g. `lamad-spa`) whose `blobCid` is the zipped browser bundle and —
+   when the app is SSR-capable — whose `serverBlobCid` is the zipped server bundle. The
    root `Jenkinsfile` `stageAndVerifyAllBundles` bundle list is the declarative registry:
    one `[distDir, slug]` line per bundle, `kind: "server"` for the SSR one.
 2. **A declared route surface** — `src/app/generated/route-claims.ts` (codegen). Doorway
@@ -103,7 +103,7 @@ runtime (no postbuild shimming). To make an app SSR-capable:
    `"prerender": false`; add `src/main.server.ts` to `tsconfig.app.json` `files`. One
    `ng build` then emits `dist/<app>/browser` AND `dist/<app>/server`.
 4. **Seed + serve**: add the server-dist line to the root Jenkinsfile bundle list
-   (`kind: "server"` → PATCHes `serverBlobHash`), and add the app slug to the doorway
+   (`kind: "server"` → PATCHes `serverBlobCid`), and add the app slug to the doorway
    manifests' `SSR_BUNDLE_SLUGS` env (`genesis/orchestrator/manifests/doorway/*.yaml`).
    The doorway `RendererRegistry` materializes each listed slug's server bundle from the
    substrate at boot; an unseeded slug is skipped with a warn and the app stays CSR

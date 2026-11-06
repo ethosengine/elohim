@@ -4,7 +4,7 @@ id: app-lamad-epr-app-governance
 covers: subtree
 purpose: >
   The lamad pillar EPR app — an Angular SPA projected as the lamad-spa EPR node
-  (browser bundle = blobHash, SSR server bundle = serverBlobHash), served at
+  (browser bundle = blobCid, SSR server bundle = serverBlobCid), served at
   /lamad/... by any doorway or peer runtime projecting it.
 ---
 # app/lamad — the lamad pillar EPR app
