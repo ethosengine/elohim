@@ -342,14 +342,14 @@ run_leg "propagate-landing-to-B-after-server" soft \
 # Read back the server bundle's hash/size — CI exports these from its own
 # upload stage (Jenkinsfile env.CONTENT_BLOB_HASH/SIZE_BYTES); this chain
 # never did (the backlog gap this Prologue exists to close). Read-back, not
-# re-derivation: the landing row's serverBlobHash IS the value the PATCH
+# re-derivation: the landing row's serverBlobCid IS the value the PATCH
 # above just wrote, and /blob/<hash> content-length is the authoritative
 # byte count (curl -w size_download, never a local `du` estimate).
 CONTENT_BLOB_HASH=""
 CONTENT_BLOB_SIZE_BYTES=""
 if [ "${LEG_RC[stage-landing-server-A]:-1}" -eq 0 ]; then
   CONTENT_BLOB_HASH="$(curl -fsS "$DOORWAY_A_URL/db/content/elohim-host-landing" \
-    | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobHash') or '')" 2>/dev/null)"
+    | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobCid') or '')" 2>/dev/null)"
   if [ -n "$CONTENT_BLOB_HASH" ]; then
     CONTENT_BLOB_SIZE_BYTES="$(curl -fsS -o /dev/null -w '%{size_download}' "$DOORWAY_A_URL/blob/$CONTENT_BLOB_HASH" 2>/dev/null)"
   fi
@@ -358,13 +358,13 @@ if [ -n "$CONTENT_BLOB_HASH" ] && [ -n "$CONTENT_BLOB_SIZE_BYTES" ]; then
   export CONTENT_BLOB_HASH CONTENT_BLOB_SIZE_BYTES
   say "CONTENT_BLOB_HASH=$CONTENT_BLOB_HASH CONTENT_BLOB_SIZE_BYTES=$CONTENT_BLOB_SIZE_BYTES"
 else
-  say "WARN: could not resolve CONTENT_BLOB_HASH/SIZE from the landing row's serverBlobHash — seed-household-formation and seed-commitments will self-skip their custody legs (they self-skip cleanly on an absent CONTENT_BLOB_HASH; this is not a hard failure of THIS script)"
+  say "WARN: could not resolve CONTENT_BLOB_HASH/SIZE from the landing row's serverBlobCid — seed-household-formation and seed-commitments will self-skip their custody legs (they self-skip cleanly on an absent CONTENT_BLOB_HASH; this is not a hard failure of THIS script)"
 fi
 
 # ---------------------------------------------------------------------------
-# 4b. Per-peer serverBlobHash stamp — the deploy-projection mirror.
+# 4b. Per-peer serverBlobCid stamp — the deploy-projection mirror.
 #
-# serverBlobHash is a deploy-time projection artifact, deliberately EXCLUDED
+# serverBlobCid is a deploy-time projection artifact, deliberately EXCLUDED
 # from the notarized content entry (elohim-storage http.rs
 # patch_needs_conductor: "the diesel-direct write is correct"). That means NO
 # sync plane carries it between peers: DECLARE_ONLY propagates only the head
@@ -381,7 +381,7 @@ fi
 # dist and VERIFIED post-PATCH (its drift seatbelt) — never "whatever a
 # doorway currently serves". Idempotent: an already-current peer is a no-op.
 # ---------------------------------------------------------------------------
-banner "4b. per-peer serverBlobHash stamp (deploy-projection mirror)"
+banner "4b. per-peer serverBlobCid stamp (deploy-projection mirror)"
 stamp_server_projection_peers() {
   if [ -z "$CONTENT_BLOB_HASH" ]; then
     echo "  ⊘ no CONTENT_BLOB_HASH resolved (stage-landing-server-A red?) — nothing to stamp" >&2
@@ -391,24 +391,24 @@ stamp_server_projection_peers() {
   for name in "${PEERS[@]}"; do
     port="$(http_port $i)"; url="http://localhost:$port"; i=$((i+1))
     current="$(curl -fsS -m 10 "$url/db/content/elohim-host-landing" \
-      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobHash') or '')" 2>/dev/null)" || current=""
+      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobCid') or '')" 2>/dev/null)" || current=""
     if [ "$current" = "$CONTENT_BLOB_HASH" ]; then
-      echo "  = $name ($url): serverBlobHash already current — no-op"
+      echo "  = $name ($url): serverBlobCid already current — no-op"
       continue
     fi
     if ! curl -fsS -m 15 -X PATCH -H 'Content-Type: application/json' \
-        -d "{\"serverBlobHash\":\"$CONTENT_BLOB_HASH\"}" \
+        -d "{\"serverBlobCid\":\"$CONTENT_BLOB_HASH\"}" \
         "$url/db/content/elohim-host-landing" >/dev/null; then
-      echo "  ✗ $name ($url): serverBlobHash PATCH failed" >&2
+      echo "  ✗ $name ($url): serverBlobCid PATCH failed" >&2
       rc=1
       continue
     fi
     current="$(curl -fsS -m 10 "$url/db/content/elohim-host-landing" \
-      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobHash') or '')" 2>/dev/null)" || current=""
+      | python3 -c "import sys, json; print(json.load(sys.stdin).get('serverBlobCid') or '')" 2>/dev/null)" || current=""
     if [ "$current" = "$CONTENT_BLOB_HASH" ]; then
-      echo "  ✓ $name ($url): serverBlobHash stamped = $CONTENT_BLOB_HASH"
+      echo "  ✓ $name ($url): serverBlobCid stamped = $CONTENT_BLOB_HASH"
     else
-      echo "  ✗ $name ($url): serverBlobHash drift after PATCH: expected $CONTENT_BLOB_HASH, got ${current:-<empty>}" >&2
+      echo "  ✗ $name ($url): serverBlobCid drift after PATCH: expected $CONTENT_BLOB_HASH, got ${current:-<empty>}" >&2
       rc=1
     fi
   done

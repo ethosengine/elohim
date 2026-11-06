@@ -5482,7 +5482,7 @@ EOF
     # projections by doorway_id, so an unset id matches ZERO seeded rows.
     # SSR env mirrors genesis/orchestrator/manifests/doorway/alpha.yaml: the
     # RendererRegistry materializes each slug's server bundle from the
-    # substrate (serverBlobHash staged via scripts/ci/stage-spa-blob.sh); an
+    # substrate (serverBlobCid staged via scripts/ci/stage-spa-blob.sh); an
     # unstaged slug degrades to CSR with x-ssr-skipped. The landing browser
     # bundle carries only index.csr.html, so WITHOUT SSR the / mount 404s.
     # Membrane thresholds (per client IP per 60s window; doorway membrane.rs defaults

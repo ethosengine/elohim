@@ -23,7 +23,7 @@
 #
 # "Recovered" = five legs, all true (spec §3.3):
 #   P0 /sync/v1/elohim/docs total == survivor's
-#   P1 every survivor content row with a blobHash: /db/content/<id> 200 + equal blobHash
+#   P1 every survivor content row with a blobCid: /db/content/<id> 200 + equal blobCid
 #   P2 GET /blob/<hash> 200 on the recovering peer for each of those hashes
 #   P3 /p2p/status pull.caughtUp == true && pull.failed == 0
 #   P4 doorway A and B both 200 on /db/content/elohim-host-landing
@@ -79,7 +79,7 @@ for offset in range(0, content, page_size):
 print(json.dumps({
   "docs": get("/sync/v1/elohim/docs?limit=1").get("total", 0),
   "content": content,
-  "rows": [{"id": i["id"], "blobHash": i["blobHash"]} for i in items if i.get("blobHash")],
+  "rows": [{"id": i["id"], "blobCid": i["blobCid"]} for i in items if i.get("blobCid")],
 }))
 PY
 }
@@ -136,12 +136,12 @@ for row in s["rows"]:
     # grammar failure counted as a replication failure. safe='' so a '/' in an
     # id cannot re-route either.
     j = getj(f"/db/content/{urllib.parse.quote(row['id'], safe='')}")
-    if not j or j.get("blobHash") != row["blobHash"]:
+    if not j or j.get("blobCid") != row["blobCid"]:
         p1 = 0
-        p1_bad.append(f"{row['id']}={'absent' if not j else (j.get('blobHash') or 'null')[:16]}")
-    if code(f"http://localhost:{port}/blob/{row['blobHash']}")[0] != 200:
+        p1_bad.append(f"{row['id']}={'absent' if not j else (j.get('blobCid') or 'null')[:16]}")
+    if code(f"http://localhost:{port}/blob/{row['blobCid']}")[0] != 200:
         p2 = 0
-        p2_bad.append(f"{row['id']}:{row['blobHash'][:16]}")
+        p2_bad.append(f"{row['id']}:{row['blobCid'][:16]}")
 # Name the failing legs' ids (to stderr so the caller's `legs=$(...)` stays one line):
 # a red bit with no id behind it is a plateau nobody can act on.
 if p1_bad or p2_bad:

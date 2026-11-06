@@ -12,8 +12,8 @@ t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
 (
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"; kill $srv 2>/dev/null' EXIT
   mkdir -p "$tmp/db/content" "$tmp/sync/v1/elohim" "$tmp/blob" "$tmp/p2p"
-  echo '{"items":[{"id":"a","blobHash":"sha256-aa"},{"id":"b"}]}' > "$tmp/db/content/index.html"
-  echo '{"id":"a","blobHash":"sha256-aa"}' > "$tmp/db/content/a"
+  echo '{"items":[{"id":"a","blobCid":"sha256-aa"},{"id":"b"}]}' > "$tmp/db/content/index.html"
+  echo '{"id":"a","blobCid":"sha256-aa"}' > "$tmp/db/content/a"
   echo '{"contentCount":2}' > "$tmp/db/stats"
   echo '{"total":2}' > "$tmp/sync/v1/elohim/docs"
   echo 'bytes' > "$tmp/blob/sha256-aa"
@@ -106,7 +106,7 @@ class Handler(BaseHTTPRequestHandler):
             if offset == 0:
                 body = {"items": [{"id": f"plain-{i}"} for i in range(500)]}
             elif offset == 500:
-                body = {"items": [{"id": "late-blob", "blobHash": "sha256-late"}]}
+                body = {"items": [{"id": "late-blob", "blobCid": "sha256-late"}]}
             else:
                 body = {"items": []}
         else:
