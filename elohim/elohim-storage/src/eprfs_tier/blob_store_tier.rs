@@ -80,6 +80,23 @@ impl BlobStoreTier {
             Lane::NotHeld => Err(StorageError::NotFound(cid.to_string())),
         }
     }
+
+    /// A failed read as an eprfs error. The store quarantines a payload whose bytes fail their
+    /// address the first time it reads them, so a later read sees no file; that object was held
+    /// and corrupted, not absent, and stays `Corrupt` (a batch names it `Integrity`) rather than
+    /// turning into a not-held answer.
+    async fn read_error(&self, cid: &BlobCid, error: StorageError) -> EprfsError {
+        if let (
+            StorageError::NotFound(_) | StorageError::BlobNotFound(_),
+            Lane::Payload(byte_cid),
+        ) = (&error, Self::lane(cid))
+        {
+            if self.store.exists(&byte_cid).await == Exists::Quarantined {
+                return EprfsError::Corrupt(cid.clone());
+            }
+        }
+        storage_error(cid, error)
+    }
 }
 
 /// The store lane a CID's profile names.
@@ -143,7 +160,10 @@ impl EprfsStorage for BlobStoreTier {
     /// The held bytes, verified against `cid`'s own codec. Both policies answer from this store
     /// alone (contract 11). Bytes that fail their address are `Corrupt`, never returned.
     async fn fetch_blob(&self, cid: &BlobCid, _policy: FetchPolicy) -> Result<BlobHandle> {
-        let bytes = self.read(cid).await.map_err(|e| storage_error(cid, e))?;
+        let bytes = match self.read(cid).await {
+            Ok(bytes) => bytes,
+            Err(error) => return Err(self.read_error(cid, error).await),
+        };
         if !verified(cid, &bytes) {
             return Err(EprfsError::Corrupt(cid.clone()));
         }
