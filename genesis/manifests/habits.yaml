@@ -1678,10 +1678,10 @@ habits:
       - "a2o tag lane: `just test mesh '@concern:addresses-are-declared-profiles'`"
       - "scripts/ci/address-profile-lint.sh: no native address spelled outside the kernel's constructors"
     evidence: >
-      DELTA 2026-11-05 (T3 hand-back, a3315d6da): still red. L0 runs green on the eprfs side — `just gate eprfs` EXIT=0, eprfs workspace 2059 passed, eprfs-ts 34 passed (address + chunker sections reproduced in Rust and TypeScript); the a2o lane and the address-profile lint are still absent. Evidence: genesis/docs/superpowers/plans/task-rg1-eprfs-report.md.
-    evidence-fingerprint: sha256:08648229709fecca
-    evidence-bytes: 890
-    evidence-entries: 3
+      DELTA 2026-11-06 (post-L2 verification pass, orchestrator 184beb01): still red, narrower. L0 green on the integrated tree 29a62b5c0 — `just gate elohim-epr`, `elohim-address`, `eprfs` (2059+ tests, vectors byte-stable), `eprfs-ts`, `epr-ts` all EXIT=0 (genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-*.log). `scripts/ci/address-profile-lint.sh` now exists (T8) and runs as the `address-profile-lint` gate in warn mode: census 557 (2 sha256 fixtures, 88 record-class bafkrei CIDs the allowlist does not yet name, 467 `*_hash` identifiers in comments/old migrations) — no byte surface spells a legacy address. Red because the a2o lane has 4 feature(s) carrying the concern tag (4 @wip) and none has run on a household under the byte profile; that run waits on the DNA closure (L3).
+    evidence-fingerprint: sha256:3e7f0d53a5ce8f44
+    evidence-bytes: 1700
+    evidence-entries: 4
     refs:
       - genesis/local-dev/regenesis-1/plan.md
       - genesis/local-dev/regenesis-1/design-gate.md
