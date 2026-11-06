@@ -1,9 +1,9 @@
 ---
 title: "Re-genesis 1 T9 report: a2o steps, scripts and fixtures on the byte profile"
 id: task-rg1-a2o-report
-status: landed-on-branch
+status: "landed"
 landed_commit: "regenesis/a2o (local, unpushed); hash in the hand-back"
-landed_on_dev: "regenesis/integrate 29a62b5c0 (L2c; dev push refused by the serving-receipt rule until a household run of features/dataplane/epr-app-deliverability.feature passes on the final tree)"
+landed_on_dev: "dev e85eeeee5..6a31ed270 (L2c+L3, 2026-11-06 ~12:45Z); household deliverability 7/7 on the recast ethosengine household"
 verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/push-L2c-1.log genesis-a2o GREEN 96 s + gherkin-prepush-lint GREEN (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor: agent:a2o-implementer@claude-sonnet-5-5
 cites: []

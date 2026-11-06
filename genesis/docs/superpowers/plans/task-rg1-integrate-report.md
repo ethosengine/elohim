@@ -3,7 +3,7 @@ title: "Re-genesis 1 L2 report: the integrated stack (kernel → eprfs → schem
 id: task-rg1-integrate-report
 status: landed
 landed_commit: "2bdfb5186 + this report commit (regenesis/integrate, local, unpushed)"
-landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2); L2c 29a62b5c0+428752cb7 pending the household receipt"
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2) and e85eeeee5..6a31ed270 (L2c+L3, full hook)"
 verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/the whole verify-pass-summary.log (39 gate runs EXIT=0) + verify-gate-orchestrator.log (EPR_BIN = epr built from L2 source) (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor: agent:l2-integrator@claude-opus-5-5
 cites: []

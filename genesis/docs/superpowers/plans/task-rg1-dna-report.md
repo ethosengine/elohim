@@ -1,9 +1,10 @@
 ---
 id: rg1-dna-report
 title: "Re-genesis 1, T1 — the DNA crossing: five-DNA seed ladder, infrastructure and node-registry byte CIDs, content_store striped ShardManifest"
-status: claimed-not-verified
+status: "landed"
 landed_commit: d12677652
-verified_by:
+landed_on_dev: "dev e85eeeee5..6a31ed270 (six commits cherry-picked -x from regenesis/dna 30e4d2799)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1): manifest-hygiene, schema-dna, dna-extern-lints, pipeline-list-fresh, orchestrator, genesis gates EXIT=0 on the L3 stack (sprint hub logs/verify-gate-*-l3.log); push hook sweettest-check PASSED 157 s (logs/push-L2c-L3-2.log); five DNAs packed locally and run on the recast household (deliverability 7/7). DNA-HASH baseline lines still pending the first CI DNA run."
 concerns: "DNA hashes pending the first CI DNA run (local packs use rustc 1.99 + --import-undefined, so they cannot be the baseline; ruled by 184beb01); sweettests not run (working-code-first steer); cross-track wire drift (a)-(f) routed to the L2 integrator; authority row 5 rode on infrastructure ContentServer, row 1 did not; BlobToReplicas deletion shifts later LinkTypes indices; commit attribution UNMEASURED (PATH epr 0.3.2 lacks commit-trailers; trailers set explicitly)"
 class: protocol-canonical
 gap: regenesis-1#T1
