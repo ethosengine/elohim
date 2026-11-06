@@ -1,0 +1,21 @@
+total 888
+drwxr-sr-x  5 root 1234      20 2026-11-06T13:58:31 .
+drwxr-sr-x 13 root 1234      28 2026-11-06T13:49:27 ..
+drwxr-sr-x  2 root 1234       2 2026-11-06T13:49:39 console
+-rw-r--r--  1 root 1234  117264 2026-11-06T13:53:30 cucumber-mesh-20261106T134927Z-6a31ed27.json
+-rw-r--r--  1 root 1234   14985 2026-11-06T13:53:54 cucumber-mesh-20261106T135336Z-6a31ed27.json
+-rw-r--r--  1 root 1234   13019 2026-11-06T13:54:06 cucumber-mesh-20261106T135359Z-6a31ed27.json
+-rw-r--r--  1 root 1234   30916 2026-11-06T13:58:27 cucumber-mesh-20261106T135503Z-6a31ed27.json
+-rw-r--r--  1 root 1234    1104 2026-11-06T13:55:03 cucumber-mesh-scoped.mjs
+-rw-r--r--  1 root 1234 1914551 2026-11-06T13:58:27 cucumber-report.html
+drwxr-sr-x  2 root 1234       2 2026-11-06T13:49:39 screenshots
+-rw-r--r--  1 root 1234   12211 2026-11-06T13:53:34 sprint-report-household-20261106T134927Z-6a31ed27.json
+-rw-r--r--  1 root 1234   12096 2026-11-06T13:53:34 sprint-report-household-20261106T134927Z-6a31ed27.md
+-rw-r--r--  1 root 1234    5450 2026-11-06T13:53:57 sprint-report-household-20261106T135336Z-6a31ed27.json
+-rw-r--r--  1 root 1234    7927 2026-11-06T13:53:57 sprint-report-household-20261106T135336Z-6a31ed27.md
+-rw-r--r--  1 root 1234    6118 2026-11-06T13:54:09 sprint-report-household-20261106T135359Z-6a31ed27.json
+-rw-r--r--  1 root 1234    8355 2026-11-06T13:54:09 sprint-report-household-20261106T135359Z-6a31ed27.md
+-rw-r--r--  1 root 1234    7291 2026-11-06T13:58:31 sprint-report-household-20261106T135503Z-6a31ed27.json
+-rw-r--r--  1 root 1234    9160 2026-11-06T13:58:31 sprint-report-household-20261106T135503Z-6a31ed27.md
+-rw-r--r--  1 root 1234     129 2026-11-06T13:58:27 substrate-scope.json
+drwxr-sr-x  2 root 1234       2 2026-11-06T13:49:39 traces

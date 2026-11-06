@@ -1,0 +1,338 @@
+{
+  "generatedAt": "2026-11-06T13:53:33.985Z",
+  "runId": "20261106T134927Z-6a31ed27",
+  "profile": "mesh",
+  "transport": "dual",
+  "gitCommit": "6a31ed270265a8391736cc5f24f2a38e62490d1e",
+  "doorway": "http://localhost:8888",
+  "env": {
+    "lane": "household",
+    "peers": 3,
+    "processControl": true,
+    "networkStage": "unknown",
+    "sut": "sha256:86f394133ee06ba7",
+    "sutParts": {
+      "a2o": "tree:d1876911c3dd736a7218ec2128c358897a38ee25",
+      "appPackaging": "tree:37a114c662728ebf16d0fdad4805a4073fce234f",
+      "appStaging": "tree:8f18e780a503f0d5dc3a4921decbb77c99f87ce8",
+      "appContracts": "tree:25411e5afa3f5b881c1c8e17fd90345b421940c6",
+      "dependencies": "tree:05e85ba89e44126f7eacefa83549233554c15029",
+      "workspace": "tree:18e9bce16b6b3453d44197ffb0573573cf9a3975",
+      "meshLauncher": "tree:77dc76a8d3d90d6eac0319187219148c03ecb827",
+      "storage": "tree:0d976e87ab34754005c5aebd482ee218443223b5",
+      "doorway": "tree:912d5248e48b5d41849759d4e1a53cffed4b3251",
+      "renderer": "tree:79aeef51c938dae6716b089a8f229945397e0d1c",
+      "conductor": "tree:96bcd2bee215f7718f6ecd125dc59c926294bb9f",
+      "dna": "tree:9cc9ddfb5296d9b3886254634d8ace7d55396361",
+      "fixtures": "file:sha256:115ae4442a035975"
+    },
+    "unknown": [
+      "networkStage",
+      "sut.dnaHash"
+    ]
+  },
+  "declared": {
+    "source": "habits.yaml:checks + @concern registry",
+    "concerns": [
+      "accountable-correction",
+      "addresses-are-declared-profiles",
+      "agent-runtime-projection",
+      "app-bundle-elected-delivery",
+      "attention-witnessed-privately",
+      "blob-durability",
+      "blob-replication",
+      "content-chrome-trust-edge",
+      "content-sync",
+      "custodial-stewardship-06-collective-stewards",
+      "dataplane-convergence",
+      "death-witness",
+      "dev-system-equilibrium",
+      "device-supervises-its-manifest",
+      "devices-share-one-berth",
+      "doorway-failover",
+      "epr-atom-home",
+      "epr-projection-fallback",
+      "federation-deploy",
+      "gate-failures-arrive-live",
+      "graduates-onto-own-key",
+      "happ-lineage-migration",
+      "health-attests-on-transition",
+      "hosted-compute-contracted",
+      "hosted-human-lifecycle",
+      "household-follows-head",
+      "hub-carries-edit",
+      "humans-served",
+      "idle-is-free",
+      "ledgers-fold-once",
+      "liveness-has-one-source",
+      "measure-runs-on-a-peer",
+      "notary-authority",
+      "operator-dashboard-under-standing",
+      "operator-runtime-surface",
+      "pain-is-answered",
+      "peer-mesh",
+      "pin-attestation",
+      "push-delivers-within-budget",
+      "reach-enforced-doorway",
+      "reach-enforced-everywhere",
+      "reach-enforced-http",
+      "reach-enforced-p2p",
+      "recall-reaches-authority",
+      "reconcile-inventory",
+      "record-proves",
+      "release-retention",
+      "run-plane-note",
+      "run-plane-projection",
+      "runtime-performance",
+      "runtime-upgrade-propagation",
+      "rust-style",
+      "sensor-labels-bounded",
+      "served-under-standing",
+      "sprint-lands-each-closure-once",
+      "transport-parity",
+      "trust-priced-sync",
+      "witness-rows-signed",
+      "workspace-device-arrival"
+    ],
+    "exercised": [
+      "blob-durability"
+    ],
+    "notMeasured": [
+      "accountable-correction",
+      "addresses-are-declared-profiles",
+      "agent-runtime-projection",
+      "app-bundle-elected-delivery",
+      "attention-witnessed-privately",
+      "blob-replication",
+      "content-chrome-trust-edge",
+      "content-sync",
+      "custodial-stewardship-06-collective-stewards",
+      "dataplane-convergence",
+      "death-witness",
+      "dev-system-equilibrium",
+      "device-supervises-its-manifest",
+      "devices-share-one-berth",
+      "doorway-failover",
+      "epr-atom-home",
+      "epr-projection-fallback",
+      "federation-deploy",
+      "gate-failures-arrive-live",
+      "graduates-onto-own-key",
+      "happ-lineage-migration",
+      "health-attests-on-transition",
+      "hosted-compute-contracted",
+      "hosted-human-lifecycle",
+      "household-follows-head",
+      "hub-carries-edit",
+      "humans-served",
+      "idle-is-free",
+      "ledgers-fold-once",
+      "liveness-has-one-source",
+      "measure-runs-on-a-peer",
+      "notary-authority",
+      "operator-dashboard-under-standing",
+      "operator-runtime-surface",
+      "pain-is-answered",
+      "peer-mesh",
+      "pin-attestation",
+      "push-delivers-within-budget",
+      "reach-enforced-doorway",
+      "reach-enforced-everywhere",
+      "reach-enforced-http",
+      "reach-enforced-p2p",
+      "recall-reaches-authority",
+      "reconcile-inventory",
+      "record-proves",
+      "release-retention",
+      "run-plane-note",
+      "run-plane-projection",
+      "runtime-performance",
+      "runtime-upgrade-propagation",
+      "rust-style",
+      "sensor-labels-bounded",
+      "served-under-standing",
+      "sprint-lands-each-closure-once",
+      "transport-parity",
+      "trust-priced-sync",
+      "witness-rows-signed",
+      "workspace-device-arrival"
+    ],
+    "notMeasuredRanAndSkipped": []
+  },
+  "summary": {
+    "scenarios": {
+      "total": 14,
+      "passed": 7,
+      "failed": 1,
+      "skipped": 3,
+      "pending": 3,
+      "durationMs": 231109.052636
+    },
+    "findings": {
+      "total": 4,
+      "bySource": {
+        "pending-step": 3,
+        "scenario-failure": 1
+      },
+      "byPillar": {
+        "resilience": 4
+      }
+    },
+    "byConcern": {
+      "blob-durability": {
+        "passed": 7,
+        "failed": 1,
+        "pending": 6,
+        "skipped": 3,
+        "scenarios": [
+          {
+            "name": "First request to an app with locally-missing bytes heals and serves",
+            "status": "passed",
+            "surface": "features/resilience/app-blob-heal-on-read.feature",
+            "durationMs": 208.02504
+          },
+          {
+            "name": "An artifact over the erasure-coding threshold is accepted whole and served whole",
+            "status": "passed",
+            "surface": "features/resilience/app-blob-heal-on-read.feature",
+            "durationMs": 19507.434258
+          },
+          {
+            "name": "A chunked artifact remains byte-identical after its storage process restarts",
+            "status": "passed",
+            "surface": "features/resilience/app-blob-heal-on-read.feature",
+            "durationMs": 11856.792666
+          },
+          {
+            "name": "A flapping peer never corrupts what the mesh believes",
+            "status": "passed",
+            "surface": "features/resilience/chaos-peer-churn.feature",
+            "durationMs": 187775.601618
+          },
+          {
+            "name": "Cascading peer loss degrades the protection status honestly, step by step",
+            "status": "failed",
+            "surface": "features/resilience/chaos-peer-churn.feature",
+            "durationMs": 110.957144
+          },
+          {
+            "name": "Simultaneous loss of two peers leaves the survivor degrading honestly",
+            "status": "passed",
+            "surface": "features/resilience/chaos-peer-churn.feature",
+            "durationMs": 11340.162245
+          },
+          {
+            "name": "Grandma's node goes offline but her photos remain protected",
+            "status": "pending",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 17.4235
+          },
+          {
+            "name": "A holder lapses but coverage survives — the family is reassured, not alarmed",
+            "status": "pending",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 11.76012
+          },
+          {
+            "name": "The system cannot yet see the album — it says so honestly",
+            "status": "passed",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 108.9661
+          },
+          {
+            "name": "When protection is short, the family is offered a pro-social action",
+            "status": "passed",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 47.505336
+          },
+          {
+            "name": "A blob-backed album lights stewarding via the operator seed lever",
+            "status": "pending",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 103.964293
+          },
+          {
+            "name": "A blob-backed album distributes across the live household mesh",
+            "status": "skipped",
+            "surface": "features/resilience/grandma-photos-survive-node-loss.feature",
+            "durationMs": 12.182685
+          },
+          {
+            "name": "Resilience snapshot reports the diversity shortfall, not just a count",
+            "status": "skipped",
+            "surface": "features/resilience/observable-distribution.feature",
+            "durationMs": 3.462864
+          },
+          {
+            "name": "coverageShortfall is a present 0 when the floor is met (absent != zero)",
+            "status": "skipped",
+            "surface": "features/resilience/observable-distribution.feature",
+            "durationMs": 4.814767
+          }
+        ]
+      }
+    }
+  },
+  "findings": [
+    {
+      "fingerprint": "03c705fd5821",
+      "source": "pending-step",
+      "pillar": "resilience",
+      "severity": "warning",
+      "message": "Pending scenario: A holder lapses but coverage survives — the family is reassured, not alarmed",
+      "occurrences": 1,
+      "scenarios": [
+        {
+          "name": "A holder lapses but coverage survives — the family is reassured, not alarmed",
+          "feature": "features/resilience/grandma-photos-survive-node-loss.feature"
+        }
+      ],
+      "suggestedObjective": "Implement pending step definition: Pending scenario: A holder lapses but coverage survives — the family is reassured, not alarmed"
+    },
+    {
+      "fingerprint": "6eb3a214b5b7",
+      "source": "pending-step",
+      "pillar": "resilience",
+      "severity": "warning",
+      "message": "Pending scenario: A blob-backed album lights stewarding via the operator seed lever",
+      "occurrences": 1,
+      "scenarios": [
+        {
+          "name": "A blob-backed album lights stewarding via the operator seed lever",
+          "feature": "features/resilience/grandma-photos-survive-node-loss.feature"
+        }
+      ],
+      "suggestedObjective": "Implement pending step definition: Pending scenario: A blob-backed album lights stewarding via the operator seed lever"
+    },
+    {
+      "fingerprint": "b5b2b1797626",
+      "source": "scenario-failure",
+      "pillar": "resilience",
+      "severity": "error",
+      "message": "AssertionError [ERR_ASSERTION]: seeded custody on all 3 household peers (matthew, jessica, james) but the household resilience fold counts only 1 intra-household copy for \"chaos-ladder\" — household formation incomplete: member agent keys not bound on the fold peer",
+      "occurrences": 1,
+      "scenarios": [
+        {
+          "name": "Cascading peer loss degrades the protection status honestly, step by step",
+          "feature": "features/resilience/chaos-peer-churn.feature"
+        }
+      ],
+      "suggestedObjective": "Fix scenario failure: AssertionError [ERR_ASSERTION]: seeded custody on all 3 household peers (matthew, jessica, james) but the household resi"
+    },
+    {
+      "fingerprint": "e8d4b92fa128",
+      "source": "pending-step",
+      "pillar": "resilience",
+      "severity": "warning",
+      "message": "Pending scenario: Grandma's node goes offline but her photos remain protected",
+      "occurrences": 1,
+      "scenarios": [
+        {
+          "name": "Grandma's node goes offline but her photos remain protected",
+          "feature": "features/resilience/grandma-photos-survive-node-loss.feature"
+        }
+      ],
+      "suggestedObjective": "Implement pending step definition: Pending scenario: Grandma's node goes offline but her photos remain protected"
+    }
+  ]
+}
