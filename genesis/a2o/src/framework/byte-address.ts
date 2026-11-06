@@ -4,20 +4,69 @@
  * multihash code, digest length and canonical text — never by a spelling or prefix test.
  * Same mint as `scripts/ci/lib/byte-cid.mjs` and `elohim_address::ByteCid`; the kernel
  * vectors in `elohim/eprfs/fixtures/tree-vectors.json` pin both.
+ *
+ * No `multiformats` here on purpose: that package is ESM-only and cucumber loads the a2o
+ * step files through `requireModule: ['tsx']` (CommonJS), where its `./cid` subpath is not
+ * exported — the first import of it took the whole lane down at load. The profile fixes the
+ * 4-byte header, so the base32 step is spelled out, exactly as the CI twin does.
  */
 import { blake3 } from '@noble/hashes/blake3';
-import { CID } from 'multiformats/cid';
-import { create as createDigest } from 'multiformats/hashes/digest';
 
-const RAW_CODEC = 0x55;
-const BLAKE3_256_CODE = 0x1e;
+/** CIDv1 · raw codec 0x55 · blake3-256 multihash 0x1e · 32-byte digest. */
+const HEADER = Uint8Array.from([0x01, 0x55, 0x1e, 0x20]);
+const DIGEST_LEN = 32;
+const CID_LEN = HEADER.length + DIGEST_LEN; // 36 bytes
+/** 'b' multibase prefix + ceil(36 * 8 / 5) = 58 base32 characters. */
+const TEXT_LEN = 59;
+
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+const ALPHABET_INDEX = new Map<string, number>([...ALPHABET].map((c, i) => [c, i]));
+
+function base32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const b of bytes) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      out += ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += ALPHABET[(value << (5 - bits)) & 31];
+  return out;
+}
+
+/** Decode base32-lower (no padding); `null` on any character outside the alphabet. */
+function base32Decode(text: string): Uint8Array | null {
+  const out: number[] = [];
+  let bits = 0;
+  let value = 0;
+  for (const c of text) {
+    const v = ALPHABET_INDEX.get(c);
+    if (v === undefined) return null;
+    value = (value << 5) | v;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Uint8Array.from(out);
+}
+
+function encodeCid(bytes: Uint8Array): string {
+  return 'b' + base32Encode(bytes);
+}
 
 /** Mint the byte CID of `data`. */
 export function mintByteCid(data: Uint8Array): string {
-  return CID.createV1(
-    RAW_CODEC,
-    createDigest(BLAKE3_256_CODE, blake3(data, { dkLen: 32 }))
-  ).toString();
+  const digest = blake3(data, { dkLen: DIGEST_LEN });
+  const cid = new Uint8Array(CID_LEN);
+  cid.set(HEADER, 0);
+  cid.set(digest, HEADER.length);
+  return encodeCid(cid);
 }
 
 /**
@@ -26,16 +75,17 @@ export function mintByteCid(data: Uint8Array): string {
  * CID, a non-canonical text — all `null`).
  */
 export function parseByteCid(address: unknown): string | null {
-  if (typeof address !== 'string') return null;
-  let cid: CID;
-  try {
-    cid = CID.parse(address);
-  } catch {
+  if (typeof address !== 'string' || address.length !== TEXT_LEN || address[0] !== 'b') {
     return null;
   }
-  if (cid.version !== 1 || cid.code !== RAW_CODEC) return null;
-  if (cid.multihash.code !== BLAKE3_256_CODE || cid.multihash.digest.length !== 32) return null;
-  return cid.toString() === address && address.length === 59 ? address : null;
+  const bytes = base32Decode(address.slice(1));
+  if (bytes === null || bytes.length !== CID_LEN) return null;
+  for (let i = 0; i < HEADER.length; i++) {
+    if (bytes[i] !== HEADER[i]) return null;
+  }
+  // Canonical text: re-encoding the decoded bytes must reproduce the input exactly
+  // (non-zero trailing bits or any other non-canonical spelling fail here).
+  return encodeCid(bytes) === address ? address : null;
 }
 
 export function isByteCid(address: unknown): address is string {
