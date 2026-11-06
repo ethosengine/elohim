@@ -99,8 +99,7 @@ pub struct SubmitSpecialistRevocationInput {
 ///
 /// Per memory `project_bootstrap_to_elohim_security_gradient`: Stage 1 default-deny
 /// is correct here; full elohim-enforcement (Stage 3) lands with Task 15.
-#[allow(unused_variables)]
-fn caller_is_defender_for(human_action_hash: &ActionHash) -> ExternResult<bool> {
+fn caller_is_defender_for(_human_action_hash: &ActionHash) -> ExternResult<bool> {
     // TODO(task-15): replace with real gate_client_zome::check_blocking call.
     // See module-level doc for the integration point signature.
     Ok(false)

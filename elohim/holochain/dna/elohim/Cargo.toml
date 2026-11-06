@@ -14,3 +14,6 @@ serde_bytes = "0.11"
 serde_json = "1"
 doorway-client = { path = "../../../../crates/doorway-client" }
 hc-rna = { path = "../../rna/rust" }
+# The one addressing kernel (re-genesis 1): byte CIDs are admitted by full decode
+# (`ByteCid::parse`) and minted by `compute_bytes_cid`; no hand-written validator.
+elohim-address = { path = "../../../../crates/elohim-address", default-features = false }

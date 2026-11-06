@@ -448,8 +448,6 @@ pub struct AmendContentPatch {
     #[serde(default)]
     pub content_size_bytes: Option<u64>,
     #[serde(default)]
-    pub content_hash: Option<String>,
-    #[serde(default)]
     pub reach: Option<String>,
 }
 
@@ -576,9 +574,6 @@ pub fn amend_content(input: AmendContentInput) -> ExternResult<ContentOutput> {
     }
     if let Some(v) = input.content.content_size_bytes {
         content.content_size_bytes = Some(v);
-    }
-    if let Some(v) = input.content.content_hash {
-        content.content_hash = Some(v);
     }
     if let Some(v) = input.content.title {
         content.title = v;

@@ -115,7 +115,6 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
         validation_status: "Valid".to_string(),
         blob_cid: None,
         content_size_bytes: None,
-        content_hash: None,
     };
 
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;

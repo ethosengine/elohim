@@ -109,6 +109,41 @@ export_for_migration() -> MigrationExport  // All data in one call
 
 ---
 
+## Version: v2 — re-genesis 1 address crossing (elohim / `content_store` DNA)
+
+**Date**: 2026-11-05
+**Kind**: Breaking integrity change — new DNA hash, re-genesis (no lineage migration; peers on v1 are a different DHT)
+**Network seed**: `elohim_<dna>_alpha2`
+**Address profile**: every byte address is a byte CID (CIDv1 raw `0x55` + BLAKE3-256 `0x1e`, `bafkr4i…`), admitted by full decode through `elohim_address::ByteCid::parse` (`crates/elohim-address`); no prefix/length predicate.
+
+### Changed entry types
+
+| Entry Type | v1 | v2 | Validator (integrity) |
+|------------|----|----|-----------------------|
+| `Content` | `blob_cid: Option<String>` (unchecked), `content_hash: Option<String>` (sha256 of body) | `blob_cid: Option<String>`; `content_hash` **deleted** (the CID is the body's integrity proof) | `blob_cid` parses as a byte CID when `Some` |
+| `BlobEntry` | `hash: String` (sha256 hex) | `cid: String` | `cid` parses as a byte CID |
+| `ShardManifest` | `blob_hash, total_size, mime_type, encoding, data_shards, total_shards, shard_size, shard_hashes, reach, author_id, created_at, verified_at` | `blob_cid, byte_len: u64, mime_type, chunker: ChunkerDecl{id, min: u32, avg: u32, max: u32, level: u8}, chunks: Vec<ChunkRef{cid, len: u32}>, erasure: ErasureDecl{id, data: u8, parity: u8}, stripes: Vec<Stripe{index: u32, byte_len: u32, shards: Vec<ShardRef{cid, len: u32, index: u8}>}>, reach, author_id, created_at, verified_at` | `blob_cid` + every chunk/shard `cid` parse as byte CIDs; `chunker.id ∈ {"fastcdc-2020"}`; `erasure.id ∈ {"none", "rs-gf8-0x11d-v1"}`; `stripes` empty iff `erasure.id == "none"`; each stripe `byte_len ≤ 16 MiB`; each stripe carries exactly `data + parity` shards |
+| `ShardLocation` | `shard_hash: String` | `shard_cid: String` | `shard_cid` parses as a byte CID |
+| `ImportBatch` | `blob_hash: String` | `blob_cid: String` | (not validated in v2) |
+| `ContentSuccession` | `content_hash: Option<String>` (sha256 of body) | `content_cid: Option<String>` | `content_cid` parses as a byte CID when `Some` |
+
+Removed constant: `SHARD_ENCODINGS` (`none`, `chunked`, `rs-4-7`, `rs-8-12`), replaced by `CHUNKER_IDS` / `ERASURE_IDS` / `MAX_STRIPE_BYTE_LEN`.
+
+### Link types
+
+- `BlobToReplicas` **deleted** (never created by any coordinator). Every later `LinkTypes` discriminant shifts down by one.
+- `IdToBlob`, `BlobToManifest`, `ShardToLocations` keep their names; their anchors are now keyed by CID: `StringAnchor("blob_cid", <blob_cid>)` for `BlobToManifest` / `IdToBlob` lookups and `StringAnchor("shard_cid", <cid>)` for `ShardToLocations` (v1: `"blob_hash"` / `"shard_hash"`).
+
+### Coordinator surface (no hash effect)
+
+- `register_shard_manifest` input mirrors the v2 `ShardManifest` minus `created_at` / `verified_at`; shape checks moved to the integrity validator.
+- `resolve_blob` / `get_storage_dids_for_blob` walk custody units: stripe shards when erasure coded, otherwise the chunks. `get_storage_dids_for_blob` now reads the anchor the manifest is written under (v1 read `"blob_manifest"`, which nothing wrote).
+- `ProjectionSignal::ImportBatchQueued.blob_hash → blob_cid`; `BlobMetadataOutput.hash → cid`; `*_hash` → `*_cid` on the blob/shard inputs and outputs.
+- The SipHash `calculate_sha256` helper is replaced by `byte_cid_of(&[u8]) -> String` (`elohim_address::compute_bytes_cid`).
+- imagodei (coordinator only, no hash effect from this change): `ContentCheckInput.content_hash → content_cid`.
+
+---
+
 ## Migration Notes
 
 ### v1 Design Decisions
@@ -144,3 +179,4 @@ When planning v2, consider:
 | Version | Date | Changes |
 |---------|------|---------|
 | v1 | 2024-12 | Initial schema with full Lamad + Shefa types |
+| v2 | 2026-11-05 | Re-genesis 1 address crossing: byte CIDs (BLAKE3) validated by full decode; `ShardManifest` recast to chunks + erasure stripes; `Content.content_hash` and `BlobToReplicas` deleted |

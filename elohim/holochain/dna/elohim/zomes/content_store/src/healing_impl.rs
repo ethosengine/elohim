@@ -65,7 +65,6 @@ pub fn transform_content_v1_to_v2(v1: ContentV1Export) -> Content {
         // V1 content has body in content field, no blob storage
         blob_cid: None,
         content_size_bytes: None,
-        content_hash: None,
     }
 }
 

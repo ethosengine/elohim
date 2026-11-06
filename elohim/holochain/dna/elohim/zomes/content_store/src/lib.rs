@@ -253,7 +253,6 @@ fn wire_to_integrity_content(w: &WireContent) -> content_store_integrity::Conten
         validation_status: w.validation_status.clone(),
         blob_cid: w.blob_cid.clone(),
         content_size_bytes: w.content_size_bytes,
-        content_hash: w.content_hash.clone(),
     }
 }
 
@@ -303,7 +302,9 @@ pub(crate) fn content_to_wire(c: &content_store_integrity::Content) -> WireConte
         validation_status: c.validation_status.clone(),
         blob_cid: c.blob_cid.clone(),
         content_size_bytes: c.content_size_bytes,
-        content_hash: c.content_hash.clone(),
+        // The integrity entry no longer carries a body hash: `blob_cid` is the body's
+        // integrity proof. The lamad-types wire field remains until the sdk track drops it.
+        content_hash: None,
     }
 }
 
@@ -1821,10 +1822,9 @@ pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
 /// ## Manifest Mode (Recommended for content > 1KB)
 ///
 /// For large content, store the body in elohim-storage and provide:
-/// - `blob_cid`: CID returned from elohim-storage
-/// - `content_hash`: SHA256 of the content body
+/// - `blob_cid`: byte CID returned from elohim-storage (it is the body's integrity proof)
 /// - `content_size_bytes`: Size of the content body
-/// - `content`: Empty string or the hash (for backwards compatibility)
+/// - `content`: Empty string
 ///
 // CreateContentInput re-exported from lamad_types
 
@@ -1844,7 +1844,7 @@ pub struct QueryBlobsByContentIdInput {
 /// Output for blob metadata
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlobMetadataOutput {
-    pub hash: String,
+    pub cid: String,
     pub size_bytes: u64,
     pub mime_type: String,
     pub fallback_urls: Vec<String>,
@@ -1859,13 +1859,13 @@ pub struct BlobMetadataOutput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyBlobIntegrityInput {
     pub content_id: String,
-    pub blob_hash: String,
+    pub blob_cid: String,
 }
 
 /// Output for blob integrity verification
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlobIntegrityCheckOutput {
-    pub blob_hash: String,
+    pub blob_cid: String,
     pub is_valid: bool,
     pub verification_time_ms: u64,
 }
@@ -1873,7 +1873,7 @@ pub struct BlobIntegrityCheckOutput {
 /// Input for querying blob variants
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryBlobVariantsInput {
-    pub blob_hash: String,
+    pub blob_cid: String,
 }
 
 // =============================================================================
@@ -2097,8 +2097,8 @@ pub struct GenerateShardsOutput {
     pub content_id: String,
     pub shard_strategy: String,
     pub total_shards: u32,
-    pub shard_hashes: Vec<String>, // Hash of each shard for verification
-    pub content_hash: String,      // Hash of complete content
+    pub shard_cids: Vec<String>, // Byte CID of each shard for verification
+    pub content_cid: String,     // Byte CID of complete content
 }
 
 /// Input for storing a shard on-chain
@@ -2110,7 +2110,7 @@ pub struct StoreShardInput {
     pub total_shards: u32,
     pub encrypted_shard_data: String, // Base64 encrypted shard
     pub encryption_method: String,    // age|pgp|xchacha20
-    pub shard_hash: String,           // Hash of shard for integrity verification
+    pub shard_cid: String,            // Byte CID of shard for integrity verification
     pub watermark_signature: String,  // Cryptographic proof of origin
 }
 
@@ -2145,7 +2145,7 @@ pub struct GetShardOutput {
     pub total_shards: u32,
     pub encrypted_shard_data: String,
     pub encryption_method: String,
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub watermark_signature: String,
     pub stored_at: String,
 }
@@ -2440,7 +2440,8 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
         // Content manifest fields (Phase 0 refactor)
         blob_cid: input.blob_cid,
         content_size_bytes: input.content_size_bytes,
-        content_hash: input.content_hash,
+        // `input.content_hash` (lamad-types, sdk track) is not carried: the entry
+        // has no body hash — `blob_cid` is the body's integrity proof.
     };
 
     // Prepare and validate - sets schema_version=2 and validation_status
@@ -2509,10 +2510,8 @@ pub(crate) fn latest_id_to_content_link(mut links: Vec<Link>) -> Option<Link> {
 /// the DHT lives in the service layer (ContentService::update_via_conductor
 /// in Task 8c), which branches on `dht_anchor_hash IS NULL`.
 ///
-/// Field naming note: input uses `blob_cid` (DNA field name per the Phase 0
-/// refactor); HTTP wire / storage diesel column use `blob_hash`. The
-/// service layer translates between the two; this zome fn speaks the DNA
-/// vocabulary.
+/// Field naming note: input uses `blob_cid`, a byte CID validated by full
+/// decode in the integrity zome (re-genesis 1 address crossing).
 #[hdk_extern]
 pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> {
     // Resolve identity before choosing a version: a newer same-id link may name
@@ -2583,9 +2582,7 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     if let Some(v) = input.content_size_bytes {
         content.content_size_bytes = Some(v);
     }
-    if let Some(v) = input.content_hash {
-        content.content_hash = Some(v);
-    }
+    // `input.content_hash` (lamad-types) has no home on the entry any more.
     if let Some(v) = input.title {
         content.title = v;
     }
@@ -7445,7 +7442,7 @@ pub fn bulk_create_content(input: BulkCreateContentInput) -> ExternResult<BulkCr
 // Flow:
 // 1. Client POSTs items to Doorway
 // 2. Doorway writes blob to Elohim-Store (blazing fast)
-// 3. Elohim-Store calls queue_import(blob_hash, manifest) on Zome
+// 3. Elohim-Store calls queue_import(blob_cid, manifest) on Zome
 // 4. Zome stores ImportBatch entry (manifest only) and emits ImportBatchQueued
 // 5. Elohim-Store calls process_import_chunk() with blob data
 // 6. Zome processes items, emits ImportBatchProgress signals
@@ -7491,7 +7488,8 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     let batch = ImportBatch {
         id: input.id.clone(),
         batch_type: input.batch_type.clone(),
-        blob_hash: input.blob_hash.clone(),
+        // lamad-types `QueueImportInput` still spells it `blob_hash` (sdk track).
+        blob_cid: input.blob_hash.clone(),
         total_items: input.total_items,
         status: "queued".to_string(),
         processed_count: 0,
@@ -7518,7 +7516,7 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     // Emit signal so elohim-store knows to start sending chunks
     emit_signal(ProjectionSignal::ImportBatchQueued {
         batch_id: input.id.clone(),
-        blob_hash: input.blob_hash.clone(),
+        blob_cid: input.blob_hash.clone(),
         total_items: input.total_items,
         batch_type: input.batch_type.clone(),
     })?;
@@ -8499,10 +8497,10 @@ pub fn get_blobs_by_content_id(
             "Could not deserialize content".to_string()
         )))?;
 
-    let content_hash = latest.target.clone();
+    let content_target = latest.target.clone();
 
     // Query ContentToBlobs links from this content
-    let query = LinkQuery::try_new(content_hash, LinkTypes::ContentToBlobs)?;
+    let query = LinkQuery::try_new(content_target, LinkTypes::ContentToBlobs)?;
     let blob_links = get_links(query, GetStrategy::default())?;
 
     if blob_links.is_empty() {
@@ -8522,7 +8520,7 @@ pub fn get_blobs_by_content_id(
         if let Some(record) = get(blob_action_hash, GetOptions::default())? {
             if let Ok(Some(blob)) = record.entry().to_app_option::<BlobEntry>() {
                 results.push(BlobMetadataOutput {
-                    hash: blob.hash,
+                    cid: blob.cid,
                     size_bytes: blob.size_bytes,
                     mime_type: blob.mime_type,
                     fallback_urls: blob.fallback_urls,
@@ -8564,8 +8562,8 @@ pub fn verify_blob_integrity(
         )));
     }
 
-    // Check if blob with this hash exists in our system
-    let blob_anchor = StringAnchor::new("blob_hash", &input.blob_hash);
+    // Check if blob with this CID exists in our system
+    let blob_anchor = StringAnchor::new("blob_cid", &input.blob_cid);
     let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor))?;
 
     let blob_query = LinkQuery::try_new(blob_anchor_hash, LinkTypes::IdToBlob)?;
@@ -8580,7 +8578,7 @@ pub fn verify_blob_integrity(
         .unwrap_or(0);
 
     Ok(BlobIntegrityCheckOutput {
-        blob_hash: input.blob_hash,
+        blob_cid: input.blob_cid,
         is_valid,
         verification_time_ms: elapsed,
     })
@@ -13686,27 +13684,26 @@ pub fn generate_shards(input: GenerateShardsInput) -> ExternResult<GenerateShard
         )));
     }
 
-    // Calculate hash of complete content
-    let content_hash = calculate_sha256(&input.content_data);
+    // Byte CID of the complete content
+    let content_cid = byte_cid_of(input.content_data.as_bytes());
 
-    // Generate shard hashes (deterministic, based on content + strategy + index)
+    // Generate shard addresses (deterministic, based on content + strategy + index)
     // In production, would use actual Shamir or Reed-Solomon libraries
-    let mut shard_hashes = Vec::new();
+    let mut shard_cids = Vec::new();
     for shard_index in 0..total_shards {
         let shard_seed = format!(
             "{}-{}-{}",
             input.content_id, shard_index, input.shard_strategy
         );
-        let shard_hash = calculate_sha256(&shard_seed);
-        shard_hashes.push(shard_hash);
+        shard_cids.push(byte_cid_of(shard_seed.as_bytes()));
     }
 
     Ok(GenerateShardsOutput {
         content_id: input.content_id,
         shard_strategy: input.shard_strategy,
         total_shards,
-        shard_hashes,
-        content_hash,
+        shard_cids,
+        content_cid,
     })
 }
 
@@ -13715,7 +13712,7 @@ pub fn generate_shards(input: GenerateShardsInput) -> ExternResult<GenerateShard
 /// Watermarks enable verification that a shard came from authorized content:
 /// - Links back to original content_id
 /// - Signed by custodian_agent_id
-/// - Contains shard hash for integrity
+/// - Contains shard CID for integrity
 /// - Timestamped for audit trail
 ///
 /// TODO: Unused — intended for content provenance verification (watermarking projected content)?
@@ -13727,7 +13724,7 @@ fn generate_watermark(
     content_id: &str,
     custodian_id: &str,
     shard_index: u32,
-    shard_hash: &str,
+    shard_cid: &str,
 ) -> ExternResult<String> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
@@ -13735,16 +13732,14 @@ fn generate_watermark(
 
     // Create watermark data
     let watermark_data = format!(
-        "content_id:{}|custodian:{}|shard:{}|hash:{}|timestamp:{}",
-        content_id, custodian_id, shard_index, shard_hash, timestamp
+        "content_id:{}|custodian:{}|shard:{}|cid:{}|timestamp:{}",
+        content_id, custodian_id, shard_index, shard_cid, timestamp
     );
 
     // Sign watermark with custodian's agent key (would use actual cryptographic signature)
     // For now, create deterministic HMAC-like proof
-    let signature = calculate_sha256(&format!(
-        "{}|{}",
-        watermark_data, agent_info.agent_initial_pubkey
-    ));
+    let signature =
+        byte_cid_of(format!("{}|{}", watermark_data, agent_info.agent_initial_pubkey).as_bytes());
 
     Ok(signature)
 }
@@ -13758,28 +13753,58 @@ fn generate_watermark(
 fn verify_watermark(
     watermark: &str,
     expected_content_id: &str,
-    expected_shard_hash: &str,
+    expected_shard_cid: &str,
 ) -> ExternResult<bool> {
     // In production: verify ECDSA/EdDSA signature
     // For now: watermark is valid if it can be reconstructed
 
-    // Watermark format: content_id:...|shard:...|hash:...
+    // Watermark format: content_id:...|shard:...|cid:...
     // Simple validation: check that expected values are in watermark
     let contains_content_id = watermark.contains(&format!("content_id:{}", expected_content_id));
-    let contains_shard_hash = watermark.contains(&format!("hash:{}", expected_shard_hash));
+    let contains_shard_cid = watermark.contains(&format!("cid:{}", expected_shard_cid));
 
-    Ok(contains_content_id && contains_shard_hash)
+    Ok(contains_content_id && contains_shard_cid)
 }
 
-/// SHA256 hash helper
-fn calculate_sha256(data: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+/// The byte CID (CIDv1 raw + BLAKE3-256, `bafkr4i…`) of `bytes`, minted by the one
+/// addressing kernel. Replaces the former "sha256" helper, which was a SipHash
+/// (`DefaultHasher`) printed as 16 hex digits: neither SHA-256 nor an address.
+pub(crate) fn byte_cid_of(bytes: &[u8]) -> String {
+    elohim_address::compute_bytes_cid(bytes).to_string()
+}
 
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("{:x}", hash)
+/// The placeholder on-chain shard address `get_shard` reports for `(content_id,
+/// shard_index)` until real shard retrieval lands: a byte CID, never a bare digest.
+fn placeholder_shard_cid(content_id: &str, shard_index: u32) -> String {
+    byte_cid_of(format!("{}-{}", content_id, shard_index).as_bytes())
+}
+
+#[cfg(test)]
+mod byte_cid_tests {
+    use super::*;
+
+    /// Positive vector from `crates/elohim-address/vectors/address-vectors.json`.
+    const HELLO_WORLD_CID: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+
+    #[test]
+    fn byte_cid_of_matches_the_kernel_vector() {
+        assert_eq!(byte_cid_of(b"hello world"), HELLO_WORLD_CID);
+    }
+
+    /// Every shard address the coordinator mints for the chain is admitted by the
+    /// same full-decode parser the integrity zome validates with.
+    #[test]
+    fn on_chain_shard_cid_is_byte_cid() {
+        for (content_id, index) in [("content-1", 0u32), ("content-1", 6), ("", 0)] {
+            let cid = placeholder_shard_cid(content_id, index);
+            assert!(
+                elohim_address::ByteCid::parse(&cid).is_ok(),
+                "{cid} is not a byte CID"
+            );
+        }
+        assert!(elohim_address::ByteCid::parse(&byte_cid_of(b"watermark")).is_ok());
+        assert_ne!(placeholder_shard_cid("c", 0), placeholder_shard_cid("c", 1));
+    }
 }
 
 /// Store shard on-chain (encrypted, with watermark, linked to commitment)
@@ -13798,7 +13823,7 @@ pub fn store_shard(input: StoreShardInput) -> ExternResult<StoredShardOutput> {
     verify_watermark(
         &input.watermark_signature,
         &input.content_id,
-        &input.shard_hash,
+        &input.shard_cid,
     )?;
 
     // Create shard metadata entry (simplified - in production would be a full Shard entry type)
@@ -13815,8 +13840,8 @@ pub fn store_shard(input: StoreShardInput) -> ExternResult<StoredShardOutput> {
     let shard_metadata = StringAnchor::new(
         "shard_metadata",
         &format!(
-            "content:{}|index:{}|total:{}|hash:{}",
-            input.content_id, input.shard_index, input.total_shards, input.shard_hash
+            "content:{}|index:{}|total:{}|cid:{}",
+            input.content_id, input.shard_index, input.total_shards, input.shard_cid
         ),
     );
     let metadata_hash = create_entry(&EntryTypes::StringAnchor(shard_metadata))?;
@@ -13914,8 +13939,8 @@ pub fn get_shard(input: GetShardInput) -> ExternResult<GetShardOutput> {
         total_shards: 8,
         encrypted_shard_data: "ENCRYPTED_DATA_PLACEHOLDER".to_string(),
         encryption_method: "xchacha20".to_string(),
-        shard_hash: calculate_sha256(&format!("{}-{}", input.content_id, input.shard_index)),
-        watermark_signature: calculate_sha256("watermark"),
+        shard_cid: placeholder_shard_cid(&input.content_id, input.shard_index),
+        watermark_signature: byte_cid_of(b"watermark"),
         stored_at: format!("{:?}", sys_time()?),
     })
 }
@@ -14002,7 +14027,7 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         recovery_instructions_json: serde_json::to_string(&serde_json::json!({
             "instructions_markdown": "Reconstruct from relationship-based custodians",
             "shard_reconstruction_method": "full_replica",
-            "verification_steps": ["verify_watermarks", "verify_shard_hashes"],
+            "verification_steps": ["verify_watermarks", "verify_shard_cids"],
             "fallback_contacts": []
         }))
         .unwrap_or_else(|_| "{}".to_string()),
@@ -14074,7 +14099,7 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         recovery_instructions_json: serde_json::to_string(&serde_json::json!({
             "instructions_markdown": "Reconstruct from relationship-based custodians",
             "shard_reconstruction_method": "full_replica",
-            "verification_steps": ["verify_watermarks", "verify_shard_hashes"],
+            "verification_steps": ["verify_watermarks", "verify_shard_cids"],
             "fallback_contacts": []
         }))
         .unwrap_or_else(|_| "{}".to_string()),
@@ -14799,14 +14824,14 @@ pub fn batch_update_commitments(
 
 /// Lazy-load shard metadata without full content
 ///
-/// Returns only shard hashes and metadata, not encrypted data
+/// Returns only shard CIDs and metadata, not encrypted data
 /// Useful for verification and inventory without bandwidth overhead
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ShardMetadataOnly {
     pub content_id: String,
     pub shard_index: u32,
     pub total_shards: u32,
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub watermark_signature: String,
     pub stored_at: String,
     pub verified_at: Option<String>,
@@ -15536,7 +15561,7 @@ pub enum ProjectionSignal {
     /// ImportBatch was queued (store can start processing)
     ImportBatchQueued {
         batch_id: String,
-        blob_hash: String,
+        blob_cid: String,
         total_items: u32,
         batch_type: String,
     },
@@ -16200,17 +16225,17 @@ pub fn warm_cache(input: WarmCacheInput) -> ExternResult<WarmCacheOutput> {
 // Every blob has a ShardManifest (even single-shard blobs) and ShardLocations
 // track which nodes hold which shards.
 
-/// Input for registering a shard manifest
+/// Input for registering a shard manifest. Field for field the integrity
+/// [`ShardManifest`] minus the two timestamps the zome stamps itself.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterShardManifestInput {
-    pub blob_hash: String,
-    pub total_size: u64,
+    pub blob_cid: String,
+    pub byte_len: u64,
     pub mime_type: String,
-    pub encoding: String,
-    pub data_shards: u8,
-    pub total_shards: u8,
-    pub shard_size: u64,
-    pub shard_hashes: Vec<String>,
+    pub chunker: ChunkerDecl,
+    pub chunks: Vec<ChunkRef>,
+    pub erasure: ErasureDecl,
+    pub stripes: Vec<Stripe>,
     pub reach: String,
     pub author_id: Option<String>,
 }
@@ -16222,43 +16247,52 @@ pub struct RegisterShardManifestOutput {
     pub manifest: ShardManifest,
 }
 
+/// Anchor under which a blob's manifest is linked (`BlobToManifest`).
+fn blob_manifest_anchor(blob_cid: &str) -> StringAnchor {
+    StringAnchor::new("blob_cid", blob_cid)
+}
+
+/// Anchor under which a shard's (or, for `erasure: none`, a chunk's) holders are
+/// linked (`ShardToLocations`).
+fn shard_locations_anchor(shard_cid: &str) -> StringAnchor {
+    StringAnchor::new("shard_cid", shard_cid)
+}
+
+/// The custody units of a manifest, in order: every stripe's shards when erasure
+/// coded, otherwise the chunks themselves.
+fn custody_unit_cids(manifest: &ShardManifest) -> Vec<String> {
+    if manifest.stripes.is_empty() {
+        manifest.chunks.iter().map(|c| c.cid.clone()).collect()
+    } else {
+        manifest
+            .stripes
+            .iter()
+            .flat_map(|stripe| stripe.shards.iter().map(|shard| shard.cid.clone()))
+            .collect()
+    }
+}
+
 /// Register a new shard manifest for a blob
 ///
-/// Creates the ShardManifest entry and establishes links:
-/// - Anchor(blob_hash) -> ShardManifest (for lookup by blob hash)
+/// The integrity zome is the judge of the manifest's shape (byte CIDs by full
+/// decode, chunker and erasure identifiers, stripe bounds); this extern only
+/// stamps the timestamps and creates the entry and its links:
+/// - Anchor(blob_cid) -> ShardManifest (for lookup by blob CID)
 /// - Anchor(author_id) -> ShardManifest (for author's manifests)
 #[hdk_extern]
 pub fn register_shard_manifest(
     input: RegisterShardManifestInput,
 ) -> ExternResult<RegisterShardManifestOutput> {
-    // Validate encoding type
-    if !SHARD_ENCODINGS.contains(&input.encoding.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Invalid encoding type: {}. Valid: {:?}",
-            input.encoding, SHARD_ENCODINGS
-        ))));
-    }
-
-    // Validate shard counts
-    if input.shard_hashes.len() != input.total_shards as usize {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Shard hash count ({}) must match total_shards ({})",
-            input.shard_hashes.len(),
-            input.total_shards
-        ))));
-    }
-
     let now = format!("{:?}", sys_time()?);
 
     let manifest = ShardManifest {
-        blob_hash: input.blob_hash.clone(),
-        total_size: input.total_size,
+        blob_cid: input.blob_cid.clone(),
+        byte_len: input.byte_len,
         mime_type: input.mime_type,
-        encoding: input.encoding,
-        data_shards: input.data_shards,
-        total_shards: input.total_shards,
-        shard_size: input.shard_size,
-        shard_hashes: input.shard_hashes,
+        chunker: input.chunker,
+        chunks: input.chunks,
+        erasure: input.erasure,
+        stripes: input.stripes,
         reach: input.reach,
         author_id: input.author_id.clone(),
         created_at: now.clone(),
@@ -16267,8 +16301,8 @@ pub fn register_shard_manifest(
 
     let action_hash = create_entry(EntryTypes::ShardManifest(manifest.clone()))?;
 
-    // Create blob_hash -> ShardManifest link
-    let blob_anchor = StringAnchor::new("blob_hash", &input.blob_hash);
+    // Create blob_cid -> ShardManifest link
+    let blob_anchor = blob_manifest_anchor(&input.blob_cid);
     let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor.clone()))?;
     create_entry(EntryTypes::StringAnchor(blob_anchor))?;
     create_link(
@@ -16293,11 +16327,11 @@ pub fn register_shard_manifest(
 
     // Emit signal for doorway cache — best-effort: the manifest and its links are
     // already committed above, so a cache-signal failure must not fail registration.
-    let doc_id = input.blob_hash.clone();
+    let doc_id = input.blob_cid.clone();
     if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal {
         signal_type: CacheSignalType::Upsert,
         doc_type: "ShardManifest".to_string(),
-        doc_id: input.blob_hash,
+        doc_id: input.blob_cid,
         data: serde_json::to_value(&manifest).ok(),
         ttl_secs: Some(86400), // 24 hours
         public: manifest.reach == "commons",
@@ -16315,10 +16349,10 @@ pub fn register_shard_manifest(
     })
 }
 
-/// Get shard manifest by blob hash
+/// Get shard manifest by blob CID
 #[hdk_extern]
-pub fn get_shard_manifest(blob_hash: String) -> ExternResult<Option<ShardManifest>> {
-    let blob_anchor = StringAnchor::new("blob_hash", &blob_hash);
+pub fn get_shard_manifest(blob_cid: String) -> ExternResult<Option<ShardManifest>> {
+    let blob_anchor = blob_manifest_anchor(&blob_cid);
     let blob_anchor_hash = hash_entry(&EntryTypes::StringAnchor(blob_anchor))?;
 
     let query = LinkQuery::try_new(blob_anchor_hash, LinkTypes::BlobToManifest)?;
@@ -16359,7 +16393,7 @@ pub fn get_shard_manifest(blob_hash: String) -> ExternResult<Option<ShardManifes
 /// Input for registering a shard location
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterShardLocationInput {
-    pub shard_hash: String,
+    pub shard_cid: String,
     pub shard_index: u8,
     pub holder: String,
     /// W3C DID of the holder (e.g., "did:web:doorway.elohim.host")
@@ -16381,7 +16415,7 @@ pub struct RegisterShardLocationOutput {
 /// Register that this node holds a shard
 ///
 /// Creates a ShardLocation entry and links:
-/// - Anchor(shard_hash) -> ShardLocation (find holders by shard)
+/// - Anchor(shard_cid) -> ShardLocation (find holders by shard)
 /// - Anchor(holder) -> ShardLocation (find shards by holder)
 /// - Anchor(holder_did) -> ShardLocation (find locations by DID)
 #[hdk_extern]
@@ -16391,7 +16425,7 @@ pub fn register_shard_location(
     let now = format!("{:?}", sys_time()?);
 
     let location = ShardLocation {
-        shard_hash: input.shard_hash.clone(),
+        shard_cid: input.shard_cid.clone(),
         shard_index: input.shard_index,
         holder: input.holder.clone(),
         holder_did: input.holder_did.clone(),
@@ -16404,8 +16438,8 @@ pub fn register_shard_location(
 
     let action_hash = create_entry(EntryTypes::ShardLocation(location.clone()))?;
 
-    // Create shard_hash -> ShardLocation link
-    let shard_anchor = StringAnchor::new("shard_hash", &input.shard_hash);
+    // Create shard_cid -> ShardLocation link
+    let shard_anchor = shard_locations_anchor(&input.shard_cid);
     let shard_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_anchor.clone()))?;
     create_entry(EntryTypes::StringAnchor(shard_anchor))?;
     create_link(
@@ -16447,8 +16481,8 @@ pub fn register_shard_location(
 
 /// Get all locations for a shard
 #[hdk_extern]
-pub fn get_shard_locations(shard_hash: String) -> ExternResult<Vec<ShardLocation>> {
-    let shard_anchor = StringAnchor::new("shard_hash", &shard_hash);
+pub fn get_shard_locations(shard_cid: String) -> ExternResult<Vec<ShardLocation>> {
+    let shard_anchor = shard_locations_anchor(&shard_cid);
     let shard_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_anchor))?;
 
     let query = LinkQuery::try_new(shard_anchor_hash, LinkTypes::ShardToLocations)?;
@@ -16538,9 +16572,11 @@ pub fn deactivate_shard_location(action_hash: ActionHash) -> ExternResult<()> {
 /// This is the primary discovery function for DID-based content federation.
 /// Returns all DIDs (holder_did + storage_dids) from active shard locations.
 #[hdk_extern]
-pub fn get_storage_dids_for_blob(blob_hash: String) -> ExternResult<Vec<String>> {
-    // First get the manifest to find all shard hashes
-    let manifest_anchor = StringAnchor::new("blob_manifest", &blob_hash);
+pub fn get_storage_dids_for_blob(blob_cid: String) -> ExternResult<Vec<String>> {
+    // First get the manifest to find all custody units. The anchor is the same one
+    // `register_shard_manifest` links under (it was "blob_manifest" here, which no
+    // writer used, so this lookup always came back empty).
+    let manifest_anchor = blob_manifest_anchor(&blob_cid);
     let manifest_anchor_hash = hash_entry(&EntryTypes::StringAnchor(manifest_anchor))?;
 
     let query = LinkQuery::try_new(manifest_anchor_hash, LinkTypes::BlobToManifest)?;
@@ -16548,16 +16584,16 @@ pub fn get_storage_dids_for_blob(blob_hash: String) -> ExternResult<Vec<String>>
 
     let mut all_dids: Vec<String> = Vec::new();
 
-    // Get manifest to find shard hashes
+    // Get manifest to find custody units
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid manifest hash".to_string())))?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Ok(Some(manifest)) = record.entry().to_app_option::<ShardManifest>() {
-                // For each shard in the manifest, get its locations
-                for shard_hash in &manifest.shard_hashes {
-                    let locations = get_shard_locations(shard_hash.clone())?;
+                // For each custody unit in the manifest, get its locations
+                for unit_cid in custody_unit_cids(&manifest) {
+                    let locations = get_shard_locations(unit_cid)?;
                     for loc in locations {
                         // Add holder_did if present
                         if let Some(ref did) = loc.holder_did {
@@ -16684,22 +16720,22 @@ pub fn get_author_manifests(author_id: String) -> ExternResult<Vec<ShardManifest
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlobResolutionOutput {
     pub manifest: ShardManifest,
-    pub shard_locations: Vec<Vec<ShardLocation>>, // One vec per shard in order
+    pub shard_locations: Vec<Vec<ShardLocation>>, // One vec per custody unit in order
 }
 
 #[hdk_extern]
-pub fn resolve_blob(blob_hash: String) -> ExternResult<Option<BlobResolutionOutput>> {
+pub fn resolve_blob(blob_cid: String) -> ExternResult<Option<BlobResolutionOutput>> {
     // Get manifest
-    let manifest = match get_shard_manifest(blob_hash)? {
+    let manifest = match get_shard_manifest(blob_cid)? {
         Some(m) => m,
         None => return Ok(None),
     };
 
-    // Get locations for each shard
-    let mut shard_locations = Vec::with_capacity(manifest.shard_hashes.len());
-    for shard_hash in &manifest.shard_hashes {
-        let locations = get_shard_locations(shard_hash.clone())?;
-        shard_locations.push(locations);
+    // Get locations for each custody unit (stripe shards, or chunks when unstriped)
+    let units = custody_unit_cids(&manifest);
+    let mut shard_locations = Vec::with_capacity(units.len());
+    for unit_cid in units {
+        shard_locations.push(get_shard_locations(unit_cid)?);
     }
 
     Ok(Some(BlobResolutionOutput {
@@ -16730,7 +16766,7 @@ pub struct CreateContentSuccessionInput {
     pub successor_author_key: String,
     pub human_id: String,
     pub renewal_attestation_id: String,
-    pub content_hash: Option<String>,
+    pub content_cid: Option<String>,
     pub succession_type: String,
 }
 
@@ -16749,7 +16785,7 @@ pub fn create_content_succession(
         successor_author_key: input.successor_author_key,
         human_id: input.human_id,
         renewal_attestation_id: input.renewal_attestation_id,
-        content_hash: input.content_hash,
+        content_cid: input.content_cid,
         succession_type: input.succession_type,
         created_at: timestamp,
     };

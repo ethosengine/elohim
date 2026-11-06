@@ -513,18 +513,17 @@ pub struct Content {
     pub schema_version: u32, // Increment when Content schema changes
     #[serde(default)]
     pub validation_status: String, // Valid, Migrated, Degraded, Healing
-    // Content manifest fields (Phase 0 refactor)
-    /// CID pointing to content body in elohim-storage.
-    /// When set, `content` field should be empty or contain the content hash.
+    // Content manifest fields (Phase 0 refactor; re-genesis 1 address crossing)
+    /// Byte CID (CIDv1 raw + BLAKE3-256, `bafkr4i…`) of the content body in
+    /// elohim-storage. The CID is itself the integrity proof of the body, so there
+    /// is no separate body hash. Validated by full decode
+    /// (`elohim_address::ByteCid::parse`) whenever it is `Some`.
     /// Read path: if blob_cid exists, fetch from elohim-storage; otherwise use content field.
     #[serde(default)]
     pub blob_cid: Option<String>,
     /// Size of content body in bytes (for manifest mode)
     #[serde(default)]
     pub content_size_bytes: Option<u64>,
-    /// SHA256 hash of content body (for integrity verification when using blob_cid)
-    #[serde(default)]
-    pub content_hash: Option<String>,
 }
 
 impl Cacheable for Content {
@@ -569,8 +568,9 @@ impl Cacheable for Content {
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct BlobEntry {
-    /// SHA256 hash of blob content (hex string, 64 chars)
-    pub hash: String,
+    /// Byte CID of the blob (CIDv1 raw + BLAKE3-256, `bafkr4i…`), validated by
+    /// full decode (`elohim_address::ByteCid::parse`).
+    pub cid: String,
 
     /// Total size in bytes
     pub size_bytes: u64,
@@ -608,51 +608,115 @@ pub struct BlobEntry {
 // Shard Management - Unified Model for Single/Distributed Storage
 // =============================================================================
 
-/// Encoding types for shard manifests
-pub const SHARD_ENCODINGS: [&str; 4] = [
-    "none",    // Single shard, no encoding
-    "chunked", // Split into sequential chunks (no redundancy)
-    "rs-4-7",  // Reed-Solomon 4 data + 3 parity (can lose 3 shards)
-    "rs-8-12", // Reed-Solomon 8 data + 4 parity (large files)
-];
+/// Chunker identifier admitted in a [`ShardManifest`] (FastCDC v2020, the epoch-0
+/// byte-profile chunker; plan §2.5.6).
+pub const CHUNKER_FASTCDC_2020: &str = "fastcdc-2020";
+/// Chunker identifiers admitted in a [`ShardManifest`].
+pub const CHUNKER_IDS: [&str; 1] = [CHUNKER_FASTCDC_2020];
 
-/// ShardManifest - Describes how a blob is split into shards.
+/// Erasure identifier for a blob held as its chunks alone (no stripes).
+pub const ERASURE_NONE: &str = "none";
+/// Erasure identifier for Reed-Solomon over GF(2^8), polynomial 0x11d, systematic
+/// Vandermonde per reed-solomon-erasure 6.0 (plan §2.5.7).
+pub const ERASURE_RS_GF8_0X11D_V1: &str = "rs-gf8-0x11d-v1";
+/// Erasure identifiers admitted in a [`ShardManifest`].
+pub const ERASURE_IDS: [&str; 2] = [ERASURE_NONE, ERASURE_RS_GF8_0X11D_V1];
+
+/// Largest stripe of original bytes an erasure stripe may cover: 16 MiB.
+pub const MAX_STRIPE_BYTE_LEN: u32 = 16 * 1024 * 1024;
+
+/// The content-defined chunker a [`ShardManifest`] was cut with, with its recorded
+/// parameters (readers use the recorded parameters, never local config).
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ChunkerDecl {
+    /// Chunker identifier; one of [`CHUNKER_IDS`].
+    pub id: String,
+    /// Minimum chunk size in bytes.
+    pub min: u32,
+    /// Average (target) chunk size in bytes.
+    pub avg: u32,
+    /// Maximum chunk size in bytes.
+    pub max: u32,
+    /// Normalization level.
+    pub level: u8,
+}
+
+/// One content-defined chunk of the blob, in blob order.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ChunkRef {
+    /// Byte CID of the chunk's bytes.
+    pub cid: String,
+    /// Chunk length in bytes.
+    pub len: u32,
+}
+
+/// The erasure code over the blob's stripes, with its parameters.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ErasureDecl {
+    /// Erasure identifier; one of [`ERASURE_IDS`].
+    pub id: String,
+    /// Data shards per stripe.
+    pub data: u8,
+    /// Parity shards per stripe.
+    pub parity: u8,
+}
+
+/// One erasure stripe: at most [`MAX_STRIPE_BYTE_LEN`] contiguous original bytes,
+/// coded into `data + parity` shards.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Stripe {
+    /// Stripe index within the blob (0-based, blob order).
+    pub index: u32,
+    /// Original bytes this stripe covers.
+    pub byte_len: u32,
+    /// The stripe's shards: data shards first, then parity, in index order.
+    pub shards: Vec<ShardRef>,
+}
+
+/// One shard of a stripe.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ShardRef {
+    /// Byte CID of the shard's bytes.
+    pub cid: String,
+    /// Shard length in bytes.
+    pub len: u32,
+    /// Shard index within its stripe (data shards first, then parity).
+    pub index: u8,
+}
+
+/// ShardManifest - How a blob is cut into content-defined chunks and, when erasure
+/// coded, into stripes of shards (re-genesis 1 address crossing).
 ///
-/// This is the unified model where:
-/// - Single blob on single host = 1 shard, encoding="none"
-/// - Chunked blob = N sequential shards, encoding="chunked"
-/// - Reed-Solomon distributed = N+M shards, encoding="rs-N-M"
+/// - `erasure.id == "none"`: `stripes` is empty; the chunks are the custody unit.
+/// - `erasure.id == "rs-gf8-0x11d-v1"`: `stripes` is non-empty; every stripe covers
+///   at most 16 MiB of original bytes and carries exactly `data + parity` shards.
 ///
-/// The manifest is stored in DHT and can be queried by any participant
-/// to discover where to fetch shards from. This enables CDN-like distribution
-/// from native Holochain participants without requiring doorway.
+/// Every address (`blob_cid`, each chunk `cid`, each shard `cid`) is a byte CID
+/// admitted by full decode. The manifest is stored in DHT and can be queried by any
+/// participant to discover what to fetch.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ShardManifest {
-    /// Original blob hash (sha256-xxx) - used to identify the complete content
-    pub blob_hash: String,
+    /// Byte CID of the complete original blob.
+    pub blob_cid: String,
 
-    /// Total size of the original blob in bytes
-    pub total_size: u64,
+    /// Total size of the original blob in bytes.
+    pub byte_len: u64,
 
     /// MIME type (video/mp4, audio/mpeg, etc.)
     pub mime_type: String,
 
-    /// Encoding type (none, chunked, rs-4-7, rs-8-12)
-    pub encoding: String,
+    /// The chunker and its recorded parameters.
+    pub chunker: ChunkerDecl,
 
-    /// Number of data shards (for RS encoding, this is the minimum needed)
-    pub data_shards: u8,
+    /// The blob's content-defined chunks, in blob order.
+    pub chunks: Vec<ChunkRef>,
 
-    /// Total number of shards (data + parity for RS encoding)
-    pub total_shards: u8,
+    /// The erasure code over the stripes.
+    pub erasure: ErasureDecl,
 
-    /// Size of each shard in bytes (last shard may be smaller)
-    pub shard_size: u64,
-
-    /// Ordered list of shard hashes (sha256-xxx)
-    /// For RS encoding: first `data_shards` are data, rest are parity
-    pub shard_hashes: Vec<String>,
+    /// Erasure stripes; empty iff `erasure.id == "none"`.
+    pub stripes: Vec<Stripe>,
 
     /// Visibility level (private, family, community, commons)
     pub reach: String,
@@ -669,7 +733,7 @@ pub struct ShardManifest {
 
 /// ShardLocation - Where a specific shard is stored.
 ///
-/// Multiple ShardLocation entries can exist for the same shard_hash,
+/// Multiple ShardLocation entries can exist for the same shard_cid,
 /// indicating redundant copies across the network. Clients can try
 /// multiple locations for resilience.
 ///
@@ -681,8 +745,8 @@ pub struct ShardManifest {
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ShardLocation {
-    /// Hash of this shard (sha256-xxx)
-    pub shard_hash: String,
+    /// Byte CID of this shard, validated by full decode.
+    pub shard_cid: String,
 
     /// Index within the parent manifest (0-based)
     pub shard_index: u8,
@@ -703,7 +767,7 @@ pub struct ShardLocation {
     #[serde(default)]
     pub storage_dids: Vec<String>,
 
-    /// Optional HTTP endpoint for direct fetch (e.g., "https://node.example.com/shard/sha256-xxx")
+    /// Optional HTTP endpoint for direct fetch (e.g., "https://node.example.com/shard/bafkr4i…")
     /// If None, use Holochain signals to request shard
     pub endpoint: Option<String>,
 
@@ -3532,7 +3596,7 @@ pub struct DoorwayHeartbeatSummary {
 ///                         │            │
 ///                         │      ┌─────▼─────┐
 ///                         │      │ ImportBatch│ (manifest only)
-///                         │      │ blob_hash ─┼──┐
+///                         │      │ blob_cid  ─┼──┐
 ///                         │      └───────────┘  │
 ///                         │                     │
 ///                         │<────────────────────┘ (read_blob for processing)
@@ -3543,7 +3607,7 @@ pub struct DoorwayHeartbeatSummary {
 /// Flow:
 /// 1. Client POSTs items to Doorway
 /// 2. Doorway writes blob to Elohim-Store (blazing fast)
-/// 3. Elohim-Store calls `queue_import(blob_hash, manifest)` on Zome
+/// 3. Elohim-Store calls `queue_import(blob_cid, manifest)` on Zome
 /// 4. Zome stores ImportBatch entry (manifest only, no payload)
 /// 5. Zome processes at conductor pace, reading chunks from store
 /// 6. Zome emits signals: ImportBatchProgress, ImportBatchCompleted
@@ -3560,10 +3624,9 @@ pub struct ImportBatch {
     /// Type of items in batch ("content", "paths", "steps", "full")
     pub batch_type: String,
 
-    /// Hash of the blob in elohim-store containing the items JSON
+    /// Byte CID of the blob in elohim-store containing the items JSON.
     /// The actual payload lives in the store, not in this entry.
-    /// Format: "sha256-xxxx" or store-specific hash
-    pub blob_hash: String,
+    pub blob_cid: String,
 
     /// Total number of items in the blob (from manifest)
     pub total_items: u32,
@@ -3639,7 +3702,7 @@ pub struct ContentSuccession {
     pub successor_author_key: String,   // New agent key (base64)
     pub human_id: String,               // Stable identity
     pub renewal_attestation_id: String, // Proof of social witness
-    pub content_hash: Option<String>,   // SHA256 of content body (verify unchanged)
+    pub content_cid: Option<String>,    // Byte CID of content body (verify unchanged)
     pub succession_type: String,        // See SUCCESSION_TYPES
     pub created_at: String,
 }
@@ -3821,18 +3884,17 @@ pub enum LinkTypes {
     // Lamad: Blob (Media) links - Phase 1
     // =========================================================================
     ContentToBlobs, // Content -> BlobEntry (one-to-many)
-    IdToBlob,       // Anchor(blob_hash) -> BlobEntry (for lookup)
+    IdToBlob,       // Anchor(blob_cid) -> BlobEntry (for lookup)
     BlobToVariants, // BlobEntry -> BlobVariant entries (quality options)
     BlobToCaptions, // BlobEntry -> BlobCaption entries (subtitles)
-    BlobToReplicas, // BlobEntry -> CustodianCommitment (replication)
     AuthorToBlobs,  // Anchor(author_id) -> BlobEntry (author's blobs)
 
     // =========================================================================
     // Lamad: Shard Management links - Unified Storage Model
     // =========================================================================
-    BlobToManifest,           // Anchor(blob_hash) -> ShardManifest (lookup manifest)
+    BlobToManifest,           // Anchor(blob_cid) -> ShardManifest (lookup manifest)
     ManifestToShardLocations, // ShardManifest -> ShardLocation (all shard locations)
-    ShardToLocations,         // Anchor(shard_hash) -> ShardLocation (find holders)
+    ShardToLocations,         // Anchor(shard_cid) -> ShardLocation (find holders)
     HolderToShards,           // Anchor(holder_agent) -> ShardLocation (agent's shards)
     AuthorToManifests,        // Anchor(author_id) -> ShardManifest (author's manifests)
 
@@ -4281,6 +4343,12 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
             if let ValidateCallbackResult::Invalid(_) = &basic {
                 return Ok(basic);
             }
+            // Step 1b: a body address, when present, is a byte CID (full decode).
+            if let Some(blob_cid) = content.blob_cid.as_deref() {
+                if let Err(reason) = check_byte_cid("Content.blob_cid", blob_cid) {
+                    return Ok(ValidateCallbackResult::Invalid(reason));
+                }
+            }
             // Step 2: if this is an attestation or governance-action entry, run
             // the discriminator-chain validator (spec §9 floors).
             if content.content_type.starts_with("attestation:")
@@ -4297,6 +4365,11 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
 
         // Renewal protocol: Content succession
         EntryTypes::ContentSuccession(succession) => validate_content_succession(succession),
+
+        // Re-genesis 1 address crossing: every byte address is admitted by full decode.
+        EntryTypes::BlobEntry(blob) => adapt_validation(validate_blob_entry(blob)),
+        EntryTypes::ShardManifest(manifest) => adapt_validation(validate_shard_manifest(manifest)),
+        EntryTypes::ShardLocation(location) => adapt_validation(validate_shard_location(location)),
 
         // EPR Phase 3 P3.2: Manifest constitutional entry — full per-message validation.
         EntryTypes::Manifest(manifest) => adapt_validation(manifest.validate()),
@@ -4378,7 +4451,104 @@ fn validate_content_succession(
         )));
     }
 
+    if let Some(content_cid) = succession.content_cid.as_deref() {
+        if let Err(reason) = check_byte_cid("ContentSuccession.content_cid", content_cid) {
+            return Ok(ValidateCallbackResult::Invalid(reason));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// Byte-address validation (re-genesis 1 address crossing)
+// =============================================================================
+
+/// Admit `value` as a byte CID by full decode (`elohim_address::ByteCid::parse`),
+/// naming the field and the check that failed. There is deliberately no prefix or
+/// length predicate here: the kernel is the only judge of a byte address.
+fn check_byte_cid(field: &str, value: &str) -> Result<(), String> {
+    elohim_address::ByteCid::parse(value)
+        .map(|_| ())
+        .map_err(|e| format!("{field} is not a byte CID ({}): {e}", e.check()))
+}
+
+/// `BlobEntry.cid` is a byte CID.
+fn validate_blob_entry(blob: &BlobEntry) -> Result<(), String> {
+    check_byte_cid("BlobEntry.cid", &blob.cid)
+}
+
+/// `ShardLocation.shard_cid` is a byte CID.
+fn validate_shard_location(location: &ShardLocation) -> Result<(), String> {
+    check_byte_cid("ShardLocation.shard_cid", &location.shard_cid)
+}
+
+/// The ShardManifest floor (plan §2.5.6–7):
+/// - `blob_cid`, every chunk `cid` and every shard `cid` are byte CIDs;
+/// - `chunker.id` is one of [`CHUNKER_IDS`];
+/// - `erasure.id` is one of [`ERASURE_IDS`];
+/// - `stripes` is empty iff `erasure.id == "none"`;
+/// - every stripe covers at most [`MAX_STRIPE_BYTE_LEN`] original bytes;
+/// - every stripe carries exactly `erasure.data + erasure.parity` shards.
+fn validate_shard_manifest(manifest: &ShardManifest) -> Result<(), String> {
+    check_byte_cid("ShardManifest.blob_cid", &manifest.blob_cid)?;
+
+    if !CHUNKER_IDS.contains(&manifest.chunker.id.as_str()) {
+        return Err(format!(
+            "ShardManifest.chunker.id '{}' is not one of {:?}",
+            manifest.chunker.id, CHUNKER_IDS
+        ));
+    }
+    for (i, chunk) in manifest.chunks.iter().enumerate() {
+        check_byte_cid(&format!("ShardManifest.chunks[{i}].cid"), &chunk.cid)?;
+    }
+
+    if !ERASURE_IDS.contains(&manifest.erasure.id.as_str()) {
+        return Err(format!(
+            "ShardManifest.erasure.id '{}' is not one of {:?}",
+            manifest.erasure.id, ERASURE_IDS
+        ));
+    }
+    let unstriped = manifest.erasure.id == ERASURE_NONE;
+    if unstriped != manifest.stripes.is_empty() {
+        return Err(format!(
+            "ShardManifest.stripes must be empty iff erasure.id is '{ERASURE_NONE}' \
+             (erasure.id '{}', {} stripes)",
+            manifest.erasure.id,
+            manifest.stripes.len()
+        ));
+    }
+
+    let shards_per_stripe =
+        usize::from(manifest.erasure.data) + usize::from(manifest.erasure.parity);
+    for stripe in &manifest.stripes {
+        if stripe.byte_len > MAX_STRIPE_BYTE_LEN {
+            return Err(format!(
+                "ShardManifest.stripes[{}].byte_len {} exceeds {MAX_STRIPE_BYTE_LEN} (16 MiB)",
+                stripe.index, stripe.byte_len
+            ));
+        }
+        if stripe.shards.len() != shards_per_stripe {
+            return Err(format!(
+                "ShardManifest.stripes[{}] carries {} shards; erasure declares data {} + parity {}",
+                stripe.index,
+                stripe.shards.len(),
+                manifest.erasure.data,
+                manifest.erasure.parity
+            ));
+        }
+        for shard in &stripe.shards {
+            check_byte_cid(
+                &format!(
+                    "ShardManifest.stripes[{}].shards[{}].cid",
+                    stripe.index, shard.index
+                ),
+                &shard.cid,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Validate EconomicEvent — defense-in-depth integrity check.
@@ -4812,5 +4982,242 @@ mod post_commit_signal_dispatch_tests {
             Agreement::try_from(sb).is_ok(),
             "a real Agreement must still decode after deny_unknown_fields"
         );
+    }
+}
+
+#[cfg(test)]
+mod address_crossing_tests {
+    //! Re-genesis 1 address crossing: the byte-address validator arms.
+    //! Vectors are from `crates/elohim-address/vectors/address-vectors.json`.
+    use super::*;
+
+    /// BLAKE3 byte CID of "hello world" (positive vector).
+    const CID_A: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+    /// BLAKE3 byte CID of "abc" (positive vector).
+    const CID_B: &str = "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu";
+    /// Citation profile (raw + sha2-256) on the byte surface (negative vector).
+    const CITE_CID: &str = "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e";
+    /// Header declares a 33-byte digest while carrying 32 (negative vector).
+    const DECLARED_33: &str = "bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+    /// The retired sha256 spelling.
+    const SHA256_SPELLING: &str =
+        "sha256-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
+
+    fn shard(cid: &str, index: u8) -> ShardRef {
+        ShardRef {
+            cid: cid.into(),
+            len: 1024,
+            index,
+        }
+    }
+
+    fn rs_manifest() -> ShardManifest {
+        ShardManifest {
+            blob_cid: CID_A.into(),
+            byte_len: 4096,
+            mime_type: "application/octet-stream".into(),
+            chunker: ChunkerDecl {
+                id: CHUNKER_FASTCDC_2020.into(),
+                min: 16 * 1024,
+                avg: 64 * 1024,
+                max: 256 * 1024,
+                level: 1,
+            },
+            chunks: vec![ChunkRef {
+                cid: CID_A.into(),
+                len: 4096,
+            }],
+            erasure: ErasureDecl {
+                id: ERASURE_RS_GF8_0X11D_V1.into(),
+                data: 4,
+                parity: 3,
+            },
+            stripes: vec![Stripe {
+                index: 0,
+                byte_len: 4096,
+                shards: (0..7).map(|i| shard(CID_B, i)).collect(),
+            }],
+            reach: "commons".into(),
+            author_id: None,
+            created_at: "2026-11-05T00:00:00Z".into(),
+            verified_at: None,
+        }
+    }
+
+    fn none_manifest() -> ShardManifest {
+        ShardManifest {
+            erasure: ErasureDecl {
+                id: ERASURE_NONE.into(),
+                data: 0,
+                parity: 0,
+            },
+            stripes: vec![],
+            ..rs_manifest()
+        }
+    }
+
+    fn invalid(entry: EntryTypes) -> bool {
+        matches!(
+            validate_create_entry(&entry),
+            Ok(ValidateCallbackResult::Invalid(_))
+        )
+    }
+
+    #[test]
+    fn well_formed_manifests_are_valid() {
+        assert_eq!(validate_shard_manifest(&rs_manifest()), Ok(()));
+        assert_eq!(validate_shard_manifest(&none_manifest()), Ok(()));
+        assert!(matches!(
+            validate_create_entry(&EntryTypes::ShardManifest(rs_manifest())),
+            Ok(ValidateCallbackResult::Valid)
+        ));
+    }
+
+    #[test]
+    fn shard_manifest_rejects_unknown_chunker_id() {
+        for id in ["fastcdc-2016", "fixed-1mib", "", "FASTCDC-2020"] {
+            let mut m = rs_manifest();
+            m.chunker.id = id.into();
+            let err = validate_shard_manifest(&m).expect_err(id);
+            assert!(err.contains("chunker.id"), "{err}");
+            assert!(invalid(EntryTypes::ShardManifest(m)));
+        }
+    }
+
+    #[test]
+    fn shard_manifest_rejects_unknown_erasure_id() {
+        for id in ["rs-4-7", "chunked", "rs-8-12", ""] {
+            let mut m = rs_manifest();
+            m.erasure.id = id.into();
+            assert!(validate_shard_manifest(&m).is_err(), "{id}");
+        }
+    }
+
+    #[test]
+    fn shard_manifest_chunks_must_be_byte_cids() {
+        for bad in [CITE_CID, DECLARED_33, SHA256_SPELLING, ""] {
+            let mut m = rs_manifest();
+            m.chunks.push(ChunkRef {
+                cid: bad.into(),
+                len: 1,
+            });
+            let err = validate_shard_manifest(&m).expect_err(bad);
+            assert!(err.contains("chunks[1].cid"), "{err}");
+            assert!(invalid(EntryTypes::ShardManifest(m)));
+        }
+        // The blob address and every shard address are held to the same floor.
+        let mut m = rs_manifest();
+        m.blob_cid = SHA256_SPELLING.into();
+        assert!(validate_shard_manifest(&m).is_err());
+        let mut m = rs_manifest();
+        m.stripes[0].shards[6].cid = CITE_CID.into();
+        assert!(validate_shard_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn shard_manifest_stripe_shard_count_equals_data_plus_parity() {
+        let mut short = rs_manifest();
+        short.stripes[0].shards.pop();
+        assert!(validate_shard_manifest(&short)
+            .expect_err("6 of 7")
+            .contains("6 shards"));
+
+        let mut long = rs_manifest();
+        long.stripes[0].shards.push(shard(CID_B, 7));
+        assert!(validate_shard_manifest(&long).is_err());
+
+        // `stripes` empty iff erasure "none", both directions.
+        let mut rs_without_stripes = rs_manifest();
+        rs_without_stripes.stripes.clear();
+        assert!(validate_shard_manifest(&rs_without_stripes).is_err());
+        let mut none_with_stripes = none_manifest();
+        none_with_stripes.stripes = rs_manifest().stripes;
+        assert!(validate_shard_manifest(&none_with_stripes).is_err());
+    }
+
+    #[test]
+    fn shard_manifest_stripe_byte_len_at_most_16mib() {
+        let mut at_limit = rs_manifest();
+        at_limit.stripes[0].byte_len = 16 * 1024 * 1024;
+        assert_eq!(validate_shard_manifest(&at_limit), Ok(()));
+
+        let mut over = rs_manifest();
+        over.stripes[0].byte_len = 16 * 1024 * 1024 + 1;
+        assert!(validate_shard_manifest(&over)
+            .expect_err("over")
+            .contains("16 MiB"));
+    }
+
+    #[test]
+    fn blob_entry_and_shard_location_require_byte_cids() {
+        let blob = |cid: &str| BlobEntry {
+            cid: cid.into(),
+            size_bytes: 1,
+            mime_type: "video/mp4".into(),
+            fallback_urls: vec![],
+            bitrate_mbps: None,
+            duration_seconds: None,
+            codec: None,
+            reach: "commons".into(),
+            author_id: None,
+            created_at: "2026-11-05T00:00:00Z".into(),
+            verified_at: None,
+        };
+        assert_eq!(validate_blob_entry(&blob(CID_A)), Ok(()));
+        for bad in [CITE_CID, DECLARED_33, SHA256_SPELLING] {
+            assert!(invalid(EntryTypes::BlobEntry(blob(bad))), "{bad}");
+        }
+
+        let location = |cid: &str| ShardLocation {
+            shard_cid: cid.into(),
+            shard_index: 0,
+            holder: "agent".into(),
+            holder_did: None,
+            storage_dids: vec![],
+            endpoint: None,
+            storage_tier: None,
+            verified_at: "2026-11-05T00:00:00Z".into(),
+            is_active: true,
+        };
+        assert_eq!(validate_shard_location(&location(CID_B)), Ok(()));
+        for bad in [CITE_CID, DECLARED_33, SHA256_SPELLING] {
+            assert!(invalid(EntryTypes::ShardLocation(location(bad))), "{bad}");
+        }
+    }
+
+    /// Compile-time guard: this exhaustive literal names every `Content` field, so
+    /// re-adding `content_hash` (or any field) fails to compile here. It also proves
+    /// `blob_cid` is checked by full decode when present.
+    #[test]
+    fn content_hash_field_is_gone() {
+        let content = |blob_cid: Option<&str>| Content {
+            id: "c-1".into(),
+            content_type: "concept".into(),
+            title: "t".into(),
+            description: "d".into(),
+            summary: None,
+            content: String::new(),
+            content_format: "markdown".into(),
+            tags: vec![],
+            source_path: None,
+            related_node_ids: vec![],
+            author_id: None,
+            reach: "commons".into(),
+            trust_score: 0.0,
+            estimated_minutes: None,
+            thumbnail_url: None,
+            metadata_json: "{}".into(),
+            created_at: "2026-11-05T00:00:00Z".into(),
+            updated_at: "2026-11-05T00:00:00Z".into(),
+            schema_version: 0,
+            validation_status: "Valid".into(),
+            blob_cid: blob_cid.map(str::to_string),
+            content_size_bytes: None,
+        };
+        assert!(!invalid(EntryTypes::Content(content(None))));
+        assert!(!invalid(EntryTypes::Content(content(Some(CID_A)))));
+        for bad in [CITE_CID, DECLARED_33, SHA256_SPELLING] {
+            assert!(invalid(EntryTypes::Content(content(Some(bad)))), "{bad}");
+        }
     }
 }

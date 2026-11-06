@@ -14,3 +14,4 @@ serde.workspace = true
 serde_json.workspace = true
 hc-rna.workspace = true
 doorway-client.workspace = true
+elohim-address.workspace = true

@@ -236,7 +236,6 @@ pub fn propose_recovery_governance_action(
         validation_status: "valid".to_string(),
         blob_cid: None,
         content_size_bytes: None,
-        content_hash: None,
     };
 
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
@@ -321,7 +320,6 @@ pub fn propose_governance_action(
         validation_status: "valid".to_string(),
         blob_cid: None,
         content_size_bytes: None,
-        content_hash: None,
     };
 
     let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;

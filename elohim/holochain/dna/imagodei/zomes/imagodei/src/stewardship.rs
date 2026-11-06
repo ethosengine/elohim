@@ -174,7 +174,8 @@ pub enum PolicyDecision {
 /// Content check input
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentCheckInput {
-    pub content_hash: String,
+    /// Byte CID of the content being checked (re-genesis 1 address crossing).
+    pub content_cid: String,
     pub categories: Vec<String>,
     pub age_rating: Option<String>,
     pub reach_level: Option<u8>,
@@ -1112,7 +1113,7 @@ pub fn check_content_access(input: ContentCheckInput) -> ExternResult<PolicyDeci
     let policy = compute_policy_for_subject(my_human.human.id)?;
 
     // Check blocked hashes
-    if policy.blocked_hashes.contains(&input.content_hash) {
+    if policy.blocked_hashes.contains(&input.content_cid) {
         return Ok(PolicyDecision::Block {
             reason: "Content is blocked".to_string(),
         });
