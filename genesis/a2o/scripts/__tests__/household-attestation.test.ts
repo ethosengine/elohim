@@ -2,7 +2,7 @@
 /* eslint-disable sonarjs/no-duplicate-string -- fixture paths are intentionally repeated. */
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
-import { createPrivateKey, sign } from 'node:crypto';
+import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,11 +12,13 @@ import { fileURLToPath } from 'node:url';
 import {
   ATTESTATION_REF_PREFIX,
   admitAttestation,
+  attestationRef,
   attestationsFromReport,
   canonicalSutParts,
   checkNameFor,
   cidShortFingerprint,
   cidToString,
+  encodeValidationBody,
   encodeValidationNode,
   peerChainVerdict,
   publishHouseholdEvidence,
@@ -877,6 +879,34 @@ describe('a record brit reports `unverifiable:` for is absent to the reader, and
     }
   });
 
+  it('new brit (0.1.13+): an epoch-2 view is read as is; an epoch it does not know is held, never a row', () => {
+    const repo = refsRepo();
+    const brit = stubBrit('new', VECTOR.node.validatorId);
+    const v2 = envelopeNode(VECTOR.seedHex, { checkName: VECTOR_CHECK });
+    stubGet(brit.dir, VECTOR_CHECK, { out: JSON.stringify(v2, null, 2) + '\n' });
+    stubGet(brit.dir, TAMPERED_CHECK, {
+      err: `no validate ref found for step=a2o-household check=${TAMPERED_CHECK}\nheld: ${TAMPERED_REF} note epoch 9 is not implemented by this reader\n`,
+    });
+    try {
+      const warned: string[] = [];
+      const found = readHouseholdAttestations(repo, CONCERN, {
+        brit: { kind: 'verified-reads', bin: brit.bin },
+        warn: l => warned.push(l),
+      });
+      assert.deepEqual(
+        found.map(f => [f.ref, f.verifiedBy]),
+        [[VECTOR.ref, 'brit']]
+      );
+      assert.deepEqual(found[0].node, v2, 'sig/key/scheme/epoch ride on the node');
+      assert.deepEqual(warned, [
+        `household attestation held: ${TAMPERED_REF} note epoch 9 is not implemented by this reader`,
+      ]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(brit.dir, { recursive: true, force: true });
+    }
+  });
+
   it('new brit: a git failure (exit 1) or non-JSON stdout is an absence with a warning, never a hit', () => {
     const repo = refsRepo();
     const brit = stubBrit('new', VECTOR.node.validatorId);
@@ -1077,5 +1107,97 @@ describe('the writer gets before it puts, and a brit refusal is an expected, war
       rmSync(repo, { recursive: true, force: true });
       rmSync(brit.dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ── Epoch-2 envelope notes (brit.validate@2) ────────────────────────────────────────────────
+function envelopeNode(seedHex = VECTOR.seedHex, overrides: Partial<ValidationNodeJson> = {}) {
+  const priv = createPrivateKey({
+    key: Buffer.concat([PKCS8_ED25519, Buffer.from(seedHex, 'hex')]),
+    format: 'der',
+    type: 'pkcs8',
+  });
+  const pub = createPublicKey(priv).export({ format: 'der', type: 'spki' }).subarray(-32);
+  const { signature: _drop, ...fields } = VECTOR.node;
+  const base = { ...fields, validatorId: pub.toString('hex'), ...overrides } as ValidationNodeJson;
+  const key = Buffer.concat([Buffer.from([0xed, 0x01]), pub]);
+  const domain = Buffer.from('brit:validate@2:');
+  const u16 = (n: number) => Buffer.from([n >> 8, n & 0xff]);
+  const transcript = Buffer.concat([
+    u16(domain.length),
+    domain,
+    u16(2),
+    u16(0),
+    u16(key.length),
+    key,
+    encodeValidationBody(base),
+  ]);
+  const sig = sign(null, transcript, priv);
+  return { ...base, epoch: 2, scheme: 0, key: [...key], sig: [...sig] } as ValidationNodeJson;
+}
+
+function readOne(stored: unknown, check = VECTOR.node.checkName) {
+  const repo = scratchRepo('h-epoch-');
+  try {
+    const oid = git(repo, ['hash-object', '-w', '--stdin'], JSON.stringify(stored)).trim();
+    git(repo, ['update-ref', attestationRef(check), oid]);
+    const lines: string[] = [];
+    const found = readHouseholdAttestations(repo, CONCERN, { warn: l => lines.push(l) });
+    return { found, lines };
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+}
+
+describe('readers decide on the epoch key (epoch 1 unchanged, 2 admitted, other held)', () => {
+  it('epoch 1: the frozen vector reads exactly as before', () => {
+    const { found, lines } = readOne(VECTOR.node);
+    assert.deepEqual(lines, []);
+    assert.deepEqual(
+      found.map(f => f.node),
+      [VECTOR.node]
+    );
+    assert.equal(found[0].verifiedBy, 'local');
+  });
+
+  it('epoch 2: the stored envelope is flattened, verified over the brit:validate@2: transcript, and read', () => {
+    const node = envelopeNode(VECTOR.seedHex, { checkName: VECTOR.node.checkName });
+    assert.equal(node.signature, undefined, 'no signature on an envelope node');
+    assert.ok(verifyValidationNode(node));
+    assert.ok(
+      !verifyValidationNode({ ...node, validatedAt: '2030-01-01T00:00:00Z' }),
+      'tamper refuses'
+    );
+    assert.ok(!verifyValidationNode({ ...node, scheme: 5 }), 'unknown scheme is not verified');
+    const { epoch, scheme, key, sig, ...body } = node;
+    const { found, lines } = readOne({ body, epoch, key, scheme, sig });
+    assert.deepEqual(lines, []);
+    assert.deepEqual(
+      found.map(f => f.node),
+      [node],
+      'sig/key/scheme/epoch are carried through'
+    );
+    const verdict = admitAttestation(node, CONCERN, node.validatorId);
+    assert.ok(
+      verdict.ok || !/held|signature/.test(verdict.reason),
+      'not refused for epoch or signature'
+    );
+  });
+
+  it('an unknown epoch is held: warned, never a row, never admitted', () => {
+    const node = envelopeNode(VECTOR.seedHex, { checkName: VECTOR.node.checkName });
+    const { epoch: _e, scheme, key, sig, ...body } = node;
+    const { found, lines } = readOne({ body, epoch: 3, key, scheme, sig });
+    assert.deepEqual(found, []);
+    assert.equal(lines.length, 1);
+    assert.match(
+      lines[0],
+      /^household attestation held: .* note epoch 3 is not implemented by this reader$/
+    );
+    const future = { ...node, epoch: 3 } as ValidationNodeJson;
+    assert.ok(!verifyValidationNode(future));
+    const verdict = admitAttestation(future, CONCERN, future.validatorId);
+    assert.equal(verdict.ok, false);
+    assert.match((verdict as { reason: string }).reason, /^held: note epoch 3 is not implemented/);
   });
 });

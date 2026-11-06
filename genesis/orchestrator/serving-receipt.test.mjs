@@ -21,6 +21,7 @@ import {
   DEFAULT_SUT_COMPONENTS,
 } from "../a2o/scripts/lib/sut.ts";
 import {
+  encodeValidationBody,
   encodeValidationNode,
   sutArtifactCidBytes,
   sutOf,
@@ -719,6 +720,68 @@ test("a signed current-source attestation is admitted as the receipt, and prefer
       /T2 serving receipt: brit validation attestation push-delivers-within-budget\/sha256:[0-9a-f]{16} \(reach trusted; signed by workspace [0-9a-f]{12}…\)/,
     );
     assert.doesNotMatch(out, /sprint-report-household-z/);
+  });
+});
+
+// ── Epoch decides the note shape: 1 frozen, 2 envelope (brit.validate@2), other held ─────────────
+/** The stored epoch-2 form of `v1` signed by `seedHex`: {body, epoch, key, scheme, sig}. */
+function envelopeStored(v1, seedHex, epoch = 2) {
+  const key = createPrivateKey({
+    key: Buffer.concat([PKCS8, Buffer.from(seedHex, "hex")]),
+    format: "der",
+    type: "pkcs8",
+  });
+  const { signature: _drop, ...body } = v1;
+  const pub = Buffer.from(body.validatorId, "hex");
+  const envKey = Buffer.concat([Buffer.from([0xed, 0x01]), pub]);
+  const domain = Buffer.from("brit:validate@2:");
+  const u16 = (n) => Buffer.from([n >> 8, n & 0xff]);
+  const transcript = Buffer.concat([
+    u16(domain.length), domain, u16(2), u16(0), u16(envKey.length), envKey,
+    encodeValidationBody(body),
+  ]);
+  return {
+    body,
+    epoch,
+    key: [...envKey],
+    scheme: 0,
+    sig: [...edSign(null, transcript, key)],
+  };
+}
+
+test("epoch 1: a frozen-shape attestation is admitted exactly as before", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const node = householdNode(root, story);
+    assert.equal(node.epoch, undefined);
+    putRef(root, story.concern, JSON.parse(node.resultSummary).sut, node);
+    const { ok, out } = check(root, reports, ["scripts/ci/fleet-write-readiness.sh"]);
+    assert.equal(ok, true, out);
+  });
+});
+
+test("epoch 2: an envelope attestation (sig/key/scheme/epoch, no signature) is admitted as the receipt", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const v1 = householdNode(root, story);
+    putRef(root, story.concern, JSON.parse(v1.resultSummary).sut, envelopeStored(v1, VECTOR.seedHex));
+    // No brit on PATH: the reader verifies the stored envelope itself (the brit at hand predates @2).
+    const { ok, out } = check(root, reports, ["scripts/ci/fleet-write-readiness.sh"], undefined, { PATH: "/nonexistent" });
+    assert.equal(ok, true, out);
+    assert.match(out, /T2 serving receipt: brit validation attestation/);
+    assert.match(out, /read verified locally/);
+  });
+});
+
+test("an unknown epoch is held: warned, never admitted, never a receipt", () => {
+  withFixture((root, reports) => {
+    const story = RECEIPT_STORIES.refusesFast;
+    const v1 = householdNode(root, story);
+    putRef(root, story.concern, JSON.parse(v1.resultSummary).sut, envelopeStored(v1, VECTOR.seedHex, 3));
+    const { ok, out } = check(root, reports, ["scripts/ci/fleet-write-readiness.sh"], undefined, { PATH: "/nonexistent" });
+    assert.equal(ok, false, out);
+    assert.match(out, /household attestation held: .*note epoch 3 is not implemented by this reader/);
+    assert.match(out, /missing household receipt/);
   });
 });
 

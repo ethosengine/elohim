@@ -609,6 +609,10 @@ export function publishHouseholdEvidence(opts: {
         );
         continue;
       }
+    } else if (prior.held) {
+      // A note in an epoch this reader does not implement is not ours to overwrite blind.
+      log(`validation attestation deferred for ${a.check}: ${prior.reason} (held, not replaced)`);
+      continue;
     } else if (prior.reason !== null) {
       log(`household attestation unverifiable: ${prior.reason}; replacing it`);
     }
@@ -648,11 +652,52 @@ export interface ValidationNodeJson {
   findingsCid: number[] | null;
   result: string;
   resultSummary: string;
-  signature: string;
+  /** Epoch 1 only: the hex signature. An epoch-2 node has none (it carries `sig`). */
+  signature?: string;
   ttlSec: number | null;
   validatedAt: string;
   validatorId: string;
   validatorVersion: string;
+  /** Epoch-2 envelope fields (`brit.validate@2`); absent on an epoch-1 node. */
+  epoch?: number;
+  scheme?: number;
+  key?: number[];
+  sig?: number[];
+}
+
+/** How a note's `epoch` key reads. Readers decide on that key alone. */
+export type NoteEpoch = { epoch: 1 } | { epoch: 2 } | { held: string };
+
+const isBytes = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.length > 0 && v.every(b => Number.isInteger(b) && b >= 0 && b < 256);
+
+/** Absent or 1: the frozen shape; 2: the envelope shape; anything else (or a broken envelope) is held. */
+export function noteEpochOf(note: unknown): NoteEpoch {
+  if (!note || typeof note !== 'object' || !('epoch' in note)) return { epoch: 1 };
+  const n = note as Record<string, unknown>;
+  if (n.epoch === 1) return { epoch: 1 };
+  if (n.epoch === 2) {
+    return Number.isInteger(n.scheme) && isBytes(n.key) && isBytes(n.sig)
+      ? { epoch: 2 }
+      : { held: 'epoch 2 note lacks scheme, key or sig' };
+  }
+  return { held: `note epoch ${JSON.stringify(n.epoch)} is not implemented by this reader` };
+}
+
+/**
+ * A stored note or a brit-printed view as one flat node. An epoch-2 stored note is
+ * `{body, epoch, key, scheme, sig}` and is flattened to the view brit prints (body fields plus
+ * `epoch`/`scheme`/`key`/`sig`); an epoch-1 note is returned as is; a held epoch is `{held}`.
+ */
+export function flattenNote(raw: unknown): { node: ValidationNodeJson } | { held: string } {
+  const read = noteEpochOf(raw);
+  if ('held' in read) return read;
+  const note = raw as Record<string, unknown>;
+  if (read.epoch === 2 && note.body && typeof note.body === 'object') {
+    const { epoch, scheme, key, sig } = note;
+    return { node: { ...(note.body as object), epoch, scheme, key, sig } as ValidationNodeJson };
+  }
+  return { node: raw as ValidationNodeJson };
 }
 
 const NODE_KEYS = [
@@ -667,6 +712,9 @@ const NODE_KEYS = [
   'validatorId',
   'validatorVersion',
 ];
+
+/** The epoch-2 body: the same fields without `signature`. */
+const BODY_KEYS = NODE_KEYS.filter(k => k !== 'signature');
 
 function cborHead(major: number, n: number): Buffer {
   if (n < 24) return Buffer.from([(major << 5) | n]);
@@ -705,10 +753,21 @@ export function encodeValidationNode(node: ValidationNodeJson): Buffer {
   if (keys.length !== NODE_KEYS.length || !NODE_KEYS.every(k => keys.includes(k))) {
     throw new Error('validation node has an unexpected field set');
   }
+  return encodeFields(node, NODE_KEYS);
+}
+
+/** Canonical DAG-CBOR of an epoch-2 body (the node's fields without `signature`). */
+export function encodeValidationBody(node: ValidationNodeJson): Buffer {
   const record = node as unknown as Record<string, unknown>;
-  const ordered = [...NODE_KEYS].sort(
-    (a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0)
-  );
+  const body = Object.fromEntries(BODY_KEYS.map(k => [k, record[k]]));
+  if (BODY_KEYS.some(k => !(k in record)))
+    throw new Error('validation body has an unexpected field set');
+  return encodeFields(body as unknown as ValidationNodeJson, BODY_KEYS);
+}
+
+function encodeFields(node: ValidationNodeJson, fields: string[]): Buffer {
+  const record = node as unknown as Record<string, unknown>;
+  const ordered = [...fields].sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));
   const parts: Buffer[] = [cborHead(5, ordered.length)];
   for (const key of ordered) {
     parts.push(cborText(key));
@@ -734,8 +793,11 @@ const PKCS8_ED25519 = Buffer.from('302e020100300506032b657004220420', 'hex');
 /** ed25519 over the unsigned node's canonical bytes, against the node's own validatorId. */
 export function verifyValidationNode(node: ValidationNodeJson): boolean {
   try {
+    const read = noteEpochOf(node);
+    if ('held' in read) return false;
+    if (read.epoch === 2) return verifyEnvelopeNode(node);
     const pub = Buffer.from(node.validatorId, 'hex');
-    const sig = Buffer.from(node.signature, 'hex');
+    const sig = Buffer.from(node.signature ?? '', 'hex');
     if (pub.length !== 32 || sig.length !== 64) return false;
     const key = createPublicKey({
       key: Buffer.concat([SPKI_ED25519, pub]),
@@ -746,6 +808,37 @@ export function verifyValidationNode(node: ValidationNodeJson): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Epoch 2: ed25519 over elohim-epr's `signing_transcript` (v1) with domain `brit:validate@2:`:
+ * `u16be(len d) ‖ d ‖ u16be(2) ‖ u16be(scheme) ‖ u16be(len key) ‖ key ‖ dag-cbor(body)`. Scheme 0
+ * only, and the envelope key must be `ed 01 ‖` the node's own `validatorId`.
+ */
+function verifyEnvelopeNode(node: ValidationNodeJson): boolean {
+  if (node.scheme !== 0) return false;
+  const pub = Buffer.from(node.validatorId, 'hex');
+  const key = Buffer.from(node.key ?? []);
+  const sig = Buffer.from(node.sig ?? []);
+  if (pub.length !== 32 || sig.length !== 64) return false;
+  if (!key.equals(Buffer.concat([Buffer.from([0xed, 0x01]), pub]))) return false;
+  const domain = Buffer.from('brit:validate@2:');
+  const u16 = (n: number) => Buffer.from([n >> 8, n & 0xff]);
+  const transcript = Buffer.concat([
+    u16(domain.length),
+    domain,
+    u16(2),
+    u16(0),
+    u16(key.length),
+    key,
+    encodeValidationBody(node),
+  ]);
+  const pk = createPublicKey({
+    key: Buffer.concat([SPKI_ED25519, pub]),
+    format: 'der',
+    type: 'spki',
+  });
+  return cryptoVerify(null, transcript, pk, sig);
 }
 
 /** Hex public key of the workspace key brit signs with (`<common-dir>/brit/agent-key`), or null. */
@@ -770,7 +863,7 @@ export function workspaceAgentId(commonDir: string): string | null {
 /** One verified read of a validate ref: the node, or why it is absent to this reader. */
 type AttestationRead =
   | { ok: true; node: ValidationNodeJson; verifiedBy: 'brit' | 'local' }
-  | { ok: false; reason: string | null };
+  | { ok: false; reason: string | null; held?: true };
 
 /**
  * `brit-build-ref validate get` for `check`: stdout is the verified record; otherwise the
@@ -799,10 +892,17 @@ function britValidateGet(
   }
   if (r.stdout.trim()) {
     try {
-      return { ok: true, node: JSON.parse(r.stdout), verifiedBy: 'brit' };
+      const flat = flattenNote(JSON.parse(r.stdout));
+      if ('held' in flat) return { ok: false, reason: `${ref} ${flat.held}`, held: true };
+      return { ok: true, node: flat.node, verifiedBy: 'brit' };
     } catch {
       return { ok: false, reason: `${ref} brit-build-ref validate get printed no JSON` };
     }
+  }
+  const held = r.stderr.split('\n').find(l => l.startsWith('held: '));
+  if (held) {
+    const rest = held.slice('held: '.length);
+    return { ok: false, reason: rest.startsWith(`${ref} `) ? rest : `${ref} ${rest}`, held: true };
   }
   const unverifiable = r.stderr.split('\n').find(l => l.startsWith('unverifiable: '));
   if (unverifiable) {
@@ -829,12 +929,16 @@ function localVerifiedRead(
   });
   if (bytes === null) return { ok: false, reason: null };
   let node: ValidationNodeJson;
+  let raw: unknown;
   try {
-    node = JSON.parse(bytes);
+    raw = JSON.parse(bytes);
   } catch (error) {
     return refuse(`does not decode: ${(error as Error).message}`);
   }
-  if (!node || typeof node !== 'object') return refuse('does not decode: not an object');
+  if (!raw || typeof raw !== 'object') return refuse('does not decode: not an object');
+  const flat = flattenNote(raw);
+  if ('held' in flat) return { ok: false, reason: `${ref} ${flat.held}`, held: true };
+  node = flat.node;
   if (!verifyValidationNode(node)) {
     const id = JSON.stringify(String(node.validatorId));
     return refuse(`signature does not verify against agentId ${id}`);
@@ -930,6 +1034,7 @@ export function readHouseholdAttestations(
         ? britValidateGet(brit.bin, repoRoot, check, run, repoRoot)
         : localVerifiedRead(storedBytes(repoRoot, oid), ref, check, brit.kind);
     if (read.ok) out.push({ ref, node: read.node, verifiedBy: read.verifiedBy });
+    else if (read.held) warn(`household attestation held: ${read.reason}`);
     else if (read.reason === null) {
       warn(`household attestation unverifiable: ${ref} listed but nothing is stored there`);
     } else warn(`household attestation unverifiable: ${read.reason}`);
@@ -1043,6 +1148,8 @@ export function admitAttestation(
 ): Admission {
   if (!workspaceId) return { ok: false, reason: 'no workspace key' };
   if (node.validatorId !== workspaceId) return { ok: false, reason: 'not the workspace key' };
+  const epoch = noteEpochOf(node);
+  if ('held' in epoch) return { ok: false, reason: `held: ${epoch.held}` };
   if (!verifyValidationNode(node)) return { ok: false, reason: 'signature does not verify' };
   if (node.result !== 'pass') return { ok: false, reason: `result ${node.result}` };
   let summary: ReceiptSummary;
