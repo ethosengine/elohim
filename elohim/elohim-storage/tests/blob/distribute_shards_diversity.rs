@@ -255,14 +255,24 @@ async fn self_selection_records_self_held_location_and_never_pushes() {
     );
 
     // The self-held write now ANNOUNCES custody on the gossip plane (the
-    // convergence hot path) — exactly one GossipPublish on the custody topic,
+    // convergence hot path) — exactly one custody announcement, handed to the
+    // swarm task to sign and fan out on `CUSTODY_ANNOUNCE_TOPIC` over every
+    // transport (R1: the producer no longer emits a raw libp2p `GossipPublish`),
     // and still never a push/dial (the original no-self-dial contract).
     match cmd_rx.try_recv() {
-        Ok(elohim_storage::p2p::P2PCommand::GossipPublish { topic, .. }) => {
+        Ok(elohim_storage::p2p::P2PCommand::AnnounceCustody(ann)) => {
             assert_eq!(
-                topic,
-                elohim_storage::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC,
-                "the only command a self-held shard emits is its custody announcement"
+                ann.shard_cid.to_string(),
+                stored.cid.to_string(),
+                "the only command a self-held shard emits is its own custody announcement"
+            );
+            assert_eq!(
+                ann.holder_agent_cid, "uhCAkSelfAgent",
+                "the announcement names the holder by agent_cid, never a transport id"
+            );
+            assert_eq!(
+                ann.status, "self-held",
+                "the announcement carries the source-honest status it recorded locally"
             );
         }
         Ok(_) => panic!(
