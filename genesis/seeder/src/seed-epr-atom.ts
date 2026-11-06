@@ -283,13 +283,52 @@ export interface FinalizedAtom {
   body: Record<string, unknown>;
 }
 
+/** The domain an EPR envelope's signature is made under (elohim/epr/src/epr.rs). */
+const EPR_SIGNATURE_DOMAIN = 'elohim:epr:v1:';
+/** Object epoch of the EPR signature transcript (elohim/epr/src/epr.rs). */
+const EPR_SIGNATURE_EPOCH = 0;
+/** Signature scheme 0 = strict Ed25519 (elohim/epr/src/signature.rs). */
+const SIGNATURE_SCHEME_ED25519 = 0;
+/** Multicodec of an Ed25519 public key, as a minimal unsigned varint (0xed → ed 01). */
+const ED25519_MULTIKEY_PREFIX = Uint8Array.from([0xed, 0x01]);
+
+function u16be(value: number): Uint8Array {
+  return Uint8Array.from([(value >> 8) & 0xff, value & 0xff]);
+}
+
+/**
+ * Transcript v1 of the kernel's signature envelope — the exact bytes elohim-storage
+ * verifies at ingest (elohim/epr/src/signature.rs `signing_transcript`; TS twin in
+ * elohim/sdk/epr-ts/src/signature.ts):
+ *
+ *   u16be(len(domain)) ‖ domain ‖ u16be(epoch) ‖ u16be(scheme) ‖ u16be(len(key)) ‖ key ‖ body
+ *
+ * Kept inline rather than imported so the seeder's dependency closure stays as it is.
+ */
+function eprSigningTranscript(multikey: Uint8Array, canonical: Uint8Array): Uint8Array {
+  const domain = new TextEncoder().encode(EPR_SIGNATURE_DOMAIN);
+  return Buffer.concat([
+    u16be(domain.length),
+    domain,
+    u16be(EPR_SIGNATURE_EPOCH),
+    u16be(SIGNATURE_SCHEME_ED25519),
+    u16be(multikey.length),
+    multikey,
+    canonical,
+  ]);
+}
+
 async function finalize(spec: AtomSpec): Promise<FinalizedAtom> {
   const canonicalBytes = buildCanonicalBytes(spec);
   const cid = await dagCborCid(canonicalBytes);
 
   const publicKeyBytes = await ed.getPublicKeyAsync(SEEDER_ED25519_SEED);
   const signerCid = await dagCborCid(publicKeyBytes);
-  const signatureBytes = await ed.signAsync(canonicalBytes, SEEDER_ED25519_SEED);
+  const multikey = Buffer.concat([ED25519_MULTIKEY_PREFIX, publicKeyBytes]);
+  const signatureBytes = await ed.signAsync(
+    eprSigningTranscript(multikey, canonicalBytes),
+    SEEDER_ED25519_SEED
+  );
 
   return {
     schemaKey: spec.schemaKey,
@@ -311,10 +350,15 @@ async function finalize(spec: AtomSpec): Promise<FinalizedAtom> {
         supersedes: null,
         supersededBy: null,
         issuedAt: ISSUED_AT,
+        // elohim_views::epr::EprSignatureView: the signer plus a scheme-tagged
+        // envelope; key and sig travel hex-encoded on the HTTP wire.
         proof: {
           signer: signerCid.toString(),
-          algorithm: 'ed25519',
-          signature: Buffer.from(signatureBytes).toString('hex'),
+          envelope: {
+            scheme: SIGNATURE_SCHEME_ED25519,
+            key: Buffer.from(multikey).toString('hex'),
+            sig: Buffer.from(signatureBytes).toString('hex'),
+          },
         },
       },
       // Hex-encoded raw payload bytes
