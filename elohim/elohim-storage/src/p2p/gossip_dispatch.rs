@@ -384,6 +384,20 @@ pub fn bound_agent_for_author(
         .flatten()
 }
 
+/// The agent any binding this node holds attributes to a relaying transport id:
+/// `peer_transport_manifest` (libp2p or iroh column), else an active
+/// `peer_identity_bindings` row (libp2p PeerId).
+pub fn relay_agent(conn: &mut diesel::SqliteConnection, transport_id: &str) -> Option<String> {
+    if let Some(agent) = bound_agent_for_author(conn, transport_id) {
+        return Some(agent);
+    }
+    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    crate::db::peer_identity_bindings::lookup_active(conn, transport_id, &now_iso)
+        .ok()
+        .flatten()
+        .map(|row| row.agent_cid)
+}
+
 /// The ed25519 key a transport peer id embeds: a libp2p PeerId's identity multihash
 /// carries the protobuf public key; an iroh NodeId is the key (64 lowercase hex).
 pub fn transport_key(author_peer: &str) -> Option<elohim_epr::signature::Multikey> {
@@ -801,16 +815,24 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
     };
 
     // The announcement is signed: the signature is the end-to-end author witness on
-    // both planes; on libp2p the gossipsub author must also be the signer. C1: the
-    // holder is the agent `peer_transport_manifest` binds to the signer's transport
-    // identity. An unsigned announcement is refused on either plane.
+    // both planes. C1: the holder is the agent `peer_transport_manifest` binds to the
+    // signer's transport identity. On libp2p the gossipsub author is a relay identity
+    // that refuses only when bound to a different agent. An unsigned announcement is
+    // refused on either plane.
     let witness = match source {
         GossipSource::Libp2p { author, .. } => AuthorWitness::Gossipsub(author.as_deref()),
         GossipSource::Iroh { .. } => AuthorWitness::EndToEnd,
     };
-    let verdict = admit(data, witness, &mut |transport_id: &str| {
-        bound_agent_for_author(&mut conn, transport_id)
-    });
+    let verdict = {
+        let conn_ref: &mut diesel::SqliteConnection = &mut conn;
+        let cell = std::cell::RefCell::new(conn_ref);
+        admit(
+            data,
+            witness,
+            &mut |transport_id: &str| bound_agent_for_author(&mut cell.borrow_mut(), transport_id),
+            &mut |transport_id: &str| relay_agent(&mut cell.borrow_mut(), transport_id),
+        )
+    };
     let (ann, author_peer) = match verdict {
         CustodyAdmission::Admitted { body, author_peer } => (body, author_peer),
         CustodyAdmission::Held { reason, bytes } => {
@@ -1257,9 +1279,9 @@ mod tests {
         );
     }
 
-    /// On libp2p the gossipsub author must also be the signer: a signed claim whose
-    /// `message.source` is another peer (or absent) is refused, and it does not
-    /// consume the dedup key the genuine delivery needs.
+    /// On libp2p a gossipsub author bound to a DIFFERENT agent than the signer
+    /// contradicts the claim and is refused, without consuming the dedup key the
+    /// genuine delivery needs.
     #[test]
     fn libp2p_author_mismatch_is_refused() {
         use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
@@ -1285,7 +1307,6 @@ mod tests {
             &bytes,
             &libp2p_from(Some(&stranger)),
         );
-        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &libp2p_from(None));
         assert!(
             custody_rows(&pool, &shard).is_empty(),
             "author mismatch projects nothing"
@@ -1301,6 +1322,76 @@ mod tests {
             custody_rows(&pool, &shard).len(),
             1,
             "the signer's delivery lands"
+        );
+    }
+
+    /// The household shape (2026-11-06, matthew/jessica refusing james): a claim
+    /// signed with james's iroh key, the manifest binding only his NodeId, arriving
+    /// over gossipsub under his libp2p PeerId that no binding names. The relay source
+    /// does not contradict the claim, so it projects; a source an identity binding
+    /// attributes to another agent refuses.
+    #[test]
+    fn an_iroh_signed_claim_relayed_over_gossipsub_projects_unless_the_relay_is_another_agent() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let keypair = elohim_epr::AgentKeypair::from_secret(&[27u8; 32]).unwrap();
+        let node = hex::encode(keypair.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkJames", &node);
+        {
+            let mut conn = pool.get().unwrap();
+            crate::db::peer_identity_bindings::upsert(
+                &mut conn,
+                &crate::db::models::NewPeerIdentityBindingRow {
+                    peer_id: "12D3KooWMallory".into(),
+                    agent_cid: "uhCAkMallory".into(),
+                    dht_anchor_hash: "binding-anchor".into(),
+                    valid_from: "2026-01-01T00:00:00Z".into(),
+                    valid_until: None,
+                    observed_at: "2026-01-01T00:00:00Z".into(),
+                    source: "dht".into(),
+                    device_archetype: "node".into(),
+                    superseded_by: None,
+                    signature: String::new(),
+                    proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
+                },
+            )
+            .unwrap();
+        }
+        let claim = |text: &[u8]| {
+            let shard = elohim_epr::address::compute_bytes_cid(text);
+            let bytes = SignedCustodyAnnouncement::sign(
+                &keypair,
+                &node,
+                custody_claim(shard, "uhCAkJames"),
+            )
+            .to_bytes()
+            .unwrap();
+            (shard, bytes)
+        };
+
+        let (shard, bytes) = claim(b"relayed by an unbound peer");
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &libp2p_from(Some("12D3KooWJamesLibp2p")),
+        );
+        let rows = custody_rows(&pool, &shard);
+        assert_eq!(rows.len(), 1, "an unbound relay source does not refuse");
+        assert_eq!(rows[0].peer_id, "uhCAkJames");
+
+        let (shard, bytes) = claim(b"relayed by another agent's peer");
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &libp2p_from(Some("12D3KooWMallory")),
+        );
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "a relay bound to another agent contradicts the claim"
         );
     }
 

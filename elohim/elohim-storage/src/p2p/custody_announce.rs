@@ -60,10 +60,12 @@
 //! 5. The signature verifies over the transcript under the envelope's own key.
 //! 6. The author is derived from that key: `author_peer` must be one of the key's
 //!    transport spellings (the libp2p PeerId it makes, or the iroh NodeId it is).
-//! 7. On libp2p the gossipsub `message.source` must be `author_peer`, or a transport
-//!    identity the manifest binds to the same agent as the signer.
-//! 8. C1: `holder_agent_cid` must be the agent `peer_transport_manifest` binds to the
+//! 7. C1: `holder_agent_cid` must be the agent `peer_transport_manifest` binds to the
 //!    signing key's transport identity ([`CustodyAnnouncement::check_binding`]).
+//! 8. On libp2p the gossipsub `message.source` is a relay identity: it must not
+//!    contradict the claim. A source this node binds (manifest or identity bindings)
+//!    to a DIFFERENT agent than the signer's refuses; an unbound or absent source
+//!    does not — the signature and the holder binding are the authority.
 //!
 //! The claim body ([`CustodyAnnouncement`]) stays the unit the projection and the
 //! catch-up inventory carry; only the gossip wire is signed.
@@ -348,7 +350,9 @@ pub enum CustodyRefusal {
     BadSignature,
     #[error("author_peer {0} is not a transport identity of the signing key")]
     AuthorNotSigner(String),
-    #[error("gossipsub author {source_peer:?} is not author_peer {author_peer}")]
+    #[error(
+        "gossipsub author {source_peer:?} is bound to another agent than author_peer {author_peer}"
+    )]
     AuthorMismatch {
         source_peer: Option<String>,
         author_peer: String,
@@ -389,11 +393,14 @@ pub enum CustodyAdmission {
 }
 
 /// Judge one received announcement (see the module docs for the order of checks).
-/// `bound_agent` answers the agent `peer_transport_manifest` binds to a transport id.
+/// `bound_agent` answers the agent `peer_transport_manifest` binds to a transport id
+/// (the signer's binding, C1); `source_agent` answers the agent any binding this node
+/// holds attributes to a relaying gossipsub source (manifest or identity bindings).
 pub fn admit(
     raw: &[u8],
     witness: AuthorWitness<'_>,
     bound_agent: &mut dyn FnMut(&str) -> Option<String>,
+    source_agent: &mut dyn FnMut(&str) -> Option<String>,
 ) -> CustodyAdmission {
     if raw.len() > CUSTODY_ANNOUNCE_LIMIT {
         return CustodyAdmission::Refused(CustodyRefusal::Oversize(raw.len()));
@@ -441,27 +448,28 @@ pub fn admit(
     let bound = std::iter::once(signed.author_peer.as_str())
         .chain(ids.iter().map(String::as_str))
         .find_map(&mut *bound_agent);
-    // On libp2p the authenticated gossipsub author must be the signer itself, or the
-    // same agent's other transport (a dual node signs with its iroh key and
-    // publishes on gossipsub under its libp2p PeerId).
-    if let AuthorWitness::Gossipsub(source) = witness {
-        let accepted = match source {
-            Some(source) if source == signed.author_peer => true,
-            Some(source) => bound.is_some() && bound_agent(source) == bound,
-            None => false,
-        };
-        if !accepted {
-            return CustodyAdmission::Refused(CustodyRefusal::AuthorMismatch {
-                source_peer: source.map(str::to_string),
-                author_peer: signed.author_peer,
-            });
-        }
-    }
     if let Err(error) = signed
         .body
         .check_binding(Some(signed.author_peer.as_str()), bound.as_deref())
     {
         return CustodyAdmission::Refused(CustodyRefusal::Binding(error));
+    }
+    // The signature and the holder's binding to the signing key are the authority.
+    // On libp2p the gossipsub author is a relay identity: it need not match the
+    // signer (a dual node signs with its iroh key and publishes under its libp2p
+    // PeerId), but it must not contradict the claim — a source this node binds to a
+    // DIFFERENT agent than the signer's refuses. An unbound or absent source does not.
+    if let AuthorWitness::Gossipsub(Some(source)) = witness {
+        if source != signed.author_peer {
+            if let Some(source_agent) = source_agent(source) {
+                if bound.as_deref() != Some(source_agent.as_str()) {
+                    return CustodyAdmission::Refused(CustodyRefusal::AuthorMismatch {
+                        source_peer: Some(source.to_string()),
+                        author_peer: signed.author_peer,
+                    });
+                }
+            }
+        }
     }
     CustodyAdmission::Admitted {
         body: signed.body,
@@ -644,7 +652,12 @@ mod tests {
     fn signed_announcement_bound_to_its_signer_is_admitted_end_to_end() {
         let (signed, peer) = signed_sample();
         let raw = signed.to_bytes().unwrap();
-        match admit(&raw, AuthorWitness::EndToEnd, &mut bound_to("uhCAkHolder")) {
+        match admit(
+            &raw,
+            AuthorWitness::EndToEnd,
+            &mut bound_to("uhCAkHolder"),
+            &mut unbound,
+        ) {
             CustodyAdmission::Admitted { body, author_peer } => {
                 assert_eq!(body, sample());
                 assert_eq!(author_peer, peer);
@@ -659,7 +672,12 @@ mod tests {
         signed.sig.scheme = 9;
         let raw = signed.to_bytes().unwrap();
         assert_eq!(
-            admit(&raw, AuthorWitness::EndToEnd, &mut bound_to("uhCAkHolder")),
+            admit(
+                &raw,
+                AuthorWitness::EndToEnd,
+                &mut bound_to("uhCAkHolder"),
+                &mut unbound
+            ),
             CustodyAdmission::Held {
                 reason: CustodyHeldReason::Scheme(9),
                 bytes: raw.clone(),
@@ -669,7 +687,12 @@ mod tests {
         signed.epoch = 1;
         let raw = signed.to_bytes().unwrap();
         assert!(matches!(
-            admit(&raw, AuthorWitness::EndToEnd, &mut bound_to("uhCAkHolder")),
+            admit(
+                &raw,
+                AuthorWitness::EndToEnd,
+                &mut bound_to("uhCAkHolder"),
+                &mut unbound
+            ),
             CustodyAdmission::Held {
                 reason: CustodyHeldReason::Epoch(1),
                 ..
@@ -686,13 +709,14 @@ mod tests {
             &raw,
             AuthorWitness::EndToEnd,
             &mut bound_to("uhCAkSomeoneElse"),
+            &mut unbound,
         );
         assert!(matches!(
             verdict,
             CustodyAdmission::Refused(CustodyRefusal::Binding(BindingError::HolderMismatch { .. }))
         ));
         // The signer's key is bound to nobody.
-        let verdict = admit(&raw, AuthorWitness::EndToEnd, &mut |_: &str| None);
+        let verdict = admit(&raw, AuthorWitness::EndToEnd, &mut unbound, &mut unbound);
         assert_eq!(
             verdict,
             CustodyAdmission::Refused(CustodyRefusal::Binding(BindingError::UnboundAuthor))
@@ -708,14 +732,24 @@ mod tests {
             .to_bytes()
             .unwrap();
         assert!(matches!(
-            admit(&raw, AuthorWitness::EndToEnd, &mut bound_to("uhCAkHolder")),
+            admit(
+                &raw,
+                AuthorWitness::EndToEnd,
+                &mut bound_to("uhCAkHolder"),
+                &mut unbound
+            ),
             CustodyAdmission::Refused(CustodyRefusal::AuthorNotSigner(_))
         ));
     }
 
+    /// A source no binding attributes to anyone.
+    fn unbound(_: &str) -> Option<String> {
+        None
+    }
+
     /// A dual node signs with its iroh key as its NodeId: the claim binds through the
-    /// manifest's iroh column; on gossipsub the libp2p author is accepted only when the
-    /// manifest binds it to the same agent.
+    /// manifest's iroh column; on gossipsub the libp2p author is a relay identity that
+    /// may differ from the signer, and refuses only when bound to another agent.
     #[test]
     fn an_iroh_signed_claim_binds_through_its_node_id() {
         let keypair = AgentKeypair::from_secret(&SECRET).unwrap();
@@ -728,33 +762,67 @@ mod tests {
             ("12D3KooWSameAgent".to_string(), "uhCAkHolder"),
             ("12D3KooWOtherAgent".to_string(), "uhCAkOther"),
         ];
-        let mut bound = |id: &str| {
+        let lookup = |id: &str| {
             bindings
                 .iter()
                 .find(|(known, _)| known == id)
                 .map(|(_, agent)| agent.to_string())
         };
+        let (mut signer, mut source) = (lookup, lookup);
         assert!(matches!(
-            admit(&raw, AuthorWitness::EndToEnd, &mut bound),
+            admit(&raw, AuthorWitness::EndToEnd, &mut signer, &mut source),
             CustodyAdmission::Admitted { .. }
         ));
-        assert!(matches!(
-            admit(
+        for admitted in [Some("12D3KooWSameAgent"), Some("12D3KooWUnbound"), None] {
+            let verdict = admit(
                 &raw,
-                AuthorWitness::Gossipsub(Some("12D3KooWSameAgent")),
-                &mut bound
-            ),
-            CustodyAdmission::Admitted { .. }
-        ));
-        for source in [Some("12D3KooWOtherAgent"), Some("12D3KooWUnbound"), None] {
-            let verdict = admit(&raw, AuthorWitness::Gossipsub(source), &mut bound);
-            assert!(
-                matches!(
-                    verdict,
-                    CustodyAdmission::Refused(CustodyRefusal::AuthorMismatch { .. })
-                ),
-                "{source:?}: {verdict:?}"
+                AuthorWitness::Gossipsub(admitted),
+                &mut signer,
+                &mut source,
             );
+            assert!(
+                matches!(verdict, CustodyAdmission::Admitted { .. }),
+                "{admitted:?}: {verdict:?}"
+            );
+        }
+    }
+
+    /// The ruling: an unbound relay source does not refuse a validly signed,
+    /// holder-bound claim.
+    #[test]
+    fn libp2p_source_unbound_does_not_refuse_a_signed_bound_claim() {
+        let (signed, _) = signed_sample();
+        let raw = signed.to_bytes().unwrap();
+        let verdict = admit(
+            &raw,
+            AuthorWitness::Gossipsub(Some("12D3KooWUnknownRelay")),
+            &mut bound_to("uhCAkHolder"),
+            &mut unbound,
+        );
+        assert!(
+            matches!(verdict, CustodyAdmission::Admitted { .. }),
+            "{verdict:?}"
+        );
+    }
+
+    /// A relay source this node binds to a different agent than the signer's
+    /// contradicts the claim and refuses it (`refused_binding`).
+    #[test]
+    fn libp2p_source_bound_to_another_agent_refuses() {
+        let (signed, _) = signed_sample();
+        let raw = signed.to_bytes().unwrap();
+        let mut other = |id: &str| (id == "12D3KooWOtherAgent").then(|| "uhCAkOther".to_string());
+        let verdict = admit(
+            &raw,
+            AuthorWitness::Gossipsub(Some("12D3KooWOtherAgent")),
+            &mut bound_to("uhCAkHolder"),
+            &mut other,
+        );
+        match verdict {
+            CustodyAdmission::Refused(reason @ CustodyRefusal::AuthorMismatch { .. }) => {
+                assert_eq!(reason.label(), "refused_binding");
+            }
+            other => panic!("expected AuthorMismatch, got {other:?}"),
         }
     }
 
@@ -765,7 +833,7 @@ mod tests {
             AuthorWitness::EndToEnd,
             AuthorWitness::Gossipsub(Some("12D3KooWa")),
         ] {
-            let verdict = admit(&raw, witness, &mut bound_to("uhCAkHolder"));
+            let verdict = admit(&raw, witness, &mut bound_to("uhCAkHolder"), &mut unbound);
             assert!(
                 matches!(
                     verdict,
