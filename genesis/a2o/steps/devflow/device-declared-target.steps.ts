@@ -7,6 +7,12 @@ import { join, resolve } from 'node:path';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
+
+// Tool CIDs minted from real bytes (byte profile), not placeholder spellings.
+const PINNED_TOOL_CID = mintByteCid(Buffer.from('epr tool, pinned session'));
+const LANDED_TOOL_CID = mintByteCid(Buffer.from('epr tool, newer landing'));
+
 interface View {
   manifestCid: string;
   supersedes: string | null;
@@ -90,7 +96,7 @@ When('a newer landed tool is available to the pinned session', function () {
   const tool = join(f.root, 'bins/epr');
   mkdirSync(join(tool, 'sessions'), { recursive: true });
   f.pin = JSON.stringify({
-    cid: 'bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku',
+    cid: PINNED_TOOL_CID,
     source: 'dev-context',
     session: 'target-fixture',
   });
@@ -98,7 +104,7 @@ When('a newer landed tool is available to the pinned session', function () {
   writeFileSync(
     join(tool, 'current.json'),
     JSON.stringify({
-      cid: 'bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      cid: LANDED_TOOL_CID,
       commit: 'fixture-commit',
       landedAt: '2026-10-25T00:00:00Z',
       subject: 'Carry the landed launcher',
@@ -120,10 +126,7 @@ Then(
   'the session receives one notice naming the old and new tool CIDs and a command to switch',
   function () {
     const f = fixture(this);
-    assert.match(
-      f.notice ?? '',
-      /bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku.*bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/
-    );
+    assert.match(f.notice ?? '', new RegExp(`${PINNED_TOOL_CID}.*${LANDED_TOOL_CID}`));
     assert.match(f.notice ?? '', /Carry the landed launcher/);
     assert.match(f.notice ?? '', /\/clear or epr bin pin --tool epr --cid/);
     const again = spawnSync(

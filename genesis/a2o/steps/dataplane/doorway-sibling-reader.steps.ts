@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile, readlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +9,7 @@ import { After, Given, When, Then } from '@cucumber/cucumber';
 
 import { chromium, type Browser, type Page, type Response } from 'playwright';
 
+import { assertByteCid, mintByteCid } from '../../src/framework/byte-address.js';
 import { resolvePeerUrl } from '../../src/framework/dataplane/surfaces.js';
 import {
   householdMeshDir,
@@ -35,7 +35,8 @@ interface Reader {
   requests: string[];
   errors: string[];
   blobUrls: string[];
-  blobDigest: string;
+  /** The byte CID of the manifesto bytes, minted from what the primary served. */
+  blobAddress: string;
   blobResponses: Response[];
   manifesto?: Response;
   recovered?: Response;
@@ -117,9 +118,8 @@ Given(
     const blobPath = `/blob/${encodeURIComponent(fixtureRow.blobCid)}`;
     const fixtureBlob = await fetch(`${primary}${blobPath}`, { signal: AbortSignal.timeout(5000) });
     assert.equal(fixtureBlob.status, 200);
-    const blobDigest = createHash('sha256')
-      .update(Buffer.from(await fixtureBlob.arrayBuffer()))
-      .digest('hex');
+    const blobAddress = mintByteCid(new Uint8Array(await fixtureBlob.arrayBuffer()));
+    assert.equal(blobAddress, assertByteCid(fixtureRow.blobCid, 'prepared manifesto blobCid'));
     // The mesh command owns the lease; use its recorded start-tick guard, not pgrep.
     const { stdout } = await run('bash', [
       '-c',
@@ -155,10 +155,8 @@ Given(
       documents: 0,
       requests: [],
       errors: [],
-      // The prepared contentBody still uses the supported legacy SHA256 wire
-      // alias; its metadata carries the equivalent raw CID. Both name these bytes.
-      blobUrls: [`${sibling}${blobPath}`, `${sibling}/blob/sha256-${blobDigest}`],
-      blobDigest,
+      blobUrls: [`${sibling}${blobPath}`],
+      blobAddress,
       blobResponses: [],
     };
     readers.set(this, state);
@@ -248,10 +246,8 @@ Then(
     const blob = state.blobResponses.find(response => response.status() === 200);
     assert.ok(blob, 'the running app must fetch the manifesto bytes through the sibling');
     assert.equal(
-      createHash('sha256')
-        .update(await blob.body())
-        .digest('hex'),
-      state.blobDigest,
+      mintByteCid(new Uint8Array(await blob.body())),
+      state.blobAddress,
       'sibling bytes must equal the prepared manifesto'
     );
   }

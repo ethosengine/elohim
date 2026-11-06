@@ -15,7 +15,7 @@
 
 import { strict as assert } from 'node:assert';
 import { execFile } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,7 @@ import { promisify } from 'node:util';
 
 import { StorageClient } from '@elohim/storage-client';
 
+import { mintByteCid, parseByteCid } from '../../src/framework/byte-address.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { OwnedDoorwayPair } from '../../src/framework/fixtures/owned-doorway-pair.js';
 
@@ -150,8 +151,8 @@ export interface StageOutcome {
   /** stage-spa-blob.sh's exit code. 2 = the peer judged the bundle BROKEN. */
   code: number;
   output: string;
-  /** `sha256-…`, parsed off the script's own "blob hash:" line. */
-  blobHash: string;
+  /** The byte CID, parsed off the script's own "blob CID:" line and admitted by full decode. */
+  blobCid: string;
   /** Exact action returned by the authoring PATCH; absent for byte-only staging. */
   authoredActionHash?: string;
 }
@@ -201,12 +202,12 @@ export async function stageBundle(opts: {
     code = typeof failure.code === 'number' ? failure.code : 1;
     output = `${failure.stdout ?? ''}\n${failure.stderr ?? ''}\n${failure.message ?? ''}`;
   }
-  const match = /blob hash:\s*(sha256-[0-9a-f]+)/i.exec(output);
+  const match = /blob CID:\s*(\S+)/i.exec(output);
   const action = /authored action:\s*([^\s]+)/i.exec(output);
   return {
     code,
     output,
-    blobHash: match?.[1] ?? '',
+    blobCid: parseByteCid(match?.[1]) ?? '',
     authoredActionHash: action?.[1],
   };
 }
@@ -447,21 +448,22 @@ export async function withStorageRetryBudget<T>(
 }
 
 /**
- * The blob hash a `PUT /blob/` reply names, normalized to `sha256-<hex>`.
+ * The byte CID a `PUT /blob/` reply names, admitted by full decode (no other spelling is an address).
  *
- * The storage wire is camelCase (`blobHash`); the SDK's hand-written `BlobManifest` still types it
- * `blob_hash`, so read the wire first. A reply naming neither is a shape defect, not a shed — it
+ * The storage wire is camelCase (`blobCid`); the SDK's hand-written `BlobManifest` still types it
+ * `blob_cid`, so read the wire first. A reply naming neither is a shape defect, not a shed — it
  * is refused at once rather than retried for the whole ladder budget.
  */
-export function uploadedBlobHash(reply: unknown): string {
-  const manifest = (reply ?? {}) as { blobHash?: unknown; blob_hash?: unknown };
-  const wireHash = manifest.blobHash ?? manifest.blob_hash;
-  if (typeof wireHash !== 'string' || wireHash.length === 0) {
+export function uploadedBlobCid(reply: unknown): string {
+  const manifest = (reply ?? {}) as { blobCid?: unknown; blob_cid?: unknown };
+  const wireCid = manifest.blobCid ?? manifest.blob_cid;
+  const admitted = parseByteCid(wireCid);
+  if (admitted === null) {
     throw new NonRetryableStageError(
-      `source storage answered the blob upload without a blob hash: ${JSON.stringify(reply).slice(0, 200)}`
+      `source storage answered the blob upload without a byte CID: ${JSON.stringify(reply).slice(0, 200)}`
     );
   }
-  return wireHash.startsWith('sha256-') ? wireHash : `sha256-${wireHash}`;
+  return admitted;
 }
 
 /**
@@ -502,7 +504,7 @@ export async function stageBundleThroughStorage(opts: {
     const archive = join(archiveDir, 'browser.zip');
     await execFileAsync('zip', ['-X', '-qr', archive, '.'], { cwd: opts.bundle.dir });
     const bytes = readFileSync(archive);
-    const expectedHash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const expectedHash = mintByteCid(bytes);
     const apiKey = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
     const client = new StorageClient({ baseUrl: opts.storageUrl, apiKey, timeout: 30_000 });
 
@@ -510,7 +512,7 @@ export async function stageBundleThroughStorage(opts: {
       async () => {
         let uploadedHash: string;
         try {
-          uploadedHash = uploadedBlobHash(
+          uploadedHash = uploadedBlobCid(
             await client.putBlob(new Uint8Array(bytes), 'application/zip')
           );
         } catch (error) {
@@ -524,7 +526,7 @@ export async function stageBundleThroughStorage(opts: {
         }
         if (uploadedHash !== expectedHash) {
           throw new NonRetryableStageError(
-            `source storage returned a different blob hash: expected ${expectedHash}, got ${uploadedHash}`
+            `source storage returned a different blob address: expected ${expectedHash}, got ${uploadedHash}`
           );
         }
 
@@ -534,7 +536,7 @@ export async function stageBundleThroughStorage(opts: {
           response = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-            body: JSON.stringify({ blobHash: expectedHash }),
+            body: JSON.stringify({ blobCid: expectedHash }),
             signal: AbortSignal.timeout(30_000),
           });
           body = await response.text();
@@ -585,17 +587,17 @@ export async function stageBundleThroughStorage(opts: {
             `seatbelt GET failed (HTTP ${verifyResponse.status}): ${verifyText}`
           );
         }
-        const actual = (JSON.parse(verifyText) as { blobHash?: string }).blobHash;
+        const actual = (JSON.parse(verifyText) as { blobCid?: string }).blobCid;
         if (actual !== expectedHash) {
           throw new NonRetryableStageError(
-            `blobHash drift after PATCH: expected ${expectedHash}, got ${actual ?? '<empty>'}`
+            `blobCid drift after PATCH: expected ${expectedHash}, got ${actual ?? '<empty>'}`
           );
         }
 
         const outcome: StageOutcome = {
           code: 0,
           output: body,
-          blobHash: expectedHash,
+          blobCid: expectedHash,
           authoredActionHash: action,
         };
         return outcome;
@@ -747,12 +749,12 @@ export async function stageInvalidFixture(
     const archive = join(archiveDir, 'invalid.zip');
     await execFileAsync('zip', ['-X', '-qr', archive, '.'], { cwd: bundle.dir });
     const bytes = readFileSync(archive);
-    const hash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const hash = mintByteCid(bytes);
     const response = await fetch(`${doorwayUrl}/admin/seed/blob`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/zip',
-        'X-Blob-Hash': hash,
+        'X-Content-Address': hash,
         'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
       },
       body: new Uint8Array(bytes),

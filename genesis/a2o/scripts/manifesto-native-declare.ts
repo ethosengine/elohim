@@ -6,10 +6,11 @@
  *
  * Run: cd genesis/a2o && DEVICE_AGENT=<W2> pnpm exec tsx scripts/manifesto-native-declare.ts
  */
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+
+import { mintByteCid } from '../src/framework/byte-address.js';
 
 const STORAGE = 'http://localhost:8090';
 const ADMIN = `ws://127.0.0.1:${process.env.WS_ADMIN_PORT ?? '41347'}`;
@@ -20,8 +21,8 @@ const MD = '/projects/elohim/genesis/docs/content/elohim-protocol/manifesto.md';
 
 async function main() {
   const body = readFileSync(MD, 'utf8');
-  const hash = 'sha256-' + createHash('sha256').update(body, 'utf8').digest('hex');
-  console.log('manifesto bytes', Buffer.byteLength(body), 'blobHash', hash.slice(0, 22));
+  const hash = mintByteCid(Buffer.from(body, 'utf8'));
+  console.log('manifesto bytes', Buffer.byteLength(body), 'blobCid', hash.slice(0, 22));
 
   // 1. blob PUT (localhost, no auth)
   const put = await fetch(`${STORAGE}/blob/${hash}`, {
@@ -45,18 +46,18 @@ async function main() {
         reach: 'commons',
         tags: ['manifesto'],
         contentBody: body,
-        blobHash: hash,
+        blobCid: hash,
       },
     ]),
   })
-    .then(r => r.text())
+    .then(async r => r.text())
     .then(t => console.log('bulk', t.slice(0, 80)));
 
   // 3. PATCH with the notarized fields → re-notarize through W2's conductor (anchors it)
   const patch = await fetch(`${STORAGE}/db/content/${ID}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ blobHash: hash, reach: 'commons', contentBody: body }),
+    body: JSON.stringify({ blobCid: hash, reach: 'commons', contentBody: body }),
   });
   const patched: any = await patch.json().catch(() => ({}));
   const target = patched.dhtAnchorHash ?? patched.content?.dhtAnchorHash;
@@ -111,7 +112,7 @@ async function main() {
       canonical: out.canonical,
     })
   );
-  console.log('blobHash for the watch:', hash);
+  console.log('blobCid for the watch:', hash);
   process.exit(0);
 }
 main().catch(e => {

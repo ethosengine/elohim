@@ -152,7 +152,7 @@ Feature: Observable + contract-aware auto-distribute
 
   @wip @resilience-p1 @act:i
   Scenario: Concept card hides badge when distribution is not yet known
-    Given content "concept-bar" has no blob_hash yet (pre-distribution)
+    Given content "concept-bar" has no blob_cid yet (pre-distribution)
     When Matthew sees a concept card for "concept-bar"
     Then the card renders no "elohim-distribution-badge" element
     # Boundary: undefined distribution is a valid state (pre-distribution
@@ -322,7 +322,7 @@ Feature: Observable + contract-aware auto-distribute
   @wip @resilience-p1 @act:i
   Scenario: Distribution badge defers details fetch until tooltip opens
     Given a content-viewer is open for "content-alpha"
-    And the distribution badge has a "blobHash" but no expanded details yet
+    And the distribution badge has a "blobCid" but no expanded details yet
     When Matthew first views the page
     Then no request is made to "/api/v1/blob/{hash}/distribution/details"
     When Matthew expands the distribution tooltip
@@ -331,7 +331,7 @@ Feature: Observable + contract-aware auto-distribute
     # Constraint: at card-grid scale (a learning path with 30+ concept cards)
     # eager detail fetch would be 30+ round-trips on render. The badge MUST
     # fetch only on tooltip-open and cache the result.
-    # Operational parameters: 1 round-trip per blob_hash per session; informs
+    # Operational parameters: 1 round-trip per blob_cid per session; informs
     # path-page rendering budget (≤1 head fetch + lazy details on demand).
 
   # --- coverageShortfall: how far short of safe, not just how many copies -----

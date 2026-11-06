@@ -125,7 +125,7 @@ interface RefusesFastState {
   sampler?: Sampler;
   told?: Told;
   previous?: ChaosPublishedAuthority;
-  next?: { bundle: FixtureBundle; blobHash: string; bytesOutput: string[] };
+  next?: { bundle: FixtureBundle; blobCid: string; bytesOutput: string[] };
   offers: Offer[];
 }
 
@@ -208,15 +208,15 @@ function requireFace(face: string, among: readonly string[] = READINESS_FACES): 
   );
 }
 
-/** The `blobHash` a doorway answers with for this app's record, or '' when unreadable. */
-async function declaredBlobHash(url: string, slug: string): Promise<string> {
+/** The `blobCid` a doorway answers with for this app's record, or '' when unreadable. */
+async function declaredBlobCid(url: string, slug: string): Promise<string> {
   const { status, text } = await getRaw(`${url}/db/content/${encodeURIComponent(slug)}`, {
     timeoutMs: 10_000,
   });
   if (status !== 200) return '';
   try {
-    const parsed = JSON.parse(text) as { blobHash?: unknown };
-    return typeof parsed.blobHash === 'string' ? parsed.blobHash : '';
+    const parsed = JSON.parse(text) as { blobCid?: unknown };
+    return typeof parsed.blobCid === 'string' ? parsed.blobCid : '';
   } catch {
     return '';
   }
@@ -649,7 +649,7 @@ When(
       return Promise.resolve();
     });
     const bytesOutput: string[] = [];
-    let blobHash = '';
+    let blobCid = '';
     for (const name of DOORWAYS) {
       const outcome = await withEnv(toldEnv(told), async () =>
         stageBundle({
@@ -665,15 +665,15 @@ When(
         0,
         `handing the next version's bytes to ${name} failed (exit ${outcome.code}):\n${outcome.output}`
       );
-      blobHash = outcome.blobHash;
+      blobCid = outcome.blobCid;
     }
-    assert.ok(blobHash, 'stage-spa-blob.sh reported no blob hash for the next version');
+    assert.ok(blobCid, 'stage-spa-blob.sh reported no blob hash for the next version');
     assert.notEqual(
-      blobHash,
-      previous.blobHash,
+      blobCid,
+      previous.blobCid,
       'the next version hashed the same as the previous one'
     );
-    current.next = { bundle, blobHash, bytesOutput };
+    current.next = { bundle, blobCid, bytesOutput };
   }
 );
 
@@ -759,12 +759,12 @@ Then(
     const url = doorwayUrl(this, doorway);
     let last = '';
     const elapsed = await pollUntil(async () => {
-      last = await declaredBlobHash(url, previous.slug);
-      return last === next.blobHash;
+      last = await declaredBlobCid(url, previous.slug);
+      return last === next.blobCid;
     }, 30_000);
     assert.ok(
       elapsed !== null,
-      `doorway "${doorway}" answers ${last || 'nothing'} as the declared head, not the offered ${next.blobHash}`
+      `doorway "${doorway}" answers ${last || 'nothing'} as the declared head, not the offered ${next.blobCid}`
     );
   }
 );
@@ -884,7 +884,7 @@ Then(
     const url = doorwayUrl(this, doorway);
     let last = '';
     const elapsed = await pollUntil(async () => {
-      last = await declaredBlobHash(url, previous.slug);
+      last = await declaredBlobCid(url, previous.slug);
       return last !== '';
     }, 30_000);
     assert.ok(
@@ -893,13 +893,13 @@ Then(
     );
     assert.notEqual(
       last,
-      next.blobHash,
+      next.blobCid,
       `the refused next version became the declared head on "${doorway}"`
     );
     assert.equal(
       last,
-      previous.blobHash,
-      `doorway "${doorway}" answers ${last}, not the previous ${previous.blobHash}`
+      previous.blobCid,
+      `doorway "${doorway}" answers ${last}, not the previous ${previous.blobCid}`
     );
   }
 );

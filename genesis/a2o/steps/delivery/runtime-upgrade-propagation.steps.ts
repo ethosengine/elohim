@@ -102,6 +102,7 @@ import { Given, When, Then, Before, AfterAll } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 
@@ -856,8 +857,8 @@ async function currentHeadCidFor(
   return cid;
 }
 
-async function putBlobRaw(baseUrl: string, sha256: string, bytes: Buffer): Promise<number> {
-  const { statusCode } = await request(`${baseUrl}/blob/sha256-${sha256}`, {
+async function putBlobRaw(baseUrl: string, cid: string, bytes: Buffer): Promise<number> {
+  const { statusCode } = await request(`${baseUrl}/blob/${cid}`, {
     method: 'PUT',
     headers: {
       'content-type': 'application/octet-stream',
@@ -2717,7 +2718,7 @@ async function ensureSecondPublished(world: E2EWorld): Promise<void> {
   const sha256 = c.secondCandidateSha256;
   assert.ok(bytes && sha256, 'no second-candidate bytes recorded');
   for (const peer of PEER_NAMES.filter(name => name !== 'matthew')) {
-    const putStatus = await putBlobRaw(peerUrl(world, peer), sha256, bytes);
+    const putStatus = await putBlobRaw(peerUrl(world, peer), mintByteCid(bytes), bytes);
     assert.ok(
       putStatus === 200 || putStatus === 201,
       `PUT second-fix blob to ${peer} returned ${putStatus}`

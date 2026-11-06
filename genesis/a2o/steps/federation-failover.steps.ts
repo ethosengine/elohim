@@ -15,6 +15,7 @@ import { readFile, readlink } from 'node:fs/promises';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import { assertByteCid } from '../src/framework/byte-address.js';
 import {
   householdMeshDir,
   loadHouseholdMeshFixture,
@@ -1328,24 +1329,12 @@ async function responseBytes(baseUrl: string, path: string): Promise<Uint8Array>
   return bytes;
 }
 
-/**
- * The CID-first migration moved blobHash off the legacy `sha256-<64hex>`
- * shape to CIDv1 (base32 lower, `bafkrei…` = raw codec + sha2-256) for
- * freshly-ingested content — manifesto is one such row. See
- * elohim/elohim-storage/src/blob_store.rs (`Cid::new_v1(RAW_CODEC, ...)`).
- */
-const CID_V1_RAW_SHA256 = /^bafkrei[a-z2-7]+$/;
-
 async function loadManifesto(world: E2EWorld, state: PeerLossState): Promise<void> {
   const doorwayUrl = registeredDoorwayUrl(world, 'alpha');
   const content = await jsonGet<Record<string, unknown>>(doorwayUrl, '/db/content/manifesto');
-  const hash = content['blobHash'];
-  assert.equal(typeof hash, 'string', 'manifesto projection has no blobHash');
-  assert.match(
-    hash as string,
-    CID_V1_RAW_SHA256,
-    `manifesto blobHash "${hash}" does not look like a CID content address (expected bafkrei…)`
-  );
+  const hash = content['blobCid'];
+  assert.equal(typeof hash, 'string', 'manifesto projection has no blobCid');
+  assertByteCid(hash, 'manifesto blobCid');
   state.manifestoHash = hash as string;
 }
 
@@ -1551,7 +1540,7 @@ Given("Jessica's storage peer holds content it stewards locally", async function
   const state = householdState(this);
   const jessica = peerByName(state, 'jessica');
   const content = await jsonGet<Record<string, unknown>>(jessica.url, '/db/content/manifesto');
-  const hash = content['blobHash'];
+  const hash = content['blobCid'];
   assert.equal(typeof hash, 'string');
   state.manifestoHash = hash as string;
   state.manifestoBytes = await responseBytes(jessica.url, `/blob/${hash}`);

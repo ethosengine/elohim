@@ -93,7 +93,7 @@ Feature: Peer Mesh — P2P App Delivery
   @wip
   Scenario: QueryDelivery protocol returns delivery info
     Given elohim-storage has "evolution-of-trust" extracted
-    When a peer sends a QueryDelivery request with the blob_hash
+    When a peer sends a QueryDelivery request with the blob_cid
     Then the response includes serves_extracted: true
     And the response includes cache_tier: extraction
     And the response includes warm: true

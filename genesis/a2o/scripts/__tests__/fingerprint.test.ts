@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { fingerprint, normalizeMessage } from '../lib/fingerprint.js';
 
 const REFERENCE_ERROR_MSG = 'ReferenceError: x is not defined';
@@ -21,9 +22,14 @@ void describe('normalizeMessage', () => {
     assert.equal(normalizeMessage(m), 'fetch https://doorway-alpha.elohim.host/foo failed');
   });
 
-  void it('strips hex hashes (sha-256 style)', () => {
-    const m = 'Shard sha256-abc123def456789012345678901234567890 missing';
-    assert.equal(normalizeMessage(m), 'Shard sha256-<hash> missing');
+  void it('strips hex hashes', () => {
+    const m = 'Shard abc123def456789012345678901234567890 missing';
+    assert.equal(normalizeMessage(m), 'Shard <hash> missing');
+  });
+
+  void it('strips byte CIDs (raw + BLAKE3-256, bafkr4i…)', () => {
+    const m = `Shard ${mintByteCid(Buffer.from('shard'))} missing`;
+    assert.equal(normalizeMessage(m), 'Shard <cid> missing');
   });
 
   void it('collapses multi-whitespace', () => {

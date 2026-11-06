@@ -28,6 +28,7 @@ import { createServer } from 'node:http';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import {
   ADOPTION_PATH,
   assertAdmissibleOverEarnedHead,
@@ -318,15 +319,17 @@ const ALPHA_DEV_CHANNEL = 'runtime:app-bundle:alpha:dev';
 const LANDING = 'elohim-host-landing';
 const TRANSPORT_FLAG = '--transport';
 
+const SERVER_CID = mintByteCid(Buffer.from('server bundle'));
+
 describe('channel bind — the slug elects itself by its release channel', () => {
   const CHANNEL = ALPHA_DEV_CHANNEL;
 
   it('sets the binding and carries every other key unchanged', () => {
     const merged = JSON.parse(
-      mergeReleaseBinding(JSON.stringify({ serverBlobHash: 'sha256-s', title: 'x' }), CHANNEL)
+      mergeReleaseBinding(JSON.stringify({ serverBlobCid: SERVER_CID, title: 'x' }), CHANNEL)
     );
     assert.deepEqual(merged, {
-      serverBlobHash: 'sha256-s',
+      serverBlobCid: SERVER_CID,
       title: 'x',
       [RELEASE_CHANNEL_KEY]: CHANNEL,
     });
@@ -335,11 +338,11 @@ describe('channel bind — the slug elects itself by its release channel', () =>
   it('unbind removes only the binding', () => {
     const merged = JSON.parse(
       mergeReleaseBinding(
-        JSON.stringify({ serverBlobHash: 'sha256-s', releaseChannel: CHANNEL }),
+        JSON.stringify({ serverBlobCid: SERVER_CID, releaseChannel: CHANNEL }),
         null
       )
     );
-    assert.deepEqual(merged, { serverBlobHash: 'sha256-s' });
+    assert.deepEqual(merged, { serverBlobCid: SERVER_CID });
   });
 
   it('binds an empty metadata, and refuses a non-channel id or non-object metadata', () => {
@@ -415,7 +418,7 @@ describe('channel bind --transport doorway — the PATCH body', () => {
 
   it("binds with the slug's own reach riding along (the notarizing PATCH)", () => {
     assert.deepEqual(
-      doorwayBindPatch({ reach: 'public', metadata: { serverBlobHash: 's' } }, CHANNEL),
+      doorwayBindPatch({ reach: 'public', metadata: { serverBlobCid: 's' } }, CHANNEL),
       {
         reach: 'public',
         metadata: { [RELEASE_CHANNEL_KEY]: CHANNEL },
@@ -495,7 +498,7 @@ function fakeDoorway(
 const CEREMONY = fileURLToPath(new URL('../release-ceremony.ts', import.meta.url));
 const TSX = fileURLToPath(new URL('../../node_modules/.bin/tsx', import.meta.url));
 
-function ceremony(
+async function ceremony(
   args: string[],
   env: Record<string, string> = {}
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -519,7 +522,7 @@ describe('channel create / bind over the doorway — the writes, end to end', ()
       [LANDING]: {
         id: LANDING,
         reach: 'commons',
-        metadata: { serverBlobHash: 's' },
+        metadata: { serverBlobCid: 's' },
       },
     };
     const { server, requests } = fakeDoorway(rows);
@@ -572,8 +575,7 @@ describe('channel create / bind over the doorway — the writes, end to end', ()
       );
       assert.equal(JSON.parse(bound.stdout).tier, 'staging');
       assert.equal(
-        rows[LANDING].metadata &&
-          (rows[LANDING].metadata as Record<string, unknown>).serverBlobHash,
+        rows[LANDING].metadata && (rows[LANDING].metadata as Record<string, unknown>).serverBlobCid,
         's'
       );
 

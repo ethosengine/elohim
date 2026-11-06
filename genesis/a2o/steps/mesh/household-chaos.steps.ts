@@ -53,6 +53,7 @@ import { promisify } from 'node:util';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import { assertByteCid } from '../../src/framework/byte-address.js';
 import {
   getRaw,
   postRaw,
@@ -471,46 +472,13 @@ async function restartDownPeers(state: DrillState): Promise<void> {
 // Blob addressing + the local (filesystem) blob-store oracle
 // ---------------------------------------------------------------------------
 
-const BASE32_LOWER = 'abcdefghijklmnopqrstuvwxyz234567';
-
-function decodeBase32Lower(input: string): Uint8Array {
-  let bits = 0;
-  let value = 0;
-  const out: number[] = [];
-  for (const char of input) {
-    const index = BASE32_LOWER.indexOf(char);
-    assert.ok(index >= 0, `"${char}" is not a lower-case base32 character`);
-    value = (value << 5) | index;
-    bits += 5;
-    if (bits >= 8) {
-      bits -= 8;
-      out.push((value >>> bits) & 0xff);
-    }
-  }
-  return Uint8Array.from(out);
-}
-
 /**
  * Admit a wire blob address as a byte CID by full decode: CIDv1 raw (0x55) +
  * BLAKE3-256 (0x1e), 32-byte digest, canonical base32-lower. Every other spelling
  * (`sha256-<hex>`, bare hex, `bafkrei…`) is refused — the household speaks one profile.
  */
 function byteCidOf(address: string): string {
-  assert.match(
-    address,
-    /^bafkr4i[a-z2-7]{52}$/,
-    `blob address "${address}" is not a byte CID (bafkr4i…, 59 chars)`
-  );
-  const bytes = decodeBase32Lower(address.slice(1));
-  assert.ok(
-    bytes.length === 36 &&
-      bytes[0] === 0x01 &&
-      bytes[1] === 0x55 &&
-      bytes[2] === 0x1e &&
-      bytes[3] === 0x20,
-    `CID "${address}" is not a v1 raw/BLAKE3-256 byte address`
-  );
-  return address;
+  return assertByteCid(address, 'blob address');
 }
 
 /** `$STORAGE_DIR/blobs/blobs/<cid[7..11]>/<cid>` — the payload or its marker. */

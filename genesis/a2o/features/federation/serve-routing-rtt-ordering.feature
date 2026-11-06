@@ -37,8 +37,8 @@ Feature: Serve-routing prefers the lower-latency capable peer cross-WAN
     # Two capable peers hold the same content blob, but peer A is geographically
     # closer (lower locally-measured RTT) than peer B. The serving node should
     # prefer A.
-    Given peer "near-peer" holds blob "<blob_hash>" with measured RTT of "20ms"
-    And peer "far-peer" holds blob "<blob_hash>" with measured RTT of "250ms"
+    Given peer "near-peer" holds blob "<blob_cid>" with measured RTT of "20ms"
+    And peer "far-peer" holds blob "<blob_cid>" with measured RTT of "250ms"
     And both peers have equal capability level and headroom
     And both peers are bonded via active replicates-content commitments
     When storage requests the blob via serve-routing with n=1
@@ -49,8 +49,8 @@ Feature: Serve-routing prefers the lower-latency capable peer cross-WAN
   Scenario: Score degrades gracefully when one peer has no measured RTT
     # A not-yet-sampled peer still participates in serve-routing with a neutral
     # RTT factor (0.5) — it is never excluded for lack of a measurement.
-    Given peer "measured-peer" holds blob "<blob_hash>" with measured RTT of "30ms"
-    And peer "new-peer" holds blob "<blob_hash>" with no measured RTT recorded
+    Given peer "measured-peer" holds blob "<blob_cid>" with measured RTT of "30ms"
+    And peer "new-peer" holds blob "<blob_cid>" with no measured RTT recorded
     And both peers have equal capability level and headroom and bonded status
     When storage requests the blob via serve-routing with n=2
     Then both "measured-peer" and "new-peer" are in the selected candidates

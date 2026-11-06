@@ -46,7 +46,7 @@ Feature: Content-addressed delivery
   @browser-only @wip
   Scenario: Re-seeded content with new CID invalidates old mapping
     Given the service worker has cached files under "/apps/bafkr4iplaceholder/"
-    When the app is re-seeded with blob hash "bafkreinewplaceholder"
+    When the app is re-seeded with blob hash "bafkr4inewplaceholder"
     And I navigate to "/apps/evolution-of-trust/index.html"
-    Then the response includes header "X-Content-Address" with value "bafkreinewplaceholder"
+    Then the response includes header "X-Content-Address" with value "bafkr4inewplaceholder"
     And the old cache entries under "/apps/bafkr4iplaceholder/" are invalidated

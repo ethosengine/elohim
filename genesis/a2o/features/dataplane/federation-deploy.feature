@@ -1,5 +1,5 @@
 # Asserts uniform all-peer EPR resolution to kill the per-host stageSpaBlob crutch. Authored
-# RED-FIRST (2026-06-29): scenario 2 failed until blobHash-pointer propagation landed. Re-probed
+# RED-FIRST (2026-06-29): scenario 2 failed until blobCid-pointer propagation landed. Re-probed
 # 2026-09-02: propagation landed — scenario 2 now passes live on both doorways. The remaining red
 # is a second, parallel failure mode (version divergence), which moved 2026-09-05 into its own
 # @act:i sibling, features/dataplane/federation-version-convergence.feature — it is proven on a
@@ -15,8 +15,8 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
   Vocabulary, because every assertion below rests on it: a DOORWAY is a gateway node that serves
   content to ordinary browsers on behalf of a federation of peers — the web2 front door to a
   peer-to-peer substrate. An EPR (Elohim Protocol Resource) is the addressable content record a
-  doorway resolves in order to serve an application; its blobHash is the pointer from that record
-  to the actual bytes, so a null blobHash means the doorway holds the record but cannot find what
+  doorway resolves in order to serve an application; its blobCid is the pointer from that record
+  to the actual bytes, so a null blobCid means the doorway holds the record but cannot find what
   it refers to. The EprRouter is the component on each doorway that follows that pointer and
   serves the bytes — it is what answers "App not found" when the pointer is null. stageSpaBlob is
   the CI stage that uploads the app bundle to each doorway individually — the crutch named below.
@@ -41,7 +41,7 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
 
   The landing EPR (elohim-host-landing) must resolve correctly on EVERY federation doorway,
   not just the deploy-time author peer. Two conditions must hold on each doorway: the root path
-  returns HTTP 200 (not "App not found"), and the EPR content record carries a non-null blobHash.
+  returns HTTP 200 (not "App not found"), and the EPR content record carries a non-null blobCid.
   Both conditions hold today on both doorways (dated probes in the Evidence log below) — the
   pointer-propagation gap this feature was authored against is closed. What the evidence also
   shows is the second failure mode below: the doorways now each resolve the page, but serve two
@@ -59,7 +59,7 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
 
   This feature is the acceptance gate that makes the per-host Jenkinsfile stageSpaBlob stage
   un-shippable: a uniform deploy MUST mean every doorway can independently resolve the landing
-  EPR, not just the peer that ran the CI blob-upload step. blobHash metadata propagation from the
+  EPR, not just the peer that ran the CI blob-upload step. blobCid metadata propagation from the
   author peer to all federation peers has now landed (backlog: dataplane-peer-fallback-and-
   blob-replication, item D5) — the crutch itself is not yet retired, since retiring it needs the
   staging-authority precondition (scenario 3) and the version-divergence cure (the sibling
@@ -69,21 +69,21 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
 
   2026-06-29:
     alpha-A      GET /                                          → HTTP 200  SPA bundle served (passing)
-    alpha-A      /db/content/elohim-host-landing.blobHash      = sha256-1c3451873f57… (non-null, passing)
+    alpha-A      /db/content/elohim-host-landing.blobCid      = bafkr4ieh6qzwk… (non-null, passing)
     elohim.host  GET /                                          → HTTP 404  {"error":"App not found: elohim-host-landing"}
-    elohim.host  /db/content/elohim-host-landing.blobHash      = null  (the gap — causes App-not-found)
+    elohim.host  /db/content/elohim-host-landing.blobCid      = null  (the gap — causes App-not-found)
 
   2026-09-02 (re-probed — scenario 2's two conditions now hold on BOTH doorways):
     alpha-A      GET /                                          → HTTP 200  SPA bundle served (passing)
-    alpha-A      /db/content/elohim-host-landing.blobHash      = sha256-04ae43109b676984a77aa15e01fc83a6f11068f2cd742e61100753f80adccd5c (non-null, passing)
+    alpha-A      /db/content/elohim-host-landing.blobCid      = bafkr4idotimj5ls54qthe7z75tdlqefstsruitv5kaz5bc3ctb73v7y4ce (non-null, passing)
                  updatedAt 2026-08-31T02:53:06Z
     elohim.host  GET /                                          → HTTP 200  SPA bundle served (passing — the App-not-found gap is closed)
-    elohim.host  /db/content/elohim-host-landing.blobHash      = sha256-f0f0e637816611570740a56221c7b9900d27a324f2bb038b1b3b8d76cc7940ad (non-null, passing)
+    elohim.host  /db/content/elohim-host-landing.blobCid      = bafkr4iccok6ieomyonv3h5zmrrqtnbsprk57qdtaa6qgf3s4esg24ahemy (non-null, passing)
                  updatedAt 2026-08-31T02:47:27Z
     Both peers report the SAME dhtAnchorHash uhCkkvfsTSJ-Ti3fscryEhYv7Nmdwy_LpMEjTFg8PKYv5FIoSuotF — the pointer-propagation
     gap this feature was written to close is closed. What remains open is the SECOND failure mode, which now has its
     own file (features/dataplane/federation-version-convergence.feature): the two
-    blobHashes differ, so the doorways hold two different VERSIONS of the same EPR — version divergence, not a missing
+    blobCides differ, so the doorways hold two different VERSIONS of the same EPR — version divergence, not a missing
     pointer. Both doorways' `/health` report `p2p.caughtUp: false`, `p2p.converged: false`, with `divergentAnchor` counts
     of 2131 (alpha-A) and 1011 (elohim.host) — the reconcile sweep has not settled the fleet.
 
@@ -97,28 +97,28 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
 
   Scenario: alpha-A fully resolves the landing EPR on both conditions (baseline — green)
     # Green baseline. alpha-A is the deploy-time author peer. The Jenkinsfile stageSpaBlob
-    # stage wrote the non-null blobHash into the EPR content record and the SPA blob was
+    # stage wrote the non-null blobCid into the EPR content record and the SPA blob was
     # uploaded locally, so the EprRouter resolves the landing app correctly. Both assertions
     # pass today and confirm the author-peer surface is healthy.
     Given EPR "elohim-host-landing" was uploaded to peer "alpha-A" at deploy time
     When I query "/" on peer "alpha-A"
     Then resolving "/" on peer "alpha-A" does NOT return App-not-found
-    And EPR "elohim-host-landing" blobHash is non-null on peer "alpha-A"
+    And EPR "elohim-host-landing" blobCid is non-null on peer "alpha-A"
 
   Scenario: elohim.host fully resolves the landing EPR on both conditions (uniform deploy — federation peer)
     # Authored RED-FIRST 2026-06-29. elohim.host is the alpha-b federation peer. At that time the
-    # EPR content record on elohim.host had blobHash: null — the blob metadata was never written
+    # EPR content record on elohim.host had blobCid: null — the blob metadata was never written
     # on the peer even though the blob bytes were placed there at deploy time by the per-host
-    # stageSpaBlob CI crutch. Because blobHash was null, the EprRouter on elohim.host could not
+    # stageSpaBlob CI crutch. Because blobCid was null, the EprRouter on elohim.host could not
     # find the blob to serve and returned HTTP 404 {"error":"App not found: elohim-host-landing"}.
     #
     # It failed then with:
     #   AssertionError: Resolving "/" on elohim.host returned 404 — route may not be registered
     #   (the 404 check fires before the body-text check; both conditions fail independently)
     #   AssertionError: EPR "elohim-host-landing" on elohim.host:
-    #     blobHash is null — blob not yet attached
+    #     blobCid is null — blob not yet attached
     #
-    # Re-probed live 2026-09-02: both conditions now hold — blobHash metadata has propagated to
+    # Re-probed live 2026-09-02: both conditions now hold — blobCid metadata has propagated to
     # the federation peer, so elohim.host independently serves the landing app. The per-host
     # stageSpaBlob CI stage is not yet retired (see the feature description above); this scenario
     # is the receipt that its replacement — pointer propagation — is working. This is the first
@@ -127,11 +127,11 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     #
     # No "was uploaded to peer" Given here, unlike scenario 1 — that absence IS the point: this
     # scenario proves elohim.host resolves the page WITHOUT ever having received a direct
-    # deploy-time upload of its own. Whatever made blobHash non-null here arrived by propagation
+    # deploy-time upload of its own. Whatever made blobCid non-null here arrived by propagation
     # from alpha-A, not by a second per-host stageSpaBlob run.
     When I query "/" on peer "elohim.host"
     Then resolving "/" on peer "elohim.host" does NOT return App-not-found
-    And EPR "elohim-host-landing" blobHash is non-null on peer "elohim.host"
+    And EPR "elohim-host-landing" blobCid is non-null on peer "elohim.host"
 
   @wip
   Scenario: the deploy authority can stage bytes on a NON-author doorway (precondition for uniform resolution)
@@ -139,7 +139,7 @@ Feature: Federation deploy uniformity — landing EPR resolves on all federation
     # elohim.host resolves the landing EPR. They are silent on the step immediately before it:
     # whether the deploy pipeline is ALLOWED to put bytes on a doorway it did not author from.
     # It was not. From app #1672 every `seed elohim.host` leg answered 403, so the two
-    # assertions above could not have gone green no matter how well blobHash propagated —
+    # assertions above could not have gone green no matter how well blobCid propagated —
     # the bytes never arrived.
     #
     # THE ACTOR: the "fleet deploy authority" is the CI pipeline's own seed credential

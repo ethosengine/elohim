@@ -7,9 +7,9 @@
  * ~376-458), against a mocked `fetch` — no real storage peer needed.
  */
 import { strict as assert } from 'node:assert';
-import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import { mintByteCid } from '../../../src/framework/byte-address.js';
 import {
   buildFixtureBundle,
   classifyStorageResponse,
@@ -61,16 +61,17 @@ function makeFetchMock(opts: {
   const fetchFn = (async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const target = url.toString();
     const method = (init?.method ?? 'GET').toUpperCase();
-    if (target === `${STORAGE_URL}/blob/` && method === 'PUT') {
+    // The client mints the byte CID itself and PUTs `/blob/<cid>`; storage re-derives it.
+    if (target.startsWith(`${STORAGE_URL}/blob/`) && method === 'PUT') {
       const bytes = init?.body as Uint8Array;
-      uploadedHash = `sha256-${createHash('sha256').update(Buffer.from(bytes)).digest('hex')}`;
+      uploadedHash = mintByteCid(new Uint8Array(bytes));
       return Promise.resolve(
         new MockResponse({
-          // Shape captured from a live household `PUT /blob/` (201, camelCase wire).
+          // Shape of a household `PUT /blob/<cid>` (201, camelCase wire).
           status: 201,
           body:
             opts.uploadBody ??
-            JSON.stringify({ blobHash: uploadedHash, totalSize: bytes.byteLength }),
+            JSON.stringify({ blobCid: uploadedHash, totalSize: bytes.byteLength }),
         }) as unknown as Response
       );
     }
@@ -84,7 +85,7 @@ function makeFetchMock(opts: {
       return Promise.resolve(
         new MockResponse({
           status: 200,
-          body: JSON.stringify({ blobHash: opts.seatbeltHash ?? uploadedHash }),
+          body: JSON.stringify({ blobCid: opts.seatbeltHash ?? uploadedHash }),
         }) as unknown as Response
       );
     }
@@ -351,7 +352,7 @@ void describe('stageBundleThroughStorage', () => {
       patchResponses: [
         new MockResponse({ status: 200, body: JSON.stringify({ dhtAnchorHash: 'action-1' }) }),
       ],
-      seatbeltHash: 'sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      seatbeltHash: mintByteCid(Buffer.from('a different bundle')),
     });
 
     await assert.rejects(
@@ -367,11 +368,11 @@ void describe('stageBundleThroughStorage', () => {
           })
         )
       ),
-      /blobHash drift after PATCH/
+      /blobCid drift after PATCH/
     );
   });
 
-  void it('refuses an upload reply that names no blob hash, on the first attempt', async () => {
+  void it('refuses an upload reply that names no byte CID, on the first attempt', async () => {
     // The defect this pins: a reply shaped unlike the wire used to surface as a TypeError that the
     // ladder retried as a shed for its whole budget (11 attempts / 275 s on the household).
     const { fetchFn, patchCallCount } = makeFetchMock({
@@ -396,7 +397,7 @@ void describe('stageBundleThroughStorage', () => {
           })
         )
       ),
-      /answered the blob upload without a blob hash/
+      /answered the blob upload without a byte CID/
     );
     assert.equal(sleepCalls.length, 0, 'a shape defect must not be retried');
     assert.equal(patchCallCount(), 0);

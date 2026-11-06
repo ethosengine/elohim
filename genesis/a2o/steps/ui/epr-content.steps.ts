@@ -112,9 +112,7 @@ Given('content {string} has a blob reference', async function (this: E2EWorld, c
   });
   assert.equal(response.status, 200, `Content ${contentId} not found`);
   const content = (await response.json()) as Record<string, unknown>;
-  const hasBlobRef =
-    content['blobHash'] ??
-    (typeof content['contentBody'] === 'string' && content['contentBody'].startsWith('sha256'));
+  const hasBlobRef = content['blobCid'];
   assert.ok(hasBlobRef, `Content ${contentId} has no blob reference`);
 });
 

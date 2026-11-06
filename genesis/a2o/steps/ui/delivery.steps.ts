@@ -8,7 +8,7 @@
  *   - genesis/a2o/features/delivery/spa-bundle-delivery.feature
  *
  * Evidence from Task 5 SW structured logging ([apps-sw] prefix):
- *   [apps-sw] capability: — delivery mode and blobHash
+ *   [apps-sw] capability: — delivery mode and blobCid
  *   [apps-sw] zip-fetch:  — ZIP blob downloaded
  *   [apps-sw] cache-put:  — file extracted from ZIP into CacheStorage
  *   [apps-sw] cache-hit:  — SW cache served the file
@@ -350,8 +350,8 @@ Given(
  *
  * The fill is background work (`event.waitUntil` after the first load), so this polls.
  * "All app files" is judged by the SW's own completion mark: it remembers the slug's
- * head (`/apps/_heads/<slug>` → blobHash) only after the archive hashed to its address
- * and every entry was written under `/apps/<blobHash>/`.
+ * head (`/apps/_heads/<slug>` → blobCid) only after the archive hashed to its address
+ * and every entry was written under `/apps/<blobCid>/`.
  *
  * Example: And the Service Worker has cached all app files
  */
@@ -366,13 +366,13 @@ Given(
 
     const headPath = `/apps/_heads/${slug}`;
     let seen: { name: string | null; paths: string[] } = { name: null, paths: [] };
-    let blobHash = '';
+    let blobCid = '';
     const filled = await pollUntil(
       device,
       async () => {
         seen = await appsCacheEntries(device);
         if (!seen.paths.includes(headPath)) return false;
-        blobHash = (await device.page.evaluate(
+        blobCid = (await device.page.evaluate(
           async (args: { name: string; headPath: string }) => {
             const cache = await caches.open(args.name);
             const head = await cache.match(new URL(args.headPath, location.origin).href);
@@ -380,12 +380,12 @@ Given(
           },
           { name: seen.name ?? '', headPath }
         )) as string;
-        return blobHash !== '' && seen.paths.some(p => p.startsWith(`/apps/${blobHash}/`));
+        return blobCid !== '' && seen.paths.some(p => p.startsWith(`/apps/${blobCid}/`));
       },
       60_000
     );
 
-    const headNote = blobHash ? `, head → ${blobHash}` : ', no remembered head';
+    const headNote = blobCid ? `, head → ${blobCid}` : ', no remembered head';
     assert.ok(
       filled,
       `SW did not finish caching "${slug}" within 60s — cache ${seen.name ?? '(none)'} holds ` +
@@ -401,19 +401,19 @@ Given(
 /**
  * Precondition: the SW has a specific app version cached.
  *
- * Example: Given the Service Worker has cached "evolution-of-trust" with blob_hash "sha256-old"
+ * Example: Given the Service Worker has cached "evolution-of-trust" with blobCid "<old address>"
  */
 Given(
-  'the Service Worker has cached {string} with blob_hash {string}',
-  async function (this: E2EWorld, _appSlug: string, _blobHash: string) {
+  'the Service Worker has cached {string} with blob_cid {string}',
+  async function (this: E2EWorld, _appSlug: string, _blobCid: string) {
     // This is a setup precondition for cache-invalidation scenarios.
     // In practice, we ensure the app was loaded so the SW cached it.
-    // The blob_hash matching is verified via SW log evidence.
+    // The blob_cid matching is verified via SW log evidence.
   }
 );
 
 /**
- * Precondition: the SW has files cached for a slug (without blob_hash).
+ * Precondition: the SW has files cached for a slug (without blob_cid).
  *
  * Example: Given the Service Worker has cached "evolution-of-trust"
  */
@@ -647,26 +647,26 @@ Given(
 /**
  * Simulate a content update signal arriving at the SW.
  *
- * Example: When a content update signal arrives with blob_hash "sha256-new" for "evolution-of-trust"
+ * Example: When a content update signal arrives with blobCid "<new address>" for "evolution-of-trust"
  */
 When(
-  'a content update signal arrives with blob_hash {string} for {string}',
-  async function (this: E2EWorld, newBlobHash: string, appSlug: string) {
+  'a content update signal arrives with blob_cid {string} for {string}',
+  async function (this: E2EWorld, newBlobCid: string, appSlug: string) {
     const device = firstPlaywright(this);
     if (!device) return 'pending';
 
     // Simulate the SW receiving a content update signal via postMessage
     await device.page.evaluate(
-      (args: { appSlug: string; newBlobHash: string }) => {
+      (args: { appSlug: string; newBlobCid: string }) => {
         if (navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'CONTENT_UPDATE',
             appSlug: args.appSlug,
-            blobHash: args.newBlobHash,
+            blobCid: args.newBlobCid,
           });
         }
       },
-      { appSlug, newBlobHash }
+      { appSlug, newBlobCid }
     );
 
     // Wait briefly for the SW to process
@@ -696,10 +696,10 @@ Then("the app's page renders with visible text", async function (this: E2EWorld)
 /**
  * The version a browser shows offline is the one the household elected, checked by
  * the browser itself. Pending: the service worker takes the version from the
- * doorway's X-Blob-Hash header and never consults the election. Lands when the
+ * doorway's X-Content-Address header and never consults the election. Lands when the
  * client resolves the address from the elected head (record-proves spec §7 slice 8).
  *
- * Example: Then the blob_hash his browser shows is the one the household's election names as current
+ * Example: Then the blob_cid his browser shows is the one the household's election names as current
  */
 Given(
   "his browser kept the household's signed election record for {string} while online",
@@ -709,7 +709,7 @@ Given(
 );
 
 Then(
-  "the blob_hash his browser shows is the one the household's election names as current",
+  "the blob_cid his browser shows is the one the household's election names as current",
   function () {
     return 'pending';
   }
@@ -1900,12 +1900,12 @@ Then('the SW sends a HEAD capability probe to the serving peer', async function 
 });
 
 /**
- * Verify the probe response includes delivery mode and blob_hash.
+ * Verify the probe response includes delivery mode and blob_cid.
  *
- * Example: And the probe response includes the delivery mode and blob_hash
+ * Example: And the probe response includes the delivery mode and blob_cid
  */
 Then(
-  'the probe response includes the delivery mode and blob_hash',
+  'the probe response includes the delivery mode and blob_cid',
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld) {
     const device = firstPlaywright(this);
@@ -1917,7 +1917,7 @@ Then(
       return;
     }
 
-    // Capability log should include deliveryMode and blobHash
+    // Capability log should include deliveryMode and blobCid
     const hasMode = capLogs.some(
       l =>
         l.text.includes('compressed') ||
@@ -2027,10 +2027,10 @@ Given(
 /**
  * Precondition: the SPA has been seeded as a spa-bundle type with a blob hash.
  *
- * Example: And content "lamad-spa" has been seeded as spa-bundle with a valid blobHash
+ * Example: And content "lamad-spa" has been seeded as spa-bundle with a valid blobCid
  */
 Given(
-  'content {string} has been seeded as spa-bundle with a valid blobHash',
+  'content {string} has been seeded as spa-bundle with a valid blobCid',
   // eslint-disable-next-line @typescript-eslint/require-await
   async function (this: E2EWorld, _contentId: string) {
     // Verify the content exists in the system

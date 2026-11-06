@@ -115,7 +115,9 @@ describe('the attestation is keyed by the same source identity the report carrie
     const parts = { a2o: 'tree:1', storage: 'tree:2' };
     const bytes = sutArtifactCidBytes(parts);
     assert.equal(cidShortFingerprint(bytes), hashSutParts(parts));
-    assert.match(cidToString(bytes), /^bafkrei[a-z2-7]{52}$/);
+    // address-lint: allow -- record class: brit's own SUT-fingerprint artifact CID (raw+sha2 of the
+    // canonical SUT parts; a validation-note identity, not a byte-surface address). Brit owns it (T4).
+    assert.match(cidToString(bytes), /^bafkrei[a-z2-7]{52}$/); // address-lint: allow
     assert.equal(cidShortFingerprint([0x01, 0x71, ...bytes.slice(2)]), null);
   });
 

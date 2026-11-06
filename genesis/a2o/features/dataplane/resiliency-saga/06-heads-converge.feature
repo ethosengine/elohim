@@ -119,7 +119,7 @@ Feature: Chapter 6 — blobs sync to one head
   # premise — B is headless and should take A's declaration — no longer holds.
   # Probed live: BOTH doorways answer /db/content/elohim-host-landing/head
   # with declared:true, trust:notarized — A=uhCkk78Z… (declaredAt 08:56:34Z)
-  # vs B=uhCkkl4C9… (10:30:38Z, NEWER, different blobHash). Heal is
+  # vs B=uhCkkl4C9… (10:30:38Z, NEWER, different blobCid). Heal is
   # structurally forbidden from moving a declared head (fills-never-moves),
   # so "B adopts A" as written would demand a backward move the invariants
   # correctly refuse.

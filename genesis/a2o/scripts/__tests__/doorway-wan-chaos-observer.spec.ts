@@ -16,13 +16,13 @@ import {
 
 const A = {
   actionHash: 'action-a',
-  blobHash: 'blob-a',
+  blobCid: 'blob-a',
   version: 'version-a',
   entryScript: 'main-a.js',
 };
 const B = {
   actionHash: 'action-b',
-  blobHash: 'blob-b',
+  blobCid: 'blob-b',
   version: 'version-b',
   entryScript: 'main-b.js',
 };
@@ -71,7 +71,7 @@ function requesterFor(expected: ExpectedAuthority, unavailable = new Set<string>
         response(JSON.stringify({ headActionHash: expected.actionHash }), key)
       );
     if (target.path.includes('/db/content/'))
-      return await Promise.resolve(response(JSON.stringify({ blobHash: expected.blobHash }), key));
+      return await Promise.resolve(response(JSON.stringify({ blobCid: expected.blobCid }), key));
     if (target.path.includes('/version.json?'))
       return await Promise.resolve(response(JSON.stringify({ commit: expected.version }), key));
     return await Promise.resolve(

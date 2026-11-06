@@ -120,6 +120,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { getRawWithHeaders } from '../../src/framework/dataplane/surfaces.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import {
@@ -301,74 +302,25 @@ function nrtMarker(root: string): string {
 // `slug_index` — populated ONLY from `content_node` rows of format
 // `html5-app`/`spa-bundle` that clear the Amber trust floor (a provenance
 // marker: `dht_anchor_hash` or a completed libp2p publish drain — see
-// `lookup_slug_blob_hash`'s doc). No such row existed for a made-up test
+// `lookup_slug_blob_cid`'s doc). No such row existed for a made-up test
 // `epr_id`, so the archive genuinely had no member matching the request —
 // the storage-side 404 this file's earlier runs actually hit.
 //
 // The fix mirrors `scripts/ci/stage-spa-blob.sh` + `genesis/seeder/src/
 // doorway-client.ts`'s `pushBlob`: PUT a real, content-addressed ZIP via
-// `/admin/seed/blob` (`X-Blob-Hash`/`X-Blob-Cid`/`X-Blob-Size`), then create a
+// `/admin/seed/blob` (`X-Content-Address`/`X-Blob-Size`), then create a
 // `content_node` row naming that blob. The one addition CI's own path does
 // NOT need: `CreateContentInput.dhtAnchorHash` (`genesis/seeder/src/
 // generated/create-content-input.ts`) — "set at ingest so the row satisfies
 // the require_provenance read gate ... where the libp2p publish drain never
-// runs" — is exactly the provenance marker `lookup_slug_blob_hash` looks for,
+// runs" — is exactly the provenance marker `lookup_slug_blob_cid` looks for,
 // so the row is Amber-floor-visible immediately, with no conductor
 // round-trip to wait out (this household mesh's doorways are dev-mode,
 // diesel-direct writes; there is no drain loop staging content for them
 // otherwise).
 //
-// No `multiformats` import: that package resolves for genesis/seeder (a
-// declared dependency there) but not genesis/a2o (a separate pnpm workspace
-// member with no such dependency of its own) — hand-rolled CIDv1 here rather
-// than adding a new cross-package dependency for one content address.
+// The blob address is the byte CID (raw + BLAKE3-256) minted by src/framework/byte-address.ts.
 // ---------------------------------------------------------------------------
-
-const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
-
-function base32Encode(bytes: Uint8Array): string {
-  let bits = 0;
-  let value = 0;
-  let output = '';
-  for (const byte of bytes) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) {
-    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
-  }
-  return output;
-}
-
-/** Unsigned LEB128 varint — CID's own encoding for its version/codec/multihash-code
- * fields. Both values used here (1, 0x55, 0x12) fit in one byte; encoded properly
- * regardless, since a varint of a small value is just that one byte. */
-function varint(n: number): number[] {
-  const out: number[] = [];
-  let v = n;
-  while (v >= 0x80) {
-    out.push((v & 0x7f) | 0x80);
-    v >>>= 7;
-  }
-  out.push(v);
-  return out;
-}
-
-const RAW_CODEC = 0x55;
-const SHA2_256_CODE = 0x12;
-
-/** CIDv1, raw codec, sha2-256 multihash — `bafkrei…`, this codebase's canonical blob
- * address (`doorway/CLAUDE.md` "Addressing canon"). */
-function cidV1Raw(bytes: Uint8Array): string {
-  const digest = createHash('sha256').update(bytes).digest();
-  const multihash = [...varint(SHA2_256_CODE), ...varint(digest.length), ...digest];
-  const cidBytes = [...varint(1), ...varint(RAW_CODEC), ...multihash];
-  return `b${base32Encode(Uint8Array.from(cidBytes))}`;
-}
 
 let crc32TableCache: Uint32Array | undefined;
 
@@ -476,8 +428,7 @@ async function stockAppArchive(
     'utf8'
   );
   const zip = buildZip('index.html', html);
-  const legacyHash = `sha256-${createHash('sha256').update(zip).digest('hex')}`;
-  const cid = cidV1Raw(zip);
+  const cid = mintByteCid(zip);
 
   let putStatus = -1;
   let putText = '';
@@ -487,8 +438,7 @@ async function stockAppArchive(
       headers: {
         Authorization: `Bearer ${ADMIN_KEY}`,
         'Content-Type': 'application/zip',
-        'X-Blob-Hash': legacyHash,
-        'X-Blob-Cid': cid,
+        'X-Content-Address': cid,
         'X-Blob-Size': String(zip.length),
       },
       body: zip,
@@ -509,7 +459,6 @@ async function stockAppArchive(
     title: `[a2o name-routing-test] ${root}`,
     contentType: 'application',
     contentFormat: 'html5-app',
-    blobHash: legacyHash,
     blobCid: cid,
     contentSizeBytes: zip.length,
     reach: 'commons',

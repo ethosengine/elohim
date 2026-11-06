@@ -9,7 +9,6 @@
 
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -19,6 +18,7 @@ import { Given, Then, When } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { assertByteCid, mintByteCid, parseByteCid } from '../../src/framework/byte-address.js';
 import { getRaw } from '../../src/framework/dataplane/surfaces.js';
 import {
   householdMeshDir,
@@ -52,7 +52,14 @@ interface Passport {
 }
 
 interface WitnessListRow {
+  /** The witness RECORD's CID (dag-cbor + sha2, `bafyrei…`). */
   cid: string;
+  /**
+   * The BYTE CID (raw + BLAKE3-256, `bafkr4i…`) of the witness's canonical bytes — what the
+   * pantry and the custody plane name the blob by. The ark reports it; it is never derived from
+   * `cid` (the two profiles share no digest).
+   */
+  blob_cid: string;
   incident: string;
   process: string;
   pid: number;
@@ -84,10 +91,10 @@ interface DeathWitnessState {
   custodians?: CustodianHandle[];
   /** Station 2: Jessica's agent key, as the pledges name her. */
   wardAgent?: string;
-  /** Station 2: the one sha256 digest behind every rendering of the witness. */
-  witnessDigest?: string;
+  /** Station 2: the witness blob's byte CID, as the ark's own witness row reports it. */
+  witnessAddress?: string;
   /**
-   * Station 3b: the blob address (`blobHash` or `blobCid`) the non-vacuity
+   * Station 3b: the blob address (`blobCid`) the non-vacuity
    * control read off Jessica's own credentialled response — the anonymous
    * probe fetches this same address, never a hash the scenario invents.
    */
@@ -438,72 +445,6 @@ function requireAgentKey(name: HouseholdPeer): string {
   return key;
 }
 
-const BASE32_LOWER = 'abcdefghijklmnopqrstuvwxyz234567';
-
-function decodeBase32Lower(input: string): Uint8Array {
-  let bits = 0;
-  let value = 0;
-  const out: number[] = [];
-  for (const char of input) {
-    const index = BASE32_LOWER.indexOf(char);
-    assert.ok(index >= 0, `"${char}" is not a lower-case base32 character`);
-    value = (value << 5) | index;
-    bits += 5;
-    if (bits >= 8) {
-      bits -= 8;
-      out.push((value >>> bits) & 0xff);
-    }
-  }
-  return Uint8Array.from(out);
-}
-
-/**
- * The one sha256 digest behind every rendering of this witness.
- *
- * A death witness wears three addresses for one set of bytes: the witness CID
- * the ark wrote (`bafyrei…`, dag-cbor codec `0x71`), the pantry blob's own CID
- * (`bafkrei…`, raw codec `0x55`), and the legacy `sha256-<hex>` marker the
- * custody and inventory planes speak. They differ in CODEC, never in digest —
- * so "the same content hash" is a comparison of DIGESTS. Comparing the CID
- * strings of two codecs would report a false mismatch on identical bytes.
- *
- * Mirrors `BlobStore::parse_content_address`, which keys on the multihash
- * digest and accepts all three.
- */
-function witnessDigestOf(address: string): string {
-  const prefixed = /^sha256-([0-9a-f]{64})$/.exec(address);
-  if (prefixed) return prefixed[1];
-  if (/^[0-9a-f]{64}$/.test(address)) return address;
-  assert.match(
-    address,
-    /^b[a-z2-7]+$/,
-    `witness address "${address}" is neither sha256-<hex> nor a base32 CIDv1`
-  );
-  const bytes = decodeBase32Lower(address.slice(1));
-  assert.ok(
-    bytes.length === 36 &&
-      bytes[0] === 0x01 &&
-      (bytes[1] === 0x55 || bytes[1] === 0x71) &&
-      bytes[2] === 0x12 &&
-      bytes[3] === 0x20,
-    `CID "${address}" is not a v1 raw-or-dag-cbor CID over sha2-256`
-  );
-  return [...bytes.slice(4)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function digestOrUndefined(address: string): string | undefined {
-  if (address === '') return undefined;
-  try {
-    return witnessDigestOf(address);
-  } catch {
-    return undefined;
-  }
-}
-
-function sha256HexOfBytes(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
-
 /** GET a JSON list surface that answers either as a bare array or as `{items}`. */
 async function listRows(url: string, what: string): Promise<Record<string, unknown>[]> {
   const { status, text } = await getRaw(url);
@@ -531,7 +472,7 @@ function classifications(row: Record<string, unknown>): string[] {
   }
   if (metadata && typeof metadata === 'object') {
     const m = metadata as Record<string, unknown>;
-    const marker = m['blobMarker'] ?? m['blobHash'];
+    const marker = m['blobMarker'] ?? m['blobCid'];
     if (typeof marker === 'string' && marker.length > 0) return [marker];
   }
   return [];
@@ -581,9 +522,9 @@ async function peerStorageDir(name: HouseholdPeer): Promise<string> {
   return value;
 }
 
-/** `$STORAGE_DIR/blobs/blobs/<first-4-hex>/sha256-<hex>` */
-function blobFilePath(storageDir: string, digest: string): string {
-  return join(storageDir, 'blobs', 'blobs', digest.slice(0, 4), `sha256-${digest}`);
+/** `$STORAGE_DIR/blobs/blobs/<cid[7..11]>/<byte CID>` — the payload or its marker. */
+function blobFilePath(storageDir: string, address: string): string {
+  return join(storageDir, 'blobs', 'blobs', address.slice(7, 11), address);
 }
 
 function requireCustodians(state: DeathWitnessState): CustodianHandle[] {
@@ -600,7 +541,7 @@ function requireCustodians(state: DeathWitnessState): CustodianHandle[] {
  * stations run in one scenario); station 2 stands alone, so it looks for the
  * new incident itself against the baseline the kill step recorded.
  */
-async function awaitWitnessDigest(state: DeathWitnessState, deadline: number): Promise<string> {
+async function awaitWitnessAddress(state: DeathWitnessState, deadline: number): Promise<string> {
   assert.ok(state.priorIncidents, 'the kill step recorded no incident baseline');
   while (state.witnessRow === undefined) {
     const row = listWitnesses(JESSICA).find(
@@ -618,9 +559,11 @@ async function awaitWitnessDigest(state: DeathWitnessState, deadline: number): P
     }
     await wait(CUSTODY_POLL_MS);
   }
-  const digest = witnessDigestOf(state.witnessRow.cid);
-  state.witnessDigest = digest;
-  return digest;
+  // The custody address comes from the field the witness row carries for it; it is never derived
+  // from the record CID (dag-cbor + sha2 and raw + BLAKE3 share no digest).
+  const address = assertByteCid(state.witnessRow.blob_cid, 'the ark witness row blob_cid');
+  state.witnessAddress = address;
+  return address;
 }
 
 /**
@@ -630,7 +573,7 @@ async function awaitWitnessDigest(state: DeathWitnessState, deadline: number): P
  */
 async function custodyBlobMissing(
   custodian: CustodianHandle,
-  digest: string
+  address: string
 ): Promise<string | undefined> {
   const rows = await listRows(
     `${custodian.url}/api/v1/commitments?action=custody-blob&limit=500`,
@@ -639,26 +582,26 @@ async function custodyBlobMissing(
   const named = rows.some(
     row =>
       String(row['provider'] ?? '') === custodian.agentPubKey &&
-      classifications(row).some(marker => digestOrUndefined(marker) === digest)
+      classifications(row).some(marker => parseByteCid(marker) === address)
   );
   return named
     ? undefined
-    : `no custody-blob commitment on ${custodian.name} names it as provider for sha256-${digest}`;
+    : `no custody-blob commitment on ${custodian.name} names it as provider for ${address}`;
 }
 
-/** Does the custodian hold bytes that hash to the witness digest? */
+/** Does the custodian hold bytes that address as the witness byte CID? */
 async function custodyBytesMissing(
   custodian: CustodianHandle,
-  digest: string
+  address: string
 ): Promise<string | undefined> {
-  const file = blobFilePath(await peerStorageDir(custodian.name), digest);
+  const file = blobFilePath(await peerStorageDir(custodian.name), address);
   if (!existsSync(file)) {
-    return `${custodian.name} is credited with custody of sha256-${digest} but holds no bytes at ${file}`;
+    return `${custodian.name} is credited with custody of ${address} but holds no bytes at ${file}`;
   }
-  const held = sha256HexOfBytes(await readFile(file));
-  return held === digest
+  const held = mintByteCid(new Uint8Array(await readFile(file)));
+  return held === address
     ? undefined
-    : `${custodian.name}'s copy at ${file} hashes to sha256-${held}, not sha256-${digest}`;
+    : `${custodian.name}'s copy at ${file} addresses as ${held}, not ${address}`;
 }
 
 /**
@@ -671,16 +614,16 @@ async function custodyBytesMissing(
  * `blob_reach::blob_serve_verdict` returns `Authorize` — and `http.rs` fails
  * that branch CLOSED for every caller, identified or not. That refusal IS the
  * contract (station 3b names it), so a 403 carrying `requiredReach` is
- * accepted here and the digest is proven from the bytes on disk instead. A 200
- * is accepted only when the served bytes hash to the witness digest; anything
+ * accepted here and the address is proven from the bytes on disk instead. A 200
+ * is accepted only when the served bytes address as the witness byte CID; anything
  * else — 404, 5xx, or a 200 over different bytes — is a real failure.
  */
 async function blobRouteDisagrees(
   custodian: CustodianHandle,
-  cid: string,
-  digest: string
+  address: string
 ): Promise<string | undefined> {
-  const url = `${custodian.url}/blob/${encodeURIComponent(cid)}`;
+  // The byte route is keyed by the byte CID, never by the witness record's CID.
+  const url = `${custodian.url}/blob/${encodeURIComponent(address)}`;
   const { statusCode, body } = await request(url, {
     method: 'GET',
     headersTimeout: 15_000,
@@ -688,10 +631,10 @@ async function blobRouteDisagrees(
   });
   const bytes = new Uint8Array(await body.arrayBuffer());
   if (statusCode === 200) {
-    const served = sha256HexOfBytes(bytes);
-    return served === digest
+    const served = mintByteCid(bytes);
+    return served === address
       ? undefined
-      : `GET ${url} served bytes hashing to sha256-${served}, not sha256-${digest}`;
+      : `GET ${url} served bytes addressing as ${served}, not ${address}`;
   }
   const text = Buffer.from(bytes).toString('utf8');
   if (statusCode === 403 && text.includes('requiredReach')) return undefined;
@@ -701,13 +644,12 @@ async function blobRouteDisagrees(
 /** Everything station 2 claims about ONE custodian, or the first thing missing. */
 async function custodyShortfall(
   custodian: CustodianHandle,
-  cid: string,
-  digest: string
+  address: string
 ): Promise<string | undefined> {
   return (
-    (await custodyBlobMissing(custodian, digest)) ??
-    (await custodyBytesMissing(custodian, digest)) ??
-    (await blobRouteDisagrees(custodian, cid, digest))
+    (await custodyBlobMissing(custodian, address)) ??
+    (await custodyBytesMissing(custodian, address)) ??
+    (await blobRouteDisagrees(custodian, address))
   );
 }
 
@@ -779,7 +721,7 @@ Then(
     const state = scenario(this);
     const custodians = requireCustodians(state);
     const deadline = Date.now() + CUSTODY_WINDOW_MS;
-    const digest = await awaitWitnessDigest(state, deadline);
+    const address = await awaitWitnessAddress(state, deadline);
     const cid = state.witnessRow?.cid ?? '';
     const pending = new Map<HouseholdPeer, string>(
       custodians.map(custodian => [custodian.name, 'not yet checked'])
@@ -788,7 +730,7 @@ Then(
     while (Date.now() <= deadline) {
       for (const custodian of custodians) {
         if (!pending.has(custodian.name)) continue;
-        const shortfall = await custodyShortfall(custodian, cid, digest);
+        const shortfall = await custodyShortfall(custodian, address);
         if (shortfall === undefined) pending.delete(custodian.name);
         else pending.set(custodian.name, shortfall);
       }
@@ -798,7 +740,7 @@ Then(
 
     const shortfalls = [...pending].map(([name, why]) => `${name}: ${why}`).join('; ');
     assert.fail(
-      `Jessica's witness ${cid} (sha256-${digest}) was not held by every custodian within ` +
+      `Jessica's witness ${cid} (blob ${address}) was not held by every custodian within ` +
         `${CUSTODY_WINDOW_MS / 1000} seconds — ${shortfalls}`
     );
   }
@@ -810,10 +752,10 @@ Then(
   async function (this: E2EWorld) {
     const state = scenario(this);
     const custodians = requireCustodians(state);
-    const digest = state.witnessDigest;
+    const address = state.witnessAddress;
     assert.ok(
-      digest,
-      'no witness digest was resolved — the custody step for this scenario did not run'
+      address,
+      'no witness address was resolved — the custody step for this scenario did not run'
     );
     const jessica = await wardIdentities();
 
@@ -822,18 +764,16 @@ Then(
         `${custodian.url}/api/v1/economic-events?action=serve-blob&limit=500`,
         `${custodian.name}'s serve-blob events`
       );
-      const receipts = rows.filter(
-        row => digestOrUndefined(String(row['resourceInventoriedAs'] ?? '')) === digest
-      );
+      const receipts = rows.filter(row => parseByteCid(row['resourceInventoriedAs']) === address);
       assert.ok(
         receipts.length > 0,
         `${custodian.name} holds the witness but records no serve-blob event for ` +
-          `sha256-${digest} — it cannot say where the bytes came from`
+          `${address} — it cannot say where the bytes came from`
       );
       const providers = new Set(receipts.map(row => String(row['provider'] ?? '')));
       assert.ok(
         [...providers].some(provider => jessica.has(provider)),
-        `${custodian.name} records receiving sha256-${digest} from ` +
+        `${custodian.name} records receiving ${address} from ` +
           `${[...providers].join(', ') || 'nobody'}, none of which is Jessica ` +
           `(${[...jessica].join(' | ')})`
       );
@@ -885,7 +825,7 @@ Given("Jessica's peer holds a death witness", { timeout: 20_000 }, async functio
   // any HTTP credential (the same call station 1/2 already rely on).
   selectedWitness(this);
   const cid = state.witnessRow.cid;
-  state.witnessDigest ??= witnessDigestOf(cid);
+  state.witnessAddress ??= assertByteCid(state.witnessRow.blob_cid, 'the ark witness row blob_cid');
 
   const { url, agentPubKey } = meshPeer(JESSICA);
   assert.ok(
@@ -908,12 +848,12 @@ Given("Jessica's peer holds a death witness", { timeout: 20_000 }, async functio
   );
   let blobRef: string | undefined;
   try {
-    const body = JSON.parse(control.text) as { blobHash?: string; blobCid?: string };
-    blobRef = body.blobHash ?? body.blobCid ?? undefined;
+    const body = JSON.parse(control.text) as { blobCid?: string };
+    blobRef = body.blobCid ?? undefined;
   } catch {
     blobRef = undefined;
   }
-  state.witnessBlobRef = blobRef ?? state.witnessDigest;
+  state.witnessBlobRef = blobRef ?? state.witnessAddress;
 });
 
 When(

@@ -42,7 +42,7 @@ import { destructiveAllowed } from '../../src/framework/fixtures/substrate-scope
 import { E2EWorld } from '../../src/framework/world.js';
 import { meshControl } from '../dataplane/epr-app-deliverability.helpers.js';
 
-import { artifact, sha256Address, type OversizedArtifact } from './oversized-blob-ingest.steps.js';
+import { artifact, byteAddress, type OversizedArtifact } from './oversized-blob-ingest.steps.js';
 
 const HOUSEHOLD_PEERS = ['matthew', 'jessica', 'james'] as const;
 type HouseholdPeerName = (typeof HOUSEHOLD_PEERS)[number];
@@ -53,11 +53,11 @@ const SURVIVORS: readonly HouseholdPeerName[] = ['jessica', 'james'];
 const MESH_LOCK = householdMeshDir();
 
 interface ManifestWire {
-  blob_hash: string;
+  blob_cid: string;
   encoding: string;
   data_shards: number;
   total_shards: number;
-  shard_hashes: string[];
+  shard_cides: string[];
 }
 
 interface DeliveryPeerWire {
@@ -172,7 +172,7 @@ function makeRunSpecific(art: OversizedArtifact): void {
   for (let index = 0; index < 4; index += 1) {
     art.bytes.set(randomBytes(64), index * RS_SHARD_BYTES);
   }
-  art.hash = sha256Address(art.bytes);
+  art.hash = byteAddress(art.bytes);
   runSpecificArtifacts.add(art);
 }
 
@@ -337,7 +337,7 @@ When(
         contentFormat: 'external',
         reach: 'commons',
         title: id,
-        blobHash: art.hash,
+        blobCid: art.hash,
         contentBody: `RS source-loss acceptance fixture ${id}`,
       }),
       signal: AbortSignal.timeout(30_000),
@@ -361,7 +361,7 @@ function normalizedManifest(manifest: ManifestWire): {
     encoding: manifest.encoding,
     dataShards: manifest.data_shards,
     totalShards: manifest.total_shards,
-    hashes: manifest.shard_hashes,
+    hashes: manifest.shard_cides,
   };
 }
 
@@ -408,7 +408,7 @@ async function readPlacement(
     `/manifest/${encodeURIComponent(art.hash)}`
   );
   const normalized = normalizedManifest(manifest);
-  const manifestHash = manifest.blob_hash;
+  const manifestHash = manifest.blob_cid;
   assert.equal(
     manifestHash,
     art.hash,
@@ -593,7 +593,7 @@ When(
     );
     state.survivorLogBefore.set(target, await readFile(peerLogPath(target), 'utf8'));
     const bytes = await directBlob(peerUrl(target), art.hash);
-    state.reconstructedHash = sha256Address(bytes);
+    state.reconstructedHash = byteAddress(bytes);
     const sourceStillDown = await fetch(`${peerUrl(INGEST_PEER)}/health`, {
       signal: AbortSignal.timeout(2_000),
     }).catch(() => undefined);
@@ -657,8 +657,7 @@ Then(
         row.source_peer === sourceStatus.peerId &&
         (row.transport === 'libp2p' || row.transport === 'iroh') &&
         sourceIndices.some(
-          index =>
-            !receiverIndices.includes(index) && row.blob_hash === placement.shardHashes[index]
+          index => !receiverIndices.includes(index) && row.blob_cid === placement.shardHashes[index]
         )
       );
     });

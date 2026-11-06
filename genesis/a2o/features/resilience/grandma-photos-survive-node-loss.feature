@@ -71,7 +71,7 @@ Feature: Grandma's photos survive a node loss; the family sees they're held
 
   # === Real-data: a blob-backed album lights stewarding (Epic B) ==============
   # The card honestly reads dark for inline-body content (DHT-replicated, never
-  # shard-distributed). A photo album IS the blob case: it has a blob_hash, so it
+  # shard-distributed). A photo album IS the blob case: it has a blob_cid, so it
   # enters the distribution plane. These two scenarios prove the card LIGHTS for
   # genuinely shard-distributed content — first deterministically (the operator
   # seed lever, for demo/test/thin-mesh), then via the real P2P path on a 2-node
@@ -96,7 +96,7 @@ Feature: Grandma's photos survive a node loss; the family sees they're held
 
   @resilience-p1 @local @requires:household-nodes
   Scenario: A blob-backed album distributes across the live household mesh
-    # The GENUINE path: POST /db/content with a blob_hash triggers distribute_shards,
+    # The GENUINE path: POST /db/content with a blob_cid triggers distribute_shards,
     # which selects committed peers and pushes shards, writing shard_locations on
     # placement. On the household P2P mesh (Matthew/Jessica/James — the stable
     # floor, itself a multi-node cluster) this lands ≥2 stewarding households.
@@ -131,7 +131,7 @@ Feature: Grandma's photos survive a node loss; the family sees they're held
   @wip @s-spine
   Scenario: The "watching" message names which holder lapsed
     # Follow-on: needs gap→holder linkage in the custody emit path (PlacementGapView
-    # carries shard_hash, not holder identity). See backlog: the felt surface names
+    # carries shard_cid, not holder identity). See backlog: the felt surface names
     # the lapsed holder once the gap event carries the lapsed household id.
     Given a placement-gap event has fired for "summer-1974" because "Aunt Ruth" stopped holding a shard
     When I read "/api/v1/resilience/summer-1974/household"

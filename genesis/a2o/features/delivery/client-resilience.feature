@@ -22,10 +22,10 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   unzipped, and lists them as ready_content in the capability announcement it publishes;
   a peer that lists an app can hand over its files one by one. When an app gets a new
   version, a CONTENT UPDATE SIGNAL — a message to the Service Worker naming the new
-  blob_hash — tells the worker its cached copy is out of date.
+  blob_cid — tells the worker its cached copy is out of date.
 
   What the offline promise proves today, and what it does not. When Matthew goes offline,
-  his browser shows the app from bytes it checked against their blob_hash, at the
+  his browser shows the app from bytes it checked against their blob_cid, at the
   version it last checked. Which version that is, it learned from a doorway. Checking
   that version against the household's election is the next stage, named as its own
   scenario below.
@@ -75,7 +75,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     And his browser kept the household's signed election record for "evolution-of-trust" while online
     When Matthew goes offline
     And Matthew reloads "evolution-of-trust"
-    Then the blob_hash his browser shows is the one the household's election names as current
+    Then the blob_cid his browser shows is the one the household's election names as current
     And his browser read that election itself rather than taking the version from a doorway
 
   @wip @tauri-only
@@ -110,7 +110,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     Given the Service Worker cache for "evolution-of-trust" is empty
     When Matthew loads "evolution-of-trust"
     Then the SW sends a HEAD capability probe to the serving peer
-    And the probe response includes the delivery mode and blob_hash
+    And the probe response includes the delivery mode and blob_cid
     And the SW uses the indicated delivery mode for subsequent file requests
 
   # --- Delivery Mode: Extracted Files ---
@@ -138,8 +138,8 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
 
   @wip @browser-only
   Scenario: SW invalidates cache when an app's version changes
-    Given the Service Worker has cached "evolution-of-trust" with blob_hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
-    When a content update signal arrives with blob_hash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi" for "evolution-of-trust"
+    Given the Service Worker has cached "evolution-of-trust" with blob_cid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When a content update signal arrives with blob_cid "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi" for "evolution-of-trust"
     Then the SW evicts all cached files for "evolution-of-trust"
     And the next request triggers a fresh fetch
 

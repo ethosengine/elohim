@@ -18,7 +18,7 @@
  *   Then the selected sync doc is present on peer {string}
  *   Then the selected sync doc has converged onto peer {string}
  *   Then blob {string} is byte-present on peer {string}
- *   Then EPR {string} blobHash is non-null on peer {string}
+ *   Then EPR {string} blobCid is non-null on peer {string}
  *   Then the served head for EPR {string} matches the declared head on peer {string}
  *   When a visitor asks peer {string} for the page at {string}
  *   Then every script and stylesheet the page from peer {string} names is one that peer serves
@@ -974,11 +974,11 @@ Then(
 // ---------------------------------------------------------------------------
 
 /**
- * Assert that a content item's blobHash field is non-null on the peer.
- * A non-null blobHash confirms that a blob has been attached to the EPR node.
+ * Assert that a content item's blobCid field is non-null on the peer.
+ * A non-null blobCid confirms that a blob has been attached to the EPR node.
  */
 Then(
-  'EPR {string} blobHash is non-null on peer {string}',
+  'EPR {string} blobCid is non-null on peer {string}',
   // probeContent rides the bounded catching-up shed; cucumber's 30s default
   // would kill the ride mid-flight, so the ceiling derives from the ride cap.
   { timeout: CATCHUP_RIDE_STEP_TIMEOUT_MS },
@@ -986,8 +986,8 @@ Then(
     const url = getPeerUrl(this, peerName);
     const { body } = await probeContent(url, eprId);
     assert.ok(
-      body.blobHash !== null && body.blobHash !== undefined && body.blobHash !== '',
-      `EPR "${eprId}" on ${peerName}: blobHash is ${JSON.stringify(body.blobHash)} — blob not yet attached`
+      body.blobCid !== null && body.blobCid !== undefined && body.blobCid !== '',
+      `EPR "${eprId}" on ${peerName}: blobCid is ${JSON.stringify(body.blobCid)} — blob not yet attached`
     );
   }
 );
@@ -995,9 +995,9 @@ Then(
 /**
  * Track-4 T4-2 — served-vs-declared projected-head propagation.
  *
- * DECLARED: GET /db/content/{slug}.serverBlobHash — the content row's SSR
+ * DECLARED: GET /db/content/{slug}.serverBlobCid — the content row's SSR
  * bundle pointer, the same field elohim-storage/src/ssr.rs
- * parse_server_blob_hash() reads to render the page.
+ * parse_server_blob_cid() reads to render the page.
  *
  * SERVED: GET /health/startup (falling back to /health) servedBundleHeads[]
  * — what the RUNNING doorway process has actually materialized. This is the
@@ -1006,7 +1006,7 @@ Then(
  * it still serves a STALE materialization (a stale-but-200 host).
  *
  * Two honest, non-failing outcomes exist alongside the pass/fail comparison:
- *   - No declared serverBlobHash at all yet (nothing has been authored) → 'pending'.
+ *   - No declared serverBlobCid at all yet (nothing has been authored) → 'pending'.
  *   - The T4-1 attestation (servedBundleHeads) is absent from BOTH health
  *     surfaces, or carries no entry for this slug → 'pending' (mirrors the
  *     CI probe's FIELD-ABSENT = SKIP semantics — forward-compatible until
@@ -1028,11 +1028,11 @@ Then(
       200,
       `EPR "${eprId}" on ${peerName}: GET /db/content returned ${contentStatus} — no declared head to compare against`
     );
-    const declared = contentBody.serverBlobHash;
+    const declared = contentBody.serverBlobCid;
     if (!declared) {
       // eslint-disable-next-line no-console
       console.log(
-        `  PENDING: EPR "${eprId}" on ${peerName} has no declared serverBlobHash yet — nothing authored to compare against`
+        `  PENDING: EPR "${eprId}" on ${peerName} has no declared serverBlobCid yet — nothing authored to compare against`
       );
       return 'pending';
     }
@@ -1042,7 +1042,7 @@ Then(
       probe.reachable,
       `${peerName}: neither /health/startup nor /health was reachable — cannot verify the served head for "${eprId}"`
     );
-    if (!probe.entry?.serverBlobHash) {
+    if (!probe.entry?.serverBlobCid) {
       // eslint-disable-next-line no-console
       console.log(
         `  PENDING: ${peerName} servedBundleHeads absent or missing an entry for "${eprId}" (source: ${probe.source}) — T4-1 attestation not yet deployed here`
@@ -1050,9 +1050,9 @@ Then(
       return 'pending';
     }
     assert.strictEqual(
-      probe.entry.serverBlobHash,
+      probe.entry.serverBlobCid,
       declared,
-      `EPR "${eprId}" on ${peerName}: served serverBlobHash "${probe.entry.serverBlobHash}" != declared "${declared}" ` +
+      `EPR "${eprId}" on ${peerName}: served serverBlobCid "${probe.entry.serverBlobCid}" != declared "${declared}" ` +
         `(materializedAt=${probe.entry.materializedAt ?? 'unknown'}, status=${probe.entry.status ?? 'unknown'}) ` +
         `— the running doorway process has not materialized the current declared head.`
     );
@@ -1350,14 +1350,14 @@ Then(
  * it 404s; a doorway that still holds both eras answers 200 for a page that
  * boots yesterday's app, and only this comparison sees that.
  *
- * DECLARED: GET /db/content/{slug}.blobHash — the BROWSER bundle pointer
- * (distinct from serverBlobHash, the SSR server bundle the served-vs-declared
+ * DECLARED: GET /db/content/{slug}.blobCid — the BROWSER bundle pointer
+ * (distinct from serverBlobCid, the SSR server bundle the served-vs-declared
  * step above compares), read through that bundle's own index as the
  * /apps/{slug}/index.html projection serves it.
  * SERVED: the bytes the visitor step already fetched from this peer.
  *
  * Two honest, non-failing outcomes sit alongside the pass/fail comparison:
- *   - No declared blobHash yet (no browser head authored) -> 'pending'.
+ *   - No declared blobCid yet (no browser head authored) -> 'pending'.
  *   - The peer does not project /apps/{slug}/index.html, or neither index
  *     names a `main-*.js` -> a NOTE, and the comparison is skipped. Assertion 1
  *     stands on its own either way.
@@ -1372,11 +1372,11 @@ Then(
     const where = `EPR "${eprId}" on ${peerName}`;
 
     const { body: row } = await probeContent(peerUrl, eprId);
-    const declaredBlobHash = typeof row.blobHash === 'string' ? row.blobHash : '';
-    if (declaredBlobHash === '') {
+    const declaredBlobCid = typeof row.blobCid === 'string' ? row.blobCid : '';
+    if (declaredBlobCid === '') {
       // eslint-disable-next-line no-console
       console.log(
-        `  PENDING: ${where} declares no browser blobHash yet — no head has been authored for the served page to match`
+        `  PENDING: ${where} declares no browser blobCid yet — no head has been authored for the served page to match`
       );
       return 'pending';
     }
@@ -1404,7 +1404,7 @@ Then(
     if (servedEntry !== declaredEntry) {
       assert.fail(
         `${where}: the page served at "${page.urlPath}" boots "${servedEntry}", but the declared browser head — ` +
-          `blobHash ${declaredBlobHash}, projected at /apps/${eprId}/index.html as content-address ` +
+          `blobCid ${declaredBlobCid}, projected at /apps/${eprId}/index.html as content-address ` +
           `${declaredIndex.headers['x-content-address'] ?? 'unknown'} — boots "${declaredEntry}"` +
           `${await describeShellProvenance(page.url)}. This doorway is handing a visitor a page from a PREVIOUS ` +
           `bundle era: every other asset can answer 200 and the app still never boots.`
@@ -1462,7 +1462,7 @@ Then(
  * (dhtAnchorHash) must be present AND identical across the two named peers.
  *
  * This is the notary's core invariant, strictly stronger than per-peer trust="notarized":
- * two peers can each be green over DIFFERENT heads (divergent dhtAnchorHash + blobHash — each
+ * two peers can each be green over DIFFERENT heads (divergent dhtAnchorHash + blobCid — each
  * having independently authored/notarized its own bundle), which is a false-green. Convergence
  * means ONE canonical head, elected by earned authority and adopted by every peer. A missing
  * anchor on either peer, or two differing anchors, is an honest red until cross-peer head

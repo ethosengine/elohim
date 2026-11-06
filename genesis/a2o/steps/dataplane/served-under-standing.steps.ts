@@ -170,6 +170,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { After, Before, Given, When, Then } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { getRawWithHeaders } from '../../src/framework/dataplane/surfaces.js';
 import {
   loadHouseholdMeshFixture,
@@ -210,47 +211,6 @@ const HOUSEHOLD_COLLECTIVE_ID = 'household-dowell';
 // file exports these helpers, and reaching into a sibling steps file for
 // unexported internals is worse than one more small, self-contained copy.
 // ---------------------------------------------------------------------------
-
-const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
-
-function base32Encode(bytes: Uint8Array): string {
-  let bits = 0;
-  let value = 0;
-  let output = '';
-  for (const byte of bytes) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) {
-    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
-  }
-  return output;
-}
-
-function varint(n: number): number[] {
-  const out: number[] = [];
-  let v = n;
-  while (v >= 0x80) {
-    out.push((v & 0x7f) | 0x80);
-    v >>>= 7;
-  }
-  out.push(v);
-  return out;
-}
-
-const RAW_CODEC = 0x55;
-const SHA2_256_CODE = 0x12;
-
-function cidV1Raw(bytes: Uint8Array): string {
-  const digest = createHash('sha256').update(bytes).digest();
-  const multihash = [...varint(SHA2_256_CODE), ...varint(digest.length), ...digest];
-  const cidBytes = [...varint(1), ...varint(RAW_CODEC), ...multihash];
-  return `b${base32Encode(Uint8Array.from(cidBytes))}`;
-}
 
 let crc32TableCache: Uint32Array | undefined;
 
@@ -758,8 +718,7 @@ async function stockArchive(doorwayUrl: string, contentId: string, label: string
     'utf8'
   );
   const zip = buildZip('index.html', html);
-  const legacyHash = `sha256-${createHash('sha256').update(zip).digest('hex')}`;
-  const cid = cidV1Raw(zip);
+  const cid = mintByteCid(zip);
 
   let putStatus = -1;
   let putText = '';
@@ -769,8 +728,7 @@ async function stockArchive(doorwayUrl: string, contentId: string, label: string
       headers: {
         Authorization: `Bearer ${ADMIN_KEY}`,
         'Content-Type': 'application/zip',
-        'X-Blob-Hash': legacyHash,
-        'X-Blob-Cid': cid,
+        'X-Content-Address': cid,
         'X-Blob-Size': String(zip.length),
       },
       body: zip,
@@ -791,7 +749,6 @@ async function stockArchive(doorwayUrl: string, contentId: string, label: string
     title: `[a2o served-under-standing] ${label}`,
     contentType: 'application',
     contentFormat: 'html5-app',
-    blobHash: legacyHash,
     blobCid: cid,
     contentSizeBytes: zip.length,
     reach: 'commons',

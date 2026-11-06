@@ -11,6 +11,7 @@ import { encodeHashToBase64, hashFrom32AndType, HoloHashType } from '@holochain/
 import { encode } from '@msgpack/msgpack';
 
 import { publishSubmission, submitRequest } from '../../../agentic/compute/submission.mjs';
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { main, parseArgs } from '../compute-runner.js';
 import {
   deriveRunnerCredentials,
@@ -64,7 +65,7 @@ async function execute(program: string, args: string[]): Promise<string> {
   const bytes = readFileSync(args[1]);
   const sha = createHash('sha256').update(bytes).digest('hex');
   if (args[0] === 'artifact')
-    return JSON.stringify({ cid: `bafkrei${sha.slice(0, 20)}`, sha256: sha, bytes: bytes.length });
+    return JSON.stringify({ cid: mintByteCid(bytes), sha256: sha, bytes: bytes.length });
   if (args[0] === 'cid') return `bafyreitask${sha.slice(0, 20)}\n`;
   throw new Error(`unknown executor verb ${args[0]}`);
 }
@@ -295,7 +296,8 @@ it('stocks inputs with bearer + owner and draws outputs naming the request', asy
   // Poll a completed task and draw its output back.
   const outChunk = Buffer.from('stage stdout\n');
   const sha = createHash('sha256').update(outChunk).digest('hex');
-  rec.stored.set('bafkreiout', outChunk);
+  const outCid = mintByteCid(outChunk);
+  rec.stored.set(outCid, outChunk);
   const completed = {
     state: 'completed',
     taskCid,
@@ -308,7 +310,7 @@ it('stocks inputs with bearer + owner and draws outputs naming the request', asy
             name: STDOUT_LOG,
             sha256: sha,
             bytes: outChunk.length,
-            chunks: [{ cid: 'bafkreiout', sha256: sha, bytes: outChunk.length }],
+            chunks: [{ cid: outCid, sha256: sha, bytes: outChunk.length }],
           },
         ],
       },

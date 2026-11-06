@@ -15,7 +15,7 @@ Feature: Elohim Protocol landing page is dogfooded as protocol content
     Then the contentFormat is "html5-app"
     And the content.slug is "elohim-host-landing"
     And the content.entryPoint is "index.html"
-    And the blobHash is a sha256 hex string
+    And the blobCid is a byte CID
 
   Scenario: The landing bundle serves at the /apps path
     When I GET "/apps/elohim-host-landing/index.html" from the doorway

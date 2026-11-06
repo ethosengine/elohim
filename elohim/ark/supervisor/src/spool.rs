@@ -49,6 +49,11 @@ pub enum SpoolError {
 pub struct WitnessSummary {
     /// Content-derived witness CID, taken from the file name.
     pub cid: String,
+    /// Byte CID (raw + BLAKE3-256, `bafkr4i…`) of this witness's canonical bytes: the address
+    /// the pantry names the witness blob by. A different profile from `cid` (dag-cbor + sha2,
+    /// `bafyrei…`) over the same bytes — the two never share a digest, so a custody check
+    /// compares this field, never a digest of `cid`.
+    pub blob_cid: String,
     /// Incident CID carrying this death.
     pub incident: String,
     /// Process that died.
@@ -104,8 +109,15 @@ impl Spool {
                     SpoolError::Data(format!("invalid witness path: {}", path.display()))
                 })?
                 .to_string();
+            let blob_cid = elohim_epr::address::compute_bytes_cid(
+                &witness
+                    .canonical_bytes()
+                    .map_err(|error| SpoolError::Data(error.to_string()))?,
+            )
+            .to_string();
             summaries.push(WitnessSummary {
                 cid,
+                blob_cid,
                 incident: witness.incident,
                 process: witness.process,
                 pid: witness.pid,
@@ -472,6 +484,13 @@ mod tests {
         let summaries = spool.list_witnesses().unwrap();
         assert_eq!(summaries.len(), 2);
         assert_eq!(summaries[0].cid, later_cid);
+        // The byte address of the canonical bytes: raw + BLAKE3-256, not the record CID's digest.
+        assert_eq!(
+            summaries[0].blob_cid,
+            elohim_epr::address::compute_bytes_cid(&later.canonical_bytes().unwrap()).to_string()
+        );
+        assert!(summaries[0].blob_cid.starts_with("bafkr4i"));
+        assert_ne!(summaries[0].blob_cid, summaries[0].cid);
         assert_eq!(summaries[0].pid, 42);
         assert_eq!(summaries[0].died_at_epoch_ms, 3_000);
         assert_eq!(summaries[1].cid, earlier_cid);

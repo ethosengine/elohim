@@ -25,6 +25,7 @@ import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { EPR_HOME } from '../../src/framework/pages/epr-home.page.js';
 import { CONTEXT_MENU, EPR_LINK, MARKDOWN } from '../../src/framework/pages/selectors.js';
@@ -90,8 +91,7 @@ Given(
 // Sentinel EPR ref for the unreachable scenario: syntactically valid, but the
 // fabricated hash resolves to nothing — the seeded DHT has no such content, so
 // the injected element's resolver returns null and the host transitions to L4.
-const UNREACHABLE_EPR =
-  'epr:sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+const UNREACHABLE_EPR = `epr:${mintByteCid(Buffer.from('a2o: no such content is seeded'))}`;
 // Title carried by the previewEprRef the unreachable EPR declares — asserted by
 // "the chip renders the preview EPR's content".
 const PREVIEW_TITLE = 'Manifesto (cached preview)';

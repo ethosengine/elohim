@@ -10,7 +10,7 @@
  *   /sync/v1/{hAppId}/docs          → SyncDocListSurface
  *   /sync/v1/{hAppId}/docs/{id}/heads → SyncDocHeadsSurface
  *   /blob/{hash}                    → HTTP status (200 present / 404 missing)
- *   /db/content/{id}                → ContentItemSurface (blobHash field)
+ *   /db/content/{id}                → ContentItemSurface (blobCid field)
  *   /p2p/status                     → P2PStatusSurface (direct storage access)
  *   /api/v1/epr/{id}/nav-context    → raw JSON
  *   /api/v1/diagnostics/inventory-parity → raw JSON
@@ -19,7 +19,7 @@
  *   /db/p2p/conductor-diagnostics   → ConductorDiagnosticsSurface (live agent set)
  *   /health/startup (→ /health fallback) → ServedHeadProbeResult (T4-1 servedBundleHeads
  *                                     attestation — Track-4 T4-2's "served" side, compared
- *                                     against ContentItemSurface.serverBlobHash, the "declared" side)
+ *                                     against ContentItemSurface.serverBlobCid, the "declared" side)
  *   /db/content/{id}/head           → DeclaredHeadResult (notary HEAD: headActionHash + declared)
  *   / (+ /health, /status.json)     → classifyDoorwayState() DoorwayState ('serving' |
  *                                     'shedding' | 'dead') — doorway-failover concern
@@ -162,17 +162,17 @@ export interface HealthConductor {
  * contract — deployed in parallel with this file; written to the CONTRACT,
  * not to whatever doorway code exists at write-time). Reports what the
  * RUNNING doorway process has actually materialized, distinct from the
- * content row's DECLARED head (`/db/content/{slug}.serverBlobHash` —
+ * content row's DECLARED head (`/db/content/{slug}.serverBlobCid` —
  * ContentItemSurface below). Absence of this field, or of an entry for a
  * given slug, means the T4-1 attestation is not deployed on that host yet —
  * see probeServedBundleHead()'s forward-compatible SKIP semantics.
  */
 export interface ServedBundleHead {
   slug: string;
-  serverBlobHash?: string;
+  serverBlobCid?: string;
   materializedAt?: string;
   status?: 'current' | 'stale' | 'refreshing' | 'failed' | string;
-  declaredServerBlobHash?: string;
+  declaredServerBlobCid?: string;
   [key: string]: unknown;
 }
 
@@ -290,24 +290,22 @@ export function classifyStorageTransportStatus(
 // /db/content/{id} surface types
 // ---------------------------------------------------------------------------
 
-/** Subset of the content DB response — the blobHash field the step library checks */
+/** Subset of the content DB response — the blobCid field the step library checks */
 export interface ContentItemSurface {
   id: string;
   /**
-   * Present and non-null when the content has an associated blob. Format
-   * depends on ingest vintage: freshly-ingested content carries a CIDv1
-   * (`bafkrei…`, raw codec + sha2-256); legacy rows may still carry the
-   * pre-migration `sha256-<64hex>` shape.
+   * Present and non-null when the content has an associated blob: the byte CID
+   * (`bafkr4i…`, raw codec + BLAKE3-256); no other spelling is an address.
    */
-  blobHash?: string | null;
+  blobCid?: string | null;
   /**
    * The DECLARED server (SSR) bundle hash — elohim-storage/src/ssr.rs
-   * parse_server_blob_hash() reads this exact field from the same GET
+   * parse_server_blob_cid() reads this exact field from the same GET
    * /db/content/{slug} response. This is the "declared" side of the
-   * served-vs-declared T4-2 comparison; ServedBundleHead.serverBlobHash
+   * served-vs-declared T4-2 comparison; ServedBundleHead.serverBlobCid
    * (from the health surface) is the "served" side.
    */
-  serverBlobHash?: string | null;
+  serverBlobCid?: string | null;
   [key: string]: unknown;
 }
 

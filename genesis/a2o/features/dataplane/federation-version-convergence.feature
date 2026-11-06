@@ -24,7 +24,7 @@ Feature: Federation version convergence — two doorways that disagree serve the
   content to ordinary browsers on behalf of a federation of peers. An EPR (Elohim Protocol
   Resource) is the addressable content record a doorway resolves in order to serve a page. A HEAD
   is the specific version of an EPR a doorway serves — a pointer to one authored revision,
-  distinct from blobHash (which points at bytes; the head names WHICH bytes). A DECLARATION is a
+  distinct from blobCid (which points at bytes; the head names WHICH bytes). A DECLARATION is a
   signed link that names one head as the canonical version of an EPR, carrying a tier: EARNED
   (authored through the protocol's authority path) or STAGING (placed by a deploy/seed scaffold).
   The ELECTION is the rule every peer shares for picking one winner from all declarations it can

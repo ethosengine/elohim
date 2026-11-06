@@ -14,6 +14,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { assertByteCid } from '../src/framework/byte-address.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -51,15 +52,6 @@ export const responseStore = new WeakMap<E2EWorld, AppResponse>();
  * address itself and is replaced by the captured X-Content-Address before use.
  */
 const PLACEHOLDER_HASH = 'bafkr4iplaceholder';
-
-/**
- * Pattern that a real content address must match. The doorway serves the byte CID
- * (CIDv1 raw 0x55 + BLAKE3-256 0x1e, base32-lower, `bafkr4i…`, 59 characters) as
- * X-Content-Address — the only content header; the doorway and storage admit it by full
- * decode (`elohim_address::ByteCid::parse`, doorway `routes::BlobAddress::parse`). No
- * `sha256-<hex>` or `bafkrei…` spelling is an address.
- */
-const CONTENT_ADDRESS_PATTERN = /^bafkr4i[a-z2-7]{52}$/;
 
 /** World-local storage key for the captured X-Content-Address value. */
 const CAPTURED_CONTENT_ADDRESS_KEY = 'capturedContentAddress';
@@ -104,8 +96,8 @@ Given('an HTML5 app with slug {string} is seeded', async function (this: E2EWorl
  * Record the expected blob hash for a seeded app so response header assertions can
  * reference it. No network call — this is a scenario-level precondition fixture.
  */
-Given("the app's blob hash is {string}", function (this: E2EWorld, blobHash: string) {
-  this.contentIds.set('currentAppBlobHash', blobHash);
+Given("the app's blob hash is {string}", function (this: E2EWorld, blobCid: string) {
+  this.contentIds.set('currentAppBlobCid', blobCid);
 });
 
 /**
@@ -151,11 +143,9 @@ When('I request {string}', async function (this: E2EWorld, path: string) {
         captured,
         `Cannot resolve "${PLACEHOLDER_HASH}": /apps/${slug}/index.html exposed no X-Content-Address header`
       );
-      assert.match(
-        captured,
-        CONTENT_ADDRESS_PATTERN,
-        `Captured "${captured}" does not look like a CID content address (expected bafkrei…)`
-      );
+      // A real content address is the byte CID (raw + BLAKE3-256, `bafkr4i…`), admitted by full
+      // decode — no `sha256-<hex>` or `bafkrei…` spelling is an address.
+      assertByteCid(captured, 'Captured content address');
     }
     capturedContentAddress = captured;
     resolvedPath = path.replace(PLACEHOLDER_HASH, captured);
@@ -199,11 +189,7 @@ Then(
     // check.  Validate the pattern and store the real hash for later steps that
     // need to build a CID URL.
     if (expectedValue === PLACEHOLDER_HASH) {
-      assert.match(
-        actual,
-        CONTENT_ADDRESS_PATTERN,
-        `Header "${headerName}" value "${actual}" does not look like a CID content address (expected bafkrei…)`
-      );
+      assertByteCid(actual, `Header "${headerName}" value`);
       this.contentIds.set(CAPTURED_CONTENT_ADDRESS_KEY, actual);
       capturedContentAddress = actual;
     } else {
@@ -287,7 +273,7 @@ const SERVING_LAYER_MAP: Record<string, string[]> = {
   'projection-cache': ['HIT', 'HIT-COALESCED'],
   // The doorway went to elohim-storage for THIS request while its cache layer
   // was still in the path: either the app-file cache was consulted and cold
-  // (MISS), or no html5-app/spa-bundle projection carries a blobHash to cache
+  // (MISS), or no html5-app/spa-bundle projection carries a blobCid to cache
   // at all (BYPASS).
   'storage-proxy': ['MISS', 'BYPASS'],
   // The doorway's cache layer is deliberately out of the path — POST
@@ -312,8 +298,8 @@ function servingLayerHint(actual: string): string {
   if (actual === 'BYPASS') {
     return (
       ' — BYPASS means the doorway never engaged its app-file cache at all: ' +
-      'resolve_blob_hash() found no html5-app/spa-bundle projection carrying a non-empty ' +
-      'blobHash for this slug (doorway/doorway-service/src/cache/app_file_cache.rs), so the ' +
+      'resolve_blob_cid() found no html5-app/spa-bundle projection carrying a non-empty ' +
+      'blobCid for this slug (doorway/doorway-service/src/cache/app_file_cache.rs), so the ' +
       'request was proxied straight through. Warming cannot fix that; the projection has to ' +
       'exist first.'
     );
@@ -789,10 +775,10 @@ Then(
  * is storage's answer; each served file echoes it as X-Content-Address. Drift
  * between the two means a cache entry is pinned to a blob the bundle no longer is.
  *
- * Example: And each cache entry records the blob_hash from storage
+ * Example: And each cache entry records the blob_cid from storage
  */
 Then(
-  'each cache entry records the blob_hash from storage',
+  'each cache entry records the blob_cid from storage',
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const doorway = [...this.doorways.values()][0];
@@ -804,8 +790,8 @@ Then(
     });
     assert.equal(statusCode, 200, `HEAD /apps/${slug}/_capability returned ${statusCode}`);
     const rawBlobCid = headers['x-content-address'];
-    const blobHash = Array.isArray(rawBlobCid) ? rawBlobCid[0] : rawBlobCid;
-    assert.ok(blobHash, `Storage advertises no X-Content-Address for "${slug}"`);
+    const blobCid = Array.isArray(rawBlobCid) ? rawBlobCid[0] : rawBlobCid;
+    assert.ok(blobCid, `Storage advertises no X-Content-Address for "${slug}"`);
 
     const files = await appFileSet(doorway.url, slug);
     const entries = await fetchAppFiles(doorway.url, slug, files);
@@ -813,9 +799,9 @@ Then(
       assert.equal(entry.resp.status, 200, `GET ${entry.file} returned ${entry.resp.status}`);
       assert.equal(
         entry.resp.headers['x-content-address'],
-        blobHash,
+        blobCid,
         `Cache entry for "${entry.file}" records X-Content-Address ` +
-          `"${entry.resp.headers['x-content-address']}" but storage advertises "${blobHash}"`
+          `"${entry.resp.headers['x-content-address']}" but storage advertises "${blobCid}"`
       );
     }
   }

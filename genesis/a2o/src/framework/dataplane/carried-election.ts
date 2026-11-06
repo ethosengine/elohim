@@ -488,7 +488,7 @@ export interface AuthorDeclareOptions {
  * `update_entry` and therefore mints a NEW notarized action on this peer's
  * chain every time — the divergence. `content_body` is not a field of the
  * anchored-row update input at all, so the page's BYTES are unchanged;
- * `blob_hash` is rewritten to its existing value and `server_blob_hash` is
+ * `blob_cid` is rewritten to its existing value and `server_blob_cid` is
  * never touched, so neither blob pointer moves. `reach` is read back from the
  * row and re-sent unchanged rather than forced, so the row's audience is not
  * silently widened by a test fixture.

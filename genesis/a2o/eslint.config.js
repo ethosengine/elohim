@@ -146,6 +146,9 @@ export default tseslint.config(
             // @holochain/client is a harness dependency and this package ships
             // nothing.
             'src/framework/dataplane/carried-election.ts',
+            // The byte-address mint/admission shared by steps and scripts; multiformats is a
+            // harness dependency (this package ships nothing).
+            'src/framework/byte-address.ts',
           ],
           peerDependencies: true,
         },

@@ -48,8 +48,8 @@ Feature: An app a doorway serves reaches a visitor able to run
   reachable at its own address on any doorway that holds it. The BUILD STAMP is one file
   inside that zip, version.json, recording which build produced it. Its DECLARED BROWSER
   HEAD is the one bundle hash its record names as current — the code a browser is supposed
-  to download and run; the record calls that field blobHash, and names a second bundle
-  under serverBlobHash (Station 2). BYTES and DECLARATION are separate acts: handing a peer
+  to download and run; the record calls that field blobCid, and names a second bundle
+  under serverBlobCid (Station 2). BYTES and DECLARATION are separate acts: handing a peer
   the zip puts the bytes within reach; declaring the head is what makes those bytes the
   answer. A deploy does the first to every peer and the second exactly once, and every
   failure below lives in the gap.
@@ -182,7 +182,7 @@ Feature: An app a doorway serves reaches a visitor able to run
   #
   # A site has two bundles: the BROWSER bundle a person downloads, and the SERVER bundle a
   # doorway runs to render the first page before that download finishes. The record names
-  # both — blobHash and serverBlobHash. The browser pointer has propagated peer to peer for
+  # both — blobCid and serverBlobCid. The browser pointer has propagated peer to peer for
   # months; the server pointer was written straight into the authoring peer's own database
   # and told nobody, so on 2026-09-08 elohim.host's renderer sat in a loop reporting that
   # the head it needed was absent, while the peer next to it had held that head all along.

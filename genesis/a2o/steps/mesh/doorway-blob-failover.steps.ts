@@ -81,7 +81,7 @@ interface FailoverDrill {
   doorwayUrl: string;
   primaryStorageUrl: string;
   siblingStorageUrls: string[];
-  blobHash?: string;
+  blobCid?: string;
   /** Set once SIGSTOP has actually landed, so the After hook only resumes what it stopped. */
   pausedPid?: number;
 }
@@ -204,13 +204,13 @@ Given(
     );
 
     const { body } = await probeContent(state.doorwayUrl, contentId);
-    const hash = body.blobHash;
+    const hash = body.blobCid;
     assert.ok(
       typeof hash === 'string' && hash.length > 0,
-      `content "${contentId}" carries no blobHash on doorway "${doorwayName}" — there are no ` +
+      `content "${contentId}" carries no blobCid on doorway "${doorwayName}" — there are no ` +
         'bytes to ride'
     );
-    state.blobHash = hash;
+    state.blobCid = hash;
 
     // Prove a sibling can actually SERVE these bytes before we stop the primary.
     // This is an HTTP read on purpose (get_blob_or_heal): the precondition this
@@ -243,7 +243,7 @@ When(
       return held(`stall doorway "${doorwayName}"'s primary storage peer`);
     }
     const state = requireDrill(this);
-    assert.ok(state.blobHash, 'no blob resolved — the Given step must run first');
+    assert.ok(state.blobCid, 'no blob resolved — the Given step must run first');
 
     const pid = storagePidFor(state.primaryStorageUrl);
     process.kill(pid, 'SIGSTOP');
@@ -253,7 +253,7 @@ When(
     // the failure window. A stalled peer answers nothing, so each of these burns
     // the doorway's 12s upstream timeout — fired together so the failures really
     // are a burst rather than a streak spread past the window.
-    const url = `${state.doorwayUrl}/blob/${encodeURIComponent(state.blobHash)}`;
+    const url = `${state.doorwayUrl}/blob/${encodeURIComponent(state.blobCid)}`;
     await Promise.all(
       Array.from({ length: CIRCUIT_FAIL_THRESHOLD }, async () => {
         try {
@@ -296,8 +296,8 @@ Then(
       return held(`read a blob through doorway "${doorwayName}" during its primary's stall`);
     }
     const state = requireDrill(this);
-    assert.ok(state.blobHash, 'no blob resolved — the Given step must run first');
-    const url = `${state.doorwayUrl}/blob/${encodeURIComponent(state.blobHash)}`;
+    assert.ok(state.blobCid, 'no blob resolved — the Given step must run first');
+    const url = `${state.doorwayUrl}/blob/${encodeURIComponent(state.blobCid)}`;
 
     // Baseline taken HERE, after the trip: the requests that opened the circuit
     // were selected while it was still closed and must not be counted as

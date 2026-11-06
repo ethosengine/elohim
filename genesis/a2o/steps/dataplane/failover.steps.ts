@@ -54,7 +54,7 @@
  *   x-elohim-freshness: green|amber            (every proxied GET)
  *   x-elohim-freshness-class: knowledge|value|authority
  *   x-elohim-stocked-at: <RFC3339>             (amber only)
- *   x-elohim-served-head: <bafkrei…>           (amber only — CIDv1 raw of the
+ *   x-elohim-served-head: <bafkr4i…>           (amber only — the byte CID of the
  *                                               served bytes)
  *   x-elohim-freshness-warn: 1                 (ServeAmberWarn only)
  *   x-elohim-freshness-required: green         (on the 503 shed)
@@ -70,6 +70,7 @@ import { strict as assert } from 'node:assert';
 
 import { Then } from '@cucumber/cucumber';
 
+import { isByteCid } from '../../src/framework/byte-address.js';
 import {
   classifyDoorwayState,
   getRaw,
@@ -220,9 +221,6 @@ const SERVED_HEAD = 'x-elohim-served-head';
 const FRESHNESS_WARN = 'x-elohim-freshness-warn';
 const FRESHNESS_REQUIRED = 'x-elohim-freshness-required';
 
-/** CIDv1, base32, raw codec + sha2-256 — the shape `x-elohim-served-head` must carry. */
-const CIDV1_RAW_SHA256 = /^bafkrei[a-z2-7]+$/;
-
 /** The four declared network stages the advertised policy may name. */
 const KNOWN_STAGES = ['simulacra', 'bootstrap', 'coordinated', 'enforced'];
 
@@ -267,9 +265,9 @@ function assertAmberReceipts(res: RawHttpResponse, where: string): void {
   );
   const servedHead = res.headers[SERVED_HEAD];
   assert.ok(
-    typeof servedHead === 'string' && CIDV1_RAW_SHA256.test(servedHead),
-    `${where}: ${SERVED_HEAD} is ${JSON.stringify(servedHead)}, expected a CIDv1 raw/sha2-256 ` +
-      `(bafkrei…) of the bytes served (${describeFreshnessSignal(res)})`
+    isByteCid(servedHead),
+    `${where}: ${SERVED_HEAD} is ${JSON.stringify(servedHead)}, expected the byte CID ` +
+      `(raw + BLAKE3-256, bafkr4i…) of the bytes served (${describeFreshnessSignal(res)})`
   );
   assert.strictEqual(
     (res.headers['cache-control'] ?? '').includes('no-store'),

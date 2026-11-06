@@ -204,7 +204,6 @@
 
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -223,6 +222,7 @@ import {
 } from '@holochain/client';
 import { request } from 'undici';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { closeTransport } from '../../src/framework/dataplane/carried-election.js';
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
@@ -1753,8 +1753,8 @@ function extractJson<T>(stdout: string): T {
   return JSON.parse(stdout.slice(start)) as T;
 }
 
-async function putBlobRaw(baseUrl: string, sha256: string, bytes: Buffer): Promise<number> {
-  const { statusCode } = await request(`${baseUrl}/blob/sha256-${sha256}`, {
+async function putBlobRaw(baseUrl: string, cid: string, bytes: Buffer): Promise<number> {
+  const { statusCode } = await request(`${baseUrl}/blob/${cid}`, {
     method: 'PUT',
     headers: {
       'content-type': 'application/octet-stream',
@@ -2056,10 +2056,9 @@ function resolveV2DnaHash(): string {
 async function putV2HappToOtherPeers(): Promise<void> {
   const v2HappPath = resolveV2HappPath();
   const bytes = readFileSync(v2HappPath);
-  const sha256 = createHash('sha256').update(bytes).digest('hex');
   await Promise.all(
     PEER_NAMES.filter(peer => peer !== 'matthew').map(async peer => {
-      const status = await putBlobRaw(directPeerUrl(peer), sha256, bytes);
+      const status = await putBlobRaw(directPeerUrl(peer), mintByteCid(bytes), bytes);
       assert.ok(status === 200 || status === 201, `PUT v2 happ blob to ${peer} returned ${status}`);
     })
   );

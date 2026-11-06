@@ -63,9 +63,8 @@
  *
  * ## Content addressing — reimplemented, not imported
  *
- * `signingPayloadCid` uses the SAME CIDv1 raw/sha2-256/base32-lower encoding
- * `scripts/epr-release-package.ts`'s `blobCid` mints (that packager's own
- * doc: "the same `bafkrei…` form `elohim-storage/src/epr_codec.rs` mints").
+ * `signingPayloadCid` uses the SAME byte-profile address (CIDv1 raw + BLAKE3-256,
+ * `bafkr4i…`) `scripts/epr-release-package.ts`'s `blobCid` mints.
  * The functions are reimplemented here rather than imported: reading that
  * script's own tail (2026-09-04) shows its whole CLI body runs at MODULE
  * EVALUATION time inside an unguarded top-level `try { … }` — no
@@ -89,36 +88,15 @@
  * demands it.
  */
 
-import { createHash } from 'node:crypto';
+import { mintByteCid } from '../../src/framework/byte-address.js';
 
 // ---------------------------------------------------------------------------
 // Content addressing (duplicated from epr-release-package.ts — see module doc)
 // ---------------------------------------------------------------------------
 
-const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
-
-function base32Encode(bytes: Uint8Array): string {
-  let out = '';
-  let buffer = 0;
-  let bits = 0;
-  for (const byte of bytes) {
-    buffer = (buffer << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      bits -= 5;
-      out += BASE32_ALPHABET[(buffer >> bits) & 0x1f];
-    }
-  }
-  if (bits > 0) out += BASE32_ALPHABET[(buffer << (5 - bits)) & 0x1f];
-  return out;
-}
-
-/** CIDv1 raw (0x55) / sha2-256, multibase base32-lower ('b' prefix). */
+/** The byte CID (raw + BLAKE3-256) of the payload bytes. */
 function contentCid(bytes: Buffer): string {
-  const digest = createHash('sha256').update(bytes).digest();
-  const multihash = Buffer.concat([Buffer.from([0x12, 0x20]), digest]);
-  const cidBytes = Buffer.concat([Buffer.from([0x01, 0x55]), multihash]);
-  return `b${base32Encode(cidBytes)}`;
+  return mintByteCid(bytes);
 }
 
 /** Deep-sorts object keys so field-insertion order never changes the digest. */

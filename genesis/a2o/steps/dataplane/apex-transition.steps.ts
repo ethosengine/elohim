@@ -376,7 +376,7 @@ async function assertExactPublishedAuthority(
   const fresh = (path: string) => `${path}${path.includes('?') ? '&' : '?'}chaos=${nonce}`;
   const headPath = `/db/content/${encodeURIComponent(expected.slug)}/head`;
   const contentPath = `/db/content/${encodeURIComponent(expected.slug)}`;
-  const versionPath = `/apps/${encodeURIComponent(expected.blobHash)}/version.json`;
+  const versionPath = `/apps/${encodeURIComponent(expected.blobCid)}/version.json`;
   const head = await getRaw(`${origin}${fresh(headPath)}`, { timeoutMs: RAW_FETCH_TIMEOUT_MS });
   assert.equal(head.status, 200, `${origin}: governed head answered ${head.status}`);
   const headBody = JSON.parse(head.text) as { headActionHash?: string };
@@ -385,8 +385,8 @@ async function assertExactPublishedAuthority(
     timeoutMs: RAW_FETCH_TIMEOUT_MS,
   });
   assert.equal(content.status, 200, `${origin}: governed content answered ${content.status}`);
-  const contentBody = JSON.parse(content.text) as { blobHash?: string };
-  assert.equal(contentBody.blobHash, expected.blobHash, `${origin}: governed blob diverged`);
+  const contentBody = JSON.parse(content.text) as { blobCid?: string };
+  assert.equal(contentBody.blobCid, expected.blobCid, `${origin}: governed blob diverged`);
   const version = await getRaw(`${origin}${fresh(versionPath)}`, {
     timeoutMs: RAW_FETCH_TIMEOUT_MS,
   });
@@ -432,10 +432,10 @@ async function lightweightAuthorityMismatch(
   const nonce = `authority-${Date.now().toString(36)}`;
   const fresh = (path: string) => `${path}${path.includes('?') ? '&' : '?'}chaos=${nonce}`;
   const encodedSlug = encodeURIComponent(expected.slug);
-  const encodedBlobHash = encodeURIComponent(expected.blobHash);
+  const encodedBlobCid = encodeURIComponent(expected.blobCid);
   const headUrl = origin + fresh(`/db/content/${encodedSlug}/head`);
   const contentUrl = origin + fresh(`/db/content/${encodedSlug}`);
-  const versionUrl = origin + fresh(`/apps/${encodedBlobHash}/version.json`);
+  const versionUrl = origin + fresh(`/apps/${encodedBlobCid}/version.json`);
   const pageUrl = origin + fresh(expected.mountPath);
   const [head, content, version, page] = await Promise.all([
     getRaw(headUrl, { timeoutMs }),
@@ -446,14 +446,14 @@ async function lightweightAuthorityMismatch(
   if (head.status !== 200) return `head status ${head.status}`;
   if (content.status !== 200) return `content status ${content.status}`;
   if (version.status !== 200) return `version status ${version.status}`;
-  const headBody = JSON.parse(head.text) as { headActionHash?: string; blobHash?: string };
-  const contentBody = JSON.parse(content.text) as { blobHash?: string };
+  const headBody = JSON.parse(head.text) as { headActionHash?: string; blobCid?: string };
+  const contentBody = JSON.parse(content.text) as { blobCid?: string };
   if (headBody.headActionHash !== expected.actionHash)
     return `action expected ${expected.actionHash}, observed ${headBody.headActionHash ?? 'absent'}`;
-  if (headBody.blobHash !== expected.blobHash)
-    return `head blob expected ${expected.blobHash}, observed ${headBody.blobHash ?? 'absent'}`;
-  if (contentBody.blobHash !== expected.blobHash)
-    return `content blob expected ${expected.blobHash}, observed ${contentBody.blobHash ?? 'absent'}`;
+  if (headBody.blobCid !== expected.blobCid)
+    return `head blob expected ${expected.blobCid}, observed ${headBody.blobCid ?? 'absent'}`;
+  if (contentBody.blobCid !== expected.blobCid)
+    return `content blob expected ${expected.blobCid}, observed ${contentBody.blobCid ?? 'absent'}`;
   const versionStamp = stampOf(version.text);
   if (versionStamp !== expected.version)
     return `version expected ${expected.version}, observed ${versionStamp || 'absent'}`;
@@ -1692,8 +1692,8 @@ Then(
       'authority action did not move A→B'
     );
     assert.notEqual(
-      authorityB.authority.blobHash,
-      state.authorityA.authority.blobHash,
+      authorityB.authority.blobCid,
+      state.authorityA.authority.blobCid,
       'authority blob did not move A→B'
     );
     state.authorityB = authorityB;

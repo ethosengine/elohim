@@ -4,10 +4,10 @@
 Feature: EPR projection fallback — root resolution on federation peer
   On elohim.host (the alpha-b federation peer), resolving "/" returns HTTP 404 with
   body {"error": "App not found: elohim-host-landing"} because the EPR content record
-  has blobHash: null and the doorway EprRouter cannot find the blob to serve. The fix
-  requires either (a) peer-fallback: the EprRouter detects null blobHash and proxies or
+  has blobCid: null and the doorway EprRouter cannot find the blob to serve. The fix
+  requires either (a) peer-fallback: the EprRouter detects null blobCid and proxies or
   redirects to a peer that has the blob so the SPA is served transparently; or (b) the
-  blobHash propagation gap is closed (blob-replication concern) and the router can serve
+  blobCid propagation gap is closed (blob-replication concern) and the router can serve
   directly from the local blob store.
 
   Live state observed 2026-06-29:
@@ -24,14 +24,14 @@ Feature: EPR projection fallback — root resolution on federation peer
     And peer "elohim.host" at "elohim.host"
 
   Scenario: alpha-A root resolves without App-not-found (baseline)
-    # Green baseline. alpha-A is the deploy-time author peer and has a non-null blobHash,
+    # Green baseline. alpha-A is the deploy-time author peer and has a non-null blobCid,
     # so the EprRouter resolves the landing app correctly. This scenario passes today
     # and confirms the surface works on a peer with a healthy EPR record.
     Then resolving "/" on peer "alpha-A" does NOT return App-not-found
 
   Scenario: elohim.host root resolves without App-not-found (RED — the gap)
     # RED-FIRST. elohim.host returns HTTP 404 {"error":"App not found: elohim-host-landing"}
-    # because the EPR content record has blobHash: null. This scenario FAILS today with:
+    # because the EPR content record has blobCid: null. This scenario FAILS today with:
     #   AssertionError: Resolving "/" on elohim.host returned 404
     #     — route may not be registered
     # (the 404 check fires before the body-text check; both would fail independently)

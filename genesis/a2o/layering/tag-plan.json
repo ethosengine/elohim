@@ -1203,12 +1203,12 @@
       },
       "scenarioTags": [
         {
-          "scenario": "alpha-A has a non-null blobHash for the landing EPR (baseline)",
+          "scenario": "alpha-A has a non-null blobCid for the landing EPR (baseline)",
           "add": ["@requires:ssr-bundle"],
           "remove": []
         },
         {
-          "scenario": "elohim.host has a non-null blobHash for the landing EPR (RED \u2014 the gap)",
+          "scenario": "elohim.host has a non-null blobCid for the landing EPR (RED \u2014 the gap)",
           "add": ["@requires:ssr-bundle"],
           "remove": []
         }

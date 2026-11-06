@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import {
   computeDnaHash,
   lineageReleaseWithoutParent,
@@ -64,9 +65,9 @@ void describe('lineage-commitments — buildMigratesLineagePayload', () => {
     role: 'node_registry',
     fromDnaHash: 'uhC0kyvKwO2J5u3mf52tjASWe0ryhdpNYalrSeMGJODF3OpUxyeoH',
     toDnaHash: 'uhC0kEKiIscIk5BDdethLGMFGLnvSvP2gRP5o74v0vAvoRnEzbiJ1',
-    releaseCid: 'bafkrei' + 'r'.repeat(52),
+    releaseCid: mintByteCid(Buffer.from('lineage fixture r')),
     constitutionRoot: 'uhC0k' + 'C'.repeat(48),
-    rosterCid: 'bafkrei' + 's'.repeat(52),
+    rosterCid: mintByteCid(Buffer.from('lineage fixture s')),
     evidence: EVIDENCE,
     window: { opensAt: '2026-09-04T00:00:00Z', revertUntil: '2026-09-11T00:00:00Z' },
   };
@@ -170,9 +171,9 @@ void describe('lineage-commitments — buildSunsetsLineagePayload', () => {
 
 void describe('lineage-commitments — buildRevocationPayload', () => {
   void it('a plain revocation carries only action/target_cid/signed_at', () => {
-    const payload = buildRevocationPayload('bafkrei' + 't'.repeat(52));
+    const payload = buildRevocationPayload(mintByteCid(Buffer.from('lineage fixture t')));
     assert.equal(payload.action, 'revokes-commitment');
-    assert.equal(payload.target_cid, 'bafkrei' + 't'.repeat(52));
+    assert.equal(payload.target_cid, mintByteCid(Buffer.from('lineage fixture t')));
     assert.ok(payload.signed_at.length > 0);
     assert.equal(payload.target_action, undefined);
     assert.equal(payload.signing_payload_cid, undefined);
@@ -180,7 +181,7 @@ void describe('lineage-commitments — buildRevocationPayload', () => {
   });
 
   void it('revoking a migrates-lineage target gains the same quorum shape a lineage commitment carries', () => {
-    const payload = buildRevocationPayload('bafkrei' + 'u'.repeat(52), {
+    const payload = buildRevocationPayload(mintByteCid(Buffer.from('lineage fixture u')), {
       targetAction: MIGRATES_LINEAGE,
     });
     assert.equal(payload.target_action, MIGRATES_LINEAGE);
@@ -189,7 +190,7 @@ void describe('lineage-commitments — buildRevocationPayload', () => {
   });
 
   void it('honors an explicit signedAt and requiredSignatures', () => {
-    const payload = buildRevocationPayload('bafkrei' + 'v'.repeat(52), {
+    const payload = buildRevocationPayload(mintByteCid(Buffer.from('lineage fixture v')), {
       targetAction: 'sunsets-lineage',
       signedAt: '2026-09-05T00:00:00Z',
       requiredSignatures: 2,

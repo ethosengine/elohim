@@ -37,7 +37,7 @@ Feature: Web2 Absorption — Doorway Projection Cache
     When Matthew loads the html5-app "evolution-of-trust"
     Then all app files are served with 200 status
     And the projection cache contains entries for "evolution-of-trust"
-    And each cache entry records the blob_hash from storage
+    And each cache entry records the blob_cid from storage
 
   # An EPR agreement is the protocol's record of permission: the terms under which one party
   # may hold and serve another's content. "Self-negotiated" means the doorway writes its own —
@@ -94,12 +94,12 @@ Feature: Web2 Absorption — Doorway Projection Cache
   # a particular string.
   @requires:owned-substrate @act:i
   Scenario: Re-seeded content invalidates stale cache entries
-    Given the projection cache for "evolution-of-trust" is warm with blob_hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    Given the projection cache for "evolution-of-trust" is warm with blob_cid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
     When "evolution-of-trust" is re-seeded with a new ZIP blob
     And storage publishes the content-changed event for "evolution-of-trust"
     Then the projection cache entries for "evolution-of-trust" with hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu" are evicted
     And the next request for "evolution-of-trust" proxies to storage
-    And the new response is cached with the new blob_hash
+    And the new response is cached with the new blob_cid
 
   # --- Replica Consistency ---
 

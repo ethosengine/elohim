@@ -55,6 +55,8 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { assertByteCid } from '../../src/framework/byte-address.js';
+
 import { mintCoordinatorCandidate } from './coordinator-candidate.js';
 
 // ---------------------------------------------------------------------------
@@ -171,7 +173,7 @@ interface RoleBinding {
 interface ReleaseManifestFile {
   channelId?: string;
   artifactClass?: string;
-  artifacts?: { blobCid: string; sha256: string; bytes: number }[];
+  artifacts?: { blobCid: string; bytes: number }[];
   appliesTo?: { roles?: Record<string, RoleBinding> };
 }
 
@@ -486,11 +488,7 @@ Then(
   async function () {
     const artifact = state.manifest?.artifacts?.[0];
     if (!artifact) return PENDING;
-    assert.match(
-      artifact.sha256,
-      /^[0-9a-f]{64}$/,
-      'the artifact is not addressed by a sha256 digest'
-    );
+    assertByteCid(artifact.blobCid, 'the artifact address');
     assert.ok(artifact.bytes > 0, 'the artifact declares zero bytes');
     const response = await request(`${WORKSPACE_STORAGE_URL}/blob/${artifact.blobCid}`, {
       method: 'GET',

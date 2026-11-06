@@ -518,7 +518,7 @@ function extractSurfaces(scenario: CensusScenario, caches: FileCaches): Surfaces
 
 type ProbeStatus = 'EXISTS' | 'ABSENT' | 'UNKNOWN';
 
-const DYNAMIC_SEGMENT_RE = /^(?:e2e-|bafk|sha256-)|^[0-9a-f]{16,}$|^\d+$|^.{24,}$/;
+const DYNAMIC_SEGMENT_RE = /^(?:e2e-|bafk)|^[0-9a-f]{16,}$|^\d+$|^.{24,}$/;
 
 /** Truncate a probed path at the first segment that looks dynamic (a hash,
  * CID, uuid-ish token, or a bare e2e-* fixture id) — probe the static prefix. */

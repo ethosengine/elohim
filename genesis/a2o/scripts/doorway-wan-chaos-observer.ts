@@ -20,7 +20,7 @@ const NOT_MEASURED: Verdict = 'NOT MEASURED';
 
 export interface ExpectedAuthority {
   actionHash: string;
-  blobHash: string;
+  blobCid: string;
   version: string;
   entryScript: string;
 }
@@ -295,15 +295,15 @@ async function observeEntrance(
   const root = await ask('/');
   const rootVersion = await ask('/version.json');
   const actionHash = firstString(parseJson(action), ['headActionHash', 'head_action_hash']);
-  const blobHash = firstString(parseJson(content), ['blobHash', 'blob_hash']);
-  const versionRequest = blobHash
-    ? await ask(`/apps/${encodeURIComponent(blobHash)}/version.json`)
+  const blobCid = firstString(parseJson(content), ['blobCid', 'blob_cid']);
+  const versionRequest = blobCid
+    ? await ask(`/apps/${encodeURIComponent(blobCid)}/version.json`)
     : undefined;
   const version = versionRequest ? versionOf(versionRequest) : undefined;
   const entryScript = entryScriptOf(root);
   const observed =
-    actionHash && blobHash && version && entryScript
-      ? { actionHash, blobHash, version, entryScript }
+    actionHash && blobCid && version && entryScript
+      ? { actionHash, blobCid, version, entryScript }
       : undefined;
   const requests = { action, content, version: versionRequest, root, rootVersion };
   const reported =
@@ -326,7 +326,7 @@ async function observeEntrance(
   }
   const matches =
     observed.actionHash === config.expected.actionHash &&
-    observed.blobHash === config.expected.blobHash &&
+    observed.blobCid === config.expected.blobCid &&
     observed.version === config.expected.version &&
     observed.entryScript === config.expected.entryScript;
   const shellServed =
@@ -420,7 +420,7 @@ function computeClaims(report: ObserverReport): ObserverReport['claims'] {
   if (complete) {
     const authorityMoved =
       baseline.expected.actionHash !== fault.expected.actionHash &&
-      baseline.expected.blobHash !== fault.expected.blobHash;
+      baseline.expected.blobCid !== fault.expected.blobCid;
     const baselineObserved =
       baseline.verdict === 'PERMITTED' &&
       baseline.continuity.verdict === 'PERMITTED' &&
@@ -443,7 +443,7 @@ function computeClaims(report: ObserverReport): ObserverReport['claims'] {
       faultObserved &&
       recovered &&
       fault.expected.actionHash === recovery.expected.actionHash &&
-      fault.expected.blobHash === recovery.expected.blobHash &&
+      fault.expected.blobCid === recovery.expected.blobCid &&
       fault.expected.version === recovery.expected.version &&
       fault.expected.entryScript === recovery.expected.entryScript &&
       baseline.authorReceipt.sha256 !== fault.authorReceipt.sha256 &&

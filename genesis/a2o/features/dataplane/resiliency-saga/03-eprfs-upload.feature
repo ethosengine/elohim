@@ -8,7 +8,7 @@
 # Both Then steps are reused verbatim from steps/dataplane.steps.ts; the same
 # pair is used by federation-deploy.feature and served-projected-head.feature
 # as the alpha-A (author-peer) baseline. Their step text is a shared contract —
-# rephrasing it (e.g. "blobHash" → "has content bytes attached") is a
+# rephrasing it (e.g. "blobCid" → "has content bytes attached") is a
 # cross-feature step-definition migration, not a local edit.
 #
 # Probe mechanics: the content probe behind both steps rides the bounded
@@ -42,4 +42,4 @@ Feature: Chapter 3 — matthew's deploy-time upload of elohim-host-landing mater
   Scenario: elohim-host-landing resolves with a matching served head and an attached blob
     Given EPR "elohim-host-landing" was uploaded to peer "alpha-A" at deploy time
     Then the served head for EPR "elohim-host-landing" matches the declared head on peer "alpha-A"
-    And EPR "elohim-host-landing" blobHash is non-null on peer "alpha-A"
+    And EPR "elohim-host-landing" blobCid is non-null on peer "alpha-A"

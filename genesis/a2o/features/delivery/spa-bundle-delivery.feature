@@ -16,7 +16,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And doorway "alpha" has ROOT_APP_SLUG set to "lamad"
-    And content "lamad-spa" has been seeded as spa-bundle with a valid blobHash
+    And content "lamad-spa" has been seeded as spa-bundle with a valid blobCid
 
   # --- Root App Resolution ---
 
@@ -65,7 +65,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     # others. The substrate-correct write path round-trips through the
     # content_store coordinator, DHT gossip propagates to every peer,
     # and EprRouter on any doorway pod can resolve the route.
-    Given content "lamad-spa" has been seeded as spa-bundle with a valid blobHash
+    Given content "lamad-spa" has been seeded as spa-bundle with a valid blobCid
     And the SPA bundle for "lamad-spa" is extracted and cached in doorway "alpha"
     And the project-epr commitment for "lamad-spa" has propagated across all alpha storage peers via DHT gossip
     And the commitment row has a non-null dhtAnchorHash on every peer (proof of substrate-correct write)
@@ -200,19 +200,19 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
 
   @wip
   Scenario: CI uploading a new SPA blob causes doorway to serve the updated version
-    # blobHash is the content address. When it changes, the old extraction is stale.
+    # blobCid is the content address. When it changes, the old extraction is stale.
     # Doorway must detect the new hash, evict the old SPA cache, and serve the
     # updated bundle without a manual restart.
-    Given doorway "alpha" is serving the SPA from blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
-    When CI re-seeds "lamad-spa" with a new ZIP blob (blobHash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi")
+    Given doorway "alpha" is serving the SPA from blobCid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When CI re-seeds "lamad-spa" with a new ZIP blob (blobCid "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi")
     And doorway receives the content update signal for "lamad-spa"
-    Then doorway evicts the extracted SPA cache for blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
-    And doorway re-extracts the SPA bundle from blobHash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
+    Then doorway evicts the extracted SPA cache for blobCid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    And doorway re-extracts the SPA bundle from blobCid "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
     And subsequent requests for / serve the updated SPA
 
   @wip
-  Scenario: Old SPA cached files are evicted when blobHash changes
-    Given the projection cache contains SPA assets from blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
-    When the blobHash for "lamad-spa" changes to "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
-    Then all projection cache entries tagged with blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu" are evicted
+  Scenario: Old SPA cached files are evicted when blobCid changes
+    Given the projection cache contains SPA assets from blobCid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When the blobCid for "lamad-spa" changes to "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
+    Then all projection cache entries tagged with blobCid "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu" are evicted
     And stale asset requests do not return old bundle files

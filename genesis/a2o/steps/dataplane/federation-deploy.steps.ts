@@ -46,7 +46,7 @@
  *   - served-versus-declared per doorway → the existing step "the served head
  *     for EPR {string} matches the declared head on peer {string}"
  *     (`steps/dataplane.steps.ts`), which reads the content row's declared
- *     `serverBlobHash` and the running doorway's `servedBundleHeads[]`
+ *     `serverBlobCid` and the running doorway's `servedBundleHeads[]`
  *     attestation. The feature calls it twice, once per doorway; this file
  *     defines nothing for it.
  *   - labelled Prometheus reads → `parseLabeledPrometheusMetric` (surfaces.ts).

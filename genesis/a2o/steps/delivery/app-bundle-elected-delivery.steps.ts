@@ -44,7 +44,6 @@
 
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
@@ -52,6 +51,7 @@ import { fileURLToPath } from 'node:url';
 
 import { AfterAll, Given, Then, When } from '@cucumber/cucumber';
 
+import { assertByteCid, mintByteCid } from '../../src/framework/byte-address.js';
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import {
@@ -105,7 +105,7 @@ interface AppBuild {
   server: FixtureBundle;
   browserZip: string;
   serverZip: string;
-  /** `sha256-<hex>` of each zip — the spelling every app record carries. */
+  /** Byte CID of each zip — the address every app record carries. */
   browserHash: string;
   serverHash: string;
 }
@@ -163,8 +163,8 @@ function adminKey(): string {
   return process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key';
 }
 
-function sha256File(file: string): string {
-  return createHash('sha256').update(readFileSync(file)).digest('hex');
+function byteCidOfFile(file: string): string {
+  return mintByteCid(readFileSync(file));
 }
 
 function zipDir(dir: string, out: string): string {
@@ -227,7 +227,7 @@ async function adoptionRow(peer: PeerName): Promise<AdoptionRow | undefined> {
 /** Does this peer's record for `app` name exactly `build`'s two halves? */
 async function recordNames(peer: PeerName, app: string, build: AppBuild): Promise<boolean> {
   const row = await contentRow(peer, app);
-  return row?.['blobHash'] === build.browserHash && row?.['serverBlobHash'] === build.serverHash;
+  return row?.['blobCid'] === build.browserHash && row?.['serverBlobCid'] === build.serverHash;
 }
 
 async function channelHead(peer: PeerName): Promise<Record<string, unknown> | null> {
@@ -253,8 +253,8 @@ function buildApps(label: string, brokenApp?: string): Record<string, AppBuild> 
       server,
       browserZip,
       serverZip,
-      browserHash: `sha256-${sha256File(browserZip)}`,
-      serverHash: `sha256-${sha256File(serverZip)}`,
+      browserHash: byteCidOfFile(browserZip),
+      serverHash: byteCidOfFile(serverZip),
     };
   }
   return builds;
@@ -892,7 +892,7 @@ Given(
         await Promise.all(
           APPS.map(async app => {
             const row = await contentRow(peer, app);
-            return [app, { blobHash: row?.['blobHash'], serverBlobHash: row?.['serverBlobHash'] }];
+            return [app, { blobCid: row?.['blobCid'], serverBlobCid: row?.['serverBlobCid'] }];
           })
         )
       );
@@ -958,7 +958,7 @@ Then("no peer's record for either app moved", { timeout: 60_000 }, async functio
     for (const app of APPS) {
       const row = await contentRow(peer, app);
       assert.deepEqual(
-        { blobHash: row?.['blobHash'], serverBlobHash: row?.['serverBlobHash'] },
+        { blobCid: row?.['blobCid'], serverBlobCid: row?.['serverBlobCid'] },
         beforeBroken[peer]?.[app],
         `${peer}'s record for ${app} moved on a release that cannot boot`
       );
@@ -1043,8 +1043,8 @@ async function retentionReport(peer: PeerName): Promise<{
 
 /** Where a peer's blob store keeps one bundle, read straight off its disk. */
 function bundleFile(peer: PeerName, hash: string): string {
-  const hex = hash.replace(/^sha256-/, '');
-  return path.join(householdMeshDir(), peer, 'blobs', 'blobs', hex.slice(0, 4), `sha256-${hex}`);
+  const cid = assertByteCid(hash, 'bundle address');
+  return path.join(householdMeshDir(), peer, 'blobs', 'blobs', cid.slice(7, 11), cid);
 }
 
 function bundleHashes(release: Release): string[] {
@@ -1189,7 +1189,7 @@ const FIRST_BUILD_MISSING = 'the first build must be handed over first';
 
 interface SoloBuild {
   bundle: FixtureBundle;
-  /** `sha256-<hex>` of the zip the peer was handed. */
+  /** Byte CID of the zip the peer was handed. */
   hash: string;
 }
 
@@ -1204,8 +1204,8 @@ const solo: {
 
 interface HoldsAccount {
   blobs?: Record<string, { blobs: number; bytes: number }>;
-  ownUnnamed?: { blobHash: string; arrivedVia: string[]; passes: number }[];
-  recentlyLetGo?: { blobHash: string }[];
+  ownUnnamed?: { blobCid: string; arrivedVia: string[]; passes: number }[];
+  recentlyLetGo?: { blobCid: string }[];
 }
 
 /** A peer's own account of why it holds what is in its blob store. */
@@ -1228,10 +1228,10 @@ async function handSoloBuild(stepTimeoutMs: number): Promise<SoloBuild> {
     stepTimeoutMs,
   });
   assert.equal(staged.code, 0, `matthew's peer did not take the build: ${staged.output}`);
-  const build = { bundle, hash: staged.blobHash };
+  const build = { bundle, hash: staged.blobCid };
   // jessica's own record of the app must name it before she can be asked for it.
   const reached = await pollUntil(
-    async () => (await contentRow('jessica', SOLO_APP))?.['blobHash'] === build.hash,
+    async () => (await contentRow('jessica', SOLO_APP))?.['blobCid'] === build.hash,
     ADOPT_BUDGET_MS,
     2_000
   );
@@ -1299,7 +1299,7 @@ Given(
   async function () {
     // The direct shard route stores bytes and writes nothing about them.
     const bytes = Buffer.from(`a2o file with no note of how it arrived (${RUN_STAMP})`);
-    const hash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const hash = mintByteCid(bytes);
     const response = await fetch(`${storageUrl('matthew')}/shard/${hash}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/octet-stream', 'x-api-key': adminKey() },
@@ -1369,8 +1369,8 @@ Then(
     const letGo = await pollUntil(
       async () => {
         const account = await holdsAccount('matthew');
-        listedAs ??= account?.ownUnnamed?.find(blob => blob.blobHash === first)?.arrivedVia;
-        return (account?.recentlyLetGo ?? []).some(blob => blob.blobHash === first);
+        listedAs ??= account?.ownUnnamed?.find(blob => blob.blobCid === first)?.arrivedVia;
+        return (account?.recentlyLetGo ?? []).some(blob => blob.blobCid === first);
       },
       RETENTION_BUDGET_MS,
       3_000
@@ -1430,7 +1430,7 @@ Then(
     const unrecorded = account?.blobs?.['unrecorded']?.blobs ?? 0;
     assert.ok(unrecorded >= 1, `matthew's account counts ${unrecorded} unrecorded files`);
     assert.ok(
-      !(account?.ownUnnamed ?? []).some(blob => blob.blobHash === solo.unrecorded),
+      !(account?.ownUnnamed ?? []).some(blob => blob.blobCid === solo.unrecorded),
       'a file with no note of how it arrived must never be listed as an own file'
     );
   }

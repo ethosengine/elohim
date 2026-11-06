@@ -29,7 +29,7 @@ Feature: Doorway natively projects EPRs at author-declared URL paths
     Given the elohim.host doorway also has an active project-epr commitment for "lamad-spa" at urlPath "/lamad"
     When an anonymous browser GETs "https://elohim.host/lamad/"
     Then the response serves the same lamad bundle as alpha.elohim.host
-    And both doorways' projections reference the same blob_hash
+    And both doorways' projections reference the same blob_cid
 
   @wip @route-claims @validation
   Scenario: An alias grant colliding with a reserved prefix is rejected at create time

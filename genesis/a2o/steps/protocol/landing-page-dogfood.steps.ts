@@ -2,6 +2,8 @@ import { strict as assert } from 'node:assert';
 
 import { Then, When } from '@cucumber/cucumber';
 
+import { assertByteCid } from '../../src/framework/byte-address.js';
+
 // Every fetch goes THROUGH the doorway — the web2 boundary / swap-test surface. The doorway
 // proxies /db/* and /api/* to its own elohim-storage (storage_proxy.rs → forward_to_storage),
 // so a client never needs (or should know) the internal storage URL. This is precisely the
@@ -64,12 +66,9 @@ Then('the content.entryPoint is {string}', function (this: DogfoodWorld, expecte
   assert.equal(landingContent(this.fetchedNode).entryPoint, expected);
 });
 
-Then('the blobHash is a sha256 hex string', function (this: DogfoodWorld) {
-  const hash = this.fetchedNode?.blobHash;
-  assert.equal(typeof hash, 'string');
-  // Canonical blob-hash wire format is `sha256-<64 hex>` (storage vocabulary),
-  // not bare hex — the doorway serves blobHash with the algorithm prefix.
-  assert.match(hash as string, /^sha256-[a-f0-9]{64}$/);
+Then('the blobCid is a byte CID', function (this: DogfoodWorld) {
+  // The wire address is the byte CID (raw + BLAKE3-256, bafkr4i…), admitted by full decode.
+  assertByteCid(this.fetchedNode?.blobCid, 'blobCid');
 });
 
 When('I GET {string} from the doorway', async function (this: DogfoodWorld, path: string) {

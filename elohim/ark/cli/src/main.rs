@@ -461,6 +461,7 @@ fn pair_witnesses(summaries: Vec<WitnessSummary>) -> Result<Vec<Value>, Failure>
                 .expect("a pair is created from at least one summary");
             Ok(json!({
                 "cid": representative.cid,
+                "blob_cid": representative.blob_cid,
                 "write_ahead_cid": write_ahead.as_ref().map(|summary| &summary.cid),
                 "verdict_cid": decided.as_ref().map(|summary| &summary.cid),
                 "incident": representative.incident,

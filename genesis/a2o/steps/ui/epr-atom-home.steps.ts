@@ -620,10 +620,10 @@ Then(
   async function (this: E2EWorld, id: string, emptyLine: string) {
     const { page } = home(this, 'Matthew');
     const doorway = this.getDoorway('alpha');
-    const content = await readJson<{ blobCid?: string; blobHash?: string }>(
+    const content = await readJson<{ blobCid?: string }>(
       `${doorway.url}/db/content/${encodeURIComponent(id)}`
     );
-    const cid = content?.blobCid ?? content?.blobHash;
+    const cid = content?.blobCid;
     const subjects = [...new Set([id, ...(cid ? [cid] : [])])];
     const lists = await Promise.all(
       subjects.map(subject =>

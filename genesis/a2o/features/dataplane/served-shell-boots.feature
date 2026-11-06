@@ -5,7 +5,7 @@
 Feature: The shell a doorway serves can boot
   An EPR is a named, content-addressed app bundle a doorway serves;
   elohim-host-landing is the one projected at the site root "/". Its DECLARED
-  BROWSER HEAD is the bundle hash (blobHash) its EPR record declares — the code
+  BROWSER HEAD is the bundle hash (blobCid) its EPR record declares — the code
   a browser downloads and runs. This is the browser-shell clause of the
   doorway-failover invariant: whichever doorway answers the root, the page it
   hands a person must name an entry script from that declared browser head,
@@ -21,7 +21,7 @@ Feature: The shell a doorway serves can boot
 
   # 2026-09-04: both doorways answered 200 at "/" with a page from a PREVIOUS
   # bundle era — it named main-EAKNZDUP.js while the declared browser head
-  # (blobHash sha256-7725d4…) holds main-7QFGHX5X.js. Fonts, styles and
+  # (blobCid bafkr4iect4fmo…) holds main-7QFGHX5X.js. Fonts, styles and
   # polyfills all resolved; only the entry script 404'd, so nothing booted and
   # every visitor got a blank page.
   @regression @requires:doorway
@@ -54,9 +54,9 @@ Feature: The shell a doorway serves can boot
   # THE BUILD STAMP is the fourth line. Every browser bundle carries a
   # version.json written by the app job (commit, version, buildTime,
   # environment, service). It records the COMMIT, not the bundle's content
-  # hash, so it cannot be compared against a blobHash directly; what it CAN be
+  # hash, so it cannot be compared against a blobCid directly; what it CAN be
   # compared against is the copy of version.json inside the declared browser
-  # head's own bundle, reached at /apps/{blobHash}/version.json — the same
+  # head's own bundle, reached at /apps/{blobCid}/version.json — the same
   # projection the entry-point comparison above reads index.html through. Equal
   # stamps mean the file a visitor is served and the file the declared head
   # holds came out of one build. Born red on the fleet 2026-09-06: both apex

@@ -28,6 +28,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import { assertByteCid, mintByteCid } from '../../src/framework/byte-address.js';
 import { loadRegistry } from '../../src/framework/session.js';
 
 type JsonObject = Record<string, unknown>;
@@ -212,7 +213,7 @@ function makeCandidate(state: FollowFixture, label: 'A' | 'B'): string {
   chmodSync(destination, 0o755);
   const identity = object(JSON.parse(ok(state, [destination, '--version']).stdout));
   assert.equal(identity.id, 'elohim-epr-cli');
-  assert.match(String(identity.cid), /^bafkrei[a-z2-7]+$/);
+  assertByteCid(identity.cid, 'epr --version cid');
   return destination;
 }
 
@@ -236,7 +237,7 @@ if sys.argv[1:] == ['--version']:
     result = subprocess.run([${JSON.stringify(candidateSource)}, 'bin', 'resolve', '--tool', 'epr', '--registry', ${JSON.stringify(registrySource)}, '--json'], env={**__import__('os').environ, 'EPR_BIN': str(here)}, capture_output=True, text=True, check=True)
     cid = json.loads(result.stdout)['cid']
     if count > 1:
-        cid = 'bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        cid = ${JSON.stringify(mintByteCid(Buffer.from('a different epr build')))}
     print(json.dumps({'id': 'elohim-epr-cli', 'version': 'wrong-cid-fixture', 'cid': cid}))
 elif sys.argv[1:] == ['flow', 'report', 'scope']:
     print('scope: aligned')

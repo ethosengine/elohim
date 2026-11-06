@@ -24,7 +24,7 @@
  * "served something of roughly the right size" is exactly the failure this
  * scenario has to exclude. The payload is deterministic pseudo-random (an
  * all-zeros or all-'A' buffer would survive both a truncation and a padding
- * bug), and the assertion is a full byte comparison plus a sha256 re-hash of
+ * bug), and the assertion is a full byte comparison plus a BLAKE3 re-address of
  * what came back — the same address the peer was asked to file it under.
  *
  * OWNERSHIP GATE. The PUT writes 68 MiB into a peer's local store, so it runs
@@ -36,11 +36,11 @@
 
 import { strict as assert } from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { Given, Then, When } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import { destructiveAllowed } from '../../src/framework/fixtures/substrate-scope.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -51,7 +51,7 @@ function storageUrl(): string {
 
 export interface OversizedArtifact {
   bytes: Uint8Array;
-  /** Canonical `sha256-{hex}` address. */
+  /** Canonical byte CID (raw + BLAKE3-256, `bafkr4i…`). */
   hash: string;
   putStatus?: number;
   putBody?: string;
@@ -104,8 +104,8 @@ export function deterministicBytes(len: number): Uint8Array {
   return out;
 }
 
-export function sha256Address(bytes: Uint8Array): string {
-  return `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+export function byteAddress(bytes: Uint8Array): string {
+  return mintByteCid(bytes);
 }
 
 function heldForOwnership(description: string): 'skipped' | undefined {
@@ -126,7 +126,7 @@ Given(
         'this scenario would silently exercise the "chunked" band instead'
     );
     const bytes = deterministicBytes(mib * 1024 * 1024);
-    artifacts.set(this, { bytes, hash: sha256Address(bytes) });
+    artifacts.set(this, { bytes, hash: byteAddress(bytes) });
   }
 );
 
@@ -139,7 +139,7 @@ Given(
         '(>16 MiB and <=64 MiB)'
     );
     const bytes = deterministicBytes(mib * 1024 * 1024);
-    artifacts.set(this, { bytes, hash: sha256Address(bytes) });
+    artifacts.set(this, { bytes, hash: byteAddress(bytes) });
   }
 );
 
@@ -235,7 +235,7 @@ Then(
         'chunked and RS reassembly must both preserve the exact original length'
     );
     assert.equal(
-      sha256Address(served),
+      byteAddress(served),
       art.hash,
       'the artifact came back with different bytes than it went in with — reassembly is lossy'
     );

@@ -19,6 +19,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
+import { mintByteCid } from '../src/framework/byte-address.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
 import { viewportArchetype } from '../src/framework/fixtures/viewport-archetypes.js';
 import { EprHomePage } from '../src/framework/pages/epr-home.page.js';
@@ -26,6 +27,11 @@ import { PROTOCOL_OMNI } from '../src/framework/pages/selectors.js';
 import { retry } from '../src/framework/utils/retry.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
 import { E2EWorld } from '../src/framework/world.js';
+
+/** A seeded row's blob address: the byte CID of a deterministic per-content payload. */
+function seedBlobCid(contentId: string): string {
+  return mintByteCid(Buffer.from(`a2o-seed:${contentId}`, 'utf8'));
+}
 
 // ---------------------------------------------------------------------------
 // Browser-tier helpers
@@ -322,7 +328,7 @@ Given(
  * step below, so the honesty-gated seeding logic lives in exactly one place.
  *
  * Root cause (2026-07-03, blob-durability/genesis 73x fingerprint): content-alpha is
- * normally ingested inline-markdown (no blobHash) which never enters distribute_shards,
+ * normally ingested inline-markdown (no blobCid) which never enters distribute_shards,
  * so `stewardingCollectives` was permanently 0 regardless of cluster health — a
  * test-authoring gap, not a substrate or commitment-activation bug. Fix mirrors the
  * already-green `grandma-photos-survive-node-loss.feature` pattern: idempotent
@@ -374,7 +380,7 @@ async function ensureStewardedByHouseholds(
   const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
     contentId,
     reach: world.contentIds.get('lastContentReach') ?? 'commons',
-    blobHash: `sha256-seed-${contentId}`,
+    blobCid: seedBlobCid(contentId),
     stewards,
     totalSizeBytes: 4096,
   });
@@ -551,7 +557,7 @@ Given(
 /**
  * Ensure a content item exists but has never entered the distribution plane —
  * the inverse precondition of the "stewarded by" steps. Plain inline-markdown
- * ingest (no blobHash) never enters distribute_shards, so distributionState
+ * ingest (no blobCid) never enters distribute_shards, so distributionState
  * honestly reads "unmeasured" regardless of reach.
  *
  * Example:
@@ -607,7 +613,7 @@ Given(
  * POST a minimal inline-markdown content item to elohim-storage. Shared by "I
  * ingest a {string}-reach content item {string}" and any Given step that needs
  * plain (never-blob-backed) content as a precondition — inline-body content
- * carries no blobHash, so it never enters distribute_shards.
+ * carries no blobCid, so it never enters distribute_shards.
  */
 async function ingestInlineContent(
   world: E2EWorld,
@@ -1582,7 +1588,7 @@ function blobPayloadFor(contentId: string): string {
 
 /**
  * Create a blob-backed content item. A photo album IS the blob case — it carries
- * a blob_hash, so it enters the distribution plane (unlike inline-body content,
+ * a blob_cid, so it enters the distribution plane (unlike inline-body content,
  * which is DHT-replicated and honestly reads distributionState: unmeasured).
  *
  * Example:
@@ -1597,9 +1603,9 @@ Given(
       contentFormat: 'external',
       reach,
       title: contentId,
-      // A blob-backed item carries blobHash; the body is the blob the substrate
+      // A blob-backed item carries blobCid; the body is the blob the substrate
       // would shard. We send both so the create path records a manifest.
-      blobHash: `sha256-seed-${contentId}`,
+      blobCid: seedBlobCid(contentId),
       content: blobPayloadFor(contentId),
     };
     await storagePostContent(payload);
@@ -1669,7 +1675,7 @@ When(
     const { statusCode, json } = await storagePut('/admin/seed/shard-manifest', {
       contentId,
       reach: this.contentIds.get('lastContentReach') ?? 'commons',
-      blobHash: `sha256-seed-${contentId}`,
+      blobCid: seedBlobCid(contentId),
       stewards,
       totalSizeBytes: 4096,
     });
@@ -1685,7 +1691,7 @@ When(
 /**
  * POST a blob-backed content item to elohim-storage and trigger the real
  * distribute_shards path. Distinct from "I ingest a {string}-reach content item"
- * (inline body) — this carries a blobHash so the substrate shards + distributes.
+ * (inline body) — this carries a blobCid so the substrate shards + distributes.
  *
  * Example:
  *   When I ingest a blob-backed "commons"-reach content item "mesh-album-1974"
@@ -1699,7 +1705,7 @@ When(
       contentFormat: 'external',
       reach,
       title: contentId,
-      blobHash: `sha256-seed-${contentId}`,
+      blobCid: seedBlobCid(contentId),
       content: blobPayloadFor(contentId),
     };
     await storagePostContent(payload);

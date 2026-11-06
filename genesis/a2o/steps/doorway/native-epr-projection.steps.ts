@@ -688,8 +688,8 @@ Then(
   }
 );
 
-Then("both doorways' projections reference the same blob_hash", function (this: E2EWorld) {
-  // The blob_hash is exposed via X-Content-Address (or similar) on
+Then("both doorways' projections reference the same blob_cid", function (this: E2EWorld) {
+  // The blob_cid is exposed via X-Content-Address (or similar) on
   // delivered responses. If neither doorway emits the header today,
   // mark pending so the contract is recorded in the feature without
   // false-positives.
@@ -698,13 +698,13 @@ Then("both doorways' projections reference the same blob_hash", function (this: 
   if (!primary || !secondary) {
     return 'pending';
   }
-  const primaryHash = primary.headers['x-content-address'] ?? primary.headers['x-blob-hash'];
-  const secondaryHash = secondary.headers['x-content-address'] ?? secondary.headers['x-blob-hash'];
+  const primaryHash = primary.headers['x-content-address'];
+  const secondaryHash = secondary.headers['x-content-address'];
   if (!primaryHash || !secondaryHash) {
     // Header contract isn't enforced yet — bytes-equal check in the
     // prior step is the substrate equivalent. Mark pending so the
     // expectation stays on the radar.
     return 'pending';
   }
-  assert.equal(primaryHash, secondaryHash, 'blob_hash mismatch across federated doorways');
+  assert.equal(primaryHash, secondaryHash, 'blob_cid mismatch across federated doorways');
 });

@@ -20,12 +20,13 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
 import {
   connectConductor,
   declareEarnedCanonicalHead,
@@ -82,7 +83,7 @@ interface PublishedApp {
   candidateHostname?: string;
   unrelatedHostname?: string;
   earnedBundle?: FixtureBundle;
-  earnedBlobHash?: string;
+  earnedBlobCid?: string;
   /** Exact Content action Matthew promoted as artifact A's earned head. */
   earnedHeadActionHash?: string;
   /** Exact Content action Matthew authored and declared as artifact B's candidate. */
@@ -92,9 +93,9 @@ interface PublishedApp {
   bundle?: FixtureBundle;
   /** The bundle deliberately built without its entry script (station 4). */
   brokenBundle?: FixtureBundle;
-  /** `sha256-…` of the coherent bundle, once staged. */
-  blobHash?: string;
-  serverBlobHash?: string;
+  /** Byte CID of the coherent bundle, once staged. */
+  blobCid?: string;
+  serverBlobCid?: string;
   serverDeclarations?: number;
   browserDeclaredAt?: number;
   serverDeclaredAt?: number;
@@ -104,8 +105,8 @@ interface PublishedApp {
   upgradeIncarnations?: string[];
   restarts?: number;
   heldPeers?: Set<string>;
-  /** `sha256-…` of the incoherent bundle, once its bytes were uploaded. */
-  brokenBlobHash?: string;
+  /** Byte CID of the incoherent bundle, once its bytes were uploaded. */
+  brokenBlobCid?: string;
   /** Every doorway URL this run PATCHed a head onto, in order. */
   declaredThrough: string[];
   /** stage-spa-blob.sh's last refusal output (station 4). */
@@ -203,7 +204,7 @@ export interface ChaosPublishedAuthority {
   slug: string;
   mountPath: string;
   actionHash: string;
-  blobHash: string;
+  blobCid: string;
   version: string;
   entryScript: string;
   styleSheet: string;
@@ -224,12 +225,12 @@ export function chaosPublishedAuthority(world: E2EWorld): ChaosPublishedAuthorit
   const record = app(world);
   const bundle = requireBundle(world);
   assert.ok(record.latestHeadActionHash, 'the run-owned app has no observed declared action');
-  assert.ok(record.blobHash, 'the run-owned app has no declared browser blob');
+  assert.ok(record.blobCid, 'the run-owned app has no declared browser blob');
   return {
     slug: record.slug,
     mountPath: record.mountPath,
     actionHash: record.latestHeadActionHash,
-    blobHash: record.blobHash,
+    blobCid: record.blobCid,
     version: bundle.stamp,
     entryScript: bundle.entryScript,
     styleSheet: bundle.styleSheet,
@@ -634,10 +635,10 @@ Given(
       const projected = (await head.json()) as {
         headActionHash?: string;
         earned?: boolean;
-        blobHash?: string | null;
+        blobCid?: string | null;
         dhtAnchorHash?: string | null;
         stagingCandidate?: string | null;
-        stagingCandidateBlobHash?: string | null;
+        stagingCandidateBlobCid?: string | null;
         stagingCandidateState?: string;
       };
       const contentResponse = await fetch(`${storageUrl}/db/content/${record.slug}`);
@@ -655,7 +656,7 @@ Given(
       );
       assert.ok(
         projected.earned === false &&
-          (projected.blobHash === null || projected.blobHash === undefined),
+          (projected.blobCid === null || projected.blobCid === undefined),
         `${doorway}: fresh record already carries a release (earned or bytes bound)`
       );
       assert.equal(
@@ -670,7 +671,7 @@ Given(
       );
       assert.equal(projected.stagingCandidate, null, `${doorway}: fresh record has a candidate`);
       assert.equal(
-        projected.stagingCandidateBlobHash,
+        projected.stagingCandidateBlobCid,
         null,
         `${doorway}: fresh record has candidate bytes`
       );
@@ -693,9 +694,9 @@ async function handCurrentBundleBytesToEachDoorway(world: E2EWorld): Promise<voi
       0,
       `handing the bundle's bytes to ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
     );
-    record.blobHash = outcome.blobHash;
+    record.blobCid = outcome.blobCid;
   }
-  assert.ok(record.blobHash, 'stage-spa-blob.sh reported no blob hash for the staged bundle');
+  assert.ok(record.blobCid, 'stage-spa-blob.sh reported no blob hash for the staged bundle');
 }
 
 When(
@@ -729,7 +730,7 @@ async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Pr
     0,
     `declaring the head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
   );
-  record.blobHash = outcome.blobHash;
+  record.blobCid = outcome.blobCid;
   assert.ok(outcome.authoredActionHash, `authoring through ${peerName} returned no exact action`);
   record.latestHeadActionHash = outcome.authoredActionHash;
   record.browserDeclaredAt = Date.now();
@@ -762,7 +763,7 @@ async function declareCurrentBrowserBundleThroughAuthorStorage(world: E2EWorld):
     0,
     `declaring the head through the source author's storage peer failed (exit ${outcome.code}):\n${outcome.output}`
   );
-  record.blobHash = outcome.blobHash;
+  record.blobCid = outcome.blobCid;
   assert.ok(
     outcome.authoredActionHash,
     'source-author storage publication returned no exact action'
@@ -816,7 +817,7 @@ When(
       await rail.close();
     }
     record.earnedBundle = requireBundle(this);
-    record.earnedBlobHash = record.blobHash;
+    record.earnedBlobCid = record.blobCid;
     record.earnedHeadActionHash = headActionHash;
   }
 );
@@ -826,7 +827,7 @@ When(
   { timeout: 300_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
-    assert.ok(record.blobHash, 'artifact B bytes have no content address to declare');
+    assert.ok(record.blobCid, 'artifact B bytes have no content address to declare');
     assert.ok(
       record.earnedHeadActionHash,
       'artifact A has no exact earned action for artifact B to name as its lineage parent'
@@ -839,7 +840,7 @@ When(
         'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
       },
       body: JSON.stringify({
-        blobHash: record.blobHash,
+        blobCid: record.blobCid,
         metadata: {
           kind: 'release-manifest',
           publishedAt: new Date().toISOString(),
@@ -1003,12 +1004,12 @@ async function publicHeadStorageFailure(world: E2EWorld, record: PublishedApp): 
           read('/head', [
             'headActionHash',
             'earned',
-            'blobHash',
+            'blobCid',
             'anchorMatchesHead',
             'stagingCandidateState',
             'updatedAt',
           ]),
-          read('', ['blobHash', 'serverBlobHash']),
+          read('', ['blobCid', 'serverBlobCid']),
         ]);
         return { doorway, peer, head, content };
       } catch (error) {
@@ -1017,7 +1018,7 @@ async function publicHeadStorageFailure(world: E2EWorld, record: PublishedApp): 
     })
   );
   return JSON.stringify({
-    expected: { headActionHash: record.candidateActionHash, blobHash: record.blobHash },
+    expected: { headActionHash: record.candidateActionHash, blobCid: record.blobCid },
     peers,
   }).slice(0, 1200);
 }
@@ -1205,7 +1206,7 @@ When(
       0,
       `declaring the server head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
     );
-    record.serverBlobHash = outcome.blobHash;
+    record.serverBlobCid = outcome.blobCid;
     record.serverDeclaredAt = Date.now();
     record.rendererAdoptionAt = record.serverDeclaredAt;
     record.serverDeclarations = (record.serverDeclarations ?? 0) + 1;
@@ -1270,7 +1271,7 @@ Then(
   async function (this: E2EWorld, bound: number) {
     const record = app(this);
     assert.ok(
-      record.serverBlobHash,
+      record.serverBlobCid,
       'no server bundle was staged, so there is no pointer to converge'
     );
     const topology = householdPeers.get(this);
@@ -1296,14 +1297,14 @@ Then(
           if (status === 200) {
             try {
               pointer = String(
-                (JSON.parse(text) as { serverBlobHash?: unknown }).serverBlobHash ?? ''
+                (JSON.parse(text) as { serverBlobCid?: unknown }).serverBlobCid ?? ''
               );
             } catch {
               pointer = '';
             }
           }
           seen.set(peer.name, pointer || `<${status}>`);
-          if (pointer !== record.serverBlobHash) all = false;
+          if (pointer !== record.serverBlobCid) all = false;
         }
         return all;
       },
@@ -1313,7 +1314,7 @@ Then(
     assert.ok(
       elapsed !== null,
       `the server pointer declared once on one peer did not reach every peer within ${bound}s. ` +
-        `Declared ${record.serverBlobHash}; peers answered ${answered}. ` +
+        `Declared ${record.serverBlobCid}; peers answered ${answered}. ` +
         "A pointer written straight into one peer's own database and told to nobody is the 2026-09-08 shape."
     );
   }
@@ -1361,7 +1362,7 @@ When(
         const row = await fetch(
           `${loadHouseholdMeshFixture().storagePeers![peer].url}/db/content/${record.slug}`
         );
-        return ((await row.json()) as { blobHash?: string }).blobHash === record.blobHash;
+        return ((await row.json()) as { blobCid?: string }).blobCid === record.blobCid;
       },
       Math.max(0, CONVERGENCE_BOUND_MS - (Date.now() - record.browserDeclaredAt!))
     );
@@ -1476,7 +1477,7 @@ When(
     record.refusal = { code: outcome.code, output: outcome.output };
     // The SDK may reject before upload. The next step explicitly injects an
     // unchecked archive only for the old-publisher defense test.
-    record.brokenBlobHash = outcome.blobHash;
+    record.brokenBlobCid = outcome.blobCid;
   }
 );
 
@@ -1503,9 +1504,9 @@ When(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const record = app(this);
-    if (!record.brokenBlobHash) {
+    if (!record.brokenBlobCid) {
       assert.ok(record.brokenBundle, 'no deliberately broken fixture was built');
-      record.brokenBlobHash = await stageInvalidFixture(
+      record.brokenBlobCid = await stageInvalidFixture(
         record.brokenBundle,
         resolvePeerUrl('alpha-A')
       );
@@ -1518,7 +1519,7 @@ When(
         'content-type': 'application/json',
         'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
       },
-      body: JSON.stringify({ blobHash: record.brokenBlobHash }),
+      body: JSON.stringify({ blobCid: record.brokenBlobCid }),
     });
     assert.ok(
       response.ok,
@@ -1527,10 +1528,10 @@ When(
     // Match the publisher's canonical declaration too. A projection-only PATCH
     // is correctly healed back to the prior canonical head and proves nothing.
     const rowResponse = await fetch(`${storageUrl}/db/content/${record.slug}`);
-    const row = (await rowResponse.json()) as { blobHash?: string; dhtAnchorHash?: string };
+    const row = (await rowResponse.json()) as { blobCid?: string; dhtAnchorHash?: string };
     assert.equal(
-      row.blobHash,
-      record.brokenBlobHash,
+      row.blobCid,
+      record.brokenBlobCid,
       `the forced head for "${record.slug}" did not resolve to the staged incoherent blob`
     );
     assert.ok(row.dhtAnchorHash, 'the forced head has no notarized action to declare');
@@ -1625,10 +1626,7 @@ Then(
     );
     assert.notEqual(observed, null, 'Doorway did not judge the forced head within 75 seconds');
     const declared = await fetch(`${resolveStorageUrl('alpha-A')}/db/content/${record.slug}`);
-    assert.equal(
-      ((await declared.json()) as { blobHash?: string }).blobHash,
-      record.brokenBlobHash
-    );
+    assert.equal(((await declared.json()) as { blobCid?: string }).blobCid, record.brokenBlobCid);
     assert.ok(
       marker.startsWith('behind'),
       `${peerName} served this app with x-elohim-bundle "${marker || 'absent'}". A doorway serving an ` +
@@ -1723,10 +1721,10 @@ Then(
 /**
  * ACT II form. version.json records the build's COMMIT, not the bundle's
  * content hash (Jenkinsfile ~1206), and it is emitted once per app build rather
- * than once per EPR slug — so it can never be compared against a blobHash
+ * than once per EPR slug — so it can never be compared against a blobCid
  * directly. The one comparison it CAN carry is against the copy of version.json
  * inside the declared browser head's OWN bundle, fetched BY CONTENT ADDRESS at
- * /apps/{blobHash}/version.json. By address, never by slug: the slug projection
+ * /apps/{blobCid}/version.json. By address, never by slug: the slug projection
  * can itself be a bundle behind, and comparing two stale copies would agree
  * perfectly while a visitor reads yesterday's page. Same comparison the CI gate
  * scripts/ci/verify-served-shell.sh makes, so a household red and a pipeline red
@@ -1743,7 +1741,7 @@ Then(
     let declaredHead = '';
     if (row.status === 200) {
       try {
-        declaredHead = String((JSON.parse(row.text) as { blobHash?: unknown }).blobHash ?? '');
+        declaredHead = String((JSON.parse(row.text) as { blobCid?: unknown }).blobCid ?? '');
       } catch {
         declaredHead = '';
       }
@@ -1813,7 +1811,7 @@ Then(
   'every household peer serves the declared server bundle bytes by their content address',
   { timeout: 180_000 },
   async function (this: E2EWorld) {
-    const hash = app(this).serverBlobHash;
+    const hash = app(this).serverBlobCid;
     assert.ok(hash);
     const fixture = loadHouseholdMeshFixture();
     for (const peer of householdPeers.get(this)!.all) {
@@ -1823,7 +1821,7 @@ Then(
       assert.equal(response.status, 200, `${peer}: cannot serve server bundle ${hash}`);
       const bytes = Buffer.from(await response.arrayBuffer());
       assert.equal(
-        `sha256-${createHash('sha256').update(bytes).digest('hex')}`,
+        mintByteCid(bytes),
         hash,
         `${peer}: server bundle bytes do not match declared content address`
       );
@@ -1858,20 +1856,20 @@ Then(
           if (response.status !== 200) return false;
           const heads = (
             JSON.parse(last) as {
-              servedBundleHeads: { slug: string; serverBlobHash: string; status: string }[];
+              servedBundleHeads: { slug: string; serverBlobCid: string; status: string }[];
             }
           ).servedBundleHeads;
           return heads.some(
             head =>
               head.slug === record.slug &&
-              head.serverBlobHash === record.serverBlobHash &&
+              head.serverBlobCid === record.serverBlobCid &&
               head.status === 'current'
           );
         }, deadline - Date.now());
         assert.notEqual(
           elapsed,
           null,
-          `${peer}: expected renderer ${record.serverBlobHash}; health=${last}`
+          `${peer}: expected renderer ${record.serverBlobCid}; health=${last}`
         );
       })
     );
@@ -1994,22 +1992,22 @@ Then(
   async function (this: E2EWorld, seconds: number) {
     const record = app(this);
     const bundle = requireBundle(this);
-    assert.ok(record.browserDeclaredAt && record.blobHash);
+    assert.ok(record.browserDeclaredAt && record.blobCid);
     const browserDeclaredAt = record.browserDeclaredAt;
-    const expectedBlobHash = record.blobHash;
+    const expectedBlobCid = record.blobCid;
     const deadline = browserDeclaredAt + seconds * 1000;
     await Promise.all(
       DOORWAYS.map(async peer => {
         const pointerTimeline: {
           elapsedMs: number;
           status: number;
-          blobHash: string | null;
+          blobCid: string | null;
         }[] = [];
-        const rememberPointer = (status: number, blobHash: string | null): void => {
+        const rememberPointer = (status: number, blobCid: string | null): void => {
           pointerTimeline.push({
             elapsedMs: Math.max(0, Date.now() - browserDeclaredAt),
             status,
-            blobHash,
+            blobCid,
           });
           if (pointerTimeline.length > 32) pointerTimeline.shift();
         };
@@ -2017,16 +2015,16 @@ Then(
           async () => {
             const base = resolvePeerUrl(peer);
             const row = await getRaw(`${base}/db/content/${record.slug}`, { timeoutMs: 5000 });
-            const observedBlobHash =
+            const observedBlobCid =
               row.status === 200
-                ? ((JSON.parse(row.text) as { blobHash?: string }).blobHash ?? null)
+                ? ((JSON.parse(row.text) as { blobCid?: string }).blobCid ?? null)
                 : null;
-            rememberPointer(row.status, observedBlobHash);
-            if (row.status !== 200 || observedBlobHash !== expectedBlobHash) return false;
+            rememberPointer(row.status, observedBlobCid);
+            if (row.status !== 200 || observedBlobCid !== expectedBlobCid) return false;
             const paths = ['index.html', bundle.entryScript, bundle.styleSheet, 'version.json'];
             const files = await Promise.all(
               paths.map(async path =>
-                getRaw(`${base}/apps/${expectedBlobHash}/${path}`, { timeoutMs: 5000 })
+                getRaw(`${base}/apps/${expectedBlobCid}/${path}`, { timeoutMs: 5000 })
               )
             );
             return (
@@ -2043,7 +2041,7 @@ Then(
             {
               measure: 'next-browser-pointer-timeline',
               peer,
-              expectedBlobHash,
+              expectedBlobCid,
               deadlineMs: seconds * 1000,
               readyElapsedMs: ready,
               lastObserved,

@@ -218,7 +218,6 @@ function buildSyntheticContentBatch(count: number): Record<string, unknown>[] {
     contentType: null,
     contentFormat: null,
     contentBody: null,
-    blobHash: null,
     blobCid: null,
     contentSizeBytes: null,
     metadata: null,

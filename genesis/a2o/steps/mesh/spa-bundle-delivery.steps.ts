@@ -191,22 +191,22 @@ Given(
   }
 );
 
-// Gap: the literal placeholder hashes ("sha256-old"/"sha256-new") are not
-// realizable content addresses on this mesh — real blob hashes are bafkrei…
-// CIDv1 (see steps/delivery.steps.ts CONTENT_ADDRESS_PATTERN), and there is
-// no a2o-callable path to pin a running doorway to an arbitrary literal hash.
+// Gap: the literal placeholder addresses ("old"/"new" in the feature) are not
+// realizable content addresses on this mesh — real blob addresses are byte CIDs
+// (bafkr4i…, admitted by full decode: src/framework/byte-address.ts), and there is
+// no a2o-callable path to pin a running doorway to an arbitrary literal address.
 Given(
-  'doorway {string} is serving the SPA from blobHash {string}',
-  function (this: E2EWorld, _doorwayId: string, _blobHash: string) {
+  'doorway {string} is serving the SPA from blobCid {string}',
+  function (this: E2EWorld, _doorwayId: string, _blobCid: string) {
     return 'pending';
   }
 );
 
 // Gap: same placeholder-hash limitation as above — nothing in this mesh's
-// projection cache is addressed by a literal "sha256-old" value to assert on.
+// projection cache is addressed by a literal placeholder value to assert on.
 Given(
-  'the projection cache contains SPA assets from blobHash {string}',
-  function (this: E2EWorld, _blobHash: string) {
+  'the projection cache contains SPA assets from blobCid {string}',
+  function (this: E2EWorld, _blobCid: string) {
     return 'pending';
   }
 );
@@ -262,10 +262,10 @@ When(String.raw`a request is made for \/`, async function (this: E2EWorld) {
 
 // Gap: no re-seed/import pathway is callable from a2o step code — the
 // elohim-import CLI that mints a new ZIP blob is out-of-band, and even if it
-// were reachable the literal "sha256-new" is not a real content address.
+// were reachable the literal placeholder is not a real content address.
 When(
-  String.raw`CI re-seeds {string} with a new ZIP blob \(blobHash {string})`,
-  function (this: E2EWorld, _slug: string, _blobHash: string) {
+  String.raw`CI re-seeds {string} with a new ZIP blob \(blobCid {string})`,
+  function (this: E2EWorld, _slug: string, _blobCid: string) {
     return 'pending';
   }
 );
@@ -283,8 +283,8 @@ When(
 
 // Gap: same placeholder-hash / no-mutation-path limitation as the Given steps above.
 When(
-  'the blobHash for {string} changes to {string}',
-  function (this: E2EWorld, _contentSlug: string, _newBlobHash: string) {
+  'the blobCid for {string} changes to {string}',
+  function (this: E2EWorld, _contentSlug: string, _newBlobCid: string) {
     return 'pending';
   }
 );
@@ -511,30 +511,30 @@ Then(String.raw`subsequent requests for \/ serve the updated SPA`, function (thi
 
 // Gap: same re-seed/placeholder-hash limitation.
 Then(
-  'doorway evicts the extracted SPA cache for blobHash {string}',
-  function (this: E2EWorld, _blobHash: string) {
+  'doorway evicts the extracted SPA cache for blobCid {string}',
+  function (this: E2EWorld, _blobCid: string) {
     return 'pending';
   }
 );
 
 // Gap: same re-seed/placeholder-hash limitation.
 Then(
-  'doorway re-extracts the SPA bundle from blobHash {string}',
-  function (this: E2EWorld, _blobHash: string) {
+  'doorway re-extracts the SPA bundle from blobCid {string}',
+  function (this: E2EWorld, _blobCid: string) {
     return 'pending';
   }
 );
 
 // Gap: same placeholder-hash limitation as the Given steps above — nothing
-// in this mesh is actually tagged with a literal "sha256-old" blobHash.
+// in this mesh is actually tagged with a literal placeholder blobCid.
 Then(
-  'all projection cache entries tagged with blobHash {string} are evicted',
-  function (this: E2EWorld, _blobHash: string) {
+  'all projection cache entries tagged with blobCid {string} are evicted',
+  function (this: E2EWorld, _blobCid: string) {
     return 'pending';
   }
 );
 
-// Gap: depends on the same unstaged blobHash-change precondition.
+// Gap: depends on the same unstaged blobCid-change precondition.
 Then('stale asset requests do not return old bundle files', function (this: E2EWorld) {
   return 'pending';
 });

@@ -34,7 +34,7 @@
 # missing node: shard→blob resolution + custody commitment. With the sweep firing,
 # the fold honestly reports unknown=32, stocked=0 on alpha-A: derive_class
 # (services/custody_facing.rs:332-364) sends a shard to `unknown` when no
-# shard_manifests row maps its shard_hash to a blob_hash — true for ALL 32 of
+# shard_manifests row maps its shard_cid to a blob_cid — true for ALL 32 of
 # matthew's shard_locations rows — and `stocked` further needs an active
 # rea_commitments row (action='custody-blob', state='active') naming the peer.
 # Probe: /api/v1/weave then /metrics; current state: sweep fires (station green
@@ -44,7 +44,7 @@
 # Station named at RCA (2026-08-18) — the commitment station's red is ROTATION:
 # active custody-blob commitments exist (seeded 2026-08-15) but classify the
 # blob hashes of THAT DAY's bundles; every SSR-bundle redeploy rotates
-# content.blob_hash/server_blob_hash underneath them, and nothing re-stated the
+# content.blob_cid/server_blob_cid underneath them, and nothing re-stated the
 # pledge (the seeder's own comment declares that reconcile pass out of scope).
 # Cure: services/custody_rotation.rs — level-triggered rotation pass (5min tick,
 # CUSTODY_ROTATION_ENABLED default on) authors the successor via the notarized

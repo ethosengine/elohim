@@ -526,16 +526,16 @@ Then('peer B fetched the bytes from peer A', async function (this: E2EWorld) {
   const state = twoNode(this);
   const content = await getJsonFrom(state.b, `/db/content/${state.id}`);
   assert.equal(content.status, 200, `peer B holds no row for "${state.id}"`);
-  const blobHash = (content.body as Record<string, unknown>)['blobHash'];
-  if (typeof blobHash === 'string' && blobHash.length > 0) {
+  const blobCid = (content.body as Record<string, unknown>)['blobCid'];
+  if (typeof blobCid === 'string' && blobCid.length > 0) {
     // undici's `request` answers with `statusCode`, not `status` — the latter
     // is not on ResponseData at all, so this read was `undefined` and the
     // assertion could never see the real HTTP code.
-    const { statusCode } = await request(`${state.b}/blob/${blobHash}`, { method: 'GET' });
+    const { statusCode } = await request(`${state.b}/blob/${blobCid}`, { method: 'GET' });
     assert.equal(
       statusCode,
       200,
-      `peer B has the row for "${state.id}" but cannot serve its blob ${blobHash} (HTTP ${statusCode})`
+      `peer B has the row for "${state.id}" but cannot serve its blob ${blobCid} (HTTP ${statusCode})`
     );
   }
   const peers = await getJsonFrom(state.b, '/api/v1/peers/delivery');

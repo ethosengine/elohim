@@ -7,9 +7,11 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
 
+import { mintByteCid } from '../../src/framework/byte-address.js';
+
 const execute = promisify(execFile);
 const contentType = 'Content-Type';
-const expectedHead = 'sha256-test';
+const expectedHead = mintByteCid(Buffer.from('served shell head'));
 const jenkinsUrl = 'https://jenkins.invalid';
 const sameOriginRedirect = 'same-origin-redirect';
 const ssrWithoutBootstrap = 'ssr-without-bootstrap';
@@ -108,7 +110,7 @@ for (const mode of [
         mode === 'cross-page'
           ? '/'
           : mode === 'cross-head'
-            ? '/apps/sha256-test/index.html'
+            ? `/apps/${expectedHead}/index.html`
             : mode === 'cross-version'
               ? '/version.json'
               : mode === 'cross-asset'
@@ -126,8 +128,8 @@ for (const mode of [
         response.writeHead(302, { Location: '/index.html' }).end();
         return;
       }
-      const isHead = url.startsWith('/apps/sha256-test/');
-      const path = isHead ? url.replace('/apps/sha256-test', '') : url;
+      const isHead = url.startsWith(`/apps/${expectedHead}/`);
+      const path = isHead ? url.replace(`/apps/${expectedHead}`, '') : url;
       if (path === '/version.json') {
         if (mode === 'missing-version') {
           response.writeHead(404).end();
@@ -243,7 +245,7 @@ for (const mode of [
           response.setHeader(contentType, 'application/json');
           response.end(
             JSON.stringify({
-              serverBlobHash:
+              serverBlobCid:
                 mode === 'declaration-missing' || mode === declarationDeadline
                   ? null
                   : mode === 'declaration-wrong' ||
@@ -264,7 +266,7 @@ for (const mode of [
                   servedBundleHeads: [
                     {
                       slug: 'test-app',
-                      serverBlobHash:
+                      serverBlobCid:
                         mode === 'stale' || (mode === adoptionTransient && healthReads === 1)
                           ? 'old'
                           : expectedHead,

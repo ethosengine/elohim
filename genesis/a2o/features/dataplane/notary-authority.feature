@@ -8,7 +8,7 @@
 #   deeper truth, observed 2026-07-09:
 #     alpha-A      /db/content/elohim-host-landing.trust = "notarized"  dhtAnchorHash = uhCkkmx3Fb8…
 #     elohim.host  /db/content/elohim-host-landing.trust = "notarized"  dhtAnchorHash = uhCkkwLFEVDz…  (DIFFERENT)
-#     …and their blobHash differs too (each host built + notarized its OWN bundle).
+#     …and their blobCid differs too (each host built + notarized its OWN bundle).
 #   Both peers are green — over TWO DIFFERENT HEADS. "Reaches notarized" was never the
 #   invariant; it is a FALSE-GREEN. The two independent authorings are not a bug to lock
 #   out — they are the natural state of a peer network where many peers legitimately author.
@@ -36,8 +36,8 @@
 #   Confirmed live that both blobs are present on both peers — GET the elohim.host bundle on
 #   alpha-A and the alpha-A bundle on elohim.host both return 200. So the divergence is NOT a
 #   byte-replication gap; the bytes moved. It is purely a HEAD-ELECTION gap: each peer serves its
-#   OWN content-row blobHash (declaredHead is null on both), and the serve path does not consult
-#   declared_head at all (`read_head_blob_hash` is called only in tests — the C3 read side is
+#   OWN content-row blobCid (declaredHead is null on both), and the serve path does not consult
+#   declared_head at all (`read_head_blob_cid` is called only in tests — the C3 read side is
 #   dead). Worse, the reconcile heal loop resolves the head from EACH peer's OWN conductor, so it
 #   re-stamps each peer's own head — per-node resolution PRESERVES the split. This is why the new
 #   landing served once then "regressed": elohim.host was always going to fall back to its own
@@ -84,7 +84,7 @@ Feature: Notary authority — the federation converges on ONE earned canonical h
   Scenario: Every federation peer resolves the SAME canonical head (RED — the convergence gap)
     # RED-FIRST, and the heart of the notary. Today alpha-A and elohim.host each report
     # trust="notarized" but over DIFFERENT canonical heads: divergent dhtAnchorHash (different
-    # notary action) and divergent blobHash (each host authored its own bundle). Both green over
+    # notary action) and divergent blobCid (each host authored its own bundle). Both green over
     # two truths is a FALSE-GREEN — authority is a privilege of the peer that ran the deploy, not
     # a property of the commons. There is no wired cross-peer head election/adoption: the reconcile
     # heal loop detects divergence but re-affirms each peer's OWN head by design ("never adopt the

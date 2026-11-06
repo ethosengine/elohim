@@ -264,8 +264,8 @@ interface ReseedState {
   slug: string;
   /** The content address the doorway SERVED before the re-seed (X-Content-Address). */
   originalHash: string | null;
-  /** The storage row's blobHash before the re-seed — what cleanup restores. */
-  storedBlobHash: string | null;
+  /** The storage row's blobCid before the re-seed — what cleanup restores. */
+  storedBlobCid: string | null;
   /** X-Cache of the FIRST response that carried the superseding address. */
   firstPostEvictionCache?: string;
   /** The superseding address that first response carried. */
@@ -274,8 +274,7 @@ interface ReseedState {
 const reseedStore = new WeakMap<E2EWorld, ReseedState>();
 
 /** The doorway reports the served bundle's address as X-Content-Address on every app
- *  file response (doorway-service/src/routes/apps.rs `build_app_response`); X-Blob-Hash
- *  exists only on the `_capability` probe. Reading the wrong header made both sides
+ *  file response (doorway-service/src/routes/apps.rs `build_app_response`). Reading the wrong header made both sides
  *  `null` and the eviction unobservable (run 20260822T201747Z-3bd326d6). */
 function servedContentAddress(headers: Record<string, unknown>): string | null {
   return (headers['x-content-address'] as string | undefined) ?? null;
@@ -287,21 +286,21 @@ function adminHeaders(): Record<string, string> {
   return key ? { authorization: `Bearer ${key}` } : {};
 }
 
-/** PATCH one row's blobHash on the primary storage peer; returns the status and body. */
-async function patchBlobHash(
+/** PATCH one row's blobCid on the primary storage peer; returns the status and body. */
+async function patchBlobCid(
   slug: string,
-  blobHash: string
+  blobCid: string
 ): Promise<{ status: number; text: string }> {
   const { statusCode, body } = await request(`${storageUrl()}/db/content/${slug}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', ...adminHeaders() },
-    body: JSON.stringify({ blobHash }),
+    body: JSON.stringify({ blobCid }),
   });
   return { status: statusCode, text: await body.text() };
 }
 
 Given(
-  'the projection cache for {string} is warm with blob_hash {string}',
+  'the projection cache for {string} is warm with blob_cid {string}',
   { timeout: 120_000 },
   async function (this: E2EWorld, slug: string, _namedHash: string) {
     const base = doorwayUrl(this);
@@ -314,14 +313,14 @@ Given(
     const observed = servedContentAddress(headers);
     // The storage row is the thing the re-seed moves and cleanup must put back.
     const { body: row } = await getJson(`${storageUrl()}/db/content/${slug}`);
-    const storedBlobHash = (row as Record<string, unknown> | null)?.['blobHash'];
-    // The scenario's literal "sha256-old" is a stand-in for "whatever hash is
+    const storedBlobCid = (row as Record<string, unknown> | null)?.['blobCid'];
+    // The scenario's placeholder old address is a stand-in for "whatever hash is
     // cached right now": the contract is that the CACHED hash is superseded,
     // not that it equals a particular string.
     reseedStore.set(this, {
       slug,
       originalHash: observed,
-      storedBlobHash: typeof storedBlobHash === 'string' ? storedBlobHash : null,
+      storedBlobCid: typeof storedBlobCid === 'string' ? storedBlobCid : null,
     });
   }
 );
@@ -331,14 +330,14 @@ When('{string} is re-seeded with a new ZIP blob', async function (this: E2EWorld
     return 'skipped';
   }
   const state = reseedStore.get(this);
-  assert.ok(state, 'no warm-cache baseline — the "is warm with blob_hash" Given must run first');
+  assert.ok(state, 'no warm-cache baseline — the "is warm with blob_cid" Given must run first');
   assert.ok(
-    state.storedBlobHash,
-    `storage holds no blobHash for "${slug}" — nothing to supersede or restore`
+    state.storedBlobCid,
+    `storage holds no blobCid for "${slug}" — nothing to supersede or restore`
   );
   // "A new ZIP blob" must be a REAL bundle the peer holds, so the app keeps
   // serving during the scenario and the new address is observable end to end.
-  // The previous shape PATCHed a fabricated `sha256-a2o-reseed-<ts>` and never
+  // The previous shape PATCHed a fabricated placeholder address and never
   // restored it: the row pointed at bytes nobody had, doorway A served 404 for
   // the app from then on, and four delivery-diagnostics scenarios in other
   // runs went red on a fixture this step had poisoned (2026-08-22). The
@@ -348,24 +347,24 @@ When('{string} is re-seeded with a new ZIP blob', async function (this: E2EWorld
     `${storageUrl()}/db/content/elohim-host-landing`
   );
   assert.equal(donorStatus, 200, `GET /db/content/elohim-host-landing returned ${donorStatus}`);
-  const newHash = (donor as Record<string, unknown>)['blobHash'];
+  const newHash = (donor as Record<string, unknown>)['blobCid'];
   assert.ok(
-    typeof newHash === 'string' && newHash !== state.storedBlobHash,
-    `no distinct donor bundle to re-seed "${slug}" with (landing blobHash ${String(newHash)})`
+    typeof newHash === 'string' && newHash !== state.storedBlobCid,
+    `no distinct donor bundle to re-seed "${slug}" with (landing blobCid ${String(newHash)})`
   );
   // Restore the row when the scenario ends, whatever happens in between — a
   // moved head on a shared mesh is exactly the kind of change that outlives
   // the run that made it. Same gate as the move itself.
-  const restoreTo = state.storedBlobHash;
+  const restoreTo = state.storedBlobCid;
   this.onCleanup(async () => {
-    const { status, text } = await patchBlobHash(slug, restoreTo);
+    const { status, text } = await patchBlobCid(slug, restoreTo);
     if (status < 200 || status >= 300) {
       console.warn(
-        `  ⚠️  could not restore "${slug}" blobHash to ${restoreTo} (${status}): ${text.slice(0, 200)}`
+        `  ⚠️  could not restore "${slug}" blobCid to ${restoreTo} (${status}): ${text.slice(0, 200)}`
       );
     }
   });
-  const { status, text } = await patchBlobHash(slug, newHash);
+  const { status, text } = await patchBlobCid(slug, newHash);
   assert.ok(
     status >= 200 && status < 300,
     `re-seeding "${slug}" returned ${status}: ${text.slice(0, 300)}`
@@ -422,11 +421,11 @@ Then(
   }
 );
 
-Then('the new response is cached with the new blob_hash', async function (this: E2EWorld) {
+Then('the new response is cached with the new blob_cid', async function (this: E2EWorld) {
   const base = doorwayUrl(this);
   const state = reseedStore.get(this);
   assert.ok(state, 'no warm-cache baseline');
-  // Two facts make "cached with the new blob_hash": the first post-eviction
+  // Two facts make "cached with the new blob_cid": the first post-eviction
   // response carried a superseding address (recorded by the eviction step),
   // and a follow-up request is now answered from the doorway's cache. The
   // address that follow-up carries is whatever storage declares at that
