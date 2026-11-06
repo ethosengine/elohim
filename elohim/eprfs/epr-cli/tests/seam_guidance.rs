@@ -64,7 +64,6 @@ fn fixture() -> TempDir {
             // gate-reads: elohim/elohim-storage/src/sync/doc_store.rs
             // gate-reads: .epr-meta/composition.md
             // gate-reads: elohim/elohim-storage/src/epr_head.rs
-            // gate-reads: elohim/elohim-storage/src/http_blob_router.rs
             // gate-reads: elohim/elohim-storage/src/content_server.rs
             // gate-reads: elohim/eprfs/epr-cli/src/govern.rs
             // gate-reads: elohim/eprfs/epr-cli/src/git.rs
