@@ -42,8 +42,15 @@ pub const STEWARD_TIERS: [&str; 4] = [
     "pioneer",   // Tier 4: Network backbone
 ];
 
-/// Maximum shard index for 4+3 Reed-Solomon (7 shards, indices 0-6)
-pub const MAX_SHARD_INDEX: u32 = 6;
+/// Epoch-0 ceiling on `ShardAssignment.shard_index`.
+///
+/// `shard_index` is the custody-unit index in the blob's `ShardManifest::custody_units()`
+/// order: the chunk index when erasure is `none`, or `stripe * (data + parity) + shard` when
+/// erasure coded. One striped blob therefore yields indices well past a single stripe's
+/// seven shards. The bound that matters is that the index names a unit of its own manifest,
+/// and storage holds that manifest, so that check is a storage-projection concern this epoch.
+/// The DNA only refuses an index no manifest could produce (more than 65536 custody units).
+pub const MAX_SHARD_INDEX: u32 = 65_535;
 
 // =============================================================================
 // Node Registration
@@ -205,7 +212,7 @@ pub struct ShardAssignment {
     pub assignment_hash: Option<String>, // Self-reference for updates
     pub content_cid: String,             // Byte CID (raw + BLAKE3-256, `bafkr4i…`)
     pub custodian_did: String,
-    pub shard_index: u32, // 0-6 for a 4+3 RS encoding
+    pub shard_index: u32, // custody-unit index in the manifest's custody_units() order
     pub strategy: ShardingStrategy,
     pub status: ShardStatus,
     pub verified_at: Option<String>,
@@ -315,7 +322,7 @@ fn validate_shard_assignment(
     if assignment.shard_index > MAX_SHARD_INDEX {
         return Ok(ValidateCallbackResult::Invalid(
             format!(
-                "ShardAssignment shard_index {} exceeds maximum {} (4+3 RS encoding)",
+                "ShardAssignment shard_index {} exceeds the epoch-0 custody-unit ceiling {}",
                 assignment.shard_index, MAX_SHARD_INDEX
             ),
         ));
@@ -831,6 +838,34 @@ mod tests {
                 "{refused:?} must be refused"
             );
         }
+    }
+
+    #[test]
+    fn shard_index_is_a_custody_unit_index_under_the_epoch_ceiling() {
+        let cid = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+        // Index 7 is shard 0 of a second 4+3 stripe; 63 refusals of exactly this shape were
+        // seen on one striped blob before the ceiling moved off a single stripe's width.
+        for accepted in [0, 6, 7, 62, 1_000, MAX_SHARD_INDEX] {
+            let assignment = ShardAssignment {
+                shard_index: accepted,
+                ..shard_assignment(cid)
+            };
+            assert!(
+                matches!(
+                    validate_shard_assignment(&assignment).unwrap(),
+                    ValidateCallbackResult::Valid
+                ),
+                "custody-unit index {accepted} must be accepted"
+            );
+        }
+        let past_ceiling = ShardAssignment {
+            shard_index: MAX_SHARD_INDEX + 1,
+            ..shard_assignment(cid)
+        };
+        assert!(matches!(
+            validate_shard_assignment(&past_ceiling).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     #[test]
