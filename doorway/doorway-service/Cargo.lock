@@ -1776,6 +1776,7 @@ dependencies = [
  "async-trait",
  "deno_core",
  "deno_error",
+ "elohim-address",
  "elohim-chrome-asset",
  "getrandom 0.3.4",
  "serde",
