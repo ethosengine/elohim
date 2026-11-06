@@ -35,17 +35,18 @@
  * `get_blob_or_heal` means an HTTP blob read HEALS on a local miss — probing
  * "is this peer missing the bytes" over HTTP would repair the very condition
  * the drill just created, and probing "does it hold them again" over HTTP would
- * be self-fulfilling. `elohim-storage` stores a blob at
- * `$STORAGE_DIR/blobs/blobs/<first-4-hex>/sha256-<hex>` (BlobStore::blob_path
- * under Config::blobs_dir), and `STORAGE_DIR` is read per peer from its own
- * `/proc/<pid>/environ`.
+ * be self-fulfilling. `elohim-storage` files a payload (inline bytes, or a marker
+ * naming its layout record) at `$STORAGE_DIR/blobs/blobs/<cid[7..11]>/<byte CID>`
+ * (BlobStore::blob_path + fanout_path under Config::blobs_dir); the marker's
+ * presence is the store's claim that it holds the payload. `STORAGE_DIR` is read
+ * per peer from its own `/proc/<pid>/environ`.
  */
 
 import { strict as assert } from 'node:assert';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -143,7 +144,7 @@ function peerIdentities(peer: PeerHandle): string {
 interface CustodyCredit {
   id: string;
   provider: string;
-  blobHash: string;
+  blobCid: string;
   state: string;
 }
 
@@ -158,7 +159,7 @@ interface DrillState {
   floor: number;
   /** Peers this scenario killed and has not yet restarted. */
   down: Set<HouseholdPeerName>;
-  /** Single blob files moved aside, keyed `${peer}:${hex}`. */
+  /** Single blob files (inline payload or marker) moved aside, keyed `${peer}:${cid}`. */
   sidelined: Map<string, { from: string; to: string }>;
   /** Whole blob planes renamed aside. */
   wipedPlanes: WipedPlane[];
@@ -166,8 +167,8 @@ interface DrillState {
   baselines: Map<string, number>;
   /** Custody credits captured by "the mesh's custody record … is settled". */
   settledCredits?: CustodyCredit[];
-  /** Blob hash (canonical `sha256-<hex>`) per content id resolved this run. */
-  blobHashes: Map<string, string>;
+  /** Blob address (byte CID) per content id resolved this run. */
+  blobCids: Map<string, string>;
   /** Bytes read from the doorway before a drill, for later byte-equality. */
   expectedBytes: Map<string, Uint8Array>;
   /** ISO timestamp the current drill started, to scope REA event queries. */
@@ -214,7 +215,7 @@ function drill(world: E2EWorld): DrillState {
     sidelined: new Map(),
     wipedPlanes: [],
     baselines: new Map(),
-    blobHashes: new Map(),
+    blobCids: new Map(),
     expectedBytes: new Map(),
     logOffsets: new Map(),
   };
@@ -490,39 +491,31 @@ function decodeBase32Lower(input: string): Uint8Array {
 }
 
 /**
- * Reduce any wire blob address to the sha256 hex the filesystem is keyed on.
- * Freshly-ingested content carries a CIDv1 (`bafkrei…` = raw codec + sha2-256);
- * legacy rows still carry `sha256-<64hex>`. Mirrors
- * `BlobStore::parse_content_address`.
+ * Admit a wire blob address as a byte CID by full decode: CIDv1 raw (0x55) +
+ * BLAKE3-256 (0x1e), 32-byte digest, canonical base32-lower. Every other spelling
+ * (`sha256-<hex>`, bare hex, `bafkrei…`) is refused — the household speaks one profile.
  */
-function sha256HexOf(address: string): string {
-  const prefixed = /^sha256-([0-9a-f]{64})$/.exec(address);
-  if (prefixed) return prefixed[1];
-  if (/^[0-9a-f]{64}$/.test(address)) return address;
+function byteCidOf(address: string): string {
   assert.match(
     address,
-    /^b[a-z2-7]+$/,
-    `blob address "${address}" is neither sha256-<hex> nor a base32 CIDv1`
+    /^bafkr4i[a-z2-7]{52}$/,
+    `blob address "${address}" is not a byte CID (bafkr4i…, 59 chars)`
   );
   const bytes = decodeBase32Lower(address.slice(1));
   assert.ok(
     bytes.length === 36 &&
       bytes[0] === 0x01 &&
       bytes[1] === 0x55 &&
-      bytes[2] === 0x12 &&
+      bytes[2] === 0x1e &&
       bytes[3] === 0x20,
-    `CID "${address}" is not a v1 raw/sha2-256 content address`
+    `CID "${address}" is not a v1 raw/BLAKE3-256 byte address`
   );
-  return [...bytes.slice(4)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  return address;
 }
 
-function canonicalBlobHash(address: string): string {
-  return `sha256-${sha256HexOf(address)}`;
-}
-
-/** `$STORAGE_DIR/blobs/blobs/<first-4-hex>/sha256-<hex>` */
-function blobFilePath(storageDir: string, hex: string): string {
-  return path.join(storageDir, 'blobs', 'blobs', hex.slice(0, 4), `sha256-${hex}`);
+/** `$STORAGE_DIR/blobs/blobs/<cid[7..11]>/<cid>` — the payload or its marker. */
+function blobFilePath(storageDir: string, cid: string): string {
+  return path.join(storageDir, 'blobs', 'blobs', cid.slice(7, 11), cid);
 }
 
 function blobPlaneDir(storageDir: string): string {
@@ -531,7 +524,7 @@ function blobPlaneDir(storageDir: string): string {
 
 async function localBlobPresent(name: HouseholdPeerName, address: string): Promise<boolean> {
   const storageDir = await peerStorageDir(name);
-  return existsSync(blobFilePath(storageDir, sha256HexOf(address)));
+  return existsSync(blobFilePath(storageDir, byteCidOf(address)));
 }
 
 /** Move ONE blob's bytes out of a peer's local store; rows are left intact. */
@@ -540,14 +533,14 @@ async function sidelineBlob(
   name: HouseholdPeerName,
   address: string
 ): Promise<void> {
-  const hex = sha256HexOf(address);
-  const key = `${name}:${hex}`;
+  const cid = byteCidOf(address);
+  const key = `${name}:${cid}`;
   if (state.sidelined.has(key)) return;
   const storageDir = await peerStorageDir(name);
-  const from = blobFilePath(storageDir, hex);
+  const from = blobFilePath(storageDir, cid);
   assert.ok(
     existsSync(from),
-    `household peer "${name}" does not hold sha256-${hex} locally — nothing to make missing ` +
+    `household peer "${name}" does not hold ${cid} locally — nothing to make missing ` +
       `(looked at ${from})`
   );
   const to = `${from}.a2o-sidelined`;
@@ -675,7 +668,7 @@ async function custodyCredits(baseUrl: string): Promise<CustodyCredit[]> {
     return {
       id: String(row['id'] ?? ''),
       provider: String(row['provider'] ?? ''),
-      blobHash: primary,
+      blobCid: primary,
       state: String(row['state'] ?? ''),
     };
   });
@@ -748,14 +741,8 @@ async function attachCustodyStateHistogram(
 }
 
 function creditsFor(credits: CustodyCredit[], address: string): CustodyCredit[] {
-  const hex = sha256HexOf(address);
-  return credits.filter(credit => {
-    try {
-      return credit.blobHash !== '' && sha256HexOf(credit.blobHash) === hex;
-    } catch {
-      return false;
-    }
-  });
+  const cid = byteCidOf(address);
+  return credits.filter(credit => credit.blobCid === cid);
 }
 
 interface ServeBlobEvent {
@@ -775,7 +762,7 @@ async function serveBlobEvents(baseUrl: string, address: string): Promise<ServeB
     ? (parsed as Record<string, unknown>[])
     : (((parsed as Record<string, unknown>)['items'] as Record<string, unknown>[] | undefined) ??
       []);
-  const hex = sha256HexOf(address);
+  const cid = byteCidOf(address);
   return rows
     .map(row => ({
       provider: String(row['provider'] ?? ''),
@@ -783,13 +770,7 @@ async function serveBlobEvents(baseUrl: string, address: string): Promise<ServeB
       resourceInventoriedAs: String(row['resourceInventoriedAs'] ?? ''),
       hasPointInTime: String(row['hasPointInTime'] ?? ''),
     }))
-    .filter(event => {
-      try {
-        return sha256HexOf(event.resourceInventoriedAs) === hex;
-      } catch {
-        return false;
-      }
-    });
+    .filter(event => event.resourceInventoriedAs === cid);
 }
 
 /**
@@ -871,17 +852,17 @@ async function intraHubRung(
   return { custodyCopies, livePeers, rung: Math.min(custodyCopies, livePeers) };
 }
 
-async function blobHashFor(world: E2EWorld, state: DrillState, contentId: string): Promise<string> {
-  const cached = state.blobHashes.get(contentId);
+async function blobCidFor(world: E2EWorld, state: DrillState, contentId: string): Promise<string> {
+  const cached = state.blobCids.get(contentId);
   if (cached) return cached;
   const { body } = await probeContent(doorwayUrl(world), contentId);
-  const hash = body.blobHash;
+  const hash = body.blobCid;
   assert.ok(
     typeof hash === 'string' && hash.length > 0,
-    `content "${contentId}" has no blobHash on the doorway projection — nothing to hold custody of`
+    `content "${contentId}" has no blobCid on the doorway projection — nothing to hold custody of`
   );
-  const canonical = canonicalBlobHash(hash);
-  state.blobHashes.set(contentId, canonical);
+  const canonical = byteCidOf(hash);
+  state.blobCids.set(contentId, canonical);
   return canonical;
 }
 
@@ -1114,7 +1095,7 @@ async function assertUnderCustody(
   contentId: string,
   expectedPeers: number
 ): Promise<void> {
-  const hash = await blobHashFor(world, state, contentId);
+  const hash = await blobCidFor(world, state, contentId);
   await measurePeerIds(state);
 
   const { status, text } = await getRaw(
@@ -1207,7 +1188,7 @@ async function ensurePeerHasBytes(
     method: 'PUT',
     headers: {
       'Content-Type': 'application/octet-stream',
-      'X-Blob-Hash': hash,
+      'X-Content-Address': hash,
       'X-Blob-Size': String(sourceBytes.length),
     },
     body: sourceBytes,
@@ -1219,11 +1200,16 @@ async function ensurePeerHasBytes(
   );
 }
 
-/** Byte length of an already-confirmed-local blob, read off disk — no network round trip. */
-async function localBlobSize(name: HouseholdPeerName, address: string): Promise<number> {
-  const storageDir = await peerStorageDir(name);
-  const { size } = await stat(blobFilePath(storageDir, sha256HexOf(address)));
-  return size;
+/**
+ * Byte length of an already-confirmed-local blob, read from the peer's own storage. The
+ * blob file on disk may be a marker (multi-chunk payload), so its size is not the payload
+ * length; a local GET cannot heal here because the bytes are already held.
+ */
+async function localBlobSize(peer: PeerHandle, address: string): Promise<number> {
+  const cid = byteCidOf(address);
+  const response = await fetch(`${peer.url}/blob/${cid}`, { signal: AbortSignal.timeout(60_000) });
+  assert.ok(response.ok, `GET ${peer.url}/blob/${cid} (local size read) → ${response.status}`);
+  return (await response.arrayBuffer()).byteLength;
 }
 
 /**
@@ -1259,7 +1245,7 @@ async function seedShardManifestFootprint(
   const response = await fetch(`${primary.url}/admin/seed/shard-manifest`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contentId, blobHash: hash, stewards }),
+    body: JSON.stringify({ contentId, blobCid: hash, stewards }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
@@ -1313,7 +1299,7 @@ async function seedSelfCustodyCommitment(
       note: `${peer.name} pledges self-custody of ${contentId} (a2o drill seed)`,
       metadata: {
         seedGeneration: 'a2o-drill-seed',
-        blobHash: hash,
+        blobCid: hash,
         contentId,
         fixture: 'a2o-drill',
       },
@@ -1353,23 +1339,20 @@ async function seedCustodyFootprint(
   state: DrillState,
   contentId: string
 ): Promise<void> {
-  const hash = await blobHashFor(world, state, contentId);
+  const hash = await blobCidFor(world, state, contentId);
   for (const peer of state.peers) {
     await ensurePeerHasBytes(state, peer, hash);
   }
   const primary = state.peers[0];
   assert.ok(primary, 'household fixture has no peers to seed custody onto');
-  const sizeBytes = await localBlobSize(primary.name, hash);
+  const sizeBytes = await localBlobSize(primary, hash);
   await seedShardManifestFootprint(state, contentId, hash);
 
   // Some content (a commons EPR like `manifesto`) can already carry a
   // custody-blob commitment minted by an earlier prologue leg
   // (`seed-drill-fixtures.ts`'s `resolveExistingSubject`) under a DIFFERENT
-  // encoding of the SAME blob address (a CIDv1 `bafkrei…` vs our canonical
-  // `sha256-<hex>`) — a different literal string, a different
-  // content-addressed commitment id, but the SAME underlying bytes once
-  // `creditsFor`/`sha256HexOf` normalize it. Checking existing credits by
-  // hex-equivalence (not by re-deriving our own id and hoping it collides)
+  // content-addressed commitment id for the SAME byte CID. Checking existing
+  // credits by address (not by re-deriving our own id and hoping it collides)
   // is what keeps this seed idempotent and prevents minting a second,
   // redundant pledge per peer.
   //
@@ -1402,7 +1385,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
 
     // QUIESCENCE precondition, not a snapshot for its own sake: the mesh must
     // have finished making up its mind about this content BEFORE the churn, or
@@ -1558,7 +1541,7 @@ Then(
   { timeout: 120_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     await measurePeerIds(state);
     for (const peer of state.peers) {
       // State-agnostic (nonWithdrawnCredits): the state column doesn't
@@ -1597,8 +1580,8 @@ Then(
       const name = state.peers.find(peer => providerNamesPeer(record.provider, peer))?.name;
       if (!name) continue; // custodian outside this household — not ours to assert about
       assert.ok(
-        await localBlobPresent(name, record.blobHash),
-        `custody record ${record.id} still names ${name} as holding ${record.blobHash}, but the ` +
+        await localBlobPresent(name, record.blobCid),
+        `custody record ${record.id} still names ${name} as holding ${record.blobCid}, but the ` +
           'bytes are gone from its local store — a phantom custody row'
       );
     }
@@ -1740,7 +1723,7 @@ Then(
   { timeout: 120_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const bytes = await doorwayBlobBytes(this, hash);
     const expected = state.expectedBytes.get(contentId);
     assert.ok(bytes.length > 0, `doorway served zero bytes for "${contentId}"`);
@@ -1757,9 +1740,9 @@ Then(
     const survivors = state.peers.filter(peer => !state.down.has(peer.name));
     assert.equal(survivors.length, 1, 'this rung expects exactly one surviving household peer');
     const survivor = survivors[0];
-    const [contentId] = [...state.blobHashes.keys()];
+    const [contentId] = [...state.blobCids.keys()];
     assert.ok(contentId, 'no content was resolved earlier in this scenario');
-    const hash = state.blobHashes.get(contentId) as string;
+    const hash = state.blobCids.get(contentId) as string;
     const response = await fetch(`${survivor.url}/blob/${encodeURIComponent(hash)}`, {
       signal: AbortSignal.timeout(60_000),
     });
@@ -1775,7 +1758,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     state.expectedBytes.set(contentId, await doorwayBlobBytes(this, hash));
 
     // Start the read and hold the stream open — the body is deliberately NOT
@@ -1856,7 +1839,7 @@ Then(
     const state = drill(this);
     const inFlight = state.inFlight;
     assert.ok(inFlight, 'no read is in flight');
-    const hash = state.blobHashes.get(inFlight.contentId) as string;
+    const hash = state.blobCids.get(inFlight.contentId) as string;
     const since = state.drillStartedAt ?? '';
     await measurePeerIds(state);
 
@@ -1935,7 +1918,7 @@ Then(
     const survivors = state.peers.filter(peer => !state.down.has(peer.name));
     assert.equal(survivors.length, 1, 'this rung expects exactly one surviving household peer');
     const survivor = survivors[0];
-    const hash = state.blobHashes.get(contentId) ?? (await blobHashFor(this, state, contentId));
+    const hash = state.blobCids.get(contentId) ?? (await blobCidFor(this, state, contentId));
 
     // "from its own store" is a claim about local bytes, so check the disk
     // first: an HTTP 200 alone could have been a heal from a peer.
@@ -2019,7 +2002,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     const jessica = peerByName(state, 'jessica');
     await peerStatus(jessica);
     const credits = creditsFor(await custodyCredits(jessica.url), hash);
@@ -2037,7 +2020,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     assert.ok(
       await localBlobPresent('jessica', hash),
       `Jessica does not hold ${hash} locally, so there is nothing for a wipe to take away`
@@ -2070,7 +2053,7 @@ When(
 
     await wipeBlobPlane(state, 'jessica');
 
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     assert.equal(
       await localBlobPresent('jessica', hash),
       false,
@@ -2091,7 +2074,7 @@ Then(
   { timeout: RECOVERY_WINDOW_MS + 30_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     // Filesystem, NOT GET /blob — an HTTP read heals on miss and would make
     // this assertion prove itself.
     await retry(
@@ -2145,7 +2128,7 @@ Then(
   async function (this: E2EWorld, action: string) {
     assert.equal(action, 'serve-blob', `this step reads serve-blob events, not "${action}"`);
     const state = drill(this);
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     const jessica = peerByName(state, 'jessica');
     await peerStatus(jessica);
     const since = state.drillStartedAt ?? '';
@@ -2199,7 +2182,7 @@ Given(
     const held = holdDestructive("move the manifesto blob out of Jessica's local store");
     if (held) return held;
     const state = drill(this);
-    const hash = await blobHashFor(this, state, MANIFESTO);
+    const hash = await blobCidFor(this, state, MANIFESTO);
     await sidelineBlob(state, 'jessica', hash);
     assert.equal(await localBlobPresent('jessica', hash), false, 'the blob is still present');
     state.drillStartedAt = new Date().toISOString();
@@ -2455,7 +2438,7 @@ Given(
       format,
       `"${contentId}" is a ${String(body['contentFormat'])}, not an ${format}`
     );
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const holders: string[] = [];
     for (const peer of state.peers) {
       if (await localBlobPresent(peer.name, hash)) holders.push(peer.name);
@@ -2477,7 +2460,7 @@ Given(
     );
     if (held) return held;
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const serving = servingPeerFor(this);
     const others = state.peers.filter(peer => peer.name !== serving.name);
     const survivors: string[] = [];
@@ -2504,7 +2487,7 @@ Then(
   { timeout: 180_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const serving = servingPeerFor(this);
     // finalize_fetch_success persists filesystem-first; the disk is the honest
     // oracle for "now holds", and it cannot be satisfied by another HTTP read.
@@ -2531,7 +2514,7 @@ Given(
   { timeout: 180_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const serving = servingPeerFor(this);
     assert.ok(
       await localBlobPresent(serving.name, hash),
@@ -2543,7 +2526,7 @@ Given(
       `${serving.name} holds ${hash} but has no serve-blob event for it — these bytes did not ` +
         'arrive by race-fetch'
     );
-    state.blobHashes.set(contentId, hash);
+    state.blobCids.set(contentId, hash);
   }
 );
 
@@ -2552,9 +2535,9 @@ When(
   { timeout: 120_000 },
   async function (this: E2EWorld, action: string) {
     const state = drill(this);
-    const [contentId] = [...state.blobHashes.keys()];
+    const [contentId] = [...state.blobCids.keys()];
     assert.ok(contentId, 'no healed content was named earlier in this scenario');
-    const hash = state.blobHashes.get(contentId) as string;
+    const hash = state.blobCids.get(contentId) as string;
     const serving = servingPeerFor(this);
     const { status, text } = await getRaw(
       `${serving.url}/api/v1/economic-events?action=${encodeURIComponent(action)}&limit=500`
@@ -2570,9 +2553,9 @@ Then(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
-    const [contentId] = [...state.blobHashes.keys()];
+    const [contentId] = [...state.blobCids.keys()];
     assert.ok(contentId, 'no healed content was named earlier in this scenario');
-    const hash = state.blobHashes.get(contentId) as string;
+    const hash = state.blobCids.get(contentId) as string;
     const serving = servingPeerFor(this);
     await peerStatus(serving);
     const events = await serveBlobEvents(serving.url, hash);
@@ -2593,7 +2576,7 @@ Given(
   { timeout: 120_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const steward = servingPeerFor(this);
     const holders: string[] = [];
     for (const peer of state.peers) {
@@ -2615,7 +2598,7 @@ Given(
     const held = holdDestructive(`move the "${contentId}" blob out of the steward's local store`);
     if (held) return held;
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const steward = servingPeerFor(this);
     await sidelineBlob(state, steward.name, hash);
     assert.equal(await localBlobPresent(steward.name, hash), false);
@@ -2637,7 +2620,7 @@ Then(
   { timeout: 180_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     const steward = servingPeerFor(this);
     await retry(
       async () => {
@@ -2663,9 +2646,9 @@ Then(
   async function (this: E2EWorld, action: string) {
     assert.equal(action, 'serve-blob', `this step reads serve-blob events, not "${action}"`);
     const state = drill(this);
-    const [contentId] = [...state.blobHashes.keys()];
+    const [contentId] = [...state.blobCids.keys()];
     assert.ok(contentId, 'no content was resolved earlier in this scenario');
-    const hash = state.blobHashes.get(contentId) as string;
+    const hash = state.blobCids.get(contentId) as string;
     const steward = servingPeerFor(this);
     const since = state.drillStartedAt ?? '';
     const events = (await serveBlobEvents(steward.url, hash)).filter(
@@ -2684,9 +2667,9 @@ Then(
   { timeout: 120_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
-    const [contentId] = [...state.blobHashes.keys()];
+    const [contentId] = [...state.blobCids.keys()];
     assert.ok(contentId, 'no content was resolved earlier in this scenario');
-    const hash = state.blobHashes.get(contentId) as string;
+    const hash = state.blobCids.get(contentId) as string;
     const steward = servingPeerFor(this);
     await peerStatus(steward);
     const since = state.drillStartedAt ?? '';
@@ -2730,7 +2713,7 @@ Given(
       format,
       `"${contentId}" is a ${String(body['contentFormat'])}, not an ${format}`
     );
-    const hash = await blobHashFor(this, state, contentId);
+    const hash = await blobCidFor(this, state, contentId);
     for (const peer of state.peers) {
       assert.equal(
         await localBlobPresent(peer.name, hash),

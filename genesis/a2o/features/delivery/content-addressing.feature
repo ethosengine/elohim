@@ -8,18 +8,18 @@ Feature: Content-addressed delivery
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And the doorway is connected to elohim-storage
     And an HTML5 app with slug "evolution-of-trust" is seeded
-    And the app's blob hash is "bafkreiplaceholder"
+    And the app's blob hash is "bafkr4iplaceholder"
 
   Scenario: Slug URL serves content with content address header
     When I request "/apps/evolution-of-trust/index.html"
     Then the response status is 200
-    And the response includes header "X-Content-Address" with value "bafkreiplaceholder"
+    And the response includes header "X-Content-Address" with value "bafkr4iplaceholder"
     And the response includes header "X-Content-Slug" with value "evolution-of-trust"
 
   Scenario: CID URL serves same content without slug lookup
-    When I request "/apps/bafkreiplaceholder/index.html"
+    When I request "/apps/bafkr4iplaceholder/index.html"
     Then the response status is 200
-    And the response includes header "X-Content-Address" with value "bafkreiplaceholder"
+    And the response includes header "X-Content-Address" with value "bafkr4iplaceholder"
     And the response body matches the slug URL response
 
   # Every seeded app is also an EPR — the protocol's named, versioned content record — and
@@ -39,14 +39,14 @@ Feature: Content-addressed delivery
   Scenario: Service worker caches by content address
     Given the service worker is active
     When I navigate to "/apps/evolution-of-trust/index.html"
-    Then the service worker caches the response under "/apps/bafkreiplaceholder/index.html"
-    When I navigate to "/apps/bafkreiplaceholder/index.html"
+    Then the service worker caches the response under "/apps/bafkr4iplaceholder/index.html"
+    When I navigate to "/apps/bafkr4iplaceholder/index.html"
     Then the response is served from the service worker cache
 
   @browser-only @wip
   Scenario: Re-seeded content with new CID invalidates old mapping
-    Given the service worker has cached files under "/apps/bafkreiplaceholder/"
+    Given the service worker has cached files under "/apps/bafkr4iplaceholder/"
     When the app is re-seeded with blob hash "bafkreinewplaceholder"
     And I navigate to "/apps/evolution-of-trust/index.html"
     Then the response includes header "X-Content-Address" with value "bafkreinewplaceholder"
-    And the old cache entries under "/apps/bafkreiplaceholder/" are invalidated
+    And the old cache entries under "/apps/bafkr4iplaceholder/" are invalidated

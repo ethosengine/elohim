@@ -89,14 +89,15 @@ Feature: Web2 Absorption — Doorway Projection Cache
   # --- Cache Invalidation ---
 
   # WRITES: re-seeding moves a real content head. Held behind A2O_ALLOW_DESTRUCTIVE=1.
-  # The literal "sha256-old" reads as "whatever hash is cached right now" — the contract is
-  # that the cached hash is SUPERSEDED, never that it equals a particular string.
+  # The literal byte CID (minted from the bytes "old") reads as "whatever address is cached
+  # right now" — the contract is that the cached address is SUPERSEDED, never that it equals
+  # a particular string.
   @requires:owned-substrate @act:i
   Scenario: Re-seeded content invalidates stale cache entries
-    Given the projection cache for "evolution-of-trust" is warm with blob_hash "sha256-old"
+    Given the projection cache for "evolution-of-trust" is warm with blob_hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
     When "evolution-of-trust" is re-seeded with a new ZIP blob
     And storage publishes the content-changed event for "evolution-of-trust"
-    Then the projection cache entries for "evolution-of-trust" with hash "sha256-old" are evicted
+    Then the projection cache entries for "evolution-of-trust" with hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu" are evicted
     And the next request for "evolution-of-trust" proxies to storage
     And the new response is cached with the new blob_hash
 

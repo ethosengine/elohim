@@ -203,16 +203,16 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     # blobHash is the content address. When it changes, the old extraction is stale.
     # Doorway must detect the new hash, evict the old SPA cache, and serve the
     # updated bundle without a manual restart.
-    Given doorway "alpha" is serving the SPA from blobHash "sha256-old"
-    When CI re-seeds "lamad-spa" with a new ZIP blob (blobHash "sha256-new")
+    Given doorway "alpha" is serving the SPA from blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When CI re-seeds "lamad-spa" with a new ZIP blob (blobHash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi")
     And doorway receives the content update signal for "lamad-spa"
-    Then doorway evicts the extracted SPA cache for blobHash "sha256-old"
-    And doorway re-extracts the SPA bundle from blobHash "sha256-new"
+    Then doorway evicts the extracted SPA cache for blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    And doorway re-extracts the SPA bundle from blobHash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
     And subsequent requests for / serve the updated SPA
 
   @wip
   Scenario: Old SPA cached files are evicted when blobHash changes
-    Given the projection cache contains SPA assets from blobHash "sha256-old"
-    When the blobHash for "lamad-spa" changes to "sha256-new"
-    Then all projection cache entries tagged with blobHash "sha256-old" are evicted
+    Given the projection cache contains SPA assets from blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When the blobHash for "lamad-spa" changes to "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi"
+    Then all projection cache entries tagged with blobHash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu" are evicted
     And stale asset requests do not return old bundle files

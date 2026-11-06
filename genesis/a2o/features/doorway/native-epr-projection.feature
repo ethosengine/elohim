@@ -19,10 +19,10 @@ Feature: Doorway natively projects EPRs at author-declared URL paths
 
   @cache-eviction @requires:owned-substrate
   Scenario: Bundle redeploy evicts doorway cache
-    Given the lamad-spa EPR's blob is sha256-OLD
-    When a deploy PATCHes the lamad-spa EPR with blobHash sha256-NEW
+    Given the lamad-spa EPR's blob is bafkr4ibasfmyq42b566pkvguqpyfx5ikrt7zh4rz423cvemjvumxnre44u
+    When a deploy PATCHes the lamad-spa EPR with blobCid bafkr4ickj3rfdwt2no3fjeoqhshbcd2dq2rfevi3ukpisybnpn3sj7eute
     Then within 5 seconds, the doorway's cache for "/lamad/index.html" is evicted
-    And the next browser request to "/lamad/index.html" serves bytes from sha256-NEW
+    And the next browser request to "/lamad/index.html" serves bytes from bafkr4ickj3rfdwt2no3fjeoqhshbcd2dq2rfevi3ukpisybnpn3sj7eute
 
   @wip @federation
   Scenario: Federation — same EPR projected on second doorway serves same content

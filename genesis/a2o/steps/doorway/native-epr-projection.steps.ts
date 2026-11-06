@@ -161,10 +161,10 @@ Given(
 /**
  * Cache eviction, on a substrate that lets us move a head.
  *
- * `sha256-OLD` / `sha256-NEW` in the feature are PLACEHOLDERS — prose standing
- * in for "the hash before" and "the hash after". Nothing on any mesh is
- * addressed that way, so these steps read the real current head rather than
- * matching the literal.
+ * The OLD / NEW byte CIDs in the feature are PLACEHOLDERS — the byte CIDs of the
+ * bytes "OLD" and "NEW", standing in for "the address before" and "the address
+ * after". No bundle on any mesh has those bytes, so these steps read the real
+ * current head rather than matching the literal.
  *
  * The substitute bundle is the LANDING EPR's blob: a blob that genuinely exists
  * on this mesh, with genuinely different bytes. PATCHing lamad-spa to a hash no
@@ -178,7 +178,7 @@ Given(
  */
 const cacheEviction = new WeakMap<
   E2EWorld,
-  { eprSlug: string; originalBlobHash: string; newBlobHash?: string; beforeBody?: Buffer }
+  { eprSlug: string; originalBlobCid: string; newBlobCid?: string; beforeBody?: Buffer }
 >();
 
 /** Skip (never fail, never pend) with the action this run declined to take. */
@@ -190,12 +190,12 @@ function holdDestructive(wouldDo: string): 'skipped' {
   return 'skipped';
 }
 
-async function contentBlobHash(base: string, slug: string): Promise<string> {
+async function contentBlobCid(base: string, slug: string): Promise<string> {
   const resp = await getRaw(`${base.replace(/\/$/, '')}/db/content/${slug}`);
   assert.equal(resp.status, 200, `GET /db/content/${slug} returned ${resp.status}`);
-  const row = JSON.parse(resp.body.toString('utf-8')) as { blobHash?: string };
-  const hash = row.blobHash;
-  assert.ok(hash, `content row "${slug}" carries no blobHash — nothing to evict a cache for`);
+  const row = JSON.parse(resp.body.toString('utf-8')) as { blobCid?: string };
+  const hash = row.blobCid;
+  assert.ok(hash, `content row "${slug}" carries no blobCid — nothing to evict a cache for`);
   return hash;
 }
 
@@ -203,11 +203,11 @@ Given(
   /^the ([\w-]+) EPR's blob is ([\w-]+)$/,
   async function (this: E2EWorld, eprSlug: string, _placeholder: string) {
     const base = resolveDoorwayUrl(this, 'alpha');
-    const originalBlobHash = await contentBlobHash(base, eprSlug);
+    const originalBlobCid = await contentBlobCid(base, eprSlug);
     const before = await getRaw(`${base.replace(/\/$/, '')}/lamad/index.html`);
     cacheEviction.set(this, {
       eprSlug,
-      originalBlobHash,
+      originalBlobCid,
       beforeBody: before.status === 200 ? before.body : undefined,
     });
   }
@@ -242,7 +242,7 @@ When('an anonymous browser GETs {string}', async function (this: E2EWorld, urlSt
 });
 
 When(
-  /^a deploy PATCHes the ([\w-]+) EPR with blobHash ([\w-]+)$/,
+  /^a deploy PATCHes the ([\w-]+) EPR with blobCid ([\w-]+)$/,
   async function (this: E2EWorld, eprSlug: string, _placeholder: string) {
     const state = cacheEviction.get(this);
     assert.ok(state, 'the blob-is-OLD Given must run before the PATCH');
@@ -253,33 +253,33 @@ When(
     }
     const base = resolveDoorwayUrl(this, 'alpha');
     // A real, different, locally-held bundle — see the note above.
-    const newBlobHash = await contentBlobHash(base, 'elohim-host-landing');
+    const newBlobCid = await contentBlobCid(base, 'elohim-host-landing');
     assert.notEqual(
-      newBlobHash,
-      state.originalBlobHash,
+      newBlobCid,
+      state.originalBlobCid,
       'the substitute bundle has the SAME head as the one under test — moving it would prove nothing'
     );
     const { statusCode } = await request(`${base.replace(/\/$/, '')}/db/content/${eprSlug}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ blobHash: newBlobHash }),
+      body: JSON.stringify({ blobCid: newBlobCid }),
     });
     assert.ok(
       statusCode >= 200 && statusCode < 300,
       `PATCH /db/content/${eprSlug} returned ${statusCode}`
     );
-    state.newBlobHash = newBlobHash;
+    state.newBlobCid = newBlobCid;
   }
 );
 
 After({ tags: '@cache-eviction' }, async function (this: E2EWorld) {
   const state = cacheEviction.get(this);
-  if (!state?.newBlobHash) return;
+  if (!state?.newBlobCid) return;
   const base = resolveDoorwayUrl(this, 'alpha');
   await request(`${base.replace(/\/$/, '')}/db/content/${state.eprSlug}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ blobHash: state.originalBlobHash }),
+    body: JSON.stringify({ blobCid: state.originalBlobCid }),
   });
 });
 
@@ -360,7 +360,7 @@ Then(
   async function (this: E2EWorld, seconds: number, path: string) {
     const state = cacheEviction.get(this);
     assert.ok(state, 'the blob-is-OLD Given must run before this assertion');
-    if (!state.newBlobHash) {
+    if (!state.newBlobCid) {
       return holdDestructive('observe the eviction of a head this run declined to move');
     }
     const base = resolveDoorwayUrl(this, 'alpha');
@@ -384,15 +384,15 @@ Then(
   async function (this: E2EWorld, path: string, _placeholder: string) {
     const state = cacheEviction.get(this);
     assert.ok(state, 'the blob-is-OLD Given must run before this assertion');
-    if (!state.newBlobHash) {
+    if (!state.newBlobCid) {
       return holdDestructive('read back the bundle behind a head this run declined to move');
     }
     const base = resolveDoorwayUrl(this, 'alpha');
     // The declared head really moved …
-    const served = await contentBlobHash(base, state.eprSlug);
+    const served = await contentBlobCid(base, state.eprSlug);
     assert.equal(
       served,
-      state.newBlobHash,
+      state.newBlobCid,
       `content row "${state.eprSlug}" still declares ${served} after the PATCH`
     );
     // … and the path serves a real page from it, not an error or an empty body.

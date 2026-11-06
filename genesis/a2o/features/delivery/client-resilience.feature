@@ -13,7 +13,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   The roles. A DOORWAY is the household's gateway to the ordinary web: a browser asks
   it for pages and files. ELOHIM-STORAGE is the storage service each peer runs; a
   SERVING PEER is whichever storage node hands over the bytes. An app's files travel as
-  one ZIP blob named by its blob_hash — the sha256 of its bytes — so a browser can check
+  one ZIP blob named by its byte CID — the BLAKE3-256 address of its bytes — so a browser can check
   the bytes it received against the name it asked for. The HOUSEHOLD is the set of peers
   that share this content, and its ELECTION is the rule every peer applies to decide
   which version of an app is current.
@@ -138,8 +138,8 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
 
   @wip @browser-only
   Scenario: SW invalidates cache when an app's version changes
-    Given the Service Worker has cached "evolution-of-trust" with blob_hash "sha256-old"
-    When a content update signal arrives with blob_hash "sha256-new" for "evolution-of-trust"
+    Given the Service Worker has cached "evolution-of-trust" with blob_hash "bafkr4iewuqsxfcpz5pf4ss74jetw7cpnq74msupd7kbs2rg45onsebjauu"
+    When a content update signal arrives with blob_hash "bafkr4ifsbkykaiferu2j4dde2ee4iqpypsn4ipkj7rybyss7n4nrnksogi" for "evolution-of-trust"
     Then the SW evicts all cached files for "evolution-of-trust"
     And the next request triggers a fresh fetch
 

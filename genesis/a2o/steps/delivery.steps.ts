@@ -46,17 +46,20 @@ export async function fetchApp(baseUrl: string, path: string): Promise<AppRespon
 // captures that the shared Then assertions in this file resolve.
 export const responseStore = new WeakMap<E2EWorld, AppResponse>();
 
-/** Sentinel value used in feature files when the real hash isn't known yet. */
-const PLACEHOLDER_HASH = 'bafkreiplaceholder';
+/**
+ * Sentinel used in feature files where the real address isn't known yet; it is never an
+ * address itself and is replaced by the captured X-Content-Address before use.
+ */
+const PLACEHOLDER_HASH = 'bafkr4iplaceholder';
 
 /**
- * Pattern that a real content address must match. The doorway serves CIDv1
- * (base32 lower, `bafkrei…` = raw codec + sha2-256) as X-Content-Address —
- * the CID-first migration moved the header off the legacy `sha256-<64hex>`
- * shape. See doorway/doorway-service/src/routes/blob.rs `parse_content_address`
- * and elohim/elohim-storage/src/blob_store.rs (`Cid::new_v1(RAW_CODEC, ...)`).
+ * Pattern that a real content address must match. The doorway serves the byte CID
+ * (CIDv1 raw 0x55 + BLAKE3-256 0x1e, base32-lower, `bafkr4i…`, 59 characters) as
+ * X-Content-Address — the only content header; the doorway and storage admit it by full
+ * decode (`elohim_address::ByteCid::parse`, doorway `routes::BlobAddress::parse`). No
+ * `sha256-<hex>` or `bafkrei…` spelling is an address.
  */
-const CONTENT_ADDRESS_PATTERN = /^bafkrei[a-z2-7]+$/;
+const CONTENT_ADDRESS_PATTERN = /^bafkr4i[a-z2-7]{52}$/;
 
 /** World-local storage key for the captured X-Content-Address value. */
 const CAPTURED_CONTENT_ADDRESS_KEY = 'capturedContentAddress';
@@ -782,7 +785,7 @@ Then(
 
 /**
  * Every cached app file must carry the blob hash elohim-storage advertises for
- * the bundle. The capability probe (HEAD /apps/{slug}/_capability, X-Blob-Hash)
+ * the bundle. The capability probe (HEAD /apps/{slug}/_capability, X-Content-Address)
  * is storage's answer; each served file echoes it as X-Content-Address. Drift
  * between the two means a cache entry is pinned to a blob the bundle no longer is.
  *
@@ -800,9 +803,9 @@ Then(
       method: 'HEAD',
     });
     assert.equal(statusCode, 200, `HEAD /apps/${slug}/_capability returned ${statusCode}`);
-    const rawBlobHash = headers['x-blob-hash'];
-    const blobHash = Array.isArray(rawBlobHash) ? rawBlobHash[0] : rawBlobHash;
-    assert.ok(blobHash, `Storage advertises no X-Blob-Hash for "${slug}"`);
+    const rawBlobCid = headers['x-content-address'];
+    const blobHash = Array.isArray(rawBlobCid) ? rawBlobCid[0] : rawBlobCid;
+    assert.ok(blobHash, `Storage advertises no X-Content-Address for "${slug}"`);
 
     const files = await appFileSet(doorway.url, slug);
     const entries = await fetchAppFiles(doorway.url, slug, files);
