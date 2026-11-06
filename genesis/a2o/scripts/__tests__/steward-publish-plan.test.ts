@@ -174,7 +174,7 @@ describe('publishPatch', () => {
     assert.equal(patch.contentType, 'concept');
     assert.deepEqual((patch.metadata as Record<string, unknown>).seedHash, h);
     assert.equal(patch.contentBody, '# body');
-    assert.equal('blobHash' in patch, false);
+    assert.equal('blobCid' in patch, false);
   });
 });
 

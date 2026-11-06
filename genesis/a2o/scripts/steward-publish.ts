@@ -55,13 +55,13 @@
  * every item is published/declared/unchanged, 2 when the commons fence refused anything
  * (nothing is written in that case), 1 on any other problem.
  */
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { decodeHashFromBase64, encodeHashToBase64 } from '@holochain/client';
 
+import { byteCid, isByteCid } from '../../seeder/src/byte-cid.js';
 import { buildContentInput, buildPathInput } from '../../seeder/src/content-input.js';
 
 import {
@@ -300,29 +300,19 @@ function parseArgs(argv: string[]): Options {
 // the builders in content-input.ts (or a sibling) so both writers import one copy.
 
 interface BlobSource {
-  hash: string;
+  /** Byte CID (`bafkr4i…`) of the blob — the seeder's one mint. */
+  cid: string;
   data?: Buffer;
   mimeType: string;
-}
-
-function sha256Address(data: Buffer): string {
-  return `sha256-${createHash('sha256').update(data).digest('hex')}`;
-}
-
-/** Legacy `sha256-` prefix only on bare hex; a CID passes through untouched. */
-function normalizeBlobHash(h: string): string {
-  return /^[0-9a-fA-F]{64}$/.test(h) ? `sha256-${h}` : h;
 }
 
 function html5AppBlob(item: RepoItem, dataDir: string): BlobSource | undefined {
   const j = item.json;
   const format = (j.contentFormat ?? '').toLowerCase();
   if (format !== 'html5-app') return undefined;
-  // seed-sqlite reads only `blobHash` when a local zip exists, and `blobHash || blob_hash`
-  // when none does — mirrored as-is so the linked hash cannot differ between writers.
-  const zipHash = j.blobHash ? normalizeBlobHash(j.blobHash) : undefined;
-  const refHash =
-    (j.blobHash ?? j.blob_hash) ? normalizeBlobHash(j.blobHash ?? j.blob_hash ?? '') : undefined;
+  // Mirrors seed-sqlite's findHtml5AppBlob: only a byte-profile CID is a declared
+  // address; a local zip without one is addressed by its own bytes.
+  const declaredCid = isByteCid(j.blobCid) ? j.blobCid : undefined;
   const localZip = j.metadata?.localZipPath;
   const candidates = [
     typeof localZip === 'string' ? join(GENESIS_DIR, localZip) : undefined,
@@ -331,10 +321,10 @@ function html5AppBlob(item: RepoItem, dataDir: string): BlobSource | undefined {
   for (const zip of candidates) {
     if (existsSync(zip)) {
       const data = readFileSync(zip);
-      return { hash: zipHash ?? sha256Address(data), data, mimeType: 'application/zip' };
+      return { cid: declaredCid ?? byteCid(data), data, mimeType: 'application/zip' };
     }
   }
-  return refHash ? { hash: refHash, mimeType: 'application/zip' } : undefined;
+  return declaredCid ? { cid: declaredCid, mimeType: 'application/zip' } : undefined;
 }
 
 const IMAGE_TYPES: Record<string, string> = {
@@ -357,7 +347,7 @@ function thumbnailBlob(item: RepoItem): BlobSource | undefined {
   if (!file || !existsSync(file)) return undefined;
   const data = readFileSync(file);
   return {
-    hash: sha256Address(data),
+    cid: byteCid(data),
     data,
     mimeType: IMAGE_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
   };
@@ -408,15 +398,15 @@ async function blobPresent(storage: string, hash: string): Promise<boolean> {
 
 /** Make the linked blob present on the steward's peer; returns what was done. */
 async function ensureBlob(storage: string, blob: BlobSource): Promise<string> {
-  if (await blobPresent(storage, blob.hash)) return 'present';
-  if (!blob.data) throw new Error(`blob ${blob.hash} is not on this peer and no local bytes exist`);
-  const put = await http(`${storage}/blob/${blob.hash}`, {
+  if (await blobPresent(storage, blob.cid)) return 'present';
+  if (!blob.data) throw new Error(`blob ${blob.cid} is not on this peer and no local bytes exist`);
+  const put = await http(`${storage}/blob/${blob.cid}`, {
     method: 'PUT',
     headers: { 'content-type': blob.mimeType },
     body: new Uint8Array(blob.data),
   });
   if (put.status >= 300)
-    throw new Error(`blob PUT ${blob.hash}: ${put.status} ${put.text.slice(0, 200)}`);
+    throw new Error(`blob PUT ${blob.cid}: ${put.status} ${put.text.slice(0, 200)}`);
   return 'uploaded';
 }
 
@@ -868,10 +858,10 @@ export async function runStewardPublish(
     let input: CreateContentInput;
     if (item.kind === 'path') {
       blob = thumbnailBlob(item);
-      input = buildPathInput(item.json, { thumbnailHash: blob?.hash });
+      input = buildPathInput(item.json, { thumbnailCid: blob?.cid });
     } else {
       blob = html5AppBlob(item, o.dataDir);
-      input = buildContentInput(item.json, { blobHash: blob?.hash });
+      input = buildContentInput(item.json, { blobCid: blob?.cid });
     }
     if (input.reach !== 'commons') {
       line(

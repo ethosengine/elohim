@@ -34,7 +34,7 @@ export interface ExistingRow {
   contentType?: string | null;
   contentFormat?: string | null;
   contentBody?: string | null;
-  blobHash?: string | null;
+  blobCid?: string | null;
   reach?: string | null;
   tags?: string[] | null;
   metadata?: unknown;
@@ -182,7 +182,7 @@ export function publishPatch(input: CreateContentInput, seedHash: string): Recor
   if (norm(input.description) !== null) patch.description = input.description;
   if (input.contentBody !== undefined) patch.contentBody = input.contentBody;
   if (input.contentFormat !== undefined) patch.contentFormat = input.contentFormat;
-  if (input.blobHash) patch.blobHash = input.blobHash;
+  if (input.blobCid) patch.blobCid = input.blobCid;
   return patch;
 }
 
@@ -200,7 +200,7 @@ export function landedMismatches(
   if (!sameReach(row.reach, input.reach)) out.push('reach');
   if ((row.title ?? null) !== input.title) out.push('title');
   if (norm(row.contentBody) !== norm(input.contentBody)) out.push('contentBody');
-  if (input.blobHash && row.blobHash !== input.blobHash) out.push('blobHash');
+  if (input.blobCid && row.blobCid !== input.blobCid) out.push('blobCid');
   if (!row.dhtAnchorHash) out.push('dhtAnchorHash');
   return out;
 }
