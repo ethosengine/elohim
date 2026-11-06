@@ -75,11 +75,11 @@ export function mintByteCid(data: Uint8Array): string {
  * CID, a non-canonical text — all `null`).
  */
 export function parseByteCid(address: unknown): string | null {
-  if (typeof address !== 'string' || address.length !== TEXT_LEN || address[0] !== 'b') {
+  if (typeof address !== 'string' || address.length !== TEXT_LEN || !address.startsWith('b')) {
     return null;
   }
   const bytes = base32Decode(address.slice(1));
-  if (bytes === null || bytes.length !== CID_LEN) return null;
+  if (bytes?.length !== CID_LEN) return null;
   for (let i = 0; i < HEADER.length; i++) {
     if (bytes[i] !== HEADER[i]) return null;
   }
