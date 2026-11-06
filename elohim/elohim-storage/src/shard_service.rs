@@ -43,6 +43,17 @@ pub struct ShardService {
     /// the composition root and shares this service across both transports.
     /// A resolver missing while a pool exists fails closed for blob `Get`.
     custody_standing: Option<Arc<dyn CustodyStanding>>,
+    /// Where a stored, scope-carrying push is reported so this node — the holder —
+    /// can author its own signed custody claim. Set once after the P2P node exists
+    /// (the service is built before it and shared with iroh), hence the cell.
+    held_shard_sink: Arc<std::sync::OnceLock<Arc<dyn HeldShardSink>>>,
+}
+
+/// Receives each pushed shard this node stored (bytes verified against their CID)
+/// together with the app scope the placer named. Production: the P2P node, which
+/// records the `self-held` row and gossips the holder-signed claim.
+pub trait HeldShardSink: Send + Sync {
+    fn held(&self, cid: ByteCid, h_app_id: String);
 }
 
 impl std::fmt::Debug for ShardService {
@@ -50,6 +61,7 @@ impl std::fmt::Debug for ShardService {
         f.debug_struct("ShardService")
             .field("has_db_pool", &self.db_pool.is_some())
             .field("reach_gated", &self.custody_standing.is_some())
+            .field("claims_held_shards", &self.held_shard_sink.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -60,7 +72,13 @@ impl ShardService {
             blob_store,
             db_pool,
             custody_standing: None,
+            held_shard_sink: Arc::new(std::sync::OnceLock::new()),
         }
+    }
+
+    /// Install the held-shard sink (first call wins; returns whether it was set).
+    pub fn set_held_shard_sink(&self, sink: Arc<dyn HeldShardSink>) -> bool {
+        self.held_shard_sink.set(sink).is_ok()
     }
 
     /// Replace the custody-standing resolver — the test seam.
@@ -90,7 +108,11 @@ impl ShardService {
         match request {
             ShardRequest::Get { cid } => self.handle_get(requester, cid).await,
             ShardRequest::Have { cid } => self.handle_have(cid).await,
-            ShardRequest::Push { cid, data } => self.handle_push(requester, cid, data).await,
+            ShardRequest::Push {
+                cid,
+                data,
+                h_app_id,
+            } => self.handle_push(requester, cid, data, h_app_id).await,
             ShardRequest::ListContent {
                 reach_filter,
                 offset,
@@ -368,6 +390,7 @@ impl ShardService {
         requester: &Requester,
         cid: ByteCid,
         data: Vec<u8>,
+        h_app_id: Option<String>,
     ) -> ShardResponse {
         let hash = cid.to_string();
         debug!(cid = %hash, size = data.len(), "Handling shard Push request");
@@ -392,6 +415,10 @@ impl ShardService {
         match self.blob_store.store(&data).await {
             Ok(_) => {
                 info!(hash = %hash, "Shard stored via P2P push");
+                // The holder claims its own custody; the placer cannot (C1).
+                if let (Some(h_app_id), Some(sink)) = (h_app_id, self.held_shard_sink.get()) {
+                    sink.held(cid, h_app_id);
+                }
                 ShardResponse::PushAck
             }
             Err(e) => {
@@ -1140,6 +1167,7 @@ mod tests {
                     ShardRequest::Push {
                         cid: hash,
                         data: data.clone(),
+                        h_app_id: None,
                     },
                 )
                 .await;
@@ -1174,6 +1202,7 @@ mod tests {
                 ShardRequest::Push {
                     cid: claimed,
                     data: data.clone(),
+                    h_app_id: None,
                 },
             )
             .await;
@@ -1195,12 +1224,58 @@ mod tests {
         let data = b"handed over in process".to_vec();
         let hash = compute_bytes_cid(&data);
         let res = svc
-            .handle(&Requester::local(), ShardRequest::Push { cid: hash, data })
+            .handle(
+                &Requester::local(),
+                ShardRequest::Push {
+                    cid: hash,
+                    data,
+                    h_app_id: None,
+                },
+            )
             .await;
         assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
         let recorded = arrivals(&svc, &hash.to_string());
         assert_eq!(recorded.len(), 1);
         assert_eq!(recorded[0].via, ArrivalVia::SelfPut);
+    }
+
+    struct CapturingSink(std::sync::Mutex<Vec<(ByteCid, String)>>);
+
+    impl HeldShardSink for CapturingSink {
+        fn held(&self, cid: ByteCid, h_app_id: String) {
+            self.0.lock().unwrap().push((cid, h_app_id));
+        }
+    }
+
+    /// The holder learns the scope of a placement it stored, so it can author its own
+    /// custody claim; a scope-less push and a push whose bytes do not match report
+    /// nothing.
+    #[tokio::test]
+    async fn a_scoped_push_reports_the_stored_shard_to_the_holder() {
+        let dir = tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+        let svc = ShardService::new(blob_store, None);
+        let sink = Arc::new(CapturingSink(std::sync::Mutex::new(Vec::new())));
+        assert!(svc.set_held_shard_sink(sink.clone()));
+        let data = b"a placed shard".to_vec();
+        let cid = compute_bytes_cid(&data);
+        let push = |h_app_id: Option<&str>, cid: ByteCid| ShardRequest::Push {
+            cid,
+            data: data.clone(),
+            h_app_id: h_app_id.map(str::to_string),
+        };
+        let placer = Requester::libp2p("12D3KooWPlacer");
+        let res = svc.handle(&placer, push(None, cid)).await;
+        assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
+        let res = svc
+            .handle(&placer, push(Some("lamad"), compute_bytes_cid(b"other")))
+            .await;
+        assert!(matches!(res, ShardResponse::Error(_)), "{res:?}");
+        assert!(sink.0.lock().unwrap().is_empty());
+
+        let res = svc.handle(&placer, push(Some("lamad"), cid)).await;
+        assert!(matches!(res, ShardResponse::PushAck), "{res:?}");
+        assert_eq!(*sink.0.lock().unwrap(), vec![(cid, "lamad".to_string())]);
     }
 
     #[tokio::test]
@@ -1217,6 +1292,7 @@ mod tests {
                 ShardRequest::Push {
                     cid: stored.cid,
                     data: data.clone(),
+                    h_app_id: None,
                 },
             )
             .await;

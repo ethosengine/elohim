@@ -160,6 +160,7 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
             &ShardRequest::Push {
                 cid,
                 data: payload.clone(),
+                h_app_id: None,
             },
         )
         .await?;
@@ -208,6 +209,7 @@ async fn rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend() -> Result<()
     let frame = rmp_serde::to_vec_named(&ShardRequest::Push {
         cid,
         data: shard.clone(),
+        h_app_id: None,
     })?;
     assert!(
         frame.len() <= elohim_storage::p2p::SHARD_TRANSFER_MAX_FRAME_SIZE,
@@ -226,6 +228,7 @@ async fn rs_68_mib_shard_pushes_and_fetches_via_real_iroh_backend() -> Result<()
             &ShardRequest::Push {
                 cid,
                 data: shard.clone(),
+                h_app_id: None,
             },
         )
         .await?;

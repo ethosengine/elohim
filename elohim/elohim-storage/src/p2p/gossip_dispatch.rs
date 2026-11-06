@@ -690,12 +690,6 @@ fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSourc
     }
 }
 
-/// Custody-announcement projection into `shard_locations` as a `peer-announced`
-/// row (Category C, cross-pod convergence). Decode → structural verify → dedup →
-/// resolve THIS node's self `agent_cid` → apply under the never-overwrite-local +
-/// monotone-newer rule. A peer telling us about ourselves is dropped
-/// (`DroppedSelf`); a claim weaker than an existing row is dropped
-/// (`dropped_weaker`).
 /// `elohim/transport/manifest`: verify the announcer's signature against its
 /// iroh NodeId, then (a) feed the iroh peer book so the plane can dial it and
 /// (b) upsert the durable `peer_transport_manifest` row. Unsigned, stale, or
@@ -774,30 +768,16 @@ fn handle_transport_manifest(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &
     }
 }
 
+/// Custody-announcement projection into `shard_locations` as a `peer-announced`
+/// row (Category C, cross-pod convergence). Admission
+/// ([`crate::p2p::custody_announce::admit`]: signature, signer = author, C1 holder
+/// binding) → dedup → resolve THIS node's self `agent_cid` → apply under the
+/// never-overwrite-local + monotone-newer rule. A peer telling us about ourselves is
+/// dropped (`DroppedSelf`); a claim weaker than an existing row is dropped
+/// (`dropped_weaker`).
 fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
-    use crate::p2p::custody_announce::CustodyAnnouncement;
-
-    let ann = match CustodyAnnouncement::from_bytes(data) {
-        Ok(a) => a,
-        Err(e) => {
-            debug!(
-                target: "elohim_storage::custody",
-                from = %source,
-                error = %e,
-                "CustodyAnnouncement decode failed — dropped"
-            );
-            return;
-        }
-    };
-    if let Err(reason) = ann.verify_structural() {
-        warn!(
-            target: "elohim_storage::custody",
-            from = %source,
-            reason = %reason,
-            "CustodyAnnouncement failed structural verify — dropped"
-        );
-        return;
-    }
+    use crate::p2p::custody_announce::{admit, CustodyAdmission, CUSTODY_ANNOUNCE_TOPIC};
+    use crate::p2p::inventory_gossip::AuthorWitness;
 
     crate::metrics::inc_custody_announce("received");
 
@@ -820,24 +800,47 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
         }
     };
 
-    // C1: the holder must be the agent the transport manifest binds to the
-    // authenticated author. iroh-gossip has no authenticated author for an
-    // unsigned announcement, so it carries no custody claim.
-    let author = match source {
-        GossipSource::Libp2p { author, .. } => author.as_deref(),
-        GossipSource::Iroh { .. } => None,
+    // The announcement is signed: the signature is the end-to-end author witness on
+    // both planes; on libp2p the gossipsub author must also be the signer. C1: the
+    // holder is the agent `peer_transport_manifest` binds to the signer's transport
+    // identity. An unsigned announcement is refused on either plane.
+    let witness = match source {
+        GossipSource::Libp2p { author, .. } => AuthorWitness::Gossipsub(author.as_deref()),
+        GossipSource::Iroh { .. } => AuthorWitness::EndToEnd,
     };
-    let bound = author.and_then(|a| bound_agent_for_author(&mut conn, a));
-    if let Err(reason) = ann.check_binding(author, bound.as_deref()) {
-        crate::metrics::inc_custody_announce("refused_binding");
-        warn!(
-            target: "elohim_storage::custody",
-            from = %source,
-            %reason,
-            "custody announcement not bound to its author — refused"
-        );
-        return;
-    }
+    let verdict = admit(data, witness, &mut |transport_id: &str| {
+        bound_agent_for_author(&mut conn, transport_id)
+    });
+    let (ann, author_peer) = match verdict {
+        CustodyAdmission::Admitted { body, author_peer } => (body, author_peer),
+        CustodyAdmission::Held { reason, bytes } => {
+            crate::metrics::inc_custody_announce("held");
+            if let Err(e) = crate::db::held_envelopes::retain(
+                &mut conn,
+                CUSTODY_ANNOUNCE_TOPIC,
+                &reason.as_reason(),
+                &bytes,
+            ) {
+                warn!(target: "elohim_storage::custody", error = %e, "held custody announcement not retained");
+            }
+            info!(
+                target: "elohim_storage::custody",
+                from = %source, ?reason,
+                "custody announcement held (unknown epoch or scheme) — retained, not projected"
+            );
+            return;
+        }
+        CustodyAdmission::Refused(reason) => {
+            crate::metrics::inc_custody_announce(reason.label());
+            warn!(
+                target: "elohim_storage::custody",
+                from = %source,
+                %reason,
+                "custody announcement refused"
+            );
+            return;
+        }
+    };
 
     // B (fix in A's handler): dedup only claims that passed the author binding,
     // so an unbound relay of the same bytes cannot consume the key first and
@@ -889,6 +892,7 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
                 holder = %ann.holder_agent_cid,
                 status = %ann.status,
                 ?outcome,
+                author = %author_peer,
                 "custody announcement projected"
             );
         }
@@ -1046,79 +1050,128 @@ mod tests {
         assert_eq!(still.addr.direct_addresses.len(), 1);
     }
 
-    #[test]
-    fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
-        use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+    /// A transport identity (libp2p PeerId) and its signer for `secret`.
+    fn custody_signer(secret: [u8; 32]) -> (elohim_epr::AgentKeypair, String) {
+        let peer = libp2p::identity::Keypair::ed25519_from_bytes(secret)
+            .unwrap()
+            .public()
+            .to_peer_id()
+            .to_string();
+        (
+            elohim_epr::AgentKeypair::from_secret(&secret).unwrap(),
+            peer,
+        )
+    }
+
+    /// `peer_transport_manifest` binds `libp2p_peer` to `agent`.
+    fn bind_agent(pool: &crate::db::DbPool, agent: &str, libp2p_peer: &str) {
+        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
         use diesel::prelude::*;
-        let pool = crate::test_util::test_pool();
-        let dedup = crate::p2p::dedup::DedupLru::new();
-        let ctx = GossipDispatchCtx {
-            db_pool: Some(&pool),
-            dedup: &dedup,
+        let mut conn = pool.get().expect("conn");
+        diesel::insert_into(t::peer_transport_manifest)
+            .values((
+                t::agent_cid.eq(agent),
+                t::libp2p_peer_id.eq(libp2p_peer),
+                t::discovery_methods_json.eq("[]"),
+                t::capability_level.eq(1),
+                t::last_observed.eq(1_i64),
+            ))
+            .execute(&mut conn)
+            .expect("bind author");
+    }
+
+    /// `peer_transport_manifest` binds iroh NodeId `node` to `agent` and no libp2p
+    /// PeerId — the shape the transport-manifest gossip projects in a household.
+    fn bind_iroh_agent(pool: &crate::db::DbPool, agent: &str, node: &str) {
+        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+        use diesel::prelude::*;
+        let mut conn = pool.get().expect("conn");
+        diesel::insert_into(t::peer_transport_manifest)
+            .values((
+                t::agent_cid.eq(agent),
+                t::iroh_node_id.eq(node),
+                t::discovery_methods_json.eq("[]"),
+                t::capability_level.eq(5),
+                t::last_observed.eq(1_i64),
+            ))
+            .execute(&mut conn)
+            .expect("bind iroh author");
+    }
+
+    fn custody_claim(
+        shard: elohim_epr::address::ByteCid,
+        holder: &str,
+    ) -> crate::p2p::custody_announce::CustodyAnnouncement {
+        crate::p2p::custody_announce::CustodyAnnouncement {
+            shard_cid: shard,
+            holder_agent_cid: holder.to_string(),
+            h_app_id: "lamad".to_string(),
+            status: "self-held".to_string(),
+            announced_at_ms: 1_700_000_000_000,
+        }
+    }
+
+    fn custody_rows(
+        pool: &crate::db::DbPool,
+        shard: &elohim_epr::address::ByteCid,
+    ) -> Vec<crate::db::models::ShardLocationRow> {
+        let mut conn = pool.get().expect("conn");
+        crate::db::shard_locations::get_locations_for_shard(&mut conn, &shard.to_string()).unwrap()
+    }
+
+    fn libp2p_from(author: Option<&str>) -> GossipSource {
+        GossipSource::Libp2p {
+            peer: "12D3KooWRelay".to_string(),
+            message_id: "m1".to_string(),
+            author: author.map(str::to_string),
+        }
+    }
+
+    fn iroh_from(node: &str) -> GossipSource {
+        GossipSource::Iroh {
+            node: node.to_string(),
+        }
+    }
+
+    fn custody_ctx<'a>(
+        pool: &'a crate::db::DbPool,
+        dedup: &'a crate::p2p::dedup::DedupLru,
+    ) -> GossipDispatchCtx<'a> {
+        GossipDispatchCtx {
+            db_pool: Some(pool),
+            dedup,
             agent_info_inbound_tx: None,
             inventory_fetch: None,
             transport_manifest_sink: None,
             self_iroh_node_id: None,
-        };
-        {
-            use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-            let mut conn = pool.get().expect("conn");
-            diesel::insert_into(t::peer_transport_manifest)
-                .values((
-                    t::agent_cid.eq("uhCAkRemoteHolder"),
-                    t::libp2p_peer_id.eq("12D3KooWHolder"),
-                    t::discovery_methods_json.eq("[]"),
-                    t::capability_level.eq(1),
-                    t::last_observed.eq(1_i64),
-                ))
-                .execute(&mut conn)
-                .expect("bind author");
         }
+    }
+
+    #[test]
+    fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (keypair, peer) = custody_signer([21u8; 32]);
+        bind_agent(&pool, "uhCAkRemoteHolder", &peer);
         let shard = elohim_epr::address::compute_bytes_cid(b"shard xyz");
-        let shard_text = shard.to_string();
-        let src = |author: Option<&str>| GossipSource::Libp2p {
-            peer: "12D3KooWRelay".to_string(),
-            message_id: "m1".to_string(),
-            author: author.map(str::to_string),
-        };
-        let ann = CustodyAnnouncement {
-            shard_cid: shard,
-            holder_agent_cid: "uhCAkRemoteHolder".to_string(),
-            h_app_id: "lamad".to_string(),
-            status: "self-held".to_string(),
-            announced_at_ms: 1_700_000_000_000,
-        };
-        let bytes = ann.to_bytes().expect("encode");
-        let rows_now = || {
-            let mut conn = pool.get().expect("conn");
-            crate::db::shard_locations::get_locations_for_shard(&mut conn, &shard_text).unwrap()
-        };
+        let bytes = SignedCustodyAnnouncement::sign(
+            &keypair,
+            &peer,
+            custody_claim(shard, "uhCAkRemoteHolder"),
+        )
+        .to_bytes()
+        .expect("encode");
 
-        // Unbound or unauthenticated authors project nothing.
+        // The bound signer's claim, relayed by another peer, projects one row.
         handle_gossip(
             &ctx,
             CUSTODY_ANNOUNCE_TOPIC,
             &bytes,
-            &src(Some("12D3KooWStranger")),
+            &libp2p_from(Some(&peer)),
         );
-        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &src(None));
-        let iroh = GossipSource::Iroh {
-            node: "peer-a".to_string(),
-        };
-        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &iroh);
-        assert!(
-            rows_now().is_empty(),
-            "no claim lands without its bound author"
-        );
-
-        // The bound author's claim, relayed by another peer, projects one row.
-        handle_gossip(
-            &ctx,
-            CUSTODY_ANNOUNCE_TOPIC,
-            &bytes,
-            &src(Some("12D3KooWHolder")),
-        );
-        let rows = rows_now();
+        let rows = custody_rows(&pool, &shard);
         assert_eq!(rows.len(), 1, "one peer-announced row projected");
         assert_eq!(rows[0].peer_id, "uhCAkRemoteHolder");
         assert_eq!(
@@ -1126,14 +1179,247 @@ mod tests {
             crate::db::shard_locations::PEER_ANNOUNCED_STATUS
         );
 
-        // An exact replay is deduped — still exactly one row.
+        // An exact replay (on either plane) is deduped — still exactly one row.
         handle_gossip(
             &ctx,
             CUSTODY_ANNOUNCE_TOPIC,
             &bytes,
-            &src(Some("12D3KooWHolder")),
+            &libp2p_from(Some(&peer)),
         );
-        assert_eq!(rows_now().len(), 1, "replay deduped — no duplicate row");
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &iroh_from("relay"));
+        assert_eq!(custody_rows(&pool, &shard).len(), 1, "replay deduped");
+    }
+
+    /// The regression: a household whose peers meet over iroh never projected
+    /// remote custody. A signed claim delivered over iroh — no gossipsub author —
+    /// is authenticated by its signature and projects.
+    #[test]
+    fn signed_announcement_over_iroh_is_applied() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        // A dual node signs with its iroh key as its NodeId; the receiver's manifest
+        // binds only that NodeId (no libp2p PeerId), as in the household.
+        let keypair = elohim_epr::AgentKeypair::from_secret(&[22u8; 32]).unwrap();
+        let node = hex::encode(keypair.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkIrohHolder", &node);
+        let shard = elohim_epr::address::compute_bytes_cid(b"iroh shard");
+        let bytes = SignedCustodyAnnouncement::sign(
+            &keypair,
+            &node,
+            custody_claim(shard, "uhCAkIrohHolder"),
+        )
+        .to_bytes()
+        .unwrap();
+
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &iroh_from("neighbour"),
+        );
+        let rows = custody_rows(&pool, &shard);
+        assert_eq!(rows.len(), 1, "the iroh-delivered signed claim projects");
+        assert_eq!(rows[0].peer_id, "uhCAkIrohHolder");
+    }
+
+    /// No C1 regression: an unsigned claim — the pre-envelope v2 wire — projects
+    /// nothing on either plane, even from a bound gossipsub author.
+    #[test]
+    fn unsigned_announcement_is_refused_on_both_planes() {
+        use crate::p2p::custody_announce::CUSTODY_ANNOUNCE_TOPIC;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (_, peer) = custody_signer([23u8; 32]);
+        bind_agent(&pool, "uhCAkUnsignedHolder", &peer);
+        let shard = elohim_epr::address::compute_bytes_cid(b"unsigned shard");
+        let bytes = custody_claim(shard, "uhCAkUnsignedHolder")
+            .to_bytes()
+            .unwrap();
+
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&peer)),
+        );
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &iroh_from("neighbour"),
+        );
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "unsigned claims never land"
+        );
+    }
+
+    /// On libp2p the gossipsub author must also be the signer: a signed claim whose
+    /// `message.source` is another peer (or absent) is refused, and it does not
+    /// consume the dedup key the genuine delivery needs.
+    #[test]
+    fn libp2p_author_mismatch_is_refused() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (keypair, peer) = custody_signer([24u8; 32]);
+        let (_, stranger) = custody_signer([25u8; 32]);
+        bind_agent(&pool, "uhCAkMismatchHolder", &peer);
+        bind_agent(&pool, "uhCAkStranger", &stranger);
+        let shard = elohim_epr::address::compute_bytes_cid(b"mismatch shard");
+        let bytes = SignedCustodyAnnouncement::sign(
+            &keypair,
+            &peer,
+            custody_claim(shard, "uhCAkMismatchHolder"),
+        )
+        .to_bytes()
+        .unwrap();
+
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&stranger)),
+        );
+        handle_gossip(&ctx, CUSTODY_ANNOUNCE_TOPIC, &bytes, &libp2p_from(None));
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "author mismatch projects nothing"
+        );
+
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&peer)),
+        );
+        assert_eq!(
+            custody_rows(&pool, &shard).len(),
+            1,
+            "the signer's delivery lands"
+        );
+    }
+
+    /// The push-ack flow end to end: the distributor pushes a shard with its app
+    /// scope; the HOLDER stores it, records its own `self-held` row, signs its claim
+    /// with its transport key and publishes it; another peer receiving that claim
+    /// over iroh projects the holder — the claim the distributor could never author.
+    #[tokio::test]
+    async fn push_ack_custody_is_claimed_by_the_holder_and_projected_by_peers() {
+        use crate::p2p::custody_announce::{
+            holder_claim_after_store, publish_custody_claim, CUSTODY_ANNOUNCE_TOPIC,
+        };
+        use crate::p2p::shard_protocol::{ShardRequest, ShardResponse};
+        use crate::services::custody_standing::Requester;
+        use crate::services::gossip_flood::{GossipPublisher, PublishError};
+        use crate::shard_service::{HeldShardSink, ShardService};
+        use std::sync::{Arc, Mutex};
+
+        struct Reported(Mutex<Vec<(elohim_epr::address::ByteCid, String)>>);
+        impl HeldShardSink for Reported {
+            fn held(&self, cid: elohim_epr::address::ByteCid, h_app_id: String) {
+                self.0.lock().unwrap().push((cid, h_app_id));
+            }
+        }
+        struct Published(Mutex<Vec<(String, Vec<u8>)>>);
+        impl GossipPublisher for Published {
+            fn publish(&self, topic: &str, payload: Vec<u8>) -> Result<(), PublishError> {
+                self.0.lock().unwrap().push((topic.to_string(), payload));
+                Ok(())
+            }
+        }
+
+        // Holder: stores the pushed bytes and learns the scope.
+        let dir = tempfile::tempdir().unwrap();
+        let pantry = Arc::new(
+            crate::blob_store::BlobStore::new(dir.path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let holder_pool = crate::test_util::test_pool();
+        let service = ShardService::new(pantry.clone(), Some(holder_pool.clone()));
+        let reported = Arc::new(Reported(Mutex::new(Vec::new())));
+        service.set_held_shard_sink(reported.clone());
+        let data = b"a placed shard".to_vec();
+        let shard = elohim_epr::address::compute_bytes_cid(&data);
+        let response = service
+            .handle(
+                &Requester::libp2p("12D3KooWDistributor"),
+                ShardRequest::Push {
+                    cid: shard,
+                    data,
+                    h_app_id: Some("lamad".to_string()),
+                },
+            )
+            .await;
+        assert!(matches!(response, ShardResponse::PushAck), "{response:?}");
+        let (cid, scope) = reported
+            .0
+            .lock()
+            .unwrap()
+            .pop()
+            .expect("holder learns the scope");
+
+        // The holder records and signs its own claim.
+        // The pantry is probed `Verified` just below; the record reads that verdict.
+        struct Pantry;
+        impl crate::reconcile::custody::LocalBlobStore for Pantry {
+            fn has(&self, _cid: &elohim_epr::address::ByteCid) -> bool {
+                true
+            }
+        }
+        assert_eq!(
+            pantry.exists(&cid).await,
+            crate::blob_store::Exists::Verified
+        );
+        let (keypair, holder_peer) = custody_signer([26u8; 32]);
+        let claim = {
+            let mut conn = holder_pool.get().unwrap();
+            holder_claim_after_store(
+                &mut conn,
+                &Pantry,
+                &cid,
+                "uhCAkPushHolder",
+                &scope,
+                1_700_000_000_000,
+            )
+            .unwrap()
+            .expect("self-held recorded")
+        };
+        let own = custody_rows(&holder_pool, &shard);
+        assert_eq!(own.len(), 1);
+        assert_eq!(
+            own[0].status,
+            crate::services::self_stewardship::SELF_HELD_STATUS
+        );
+        let published = Published(Mutex::new(Vec::new()));
+        assert!(publish_custody_claim(
+            Some(&keypair),
+            &holder_peer,
+            &published,
+            claim
+        ));
+        let (topic, bytes) = published.0.lock().unwrap().pop().expect("claim published");
+        assert_eq!(topic, CUSTODY_ANNOUNCE_TOPIC);
+
+        // The distributor (or any peer) projects the holder from the signed claim.
+        let peer_pool = crate::test_util::test_pool();
+        bind_agent(&peer_pool, "uhCAkPushHolder", &holder_peer);
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&peer_pool, &dedup);
+        handle_gossip(&ctx, &topic, &bytes, &iroh_from("neighbour"));
+        let rows = custody_rows(&peer_pool, &shard);
+        assert_eq!(
+            rows.len(),
+            1,
+            "the holder's claim projects at the distributor"
+        );
+        assert_eq!(rows[0].peer_id, "uhCAkPushHolder");
+        assert_eq!(rows[0].h_app_id, "lamad");
     }
 
     #[test]

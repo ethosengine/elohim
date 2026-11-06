@@ -1007,6 +1007,11 @@ pub struct P2PNode {
     /// key, so a receiver binds `holder ↔ author_peer` to the gossipsub author.
     /// `None` only for a non-ed25519 identity, which then announces nothing.
     inventory_signer: Option<Arc<elohim_epr::proof::AgentKeypair>>,
+    /// Signs this node's custody claims, with the transport id it signs as. Defaults
+    /// to the libp2p identity (as the inventory signer); a dual node switches to its
+    /// iroh key ([`Self::set_custody_signer`]), the identity `peer_transport_manifest`
+    /// binds from the signed transport manifest, so iroh receivers can bind the claim.
+    custody_signer: Option<(Arc<elohim_epr::proof::AgentKeypair>, String)>,
     /// Inventory refresh pages not yet published — drained `INVENTORY_PAGES_PER_TICK`
     /// per `INVENTORY_PACER_INTERVAL` so a 77-page refresh never overruns the
     /// 64-slot command channel the swarm loop itself drains (measured
@@ -1322,7 +1327,10 @@ pub enum P2PCommand {
     /// Currently unused: the drain loop (`drain_publish_queue`) is the sole
     /// publisher of EPR Heads and calls `put_record` directly on the swarm.
     /// Retained as part of the P2PHandle abstraction for future use.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained imperative-publish variant; drain_publish_queue is the sole EPR Head publisher today"
+    )]
     PublishEprHead { id: String, head_bytes: Vec<u8> },
     /// Resolve an EPR Head via Kademlia DHT lookup
     ResolveEpr {
@@ -1340,6 +1348,8 @@ pub enum P2PCommand {
         peer_id: PeerId,
         cid: ByteCid,
         data: Vec<u8>,
+        /// App scope of the placement, so the holder can claim its own custody.
+        h_app_id: Option<String>,
         reply: oneshot::Sender<Result<(), String>>,
     },
     /// List connected peers with identify info
@@ -1459,6 +1469,14 @@ pub enum P2PCommand {
     /// for content-reach broadcasts. Best-effort — publish failure (e.g. no
     /// peers subscribed) is logged and does not block the caller.
     GossipPublish { topic: String, payload: Vec<u8> },
+    /// Sign a custody claim about THIS node's own holding with the transport key and
+    /// publish it on `elohim/storage/custody/2` through the configured gossip
+    /// publisher (both planes in dual mode). `GossipPublish` stays the libp2p leaf
+    /// the fan-out uses, so this never recurses.
+    AnnounceCustody(crate::p2p::custody_announce::CustodyAnnouncement),
+    /// The shard service stored pushed bytes under the placer's app scope: record
+    /// this node's `self-held` row and announce the holder-signed claim.
+    ClaimHeldShard { cid: ByteCid, h_app_id: String },
     /// Reconcile this node's projection of `peer_id`'s blob inventory with the
     /// peer over `/elohim/inventory-recon/1.0.0`: issued for a gap the reorder
     /// window could not close, and by the periodic recon tick. Spawns one bounded
@@ -1738,6 +1756,8 @@ impl P2PHandle {
                     P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
                     P2PCommand::SendDirect { .. } => {} // fire-and-forget (T14 back-prop stub)
                     P2PCommand::GossipPublish { .. } => {} // fire-and-forget (T14 gossip-flood stub)
+                    P2PCommand::AnnounceCustody(_) => {}   // fire-and-forget
+                    P2PCommand::ClaimHeldShard { .. } => {} // fire-and-forget
                     P2PCommand::KadGetProviders { reply, .. } => {
                         // D.7 stub: no swarm in test, always return empty.
                         let _ = reply.send(vec![]);
@@ -2028,7 +2048,10 @@ impl P2PHandle {
     /// publisher of EPR Heads to Kademlia and calls `put_record` directly,
     /// also setting `p2p_published_at` via `mark_published`. This method is
     /// retained as part of the P2PHandle abstraction for future use.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "retained imperative-publish entry point; drain_publish_queue is the sole EPR Head publisher today"
+    )]
     pub async fn publish_epr_head(&self, id: String, head_bytes: Vec<u8>) {
         if let Err(e) = self
             .command_tx
@@ -2122,6 +2145,7 @@ impl P2PHandle {
         iroh_addr: Option<IrohPushAddr>,
         cid: &ByteCid,
         data: Vec<u8>,
+        h_app_id: &str,
     ) -> Result<&'static str, String> {
         use crate::p2p::transport_paths::{global, OpClass, Route, Transport};
         let mut eligible: Vec<Transport> = Vec::with_capacity(2);
@@ -2147,14 +2171,16 @@ impl P2PHandle {
             let started = std::time::Instant::now();
             let res: Result<(), String> = match t {
                 Transport::Libp2p => match libp2p_id {
-                    Some(id) => self.push_shard(id, cid, data.clone()).await,
+                    Some(id) => self.push_shard(id, cid, data.clone(), Some(h_app_id)).await,
                     None => Err("no libp2p binding".to_string()),
                 },
                 Transport::Iroh => {
                     #[cfg(feature = "p2p-iroh")]
                     {
                         match iroh_addr.clone() {
-                            Some(addr) => push_shard_over_iroh(addr, cid, data.clone()).await,
+                            Some(addr) => {
+                                push_shard_over_iroh(addr, cid, data.clone(), h_app_id).await
+                            }
                             None => Err("no iroh binding".to_string()),
                         }
                     }
@@ -2182,6 +2208,7 @@ impl P2PHandle {
         peer_id: &str,
         cid: &ByteCid,
         data: Vec<u8>,
+        h_app_id: Option<&str>,
     ) -> Result<(), String> {
         let peer_id: PeerId = peer_id
             .parse()
@@ -2192,6 +2219,7 @@ impl P2PHandle {
                 peer_id,
                 cid: *cid,
                 data,
+                h_app_id: h_app_id.map(str::to_string),
                 reply: tx,
             })
             .await
@@ -2204,25 +2232,21 @@ impl P2PHandle {
         }
     }
 
-    /// Broadcast a single custody claim on the custody-announcement gossip plane
-    /// (`elohim/storage/custody`). Called on-change immediately after a
-    /// `shard_locations` row this node can verify is written — self-held recording
-    /// and push-ack placement in [`P2PHandle::distribute_shards`].
+    /// Broadcast this node's own custody claim on the custody-announcement plane
+    /// (`elohim/storage/custody/2`). Called on-change immediately after a
+    /// `self-held` `shard_locations` row is written in
+    /// [`P2PHandle::distribute_shards`]; a holder that received a pushed shard
+    /// announces through `P2PCommand::ClaimHeldShard` instead.
     ///
-    /// Best-effort: routed through `P2PCommand::GossipPublish` (the libp2p
-    /// gossipsub plane — the same path content-reach broadcasts take via
-    /// `LibP2PGossipPublisher`). A closed/full channel is logged and never reverts
-    /// the local projection — the DB is this node's operational truth, and the
-    /// catch-up reconcile arm backfills peers that missed the gossip.
+    /// The node signs the claim with its custody signer (its iroh key on a dual
+    /// node, else its libp2p identity key) and publishes it through its configured
+    /// gossip publisher — the fan-out publisher in dual mode, so the claim reaches
+    /// the iroh plane as well as gossipsub. Best-effort: a closed/full channel is
+    /// logged and never reverts the local projection — the DB is this node's
+    /// operational truth.
     ///
-    /// KNOWN Dual-mode gap: this reaches only libp2p (the handle holds the command
-    /// channel, not the `DualGossipPublisher`), so an iroh-only peer converges via
-    /// the catch-up arm rather than this hot announce — same asymmetry class as the
-    /// inventory active-fetch path documented in `p2p::gossip_dispatch`.
-    ///
-    /// `holder_agent_cid` and `status` are exactly the values just written to
-    /// `shard_locations`; the receiver projects them as a weaker `peer-announced`
-    /// row that never overwrites a locally-witnessed one.
+    /// `holder_agent_cid` must be THIS node's agent: under C1 a receiver binds the
+    /// holder to the signer, so a claim about another holder would be refused.
     async fn announce_custody(
         &self,
         shard_cid: &ByteCid,
@@ -2230,7 +2254,7 @@ impl P2PHandle {
         h_app_id: &str,
         status: &str,
     ) {
-        use crate::p2p::custody_announce::{CustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        use crate::p2p::custody_announce::CustodyAnnouncement;
 
         let ann = CustodyAnnouncement {
             shard_cid: *shard_cid,
@@ -2239,40 +2263,13 @@ impl P2PHandle {
             status: status.to_string(),
             announced_at_ms: chrono::Utc::now().timestamp_millis(),
         };
-        let bytes = match ann.to_bytes() {
-            Ok(b) => b,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::custody",
-                    error = %e,
-                    "failed to serialize custody announcement"
-                );
-                return;
-            }
-        };
-        if let Err(e) = self
-            .command_tx
-            .send(P2PCommand::GossipPublish {
-                topic: CUSTODY_ANNOUNCE_TOPIC.to_string(),
-                payload: bytes,
-            })
-            .await
-        {
+        if let Err(e) = self.command_tx.send(P2PCommand::AnnounceCustody(ann)).await {
             debug!(
                 target: "elohim_storage::custody",
                 error = %e,
-                "custody announcement publish failed (P2P command channel closed)"
+                "custody announcement not queued (P2P command channel closed)"
             );
-            return;
         }
-        crate::metrics::inc_custody_announce("sent");
-        debug!(
-            target: "elohim_storage::custody",
-            shard_cid = %shard_cid,
-            holder = %holder_agent_cid,
-            status = %status,
-            "queued custody announcement for gossip"
-        );
     }
 
     /// Distribute all shards of a blob to delivery peers.
@@ -2576,6 +2573,7 @@ impl P2PHandle {
                     iroh_addr,
                     hash,
                     shard_data.clone(),
+                    h_app_id,
                 )
                 .await
             {
@@ -2601,10 +2599,11 @@ impl P2PHandle {
                         };
                         let _ = crate::db::shard_locations::upsert_location(&mut conn, &location);
                     }
-                    // Cross-pod convergence: announce this push-acked placement so
-                    // peers project the holder into their own shard_locations.
-                    self.announce_custody(hash, &peer.peer_id, h_app_id, "announced")
-                        .await;
+                    // Cross-pod convergence is the HOLDER's claim: the push carries
+                    // `h_app_id`, and the holder signs and gossips its own custody
+                    // after it stores the bytes (`P2PCommand::ClaimHeldShard`). A
+                    // distributor's claim naming another holder could never bind
+                    // under C1, so it is not announced.
                     distributed += 1;
                 }
                 Err(e) => {
@@ -3184,6 +3183,9 @@ impl P2PNode {
         );
 
         let inventory_signer = inventory_signer_of(&identity);
+        let custody_signer = inventory_signer
+            .clone()
+            .map(|signer| (signer, peer_id.to_string()));
 
         Ok(Self {
             identity,
@@ -3297,6 +3299,7 @@ impl P2PNode {
             salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
             inventory_signer,
+            custody_signer,
             inventory_page_backlog: std::sync::Mutex::new(std::collections::VecDeque::new()),
             sealing_keys: None,
             agent_info_inbound_tx: None,
@@ -3366,8 +3369,87 @@ impl P2PNode {
     /// Replace the default pool-less shard service with the process-lifetime
     /// service assembled in `main.rs` and shared with iroh.
     pub fn with_shard_service(mut self, service: Arc<crate::shard_service::ShardService>) -> Self {
+        // This node is the holder of what it is pushed: the shared service reports
+        // each stored, scope-carrying push here so the node authors its own claim.
+        service.set_held_shard_sink(Arc::new(CommandHeldShardSink {
+            command_tx: self.command_tx.clone(),
+        }));
         self.shard_service = service;
         self
+    }
+
+    /// Sign `body` with the custody signer and publish it through the configured
+    /// gossip publisher (fan-out to both planes in dual mode).
+    fn publish_custody_claim(&self, body: crate::p2p::custody_announce::CustodyAnnouncement) {
+        let (signer, author_peer) = match self.custody_signer.as_ref() {
+            Some((signer, author)) => (Some(signer.as_ref()), author.as_str()),
+            None => (None, ""),
+        };
+        crate::p2p::custody_announce::publish_custody_claim(
+            signer,
+            author_peer,
+            self.gossip_publisher.as_ref(),
+            body,
+        );
+    }
+
+    /// Record and announce this node's custody of a shard it was pushed and stored:
+    /// the `self-held` row (only when the pantry verifies the bytes and the self
+    /// identity resolves to an `agent_cid`), then the holder-signed claim.
+    async fn claim_held_shard(&self, cid: ByteCid, h_app_id: &str) {
+        struct Probed(bool);
+        impl crate::reconcile::custody::LocalBlobStore for Probed {
+            fn has(&self, _cid: &ByteCid) -> bool {
+                self.0
+            }
+        }
+        let Some(pool) = self.db_pool.as_ref() else {
+            return;
+        };
+        let held = Probed(matches!(
+            self.blob_store.exists(&cid).await,
+            Exists::Verified
+        ));
+        let claim = match pool.get() {
+            Ok(mut conn) => {
+                let Some(self_agent) = crate::reconcile::custody::resolve_self_agent_cid(
+                    &mut conn,
+                    Some(self.identity.agent_pubkey()),
+                ) else {
+                    debug!(
+                        target: "elohim_storage::custody",
+                        shard_cid = %cid,
+                        "held shard not claimed: self agent_cid unresolved"
+                    );
+                    return;
+                };
+                crate::p2p::custody_announce::holder_claim_after_store(
+                    &mut conn,
+                    &held,
+                    &cid,
+                    &self_agent,
+                    h_app_id,
+                    chrono::Utc::now().timestamp_millis(),
+                )
+            }
+            Err(e) => Err(StorageError::Database(e.to_string())),
+        };
+        match claim {
+            Ok(Some(body)) => {
+                self.publish_custody_claim(body);
+            }
+            Ok(None) => debug!(
+                target: "elohim_storage::custody",
+                shard_cid = %cid,
+                "held shard not claimed (bytes absent or identity not an agent_cid)"
+            ),
+            Err(e) => warn!(
+                target: "elohim_storage::custody",
+                shard_cid = %cid,
+                error = %e,
+                "held shard claim failed"
+            ),
+        }
     }
 
     /// Inject the canonical libp2p requester resolver. The custody-standing
@@ -4910,9 +4992,14 @@ impl P2PNode {
                 peer_id,
                 cid,
                 data,
+                h_app_id,
                 reply,
             } => {
-                let request = ShardRequest::Push { cid, data };
+                let request = ShardRequest::Push {
+                    cid,
+                    data,
+                    h_app_id,
+                };
                 let request_id = swarm
                     .behaviour_mut()
                     .shard_protocol
@@ -5305,6 +5392,12 @@ impl P2PNode {
                         "GossipPublish: gossipsub publish failed (often: no peers subscribed yet)"
                     ),
                 }
+            }
+            P2PCommand::AnnounceCustody(body) => {
+                self.publish_custody_claim(body);
+            }
+            P2PCommand::ClaimHeldShard { cid, h_app_id } => {
+                self.claim_held_shard(cid, &h_app_id).await;
             }
             P2PCommand::ReconcileInventory { peer_id } => {
                 self.spawn_recon_session(peer_id);
@@ -10162,6 +10255,16 @@ impl P2PNode {
         }
     }
 
+    /// Sign custody claims with `signer` as transport identity `author_peer` (a dual
+    /// node's iroh key and NodeId).
+    pub fn set_custody_signer(
+        &mut self,
+        signer: Arc<elohim_epr::proof::AgentKeypair>,
+        author_peer: String,
+    ) {
+        self.custody_signer = Some((signer, author_peer));
+    }
+
     /// Record the co-resident iroh node's `NodeId` on the status snapshot.
     ///
     /// Wired from the `main.rs` dual block once the iroh node exists. Mutates the
@@ -10594,6 +10697,27 @@ mod reach_gate_tests {
             &CallerIdentity::Anonymous,
             None
         ));
+    }
+}
+
+/// The shard service's held-shard reports, queued to the node that signs claims.
+struct CommandHeldShardSink {
+    command_tx: mpsc::Sender<P2PCommand>,
+}
+
+impl crate::shard_service::HeldShardSink for CommandHeldShardSink {
+    fn held(&self, cid: ByteCid, h_app_id: String) {
+        if let Err(e) = self
+            .command_tx
+            .try_send(P2PCommand::ClaimHeldShard { cid, h_app_id })
+        {
+            warn!(
+                target: "elohim_storage::custody",
+                shard_cid = %cid,
+                error = %e,
+                "held-shard custody claim not queued"
+            );
+        }
     }
 }
 
@@ -11172,11 +11296,16 @@ async fn push_shard_over_iroh(
     addr: iroh::NodeAddr,
     cid: &ByteCid,
     data: Vec<u8>,
+    h_app_id: &str,
 ) -> Result<(), String> {
     use crate::p2p_iroh::IrohShardClient;
     let leg = crate::p2p_iroh::iroh_fetch_leg().ok_or_else(|| "iroh leg not ready".to_string())?;
     let client = IrohShardClient::new(leg.endpoint());
-    let request = ShardRequest::Push { cid: *cid, data };
+    let request = ShardRequest::Push {
+        cid: *cid,
+        data,
+        h_app_id: Some(h_app_id.to_string()),
+    };
     match tokio::time::timeout(
         std::time::Duration::from_secs(30),
         client.request(addr, &request),

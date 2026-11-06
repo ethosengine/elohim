@@ -4110,6 +4110,20 @@ async fn async_main(
             // /p2p/status (the setter mutates the live watch value; the periodic
             // libp2p status rebuild preserves it — see P2PNode::set_iroh_node_id).
             libp2p_n.set_iroh_node_id(iroh_n.node_id().to_string());
+            // Custody claims are signed with the iroh key: `peer_transport_manifest`
+            // binds the iroh NodeId (from the signed transport manifest), so an iroh
+            // receiver can bind the claim's holder to its signer (C1).
+            match elohim_epr::proof::AgentKeypair::from_secret(
+                &iroh_n.endpoint().secret_key().to_bytes(),
+            ) {
+                Ok(signer) => {
+                    libp2p_n.set_custody_signer(Arc::new(signer), iroh_n.node_id().to_string())
+                }
+                Err(e) => warn!(
+                    error = ?e,
+                    "Dual: iroh key unusable as custody signer — claims stay libp2p-signed"
+                ),
+            }
             info!(
                 "Dual: FanoutGossipPublisher wired into P2PNode — gossip fans out to both stacks"
             );

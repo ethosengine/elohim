@@ -1599,13 +1599,19 @@ lazy_static! {
     /// network footprint. A [`CustodyAnnouncement`](crate::p2p::custody_announce)
     /// gossips a claim on change; peers project it as a `peer-announced` row that
     /// never overwrites a locally-witnessed one. labels: direction =
-    ///   "sent"          — a claim this node broadcast,
-    ///   "received"      — a claim decoded off the wire (before the apply verdict),
-    ///   "applied"       — landed a write (absence filled or refreshed),
-    ///   "dropped_weaker"— an existing local/peer row was stronger-or-fresher,
-    ///   "dropped_self"  — a peer claiming THIS node holds a shard (weaker than
-    ///                     our own records).
-    /// `received == applied + dropped_weaker + dropped_self` per receive path.
+    ///   "sent"              — a signed claim this node handed to the transport,
+    ///   "received"          — an announcement arrived on the topic (before any verdict),
+    ///   "refused_signature" — unsigned, malformed, oversize, a signature that does
+    ///                         not verify, or an `author_peer` that is not the signer,
+    ///   "refused_binding"   — the holder is not the agent bound to the signer (or
+    ///                         the gossipsub author is not the signer),
+    ///   "refused_structural"— an empty holder / app scope / status,
+    ///   "held"              — an unknown epoch or signature scheme, retained opaque,
+    ///   "applied"           — landed a write (absence filled or refreshed),
+    ///   "dropped_weaker"    — an existing local/peer row was stronger-or-fresher,
+    ///   "dropped_self"      — a peer claiming THIS node holds a shard (weaker than
+    ///                         our own records).
+    /// Every label is pre-touched at zero ([`CUSTODY_ANNOUNCE_DIRECTIONS`]).
     pub static ref CUSTODY_ANNOUNCE_TOTAL: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_custody_announce_total",
@@ -3801,6 +3807,13 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_DISCOVERED_CIDS.clone()));
         let _ = REGISTRY.register(Box::new(IDENTITY_FILL_COLLECTIVE_CID_STAMPED.clone()));
         let _ = REGISTRY.register(Box::new(CUSTODY_ANNOUNCE_TOTAL.clone()));
+        // Pre-touched at zero: an absent receipt must read as a visible 0, not a
+        // missing series.
+        for direction in CUSTODY_ANNOUNCE_DIRECTIONS {
+            CUSTODY_ANNOUNCE_TOTAL
+                .with_label_values(&[direction])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(IROH_PEERS_KNOWN.clone()));
         let _ = REGISTRY.register(Box::new(IROH_MANIFEST_ANNOUNCEMENTS.clone()));
         let _ = REGISTRY.register(Box::new(IROH_GOSSIP_NEIGHBOR_EVENTS.clone()));
@@ -5433,9 +5446,21 @@ pub fn inc_shard_push_peer_unresolved() {
     SHARD_PUSH_PEER_UNRESOLVED.inc();
 }
 
-/// Record one custody-announcement flow event. `direction` is one of the labels
-/// documented on [`CUSTODY_ANNOUNCE_TOTAL`]: `sent` | `received` | `applied` |
-/// `dropped_weaker` | `dropped_self`.
+/// `direction` vocabulary of `CUSTODY_ANNOUNCE_TOTAL`, pre-touched at zero.
+pub const CUSTODY_ANNOUNCE_DIRECTIONS: &[&str] = &[
+    "sent",
+    "received",
+    "refused_signature",
+    "refused_binding",
+    "refused_structural",
+    "held",
+    "applied",
+    "dropped_weaker",
+    "dropped_self",
+];
+
+/// Record one custody-announcement flow event. `direction` is one of
+/// [`CUSTODY_ANNOUNCE_DIRECTIONS`], documented on [`CUSTODY_ANNOUNCE_TOTAL`].
 pub fn inc_custody_announce(direction: &str) {
     CUSTODY_ANNOUNCE_TOTAL.with_label_values(&[direction]).inc();
 }
@@ -8135,6 +8160,27 @@ mod tests {
             before_count + 1,
             "a successful request must be observed under 2xx"
         );
+    }
+
+    /// An absent custody receipt is a visible zero: every direction renders on
+    /// `/metrics` before the first announcement arrives.
+    #[test]
+    fn custody_announce_directions_render_before_any_announcement() {
+        register_all();
+        let families = REGISTRY.gather();
+        let family = families
+            .iter()
+            .find(|f| f.name() == "elohim_custody_announce_total")
+            .expect("custody counter registered");
+        for direction in CUSTODY_ANNOUNCE_DIRECTIONS {
+            assert!(
+                family.get_metric().iter().any(|m| m
+                    .get_label()
+                    .iter()
+                    .any(|l| l.name() == "direction" && l.value() == *direction)),
+                "direction {direction} pre-touched"
+            );
+        }
     }
 
     #[test]

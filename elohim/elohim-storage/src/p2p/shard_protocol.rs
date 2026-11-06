@@ -150,6 +150,15 @@ pub enum ShardRequest {
         /// `bin`, never an integer array — see `serialize_bounded_messagepack`.
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
+        /// App scope of the custody the placement creates, so the HOLDER can author
+        /// its own signed custody claim after it stores the bytes (C1: only the
+        /// holder may claim its custody). Trailing and omitted when `None`, so a
+        /// scope-less push is byte-identical to the historical frame and an older
+        /// frame decodes to `None`. A positional (libp2p) frame that carries it is
+        /// refused by a build that predates it; the push router then falls back to
+        /// the map-keyed iroh leg, which ignores the unknown key.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        h_app_id: Option<String>,
     },
     /// List content inventory (EPR Head summaries for replication discovery)
     ListContent {
@@ -407,6 +416,7 @@ mod tests {
         let request = ShardRequest::Push {
             cid: elohim_epr::address::compute_bytes_cid(b"small"),
             data: b"existing-wire".to_vec(),
+            h_app_id: None,
         };
         let historical = rmp_serde::to_vec(&request).expect("historical serializer");
         let mut framed = Vec::new();
@@ -447,6 +457,7 @@ mod tests {
         let request = ShardRequest::Push {
             cid: elohim_epr::address::compute_bytes_cid(b"oversize"),
             data: vec![0xff; SHARD_TRANSFER_MAX_FRAME_SIZE + 1],
+            h_app_id: None,
         };
         let mut framed = Vec::new();
         let mut writer = Cursor::new(&mut framed);

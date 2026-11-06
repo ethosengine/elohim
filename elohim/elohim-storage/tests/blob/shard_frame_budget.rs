@@ -175,6 +175,7 @@ fn encoded_rs_shard() -> (ByteCid, Vec<u8>) {
     let frame = rmp_serde::to_vec(&ShardRequest::Push {
         cid,
         data: shard.clone(),
+        h_app_id: None,
     })
     .expect("shard wire");
     assert!(frame.len() > 4 * MIB, "the frame carries the whole shard");
@@ -250,6 +251,7 @@ async fn rs_68_mib_artifact_shard_pushes_and_fetches_over_real_libp2p_codecs() -
         ShardRequest::Push {
             cid: hash,
             data: shard.clone(),
+            h_app_id: None,
         },
     );
     assert!(matches!(

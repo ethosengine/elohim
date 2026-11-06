@@ -305,6 +305,7 @@ mod tests {
         let request = ShardRequest::Push {
             cid: elohim_epr::address::compute_bytes_cid(b"request-wire"),
             data: b"request-wire".to_vec(),
+            h_app_id: None,
         };
         let response = ShardResponse::Data(b"response-wire".to_vec());
 
