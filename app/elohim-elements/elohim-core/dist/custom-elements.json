@@ -8057,6 +8057,118 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/loader/byte-cid.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "byteCidDigest",
+          "return": {
+            "type": {
+              "text": "Uint8Array | null"
+            }
+          },
+          "parameters": [
+            {
+              "name": "address",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "The 32-byte digest a canonical byte CID commits to, or null when `address` is not one."
+        },
+        {
+          "kind": "function",
+          "name": "isByteCid",
+          "return": {
+            "type": {
+              "text": "address is string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "address",
+              "type": {
+                "text": "string | null | undefined"
+              }
+            }
+          ],
+          "description": "True iff `address` is a canonical byte CID (`bafkr4i…`)."
+        },
+        {
+          "kind": "function",
+          "name": "byteCidFromDigest",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "digest",
+              "type": {
+                "text": "Uint8Array"
+              }
+            }
+          ],
+          "description": "The byte CID text for a 32-byte BLAKE3-256 digest."
+        },
+        {
+          "kind": "function",
+          "name": "byteCidOfBytes",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "bytes",
+              "type": {
+                "text": "Uint8Array"
+              }
+            }
+          ],
+          "description": "BLAKE3-256 of `bytes`, spelled as a byte CID."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "byteCidDigest",
+          "declaration": {
+            "name": "byteCidDigest",
+            "module": "src/loader/byte-cid.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "isByteCid",
+          "declaration": {
+            "name": "isByteCid",
+            "module": "src/loader/byte-cid.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "byteCidFromDigest",
+          "declaration": {
+            "name": "byteCidFromDigest",
+            "module": "src/loader/byte-cid.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "byteCidOfBytes",
+          "declaration": {
+            "name": "byteCidOfBytes",
+            "module": "src/loader/byte-cid.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/loader/loader.ts",
       "declarations": [
         {
@@ -8112,7 +8224,8 @@
                     "text": "Uint8Array"
                   }
                 }
-              ]
+              ],
+              "description": "Admit only the byte profile: the requested address must be a canonical byte CID\n(`bafkr4i…`, a full decode) and the bytes must BLAKE3-256 to the digest it commits to.\nEvery other spelling — legacy `sha256-<hex>`, a citation or record CID — is rejected by name."
             }
           ]
         }
