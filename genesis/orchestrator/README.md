@@ -479,7 +479,15 @@ registry or result classifier.
 Before calling a red build a regression, or before changing a measure or the
 baseline, read the
 [recurring CI and orchestrator anti-patterns museum](../docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md).
-Each entry gives the symptom and the fix. [`CI_RELIABILITY.md`](CI_RELIABILITY.md)
+Each entry gives the symptom and the fix. Two of its entries are commonly
+misread. `process apparently never started` / `exit code -2` is not a launch
+flake until you have ruled out an env value over 128 KiB (museum #20). A
+NOT_BUILT run that your own push or the 09:00 timer superseded is not a
+measurement (museum #21). A red alpha surface right after a push is
+usually deploy lag or stale seed state, not a code bug: compare the running
+image with `dev` before you change code
+([eve cold-install shakeout](../docs/content/elohim-protocol/history/2026-06-24-eve-cold-install-timeout-overnight-shakeout.md)).
+[`CI_RELIABILITY.md`](CI_RELIABILITY.md)
 in this directory is a dated incident note on build-state persistence and the
 Stage View layout.
 

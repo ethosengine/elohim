@@ -2499,10 +2499,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-05 (status unchanged; evidence still dark): the `evidence: unavailable` on every gate since 2026-11-04 is brit-cli's gix 0.81 opening this repository (`.git` owned by an unmapped uid) with a 32-slot object store kept after safe.directory promotes trust, while the repository holds 49 pack indexes — not shallowness (a probe with the shallow marker fingerprints cleanly). Cure committed in brit as 9776a9ad95 on fix/gix-slots-after-trust (three gpt-6-astra reviews); a debug build fingerprints the main checkout and a linked worktree where brit 0.1.8 fails. Lands as brit-cli 0.1.10 after shem's replay release (0.1.9). Backlog: brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo.
-    evidence-fingerprint: sha256:6ac66dd6058037ab
-    evidence-bytes: 12896
-    evidence-entries: 16
+      DELTA 2026-11-06b (status unchanged; validation limit): receipt tests 35/35 and mesh freshness 13/13; broad orchestrator gate remains red on the unchanged source-state validator requiring bafkr4i while the installed EPR emits bafkrei (clean=true). Two additional launcher-alias errors cleared when checked with the concrete installed binary. No heavy build or push under Matthew's landing hold; this pass does not claim a green reach gate.
+    evidence-fingerprint: sha256:134b04c375eb28bb
+    evidence-bytes: 14088
+    evidence-entries: 18
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

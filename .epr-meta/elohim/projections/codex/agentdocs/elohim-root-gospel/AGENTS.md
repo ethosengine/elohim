@@ -115,6 +115,14 @@ that an instruction proves adoption. This rule is instruction-level friction; co
 reminders require a supported shell invocation adapter and must not be claimed from the
 edit-only `.epr-meta` resolver. All existing staging, hook, gate and history safeguards apply.
 
+Temporary landing exception (cycle-time harvest, 2026-11-06): the re-genesis landing
+logs record brit 0.1.12 closing send-pack after a green hook. Until a corrected Brit
+push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev 'refs/notes/brit/*:refs/notes/brit/*'`, keeping the hook enabled and recording
+the fallback in the sprint journal. The explicit notes refspec is required: a local
+remote probe proved `HEAD:dev` alone omits the validation receipts. Keep Brit for
+other operations; recheck the exception when the push fix lands. Coordinate the
+landing lane before pushing; an occupied lane is not permission to race its head.
+
 ## What to work on, and how you know it's done
 
 Four artifacts. Everything else in the development machinery is commentary hanging off them.
@@ -176,6 +184,7 @@ BERTH_CLASS=verify BERTH_TTL=1800 just test mesh   # every mesh lane claims the 
 just measure <feature-path> [--on jessica|adam] [--gap <id>]   # send ONE feature as a peer-executed stage to the provider that holds the stores and return immediately (genesis/agentic/compute/measure.sh: grant | worker | status | poll | fixture); refuses before launch naming the fix; MEASURE_DRY_RUN=1 prints without running; the listener writes the brit ref, sprint report, gap fulfil and habit DELTA when the completion arrives — `--on adam` refuses today naming the operator items
 just mesh preflight            # refuse-before-launch: binaries incl. fork-pair pin, per-peer transport capability, every mesh port free-or-ours — one ok/REFUSED line per check
 MESH_ALLOW_STALE_BINARY=1 just mesh preflight  # preflight normally REFUSES a pool elohim-storage/doorway binary older than the newest tracked file under its crate's src — `just gate` runs `cargo test --lib --bins`, which never refreshes a `--bin` artifact; rebuild with `just mesh build [storage|doorway|beacon]`, or set this to measure an older binary on purpose; it also REFUSES a storage binary that defaulted to the gate's dev/debug slot (no mesh copy) — the gate rewrites that slot with default features under running peers, and every storage restart arm then refuses; `just mesh build storage` installs the copy, an explicit STORAGE_BIN is never refused
+MESH_REBUILD_STALE_HAPP=1 MESH_RESET=1 just mesh start  # opt-in stale-DNA build: preflight reports only; start runs the named DNA's just build once, rechecks freshness, then repacks; refuses without explicit reset, on build failure, or if still stale; explicit MESH_HAPP_PATH remains untouched
 MESH_ALLOW_STALE_HAPP=1 just mesh start  # start/preflight normally REFUSE a DNA's coordinator wasm older than the newest tracked file under its zome crate's src, cascading wasm -> dna -> happ and repacking the packed .dna/.happ (never the wasm) when only the pack is stale; rebuild with `just build` in that DNA's directory (e.g. elohim/holochain/dna/elohim), or set this to measure an older coordinator on purpose — an explicit MESH_HAPP_PATH is never repacked or refused
 MESH_ALLOW_BUNDLE_SKEW=1 just mesh start  # a resume normally REFUSES a bundle that does not reproduce the household's cells, naming each role: readiness records <mesh>/installed-cells.json from storage /health, and preflight hashes each bundled DNA repacked with its role's network_seed/properties (raw `hc dna hash` ignores them); a coordinator-only change keeps the hashes and passes; this proceeds with a warning, MESH_RESET=1 recasts onto the new bundle
 just mesh start                # conductor = the PINNED FORK, auto-detected at /projects/.claude-config/tools/hc-fork-<submodule-pin12>/bin (MESH_TOOLS_DIR); runs preflight then launches detached, returning immediately (MESH_FOREGROUND=1 blocks inline instead); a conductor whose line differs from the DNA's hdk line (0.7) is REFUSED, not warned (MESH_ALLOW_TOOLCHAIN_SKEW=1 overrides)

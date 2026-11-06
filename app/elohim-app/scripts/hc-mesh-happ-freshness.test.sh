@@ -54,10 +54,9 @@ HAPP_DNA_TABLE=(
 )
 HAPP_PATH="$HAPP_WORKDIR/elohim.happ"
 HAPP_PATH_EXPLICIT=0
-unset MESH_ALLOW_STALE_HAPP
+unset MESH_ALLOW_STALE_HAPP MESH_REBUILD_STALE_HAPP MESH_RESET
 
-# Stub `hc` — the launcher must never build wasm, and this test must never
-# shell out to a real Holochain toolchain either. Simulates `hc dna pack . -o
+# Stub `hc` — this test must never shell out to a real Holochain toolchain. Simulates `hc dna pack . -o
 # <path>` / `hc app pack . -o <path>` by just touching the named output.
 hc() {
   local out=""
@@ -166,6 +165,62 @@ else
   fail "explicit path handling wrong: rc=$rc"$'\n'"$out"
 fi
 HAPP_PATH_EXPLICIT=0
+
+
+# Opt-in rebuild boundaries: no real toolchain or household is touched.
+HAPP_PATH="$HAPP"
+BUILD_LOG="$TESTROOT/build.log"
+just() {
+  echo "$PWD $*" >> "$BUILD_LOG"
+  [ -z "${CARGO_TARGET_DIR+x}" ] || return 43
+  case "${BUILD_RESULT:-fresh}" in
+    fail) return 42 ;;
+    stale) return 0 ;;
+    missing) rm "$WASM"; return 0 ;;
+    fresh) touch -d "2026-01-01T00:02:00" "$WASM" ;;
+  esac
+}
+reset_stale() {
+  : > "$BUILD_LOG"
+  touch -d "2026-01-01T00:00:00" "$WASM"
+  touch -d "2026-01-01T00:01:00" "$SRC"
+  touch -d "2026-01-01T00:00:10" "$DNA"
+  touch -d "2026-01-01T00:00:20" "$HAPP"
+}
+export CARGO_TARGET_DIR="$TESTROOT/native-pool-must-not-be-used"
+export MESH_REBUILD_STALE_HAPP=1
+unset MESH_RESET
+reset_stale
+out="$(happ_bundle_freshness apply)"; rc=$?
+if [ "$rc" = 1 ] && [ ! -s "$BUILD_LOG" ] && grep -q 'requires MESH_RESET=1' <<<"$out"; then
+  pass "rebuild refuses ordinary resume before calling build"
+else fail "resume rebuild guard: $out"; fi
+export MESH_RESET=1
+reset_stale
+out="$(happ_bundle_freshness report)"; rc=$?
+if [ "$rc" = 0 ] && [ ! -s "$BUILD_LOG" ] && grep -q 'would rebuild:' <<<"$out"; then
+  pass "preflight forecasts rebuild without mutation"
+else fail "rebuild report: $out"; fi
+out="$(happ_bundle_freshness apply)"; rc=$?
+if [ "$rc" = 0 ] && [ "$(wc -l < "$BUILD_LOG")" = 1 ] && grep -q '^repacking elohim.happ' <<<"$out" && grep -q '/dna/testdna build$' "$BUILD_LOG"; then
+  pass "recast builds the named DNA once, rechecks and repacks"
+else fail "rebuild apply: $out"; fi
+for BUILD_RESULT in fail stale missing; do
+  reset_stale
+  out="$(happ_bundle_freshness apply)"; rc=$?
+  if [ "$rc" = 1 ] && [ "$(wc -l < "$BUILD_LOG")" = 1 ] && ! grep -q '^repacking' <<<"$out"; then
+    pass "$BUILD_RESULT build refuses without packing or retrying"
+  else fail "$BUILD_RESULT build: $out"; fi
+done
+BUILD_RESULT=fresh
+reset_stale
+HAPP_PATH_EXPLICIT=1
+out="$(happ_bundle_freshness apply)"; rc=$?
+if [ "$rc" = 0 ] && [ ! -s "$BUILD_LOG" ]; then
+  pass "explicit bundle is never rebuilt"
+else fail "explicit rebuild: $out"; fi
+HAPP_PATH_EXPLICIT=0
+unset MESH_REBUILD_STALE_HAPP MESH_RESET
 
 echo
 if [ "$FAILS" -eq 0 ]; then

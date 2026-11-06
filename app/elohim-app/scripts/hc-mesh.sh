@@ -2145,7 +2145,9 @@ _happ_max_mtime() { # <path...>
 _happ_fmt_ts() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; } # <epoch>
 
 # mode="report" (preflight — pure inspection, never touches disk) or mode="apply"
-# (start_all — cascades a stale .dna/.happ repack; NEVER builds wasm, only packs).
+# (start_all — cascades a stale .dna/.happ repack).
+# MESH_REBUILD_STALE_HAPP=1 permits one build per stale DNA only with MESH_RESET=1.
+# Report mode only forecasts that build; apply rechecks freshness before packing.
 # Returns 0 when the default bundle is fine to install as-is, when
 # MESH_ALLOW_STALE_HAPP=1 overrides a wasm staleness on purpose, or when an explicit
 # MESH_HAPP_PATH is in play (never judged for staleness); 1 when a coordinator wasm is
@@ -2184,31 +2186,60 @@ happ_bundle_freshness() { # <mode>
     # exists: a coordinator-only change must not mark the untouched integrity wasm stale.
     # Judged against the whole zomes dir, it did — and cargo, rightly, will not rebuild an
     # integrity crate whose source did not move (false REFUSED, 2026-09-26).
-    local stale_w="" stale_ts="" stale_src_ts="" stale_dir=""
-    if [ -n "$src_ts" ]; then
-      for w in "${paths[@]}"; do
-        [ -f "$w" ] || continue
-        local wts crate wsrc; wts="$(stat -c %Y "$w")"
-        crate="$zdir/$(basename "$w" .wasm)"
-        if [ -d "$REPO_ROOT/$crate" ]; then wsrc="$(_happ_newest_tracked_mtime "$crate")"; else crate="$zdir"; wsrc="$src_ts"; fi
-        [ -n "$wsrc" ] || continue
-        if [ "$wts" -lt "$wsrc" ] && { [ -z "$stale_ts" ] || [ "$wts" -lt "$stale_ts" ]; }; then
-          stale_w="$(basename "$w")"; stale_ts="$wts"; stale_src_ts="$wsrc"; stale_dir="$crate"
-        fi
-      done
-    fi
-    if [ -n "$stale_w" ]; then
-      local head_h; head_h="$(git -C "$REPO_ROOT" log -1 --format=%h -- "$REPO_ROOT/$stale_dir" 2>/dev/null)"
-      local detail="$name coordinator wasm ($stale_w) is STALE: built $(_happ_fmt_ts "$stale_ts"), newest tracked source under $stale_dir was modified $(_happ_fmt_ts "$stale_src_ts") (HEAD ${head_h:-?})"
-      if [ "${MESH_ALLOW_STALE_HAPP:-0}" = "1" ]; then
-        echo "WARN hApp bundle: $detail — MESH_ALLOW_STALE_HAPP=1, proceeding with the stale coordinator on purpose"
-      else
-        echo "REFUSED hApp bundle: $detail — rebuild it (\`cd $dnadir && just build\`) or set MESH_ALLOW_STALE_HAPP=1 to measure the older coordinator on purpose"
-        any_refused=1
+    local attempt
+    for attempt in 0 1; do
+      local stale_w="" stale_ts="" stale_src_ts="" stale_dir=""
+      if [ -n "$src_ts" ]; then
+        for w in "${paths[@]}"; do
+          [ -f "$w" ] || continue
+          local wts crate wsrc; wts="$(stat -c %Y "$w")"
+          crate="$zdir/$(basename "$w" .wasm)"
+          if [ -d "$REPO_ROOT/$crate" ]; then wsrc="$(_happ_newest_tracked_mtime "$crate")"; else crate="$zdir"; wsrc="$src_ts"; fi
+          [ -n "$wsrc" ] || continue
+          if [ "$wts" -lt "$wsrc" ] && { [ -z "$stale_ts" ] || [ "$wts" -lt "$stale_ts" ]; }; then
+            stale_w="$(basename "$w")"; stale_ts="$wts"; stale_src_ts="$wsrc"; stale_dir="$crate"
+          fi
+        done
       fi
-    else
-      echo "ok $name coordinator wasm is not older than $zdir"
-    fi
+      if [ -n "$stale_w" ]; then
+        local head_h; head_h="$(git -C "$REPO_ROOT" log -1 --format=%h -- "$REPO_ROOT/$stale_dir" 2>/dev/null)"
+        local detail="$name coordinator wasm ($stale_w) is STALE: built $(_happ_fmt_ts "$stale_ts"), newest tracked source under $stale_dir was modified $(_happ_fmt_ts "$stale_src_ts") (HEAD ${head_h:-?})"
+        if [ "${MESH_REBUILD_STALE_HAPP:-0}" = "1" ]; then
+          if [ "${MESH_RESET:-0}" != "1" ]; then
+            echo "REFUSED hApp rebuild: MESH_REBUILD_STALE_HAPP=1 requires MESH_RESET=1"
+            return 1
+          fi
+          if [ "$mode" = report ]; then
+            echo "would rebuild: $dnadir (MESH_REBUILD_STALE_HAPP=1, MESH_RESET=1); apply must recheck freshness"
+          elif [ "$attempt" = 0 ]; then
+            echo "rebuilding $dnadir ($stale_w is stale; explicit recast)"
+            (unset CARGO_TARGET_DIR; cd "$REPO_ROOT/$dnadir" && just build) || {
+              echo "REFUSED hApp rebuild: $dnadir just build failed"
+              return 1
+            }
+            for w in "${paths[@]}"; do
+              if [ ! -f "$w" ]; then
+                echo "REFUSED hApp rebuild: $dnadir just build left missing wasm $w"
+                return 1
+              fi
+            done
+            continue
+          else
+            echo "REFUSED hApp rebuild: $detail — still stale after just build"
+            return 1
+          fi
+        elif [ "${MESH_ALLOW_STALE_HAPP:-0}" = "1" ]; then
+          echo "WARN hApp bundle: $detail — MESH_ALLOW_STALE_HAPP=1, proceeding with the stale coordinator on purpose"
+        else
+          echo "REFUSED hApp bundle: $detail — rebuild it (\`cd $dnadir && just build\`) or set MESH_ALLOW_STALE_HAPP=1 to measure the older coordinator on purpose"
+          any_refused=1
+        fi
+      else
+        echo "ok $name coordinator wasm is not older than $zdir"
+      fi
+
+      break
+    done
 
     # (b) dna vs wasm — cascades independently of (a): a repack from a
     # deliberately-stale wasm (MESH_ALLOW_STALE_HAPP=1) is still the correct
