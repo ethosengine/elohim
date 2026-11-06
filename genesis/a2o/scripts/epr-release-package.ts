@@ -129,7 +129,7 @@ app-bundle (slice 2 of the elected-content spec, §12.8):
   --app-mount <slug>=<path>     the URL mount an app is served under (e.g. lamad-spa=/lamad/);
                                 recorded on the receipt, never used to address bytes
   --put-via <storage|doorway>   storage (default): PUT /blob/<bafkr4i…> on --peer. doorway: PUT
-                                /admin/seed/blob with X-Blob-Cid and X-API-Key from
+                                /admin/seed/blob with X-Content-Address and X-API-Key from
                                 STORAGE_API_KEY_ADMIN — the one admin route a CI doorway exposes
 
 Channel and reach:
@@ -1174,7 +1174,8 @@ async function putAndVerify(
 ): Promise<BlobResult> {
   // A storage peer takes the blob at its own address; a CI doorway exposes the
   // admin seed route instead (the one route stage-spa-blob.sh has always used),
-  // which forwards to the storage peer behind it and checks X-Blob-Cid.
+  // which forwards to the storage peer behind it and checks X-Content-Address
+  // (the one content header, reads and the admin seed PUT alike).
   const viaDoorway = options.putVia === 'doorway';
   const putPath = viaDoorway
     ? `${options.peer}/admin/seed/blob`
@@ -1184,7 +1185,7 @@ async function putAndVerify(
     'x-agent-id': options.agentId,
   };
   if (viaDoorway) {
-    headers['x-blob-cid'] = entry.blobCid;
+    headers['x-content-address'] = entry.blobCid;
     headers['x-api-key'] = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
   }
   const putResponse = await reach(putPath, {
@@ -1202,14 +1203,16 @@ async function putAndVerify(
   // The server derives the address from the bytes it received; it must be the one this tool
   // minted. Any other answer (a legacy spelling, a different CID) is a typed failure, never a
   // silent substitution.
-  const putBody = (await putResponse.json()) as { blobCid?: unknown };
-  if (putBody.blobCid !== entry.blobCid) {
+  // Storage answers PutBlobResponseView (`blobCid`); the doorway seed route answers `cid`.
+  const putBody = (await putResponse.json()) as { blobCid?: unknown; cid?: unknown };
+  const answered = viaDoorway ? putBody.cid : putBody.blobCid;
+  if (answered !== entry.blobCid) {
     throw new PackagingFailure(`blob PUT for ${path.basename(file)} answered a different address`, [
       `expected ${entry.blobCid}`,
-      `observed ${String(putBody.blobCid)}`,
+      `observed ${String(answered)}`,
     ]);
   }
-  const storedAs = putBody.blobCid;
+  const storedAs = answered;
 
   // The interface contract: the bytes must be fetchable by address from the peer
   // they were PUT to BEFORE this tool exits 0. Nothing downstream can recover a
