@@ -665,7 +665,7 @@ pub fn auto_assign_custodians(input: AutoAssignInput) -> ExternResult<AutoAssign
         let assignment = CustodianAssignment {
             assignment_id: format!("auto-{}-{}", input.node_id, sys_time()?.as_micros()),
             content_id: content.content_id.clone(),
-            content_hash: content.content_hash.clone(),
+            content_cid: content.content_cid.clone(),
             custodian_node_id: input.node_id.clone(),
             strategy: content.strategy.clone().unwrap_or("full_replica".to_string()),
             shard_index: None,
@@ -688,7 +688,7 @@ pub fn auto_assign_custodians(input: AutoAssignInput) -> ExternResult<AutoAssign
                 // Emit signal for orchestrator to transfer content
                 emit_signal(Signal::ReplicateContent {
                     content_id: content.content_id.clone(),
-                    content_hash: content.content_hash,
+                    content_cid: content.content_cid,
                     from_custodians: content.existing_custodians,
                     to_custodian: input.node_id.clone(),
                     strategy: content.strategy.unwrap_or("full_replica".to_string()),
@@ -708,7 +708,7 @@ pub fn auto_assign_custodians(input: AutoAssignInput) -> ExternResult<AutoAssign
 #[derive(Debug, Clone)]
 struct ContentNeedingCustodian {
     content_id: String,
-    content_hash: String,
+    content_cid: String,
     size_gb: Option<f64>,
     reach_level: u8,
     current_replicas: u32,
@@ -844,7 +844,7 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
         let new_assignment = CustodianAssignment {
             assignment_id: format!("recovery-{}-{}", assignment.content_id, sys_time()?.as_micros()),
             content_id: assignment.content_id,
-            content_hash: assignment.content_hash,
+            content_cid: assignment.content_cid,
             custodian_node_id: available_custodians[0].node_id.clone(),
             strategy: assignment.strategy,
             shard_index: assignment.shard_index,
@@ -864,7 +864,7 @@ pub fn trigger_disaster_recovery(failed_node_id: String) -> ExternResult<Vec<Act
         // Emit signal to trigger actual content transfer
         emit_signal(Signal::ReplicateContent {
             content_id: new_assignment.content_id,
-            content_hash: new_assignment.content_hash,
+            content_cid: new_assignment.content_cid,
             from_custodians: find_other_custodians(&content_id_for_lookup, &failed_node_id)?,
             to_custodian: new_assignment.custodian_node_id,
             strategy: new_assignment.strategy,
@@ -893,8 +893,8 @@ pub fn create_shard_assignment(assignment: ShardAssignment) -> ExternResult<Acti
 
     // Link from content to assignment
     let content_anchor = StringAnchor {
-        anchor_type: "content_hash".to_string(),
-        anchor_value: assignment.content_hash.clone(),
+        anchor_type: "content_cid".to_string(),
+        anchor_value: assignment.content_cid.clone(),
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
     create_link(
@@ -919,8 +919,8 @@ pub fn create_shard_assignment(assignment: ShardAssignment) -> ExternResult<Acti
 
     // Link from content:shard_index to assignment
     let shard_index_anchor = StringAnchor {
-        anchor_type: "content_hash:shard_index".to_string(),
-        anchor_value: format!("{}:{}", assignment.content_hash, assignment.shard_index),
+        anchor_type: "content_cid:shard_index".to_string(),
+        anchor_value: format!("{}:{}", assignment.content_cid, assignment.shard_index),
     };
     let shard_index_anchor_hash = hash_entry(&EntryTypes::StringAnchor(shard_index_anchor))?;
     create_link(
@@ -932,7 +932,7 @@ pub fn create_shard_assignment(assignment: ShardAssignment) -> ExternResult<Acti
 
     // Emit signal for projection
     emit_signal(Signal::ShardAssignmentCommitted {
-        content_hash: assignment.content_hash,
+        content_cid: assignment.content_cid,
         shard_index: assignment.shard_index,
         custodian_did: assignment.custodian_did,
         status: assignment.status,
@@ -942,10 +942,10 @@ pub fn create_shard_assignment(assignment: ShardAssignment) -> ExternResult<Acti
 }
 
 #[hdk_extern]
-pub fn get_shard_assignments_for_content(content_hash: String) -> ExternResult<Vec<ShardAssignment>> {
+pub fn get_shard_assignments_for_content(content_cid: String) -> ExternResult<Vec<ShardAssignment>> {
     let content_anchor = StringAnchor {
-        anchor_type: "content_hash".to_string(),
-        anchor_value: content_hash,
+        anchor_type: "content_cid".to_string(),
+        anchor_value: content_cid,
     };
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
@@ -1036,13 +1036,13 @@ pub enum Signal {
     },
     ReplicateContent {
         content_id: String,
-        content_hash: String,
+        content_cid: String,
         from_custodians: Vec<String>,
         to_custodian: String,
         strategy: String,
     },
     ShardAssignmentCommitted {
-        content_hash: String,
+        content_cid: String,
         shard_index: u32,
         custodian_did: String,
         status: ShardStatus,

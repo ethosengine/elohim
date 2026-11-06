@@ -13,6 +13,9 @@ holochain_serialized_bytes.workspace = true
 serde.workspace = true
 infrastructure-types = { path = "../../../../../sdk/domains/infrastructure/types" }
 pkarr-bridge = { path = "../../../../../../bridges/pkarr/pkarr-bridge" }
+# The one byte-CID kernel (re-genesis 1, plan §2.5.1): ContentServer.content_cid is
+# validated by its full decode, never by a hand-written prefix/length predicate.
+elohim-address = { path = "../../../../../../crates/elohim-address", default-features = false }
 
 [dev-dependencies]
 ed25519-dalek = { version = "2", default-features = false }

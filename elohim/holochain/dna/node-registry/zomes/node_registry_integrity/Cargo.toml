@@ -16,6 +16,9 @@ lineage-witness = []
 hdi = "=0.8.0"
 serde = "1"
 holochain_serialized_bytes = "=0.0.57"
+# The one byte-CID kernel (re-genesis 1, plan §2.5.1): content_cid fields are
+# validated by its full decode, never by a hand-written prefix/length predicate.
+elohim-address = { path = "../../../../../../crates/elohim-address", default-features = false }
 
 [profile.release]
 opt-level = "z"

@@ -143,7 +143,7 @@ pub struct CustodianAssignment {
 
     // === CONTENT ===
     pub content_id: String,           // What content
-    pub content_hash: String,         // SHA256 for integrity
+    pub content_cid: String,          // Byte CID (raw + BLAKE3-256, `bafkr4i…`)
     pub content_size_gb: Option<f64>, // Size of content for capacity planning
 
     // === CUSTODIAN ===
@@ -203,7 +203,7 @@ pub enum ShardingStrategy {
 #[derive(Clone, PartialEq)]
 pub struct ShardAssignment {
     pub assignment_hash: Option<String>, // Self-reference for updates
-    pub content_hash: String,
+    pub content_cid: String,             // Byte CID (raw + BLAKE3-256, `bafkr4i…`)
     pub custodian_did: String,
     pub shard_index: u32, // 0-6 for a 4+3 RS encoding
     pub strategy: ShardingStrategy,
@@ -250,9 +250,9 @@ pub enum LinkTypes {
     NodeToAssignment,          // NodeRegistration -> CustodianAssignment (what node custodies)
 
     // Shard assignments
-    ContentToShardAssignment,   // Anchor(content_hash) -> ShardAssignment
+    ContentToShardAssignment,   // Anchor(content_cid) -> ShardAssignment
     CustodianToShardAssignment, // Anchor(custodian_did) -> ShardAssignment
-    ShardIndexToAssignment,     // Anchor(content_hash:shard_index) -> ShardAssignment
+    ShardIndexToAssignment,     // Anchor(content_cid:shard_index) -> ShardAssignment
 }
 
 // =============================================================================
@@ -277,19 +277,33 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::ShardAssignment(assignment) => validate_shard_assignment(assignment),
+        EntryTypes::CustodianAssignment(assignment) => {
+            validate_content_cid("CustodianAssignment", &assignment.content_cid)
+        }
         // TODO: Add validation for NodeRegistration, NodeHeartbeat,
-        // HealthAttestation, CustodianAssignment
+        // HealthAttestation (authority-in-integrity row 6, sequenced separately)
         _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+/// A content address on this DNA is a byte CID under the epoch-0 profile
+/// (CIDv1 raw + BLAKE3-256), checked by the kernel's full decode.
+fn validate_content_cid(entry: &str, content_cid: &str) -> ExternResult<ValidateCallbackResult> {
+    match elohim_address::ByteCid::parse(content_cid) {
+        Ok(_) => Ok(ValidateCallbackResult::Valid),
+        Err(error) => Ok(ValidateCallbackResult::Invalid(format!(
+            "{entry} content_cid '{content_cid}' is not a byte CID ({}): {error}",
+            error.check()
+        ))),
     }
 }
 
 fn validate_shard_assignment(
     assignment: &ShardAssignment,
 ) -> ExternResult<ValidateCallbackResult> {
-    if assignment.content_hash.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "ShardAssignment content_hash cannot be empty".to_string(),
-        ));
+    let content = validate_content_cid("ShardAssignment", &assignment.content_cid)?;
+    if !matches!(content, ValidateCallbackResult::Valid) {
+        return Ok(content);
     }
 
     if assignment.custodian_did.is_empty() {
@@ -450,9 +464,9 @@ pub enum LinkTypes {
     NodeToAssignment,          // NodeRegistration -> CustodianAssignment (what node custodies)
 
     // Shard assignments
-    ContentToShardAssignment,   // Anchor(content_hash) -> ShardAssignment
+    ContentToShardAssignment,   // Anchor(content_cid) -> ShardAssignment
     CustodianToShardAssignment, // Anchor(custodian_did) -> ShardAssignment
-    ShardIndexToAssignment,     // Anchor(content_hash:shard_index) -> ShardAssignment
+    ShardIndexToAssignment,     // Anchor(content_cid:shard_index) -> ShardAssignment
 
     // Lineage / notarization carrying
     EntryToWitness,             // EntryHash(carried entry) -> NotarizationWitness
@@ -772,4 +786,66 @@ fn refuse_carried_after_close(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shard_assignment(content_cid: &str) -> ShardAssignment {
+        ShardAssignment {
+            assignment_hash: None,
+            content_cid: content_cid.to_string(),
+            custodian_did: "did:key:z6MkCustodian".to_string(),
+            shard_index: 3,
+            strategy: ShardingStrategy::Manual,
+            status: ShardStatus::Active,
+            verified_at: None,
+            created_at: "2026-11-05T00:00:00Z".to_string(),
+            updated_at: "2026-11-05T00:00:00Z".to_string(),
+        }
+    }
+
+    fn verdict(content_cid: &str) -> ValidateCallbackResult {
+        validate_shard_assignment(&shard_assignment(content_cid)).unwrap()
+    }
+
+    #[test]
+    fn shard_assignment_requires_byte_cid() {
+        // `byteCid` of "hello world" in crates/elohim-address/vectors/address-vectors.json.
+        assert!(matches!(
+            verdict("bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"),
+            ValidateCallbackResult::Valid
+        ));
+        for refused in [
+            "",
+            "sha256-b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+            // raw + sha2-256 (`citeCid`): a citation, not a byte address.
+            "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e",
+            // Negative vector `declared-33-byte-digest` (malformed multihash header).
+            "bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq",
+        ] {
+            assert!(
+                matches!(verdict(refused), ValidateCallbackResult::Invalid(_)),
+                "{refused:?} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn custodian_assignment_requires_byte_cid() {
+        assert!(matches!(
+            validate_content_cid("CustodianAssignment", "sha256-00").unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+        assert!(matches!(
+            validate_content_cid(
+                "CustodianAssignment",
+                "bafkr4ideg6z2yocgkez77nr3outtvdnvjdcvqrs5phnqh7jvtrwnlpm5qu"
+            )
+            .unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
 }

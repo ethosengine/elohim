@@ -158,9 +158,16 @@ pub struct StorageEndpoint {
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ContentServer {
-    /// Content hash this server can provide (e.g., "sha256-abc123")
-    /// Use "*" for wildcard registration (can serve any content of this capability)
-    pub content_hash: String,
+    /// Byte CID of the content this server can provide: CIDv1 raw + BLAKE3-256
+    /// (`bafkr4i…`, the epoch-0 byte profile). Validated by
+    /// `elohim_address::ByteCid::parse`; legacy `sha256-…`/`sha256:…` spellings,
+    /// raw+sha2 `bafkrei…` CIDs and the old `"*"` wildcard are all refused.
+    pub content_cid: String,
+
+    /// The agent operating this server. Must equal the authoring agent of every
+    /// create and update (authority-in-integrity row 5): a ContentServer is a
+    /// claim about the author's own serving, never about someone else's.
+    pub operator_agent: AgentPubKey,
 
     /// What type of content serving this server supports (from CONTENT_SERVER_CAPABILITIES)
     pub capability: String,
@@ -256,7 +263,7 @@ pub enum LinkTypes {
     // SummaryByDate removed (Stage C.3.a) — DoorwayHeartbeatSummary entry type removed
 
     // ContentServer links (P2P content publishing)
-    HashToContentServer,        // Anchor(content_hash) -> ContentServer
+    CidToContentServer,         // Anchor(content_cid) -> ContentServer
     AgentToContentServer,       // Anchor(agent_pubkey) -> ContentServer
     CapabilityToContentServer,  // Anchor(capability) -> ContentServer
     RegionToContentServer,      // Anchor(region) -> ContentServer (for geo-routing)
@@ -285,7 +292,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     // DoorwayHeartbeat removed (observation-event-layer spec §10 Stage 6)
                     EntryTypes::ContentServer(server) => {
-                        validate_content_server(&server)
+                        validate_content_server(&server, action.author())
                     }
                     EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
                     EntryTypes::PeerStatus(ps) => validate_peer_status(&ps, &action),
@@ -295,6 +302,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 match app_entry {
                     EntryTypes::DoorwayRegistration(doorway) => {
                         validate_doorway_update(&doorway, &action)
+                    }
+                    EntryTypes::ContentServer(server) => {
+                        validate_content_server(&server, action.author())
                     }
                     _ => Ok(ValidateCallbackResult::Valid),
                 }
@@ -467,12 +477,25 @@ fn validate_peer_status(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate ContentServer registration
-fn validate_content_server(server: &ContentServer) -> ExternResult<ValidateCallbackResult> {
-    // Validate content_hash is not empty
-    if server.content_hash.is_empty() {
+/// Validate a ContentServer create or update authored by `author`.
+fn validate_content_server(
+    server: &ContentServer,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    // content_cid must be a byte CID under the epoch-0 profile — full decode.
+    if let Err(error) = elohim_address::ByteCid::parse(&server.content_cid) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "content_cid '{}' is not a byte CID ({}): {}",
+            server.content_cid,
+            error.check(),
+            error
+        )));
+    }
+
+    // A server registration speaks only for its author.
+    if server.operator_agent != *author {
         return Ok(ValidateCallbackResult::Invalid(
-            "content_hash cannot be empty".to_string(),
+            "ContentServer operator_agent must equal the action author".to_string(),
         ));
     }
 
@@ -612,6 +635,77 @@ mod tests {
         doorway.endpoints[0].url = "https://attacker.example".to_string();
         assert!(matches!(
             validate_doorway_record(&doorway, &author),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    /// `byteCid` of "hello world" in crates/elohim-address/vectors/address-vectors.json.
+    const HELLO_BYTE_CID: &str = "bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq";
+
+    fn operator() -> AgentPubKey {
+        AgentPubKey::from_raw_32(vec![7_u8; 32])
+    }
+
+    fn content_server(content_cid: &str) -> ContentServer {
+        ContentServer {
+            content_cid: content_cid.to_string(),
+            operator_agent: operator(),
+            capability: CONTENT_SERVER_CAPABILITIES[0].to_string(),
+            serve_url: None,
+            endpoints: Vec::new(),
+            online: true,
+            priority: 50,
+            region: None,
+            bandwidth_mbps: None,
+            registered_at: 0,
+            last_heartbeat: 0,
+        }
+    }
+
+    fn verdict(content_cid: &str) -> ValidateCallbackResult {
+        validate_content_server(&content_server(content_cid), &operator()).unwrap()
+    }
+
+    #[test]
+    fn content_server_rejects_sha256_spelling_and_bafkrei() {
+        // The legacy sha256 spellings, hyphen and colon forms.
+        let hex = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
+        for legacy in [format!("sha256:{hex}"), format!("sha256-{hex}")] {
+            assert!(
+                matches!(verdict(&legacy), ValidateCallbackResult::Invalid(_)),
+                "{legacy} must be refused"
+            );
+        }
+        // raw + sha2-256 (`citeCid` of "hello world"): a citation, not a byte address.
+        assert!(matches!(
+            verdict("bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e"),
+            ValidateCallbackResult::Invalid(_)
+        ));
+        // Negative vector `declared-33-byte-digest`: a malformed multihash header.
+        assert!(matches!(
+            verdict("bafkr4ioxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6eq"),
+            ValidateCallbackResult::Invalid(_)
+        ));
+        // Negative vector `non-zero-padding-bits`.
+        assert!(matches!(
+            verdict("bafkr4igxjga67jykbseaxdmmdgc5a5o3zp3htom2l6mrjznk7fvyggu6er"),
+            ValidateCallbackResult::Invalid(_)
+        ));
+        // The retired wildcard and the empty string.
+        assert!(matches!(verdict("*"), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(verdict(""), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn content_server_accepts_byte_cid() {
+        assert!(matches!(verdict(HELLO_BYTE_CID), ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn content_server_operator_must_be_author() {
+        let stranger = AgentPubKey::from_raw_32(vec![9_u8; 32]);
+        assert!(matches!(
+            validate_content_server(&content_server(HELLO_BYTE_CID), &stranger).unwrap(),
             ValidateCallbackResult::Invalid(_)
         ));
     }
