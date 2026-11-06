@@ -1,9 +1,10 @@
 ---
 id: rg1-eprfs-report
 title: "Re-genesis 1, T3 — eprfs: addresses through the one kernel, epoch-2 tier blobs, the byte profile's TypeScript twin"
-status: claimed-not-verified
+status: landed
 landed_commit: a3315d6da
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2, 2026-11-06 02:20Z)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-eprfs.log (2103 s), verify-gate-eprfs-ts.log, verify-gate-epr-storage.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 concerns: "short_fingerprint -> Result forced a one-call adaptation at cites.rs:760 (fingerprint bytes unchanged, pinned); bin-* view schemas in elohim/sdk/schemas (T5's tree) re-patterned because the device-runtime contract test validates them; tier blob manifests record erasure `none`, not BYTE_PROFILE_0's rs{4,3}; habit declared red, not unwired (the census refuses unwired beside checks); governance_parity_vectors.rs needed no change (it never reads tree-vectors.json); ~140 compute_raw callers outside cites still mint raw+sha2 for non-cite bytes — successor work; device bin-store custody minted before this change is no longer `verified` and needs a re-ingest; commit attribution UNMEASURED"
 class: protocol-canonical
 gap: regenesis-1#T3

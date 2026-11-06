@@ -1,9 +1,10 @@
 ---
 title: "Re-genesis 1 T5 report: rakia + sdk schemas + elohim-views + generated TS + packager"
 id: task-rg1-schemas-report
-status: claimed-not-verified
+status: landed
 landed_commit: "see git log regenesis/schemas (feat(regenesis-1/T5) plus follow-up); rakia submodule f9787c9e58305e1cf51a220968946fc37e6d4b89 on rakia branch regenesis/schemas (local, unpushed)"
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-app-lifecycle-contracts.log, verify-gate-schema-validate.log, verify-gate-schema-codegen.log, verify-gate-domain-types.log, verify-gate-rakia-codegen.log, verify-gate-rakia-validate.log, verify-gate-storage-client-ts.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor: agent:schemas-implementer@claude-sonnet-5-5
 cites: []
 concerns:

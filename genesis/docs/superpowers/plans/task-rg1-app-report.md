@@ -1,9 +1,10 @@
 ---
 id: rg1-app-report
 title: "Re-genesis 1, T7 — the address crossing on the SPA: byte CIDs only, apps-v4, lamad BLAKE3 verification"
-status: claimed-not-verified
+status: landed
 landed_commit: b71acbc42
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/push-L2c-1.log elohim-app GREEN 142 s + elohim-storybook GREEN; verify-gate-elohim-library.log, verify-gate-elements-codegen-2.log (after the loader.spec fix-up 428752cb7), verify-gate-epr-app-package.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 concerns: "gate not green end to end: just gate elohim-app lint + vitest pass (238 files / 4721 tests) but preflight REFUSED submodules (brit, rakia, sophia not checked out in the worktree) so the run exits 1; eyes-first pnpm look NOT done; WTR element suites not run; library jest unparseable in this env and 5 rea-runtime vitest suites fail to load (pre-existing); lockfile churn (jsdom peer @noble/hashes 2.0.1 -> 1.8.0) from declaring @noble/hashes in elohim-app, lamad, elohim-core; codegen also rewrites doorway-app, sdk/schemas/generated-ts and genesis/seeder generated copies which I reverted (stale on base until T5/T6/seeder regenerate); gospel CLAUDE.md prose still names old spellings (managed surfaces, not edited); byte-CID admission helper is duplicated in three bundles (no shared leaf package); commit attribution UNMEASURED"
 class: protocol-canonical
 gap: regenesis-1#T7

@@ -1,9 +1,10 @@
 ---
 title: "Re-genesis 1 T2 report: elohim-storage on the byte profile"
 id: task-rg1-storage-report
-status: claimed-not-verified
+status: landed
 landed_commit: "regenesis/storage on regenesis/kernel e6adb9b43: 0a082ba74 B1, ae90f9531 B2, cce464f94 B3, efe21e7f3 B4, 4720931e1 + 2f495757f fix-ups (A: 8e1f7a8d7, ef6afcd21; B step 0/T5 adoption: 4693e4a1c, fb2386513)"
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-elohim-storage.log (2747 s, CARGO_BUILD_JOBS=1), verify-gate-storage-client-ts.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor:
   - agent:storage-a@claude-opus-5-5 (A1 blob store, A2 sharding, A3 inventory, A4 trust/release verify)
   - agent:storage-b@claude-opus-5-5 (B1 migration+db, B2 http, B3 fetch+wiring, B4 tests)

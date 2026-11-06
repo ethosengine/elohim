@@ -1,9 +1,10 @@
 ---
 title: "Re-genesis 1 T10+T11 report: steward/node and ark on the byte profile"
 id: task-rg1-steward-report
-status: claimed-not-verified
+status: landed
 landed_commit: "regenesis/steward on regenesis/storage bc0edbd64: b026b4fdf (T11 ark), d46347e28 (T10 steward/node), and the rust-style paydown commit (git log of regenesis/steward)"
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-steward-node.log (341 s); push-L2c-1.log elohim-ark GREEN (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor:
   - agent:steward-ark-implementer@claude-sonnet-5-5
 cites: []

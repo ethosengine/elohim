@@ -1,9 +1,10 @@
 ---
 id: rg1-kernel-report
 title: "Re-genesis 1, T0 — the profile kernel: elohim-address, elohim-epr 0.2.0 profile + chunker + signature envelope, consent-grant carrier"
-status: claimed-not-verified
+status: landed
 landed_commit: 77c83e07b
-verified_by:
+landed_on_dev: "dev b663aa65f..9f9fef877 (L1, 2026-11-06 01:45Z)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-elohim-epr.log, verify-gate-elohim-address.log, verify-gate-consent-grant.log, verify-gate-epr-ts.log, verify-gate-seam-contracts.log; rust-style-crossing-dc01152d8..29a62b5c0.log PASS (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 concerns: "EPR signing transcript changed (EPR wire break); signature.schema.json and the epr-ts verifier taken by T0 (overlap with T5.2/T5.4); storage consumers of Signature/CarrierProof/Dropped must adapt (T2); Erasure variant spelled RsGf8x11dV1; chunk_bytes panics on invalid params (try_chunk_bytes added); domain prefix-freeness is a registry rule, not a byte rule; commit attribution UNMEASURED (subagent session envelope bound to another checkout)"
 class: protocol-canonical
 gap: regenesis-1#T0

@@ -1,9 +1,10 @@
 ---
 id: rg1-seeder-report
 title: "Task report: re-genesis 1 T8 (seeder + CI scripts + recast script + durable lint)"
-status: claimed-not-verified
+status: landed
 landed_commit: e489b0150
-verified_by:
+landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
+verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/push-L2c-1.log genesis GREEN; verify-gate-address-profile-lint.log (warn-mode census 557: R1 2 fixture, R3 88 record-class, R4 467 identifiers), verify-gate-constants-sync.log, verify-gate-pipeline-list-fresh.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."
 actor: agent:seeder-implementer@claude-sonnet-5-5
 class: protocol-canonical
 cites: []
