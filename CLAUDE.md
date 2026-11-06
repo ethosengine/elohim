@@ -30,11 +30,14 @@ edit-only `.epr-meta` resolver. All existing staging, hook, gate and history saf
 
 Temporary landing exception (cycle-time harvest, 2026-11-06): the re-genesis landing
 logs record brit 0.1.12 closing send-pack after a green hook. Until a corrected Brit
-push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev 'refs/notes/brit/*:refs/notes/brit/*'`, keeping the hook enabled and recording
-the fallback in the sprint journal. The explicit notes refspec is required: a local
-remote probe proved `HEAD:dev` alone omits the validation receipts. Keep Brit for
-other operations; recheck the exception when the push fix lands. Coordinate the
-landing lane before pushing; an occupied lane is not permission to race its head.
+push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev`,
+keeping the hook enabled and recording the fallback in the sprint journal. Known gap, recorded
+rather than bypassed: `HEAD:dev` alone omits `refs/notes/brit/*` (the validation receipts), and
+the explicit notes refspec does not pass the hook today — its rust-style reach gate refuses
+every notes ref (push-notes-brit.log, 2026-11-06). Until that gate skips `refs/notes/*`, the
+receipts stay local. Keep Brit for other operations; recheck the exception when the push fix
+lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
+its head.
 
 ## What to work on, and how you know it's done
 
