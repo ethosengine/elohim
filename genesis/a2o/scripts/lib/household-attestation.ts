@@ -668,32 +668,75 @@ export interface ValidationNodeJson {
 /** How a note's `epoch` key reads. Readers decide on that key alone. */
 export type NoteEpoch = { epoch: 1 } | { epoch: 2 } | { held: string };
 
-const isBytes = (v: unknown): v is number[] =>
-  Array.isArray(v) && v.length > 0 && v.every(b => Number.isInteger(b) && b >= 0 && b < 256);
+const isU16 = (v: unknown): v is number =>
+  Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 0xffff;
+const isByteArray = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.every(b => Number.isInteger(b) && b >= 0 && b < 256);
 
-/** Absent or 1: the frozen shape; 2: the envelope shape; anything else (or a broken envelope) is held. */
+const ENVELOPE_KEYS = ['epoch', 'scheme', 'key', 'sig'];
+
+/** Exactly the nine body fields, each of the type brit's strict `ValidationBody` decode admits. */
+function bodyShape(b: unknown): boolean {
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return false;
+  const keys = Object.keys(b);
+  if (keys.length !== BODY_KEYS.length || !BODY_KEYS.every(k => keys.includes(k))) return false;
+  try {
+    encodeFields(b as ValidationNodeJson, BODY_KEYS);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether `n` decodes as brit's `EnvelopeNote<ValidationBody>` (`deny_unknown_fields`, u16 scheme,
+ * byte-array key and sig): the stored shape `{body, epoch, key, scheme, sig}`, or the flat view
+ * `validate get` prints (body fields beside the four envelope keys). Any other key is refused.
+ */
+function envelopeShape(n: Record<string, unknown>): boolean {
+  if (!isU16(n.scheme) || !isByteArray(n.key) || !isByteArray(n.sig)) return false;
+  if (!ENVELOPE_KEYS.every(k => k in n)) return false;
+  const keys = Object.keys(n);
+  if ('body' in n) return keys.length === ENVELOPE_KEYS.length + 1 && bodyShape(n.body);
+  if (keys.length !== ENVELOPE_KEYS.length + BODY_KEYS.length) return false;
+  return (
+    BODY_KEYS.every(k => k in n) && bodyShape(Object.fromEntries(BODY_KEYS.map(k => [k, n[k]])))
+  );
+}
+
+/**
+ * How brit's `decode_note` + `EnvelopeNote::verify` dispatch (`brit-epr/src/elohim/attestation/
+ * note.rs`): `epoch` absent → frozen; `2` → envelope, and HELD when its scheme is one this reader
+ * does not implement (only once the envelope decodes — brit decodes strictly first); any other
+ * u16 → HELD. An `epoch` that is `1`, null, or not a u16 is refused there, never held: it routes
+ * to the frozen path here, whose exact field set refuses a node carrying `epoch`.
+ */
 export function noteEpochOf(note: unknown): NoteEpoch {
   if (!note || typeof note !== 'object' || !('epoch' in note)) return { epoch: 1 };
   const n = note as Record<string, unknown>;
-  if (n.epoch === 1) return { epoch: 1 };
   if (n.epoch === 2) {
-    return Number.isInteger(n.scheme) && isBytes(n.key) && isBytes(n.sig)
-      ? { epoch: 2 }
-      : { held: 'epoch 2 note lacks scheme, key or sig' };
+    if (isU16(n.scheme) && n.scheme !== 0 && envelopeShape(n)) {
+      return { held: `signature scheme ${n.scheme} is not implemented by this reader` };
+    }
+    return { epoch: 2 };
   }
-  return { held: `note epoch ${JSON.stringify(n.epoch)} is not implemented by this reader` };
+  if (isU16(n.epoch) && n.epoch !== 1) {
+    return { held: `note epoch ${n.epoch} is not implemented by this reader` };
+  }
+  return { epoch: 1 };
 }
 
 /**
  * A stored note or a brit-printed view as one flat node. An epoch-2 stored note is
  * `{body, epoch, key, scheme, sig}` and is flattened to the view brit prints (body fields plus
  * `epoch`/`scheme`/`key`/`sig`); an epoch-1 note is returned as is; a held epoch is `{held}`.
+ * A stored envelope that does not decode strictly is returned unflattened, so it never verifies.
  */
 export function flattenNote(raw: unknown): { node: ValidationNodeJson } | { held: string } {
   const read = noteEpochOf(raw);
   if ('held' in read) return read;
   const note = raw as Record<string, unknown>;
-  if (read.epoch === 2 && note.body && typeof note.body === 'object') {
+  if (read.epoch === 2 && 'body' in note && envelopeShape(note)) {
     const { epoch, scheme, key, sig } = note;
     return { node: { ...(note.body as object), epoch, scheme, key, sig } as ValidationNodeJson };
   }
@@ -715,6 +758,9 @@ const NODE_KEYS = [
 
 /** The epoch-2 body: the same fields without `signature`. */
 const BODY_KEYS = NODE_KEYS.filter(k => k !== 'signature');
+
+/** brit's `ValidationResult`, serde `rename_all = "lowercase"`. */
+const VALIDATION_RESULTS = ['pass', 'fail', 'warn', 'skip'];
 
 function cborHead(major: number, n: number): Buffer {
   if (n < 24) return Buffer.from([(major << 5) | n]);
@@ -772,8 +818,13 @@ function encodeFields(node: ValidationNodeJson, fields: string[]): Buffer {
   for (const key of ordered) {
     parts.push(cborText(key));
     const value = record[key];
-    if (value === null) parts.push(Buffer.from([0xf6]));
-    else if (key === 'artifactCid' || key === 'findingsCid') {
+    if (value === null) {
+      // Only the two `Option` fields of brit's node/body may be null.
+      if (key !== 'findingsCid' && key !== 'ttlSec') throw new Error(`${key} is null`);
+      parts.push(Buffer.from([0xf6]));
+    } else if (key === 'result' && !VALIDATION_RESULTS.includes(value as string)) {
+      throw new Error(`result ${JSON.stringify(value)} is not a ValidationResult`);
+    } else if (key === 'artifactCid' || key === 'findingsCid') {
       if (!Array.isArray(value) || !value.every(n => Number.isInteger(n) && n >= 0 && n < 256)) {
         throw new Error(`${key} is not CID bytes`);
       }
@@ -790,21 +841,60 @@ function encodeFields(node: ValidationNodeJson, fields: string[]): Buffer {
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const PKCS8_ED25519 = Buffer.from('302e020100300506032b657004220420', 'hex');
 
+/**
+ * Encodings of the eight small-order Edwards points, canonical and not, compared with the sign
+ * bit cleared (libsodium's `has_small_order` list). ed25519-dalek's `verify_strict`, which brit
+ * uses on both note epochs, refuses a key or an `R` of small order; OpenSSL (node:crypto) does
+ * not — under the identity key `01 00…00` the signature `01 00…00 ‖ 00…00` verifies for ANY
+ * message. These are refused here before node:crypto sees them.
+ */
+const SMALL_ORDER_POINTS = [
+  '0000000000000000000000000000000000000000000000000000000000000000',
+  '0100000000000000000000000000000000000000000000000000000000000000',
+  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05',
+  'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+  'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+].map(h => Buffer.from(h, 'hex'));
+
+function hasSmallOrder(point: Buffer): boolean {
+  const masked = Buffer.from(point);
+  masked[31] &= 0x7f;
+  return SMALL_ORDER_POINTS.some(p => p.equals(masked));
+}
+
+/** brit's `validatorId`: hex of a raw 32-byte key, decoded strictly (`hex::decode`), never truncated. */
+function validatorKey(validatorId: unknown): Buffer | null {
+  return typeof validatorId === 'string' && /^[0-9a-fA-F]{64}$/.test(validatorId)
+    ? Buffer.from(validatorId, 'hex')
+    : null;
+}
+
+/** ed25519 with dalek `verify_strict`'s refusals: small-order key or R (node:crypto refuses S ≥ L). */
+function verifyEd25519Strict(pub: Buffer, message: Buffer, sig: Buffer): boolean {
+  if (pub.length !== 32 || sig.length !== 64) return false;
+  if (hasSmallOrder(pub) || hasSmallOrder(sig.subarray(0, 32))) return false;
+  const key = createPublicKey({
+    key: Buffer.concat([SPKI_ED25519, pub]),
+    format: 'der',
+    type: 'spki',
+  });
+  return cryptoVerify(null, message, key, sig);
+}
+
 /** ed25519 over the unsigned node's canonical bytes, against the node's own validatorId. */
 export function verifyValidationNode(node: ValidationNodeJson): boolean {
   try {
     const read = noteEpochOf(node);
     if ('held' in read) return false;
     if (read.epoch === 2) return verifyEnvelopeNode(node);
-    const pub = Buffer.from(node.validatorId, 'hex');
-    const sig = Buffer.from(node.signature ?? '', 'hex');
-    if (pub.length !== 32 || sig.length !== 64) return false;
-    const key = createPublicKey({
-      key: Buffer.concat([SPKI_ED25519, pub]),
-      format: 'der',
-      type: 'spki',
-    });
-    return cryptoVerify(null, encodeValidationNode({ ...node, signature: '' }), key, sig);
+    const pub = validatorKey(node.validatorId);
+    if (!pub || typeof node.signature !== 'string' || !/^[0-9a-fA-F]{128}$/.test(node.signature)) {
+      return false;
+    }
+    const sig = Buffer.from(node.signature, 'hex');
+    return verifyEd25519Strict(pub, encodeValidationNode({ ...node, signature: '' }), sig);
   } catch {
     return false;
   }
@@ -816,11 +906,14 @@ export function verifyValidationNode(node: ValidationNodeJson): boolean {
  * only, and the envelope key must be `ed 01 ‖` the node's own `validatorId`.
  */
 function verifyEnvelopeNode(node: ValidationNodeJson): boolean {
+  const record = node as unknown as Record<string, unknown>;
+  // The flat view only (a stored note is flattened first), decoding exactly as brit's would.
+  if ('body' in record || !envelopeShape(record)) return false;
   if (node.scheme !== 0) return false;
-  const pub = Buffer.from(node.validatorId, 'hex');
+  const pub = validatorKey(node.validatorId);
+  if (!pub) return false;
   const key = Buffer.from(node.key ?? []);
   const sig = Buffer.from(node.sig ?? []);
-  if (pub.length !== 32 || sig.length !== 64) return false;
   if (!key.equals(Buffer.concat([Buffer.from([0xed, 0x01]), pub]))) return false;
   const domain = Buffer.from('brit:validate@2:');
   const u16 = (n: number) => Buffer.from([n >> 8, n & 0xff]);
@@ -833,12 +926,7 @@ function verifyEnvelopeNode(node: ValidationNodeJson): boolean {
     key,
     encodeValidationBody(node),
   ]);
-  const pk = createPublicKey({
-    key: Buffer.concat([SPKI_ED25519, pub]),
-    format: 'der',
-    type: 'spki',
-  });
-  return cryptoVerify(null, transcript, pk, sig);
+  return verifyEd25519Strict(pub, transcript, sig);
 }
 
 /** Hex public key of the workspace key brit signs with (`<common-dir>/brit/agent-key`), or null. */
@@ -938,6 +1026,11 @@ function localVerifiedRead(
   if (!raw || typeof raw !== 'object') return refuse('does not decode: not an object');
   const flat = flattenNote(raw);
   if ('held' in flat) return { ok: false, reason: `${ref} ${flat.held}`, held: true };
+  const stored = raw as Record<string, unknown>;
+  if (stored.epoch === 2 && !('body' in stored && envelopeShape(stored))) {
+    // brit stores `{body, epoch, key, scheme, sig}` and nothing else; the flat view is printed only.
+    return refuse('does not decode: not a brit.validate@2 stored envelope');
+  }
   node = flat.node;
   if (!verifyValidationNode(node)) {
     const id = JSON.stringify(String(node.validatorId));

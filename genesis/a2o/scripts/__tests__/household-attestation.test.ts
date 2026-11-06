@@ -1201,3 +1201,138 @@ describe('readers decide on the epoch key (epoch 1 unchanged, 2 admitted, other 
     assert.match((verdict as { reason: string }).reason, /^held: note epoch 3 is not implemented/);
   });
 });
+
+// ── The cross-implementation vector: a REAL brit.validate@2 note ────────────────────────────
+/**
+ * Minted by brit-build-ref built from the T4 brit commit (see the fixture's provenance), never by
+ * this module: these bytes prove the reader's transcript, body encoding and key binding agree with
+ * real brit, where the self-signed envelopes above only prove the reader agrees with itself.
+ */
+const V2 = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL('./fixtures/brit-validation-attestation-epoch2.json', import.meta.url)),
+    'utf8'
+  )
+) as {
+  ref: string;
+  storedNote: string;
+  validateGetStdout: string;
+  objectStoreCborHex: string;
+  seedHex: string;
+  withFindingsAndTtl: { seedHex: string; storedNote: string };
+};
+
+/** Store `bytes` verbatim at the vector's ref and read it with NO brit: local verification only. */
+function readStoredLocally(bytes: string) {
+  const repo = scratchRepo('h-real-v2-');
+  try {
+    const oid = git(repo, ['hash-object', '-w', '--stdin'], bytes).trim();
+    git(repo, ['update-ref', V2.ref, oid]);
+    const lines: string[] = [];
+    const run: Runner = () => {
+      throw new Error('no brit may be run: this read verifies locally');
+    };
+    const found = readHouseholdAttestations(repo, CONCERN, {
+      brit: { kind: 'absent', bin: null },
+      run,
+      warn: l => lines.push(l),
+    });
+    return { found, lines };
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+}
+
+function seedPublicHex(seedHex: string): string {
+  const priv = createPrivateKey({
+    key: Buffer.concat([PKCS8_ED25519, Buffer.from(seedHex, 'hex')]),
+    format: 'der',
+    type: 'pkcs8',
+  });
+  return createPublicKey(priv)
+    .export({ format: 'der', type: 'spki' })
+    .subarray(-32)
+    .toString('hex');
+}
+
+describe('a real brit.validate@2 note (brit-build-ref at the T4 commit) reads without brit', () => {
+  it('verifies the stored bytes locally, as the view validate get printed, and admits it', () => {
+    const view = JSON.parse(V2.validateGetStdout) as ValidationNodeJson;
+    const { found, lines } = readStoredLocally(V2.storedNote);
+    assert.deepEqual(lines, []);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].verifiedBy, 'local');
+    assert.deepEqual(found[0].node, view, 'the flattened stored note is the view brit printed');
+    assert.equal(view.validatorId, seedPublicHex(V2.seedHex), 'signed by the key brit generated');
+    assert.deepEqual(view.key, [0xed, 0x01, ...Buffer.from(view.validatorId, 'hex')]);
+    assert.ok(
+      V2.objectStoreCborHex.includes(encodeValidationBody(view).toString('hex')),
+      "the body bytes this reader signs over are the bytes brit's own DAG-CBOR object carries"
+    );
+    assert.ok(verifyValidationNode(view));
+    assert.equal(admitAttestation(view, CONCERN, view.validatorId).ok, true);
+    // brit's put fixes findingsCid/ttlSec at null; the second vector carries both.
+    const other = JSON.parse(V2.withFindingsAndTtl.storedNote) as {
+      body: ValidationNodeJson;
+      epoch: number;
+      scheme: number;
+      key: number[];
+      sig: number[];
+    };
+    const otherView = { ...other.body, epoch: 2, scheme: 0, key: other.key, sig: other.sig };
+    assert.ok(otherView.findingsCid !== null && otherView.ttlSec !== null);
+    assert.equal(otherView.validatorId, seedPublicHex(V2.withFindingsAndTtl.seedHex));
+    assert.ok(verifyValidationNode(otherView as ValidationNodeJson));
+  });
+
+  it('refuses the real note with one body field tampered, and holds it under an unknown scheme', () => {
+    const stored = JSON.parse(V2.storedNote) as { body: Record<string, unknown>; scheme: number };
+    const tampered = JSON.stringify({ ...stored, body: { ...stored.body, result: 'fail' } });
+    const { found, lines } = readStoredLocally(tampered);
+    assert.deepEqual(found, []);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^household attestation unverifiable: .* signature does not verify/);
+    const view = JSON.parse(V2.validateGetStdout) as ValidationNodeJson;
+    assert.equal(verifyValidationNode({ ...view, resultSummary: view.resultSummary + ' ' }), false);
+    const other = JSON.parse(V2.withFindingsAndTtl.storedNote);
+    const otherView = { ...other.body, epoch: 2, scheme: 0, key: other.key, sig: other.sig };
+    assert.equal(verifyValidationNode({ ...otherView, ttlSec: otherView.ttlSec + 1 }), false);
+    // brit (note.rs) holds a scheme it does not implement; it never refuses it as forged.
+    const future = readStoredLocally(JSON.stringify({ ...stored, scheme: 7 }));
+    assert.deepEqual(future.found, []);
+    assert.match(
+      future.lines[0],
+      /^household attestation held: .* signature scheme 7 is not implemented by this reader$/
+    );
+  });
+
+  it('refuses what brit refuses: unknown fields, a flat stored note, a weak key, loose hex', () => {
+    const stored = JSON.parse(V2.storedNote) as Record<string, unknown> & {
+      body: Record<string, unknown>;
+    };
+    const view = JSON.parse(V2.validateGetStdout) as ValidationNodeJson;
+    // deny_unknown_fields on EnvelopeNote and on ValidationBody: unsigned riders never read.
+    for (const bytes of [
+      JSON.stringify({ ...stored, rider: 1 }),
+      JSON.stringify({ ...stored, body: { ...stored.body, rider: 1 } }),
+      JSON.stringify(view), // the printed view is not a stored note
+    ]) {
+      const { found, lines } = readStoredLocally(bytes);
+      assert.deepEqual(found, []);
+      assert.match(lines[0], /^household attestation unverifiable: /);
+    }
+    assert.equal(verifyValidationNode({ ...view, rider: 1 } as ValidationNodeJson), false);
+    // verify_strict: under the identity key `01 00…00`, node:crypto alone accepts a signature
+    // forged for ANY message; brit refuses a small-order key.
+    const weak = '01' + '00'.repeat(31);
+    const forged = {
+      ...view,
+      validatorId: weak,
+      key: [0xed, 0x01, ...Buffer.from(weak, 'hex')],
+      sig: [1, ...new Array(63).fill(0)],
+    };
+    assert.equal(verifyValidationNode(forged), false);
+    // hex::decode is strict; Buffer.from(…, 'hex') would truncate at the first non-hex pair.
+    assert.equal(verifyValidationNode({ ...view, validatorId: view.validatorId + 'zz' }), false);
+  });
+});
