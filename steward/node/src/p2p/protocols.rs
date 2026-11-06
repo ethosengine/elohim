@@ -16,9 +16,15 @@ use crate::sync::protocol::SyncMessage;
 /// collision with elohim-storage's `/elohim/storage-sync/1.0.0` in the
 /// unified swarm.
 pub const DOC_SYNC_PROTOCOL: &str = "/elohim/doc-sync/1.0.0";
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "protocol id kept beside its siblings; the swarm negotiates the shard protocol through elohim-storage's ShardProtocol"
+)]
 pub const SHARD_PROTOCOL: &str = "/elohim/shard/2.0.0";
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "cluster protocol id is declared ahead of its behaviour"
+)]
 pub const CLUSTER_PROTOCOL: &str = "/elohim/cluster/1.0.0";
 
 /// Maximum message size (10 MB)
