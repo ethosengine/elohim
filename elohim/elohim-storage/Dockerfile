@@ -197,6 +197,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../crates/consent-grant"|path = "crates/consent-grant"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/epr"|path = "../../epr"|' crates/consent-grant/Cargo.toml && \
     sed -i 's|path = "../../crates/elohim-address"|path = "../crates/elohim-address"|' epr/Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-address"|path = "../crates/elohim-address"|' elohim-render/Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
@@ -375,6 +376,7 @@ RUN EPRFS_VERSION="$(sed -n 's/^version = "\(.*\)"$/\1/p' /eprfs-workspace/Cargo
     -e 's|thiserror.workspace = true|thiserror = "2"|' \
     -e 's|tokio.workspace = true|tokio = { version = "1", features = ["macros", "rt-multi-thread"] }|' \
     -e 's|path = "../../../crates/seam-contracts"|path = "../../crates/seam-contracts"|' \
+    -e 's|path = "../../../crates/elohim-address"|path = "../../crates/elohim-address"|' \
     -e 's|, registry = "elohim"||' \
     eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml eprfs/device-runtime/Cargo.toml && \
     if grep -nE 'workspace *= *true' eprfs/eprfs-core/Cargo.toml eprfs/eprfs-serve/Cargo.toml eprfs/device-runtime/Cargo.toml; then \

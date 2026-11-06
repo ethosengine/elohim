@@ -9,6 +9,8 @@ description = "JS execution runtime for server-side rendering at the Elohim peer
 # Light, V8-free home of the served omnibar element bytes/hash/path + inject helper.
 # Re-exported through `chrome::element` so serving the static asset never needs deno_core.
 elohim-chrome-asset = { path = "../elohim-chrome-asset" }
+# The one addressing kernel: SSR bundles are fetched by byte CID and verified against it.
+elohim-address = { path = "../../crates/elohim-address" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

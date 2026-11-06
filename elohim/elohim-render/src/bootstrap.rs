@@ -1,64 +1,72 @@
 //! Bootstrap module — fetch, verify, and unzip an SSR bundle from the substrate.
 //!
-//! `BundleSource` is the trait that resolves a deployment slug to a content-addressed
-//! blob hash and then fetches the raw bytes. `materialize_server_bundle` does the
-//! integrity check and unzips the bundle into a target directory, returning the path to
-//! `main.server.mjs` inside it.
+//! `BundleSource` is the trait that resolves a deployment slug to the byte CID of its
+//! bundle (CIDv1 raw + BLAKE3-256, `bafkr4i…`) and then fetches the raw bytes.
+//! `materialize_server_bundle` admits the resolved address by full decode, verifies the
+//! fetched bytes against it, and unzips the bundle into a target directory, returning the
+//! path to `main.server.mjs` inside it.
 //!
 //! The SSR runtime always materializes the Angular **server** bundle, so the
-//! materialize path resolves via [`BundleSource::resolve_server_blob_hash`] (the
-//! deploy-time `serverBlobHash` pointer), not the browser `blobHash`. The trait
-//! retains `resolve_blob_hash` for the browser-bundle resolve used elsewhere
+//! materialize path resolves via [`BundleSource::resolve_server_blob_cid`] (the
+//! deploy-time `serverBlobCid` pointer), not the browser `blobCid`. The trait
+//! retains `resolve_blob_cid` for the browser-bundle resolve used elsewhere
 //! (e.g. doorway's per-app file cache), but the boot materialize is server-only.
 
-use sha2::{Digest, Sha256};
+use elohim_address::{compute_bytes_cid, ByteCid};
 use std::fs;
 use std::io::Read as IoRead;
 use std::path::{Path, PathBuf};
 
 use crate::error::{RenderError, Result};
 
-/// Resolves a deployment slug to a content-addressed hash and fetches the blob bytes.
+/// Resolves a deployment slug to the byte CID of a bundle and fetches the blob bytes.
 ///
 /// Two resolve methods, by bundle kind:
-/// - `resolve_blob_hash` reads the **browser** bundle pointer (`blobHash`).
-/// - `resolve_server_blob_hash` reads the **server** bundle pointer (`serverBlobHash`).
+/// - `resolve_blob_cid` reads the **browser** bundle pointer (`blobCid`).
+/// - `resolve_server_blob_cid` reads the **server** bundle pointer (`serverBlobCid`).
 ///
 /// Both are required (no default impl): an implementor must read a genuinely
 /// different field for each — a default that delegated server→browser would
 /// silently materialize the wrong bundle.
 pub trait BundleSource {
-    fn resolve_blob_hash(&self, slug: &str) -> Result<String>;
-    fn resolve_server_blob_hash(&self, slug: &str) -> Result<String>;
-    fn fetch_blob(&self, hash: &str) -> Result<Vec<u8>>;
+    fn resolve_blob_cid(&self, slug: &str) -> Result<String>;
+    fn resolve_server_blob_cid(&self, slug: &str) -> Result<String>;
+    fn fetch_blob(&self, cid: &str) -> Result<Vec<u8>>;
 }
 
 /// Fetch the **server** bundle for `slug`, verify its integrity, unzip into
 /// `target_dir`, and return the path to `main.server.mjs`.
 ///
-/// Resolves the content hash via [`BundleSource::resolve_server_blob_hash`]
-/// (the deploy-time `serverBlobHash` pointer on the one EPR node), then performs
-/// the shared verify + zip-slip-guarded unzip.
+/// Resolves the byte CID via [`BundleSource::resolve_server_blob_cid`]
+/// (the deploy-time `serverBlobCid` pointer on the one EPR node), admits it by
+/// full decode, then performs the shared verify + zip-slip-guarded unzip.
 ///
 /// Errors (never panics) on:
-/// - `resolve_server_blob_hash` failure
+/// - `resolve_server_blob_cid` failure
+/// - a resolved address that is not a byte CID (any legacy spelling)
 /// - `fetch_blob` failure
-/// - SHA-256 mismatch
+/// - bytes whose byte CID differs from the resolved one
 /// - ZIP extraction failure
 pub fn materialize_server_bundle<S: BundleSource>(
     src: &S,
     slug: &str,
     target_dir: &Path,
 ) -> Result<PathBuf> {
-    let expected_hash = src.resolve_server_blob_hash(slug)?;
-    let bytes = src.fetch_blob(&expected_hash)?;
+    let resolved = src.resolve_server_blob_cid(slug)?;
+    let expected = ByteCid::parse(&resolved).map_err(|e| {
+        RenderError::Bootstrap(format!(
+            "slug `{}` resolved to `{}`, which is not a byte CID: {}",
+            slug, resolved, e
+        ))
+    })?;
+    let bytes = src.fetch_blob(&expected.to_string())?;
 
-    // Verify integrity: format!("sha256-{:x}", Sha256::digest(&bytes))
-    let actual_hash = format!("sha256-{:x}", Sha256::digest(&bytes));
-    if actual_hash != expected_hash {
+    // Verify integrity: the bytes must hash (BLAKE3-256) to the resolved byte CID.
+    let actual = compute_bytes_cid(&bytes);
+    if actual != expected {
         return Err(RenderError::Bootstrap(format!(
-            "hash mismatch for slug `{}`: expected `{}`, got `{}`",
-            slug, expected_hash, actual_hash
+            "address mismatch for slug `{}`: expected `{}`, got `{}`",
+            slug, expected, actual
         )));
     }
 
@@ -103,9 +111,14 @@ mod tests {
     use super::*;
     use std::io::Write as IoWrite;
 
+    /// The byte CID of `bytes`, as the text a source would resolve.
+    fn cid_of(bytes: &[u8]) -> String {
+        compute_bytes_cid(bytes).to_string()
+    }
+
     // A simple mock source that returns whatever hash/bytes we configure.
     //
-    // `server_hash` is the value returned by `resolve_server_blob_hash`. When
+    // `server_hash` is the value returned by `resolve_server_blob_cid`. When
     // `None`, it mirrors `hash` (the browser hash) — but the dedicated
     // distinct-hash test sets it explicitly so we can prove the materialize
     // path resolves the SERVER pointer, not the browser one.
@@ -138,19 +151,19 @@ mod tests {
     }
 
     impl BundleSource for MockSource {
-        fn resolve_blob_hash(&self, _slug: &str) -> Result<String> {
+        fn resolve_blob_cid(&self, _slug: &str) -> Result<String> {
             match &self.hash {
                 Ok(h) => Ok(h.clone()),
                 Err(e) => Err(RenderError::Bootstrap(e.to_string())),
             }
         }
-        fn resolve_server_blob_hash(&self, slug: &str) -> Result<String> {
+        fn resolve_server_blob_cid(&self, slug: &str) -> Result<String> {
             match &self.server_hash {
                 Some(Ok(h)) => Ok(h.clone()),
                 Some(Err(e)) => Err(RenderError::Bootstrap(e.to_string())),
                 // Default: mirror the browser hash so existing fixtures that
                 // don't distinguish still work; the distinct-hash test overrides.
-                None => self.resolve_blob_hash(slug),
+                None => self.resolve_blob_cid(slug),
             }
         }
         fn fetch_blob(&self, _hash: &str) -> Result<Vec<u8>> {
@@ -174,11 +187,8 @@ mod tests {
     #[test]
     fn materialize_rejects_hash_mismatch() {
         let dir = tempfile::tempdir().unwrap();
-        // Source returns a hash that won't match the actual bytes
-        let src = MockSource::ok(
-            "sha256-deadbeef00000000000000000000000000000000000000000000000000000000",
-            b"wrong bytes".to_vec(),
-        );
+        // Source resolves a byte CID that won't match the bytes it serves
+        let src = MockSource::ok(cid_of(b"the expected bytes"), b"wrong bytes".to_vec());
         let result = materialize_server_bundle(&src, "my-bundle", dir.path());
         assert!(result.is_err(), "expected Err on hash mismatch, got Ok");
     }
@@ -188,7 +198,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         // Build in-memory zip with main.server.mjs containing "X"
         let zip_bytes = make_zip("main.server.mjs", b"X");
-        let hash = format!("sha256-{:x}", Sha256::digest(&zip_bytes));
+        let hash = cid_of(&zip_bytes);
         // server hash mirrors the browser hash here (None) — fine for the
         // unzip path because the bytes match either way.
         let src = MockSource::ok(&hash, zip_bytes);
@@ -205,7 +215,7 @@ mod tests {
         let result = materialize_server_bundle(&src, "missing-bundle", dir.path());
         assert!(
             result.is_err(),
-            "expected Err when resolve_server_blob_hash fails"
+            "expected Err when resolve_server_blob_cid fails"
         );
     }
 
@@ -219,10 +229,10 @@ mod tests {
     }
 
     impl BundleSource for RecordingSource {
-        fn resolve_blob_hash(&self, _slug: &str) -> Result<String> {
+        fn resolve_blob_cid(&self, _slug: &str) -> Result<String> {
             Ok(self.browser_hash.clone())
         }
-        fn resolve_server_blob_hash(&self, _slug: &str) -> Result<String> {
+        fn resolve_server_blob_cid(&self, _slug: &str) -> Result<String> {
             Ok(self.server_hash.clone())
         }
         fn fetch_blob(&self, hash: &str) -> Result<Vec<u8>> {
@@ -238,9 +248,8 @@ mod tests {
         // The server hash is the real (correct) hash of the bytes; the browser
         // hash is a DISTINCT bogus value. If the materialize path mistakenly
         // resolved the browser hash, the integrity check would fail.
-        let server_hash = format!("sha256-{:x}", Sha256::digest(&zip_bytes));
-        let browser_hash =
-            "sha256-0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        let server_hash = cid_of(&zip_bytes);
+        let browser_hash = cid_of(b"a different (browser) bundle");
         assert_ne!(server_hash, browser_hash, "test setup: hashes must differ");
 
         let src = RecordingSource {
@@ -268,16 +277,32 @@ mod tests {
         // Mirror of the above using MockSource's `with_server_hash` builder, to
         // exercise the trait method's distinct-field contract directly.
         let zip_bytes = make_zip("main.server.mjs", b"Y");
-        let server_hash = format!("sha256-{:x}", Sha256::digest(&zip_bytes));
-        // Browser hash is distinct and bogus; the materialize path must NOT use it.
-        let src = MockSource::ok(
-            "sha256-1111111111111111111111111111111111111111111111111111111111111111",
-            zip_bytes,
-        )
-        .with_server_hash(server_hash);
+        let server_hash = cid_of(&zip_bytes);
+        // Browser address is distinct and wrong for these bytes; the materialize path must NOT use it.
+        let src =
+            MockSource::ok(cid_of(b"browser bundle"), zip_bytes).with_server_hash(server_hash);
         let dir = tempfile::tempdir().unwrap();
         let path = materialize_server_bundle(&src, "slug", dir.path())
             .expect("server materialize must succeed using the server hash");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "Y");
+    }
+
+    #[test]
+    fn materialize_refuses_a_legacy_spelling_before_fetching() {
+        let zip_bytes = make_zip("main.server.mjs", b"Z");
+        let legacy = format!("sha256-{}", "0".repeat(64));
+        let src = RecordingSource {
+            browser_hash: legacy.clone(),
+            server_hash: legacy,
+            zip_bytes,
+            fetched: std::cell::RefCell::new(None),
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let result = materialize_server_bundle(&src, "slug", dir.path());
+        assert!(result.is_err(), "a sha256-<hex> pointer is not a byte CID");
+        assert!(
+            src.fetched.borrow().is_none(),
+            "nothing is fetched for an address that does not decode"
+        );
     }
 }

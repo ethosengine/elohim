@@ -1127,14 +1127,13 @@ impl DoorwayBundleSource {
 }
 
 impl elohim_render::BundleSource for DoorwayBundleSource {
-    // The trait's method names are elohim-render's (outside this crate's write set);
-    // both return a byte CID, admitted by `parse_blob_cid` / `parse_server_blob_cid`.
-    fn resolve_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+    // Both return a byte CID, admitted by `parse_blob_cid` / `parse_server_blob_cid`.
+    fn resolve_blob_cid(&self, slug: &str) -> elohim_render::Result<String> {
         let body = self.fetch_content_body(slug)?;
         parse_blob_cid(&body)
     }
 
-    fn resolve_server_blob_hash(&self, slug: &str) -> elohim_render::Result<String> {
+    fn resolve_server_blob_cid(&self, slug: &str) -> elohim_render::Result<String> {
         let body = self.fetch_content_body(slug)?;
         parse_server_blob_cid(&body)
     }
@@ -1626,7 +1625,7 @@ mod tests {
         );
         // And the BundleSource surface honours it: an Err, not a 30s hang.
         let err = src
-            .resolve_server_blob_hash("elohim-host-landing")
+            .resolve_server_blob_cid("elohim-host-landing")
             .expect_err("a spent budget cannot resolve a head");
         assert!(
             format!("{err}").contains("budget exhausted"),
@@ -2016,7 +2015,7 @@ mod tests {
 
         let src = DoorwayBundleSource::new(server.uri());
         // Thread-isolation regression: must not panic from within a tokio runtime.
-        let result = src.resolve_server_blob_hash("elohim-host-landing");
+        let result = src.resolve_server_blob_cid("elohim-host-landing");
         assert_eq!(
             result.expect("resolve_server_blob_cid must succeed from async context"),
             "bafkr4iexty4cfh5ucxgqlt7egc2rzudjg3kcddu23mk6rqsghr4gqblx44"
@@ -2061,7 +2060,7 @@ mod tests {
 
         let src = DoorwayBundleSource::new(server.uri());
         // This call PANICS before the thread-isolation fix; it must return Ok after.
-        let result = src.resolve_blob_hash("my-bundle-slug");
+        let result = src.resolve_blob_cid("my-bundle-slug");
         assert_eq!(
             result.expect("resolve_blob_cid must succeed from async context"),
             "bafkr4ifn4fixwexqhfpp2zcrpzisi5pdooettkasrdfoeh4ona6btf3wlq"
@@ -2081,7 +2080,7 @@ mod tests {
 
         let src = DoorwayBundleSource::new(server.uri());
         let err = src
-            .resolve_blob_hash("missing-slug")
+            .resolve_blob_cid("missing-slug")
             .expect_err("404 must produce an Err");
         let msg = err.to_string();
         // The error must mention the HTTP status so callers get a useful message

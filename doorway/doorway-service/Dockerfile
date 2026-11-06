@@ -108,6 +108,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml && \
     sed -i 's|path = "../../crates/elohim-views"|path = "crates/elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-address"|path = "crates/elohim-address"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-peer-fabric"|path = "elohim/elohim-peer-fabric"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml

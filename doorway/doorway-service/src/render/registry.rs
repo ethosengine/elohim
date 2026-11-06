@@ -445,7 +445,7 @@ impl RendererRegistry {
             // registered `unresolved` (never dropped) so reconcile converges.
             let pre = {
                 use elohim_render::BundleSource;
-                src.resolve_server_blob_hash(slug)
+                src.resolve_server_blob_cid(slug)
             };
             match elohim_render::materialize_server_bundle(&src, slug, &bundle_parent) {
                 Ok(materialized) => {
@@ -538,7 +538,7 @@ impl RendererRegistry {
             // materialize window and only attest a confirmed hash.
             let pre = {
                 use elohim_render::BundleSource;
-                src.resolve_server_blob_hash(slug)
+                src.resolve_server_blob_cid(slug)
             };
             let materialized = match elohim_render::materialize_server_bundle(&src, slug, &app_dir)
             {
@@ -1382,7 +1382,7 @@ fn boot_head(
     pre: elohim_render::Result<String>,
 ) -> BundleHead {
     use elohim_render::BundleSource;
-    let post = src.resolve_server_blob_hash(slug);
+    let post = src.resolve_server_blob_cid(slug);
     let head = decide_boot_head(
         slug,
         pre.map_err(|e| e.to_string()),
@@ -1459,7 +1459,7 @@ async fn resolve_declared(storage_url: &str, slug: &str) -> std::result::Result<
     let slug = slug.to_string();
     match tokio::task::spawn_blocking(move || {
         use elohim_render::BundleSource;
-        crate::ssr::DoorwayBundleSource::new(storage_url).resolve_server_blob_hash(&slug)
+        crate::ssr::DoorwayBundleSource::new(storage_url).resolve_server_blob_cid(&slug)
     })
     .await
     {
