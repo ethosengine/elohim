@@ -1990,6 +1990,7 @@ dependencies = [
  "ed25519-dalek",
  "elohim-agent",
  "elohim-bitswap",
+ "elohim-epr",
  "elohim-storage",
  "elohim-views",
  "futures",

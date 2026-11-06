@@ -37,6 +37,7 @@ elohim-storage = { path = "../../elohim/elohim-storage", default-features = fals
 
 # Wire-shape View types — boundary is now explicit; view imports must use elohim-views, not elohim-storage
 elohim-views = { path = "../../crates/elohim-views" }
+elohim-epr = { path = "../../elohim/epr" }
 elohim-bitswap = { path = "../../elohim/elohim-bitswap" }
 sled = "0.34"
 cid = "0.11"

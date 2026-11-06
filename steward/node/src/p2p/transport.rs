@@ -46,7 +46,7 @@ pub struct ElohimBehaviour {
     pub doc_sync: request_response::Behaviour<SyncCodec>,
 
     // --- Storage protocols ---
-    /// Blob shard transfer (/elohim/shard/1.0.0)
+    /// Blob shard transfer (/elohim/shard/2.0.0)
     pub shard_protocol: request_response::Behaviour<ShardCodec>,
     /// Storage CRDT sync (/elohim/storage-sync/1.0.0)
     pub storage_sync: request_response::Behaviour<StorageSyncCodec>,

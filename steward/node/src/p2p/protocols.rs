@@ -17,7 +17,7 @@ use crate::sync::protocol::SyncMessage;
 /// unified swarm.
 pub const DOC_SYNC_PROTOCOL: &str = "/elohim/doc-sync/1.0.0";
 #[allow(dead_code)]
-pub const SHARD_PROTOCOL: &str = "/elohim/shard/1.0.0";
+pub const SHARD_PROTOCOL: &str = "/elohim/shard/2.0.0";
 #[allow(dead_code)]
 pub const CLUSTER_PROTOCOL: &str = "/elohim/cluster/1.0.0";
 

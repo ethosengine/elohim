@@ -6,6 +6,8 @@
 use std::sync::Arc;
 
 use cid::Cid;
+use elohim_epr::address::{ByteCid, RECORD_CODEC};
+use elohim_storage::blob_store::Exists;
 use elohim_storage::BlobStore;
 
 /// Manages blob storage for the unified node.
@@ -29,54 +31,59 @@ impl BlobManager {
     }
 }
 
+impl BlobManager {
+    /// Read a block under whichever lane its CID names: a dag-cbor record (`0x71`) or a byte
+    /// CID. A CID in neither profile is simply not held.
+    async fn read_block(&self, cid: &Cid) -> Option<Vec<u8>> {
+        if cid.codec() == RECORD_CODEC {
+            return self.store.get_record(cid).await.ok().map(|b| b.to_vec());
+        }
+        let byte_cid = ByteCid::try_from(*cid).ok()?;
+        self.store.get(&byte_cid).await.ok().map(|b| b.to_vec())
+    }
+}
+
 #[async_trait::async_trait]
 impl elohim_bitswap::BitswapStore for BlobManager {
     async fn contains(&self, cid: &Cid) -> anyhow::Result<bool> {
-        let cid_str = cid.to_string();
-        Ok(self
-            .store
-            .exists_by_address(&cid_str)
-            .await
-            .unwrap_or(false))
+        if cid.codec() == RECORD_CODEC {
+            return Ok(self.store.get_record(cid).await.is_ok());
+        }
+        Ok(match ByteCid::try_from(*cid) {
+            Ok(byte_cid) => self.store.exists(&byte_cid).await == Exists::Verified,
+            Err(_) => false,
+        })
     }
 
     async fn get(&self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
-        let cid_str = cid.to_string();
-        match self.store.get_by_address(&cid_str).await {
-            Ok(data) => Ok(Some(data)),
-            Err(_) => Ok(None),
-        }
+        Ok(self.read_block(cid).await)
     }
 
     async fn insert(&self, cid: Cid, data: Vec<u8>) -> anyhow::Result<()> {
-        // Store using the BlobStore; CID is recomputed from data internally.
-        // For DAG-CBOR (codec 0x71), use store_dag_cbor to get the right codec in the CID.
-        if cid.codec() == 0x71 {
-            self.store.store_dag_cbor(&data).await?;
+        // The CID is recomputed from the bytes by the store; a block whose bytes hash
+        // elsewhere than its claimed CID is refused, never stored under another name.
+        let stored = if cid.codec() == RECORD_CODEC {
+            self.store.store_record(&data).await?.cid
         } else {
-            self.store.store(&data).await?;
-        }
+            *self.store.store(&data).await?.cid.as_cid()
+        };
+        anyhow::ensure!(
+            stored == cid,
+            "block bytes hash to {stored}, not the claimed {cid}"
+        );
         Ok(())
     }
 
     async fn missing_blocks(&self, cid: &Cid) -> anyhow::Result<Vec<Cid>> {
-        let cid_str = cid.to_string();
-        let data = match self.store.get_by_address(&cid_str).await {
-            Ok(data) => data,
-            Err(_) => return Ok(vec![*cid]), // Block itself is missing
+        let Some(data) = self.read_block(cid).await else {
+            return Ok(vec![*cid]); // Block itself is missing
         };
 
         // Extract linked CIDs from IPLD-encoded data
         let links = elohim_storage::dag_store::extract_links(&data, cid.codec());
         let mut missing = Vec::new();
         for link_cid in links {
-            let link_str = link_cid.to_string();
-            if !self
-                .store
-                .exists_by_address(&link_str)
-                .await
-                .unwrap_or(false)
-            {
+            if !self.contains(&link_cid).await.unwrap_or(false) {
                 missing.push(link_cid);
             }
         }

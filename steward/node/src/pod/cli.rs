@@ -131,9 +131,9 @@ pub enum ExecCommands {
 
     /// Replicate a blob
     ReplicateBlob {
-        /// Blob hash
+        /// Blob byte CID (`bafkr4i…`)
         #[arg(short, long)]
-        hash: String,
+        cid: String,
         /// Target nodes (comma-separated)
         #[arg(short, long)]
         targets: Option<String>,
@@ -141,9 +141,9 @@ pub enum ExecCommands {
 
     /// Evict a blob
     EvictBlob {
-        /// Blob hash
+        /// Blob byte CID (`bafkr4i…`)
         #[arg(short, long)]
-        hash: String,
+        cid: String,
         /// Minimum replicas required
         #[arg(long, default_value = "2")]
         min_replicas: usize,
@@ -212,6 +212,11 @@ pub async fn execute_command(pod: &mut Pod, command: PodCommands) -> Result<Stri
 }
 
 /// Convert ExecCommand to Action
+/// Parse a blob address at the CLI boundary; only a byte CID is admitted.
+fn parse_blob_cid(text: &str) -> Result<elohim_epr::address::ByteCid, String> {
+    elohim_epr::address::ByteCid::parse(text).map_err(|error| format!("invalid blob cid: {error}"))
+}
+
 fn exec_to_action(cmd: ExecCommands) -> Result<Action, String> {
     match cmd {
         ExecCommands::SetLogLevel { level, module } => Ok(Action::new(
@@ -305,26 +310,27 @@ fn exec_to_action(cmd: ExecCommands) -> Result<Action, String> {
             }
         })),
 
-        ExecCommands::ReplicateBlob { hash, targets } => {
+        ExecCommands::ReplicateBlob { cid, targets } => {
+            let cid = parse_blob_cid(&cid)?;
             let target_nodes: Vec<String> = targets
                 .map(|t| t.split(',').map(String::from).collect())
                 .unwrap_or_default();
 
             Ok(Action::new(
                 ActionKind::ReplicateBlob,
-                format!("Replicate blob {}", hash),
+                format!("Replicate blob {}", cid),
                 serde_json::json!({
-                    "blob_hash": hash,
+                    "blob_cid": cid.to_string(),
                     "target_nodes": target_nodes,
                 }),
             ))
         }
 
-        ExecCommands::EvictBlob { hash, min_replicas } => Ok(Action::new(
+        ExecCommands::EvictBlob { cid, min_replicas } => Ok(Action::new(
             ActionKind::EvictBlob,
-            format!("Evict blob {}", hash),
+            format!("Evict blob {}", parse_blob_cid(&cid)?),
             serde_json::json!({
-                "blob_hash": hash,
+                "blob_cid": cid,
                 "min_replicas": min_replicas,
                 "verify_replicas": true,
             }),

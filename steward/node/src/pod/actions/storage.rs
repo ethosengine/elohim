@@ -2,6 +2,7 @@
 //!
 //! Actions for replicating, evicting, rebuilding, and rebalancing storage.
 
+use elohim_epr::address::ByteCid;
 use tracing::info;
 
 use crate::pod::executor::ActionHandler;
@@ -37,18 +38,29 @@ impl ActionHandler for StorageActionHandler {
     }
 }
 
+/// Parse the action's `blob_cid` parameter at the boundary. The only admitted spelling is a
+/// byte CID (`bafkr4i…`); anything else, a legacy sha256 spelling included, is refused here
+/// and never reaches the rest of the handler.
+fn blob_cid_param(action: &Action) -> Result<ByteCid, ActionResult> {
+    let refuse = |message: String| ActionResult {
+        success: false,
+        message,
+        duration_ms: 0,
+        details: None,
+    };
+    let text = action
+        .params
+        .get("blob_cid")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| refuse("Missing 'blob_cid' parameter".to_string()))?;
+    ByteCid::parse(text).map_err(|error| refuse(format!("Invalid 'blob_cid' parameter: {error}")))
+}
+
 impl StorageActionHandler {
     async fn replicate_blob(&self, action: &Action) -> ActionResult {
-        let blob_hash = match action.params.get("blob_hash").and_then(|v| v.as_str()) {
-            Some(h) => h,
-            None => {
-                return ActionResult {
-                    success: false,
-                    message: "Missing 'blob_hash' parameter".to_string(),
-                    duration_ms: 0,
-                    details: None,
-                };
-            }
+        let blob_cid = match blob_cid_param(action) {
+            Ok(cid) => cid,
+            Err(refusal) => return refusal,
         };
 
         let target_nodes: Vec<String> = action
@@ -69,7 +81,7 @@ impl StorageActionHandler {
             .unwrap_or("normal");
 
         info!(
-            blob_hash,
+            %blob_cid,
             targets = target_nodes.len(),
             priority,
             "Blob replication requested"
@@ -85,12 +97,12 @@ impl StorageActionHandler {
             success: true,
             message: format!(
                 "Blob {} replicated to {} nodes",
-                blob_hash,
+                blob_cid,
                 target_nodes.len()
             ),
             duration_ms: 0,
             details: Some(serde_json::json!({
-                "blob_hash": blob_hash,
+                "blob_cid": blob_cid.to_string(),
                 "targets_requested": target_nodes.len(),
                 "targets_completed": target_nodes.len(),
                 "bytes_transferred": 0, // Would be actual
@@ -99,16 +111,9 @@ impl StorageActionHandler {
     }
 
     async fn evict_blob(&self, action: &Action) -> ActionResult {
-        let blob_hash = match action.params.get("blob_hash").and_then(|v| v.as_str()) {
-            Some(h) => h,
-            None => {
-                return ActionResult {
-                    success: false,
-                    message: "Missing 'blob_hash' parameter".to_string(),
-                    duration_ms: 0,
-                    details: None,
-                };
-            }
+        let blob_cid = match blob_cid_param(action) {
+            Ok(cid) => cid,
+            Err(refusal) => return refusal,
         };
 
         let verify_replicas = action
@@ -124,7 +129,7 @@ impl StorageActionHandler {
             .unwrap_or(2) as usize;
 
         info!(
-            blob_hash,
+            %blob_cid,
             verify_replicas, min_replicas, "Blob eviction requested"
         );
 
@@ -136,10 +141,10 @@ impl StorageActionHandler {
 
         ActionResult {
             success: true,
-            message: format!("Blob {} evicted from local storage", blob_hash),
+            message: format!("Blob {} evicted from local storage", blob_cid),
             duration_ms: 0,
             details: Some(serde_json::json!({
-                "blob_hash": blob_hash,
+                "blob_cid": blob_cid.to_string(),
                 "bytes_freed": 0, // Would be actual
                 "remaining_replicas": 3, // Would be actual
             })),
@@ -147,16 +152,9 @@ impl StorageActionHandler {
     }
 
     async fn rebuild_shard(&self, action: &Action) -> ActionResult {
-        let blob_hash = match action.params.get("blob_hash").and_then(|v| v.as_str()) {
-            Some(h) => h,
-            None => {
-                return ActionResult {
-                    success: false,
-                    message: "Missing 'blob_hash' parameter".to_string(),
-                    duration_ms: 0,
-                    details: None,
-                };
-            }
+        let blob_cid = match blob_cid_param(action) {
+            Ok(cid) => cid,
+            Err(refusal) => return refusal,
         };
 
         let shard_index = action
@@ -166,7 +164,7 @@ impl StorageActionHandler {
             .map(|i| i as usize);
 
         info!(
-            blob_hash,
+            %blob_cid,
             shard_index = ?shard_index,
             "Shard rebuild requested"
         );
@@ -182,11 +180,11 @@ impl StorageActionHandler {
             message: format!(
                 "Shard{} for blob {} rebuilt",
                 shard_index.map(|i| format!(" {}", i)).unwrap_or_default(),
-                blob_hash
+                blob_cid
             ),
             duration_ms: 0,
             details: Some(serde_json::json!({
-                "blob_hash": blob_hash,
+                "blob_cid": blob_cid.to_string(),
                 "shard_index": shard_index,
                 "shards_fetched": 4, // Would be actual
                 "shards_reconstructed": 1, // Would be actual
@@ -230,6 +228,50 @@ impl StorageActionHandler {
                 "bytes_to_move": 0, // Would be actual
                 "nodes_affected": 0, // Would be actual
             })),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use elohim_epr::address::compute_bytes_cid;
+
+    fn action(kind: ActionKind, params: serde_json::Value) -> Action {
+        Action::new(kind, "test".to_string(), params)
+    }
+
+    #[tokio::test]
+    async fn replicate_accepts_a_byte_cid_and_reports_it() {
+        let cid = compute_bytes_cid(b"kernel vector").to_string();
+        let result = StorageActionHandler
+            .execute(&action(
+                ActionKind::ReplicateBlob,
+                serde_json::json!({"blob_cid": cid}),
+            ))
+            .await;
+        assert!(result.success, "{}", result.message);
+        assert_eq!(result.details.unwrap()["blob_cid"], cid);
+    }
+
+    #[tokio::test]
+    async fn legacy_spellings_and_the_old_key_are_refused() {
+        for params in [
+            serde_json::json!({"blob_cid": "sha256-".to_string() + &"a".repeat(64)}),
+            serde_json::json!({"blob_cid": "sha256:".to_string() + &"a".repeat(64)}),
+            serde_json::json!({"blob_cid": elohim_epr::cid::compute_cid(b"x").to_string()}),
+            serde_json::json!({"blob_hash": compute_bytes_cid(b"x").to_string()}),
+        ] {
+            for kind in [
+                ActionKind::ReplicateBlob,
+                ActionKind::EvictBlob,
+                ActionKind::RebuildShard,
+            ] {
+                let result = StorageActionHandler
+                    .execute(&action(kind, params.clone()))
+                    .await;
+                assert!(!result.success, "admitted {params}");
+            }
         }
     }
 }

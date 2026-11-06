@@ -230,7 +230,13 @@ async fn main() -> anyhow::Result<()> {
                 move |axum::extract::Path(hash): axum::extract::Path<String>| {
                     let store = store.clone();
                     async move {
-                        match store.get_by_address(&hash).await {
+                        let Ok(cid) = elohim_epr::address::ByteCid::parse(&hash) else {
+                            return axum::response::Response::builder()
+                                .status(400)
+                                .body(axum::body::Body::from("invalid byte cid"))
+                                .unwrap();
+                        };
+                        match store.get(&cid).await {
                             Ok(data) => axum::response::Response::builder()
                                 .header("content-type", "application/octet-stream")
                                 .body(axum::body::Body::from(data))
