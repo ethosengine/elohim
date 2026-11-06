@@ -29,6 +29,8 @@ imagodei); the session owner reviewed each diff and made every commit.
 | `e21b23f16` | T1.1 seed ladder | `network_seed` `elohim_<dna>_alpha → _alpha2` in all five `dna.yaml` and `workdir/happ.yaml`; `manifest_hygiene.rs` expects `_alpha2` |
 | `2520f112f` | T1.2 infrastructure, T1.3 node-registry | `ContentServer.content_cid`; `CustodianAssignment.content_cid`, `ShardAssignment.content_cid`; anchors and links renamed; authority row 5 |
 | `d12677652` | T1.4 content_store, imagodei spelling, `SCHEMA_VERSIONS.md` v2 | striped `ShardManifest`; `Content.content_hash` deleted; `byte_cid_of` replaces the SipHash helper |
+| `c48e49647` | L3 base: merge of `origin/dev` `e85eeeee5` (L2) | a merge, not the requested rebase: the session's stasis keeper parked history-rewriting rebases pending a steward ruling; dev still fast-forwards to the head |
+| (L3 fix) | coordinators onto L2's wire spellings | infrastructure and content_store coordinators read and write the SDK's renamed fields (`content_cid`, `blob_cid`; `content_hash` gone) — drift items (b) and (d) closed on the DNA side; coordinator-only, no DNA hash moves |
 
 All three carry `[dna:migrate]`. `dna-hashes.baseline` is not moved yet: a fix-forward
 commit carries the five CI `DNA-HASH` lines once the first CI DNA run over the landed
@@ -102,7 +104,9 @@ packs, for reference only and never the baseline:
 | `cargo test` content_store_integrity | 106 passed (8 new) |
 | `cargo test` content_store `--lib` | 139 passed (2 new) |
 | `just gate rust-style` | PASS; imagodei debt 1 → 0 |
-| `just gate schema-dna` | pending (run after the workspace install) |
+| wasm32 re-pack on the L3 base (elohim, imagodei, infrastructure, node-registry) | EXIT=0 each after the wire-spelling fix; all five local hashes unchanged |
+| `cargo test` content_store `--lib`, infrastructure (L3 base) | 139 passed; 4 passed |
+| `just gate schema-dna` (L3 base) | EXIT=0, 5 s; every schema ↔ DNA constant pair PASS |
 | sweettests (`ShardManifest` create/get, `just gate sweettest-check`) | not run (working-code-first steer) |
 
 New tests: `content_server_rejects_sha256_spelling_and_bafkrei`,

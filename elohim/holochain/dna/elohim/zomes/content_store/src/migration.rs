@@ -245,7 +245,6 @@ pub fn import_migrated_content(content_list: Vec<Content>) -> ExternResult<Migra
             // Legacy migration - content body stays in content field
             blob_cid: None,
             content_size_bytes: None,
-            content_hash: None,
         };
 
         match create_content(input) {

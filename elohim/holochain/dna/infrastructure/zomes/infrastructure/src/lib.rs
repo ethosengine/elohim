@@ -66,9 +66,7 @@ fn content_server_to_wire(
     entry: &infrastructure_integrity::ContentServer,
 ) -> infrastructure_types::ContentServer {
     infrastructure_types::ContentServer {
-        // Wire type (sdk infrastructure-types) still spells this `content_hash`;
-        // its rename belongs to the wire crate's own crossing.
-        content_hash: entry.content_cid.clone(),
+        content_cid: entry.content_cid.clone(),
         capability: entry.capability.clone(),
         serve_url: entry.serve_url.clone(),
         endpoints: entry
@@ -1119,7 +1117,7 @@ pub fn register_content_server(
     };
 
     let server = ContentServer {
-        content_cid: input.content_hash.clone(),
+        content_cid: input.content_cid.clone(),
         operator_agent: agent_info.agent_initial_pubkey.clone(),
         capability: input.capability.clone(),
         serve_url: input.serve_url,
@@ -1266,9 +1264,7 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
     let limit = input.limit.unwrap_or(10);
     let online_only = input.online_only.unwrap_or(true);
 
-    // `input.content_hash` is the wire field name (sdk infrastructure-types); its
-    // value is the content's byte CID.
-    let cid_anchor = StringAnchor::new("content_cid", &input.content_hash);
+    let cid_anchor = StringAnchor::new("content_cid", &input.content_cid);
     let cid_anchor_hash = hash_entry(&EntryTypes::StringAnchor(cid_anchor))?;
 
     let query = LinkQuery::try_new(cid_anchor_hash, LinkTypes::CidToContentServer)?;
@@ -1327,7 +1323,7 @@ pub fn find_publishers(input: FindPublishersInput) -> ExternResult<FindPublisher
     publishers.truncate(limit);
 
     Ok(FindPublishersOutput {
-        content_hash: input.content_hash,
+        content_cid: input.content_cid,
         publishers,
     })
 }

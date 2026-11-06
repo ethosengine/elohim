@@ -250,7 +250,6 @@ mod tests {
             metadata_json: metadata_json.to_string(),
             blob_cid: None,
             content_size_bytes: None,
-            content_hash: None,
         }
     }
 

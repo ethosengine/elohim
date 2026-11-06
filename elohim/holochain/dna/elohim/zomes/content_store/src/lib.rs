@@ -302,9 +302,6 @@ pub(crate) fn content_to_wire(c: &content_store_integrity::Content) -> WireConte
         validation_status: c.validation_status.clone(),
         blob_cid: c.blob_cid.clone(),
         content_size_bytes: c.content_size_bytes,
-        // The integrity entry no longer carries a body hash: `blob_cid` is the body's
-        // integrity proof. The lamad-types wire field remains until the sdk track drops it.
-        content_hash: None,
     }
 }
 
@@ -2440,8 +2437,6 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
         // Content manifest fields (Phase 0 refactor)
         blob_cid: input.blob_cid,
         content_size_bytes: input.content_size_bytes,
-        // `input.content_hash` (lamad-types, sdk track) is not carried: the entry
-        // has no body hash — `blob_cid` is the body's integrity proof.
     };
 
     // Prepare and validate - sets schema_version=2 and validation_status
@@ -2582,7 +2577,6 @@ pub fn update_content(input: UpdateContentInput) -> ExternResult<ContentOutput> 
     if let Some(v) = input.content_size_bytes {
         content.content_size_bytes = Some(v);
     }
-    // `input.content_hash` (lamad-types) has no home on the entry any more.
     if let Some(v) = input.title {
         content.title = v;
     }
@@ -7488,8 +7482,7 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     let batch = ImportBatch {
         id: input.id.clone(),
         batch_type: input.batch_type.clone(),
-        // lamad-types `QueueImportInput` still spells it `blob_hash` (sdk track).
-        blob_cid: input.blob_hash.clone(),
+        blob_cid: input.blob_cid.clone(),
         total_items: input.total_items,
         status: "queued".to_string(),
         processed_count: 0,
@@ -7516,7 +7509,7 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     // Emit signal so elohim-store knows to start sending chunks
     emit_signal(ProjectionSignal::ImportBatchQueued {
         batch_id: input.id.clone(),
-        blob_cid: input.blob_hash.clone(),
+        blob_cid: input.blob_cid.clone(),
         total_items: input.total_items,
         batch_type: input.batch_type.clone(),
     })?;
