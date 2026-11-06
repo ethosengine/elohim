@@ -36,12 +36,12 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { blake3 } from '@noble/hashes/blake3';
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { blake3 } from '@noble/hashes/blake3';
 import * as AjvNs from 'ajv/dist/2020.js';
 
 interface AjvOptions {
