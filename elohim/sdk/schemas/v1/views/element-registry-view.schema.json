@@ -34,8 +34,8 @@
         },
         "cid": {
           "type": "string",
-          "pattern": "^sha256-",
-          "description": "Content address of the element bundle."
+          "pattern": "^bafkr4i[a-z2-7]{52}$",
+          "description": "Byte CID of the element bundle (CIDv1 raw 0x55 + BLAKE3-256 0x1e, base32-lower)."
         },
         "version": {
           "type": "string",

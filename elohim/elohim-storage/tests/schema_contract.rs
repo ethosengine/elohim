@@ -4035,15 +4035,14 @@ fn element_registry_view_matches_schema() {
     // Exercises:
     //  - minimal valid registry (one element, no view_deps)
     //  - tagName satisfies ^[a-z][a-z0-9]*-[a-z0-9-]+$ pattern
-    //  - cid satisfies ^sha256- pattern (the element-registry schema still declares it;
-    //    reported to T5 as a crossing gap, not changed here)
+    //  - cid is a byte CID (^bafkr4i[a-z2-7]{52}$; minted from the bytes "elohim-button@1.0.0")
     //  - version satisfies ^\d+\.\d+\.\d+ pattern
     let view = ElementRegistryView {
         epr_id: "elohim-core-elements".into(),
         pillar: "elohim-core".into(),
         elements: vec![ElementEntry {
             tag_name: "elohim-button".into(),
-            cid: "sha256-0000000000000000000000000000000000000000000000000000000000000000".into(),
+            cid: "bafkr4icpqjy53ydsk2mmlan6ihs7pfqmr7wl75wc4e2siiyr2hyxvl3ami".into(),
             version: "1.0.0".into(),
             view_deps: vec![],
         }],
@@ -4074,15 +4073,15 @@ fn element_registry_view_with_view_deps_matches_schema() {
         elements: vec![
             ElementEntry {
                 tag_name: "shefa-balance-card".into(),
-                cid: "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                    .into(),
+                // byte CID of the bytes "shefa-balance-card@2.1.3"
+                cid: "bafkr4ie53dwbogc2pvirhouj6dz24w7y3kyypbpw7d6ucdwyhmcvwvs2c4".into(),
                 version: "2.1.3".into(),
                 view_deps: vec!["ShefaBalanceView".into(), "AccountView".into()],
             },
             ElementEntry {
                 tag_name: "shefa-commitment-chip".into(),
-                cid: "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                    .into(),
+                // byte CID of the bytes "shefa-commitment-chip@1.0.0"
+                cid: "bafkr4ig4pkcww75jyakgy5trlawl3uiaqlofqoncvgqk3yxbhi7p5gltmi".into(),
                 version: "1.0.0".into(),
                 view_deps: vec![],
             },
