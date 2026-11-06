@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
+import { noteEpoch, noteSignature } from './scripts/brit-attest.mjs';
 import { nativeGateState } from './gate-source-state.mjs';
 import { COST_FIELDS } from './gate-cycle.mjs';
 import {
@@ -292,6 +293,49 @@ test('a note brit reports unverifiable is absent to findEvidence, and named once
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn: failed.spawn, warn }).error,
     `build find failed: Error: git command failed: git notes --ref ${BUILD_REF} list: fatal: not a notes commit`);
   assert.equal(warnings.length, 1);
+});
+
+const epochRow = (commit, epoch) => ({ commit, attestation: { ...greenRow.attestation, signature: undefined, epoch, scheme: 0, key: [237, 1, 109], sig: [146, 50, 191] } });
+
+test('epoch-1 rows are read unchanged: no epoch key, hex signature, no held', () => {
+  const warnings = [];
+  const { spawn } = fakeSpawn([[isFind, { status: 0, stdout: `[${JSON.stringify(greenRow)}]\n`, stderr: '' }]]);
+  const found = findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn, warn: l => warnings.push(l) });
+  assert.deepEqual(found.rows, [greenRow]);
+  assert.deepEqual(found.held, []);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(noteEpoch(greenRow.attestation), { epoch: 1 });
+  assert.deepEqual(noteEpoch({ epoch: 1 }), { epoch: 1 });
+});
+
+test('an epoch-2 row is admitted, with sig/key/scheme carried and no signature', () => {
+  const row = epochRow('a'.repeat(40), 2);
+  const { spawn } = fakeSpawn([[isFind, { status: 0, stdout: `[${JSON.stringify(row)}]\n`, stderr: '' }]]);
+  const found = findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn, warn: () => {} });
+  assert.equal(found.rows.length, 1);
+  assert.deepEqual(found.held, []);
+  assert.equal(found.rows[0].attestation.signature, undefined);
+  assert.deepEqual(noteEpoch(found.rows[0].attestation), { epoch: 2, scheme: 0, key: [237, 1, 109], sig: [146, 50, 191] });
+  assert.equal(noteSignature(found.rows[0].attestation), 'brit@2/0/ed016d/9232bf');
+  assert.equal(noteSignature(greenRow.attestation), greenRow.attestation.signature ?? '');
+});
+
+test('an unknown epoch is held: reported once, never a row, never a veto-by-unverifiable', () => {
+  const warnings = [];
+  const future = epochRow('b'.repeat(40), 3);
+  const stderr = `held: ${'c'.repeat(40)} note epoch 9 is not implemented by this reader\n`;
+  const { spawn } = fakeSpawn([[isFind, { status: 0, stdout: `[${JSON.stringify(greenRow)},${JSON.stringify(future)}]\n`, stderr }]]);
+  const found = findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', spawn, warn: l => warnings.push(l) });
+  assert.deepEqual(found.rows, [greenRow], 'a held epoch is never a row');
+  assert.deepEqual(found.held, [
+    { commit: 'c'.repeat(40), reason: 'note epoch 9 is not implemented by this reader' },
+    { commit: 'b'.repeat(40), reason: 'note epoch 3 is not implemented by this reader' },
+  ]);
+  assert.deepEqual(found.unverifiable, []);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[0], /held note on refs\/notes\/brit\/build\/gate%3Aelohim-storage at c+: note epoch 9/);
+  assert.deepEqual(noteEpoch({ epoch: 'x' }), { held: 'note epoch "x" is not implemented by this reader' });
+  assert.deepEqual(noteEpoch({ epoch: 2 }), { held: 'epoch 2 row lacks scheme, key or sig' });
 });
 
 test('gateEvidence counts unverifiable notes on its line as a reuse veto and still reports the miss', t => {

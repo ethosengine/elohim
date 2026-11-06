@@ -90,6 +90,45 @@ export function unverifiableNotes(stderr) {
   });
 }
 
+/** The `held: <commit> <reason>` lines of a brit read's stderr: notes in a format this brit does not implement. */
+export function heldNotes(stderr) {
+  return String(stderr || '').split('\n').flatMap(line => {
+    const m = /^held: (\S+) (.*)$/.exec(line);
+    return m ? [{ commit: m[1], reason: m[2] }] : [];
+  });
+}
+
+/**
+ * How a note's `epoch` key reads (readers decide on that key alone):
+ *   { epoch: 1 }                         absent or 1: the frozen shape (`agentId` + hex `signature`);
+ *   { epoch: 2, scheme, key, sig }       the envelope shape (body fields + epoch/scheme/key/sig, no `signature`);
+ *   { held: reason }                     any other epoch, or an envelope shape missing what it carries.
+ * A held note is reported and never admitted as a row.
+ */
+export function noteEpoch(note) {
+  if (!note || typeof note !== 'object' || !('epoch' in note)) return { epoch: 1 };
+  const e = note.epoch;
+  if (e === 1) return { epoch: 1 };
+  if (e === 2) {
+    const bytes = v => Array.isArray(v) && v.length > 0 && v.every(b => Number.isInteger(b) && b >= 0 && b <= 255);
+    if (Number.isInteger(note.scheme) && bytes(note.key) && bytes(note.sig)) {
+      return { epoch: 2, scheme: note.scheme, key: note.key, sig: note.sig };
+    }
+    return { held: 'epoch 2 row lacks scheme, key or sig' };
+  }
+  return { held: `note epoch ${JSON.stringify(e)} is not implemented by this reader` };
+}
+
+/** The signature a row carries as one string: epoch 1 its hex `signature`, epoch 2 `brit@2/<scheme>/<hex key>/<hex sig>`. */
+export function noteSignature(note) {
+  const read = noteEpoch(note);
+  if (read.epoch === 2) {
+    const hex = bytes => bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `brit@2/${read.scheme}/${hex(read.key)}/${hex(read.sig)}`;
+  }
+  return read.held ? null : (note?.signature ?? '');
+}
+
 /**
  * A `build put` stderr that is one of brit's expected refusals, or null for any other failure.
  * `kind` names the class; `line` is brit's own line without the anyhow `Error: ` prefix.
@@ -110,6 +149,8 @@ const lastLine = text => String(text || '').trim().split('\n').filter(Boolean).p
  *   { state: 'verified', node }                    stdout held the signed node (verified by brit);
  *   { state: 'absent' }                            no note, miss line only;
  *   { state: 'unverifiable', commit, reason }      a note is stored but failed verification;
+ *   { state: 'held', commit?, reason }             a note is stored in an epoch this reader does not
+ *                                                  implement; reported, never read as a row;
  *   { state: 'unreadable', reason, code? }         git could not read the ref, or the output was
  *                                                  not brit's (exit 1, non-JSON stdout, no spawn;
  *                                                  `code` is the spawn error's, ENOENT = no binary).
@@ -141,11 +182,14 @@ export function readBuildNote(step, commit, { buildRefBin, root, spawn = spawnSy
   if (text) {
     try {
       const node = JSON.parse(text);
+      if (node && typeof node === 'object' && noteEpoch(node).held) return { state: 'held', reason: noteEpoch(node).held };
       return node && typeof node === 'object' ? { state: 'verified', node } : { state: 'unreadable', reason: 'build get: not an object' };
     } catch {
       return { state: 'unreadable', reason: 'build get: not JSON' };
     }
   }
+  const [held] = heldNotes(r.stderr);
+  if (held) return { state: 'held', ...held };
   const [note] = unverifiableNotes(r.stderr);
   return note ? { state: 'unverifiable', ...note } : { state: 'absent' };
 }
@@ -336,6 +380,11 @@ export async function main(argv, { env = process.env } = {}) {
           // for nothing, so a note this device could not read is never written over blind. The gate
           // (gate-evidence.mjs recordEvidence) rules the other way for its own fresh verdict.
           defer(`${ref} on ${short} could not be read (${existing.reason}); ${p.step} not written`);
+          continue;
+        }
+        if (existing.state === 'held') {
+          // A note in a newer epoch is not ours to overwrite blind.
+          defer(`${ref} on ${short} holds a note this reader does not implement (${existing.reason}); ${p.step} not written`);
           continue;
         }
         if (existing.state === 'unverifiable') {

@@ -27,7 +27,7 @@ import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { delimiter, isAbsolute, join, relative, resolve } from 'path';
 import { globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
-import { buildNotesRef, expectedRefusal, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
+import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
 export function attestationStep(project) {
@@ -364,7 +364,21 @@ export function findEvidence(project, key, { buildRefBin, root, spawn = spawnSyn
   for (const note of unverifiable) {
     warn(`[gate] ${project.name} evidence: unverifiable note on ${attestationRef(project)} at ${note.commit}: ${note.reason}; it vetoes reuse until replaced or removed\n`);
   }
-  return { rows, unverifiable };
+  // Epoch decides the row's shape: absent/1 frozen, 2 envelope (read as is: `sig`/`key`/`scheme`
+  // ride on the row), anything else held. A held note (brit's `held:` line, or a row whose epoch
+  // this reader does not implement) is named once and is never a row and never reuse evidence.
+  const held = heldNotes(r.stderr);
+  const admitted = [];
+  for (const row of rows) {
+    const read = noteEpoch(row?.attestation);
+    if (read.held) held.push({ commit: row?.commit ?? '', reason: read.held });
+    else admitted.push(row);
+  }
+  for (const note of held) {
+    warn(`[gate] ${project.name} evidence: held note on ${attestationRef(project)} at ${note.commit}: ${note.reason}; this reader does not admit it\n`);
+  }
+  const heldAt = new Set(held.map(note => note.commit));
+  return { rows: admitted.filter(row => !heldAt.has(row?.commit)), unverifiable, held };
 }
 
 export function ageOf(iso, now = Date.now()) {
@@ -598,6 +612,8 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
   const sha = existing.state === 'unverifiable' ? existing.commit : resolvedCommit(root, commit, spawn);
   if (existing.state === 'unverifiable') {
     warn(`[gate] ${project.name} evidence: unverifiable note on ${ref} at ${sha}: ${existing.reason}; replacing it\n`);
+  } else if (existing.state === 'held') {
+    warn(`[gate] ${project.name} evidence: ${ref} at ${sha} holds a note this reader does not implement (${existing.reason}); writing anyway\n`);
   } else if (existing.state === 'unreadable') {
     // The gate's rule is last run wins, named: the read above only names what the put replaces,
     // and a verdict that cost a run is not withheld because the name could not be read (brit's own

@@ -61,8 +61,78 @@ pub struct Attestation {
     pub success: Option<bool>,
     #[serde(default)]
     pub output_cid: Vec<u8>,
+    /// Epoch-1 (frozen) signature: hex, no `epoch` key on the row.
     #[serde(default)]
     pub signature: String,
+    /// The note epoch as brit printed it. Absent or 1 is the frozen shape; 2 is the envelope
+    /// shape; anything else is held ([`Attestation::epoch_kind`]). Kept raw so a non-number is
+    /// held too, never silently read as epoch 1.
+    #[serde(default)]
+    pub epoch: Option<serde_json::Value>,
+    /// Epoch-2 signature scheme (0 = strict Ed25519).
+    #[serde(default)]
+    pub scheme: Option<u64>,
+    /// Epoch-2 signer key bytes (`ed 01 || public key` for scheme 0).
+    #[serde(default)]
+    pub key: Vec<u8>,
+    /// Epoch-2 signature bytes.
+    #[serde(default)]
+    pub sig: Vec<u8>,
+}
+
+/// How a row's `epoch` key reads. Readers decide on that key alone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoteEpoch {
+    /// Absent or 1: `agentId` plus hex `signature`.
+    V1,
+    /// 2: body fields plus `epoch`/`scheme`/`key`/`sig`, no `signature`.
+    V2,
+    /// Any other value, or an envelope row missing what it must carry: never a row.
+    Held(String),
+}
+
+impl Attestation {
+    /// The epoch this row reads under.
+    pub fn epoch_kind(&self) -> NoteEpoch {
+        match self.epoch.as_ref() {
+            None => NoteEpoch::V1,
+            Some(value) => match value.as_u64() {
+                Some(1) => NoteEpoch::V1,
+                Some(2)
+                    if self.scheme.is_some() && !self.key.is_empty() && !self.sig.is_empty() =>
+                {
+                    NoteEpoch::V2
+                }
+                Some(2) => NoteEpoch::Held("epoch 2 row lacks scheme, key or sig".into()),
+                _ => NoteEpoch::Held(format!(
+                    "note epoch {value} is not implemented by this reader"
+                )),
+            },
+        }
+    }
+
+    /// The signature as the derivation witness carries it. Epoch 1: the stored hex, unchanged.
+    /// Epoch 2: `brit@2/<scheme>/<hex key>/<hex sig>`, so key, scheme and epoch travel with the
+    /// signature in the witness's one string.
+    pub fn witness_sig(&self) -> String {
+        match self.epoch_kind() {
+            NoteEpoch::V2 => format!(
+                "brit@2/{}/{}/{}",
+                self.scheme.unwrap_or(0),
+                hex_of(&self.key),
+                hex_of(&self.sig)
+            ),
+            _ => self.signature.clone(),
+        }
+    }
+}
+
+fn hex_of(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::new(), |mut out, byte| {
+        let _ = write!(out, "{byte:02x}");
+        out
+    })
 }
 
 impl Attestation {
@@ -219,11 +289,36 @@ pub fn parse_unverifiable(stderr: &str) -> Vec<Unverifiable> {
         .collect()
 }
 
-/// What `build find` answered: the rows brit verified, and the notes it refused.
+/// One note a reader holds: a `held: <commit> <reason>` stderr line, or a row whose epoch this
+/// reader does not implement. Reported, never admitted, never a row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Held {
+    pub commit: String,
+    pub reason: String,
+}
+
+/// The `held:` lines of a brit read's stderr, in order.
+pub fn parse_held(stderr: &str) -> Vec<Held> {
+    stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("held: "))
+        .map(|rest| {
+            let (commit, reason) = rest.split_once(' ').unwrap_or((rest, ""));
+            Held {
+                commit: commit.to_string(),
+                reason: reason.to_string(),
+            }
+        })
+        .collect()
+}
+
+/// What `build find` answered: the rows brit verified, the notes it refused, and the notes it
+/// (or this reader) holds.
 #[derive(Debug, Clone, Default)]
 pub struct Found {
     pub rows: Vec<Row>,
     pub unverifiable: Vec<Unverifiable>,
+    pub held: Vec<Held>,
 }
 
 /// `build find` for a step and closure key. The rows are brit's stdout, the verified read; each
@@ -254,15 +349,33 @@ pub fn find_rows(bin: &Path, repo: &Path, step: &str, inputs_hash: &str) -> Resu
     let rows: Vec<Row> =
         serde_json::from_slice(&out.stdout).map_err(|_| "build find: not JSON rows".to_string())?;
     let unverifiable = parse_unverifiable(&stderr);
-    let rows = rows
+    let mut held = parse_held(&stderr);
+    let mut admitted = Vec::new();
+    for row in rows {
+        if let NoteEpoch::Held(reason) = row.attestation.epoch_kind() {
+            held.push(Held {
+                commit: row.commit.clone().unwrap_or_default(),
+                reason,
+            });
+        } else {
+            admitted.push(row);
+        }
+    }
+    let rows = admitted
         .into_iter()
         .filter(|row| {
+            let at = row.commit.as_deref();
             !unverifiable
                 .iter()
-                .any(|note| row.commit.as_deref() == Some(note.commit.as_str()))
+                .any(|note| at == Some(note.commit.as_str()))
+                && !held.iter().any(|note| at == Some(note.commit.as_str()))
         })
         .collect();
-    Ok(Found { rows, unverifiable })
+    Ok(Found {
+        rows,
+        unverifiable,
+        held,
+    })
 }
 
 /// Say each note brit refused for `step`, once, with its ref and reason: the one place a
@@ -272,6 +385,12 @@ pub fn say_unverifiable(step: &str, found: &Found) {
     for note in &found.unverifiable {
         eprintln!(
             "ark brit: unverifiable attestation on {refused} at {}: {}; it vetoes reuse until replaced or removed",
+            note.commit, note.reason
+        );
+    }
+    for note in &found.held {
+        eprintln!(
+            "ark brit: held attestation on {refused} at {}: {}; this reader does not admit it",
             note.commit, note.reason
         );
     }
@@ -435,7 +554,7 @@ impl BritIndex {
             basis: DerivationBasis::Computed,
             deterministic: self.method.deterministic,
             witness: Witness::Signature {
-                sig: row.attestation.signature.clone(),
+                sig: row.attestation.witness_sig(),
             },
         })
     }
@@ -607,6 +726,10 @@ mod tests {
                 success: Some(success),
                 output_cid: Vec::new(),
                 signature: String::new(),
+                epoch: None,
+                scheme: None,
+                key: Vec::new(),
+                sig: Vec::new(),
             },
         }
     }
@@ -692,6 +815,79 @@ mod tests {
             ]
         );
         assert_eq!(found.rows[0].attestation.output_cid, [1, 85, 18, 32]);
+    }
+
+    fn v2_row(commit: &str, epoch: u64) -> String {
+        format!(
+            r#"{{"commit":"{commit}","attestation":{{"agentId":"6d65","builtAt":"2026-10-26T10:00:00Z","epoch":{epoch},"key":[237,1,109,101],"outputCid":[1,85,18,32],"scheme":0,"sig":[146,50,191],"stepName":"gate:x","success":true}}}}"#
+        )
+    }
+
+    #[test]
+    fn epoch_one_row_reads_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = stub(
+            dir.path(),
+            "brit-build-ref",
+            &format!("[{}]", find_row("aaaa1111")),
+            "",
+            0,
+        );
+        let found = find_rows(&bin, dir.path(), "gate:x", "k").unwrap();
+        assert_eq!(found.rows.len(), 1);
+        assert!(found.held.is_empty());
+        let at = &found.rows[0].attestation;
+        assert_eq!(at.epoch_kind(), NoteEpoch::V1);
+        assert_eq!(at.witness_sig(), "00");
+    }
+
+    #[test]
+    fn epoch_two_row_is_admitted_with_sig_key_and_scheme_carried() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = stub(
+            dir.path(),
+            "brit-build-ref",
+            &format!("[{}]", v2_row("aaaa1111", 2)),
+            "",
+            0,
+        );
+        let found = find_rows(&bin, dir.path(), "gate:x", "k").unwrap();
+        assert_eq!(found.rows.len(), 1, "an envelope row is a row");
+        assert!(found.held.is_empty());
+        let at = &found.rows[0].attestation;
+        assert_eq!(at.epoch_kind(), NoteEpoch::V2);
+        assert_eq!(at.signature, "", "an envelope row has no `signature`");
+        assert_eq!(at.witness_sig(), "brit@2/0/ed016d65/9232bf");
+        assert_eq!(at.agent_id.as_deref(), Some("6d65"));
+    }
+
+    #[test]
+    fn unknown_epoch_is_held_never_a_row() {
+        let dir = tempfile::tempdir().unwrap();
+        let stdout = format!("[{},{}]", v2_row("aaaa1111", 3), find_row("bbbb2222"));
+        let stderr = "held: cccc3333 note epoch 7 is not implemented by this reader";
+        let bin = stub(dir.path(), "brit-build-ref", &stdout, stderr, 0);
+        let found = find_rows(&bin, dir.path(), "gate:x", "k").unwrap();
+        let commits: Vec<&str> = found
+            .rows
+            .iter()
+            .map(|r| r.commit.as_deref().unwrap())
+            .collect();
+        assert_eq!(commits, ["bbbb2222"]);
+        assert_eq!(
+            found.held,
+            [
+                Held {
+                    commit: "cccc3333".into(),
+                    reason: "note epoch 7 is not implemented by this reader".into()
+                },
+                Held {
+                    commit: "aaaa1111".into(),
+                    reason: "note epoch 3 is not implemented by this reader".into()
+                },
+            ]
+        );
+        assert!(found.unverifiable.is_empty(), "held is not unverifiable");
     }
 
     #[test]
