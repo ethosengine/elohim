@@ -25,6 +25,7 @@
           "elohim/Cargo.toml",
           "crates/doorway-client/**",
           "crates/seam-contracts/**",
+          "crates/elohim-address/**",
           "bridges/pkarr/Cargo.toml",
           "bridges/pkarr/pkarr-bridge/**",
           "VERSION"
@@ -118,6 +119,7 @@
           "elohim/Cargo.toml",
           "crates/doorway-client/**",
           "crates/seam-contracts/**",
+          "crates/elohim-address/**",
           "bridges/pkarr/Cargo.toml",
           "bridges/pkarr/pkarr-bridge/**"
         ],
@@ -152,6 +154,7 @@
           "elohim/Cargo.toml",
           "crates/doorway-client/**",
           "crates/seam-contracts/**",
+          "crates/elohim-address/**",
           "bridges/pkarr/Cargo.toml",
           "bridges/pkarr/pkarr-bridge/**"
         ],
