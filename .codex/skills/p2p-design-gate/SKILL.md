@@ -192,7 +192,7 @@ For each entity, declare which addressing strategy applies. There are exactly th
 
 The identity of the entity IS a hash of its content. If the content changes, the address changes — you get a new version, not a mutation.
 
-**Use when**: the entity represents immutable content (articles, assessments, media, attestations). The canonical format is CIDv1 (`bafkrei...`).
+**Use when**: the entity represents immutable content (articles, assessments, media, attestations). The canonical format is CIDv1 (`bafkr4i...` for bytes).
 
 **Implication**: no `UPDATE` semantics. New version = new CID. Versions form a DAG, not a line — and **which version applies is a DECLARED dependency, never resolved by recency**. A cid-pin is a lockfile: a consumer names the head it depends on, and "latest" is not an answer ([[project_versioned_entity_head_is_declared_dependency]]). Head-selection is a binding-layer decision your design must place, not a default it can inherit.
 
@@ -203,7 +203,7 @@ The identity of the entity IS a hash of its content. If the content changes, the
 | What is being addressed | Canonical form | How it is minted | Example |
 |---|---|---|---|
 | Atom / DAG-CBOR content (EPR heads & atoms, manifests, content-set fingerprints, projection digests) | **CIDv1, dag-cbor codec** → `bafyrei…` | `Cid::new_v1(0x71 dag-cbor, Sha2_256(canonical-bytes))` — see `elohim/elohim-storage/src/epr_codec.rs` (`DAG_CBOR_CODEC`) | `bafyrei…` |
-| Raw blob bytes | **CIDv1, raw codec** → `bafkrei…` | `Cid::new_v1(0x55 raw, Sha2_256(bytes))` — see `doorway/doorway-service/src/routes/blob.rs`; the **same** sha256 you already compute, wrapped | `bafkrei…` |
+| Raw blob bytes | **CIDv1, raw codec over BLAKE3** → `bafkr4i…` (59 chars) | `crates/elohim-address` `ByteCid` (0x55 raw + 0x1e BLAKE3), admitted only by full decode (`ByteCid::parse`; TS `verifyAddress`/`parseByteCid` in `elohim/sdk/epr-ts`) — see `doorway/doorway-service/src/routes/blob.rs` | `bafkr4i…` |
 | Agent / action identity | **Holochain hash** → `uhCAk…` (agent key), action hash for actions | conductor-minted; NOT a CID, NOT a bare sha | `uhCAk…` |
 
 **NOT addresses — keep these as bare sha256.** The discriminator: *does something resolve / dereference / fetch it?* If no, it is not an address — leave it.
@@ -211,7 +211,7 @@ The identity of the entity IS a hash of its content. If the content changes, the
 - **Byte-equality verification** — e.g. `sha256-verify the ts-rs codegen diff`, blob-arrival integrity checks. Comparing bytes, not naming content.
 - **Cite fingerprints** — `cites:` frontmatter `sha256:<hex>` is formally the **short-form projection of the body CID** (`CIDv1(raw 0x55, sha2-256(canonical-body))`) per the 2026-07-12 cite↔CID convergence — one digest, two renderings, not a separate system. Envelopes stay short-form; it is tool-generated (`cite-gen`) — **never hand-edit.**
 
-**Legacy / in-migration:** the bare `sha256-<hex>` blob wire marker (described in `elohim/elohim-storage/CLAUDE.md` / `doorway/CLAUDE.md`, on the `/blob/<hash>` path) is the **legacy** form; the canonical target is the wrapping CID `bafkrei…`. Moving the blob plane (`/blob`, `BlobStore`, inventory-gossip wire, seeder) from bare-hash to CID is a named **downstream migration arc** — describe existing behavior accurately, design *new* surfaces CID-first.
+The blob plane crossed on 2026-11-05 (re-genesis 1): every byte address is `bafkr4i…`, the bare-hash form is refused (`/blob/{cid}` answers 400 `invalid-byte-cid`), and cite fingerprints stay `sha256:<16hex>`.
 
 ### Option 2: Agent-Scoped Composite
 
