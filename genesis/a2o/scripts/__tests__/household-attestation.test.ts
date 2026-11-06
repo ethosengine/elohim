@@ -1118,7 +1118,8 @@ function envelopeNode(seedHex = VECTOR.seedHex, overrides: Partial<ValidationNod
     type: 'pkcs8',
   });
   const pub = createPublicKey(priv).export({ format: 'der', type: 'spki' }).subarray(-32);
-  const { signature: _drop, ...fields } = VECTOR.node;
+  const fields: Record<string, unknown> = { ...VECTOR.node };
+  delete fields.signature;
   const base = { ...fields, validatorId: pub.toString('hex'), ...overrides } as ValidationNodeJson;
   const key = Buffer.concat([Buffer.from([0xed, 0x01]), pub]);
   const domain = Buffer.from('brit:validate@2:');
@@ -1186,7 +1187,12 @@ describe('readers decide on the epoch key (epoch 1 unchanged, 2 admitted, other 
 
   it('an unknown epoch is held: warned, never a row, never admitted', () => {
     const node = envelopeNode(VECTOR.seedHex, { checkName: VECTOR.node.checkName });
-    const { epoch: _e, scheme, key, sig, ...body } = node;
+    const { scheme, key, sig } = node;
+    const body: Record<string, unknown> = { ...node };
+    delete body.epoch;
+    delete body.scheme;
+    delete body.key;
+    delete body.sig;
     const { found, lines } = readOne({ body, epoch: 3, key, scheme, sig });
     assert.deepEqual(found, []);
     assert.equal(lines.length, 1);

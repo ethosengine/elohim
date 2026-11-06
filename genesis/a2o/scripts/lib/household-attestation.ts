@@ -760,7 +760,7 @@ const NODE_KEYS = [
 const BODY_KEYS = NODE_KEYS.filter(k => k !== 'signature');
 
 /** brit's `ValidationResult`, serde `rename_all = "lowercase"`. */
-const VALIDATION_RESULTS = ['pass', 'fail', 'warn', 'skip'];
+const VALIDATION_RESULTS = new Set(['pass', 'fail', 'warn', 'skip']);
 
 function cborHead(major: number, n: number): Buffer {
   if (n < 24) return Buffer.from([(major << 5) | n]);
@@ -822,7 +822,7 @@ function encodeFields(node: ValidationNodeJson, fields: string[]): Buffer {
       // Only the two `Option` fields of brit's node/body may be null.
       if (key !== 'findingsCid' && key !== 'ttlSec') throw new Error(`${key} is null`);
       parts.push(Buffer.from([0xf6]));
-    } else if (key === 'result' && !VALIDATION_RESULTS.includes(value as string)) {
+    } else if (key === 'result' && !VALIDATION_RESULTS.has(value as string)) {
       throw new Error(`result ${JSON.stringify(value)} is not a ValidationResult`);
     } else if (key === 'artifactCid' || key === 'findingsCid') {
       if (!Array.isArray(value) || !value.every(n => Number.isInteger(n) && n >= 0 && n < 256)) {
@@ -1016,7 +1016,6 @@ function localVerifiedRead(
     reason: `${ref} ${why} (${localVerifier(kind)})`,
   });
   if (bytes === null) return { ok: false, reason: null };
-  let node: ValidationNodeJson;
   let raw: unknown;
   try {
     raw = JSON.parse(bytes);
@@ -1031,7 +1030,7 @@ function localVerifiedRead(
     // brit stores `{body, epoch, key, scheme, sig}` and nothing else; the flat view is printed only.
     return refuse('does not decode: not a brit.validate@2 stored envelope');
   }
-  node = flat.node;
+  const node: ValidationNodeJson = flat.node;
   if (!verifyValidationNode(node)) {
     const id = JSON.stringify(String(node.validatorId));
     return refuse(`signature does not verify against agentId ${id}`);
