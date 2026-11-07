@@ -1,5 +1,6 @@
 {
   "name": "elohim-orchestrator",
+  "license": "Apache-2.0",
   "private": true,
   "description": "CI/CD orchestrator - Jenkinsfile linting and pipeline management",
   "scripts": {

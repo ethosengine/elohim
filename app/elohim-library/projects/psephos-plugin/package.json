@@ -3,5 +3,5 @@
   "version": "0.1.0",
   "description": "Angular wrapper for Psephos governance ballot web component",
   "main": "src/public-api.ts",
-  "license": "UNLICENSED"
+  "license": "Apache-2.0"
 }

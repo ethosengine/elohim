@@ -2,6 +2,7 @@
 name = "avodah-types"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 description = "Wire types for avodah (work/services) domain coordinator functions"
 
 [dependencies]

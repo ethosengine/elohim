@@ -1,6 +1,7 @@
 {
   "name": "elohim-content-mcp",
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "description": "MCP server for transforming docs to structured content graph seed data",
   "type": "module",
   "main": "dist/index.js",

@@ -1,0 +1,16 @@
+---
+name: feedback_dayjob_feedback_flows_through_matthew_only
+description: Operator 2026-11-06 — the dayjob never submits MRs or feedback; Matthew carries the pain of using his own stewardship back in; cures built upstream on his own time
+metadata:
+  node_type: memory
+  title: Dayjob feedback flows through Matthew only
+  type: feedback
+  originSessionId: 717c876b-7262-4b9c-9b81-0bf6fbc11cda
+  modified: 2026-11-07T00:41:46.202Z
+---
+
+[steward of record: human:matthew] Operator ruling 2026-11-06, while weighing reuse of the protocol's tooling (epr, eprfs, a2o patterns, habit register) in an e2e verification project at their dayjob: "I will be the vehicle for escalating what pain I'm experiencing as a user of my own stewardship and I'll take that into elohim directly. My dayjob won't submit any direct MRs or feedback."
+
+**Why:** Keeps the dependency edge clean. The organisation pins a published release like any open-source package; nothing it produces crosses back. Pain is observation, which Matthew may carry as a person; a cure designed on the organisation's time would be its work product, so cures are built upstream on Matthew's own time and equipment, then released, and the organisation upgrades. See the licensing handoff (2026-11-06) concern 3 and [[user_operator_resource_reality_and_thesis]].
+
+**How to apply:** Never propose that the dayjob contribute code, issues, or reviews to elohim. When Matthew reports a pain from dayjob use, treat it as an operator-surfaced pain (the protocol's own algedonic channel, e.g. an `epr flow note --kind observation` against the declared measure) and design the cure here from the canon, not from anything described as the organisation's design. Licensing ruled the same day (steward, council-class): primitives MPL-2.0, services that serve people AGPL-3.0, everything else Apache-2.0 under the root LICENSE; CAL-1.0 only on the conductor fork; the canon prose CC BY-SA 4.0 (2026-11-07: "the elohim commons should own it", not a gift; then "owed to the constitution and the 'true commons' held in trust by the elohim and no human person" — constitution I.1: owned by no one, including its authors). Matthew is its copyright's holder of record only (not "trustee": no deed exists), bound by the irrevocable grant and the covenant's no-other-terms commitment; never write a transfer to an owner, a steward body included. Trajectory (Matthew, same day): as the network matures the holder-of-record seat dissolves rather than transfers — his stewardship becomes the ordinary standing every participant has, and the canon is held in stewardship by the network itself (he said "sovereign"; the canon's word is stewardship, nothing above it). Record: `genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md`, habit `licence-tiers-declared`. Not legal advice; counsel confirms before the first published release.

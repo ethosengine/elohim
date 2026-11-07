@@ -1,6 +1,7 @@
 {
   "name": "elohim-app",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "scripts": {
     "ng": "ng",
     "prestart": "pnpm --filter @elohim/storage-client build && bash scripts/fetch-fonts.sh && pnpm run build:sw && pnpm run build:wasm",

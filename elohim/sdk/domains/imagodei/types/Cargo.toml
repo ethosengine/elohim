@@ -2,6 +2,7 @@
 name = "imagodei-types"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 description = "Wire types for imagodei domain coordinator functions"
 
 [dependencies]

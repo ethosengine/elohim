@@ -1,6 +1,7 @@
 {
   "name": "elohim-core",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "sideEffects": [
@@ -9,7 +10,7 @@
     "*.css",
     "*.scss"
   ],
-  "description": "Protocol substrate \u2014 tokens, light-DOM globals, and atomic Custom Elements.",
+  "description": "Protocol substrate — tokens, light-DOM globals, and atomic Custom Elements.",
   "style": "./index.scss",
   "sass": "./index.scss",
   "main": "./dist/index.js",

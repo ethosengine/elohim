@@ -20,7 +20,7 @@
     "p2p"
   ],
   "author": "Elohim Protocol",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@holochain/client": "^0.21.0",
     "@msgpack/msgpack": "^3.0.0-beta2"

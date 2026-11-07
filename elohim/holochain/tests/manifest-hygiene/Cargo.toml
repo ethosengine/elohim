@@ -2,6 +2,7 @@
 name = "elohim_manifest_hygiene"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 publish = false
 description = "Fast schema contract test for elohim DNA manifests (wave-1 §7)."
 

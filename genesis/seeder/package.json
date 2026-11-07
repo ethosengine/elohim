@@ -1,6 +1,7 @@
 {
   "name": "holochain-seeder",
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "description": "Seed structured JSON from /data/lamad into Holochain",
   "type": "module",
   "scripts": {

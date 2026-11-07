@@ -2,6 +2,7 @@
 name = "elohim-peer-fabric"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Shared pure-logic peer-traffic fabric: defense-in-depth (guard) + capability-aware peer ranking (score). No I/O, no diesel — the dependency graph is the purity boundary."
 
 [features]

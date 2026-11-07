@@ -232,6 +232,8 @@ dependencies — every crate `epr_codec.rs` uses is already declared by `elohim-
 separate crate would be a fifth EPR crate whose dependency set is a subset of an existing one's. No consumer of
 `elohim-epr` is wasm-compiled (its own `flake.nix` says "Native crate"), and it is already a path dep of storage,
 already COPY'd by the Dockerfile and already in the edge manifest's globs, so no build wiring is needed.
+> **Superseded 2026-11-06** by the steward's licence-tiers ruling (`genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md`): primitives MPL-2.0, services AGPL-3.0, everything else Apache-2.0; CAL-1.0 remains only on the conductor fork. The fold/internal rules below still hold; only the licence names changed.
+
 **Licence — decided provisionally, 2026-09-19 (operator delegated the call "for now, we're still in
 development"; the stated ideal: encourage re-use that supports a commons while discouraging borrowers from breaking
 the base primitives).** `elohim-epr` is CAL-1.0 and `elohim-storage` is AGPL-3.0. The rule for this decomposition:
