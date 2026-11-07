@@ -2430,38 +2430,61 @@ impl P2PHandle {
                 Some(self.agent_pubkey.as_str()),
             )
         });
-        let self_is_selected = self_agent_cid
-            .as_deref()
-            .is_some_and(|me| selected.iter().any(|p| p.peer_id == me));
-        let local_pantry: Option<crate::reconcile::custody::BlobStoreSnapshot> = if self_is_selected
-        {
-            match self.blob_store.as_ref() {
-                Some(store) => {
-                    match crate::reconcile::custody::BlobStoreSnapshot::from_store(store) {
-                        Ok(snap) => Some(snap),
-                        Err(e) => {
-                            tracing::warn!(
-                                content_id,
-                                error = %e,
-                                "self-stewardship: local pantry snapshot failed; \
-                                 self-held locations not recorded this pass"
-                            );
-                            None
+        // The pantry snapshot is taken whenever this node has an identity, not only
+        // when the selector picked it: an uploader that holds a verified full copy
+        // is a holder whether or not placement chose it (storage-owner ruling,
+        // regenesis-1, on chaos-peer-churn:112).
+        let local_pantry: Option<crate::reconcile::custody::BlobStoreSnapshot> =
+            if self_agent_cid.is_some() {
+                match self.blob_store.as_ref() {
+                    Some(store) => {
+                        match crate::reconcile::custody::BlobStoreSnapshot::from_store(store) {
+                            Ok(snap) => Some(snap),
+                            Err(e) => {
+                                tracing::warn!(
+                                    content_id,
+                                    error = %e,
+                                    "self-stewardship: local pantry snapshot failed; \
+                                     self-held locations not recorded this pass"
+                                );
+                                None
+                            }
                         }
                     }
+                    None => {
+                        tracing::debug!(
+                            content_id,
+                            "self-stewardship: no local pantry on this handle; \
+                             self-held locations not recorded"
+                        );
+                        None
+                    }
                 }
-                None => {
+            } else {
+                None
+            };
+
+        // Full verified local copy: the whole payload reads back from this node's
+        // own pantry with its BLAKE3 recomputed over every chunk (`BlobStore::get`
+        // re-derives the CID before returning a byte; C5). Only then may this node
+        // record and pledge custody it was not selected for.
+        let self_full_copy_verified = match (self_agent_cid.as_deref(), self.blob_store.as_ref()) {
+            (Some(_), Some(store)) => match store.get(&manifest.blob_cid).await {
+                Ok(bytes) => bytes.len() as u64 == manifest.byte_len,
+                Err(e) => {
                     tracing::debug!(
                         content_id,
-                        "self-stewardship: no local pantry on this handle; \
-                             self-held locations not recorded"
+                        blob_cid = %manifest.blob_cid,
+                        error = %e,
+                        "self-stewardship: no verified full local copy; uploader custody not recorded"
                     );
-                    None
+                    false
                 }
-            }
-        } else {
-            None
+            },
+            _ => false,
         };
+        let mut self_recorded_units: std::collections::HashSet<ByteCid> =
+            std::collections::HashSet::new();
 
         let placement_plan = crate::sharding::plan_shard_placement_slots(&manifest, selected.len());
         if !manifest.stripes.is_empty() {
@@ -2522,6 +2545,7 @@ impl P2PHandle {
                             crate::services::self_stewardship::SELF_HELD_STATUS,
                         )
                         .await;
+                        self_recorded_units.insert(*hash);
                         self_placement_recorded = true;
                         distributed += 1;
                     }
@@ -2619,6 +2643,58 @@ impl P2PHandle {
             }
         }
 
+        // Uploader custody, independent of selection. A node that holds and serves
+        // a verified full copy IS a holder; leaving it un-recorded because the
+        // selector chose other peers made the resilience fold under-count (it
+        // depended on agent-key sort order). Each custody unit the pantry holds,
+        // and that placement did not already record for self, is recorded
+        // `self-held` and announced by its holder. It does NOT count toward
+        // `distributed`: placement gaps still measure the selected holders alone,
+        // and nothing here dials or pushes (no-self-dial contract).
+        if self_full_copy_verified {
+            if let (Some(me), Some(pantry)) = (self_agent_cid.as_deref(), local_pantry.as_ref()) {
+                for (unit_cid, _) in &units {
+                    if self_recorded_units.contains(unit_cid) {
+                        continue;
+                    }
+                    let Ok(mut conn) = pool.get() else { continue };
+                    match crate::services::self_stewardship::record_self_held_shard(
+                        &mut conn, pantry, unit_cid, me, h_app_id,
+                    ) {
+                        Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => {
+                            tracing::info!(
+                                content_id,
+                                shard_cid = %unit_cid,
+                                peer = %me,
+                                "Uploader copy recorded as self-held (verified full copy; not selected, no push)"
+                            );
+                            self.announce_custody(
+                                unit_cid,
+                                me,
+                                h_app_id,
+                                crate::services::self_stewardship::SELF_HELD_STATUS,
+                            )
+                            .await;
+                            self_recorded_units.insert(*unit_cid);
+                            self_placement_recorded = true;
+                        }
+                        Ok(outcome) => tracing::debug!(
+                            content_id,
+                            shard_cid = %unit_cid,
+                            ?outcome,
+                            "Uploader unit NOT recorded self-held (derived bytes not in the pantry)"
+                        ),
+                        Err(e) => tracing::warn!(
+                            content_id,
+                            shard_cid = %unit_cid,
+                            error = %e,
+                            "Uploader self-held recording failed"
+                        ),
+                    }
+                }
+            }
+        }
+
         // First-commitment producer: verified self-placement is the consented
         // self-stewardship seam. Author ONE active custody-blob promise for the
         // exact generated manifest address. The method already holds the full
@@ -2629,7 +2705,9 @@ impl P2PHandle {
         // and a later distribution/backfill retries; it never creates a local
         // SQLite-only promise. Failure is non-fatal to the evidence plane—the
         // manifest + shard_locations remain truthful and the gap stays visible.
-        if self_placement_recorded {
+        // A verified full local copy pledges the blob too, even when every unit
+        // is a derived stripe shard the pantry does not hold as such.
+        if self_placement_recorded || self_full_copy_verified {
             match (self_agent_cid.as_deref(), self.hc_lamad.as_ref()) {
                 (Some(provider), Some(hc)) => match pool.get() {
                     Ok(mut conn) => {
@@ -11069,7 +11147,13 @@ fn acquisition_prefer_iroh() -> &'static bool {
 #[derive(Clone)]
 // `blob_store` / `self_cid` feed the iroh quilt-draw leg (`acquire_over_iroh`);
 // without that feature the libp2p leg reads them from `P2PNode` directly.
-#[cfg_attr(not(feature = "p2p-iroh"), allow(dead_code))]
+#[cfg_attr(
+    not(feature = "p2p-iroh"),
+    allow(
+        dead_code,
+        reason = "blob_store / self_cid are read only by the iroh quilt-draw leg"
+    )
+)]
 pub(crate) struct AcquisitionIngestCtx {
     pub(crate) db_pool: Option<DbPool>,
     pub(crate) replication_state: replication::ReplicationState,

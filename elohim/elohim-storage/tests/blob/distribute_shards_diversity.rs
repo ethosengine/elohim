@@ -338,3 +338,125 @@ async fn self_selection_records_nothing_when_bytes_are_absent() {
         "still no self-dial when the bytes are absent"
     );
 }
+
+/// Uploader NOT selected + verified full copy in its own pantry → the uploader
+/// still records ONE `self-held` row and announces it, while the selected peer
+/// keeps its slot (storage-owner ruling on chaos-peer-churn:112). Before this,
+/// the uploader's copy was un-recorded whenever another household member's
+/// agent key sorted first — a holder answering 200 that the fold never saw.
+#[tokio::test]
+async fn uploader_not_selected_still_records_self_held_and_announces() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    // One household, two members. `PeerSelection` sorts by agent_cid and takes
+    // the first candidate per household, so `uhCAkAAA…` is selected and the
+    // uploader (`uhCAkSelfAgent`) is not.
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[
+            ("uhCAkAAAOtherAgent", "home-self", "accepting"),
+            ("uhCAkSelfAgent", "home-self", "accepting"),
+        ],
+    )
+    .await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    // One chunk, unstriped: the single custody unit's CID is the blob's.
+    let blob = vec![5u8; 4096];
+    let stored = store.store(&blob).await.expect("stock blob");
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    let distributed = handle
+        .distribute_shards("content-uploader-unselected", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    assert_eq!(
+        distributed, 0,
+        "the uploader's own copy is not a placement: the selected peer has no \
+         transport binding here, so nothing was placed"
+    );
+
+    let mut conn = pool.get().unwrap();
+    let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+        &mut conn,
+        &stored.cid.to_string(),
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1, "exactly the uploader's row, got {rows:?}");
+    assert_eq!(rows[0].peer_id, "uhCAkSelfAgent");
+    assert_eq!(
+        rows[0].status, "self-held",
+        "the uploader's copy stays distinguishable from a peer-verified one"
+    );
+
+    match cmd_rx.try_recv() {
+        Ok(elohim_storage::p2p::P2PCommand::AnnounceCustody(ann)) => {
+            assert_eq!(ann.shard_cid.to_string(), stored.cid.to_string());
+            assert_eq!(ann.holder_agent_cid, "uhCAkSelfAgent");
+            assert_eq!(ann.status, "self-held");
+        }
+        Ok(_) => {
+            panic!("the uploader emitted a non-announce P2P command (it must never dial itself)")
+        }
+        Err(e) => panic!("expected the uploader's custody announcement, got recv error: {e}"),
+    }
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "one announcement, no push, no self-dial"
+    );
+}
+
+/// Uploader NOT selected and its pantry does NOT hold the blob → nothing is
+/// recorded or announced: a copy that cannot be read back verified is no copy.
+#[tokio::test]
+async fn uploader_not_selected_without_a_verified_copy_records_nothing() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[
+            ("uhCAkAAAOtherAgent", "home-self", "accepting"),
+            ("uhCAkSelfAgent", "home-self", "accepting"),
+        ],
+    )
+    .await;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    let blob = vec![6u8; 4096];
+    let shard_cid = elohim_epr::address::compute_bytes_cid(&blob).to_string();
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    handle
+        .distribute_shards("content-uploader-dark", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+
+    let mut conn = pool.get().unwrap();
+    let rows = elohim_storage::db::shard_locations::get_locations_for_shard(&mut conn, &shard_cid)
+        .unwrap();
+    assert!(rows.is_empty(), "no verified copy, no row; got {rows:?}");
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "no announcement without a verified copy"
+    );
+}

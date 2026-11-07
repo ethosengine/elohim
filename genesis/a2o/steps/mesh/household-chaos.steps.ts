@@ -990,23 +990,25 @@ Given(
     // The custody-blob commitment check above proves each peer holds a
     // provider row and the bytes — it does NOT prove the household
     // resilience fold counts those copies. `intraHubPeers` is folded on the
-    // fold peer (today: matthew) from BOUND member agent keys, and a peer's
-    // copy joins the household entry only once its agent key is bound as a
-    // household member there. Bytes-plus-commitment on jessica/james does
-    // not bind them as household members, so the fold can undercount even
-    // when custody itself is real and converged. A cascade asserted against
-    // that undercounted baseline would blame CHURN for a gap that predates
-    // it — refuse here, loudly, instead of letting the ladder rungs below
-    // read a broken baseline as if it were the drill's doing.
+    // fold peer (today: matthew) from the holders its own `shard_locations`
+    // names, joined to bound household members. A holder can be missing from
+    // that view for more than one reason (its copy was never recorded or
+    // announced, the announcement has not arrived, or its key is not bound
+    // there), so this step reports the measured shortfall and names no cause
+    // it did not check. A cascade asserted against an undercounted baseline
+    // would blame CHURN for a gap that predates it — refuse here, loudly,
+    // instead of letting the ladder rungs below read a broken baseline as if
+    // it were the drill's doing.
     const { custodyCopies } = await intraHubRung(this, contentId);
     const seededNames = state.peers.map(peer => peer.name).join(', ');
     assert.equal(
       custodyCopies,
       expected,
       `seeded custody on all ${expected} household peers (${seededNames}) but the household ` +
-        `resilience fold counts only ${custodyCopies} intra-household ` +
-        `cop${custodyCopies === 1 ? 'y' : 'ies'} for "${contentId}" — household formation ` +
-        'incomplete: member agent keys not bound on the fold peer'
+        `resilience fold counts ${custodyCopies} held ` +
+        `cop${custodyCopies === 1 ? 'y' : 'ies'} for "${contentId}", fewer than the ${expected} ` +
+        `expected — ${expected - custodyCopies} holder(s) missing from the fold peer's view ` +
+        "(compare each peer's shard_locations rows for this content)"
     );
   }
 );
