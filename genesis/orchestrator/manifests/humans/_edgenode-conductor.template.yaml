@@ -356,10 +356,13 @@ spec:
             # pool every worker parks, the db open never completes, and install_app
             # idles to the 180 s admin timeout ("Failed to get a RwShare read lock for
             # over 120s", edge #1826). More threads, not more CPU: parked threads cost
-            # nothing against the quota. Remove when the fork builds the Space outside
-            # the write lock.
+            # nothing against the quota. 24 installed five of seven (edge #1828); adam
+            # still starved once five peers' inbound handlers added readers, so 128.
+            # The starved piece is tokio's timer/IO driver, which only an idle worker
+            # runs. Remove when the fork builds the Space outside the map lock (per-DNA
+            # single-flight; genesis/local-dev/regenesis-1/codex/space-lock.out).
             - name: TOKIO_WORKER_THREADS
-              value: "24"
+              value: "128"
             # Cooperative-cgroup CPU lever, now a no-op: storage and conductor
             # no longer share a container cgroup, so there is no intra-cgroup
             # CPU race for niceness to arbitrate. Explicitly "0" (disabled) so
