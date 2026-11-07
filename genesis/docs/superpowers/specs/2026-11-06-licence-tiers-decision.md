@@ -149,15 +149,8 @@ on MPL primitives (allowed: MPL is file-scoped; a larger work may carry other te
 inversion — Apache `doorway-service` taking CAL `elohim-views` as a path dependency — is gone with
 both ends moved. `deny.toml` now allows AGPL-3.0 beside MPL-2.0 and CAL-1.0 (the fork's deps).
 
-## What this did not decide
+## Adopted as the working commitment
 
-- `elohim-storage-client`, `elohim-sdk`, `consent-grant`, `seam-contracts`, `bridges/workspace` and
-  `bridges/browser` stay AGPL-3.0 as carved-out storage internals. The client and SDK crates are
-  consumer-facing and may belong in the primitives or tooling tier; that is the next ruling.
-- Whether a legal person other than the steward should ever be the canon's holder of record, and whether the covenant's no-other-terms commitment should be given an instrument (a deed, an assignment to a body bound by the constitution). Either would be a holder under the constitution, not an owner; the question is who signs and what binds them beyond a pledge.
-- Per-crate `LICENSE` files in published tarballs; the SPDX `license` field is relied on for now.
-- A trademark on "elohim" and the pillar names, as the instrument that polices capture without
-  enclosing the code.
 - **Adopted 2026-11-07 as `EPR-LICENSE-1.0.md`**, the protocol's own licence and "the working
   commitment to the constitution" (the steward's words). Asked for first as a bespoke copyright
   licence and declined in that form (not OSI-approved, untested, incompatible with the
@@ -173,8 +166,52 @@ both ends moved. `deny.toml` now allows AGPL-3.0 beside MPL-2.0 and CAL-1.0 (the
   do, the licence composed into the repository's `.epr-meta`, and the measure of maturity as habit
   `commons-held-by-the-network`. Its present-tense claims are a working commitment: what runs of the
   machinery is stated in the licence's own "What runs today" and in the habit's delta.
-- A published, versioned release of the tooling tier (workspace-discipline backlog row 3): until it
-  exists a downstream organisation has nothing to pin and can only re-implement patterns.
+
+## Working postures
+
+Steward, 2026-11-07: "set a working posture for everything." Nothing below is decided. Each is the
+stance the work proceeds under until the named trigger reopens it, the same way the licence is a
+working commitment rather than a claim of present enforcement.
+
+- **The push.** The licence commits (`ec7a85bfe`, `3780065e1`, and this one) stay on `dev` unpushed
+  and ride with the next work that lands; no push is made for them alone. Resolves itself.
+- **The storage client and SDK crates** (`elohim-storage-client`, `elohim-sdk`, `consent-grant`,
+  `seam-contracts`, `bridges/workspace`, `bridges/browser`): stay AGPL-3.0 as carved-out storage
+  internals. Reopens when a consumer outside the services tier needs to pin one; the ruling then is
+  MPL-2.0 for the client and SDK pair as primitives, made at that moment and not before.
+- **The holder of record.** The steward, for the canon and for what the steward wrote; every other
+  maker for what they wrote; no deed, no assignment, no instrument beyond the irrevocable grants,
+  the covenant's no-other-terms commitment and the licence's §13 measure. Reopens only if outside
+  law requires a signatory the steward cannot be, and whoever then signs does so as the councils'
+  instrument (licence §7) and nothing more.
+- **The name.** Reserved by the licence (§5) inside the network: a false wearing is flagged and
+  marked false in the record. Nothing registered, no litigation posture, no bridge holding a mark.
+  Reopens when a rent-charging fork wears the name outside the network; the instrument then is a
+  mark held by a bridge, never as governance, never convertible, for that one purpose.
+- **Per-crate `LICENSE` files.** The SPDX `license` field is the declaration; no per-crate text.
+  Reopens at the first published tarball of a tooling crate.
+- **The tooling release.** None exists; a downstream organisation re-implements patterns and pins
+  nothing. Reopens as workspace-discipline backlog row 3 when the next sprint touches eprfs or
+  epr-cli, which then tags a 0.x of epr-cli and the eprfs crates and flips epr-cli's
+  `publish = false`; the steward's employer's first need to pin is what schedules it.
+- **The clauses the licence states first** (the network shape, the intersection rule, the layered
+  council chosen by reach): the licence's own terms under its §9 until the constitution carries
+  them. The constitution absorbs them at its next amendment, with `governance-layers-architecture.md`
+  §2 and §4 reconciled to the from-below reading in the same pass. Reopens at that amendment.
+- **The licence's present tense.** The licence speaks in the voice of the mature network; its "What
+  runs today" and habit `commons-held-by-the-network` are the truth, and the register is read
+  first. Each of the six conditions gets its check the moment it becomes observable, the fourth
+  first (the record refusing an addition under other terms). Reopens with every flip of the habit.
+- **Counsel.** Not legal advice throughout. Counsel reads the border licences and the tiers before
+  the first published release, and nothing blocks on counsel until then.
+- **The relying organisation** (the steward's employer): an outsider at the border (licence §11). It
+  pins a release when one exists and re-implements patterns until then; nothing it makes crosses
+  back; the steward carries the pain in as a person and makes the cure here on their own time. The
+  one act on its side, owed before the first pin: a dated prior-work notice pointing at the public
+  history.
+- **Attribution on these commits.** The hook reports `UNMEASURED` although the berth is moored to the
+  model. The commits stand unamended, carrying the `Co-Authored-By` line; the hook's reading of the
+  envelope is its own item, diagnosed, never repaired by rewriting history.
 
 ## Evidence
 
