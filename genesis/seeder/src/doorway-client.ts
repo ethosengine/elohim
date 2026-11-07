@@ -60,6 +60,8 @@ export interface DoorwayClientConfig {
   retries?: number;
   /** Dry run mode - log but don't actually push */
   dryRun?: boolean;
+  /** Test seam for retry backoff waits. */
+  sleep?: (milliseconds: number) => Promise<void>;
 }
 
 /** Credentials for authenticating the seeder against a bearer-gated doorway. */
@@ -332,11 +334,62 @@ export async function sendRetryingShed(
 }
 
 // =============================================================================
+// Deferred commitment-write retry
+// =============================================================================
+
+/** Backoffs after a transient deferred commitment write (four attempts total). */
+export const DEFERRED_COMMITMENT_BACKOFFS_MS = [1_000, 2_000, 4_000] as const;
+
+/**
+ * Re-issue one commitment write only when storage answers HTTP 400 and its
+ * body contains `deferred`. Every other response is returned unchanged (and
+ * with a readable body) so the caller's existing error handling remains in
+ * force. Persistent deferral throws after four attempts and names that count.
+ */
+export async function sendRetryingDeferredCommitmentWrite(
+  send: () => Promise<Response>,
+  label: string,
+  sleep: (milliseconds: number) => Promise<void> = async milliseconds => {
+    await new Promise(resolve => setTimeout(resolve, milliseconds));
+  },
+): Promise<Response> {
+  const maxAttempts = DEFERRED_COMMITMENT_BACKOFFS_MS.length + 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await send();
+    if (response.status !== 400) return response;
+
+    const text = await response.clone().text();
+    if (!text.includes('deferred')) {
+      return response;
+    }
+
+    const reason = text.replace(/\s+/g, ' ').trim();
+    if (attempt === maxAttempts) {
+      throw new Error(`${label}: failed after ${maxAttempts} attempts — HTTP 400: ${reason}`);
+    }
+
+    const delay = DEFERRED_COMMITMENT_BACKOFFS_MS[attempt - 1]!;
+    console.warn(
+      `${label}: retrying attempt ${attempt + 1}/${maxAttempts} in ${delay / 1000}s — ${reason}`,
+    );
+    await sleep(delay);
+  }
+
+  throw new Error(`${label}: failed after ${maxAttempts} attempts`);
+}
+
+// =============================================================================
 // Doorway Client
 // =============================================================================
 
 export class DoorwayClient {
-  private config: DoorwayClientConfig & { baseUrl: string; timeout: number; retries: number; dryRun: boolean };
+  private config: DoorwayClientConfig & {
+    baseUrl: string;
+    timeout: number;
+    retries: number;
+    dryRun: boolean;
+    sleep: (milliseconds: number) => Promise<void>;
+  };
 
   /**
    * Bearer JWT minted by `login()`. When present it is sent on every request
@@ -364,6 +417,9 @@ export class DoorwayClient {
       timeout: config.timeout || 30000,
       retries: config.retries || 3,
       dryRun: config.dryRun || false,
+      sleep: config.sleep ?? (async milliseconds => {
+        await new Promise(resolve => setTimeout(resolve, milliseconds));
+      }),
     };
   }
 
@@ -1261,7 +1317,7 @@ export class DoorwayClient {
     // the body stays readable) and the caller's own handling runs unchanged.
     // The policy lives in sendRetryingShed (above), shared with the seeders
     // that write with plain fetch.
-    return sendRetryingShed(async () => {
+    const send = () => sendRetryingShed(async () => {
       let lastError: Error | null = null;
       let response: Response | null = null;
 
@@ -1295,6 +1351,12 @@ export class DoorwayClient {
       }
       return response;
     }, `${options.method || 'GET'} ${path}`);
+
+    const method = options.method || 'GET';
+    if (path === '/api/v1/commitments' && (method === 'POST' || method === 'PUT')) {
+      return sendRetryingDeferredCommitmentWrite(send, `${method} ${path}`, this.config.sleep);
+    }
+    return send();
   }
 }
 
