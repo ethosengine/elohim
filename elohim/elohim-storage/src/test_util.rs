@@ -169,3 +169,128 @@ pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) ->
     let p2p = crate::p2p::P2PHandle::for_testing();
     P2PTestHarness { p2p, pool }
 }
+
+// ---------------------------------------------------------------------------
+// Cross-signed identity fixtures — the ONLY authority admission reads
+// (`p2p::transport_authority`). A test that binds an author to an agent goes
+// through these, never through `peer_transport_manifest`.
+// ---------------------------------------------------------------------------
+
+/// The agent signing key for a readable test name (seeded from the name's BLAKE3).
+#[cfg(feature = "p2p")]
+pub fn test_agent_key(name: &str) -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(blake3::hash(name.as_bytes()).as_bytes())
+}
+
+/// A real HoloHash `agent_cid` (`uhCAk…`) for a readable test name: the agent key a
+/// cross-signed binding can actually name.
+#[cfg(feature = "p2p")]
+pub fn test_agent(name: &str) -> String {
+    crate::p2p::binding_proof_wire::agent_cid_from_agent_pubkey(
+        &test_agent_key(name).verifying_key().to_bytes(),
+    )
+}
+
+/// Insert an active, cross-signed `AgentPeerBinding` row binding [`test_agent`]`(name)`
+/// to the libp2p PeerId of `transport_secret` — both halves really signed and
+/// classified by the production chokepoint. Returns the PeerId.
+#[cfg(feature = "p2p")]
+pub fn bind_cross_signed(
+    conn: &mut diesel::SqliteConnection,
+    name: &str,
+    transport_secret: [u8; 32],
+) -> String {
+    use crate::p2p::binding_cross_signature::{
+        canonical_bytes, BindingCore, CrossSignatureProof, AGENT_DOMAIN, SCHEME_VERSION,
+        TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
+    };
+    use crate::p2p::binding_proof_wire::{
+        classify_binding_signature, encode_proof, libp2p_peer_id_from_ed25519_pubkey,
+    };
+    use ed25519_dalek::Signer;
+
+    let agent_sk = test_agent_key(name);
+    let transport_sk = ed25519_dalek::SigningKey::from_bytes(&transport_secret);
+    let agent = test_agent(name);
+    let peer_id = libp2p_peer_id_from_ed25519_pubkey(&transport_sk.verifying_key().to_bytes())
+        .expect("ed25519 PeerId");
+    let now = chrono::Utc::now();
+    let fmt = |t: chrono::DateTime<chrono::Utc>| t.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let (from, until) = (
+        fmt(now - chrono::Duration::days(1)),
+        fmt(now + chrono::Duration::days(29)),
+    );
+    let core = BindingCore {
+        agent_cid: agent.clone(),
+        transport_id: peer_id.clone(),
+        transport_kind: TRANSPORT_KIND_LIBP2P,
+        valid_from: from.clone(),
+        valid_until: Some(until.clone()),
+        nonce: "dGVzdC1iaW5kaW5n".into(),
+        issued_at: from.clone(),
+    };
+    let signature = encode_proof(&CrossSignatureProof {
+        scheme_version: SCHEME_VERSION,
+        transport_kind: TRANSPORT_KIND_LIBP2P,
+        transport_pubkey: transport_sk.verifying_key().to_bytes(),
+        transport_signature: transport_sk
+            .sign(&canonical_bytes(TRANSPORT_DOMAIN, &core))
+            .to_bytes(),
+        agent_pubkey: agent_sk.verifying_key().to_bytes(),
+        agent_signature: agent_sk
+            .sign(&canonical_bytes(AGENT_DOMAIN, &core))
+            .to_bytes(),
+        nonce: core.nonce.clone(),
+        issued_at: from.clone(),
+    });
+    let proof_status = classify_binding_signature(
+        &agent,
+        &peer_id,
+        TRANSPORT_KIND_LIBP2P,
+        &from,
+        Some(&until),
+        &signature,
+    );
+    assert!(
+        proof_status.is_cross_signed(),
+        "fixture must classify cross_signed"
+    );
+    crate::db::peer_identity_bindings::upsert(
+        conn,
+        &crate::db::models::NewPeerIdentityBindingRow {
+            peer_id: peer_id.clone(),
+            agent_cid: agent,
+            dht_anchor_hash: format!("anchor-{peer_id}"),
+            valid_from: from.clone(),
+            valid_until: Some(until),
+            observed_at: from,
+            source: "dht".into(),
+            device_archetype: "node".into(),
+            superseded_by: None,
+            signature,
+            proof_status,
+        },
+    )
+    .expect("insert cross-signed binding");
+    peer_id
+}
+
+/// Record a verified two-key transport link between the libp2p key `libp2p_secret`
+/// and the iroh key `iroh_secret`. Returns the iroh NodeId.
+#[cfg(feature = "p2p")]
+pub fn link_transports(
+    conn: &mut diesel::SqliteConnection,
+    libp2p_secret: [u8; 32],
+    iroh_secret: [u8; 32],
+) -> String {
+    let link = crate::p2p::transport_link::TransportLink::sign(
+        &elohim_epr::proof::AgentKeypair::from_secret(&libp2p_secret).expect("libp2p key"),
+        &elohim_epr::proof::AgentKeypair::from_secret(&iroh_secret).expect("iroh key"),
+        chrono::Utc::now().timestamp_millis(),
+    )
+    .expect("link");
+    link.verify(chrono::Utc::now().timestamp_millis())
+        .expect("fixture link verifies");
+    crate::db::transport_links::record_verified(conn, &link).expect("record link");
+    link.iroh_node_id
+}

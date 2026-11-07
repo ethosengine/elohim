@@ -2734,15 +2734,11 @@ async fn async_main(
                                             );
                                             continue;
                                         };
-                                        let pantry = match elohim_storage::reconcile::custody::BlobStoreSnapshot::from_store(
+                                        // A verified pantry: the pledge is authored only over bytes that read
+                                        // back verified, never over a name `blobs/` lists.
+                                        let pantry = elohim_storage::reconcile::custody::VerifiedPantry::new(
                                             &rotation_blob_store,
-                                        ) {
-                                            Ok(p) => p,
-                                            Err(e) => {
-                                                tracing::warn!(error = %e, "custody rotation tick: pantry snapshot failed (retry next tick)");
-                                                continue;
-                                            }
-                                        };
+                                        );
                                         match elohim_storage::services::custody_rotation::run_rotation_pass(
                                             &mut conn,
                                             &ctx,
@@ -4221,6 +4217,34 @@ async fn async_main(
                     e
                 })?
                 .to_bytes();
+        // The two-key transport link: on a dual node the libp2p identity key (whose
+        // PeerId this node's AgentPeerBinding cross-signs) and the iroh key each sign
+        // the pair, so receivers can resolve this node's iroh-signed claims to its
+        // agent (`p2p::transport_authority`). Signed once; both keys live for the
+        // process. A pure-iroh node has no libp2p identity and carries none.
+        let announce_transport_link = if p2p_node.is_some() {
+            let link = elohim_storage::identity::NodeIdentity::load(
+                &config.storage_dir.join("identity.key"),
+                String::new(),
+            )
+            .ok()
+            .and_then(|identity| identity.keypair().clone().try_into_ed25519().ok())
+            .and_then(|ed| elohim_epr::proof::AgentKeypair::from_secret(ed.secret().as_ref()).ok())
+            .zip(elohim_epr::proof::AgentKeypair::from_secret(&iroh_announce_secret).ok())
+            .and_then(|(libp2p_key, iroh_key)| {
+                elohim_storage::p2p::transport_link::TransportLink::sign(
+                    &libp2p_key,
+                    &iroh_key,
+                    chrono::Utc::now().timestamp_millis(),
+                )
+            });
+            if link.is_none() {
+                warn!("iroh: no transport link signed — this node's iroh-signed claims bind to no agent");
+            }
+            link
+        } else {
+            None
+        };
         // One resolution, two consumers (the announcer's POST leg and the
         // bootstrap joiner's GET leg) — they must agree on the same doorway.
         let doorway_base_url = elohim_storage::p2p_iroh::doorway_base_url();
@@ -4246,6 +4270,7 @@ async fn async_main(
                 .collect(),
                 publisher: announce_publisher,
                 doorway_url: doorway_base_url.clone(),
+                transport_link: announce_transport_link,
             },
             elohim_storage::p2p_iroh::announcer::announce_interval(),
         );

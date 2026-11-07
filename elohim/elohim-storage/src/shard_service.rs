@@ -22,7 +22,7 @@ use tracing::{debug, error, info, warn};
 
 use elohim_epr::address::{compute_bytes_cid, ByteCid};
 
-use crate::blob_store::{BlobStore, Exists};
+use crate::blob_store::BlobStore;
 use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::p2p::shard_protocol::{self, ShardRequest, ShardResponse};
@@ -382,7 +382,9 @@ impl ShardService {
 
     async fn handle_have(&self, cid: ByteCid) -> ShardResponse {
         debug!(cid = %cid, "Handling shard Have request");
-        ShardResponse::Have(self.blob_store.exists(&cid).await == Exists::Verified)
+        // An advertising probe: structural presence, no payload hashing and no
+        // quarantine side effect (a requester verifies what it fetches).
+        ShardResponse::Have(self.blob_store.present(&cid).await)
     }
 
     async fn handle_push(
@@ -674,6 +676,49 @@ mod tests {
         let dir = tempdir().unwrap();
         let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
         ShardService::new(blob_store, None)
+    }
+
+    /// `Have` is an advertising probe: it answers from the store's structure and never
+    /// hashes (or quarantines) the payload — a requester verifies what it fetches. A
+    /// same-length corruption a hash would catch is left exactly where it was.
+    #[tokio::test]
+    async fn have_does_not_hash_the_payload() {
+        fn find(root: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+            for entry in std::fs::read_dir(root).ok()?.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(found) = find(&path, name) {
+                        return Some(found);
+                    }
+                } else if entry.file_name().to_string_lossy() == name {
+                    return Some(path);
+                }
+            }
+            None
+        }
+        let dir = tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(dir.path().to_path_buf()).await.unwrap());
+        let stored = blob_store.store(b"advertised, not hashed").await.unwrap();
+        let path = find(&dir.path().join("blobs"), &stored.cid.to_string()).unwrap();
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[0] ^= 0x01;
+        std::fs::write(&path, &bytes).unwrap();
+        let svc = ShardService::new(blob_store.clone(), None);
+        let have = svc
+            .handle(&Requester::local(), ShardRequest::Have { cid: stored.cid })
+            .await;
+        assert!(matches!(have, ShardResponse::Have(true)), "{have:?}");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            bytes,
+            "no quarantine, no rewrite"
+        );
+        // The verified answer still refuses it.
+        assert_eq!(blob_store.exists(&stored.cid).await, Exists::Quarantined);
+        let absent = svc
+            .handle(&Requester::local(), ShardRequest::Have { cid: stored.cid })
+            .await;
+        assert!(matches!(absent, ShardResponse::Have(false)), "{absent:?}");
     }
 
     /// A holder serves a payload under its byte CID, the one spelling the wire

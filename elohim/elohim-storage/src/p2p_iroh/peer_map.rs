@@ -306,6 +306,47 @@ pub fn record_iroh_observation(
     .map_err(|e| StorageError::Database(format!("record_iroh_observation: {e}")))
 }
 
+/// Record what an UNAUTHENTICATED transport manifest says about where `agent_cid`'s
+/// iroh endpoint lives — a dial hint, never authority.
+///
+/// The manifest's signature proves only that the announcer holds `node_id`'s key; its
+/// `agent_cid` is self-asserted, so anyone can announce `{node_id: theirs, agent_cid:
+/// victim}`. This therefore never REPLACES an iroh NodeId already recorded for the
+/// agent with a different one, unless the announcing NodeId is itself authenticated to
+/// that agent through the cross-signed chain (`p2p::transport_authority` — a two-key
+/// transport link to a PeerId whose `AgentPeerBinding` the agent cross-signed). A
+/// first observation, or a refresh of the same NodeId, records as before. Nothing here
+/// is ever read as authority: binding checks go through `transport_authority` only.
+///
+/// Returns whether the row was written.
+pub fn record_manifest_hint(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+    node_id: &str,
+    relays: &[String],
+    supports: &[Plane],
+    observed_at: i64,
+) -> Result<bool, StorageError> {
+    use peer_transport_manifest as t;
+    let held: Option<Option<String>> = t::table
+        .filter(t::agent_cid.eq(agent_cid))
+        .select(t::iroh_node_id)
+        .first(conn)
+        .optional()
+        .map_err(|e| StorageError::Database(format!("record_manifest_hint: {e}")))?;
+    if let Some(Some(held)) = held {
+        if held != node_id
+            && crate::p2p::transport_authority::authenticated_agent_for_transport(conn, node_id)
+                .as_deref()
+                != Some(agent_cid)
+        {
+            return Ok(false);
+        }
+    }
+    record_iroh_observation(conn, agent_cid, node_id, relays, supports, observed_at)?;
+    Ok(true)
+}
+
 pub fn record_capability(
     conn: &mut SqliteConnection,
     agent_cid: &str,

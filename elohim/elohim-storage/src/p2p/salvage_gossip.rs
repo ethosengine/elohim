@@ -22,7 +22,7 @@
 //! that authored it (`author_peer`) and a [`SignatureEnvelope`] made with that peer's
 //! transport key over transcript v1, exactly as a custody announcement is
 //! (`p2p::custody_announce`): a dual node signs with its iroh key, the identity
-//! `peer_transport_manifest` binds from the signed transport manifest; a libp2p-only
+//! a verified two-key transport link ties to its cross-signed libp2p PeerId; a libp2p-only
 //! node with its libp2p identity key.
 //!
 //! ```text
@@ -46,13 +46,15 @@
 //! 5. The signature verifies over the transcript under the envelope's own key.
 //! 6. The author is derived from that key: `author_peer` must be one of the key's
 //!    transport spellings (the libp2p PeerId it makes, or the iroh NodeId it is).
-//! 7. The advertised `agent_cid` must be the agent `peer_transport_manifest` binds to
+//! 7. The advertised `agent_cid` must be the agent the cross-signed chain (`p2p::transport_authority`) binds to
 //!    the signing key's transport identity. An unbound signer is refused.
 //! 8. On libp2p the gossipsub `message.source` must not contradict the ad: a source
 //!    this node binds to a DIFFERENT agent than the signer's refuses; an unbound or
 //!    absent source does not — the signature and the binding are the authority.
 //! 9. Freshness: `issued_at_ms` is no older than [`SALVAGE_AD_MAX_AGE_MS`] and no more
-//!    than [`SALVAGE_AD_MAX_SKEW_MS`] ahead of the receiver's clock.
+//!    than [`SALVAGE_AD_MAX_SKEW_MS`] ahead of the receiver's clock, and the boot epoch
+//!    in `seq`'s high bits is not later than `issued_at_ms` (a seq cannot be minted to
+//!    run ahead of every honest one).
 //!
 //! Replay is judged at projection: an admitted ad applies only when its `seq` is
 //! strictly above the `seq` already projected for that agent
@@ -261,6 +263,8 @@ pub enum SalvageRefusal {
     Stale { issued_at_ms: i64 },
     #[error("ad issued at {issued_at_ms} ms is ahead of this clock beyond the skew bound")]
     FromTheFuture { issued_at_ms: i64 },
+    #[error("seq {seq} claims a boot epoch after the ad's own issue time {issued_at_ms} ms")]
+    SeqAheadOfIssue { seq: u64, issued_at_ms: i64 },
 }
 
 impl SalvageRefusal {
@@ -269,7 +273,9 @@ impl SalvageRefusal {
         match self {
             Self::Structural(_) => "refused_structural",
             Self::AuthorMismatch { .. } | Self::Binding(_) => "refused_binding",
-            Self::Stale { .. } | Self::FromTheFuture { .. } => "refused_freshness",
+            Self::Stale { .. } | Self::FromTheFuture { .. } | Self::SeqAheadOfIssue { .. } => {
+                "refused_freshness"
+            }
             Self::Oversize(_)
             | Self::Unsigned(_)
             | Self::Malformed(_)
@@ -297,9 +303,9 @@ pub enum SalvageAdmission {
 }
 
 /// Judge one received ad (see the module docs for the order of checks).
-/// `bound_agent` answers the agent `peer_transport_manifest` binds to a transport id
+/// `bound_agent` answers the agent the cross-signed chain (`p2p::transport_authority`) binds to a transport id
 /// (the signer's binding); `source_agent` answers the agent any binding this node
-/// holds attributes to a relaying gossipsub source (manifest or identity bindings).
+/// holds attributes to a relaying gossipsub source (the same chain).
 /// `now_ms` is the receiver's clock (epoch milliseconds).
 pub fn admit(
     raw: &[u8],
@@ -349,7 +355,7 @@ pub fn admit(
     if !ids.iter().any(|id| id == &signed.author_peer) {
         return SalvageAdmission::Refused(SalvageRefusal::AuthorNotSigner(signed.author_peer));
     }
-    // The advertised agent is the agent the manifest binds to the signer's transport
+    // The advertised agent is the agent the cross-signed chain binds to the signer's transport
     // identity (the claimed spelling first, then the key's other spelling).
     let bound = std::iter::once(signed.author_peer.as_str())
         .chain(ids.iter().map(String::as_str))
@@ -389,6 +395,16 @@ pub fn admit(
     }
     if issued_at_ms > now_ms.saturating_add(SALVAGE_AD_MAX_SKEW_MS) {
         return SalvageAdmission::Refused(SalvageRefusal::FromTheFuture { issued_at_ms });
+    }
+    // The seq carries the advertiser's boot epoch in its high 32 bits
+    // (`p2p::sync_state`). A process cannot have booted after it signed, so an epoch
+    // past the ad's own issue time is a seq minted to run ahead of every honest one
+    // (a single such ad would freeze the agent's row: replay is judged by seq).
+    let seq = signed.body.seq;
+    let issued_epoch =
+        crate::p2p::sync_state::boot_epoch(u64::try_from(issued_at_ms.max(0) / 1000).unwrap_or(0));
+    if crate::p2p::sync_state::split_sequence(seq).0 > issued_epoch {
+        return SalvageAdmission::Refused(SalvageRefusal::SeqAheadOfIssue { seq, issued_at_ms });
     }
     SalvageAdmission::Admitted {
         body: signed.body,
@@ -569,5 +585,36 @@ mod tests {
             judge(&raw, &mut nobody),
             SalvageAdmission::Refused(SalvageRefusal::Oversize(_))
         ));
+    }
+
+    #[test]
+    fn seq_ahead_of_issue_time_is_refused() {
+        let (keypair, peer) = signer();
+        let issued_epoch = crate::p2p::sync_state::boot_epoch((NOW_MS / 1000) as u64);
+        // Booted at the issue second: admitted.
+        let mut honest = sample("uhCAkSalvager");
+        honest.seq = crate::p2p::sync_state::epoch_base(issued_epoch) + 3;
+        let raw = SignedSalvageAd::sign(&keypair, &peer, honest)
+            .to_bytes()
+            .unwrap();
+        assert!(matches!(
+            judge(&raw, &mut bound_to("uhCAkSalvager")),
+            SalvageAdmission::Admitted { .. }
+        ));
+        // A boot epoch after the ad was signed, up to u64::MAX: refused.
+        for seq in [
+            crate::p2p::sync_state::epoch_base(issued_epoch + 1),
+            u64::MAX,
+        ] {
+            let mut ahead = sample("uhCAkSalvager");
+            ahead.seq = seq;
+            let raw = SignedSalvageAd::sign(&keypair, &peer, ahead)
+                .to_bytes()
+                .unwrap();
+            assert!(matches!(
+                judge(&raw, &mut bound_to("uhCAkSalvager")),
+                SalvageAdmission::Refused(SalvageRefusal::SeqAheadOfIssue { .. })
+            ));
+        }
     }
 }

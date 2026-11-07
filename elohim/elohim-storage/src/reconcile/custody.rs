@@ -54,7 +54,7 @@ pub trait FetchKicker: Send + Sync {
 /// `BlobStore::exists` per commitment. Comparison is by [`ByteCid`] value (C4):
 /// a commitment marker is parsed by full decode before it is compared.
 ///
-/// It is a filename set, not a verification: a payload whose marker is present but
+/// It is a filename set, not a verification (see [`VerifiedPantry`] for the verified one): a payload whose marker is present but
 /// whose bytes are corrupt or whose chunks are missing is still listed, and chunk or
 /// shard units are not listed at all. It answers "is a fetch needed?" (a wrong yes
 /// costs a skipped fetch, healed by verify-on-read). It must never gate a custody
@@ -87,6 +87,26 @@ impl BlobStoreSnapshot {
 impl LocalBlobStore for BlobStoreSnapshot {
     fn has(&self, blob_cid: &ByteCid) -> bool {
         self.cids.contains(blob_cid)
+    }
+}
+
+/// A [`LocalBlobStore`] that answers `has` from a verified read, per query: the payload's
+/// bytes (or the unit's) hash to their CID, or the answer is no. Use it wherever `has`
+/// gates a custody act or a "do I still need to fetch this?" decision; a corrupt local
+/// copy is "not held" (and quarantined), so it is re-fetched rather than pledged or
+/// advertised. Cost is the bytes of each queried CID, so it suits the few CIDs a pass
+/// asks about, not a whole-store scan.
+pub struct VerifiedPantry<'a>(&'a crate::blob_store::BlobStore);
+
+impl<'a> VerifiedPantry<'a> {
+    pub fn new(store: &'a crate::blob_store::BlobStore) -> Self {
+        Self(store)
+    }
+}
+
+impl LocalBlobStore for VerifiedPantry<'_> {
+    fn has(&self, blob_cid: &ByteCid) -> bool {
+        self.0.holds_verified(blob_cid)
     }
 }
 
@@ -418,24 +438,17 @@ pub struct SalvageOutcome {
 }
 
 /// The spellings one holder's custody evidence may be keyed by: the provider itself
-/// and every transport id (libp2p PeerId, iroh NodeId) `peer_transport_manifest`
-/// binds to it. Never a raw cross-namespace match: the manifest is the join.
+/// (a legacy commitment naming a transport id directly) and every transport id the
+/// cross-signed chain authenticates to it (`p2p::transport_authority`: the libp2p
+/// PeerIds its `AgentPeerBinding`s cross-sign, and the iroh NodeIds verified two-key
+/// links tie to those). Never `peer_transport_manifest`: its `agent_cid` is a
+/// self-asserted dial hint, and a forged manifest must not inflate or deflate a floor.
 fn holder_identities(
     conn: &mut SqliteConnection,
     provider: &str,
 ) -> Result<Vec<String>, StorageError> {
-    use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-    let bound: Vec<(Option<String>, Option<String>)> = t::peer_transport_manifest
-        .filter(t::agent_cid.eq(provider))
-        .select((t::libp2p_peer_id, t::iroh_node_id))
-        .load(conn)
-        .map_err(|e| StorageError::Database(format!("holder transport ids: {e}")))?;
     let mut identities = vec![provider.to_string()];
-    for id in bound
-        .into_iter()
-        .flat_map(|(libp2p, iroh)| [libp2p, iroh])
-        .flatten()
-    {
+    for id in crate::p2p::transport_authority::authenticated_transports_for_agent(conn, provider) {
         if !identities.contains(&id) {
             identities.push(id);
         }
@@ -636,6 +649,10 @@ pub struct ManifestBackfillOutcome {
     /// `self_held_recorded` so "the node re-attributed old custody to its live
     /// key" is distinguishable in logs from "the node manifested new bytes".
     pub self_held_reclaimed: usize,
+    /// Self-held rows recorded by the unit sweep: a custody unit (a chunk file, an inline
+    /// payload or a received shard) the store read back verified that no row named yet.
+    /// This is how a striped upload's chunks and a received shard get a row.
+    pub units_recorded: usize,
     /// Candidates that turned out to already have a manifest (pre-filter hit,
     /// or a race detected at the write-time re-check).
     pub skipped_existing: usize,
@@ -698,6 +715,36 @@ fn claim_units(
                 *errors += 1;
             }
         }
+    }
+    recorded
+}
+
+/// Row every custody unit the store holds that no self-held row names yet. The candidates
+/// are `BlobStore::unit_names` (a filename set, never evidence); each is read back through
+/// `get_chunk`, which re-derives its CID and quarantines a failure, and only a verified
+/// unit is recorded. This reaches what the per-payload pass cannot: the chunks of a payload
+/// whose manifest is striped (its shards are derived, but the node serves its chunks) and
+/// a shard another node pushed here. At most `cap` rows are recorded per pass.
+async fn claim_held_units(
+    conn: &mut SqliteConnection,
+    blob_store: &BlobStore,
+    agent_cid: &str,
+    h_app_id: &str,
+    cap: usize,
+    errors: &mut usize,
+) -> usize {
+    let mut recorded = 0;
+    for unit in blob_store.unit_names() {
+        if recorded >= cap {
+            break;
+        }
+        let already = crate::db::shard_locations::get_locations_for_shard(conn, &unit.to_string())
+            .map(|rows| rows.iter().any(|l| l.peer_id == agent_cid))
+            .unwrap_or(false);
+        if already || blob_store.get_chunk(&unit).await.is_err() {
+            continue;
+        }
+        recorded += claim_units(conn, &[unit], agent_cid, h_app_id, errors);
     }
     recorded
 }
@@ -850,10 +897,23 @@ pub async fn manifest_backfill_pass(
         }
     }
 
+    if let Some(agent_cid) = agent {
+        outcome.units_recorded += claim_held_units(
+            conn,
+            blob_store,
+            agent_cid,
+            h_app_id,
+            batch_cap,
+            &mut outcome.errors,
+        )
+        .await;
+    }
+
     tracing::info!(
         target: "elohim_storage::reconcile",
         blobs_scanned = outcome.blobs_scanned,
         manifests_written = outcome.manifests_written,
+        units_recorded = outcome.units_recorded,
         self_held_recorded = outcome.self_held_recorded,
         self_held_reclaimed = outcome.self_held_reclaimed,
         skipped_existing = outcome.skipped_existing,
@@ -1762,19 +1822,15 @@ mod tests {
             .unwrap();
     }
 
-    /// `peer_transport_manifest` binds libp2p PeerId `peer` to `agent`.
-    fn bind_transport(conn: &mut SqliteConnection, agent: &str, peer: &str) {
-        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-        diesel::insert_into(t::peer_transport_manifest)
-            .values((
-                t::agent_cid.eq(agent),
-                t::libp2p_peer_id.eq(peer),
-                t::discovery_methods_json.eq("[]"),
-                t::capability_level.eq(1),
-                t::last_observed.eq(1_i64),
-            ))
-            .execute(conn)
-            .unwrap();
+    /// A cross-signed `AgentPeerBinding` binds `test_agent(name)` to the libp2p
+    /// PeerId of `secret`. Returns `(agent_cid, peer_id)`.
+    fn bind_transport(
+        conn: &mut SqliteConnection,
+        name: &str,
+        secret: [u8; 32],
+    ) -> (String, String) {
+        let peer = crate::test_util::bind_cross_signed(conn, name, secret);
+        (crate::test_util::test_agent(name), peer)
     }
 
     fn run_salvage(
@@ -1835,15 +1891,15 @@ mod tests {
         let mut conn = p.get().unwrap();
         let now = chrono::Utc::now();
         let blob = cid_of('x');
-        insert_custody_commitment(&mut conn, "c1", "uhCAkProvA", "steward-Z", &blob);
-        insert_custody_commitment(&mut conn, "c2", "uhCAkProvB", "steward-Z", &blob);
-        bind_transport(&mut conn, "uhCAkProvA", "12D3KooWProvA");
-        bind_transport(&mut conn, "uhCAkProvB", "12D3KooWProvB");
+        let (prov_a, peer_a) = bind_transport(&mut conn, "uhCAkProvA", [71u8; 32]);
+        let (prov_b, peer_b) = bind_transport(&mut conn, "uhCAkProvB", [72u8; 32]);
+        insert_custody_commitment(&mut conn, "c1", &prov_a, "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", &prov_b, "steward-Z", &blob);
         // A: fresh, bound, keyed by its transport id. B: bound, but an hour old.
-        mark_hosting(&mut conn, "12D3KooWProvA", &blob, now);
+        mark_hosting(&mut conn, &peer_a, &blob, now);
         mark_hosting(
             &mut conn,
-            "12D3KooWProvB",
+            &peer_b,
             &blob,
             now - chrono::Duration::seconds(3600),
         );
@@ -1856,7 +1912,7 @@ mod tests {
         // B re-announces inside the window (the next in-order delta): the floor holds.
         apply_snapshot(
             &mut conn,
-            "12D3KooWProvB",
+            &peer_b,
             std::slice::from_ref(&blob),
             2,
             &now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
@@ -1865,6 +1921,49 @@ mod tests {
         let (outcome, author) = run_salvage(&mut conn, now);
         assert_eq!(outcome.under_replicated, 0, "two fresh bound holders");
         assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    /// The red-team inflation: a forged transport manifest naming a provider agent
+    /// (`{iroh_node_id: forger, agent_cid: provider}`) must not make the forger's own
+    /// bound inventory rows count as that provider's custody — nor may the floor
+    /// read any manifest row at all. Only the provider's cross-signed transports count.
+    #[test]
+    fn custody_floor_ignores_rows_from_a_hijacked_transport() {
+        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('h');
+        let (prov_a, peer_a) = bind_transport(&mut conn, "uhCAkProvA", [73u8; 32]);
+        let prov_b = crate::test_util::test_agent("uhCAkProvB");
+        insert_custody_commitment(&mut conn, "c1", &prov_a, "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", &prov_b, "steward-Z", &blob);
+        mark_hosting(&mut conn, &peer_a, &blob, now);
+        // The forger's own transports, hosting under bound witnesses (its signed
+        // deltas are genuinely its own), hijack B's agent in the manifest table on
+        // both columns.
+        let forger_peer = crate::test_util::bind_cross_signed(&mut conn, "uhCAkForger", [74u8; 32]);
+        let forger_node = hex::encode([75u8; 32]);
+        mark_hosting(&mut conn, &forger_peer, &blob, now);
+        mark_hosting(&mut conn, &forger_node, &blob, now);
+        diesel::insert_into(t::peer_transport_manifest)
+            .values((
+                t::agent_cid.eq(&prov_b),
+                t::libp2p_peer_id.eq(&forger_peer),
+                t::iroh_node_id.eq(&forger_node),
+                t::discovery_methods_json.eq("[]"),
+                t::capability_level.eq(1),
+                t::last_observed.eq(1_i64),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(
+            outcome.under_replicated, 1,
+            "B holds no floor: the hijacked transports speak for the forger, not for B"
+        );
+        assert_eq!(author.authored.lock().unwrap().len(), 1);
     }
 
     #[test]
@@ -2209,5 +2308,189 @@ mod tests {
                 .map(|l| l.peer_id)
                 .collect();
         assert_eq!(holders, vec!["uhCAkRealAgentKey".to_string()]);
+    }
+
+    const UNIT_AGENT: &str = "uhCAkUnitSweepUploaderAgentKey";
+
+    fn self_rows(conn: &mut SqliteConnection, unit: &ByteCid) -> Vec<String> {
+        crate::db::shard_locations::get_locations_for_shard(conn, &unit.to_string())
+            .expect("load locations")
+            .into_iter()
+            .filter(|l| l.peer_id == UNIT_AGENT)
+            .map(|l| l.status)
+            .collect()
+    }
+
+    /// A payload cut into several chunks (under the striping threshold): the backfill
+    /// rows every chunk the store serves, not only the payload.
+    #[tokio::test]
+    async fn multi_chunk_payload_rows_every_chunk() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        assert!(stored.chunks.len() > 1, "fixture must be chunked");
+
+        let outcome = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert_eq!(outcome.errors, 0);
+        for chunk in &stored.chunks {
+            assert_eq!(
+                self_rows(&mut conn, &chunk.cid),
+                vec!["self-held".to_string()],
+                "chunk {} has its own self-held row",
+                chunk.cid
+            );
+        }
+        assert!(
+            self_rows(&mut conn, &stored.cid).is_empty(),
+            "the marker names a payload, not a unit: no row for it"
+        );
+
+        // Steady state: nothing new to record.
+        let again = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("second pass");
+        assert_eq!(again.units_recorded, 0);
+    }
+
+    /// An upload whose manifest is erasure-coded: the per-payload arm never self-claims
+    /// a striped manifest's derived shards, so the unit sweep is what rows the chunks
+    /// the node serves and any shard another node pushed here.
+    #[tokio::test]
+    async fn striped_upload_rows_cover_every_served_unit() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let data = crate::blob_store::tests::xorshift_bytes(3 * 1024 * 1024);
+        let stored = store.store(&data).await.expect("store");
+
+        // The upload's manifest is striped (threshold lowered so the fixture stays small).
+        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig {
+            rs_threshold: 0,
+            ..crate::sharding::ShardConfig::default()
+        });
+        let (manifest, shards) = encoder
+            .encode(&data, "application/octet-stream", "commons")
+            .expect("encode");
+        assert!(!manifest.stripes.is_empty(), "fixture must be striped");
+        crate::db::shard_manifests::record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", stored.cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("manifest");
+        // One shard another node pushed here, held under its own CID.
+        let pushed = store.store(&shards[0][0]).await.expect("pushed shard");
+        assert_eq!(pushed.chunks.len(), 1, "a small shard is one inline unit");
+
+        let outcome = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert_eq!(outcome.errors, 0);
+
+        let served = store.list_units().expect("list_units");
+        assert!(served.contains(&pushed.cid), "the pushed shard is a unit");
+        for chunk in &stored.chunks {
+            assert!(served.contains(&chunk.cid), "every chunk is a unit");
+        }
+        for unit in &served {
+            assert_eq!(
+                self_rows(&mut conn, unit),
+                vec!["self-held".to_string()],
+                "served unit {unit} has a self-held row"
+            );
+        }
+    }
+
+    /// A unit whose bytes do not hash to its name is quarantined by the sweep and never
+    /// rowed, however the name looks on disk.
+    #[tokio::test]
+    async fn unit_sweep_rows_nothing_it_cannot_read_back_verified() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        let victim = stored.chunks[1].cid;
+        let path = {
+            let root = store.root_dir().join("chunks");
+            let name = victim.to_string();
+            root.join(name.get(7..11).unwrap()).join(&name)
+        };
+        let mut bytes = std::fs::read(&path).expect("chunk file");
+        bytes[3] ^= 0xff;
+        std::fs::write(&path, bytes).expect("corrupt");
+
+        manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert!(self_rows(&mut conn, &victim).is_empty());
+        assert!(!store.list_units().unwrap().contains(&victim));
+    }
+
+    /// A local copy that is named but corrupt is not a held copy: the pass kicks a
+    /// re-fetch for it, and stops kicking once the copy is whole again.
+    #[tokio::test]
+    async fn reconcile_refetches_a_corrupt_local_copy() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        let blob_hash = stored.cid.to_string();
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let when = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_hash),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let run = |conn: &mut SqliteConnection| {
+            let kicker = RecordingKicker {
+                kicks: Mutex::new(Vec::new()),
+            };
+            reconcile_pass(
+                conn,
+                "self_cid",
+                None,
+                &VerifiedPantry::new(&store),
+                &kicker,
+                default_cfg(),
+                chrono::Utc::now(),
+                &[],
+            )
+            .unwrap();
+            let kicks = kicker.kicks.lock().unwrap().len();
+            kicks
+        };
+        assert_eq!(run(&mut conn), 0, "a whole local copy needs no fetch");
+
+        let victim = stored.chunks[1].cid.to_string();
+        let path = {
+            let root = store.root_dir().join("chunks");
+            root.join(victim.get(7..11).unwrap()).join(&victim)
+        };
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[2] ^= 0xff;
+        std::fs::write(&path, bytes).unwrap();
+        // The filename snapshot still says "held"; the verified pantry does not.
+        assert!(BlobStoreSnapshot::from_store(&store)
+            .unwrap()
+            .has(&stored.cid));
+        assert_eq!(run(&mut conn), 1, "a corrupt local copy is re-fetched");
     }
 }

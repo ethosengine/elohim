@@ -111,6 +111,16 @@ pub enum Exists {
     Quarantined,
 }
 
+/// What the hashing presence check concluded about a held payload.
+enum Verdict {
+    /// Every byte hashed to its CID.
+    Whole,
+    /// A definitive defect (missing part, wrong length, hash mismatch): quarantine.
+    Defect(String),
+    /// A read failed for another reason: not verified, and not evidence of corruption.
+    Unknown(String),
+}
+
 /// What [`BlobStore::store_record`] reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordStoreResult {
@@ -378,6 +388,16 @@ impl BlobStore {
             .unwrap_or(Exists::Absent)
     }
 
+    /// Structural presence with no payload hashing and no side effects (see the inner
+    /// `present`). For advertising probes only; `exists` is the verified answer.
+    pub async fn present(&self, cid: &ByteCid) -> bool {
+        let inner = self.inner.clone();
+        let cid = *cid;
+        tokio::task::spawn_blocking(move || inner.present(&cid))
+            .await
+            .unwrap_or(false)
+    }
+
     /// Remove a payload: marker (or inline file) first, then its layout record, then the
     /// chunks no remaining layout record names. Removing an absent payload is not an error.
     pub async fn delete(&self, cid: &ByteCid) -> Result<(), StorageError> {
@@ -409,6 +429,65 @@ impl BlobStore {
             }
         });
         Ok(cids)
+    }
+
+    /// Every custody unit this store holds AND can read back verified: the chunk files
+    /// under `chunks/` and the inline payloads under `blobs/` (an inline payload is its
+    /// own single chunk, and a Reed-Solomon shard pushed to this node is stored as one).
+    /// A chunked payload's marker is a payload, not a unit, and is skipped. Where
+    /// [`BlobStore::list_cids`] names what `blobs/` holds, this hashes each candidate
+    /// against its own CID (`get_chunk`): a unit that fails is quarantined, never listed.
+    /// Synchronous and proportional to the bytes held: call from a blocking context.
+    pub fn list_units(&self) -> Result<Vec<ByteCid>, StorageError> {
+        let mut verified = Vec::new();
+        for cid in self.unit_names() {
+            if self.inner.get_chunk(&cid).is_ok() {
+                verified.push(cid);
+            }
+        }
+        Ok(verified)
+    }
+
+    /// Whether this store holds `cid` AND can read it back verified: a payload whose
+    /// every chunk and whole hash (`exists` == `Verified`) or a single unit (a chunk, an
+    /// inline payload or a shard) whose bytes hash to its CID. Hashes the bytes; a
+    /// failure is quarantined by the underlying read. Synchronous: call from a blocking
+    /// context. This is the question custody acts ask instead of "is it named?".
+    pub fn holds_verified(&self, cid: &ByteCid) -> bool {
+        self.inner.exists(cid) == Exists::Verified || self.inner.get_chunk(cid).is_ok()
+    }
+
+    /// Every CID this store can serve verified: the verified units of
+    /// [`BlobStore::list_units`] plus each chunked payload whose marker verifies
+    /// (`exists` == `Verified`). What a peer reconciling against this node may be told it
+    /// holds; a named-but-corrupt payload or chunk is left out (and quarantined).
+    pub fn list_servable(&self) -> Result<Vec<ByteCid>, StorageError> {
+        let mut servable: std::collections::HashSet<ByteCid> =
+            self.list_units()?.into_iter().collect();
+        for cid in self.list_cids()? {
+            if !servable.contains(&cid) && self.inner.exists(&cid) == Exists::Verified {
+                servable.insert(cid);
+            }
+        }
+        Ok(servable.into_iter().collect())
+    }
+
+    /// The names [`BlobStore::list_units`] would verify, with no byte read: a filename set,
+    /// which is a candidate list for the caller to verify (`get_chunk`) one unit at a time
+    /// before it records anything. Never evidence that a unit is whole.
+    pub fn unit_names(&self) -> Vec<ByteCid> {
+        let empty = compute_bytes_cid(&[]);
+        let mut seen = std::collections::HashSet::new();
+        for area in ["chunks", "blobs"] {
+            walk_fanout(&self.inner.root.join(area), |_, name, len| {
+                if let Ok(cid) = ByteCid::parse(name) {
+                    if len > 0 || cid == empty {
+                        seen.insert(cid);
+                    }
+                }
+            });
+        }
+        seen.into_iter().collect()
     }
 
     /// Store a dag-cbor record (`0x71 + sha2-256`) on the record lane.
@@ -469,6 +548,31 @@ enum Area {
 enum Entry {
     Inline(Vec<u8>),
     Marker(Cid),
+}
+
+/// How many times a read re-reads a payload a writer changed under it.
+const READ_RETRIES: usize = 4;
+
+/// Why one read attempt did not return bytes.
+enum ReadFailure {
+    /// A structural miss (layout record or chunk missing or the wrong size): settle it.
+    Structural(String),
+    /// A verdict already (not found, hash mismatch, I/O).
+    Final(StorageError),
+}
+
+impl From<StorageError> for ReadFailure {
+    fn from(error: StorageError) -> Self {
+        Self::Final(error)
+    }
+}
+
+/// What a look under the stripe found after a structural miss.
+enum Settled {
+    /// The payload verifies: the miss was a race with a writer.
+    Healthy,
+    /// The read's final error.
+    Refused(StorageError),
 }
 
 impl Inner {
@@ -543,7 +647,9 @@ impl Inner {
         let parent = dest
             .parent()
             .ok_or_else(|| io::Error::other("destination has no parent"))?;
-        fs::create_dir_all(parent)?;
+        self.ensure_bucket(parent)?;
+        #[cfg(test)]
+        self.event(tests::Event::Rename(dest.to_path_buf()));
         if let Err(error) = fs::rename(&tmp, dest) {
             let _ = fs::remove_file(&tmp);
             return Err(error);
@@ -551,7 +657,30 @@ impl Inner {
         File::open(parent)?.sync_all()?;
         #[cfg(test)]
         self.journal(area);
+        #[cfg(test)]
+        if let Some(tests::Fault::CrashAfter) = fault {
+            // A process that dies here has made the write durable and told no one.
+            return Err(io::Error::other("injected crash after the final fsync"));
+        }
         let _ = area;
+        Ok(())
+    }
+
+    /// Make sure the fan-out bucket `parent` exists and that its own directory entry is
+    /// durable: a freshly created bucket is a new entry in `blobs/` (or `chunks/`), and
+    /// an fsync of the bucket after the rename persists the file's entry, never the
+    /// bucket's. Without syncing the bucket's parent a power loss can drop the bucket
+    /// and with it every file renamed into it.
+    fn ensure_bucket(&self, parent: &Path) -> io::Result<()> {
+        if parent.is_dir() {
+            return Ok(());
+        }
+        fs::create_dir_all(parent)?;
+        if let Some(grandparent) = parent.parent() {
+            File::open(grandparent)?.sync_all()?;
+            #[cfg(test)]
+            self.event(tests::Event::BucketSynced(grandparent.to_path_buf()));
+        }
         Ok(())
     }
 
@@ -745,16 +874,37 @@ impl Inner {
         LayoutRecord::decode_for(&bytes, cid).map(|(_, chunks)| chunks)
     }
 
+    /// A whole verified read. A read holds no lock, so a racing delete or store can change
+    /// the payload between its marker, layout record and chunks; such a structural miss is
+    /// settled under the payload's stripe (see [`Inner::settle`]) and retried when the
+    /// payload turns out to be whole, so a read returns the whole payload or a typed
+    /// error, never a partial one.
     fn get(&self, cid: &ByteCid) -> Result<Bytes, StorageError> {
+        for _ in 0..READ_RETRIES {
+            match self.get_once(cid) {
+                Ok(bytes) => return Ok(bytes),
+                Err(ReadFailure::Final(error)) => return Err(error),
+                Err(ReadFailure::Structural(reason)) => match self.settle(cid, &reason) {
+                    Settled::Healthy => continue,
+                    Settled::Refused(error) => return Err(error),
+                },
+            }
+        }
+        Err(StorageError::Internal(format!(
+            "payload {cid} kept changing under the read"
+        )))
+    }
+
+    fn get_once(&self, cid: &ByteCid) -> Result<Bytes, ReadFailure> {
         let Some(entry) = self.read_entry(cid)? else {
-            return Err(StorageError::BlobNotFound(cid.to_string()));
+            return Err(StorageError::BlobNotFound(cid.to_string()).into());
         };
         let data = match entry {
             Entry::Inline(data) => data,
             Entry::Marker(bound) => {
                 let chunks = match self.read_layout(cid, &bound) {
                     Ok(chunks) => chunks,
-                    Err(reason) => return Err(self.refuse(cid, &reason)),
+                    Err(reason) => return Err(ReadFailure::Structural(reason)),
                 };
                 let total: u64 = chunks.iter().map(|c| u64::from(c.len)).sum();
                 let mut data = Vec::with_capacity(usize::try_from(total).unwrap_or(0));
@@ -770,11 +920,11 @@ impl Inner {
                                 bytes.len(),
                                 chunk.len
                             );
-                            return Err(self.refuse(cid, &reason));
+                            return Err(ReadFailure::Structural(reason));
                         }
                         Err(error) => {
                             let reason = format!("chunk {}: {error}", chunk.cid);
-                            return Err(self.refuse(cid, &reason));
+                            return Err(ReadFailure::Structural(reason));
                         }
                     }
                 }
@@ -789,17 +939,40 @@ impl Inner {
             return Err(StorageError::HashMismatch {
                 expected: cid.to_string(),
                 actual: actual.to_string(),
-            });
+            }
+            .into());
         }
         Ok(Bytes::from(data))
     }
 
-    /// Quarantine a payload that failed a structural check and build the read's error.
+    /// A read found `cid` structurally broken. Under the payload's stripe (a store or
+    /// delete cannot interleave), look again: gone is a typed absence; whole is a read
+    /// that raced a writer and should be retried; still broken is quarantined.
+    fn settle(&self, cid: &ByteCid, reason: &str) -> Settled {
+        let _stripe = self.stripe(cid);
+        match self.read_entry(cid) {
+            Ok(None) => return Settled::Refused(StorageError::BlobNotFound(cid.to_string())),
+            Err(error) => return Settled::Refused(error),
+            Ok(Some(_)) => {}
+        }
+        match self.exists_locked(cid) {
+            Exists::Verified => Settled::Healthy,
+            Exists::Absent => Settled::Refused(StorageError::BlobNotFound(cid.to_string())),
+            Exists::Quarantined => Settled::Refused(StorageError::HashMismatch {
+                expected: cid.to_string(),
+                actual: format!("quarantined: {reason}"),
+            }),
+        }
+    }
+
+    /// Quarantine a payload that failed a structural check and build the read's error
+    /// (a payload that is no longer there is a typed absence).
     fn refuse(&self, cid: &ByteCid, reason: &str) -> StorageError {
-        let _ = self.quarantine_payload(cid, reason);
-        StorageError::HashMismatch {
-            expected: cid.to_string(),
-            actual: format!("quarantined: {reason}"),
+        match self.settle(cid, reason) {
+            Settled::Refused(error) => error,
+            Settled::Healthy => {
+                StorageError::Internal(format!("payload {cid} changed during the read"))
+            }
         }
     }
 
@@ -888,39 +1061,59 @@ impl Inner {
             Ok(Some(entry)) => entry,
             Ok(None) | Err(_) => return self.absent_or_quarantined(cid),
         };
-        let defect = match entry {
+        let verdict = match entry {
             Entry::Inline(data) => {
                 let actual = compute_bytes_cid(&data);
-                (&actual != cid).then(|| format!("inline bytes hash to {actual}"))
+                if &actual == cid {
+                    Verdict::Whole
+                } else {
+                    Verdict::Defect(format!("inline bytes hash to {actual}"))
+                }
             }
-            Entry::Marker(bound) => match self.read_layout(cid, &bound) {
-                Err(reason) => Some(reason),
-                Ok(chunks) => self.chunked_defect(cid, &chunks),
+            Entry::Marker(bound) => match fs::read(self.index_path(cid)) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    Verdict::Defect("layout record: missing".to_string())
+                }
+                // A failed read is not evidence of corruption (as in `read_entry`).
+                Err(error) => Verdict::Unknown(format!("layout record: {error}")),
+                Ok(_) => match self.read_layout(cid, &bound) {
+                    Err(reason) => Verdict::Defect(reason),
+                    Ok(chunks) => self.chunked_verdict(cid, &chunks),
+                },
             },
         };
-        match defect {
-            None => Exists::Verified,
-            Some(reason) => {
+        match verdict {
+            Verdict::Whole => Exists::Verified,
+            Verdict::Defect(reason) => {
                 warn!(cid = %cid, %reason, "held blob failed verification — quarantined");
                 let _ = self.quarantine_payload(cid, &reason);
                 Exists::Quarantined
+            }
+            Verdict::Unknown(reason) => {
+                warn!(cid = %cid, %reason, "held blob could not be read — not verified, not quarantined");
+                self.absent_or_quarantined(cid)
             }
         }
     }
 
     /// Hash every chunk of a chunked payload against its own CID and the whole against
-    /// `cid`. Returns the first defect; a chunk that fails its own CID is moved to
-    /// quarantine before returning, so no later read or `store` reuses it.
-    fn chunked_defect(&self, cid: &ByteCid, chunks: &[ChunkRef]) -> Option<String> {
+    /// `cid`. Only a definitive defect — a missing chunk, a wrong length, a hash
+    /// mismatch — condemns the payload; a chunk that fails its own CID is moved to
+    /// quarantine before returning, so no later read or `store` reuses it. Any other
+    /// read error is [`Verdict::Unknown`]: nothing is quarantined on a transient fault.
+    fn chunked_verdict(&self, cid: &ByteCid, chunks: &[ChunkRef]) -> Verdict {
         let mut whole = blake3::Hasher::new();
         for chunk in chunks {
             let path = self.chunk_path(&chunk.cid);
             let bytes = match fs::read(&path) {
                 Ok(bytes) => bytes,
-                Err(error) => return Some(format!("chunk {}: {error}", chunk.cid)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    return Verdict::Defect(format!("chunk {}: missing", chunk.cid))
+                }
+                Err(error) => return Verdict::Unknown(format!("chunk {}: {error}", chunk.cid)),
             };
             if bytes.len() as u64 != u64::from(chunk.len) {
-                return Some(format!(
+                return Verdict::Defect(format!(
                     "chunk {} is {} bytes, not {}",
                     chunk.cid,
                     bytes.len(),
@@ -934,12 +1127,35 @@ impl Inner {
                     std::slice::from_ref(&path),
                     "chunk fails its own cid",
                 );
-                return Some(format!("chunk {} hashes to {actual}", chunk.cid));
+                return Verdict::Defect(format!("chunk {} hashes to {actual}", chunk.cid));
             }
             whole.update(&bytes);
         }
         let actual = ByteCid::from_digest(*whole.finalize().as_bytes());
-        (&actual != cid).then(|| format!("whole payload hashes to {actual}"))
+        if &actual == cid {
+            Verdict::Whole
+        } else {
+            Verdict::Defect(format!("whole payload hashes to {actual}"))
+        }
+    }
+
+    /// Structural presence without hashing a payload byte and without side effects:
+    /// the inline file, or the marker, the layout record it binds and every chunk file
+    /// at its declared length. For probes that only advertise (`ShardRequest::Have`,
+    /// `HEAD /shard`); a reader verifies on read, and `store`'s idempotence path uses the
+    /// hashing [`Self::exists_locked`].
+    fn present(&self, cid: &ByteCid) -> bool {
+        let _stripe = self.stripe(cid);
+        match self.read_entry(cid) {
+            Ok(Some(Entry::Inline(_))) => true,
+            Ok(Some(Entry::Marker(bound))) => self.read_layout(cid, &bound).is_ok_and(|chunks| {
+                chunks.iter().all(|chunk| {
+                    fs::metadata(self.chunk_path(&chunk.cid))
+                        .is_ok_and(|meta| meta.len() == u64::from(chunk.len))
+                })
+            }),
+            Ok(None) | Err(_) => false,
+        }
     }
 
     fn absent_or_quarantined(&self, cid: &ByteCid) -> Exists {
@@ -1294,7 +1510,18 @@ impl Inner {
         if faults.crash_at == Some(n) {
             return Some(tests::Fault::Crash);
         }
+        if faults.crash_after == Some(n) {
+            return Some(tests::Fault::CrashAfter);
+        }
         None
+    }
+
+    fn event(&self, event: tests::Event) {
+        self.faults
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .events
+            .push(event);
     }
 
     fn journal(&self, area: Area) {
@@ -1315,6 +1542,17 @@ pub(crate) mod tests {
     pub(super) enum Fault {
         Enospc,
         Crash,
+        /// The write completes and is durable; the process then dies before returning.
+        CrashAfter,
+    }
+
+    /// What `write_atomic` did to the directory tree, in order.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(super) enum Event {
+        /// A new fan-out bucket's parent was fsynced.
+        BucketSynced(PathBuf),
+        /// A file is about to be renamed to this destination.
+        Rename(PathBuf),
     }
 
     #[derive(Debug, Default)]
@@ -1322,7 +1560,9 @@ pub(crate) mod tests {
         pub writes: usize,
         pub enospc_at: Option<usize>,
         pub crash_at: Option<usize>,
+        pub crash_after: Option<usize>,
         pub journal: Vec<Area>,
+        pub events: Vec<Event>,
     }
 
     fn faults(store: &BlobStore) -> std::sync::MutexGuard<'_, Faults> {
@@ -1866,5 +2106,360 @@ pub(crate) mod tests {
         assert!(!again.already_existed);
         assert_eq!(&store.get(&held.cid).await.unwrap()[..], &small[..]);
         assert_eq!(store.exists(&held.cid).await, Exists::Verified);
+    }
+
+    /// Count `Event::BucketSynced` entries whose directory is `dir`.
+    fn bucket_syncs(store: &BlobStore, dir: &Path) -> Vec<usize> {
+        faults(store)
+            .events
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| matches!(e, Event::BucketSynced(p) if p == dir))
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// The index of the first rename into a bucket under `area`.
+    fn first_rename_under(store: &BlobStore, area: &Path) -> usize {
+        faults(store)
+            .events
+            .iter()
+            .position(|e| matches!(e, Event::Rename(p) if p.starts_with(area)))
+            .expect("a rename under the area")
+    }
+
+    #[tokio::test]
+    async fn new_bucket_parent_is_synced_before_rename() {
+        let (dir, store) = open().await;
+        let blobs = dir.path().join("blobs");
+        let chunks = dir.path().join("chunks");
+
+        // A chunked payload creates buckets in both `chunks/` and `blobs/`.
+        let result = store.store(&chunked_payload()).await.unwrap();
+        for area in [&blobs, &chunks] {
+            let synced = bucket_syncs(&store, area);
+            assert!(
+                !synced.is_empty(),
+                "{area:?} was fsynced after a new bucket"
+            );
+            assert!(
+                synced[0] < first_rename_under(&store, area),
+                "{area:?} is synced before the first file is renamed into its bucket"
+            );
+        }
+        // Every bucket a rename landed in had been created and synced first.
+        let distinct_buckets: std::collections::HashSet<PathBuf> = faults(&store)
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Rename(p) => p.parent().map(Path::to_path_buf),
+                _ => None,
+            })
+            .filter(|b| b.starts_with(&blobs) || b.starts_with(&chunks))
+            .collect();
+        let syncs = faults(&store)
+            .events
+            .iter()
+            .filter(|e| matches!(e, Event::BucketSynced(_)))
+            .count();
+        assert_eq!(
+            syncs,
+            distinct_buckets.len(),
+            "one parent sync per newly created bucket"
+        );
+
+        // A second write into an existing bucket syncs nothing more.
+        let before = syncs;
+        store.store(&chunked_payload()).await.unwrap();
+        let after = faults(&store)
+            .events
+            .iter()
+            .filter(|e| matches!(e, Event::BucketSynced(_)))
+            .count();
+        assert_eq!(before, after, "an existing bucket is not re-synced");
+        assert_eq!(store.exists(&result.cid).await, Exists::Verified);
+    }
+
+    #[tokio::test]
+    async fn power_loss_after_marker_reopens_verified() {
+        let (dir, store) = open().await;
+        let data = chunked_payload();
+        let chunk_count = chunk_bytes(&ValidatedProfile::EPOCH_0, &data).len();
+        // Every chunk, the index and the marker are durable; the process dies before
+        // `store` returns, so no caller ever learns the payload landed.
+        faults(&store).crash_after = Some(chunk_count + 2);
+        assert!(store.store(&data).await.is_err());
+        drop(store);
+
+        let reopened = BlobStore::new(dir.path()).await.unwrap();
+        let cid = compute_bytes_cid(&data);
+        assert_eq!(reopened.exists(&cid).await, Exists::Verified);
+        assert_eq!(&reopened.get(&cid).await.unwrap()[..], &data[..]);
+        assert_eq!(reopened.stats().total_blobs, 1, "the open scan counts it");
+        assert!(tmp_is_empty(&dir));
+        // Storing it again is the idempotent path, not a rewrite.
+        assert!(reopened.store(&data).await.unwrap().already_existed);
+    }
+
+    /// Read until told to stop; every read is the whole payload or a typed absence.
+    async fn read_whole_or_absent(
+        store: std::sync::Arc<BlobStore>,
+        cid: ByteCid,
+        data: std::sync::Arc<Vec<u8>>,
+        stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> usize {
+        use std::sync::atomic::Ordering;
+        let mut whole = 0;
+        while !stop.load(Ordering::Relaxed) {
+            match store.get(&cid).await {
+                Ok(bytes) => {
+                    assert_eq!(&bytes[..], &data[..], "a read is never a partial payload");
+                    whole += 1;
+                }
+                Err(StorageError::BlobNotFound(_)) => {}
+                Err(other) => panic!("a racing read returned {other:?}, not whole-or-absent"),
+            }
+            tokio::task::yield_now().await;
+        }
+        whole
+    }
+
+    #[tokio::test]
+    async fn delete_racing_store_never_serves_partial() {
+        use std::sync::{atomic::AtomicBool, Arc};
+        let (_dir, store) = open().await;
+        let store = Arc::new(store);
+        let data = Arc::new(chunked_payload());
+        let cid = compute_bytes_cid(&data);
+        for _ in 0..6 {
+            let stop = Arc::new(AtomicBool::new(false));
+            let readers: Vec<_> = (0..2)
+                .map(|_| {
+                    tokio::spawn(read_whole_or_absent(
+                        store.clone(),
+                        cid,
+                        data.clone(),
+                        stop.clone(),
+                    ))
+                })
+                .collect();
+            let writer = {
+                let (store, data) = (store.clone(), data.clone());
+                tokio::spawn(async move { store.store(&data).await.map(|_| ()) })
+            };
+            let deleter = {
+                let store = store.clone();
+                tokio::spawn(async move { store.delete(&cid).await })
+            };
+            writer.await.unwrap().unwrap();
+            deleter.await.unwrap().unwrap();
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            for reader in readers {
+                reader.await.unwrap();
+            }
+            // Whichever won, what remains is whole or absent.
+            match store.exists(&cid).await {
+                Exists::Verified => {
+                    assert_eq!(&store.get(&cid).await.unwrap()[..], &data[..]);
+                }
+                Exists::Absent => {}
+                Exists::Quarantined => panic!("a store/delete race must not quarantine"),
+            }
+        }
+        // And the store still takes the payload afterwards.
+        store.store(&data).await.unwrap();
+        assert_eq!(store.exists(&cid).await, Exists::Verified);
+    }
+
+    #[tokio::test]
+    async fn delete_racing_read_returns_whole_or_typed_absent() {
+        use std::sync::{atomic::AtomicBool, Arc};
+        let (dir, store) = open().await;
+        let store = Arc::new(store);
+        let data = Arc::new(chunked_payload());
+        let cid = compute_bytes_cid(&data);
+        for _ in 0..6 {
+            store.store(&data).await.unwrap();
+            let stop = Arc::new(AtomicBool::new(false));
+            let readers: Vec<_> = (0..3)
+                .map(|_| {
+                    tokio::spawn(read_whole_or_absent(
+                        store.clone(),
+                        cid,
+                        data.clone(),
+                        stop.clone(),
+                    ))
+                })
+                .collect();
+            tokio::task::yield_now().await;
+            store.delete(&cid).await.unwrap();
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            for reader in readers {
+                reader.await.unwrap();
+            }
+            assert!(matches!(
+                store.get(&cid).await,
+                Err(StorageError::BlobNotFound(_))
+            ));
+            assert_eq!(store.exists(&cid).await, Exists::Absent);
+            assert_eq!(
+                fs::read_dir(dir.path().join("quarantine")).unwrap().count(),
+                0,
+                "a delete is not a defect: nothing was quarantined"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn quarantine_leaves_unrelated_objects_readable() {
+        let (dir, store) = open().await;
+        let victim_data = chunked_payload();
+        // A different stream, so no chunk is shared with the victim.
+        let other_data: Vec<u8> = chunked_payload().iter().map(|b| b ^ 0xa5).collect();
+        let small = b"an unrelated inline payload".to_vec();
+        let victim = store.store(&victim_data).await.unwrap();
+        let other = store.store(&other_data).await.unwrap();
+        let inline = store.store(&small).await.unwrap();
+        assert!(
+            other.chunks.iter().all(|c| !victim.chunks.contains(c)),
+            "fixture shares no chunk"
+        );
+
+        corrupt_chunk_in_place(&dir, &victim.chunks[1].cid, 5);
+        assert!(store.get(&victim.cid).await.is_err());
+        assert_eq!(store.exists(&victim.cid).await, Exists::Quarantined);
+
+        assert_eq!(&store.get(&other.cid).await.unwrap()[..], &other_data[..]);
+        assert_eq!(store.exists(&other.cid).await, Exists::Verified);
+        assert_eq!(&store.get(&inline.cid).await.unwrap()[..], &small[..]);
+        assert_eq!(store.exists(&inline.cid).await, Exists::Verified);
+        let listed = store.list_cids().unwrap();
+        assert!(listed.contains(&other.cid) && listed.contains(&inline.cid));
+        assert!(!listed.contains(&victim.cid));
+        assert_eq!(store.stats().total_blobs, 2);
+    }
+
+    #[tokio::test]
+    async fn list_units_names_only_verified_chunks_and_inline_payloads() {
+        let (dir, store) = open().await;
+        let chunked = store.store(&chunked_payload()).await.unwrap();
+        let inline = store.store(b"one inline unit").await.unwrap();
+
+        let units = store.list_units().unwrap();
+        for chunk in &chunked.chunks {
+            assert!(units.contains(&chunk.cid), "chunk {} is a unit", chunk.cid);
+        }
+        assert!(units.contains(&inline.cid), "an inline payload is a unit");
+        assert!(
+            !units.contains(&chunked.cid),
+            "a marker is a payload, not a unit"
+        );
+        assert!(store.list_cids().unwrap().contains(&chunked.cid));
+
+        // A chunk whose bytes are wrong is left out and quarantined, not listed.
+        let victim = chunked.chunks[2].cid;
+        corrupt_chunk_in_place(&dir, &victim, 9);
+        assert!(
+            store.unit_names().contains(&victim),
+            "its name is still there"
+        );
+        let units = store.list_units().unwrap();
+        assert!(!units.contains(&victim));
+        assert!(units.contains(&chunked.chunks[0].cid));
+    }
+
+    #[tokio::test]
+    async fn recon_set_excludes_unverified_units() {
+        let (dir, store) = open().await;
+        let good = store.store(&chunked_payload()).await.unwrap();
+        let other: Vec<u8> = chunked_payload().iter().map(|b| b ^ 0x5a).collect();
+        let broken = store.store(&other).await.unwrap();
+        let inline = store.store(b"a whole inline payload").await.unwrap();
+        let bad_inline = store.store(b"an inline payload to spoil").await.unwrap();
+        let bad_chunk = broken.chunks[1].cid;
+        corrupt_chunk_in_place(&dir, &bad_chunk, 4);
+        let path = fanout_path(&dir.path().join("blobs"), &bad_inline.cid.to_string());
+        fs::write(&path, b"an inline payload to spoiL").unwrap();
+
+        assert!(store.list_cids().unwrap().contains(&broken.cid), "named");
+        let servable = store.list_servable().unwrap();
+        assert!(servable.contains(&good.cid) && servable.contains(&inline.cid));
+        for chunk in &good.chunks {
+            assert!(servable.contains(&chunk.cid));
+        }
+        assert!(
+            !servable.contains(&broken.cid),
+            "a payload with a corrupt chunk"
+        );
+        assert!(!servable.contains(&bad_chunk), "the corrupt chunk");
+        assert!(
+            !servable.contains(&bad_inline.cid),
+            "the corrupt inline payload"
+        );
+        assert!(store.holds_verified(&good.cid) && store.holds_verified(&good.chunks[0].cid));
+        assert!(!store.holds_verified(&broken.cid));
+    }
+
+    // ── R3 follow-up: only a definitive defect quarantines; probes do not hash ──
+
+    #[tokio::test]
+    async fn transient_read_error_never_quarantines() {
+        let (dir, store) = open().await;
+        let data = chunked_payload();
+        let result = store.store(&data).await.unwrap();
+        // A chunk path that cannot be read for a reason other than absence (here a
+        // directory where the file should be): not verified, and nothing moves.
+        let victim = result.chunks[1].cid;
+        let path = fanout_path(&dir.path().join("chunks"), &victim.to_string());
+        let held = fs::read(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert_ne!(store.exists(&result.cid).await, Exists::Verified);
+        assert!(
+            fanout_path(&dir.path().join("blobs"), &result.cid.to_string()).exists(),
+            "the marker stays in the serving tree"
+        );
+        assert!(
+            fs::read_dir(dir.path().join("quarantine"))
+                .map(|mut d| d.next().is_none())
+                .unwrap_or(true),
+            "nothing quarantined on a non-definitive read error"
+        );
+        // The fault clears: the payload verifies again, untouched.
+        fs::remove_dir(&path).unwrap();
+        fs::write(&path, &held).unwrap();
+        assert_eq!(store.exists(&result.cid).await, Exists::Verified);
+
+        // The same for the layout record.
+        let index = dir.path().join("index").join(result.cid.to_string());
+        let record = fs::read(&index).unwrap();
+        fs::remove_file(&index).unwrap();
+        fs::create_dir(&index).unwrap();
+        assert_ne!(store.exists(&result.cid).await, Exists::Verified);
+        fs::remove_dir(&index).unwrap();
+        fs::write(&index, &record).unwrap();
+        assert_eq!(store.exists(&result.cid).await, Exists::Verified);
+    }
+
+    #[tokio::test]
+    async fn present_is_structural_and_moves_nothing() {
+        let (dir, store) = open().await;
+        let data = chunked_payload();
+        let result = store.store(&data).await.unwrap();
+        let victim = result.chunks[1].cid;
+        let path = fanout_path(&dir.path().join("chunks"), &victim.to_string());
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[5] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        // The structural probe answers from names and lengths: it cannot see a
+        // same-length corruption, and it moves nothing.
+        assert!(store.present(&result.cid).await);
+        assert_eq!(fs::read(&path).unwrap(), bytes, "the probe touched no byte");
+        assert!(path.exists());
+        // The hashing check still refuses it.
+        assert_eq!(store.exists(&result.cid).await, Exists::Quarantined);
+        assert!(!store.present(&result.cid).await);
+        let absent = compute_bytes_cid(b"never stored");
+        assert!(!store.present(&absent).await);
     }
 }

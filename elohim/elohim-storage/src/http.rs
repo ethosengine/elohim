@@ -3954,14 +3954,13 @@ impl HttpServer {
             Err(refusal) => return Ok(refusal),
         };
         // The length read first: it separates absence (404) from a storage failure
-        // (an error), which the structural `exists` probe folds together.
+        // (an error), which the structural `present` probe folds together. A HEAD
+        // never hashes the payload; a GET verifies on read.
         match self.blob_store.size(&cid).await {
-            Ok(_) if self.blob_store.exists(&cid).await != Exists::Verified => {
-                Ok(Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Full::new(Bytes::new()))
-                    .unwrap())
-            }
+            Ok(_) if !self.blob_store.present(&cid).await => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Full::new(Bytes::new()))
+                .unwrap()),
             Ok(size) => Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/octet-stream")

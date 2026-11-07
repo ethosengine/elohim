@@ -83,6 +83,8 @@ pub mod sync_protocol;
 pub mod sync_round;
 pub mod sync_state; // the sync-state contract: epoch before position, caught-up is a comparison
 pub mod topics;
+pub mod transport_authority;
+pub mod transport_link;
 pub mod transport_manifest_gossip;
 pub mod transport_paths; // PathObservation + select_path — transport self-awareness (spec 2026-08-24 §3.1)
 pub mod trigger_courier; // the node's half of the adoption trigger's courier path: owned head-record fetcher + byte presence
@@ -2507,7 +2509,7 @@ impl P2PHandle {
                 let Some(store) = pantry else {
                     continue;
                 };
-                let held = VerifiedRead(verified_unit_read(store, hash).await);
+                let held = VerifiedRead::of(store, hash).await;
                 let Ok(mut conn) = pool.get() else { continue };
                 match crate::services::self_stewardship::record_self_held_shard(
                     &mut conn,
@@ -2532,6 +2534,20 @@ impl P2PHandle {
                             crate::services::self_stewardship::SELF_HELD_STATUS,
                         )
                         .await;
+                        self_recorded_units.insert(*hash);
+                        distributed += 1;
+                    }
+                    Ok(crate::services::self_stewardship::SelfHeldOutcome::Unchanged) => {
+                        // Held and already rowed exactly so: still held (it counts
+                        // toward placement), but nothing changed, so nothing is
+                        // announced. Liveness after a restart is inventory freshness
+                        // and recon, not a re-announcement of unchanged custody.
+                        tracing::debug!(
+                            content_id,
+                            shard_index = i,
+                            peer = %peer.peer_id,
+                            "Self-held shard unchanged (no announcement)"
+                        );
                         self_recorded_units.insert(*hash);
                         distributed += 1;
                     }
@@ -2639,11 +2655,20 @@ impl P2PHandle {
         // and nothing here dials or pushes (no-self-dial contract).
         if self_full_copy_verified {
             if let (Some(me), Some(store)) = (self_agent_cid.as_deref(), pantry) {
-                for (unit_cid, _) in &units {
+                // A striped manifest's custody units are derived shards this pantry does
+                // not hold; what it serves is the payload's own chunks, so those are
+                // the units it can honestly row.
+                let served_chunks: Vec<ByteCid> = if manifest.stripes.is_empty() {
+                    Vec::new()
+                } else {
+                    manifest.chunks.iter().map(|c| c.cid).collect()
+                };
+                let uploader_units = units.iter().map(|(cid, _)| cid).chain(served_chunks.iter());
+                for unit_cid in uploader_units {
                     if self_recorded_units.contains(unit_cid) {
                         continue;
                     }
-                    let held = VerifiedRead(verified_unit_read(store, unit_cid).await);
+                    let held = VerifiedRead::of(store, unit_cid).await;
                     let Ok(mut conn) = pool.get() else { continue };
                     match crate::services::self_stewardship::record_self_held_shard(
                         &mut conn, &held, unit_cid, me, h_app_id,
@@ -2662,6 +2687,9 @@ impl P2PHandle {
                                 crate::services::self_stewardship::SELF_HELD_STATUS,
                             )
                             .await;
+                            self_recorded_units.insert(*unit_cid);
+                        }
+                        Ok(crate::services::self_stewardship::SelfHeldOutcome::Unchanged) => {
                             self_recorded_units.insert(*unit_cid);
                         }
                         Ok(outcome) => tracing::debug!(
@@ -3776,7 +3804,7 @@ impl P2PNode {
     /// **Lock contract:** does NOT acquire the swarm lock. Callers from the
     /// `run()` select! arms must drop their swarm guard before invoking.
     pub(crate) async fn run_custody_reconcile(&self) {
-        use crate::reconcile::custody::{reconcile_pass, BlobStoreSnapshot, ReconcileConfig};
+        use crate::reconcile::custody::{reconcile_pass, ReconcileConfig};
         use crate::reconcile::custody_sweep::RaceFetchKicker;
         use std::sync::atomic::Ordering;
 
@@ -3820,17 +3848,9 @@ impl P2PNode {
             self.config.self_cellkey_agent_cid.as_deref(),
         );
 
-        let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
-            Ok(s) => s,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::reconcile",
-                    error = %e,
-                    "T23: BlobStoreSnapshot build failed; skipping custody reconcile pass"
-                );
-                return;
-            }
-        };
+        // A verified pantry, not a filename listing: a corrupt local copy is not held, so
+        // the pass re-fetches it instead of skipping on its name.
+        let snapshot = crate::reconcile::custody::VerifiedPantry::new(&self.blob_store);
 
         // T23 review fix #4: warn (once per pass) if a misconfigured
         // 0-value will be silently clamped to 1 inside `RaceFetchKicker`.
@@ -3921,7 +3941,6 @@ impl P2PNode {
                 // and could not tell a dead sweep from a quiet one.
                 tracing::info!(
                     target: "elohim_storage::reconcile",
-                    snapshot_size = snapshot.len(),
                     commitments_examined = outcome.commitments_examined,
                     kicks_fired = outcome.kicks_fired,
                     fallback_kicks = outcome.fallback_kicks,
@@ -4614,7 +4633,10 @@ impl P2PNode {
         tokio::spawn(async move {
             let reply = tokio::task::spawn_blocking(move || {
                 request.admit().map_err(|e| e.to_string())?;
-                let local = blob_store.list_cids().map_err(|e| e.to_string())?;
+                // Only what this node can serve verified: a named-but-corrupt payload
+                // or chunk is not advertised, so a recon-witnessed row never describes
+                // an unservable payload.
+                let local = blob_store.list_servable().map_err(|e| e.to_string())?;
                 let set = inventory_recon::ReconSet::new(&local);
                 inventory_recon::Reconciler::responder(&set)
                     .reconcile(&request.msg)
@@ -10895,12 +10917,25 @@ async fn verified_unit_read(store: &BlobStore, unit: &ByteCid) -> bool {
 }
 
 /// The verdict of one [`verified_unit_read`], as the
-/// `services::self_stewardship::record_self_held_shard` probe.
-struct VerifiedRead(bool);
+/// `services::self_stewardship::record_self_held_shard` probe. It vouches for the one
+/// unit it read and nothing else: `has` answers `false` for any other CID.
+struct VerifiedRead {
+    unit: ByteCid,
+    verified: bool,
+}
+
+impl VerifiedRead {
+    async fn of(store: &BlobStore, unit: &ByteCid) -> Self {
+        Self {
+            unit: *unit,
+            verified: verified_unit_read(store, unit).await,
+        }
+    }
+}
 
 impl crate::reconcile::custody::LocalBlobStore for VerifiedRead {
-    fn has(&self, _cid: &ByteCid) -> bool {
-        self.0
+    fn has(&self, cid: &ByteCid) -> bool {
+        self.verified && *cid == self.unit
     }
 }
 

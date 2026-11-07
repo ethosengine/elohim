@@ -2115,6 +2115,15 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    transport_links (iroh_node_id) {
+        iroh_node_id -> Text,
+        libp2p_peer_id -> Text,
+        issued_at_ms -> BigInt,
+        recorded_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     acquisition_pins,
     accumulation_status,
@@ -2193,6 +2202,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     projection_events,
     proposals,
     peer_transport_manifest,
+    transport_links,
     ranked_votes,
     key_revocations,
     key_rotations,

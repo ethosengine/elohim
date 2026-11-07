@@ -37,7 +37,7 @@
 //! On the wire a claim travels as a [`SignedCustodyAnnouncement`]: the claim body, the
 //! transport peer that authored it (`author_peer`) and a [`SignatureEnvelope`] made with
 //! that peer's transport key over transcript v1 (a dual node signs with its iroh key,
-//! the identity `peer_transport_manifest` binds from the signed transport manifest;
+//! the identity a verified two-key transport link ties to its cross-signed libp2p PeerId;
 //! a libp2p-only node with its libp2p identity key)
 //!
 //! ```text
@@ -60,10 +60,10 @@
 //! 5. The signature verifies over the transcript under the envelope's own key.
 //! 6. The author is derived from that key: `author_peer` must be one of the key's
 //!    transport spellings (the libp2p PeerId it makes, or the iroh NodeId it is).
-//! 7. C1: `holder_agent_cid` must be the agent `peer_transport_manifest` binds to the
+//! 7. C1: `holder_agent_cid` must be the agent the cross-signed chain (`p2p::transport_authority`) binds to the
 //!    signing key's transport identity ([`CustodyAnnouncement::check_binding`]).
 //! 8. On libp2p the gossipsub `message.source` is a relay identity: it must not
-//!    contradict the claim. A source this node binds (manifest or identity bindings)
+//!    contradict the claim. A source this node binds (through the same cross-signed chain)
 //!    to a DIFFERENT agent than the signer's refuses; an unbound or absent source
 //!    does not — the signature and the holder binding are the authority.
 //!
@@ -148,7 +148,7 @@ pub enum VerifyError {
 pub enum BindingError {
     #[error("no authenticated author on this plane")]
     NoAuthenticatedAuthor,
-    #[error("the author is not bound to an agent in peer_transport_manifest")]
+    #[error("the author is not bound to an agent by a cross-signed chain")]
     UnboundAuthor,
     #[error("holder {holder} is not the author's bound agent {bound}")]
     HolderMismatch { holder: String, bound: String },
@@ -185,7 +185,7 @@ impl CustodyAnnouncement {
     }
 
     /// Bind the claim to its author: `author` is the authenticated gossip author (if
-    /// the plane has one) and `bound_agent` the agent `peer_transport_manifest` binds
+    /// the plane has one) and `bound_agent` the agent the cross-signed chain (`p2p::transport_authority`) binds
     /// to it. The holder must be exactly that agent.
     pub fn check_binding(
         &self,
@@ -393,9 +393,9 @@ pub enum CustodyAdmission {
 }
 
 /// Judge one received announcement (see the module docs for the order of checks).
-/// `bound_agent` answers the agent `peer_transport_manifest` binds to a transport id
+/// `bound_agent` answers the agent the cross-signed chain (`p2p::transport_authority`) binds to a transport id
 /// (the signer's binding, C1); `source_agent` answers the agent any binding this node
-/// holds attributes to a relaying gossipsub source (manifest or identity bindings).
+/// holds attributes to a relaying gossipsub source (the same chain).
 pub fn admit(
     raw: &[u8],
     witness: AuthorWitness<'_>,
@@ -443,7 +443,7 @@ pub fn admit(
     if !ids.iter().any(|id| id == &signed.author_peer) {
         return CustodyAdmission::Refused(CustodyRefusal::AuthorNotSigner(signed.author_peer));
     }
-    // C1: the holder is the agent the manifest binds to the signer's transport identity
+    // C1: the holder is the agent the cross-signed chain binds to the signer's transport identity
     // (the claimed spelling first, then the key's other spelling).
     let bound = std::iter::once(signed.author_peer.as_str())
         .chain(ids.iter().map(String::as_str))
@@ -748,7 +748,7 @@ mod tests {
     }
 
     /// A dual node signs with its iroh key as its NodeId: the claim binds through the
-    /// manifest's iroh column; on gossipsub the libp2p author is a relay identity that
+    /// agent its NodeId resolves to (in production, the cross-signed chain); on gossipsub the libp2p author is a relay identity that
     /// may differ from the signer, and refuses only when bound to another agent.
     #[test]
     fn an_iroh_signed_claim_binds_through_its_node_id() {
