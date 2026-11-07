@@ -66,6 +66,7 @@ fn config(
         signer: Arc::new(signer),
         verifier: verifier(devices),
         log: Arc::new(|_line: &str| {}),
+        payload_store: None,
     }
 }
 

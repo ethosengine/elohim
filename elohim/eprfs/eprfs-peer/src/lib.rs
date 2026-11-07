@@ -11,6 +11,11 @@
 //! - [`TierProtocol`] serves this device's eprfs store on [`TIER_ALPN`] behind
 //!   [`StewardDevicesGate`], which answers only admitted devices; everyone else gets
 //!   eprfs-serve's uniform refusal. [`tier_call`] and [`tier_request`] ask a peer's tier.
+//! - The artifact mount (artifact-store design §1): [`BlobMount`] answers
+//!   [`TierRequest::Manifest`] and [`TierRequest::Blob`] for the derivation artifacts this device
+//!   holds custody of, indexed from its own flow store, to the devices [`ArtifactServeList`]
+//!   grants by method name; the gate judges roots and objects by a [`ServeScope`]. Each serve is
+//!   recorded as one `serve-blob` Use event that never crosses.
 //!
 //! - The steward channel (§3.3): [`project_channel`] places this device's crossing events (the
 //!   [`CrossingAllowList`] from `pool-policy.json`) in a channel tree served from a
@@ -35,6 +40,7 @@
 mod admission;
 mod allow;
 mod announce;
+mod blob_mount;
 mod channel;
 mod connections;
 mod daemon;
@@ -50,6 +56,7 @@ mod lease_view;
 mod local_blob;
 mod proof;
 mod rules;
+mod serves;
 mod steward_scope;
 mod tier;
 
@@ -57,6 +64,10 @@ pub use admission::{roster_rows_from_file, Admission};
 pub use allow::{slots, via_device, CrossingAllowList, KIND_SLOT, MEASURE_SLOT, VIA_SLOT};
 pub use announce::{
     topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
+};
+pub use blob_mount::{
+    open_payload_store, ArtifactIndex, BlobMount, DeviceScope, DrawOutcome, Held, ServedDraw,
+    Unindexed, SERVE_BLOB, SERVE_IDLE,
 };
 pub use channel::{
     channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,
@@ -75,7 +86,9 @@ pub use fold::{
     FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
     MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
-pub use gate::{SharedAdmission, StewardDevicesGate};
+pub use gate::{
+    serve_blob_standing, ServeScope, Served, SharedAdmission, StewardDevicesGate, WholeStoreScope,
+};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
@@ -92,6 +105,7 @@ pub use lease_view::{
 };
 pub use local_blob::{put_local_blob, read_local_blob, stream_local_blob, LocalBlobContext};
 pub use rules::{Rules, RulesDigest, RulesState};
+pub use serves::{ArtifactServeList, CARRIER_AUDIENCE_PREFIX, STEWARD_AUDIENCE};
 pub use steward_scope::{
     Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,
 };

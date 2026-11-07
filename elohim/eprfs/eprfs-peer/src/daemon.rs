@@ -7,6 +7,9 @@
 //!   device at once, with no restart;
 //! - re-reads the policy when it changed, keeping the last loaded rules on an unreadable or
 //!   malformed replacement and re-projecting when the enforced rules change;
+//! - re-indexes the artifact mount, when the daemon has a payload store, from the custody
+//!   manifests the flow store records, and records each closed `serve-blob` session as one Use
+//!   event ([`BlobMount`]);
 //! - re-projects the channel tree when the flow store changed, and installs it in the store the
 //!   tier serves (a failure is recorded in the head table, where `epr peer status` reads it, and
 //!   the same state of the store is retried with a growing wait: [`ProjectionRetry`]);
@@ -28,8 +31,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use elohim_epr_rea::{ParticipantRow, SidecarFlowStore, SignatureVerifier};
-use eprfs_core::TreeLimits;
+use elohim_epr_rea::{FlowRecord, FlowStore, ParticipantRow, SidecarFlowStore, SignatureVerifier};
+use eprfs_core::{EprfsStorage, TreeLimits};
 use futures_lite::StreamExt;
 use iroh::protocol::Router;
 use iroh::{Endpoint, NodeAddr, NodeId};
@@ -42,6 +45,7 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
+use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -53,6 +57,7 @@ use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::rules::{Rules, RulesState};
+use crate::serves::ArtifactServeList;
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -273,6 +278,9 @@ pub struct PeerConfig {
     pub verifier: Arc<dyn SignatureVerifier + Send + Sync>,
     /// Where the daemon reports what it did, one line at a time.
     pub log: Arc<dyn Fn(&str) + Send + Sync>,
+    /// The device's payload store, whose custody artifacts the tier serves to the devices
+    /// `rules.serves()` grants; `None` for a channel-only daemon, which serves no artifact.
+    pub payload_store: Option<Arc<dyn EprfsStorage>>,
 }
 
 /// A running device daemon.
@@ -316,11 +324,27 @@ impl PeerDaemon {
         let limits = TierLimits::default();
         let book = ConnectionBook::default();
         book.name(roster_named_nodes(&rows, &config.chain_root));
-        let tier = TierProtocol::new(
+        let serves = Arc::new(RwLock::new(config.rules.serves().clone()));
+        let (mount, served_rx) = match &config.payload_store {
+            Some(payload) => {
+                let (mount, served_rx) = BlobMount::new(payload.clone());
+                (Some(Arc::new(mount)), Some(served_rx))
+            }
+            None => (None, None),
+        };
+        let scope = DeviceScope::new(
+            store.clone(),
+            mount.clone(),
+            serves.clone(),
+            admission.clone(),
+        );
+        let tier = TierProtocol::with_scope(
             channel_tier_id(),
             store.clone(),
             admission.clone(),
             limits.clone(),
+            Arc::new(scope),
+            mount.clone(),
         )
         .map_err(|e| PeerError::ChannelTree {
             reason: e.to_string(),
@@ -390,6 +414,11 @@ impl PeerDaemon {
             waiting: HashMap::new(),
             held: HashMap::new(),
             stats: stats.clone(),
+            mount,
+            served_rx,
+            index_stamp: None,
+            indexed_once: false,
+            serves,
             config,
         };
         let (stop, stopped) = oneshot::channel();
@@ -595,6 +624,15 @@ struct Run {
     /// Original event CIDs held from each device, rebuilt lazily after start or any uncertain fold.
     held: HashMap<String, Arc<HashSet<cid::Cid>>>,
     stats: Arc<RunStats>,
+    /// The artifact mount, when this device has a payload store.
+    mount: Option<Arc<BlobMount>>,
+    /// Closed `serve-blob` sessions, recorded on the tick.
+    served_rx: Option<mpsc::UnboundedReceiver<ServedDraw>>,
+    /// The state of the flow log the mount was last indexed from.
+    index_stamp: Stamp,
+    indexed_once: bool,
+    /// The artifact grant the tier's scope reads; replaced when the rules reload.
+    serves: Arc<RwLock<ArtifactServeList>>,
 }
 
 impl Run {
@@ -851,6 +889,8 @@ impl Run {
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
         self.reload_rules()?;
+        self.reindex().await;
+        self.record_serves();
         self.maintain_rejoins().await;
         // Refused connections reach the head table `epr peer status` reads: kept in memory every
         // tick, written with the next announce, or on their own at most once per re-announce
@@ -1012,6 +1052,9 @@ impl Run {
                     old.short(),
                     new.short()
                 ));
+                if let Ok(mut serves) = self.serves.write() {
+                    *serves = rules.serves().clone();
+                }
                 self.config.rules = rules;
                 self.reproject = true;
                 *self.channel.rules_state_mut() = Some(RulesState {
@@ -1042,6 +1085,57 @@ impl Run {
                     state.pending = Some(reason);
                 }
                 self.save()
+            }
+        }
+    }
+
+    /// Re-index the artifact mount from the flow store when the log moved: every custody manifest
+    /// the device holds is indexed, or reported once as unindexed (never served).
+    async fn reindex(&mut self) {
+        let Some(mount) = self.mount.clone() else {
+            return;
+        };
+        let now = stamp(self.flow.log_path());
+        if self.indexed_once && now == self.index_stamp {
+            return;
+        }
+        // Settled per state of the log, failed or not: the next append is the next try.
+        self.index_stamp = now;
+        self.indexed_once = true;
+        let events = match self.flow.events() {
+            Ok(events) => events,
+            Err(e) => {
+                self.log(&format!(
+                    "artifacts not indexed: the flow store failed: {e}"
+                ));
+                return;
+            }
+        };
+        for unindexed in mount.rebuild_from_flow(&events).await {
+            self.log(&unindexed.to_string());
+        }
+    }
+
+    /// Close idle `serve-blob` sessions and record every closed one as one Use event provided by
+    /// this device to its requester. A record that cannot be appended is reported, never retried
+    /// into a second event.
+    fn record_serves(&mut self) {
+        let (Some(mount), Some(served_rx)) = (self.mount.as_ref(), self.served_rx.as_mut()) else {
+            return;
+        };
+        mount.sweep_idle(Instant::now());
+        let mut draws = Vec::new();
+        while let Ok(draw) = served_rx.try_recv() {
+            draws.push(draw);
+        }
+        for draw in draws {
+            let event = draw.use_event(&self.config.device, rfc3339_utc(SystemTime::now()));
+            if let Err(source) = self.flow.append(FlowRecord::Event(event)) {
+                let error = PeerError::ServeUnrecorded {
+                    artifact: Box::new(draw.artifact.clone()),
+                    source,
+                };
+                self.log(&error.to_string());
             }
         }
     }

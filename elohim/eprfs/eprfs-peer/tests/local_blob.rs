@@ -34,6 +34,7 @@ fn context() -> LocalBlobContext {
         custodian: AgentRef("uhCAkLocalDevice".into()),
         in_scope_of: atom_cid(&"local-tier-scope").unwrap(),
         occurred_at: "2026-11-04T12:00:00Z".into(),
+        crossing: None,
     }
 }
 

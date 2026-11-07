@@ -14,11 +14,17 @@
 //! devices. A stream finding its pool empty is reset at once, before any byte of it is read. The
 //! request itself is still judged on decode, so a device dropped by a reload mid-connection gets
 //! the uniform refusal, and a stranger's refusal is unchanged.
+//!
+//! Beside the tree endpoint, a tier may mount a [`BlobMount`]: [`TierRequest::Manifest`] and
+//! [`TierRequest::Blob`] ask for a derivation artifact this device holds custody of, by its output
+//! CID, on the same ALPN and framing. The gate judges them by the [`ServeScope`] the tier was
+//! built with (artifact-store design §1.2–§1.3).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::Bytes;
 use eprfs_core::{
     encode_tree, BatchOptions, BlobCid, DirListing, EprfsStorage, ItemAbsence, ReadLeaf, TierId,
     TreeChange, TreeError, TreeLimits, TreeNode, TreePath, TreeResult, View,
@@ -32,8 +38,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
+use crate::blob_mount::{self, Answered, BlobMount};
 use crate::error::PeerError;
-use crate::gate::{SharedAdmission, StewardDevicesGate};
+use crate::gate::{ServeScope, SharedAdmission, StewardDevicesGate, WholeStoreScope};
 
 /// The ALPN a device's tier answers on.
 pub const TIER_ALPN: &[u8] = b"/elohim/eprfs-tier/1.0.0";
@@ -107,7 +114,8 @@ impl Default for TierLimits {
     }
 }
 
-/// One question to a device's tier: [`TierEndpoint`]'s read, list and diff.
+/// One question to a device's tier: [`TierEndpoint`]'s read, list and diff, or one object of a
+/// derivation artifact from its mount.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum TierRequest {
@@ -121,6 +129,12 @@ pub enum TierRequest {
         new: BlobCid,
         view: View,
     },
+    /// The manifest of the artifact whose complete output is `artifact`. The answer names the
+    /// manifest's own CID; decoding it and checking it names `artifact` is the fetcher's.
+    Manifest { artifact: BlobCid },
+    /// The object `cid` (a chunk, or the manifest) of the artifact `artifact`. Asked under the
+    /// artifact, never alone: an object is served only as part of an artifact granted here.
+    Blob { artifact: BlobCid, cid: BlobCid },
 }
 
 /// A device tier's answer to one [`TierRequest`].
@@ -130,6 +144,11 @@ pub enum TierAnswer {
     Read(ReadLeaf),
     List(DirListing),
     Diff(Vec<TreeChange>),
+    /// One object of an artifact: its bytes, which must hash to `cid`.
+    Blob {
+        cid: BlobCid,
+        bytes: Bytes,
+    },
     /// The endpoint did not answer for the object at `path` under `cid`, with ruling 7's three
     /// parts ([`TreeError::Unanswered`]). To a requester outside reach this is the uniform
     /// refusal, alike for a held root and an unknown one.
@@ -171,6 +190,9 @@ struct TierCounters {
     timed_out_frames: AtomicU64,
     shed_streams: AtomicU64,
     oversized_answers: AtomicU64,
+    served_manifests: AtomicU64,
+    served_chunks: AtomicU64,
+    refused_scope: AtomicU64,
 }
 
 /// A snapshot of a [`TierProtocol`]'s counters.
@@ -189,6 +211,12 @@ pub struct TierCountersSnapshot {
     pub shed_streams: u64,
     /// Answers sent as [`TierAnswer::Failed`] for exceeding the answer frame cap.
     pub oversized_answers: u64,
+    /// Artifact manifests served by the mount.
+    pub served_manifests: u64,
+    /// Artifact chunks served by the mount.
+    pub served_chunks: u64,
+    /// Artifact requests the gate refused, strangers' included (a stranger is only counted).
+    pub refused_scope: u64,
 }
 
 impl TierCounters {
@@ -205,6 +233,9 @@ impl TierCounters {
             timed_out_frames: read(&self.timed_out_frames),
             shed_streams: read(&self.shed_streams),
             oversized_answers: read(&self.oversized_answers),
+            served_manifests: read(&self.served_manifests),
+            served_chunks: read(&self.served_chunks),
+            refused_scope: read(&self.refused_scope),
         }
     }
 }
@@ -224,6 +255,10 @@ pub struct TierProtocol {
 struct Inner {
     gate: StewardDevicesGate,
     endpoint: TierEndpoint<StewardDevicesGate>,
+    /// The identity the tier stamps on what it answers; the mount's refusals use the endpoint's.
+    self_id: TierId,
+    /// The artifact mount, when this tier serves artifacts.
+    mount: Option<Arc<BlobMount>>,
     limits: TierLimits,
     counters: TierCounters,
 }
@@ -250,14 +285,40 @@ impl TierProtocol {
         admission: SharedAdmission,
         limits: TierLimits,
     ) -> eprfs_core::Result<TierProtocol> {
-        let gate = StewardDevicesGate::new(admission.clone());
-        let endpoint = TierEndpoint::new(self_id, store, gate.clone(), None, limits.tree)?;
+        TierProtocol::with_scope(
+            self_id,
+            store,
+            admission,
+            limits,
+            Arc::new(WholeStoreScope),
+            None,
+        )
+    }
+
+    /// Serve `store` as `self_id` behind a gate judging roots and objects by `scope`, and answer
+    /// artifact requests from `mount` (none when `None`: every artifact request is refused).
+    ///
+    /// # Errors
+    ///
+    /// The [`TierEndpoint::new`] refusals: an indexical `self_id`.
+    pub fn with_scope(
+        self_id: TierId,
+        store: Arc<dyn EprfsStorage>,
+        admission: SharedAdmission,
+        limits: TierLimits,
+        scope: Arc<dyn ServeScope>,
+        mount: Option<Arc<BlobMount>>,
+    ) -> eprfs_core::Result<TierProtocol> {
+        let gate = StewardDevicesGate::with_scope(admission.clone(), scope);
+        let endpoint = TierEndpoint::new(self_id.clone(), store, gate.clone(), None, limits.tree)?;
         Ok(TierProtocol {
             book: crate::connections::ConnectionBook::default(),
             admission,
             inner: Arc::new(Inner {
                 gate,
                 endpoint,
+                self_id,
+                mount,
                 limits,
                 counters: TierCounters::default(),
             }),
@@ -298,6 +359,7 @@ impl ProtocolHandler for TierProtocol {
         if !admitted {
             self.book.refused(remote);
         }
+        let connection_id = connection.stable_id();
         let per_connection = self.inner.limits.max_streams_per_connection.max(1);
         let mut streams = JoinSet::new();
         loop {
@@ -328,18 +390,28 @@ impl ProtocolHandler for TierProtocol {
             };
             let inner = Arc::clone(&self.inner);
             streams.spawn(async move {
-                inner.answer_stream(remote, send, recv).await;
+                inner.answer_stream(remote, connection_id, send, recv).await;
                 drop(permit);
             });
         }
         while streams.join_next().await.is_some() {}
+        // The requester went away: what it was drawing on this connection closes as partial.
+        if let Some(mount) = &self.inner.mount {
+            mount.connection_closed(connection_id);
+        }
         Ok(())
     }
 }
 
 impl Inner {
     /// Answer one stream. Stream failures end it quietly: the peer sees its stream fail.
-    async fn answer_stream(&self, remote: NodeId, mut send: SendStream, mut recv: RecvStream) {
+    async fn answer_stream(
+        &self,
+        remote: NodeId,
+        connection: usize,
+        mut send: SendStream,
+        mut recv: RecvStream,
+    ) {
         let deadline = self.limits.frame_deadline;
         let cap = self.limits.max_request_frame_bytes;
         let read = tokio::time::timeout(deadline, read_frame::<TierRequest>(&mut recv, cap)).await;
@@ -364,7 +436,7 @@ impl Inner {
         if who.agent().is_none() {
             TierCounters::bump(&self.counters.unadmitted);
         }
-        let answer = self.answer(&who, request).await;
+        let answer = self.answer(&who, connection, request).await;
         let cap = self
             .limits
             .max_answer_frame_bytes
@@ -396,7 +468,12 @@ impl Inner {
         }
     }
 
-    async fn answer(&self, who: &eprfs_core::Requester, request: TierRequest) -> TierAnswer {
+    async fn answer(
+        &self,
+        who: &eprfs_core::Requester,
+        connection: usize,
+        request: TierRequest,
+    ) -> TierAnswer {
         // No upstream: the endpoint reads its own store only, so a requester's options are moot.
         let opts = BatchOptions::default();
         let endpoint = &self.endpoint;
@@ -413,6 +490,27 @@ impl Inner {
                 endpoint.serve_diff(who, &old, &new, &view, &opts).await,
                 TierAnswer::Diff,
             ),
+            TierRequest::Manifest { .. } | TierRequest::Blob { .. } => {
+                let (answer, answered) = blob_mount::answer(
+                    self.mount.as_deref(),
+                    &self.gate,
+                    &self.self_id,
+                    who,
+                    connection,
+                    &request,
+                )
+                .await;
+                let counter = match answered {
+                    Answered::Manifest => Some(&self.counters.served_manifests),
+                    Answered::Chunk => Some(&self.counters.served_chunks),
+                    Answered::Refused => Some(&self.counters.refused_scope),
+                    Answered::Other => None,
+                };
+                if let Some(counter) = counter {
+                    TierCounters::bump(counter);
+                }
+                answer
+            }
         }
     }
 }
@@ -448,15 +546,17 @@ pub async fn tier_call(
 /// requested path and its entries must encode to its CID under `tree`, the caller's own tree
 /// limits (a listing the caller would refuse to encode is refused here too). Anything else is an
 /// error, never an answer. Membership under the requested root is not checked here: that would
-/// need the spine.
+/// need the spine. An artifact object must hash to the CID it is served under, and a
+/// [`TierRequest::Blob`] answer must be the object asked; decoding a manifest and checking it
+/// names the artifact asked is the fetcher's.
 ///
 /// # Errors
 ///
 /// - [`PeerError::TierStream`] when the stream fails or the peer resets it.
 /// - [`PeerError::TierFrame`] when the request is past its cap or the answer does not decode;
 ///   [`PeerError::TierFrameTooLarge`] when the answer frame is past the client's cap.
-/// - [`PeerError::TierLeafIntegrity`] when a served leaf or listing fails its address or answers
-///   another path.
+/// - [`PeerError::TierLeafIntegrity`] when a served leaf, listing or artifact object fails its
+///   address, answers another path, or is another object than the one asked.
 pub async fn tier_request(
     connection: &Connection,
     req: &TierRequest,
@@ -498,6 +598,12 @@ fn check_answer(
             &listing.cid,
             listing.path == *path && listing_cid(listing, tree).as_ref() == Some(&listing.cid),
         ),
+        (TierRequest::Manifest { .. }, TierAnswer::Blob { cid, bytes }) => {
+            (cid, cid.verifies(bytes))
+        }
+        (TierRequest::Blob { cid: asked, .. }, TierAnswer::Blob { cid, bytes }) => {
+            (cid, cid == asked && cid.verifies(bytes))
+        }
         (TierRequest::Diff { .. }, TierAnswer::Diff(_))
         | (_, TierAnswer::Unanswered { .. } | TierAnswer::Failed { .. }) => return Ok(()),
         _ => return Err(frame_error("the answer is not of the kind asked")),

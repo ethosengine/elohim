@@ -27,10 +27,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
-    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
-    steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
-    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
-    KIND_SLOT, MEASURE_SLOT,
+    lease_events, open_payload_store, other_devices, peer_from_arg, relay_from_env,
+    roster_rows_from_file, slots, steward_lease_view, via_device, Admission, CrossingAllowList,
+    HeadTable, LeaseVerdict, NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules,
+    RulesState, StewardScope, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -89,9 +89,11 @@ pub fn usage() -> String {
     "usage: epr peer <\n  \
      id [--json]\n  \
      | serve [--check] [--root DIR] [--handle H] [--listen IP:PORT] \
-     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--json] \
-     (the device peer: the tier ALPN over this device's channel tree and the steward topic, \
-     admitted devices only; runs until stopped. --check validates its read-only start floor; \
+     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--payload-store DIR] [--json] \
+     (the device peer: the tier ALPN over this device's channel tree, the artifacts of its \
+     payload store that berth.artifacts.serves grants, and the steward topic, admitted devices \
+     only; runs until stopped. The payload store is --payload-store, else EPR_PAYLOAD_STORE, \
+     else $XDG_DATA_HOME/epr/payload. --check validates its read-only start floor; \
      EPR_PEER_RELAY_URL homes it to a relay; --peer names a device's direct address when there \
      is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
@@ -141,6 +143,8 @@ pub struct Options {
     pub listen: Option<SocketAddrV4>,
     pub peers: Vec<String>,
     pub policy: Option<PathBuf>,
+    /// `serve`'s payload store directory (`--payload-store`).
+    pub payload_store: Option<PathBuf>,
     pub project: Option<String>,
     pub closure: Option<String>,
     pub json: bool,
@@ -176,6 +180,7 @@ impl Options {
                 "--root" => options.root = PathBuf::from(value),
                 "--handle" => options.handle = Some(value),
                 "--policy" => options.policy = Some(PathBuf::from(value)),
+                "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
                 "--project" => options.project = Some(value),
                 "--closure" => options.closure = Some(value),
                 "--peer" => options.peers.push(value),
@@ -630,6 +635,31 @@ fn termination() -> impl std::future::Future<Output = ()> {
     }
 }
 
+/// The environment variable naming `epr peer serve`'s payload store directory.
+pub const PAYLOAD_STORE_ENV: &str = "EPR_PAYLOAD_STORE";
+
+/// `serve`'s payload store: `--payload-store`, else [`PAYLOAD_STORE_ENV`], else
+/// `$XDG_DATA_HOME/epr/payload` (`$HOME/.local/share/epr/payload` when unset).
+fn payload_store_dir(options: &Options) -> PeerResult<PathBuf> {
+    if let Some(dir) = &options.payload_store {
+        return Ok(dir.clone());
+    }
+    let set = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
+    if let Some(dir) = set(PAYLOAD_STORE_ENV) {
+        return Ok(PathBuf::from(dir));
+    }
+    let data = set("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| set("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        .ok_or_else(|| {
+            PeerCliError::InvalidArguments(format!(
+                "no payload store: pass --payload-store or set {PAYLOAD_STORE_ENV}, XDG_DATA_HOME \
+                 or HOME"
+            ))
+        })?;
+    Ok(data.join("epr").join("payload"))
+}
+
 fn serve(options: Options) -> PeerResult<ExitCode> {
     if options.check {
         return serve_check(&options);
@@ -679,6 +709,7 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         signer: Arc::new(move |message: &[u8]| signer_key.sign(message)),
         verifier: Arc::new(verifier()),
         log: Arc::new(|line: &str| eprintln!("epr peer: {line}")),
+        payload_store: Some(open_payload_store(&payload_store_dir(&options)?)?),
     };
     let runtime = runtime()?;
     runtime.block_on(async move {
