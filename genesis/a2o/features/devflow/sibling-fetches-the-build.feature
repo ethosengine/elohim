@@ -9,21 +9,23 @@ Feature: A sibling device fetches a build instead of rebuilding it
   - A build KEY is derived from the build's inputs (its method plus the projected source), so the same inputs give the same key, and two different outputs for one key are a mismatch.
   - A CID is a content address, the hash of the bytes: bytes either verify against it or are refused.
   - A build output is cut into CHUNKS; its MANIFEST lists every chunk by CID. The build record names the manifest CID and the output CID separately.
-  - An artifact METHOD names a build recipe (for example mesh-build:elohim-storage) and is the unit of the serve grant. ADMITTED means on Matthew's device roster; GRANTED means that roster device may fetch that method.
+  - A METHOD names a build recipe (mesh-build); a STEP names one build of it (mesh-build:elohim-storage). Serve grants are per method.
+  - A HOLDER is a device that holds a verified output and serves it. A holder serves a method only to the audiences its serve list names; Matthew's serve list grants method mesh-build to every admitted device. ADMITTED means on Matthew's device roster.
+  - The PAYLOAD STORE is the one store on a device that holds verified bytes.
   - PRODUCE is the builder's record that it made an output; USE is a device's record that it consumed bytes. A serve-blob Use is the serving device's record of the bytes it delivered.
   - WASTED BYTES are bytes received but discarded before verification, recorded as a measured quantity.
 
   Background:
-    Given matthew's admitted device "A" runs a peer daemon and can build "elohim-storage"
-    And matthew's admitted device "B" runs a peer daemon and needs "elohim-storage"
-    And matthew's admitted device "matthew-node" runs a peer daemon and is granted method "mesh-build" for devices A and B
-    And both devices use the artifact method "mesh-build:elohim-storage"
-    And the fetch budget allows 8 chunks in flight per holder, a 30 second stall, a 1800 second total, and a 1 MiB manifest
+    Given matthew's admitted device "A" runs a peer daemon, can build "elohim-storage", and holds a serve list granting method "mesh-build" to admitted devices
+    And matthew's admitted device "B" runs a peer daemon, needs "elohim-storage", and can build it locally
+    And matthew's admitted device "matthew-node" runs a peer daemon and holds a serve list granting method "mesh-build" to admitted devices
+    And devices A and B use the step "mesh-build:elohim-storage"
+    And the fetch budget allows 8 chunks in flight per holder, a 30 second stall, a 1800 second total, and a 1 MiB manifest limit
 
   @wip
   Scenario: Device B installs the exact build that device A produced
     Given device A has recorded a successful Produce for key "storage-key-1", output "storage-output-1", and its chunk manifest
-    And device A's grant permits device B to fetch method "mesh-build"
+    And device A's serve list grants device B method "mesh-build"
     When device B resolves the build record by key "storage-key-1"
     And device B fetches every chunk named by the resolved manifest
     Then every received chunk verifies against its own CID before device B stores it
@@ -49,14 +51,14 @@ Feature: A sibling device fetches a build instead of rebuilding it
     And device B already has 120 verified chunks of that output
     And device A's connection closes after device B receives 40 more verified chunks
     When device B resumes the fetch from device "matthew-node"
-    Then device B requests only chunks absent from its verified local store
-    And no request names any of the 160 chunks device B already verified
+    Then no request names any of the 160 chunks device B already verified
     And the completed binary verifies against the resolved output CID before installation
     And the fetch record names both holders and the number of resumed chunks
 
   @wip
   Scenario: A trickling holder is abandoned within budget and its chunk is re-raced
-    Given device A trickles one requested chunk without completing it
+    Given device B is fetching key "storage-key-6" from device A
+    And device A trickles one requested chunk without completing it
     And device "matthew-node" can deliver the same chunk within the 1800 second total
     When device B waits on device A past the 30 second stall
     Then device B abandons device A without waiting for another byte from it
@@ -66,7 +68,8 @@ Feature: A sibling device fetches a build instead of rebuilding it
 
   @wip
   Scenario: With no other holder a trickling holder ends the fetch at the total budget
-    Given device A trickles one requested chunk without completing it
+    Given device B is fetching key "storage-key-7" from device A
+    And device A trickles one requested chunk without completing it
     And no other device holds that output
     When device B reaches the 1800 second total
     Then device B abandons device A
@@ -75,7 +78,7 @@ Feature: A sibling device fetches a build instead of rebuilding it
 
   @wip
   Scenario: An oversized manifest is refused before any chunk moves
-    Given device A offers a manifest larger than the 1 MiB manifest
+    Given device A offers a manifest larger than the 1 MiB manifest limit
     When device B requests the manifest
     Then device B prints "ManifestTooLarge" with the offered length and the 1 MiB manifest limit
     And device B sends no chunk request
@@ -116,10 +119,10 @@ Feature: A sibling device fetches a build instead of rebuilding it
     And device A records one refused serve-blob Use for device B with quantity 0
 
   @wip
-  Scenario: A stranger receives the same refusal for every artifact class
+  Scenario: A stranger receives the same refusal regardless of the artifact's grant status
     Given a requester with no admitted device identity asks device A for a granted artifact, an ungranted artifact, and an unknown artifact
     When device A answers the three manifest requests
-    Then the three refusal frames are byte-identical
+    Then the three refusal responses are byte-identical
     And none names an artifact, method, grant, or policy label
     And device A sends no manifest or chunk bytes
     And device A counts the refusals without writing a Use that identifies the stranger
@@ -135,7 +138,7 @@ Feature: A sibling device fetches a build instead of rebuilding it
     Examples:
       | mode         | condition                                                     | outcome                                  |
       | "direct"     | "the direct address is reachable"                            | "FETCHED"                               |
-      | "relay"      | "the stream delivers at least 4 MiB in each 10 second frame" | "FETCHED"                               |
+      | "relay"      | "the stream delivers at least 4 MiB in each 10 second window" | "FETCHED"                               |
       | "iroh-blobs" | "the payload store offers no iroh-blobs byte path"  | "TransportCannotDeliver(iroh-blobs)"    |
 
   @wip

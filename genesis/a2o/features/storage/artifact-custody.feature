@@ -9,8 +9,9 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
   - The PUBLICATION DECISION is the step that evaluates an artifact's reach before any DHT action.
   - REACH is one of Private, SelfScope, Intimate, Trusted, or wider; below Trusted creates zero DHT heads.
   - A channel's HEAD is the release peers currently serve; it moves only through an admitted election.
-  - A CUSTODY ADMISSION POLICY EPOCH is a versioned set of requirements a release must satisfy before shared custody; the release names it in its adoption discipline.
-  - A FAILURE DOMAIN is a declared dimension with provenance, household first; an undeclared domain never counts as independent.
+  - A CUSTODY ADMISSION POLICY EPOCH is a versioned set of requirements a release must satisfy before shared custody. The ADOPTION DISCIPLINE is the part of a release that names the epoch it must be admitted under. The QUALIFICATION RULE is the current custody admission policy the head must satisfy.
+  - An AUTHORIZED CUSTODY COMMITMENT is a peer's signed promise to hold and serve a release for a bounded window under that policy; it carries the peer's consent to serve, and consent withdrawal revokes it.
+  - A FAILURE DOMAIN is a declared dimension with provenance, household first. A household is the unit of failure domain: two peers in the same household are one domain, and an undeclared domain never counts as independent. Matthew, Jessica and James are the Dowell household; Daniel (Jessica's brother) is a single-peer household in Tulsa.
   - STANDING means authority to act during an interval.
 
   Background:
@@ -18,6 +19,7 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
     And peer "matthew" at "matthew"
     And peer "jessica" at "jessica"
     And peer "james" at "james"
+    And peer "daniel" at "daniel"
     And Matthew publishes artifacts through channel "Household builds"
     And James holds the household safety-steward role for channel "Household builds"
 
@@ -29,7 +31,7 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
     Then the publication record reports zero DHT heads created
     And a DHT lookup for "Family build" returns zero heads
     And the save completes without requesting a custody quorum
-    And the second device's copy is reported only as that device's copy
+    And the publication record lists the second device's copy as a local copy, not as custody
 
     Examples:
       | reach       |
@@ -41,15 +43,16 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
     Given Matthew proposes "Trusted build" as a release at reach "Trusted"
     And its adoptionDiscipline names custody admission policy epoch 7
     And policy epoch 7 names the release closure, coding parameters, tolerated failure, evidence ages, and retention window
-    And Jessica declares her household as a failure domain
-    And James declares his household as a different failure domain
-    And Jessica and James each have an authorized custody commitment
+    And Jessica declares the Dowell household as her failure domain
+    And Daniel declares his own Tulsa household as a different failure domain
+    And Jessica and Daniel each have an authorized custody commitment
     And each has a recent authenticated availability proof
     And each has a recent fetch whose bytes verified and that was served by that same peer
     And no device of publisher Matthew is counted as external custody
     When peer "jessica" evaluates the election under policy epoch 7
     Then the election outcome is "ADMITTED"
     And the admission record names policy epoch 7 and the evidence that satisfied each requirement
+    And the admission record names the release closure, coding parameters, tolerated failure, evidence ages, and retention window, each with the evidence that satisfied it
     And the channel head moves only through that admitted election
 
   Scenario: An unknown custody policy epoch is held as a pending election with its reason
@@ -64,7 +67,7 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
 
   Scenario: A custody shortfall is detected and named
     Given "Trusted build" is admitted under a policy that must survive one whole-copy loss across two household failure domains
-    And Jessica's and James's verified copies currently satisfy that policy
+    And Jessica's copy in the Dowell household and Daniel's copy in his Tulsa household currently satisfy that policy
     And Jessica's counted availability evidence expires
     When peer "matthew" evaluates the release's current custody
     Then the release is reported "under-custodied" with Jessica's expired evidence as the reason
@@ -72,12 +75,20 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
 
   Scenario: Repair asks only an eligible peer and completes within the measured objective
     Given "Trusted build" is reported "under-custodied" because Jessica's availability evidence expired
+    And Daniel's copy and evidence remain counted
     And peer "james" holds an authorized custody commitment for "Trusted build", consents to serve it, and is not one of publisher Matthew's devices
     When the repair window opens
     Then repair requests a copy only from an eligible peer, one that holds an authorized custody commitment, consents, and is not one of the publisher's devices
     And within the measured 900 second objective that peer verifies the full release and records fresh serving evidence
-    And the repair record reports elapsed seconds and returns the release to its required custody level
-    And a missed deadline is reported with its cause
+    And the repair record reports elapsed seconds and returns the release to its required custody level, counting the Dowell household and the Tulsa household
+
+  Scenario: A repair that misses its objective reports its cause
+    Given "Trusted build" is reported "under-custodied" because Jessica's availability evidence expired
+    And peer "james" is the only eligible peer and is unreachable for the whole 900 second window
+    When the repair window opens and the 900 second objective passes
+    Then the repair is reported as missing its objective with cause "no eligible peer reachable"
+    And the release stays "under-custodied"
+    And the channel head does not move
 
   Scenario Outline: Quarantine is an expiring hold while refusal is terminal
     Given James can fetch release "Unsafe build" from peer "jessica"
@@ -90,7 +101,7 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
 
     Examples:
       | action                                 | decision      | payload state                       | duration                         |
-      | "quarantine until 2026-11-08T00:00Z"  | "QUARANTINED" | "retained but unavailable to serve" | "expiry 2026-11-08T00:00Z"      |
+      | "quarantine expiring one day after the decision" | "QUARANTINED" | "retained but unavailable to serve" | "expiry one day after the decision"|
       | "refuse for verified harmful content" | "REFUSED"     | "destroyed on peer jessica"          | "terminal with no expiry"       |
 
   Scenario: Consent withdrawal retires replication and serving without deleting proof
@@ -108,11 +119,11 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
     And each release has separate eligibility, serving authority, retention, and authority evidence
     When an authorized election supersedes "build-1" with "build-2"
     And Matthew withdraws "build-2" from new adoption without electing a replacement
-    And the issuer's standing to serve "build-3" is revoked for a named interval
+    And Matthew's standing to serve "build-3" is revoked for a named interval
     Then "build-1" records "superseded" and can return only through current qualification and a new election
     And "build-2" records "withdrawn", prevents new adoption, and names no replacement head
     And "build-3" records "standing-revoked" with the affected acts and interval
-    And the issuer's standing at publication time for releases outside that interval remains assessable
+    And Matthew's standing at publication time for releases outside that interval remains assessable
     And no one of the three records is inferred from either of the others
 
   Scenario: No eligible head is explicit and an unreachable candidate is not absent
@@ -124,7 +135,7 @@ Feature: Shared artifacts keep their reach, safety, and consent promises
     And no report calls the unreachable candidate absent or deletes its evidence
     And the channel does not silently fall back to an earlier release
 
-  Scenario: An older reader cannot admit an election under a policy epoch it cannot interpret
+  Scenario: An older reader does not inherit another peer's admission of an epoch it cannot interpret
     Given peer "james" understands custody admission policy epoch 8 and has admitted "Trusted build" under it
     And peer "jessica" is an older reader that understands policy epoch 7 but not epoch 8
     When peer "jessica" receives the epoch 8 election and its verified evidence
