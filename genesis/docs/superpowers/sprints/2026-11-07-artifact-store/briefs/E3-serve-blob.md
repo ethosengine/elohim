@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-e3-serve-blob
+status: active
+---
+
 # Brief E3 — `serve-blob` mount with scope enforcement (Opus 5.5; integrity class)
 
 Worktree `as-e3`, branch `artifact-store/e3`. Read `common.md`, then `design.md` §0 (F0.1, F0.2, F0.6–F0.9) and §1 in full. **§1 is your specification**; this brief only frames it.

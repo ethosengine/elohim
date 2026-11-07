@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-b2-seeder-deferred-retry
+status: active
+---
+
 # Brief B2 — the seeder retries a "deferred" 400 with backoff (Codex sol + Sonnet test)
 
 Worktree `as-b2`, branch `artifact-store/b2`. Read `common.md`.

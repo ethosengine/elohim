@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-b1-notes-reach-gate
+status: active
+---
+
 # Brief B1 — brit receipts travel: the style reach gate skips notes refs (Sonnet 5.5)
 
 Worktree `as-b1`, branch `artifact-store/b1`. Read `common.md`.

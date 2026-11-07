@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-common
+status: active
+---
+
 # Common rules for every artifact-store brief (read before your own brief)
 
 - **Worktree:** your brief names it: `/projects/elohim/.worktrees/as-<track>` on branch `artifact-store/<track>`, `.family` = `sprint`. Never run git in `/projects/elohim` (the shared main checkout). Never `cd` into a worktree from the main shell; use `git -C <wt>` / `brit` with `-C`, or a subshell. One committer per worktree; commit by pathspec.

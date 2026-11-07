@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-h-hardening
+status: active
+---
+
 # Brief H — elohim-storage hardening residual (Opus 5.5 for R1, R2, R3, R7; Sonnet 5.5 for R4–R6, R8–R10)
 
 Worktree `as-h`, branch `artifact-store/h`; two workers share it **by disjoint file ownership** (below), each committing only its own paths. Read `common.md`, then `../h-audit.md` — **its residual table R1–R10 is your scope; nothing that the audit lists as landed is reopened.** Read `elohim/elohim-storage/CLAUDE.md` and the trust-contract runbook named in the root CLAUDE.md before touching gossip.

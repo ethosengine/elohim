@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-s-stories
+status: active
+---
+
 # Brief S — stories first: `@concern:artifact-custody` and the sibling fetch (Codex sol drafts, Sonnet steps, blind-reader review)
 
 Worktree `as-s`, branch `artifact-store/s`. Read `common.md`, plan §7.3 "Stories first" and §7.4 R2/R4 (`2026-10-29-native-dev-tooling-over-peers-plan.md:317-324, 376-381`), and `design.md` §3.e.

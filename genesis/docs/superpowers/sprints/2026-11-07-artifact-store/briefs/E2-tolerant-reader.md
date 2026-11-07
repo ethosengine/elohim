@@ -1,3 +1,8 @@
+---
+id: artifact-store-brief-e2-tolerant-reader
+status: active
+---
+
 # Brief E2 — A11 tolerant reader (Sonnet 5.5)
 
 Worktree `as-e2`, branch `artifact-store/e2`. Read `common.md`, then plan §7.3 E2 (`genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md:298-299`) and design D7 in `genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md` (§7, "the law of honest evolution").
