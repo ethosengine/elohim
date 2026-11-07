@@ -102,7 +102,8 @@ pub struct StoreResult {
 /// What [`BlobStore::exists`] found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exists {
-    /// Structurally complete (and, inline, hash-verified).
+    /// Held and hash-verified: every byte hashed to its CID (inline, or every chunk
+    /// and the whole of a chunked payload).
     Verified,
     /// Not held (including a write that never reached its marker).
     Absent,
@@ -366,8 +367,9 @@ impl BlobStore {
         blocking(move || inner.size(&cid)).await
     }
 
-    /// Structural presence; see [`Exists`]. A held payload that fails the structural
-    /// check is moved to quarantine and reported [`Exists::Quarantined`].
+    /// Verified presence; see [`Exists`]. Hashes every byte of the payload (BLAKE3,
+    /// one chunk in memory at a time). A held payload that fails is moved to
+    /// quarantine and reported [`Exists::Quarantined`].
     pub async fn exists(&self, cid: &ByteCid) -> Exists {
         let inner = self.inner.clone();
         let cid = *cid;
@@ -592,6 +594,9 @@ impl Inner {
 
         let _gc = read_lock(&self.chunk_gc);
         let _stripe = self.stripe(&cid);
+        // "Already exists" means exists AND verifies: `exists_locked` hashes every byte
+        // it vouches for. Anything less (absent, quarantined just now) is rewritten
+        // below; `put_chunk` replaces a held chunk that fails its CID.
         if self.exists_locked(&cid) == Exists::Verified {
             return Ok(result(true));
         }
@@ -871,6 +876,13 @@ impl Inner {
     }
 
     /// [`Self::exists`] with the CID's stripe held by the caller.
+    ///
+    /// `Verified` means the bytes were hashed: an inline payload against its CID, a
+    /// chunked one chunk by chunk against each chunk's CID and as a whole against the
+    /// payload CID (BLAKE3 streamed over the chunks, one chunk in memory at a time). A
+    /// length check alone never answers `Verified`: a same-length corrupt chunk passes
+    /// it. A chunk that fails its own CID is quarantined with the payload, so the next
+    /// `store` rewrites it.
     fn exists_locked(&self, cid: &ByteCid) -> Exists {
         let entry = match self.read_entry(cid) {
             Ok(Some(entry)) => entry,
@@ -883,28 +895,51 @@ impl Inner {
             }
             Entry::Marker(bound) => match self.read_layout(cid, &bound) {
                 Err(reason) => Some(reason),
-                Ok(chunks) => chunks.iter().find_map(|chunk| {
-                    match fs::metadata(self.chunk_path(&chunk.cid)) {
-                        Ok(meta) if meta.len() == u64::from(chunk.len) => None,
-                        Ok(meta) => Some(format!(
-                            "chunk {} is {} bytes, not {}",
-                            chunk.cid,
-                            meta.len(),
-                            chunk.len
-                        )),
-                        Err(error) => Some(format!("chunk {}: {error}", chunk.cid)),
-                    }
-                }),
+                Ok(chunks) => self.chunked_defect(cid, &chunks),
             },
         };
         match defect {
             None => Exists::Verified,
             Some(reason) => {
-                warn!(cid = %cid, %reason, "held blob failed its structural check — quarantined");
+                warn!(cid = %cid, %reason, "held blob failed verification — quarantined");
                 let _ = self.quarantine_payload(cid, &reason);
                 Exists::Quarantined
             }
         }
+    }
+
+    /// Hash every chunk of a chunked payload against its own CID and the whole against
+    /// `cid`. Returns the first defect; a chunk that fails its own CID is moved to
+    /// quarantine before returning, so no later read or `store` reuses it.
+    fn chunked_defect(&self, cid: &ByteCid, chunks: &[ChunkRef]) -> Option<String> {
+        let mut whole = blake3::Hasher::new();
+        for chunk in chunks {
+            let path = self.chunk_path(&chunk.cid);
+            let bytes = match fs::read(&path) {
+                Ok(bytes) => bytes,
+                Err(error) => return Some(format!("chunk {}: {error}", chunk.cid)),
+            };
+            if bytes.len() as u64 != u64::from(chunk.len) {
+                return Some(format!(
+                    "chunk {} is {} bytes, not {}",
+                    chunk.cid,
+                    bytes.len(),
+                    chunk.len
+                ));
+            }
+            let actual = compute_bytes_cid(&bytes);
+            if actual != chunk.cid {
+                let _ = self.quarantine_files(
+                    &chunk.cid,
+                    std::slice::from_ref(&path),
+                    "chunk fails its own cid",
+                );
+                return Some(format!("chunk {} hashes to {actual}", chunk.cid));
+            }
+            whole.update(&bytes);
+        }
+        let actual = ByteCid::from_digest(*whole.finalize().as_bytes());
+        (&actual != cid).then(|| format!("whole payload hashes to {actual}"))
     }
 
     fn absent_or_quarantined(&self, cid: &ByteCid) -> Exists {
@@ -1489,15 +1524,9 @@ pub(crate) mod tests {
         bytes[7] ^= 0xff; // same length: the structural check cannot see it
         fs::write(&path, &bytes).unwrap();
 
-        assert_eq!(
-            store.exists(&result.cid).await,
-            Exists::Verified,
-            "structural only"
-        );
-        assert!(matches!(
-            store.get(&result.cid).await,
-            Err(StorageError::HashMismatch { .. })
-        ));
+        // `exists` hashes every chunk (R3): a same-length corruption is never Verified.
+        assert_eq!(store.exists(&result.cid).await, Exists::Quarantined);
+        assert!(store.get(&result.cid).await.is_err());
         assert!(!path.exists(), "the corrupt chunk left the serving tree");
         assert!(store.get_chunk(&victim.cid).await.is_err());
         assert_eq!(store.exists(&result.cid).await, Exists::Quarantined);
@@ -1754,5 +1783,88 @@ pub(crate) mod tests {
         }
         assert_eq!(created, 1, "exactly one writer creates the blob");
         assert_eq!(store.stats().total_blobs, 1);
+    }
+
+    // ── R3: "exists" means exists and verifies ──────────────────────────────
+
+    /// Flip one byte of a held chunk in place, keeping its length.
+    fn corrupt_chunk_in_place(dir: &TempDir, chunk: &ByteCid, at: usize) -> PathBuf {
+        let path = fanout_path(&dir.path().join("chunks"), &chunk.to_string());
+        let mut bytes = fs::read(&path).unwrap();
+        let at = at.min(bytes.len() - 1);
+        bytes[at] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn same_length_corrupt_chunk_is_never_reported_verified() {
+        let data = chunked_payload();
+        for (victim, at) in [(0usize, 0usize), (1, 7), (usize::MAX, usize::MAX)] {
+            let (dir, store) = open().await;
+            let result = store.store(&data).await.unwrap();
+            assert!(result.chunks.len() > 2, "fixture must be chunked");
+            let victim = result.chunks[victim.min(result.chunks.len() - 1)].cid;
+            let path = corrupt_chunk_in_place(&dir, &victim, at);
+            assert_eq!(
+                fs::metadata(&path).unwrap().len(),
+                result
+                    .chunks
+                    .iter()
+                    .find(|c| c.cid == victim)
+                    .map(|c| u64::from(c.len))
+                    .unwrap(),
+                "the corruption keeps the structural length"
+            );
+            let verdict = store.exists(&result.cid).await;
+            assert_ne!(verdict, Exists::Verified, "chunk {victim} at {at}");
+            assert_eq!(verdict, Exists::Quarantined);
+            assert!(
+                !path.exists(),
+                "the failing chunk is out of the serving tree"
+            );
+            // Asked again, it stays not-Verified (the payload is in quarantine).
+            assert_ne!(store.exists(&result.cid).await, Exists::Verified);
+        }
+    }
+
+    #[tokio::test]
+    async fn store_over_a_structurally_present_corrupt_object_repairs_it() {
+        // Chunked: the marker, the layout record and every chunk file are present at
+        // their declared lengths, but one chunk's bytes are wrong.
+        let (dir, store) = open().await;
+        let data = chunked_payload();
+        let first = store.store(&data).await.unwrap();
+        let victim = first.chunks[1].cid;
+        corrupt_chunk_in_place(&dir, &victim, 3);
+
+        let again = store.store(&data).await.unwrap();
+        assert!(
+            !again.already_existed,
+            "a corrupt object is not 'already stored': it is rewritten"
+        );
+        assert_eq!(store.exists(&first.cid).await, Exists::Verified);
+        assert_eq!(&store.get(&first.cid).await.unwrap()[..], &data[..]);
+        let healed =
+            fs::read(fanout_path(&dir.path().join("chunks"), &victim.to_string())).unwrap();
+        assert_eq!(
+            compute_bytes_cid(&healed),
+            victim,
+            "the chunk file is whole again"
+        );
+        assert_eq!(store.stats().total_blobs, 1, "counted once");
+
+        // Inline: same length, wrong bytes.
+        let (dir, store) = open().await;
+        let small = b"an inline payload".to_vec();
+        let held = store.store(&small).await.unwrap();
+        let path = fanout_path(&dir.path().join("blobs"), &held.cid.to_string());
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[0] ^= 0x01;
+        fs::write(&path, &bytes).unwrap();
+        let again = store.store(&small).await.unwrap();
+        assert!(!again.already_existed);
+        assert_eq!(&store.get(&held.cid).await.unwrap()[..], &small[..]);
+        assert_eq!(store.exists(&held.cid).await, Exists::Verified);
     }
 }
