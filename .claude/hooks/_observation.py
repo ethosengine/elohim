@@ -44,8 +44,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-__all__ = ["resolve", "resolve_bin", "resolved_cid", "available", "emit", "reset_cache", "bound_count",
-           "bootstrap_session_id"]
+__all__ = ["resolve", "resolve_bin", "resolved_cid", "available", "emit", "emit_many", "reset_cache",
+           "bound_count", "bootstrap_session_id"]
 
 _scripts = Path(__file__).resolve().parents[1] / "scripts"
 if str(_scripts) not in sys.path:
@@ -169,11 +169,72 @@ def emit(measure: str, subject: str, value, *, reason: str,
     Fail-open by construction: a missing binary, an absent verb, a non-zero exit or a
     timeout all return False so the caller keeps its JSON fallback. Never prints.
     """
-    if not available():
+    argv = _emit_argv(measure, subject, value, reason=reason, env=env, root=root)
+    if argv is None:
         return False
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=_EMIT_TIMEOUT)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def emit_many(notes: list[dict], *, wait: bool = True) -> list[bool]:
+    """Append several observations CONCURRENTLY; one bool per note, in order.
+
+    `wait=False` hands the appends to their own session and returns at once, each entry True
+    when its process STARTED (not when it landed). For a hook that never reads the result:
+    on a loaded host one `epr` start costs 0.7-1.5 s (measured at load average 20-24), so
+    waiting at all keeps a 2 s hook at the edge of its budget.
+
+    Each note is the keyword set `emit` takes (`measure`, `subject`, `value`, `reason`, and
+    optionally `env`, `root`). A hook that emits once per enclosing scope paid one
+    `epr flow note` (~0.5 s) per scope in sequence: a file inside a worktree has three
+    enclosing CLAUDE.md scopes, and `claude-md-drift-signal` reached 1.9 s against its 2 s
+    budget (2026-11-07, PostToolUse:Edit cancelled six times). The notes are independent
+    appends, so they run side by side and the hook pays roughly one. Same fail-open contract
+    as `emit`: one shared `_EMIT_TIMEOUT` deadline, and a note that cannot land is False.
+    """
+    import time
+
+    procs: list = []
+    for note in notes:
+        argv = _emit_argv(note["measure"], note["subject"], note["value"],
+                          reason=note["reason"], env=note.get("env"), root=note.get("root"))
+        if argv is None:
+            procs.append(None)
+            continue
+        try:
+            procs.append(subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                                          stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL,
+                                          start_new_session=not wait))
+        except OSError:
+            procs.append(None)
+    if not wait:
+        return [proc is not None for proc in procs]
+    deadline = time.monotonic() + _EMIT_TIMEOUT
+    landed: list[bool] = []
+    for proc in procs:
+        if proc is None:
+            landed.append(False)
+            continue
+        try:
+            landed.append(proc.wait(timeout=max(0.0, deadline - time.monotonic())) == 0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            landed.append(False)
+    return landed
+
+
+def _emit_argv(measure: str, subject: str, value, *, reason: str,
+               env: dict | None = None, root: str | None = None) -> list[str] | None:
+    """The `epr flow note` argv for one observation, or None when the binary is unavailable."""
+    if not available():
+        return None
     binary = resolve_bin()
     if not binary:
-        return False
+        return None
     # Measure routing: a bulk clear is the reset measure on the repository, never a zero on one
     # subject (see _BULK_CLEAR_ON_ZERO).
     try:
@@ -194,11 +255,7 @@ def emit(measure: str, subject: str, value, *, reason: str,
         argv += ["--env", f"{k}={v}"]
     if root:
         argv += ["--root", root]
-    try:
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=_EMIT_TIMEOUT)
-        return r.returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+    return argv
 
 
 # ── native bound reader ─────────────────────────────────────────────────────────────────

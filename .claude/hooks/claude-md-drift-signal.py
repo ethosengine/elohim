@@ -118,16 +118,22 @@ def main() -> int:
     # The bound lives in .claude/epr-meta (claude-md-edit-signal@1 feeding the derived
     # claude-md-drift-score@1 ceiling). One observation per enclosing scope; the drift score
     # is derived from the folds by the native report, not carried in a private counter here.
+    # The notes are independent appends and this hook never reads whether they landed, so
+    # they are handed off without waiting (`emit_many(wait=False)`): one per scope in
+    # sequence cost 0.5-1.5 s each on a loaded host and timed the hook out on worktree files
+    # (three enclosing scopes).
     if _obs.available():
+        notes = []
         for claude_md in enclosing:
             try:
                 rel = str(claude_md.relative_to(repo))
             except ValueError:
                 rel = str(claude_md)
             kind = "direct" if (is_direct_edit_target and edited_path == claude_md) else "scope"
-            _obs.emit("claude-md-edit-signal@1", rel, 1,
-                      reason=f"gospel drift: {kind} edit inside this CLAUDE.md scope",
-                      env={"kind": kind}, root=str(repo))
+            notes.append({"measure": "claude-md-edit-signal@1", "subject": rel, "value": 1,
+                          "reason": f"gospel drift: {kind} edit inside this CLAUDE.md scope",
+                          "env": {"kind": kind}, "root": str(repo)})
+        _obs.emit_many(notes, wait=False)
 
     return 0  # hooks are best-effort; never block the tool call
 

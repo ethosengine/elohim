@@ -367,7 +367,16 @@ class DriftObservationCase(unittest.TestCase):
         self.run_hook("claude-md-drift-signal.py",
                       {"tool_name": "Edit", "tool_input": {"file_path": str(target)}},
                       MEASURE_VERB="1")
-        notes = [c for c in self.stub_calls() if c[:2] == ["flow", "note"] and "--help" not in c]
+        # The hook hands its notes off without waiting (`emit_many(wait=False)`), so the
+        # stub may record them just after the hook returns: poll, bounded.
+        import time
+        deadline = time.monotonic() + 5
+        while True:
+            notes = [c for c in self.stub_calls()
+                     if c[:2] == ["flow", "note"] and "--help" not in c]
+            if notes or time.monotonic() > deadline:
+                break
+            time.sleep(0.05)
         self.assertEqual([n[n.index("--measure") + 1] for n in notes],
                          ["claude-md-edit-signal@1"], self.stub_calls())
         self.assertEqual(self.json_accumulators(), [], "the fold is the only store")
