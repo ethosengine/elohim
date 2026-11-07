@@ -2,7 +2,10 @@
 name = "elohim-peer-fabric"
 version = "0.1.0"
 edition = "2021"
-license.workspace = true
+# Literal, not `license.workspace = true`: the storage image copies this crate standalone into a
+# flattened /app layout with no workspace root (elohim/elohim-storage/Dockerfile), where an
+# inherited field fails to resolve (elohim-edge #1823). Keep in step with elohim/Cargo.toml.
+license = "Apache-2.0"
 description = "Shared pure-logic peer-traffic fabric: defense-in-depth (guard) + capability-aware peer ranking (score). No I/O, no diesel — the dependency graph is the purity boundary."
 
 [features]
