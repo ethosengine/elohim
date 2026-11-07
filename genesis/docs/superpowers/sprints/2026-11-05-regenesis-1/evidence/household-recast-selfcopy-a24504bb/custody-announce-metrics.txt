@@ -1,0 +1,124 @@
+### custody metrics after prologue 03:05:43Z
+## storage :8090
+elohim_custody_announce_total{direction="applied"} 15
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 30
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 13
+## storage :8091
+elohim_custody_announce_total{direction="applied"} 15
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 30
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 13
+## storage :8092
+elohim_custody_announce_total{direction="applied"} 26
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 52
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 2
+### custody metrics after chaos 03:09:25Z
+## storage :8090
+elohim_custody_announce_total{direction="applied"} 20
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 39
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 13
+## storage :8091
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 0
+## storage :8092
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 1
+### custody metrics after durability 03:13:35Z
+## storage :8090
+elohim_custody_announce_total{direction="applied"} 8
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 2
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 12
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 0
+## storage :8091
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 0
+## storage :8092
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 0
+### custody metrics after deliverability 03:19:54Z
+## storage :8090
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 3
+## storage :8091
+elohim_custody_announce_total{direction="applied"} 0
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 0
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 1
+## storage :8092
+elohim_custody_announce_total{direction="applied"} 6
+elohim_custody_announce_total{direction="dropped_self"} 0
+elohim_custody_announce_total{direction="dropped_weaker"} 0
+elohim_custody_announce_total{direction="held"} 0
+elohim_custody_announce_total{direction="received"} 9
+elohim_custody_announce_total{direction="refused_binding"} 0
+elohim_custody_announce_total{direction="refused_signature"} 0
+elohim_custody_announce_total{direction="refused_structural"} 0
+elohim_custody_announce_total{direction="sent"} 3
