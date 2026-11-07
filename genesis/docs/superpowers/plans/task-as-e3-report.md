@@ -205,7 +205,9 @@ dirty") because of the orchestrator's uncommitted `briefs/common.md` copy in thi
 
 ## After review: astra BLOCK (`evidence/e3-astra-review.md`) and the orchestrator's verification
 
-Fix commit: see `brit log` on `artifact-store/e3` after `5fd5fb2f`. The deviations list above
+Fix commit: `5d93dc24`. `just gate eprfs` at `5d93dc24`: `evidence/gate-E3-eprfs.log`,
+**EXIT=0**. The green run at `b308cf96` before the review is kept as
+`gate-E3-eprfs.run2-pre-review.log`. The deviations list above
 has nine entries; the count of ten in the first hand-off message was wrong.
 
 - **H1: a superseded derivation's objects stayed in `by_object`.**
