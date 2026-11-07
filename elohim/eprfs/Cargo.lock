@@ -1668,6 +1668,7 @@ dependencies = [
  "elohim-epr",
  "eprfs-core",
  "eprfs-serve",
+ "ipld-core",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

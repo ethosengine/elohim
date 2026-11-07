@@ -20,9 +20,9 @@ pub mod budget;
 pub use budget::{BudgetScope, SemaphoreGate};
 mod tier_blob;
 pub use tier_blob::{
-    put_tier_blob, read_tier_blob, read_tier_manifest, stream_tier_blob, TierBlobChunk,
-    TierBlobDraw, TierBlobManifest, TierBlobMiss, TierBlobPut, TierBlobSink, TierBlobStreamDraw,
-    TierBlobUnavailable, TIER_BLOB_MANIFEST_EPOCH, TIER_BLOB_PROFILE,
+    put_tier_blob, read_tier_blob, read_tier_manifest, stream_tier_blob, ManifestExt,
+    TierBlobChunk, TierBlobDraw, TierBlobManifest, TierBlobMiss, TierBlobPut, TierBlobSink,
+    TierBlobStreamDraw, TierBlobUnavailable, TIER_BLOB_MANIFEST_EPOCH, TIER_BLOB_PROFILE,
 };
 
 #[cfg(windows)]

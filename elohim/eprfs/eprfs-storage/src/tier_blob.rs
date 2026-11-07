@@ -20,6 +20,7 @@ use elohim_epr::address::{
 };
 use elohim_epr::profile::{try_chunk_bytes, ByteProfile, Chunker, Erasure, BYTE_PROFILE_0};
 use eprfs_core::{BlobCid, DerivationRecord, EprfsError, EprfsStorage, FetchPolicy, Result};
+use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -52,14 +53,54 @@ pub struct TierBlobChunk {
 /// before returning bytes. `profile` is the byte profile the chunks were cut and addressed under;
 /// readers bound chunk lengths by it. The record names the closure and signer claim; accepting
 /// its witness or widening its reach remains the caller's decision.
+///
+/// D7: a known-epoch manifest refuses unknown fields outside `ext`; content under `ext` carries no
+/// decision meaning and is retained, so a decode followed by an encode reproduces it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TierBlobManifest {
     pub epoch: u32,
     pub profile: ByteProfile,
     pub record: DerivationRecord,
     pub byte_len: u64,
     pub chunks: Vec<TierBlobChunk>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ext: Option<ManifestExt>,
+}
+
+/// Opaque content of a manifest's top-level `ext` namespace (D7), held as its DAG-CBOR bytes so
+/// the manifest stays `Eq` and the content is never interpreted. Decoding keeps the value and
+/// encoding writes it back; for the canonical DAG-CBOR a writer emits that is byte-exact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManifestExt(Vec<u8>);
+
+impl ManifestExt {
+    /// The canonical DAG-CBOR bytes of the retained `ext` value.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Serialize for ManifestExt {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        let value: Ipld =
+            serde_ipld_dagcbor::from_slice(&self.0).map_err(serde::ser::Error::custom)?;
+        value.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ManifestExt {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = Ipld::deserialize(deserializer)?;
+        serde_ipld_dagcbor::to_vec(&value)
+            .map(Self)
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 /// The one field every manifest epoch shares. Read before the epoch-2 schema so an older (or
@@ -248,6 +289,7 @@ pub async fn put_tier_blob<S: EprfsStorage + ?Sized>(
         record,
         byte_len: bytes.len() as u64,
         chunks,
+        ext: None,
     };
     let (manifest_cid, manifest_bytes) = BlobCid::encode_manifest(&manifest)
         .map_err(|error| EprfsError::Storage(format!("tier blob manifest encoding: {error}")))?;
