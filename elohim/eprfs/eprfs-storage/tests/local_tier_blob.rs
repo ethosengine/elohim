@@ -591,3 +591,28 @@ async fn held_manifest_is_never_a_hit_and_records_unavailable_use() {
         );
     }
 }
+
+#[tokio::test]
+async fn explicit_null_ext_is_refused_not_normalized() {
+    let store = MemoryStorage::default();
+    let bytes = Bytes::from_static(b"payload with a null extension");
+    let put = put_tier_blob(&store, record_for(&bytes), bytes.clone())
+        .await
+        .unwrap();
+    let (cid, manifest_bytes) =
+        forged_manifest(&put.manifest, 2, Some(ipld_core::ipld::Ipld::Null));
+    store.put_blob_verified(&cid, manifest_bytes).await.unwrap();
+
+    let draw = read_tier_blob(&store, &cid).await;
+    assert_eq!(draw.bytes(), None);
+    assert!(
+        matches!(
+            draw,
+            TierBlobDraw::Unavailable {
+                why: TierBlobUnavailable::ManifestInvalid { ref reason },
+                ..
+            } if reason.contains("null ext")
+        ),
+        "{draw:?}"
+    );
+}

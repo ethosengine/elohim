@@ -64,7 +64,11 @@ pub struct TierBlobManifest {
     pub record: DerivationRecord,
     pub byte_len: u64,
     pub chunks: Vec<TierBlobChunk>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_ext"
+    )]
     pub ext: Option<ManifestExt>,
 }
 
@@ -97,10 +101,23 @@ impl<'de> Deserialize<'de> for ManifestExt {
         deserializer: D,
     ) -> std::result::Result<Self, D::Error> {
         let value = Ipld::deserialize(deserializer)?;
+        if value == Ipld::Null {
+            return Err(serde::de::Error::custom(
+                "explicit null ext is non-canonical; absent means no extension",
+            ));
+        }
         serde_ipld_dagcbor::to_vec(&value)
             .map(Self)
             .map_err(serde::de::Error::custom)
     }
+}
+
+/// A present `ext` key always carries a value: serde's `Option` would otherwise read an explicit
+/// CBOR `null` as absent and re-encode it as absent, changing the bytes and the manifest CID.
+fn present_ext<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<ManifestExt>, D::Error> {
+    ManifestExt::deserialize(deserializer).map(Some)
 }
 
 /// The one field every manifest epoch shares. Read before the epoch-2 schema so an older (or

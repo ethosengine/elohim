@@ -2,7 +2,7 @@
 id: task-as-e2-report
 status: landed
 cites: []
-landed_commit: 1b76c2327  # without the review fix d4cf5763b; see "Landing gap" below
+landed_commit: 1b76c2327  # without the review fix d4cf5763b; it rides the E4 storage closure (branch artifact-store/e4)
 verified_by: "astra review evidence/e2-astra-review.md; L3 combined gate evidence/gate-L3-storage.log; L3 landing evidence/push-L3.log"
 concerns: see Deviations
 actor: agent:e2@claude-sonnet-5-5
@@ -41,6 +41,6 @@ non-canonical (forged) manifest carries one.
 The fix is re-applied as d77171ffd on branch `artifact-store/e2-null-ext` (14/14 in
 `local_tier_blob`). It cannot land alone: eprfs's publish precheck requires an `eprfs-storage`
 version bump (0.3.6 → 0.3.7) for a changed `tier_blob.rs`. The bump rewrites `elohim/Cargo.lock`,
-which dispatches elohim-edge (an alpha roll) and the elohim-storage gate. It rides the next storage
-closure. Found while checking as-e2 for unlanded patches before removing it.
+which dispatches elohim-edge (an alpha roll) and the elohim-storage gate. It rides the E4 storage
+closure (branch `artifact-store/e4`, 2026-11-09). Found while checking as-e2 for unlanded patches before removing it.
 
