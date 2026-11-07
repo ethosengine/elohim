@@ -347,6 +347,19 @@ spec:
               value: "uhC0keVeFYqh1FAN7Zhye9iK3_mZPmHYQyKQrFU_4XHZ3IJKgmC6R,uhC0kVl3RQECBGTPvhGSUr8T1KfR_75c0t0-gRNmEk1empvGp9Dbz,uhC0kWcMKyH2gxgfuZgX-cb0p0sHQA8q0T5--LyOO1QcYBMEg1nyb,uhC0kT00zR88Qae1cngAyYXdP31vLvMmsQWv-Ac87neR1hha0ZRpR,uhC0keORQ2XO6tfRxWMY87iY6N968qpg-pT6qpK5uZIzcy1ibDvGP"
             - name: ALLOW_COORDINATOR_UPDATE
               value: "true"
+            # Re-genesis 1 (2026-11-07): the conductor's tokio runtime sizes its worker
+            # pool from the cgroup CPU quota (2-6 workers here, 24 on the household
+            # hosts). On a COLD install the fork's Spaces::get_or_create_space_ref holds
+            # the spaces-map write lock across Space::new, whose
+            # block_in_place(block_on(open_db)) needs free workers, while concurrent
+            # RwShare readers park workers synchronously (try_read_for) - with a small
+            # pool every worker parks, the db open never completes, and install_app
+            # idles to the 180 s admin timeout ("Failed to get a RwShare read lock for
+            # over 120s", edge #1826). More threads, not more CPU: parked threads cost
+            # nothing against the quota. Remove when the fork builds the Space outside
+            # the write lock.
+            - name: TOKIO_WORKER_THREADS
+              value: "24"
             # Cooperative-cgroup CPU lever, now a no-op: storage and conductor
             # no longer share a container cgroup, so there is no intra-cgroup
             # CPU race for niceness to arbitrate. Explicitly "0" (disabled) so
