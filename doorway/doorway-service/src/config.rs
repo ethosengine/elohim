@@ -575,7 +575,10 @@ impl Args {
     }
 
     /// Get effective admin URL (falls back to conductor_url if not set)
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "documented accessor with no caller: the per-conductor derivation above is the live path"
+    )]
     pub fn admin_url(&self) -> &str {
         self.conductor_admin_url
             .as_deref()
