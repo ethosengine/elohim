@@ -67,7 +67,7 @@ pub use announce::{
 };
 pub use blob_mount::{
     open_payload_store, ArtifactIndex, BlobMount, DeviceScope, DrawOutcome, Held, ServedDraw,
-    Unindexed, SERVE_BLOB, SERVE_IDLE,
+    Unindexed, REFUSALS_PER_WINDOW, SERVED_QUEUE, SERVE_BLOB, SERVE_IDLE,
 };
 pub use channel::{
     channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,

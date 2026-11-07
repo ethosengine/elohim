@@ -327,7 +327,7 @@ impl PeerDaemon {
         let serves = Arc::new(RwLock::new(config.rules.serves().clone()));
         let (mount, served_rx) = match &config.payload_store {
             Some(payload) => {
-                let (mount, served_rx) = BlobMount::new(payload.clone());
+                let (mount, served_rx) = BlobMount::new(payload.clone(), config.device.clone());
                 (Some(Arc::new(mount)), Some(served_rx))
             }
             None => (None, None),
@@ -627,7 +627,7 @@ struct Run {
     /// The artifact mount, when this device has a payload store.
     mount: Option<Arc<BlobMount>>,
     /// Closed `serve-blob` sessions, recorded on the tick.
-    served_rx: Option<mpsc::UnboundedReceiver<ServedDraw>>,
+    served_rx: Option<mpsc::Receiver<ServedDraw>>,
     /// The state of the flow log the mount was last indexed from.
     index_stamp: Stamp,
     indexed_once: bool,
@@ -1021,8 +1021,10 @@ impl Run {
         }
     }
 
-    /// Re-read both enforced rule sets when their policy file changed. A bad replacement keeps
-    /// the loaded rules and is recorded for status readers.
+    /// Re-read the enforced rule sets when their policy file changed. A bad replacement keeps
+    /// the loaded crossing and steward rules and is recorded for status readers, but revokes
+    /// serving: the artifact grant is empty (deny) until a policy that reads loads again. A grant
+    /// is never carried past a policy that no longer says it.
     fn reload_rules(&mut self) -> Result<(), PeerError> {
         let Some(policy) = self.config.policy.clone() else {
             return Ok(());
@@ -1034,6 +1036,10 @@ impl Run {
         self.policy_stamp = now;
         match Rules::from_policy_file(&policy) {
             Ok(rules) => {
+                // Restored on every policy that reads, a revocation's included.
+                if let Ok(mut serves) = self.serves.write() {
+                    *serves = rules.serves().clone();
+                }
                 let old = self.config.rules.digest();
                 let new = rules.digest();
                 if old == new {
@@ -1052,9 +1058,6 @@ impl Run {
                     old.short(),
                     new.short()
                 ));
-                if let Ok(mut serves) = self.serves.write() {
-                    *serves = rules.serves().clone();
-                }
                 self.config.rules = rules;
                 self.reproject = true;
                 *self.channel.rules_state_mut() = Some(RulesState {
@@ -1066,6 +1069,10 @@ impl Run {
                 self.save()
             }
             Err(error) => {
+                // Fail closed for serving, every time the file fails to read.
+                if let Ok(mut serves) = self.serves.write() {
+                    *serves = ArtifactServeList::default();
+                }
                 let reason = error.to_string();
                 let digest = self.config.rules.digest();
                 let already_pending = self
@@ -1078,7 +1085,8 @@ impl Run {
                     return Ok(());
                 }
                 self.log(&format!(
-                    "rules not reloaded, keeping {}: {reason}",
+                    "rules not reloaded, keeping {} and serving no artifact until a policy \
+                     reads: {reason}",
                     digest.short()
                 ));
                 if let Some(state) = self.channel.rules_state_mut().as_mut() {

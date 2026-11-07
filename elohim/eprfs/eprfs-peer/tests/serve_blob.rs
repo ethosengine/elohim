@@ -23,7 +23,8 @@ use eprfs_peer::{
     bind, channel_tier_id, open_payload_store, put_local_blob, tier_call, tier_request,
     ArtifactServeList, BlobMount, ChannelStore, CrossingAllowList, DeviceScope, DrawOutcome,
     LocalBlobContext, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, ServedDraw,
-    SharedAdmission, TierAnswer, TierLimits, TierProtocol, TierRequest, Unindexed, TIER_ALPN,
+    SharedAdmission, TierAnswer, TierLimits, TierProtocol, TierRequest, Unindexed,
+    REFUSALS_PER_WINDOW, TIER_ALPN,
 };
 use eprfs_storage::{TierBlobManifest, TierBlobPut};
 use iroh::endpoint::Connection;
@@ -156,18 +157,18 @@ struct Holder {
     payload: Arc<dyn EprfsStorage>,
     flow: MemoryFlowStore,
     mount: Arc<BlobMount>,
-    served: mpsc::UnboundedReceiver<ServedDraw>,
+    served: mpsc::Receiver<ServedDraw>,
     admission: SharedAdmission,
     protocol: TierProtocol,
     router: Router,
     addr: NodeAddr,
-    _dir: tempfile::TempDir,
+    dir: tempfile::TempDir,
 }
 
 async fn holder(h: &Household) -> Holder {
     let dir = tempfile::tempdir().expect("payload dir");
     let payload = open_payload_store(&dir.path().join("payload")).expect("payload store");
-    let (mount, served) = BlobMount::new(payload.clone());
+    let (mount, served) = BlobMount::new(payload.clone(), h.a.did.clone());
     let mount = Arc::new(mount);
     let admission = h.shared_admission();
     let channel = Arc::new(ChannelStore::default());
@@ -206,7 +207,7 @@ async fn holder(h: &Household) -> Holder {
         protocol,
         router,
         addr,
-        _dir: dir,
+        dir,
     }
 }
 
@@ -349,6 +350,20 @@ fn local(port: u16) -> std::net::SocketAddrV4 {
 
 /// Start device A's daemon over `side`, serving its payload store under [`serve_policy`].
 async fn start_holder(p: &Pair, side: &Side, port: u16) -> PeerDaemon {
+    start_holder_with(p, side, port, None).await
+}
+
+/// [`start_holder`], reloading its rules from `policy` when given.
+async fn start_holder_with(
+    p: &Pair,
+    side: &Side,
+    port: u16,
+    policy: Option<std::path::PathBuf>,
+) -> PeerDaemon {
+    let rules = match &policy {
+        Some(path) => Rules::from_policy_file(path).expect("policy file"),
+        None => Rules::from_policy(&serve_policy()).expect("policy"),
+    };
     let signer = p.a.signer();
     let roster = SidecarRoster::open(side.checkout.dir.path(), HANDLE)
         .expect("roster")
@@ -361,8 +376,8 @@ async fn start_holder(p: &Pair, side: &Side, port: u16) -> PeerDaemon {
         flow_root: side.checkout.dir.path().to_path_buf(),
         roster,
         state_dir: side.state.path().to_path_buf(),
-        rules: Rules::from_policy(&serve_policy()).expect("policy"),
-        policy: None,
+        rules,
+        policy,
         relay: None,
         listen: Some(local(port)),
         peers: Vec::new(),
@@ -464,10 +479,18 @@ async fn an_admitted_sibling_draws_a_granted_artifact_and_the_holder_records_one
     }
     assert_eq!(Bytes::from(drawn), bytes);
 
-    eventually("A records the serve", || !side.serve_events().is_empty()).await;
+    // Polls that arrived before the mount indexed the artifact were refused and recorded as
+    // such; the draw itself is one session.
+    let draws = || {
+        side.serve_events()
+            .into_iter()
+            .filter(|e| !e.classified_as.iter().any(|s| s == "draw:refused"))
+            .collect::<Vec<_>>()
+    };
+    eventually("A records the serve", || !draws().is_empty()).await;
     // A later tick records nothing more for one completed session.
     tokio::time::sleep(Duration::from_millis(800)).await;
-    let events = side.serve_events();
+    let events = draws();
     assert_eq!(events.len(), 1, "{events:?}");
     let event = &events[0];
     assert_eq!(event.action, ReaVerb::Use);
@@ -504,7 +527,7 @@ async fn an_admitted_sibling_draws_a_granted_artifact_and_the_holder_records_one
     // The connection closing after the last chunk adds nothing: the session already closed.
     connection.close(iroh::endpoint::VarInt::from_u32(0), b"");
     tokio::time::sleep(Duration::from_millis(800)).await;
-    assert_eq!(side.serve_events().len(), 1);
+    assert_eq!(draws().len(), 1);
 
     b.close().await;
     daemon.shutdown().await;
@@ -554,23 +577,35 @@ async fn an_admitted_sibling_asking_outside_its_grant_is_refused_with_a_typed_re
     )
     .await;
 
-    // A method outside the grant: refused naming the standing the device lacks.
-    let refused = call(
-        &b,
-        &to_a,
-        TierRequest::Manifest {
-            artifact: output(&not_shared),
-        },
-    )
-    .await;
-    assert_eq!(
-        refused,
-        typed(
-            &output(&not_shared),
-            ReachReason::OutsideStanding,
-            Some("serve-blob:not-shared")
-        )
+    // A method outside the grant: refused naming the standing the device lacks, once the mount
+    // has indexed it (until then it is unknown here, and refused without a label).
+    let labelled = typed(
+        &output(&not_shared),
+        ReachReason::OutsideStanding,
+        Some("serve-blob:not-shared"),
     );
+    tokio::time::timeout(WITHIN, async {
+        loop {
+            let refused = call(
+                &b,
+                &to_a,
+                TierRequest::Manifest {
+                    artifact: output(&not_shared),
+                },
+            )
+            .await;
+            if refused == labelled {
+                break;
+            }
+            assert_eq!(
+                refused,
+                typed(&output(&not_shared), ReachReason::OutsideStanding, None)
+            );
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("indexed and refused by name");
     let refused_chunk = call(
         &b,
         &to_a,
@@ -643,7 +678,10 @@ async fn an_admitted_sibling_asking_outside_its_grant_is_refused_with_a_typed_re
     assert_eq!(
         refusals
             .iter()
-            .filter(|e| e.resource == *output(&not_shared).as_cid())
+            .filter(|e| e.resource == *output(&not_shared).as_cid()
+                && e.classified_as
+                    .iter()
+                    .any(|s| s == "reason:serve-blob:not-shared"))
             .count(),
         1,
         "{refusals:?}"
@@ -1102,4 +1140,418 @@ fn a_payload_store_is_created_with_private_parents() {
     }
     // Opening it again opens the same store.
     open_payload_store(&path).expect("reopened");
+}
+
+impl Holder {
+    /// Where the payload store keeps `cid`'s bytes (one file per object).
+    fn object_path(&self, cid: &BlobCid) -> std::path::PathBuf {
+        self.dir.path().join("payload").join(cid.to_string())
+    }
+
+    /// Drain what the mount recorded so far.
+    fn drain(&mut self) -> Vec<ServedDraw> {
+        let mut draws = Vec::new();
+        while let Ok(draw) = self.served.try_recv() {
+            draws.push(draw);
+        }
+        draws
+    }
+}
+
+/// Write an object file as the store does: readable by this account only.
+fn write_object(path: &Path, bytes: &[u8]) {
+    use std::io::Write as _;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options
+        .open(path)
+        .and_then(|mut file| file.write_all(bytes))
+        .expect("write object");
+}
+
+/// The Produce event `put` wrote, with `edit` applied, appended to `holder`'s flow store.
+fn append_edited(holder: &mut Holder, from: &MemoryFlowStore, edit: impl FnOnce(&mut FlowEvent)) {
+    let (_, mut event) = from
+        .events()
+        .expect("events")
+        .into_iter()
+        .find(|(_, event)| event.action == ReaVerb::Produce)
+        .expect("a custody Produce");
+    edit(&mut event);
+    holder
+        .flow
+        .append(elohim_epr_rea::FlowRecord::Event(event))
+        .expect("append");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn replacing_a_derivation_drops_the_old_manifest_from_membership() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let bytes = artifact_bytes(61, 700 * 1024);
+    // One output, two derivations: first under an ungranted method, then under a granted one.
+    let old = holder.put(NOT_SHARED, bytes.clone(), true).await;
+    let new = holder.put(GRANTED, bytes, true).await;
+    assert_eq!(output(&old), output(&new));
+    assert_ne!(old.manifest_cid, new.manifest_cid);
+    assert!(holder.reindex().await.is_empty());
+    let artifact = output(&new);
+    assert_eq!(
+        holder.mount.held(&artifact).map(|held| held.manifest),
+        Some(new.manifest_cid.clone())
+    );
+    let b = client(&h.key_b).await;
+    let connection = b
+        .connect(holder.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connect");
+
+    // The superseded, ungranted manifest is no object of the granted entry.
+    for _ in 0..2 {
+        let stale = ask(
+            &connection,
+            TierRequest::Blob {
+                artifact: artifact.clone(),
+                cid: old.manifest_cid.clone(),
+            },
+        )
+        .await;
+        assert_eq!(
+            stale,
+            typed(&artifact, ReachReason::NotUnderRoot, None),
+            "never served under the new method"
+        );
+        // A rebuild never brings the superseded derivation back.
+        assert!(holder.reindex().await.is_empty());
+    }
+    served_bytes(
+        ask(
+            &connection,
+            TierRequest::Manifest {
+                artifact: artifact.clone(),
+            },
+        )
+        .await,
+        &new.manifest_cid,
+    );
+    for chunk in chunks(&new) {
+        served_bytes(
+            ask(
+                &connection,
+                TierRequest::Blob {
+                    artifact: artifact.clone(),
+                    cid: chunk.clone(),
+                },
+            )
+            .await,
+            &chunk,
+        );
+    }
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_folded_sibling_produce_never_indexes_a_manifest() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    // The manifest, its chunks and its method record are all held here, but the only Produce
+    // naming them came from B: folded `via` B, as fold.rs appends it, and crossing as F2's
+    // artifact Produce will.
+    let mut sibling_flow = MemoryFlowStore::new();
+    let put = put_artifact(
+        holder.payload.as_ref(),
+        &mut sibling_flow,
+        GRANTED,
+        artifact_bytes(71, 400 * 1024),
+        true,
+    )
+    .await;
+    let b_did = h.b.did.clone();
+    append_edited(&mut holder, &sibling_flow, |event| {
+        event
+            .classified_as
+            .push("measure:artifact-produce@1".into());
+        event.classified_as.push("reason:produce".into());
+        event.classified_as.push(format!("via:{b_did}"));
+    });
+    assert!(holder.reindex().await.is_empty(), "not even tried");
+    assert!(holder.mount.held(&output(&put)).is_none());
+    assert!(holder.mount.unindexed(&put.manifest_cid).is_none());
+
+    let b = client(&h.key_b).await;
+    let answer = call(
+        &b,
+        &holder.addr,
+        TierRequest::Manifest {
+            artifact: output(&put),
+        },
+    )
+    .await;
+    assert_eq!(
+        answer,
+        typed(&output(&put), ReachReason::OutsideStanding, None)
+    );
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_produce_naming_another_provider_is_not_local_custody() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    // Custody in a Produce is its receiver (`LocalBlobContext::custodian`); its provider is the
+    // computing agent. A Produce putting the artifact in B's custody is B's, not this device's.
+    let mut elsewhere = MemoryFlowStore::new();
+    let theirs = put_artifact(
+        holder.payload.as_ref(),
+        &mut elsewhere,
+        GRANTED,
+        artifact_bytes(81, 400 * 1024),
+        true,
+    )
+    .await;
+    let b_did = h.b.did.clone();
+    append_edited(&mut holder, &elsewhere, |event| {
+        event.receiver = AgentRef(b_did.clone());
+        event.provider = AgentRef(b_did);
+    });
+    // Computed by another agent, received into this device's custody: this device's own.
+    let mut computed_elsewhere = MemoryFlowStore::new();
+    let ours = put_artifact(
+        holder.payload.as_ref(),
+        &mut computed_elsewhere,
+        GRANTED,
+        artifact_bytes(82, 400 * 1024),
+        true,
+    )
+    .await;
+    append_edited(&mut holder, &computed_elsewhere, |event| {
+        event.provider = AgentRef("did:key:zSomeBuilder".into());
+    });
+    assert!(holder.reindex().await.is_empty());
+    assert!(holder.mount.held(&output(&theirs)).is_none(), "B's custody");
+    assert!(
+        holder.mount.held(&output(&ours)).is_some(),
+        "this device's custody"
+    );
+
+    let b = client(&h.key_b).await;
+    let refused = call(
+        &b,
+        &holder.addr,
+        TierRequest::Manifest {
+            artifact: output(&theirs),
+        },
+    )
+    .await;
+    assert_eq!(
+        refused,
+        typed(&output(&theirs), ReachReason::OutsideStanding, None)
+    );
+    let served = call(
+        &b,
+        &holder.addr,
+        TierRequest::Manifest {
+            artifact: output(&ours),
+        },
+    )
+    .await;
+    served_bytes(served, &ours.manifest_cid);
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn refusal_events_per_requester_are_bounded() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let b = client(&h.key_b).await;
+    let connection = b
+        .connect(holder.addr.clone(), TIER_ALPN)
+        .await
+        .expect("connect");
+    let asked = 3 * REFUSALS_PER_WINDOW;
+    for n in 0..asked {
+        let unknown = BlobCid::compute_bytes(format!("never held {n}").as_bytes());
+        let answer = ask(
+            &connection,
+            TierRequest::Manifest {
+                artifact: unknown.clone(),
+            },
+        )
+        .await;
+        // Every refusal is still answered, typed.
+        assert_eq!(answer, typed(&unknown, ReachReason::OutsideStanding, None));
+    }
+    // The same refusal asked again is neither recorded nor counted twice.
+    let again = BlobCid::compute_bytes(b"never held 0");
+    ask(&connection, TierRequest::Manifest { artifact: again }).await;
+
+    let draws = holder.drain();
+    assert_eq!(
+        draws.len(),
+        REFUSALS_PER_WINDOW,
+        "recorded up to the window's bound"
+    );
+    assert!(draws
+        .iter()
+        .all(|draw| matches!(draw.outcome, DrawOutcome::Refused { .. })));
+    assert_eq!(
+        holder.mount.suppressed_refusals(),
+        (asked - REFUSALS_PER_WINDOW) as u64,
+        "the rest only counted"
+    );
+    assert_eq!(holder.mount.dropped_draws(), 0);
+    assert_eq!(holder.protocol.counters().refused_scope, asked as u64 + 1);
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_malformed_policy_reload_revokes_serving() {
+    let p = pair();
+    let side = Side::new(&p.rows);
+    let put = put_artifact(
+        side.payload().as_ref(),
+        &mut side.flow(),
+        GRANTED,
+        artifact_bytes(91, 400 * 1024),
+        true,
+    )
+    .await;
+    let policy_dir = tempfile::tempdir().expect("policy dir");
+    let policy = policy_dir.path().join("pool-policy.json");
+    let valid = serde_json::to_vec_pretty(&serve_policy()).expect("policy");
+    std::fs::write(&policy, &valid).expect("write policy");
+    let port = free_port();
+    let daemon = start_holder_with(&p, &side, port, Some(policy.clone())).await;
+    let to_a = NodeAddr::new(daemon.node_id())
+        .with_direct_addresses([std::net::SocketAddr::V4(local(port))]);
+    let b = client(&load_key(p.key_dir_b.path())).await;
+    let manifest = TierRequest::Manifest {
+        artifact: output(&put),
+    };
+    served_bytes(
+        until_served(&b, &to_a, manifest.clone()).await,
+        &put.manifest_cid,
+    );
+    let revoked = typed(
+        &output(&put),
+        ReachReason::OutsideStanding,
+        Some("serve-blob:mesh-build"),
+    );
+
+    let mut unknown_audience = serve_policy();
+    unknown_audience["berth"]["artifacts"]["serves"][GRANTED] = serde_json::json!(["everyone"]);
+    for bad in [
+        b"{ not a policy".to_vec(),
+        serde_json::to_vec(&unknown_audience).expect("policy"),
+    ] {
+        // Through the real reload path: the file the daemon watches changes.
+        std::fs::write(&policy, &bad).expect("write bad policy");
+        tokio::time::timeout(WITHIN, async {
+            while call(&b, &to_a, manifest.clone()).await != revoked {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .expect("serving revoked by a policy that does not read");
+        // A valid policy restores the grant.
+        std::fs::write(&policy, &valid).expect("restore policy");
+        served_bytes(
+            until_served(&b, &to_a, manifest.clone()).await,
+            &put.manifest_cid,
+        );
+    }
+
+    b.close().await;
+    daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_output_its_chunks_do_not_reconstruct_here_is_not_served() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let b = client(&h.key_b).await;
+
+    // A chunk missing here: deferred, not served, tried again at the next rebuild.
+    let deferred = holder
+        .put(GRANTED, artifact_bytes(101, 3 * 1024 * 1024), true)
+        .await;
+    let last = chunks(&deferred).last().cloned().expect("a chunk");
+    let kept = std::fs::read(holder.object_path(&last)).expect("chunk file");
+    std::fs::remove_file(holder.object_path(&last)).expect("remove chunk");
+    let unindexed = holder.reindex().await;
+    assert!(
+        matches!(
+            holder.mount.unindexed(&deferred.manifest_cid),
+            Some(Unindexed::OutputUnverified { .. })
+        ),
+        "{unindexed:?}"
+    );
+    assert_eq!(
+        call(
+            &b,
+            &holder.addr,
+            TierRequest::Manifest {
+                artifact: output(&deferred),
+            }
+        )
+        .await,
+        typed(&output(&deferred), ReachReason::OutsideStanding, None)
+    );
+    write_object(&holder.object_path(&last), &kept);
+    let retried = holder.reindex().await;
+    assert!(
+        retried.is_empty(),
+        "verified once the chunk is held: {retried:?}"
+    );
+    assert!(holder.mount.held(&output(&deferred)).is_some());
+
+    // A chunk whose bytes do not hash to it: invalid, never served.
+    let corrupt = holder
+        .put(GRANTED, artifact_bytes(102, 400 * 1024), true)
+        .await;
+    let chunk = chunks(&corrupt)[0].clone();
+    // Private, as the store writes objects, so only the hash is wrong.
+    std::fs::remove_file(holder.object_path(&chunk)).expect("remove chunk");
+    write_object(&holder.object_path(&chunk), b"not the chunk");
+    holder.reindex().await;
+    assert!(holder.mount.held(&output(&corrupt)).is_none());
+    assert!(matches!(
+        holder.mount.unindexed(&corrupt.manifest_cid),
+        Some(Unindexed::ManifestInvalid { .. })
+    ));
+
+    // An accepted entry whose manifest no longer reads is dropped at the next rebuild.
+    std::fs::remove_file(holder.object_path(&deferred.manifest_cid)).expect("remove manifest");
+    let dropped = holder.reindex().await;
+    assert!(
+        dropped.iter().any(|error| matches!(
+            error,
+            PeerError::ArtifactUnindexed { manifest, .. } if **manifest == deferred.manifest_cid
+        )),
+        "{dropped:?}"
+    );
+    assert!(holder.mount.held(&output(&deferred)).is_none());
+    assert_eq!(
+        call(
+            &b,
+            &holder.addr,
+            TierRequest::Blob {
+                artifact: output(&deferred),
+                cid: chunks(&deferred)[0].clone(),
+            }
+        )
+        .await,
+        typed(&output(&deferred), ReachReason::OutsideStanding, None)
+    );
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
 }

@@ -9,29 +9,43 @@
 //! - an [`ArtifactIndex`] of what it may serve: each artifact's manifest, method name and chunks.
 //!   The index's source of truth is this device's own flow store — the `custody-blob` Produce
 //!   events with `manifest:<cid>` and `copy:self` that [`crate::put_local_blob`] writes, daemon or
-//!   no daemon — rebuilt when the store moves. A manifest whose method record is not held here is
-//!   [`Unindexed::MethodUnknown`] and is never served;
+//!   no daemon — rebuilt when the store moves. Only this device's own custody counts: a Produce
+//!   whose custodian (its receiver) is another device, or that was folded from another device
+//!   (`via:`), is never local custody. A manifest whose method record is not held here is
+//!   [`Unindexed::MethodUnknown`], one whose chunks do not reconstruct its output here is
+//!   [`Unindexed::OutputUnverified`] or [`Unindexed::ManifestInvalid`], and neither is served. A
+//!   second derivation of one output supersedes the first, whose objects leave the index with it;
+//!   an indexed manifest that no longer reads is dropped at the next rebuild;
 //! - one `serve-blob` session per (requester, artifact), closed on the last distinct chunk, when
 //!   the connection closes, or after [`SERVE_IDLE`]; each closed session (and each refusal of an
 //!   admitted device) becomes one [`ServedDraw`], which the daemon records as one `Use` event.
-//!   That event carries no `measure:` slot, so it never crosses.
+//!   That event carries no `measure:` slot, so it never crosses. Recording is bounded: at most
+//!   [`REFUSALS_PER_WINDOW`] refusals per requester per [`SERVE_IDLE`] are recorded (the rest are
+//!   counted), and at most [`SERVED_QUEUE`] draws wait for the daemon (the rest are dropped and
+//!   counted).
 //!
 //! A stranger is only counted. Every refusal it receives is the uniform form, byte-identical to
 //! the tree endpoint's, whether the artifact is granted, held ungranted, or unknown.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use bytes::Bytes;
 use elohim_epr_rea::{AgentRef, FlowEvent, ReaVerb};
 use eprfs_core::{
     BlobCid, EprfsError, EprfsStorage, FetchPolicy, ItemAbsence, MethodDescriptor, ReachGate,
     ReachReason, ReachRefusal, Requester, TierId, TreePath,
 };
-use eprfs_storage::{read_tier_manifest, DirectoryStorage, OffloadedDirectory};
+use eprfs_storage::{
+    read_tier_manifest, stream_tier_blob, DirectoryStorage, OffloadedDirectory, TierBlobChunk,
+    TierBlobStreamDraw, TierBlobUnavailable,
+};
 use tokio::sync::mpsc;
 
+use crate::allow::via_device;
 use crate::channel::ChannelStore;
 use crate::error::PeerError;
 use crate::gate::{ServeScope, Served, SharedAdmission, StewardDevicesGate};
@@ -45,14 +59,26 @@ pub const SERVE_IDLE: Duration = Duration::from_secs(60);
 /// The tag a serve's `Use` event carries after its subject.
 pub const SERVE_BLOB: &str = "serve-blob";
 
+/// The most refusals of one requester recorded as events per [`SERVE_IDLE`] window; further
+/// refusals in the window are only counted ([`BlobMount::suppressed_refusals`]).
+pub const REFUSALS_PER_WINDOW: usize = 16;
+
+/// The most closed sessions and refusals waiting for the daemon to record them; past it a draw is
+/// dropped and counted ([`BlobMount::dropped_draws`]), never queued without bound.
+pub const SERVED_QUEUE: usize = 1024;
+
 /// Why a custody manifest is held but not served.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Unindexed {
     /// The method descriptor its derivation record keys is not held here, or does not decode to
     /// that CID: the method's name, and so the grant, cannot be known.
     MethodUnknown,
-    /// The manifest does not read, does not validate, or disagrees with its Produce event.
+    /// The manifest does not read, does not validate, disagrees with its Produce event, or its
+    /// chunks do not reconstruct its output.
     ManifestInvalid { reason: String },
+    /// Its chunks are not all held here, so whether they reconstruct its output cannot be
+    /// checked yet: deferred, and tried again at the next rebuild.
+    OutputUnverified { reason: String },
 }
 
 impl std::fmt::Display for Unindexed {
@@ -60,6 +86,9 @@ impl std::fmt::Display for Unindexed {
         match self {
             Unindexed::MethodUnknown => f.write_str("its method record is not held here"),
             Unindexed::ManifestInvalid { reason } => write!(f, "the manifest is invalid: {reason}"),
+            Unindexed::OutputUnverified { reason } => {
+                write!(f, "its output is not verified here yet: {reason}")
+            }
         }
     }
 }
@@ -97,11 +126,22 @@ pub struct ArtifactIndex {
     by_object: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
     /// Manifests held and never served, with why.
     unindexed: BTreeMap<BlobCid, Unindexed>,
+    /// Manifests superseded by a later derivation of the same output: never served again.
+    superseded: BTreeSet<BlobCid>,
 }
 
 impl ArtifactIndex {
+    /// Index `held`, superseding any other derivation of its output. The superseded entry's
+    /// manifest and chunk memberships leave the index with it, so no object of it is served under
+    /// the new entry's method.
     fn insert(&mut self, held: Held) {
         self.unindexed.remove(&held.manifest);
+        self.superseded.remove(&held.manifest);
+        if let Some(old) = self.remove_output(&held.output) {
+            if old.manifest != held.manifest {
+                self.superseded.insert(old.manifest);
+            }
+        }
         for object in std::iter::once(&held.manifest).chain(&held.chunks) {
             self.by_object
                 .entry(object.clone())
@@ -111,13 +151,28 @@ impl ArtifactIndex {
         self.by_output.insert(held.output.clone(), held);
     }
 
-    fn indexed_manifest(&self, manifest: &BlobCid) -> bool {
-        self.by_object.get(manifest).is_some_and(|outputs| {
-            outputs.iter().any(|output| {
-                self.by_output
-                    .get(output)
-                    .is_some_and(|h| &h.manifest == manifest)
-            })
+    /// Drop the entry for `output` and every membership it gave its objects.
+    fn remove_output(&mut self, output: &BlobCid) -> Option<Held> {
+        let old = self.by_output.remove(output)?;
+        for object in std::iter::once(&old.manifest).chain(&old.chunks) {
+            let emptied = self.by_object.get_mut(object).is_some_and(|outputs| {
+                outputs.remove(output);
+                outputs.is_empty()
+            });
+            if emptied {
+                self.by_object.remove(object);
+            }
+        }
+        Some(old)
+    }
+
+    /// The output `manifest` is indexed for, when it is the current entry of that output.
+    fn output_of_manifest(&self, manifest: &BlobCid) -> Option<BlobCid> {
+        self.by_object.get(manifest)?.iter().find_map(|output| {
+            self.by_output
+                .get(output)
+                .filter(|held| &held.manifest == manifest)
+                .map(|_| output.clone())
         })
     }
 }
@@ -228,15 +283,27 @@ pub(crate) enum Answered {
     Other,
 }
 
+/// One requester's refusals recorded in the current [`SERVE_IDLE`] window.
+#[derive(Debug)]
+struct RefusalWindow {
+    opened: Instant,
+    /// The (artifact, reason) pairs recorded in this window: each once, and at most
+    /// [`REFUSALS_PER_WINDOW`] of them.
+    recorded: BTreeSet<(BlobCid, String)>,
+}
+
 /// The artifact mount. See the module docs.
 pub struct BlobMount {
     store: Arc<dyn EprfsStorage>,
+    /// This device's did:key: the only custodian whose custody Produce events are indexed.
+    custodian: String,
     index: RwLock<ArtifactIndex>,
-    served: mpsc::UnboundedSender<ServedDraw>,
+    served: mpsc::Sender<ServedDraw>,
     sessions: Mutex<HashMap<(String, BlobCid), Session>>,
-    /// The last time each (requester, artifact, reason) refusal was recorded, so a device that
-    /// keeps asking is recorded once per [`SERVE_IDLE`], not once per request.
-    refused: Mutex<HashMap<(String, BlobCid, String), Instant>>,
+    /// Per requester, the refusals recorded in its current window.
+    refused: Mutex<HashMap<String, RefusalWindow>>,
+    suppressed_refusals: AtomicU64,
+    dropped_draws: AtomicU64,
 }
 
 impl std::fmt::Debug for BlobMount {
@@ -246,19 +313,45 @@ impl std::fmt::Debug for BlobMount {
 }
 
 impl BlobMount {
-    /// A mount over `store`, and the receiver its closed sessions arrive on.
-    pub fn new(store: Arc<dyn EprfsStorage>) -> (BlobMount, mpsc::UnboundedReceiver<ServedDraw>) {
-        let (served, receiver) = mpsc::unbounded_channel();
+    /// A mount over `store` for the device `custodian` (its did:key), and the receiver its closed
+    /// sessions arrive on (at most [`SERVED_QUEUE`] waiting).
+    pub fn new(
+        store: Arc<dyn EprfsStorage>,
+        custodian: impl Into<String>,
+    ) -> (BlobMount, mpsc::Receiver<ServedDraw>) {
+        let (served, receiver) = mpsc::channel(SERVED_QUEUE);
         (
             BlobMount {
                 store,
+                custodian: custodian.into(),
                 index: RwLock::new(ArtifactIndex::default()),
                 served,
                 sessions: Mutex::new(HashMap::new()),
                 refused: Mutex::new(HashMap::new()),
+                suppressed_refusals: AtomicU64::new(0),
+                dropped_draws: AtomicU64::new(0),
             },
             receiver,
         )
+    }
+
+    /// Refusals of admitted devices counted but not recorded: past [`REFUSALS_PER_WINDOW`] in a
+    /// requester's window.
+    pub fn suppressed_refusals(&self) -> u64 {
+        self.suppressed_refusals.load(Ordering::Relaxed)
+    }
+
+    /// Draws dropped because [`SERVED_QUEUE`] draws were already waiting.
+    pub fn dropped_draws(&self) -> u64 {
+        self.dropped_draws.load(Ordering::Relaxed)
+    }
+
+    /// Hand `draw` to the daemon, or count it dropped when the queue is full. A closed receiver
+    /// means the daemon is gone: nothing is left to record.
+    fn send(&self, draw: ServedDraw) {
+        if let Err(mpsc::error::TrySendError::Full(_)) = self.served.try_send(draw) {
+            self.dropped_draws.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     /// The payload store this mount serves from.
@@ -332,6 +425,22 @@ impl BlobMount {
                 "the record's deterministic flag disagrees with its method's".into(),
             ));
         }
+        // The chunks must reconstruct the output here, verified chunk by chunk and as a whole,
+        // before anything of it is served. Nothing is retained: the sink only discards.
+        let mut discard = |_: &TierBlobChunk, _: Bytes| Ok(());
+        match stream_tier_blob(self.store.as_ref(), manifest_cid, &mut discard).await {
+            TierBlobStreamDraw::Completed { .. } => {}
+            TierBlobStreamDraw::Unavailable {
+                why: why @ TierBlobUnavailable::ChunkMissing { .. },
+                ..
+            } => {
+                return Err(Unindexed::OutputUnverified {
+                    reason: why.to_string(),
+                })
+            }
+            TierBlobStreamDraw::Unavailable { why, .. } => return Err(invalid(why.to_string())),
+            TierBlobStreamDraw::Miss { why, .. } => return Err(invalid(why.to_string())),
+        }
         Ok(Held {
             manifest: manifest_cid.clone(),
             output: manifest.record.output.clone(),
@@ -348,23 +457,45 @@ impl BlobMount {
     }
 
     /// Index every custody manifest `events` (this device's flow store, in append order) put in
-    /// custody here and that is not indexed yet; an unindexed one is tried again. Returns what
-    /// could not be indexed, for the caller to report.
+    /// custody here by this device: a later derivation of one output supersedes an earlier one.
+    /// An unindexed manifest is tried again; an indexed one is re-read, and dropped from the
+    /// index when its bytes no longer read and validate. Returns what could not be indexed, for
+    /// the caller to report.
     pub async fn rebuild_from_flow(&self, events: &[(cid::Cid, FlowEvent)]) -> Vec<PeerError> {
         let mut unindexed = Vec::new();
         let mut seen = BTreeSet::new();
         for (_, event) in events {
-            let Some(manifest) = custody_manifest(event) else {
+            let Some(manifest) = custody_manifest(event, &self.custodian) else {
                 continue;
             };
             if !seen.insert(manifest.clone()) {
                 continue;
             }
-            let indexed = self
-                .index
-                .read()
-                .is_ok_and(|index| index.indexed_manifest(&manifest));
-            if indexed {
+            let (current, superseded) = self.index.read().map_or((None, true), |index| {
+                (
+                    index.output_of_manifest(&manifest),
+                    index.superseded.contains(&manifest),
+                )
+            });
+            if let Some(output) = current {
+                // Revalidate: the manifest must still read as the one indexed.
+                let still = read_tier_manifest(self.store.as_ref(), &manifest).await;
+                if let Err(why) = still {
+                    let reason = Unindexed::ManifestInvalid {
+                        reason: why.to_string(),
+                    };
+                    if let Ok(mut index) = self.index.write() {
+                        index.remove_output(&output);
+                        index.unindexed.insert(manifest.clone(), reason.clone());
+                    }
+                    unindexed.push(PeerError::ArtifactUnindexed {
+                        manifest: Box::new(manifest),
+                        reason,
+                    });
+                }
+                continue;
+            }
+            if superseded {
                 continue;
             }
             if let Err(error) = self
@@ -423,7 +554,7 @@ impl BlobMount {
     pub fn sweep_idle(&self, now: Instant) {
         self.close_where(|session| now.duration_since(session.last) >= SERVE_IDLE);
         if let Ok(mut refused) = self.refused.lock() {
-            refused.retain(|_, at| now.duration_since(*at) < SERVE_IDLE);
+            refused.retain(|_, window| now.duration_since(window.opened) < SERVE_IDLE);
         }
     }
 
@@ -444,8 +575,7 @@ impl BlobMount {
             .collect();
         for key in closing {
             if let Some(session) = sessions.remove(&key) {
-                // The receiver is gone only when the daemon is: nothing is left to record.
-                let _ = self.served.send(session.draw(key.0, DrawOutcome::Partial));
+                self.send(session.draw(key.0, DrawOutcome::Partial));
             }
         }
     }
@@ -477,32 +607,41 @@ impl BlobMount {
         }
         if session.served.len() >= held.distinct_chunks() {
             if let Some(session) = sessions.remove(&key) {
-                // The receiver is gone only when the daemon is.
-                let _ = self
-                    .served
-                    .send(session.draw(key.0, DrawOutcome::Completed));
+                self.send(session.draw(key.0, DrawOutcome::Completed));
             }
         }
     }
 
+    /// Record one refusal of `device`, unless the same (artifact, reason) was already recorded in
+    /// its window, or its window already holds [`REFUSALS_PER_WINDOW`] (then it is only
+    /// counted): a device asking for ever-new CIDs cannot grow memory, disk or the flow log.
     fn record_refused(&self, device: &str, artifact: &BlobCid, reason: String) {
-        let key = (device.to_string(), artifact.clone(), reason.clone());
         let now = Instant::now();
-        let fresh = self.refused.lock().is_ok_and(|mut refused| {
-            let fresh = refused
-                .get(&key)
-                .is_none_or(|at| now.duration_since(*at) >= SERVE_IDLE);
-            if fresh {
-                refused.insert(key, now);
-            }
-            fresh
-        });
-        if !fresh {
+        let Ok(mut refused) = self.refused.lock() else {
+            return;
+        };
+        let window = refused
+            .entry(device.to_string())
+            .or_insert_with(|| RefusalWindow {
+                opened: now,
+                recorded: BTreeSet::new(),
+            });
+        if now.duration_since(window.opened) >= SERVE_IDLE {
+            window.opened = now;
+            window.recorded.clear();
+        }
+        let key = (artifact.clone(), reason.clone());
+        if window.recorded.contains(&key) {
             return;
         }
+        if window.recorded.len() >= REFUSALS_PER_WINDOW {
+            self.suppressed_refusals.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        window.recorded.insert(key);
+        drop(refused);
         let held = self.held(artifact);
-        // The receiver is gone only when the daemon is.
-        let _ = self.served.send(ServedDraw {
+        self.send(ServedDraw {
             requester: device.to_string(),
             artifact: artifact.clone(),
             manifest: held.as_ref().map(|held| held.manifest.clone()),
@@ -515,9 +654,14 @@ impl BlobMount {
     }
 }
 
-/// The manifest a custody Produce event names: `custody-blob`, `copy:self`, `manifest:<cid>`.
-fn custody_manifest(event: &FlowEvent) -> Option<BlobCid> {
+/// The manifest a custody Produce event of `custodian`'s own names: `custody-blob`,
+/// `copy:self`, `manifest:<cid>`, received into custody by `custodian` (this device), and not
+/// folded from another device (no `via:` slot). A sibling's Produce, crossed or folded, is that
+/// sibling's custody, never this device's: it names no authority to serve from here.
+fn custody_manifest(event: &FlowEvent, custodian: &str) -> Option<BlobCid> {
     if event.action != ReaVerb::Produce
+        || event.receiver.0 != custodian
+        || via_device(event).is_some()
         || event.classified_as.first().map(String::as_str) != Some("custody-blob")
         || !event.classified_as.iter().any(|slot| slot == "copy:self")
     {
@@ -608,7 +752,9 @@ pub(crate) async fn answer(
     if let Err(refusal) = gate.admit_object(who, object) {
         return refuse(refusal);
     }
-    if !mount.object_of(artifact, object) {
+    // Membership in the very entry whose method admitted the root, and in the index now.
+    let in_held = *object == held.manifest || held.chunks.contains(object);
+    if !in_held || !mount.object_of(artifact, object) {
         return refuse(ReachRefusal::new(ReachReason::NotUnderRoot, None));
     }
     // Admitted by every rule: only now is a byte read.

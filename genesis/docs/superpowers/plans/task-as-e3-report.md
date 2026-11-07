@@ -189,9 +189,9 @@ dirty") because of the orchestrator's uncommitted `briefs/common.md` copy in thi
 7. **A tree read of a granted artifact root passes `admit_root`, as §1.3 specifies; the tree
    endpoint reads only the channel store and answers `Failed`/`Unanswered`.** The amended daemon
    test asserts that no tree answer ever lists or reads an artifact.
-8. **Refusal events are deduplicated per (device, artifact, reason) for `SERVE_IDLE`.** This
-   keeps a retrying device from writing one event per request; §1.5 says "one `draw:refused`
-   event".
+8. **Refusal events are deduplicated per (device, artifact, reason) for `SERVE_IDLE`.** §1.5 says
+   "one `draw:refused` event". This alone did not bound a device asking for ever-new CIDs; that
+   bound was added after review (M3, below).
 9. **The epr session envelope was not opened per common.md.** `epr session open` refused
    `session-conflict`: the runtime session is the orchestrator's, bound to the main checkout. The
    commit prints the expected `UNMEASURED` line (STATE.md 18:55Z).
@@ -202,3 +202,69 @@ dirty") because of the orchestrator's uncommitted `briefs/common.md` copy in thi
 - `TierAnswer::Blob` for `Manifest` carries the manifest's own CID. Decode it and check
   `record.output == artifact` in the fetch layer.
 - `LocalBlobContext.crossing` is ready for the crossing Produce.
+
+## After review: astra BLOCK (`evidence/e3-astra-review.md`) and the orchestrator's verification
+
+Fix commit: see `brit log` on `artifact-store/e3` after `5fd5fb2f`. The deviations list above
+has nine entries; the count of ten in the first hand-off message was wrong.
+
+- **H1: a superseded derivation's objects stayed in `by_object`.**
+  - `ArtifactIndex::insert` now calls `remove_output` before indexing a new entry for the same
+    output. That drops every manifest and chunk membership the old entry gave its objects and
+    records the old manifest as `superseded`; a rebuild never brings it back.
+  - Defence in depth: the answer path also requires the object to be the manifest or a chunk of
+    the very `Held` entry whose method admitted the root, as well as a member of the index now.
+  - Test: `replacing_a_derivation_drops_the_old_manifest_from_membership`. One output with two
+    derivations, ungranted then granted. `Blob { artifact: output, cid: old_manifest }` is
+    `NotUnderRoot` across two rebuilds, and the new manifest and its chunks are served.
+- **H2: a folded or crossed sibling Produce was accepted as local custody.**
+  - `custody_manifest` now requires `receiver == this device's did:key` and no `via:` slot, as
+    well as `custody-blob`, `copy:self` and `manifest:<cid>`.
+  - `BlobMount::new(store, custodian)` takes the device did; the daemon passes `config.device`.
+  - **Binding on the receiver, not the provider, is deliberate.** In `put_local_blob`'s Produce
+    the custody party is `receiver` (`LocalBlobContext::custodian`), while `provider` is
+    `record.computed_by`, the computing agent, which may be another agent.
+  - Tests:
+    - `a_folded_sibling_produce_never_indexes_a_manifest`: the manifest, chunks and method record
+      are all held here; the only Produce carries `measure:artifact-produce@1`, `reason:produce`
+      and `via:<B>`. It is not even tried, and is refused as unknown.
+    - `a_produce_naming_another_provider_is_not_local_custody`: a Produce whose custodian
+      (receiver) and provider are B is not indexed. A Produce computed by another agent but
+      received into this device's custody is indexed and served.
+- **M3: refusal-event amplification.**
+  - Per requester, at most `REFUSALS_PER_WINDOW = 16` distinct (artifact, reason) refusals are
+    recorded per `SERVE_IDLE` window; further ones are only counted
+    (`BlobMount::suppressed_refusals`).
+  - The served-draw queue is a bounded `mpsc::channel(SERVED_QUEUE = 1024)` with `try_send`;
+    past it a draw is dropped and counted (`BlobMount::dropped_draws`).
+  - Memory per requester is bounded by the window; requesters are admitted devices only.
+  - Test: `refusal_events_per_requester_are_bounded`. 48 distinct unknown CIDs plus one repeat:
+    16 recorded, 32 suppressed, 0 dropped, all 49 still answered typed.
+- **M4: a malformed policy reload kept the old grant.**
+  - `Run::reload_rules` now empties the shared artifact grant on every policy file that fails
+    to read, whether malformed JSON, an invalid `serves` shape or an unknown audience. Serving
+    is denied until a policy that reads loads again. Each policy that reads restores its own
+    grant, including the case where the digest is unchanged from before the failure.
+  - The log line names the revocation once per failing reason.
+  - The crossing and steward rules keep their previous behaviour (kept, `pending` recorded).
+    The persisted digest still names those kept rules, so a revoked grant is visible in the
+    `pending` reason, not in the digest.
+  - Test: `a_malformed_policy_reload_revokes_serving`, through the daemon's real policy-file
+    reload: malformed JSON revokes, then valid restores; an unknown audience revokes, then valid
+    restores.
+- **Informational 7: output reconstruction and revalidation.**
+  - Indexing now streams the manifest's chunks through `stream_tier_blob` with a discarding sink,
+    verifying each chunk and the complete output.
+  - A missing chunk is `Unindexed::OutputUnverified { reason }` (a new variant): deferred, never
+    served, retried on the next rebuild. A corrupt chunk or output mismatch is `ManifestInvalid`.
+  - On every rebuild an indexed manifest is re-read with `read_tier_manifest`; one that no
+    longer reads is removed from the index with all its memberships.
+  - Cost: indexing hashes each artifact once per daemon run, and a deferred artifact is
+    re-streamed up to its first missing chunk on each rebuild.
+  - Test: `an_output_its_chunks_do_not_reconstruct_here_is_not_served`. It covers a deferred
+    chunk that is then restored, a corrupt chunk, and a vanished manifest.
+- **Test adjustments.**
+  - The daemon tests now poll until indexing completes: the full-output check makes the first
+    tick slower, so early polls are recorded as `draw:refused`.
+  - Test 1 counts only non-refused draws (still exactly one, completed).
+  - Test 2 waits for the labelled refusal, and asserts the label dedup on its own reason.
