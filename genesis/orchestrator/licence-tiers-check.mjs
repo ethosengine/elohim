@@ -72,7 +72,7 @@ for (const rel of tracked) {
   }
 }
 
-for (const f of ['LICENSE', 'LICENSES/Apache-2.0.txt', 'LICENSES/MPL-2.0.txt', 'LICENSES/AGPL-3.0.txt', 'LICENSES/CC-BY-SA-4.0.txt', 'genesis/docs/content/elohim-protocol/LICENSE', 'LICENSING.md']) {
+for (const f of ['LICENSE', 'LICENSES/Apache-2.0.txt', 'LICENSES/MPL-2.0.txt', 'LICENSES/AGPL-3.0.txt', 'LICENSES/CC-BY-SA-4.0.txt', 'genesis/docs/content/elohim-protocol/LICENSE', 'LICENSING.md', 'EPR-LICENSE-1.0.md', '.epr-meta/commons-held-by-the-network.habit.md']) {
   try { readFileSync(resolve(ROOT, f)); } catch { refusals.push(`${f}: missing`); }
 }
 

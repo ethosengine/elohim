@@ -13,7 +13,11 @@ purpose: >
   vulnerability-cluster sheets). The body records the top-level allow-list, which the gate cannot
   express. It anchors the cascade and hosts the
   ignores and basename-wide rules that cannot decentralize, plus the subtree/orchestrator exact-path
-  entries kept inline for the first cut.
+  entries kept inline for the first cut. It declares EPR-LICENSE-1.0.md, the protocol's own
+  licence (adopted by the steward 2026-11-07 as the working commitment to the constitution), as
+  part of what composes from the root (the licence's §12): today the cascade carries it as this
+  declaration and the licence-amendment-by-reach rule below; the compose gate does not yet
+  evaluate the licence's own terms on every write, and the licence says so.
 policy-recipe: .claude/epr-meta
 policy-recipes:
   default:
@@ -36,6 +40,20 @@ policy-recipes:
       and carrying `name:` so a label reader can take the name from the key or the field. The
       declared name and the reported label agree at `default`; a second recipe is added here.
 rules:
+  - id: licence-amendment-by-reach
+    class: inject
+    when: { write: "EPR-LICENSE-1.0.md" }
+    dedupe-of: genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md
+    why: >
+      EPR-LICENSE-1.0.md is the protocol's own licence, adopted 2026-11-07 as the working
+      commitment to the constitution, and this manifest is where it is declared (its §12). A
+      write to it is a proposed amendment, and amendment follows immutability by reach (its §9):
+      until the councils exist the steward of record proposes a change and the record witnesses
+      it; no version may lower a grant already made at the border, and none may claim ownership
+      of the commons for anyone, because §2.1 is the constitution's. Before landing: name the
+      version it supersedes, keep its "What runs today" section true against README's "What runs
+      today", re-run genesis/orchestrator/licence-tiers-check.mjs, and land it as its own commit
+      carrying the steward's words.
   - { id: commit-format-ratchet, policy: commit-format-ratchet@1 }
   - id: rs-loc-ceiling
     policy: source-file-loc-ceiling@1

@@ -380,7 +380,7 @@ All GitHub webhooks go to one orchestrator job, which picks the pipelines a push
 
 ## License
 
-Three tiers, by what the code does: primitives (the EPR crates, the addressing kernel, the wire-shape types, the DNA zomes) are MPL-2.0; services that serve people (`elohim-storage`, `doorway-service`, `steward/node`) are AGPL-3.0; everything else, including the apps, tooling, bridges and the a2o suite, is Apache-2.0 under the root `LICENSE`. Each crate and package declares its own in its `Cargo.toml` or `package.json`, and the texts are in `LICENSES/`. The directory rule, so you can classify a path before cloning:
+The protocol's own licence is [EPR-LICENSE-1.0.md](./EPR-LICENSE-1.0.md): a network-participation agreement, not a code licence, stating how value is accounted for and how the commons is held; it binds those who take part in the network, by the network's validation rules and governance rather than by law, and binds no one else. For any code you would touch, the licence declared in its crate or package is the whole of the legal terms; the standard licences below are how the protocol's terms read at its border, and a fork that drops `EPR-LICENSE-1.0.md` breaks nothing. Three tiers, by what the code does: primitives (the EPR crates, the addressing kernel, the wire-shape types, the DNA zomes) are MPL-2.0; services that serve people (`elohim-storage`, `doorway-service`, `steward/node`) are AGPL-3.0; everything else, including the apps, tooling, bridges and the a2o suite, is Apache-2.0 under the root `LICENSE`. Each crate and package declares its own in its `Cargo.toml` or `package.json`, and the texts are in `LICENSES/`. The directory rule, so you can classify a path before cloning:
 
 | Licence | Paths |
 |---|---|

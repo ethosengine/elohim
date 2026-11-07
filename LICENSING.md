@@ -1,7 +1,13 @@
 # Licensing
 
-The Elohim Protocol is offered under three licences, chosen by what each part of the tree
-does rather than by where it sits. Each crate and package declares its own licence in its
+The protocol's own licence is [`EPR-LICENSE-1.0.md`](./EPR-LICENSE-1.0.md): its account of what
+value is, who it is owed to, and how the commons is held, adopted by the steward on 2026-11-07
+as the working commitment to the constitution. The licences on this page are that licence's
+outward face: what the protocol says at its border, in the law's language, as the governance
+settlement of this era. They are chosen by what each part of the tree does rather than by where
+it sits, and nothing in the protocol's own licence narrows what they grant. For any file, the
+licence it declares is the whole of the legal terms; the protocol's own licence binds those who
+take part in the network, by the network's own means, and no one else. Each crate and package declares its own licence in its
 `Cargo.toml` or `package.json`; the full texts are in `LICENSES/`. The root `LICENSE`
 (Apache-2.0) covers everything that does not declare otherwise.
 
@@ -16,8 +22,9 @@ does rather than by where it sits. Each crate and package declares its own licen
 One thing is deliberately **not** covered by any of these:
 
 - **Upstream code held in the tree.** `elohim/holochain-conductor` is a fork of Holochain under
-  CAL-1.0, `sophia` keeps Khan Academy's MIT licence, and `vendor/` carries each vendored crate's
-  own licence. Their terms come with them and are not changed here.
+  CAL-1.0, `sophia` keeps Khan Academy's MIT licence, the `elohim/brit` and `elohim/rakia`
+  submodules carry their own licences, and `vendor/` carries each vendored crate's own. Their
+  terms come with them and are not changed here.
 
 Why not CAL-1.0 on our own code: CAL's distinctive clause protects one person's ability to leave
 with their data. The protocol holds that a person's standing comes from the network that holds
@@ -27,5 +34,10 @@ the thesis they assume, so our own crates do not carry it. The conductor fork ke
 duties it places on anyone hosting people on that conductor (hand them their data; never use key
 custody to lock them in) are duties the protocol's doorways already meet by design.
 
-The decision and its reasoning: `genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md`.
+Why the licences claim no more than share-alike and attribution: they permit others to profit from
+this code outside the protocol, and what those others owe back is their changes, not their revenue.
+Copyright names one licensor and cannot name the people and holons the protocol holds value for;
+that flow belongs to the protocol's own economic layer, not to a licence clause.
+
+The decision and its reasoning, including that limit: `genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md`.
 This file is not legal advice; counsel should confirm it before the first published release.

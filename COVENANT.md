@@ -43,6 +43,8 @@ A presence is a place in the network held in trust for a project's makers, where
 
 **Promised:** We will publish no default allocation. Any valuation is a claim made with its method cited. What a work was worth is settled with its makers, at a table where their seat is already held, and never announced to them. A funding channel a maker has declared, such as Sebastian Thiel's Drips file, is recorded as a fact about them; how anything is settled through it is a question the protocol's steward (Matthew Dowell, who founded it and makes its decisions until its councils exist) has not yet ruled on.
 
+The same term holds for the protocol's own maker. Under the licence's account of value (`EPR-LICENSE-1.0.md` §1, §2.4), the steward's attention, time and direction are labour, and what the commons owes for them is owed in labour's kind. It is recorded here as owed and unaccounted, in no denominator the outside world has, with the seat held like every maker's: no allocation is published for it, no valuation announced, and it is settled at the table or not at all; the steward has said so, and that it is good. The steward's own words, 2026-11-07: "my attention and time is my labor; the elohim protocol owes me that; not sure what outside of our network it's worth, in what denominator, but it's owed, unaccounted for now, and I'm ok with that."
+
 ## 6. What an AI contributes is cited too
 
 **Today:** Code here is co-written by people and AI agents, and commits record this with trailers such as `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.

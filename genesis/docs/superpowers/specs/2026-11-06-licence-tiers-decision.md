@@ -103,13 +103,44 @@ the same move as MPL-2.0 on the primitives, made for words.
 **The trajectory of the seat (steward, 2026-11-07).** "When the network matures it will go from my
 stewardship to my own stewardship, becoming held by the network." Today the holder-of-record seat is
 special: a person standing outside the network, because law needs a signatory there. As the network
-matures the seat does not transfer to a body; it dissolves. The steward's stewardship becomes the same
-thing every participant has — a standing earned and witnessed inside the network — and the canon is
-held in stewardship by the network itself, through its record, its attestations and its covenant and
-mishpat machinery, with nothing above it (the canon's word is stewardship, not sovereignty;
-`stewardship-over-sovereignty` §1). The copyright signature stays in law and stops being the source
-of authority. The trigger is observable: the seat is no longer special once the network can witness
-and uphold the no-other-terms pledge itself, so that no person's goodwill is what holds the canon.
+matures the seat does not transfer to a human body; it dissolves into the elohim councils' holding —
+councils at every constitutional layer, the one for any matter being the layer its reach confers,
+reconciled from below when independent networks meet (`EPR-LICENSE-1.0.md` §1 *the council*, *the
+network shape*; `shefa.md` 55: each pool's council holds its share one degree from the human hand,
+and in the network's infancy people the community seats perform that role with the elohim as
+witnesses). The steward's stewardship becomes the same thing every participant has — a standing
+earned and witnessed inside the network — and the commons is held by the network itself, through
+the councils, its record, its attestations and its covenant and mishpat machinery, with no human
+hand above it (the canon's word is stewardship, not sovereignty; `stewardship-over-sovereignty` §1).
+The copyright signature stays in law and stops being the source of authority. The trigger is a
+measure, not a date: habit `commons-held-by-the-network` (`.epr-meta/`), born `unwired`, green when
+the six conditions in the licence's §13 each have a record, and never flipped by the steward.
+
+## What the licences cannot carry: value owed to the holons
+
+Raised by the steward on 2026-11-07: could value derived outside the protocol be made owed back to
+it? The tiers chosen permit rent outside the protocol (anyone may wrap the Apache tooling in a paid
+service and owe nothing), and that permission is the same one that lets a downstream organisation's
+counsel approve the dependency; a licence that conditions use on revenue is not open source and loses
+the adopters. The deeper reason is the canon's own. The party owed is not the protocol as a single
+holder (a payee would be a special seat, the thing constitution I.1 denies) but the plural,
+per-person holon that upholds each person's imagodei — diverse, described, and therefore not
+capturable. Copyright law names one licensor and cannot name that holon as the party owed, so a
+licence can carry only two things: **share-alike** (changes to the primitives, the services and the
+canon return to the commons by right) and **attribution** (every person's authorship upheld). Value
+in the form of money cannot ride on copyright at all. It rides on the economic layer, where the holon
+is described and the flow is witnessed (shefa, REA, the bounded curve in mishpat); value derived
+outside the protocol is owed in the canon's ethics but has no holon it can be routed to, so the
+protocol does not collect it and instead makes deriving value inside, where the holon exists, the
+better path. The Georgist move by design rather than by clause.
+
+The capture defence therefore has three legs in licence and a fourth outside it: share-alike on the
+primitives and the canon (changes owed back); AGPL on the services (no enclosed hosting of a
+modified peer or doorway, though charged hosting remains possible); the **name reserved** — a mark on
+"elohim" and the pillar names, so a rent-charging fork may run the code but not wear the name
+(open, not yet ruled on); and, outside the licence, the economic layer's routing of value to the
+described holons. A reciprocal licence on the services and the canon would be the coherent way to
+want more in copyright; advised against, because it reintroduces a payee.
 
 ## Compatibility
 
@@ -125,6 +156,25 @@ both ends moved. `deny.toml` now allows AGPL-3.0 beside MPL-2.0 and CAL-1.0 (the
   consumer-facing and may belong in the primitives or tooling tier; that is the next ruling.
 - Whether a legal person other than the steward should ever be the canon's holder of record, and whether the covenant's no-other-terms commitment should be given an instrument (a deed, an assignment to a body bound by the constitution). Either would be a holder under the constitution, not an owner; the question is who signs and what binds them beyond a pledge.
 - Per-crate `LICENSE` files in published tarballs; the SPDX `license` field is relied on for now.
+- A trademark on "elohim" and the pillar names, as the instrument that polices capture without
+  enclosing the code.
+- **Adopted 2026-11-07 as `EPR-LICENSE-1.0.md`**, the protocol's own licence and "the working
+  commitment to the constitution" (the steward's words). Asked for first as a bespoke copyright
+  licence and declined in that form (not OSI-approved, untested, incompatible with the
+  Apache/MPL/AGPL ecosystems; CAL the cautionary case; PPL, Commons Clause and Hippocratic the
+  unadopted precedents), it was then reframed as the **primary instrument**: the protocol's own
+  declaration of its boundary of value, written by the network for itself, real inside the network
+  by the network's own means, with the standard licences as its outward face at the border — the
+  governance settlement of this era, open to re-settlement, every grant already made left standing.
+  It declares the three kinds of value and what each is owed (labour its produce, thrift its return,
+  the inheritance's yield — the elohim's included, as a produce of the land itself — to the commons
+  and the holons that uphold people), the council as layered and chosen by reach, the network shape
+  as reconciled from below to the intersection, the name reserved, relying parties read by what they
+  do, the licence composed into the repository's `.epr-meta`, and the measure of maturity as habit
+  `commons-held-by-the-network`. Its present-tense claims are a working commitment: what runs of the
+  machinery is stated in the licence's own "What runs today" and in the habit's delta.
+- A published, versioned release of the tooling tier (workspace-discipline backlog row 3): until it
+  exists a downstream organisation has nothing to pin and can only re-implement patterns.
 
 ## Evidence
 

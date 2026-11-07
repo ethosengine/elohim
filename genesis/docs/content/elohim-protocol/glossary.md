@@ -21,6 +21,7 @@ cites:
 - **elohim-operator** — the elohim that tends a household's hardware and runtime: a software steward bounded by the household's commitments, never the owner of the rack and not the human who runs it. It carries the sensing, folding, signing and first escalation the Observability epic describes.
 - **holon** — a space that holds its own activity ledger: a person, a household, a collective, a region. Each holon sees inside itself; nothing outside it may join its ledger to another's.
 - **imago dei** — "the image of God" (Genesis 1:27): the conviction that every human bears inherent, unearnable dignity. The protocol's model of identity rests on this rather than on ownership or credentials.
+- **the holon that upholds a person** — whatever holon or holons hold a person's imago dei up: their household, their community, the people who stand behind their identity, the elohim attuned to them. It looks different for every person; its adequate diversity and honest description are what make that person's standing inviolable, because no single party is it, so no single party can take it. The party to whom the protocol's licence (`EPR-LICENSE-1.0.md` §2.3) says value drawn from the common inheritance is owed, plural and per person, not the protocol as a body.
 - **El Roi** — "the God who sees me" (Hagar's name for God, Genesis 16:13): the protocol's ideal of being genuinely *known* — recognized as a person — rather than surveilled as a data source.
 
 ## How participation works

@@ -743,6 +743,50 @@ habits:
       - "elohim/eprfs/epr-cli/src/flow/memory/import.rs — `acting_author` and the rewrite-on-change path"
       - "elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md — the sibling: this habit makes attribution REPRESENTABLE; that one makes it ADMISSIBLE for economic joins"
 
+  - id: commons-held-by-the-network
+    declared: .epr-meta/commons-held-by-the-network.habit.md
+    invariant: >-
+      The commons is held by the network itself and no person's goodwill is what holds it: value
+      drawn from the common inheritance flows, witnessed, to the holons it was drawn from without
+      the steward's hand on the flow; a hand reaching for the commons is refused in the open by an
+      elohim and the refusal stands, the steward's hand included; a challenge to the licence's terms
+      is heard at the layer its reach confers and carries no further; an addition offered under
+      other terms is refused by the record itself, not by a person; a council of people drawn by lot
+      has audited an elohim at at least one layer; and two independently established networks have
+      reconciled a common layer holding their intersection. While any of these lacks a record the
+      holder-of-record seat is special and EPR-LICENSE-1.0.md §7 binds the steward as written; when
+      all six have one the seat is ordinary without amending the text.
+    status: unwired
+    active: false
+    checks: []
+    evidence: >
+      DELTA 2026-11-07 (born UNWIRED; declared by the steward's adoption of EPR-LICENSE-1.0.md as the working commitment to the constitution): §13 of the licence names the point at which the holder-of-record seat stops being special, and declares it the protocol's way: a measure, flipped only on evidence. None of the six conditions has a record today. What runs of the machinery (README "What runs today"): the authoring gate's reach classification and the feedback back-propagation with the standing projection in elohim-storage. Designed, not running: the agent runtime (no elohim takes part in any gate), reach gated by standing (written and tested, not on the storage path), every council at every layer, the sortition floor, the commons pools and their witnessed flows, any second network. The steward may not flip this habit; until any council exists the register is read in the open. Checks arrive one condition at a time, the fourth first.
+    evidence-fingerprint: sha256:b776a56d8a3a8bda
+    evidence-bytes: 944
+    evidence-entries: 1
+    first_move: >-
+      The first of the six to become observable is the fourth: refuse, at the authoring gate and
+      not by a person, an addition to the canon or the primitives offered under terms other than the
+      licence's and its border licences. licence-tiers-check.mjs already refuses a manifest field
+      outside the allowed set; extend the same refusal to a new canon document without the canon
+      directory's licence, and to a new crate declaring a licence outside its tier, so the record
+      refuses the addition. The second observable is the first: a witnessed REA flow from a commons
+      pool to a holon with no steward signature on the event (shefa, once the pool exists).
+    refs:
+      - EPR-LICENSE-1.0.md
+      - LICENSING.md
+      - COVENANT.md
+      - genesis/docs/content/elohim-protocol/values-forward.md
+      - genesis/docs/content/elohim-protocol/shefa.md
+      - genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md
+      - genesis/orchestrator/licence-tiers-check.mjs
+      - .epr-meta/licence-tiers-declared.habit.md
+    retire-when: >-
+      the six conditions are each enforced by construction in the machinery that performs them (the
+      authoring gate, the commons pools, the council and sortition records, the cross-network
+      settlement) and every one has its own habit, so this cross-seam roll-up names nothing those
+      habits do not.
+
   - id: guards-sense-frames
     declared: .epr-meta/guards-sense-frames.habit.md
     invariant: >
@@ -820,10 +864,10 @@ habits:
     checks:
       - "node genesis/orchestrator/licence-tiers-check.mjs (walks tracked Cargo.toml [package] tables and package.json manifests; refuses a missing field, a licence outside the allowed set, CAL-1.0 outside the fork, a named tier member on the wrong tier, a zome that is not MPL-2.0, or a missing LICENSE/LICENSES text)"
     evidence: >
-      DELTA 2026-11-07 (GREEN; the deferred finding is ruled): steward ruling on the canon prose — "the elohim commons should own it", not a gift — lands as CC BY-SA 4.0: `genesis/docs/content/elohim-protocol/LICENSE` and `LICENSES/CC-BY-SA-4.0.txt` from the Creative Commons legal code; the check now refuses a missing canon LICENSE. The README's quotation gloss is gone with the carve-out. Refined the same day on the steward's correction: the trust does not end in a council-derived owner — the canon is "owned by no one, including its authors" (constitution I.1), owed to the constitution and held in trust by the elohim and the people who tend it; the steward is the copyright's holder of record because a licence needs a signatory. Every text that had promised a transfer to a steward body now records a commitment instead. Residue: whether another legal person should ever be holder of record, and whether the commitment should get an instrument. README loop continued for the canon paragraph: R4 READY (0 correctness · 4 interpretability · 1 preference, read against the pre-correction text; the two that survived the correction — is the trust legal or moral, and "pillar papers" narrowing the directory rule — fixed: no deed exists, the irrevocable grant is the floor, every document under the path is covered; CC text location and checker coverage stated). R5 REVISE (1 correctness · 4 interpretability · 1 preference): the correctness finding stands — irrevocability covers only what is already shared and does not stop dual-licensing or private additions, and "trustee" without a deed is a costume. Fixed: "trustee of record" → "holder of record" in every text; the gap named; the covenant's no-other-terms commitment recorded as what closes it, labelled a public pledge not an instrument; succession by inheritance stated with the grant surviving; "commercially or not" added; referent and the overloaded "trust" disambiguated. Closed by the author's judgment at round 5 (5 rounds, 5 fresh readers): the remaining question — whether the pledge should get an instrument — is the steward's, recorded in the spec's open items.
-    evidence-fingerprint: sha256:19e60d6ae6caed60
-    evidence-bytes: 4426
-    evidence-entries: 2
+      DELTA 2026-11-07b (GREEN; the border licences gain their primary instrument): the steward adopted `EPR-LICENSE-1.0.md` as "the working commitment to the constitution" — the protocol's own licence, with the four border licences as its outward face, the governance settlement of this era. This habit now also refuses a tree without the licence file and without `.epr-meta/commons-held-by-the-network.habit.md` (the licence's §13 measure, born `unwired`); the root manifest declares the licence and guards its amendment (`licence-amendment-by-reach`). Pre-adoption review of the licence, recorded here because the licence has no habit of its own yet: a five-lens verified workflow (canon fidelity · present-tense claims against README "What runs today" · internal consistency · border-law accuracy · structure and voice; 76 agents) returned 70 findings, 58 refuted by an adversarial pass, 12 confirmed, plus 6 from a completeness critic; applied: reach is read from the record, never allocated by a council (stance III.2); the elohim's deference ratio restored to the constitution's (defer on ordinary life and most governance, hold only what has graduated); "holds the rights to the commons" → holds the commons in trust, three places; §3's "unconditionally" → on each border licence's own conditions; every maker is holder of record for what they wrote (no CLA, inbound = outbound); demurrage's direction corrected to shefa's (the idle balance decays back to the commons); the manifesto's imagodei sentence no longer transposed to the commons; the §5 "language is common inheritance" attribution made the licence's own step; the layer list stated once; shefa linked; the minted term "the holon that upholds a person" marked as the licence's own composition of two glossary words, and the glossary entry made to point at the licence rather than vouch for it. The steward's rulings of the same evening are in: the Georgist split completed in kind (labour its produce, thrift its return, the inheritance's yield — the elohim's, as a produce of the land itself — to the commons), the Jubilee→George→protocol lineage named, and the steward's own seat recorded as owed and unaccounted ("and that it is good"). Check: `licence-tiers-check: 85 Cargo.toml packages, 33 package.json manifests, 0 refusal(s)`; the register projects 64 habits. Blind-reader rounds after the review: the licence, R1 READY (0 correctness · 8 interpretability · 3 preference; applied: a gloss of what a "stance" citation names, REA and shefa glossed at first use, the §4.3 sanction's argument made explicit, demurrage given its own sentence, the minted term's plural use declared, one §11 antecedent fixed, §7 broken into paragraphs; the three preference findings on §1's long entries left, since the steward adopted them). The README's License section, R6 REVISE (0 · 2 · 1: the legal relationship between the protocol's licence and a crate's declared licence stated plainly) and R7 READY (0 · 2 · 0: genre and mechanism named in one clause). Closed at R7 by the author's judgment, with no correctness finding at any round. README loop continued for the canon paragraph: R4 READY (0 correctness · 4 interpretability · 1 preference, read against the pre-correction text; the two that survived the correction — is the trust legal or moral, and "pillar papers" narrowing the directory rule — fixed: no deed exists, the irrevocable grant is the floor, every document under the path is covered; CC text location and checker coverage stated). R5 REVISE (1 correctness · 4 interpretability · 1 preference): the correctness finding stands — irrevocability covers only what is already shared and does not stop dual-licensing or private additions, and "trustee" without a deed is a costume. Fixed: "trustee of record" → "holder of record" in every text; the gap named; the covenant's no-other-terms commitment recorded as what closes it, labelled a public pledge not an instrument; succession by inheritance stated with the grant surviving; "commercially or not" added; referent and the overloaded "trust" disambiguated. Closed by the author's judgment at round 5 (5 rounds, 5 fresh readers): the remaining question — whether the pledge should get an instrument — is the steward's, recorded in the spec's open items.
+    evidence-fingerprint: sha256:f6180e8571671262
+    evidence-bytes: 7550
+    evidence-entries: 3
     guard: >-
       Never change a tier's licence or move a crate between tiers in a sweep; that is a steward ruling
       recorded in the decision spec first. Never add a licence to upstream code held in the tree
