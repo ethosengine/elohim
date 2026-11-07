@@ -1,9 +1,9 @@
 ---
 id: task-as-b1-report
 cites: []
-status: claimed-not-verified
+status: landed-on-branch
 landed_commit:
-verified_by:
+verified_by: "orchestrator (Claude Opus 5.5): diff read + `just gate orchestrator` EXIT=0 at dc0a8b2f4 with EPR_BIN at bafyreif5zxb6… (evidence/gate-B1-orchestrator.log, 2026-11-07T23:23Z); the real notes push and the gospel change follow at landing"
 concerns: gate orchestrator red in this worktree for environmental reasons (see body)
 actor: agent:b1@claude-sonnet-5-5
 ---
@@ -18,7 +18,7 @@ actor: agent:b1@claude-sonnet-5-5
 - `notes_ref_is_skipped_and_branch_ref_still_gated_by_the_pushed_ref_loop`: PASS. It extracts the real ref loop from the hook, runs it in a mkdtemp scratch repo with a stub rust-style.sh, one notes ref and one branch ref; asserts one skip line, no style call on the notes sha, the branch still style-gated and diffed.
 
 ## Gate
-`just gate orchestrator`, log `.../evidence/gate-B1-orchestrator.log` ends `EXIT=1` (earlier dirty-tree run kept as `gate-B1-orchestrator-run1-dirty.log`). The new test passed inside it. Seven failures, none in this change: six `.husky/commit-msg.test.mjs` cases fail with ENOENT `.husky/_/h` (the untracked husky install dir is absent in this worktree) and one `gate-runner.test.mjs` "dirty external dependency" case. The preflight also reported submodules not checked out. Orchestrator should run the gate from the main checkout/shem, where `.husky/_` exists.
+`just gate orchestrator`, log `.../evidence/gate-B1-orchestrator.log`: **EXIT=0** (2026-11-07T23:23Z, run by the orchestrator with `EPR_BIN` at the shem-built epr `bafyreif5zxb6…`). The earlier reds were environmental and are kept as `gate-B1-orchestrator-run1-dirty.log` and `-run2-envred.log`: the worktree lacked node_modules (`.husky/_/h` ENOENT in six commit-msg cases), and shem's installed epr predated abd66bdb1's byte-profile closure CID (the "dirty external dependency" case).
 
 ## Deviations
 None to the fix. Gate not green here; see above.
