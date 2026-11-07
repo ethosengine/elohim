@@ -1006,8 +1006,9 @@ Given(
       expected,
       `seeded custody on all ${expected} household peers (${seededNames}) but the household ` +
         `resilience fold counts ${custodyCopies} held ` +
-        `cop${custodyCopies === 1 ? 'y' : 'ies'} for "${contentId}", fewer than the ${expected} ` +
-        `expected — ${expected - custodyCopies} holder(s) missing from the fold peer's view ` +
+        `cop${custodyCopies === 1 ? 'y' : 'ies'} for "${contentId}", not the ${expected} ` +
+        `expected — ${Math.abs(expected - custodyCopies)} holder(s) ` +
+        `${custodyCopies < expected ? 'missing from' : 'in excess of'} the fold peer's view ` +
         "(compare each peer's shard_locations rows for this content)"
     );
   }
