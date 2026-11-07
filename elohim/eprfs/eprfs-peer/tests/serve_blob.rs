@@ -1079,3 +1079,27 @@ fn the_serve_grant_parses_its_vocabulary_and_refuses_anything_else() {
         .expect("absent")
         .is_empty());
 }
+
+#[test]
+fn a_payload_store_is_created_with_private_parents() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("data/epr/payload");
+    open_payload_store(&path).expect("created");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for created in [
+            dir.path().join("data"),
+            dir.path().join("data/epr"),
+            path.clone(),
+        ] {
+            let mode = std::fs::metadata(&created)
+                .expect("meta")
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o077, 0, "{} is private", created.display());
+        }
+    }
+    // Opening it again opens the same store.
+    open_payload_store(&path).expect("reopened");
+}

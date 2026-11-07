@@ -713,13 +713,32 @@ impl ServeScope for DeviceScope {
     }
 }
 
-/// Open (creating it if absent) the directory payload store at `path`, as `epr peer serve`
-/// mounts it.
+/// Open (creating it, and any missing parent, if absent) the directory payload store at `path`,
+/// as `epr peer serve` mounts it. Parents it creates are private to this account (0700), as the
+/// store itself is.
 ///
 /// # Errors
 ///
-/// [`PeerError::LocalBlob`] when the directory cannot be created or opened.
+/// [`PeerError::LocalBlob`] when a parent or the store cannot be created, or the store opened.
 pub fn open_payload_store(path: &Path) -> Result<Arc<dyn EprfsStorage>, PeerError> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder.create(parent).map_err(|source| {
+            PeerError::LocalBlob(EprfsError::Io {
+                path: parent.to_path_buf(),
+                source,
+            })
+        })?;
+    }
     let store = DirectoryStorage::create(path).map_err(PeerError::LocalBlob)?;
     Ok(Arc::new(OffloadedDirectory::new(store)))
 }
