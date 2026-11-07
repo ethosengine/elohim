@@ -1271,6 +1271,7 @@ diesel::table! {
         last_seen_at       -> Text,
         source             -> Text,
         sequence           -> BigInt,
+        witness            -> Text,
     }
 }
 

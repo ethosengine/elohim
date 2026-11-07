@@ -45,7 +45,7 @@ pub trait FetchKicker: Send + Sync {
     fn kick(&self, blob_cid: &ByteCid, candidates: Vec<String>);
 }
 
-/// Snapshot of the local blob store taken at reconcile-pass start.
+/// Snapshot of the local blob store's payload NAMES taken at reconcile-pass start.
 ///
 /// Implements [`LocalBlobStore`] for the duration of a single pass by
 /// pre-fetching the full CID set once via [`crate::blob_store::BlobStore::list_cids`]
@@ -53,6 +53,13 @@ pub trait FetchKicker: Send + Sync {
 /// (and avoids holding the blob store across diesel queries) than calling
 /// `BlobStore::exists` per commitment. Comparison is by [`ByteCid`] value (C4):
 /// a commitment marker is parsed by full decode before it is compared.
+///
+/// It is a filename set, not a verification: a payload whose marker is present but
+/// whose bytes are corrupt or whose chunks are missing is still listed, and chunk or
+/// shard units are not listed at all. It answers "is a fetch needed?" (a wrong yes
+/// costs a skipped fetch, healed by verify-on-read). It must never gate a custody
+/// row, a pledge or an announcement — those rest on a verified read
+/// (`BlobStore::get` / `get_chunk`, or `exists` == `Verified`).
 pub struct BlobStoreSnapshot {
     cids: std::collections::HashSet<ByteCid>,
 }
@@ -149,7 +156,10 @@ pub fn resolve_self_agent_cid(
 }
 
 /// then degrades to transport-only (the pre-existing behavior — no regression).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is an independent seam (two self identities, the local store, the fetch kicker, timing config, clock, connected peers) that tests substitute; a bundling struct would only rename them"
+)]
 pub fn reconcile_pass(
     conn: &mut SqliteConnection,
     self_cid: &str,
@@ -407,6 +417,32 @@ pub struct SalvageOutcome {
     pub skipped_opted_out: u32,
 }
 
+/// The spellings one holder's custody evidence may be keyed by: the provider itself
+/// and every transport id (libp2p PeerId, iroh NodeId) `peer_transport_manifest`
+/// binds to it. Never a raw cross-namespace match: the manifest is the join.
+fn holder_identities(
+    conn: &mut SqliteConnection,
+    provider: &str,
+) -> Result<Vec<String>, StorageError> {
+    use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+    let bound: Vec<(Option<String>, Option<String>)> = t::peer_transport_manifest
+        .filter(t::agent_cid.eq(provider))
+        .select((t::libp2p_peer_id, t::iroh_node_id))
+        .load(conn)
+        .map_err(|e| StorageError::Database(format!("holder transport ids: {e}")))?;
+    let mut identities = vec![provider.to_string()];
+    for id in bound
+        .into_iter()
+        .flat_map(|(libp2p, iroh)| [libp2p, iroh])
+        .flatten()
+    {
+        if !identities.contains(&id) {
+            identities.push(id);
+        }
+    }
+    Ok(identities)
+}
+
 /// Run one salvage pass (Phase 3). For each under-replicated `custody-blob`
 /// blob, if this node is opted in, not already a provider, and among the
 /// deterministic closest-N holders for the blob (per `strategy`), author a new
@@ -488,23 +524,25 @@ pub fn salvage_pass(
     for (blob, want) in wants {
         outcome.blobs_examined += 1;
 
-        // honored = distinct committed providers currently hosting (fresh inventory).
-        // Only admitted, projected inventory counts: a HELD envelope (unknown epoch
-        // or scheme) is never projected into `peer_blob_inventory`, so it can never
-        // inflate this count.
-        // Joins provider against `peer_blob_inventory.peer_id` exactly as the
-        // receiver-role check in `reconcile_pass` does; the pool is resolved to
-        // `agent_cid` upstream (P3-6) so the namespaces line up.
+        // honored = distinct committed providers with BOUND, unexpired custody
+        // evidence. A row counts only when its witness bound the peer id to the
+        // speaker (signed author, end-to-end signature, recon over the peer's own
+        // connection, a verified fetch, this node's own verified store); a
+        // `legacy-hint` row stays a fetch hint and an expired row is no evidence. A
+        // HELD envelope (unknown epoch or scheme) is never projected at all.
+        //
+        // Inventory rows are keyed by the author's TRANSPORT id while a provider is
+        // an `agent_cid` (or, for legacy rows, a transport id), so a provider's
+        // evidence is read under every spelling `peer_transport_manifest` binds to it.
         let mut honored = 0usize;
         for provider in &want.providers {
-            let fresh: i64 = peer_blob_inventory::table
-                .filter(peer_blob_inventory::peer_id.eq(provider))
-                .filter(peer_blob_inventory::blob_cid.eq(&blob))
-                .filter(peer_blob_inventory::last_seen_at.gt(&fresh_before))
-                .count()
-                .get_result(conn)
-                .map_err(|e| StorageError::Database(format!("count honored providers: {e}")))?;
-            if fresh > 0 {
+            let identities = holder_identities(conn, provider)?;
+            if crate::db::peer_blob_inventory::holds_bound_fresh(
+                conn,
+                &identities,
+                &blob,
+                &fresh_before,
+            )? {
                 honored += 1;
             }
         }
@@ -676,7 +714,7 @@ fn claim_units(
 /// candidate. This node's `agent_cid` changes across a non-prod DNA reinstall, and a
 /// manifest written by the ingest path records no self-held row, so the claim is
 /// re-asserted under the live identity (`self_held_reclaimed`) when the store still
-/// holds the payload structurally whole ([`Exists::Verified`]). Steady state writes
+/// holds the payload hash-verified ([`Exists::Verified`]). Steady state writes
 /// nothing.
 ///
 /// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`); `None` skips
@@ -846,8 +884,16 @@ mod tests {
         sequence: i64,
         when: &str,
     ) -> Result<(), StorageError> {
-        crate::db::peer_blob_inventory::apply_delta(conn, peer, cids, &[], sequence, when)
-            .map(|_| ())
+        crate::db::peer_blob_inventory::apply_delta(
+            conn,
+            peer,
+            cids,
+            &[],
+            sequence,
+            when,
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
+        )
+        .map(|_| ())
     }
     use crate::db::{run_migrations, DbPool};
     use diesel::r2d2::{ConnectionManager, Pool};
@@ -1693,11 +1739,132 @@ mod tests {
             .collect()
     }
 
-    /// Mark a provider as currently hosting a blob (fresh inventory row).
+    /// Mark a provider as currently hosting a blob: a fresh inventory row under a
+    /// bound witness (an admitted signed delta), the only kind a custody floor counts.
     fn mark_hosting(conn: &mut SqliteConnection, peer: &str, blob: &str, now: DateTime<Utc>) {
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let b = blob.to_string();
         apply_snapshot(conn, peer, std::slice::from_ref(&b), 1, &when).unwrap();
+    }
+
+    /// A fresh inventory row with no recorded witness — what every row written before
+    /// the witness column reads as (`legacy-hint`).
+    fn mark_legacy_hint(conn: &mut SqliteConnection, peer: &str, blob: &str, now: DateTime<Utc>) {
+        diesel::insert_into(peer_blob_inventory::table)
+            .values(&crate::db::models::NewPeerBlobInventoryRow {
+                peer_id: peer.to_string(),
+                blob_cid: blob.to_string(),
+                last_seen_at: now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                source: "gossip-delta".to_string(),
+                sequence: 1,
+            })
+            .execute(conn)
+            .unwrap();
+    }
+
+    /// `peer_transport_manifest` binds libp2p PeerId `peer` to `agent`.
+    fn bind_transport(conn: &mut SqliteConnection, agent: &str, peer: &str) {
+        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+        diesel::insert_into(t::peer_transport_manifest)
+            .values((
+                t::agent_cid.eq(agent),
+                t::libp2p_peer_id.eq(peer),
+                t::discovery_methods_json.eq("[]"),
+                t::capability_level.eq(1),
+                t::last_observed.eq(1_i64),
+            ))
+            .execute(conn)
+            .unwrap();
+    }
+
+    fn run_salvage(
+        conn: &mut SqliteConnection,
+        now: DateTime<Utc>,
+    ) -> (SalvageOutcome, RecordingAuthor) {
+        let author = RecordingAuthor::new();
+        let outcome = salvage_pass(
+            conn,
+            "self",
+            "self",
+            &StaticStrategy(vec!["self".into()]),
+            &author,
+            &pool(&["self"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+        (outcome, author)
+    }
+
+    /// R2: two committed providers whose only evidence is fresh `legacy-hint` rows (no
+    /// recorded witness) do not hold the floor: the blob is under-replicated and the
+    /// closest volunteer adopts it. The rows stay fetch hints.
+    #[test]
+    fn custody_count_ignores_unbound_legacy_rows() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('l');
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
+        mark_legacy_hint(&mut conn, "prov-A", &blob, now);
+        mark_legacy_hint(&mut conn, "prov-B", &blob, now);
+
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(outcome.under_replicated, 1, "legacy rows hold no floor");
+        assert_eq!(outcome.commitments_authored, 1);
+        assert_eq!(author.authored.lock().unwrap().len(), 1);
+        let stale_before = (now - chrono::Duration::seconds(600))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        assert_eq!(
+            crate::db::peer_blob_inventory::lookup_hosts(&mut conn, &blob, &stale_before)
+                .unwrap()
+                .len(),
+            2,
+            "legacy rows remain fetch hints"
+        );
+    }
+
+    /// R2: a bound row inside the freshness window counts; the same bound evidence
+    /// past it does not. Evidence keyed by a provider's bound transport id counts for
+    /// the provider's `agent_cid`.
+    #[test]
+    fn bound_fresh_row_counts_and_expired_one_does_not() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('x');
+        insert_custody_commitment(&mut conn, "c1", "uhCAkProvA", "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", "uhCAkProvB", "steward-Z", &blob);
+        bind_transport(&mut conn, "uhCAkProvA", "12D3KooWProvA");
+        bind_transport(&mut conn, "uhCAkProvB", "12D3KooWProvB");
+        // A: fresh, bound, keyed by its transport id. B: bound, but an hour old.
+        mark_hosting(&mut conn, "12D3KooWProvA", &blob, now);
+        mark_hosting(
+            &mut conn,
+            "12D3KooWProvB",
+            &blob,
+            now - chrono::Duration::seconds(3600),
+        );
+        let (outcome, _) = run_salvage(&mut conn, now);
+        assert_eq!(
+            outcome.under_replicated, 1,
+            "one fresh bound holder of two: the expired row does not count"
+        );
+
+        // B re-announces inside the window (the next in-order delta): the floor holds.
+        apply_snapshot(
+            &mut conn,
+            "12D3KooWProvB",
+            std::slice::from_ref(&blob),
+            2,
+            &now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        )
+        .unwrap();
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(outcome.under_replicated, 0, "two fresh bound holders");
+        assert!(author.authored.lock().unwrap().is_empty());
     }
 
     #[test]
@@ -1742,6 +1909,9 @@ mod tests {
         let blob = cid_of('c');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
+        // R2: "hosting" means BOUND, unexpired evidence — an admitted signed delta
+        // from each provider (`mark_hosting`). Unwitnessed rows would not hold the
+        // floor (`custody_count_ignores_unbound_legacy_rows`).
         mark_hosting(&mut conn, "prov-A", &blob, now);
         mark_hosting(&mut conn, "prov-B", &blob, now);
 

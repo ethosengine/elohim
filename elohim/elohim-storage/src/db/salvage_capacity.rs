@@ -1,8 +1,8 @@
 //! CRUD for `salvage_capacity`.
 //!
-//! Source of truth: salvage-capacity gossip (`SalvageCapacityAd` on topic
-//! 'elohim/storage/salvage'). Category C operational projection rebuildable
-//! from gossip replay.
+//! Source of truth: signed salvage-capacity gossip (`SignedSalvageAd` on topic
+//! 'elohim/storage/salvage', admitted by `p2p::salvage_gossip::admit`). Category C
+//! operational projection rebuildable from gossip.
 //!
 //! agent_cid-keyed by construction — the candidate pool the Phase-3 placement
 //! XOR metric ranks over never crosses identity namespaces (the all-zeros
@@ -14,9 +14,24 @@ use crate::db::models::{NewSalvageCapacityRow, SalvageCapacityRow};
 use crate::error::StorageError;
 use diesel::prelude::*;
 
-/// Apply (upsert) a salvage-capacity advertisement for an agent. Replaces any
-/// prior row for the same `agent_cid` (PK), so the newest advertisement wins.
-/// Mirrors `peer_blob_inventory`'s `replace_into` upsert.
+/// What [`apply_capacity`] did with an admitted advertisement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapacityApply {
+    /// The ad's `seq` is above the projected one (or the agent is new): the row now
+    /// reflects it.
+    Applied,
+    /// The ad's `seq` is at or below the projected one: a replay or a reordered older
+    /// ad. Nothing changed.
+    Replay,
+}
+
+/// Apply a signed, admitted salvage-capacity advertisement for an agent.
+///
+/// Freshness and replay are judged by the per-agent `seq` (the advertising peer's
+/// monotone counter, boot epoch in the high bits): the row is written only when `seq`
+/// is strictly above the projected one, so a replayed or reordered older ad never
+/// re-projects — not its spare bytes, not its archetype, not its `last_seen_at`.
+/// Check and write run in one write transaction.
 pub fn apply_capacity(
     conn: &mut SqliteConnection,
     agent_cid: &str,
@@ -24,19 +39,29 @@ pub fn apply_capacity(
     archetype: &str,
     observed_at: &str,
     seq: i64,
-) -> Result<(), StorageError> {
-    let row = NewSalvageCapacityRow {
-        agent_cid: agent_cid.to_string(),
-        spare_bytes,
-        archetype: archetype.to_string(),
-        last_seen_at: observed_at.to_string(),
-        seq,
-    };
-    diesel::replace_into(salvage_capacity::table)
-        .values(&row)
-        .execute(conn)
-        .map(|_| ())
-        .map_err(|e| StorageError::Database(format!("apply_capacity: {e}")))
+) -> Result<CapacityApply, StorageError> {
+    super::read_then_write_transaction(conn, |conn| {
+        let projected: Option<i64> = salvage_capacity::table
+            .find(agent_cid)
+            .select(salvage_capacity::seq)
+            .first::<i64>(conn)
+            .optional()?;
+        if projected.is_some_and(|projected| seq <= projected) {
+            return Ok::<CapacityApply, diesel::result::Error>(CapacityApply::Replay);
+        }
+        let row = NewSalvageCapacityRow {
+            agent_cid: agent_cid.to_string(),
+            spare_bytes,
+            archetype: archetype.to_string(),
+            last_seen_at: observed_at.to_string(),
+            seq,
+        };
+        diesel::replace_into(salvage_capacity::table)
+            .values(&row)
+            .execute(conn)?;
+        Ok(CapacityApply::Applied)
+    })
+    .map_err(|e| StorageError::Database(format!("apply_capacity: {e}")))
 }
 
 /// Lookup the capacity row for a specific agent (None if never advertised).
@@ -155,5 +180,24 @@ mod tests {
         assert!(cids.contains(&"uhCAk-fresh"), "fresh row must be included");
         assert!(!cids.contains(&"uhCAk-stale"), "stale row must be excluded");
         assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn an_older_or_equal_seq_never_reprojects() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            apply_capacity(&mut conn, "uhCAk-self", 1000, "node", &iso_offset(-10), 5).unwrap(),
+            CapacityApply::Applied
+        );
+        for seq in [5, 4] {
+            assert_eq!(
+                apply_capacity(&mut conn, "uhCAk-self", 9, "steward", &iso_offset(0), seq).unwrap(),
+                CapacityApply::Replay
+            );
+        }
+        let row = lookup_capacity(&mut conn, "uhCAk-self").unwrap().unwrap();
+        assert_eq!((row.spare_bytes, row.seq), (1000, 5));
+        assert_eq!(row.archetype, "node");
     }
 }

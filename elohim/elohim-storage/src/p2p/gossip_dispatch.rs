@@ -419,6 +419,8 @@ pub fn transport_key(author_peer: &str) -> Option<elohim_epr::signature::Multike
 /// `peer_blob_inventory` + `held_envelopes` behind the transport-neutral sink.
 struct DbInventorySink<'c, 'a> {
     conn: &'c std::cell::RefCell<&'a mut diesel::SqliteConnection>,
+    /// The witness the arriving plane gives every row this delivery applies.
+    witness: crate::db::peer_blob_inventory::InventoryWitness,
 }
 
 impl crate::p2p::inventory_gossip::InventorySink for DbInventorySink<'_, '_> {
@@ -427,7 +429,7 @@ impl crate::p2p::inventory_gossip::InventorySink for DbInventorySink<'_, '_> {
         peer: &str,
         delta: &crate::p2p::inventory_gossip::InventoryDelta,
     ) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
-        apply_delta_row(&mut self.conn.borrow_mut(), peer, delta)
+        apply_delta_row(&mut self.conn.borrow_mut(), peer, delta, self.witness)
     }
 
     fn retain_held(&mut self, held: crate::p2p::inventory_gossip::HeldEnvelope) {
@@ -454,6 +456,7 @@ fn apply_delta_row(
     conn: &mut diesel::SqliteConnection,
     peer: &str,
     delta: &crate::p2p::inventory_gossip::InventoryDelta,
+    witness: crate::db::peer_blob_inventory::InventoryWitness,
 ) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
     use crate::db::peer_blob_inventory::DeltaApplyOutcome as Db;
     use crate::p2p::inventory_gossip::DeltaOutcome;
@@ -468,6 +471,7 @@ fn apply_delta_row(
         &removed,
         delta.sequence as i64,
         &when,
+        witness,
     ) {
         Ok(Db::Applied) => Ok(DeltaOutcome::Applied),
         Ok(Db::Replay) => Ok(DeltaOutcome::Replay),
@@ -479,7 +483,11 @@ fn apply_delta_row(
 }
 
 /// Apply every held page that is now contiguous with the cursor, in order. Held pages
-/// were admitted (signature-verified) before they were stashed.
+/// were admitted (signature-verified) before they were stashed; the stash does not
+/// keep the plane each arrived on, so each is recorded under the witness every
+/// admitted envelope carries on both planes, [`InventoryWitness::EndToEnd`].
+///
+/// [`InventoryWitness::EndToEnd`]: crate::db::peer_blob_inventory::InventoryWitness::EndToEnd
 /// bounded-work: at most the per-peer window (`MAX_PENDING_PER_PEER`) applies per call.
 fn flush_held_pages(
     ctx: &GossipDispatchCtx<'_>,
@@ -491,7 +499,12 @@ fn flush_held_pages(
     use crate::p2p::inventory_reorder::with_reorder;
     let mut flushed = 0usize;
     while let Some(held) = with_reorder(|r| r.take_next(peer_id, next_seq)) {
-        match apply_delta_row(conn, peer_id, &held.body) {
+        match apply_delta_row(
+            conn,
+            peer_id,
+            &held.body,
+            crate::db::peer_blob_inventory::InventoryWitness::EndToEnd,
+        ) {
             Ok(DeltaOutcome::Applied) => {
                 flushed += 1;
                 crate::metrics::inc_inventory_page("delta", "flushed");
@@ -562,7 +575,18 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sourc
     let conn_ref: &mut diesel::SqliteConnection = &mut conn;
     let cell = std::cell::RefCell::new(conn_ref);
     let resolver = ManifestHolderResolver { conn: &cell };
-    let mut sink = DbInventorySink { conn: &cell };
+    // libp2p admission required the signed `message.source` to be the author; iroh
+    // admission rests on the envelope signature alone.
+    let row_witness = match witness {
+        AuthorWitness::Gossipsub(_) => {
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor
+        }
+        AuthorWitness::EndToEnd => crate::db::peer_blob_inventory::InventoryWitness::EndToEnd,
+    };
+    let mut sink = DbInventorySink {
+        conn: &cell,
+        witness: row_witness,
+    };
     let receipt = receive(topic, data, witness, &peer_hint, &resolver, &mut sink);
     let conn: &mut diesel::SqliteConnection = cell.into_inner();
     match receipt {
@@ -646,60 +670,105 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sourc
     }
 }
 
+/// Salvage-capacity ads into `salvage_capacity`. Admission is
+/// [`crate::p2p::salvage_gossip::admit`] (signature, signer = author, the advertised
+/// agent bound to the signer, no contradicting gossipsub source, freshness); an
+/// unknown epoch or scheme is held, bounded, never projected; replay is judged by the
+/// per-agent `seq` at projection. An unsigned, unbound, stale or replayed ad changes
+/// nothing.
 fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
-    use crate::p2p::salvage_gossip::SalvageCapacityAd;
+    use crate::db::salvage_capacity::CapacityApply;
+    use crate::p2p::inventory_gossip::AuthorWitness;
+    use crate::p2p::salvage_gossip::{admit, SalvageAdmission, SALVAGE_CAPACITY_TOPIC};
 
-    match SalvageCapacityAd::from_bytes(data) {
-        Ok(ad) => {
-            if let Err(e) = ad.verify_structural() {
-                warn!(
-                    target: "elohim_storage::salvage",
-                    from = %source,
-                    error = ?e,
-                    "Salvage-capacity ad failed structural verify — dropped"
-                );
-            } else if let Some(pool) = ctx.db_pool {
-                match pool.get() {
-                    Ok(mut conn) => {
-                        let when = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-                        match crate::db::salvage_capacity::apply_capacity(
-                            &mut conn,
-                            &ad.agent_cid,
-                            ad.spare_bytes as i64,
-                            &ad.archetype,
-                            &when,
-                            ad.seq as i64,
-                        ) {
-                            Ok(()) => debug!(
-                                target: "elohim_storage::salvage",
-                                from = %source,
-                                agent_cid = %ad.agent_cid,
-                                spare_bytes = ad.spare_bytes,
-                                archetype = %ad.archetype,
-                                seq = ad.seq,
-                                "Salvage-capacity ad applied"
-                            ),
-                            Err(e) => warn!(
-                                target: "elohim_storage::salvage",
-                                from = %source,
-                                error = %e,
-                                "apply_capacity failed"
-                            ),
-                        }
-                    }
-                    Err(e) => warn!(
-                        target: "elohim_storage::salvage",
-                        error = %e,
-                        "salvage: db pool exhausted"
-                    ),
-                }
-            }
+    let Some(pool) = ctx.db_pool else {
+        return;
+    };
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            warn!(target: "elohim_storage::salvage", error = %e, "salvage: db pool exhausted");
+            return;
         }
-        Err(e) => debug!(
+    };
+    let witness = match source {
+        GossipSource::Libp2p { author, .. } => AuthorWitness::Gossipsub(author.as_deref()),
+        GossipSource::Iroh { .. } => AuthorWitness::EndToEnd,
+    };
+    let now = chrono::Utc::now();
+    let verdict = {
+        let conn_ref: &mut diesel::SqliteConnection = &mut conn;
+        let cell = std::cell::RefCell::new(conn_ref);
+        admit(
+            data,
+            witness,
+            &mut |transport_id: &str| bound_agent_for_author(&mut cell.borrow_mut(), transport_id),
+            &mut |transport_id: &str| relay_agent(&mut cell.borrow_mut(), transport_id),
+            now.timestamp_millis(),
+        )
+    };
+    let (ad, author_peer) = match verdict {
+        SalvageAdmission::Admitted { body, author_peer } => (body, author_peer),
+        SalvageAdmission::Held { reason, bytes } => {
+            if let Err(e) = crate::db::held_envelopes::retain(
+                &mut conn,
+                SALVAGE_CAPACITY_TOPIC,
+                &reason.as_reason(),
+                &bytes,
+            ) {
+                warn!(target: "elohim_storage::salvage", error = %e, "held salvage ad not retained");
+            }
+            info!(
+                target: "elohim_storage::salvage",
+                from = %source, ?reason,
+                "salvage-capacity ad held (unknown epoch or scheme) — retained, not projected"
+            );
+            return;
+        }
+        SalvageAdmission::Refused(reason) => {
+            warn!(
+                target: "elohim_storage::salvage",
+                from = %source, label = reason.label(), %reason,
+                "salvage-capacity ad refused"
+            );
+            return;
+        }
+    };
+    // `last_seen_at` is the signed issue time (never later than this clock), so the
+    // pool's freshness window ages the ad from when its author made it.
+    let issued = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ad.issued_at_ms)
+        .map_or(now, |issued| issued.min(now));
+    let when = issued.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    match crate::db::salvage_capacity::apply_capacity(
+        &mut conn,
+        &ad.agent_cid,
+        i64::try_from(ad.spare_bytes).unwrap_or(i64::MAX),
+        &ad.archetype,
+        &when,
+        i64::try_from(ad.seq).unwrap_or(i64::MAX),
+    ) {
+        Ok(CapacityApply::Applied) => debug!(
+            target: "elohim_storage::salvage",
+            from = %source,
+            author = %author_peer,
+            agent_cid = %ad.agent_cid,
+            spare_bytes = ad.spare_bytes,
+            archetype = %ad.archetype,
+            seq = ad.seq,
+            "Salvage-capacity ad applied"
+        ),
+        Ok(CapacityApply::Replay) => debug!(
+            target: "elohim_storage::salvage",
+            from = %source,
+            agent_cid = %ad.agent_cid,
+            seq = ad.seq,
+            "Salvage-capacity ad at or below the projected seq — replay, not re-projected"
+        ),
+        Err(e) => warn!(
             target: "elohim_storage::salvage",
             from = %source,
             error = %e,
-            "Salvage-capacity ad failed to decode — dropped"
+            "apply_capacity failed"
         ),
     }
 }
@@ -1167,6 +1236,270 @@ mod tests {
             transport_manifest_sink: None,
             self_iroh_node_id: None,
         }
+    }
+
+    // ── R1: salvage-capacity ads are signed, bound, fresh and replay-ordered ──
+
+    fn salvage_ad(
+        agent: &str,
+        seq: u64,
+        spare: u64,
+    ) -> crate::p2p::salvage_gossip::SalvageCapacityAd {
+        crate::p2p::salvage_gossip::SalvageCapacityAd {
+            agent_cid: agent.to_string(),
+            spare_bytes: spare,
+            archetype: "node".to_string(),
+            seq,
+            issued_at_ms: chrono::Utc::now().timestamp_millis(),
+        }
+    }
+
+    fn salvage_row(
+        pool: &crate::db::DbPool,
+        agent: &str,
+    ) -> Option<crate::db::models::SalvageCapacityRow> {
+        let mut conn = pool.get().expect("conn");
+        crate::db::salvage_capacity::lookup_capacity(&mut conn, agent).unwrap()
+    }
+
+    fn salvage_row_count(pool: &crate::db::DbPool) -> i64 {
+        use crate::db::diesel_schema::salvage_capacity::dsl as t;
+        use diesel::prelude::*;
+        let mut conn = pool.get().expect("conn");
+        t::salvage_capacity.count().get_result(&mut conn).unwrap()
+    }
+
+    #[test]
+    fn unsigned_salvage_ad_is_refused_and_projects_nothing() {
+        use crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC;
+        #[derive(serde::Serialize)]
+        struct Stage1Ad {
+            agent_cid: String,
+            spare_bytes: u64,
+            archetype: String,
+            seq: u64,
+            signature: Vec<u8>,
+        }
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (_, peer) = custody_signer([41u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", &peer);
+        // The retired Stage-1 wire: a placeholder null-byte "signature", nothing signed.
+        let unsigned = rmp_serde::to_vec_named(&Stage1Ad {
+            agent_cid: "uhCAkSalvager".to_string(),
+            spare_bytes: 1 << 30,
+            archetype: "node".to_string(),
+            seq: 1,
+            signature: vec![0x00],
+        })
+        .unwrap();
+        // Even the bare body, without any envelope, from the bound author itself.
+        let body_only = rmp_serde::to_vec_named(&salvage_ad("uhCAkSalvager", 2, 1 << 30)).unwrap();
+        for bytes in [&unsigned, &body_only] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                bytes,
+                &libp2p_from(Some(&peer)),
+            );
+            handle_gossip(&ctx, SALVAGE_CAPACITY_TOPIC, bytes, &iroh_from("neighbour"));
+        }
+        assert_eq!(salvage_row_count(&pool), 0, "an unsigned ad never lands");
+    }
+
+    #[test]
+    fn salvage_ad_from_unbound_source_is_refused() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+
+        // A validly signed ad whose signer no manifest binds to any agent.
+        let (unbound_key, unbound_peer) = custody_signer([42u8; 32]);
+        let bytes = SignedSalvageAd::sign(
+            &unbound_key,
+            &unbound_peer,
+            salvage_ad("uhCAkUnboundSalvager", 1, 4096),
+        )
+        .to_bytes()
+        .unwrap();
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&unbound_peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &iroh_from("neighbour"),
+        );
+        assert!(salvage_row(&pool, "uhCAkUnboundSalvager").is_none());
+
+        // A bound signer's ad relayed under a gossipsub source this node binds to a
+        // DIFFERENT agent contradicts the ad and is refused.
+        let (key, peer) = custody_signer([43u8; 32]);
+        bind_agent(&pool, "uhCAkBoundSalvager", &peer);
+        let (_, other_peer) = custody_signer([44u8; 32]);
+        bind_agent(&pool, "uhCAkSomeoneElse", &other_peer);
+        let bytes = SignedSalvageAd::sign(&key, &peer, salvage_ad("uhCAkBoundSalvager", 1, 4096))
+            .to_bytes()
+            .unwrap();
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&other_peer)),
+        );
+        assert!(salvage_row(&pool, "uhCAkBoundSalvager").is_none());
+
+        // The same bytes from the bound author itself project.
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&peer)),
+        );
+        assert_eq!(
+            salvage_row(&pool, "uhCAkBoundSalvager")
+                .unwrap()
+                .spare_bytes,
+            4096
+        );
+        assert_eq!(salvage_row_count(&pool), 1);
+    }
+
+    #[test]
+    fn replayed_salvage_ad_does_not_reproject() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (key, peer) = custody_signer([45u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", &peer);
+        let sign = |seq, spare| {
+            SignedSalvageAd::sign(&key, &peer, salvage_ad("uhCAkSalvager", seq, spare))
+                .to_bytes()
+                .unwrap()
+        };
+        let older = sign(10, 100);
+        let newer = sign(11, 200);
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &older,
+            &libp2p_from(Some(&peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &newer,
+            &iroh_from("neighbour"),
+        );
+        let applied = salvage_row(&pool, "uhCAkSalvager").unwrap();
+        assert_eq!((applied.seq, applied.spare_bytes), (11, 200));
+
+        // Replays — the older ad, and the newest one again, on either plane — change
+        // nothing: not the spare bytes, not the seq, not the freshness stamp.
+        handle_gossip(&ctx, SALVAGE_CAPACITY_TOPIC, &older, &iroh_from("relay"));
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &older,
+            &libp2p_from(Some(&peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &newer,
+            &libp2p_from(Some(&peer)),
+        );
+        let after = salvage_row(&pool, "uhCAkSalvager").unwrap();
+        assert_eq!(
+            (after.seq, after.spare_bytes, after.last_seen_at),
+            (applied.seq, applied.spare_bytes, applied.last_seen_at)
+        );
+    }
+
+    #[test]
+    fn forged_iroh_salvage_ad_naming_another_holder_is_refused() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        // Victim and forger are both bound by iroh NodeId, as in a household.
+        let victim = elohim_epr::AgentKeypair::from_secret(&[46u8; 32]).unwrap();
+        let victim_node = hex::encode(victim.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkVictim", &victim_node);
+        let forger = elohim_epr::AgentKeypair::from_secret(&[47u8; 32]).unwrap();
+        let forger_node = hex::encode(forger.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkForger", &forger_node);
+
+        // The forger signs with its own key and names the victim as the advertiser…
+        let as_victim_agent =
+            SignedSalvageAd::sign(&forger, &forger_node, salvage_ad("uhCAkVictim", 1, 1 << 40));
+        // …or claims the victim's NodeId as author while signing with its own key.
+        let as_victim_author =
+            SignedSalvageAd::sign(&forger, &victim_node, salvage_ad("uhCAkVictim", 2, 1 << 40));
+        for forged in [as_victim_agent, as_victim_author] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &forged.to_bytes().unwrap(),
+                &iroh_from(&victim_node),
+            );
+        }
+        assert!(
+            salvage_row(&pool, "uhCAkVictim").is_none(),
+            "no ad the victim did not sign may place it in the salvage pool"
+        );
+
+        // The victim's own signed ad over iroh is end-to-end authenticated and lands.
+        let genuine =
+            SignedSalvageAd::sign(&victim, &victim_node, salvage_ad("uhCAkVictim", 3, 4096));
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &genuine.to_bytes().unwrap(),
+            &iroh_from(&forger_node),
+        );
+        assert_eq!(salvage_row(&pool, "uhCAkVictim").unwrap().spare_bytes, 4096);
+    }
+
+    #[test]
+    fn unknown_scheme_salvage_ad_is_held_not_projected() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (key, peer) = custody_signer([48u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", &peer);
+        let mut unknown_scheme =
+            SignedSalvageAd::sign(&key, &peer, salvage_ad("uhCAkSalvager", 1, 4096));
+        unknown_scheme.sig.scheme = 77;
+        let mut unknown_epoch =
+            SignedSalvageAd::sign(&key, &peer, salvage_ad("uhCAkSalvager", 2, 4096));
+        unknown_epoch.epoch = 3;
+        for held in [unknown_scheme, unknown_epoch] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &held.to_bytes().unwrap(),
+                &libp2p_from(Some(&peer)),
+            );
+        }
+        assert!(
+            salvage_row(&pool, "uhCAkSalvager").is_none(),
+            "held, never projected"
+        );
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            crate::db::held_envelopes::count(&mut conn).unwrap(),
+            2,
+            "both kept opaque in the bounded held table"
+        );
     }
 
     #[test]

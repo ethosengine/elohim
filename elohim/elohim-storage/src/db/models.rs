@@ -3417,8 +3417,15 @@ pub struct PeerBlobInventoryRow {
     /// 'gossip-delta' | 'recon' | 'fetch-success' | 'self-custody'
     pub source: String,
     pub sequence: i64,
+    /// The witness that admitted the row (`db::peer_blob_inventory::InventoryWitness`
+    /// spelling). Only bound witnesses count toward a custody floor.
+    pub witness: String,
 }
 
+/// An unwitnessed insert: it carries no `witness`, so the row is recorded
+/// `legacy-hint` (the column default) — a fetch hint that never counts toward custody.
+/// Admitted evidence is written through `db::peer_blob_inventory`, which records its
+/// witness.
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = peer_blob_inventory)]
 pub struct NewPeerBlobInventoryRow {

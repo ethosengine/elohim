@@ -784,6 +784,7 @@ mod tests {
             &[],
             1,
             &when,
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
         )
         .unwrap();
     }

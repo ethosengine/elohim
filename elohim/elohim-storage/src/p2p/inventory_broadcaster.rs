@@ -697,6 +697,7 @@ mod tests {
                 &[],
                 env.body.sequence as i64,
                 "2026-11-05T00:00:00Z",
+                crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
             )
             .unwrap();
         }
@@ -745,6 +746,7 @@ mod tests {
             &[],
             1,
             "2026-08-23T00:00:00Z",
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
         )
         .unwrap();
 
