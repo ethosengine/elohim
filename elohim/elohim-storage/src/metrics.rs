@@ -3004,6 +3004,21 @@ lazy_static! {
         "Composite blobs fully reassembled from swarm-fetched shards.",
     )
     .unwrap();
+
+    /// Bytes this node received over a blob fetch and then discarded without using
+    /// them (H3d). label: reason = "losing_racer" (a complete reply that arrived beside
+    /// the winner's) | "oversized_reply" (past the fetch budget) | "hash_failure"
+    /// (bytes that do not hash to the requested CID, either plane) | "unpersisted_shard"
+    /// (a verified swarm shard that could not be written). The F2 receipts read it as
+    /// the transfer cost a fetch paid for nothing.
+    pub static ref BLOB_FETCH_WASTED_BYTES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_blob_fetch_wasted_bytes_total",
+            "Bytes received over a blob fetch and discarded unused, by reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
 }
 
 // Observation cursor gossip gate (`p2p::observation_gossip::announcement_for`).
@@ -4069,6 +4084,12 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_MANIFESTS_RECEIVED.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_SHARDS_FETCHED.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_COMPOSITE_COMPLETED.clone()));
+        let _ = REGISTRY.register(Box::new(BLOB_FETCH_WASTED_BYTES.clone()));
+        for reason in WASTED_BYTES_REASONS {
+            BLOB_FETCH_WASTED_BYTES
+                .with_label_values(&[reason])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(ATOM_DURATION_MS.clone()));
         // Pre-touch all 8 atoms so a run that has never hit one (e.g. no
         // `shard_fetch` on a mesh with no >16MB blob) reads as a MEASURED zero,
@@ -4502,6 +4523,29 @@ pub fn inc_blob_swarm_shard_fetched(outcome: &str) {
 /// Record one composite blob fully reassembled from swarm-fetched shards (Q4).
 pub fn inc_blob_swarm_composite_completed() {
     BLOB_SWARM_COMPOSITE_COMPLETED.inc();
+}
+
+/// The `reason` labels of `elohim_blob_fetch_wasted_bytes_total`.
+pub const WASTED_BYTES_REASONS: [&str; 4] = [
+    "losing_racer",
+    "oversized_reply",
+    "hash_failure",
+    "unpersisted_shard",
+];
+
+/// Count `bytes` received over a blob fetch and discarded unused (H3d).
+pub fn add_blob_fetch_wasted_bytes(reason: &str, bytes: usize) {
+    BLOB_FETCH_WASTED_BYTES
+        .with_label_values(&[reason])
+        .inc_by(bytes as u64);
+}
+
+/// Every wasted byte counted so far, across reasons.
+pub fn blob_fetch_wasted_bytes_total() -> u64 {
+    WASTED_BYTES_REASONS
+        .iter()
+        .map(|reason| BLOB_FETCH_WASTED_BYTES.with_label_values(&[reason]).get())
+        .sum()
 }
 
 // ── HTTP dispatch wrapper (route_class × status_class) ───────────────────────

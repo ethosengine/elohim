@@ -6,10 +6,12 @@ landed_commit:
 verified_by:
 concerns:
   - "R2 adds three witness values beyond the brief's three (recon, fetch-verified, self): those writers exist and needed a class; all three bind the row's peer id to the speaker"
-  - "R2 the salvage custody floor now joins a provider to its rows through peer_transport_manifest (inventory rows are keyed by transport id, providers by agent_cid); the raw-equality join counted almost nothing for agent_cid providers"
+  - "R2 (pass 1) joined the salvage floor through peer_transport_manifest — red-team BLOCK, superseded in pass 2 (beb0888b): every binding and floor read now goes through p2p::transport_authority (cross-signed chain only)"
+  - "pass 2 timing: a fresh household's iroh-signed custody/salvage claims bind only after the peer's AgentPeerBinding is minted (binding_mint retries 5 s..600 s after sign_for_agent answers) and its manifest link has arrived (30 s cadence); claims published before that are refused as unbound and custody announcements are not re-sent — the chaos-peer-churn/durability acceptance lanes are the measure"
   - "R7 the blob pledge now rests only on the whole payload read back verified; a verified unit earns its own row and announcement, never the blob's pledge"
   - "R3 exists() now hashes the whole payload on every call (HEAD /shard, claim_held_shard, backfill re-claim): correct, and costlier for large payloads"
-  - "filename-set custody acts outside R7 remain: services::custody_rotation (main.rs rotation tick) authors custody from BlobStoreSnapshot"
+  - "filename-set custody acts outside R7 remain: services::custody_rotation (main.rs rotation tick) authors custody from BlobStoreSnapshot (finding 5, Worker B)"
+  - "low 7 not taken: flush_held_pages still records a reorder-window page as end-to-end (the stash keeps no arrival plane); low 8/9 filed as follow-ups"
   - "custody-adjacent readers that ignore the witness remain: reconcile_pass receiver-side placement-gap last_seen, distribution_view replica_count, peer_topology_view, services::resilience"
 actor: agent:H-A@claude-opus-5-5
 ---
@@ -78,3 +80,82 @@ Supporting tests added: `salvage_gossip::tests::*` (roundtrip/admit, every signe
 - R2's "count only bound rows" at `custody.rs:491-508` was joining `agent_cid` providers to transport-id-keyed rows by raw equality, so the floor was near zero for agent providers before any provenance question.
 - R7's `list_cids` snapshot could never match a chunked payload's units (chunks are not under `blobs/`), so the filename gate failed open only for inline payloads; but it also fed the pledge through `self_placement_recorded`.
 - Not in the audit: `services::custody_rotation` authors custody commitments from the same filename snapshot (`main.rs` rotation tick), and several custody-reading folds ignore the new witness (see `concerns`).
+
+### Pass 2 — red-team BLOCK fixes (commit `beb0888b`)
+
+`beb0888b` fix(storage): binding authority only from a cross-signed chain; probes do not hash (H red-team pass 2). It also carries Worker B's then-uncommitted hunks in the four shared files (`blob_store.rs`, `reconcile/custody.rs`, `p2p/mod.rs`, `main.rs`), as the orchestrator directed; both trailers are on it.
+
+**The production binding producer.** `p2p::binding_mint` (`spawn_binding_mint_task`, scheduled in `main.rs` once the swarm identity is loaded and the imagodei bridge answers `sign_for_agent`) commits a cross-signed `AgentPeerBinding` for **agent ↔ libp2p PeerId** (transport half signed with `identity.key`, agent half by the conductor); it reaches peers by DHT arrival (`ReconcileController::on_agent_peer_binding`) and identity-binding gossip, each classifying it with `classify_binding_signature`. Read-only check of the shem household DBs: matthew, jessica and james each hold `cross_signed` rows for all three of their PeerIds (valid to 2026-12-07); their `peer_transport_manifest` rows carry only iroh NodeIds. No binding ever names an iroh NodeId (`transport_id_derives_from` admits libp2p only), so the iroh half is new here: **`p2p::transport_link`** — the libp2p identity key and the iroh key each sign `(iroh_node_id, libp2p_peer_id, issued_at_ms)` over the elohim-epr transcript (domain `elohim:transport-link:v1:`), carried as an additive field on the transport manifest (outside its v1 signing bytes, like `user_agent`), signed once at boot in `main.rs` beside the announcer, verified on receipt and recorded in `transport_links` (migration `2026-11-07-130000_transport_links`). This is the ruling's "acceptable alternative" (the libp2p key attests the iroh id), made two-sided so neither key can claim the other unilaterally; `binding_mint` and the DNA are unchanged.
+
+**Authority.** `p2p::transport_authority::authenticated_agent_for_transport` is the single read: PeerId → active cross-signed binding → agent (two agents for one PeerId → none); iroh NodeId → verified link → PeerId → the same. It backs `gossip_dispatch::bound_agent_for_author` (salvage admission, custody-announcement holder binding, inventory `BoundHolderResolver`), `relay_agent` (the refuse-only relay check) and, through `authenticated_transports_for_agent`, the salvage custody floor's identity join. `peer_transport_manifest` is no longer read by any of them; `peer_map::record_manifest_hint` keeps manifests as dial hints that never replace an agent's recorded iroh NodeId unless the new NodeId is itself authenticated to that agent.
+
+**Mixed version.** A peer whose manifest carries no link (an older build) has its iroh-signed custody announcements, salvage ads and inventory **refused as unbound** — never projected, never counted (`refused_binding`); not held. Its libp2p-signed inventory still binds through its cross-signed PeerId.
+
+**Also fixed.** Finding 3: a salvage ad whose `seq` epoch is later than its own `issued_at` is refused. Finding 4: `exists` quarantines only on a missing part, a wrong length or a hash mismatch (other read errors: not verified, not quarantined); `ShardRequest::Have` and `HEAD /shard` answer from the new structural `BlobStore::present` (no hashing, no side effects); `store`'s idempotence keeps the hashing path. Low 6: `held_envelopes` caps per topic and holds an identical envelope once. Low 10: `VerifiedRead::has` vouches only for the unit it read. Not taken: low 7 (reorder-window pages still recorded `end-to-end`); 8 and 9 left as follow-ups.
+
+**Tests (focused, this device, all EXIT=0).** Default features, lib filters `salvage` 35, `peer_blob_inventory` 7, `blob_store::` 30, `gossip_dispatch` 20, `transport_link` 3, `held_envelopes` 2, `shard_service` 23, `custody_announce` 10, `inventory_gossip` 17, `transport_manifest` 9 passed. In `reconcile::custody` 40 passed and B's own in-progress `striped_upload_rows_cover_every_served_unit` failed on that pre-commit build; B reports it green since. `--features "p2p p2p-iroh" --lib` (dispatch, gossip_receive, announcer, peer_map, transport, salvage): 139 passed; `--test iroh_planes` (inventory fetch parity, peer map): 13 passed; `--test blob`: 11 passed, 1 ignored as before.
+
+| Test | Result |
+|---|---|
+| `forged_manifest_cannot_bind_a_victim_agent` (drives the real manifest gossip path) | ok |
+| `iroh_author_resolves_only_through_the_cross_signed_iroh_half` | ok |
+| `forged_salvage_ad_via_manifest_hijack_is_refused` | ok |
+| `custody_announcement_via_manifest_hijack_is_refused` | ok |
+| `custody_floor_ignores_rows_from_a_hijacked_transport` | ok |
+| `a_forged_manifest_does_not_replace_a_recorded_node_id` (iroh feature) | ok |
+| `seq_ahead_of_issue_time_is_refused` | ok |
+| `transient_read_error_never_quarantines` | ok |
+| `have_does_not_hash_the_payload` (shard_service) and `present_is_structural_and_moves_nothing` (blob_store) | ok |
+| `a_flood_on_one_topic_never_evicts_another_and_duplicates_are_held_once` | ok |
+| honest paths moved onto cross-signed fixtures: every custody / salvage / inventory dispatch test, `forged_iroh_inventory_holder_is_refused` (B's R10 test), `iroh_and_libp2p_dispatch_queue_identical_inventory_work`, `bound_fresh_row_counts_and_expired_one_does_not` | ok |
+
+**Gate.** Not run by Worker A in pass 2, by instruction: the orchestrator runs one combined `just gate elohim-storage` + rust-style for the branch after Worker B commits. `cargo fmt --check` was clean on every file in `beb0888b`; the remaining diffs (`metrics.rs`, `p2p/blob_fetch.rs`, `services/custody_rotation.rs`) are in Worker B's own files.
+
+### Pass 3 — unbound claims held, not lost (commit `0ceb2fd1`)
+
+`0ceb2fd1` fix(storage): hold well-signed unbound claims and replay them when the author binds (H pass 3). This replaces the pass-2 "refused as unbound" rule for mixed versions and fresh households: a custody announcement, salvage ad or inventory delta whose signature verified under its author's own key, but whose author has no cross-signed chain yet, is **held** in `held_unbound_claims` (migration `2026-11-07-140000`). Held claims are capped at 256 per topic, stored once per distinct bytes, expire after 15 min, and are never projected or counted. They are **replayed through full admission** (original plane and gossipsub source) when a transport link is recorded, a cross-signed binding arrives by gossip, or one is projected from the DHT. A claim that still fails on replay is dropped with its reason. Forged or badly signed claims stay refused and are never held. Tests (all ok, focused runs EXIT=0; default lib 179 passed, iroh lib 28, iroh_planes 2): `an_unbound_custody_announcement_is_held_and_admitted_when_its_link_arrives`, `a_held_claim_that_still_fails_on_replay_is_dropped`, `held_unbound_claims_expire`, `held_once_bounded_per_topic_and_taken_only_when_resolvable`. Residual: the per-topic cap means a sender minting many keys can push honest held claims out before their binding arrives. That costs only the recovery of those claims, never integrity.
+
+## Worker B (Sonnet 5.5 — R4, R5, R6, R8, R9, R10, and red-team finding 5)
+
+Status: code complete in the worktree, focused tests green, **not yet committed and storage gate not yet run** (see Deviations 1). Ownership claims: `evidence/H-owner.md`.
+
+### What changed
+
+- **R4** `blob_store::write_atomic` calls new `ensure_bucket`: when a fan-out bucket (`blobs/<b>/`, `chunks/<b>/`, `records/<b>/`) is created, its parent is fsynced before the rename into it. Residual: two writers creating one bucket concurrently, where the second sees the directory before the first has synced it, rely on the first's sync (microsecond window).
+- **R5** fault seam gains `CrashAfter` (write durable, process dies before returning) and an `Event` log (`BucketSynced`, `Rename`). `BlobStore::get` was lock-free, so a delete racing a read surfaced as a quarantine plus `HashMismatch`: it now splits into `get_once`, which reports a structural miss, and `settle`, which looks again under the payload's stripe. Gone gives `BlobNotFound`; whole means retry (up to 4 times); still broken is quarantined. `size` and `refuse` share `settle`.
+- **R6** `elohim_blob_fetch_wasted_bytes_total{reason}` (`losing_racer`, `oversized_reply`, `hash_failure`, `unpersisted_shard`), pre-touched at zero. Counted in `blob_fetch` (complete replies already in hand when a race is won, oversized replies, hash failures), in `blob_swarm` (iroh hash failure, a verified swarm shard that failed to persist).
+- **R8** `BlobStore::list_units()` (verified chunk files and inline payloads, hashed via `get_chunk`; a failing unit is quarantined, never listed) and `unit_names()` (the filename candidate set). `manifest_backfill_pass` ends with `claim_held_units`: every unit not yet rowed for the agent is read back verified, then rowed (counter `units_recorded`, cap = batch cap on rows recorded). `distribute_shards` uploader arm also rows the payload's chunks for a striped manifest. Worker A's per-chunk rows and announcements for unstriped payloads are unchanged.
+- **R9** `SelfHeldOutcome::Unchanged`: an identical self-held row is not rewritten. `distribute_shards` announces only on `Recorded`; `Unchanged` still counts as held (`distributed`, `self_recorded_units`) so a redistribution does not manufacture a placement gap. No restart republishing.
+- **R10** `forged_iroh_inventory_holder_is_refused` drives `handle_gossip` with `GossipSource::Iroh`.
+- **Finding 5 (a)** `main.rs` rotation tick now passes `reconcile::custody::VerifiedPantry` (new: `has` = `BlobStore::holds_verified`, a hashed read) to `run_rotation_pass`, not a filename snapshot. **(b)** `run_custody_reconcile` passes the same `VerifiedPantry` to `reconcile_pass`, so a corrupt local copy is re-fetched. **(c)** `answer_recon` answers from new `BlobStore::list_servable()` (verified units plus verified chunked payloads), not `list_cids`.
+- `services::custody_rotation` did author a pledge from the filename list; that is fixed by (a) (it was a call-site fix, not a function rewrite).
+
+### Tests (focused runs, `RUSTUP_TOOLCHAIN=1.96.1 CARGO_BUILD_JOBS=1`, all EXIT=0)
+
+| Item | Test | Result |
+|---|---|---|
+| R4 | `blob_store::tests::new_bucket_parent_is_synced_before_rename` | ok |
+| R5 | `power_loss_after_marker_reopens_verified` | ok |
+| R5 | `delete_racing_store_never_serves_partial` | ok |
+| R5 | `delete_racing_read_returns_whole_or_typed_absent` | ok |
+| R5 | `quarantine_leaves_unrelated_objects_readable` | ok |
+| R6 | `p2p::blob_fetch::tests::wasted_bytes_counts_a_losing_racers_partial_body` | ok |
+| R6 | `stall_deadline_abandons_a_silent_holder_before_total_deadline` | ok |
+| R8 | `reconcile::custody::tests::striped_upload_rows_cover_every_served_unit` | ok (`--features p2p-iroh` build) |
+| R8 | `multi_chunk_payload_rows_every_chunk` | ok |
+| R8 | `unit_sweep_rows_nothing_it_cannot_read_back_verified`, `blob_store::tests::list_units_names_only_verified_chunks_and_inline_payloads` | ok |
+| R9 | `tests/blob distribute_shards_diversity::redistribution_emits_no_unchanged_announcement` | ok (9 passed, 1 ignored as before) |
+| R9 | `self_stewardship::tests::self_held_recording_is_idempotent` (now Recorded, Unchanged, Unchanged) | ok |
+| R10 | `p2p_iroh::gossip_receive::tests::forged_iroh_inventory_holder_is_refused` | ok (`--features p2p-iroh`) |
+| 5a | `services::custody_rotation::tests::rotation_never_pledges_a_payload_with_a_corrupt_chunk` | ok |
+| 5b | `reconcile::custody::tests::reconcile_refetches_a_corrupt_local_copy` | ok |
+| 5c | `blob_store::tests::recon_set_excludes_unverified_units` | ok |
+
+All 30 `blob_store::` tests pass together, including Worker A's.
+
+### Deviations
+
+1. **Not committed, gate not run.** Worker A resumed in the same worktree with uncommitted hunks interleaved in four files I also edited (`blob_store.rs`: `Exists`/`exists_locked`; `reconcile/custody.rs`: identity join; `p2p/mod.rs`: module declarations; `main.rs`: transport-link announce). `brit add` stages whole files only, so a pathspec commit of mine would carry A's unfinished work, and A's hunks reference untracked files. The files that are purely mine are `metrics.rs`, `p2p/blob_fetch.rs`, `p2p/blob_swarm.rs`, `services/self_stewardship.rs`, `services/custody_rotation.rs`, `p2p_iroh/gossip_receive.rs`, `tests/blob/distribute_shards_diversity.rs`. Intended sequence: A commits, then B commits the remainder by pathspec, then one `just gate elohim-storage` and `just gate rust-style`.
+2. **`list_units` semantics.** A chunked RS shard pushed to this node is a marker payload under `blobs/`, not a unit; its chunks are the units and the shard's own row comes from the existing `claim_held_shard` path. A striped upload's derived shards are not held by the uploader, so its rows are the payload's chunks.
+3. **R6 cancelled work.** Bytes of a racer aborted before its reply completed are unknowable at this layer and are not counted.
+4. A `get` that settles `Healthy` retries up to 4 times; after that it returns `Internal`.

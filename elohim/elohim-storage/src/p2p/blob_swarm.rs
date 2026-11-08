@@ -336,6 +336,7 @@ pub async fn fetch_shards_via_swarm(
                         "Q4: swarm-fetched shard failed to persist"
                     );
                     crate::metrics::inc_blob_swarm_shard_fetched("miss");
+                    crate::metrics::add_blob_fetch_wasted_bytes("unpersisted_shard", bytes.len());
                     continue;
                 }
                 source_peers.insert(source_peer);
@@ -834,6 +835,10 @@ async fn race_both_planes(
                                 "iroh blob fetch: bytes do not hash to the requested address"
                             );
                             crate::metrics::inc_iroh_blob_fetch("verify_failed");
+                            crate::metrics::add_blob_fetch_wasted_bytes(
+                                "hash_failure",
+                                bytes.len(),
+                            );
                             crate::p2p::transport_paths::global().record(
                                 &peer_id,
                                 crate::p2p::transport_paths::Transport::Iroh,

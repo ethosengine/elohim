@@ -191,6 +191,18 @@ impl Drop for AbortOnDrop {
     }
 }
 
+/// A race was won: every other racer whose complete reply is already in hand is a loser
+/// whose bytes were moved for nothing. Racers still in flight are aborted when the
+/// caller's guard drops, and what they had not finished receiving is unknowable here.
+fn count_losing_replies(in_flight: &mut FuturesUnordered<tokio::task::JoinHandle<RacerResult>>) {
+    use futures::FutureExt;
+    while let Some(Some(joined)) = in_flight.next().now_or_never() {
+        if let Ok((_, _, Ok(BlobFetchReply::Bytes(bytes)))) = joined {
+            crate::metrics::add_blob_fetch_wasted_bytes("losing_racer", bytes.len());
+        }
+    }
+}
+
 type RacerResult = (String, std::time::Instant, Result<BlobFetchReply, String>);
 
 async fn race_batches(
@@ -267,6 +279,7 @@ async fn race_batches(
                             cid = %cid, source_peer = %peer, size = bytes.len(),
                             "reply exceeds the fetch budget; refused"
                         );
+                        crate::metrics::add_blob_fetch_wasted_bytes("oversized_reply", bytes.len());
                         continue;
                     }
                     if verify_fetched_bytes(&bytes, cid) {
@@ -277,12 +290,14 @@ async fn race_batches(
                             transport = "libp2p",
                             "share-blob received"
                         );
+                        count_losing_replies(&mut in_flight);
                         return FetchOutcome::Hit {
                             bytes,
                             source_peer: peer,
                         };
                     }
                     // Bytes that do not hash to the CID: never trusted.
+                    crate::metrics::add_blob_fetch_wasted_bytes("hash_failure", bytes.len());
                 }
                 BlobFetchReply::Manifest(manifest) => {
                     if manifest.blob_cid != *cid {
@@ -952,5 +967,100 @@ mod tests {
         )
         .await;
         assert!(matches!(outcome, FetchOutcome::NoCandidates));
+    }
+
+    /// A racer that delivers a truncated body beside the winner moved bytes for nothing;
+    /// the meter counts them whichever way the race drains them (a loser, or a body that
+    /// fails the CID).
+    #[tokio::test]
+    async fn wasted_bytes_counts_a_losing_racers_partial_body() {
+        let bytes: Vec<u8> = (0..4096u32).map(|i| (i % 251) as u8).collect();
+        let cid = compute_bytes_cid(&bytes);
+        let partial = bytes[..bytes.len() / 2].to_vec();
+        let (fast, slow) = (test_peer_id(), test_peer_id());
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+
+        let (served, truncated) = (bytes.clone(), partial.clone());
+        let responder = tokio::spawn(async move {
+            let mut replies = Vec::new();
+            for _ in 0..2 {
+                if let Some(crate::p2p::P2PCommand::FetchBlob { peer_id, reply, .. }) =
+                    cmd_rx.recv().await
+                {
+                    replies.push((peer_id, reply));
+                }
+            }
+            // The winner's reply first, then the loser's partial body.
+            replies.sort_by_key(|(peer, _)| *peer != fast);
+            for (peer, reply) in replies {
+                let body = if peer == fast {
+                    served.clone()
+                } else {
+                    truncated.clone()
+                };
+                let _ = reply.send(Ok(BlobFetchReply::Bytes(body)));
+            }
+        });
+
+        let before = crate::metrics::blob_fetch_wasted_bytes_total();
+        let outcome = race_fetch(
+            &cid,
+            vec![slow.to_string(), fast.to_string()],
+            &cmd_tx,
+            |_| true,
+            2,
+            Duration::from_secs(30),
+        )
+        .await;
+        responder.await.expect("responder");
+        assert!(matches!(outcome, FetchOutcome::Hit { .. }), "{outcome:?}");
+        let counted = crate::metrics::blob_fetch_wasted_bytes_total() - before;
+        assert!(
+            counted >= partial.len() as u64,
+            "the partial body's {} bytes are counted, got {counted}",
+            partial.len()
+        );
+    }
+
+    /// A holder that never answers is dropped at the per-peer stall deadline, long
+    /// before the total deadline; the race reports a miss, not an exhausted budget.
+    #[tokio::test]
+    async fn stall_deadline_abandons_a_silent_holder_before_total_deadline() {
+        let cid = compute_bytes_cid(b"a holder that never answers");
+        let peer = test_peer_id();
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<crate::p2p::P2PCommand>(4);
+        let responder = tokio::spawn(async move {
+            let Some(crate::p2p::P2PCommand::FetchBlob { mut reply, .. }) = cmd_rx.recv().await
+            else {
+                return false;
+            };
+            // Never answers; the racer must hang up on its own stall deadline.
+            tokio::time::timeout(Duration::from_secs(5), reply.closed())
+                .await
+                .is_ok()
+        });
+
+        let budget = FetchBudget {
+            max_bytes: FetchBudget::DEFAULT_MAX_BYTES,
+            stall_deadline: Duration::from_millis(150),
+            total_deadline: Duration::from_secs(60),
+            retries: 1,
+        };
+        let started = std::time::Instant::now();
+        let outcome =
+            race_fetch_budgeted(&cid, vec![peer.to_string()], &cmd_tx, |_| true, 1, &budget).await;
+        let elapsed = started.elapsed();
+        assert!(
+            matches!(outcome, FetchOutcome::Miss),
+            "a stalled holder is a miss, not an exhausted budget; got {outcome:?}"
+        );
+        assert!(
+            elapsed >= Duration::from_millis(100) && elapsed < Duration::from_secs(5),
+            "abandoned at the stall deadline, not the total: {elapsed:?}"
+        );
+        assert!(
+            responder.await.expect("responder"),
+            "the racer hung up on the silent holder"
+        );
     }
 }

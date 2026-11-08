@@ -635,3 +635,70 @@ async fn selected_path_refuses_missing_chunk_payload() {
         assert!(announced.contains(&chunk.cid.to_string()));
     }
 }
+
+/// A second distribution of the same payload finds the self-held rows exactly as the
+/// first left them: it counts the units as held, changes nothing and announces nothing.
+/// (Liveness after a restart is inventory freshness and recon, not a re-announcement.)
+#[tokio::test]
+async fn redistribution_emits_no_unchanged_announcement() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[
+            ("uhCAkAAAOtherAgent", "home-self", "accepting"),
+            ("uhCAkSelfAgent", "home-self", "accepting"),
+        ],
+    )
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    let blob = varied_bytes(6 * 1024 * 1024);
+    let stored = store.store(&blob).await.expect("stock blob");
+    assert!(stored.chunks.len() > 1, "fixture must be chunked");
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    handle
+        .distribute_shards("content-redistributed", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    let first = drain_announcements(&mut cmd_rx);
+    for chunk in &stored.chunks {
+        assert!(
+            first.contains(&chunk.cid.to_string()),
+            "first distribution announces chunk {}",
+            chunk.cid
+        );
+    }
+
+    handle
+        .distribute_shards("content-redistributed", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    let second = drain_announcements(&mut cmd_rx);
+    assert!(
+        second.is_empty(),
+        "identical custody is not re-announced, got {second:?}"
+    );
+
+    // One row per chunk, still self-held.
+    let mut conn = pool.get().unwrap();
+    for chunk in &stored.chunks {
+        let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+            &mut conn,
+            &chunk.cid.to_string(),
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 1, "one row per unit, got {rows:?}");
+        assert_eq!(rows[0].status, "self-held");
+    }
+}

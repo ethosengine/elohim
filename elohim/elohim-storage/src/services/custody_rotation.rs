@@ -1358,4 +1358,47 @@ mod tests {
             "rotation + witnessed possession must fold to stocked, got {after:?}"
         );
     }
+
+    #[tokio::test]
+    async fn rotation_never_pledges_a_payload_with_a_corrupt_chunk() {
+        use crate::reconcile::custody::{BlobStoreSnapshot, VerifiedPantry};
+        let store = crate::blob_store::BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        let blob = stored.cid.to_string();
+        let victim = stored.chunks[1].cid.to_string();
+        let path = store
+            .root_dir()
+            .join("chunks")
+            .join(victim.get(7..11).unwrap())
+            .join(&victim);
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[1] ^= 0xff;
+        std::fs::write(&path, bytes).unwrap();
+        // The listing still names the payload; only a verified read refuses it.
+        assert!(BlobStoreSnapshot::from_store(&store)
+            .unwrap()
+            .has(&stored.cid));
+
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        insert_content(&mut conn, "c1", Some(&blob), None);
+        seed_stale_pledge(&mut conn, "custody-blob-stale", "c1");
+        let author = RecordingAuthor::default();
+        let _w = counter_window();
+        let outcome = run_rotation_pass(
+            &mut conn,
+            &ctx(),
+            &selves(),
+            &VerifiedPantry::new(&store),
+            &author,
+        )
+        .expect("pass");
+        assert_eq!(outcome.bytes_absent, 1);
+        assert_eq!(outcome.rotated, 0);
+        assert!(author.authored.lock().unwrap().is_empty());
+        assert_eq!(state_of(&mut conn, "custody-blob-stale"), "active");
+    }
 }
