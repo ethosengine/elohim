@@ -2,7 +2,7 @@
 id: regenesis-1-result
 title: Re-genesis 1 — the address crossing — sprint result
 date: 2026-11-07
-status: landed; alpha re-genesis pending (operator act)
+status: closed; alpha re-genesised and validated (edge #1839)
 author: orchestrator session 184beb01 (Claude Fable 5.1) with shem session 617b9272 (Claude Opus 5.5), Opus/Sonnet implementers, Codex gpt-6-astra read legs
 habits: [dataplane-convergence, push-gate-pays-once, pin-attestation, addresses-are-declared-profiles]
 ---
@@ -74,14 +74,34 @@ Before R1 (dev 6a31ed270, both devices): chaos refused at its baseline step (rem
   receipt narrowing deferred to the import-closure form).
 - brit notes: a real brit 0.1.13-minted `@2` note is the a2o verifier's fixture; ark's witness string
   encoding awaits a typed `Witness` in eprfs-core.
-- Memory index population (258 unattributed contributions) before the projector can compact it.
+- Memory index population (258 unattributed contributions) before the projector can compac## Alpha re-genesis (2026-11-07/08)
 
-## Still owed — the operator's alpha re-genesis (plan §5 A2–A6)
+The operator armed `DNA_MIGRATION_INTENT` with the five bundle hashes on every alpha conductor, cleared
+the stores and re-seeded. Bringing the fleet up surfaced six defects. Each is fixed or filed.
 
-Alpha runs the new storage image and conductors but its cells and landing content predate the crossing:
-both doorways report the landing has no `blobCid`. Arm `DNA_MIGRATION_INTENT` with the five BUNDLE
-hashes (read from the alpha storage pod's boot ERROR line — happ_manager names each drifted role with its
-bundle hash), both genesis peers in the same roll, `RESET_STORAGE=true` on the genesis run, PVC clear after
-the roll; then the receipts from here: one landing CID on both doorways, conductor diagnostics on the new
-hashes, `X-Content-Address: bafkr4i…`, a `[build:edge] [edge:validate-only]` measure, `pnpm look`.
-Next-session device check: the brit session pin moves to 10d18eacc at the next session start.
+| Defect | Cure |
+|---|---|
+| Cold cell install deadlocked the conductor under a CPU limit (the spaces-map write lock was held across a blocking DB open) | conductor fork `993cf597a`, per-DNA single-flight `Space` creation with a regression test; pinned by `230c06042` |
+| Crash-looped lair keystores could not install apps (WAL never checkpointed) | operator wiped the adam and matthew keystores in place; forensic copies kept; lair cause still open |
+| Adam's storage manifest had drifted from the shared template (nine env vars, network-stakes seed gate among them) | `2381eb727` parity, and `human-manifest-parity.test.mjs` in the orchestrator gate |
+| The seeder passed an empty `blobCid` as an address and storage refused the whole batch | `8a65a8518` |
+| The reset wiped the app release channel | `eed9cbfaf [app:channel-create]` |
+| Storage captured its conductor client once at boot, so a storage pod that booted before its conductor never adopted a release and never minted a binding | late-bind fix `9faf54076`, admitted 3/4 by the operator ruling |
+
+The 3/4 admission names a pre-existing gap: doorway `/health/serving` counts roles discovered at boot,
+so it answers ready through a conductor restart (`genesis/data/timeline/backlog/doorway-readiness-blind-to-conductor-restart.md`).
+`regression-classes.md` records the eight defect classes behind these and the patterns that would have
+caught them.
+
+**Receipts (2026-11-08 ~13:35Z):**
+- The live cells on alpha are exactly the five bundle hashes, and all seven conductors run fork `993cf597a`.
+- doorway-alpha and elohim.host serve `/` and `/lamad/` with 200.
+- Both doorways resolve the landing head to one CID, `bafyreif4jcwpm3nuhj5jiwdf7qzahidrxs63rwus4ensfabsbvtewsaehu`.
+- A byte-CID blob from doorway-alpha answers with `X-Content-Address: bafkr4i…`.
+- `pnpm look` shows 0 page errors and 0 failed requests on both doorways.
+
+- Dataplane Validation is green on the cured fleet: edge #1839 (validate-only, after #1838 rolled the late-bind storage image) passed 10 scenarios with 0 failed. Edge #1837 had run before matthew's storage restart and failed only on doorway-alpha `/` 404.
+
+**Still owed:**
+- Live log proof of the late-bind fix on a storage pod that boots before its conductor.
+- A side finding: `HEAD /` answers 404 on both doorways while `GET /` answers 200.
