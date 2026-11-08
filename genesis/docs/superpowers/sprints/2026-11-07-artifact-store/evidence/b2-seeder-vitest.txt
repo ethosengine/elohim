@@ -1,0 +1,9 @@
+ RUN  v4.1.11 /projects/elohim/.worktrees/as-b2/genesis/seeder
+
+
+ Test Files  50 passed | 1 skipped (51)
+      Tests  742 passed | 9 skipped (751)
+   Start at  18:56:58
+   Duration  9.97s (transform 5.97s, setup 0ms, import 26.75s, tests 15.63s, environment 15ms)
+
+EXIT=0
