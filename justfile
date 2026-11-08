@@ -787,6 +787,13 @@ _gate-elohim-address:
     cd crates/elohim-address && cargo fmt --check
     cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
+# The storage client is the only Rust reader of storage's blob wire shapes; its contract test
+# round-trips the producer's own view serializer, so a rename on either side fails here.
+_gate-elohim-storage-client:
+    cd crates/elohim-storage-client && cargo test
+    cd crates/elohim-storage-client && cargo clippy --all-targets -- -D warnings
+    cd crates/elohim-storage-client && cargo fmt --check
+
 _gate-consent-grant:
     cd crates/consent-grant && cargo test
     cd crates/consent-grant && cargo clippy --all-targets -- -D warnings
@@ -848,11 +855,8 @@ _gate-constants-sync:
 # gate, until Phase 3. The flip to refuse is this recipe's body becoming just
 # `bash scripts/ci/address-profile-lint.sh`.
 _gate-address-profile-lint:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    if ! bash scripts/ci/address-profile-lint.sh; then
-        echo "address-profile-lint: WARN-CLASS (not yet refusing) — see violations above"
-    fi
+    bash scripts/ci/address-profile-lint.test.sh
+    bash scripts/ci/address-profile-lint.sh
 
 _gate-genesis-a2o:
     cd genesis/a2o && pnpm run lint && pnpm run format:check && pnpm run typecheck

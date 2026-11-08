@@ -73,6 +73,18 @@
           "cargo": { "workspace": "crates/elohim-address", "profile": "dev", "rustflags": "" }
         }
       },
+      "elohim-storage-client": {
+        "dir": "crates/elohim-storage-client",
+        "inputs": {
+          "sources": ["crates/elohim-storage-client/**", "crates/elohim-address/**", "crates/elohim-views/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-storage-client",
+          "cargo": { "workspace": "crates/elohim-storage-client", "profile": "dev", "rustflags": "" }
+        }
+      },
       "epr-ts": {
         "dir": "elohim/sdk/epr-ts",
         "steps": ["ts-test"],

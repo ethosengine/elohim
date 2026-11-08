@@ -79,7 +79,7 @@ interface DeploymentsJson {
  * Fail-open on read errors: if deployments.json is unreadable, treat
  * everyone as deployable (preserves prior behavior).
  */
-function loadSuspendedNames(): Set<string> {
+export function loadSuspendedNames(): Set<string> {
   try {
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const jsonPath = resolve(__dirname, '../../orchestrator/data/deployments.json');
@@ -238,6 +238,51 @@ interface RegisterResult {
    * seeded persona and the hosted account are one identity rather than two.
    */
   agentPubKey?: string;
+  /** `installedAppId` the doorway's login answered with (the session's app binding). */
+  installedAppId?: string;
+  /** `doorwayId` the doorway's login answered with. */
+  doorwayId?: string;
+}
+
+/**
+ * Prove the doorway can resolve this human's installed-app binding, or name the orphan.
+ *
+ * Why this exists (alpha, 2026-11-08): the fleet was re-genesised but the doorway's `users`
+ * rows survived. Register answered 409, login succeeded, and the seed reported green while
+ * every later `POST /hc/connect` answered 401 "Session is missing its installed app binding"
+ * (chaperone.rs `installed_app_id_for_claim`: JWT `installed_app_id`, else the conductor
+ * registry's mapping for the session's agent). That is exactly what the login response
+ * reports in `installedAppId` (auth_routes.rs handle_login: the registry lookup for an
+ * already-provisioned user), so the login we already made IS the read of the same path.
+ * A real /hc/connect probe is not read-only (a resolving binding makes the doorway grant a
+ * zome-call capability for the supplied key) and the binding check follows body validation,
+ * so it cannot be asked without writing.
+ *
+ * The chaperone serves every session whose agent lives on a doorway-reached conductor: a
+ * `hosted` human (a cell the doorway provisioned) and a `doorway` human (the operator, whose
+ * identity IS the doorway conductor's own app agent — the 2026-11-08 alpha incident was this
+ * case: Matthew's row outlived the re-key). node/device humans carry their own conductor and
+ * legitimately have no doorway-installed app.
+ *
+ * Returns the greppable refusal line, or undefined when the binding resolves / does not apply.
+ * Never repairs anything: remediation (rebind, re-register) is an operator act.
+ */
+/** Agency phases whose sessions reach their conductor through the doorway chaperone. */
+export const CHAPERONED_PHASES: ReadonlySet<string> = new Set(['hosted', 'doorway']);
+
+export function orphanedBindingLine(
+  human: Pick<HumansJsonHuman, 'displayName' | 'agencyPhase'>,
+  doorwayUrl: string,
+  login: { installedAppId?: string; doorwayId?: string }
+): string | undefined {
+  if (!CHAPERONED_PHASES.has(human.agencyPhase ?? 'hosted')) return undefined;
+  if (login.installedAppId?.trim()) return undefined;
+  const doorway = login.doorwayId?.trim() || doorwayUrl;
+  return (
+    `ORPHANED-BINDING human=${human.displayName} doorway=${doorway} ` +
+    'reason=Session is missing its installed app binding ' +
+    '(login returned no installedAppId; POST /hc/connect would answer 401)'
+  );
 }
 
 /**
@@ -271,7 +316,7 @@ async function ownConductorAgentKey(human: HumansJsonHuman): Promise<string | un
   }
 }
 
-async function registerHuman(
+export async function registerHuman(
   doorwayUrl: string,
   human: HumansJsonHuman,
   adminBootstrapKey?: string
@@ -326,7 +371,11 @@ async function registerHuman(
 
     // 409 Conflict — already registered, verify credentials match via login
     if (res.status === 409) {
-      return await verifyExisting(doorwayUrl, creds, human.displayName);
+      return requireBinding(
+        await verifyExisting(doorwayUrl, creds, human.displayName),
+        doorwayUrl,
+        human
+      );
     }
 
     // 503 with "Agent already has a Human profile" means the Holochain DHT has the identity
@@ -334,7 +383,11 @@ async function registerHuman(
     // Treat as "exists" and verify via login.
     const errorText = await res.text();
     if (res.status === 503 && errorText.includes('Agent already has a Human profile')) {
-      return await verifyExisting(doorwayUrl, creds, human.displayName);
+      return requireBinding(
+        await verifyExisting(doorwayUrl, creds, human.displayName),
+        doorwayUrl,
+        human
+      );
     }
     return {
       displayName: human.displayName,
@@ -350,6 +403,17 @@ async function registerHuman(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/** Turn an `exists` result whose binding does not resolve into a loud failure. */
+function requireBinding(
+  result: RegisterResult,
+  doorwayUrl: string,
+  human: HumansJsonHuman
+): RegisterResult {
+  if (result.result !== 'exists') return result;
+  const line = orphanedBindingLine(human, doorwayUrl, result);
+  return line ? { ...result, result: 'failed', error: line } : result;
 }
 
 async function verifyExisting(
@@ -371,12 +435,18 @@ async function verifyExisting(
     }), 'POST /auth/login');
 
     if (loginRes.ok) {
-      const auth = (await loginRes.json().catch(() => ({}))) as { agentPubKey?: string };
+      const auth = (await loginRes.json().catch(() => ({}))) as {
+        agentPubKey?: string;
+        installedAppId?: string;
+        doorwayId?: string;
+      };
       return {
         displayName,
         identifier: creds.identifier,
         result: 'exists',
         agentPubKey: auth.agentPubKey,
+        installedAppId: auth.installedAppId,
+        doorwayId: auth.doorwayId,
       };
     }
 
@@ -487,6 +557,24 @@ async function seedProjectionRow(
 // Main
 // =============================================================================
 
+/**
+ * The humans this run seeds. Suspended humans (deployments.json) are skipped, never failed,
+ * so they are never registered, logged in or binding-checked.
+ */
+export function selectActiveHumans<T extends HumansJsonHuman>(
+  humans: T[],
+  suspendedNames: Set<string>,
+  castAllowed?: Set<string>
+): T[] {
+  return humans.filter(h => {
+    if (h.category === 'visitor' || h.agencyPhase === 'visitor') return false;
+    if (suspendedNames.has(h.displayName.toLowerCase())) return false;
+    if (castAllowed && !castAllowed.has(h.displayName.toLowerCase())) return false;
+    if (!h.agencyPhase) return false;
+    return true;
+  });
+}
+
 async function main(): Promise<void> {
   const doorwayUrl = (process.env.DOORWAY_URL || 'https://doorway-alpha.elohim.host').replace(
     /\/$/,
@@ -517,13 +605,11 @@ async function main(): Promise<void> {
   // doorway, registering is PROVISIONING, so the cast is the lane's allow-list.
   const castMode = hostedCastMode(doorwayUrl);
   const castAllowed = new Set(HOUSEHOLD_HOSTED_CAST.map(n => n.toLowerCase()));
-  const active = humansJson.humans.filter(h => {
-    if (h.category === 'visitor' || h.agencyPhase === 'visitor') return false;
-    if (suspendedNames.has(h.displayName.toLowerCase())) return false;
-    if (castMode === 'lane' && !castAllowed.has(h.displayName.toLowerCase())) return false;
-    if (!h.agencyPhase) return false;
-    return true;
-  });
+  const active = selectActiveHumans(
+    humansJson.humans,
+    suspendedNames,
+    castMode === 'lane' ? castAllowed : undefined
+  );
   const skippedSuspended = humansJson.humans.filter(h =>
     suspendedNames.has(h.displayName.toLowerCase())
   );
@@ -658,7 +744,8 @@ async function main(): Promise<void> {
   if (failed > 0) {
     console.error('\nFailed humans:');
     for (const r of results.filter(r => r.result === 'failed')) {
-      console.error(`  ${r.displayName}: ${r.error}`);
+      // The orphan line is the greppable contract: print it bare, one per human.
+      console.error(r.error?.startsWith('ORPHANED-BINDING ') ? r.error : `  ${r.displayName}: ${r.error}`);
     }
     process.exit(1);
   }

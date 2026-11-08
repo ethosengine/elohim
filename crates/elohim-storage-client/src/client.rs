@@ -3,6 +3,7 @@
 use crate::error::{Result, StorageError};
 use crate::types::*;
 use base64::Engine;
+use elohim_address::{compute_bytes_cid, ByteCid};
 use reqwest::{header, Client, StatusCode};
 use std::time::Duration;
 
@@ -190,9 +191,14 @@ impl StorageClient {
 
     // ==================== Blob API ====================
 
-    /// Store a blob
-    pub async fn put_blob(&self, data: &[u8], mime_type: &str) -> Result<BlobManifest> {
-        let url = format!("{}/blob/", self.config.base_url);
+    /// Store a blob under its byte CID.
+    ///
+    /// The CID is computed here with the addressing kernel and sent in the path
+    /// (`PUT /blob/{cid}`); storage re-hashes the body and refuses a mismatch.
+    /// The answer is checked against the CID this call computed.
+    pub async fn put_blob(&self, data: &[u8], mime_type: &str) -> Result<PutBlobReceipt> {
+        let cid = compute_bytes_cid(data);
+        let url = format!("{}/blob/{}", self.config.base_url, cid);
 
         let response = self
             .client
@@ -202,21 +208,24 @@ impl StorageClient {
             .send()
             .await?;
 
-        self.handle_response(response).await
+        let receipt: PutBlobReceipt = self.handle_response(response).await?;
+        if receipt.blob_cid != cid {
+            return Err(StorageError::InvalidResponse(format!(
+                "stored under {} but {} was sent",
+                receipt.blob_cid, cid
+            )));
+        }
+        Ok(receipt)
     }
 
-    /// Get a blob by hash or CID
-    pub async fn get_blob(&self, hash_or_cid: &str) -> Result<Vec<u8>> {
-        let url = format!(
-            "{}/blob/{}",
-            self.config.base_url,
-            urlencoding::encode(hash_or_cid)
-        );
+    /// Get a blob by byte CID.
+    pub async fn get_blob(&self, cid: &ByteCid) -> Result<Vec<u8>> {
+        let url = format!("{}/blob/{}", self.config.base_url, cid);
 
         let response = self.client.get(&url).send().await?;
 
         if response.status() == StatusCode::NOT_FOUND {
-            return Err(StorageError::NotFound(hash_or_cid.to_string()));
+            return Err(StorageError::NotFound(cid.to_string()));
         }
 
         if !response.status().is_success() {
@@ -232,27 +241,11 @@ impl StorageClient {
     }
 
     /// Check if a blob exists
-    pub async fn blob_exists(&self, hash_or_cid: &str) -> Result<bool> {
-        let url = format!(
-            "{}/shard/{}",
-            self.config.base_url,
-            urlencoding::encode(hash_or_cid)
-        );
+    pub async fn blob_exists(&self, cid: &ByteCid) -> Result<bool> {
+        let url = format!("{}/shard/{}", self.config.base_url, cid);
 
         let response = self.client.head(&url).send().await?;
         Ok(response.status().is_success())
-    }
-
-    /// Get blob manifest
-    pub async fn get_manifest(&self, hash_or_cid: &str) -> Result<BlobManifest> {
-        let url = format!(
-            "{}/manifest/{}",
-            self.config.base_url,
-            urlencoding::encode(hash_or_cid)
-        );
-
-        let response = self.client.get(&url).send().await?;
-        self.handle_response(response).await
     }
 
     // ==================== Database API: Content ====================

@@ -72,6 +72,38 @@ The common thread: **state and contracts that live only at runtime** — in a ru
 - **Pattern:** rolls reference digests; a tag is only an input to resolving a digest once, at plan time, recorded in the roll plan.
 - **Status:** filed (edge Jenkinsfile, CI-gating).
 
+## Found after closure (shakeout, 2026-11-08)
+
+Nothing below turned anything red. Each was found by reading CI that had already "passed", and each is a name or a reference that crossed a boundary no compiler sees. For each one, the cure is placed at the **lowest layer that can see the defect**, with higher layers kept as backstops rather than as the catch. The ladder runs: type/compile, then lint, then contract test, then pipeline stage, then live probe.
+
+## 9. A name spelled on both sides of a language boundary
+
+`substrate-verify.ts` renamed its state files to `*_blob_cid` (`44a8b99a8`), but `genesis/Jenkinsfile` kept `cat`ing `*_blob_hash`. The read failed inside `catchError`, so it only set UNSTABLE among other causes. The env stayed empty, and three stages gated on `when { env.X != '' }` skipped for two builds: custody seeding, propagation and delivery verify. **Cure (compile and test):** the producer owns the names. `UPLOAD_EXPORTS` is a typed map in TS, the script writes `exports.env` from it and refuses on any empty value, and the Jenkinsfile reads that file generically. The self-test pins both the file's keys and the fact that the Jenkinsfile spells no state file.
+
+## 10. A skip that reads as green
+
+A `when` gate on a derived value turns an upstream failure into a skipped stage. Jenkins shows a skip as neither red nor unstable. **Cure (pipeline):** consumer stages no longer gate on the derived value. A missing value is a named `unstable(...)`, or the script's own preflight failure (`propagation.preflight CONTENT_BLOB_HASH unset`).
+
+## 11. A test that inherits the developer's environment
+
+The pin-attestation steps spawned the gate with `...process.env`. Pre-push and agent shells export `GATE_LIVE_RUN`, which hid the runner's own `epr session id` probe. So the scenario passed locally and failed in the Jenkins pod (#1752/#1753, 6 scenarios). **Cure (test):** the spawn is hermetic and strips inherited `GATE_*` and session variables, so local runs model CI. The fake `epr` answers the runner's housekeeping without counting it as an observation.
+
+## 12. A durable reference into a store that was reset
+
+The doorway's Mongo `users` rows survived the alpha re-genesis, but the conductors were re-keyed. The account rows still named agents that no conductor hosts, so login succeeded and `/hc/connect` answered 401 `Session is missing its installed app binding`. The seeder took 409 "already registered" as success. No compiler sees a reference across two stores. **Cure (pipeline):** the seeder verifies the binding resolves and fails `ORPHANED-BINDING human=…` instead of assuming. **Backstop (live probe):** a doorway invariant, orphaned bindings = 0; the `storeVerdict` check covers only the opposite case, store lost and conductors intact. **Procedure:** a re-genesis resets every store that holds a key binding, the doorway Mongo included, as the household `MESH_RESET` already does. The remaining alpha cure is an operator act.
+
+## 13. A whole-tree check selected only by its own file
+
+`address-profile-lint` scans the tree, but its gate declared only the script itself as input, so no ordinary push selected it. It could not be widened either, because 326 identifier hits would have blocked every push. **Cure (lint):** a ratchet against a committed baseline, refusing any new (rule, path) hit while allowing paydown. Its inputs are now the byte-plane surfaces, and the recipe refuses instead of printing WARN-CLASS.
+
+## 14. Wire shapes hand-copied into a client crate
+
+`crates/elohim-storage-client` kept its own `BlobManifest { blob_hash }` and a `PUT /blob/` with no CID, while storage serialises `blob_cid` and requires `PUT /blob/{cid}`. It has no caller and no test, so nothing noticed. **Cure (test, then compile):** the drifted methods had no caller. `get_manifest` and `BlobManifest` are deleted. `put_blob` computes the CID with the address kernel, PUTs `/blob/{cid}` and refuses a receipt whose CID differs. `get_blob` and `blob_exists` take a `ByteCid`. The contract test `tests/blob_wire_contract.rs` serialises the real `PutBlobResponseView` and parses it through the client. No gate ran this crate's tests: `workspace-bridge` lists it as an input but never builds it, which is class 13 again. A new `elohim-storage-client` gate project now runs test, clippy and fmt. **Still owed (compile):** derive `Deserialize` on `PutBlobResponseView` and its sub-views, so the client parses the producer's type and the last hand-copied receipt struct goes away. The general rule: **a hand-written reader of a wire shape is the drift point.** That covers jq and python in shell scripts, wasm `JSON.parse(...).field`, and Rust clients with private structs. Each either consumes generated types or carries a contract test through the producer's serializer.
+
+## 15. A method guard repeated per branch
+
+The doorway's EPR router served the root only for `method == GET`, so HEAD fell through to a 404. The guard was not one site. About 90 `(Method::GET, …)` arms, the relay and name-standing guards, the registry's exact method match and storage's GET-only dispatch all refused HEAD independently. **Cure (compile and test):** `MethodClass` classifies the method once at the single entry point. A HEAD is admitted as a GET, with any Upgrade dropped, and its body is stripped at the single exit; status and headers are kept. Only two declared native HEAD probes stay HEAD. A source-scan test fails on any new `(Method::HEAD, …)` arm that does not guard on `native_head`, an arm the compiler would let sit dead. A real-listener parity test asserts that HEAD and GET agree on status, content-type and `X-Content-Address` across the root projection, a deep link, a registry read, a blob and health. A mutation check confirmed the test fails without the rewrite. Found while there: a blob pantry hit dropped `X-Content-Address`, for GET too. It is fixed and asserted.
+
 ## Smaller frictions met while fixing in flight
 
 - **The style ratchet is invisible until push.** The late-bind fix touched `elohim-storage`, whose RS-GOV-04 rule requires every touched crate to pay down at least one finding; the pre-push gate refused after 322 s. Running `just gate rust-style` with the fix would have caught it in 20 s. Filed: the implementer brief template names `just gate rust-style` for any crate with debt.

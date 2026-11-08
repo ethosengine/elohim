@@ -86,17 +86,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 // Store a blob
-let manifest = client.put_blob(&image_data, "image/png").await?;
-println!("Stored with hash: {}", manifest.blob_hash);
+// (the byte CID is computed client-side and sent as PUT /blob/{cid})
+let receipt = client.put_blob(&image_data, "image/png").await?;
+println!("Stored as: {}", receipt.blob_cid);
 
 // Get a blob
-let data = client.get_blob(&manifest.blob_hash).await?;
+let data = client.get_blob(&receipt.blob_cid).await?;
 
 // Check if blob exists
-let exists = client.blob_exists(&hash_or_cid).await?;
-
-// Get manifest
-let info = client.get_manifest(&hash_or_cid).await?;
+let exists = client.blob_exists(&receipt.blob_cid).await?;
 ```
 
 ## API Reference
@@ -111,10 +109,9 @@ let info = client.get_manifest(&hash_or_cid).await?;
 | `get_changes_since(doc_id, heads)` | Get changes since given heads |
 | `apply_changes(doc_id, changes)` | Apply changes to document |
 | `count_documents()` | Get document count |
-| `put_blob(data, mime_type)` | Store a blob |
-| `get_blob(hash_or_cid)` | Get blob data |
-| `blob_exists(hash_or_cid)` | Check if blob exists |
-| `get_manifest(hash_or_cid)` | Get blob manifest |
+| `put_blob(data, mime_type)` | Store a blob (`PUT /blob/{cid}`), returns `PutBlobReceipt` |
+| `get_blob(&ByteCid)` | Get blob data |
+| `blob_exists(&ByteCid)` | Check if blob exists |
 
 ### AutomergeSync
 

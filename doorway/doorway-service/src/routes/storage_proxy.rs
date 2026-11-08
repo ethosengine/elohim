@@ -1156,6 +1156,11 @@ where
                 .header("Content-Type", &entry.content_type)
                 .header("Content-Length", entry.data.len())
                 .header("Cross-Origin-Resource-Policy", "cross-origin")
+                // The pantry holds only bytes verified against this address
+                // on their way in, so a hit states the address exactly as the
+                // storage-served 200 below does — a second read of a blob
+                // must not lose the header its first read carried.
+                .header(crate::routes::CONTENT_ADDRESS_HEADER, &hash)
                 // The stored Content-Type is CALLER-SUPPLIED upstream:
                 // `PUT /blob/{hash}` takes the uploader's Content-Type verbatim
                 // into the shard manifest's mime type, and content addressing
@@ -2439,6 +2444,18 @@ mod tests {
         )
         .await;
         assert_eq!(resp2.status(), StatusCode::OK);
+        assert_eq!(
+            resp2.headers().get(crate::routes::CONTENT_ADDRESS_HEADER),
+            resp1.headers().get(crate::routes::CONTENT_ADDRESS_HEADER),
+            "a pantry hit states the same X-Content-Address as the storage-served read"
+        );
+        assert_eq!(
+            resp2
+                .headers()
+                .get(crate::routes::CONTENT_ADDRESS_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some(hash)
+        );
 
         // Storage must still have been hit only once
         assert_eq!(

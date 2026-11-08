@@ -2435,6 +2435,7 @@ dependencies = [
  "cid",
  "data-encoding",
  "multihash-codetable",
+ "serde",
  "thiserror 2.0.17",
 ]
 
@@ -2790,6 +2791,7 @@ dependencies = [
  "automerge",
  "base64 0.22.1",
  "cid",
+ "elohim-address",
  "elohim-views",
  "hex",
  "reqwest",

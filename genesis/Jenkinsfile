@@ -1318,10 +1318,14 @@ def uploadBlobContentStage() {
                 sh "REPORT_DIR='${env.WORKSPACE}' CONTENT_PATH='${env.WORKSPACE}/genesis/docs/content/elohim-protocol/manifesto.md' pnpm exec tsx scripts/substrate-verify.ts upload"
             }
         }
-        env.CONTENT_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/content_blob_hash', returnStdout: true).trim()
-        env.CONTENT_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/substrate-verify/content_blob_size', returnStdout: true).trim()
-        env.PROBE_BLOB_HASH = sh(script: 'cat /tmp/substrate-verify/probe_blob_hash', returnStdout: true).trim()
-        env.SUBSTRATE_BUILD_START_ISO = sh(script: 'cat /tmp/substrate-verify/build_start_iso', returnStdout: true).trim()
+        // The export names are declared once, in substrate-verify.ts UPLOAD_EXPORTS, which writes
+        // exports.env and refuses the upload leg on any empty value. Nothing here spells a state
+        // file: a rename there cannot strand a reader here (the 2026-11 *_blob_hash drift did).
+        String exported = sh(script: 'cat /tmp/substrate-verify/exports.env', returnStdout: true)
+        for (String ln : exported.split('\n')) {
+            int eq = ln.indexOf('=')
+            if (eq > 0) { env."${ln.substring(0, eq).trim()}" = ln.substring(eq + 1).trim() }
+        }
         echo "Exported: CONTENT_BLOB_HASH=${env.CONTENT_BLOB_HASH} (${env.CONTENT_BLOB_SIZE_BYTES} bytes), PROBE_BLOB_HASH=${env.PROBE_BLOB_HASH}"
     }
     archiveArtifacts(artifacts: 'substrate-verify-upload.json', allowEmptyArchive: true, fingerprint: true)
@@ -1976,11 +1980,16 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
-                expression { env.CONTENT_BLOB_HASH != null && env.CONTENT_BLOB_HASH != '' }
             }}
             steps {
                 container('builder') {
                     script {
+                        // No when-gate on the upload's export: a missing value is a named
+                        // failure, never a skipped stage that reads as green.
+                        if (!env.CONTENT_BLOB_HASH) {
+                            unstable('Seed Custody Commitments: Upload Blob exported no CONTENT_BLOB_HASH (see substrate-verify-upload.json)')
+                            return
+                        }
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
                         def blobCid = env.CONTENT_BLOB_HASH
                         def blobSize = env.CONTENT_BLOB_SIZE_BYTES ?: '0'
@@ -2083,7 +2092,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
-                expression { env.CONTENT_BLOB_HASH != null && env.CONTENT_BLOB_HASH != '' }
             }}
             steps {
                 container('builder') {
@@ -2101,7 +2109,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { params.SEED_DATA }
-                expression { env.PROBE_BLOB_HASH != null && env.PROBE_BLOB_HASH != '' }
             }}
             steps {
                 container('builder') {

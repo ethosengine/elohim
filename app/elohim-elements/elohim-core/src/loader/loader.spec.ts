@@ -32,7 +32,7 @@ const SAMPLE_CID = 'bafkr4iddpaorofbfunrrf6qfrwdrfvoqke22tepmea2rz2owltnrticugi'
 // A well-formed byte CID of different bytes ([9, 9, 9]): admitted by form, wrong for SAMPLE_BYTES.
 const OTHER_CID = 'bafkr4iavye722q542l6rhzqmpzryv3pzkciiikkwomxhibtkfuvxz4k4vi';
 // The same four bytes under the retired spelling: not an address.
-const LEGACY_SHA256 = 'sha256-9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';
+const LEGACY_SHA256 = 'sha256-9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a'; // address-lint: allow (fixture asserting refusal)
 
 // ---------------------------------------------------------------------------
 // Loader — transport fallback chain

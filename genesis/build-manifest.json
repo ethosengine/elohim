@@ -151,7 +151,7 @@
       }
     },
     "address-profile-lint": {
-      "description": "Refuse legacy blob-address spellings (sha256-/blake3- hex, legacy raw+sha2 CID gates on byte surfaces, *_hash identifiers on the blob plane) — warn-class until Phase 3 of re-genesis 1",
+      "description": "Refuse legacy blob-address spellings (sha256-/blake3- hex, bafkrei gates on byte surfaces, *_hash identifiers on the blob/shard plane). Ratchet against scripts/ci/address-profile-lint.baseline: new debt refuses, existing debt may only shrink",
       "inputs": {
         "sources": [
           "scripts/ci/address-profile-lint.sh"
@@ -213,6 +213,20 @@
       "address-profile-lint": {
         "dir": ".",
         "steps": ["address-profile-lint"],
+        "inputs": {
+          "sources": [
+            "scripts/ci/address-profile-lint.sh",
+            "scripts/ci/address-profile-lint.baseline",
+            "**/*.rs",
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.js",
+            "**/*.mjs",
+            "**/*.json",
+            "**/*.sh"
+          ],
+          "buildProcess": []
+        },
         "run": {
           "kind": "root-just",
           "recipe": "_gate-address-profile-lint"

@@ -1,5 +1,6 @@
 //! Types for storage client API
 
+use elohim_address::ByteCid;
 use serde::{Deserialize, Serialize};
 
 /// Client configuration
@@ -120,28 +121,21 @@ pub struct ApplyChangesRequest {
     pub changes: Vec<String>,
 }
 
-/// Blob manifest
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlobManifest {
-    /// Blob hash
-    pub blob_hash: String,
-    /// Blob CID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub blob_cid: Option<String>,
-    /// MIME type
+/// What a client reads from the `PUT /blob/{cid}` answer.
+///
+/// A strict subset of storage's `PutBlobResponseView` (`elohim-views`): serde
+/// ignores the rest of the view, and a field named here that the view renames
+/// or drops fails `tests/blob_wire_contract.rs`. The address is a typed
+/// [`ByteCid`], so a non-byte-CID answer is refused at parse time.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutBlobReceipt {
+    /// Byte CID (CIDv1 raw + BLAKE3-256) the bytes were stored under.
+    pub blob_cid: ByteCid,
+    /// Stored length in bytes.
+    pub byte_len: u64,
+    /// MIME type the payload was stored with.
     pub mime_type: String,
-    /// Total size in bytes
-    pub total_size: u64,
-    /// Shard size
-    pub shard_size: u32,
-    /// Encoding method
-    pub encoding: String,
-    /// List of shard hashes
-    pub shard_hashes: Vec<String>,
-    /// Data parity shards
-    pub data_parity: (u32, u32),
-    /// Reach level
-    pub reach: String,
 }
 
 /// Options for list documents
