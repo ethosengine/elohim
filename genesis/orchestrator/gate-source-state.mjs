@@ -35,8 +35,13 @@ export function nativeGateState(project, { root, env = process.env, run = spawnS
     /** @type {import('../../elohim/sdk/storage-client-ts/src/generated/source-state.js').SourceState} */
     state = JSON.parse(evaluated.stdout);
   } catch { return { miss: `native evaluator ${bin} printed no source state` }; }
-  if (state.clean !== true || state.status !== '' || !/^bafkr4i[a-z2-7]{52}$/.test(state.closureCid)
-    || !Array.isArray(state.closure) || !state.closure.length) return { miss: 'source closure dirty' };
+  if (state.clean !== true || state.status !== '') return { miss: 'source closure dirty' };
+  if (typeof state.closureCid !== 'string' || !/^bafkr4i[a-z2-7]{52}$/.test(state.closureCid)) {
+    // A pre-abd66bdb1 evaluator mints the closure as a raw sha2 CID (bafkrei…): name that, not "dirty".
+    const seen = typeof state.closureCid === 'string' ? `${state.closureCid.slice(0, 7)}…` : String(state.closureCid);
+    return { miss: `native evaluator ${bin} emitted closureCid ${seen}, not a byte CID (^bafkr4i); it predates abd66bdb1 — set EPR_BIN to a newer epr` };
+  }
+  if (!Array.isArray(state.closure) || !state.closure.length) return { miss: 'source closure is empty' };
   if (state.head !== git(['rev-parse', `${commit}^{commit}`])?.trim()) return { miss: 'source closure is not at the gated commit' };
   const manifestPath = project.manifestPath || `${project.dir}/build-manifest.json`;
   const bytes = git(['show', `${commit}:${manifestPath}`]);
