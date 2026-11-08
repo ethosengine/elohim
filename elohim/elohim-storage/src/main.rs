@@ -3643,14 +3643,6 @@ async fn async_main(
             let mint_hc = hc_registry_for_http
                 .as_ref()
                 .and_then(|r| r.imagodei_client());
-            // DHT confirmation of gossip-arrived cross-signed bindings: only a binding
-            // the DHT confirms is authority (`p2p::transport_authority`). Independent of
-            // the mint kill switch; without the bridge nothing gossip-arrived binds.
-            if let (Some(hc), Some(pool)) = (mint_hc.clone(), db_pool.clone()) {
-                elohim_storage::p2p::transport_authority::confirm::spawn_binding_confirmer(
-                    hc, pool,
-                );
-            }
             match (mint_enabled, mint_hc, db_pool.clone()) {
                 (true, Some(hc), Some(pool)) => {
                     // The zome accepts only these four archetypes; anything else
@@ -5582,6 +5574,31 @@ async fn async_main(
             // no-swarm-path in on_agent_peer_binding).
             #[cfg(feature = "p2p")]
             let swarm_tx_opt = p2p_node.as_ref().map(|n| n.handle().command_sender());
+            // This node's own agent: its own binding signals are DHT confirmation as they
+            // stand; any other agent's are routed through the confirmer.
+            #[cfg(feature = "p2p")]
+            let own_agent_opt = p2p_node
+                .as_ref()
+                .map(|n| n.handle().agent_pubkey().to_string());
+            #[cfg(not(feature = "p2p"))]
+            let own_agent_opt: Option<String> = None;
+            // DHT confirmation of cross-signed bindings learned by gossip or handshake:
+            // only a binding the DHT confirms is authority (`p2p::transport_authority`).
+            // Started even when the imagodei bridge is not up yet: the client is
+            // acquired through the registry on every attempt, and the startup and
+            // periodic sweeps re-request unconfirmed rows.
+            #[cfg(feature = "p2p")]
+            if let Some(pool) = db_pool.clone() {
+                let registry = hc_registry_for_http.clone();
+                elohim_storage::p2p::transport_authority::confirm::spawn_binding_confirmer(
+                    pool,
+                    elohim_storage::p2p::transport_authority::confirm::conductor_reader(
+                        std::sync::Arc::new(move || {
+                            registry.as_ref().and_then(|r| r.imagodei_client())
+                        }),
+                    ),
+                );
+            }
 
             // genesis #1122 fix: the imagodei conductor needs 6+ minutes to
             // enable its cells after a rolling restart. The old code connected
@@ -5690,6 +5707,12 @@ async fn async_main(
                         }
                     }
 
+                    // The conductor app answers (boot, or a reconnect after a cold
+                    // fleet installs it): wake the binding mint and sweep unconfirmed
+                    // bindings into the DHT confirmer now, not after a backoff timer.
+                    #[cfg(feature = "p2p")]
+                    elohim_storage::p2p::binding_mint::conductor_app_available();
+
                     // Build controller. new_with_storage when db_pool available
                     // (enables sweep + compromise_at derivation); new() otherwise.
                     let mut controller = match reconcile_pool.clone() {
@@ -5698,7 +5721,8 @@ async fn async_main(
                                 stream,
                                 pool,
                                 Arc::clone(&pubkey_cache),
-                            );
+                            )
+                            .with_own_agent_cid(own_agent_opt.clone());
                             #[cfg(feature = "p2p")]
                             let c = match swarm_tx_opt.clone() {
                                 Some(tx) => c.with_swarm_tx(tx),

@@ -201,9 +201,16 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
                                         // (`p2p::transport_authority::confirm`), which also replays
                                         // the claims held for its author.
                                         if row.proof_status.is_cross_signed() {
+                                            let relay = match source {
+                                                GossipSource::Libp2p { author, peer, .. } => {
+                                                    author.as_deref().unwrap_or(peer.as_str())
+                                                }
+                                                GossipSource::Iroh { node } => node.as_str(),
+                                            };
                                             crate::p2p::transport_authority::confirm::request_confirmation(
                                                 &row.peer_id,
                                                 &row.dht_anchor_hash,
+                                                Some(relay),
                                             );
                                         }
                                     }
@@ -887,13 +894,63 @@ enum HeldJob {
     Replay(Vec<String>),
 }
 
-/// The single-flight worker's queue: one blocking drain at a time, in order.
-struct HeldQueue {
-    running: bool,
-    jobs: std::collections::VecDeque<(crate::db::DbPool, HeldJob)>,
+/// Jobs the held-claim worker queues at most.
+const HELD_QUEUE_CAP: usize = 1024;
+
+/// Hold jobs dropped because the worker's queue was full.
+static HELD_JOBS_DROPPED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// What [`HeldQueue::push`] did with a job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pushed {
+    Queued,
+    /// Full: a Hold job is dropped (a lost hold costs one claim's recovery).
+    DroppedHold,
+    /// Full: the oldest queued Hold job made room for this Replay.
+    EvictedHold,
+    /// Full of Replay jobs: this one's authors merged into the newest Replay.
+    Coalesced,
 }
 
-static HELD_QUEUE: std::sync::LazyLock<std::sync::Mutex<HeldQueue>> =
+/// The single-flight worker's queue: one blocking drain at a time, in order, bounded
+/// by [`HELD_QUEUE_CAP`]. When full, Hold jobs give way so a Replay — which turns held
+/// claims into projected ones — is never starved.
+struct HeldQueue<P> {
+    running: bool,
+    jobs: std::collections::VecDeque<(P, HeldJob)>,
+}
+
+impl<P> HeldQueue<P> {
+    fn push(&mut self, pool: P, job: HeldJob) -> Pushed {
+        if self.jobs.len() < HELD_QUEUE_CAP {
+            self.jobs.push_back((pool, job));
+            return Pushed::Queued;
+        }
+        let authors = match job {
+            HeldJob::Hold(_) => return Pushed::DroppedHold,
+            HeldJob::Replay(authors) => authors,
+        };
+        if let Some(index) = self
+            .jobs
+            .iter()
+            .position(|(_, queued)| matches!(queued, HeldJob::Hold(_)))
+        {
+            self.jobs.remove(index);
+            self.jobs.push_back((pool, HeldJob::Replay(authors)));
+            return Pushed::EvictedHold;
+        }
+        if let Some((_, HeldJob::Replay(newest))) = self.jobs.back_mut() {
+            for author in authors {
+                if !newest.contains(&author) {
+                    newest.push(author);
+                }
+            }
+        }
+        Pushed::Coalesced
+    }
+}
+
+static HELD_QUEUE: std::sync::LazyLock<std::sync::Mutex<HeldQueue<crate::db::DbPool>>> =
     std::sync::LazyLock::new(|| {
         std::sync::Mutex::new(HeldQueue {
             running: false,
@@ -903,8 +960,8 @@ static HELD_QUEUE: std::sync::LazyLock<std::sync::Mutex<HeldQueue>> =
 
 /// Queue `job` for the single-flight blocking worker, starting it if idle. Returns
 /// `false` when there is no tokio runtime here: the caller runs the job inline.
-/// bounded-work: hold jobs are bounded by gossip intake, replay jobs by bindings
-/// recorded; the drain owns one connection at a time.
+/// bounded-work: at most `HELD_QUEUE_CAP` jobs are queued; the drain owns one
+/// connection at a time.
 fn submit_held_job(pool: &crate::db::DbPool, job: HeldJob) -> bool {
     let Ok(runtime) = tokio::runtime::Handle::try_current() else {
         return false;
@@ -913,7 +970,14 @@ fn submit_held_job(pool: &crate::db::DbPool, job: HeldJob) -> bool {
         let mut queue = HELD_QUEUE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        queue.jobs.push_back((pool.clone(), job));
+        if queue.push(pool.clone(), job) == Pushed::DroppedHold {
+            let dropped = HELD_JOBS_DROPPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            warn!(
+                target: "elohim_storage::held_unbound",
+                dropped,
+                "held-claim worker queue full — an unbound claim was not held"
+            );
+        }
         !std::mem::replace(&mut queue.running, true)
     };
     if start {
@@ -2429,6 +2493,51 @@ mod tests {
             binding_row(&pool, &first.peer_id, "uhCkkSecond").is_none(),
             "the same signed core under another anchor is a duplicate"
         );
+    }
+
+    /// The held-claim worker's queue is bounded; when full, Hold jobs give way and a
+    /// Replay is always queued (or merged), never dropped.
+    #[test]
+    fn held_queue_is_bounded_and_replay_is_never_starved() {
+        let hold = |i: usize| {
+            HeldJob::Hold(crate::db::held_unbound::HeldClaim {
+                topic: "t".into(),
+                author_peer: format!("a{i}"),
+                plane: crate::db::held_unbound::HeldPlane::Iroh,
+                gossipsub_source: None,
+                bytes: i.to_be_bytes().to_vec(),
+            })
+        };
+        let mut queue: HeldQueue<()> = HeldQueue {
+            running: false,
+            jobs: std::collections::VecDeque::new(),
+        };
+        for i in 0..HELD_QUEUE_CAP {
+            assert_eq!(queue.push((), hold(i)), Pushed::Queued);
+        }
+        assert_eq!(queue.push((), hold(HELD_QUEUE_CAP)), Pushed::DroppedHold);
+        assert_eq!(queue.jobs.len(), HELD_QUEUE_CAP);
+        // A Replay into a full queue evicts the oldest Hold, every time there is one.
+        for i in 0..HELD_QUEUE_CAP {
+            assert_eq!(
+                queue.push((), HeldJob::Replay(vec![format!("p{i}")])),
+                Pushed::EvictedHold
+            );
+        }
+        assert!(queue
+            .jobs
+            .iter()
+            .all(|(_, j)| matches!(j, HeldJob::Replay(_))));
+        // Full of Replays: the next one is merged, never lost.
+        assert_eq!(
+            queue.push((), HeldJob::Replay(vec!["late".into()])),
+            Pushed::Coalesced
+        );
+        assert_eq!(queue.jobs.len(), HELD_QUEUE_CAP);
+        assert!(matches!(
+            queue.jobs.back(),
+            Some((_, HeldJob::Replay(authors))) if authors.contains(&"late".to_string())
+        ));
     }
 
     #[test]

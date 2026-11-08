@@ -28,10 +28,13 @@ pub const HELD_UNBOUND_CAP: usize = 256;
 /// or one key among many a Sybil mints — cannot occupy a whole topic's window alone.
 pub const HELD_UNBOUND_PER_AUTHOR: usize = 32;
 
-/// How long an unbound claim waits for its author's binding: 40 minutes. It must
-/// outlast DHT confirmation of a remote binding (`p2p::transport_authority::confirm` retries for
-/// about 33 minutes) plus the transport link's 30 s manifest cadence.
-pub const HELD_UNBOUND_TTL_MS: i64 = 40 * 60 * 1000;
+/// How long an unbound claim waits for its author's binding: 4 hours. A cold fleet
+/// installs its conductors hours after storage boots (alpha re-genesis: about 1 h),
+/// and the author's binding must then be minted, gossiped and DHT-confirmed
+/// (`p2p::transport_authority::confirm`: attempts over ~33 min, then a sweep every
+/// 10 min) before its held claims replay. The table stays bounded by the per-topic
+/// and per-author caps whatever the TTL.
+pub const HELD_UNBOUND_TTL_MS: i64 = 4 * 60 * 60 * 1000;
 
 /// The plane a held claim arrived on, so its replay re-runs the same witness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

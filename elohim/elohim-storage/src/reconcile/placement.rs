@@ -128,10 +128,12 @@ impl PlacementStrategy for XorDistanceStrategy {
 /// household (the spec's "sharpest blind spot"), eroding the diversity ingest
 /// established.
 ///
-/// **Failure domain** = `household_id` when known; a candidate whose `household_id`
-/// is `None` is treated as its OWN distinct domain — we have no evidence of
-/// co-location, so we neither claim nor penalize diversity for it. A consequence worth
-/// stating: a pool with NO household data degrades **exactly** to
+/// **Failure domain** = `household_id`. This strategy still reads a `None` household as
+/// its own domain, but the salvage pool never hands it one: `build_salvage_candidates`
+/// (`services::salvage_commitment_author`) gives every candidate without a declared
+/// household the one shared `UNDECLARED_HOUSEHOLD` domain, so undeclared keys cannot
+/// pose as independent places for a replica. A consequence worth stating: a pool with
+/// NO household data is one domain and degrades **exactly** to
 /// [`XorDistanceStrategy`] — same output, candidate-for-candidate.
 ///
 /// Still a **pure, deterministic** function of the candidate set, so it preserves the

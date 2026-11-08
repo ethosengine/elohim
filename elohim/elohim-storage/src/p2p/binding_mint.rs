@@ -601,18 +601,33 @@ pub fn mint_enabled_from_env() -> bool {
     }
 }
 
-/// Retry schedule for the mint task, in seconds. Bounded and short: the
-/// conductor connection can precede Human/Agent onboarding. Re-resolve missing
-/// Agent EPR candidates within this bounded budget, then stop loudly rather than
-/// retrying indefinitely against a conductor.
+/// Retry schedule for the mint task, in seconds: exponential, then capped at the last
+/// value for the life of the process. A cold fleet installs its conductors hours after
+/// storage boots (alpha re-genesis: storage 01:32Z, conductors 02:36–02:44Z), so the
+/// mint never gives up while `sign_for_agent` cannot answer yet; it is also woken at
+/// once when the conductor app becomes available ([`conductor_app_available`]).
 const MINT_RETRY_BACKOFF_SECS: [u64; 6] = [5, 15, 45, 120, 300, 600];
+
+/// Wakes the mint task out of its backoff (a permit is kept if it is mid-attempt).
+static MINT_WAKE: std::sync::LazyLock<tokio::sync::Notify> =
+    std::sync::LazyLock::new(tokio::sync::Notify::new);
+
+/// The conductor app answered (the imagodei signal stream connected, at boot or after
+/// a reconnect): wake the mint task out of its backoff and sweep unconfirmed bindings
+/// into the DHT confirmer, so neither waits out a 10-minute timer on a fleet that just
+/// came up.
+pub fn conductor_app_available() {
+    MINT_WAKE.notify_one();
+    crate::p2p::transport_authority::confirm::sweep_now();
+}
 
 /// Spawn the boot-time mint task.
 ///
-/// Waits for the caller to acknowledge completed imagodei signal registration,
-/// after the swarm identity and conductor connection are up. Retries on transient failure until the projection shows
-/// the cross-signed row. A missing Agent EPR can arrive during onboarding; an
-/// actual [`MintError::AgentCidMismatch`] remains terminal.
+/// Waits for the caller to acknowledge completed imagodei signal registration, then
+/// retries — with capped backoff, for the life of the process, woken early by
+/// [`conductor_app_available`] — until the projection shows the cross-signed row. A
+/// missing Agent EPR is transient (a cold fleet installs and onboards its conductors
+/// hours later); only an actual [`MintError::AgentCidMismatch`] is terminal.
 pub fn spawn_binding_mint_task(
     hc: Arc<HcClient>,
     pool: DbPool,
@@ -673,17 +688,19 @@ async fn run_binding_mint_after_subscription<T, F, Fut>(
         warn!("binding mint: signal subscription unavailable — no binding published");
         return;
     };
-    run_binding_mint_task(|| mint(projection.clone())).await;
+    run_binding_mint_task(|| mint(projection.clone()), &MINT_WAKE).await;
 }
 
 // The production retry driver accepts one mint attempt so tests can advance the
 // real backoff under a paused clock without a live conductor or transport key.
-async fn run_binding_mint_task<F, Fut>(mut mint: F)
+// bounded-work: one attempt per backoff step (capped at 600 s) or per wake.
+async fn run_binding_mint_task<F, Fut>(mut mint: F, wake: &tokio::sync::Notify)
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<MintOutcome, MintError>>,
 {
-    for (attempt, backoff) in MINT_RETRY_BACKOFF_SECS.iter().enumerate() {
+    let mut attempt = 0usize;
+    loop {
         match mint().await {
             Ok(MintOutcome::AlreadyCurrent) => {
                 debug!("binding mint: already current — task done");
@@ -698,21 +715,28 @@ where
                 return;
             }
             Err(e) => {
-                warn!(
-                    attempt = attempt + 1,
-                    retry_in_secs = backoff,
-                    error = %e,
-                    "binding mint: attempt failed — retrying"
-                );
-                tokio::time::sleep(std::time::Duration::from_secs(*backoff)).await;
+                let backoff =
+                    MINT_RETRY_BACKOFF_SECS[attempt.min(MINT_RETRY_BACKOFF_SECS.len() - 1)];
+                if attempt < MINT_RETRY_BACKOFF_SECS.len() {
+                    warn!(
+                        attempt = attempt + 1,
+                        retry_in_secs = backoff,
+                        error = %e,
+                        "binding mint: attempt failed — retrying (never gives up; woken early when the conductor app is available)"
+                    );
+                } else {
+                    debug!(attempt = attempt + 1, retry_in_secs = backoff, error = %e, "binding mint: still waiting for the conductor");
+                }
+                attempt += 1;
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(backoff)) => {}
+                    _ = wake.notified() => {
+                        debug!("binding mint: conductor app available — retrying now");
+                    }
+                }
             }
         }
     }
-    warn!(
-        "binding mint: gave up after {} attempts — this node's binding stays \
-         self-asserted; economic attribution for it will count as unverified",
-        MINT_RETRY_BACKOFF_SECS.len()
-    );
 }
 
 #[cfg(test)]
@@ -756,30 +780,88 @@ mod tests {
     async fn retry_waits_for_agent_onboarding_then_stops_after_mint() {
         let start = tokio::time::Instant::now();
         let mut attempts = Vec::new();
-        run_binding_mint_task(|| {
-            attempts.push(start.elapsed().as_secs());
-            std::future::ready(if attempts.len() < 3 {
-                Err(MintError::NoAgentEpr)
-            } else {
-                Ok(MintOutcome::Minted("owned-binding-action".into()))
-            })
-        })
+        let wake = tokio::sync::Notify::new();
+        run_binding_mint_task(
+            || {
+                attempts.push(start.elapsed().as_secs());
+                std::future::ready(if attempts.len() < 3 {
+                    Err(MintError::NoAgentEpr)
+                } else {
+                    Ok(MintOutcome::Minted("owned-binding-action".into()))
+                })
+            },
+            &wake,
+        )
         .await;
         assert_eq!(attempts, vec![0, 5, 20]);
         assert_eq!(start.elapsed().as_secs(), 20);
     }
 
+    /// The alpha re-genesis shape: storage boots hours before its conductor can sign.
+    /// The mint keeps trying past the old six-attempt budget, capped at 600 s, until
+    /// `sign_for_agent` answers.
     #[tokio::test(start_paused = true)]
-    async fn retry_missing_agent_epr_exhausts_the_existing_budget() {
+    async fn binding_mint_retries_until_the_conductor_answers() {
         let start = tokio::time::Instant::now();
         let mut attempts = 0;
-        run_binding_mint_task(|| {
-            attempts += 1;
-            std::future::ready(Err(MintError::NoAgentEpr))
-        })
+        let wake = tokio::sync::Notify::new();
+        run_binding_mint_task(
+            || {
+                attempts += 1;
+                std::future::ready(if attempts <= 20 {
+                    Err(MintError::NoAgentEpr)
+                } else {
+                    Ok(MintOutcome::Minted("finally".into()))
+                })
+            },
+            &wake,
+        )
         .await;
-        assert_eq!(attempts, 6);
-        assert_eq!(start.elapsed().as_secs(), 1085);
+        assert_eq!(
+            attempts, 21,
+            "never gives up while the conductor cannot sign"
+        );
+        // 5+15+45+120+300+600 then 600 for each further wait.
+        assert_eq!(start.elapsed().as_secs(), 1085 + 14 * 600);
+    }
+
+    /// While the mint waits out a long backoff, the conductor app becomes available:
+    /// it retries at once instead of finishing the wait.
+    #[tokio::test(start_paused = true)]
+    async fn binding_mint_runs_when_the_app_becomes_available() {
+        let start = tokio::time::Instant::now();
+        let wake = std::sync::Arc::new(tokio::sync::Notify::new());
+        let attempts = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let task = {
+            let wake = wake.clone();
+            let attempts = attempts.clone();
+            tokio::spawn(async move {
+                run_binding_mint_task(
+                    || {
+                        let mut seen = attempts.lock().unwrap();
+                        seen.push(start.elapsed().as_secs());
+                        std::future::ready(if seen.len() < 8 {
+                            Err(MintError::NoAgentEpr)
+                        } else {
+                            Ok(MintOutcome::Minted("after the app came up".into()))
+                        })
+                    },
+                    &wake,
+                )
+                .await
+            })
+        };
+        // Seven failures put it into the 600 s cap (0, 5, 20, 65, 185, 485, 1085).
+        tokio::time::sleep(std::time::Duration::from_secs(1100)).await;
+        assert_eq!(attempts.lock().unwrap().len(), 7);
+        wake.notify_one();
+        task.await.unwrap();
+        let seen = attempts.lock().unwrap().clone();
+        assert_eq!(seen.len(), 8);
+        assert_eq!(
+            seen[7], 1100,
+            "retried the moment the app was available, not at 1685 s"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -790,9 +872,11 @@ mod tests {
         ] {
             let start = tokio::time::Instant::now();
             let mut outcome = Some(outcome);
-            run_binding_mint_task(|| {
-                std::future::ready(outcome.take().expect("must not retry terminal outcome"))
-            })
+            let wake = tokio::sync::Notify::new();
+            run_binding_mint_task(
+                || std::future::ready(outcome.take().expect("must not retry terminal outcome")),
+                &wake,
+            )
             .await;
             assert!(outcome.is_none());
             assert_eq!(start.elapsed().as_secs(), 0);
