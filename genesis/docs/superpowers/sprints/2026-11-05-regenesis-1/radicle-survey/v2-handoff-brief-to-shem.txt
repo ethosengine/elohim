@@ -1,0 +1,18 @@
+Operator ask (via ethosengine 184beb01): please own the v2 pass of genesis/research/radicle-heartwood-cross-pollination-2026-11-05.md, because you hold the artifact-store detail. The operator's goal: every Radicle lesson is either captured in the artifact-store sprint or clearly documented in its design for when artifact stores become Radicle-like objects in elohim-native rakia. Make the survey's assumptions about our codebase current, retrospectively.
+
+What ethosengine already established (draft kept locally, not pushed):
+1. Radicle side, re-checked 2026-11-08: still 1.10.3; the 09-23 disclosure is the newest news; no transport fix released; Heartwood master 2fce5b4e..8b053320 (6 commits), still no iroh dependency. RIP and CI-broker mirrors are at their remote heads.
+2. Proposed lesson 15 from those commits: eee5cb8d (a COB change could cite a self-made identity commit and act as a delegate; fix = accept only revisions reached from rad/id); df62b66d (entries not descended from the root became parents of honest updates; fix = parentless root, keep only root descendants, apply only when every parent applied); 783b06fb (a derived pointer every caller had to move; one forgot). Our analogues to check: your pass-4 "superseded core stays superseded under any fresh anchor" (revival class), E3 N1 event-order designation, correction and successor chains, and the release election.
+3. Re-genesis 1 status by lesson: L3 store atomicity/quarantine done (but chunked exists is structural on dev = your R3); L14 clean break done; L2 holder bound to the transport peer, not the agent (your H-A); L6 deliberately skipped by the clean-break ruling, with unknown epochs/schemes held; L10 version bumps everywhere; L8 FetchBudget plus drop-cancel racing in storage.
+4. Re-genesis 1 regression classes vs Radicle: class 7 (boot snapshots, fixed retry budgets: binding minter, release adoption, doorway readiness) matches L1's retry-on-tick; class 5 (lair crash-loop damage) matches the corrupted-repo-blocks-start issue; class 2 (empty blobCid) matches the bare-SHA-1 RID; class 1 (channel only in store) matches B2.
+5. Where my draft was WRONG and needs your knowledge: it called E3, F2 and the stories "sprint 2, not started", although they are on dev (ce562f5dd..79acec4eb); it missed the H track on artifact-store/h (R1-R10, transport_authority, DHT-confirmed bindings, held_unbound, verified index, the wasted-bytes meter, the life-long binding minter); E4 (one payload store per device) and F2r (454 MB) are the open items; the Sybil residual is ruled not to gate.
+
+Lesson-by-lesson questions only you can answer well:
+- L1/T1: is custody-before-head a gate anywhere in sprint 2, or only the artifact-custody story? Is "a fetched artifact is not served onward" the intended custody floor for rakia objects?
+- L4/T3: where will the lineage root plus parent binding live for a rakia artifact object: the DerivationRecord, the brit @2 note, or the release manifest?
+- L5/T6: the swap test and the attestation chain (brit build put --output --inputs-hash DerivationKey); the interim git-tree key and what F1r must deliver.
+- L7/L9: F2 resume, relay floor and TransportCannotDeliver vs Radicle's pack transfer; what F2r must prove.
+- L11: yank/supersede/revoke vs E3 grants, supersession by event order, and "not served onward".
+- L12/L13: standing at publication vs the binding authority you built; the release election.
+- B1 (Radicle punted on large files): with E3/F2, are we past B1 on one steward's devices, and what remains for cross-steward rakia objects?
+Please also resolve the duplicate id the cite tool refuses on (radicle-survey/draft-v1.md and draft-v2.md in the regenesis-1 sprint folder declare the survey's id), then stamp the cites.
