@@ -14,6 +14,9 @@
 //!   while `serve` runs; berth polls it to settle a steward-scoped claim.
 //! - `verdicts` reads completed gate verdicts folded from admitted sibling devices. It is a pure
 //!   local projection read; sibling evidence never becomes an independent witness or quorum vote.
+//! - `artifacts` reads the `artifact-produce@1` custody records folded from admitted sibling
+//!   devices for one derivation key (artifact-store design §3.b.1): who holds which output, under
+//!   which manifest. `epr artifact fetch` resolves its holders through the same read.
 //!
 //! The iroh key lives at `$XDG_CONFIG_HOME/epr/peer/iroh.key` (mode 0600). Neither it nor the
 //! device key is ever printed, logged or copied: the device key is reached only as a signer.
@@ -27,10 +30,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
-    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
-    steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
-    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
-    KIND_SLOT, MEASURE_SLOT,
+    lease_events, open_payload_store, other_devices, peer_from_arg, relay_from_env,
+    roster_rows_from_file, slots, steward_lease_view, via_device, Admission, CrossingAllowList,
+    HeadTable, LeaseVerdict, NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules,
+    RulesState, StewardScope, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT,
+    MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -89,9 +93,13 @@ pub fn usage() -> String {
     "usage: epr peer <\n  \
      id [--json]\n  \
      | serve [--check] [--root DIR] [--handle H] [--listen IP:PORT] \
-     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--json] \
-     (the device peer: the tier ALPN over this device's channel tree and the steward topic, \
-     admitted devices only; runs until stopped. --check validates its read-only start floor; \
+     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--payload-store DIR] [--install-root DIR]... \
+     [--json] \
+     (the device peer: the tier ALPN over this device's channel tree, the artifacts of its \
+     payload store that berth.artifacts.serves grants, and the steward topic, admitted devices \
+     only; runs until stopped. The payload store is --payload-store, else EPR_PAYLOAD_STORE, \
+     else $XDG_DATA_HOME/epr/payload. A fetch `epr artifact fetch` queues installs only under an \
+     --install-root, EPR_INSTALL_ROOTS, or a mesh-bin directory under the cargo pool. --check validates its read-only start floor; \
      EPR_PEER_RELAY_URL homes it to a relay; --peer names a device's direct address when there \
      is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
@@ -102,6 +110,9 @@ pub fn usage() -> String {
      be computed)\n  \
      | verdicts --project P --closure K [--root DIR] [--handle H] [--json] \
      (completed gate verdicts folded from admitted sibling devices only)\n  \
+     | artifacts --key CID [--root DIR] [--handle H] [--json] \
+     (artifact-produce@1 custody records folded from admitted sibling devices for one \
+     derivation key CID: device, output, manifest, bytes, commit)\n  \
      | intents [--all] [--root DIR] [--handle H] [--policy PATH] [--json] \
      (landing intents from this device and admitted siblings, read from the serve-recorded store)>"
         .to_string()
@@ -119,13 +130,22 @@ pub fn run(args: &[String]) -> PeerResult<ExitCode> {
         Some("status") => status(&Options::parse(&args[1..])?),
         Some("leases") => leases(&Options::parse(&args[1..])?),
         Some("verdicts") => verdicts(&Options::parse(&args[1..])?),
+        Some("artifacts") => artifacts(&Options::parse(&args[1..])?),
         Some("intents") => intents(&Options::parse(&args[1..])?),
         Some(other) => Err(PeerCliError::InvalidArguments(format!(
             "unknown peer verb `{other}`{}\n{}",
             crate::hint::did_you_mean(
                 other,
                 "epr peer",
-                &["id", "serve", "status", "leases", "verdicts", "intents"],
+                &[
+                    "id",
+                    "serve",
+                    "status",
+                    "leases",
+                    "verdicts",
+                    "artifacts",
+                    "intents",
+                ],
             ),
             usage()
         ))),
@@ -141,8 +161,14 @@ pub struct Options {
     pub listen: Option<SocketAddrV4>,
     pub peers: Vec<String>,
     pub policy: Option<PathBuf>,
+    /// `serve`'s payload store directory (`--payload-store`).
+    pub payload_store: Option<PathBuf>,
+    /// `serve`'s extra install roots for queued fetches (`--install-root`, repeatable).
+    pub install_roots: Vec<PathBuf>,
     pub project: Option<String>,
     pub closure: Option<String>,
+    /// `artifacts`' derivation key CID (`--key`).
+    pub key: Option<String>,
     pub json: bool,
     pub all: bool,
     /// Validate the serve start floor without taking the lock, binding, or writing.
@@ -176,8 +202,11 @@ impl Options {
                 "--root" => options.root = PathBuf::from(value),
                 "--handle" => options.handle = Some(value),
                 "--policy" => options.policy = Some(PathBuf::from(value)),
+                "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
+                "--install-root" => options.install_roots.push(PathBuf::from(value)),
                 "--project" => options.project = Some(value),
                 "--closure" => options.closure = Some(value),
+                "--key" => options.key = Some(value),
                 "--peer" => options.peers.push(value),
                 "--listen" => {
                     options.listen = Some(value.parse().map_err(|e| {
@@ -630,6 +659,74 @@ fn termination() -> impl std::future::Future<Output = ()> {
     }
 }
 
+/// The environment variable naming `epr peer serve`'s payload store directory.
+pub const PAYLOAD_STORE_ENV: &str = "EPR_PAYLOAD_STORE";
+
+/// The file in the peer directory naming the payload store the serving daemon serves.
+pub const PAYLOAD_STORE_RECORD: &str = "payload-store";
+
+/// The environment variable naming extra install roots for queued fetches (`:`-separated).
+pub const INSTALL_ROOTS_ENV: &str = "EPR_INSTALL_ROOTS";
+
+/// Where this daemon's queued fetches may install: every `--install-root`, every root in
+/// [`INSTALL_ROOTS_ENV`], and a `mesh-bin` directory under the cargo pool
+/// (`CARGO_TARGET_POOL_ROOT`, else `/projects/.cargo-target-pool` when it exists).
+fn install_scope(options: &Options) -> eprfs_peer::InstallScope {
+    let mut roots = options.install_roots.clone();
+    if let Some(extra) = std::env::var_os(INSTALL_ROOTS_ENV) {
+        roots.extend(std::env::split_paths(&extra).filter(|p| p.is_absolute()));
+    }
+    let mesh_bin_pool = std::env::var_os("CARGO_TARGET_POOL_ROOT")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            let default = PathBuf::from("/projects/.cargo-target-pool");
+            default.is_dir().then_some(default)
+        });
+    eprfs_peer::InstallScope {
+        roots,
+        mesh_bin_pool,
+    }
+}
+
+fn describe_install(scope: &eprfs_peer::InstallScope) -> String {
+    let mut places: Vec<String> = scope
+        .roots
+        .iter()
+        .map(|root| root.display().to_string())
+        .collect();
+    if let Some(pool) = &scope.mesh_bin_pool {
+        places.push(format!("{}/**/mesh-bin", pool.display()));
+    }
+    if places.is_empty() {
+        "nowhere (no install root, no cargo pool)".into()
+    } else {
+        places.join(", ")
+    }
+}
+
+/// `serve`'s payload store: `--payload-store`, else [`PAYLOAD_STORE_ENV`], else
+/// `$XDG_DATA_HOME/epr/payload` (`$HOME/.local/share/epr/payload` when unset).
+pub(crate) fn payload_store_dir(options: &Options) -> PeerResult<PathBuf> {
+    if let Some(dir) = &options.payload_store {
+        return Ok(dir.clone());
+    }
+    let set = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
+    if let Some(dir) = set(PAYLOAD_STORE_ENV) {
+        return Ok(PathBuf::from(dir));
+    }
+    let data = set("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| set("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+        .ok_or_else(|| {
+            PeerCliError::InvalidArguments(format!(
+                "no payload store: pass --payload-store or set {PAYLOAD_STORE_ENV}, XDG_DATA_HOME \
+                 or HOME"
+            ))
+        })?;
+    Ok(data.join("epr").join("payload"))
+}
+
 fn serve(options: Options) -> PeerResult<ExitCode> {
     if options.check {
         return serve_check(&options);
@@ -656,6 +753,20 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
             .map(std::path::Path::new),
     )?;
     let _serving = ServeLock::acquire(&device.peer_dir)?;
+    // The payload store this daemon serves, recorded where `epr artifact put` checks it writes the
+    // same one (artifact-store review M9).
+    let payload_dir = payload_store_dir(&options)?;
+    let payload = open_payload_store(&payload_dir)?;
+    let payload_dir = std::fs::canonicalize(&payload_dir)?;
+    std::fs::write(
+        device.peer_dir.join(PAYLOAD_STORE_RECORD),
+        format!("{}\n", payload_dir.display()),
+    )?;
+    let install = install_scope(&options);
+    eprintln!(
+        "epr peer: a queued fetch installs only under {}",
+        describe_install(&install)
+    );
     if rules.allow().is_empty() {
         eprintln!(
             "epr peer: the crossing allow-list is empty — nothing of this device crosses until \
@@ -679,6 +790,8 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         signer: Arc::new(move |message: &[u8]| signer_key.sign(message)),
         verifier: Arc::new(verifier()),
         log: Arc::new(|line: &str| eprintln!("epr peer: {line}")),
+        payload_store: Some(payload),
+        install,
     };
     let runtime = runtime()?;
     runtime.block_on(async move {
@@ -1266,6 +1379,175 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
                 row.at,
                 row.seconds,
                 row.commit
+            );
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// One custody record of an admitted sibling for a derivation key, as `artifacts` reports it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiblingArtifact {
+    pub device: String,
+    pub output: String,
+    pub manifest: String,
+    pub bytes: u64,
+    pub commit: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    pub at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head_seq: Option<u64>,
+}
+
+/// The record `event` is, when it is an `artifact-produce@1` custody Produce for `key` folded
+/// from an admitted device other than `me`, and consistent with itself: its resource, subject
+/// and `env:output` name one output, and it names exactly one manifest.
+fn artifact_from_event(
+    event: &FlowEvent,
+    me: &str,
+    key: &str,
+    admission: &Admission,
+    heads: &HeadTable,
+) -> Option<SiblingArtifact> {
+    let device = via_device(event)?;
+    if device == me || !admission.admits_device(device) {
+        return None;
+    }
+    if event.action != elohim_epr_rea::ReaVerb::Produce
+        || event.classified_as.first().map(String::as_str) != Some("custody-blob")
+        || one_slot(event, MEASURE_SLOT)? != ARTIFACT_PRODUCE_MEASURE
+        || one_slot(event, KIND_SLOT)? != ARTIFACT_PRODUCE_KIND
+    {
+        return None;
+    }
+    let env: std::collections::BTreeMap<&str, &str> = slots(event)
+        .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
+        .collect();
+    if env.get("key").copied()? != key {
+        return None;
+    }
+    let output = env.get("output").copied()?;
+    let resource = event.resource.to_string();
+    if output != resource || event.classified_as.get(1).map(String::as_str) != Some(output) {
+        return None;
+    }
+    let manifest = one_slot(event, "manifest:")?;
+    Some(SiblingArtifact {
+        device: device.to_string(),
+        output: output.to_string(),
+        manifest: manifest.to_string(),
+        bytes: env.get("bytes")?.parse().ok()?,
+        commit: (*env.get("commit")?).to_string(),
+        agent_id: env.get("agentId").map(|value| (*value).to_string()),
+        at: event.occurred_at.clone(),
+        head_seq: heads.devices.get(device).map(|head| head.seq),
+    })
+}
+
+/// What [`sibling_artifacts`] read: the records, in flow order, and the store they came from.
+#[derive(Debug)]
+pub struct SiblingArtifacts {
+    pub rows: Vec<SiblingArtifact>,
+    /// This device's did:key.
+    pub device: String,
+    /// The checkout whose flow store `epr peer serve` projects and folds into.
+    pub served_root: PathBuf,
+}
+
+/// The checkout whose flow store this device's daemon serves (recorded in its head table), else
+/// `root`.
+///
+/// # Errors
+///
+/// [`PeerCliError::InvalidArguments`] when the recorded store is gone.
+pub fn served_root(root: &Path) -> PeerResult<PathBuf> {
+    let table = HeadTable::load(&peer_dir()?)?;
+    if let Some(place) = table.store.as_ref().filter(|place| !place.log.is_file()) {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "the channel store `{}` that epr peer serve recorded is gone; restart epr peer serve \
+             on this device's checkout",
+            place.log.display()
+        )));
+    }
+    Ok(table
+        .store
+        .as_ref()
+        .map_or_else(|| root.to_path_buf(), |place| place.root.clone()))
+}
+
+/// The custody records for derivation key `key` (a CID) folded from admitted sibling devices
+/// into the flow store this device's daemon serves: the same `via:` and `admits_device` filter
+/// as `verdicts`, never this device's own records.
+///
+/// # Errors
+///
+/// When this workspace is no device of its steward, or its flow store cannot be read.
+pub fn sibling_artifacts(
+    root: &Path,
+    handle: Option<&str>,
+    key: &str,
+) -> PeerResult<SiblingArtifacts> {
+    let table = HeadTable::load(&peer_dir()?)?;
+    let root = served_root(root)?;
+    let (device, admission) = match standing(&root, handle)? {
+        Standing::Device(device) => *device,
+        Standing::NotADevice(why) => return Err(PeerCliError::InvalidArguments(why)),
+        Standing::Revoked(did) => {
+            return Err(PeerCliError::InvalidArguments(format!(
+                "{did} is revoked: this device's binding is contested"
+            )))
+        }
+    };
+    let did = device.key.did_key();
+    let log = root.join(".eprfs/status/flows.jsonl");
+    if !log.is_file() {
+        return Ok(SiblingArtifacts {
+            rows: Vec::new(),
+            device: did,
+            served_root: root,
+        });
+    }
+    let store = elohim_epr_rea::SidecarFlowStore::open(&root)
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let rows = store
+        .events()
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?
+        .into_iter()
+        .filter_map(|(_, event)| artifact_from_event(&event, &did, key, &admission, &table))
+        .collect();
+    Ok(SiblingArtifacts {
+        rows,
+        device: did,
+        served_root: root,
+    })
+}
+
+/// `epr peer artifacts --key <cid>`: the custody records admitted siblings hold for one key.
+fn artifacts(options: &Options) -> PeerResult<ExitCode> {
+    let key = options
+        .key
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            PeerCliError::InvalidArguments(format!("--key needs a value\n{}", usage()))
+        })?;
+    let found = sibling_artifacts(&options.root, options.handle.as_deref(), key)?;
+    if options.json {
+        println!("{}", serde_json::to_string_pretty(&found.rows)?);
+    } else if found.rows.is_empty() {
+        println!("no sibling holds an artifact for key {key}");
+    } else {
+        for row in &found.rows {
+            println!(
+                "{}  {}  {} bytes  manifest {}  commit {}  {}",
+                short(&row.device),
+                row.output,
+                row.bytes,
+                row.manifest,
+                row.commit,
+                row.at
             );
         }
     }

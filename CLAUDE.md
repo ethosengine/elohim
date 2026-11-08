@@ -31,12 +31,14 @@ edit-only `.epr-meta` resolver. All existing staging, hook, gate and history saf
 Temporary landing exception (cycle-time harvest, 2026-11-06): the re-genesis landing
 logs record brit 0.1.12 closing send-pack after a green hook. Until a corrected Brit
 push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev`,
-keeping the hook enabled and recording the fallback in the sprint journal. Known gap, recorded
-rather than bypassed: `HEAD:dev` alone omits `refs/notes/brit/*` (the validation receipts), and
-the explicit notes refspec does not pass the hook today — its rust-style reach gate refuses
-every notes ref (push-notes-brit.log, 2026-11-06). Until that gate skips `refs/notes/*`, the
-receipts stay local. Keep Brit for other operations; recheck the exception when the push fix
-lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
+keeping the hook enabled and recording the fallback in the sprint journal. `HEAD:dev` alone
+omits the validation receipts: push them separately with
+`git push origin 'refs/notes/brit/build/*:refs/notes/brit/build/*'`. The pre-push hook skips
+`refs/notes/*` since 2bba47154 (verified 2026-11-08, artifact-store push-notes-build.log).
+`core.hooksPath` names the main checkout's `.husky/_`, so a worktree push runs the main
+checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`.
+Covenant notes (`refs/notes/brit/covenant/*`) stay local until the steward rules on publishing
+them. Keep Brit for other operations; recheck the exception when the push fix lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
 its head.
 
 ## What to work on, and how you know it's done

@@ -115,6 +115,23 @@ pub enum PeerError {
         source: elohim_epr_rea::FabricError,
     },
 
+    /// A custody manifest in this device's flow store cannot be served: its method record is not
+    /// held here, or the manifest does not read. It stays held and is never served.
+    #[error("artifact manifest {manifest} is unindexed: {reason}")]
+    ArtifactUnindexed {
+        manifest: Box<eprfs_core::BlobCid>,
+        reason: crate::blob_mount::Unindexed,
+    },
+
+    /// An artifact was served (or refused) to an admitted device, but its `serve-blob` Use event
+    /// could not be appended to this device's flow store.
+    #[error("the serve of artifact {artifact} is unrecorded: {source}")]
+    ServeUnrecorded {
+        artifact: Box<eprfs_core::BlobCid>,
+        #[source]
+        source: elohim_epr_rea::FabricError,
+    },
+
     /// A channel tree could not be encoded (an event or a directory past the tree limits).
     #[error("cannot build the channel tree: {reason}")]
     ChannelTree { reason: String },

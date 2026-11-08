@@ -506,3 +506,33 @@ fn validate_manifest(manifest: &TierBlobManifest) -> std::result::Result<(), Tie
     }
     Ok(())
 }
+
+/// Read and validate one tier manifest from `store`, local only, without reading its chunks: the
+/// manifest bytes must hash to `manifest_cid` and decode under this reader's epoch.
+///
+/// A serving index uses this to learn which chunks an artifact names before it serves any of
+/// them; a draw still verifies every chunk and the complete output ([`stream_tier_blob`]).
+///
+/// # Errors
+///
+/// [`TierBlobUnavailable::ManifestCorrupt`] when the stored bytes fail their address,
+/// [`TierBlobUnavailable::Store`] when the store cannot answer (an absent manifest included), and
+/// the decode refusals [`stream_tier_blob`] gives for the same bytes.
+pub async fn read_tier_manifest<S: EprfsStorage + ?Sized>(
+    store: &S,
+    manifest_cid: &BlobCid,
+) -> std::result::Result<TierBlobManifest, TierBlobUnavailable> {
+    let handle = store
+        .fetch_blob(manifest_cid, FetchPolicy::LocalOnly)
+        .await
+        .map_err(|error| match error {
+            EprfsError::Corrupt(_) => TierBlobUnavailable::ManifestCorrupt,
+            other => TierBlobUnavailable::Store {
+                reason: other.to_string(),
+            },
+        })?;
+    if handle.cid != *manifest_cid || !manifest_cid.verifies(&handle.bytes) {
+        return Err(TierBlobUnavailable::ManifestCorrupt);
+    }
+    decode_manifest(&handle.bytes)
+}

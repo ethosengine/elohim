@@ -2009,12 +2009,35 @@ for k, v in merged.items():
 PY
 }
 
+# The epr the mesh build records and fetches artifacts through (artifact-store design §3).
+_mesh_epr() { printf '%s\n' "${EPR_BIN:-epr}"; }
+
+# mesh_fetch <method.json> <dest> — draw the artifact the method's key names at this checkout's
+# HEAD from one of the person's other devices, through this device's running `epr peer serve`
+# (artifact-store design §3.b.4). 0 only when the whole-blob-verified artifact is installed at
+# <dest>; every gap (no record, mismatch, daemon down, refused, deadline, integrity, transport)
+# prints its typed reason and returns 1, and the caller builds here.
+mesh_fetch() {
+  local method="$1" dest="$2" out rc=0
+  out=$("$(_mesh_epr)" artifact fetch --method "$method" --repo "$REPO_ROOT" --dest "$dest" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    chmod 0755 "$dest" || return 1
+    echo "[mesh build] $out"
+    return 0
+  fi
+  echo "[mesh build] ${out:-fetch gap: epr artifact fetch exited $rc} — building here" >&2
+  return 1
+}
+
 mesh_build() { # [storage|doorway|beacon] (default all three)
   local which="${1:-all}" dry="${MESH_BUILD_DRY_RUN:-0}" rc=0
   case "$which" in all|storage|doorway|beacon) ;; *)
     echo "usage: hc-mesh.sh build [storage|doorway|beacon]" >&2; return 2 ;; esac
-  _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest>
+  # <sources> names the build step whose declared inputs are the artifact's view
+  # (`elohim/holochain/build-manifest.json#cargo-build-storage`); empty = not recorded or fetched.
+  _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest> [sources]
     local project="$1" crate="$2" slot="$3" bin="$4" rustflags="$5" features="$6" dest="$7"
+    local sources="${8:-}" method="" input="" commit="" unrecorded="" started=0 out=""
     local envs=() line
     # Declared values win over the caller's environment, exactly as run-local-gate.sh exports
     # them: the workspace shell carries CARGO_BUILD_JOBS=4, and storage's measured cap is 1.
@@ -2023,12 +2046,66 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
     done < <(mesh_build_env "$project")
     local cmd=(env "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
       cargo build --bin "$bin")
+    # A recorded build (artifact-store review H3) runs cargo in an explicit environment: the
+    # method's non-path inputs (the declared caps and toolchain, RUSTFLAGS, the native toolchain
+    # variables `describe` records, and a FIXED PATH, recorded too, under which the key also names
+    # the cc and ld it resolves) plus HOME/LANG/TMPDIR and where the toolchain lives.
+    # Nothing else the caller exported (CARGO_ENCODED_RUSTFLAGS, CARGO_PROFILE_*, RUSTC_WRAPPER...)
+    # reaches it, and `epr artifact key|put` refuse when anything unrecorded is set.
+    local rec=(env)
+    local build_path="${CARGO_HOME:-$HOME/.cargo}/bin:/usr/local/bin:/usr/bin:/bin"
+    if [ -n "$sources" ]; then
+      local base=("PATH=$build_path" "HOME=$HOME" "LANG=${LANG:-C.UTF-8}") v
+      for v in TMPDIR CARGO_HOME RUSTUP_HOME CC CXX AR LIBCLANG_PATH PKG_CONFIG_PATH \
+        OPENSSL_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR PROTOC; do
+        [ -n "${!v+x}" ] && base+=("$v=${!v}")
+      done
+      cmd=(env -i "${base[@]}" "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
+        cargo build --bin "$bin")
+      # The epr calls keep the caller's own environment (device key, peer and payload places)
+      # less every other cargo/rust variable, plus the build's.
+      while IFS= read -r v; do
+        case "$v" in CARGO_HOME|RUSTUP_HOME) ;; CARGO_*|RUST*) rec+=(-u "$v") ;; esac
+      done < <(compgen -e)
+      rec+=("${envs[@]}" "RUSTFLAGS=$rustflags")
+    fi
     [ -n "$features" ] && cmd+=(--features "$features")
     local built="$POOL/$slot/dev/debug/$bin"
     echo "[mesh build] $project -> $dest"
     printf '  (cd %q &&' "$REPO_ROOT/$crate"; printf ' %q' "${cmd[@]}"; printf ')\n'
     [ "$built" = "$dest" ] || printf '  install -D -m 0755 %q %q\n' "$built" "$dest"
+    if [ -n "$sources" ]; then
+      method="$POOL/$slot/mesh-bin/.method-$bin.json"
+      [ "${MESH_BUILD_FETCH:-1}" = "0" ] || printf '  %q artifact fetch --method %q --repo %q --dest %q   # first; any gap builds here\n' \
+        "$(_mesh_epr)" "$method" "$REPO_ROOT" "$dest"
+      printf '  %q artifact put --method %q --input <key input> --bytes %q --project %q --cross   # after the install\n' \
+        "$(_mesh_epr)" "$method" "$dest" "$project"
+    fi
     [ "$dry" = "1" ] && return 0
+    if [ -n "$sources" ]; then
+      # The method and its key, computed BEFORE the build: the record names the closure the
+      # build started from, and `put` refuses if it moved meanwhile.
+      local describe=("${rec[@]}" "$(_mesh_epr)" artifact describe --project "$project" --bin "$bin"
+        --rustflags "$rustflags" --sources "$sources" --crate "$crate" --repo "$REPO_ROOT" --out "$method")
+      [ -n "$features" ] && describe+=(--features "$features")
+      for line in "${envs[@]}"; do describe+=(--env "$line"); done
+      describe+=(--env "PATH=$build_path")
+      if ! out=$("${describe[@]}" 2>&1); then
+        unrecorded="the method is not described: ${out:-epr artifact describe failed}"
+        method=""
+      elif ! input=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+          --print input 2>"$method.key-why"); then
+        unrecorded="no key: $(tail -n 1 "$method.key-why" 2>/dev/null || true)"
+        input=""
+      fi
+      commit=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)
+      if [ -n "$input" ] && [ "${MESH_BUILD_FETCH:-1}" != "0" ] && mesh_fetch "$method" "$dest"; then
+        rm -f "$(dirname "$dest")/.unrecorded"
+        echo "[mesh build] ok $dest (fetched from a sibling)"
+        return 0
+      fi
+      started=$(date +%s%3N)
+    fi
     (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
     [ "$built" = "$dest" ] || install -D -m 0755 "$built" "$dest" || return 1
     # An install has returned 0 over a copy that differed from its source (2026-10-12:
@@ -2039,15 +2116,33 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       install -D -m 0755 "$built" "$dest" && cmp -s "$built" "$dest" || {
         echo "[mesh build] REFUSED $project: $dest does not match the built binary" >&2; return 1; }
     fi
+    if [ -n "$sources" ]; then
+      # Record the install (design §3.a.4): one custody Produce that crosses. A failure is
+      # explicit, never silent, and never fails the build.
+      if [ -z "$unrecorded" ]; then
+        out=$("${rec[@]}" "$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$dest" \
+          --project "$project" --commit "$commit" --duration-ms "$(( $(date +%s%3N) - started ))" \
+          --cross --repo "$REPO_ROOT" 2>&1) || unrecorded="${out:-epr artifact put failed}"
+      fi
+      if [ -n "$unrecorded" ]; then
+        unrecorded="${unrecorded#unrecorded: }"
+        echo "[mesh build] unrecorded: $unrecorded" >&2
+        printf '%s\n' "$unrecorded" > "$(dirname "$dest")/.unrecorded" || true
+      else
+        rm -f "$(dirname "$dest")/.unrecorded"
+        echo "[mesh build] $out"
+      fi
+    fi
     echo "[mesh build] ok $dest"
   }
   if [ "$which" = all ] || [ "$which" = storage ]; then
     _mesh_build_one elohim-storage elohim/elohim-storage elohim__elohim-storage elohim-storage \
-      '--cfg getrandom_backend="custom"' "p2p p2p-iroh" "$_storage_mesh" || rc=1
+      '--cfg getrandom_backend="custom"' "p2p p2p-iroh" "$_storage_mesh" \
+      elohim/holochain/build-manifest.json#cargo-build-storage || rc=1
   fi
   if [ "$which" = all ] || [ "$which" = doorway ]; then
     _mesh_build_one doorway doorway/doorway-service doorway__doorway-service doorway \
-      "" "" "$_doorway_mesh" || rc=1
+      "" "" "$_doorway_mesh" elohim/holochain/build-manifest.json#cargo-build-doorway || rc=1
   fi
   if [ "$which" = all ] || [ "$which" = beacon ]; then
     # Its own workspace root and slot; nothing else writes that binary, so it is run in place.

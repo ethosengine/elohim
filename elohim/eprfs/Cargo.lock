@@ -1633,6 +1633,7 @@ dependencies = [
  "futures-lite",
  "iroh",
  "iroh-gossip",
+ "libc",
  "rand 0.8.8",
  "serde",
  "serde_ipld_dagcbor",

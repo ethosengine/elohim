@@ -292,6 +292,8 @@ PEER-VOUCHED — a join proof signed by any already-registered node, checkable d
 `must_get_valid_record` on the voucher's registration — never founder-signed. Until that pressure is
 measured, self-bound entries (row 6) plus the attribution cut are the defence.
 
+**Measured pressure, 2026-11-08 (artifact-store sprint red-team):** custody and salvage authority in elohim-storage now rests on DHT-confirmed AgentPeerBindings, and the confirmation is weak at the DNA: the imagodei binding view returns no author or signature and `create_agent_peer_binding` accepts unregistered agents, so a Sybil costs one DHT entry. Named residual, not a gate (operator: "our sybil resistance doesn't have to be perfect yet"); the DNA-side cure — a view that returns the record, and registration-checked binding validation, with a peer-vouched membrane only if pressure is measured — is tracked as [arch-dataplane-borrows](epr:arch-dataplane-borrows-backlog) row 25 for this batched DNA move.
+
 **D6 — Item 1's link arm is exhaustive; no `_ =>`.** Each `LinkTypes` variant is classified by an
 exhaustive fn into `AuthorIsBase` / `AuthorIsTargetAuthor` / `OpenIndex(<reason>)`, so an anchor or
 path link is open *by declaration* rather than by fallthrough. This is the habit's `retire-when`:

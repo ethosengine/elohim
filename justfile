@@ -417,6 +417,10 @@ mesh action="status" *args="":
       preflight) exec "{{ app_dir }}/scripts/hc-mesh.sh" preflight ;;
       # build the mesh's OWN storage (p2p p2p-iroh) + doorway binaries and install them into the
       # pool's mesh-bin/ paths, which the gate never writes; MESH_BUILD_DRY_RUN=1 prints the commands.
+      # Storage and doorway first try `epr artifact fetch` (the same closure built on a sibling
+      # device, whole-blob verified; MESH_BUILD_FETCH=0 opts out) and fall through to cargo on any
+      # typed gap; a cargo build is recorded with `epr artifact put --cross` (`unrecorded:` + a
+      # `<slot>/mesh-bin/.unrecorded` marker on failure; the build still succeeds).
       # build writes the mesh-bin paths every running household doorway/storage re-execs from, so it
       # is held to the same owner-check as the restart arms below.
       build)

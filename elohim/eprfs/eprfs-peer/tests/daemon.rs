@@ -75,6 +75,8 @@ fn config(
         signer: Arc::new(signer),
         verifier: verifier(devices),
         log: Arc::new(|_line: &str| {}),
+        payload_store: None,
+        install: Default::default(),
     }
 }
 
@@ -964,8 +966,72 @@ async fn a_stalled_device_holds_back_neither_another_devices_fold_nor_our_announ
     daemon_b.shutdown().await;
 }
 
+/// Put `bytes` in `side`'s custody, in `payload`, as the output of the method named `method`
+/// (its descriptor record held too), and return (output CID, manifest CID).
+async fn put_artifact(
+    side: &Side,
+    payload: &dyn eprfs_core::EprfsStorage,
+    method: &str,
+    bytes: &[u8],
+) -> (eprfs_core::BlobCid, eprfs_core::BlobCid) {
+    let descriptor = eprfs_core::MethodDescriptor {
+        name: method.to_string(),
+        tools: Default::default(),
+        flags: Vec::new(),
+        params: None,
+        exec: None,
+        step: None,
+        embedder: None,
+        view: Vec::new(),
+        non_path_inputs: Default::default(),
+        deterministic: true,
+    };
+    let method_cid = descriptor.cid().expect("method cid");
+    payload
+        .put_blob_verified(
+            &method_cid,
+            serde_ipld_dagcbor::to_vec(&descriptor)
+                .expect("descriptor")
+                .into(),
+        )
+        .await
+        .expect("method record");
+    let record = eprfs_core::DerivationRecord {
+        key: eprfs_core::DerivationKey {
+            method: method_cid,
+            input: eprfs_core::KeyInput::Raw(eprfs_core::BlobCid::compute_raw(method.as_bytes())),
+        },
+        output: eprfs_core::BlobCid::compute_bytes(bytes),
+        computed_by: "did:key:zDeviceB".into(),
+        basis: eprfs_core::DerivationBasis::Computed,
+        deterministic: true,
+        witness: eprfs_core::Witness::Signature {
+            sig: "fixture-signature".into(),
+        },
+    };
+    let context = eprfs_peer::LocalBlobContext {
+        custodian: elohim_epr_rea::AgentRef("did:key:zDeviceB".into()),
+        in_scope_of: elohim_epr_rea::atom_cid(&"artifact-scope").expect("scope"),
+        occurred_at: "2026-11-07T12:00:00Z".into(),
+        crossing: None,
+    };
+    let put = eprfs_peer::put_local_blob(
+        payload,
+        &mut side.checkout.store(),
+        record,
+        bytes::Bytes::copy_from_slice(bytes),
+        &context,
+    )
+    .await
+    .expect("put");
+    (put.manifest.record.output, put.manifest_cid)
+}
+
+/// Amended by the artifact mount (artifact-store design F0.2): a started daemon serves its
+/// channel roots plus the artifact roots its grant serves, and nothing else — not a flow event, not
+/// an unrelated CID, not an artifact of an ungranted method, and never an artifact as a tree.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_started_daemon_serves_only_its_channel_tree() {
+async fn a_started_daemon_serves_its_channel_roots_and_granted_artifact_roots_only() {
     let a = device("DeviceA", 1);
     let b = device("DeviceB", 2);
     let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
@@ -984,18 +1050,24 @@ async fn a_started_daemon_serves_only_its_channel_tree() {
     let refused = side_b
         .checkout
         .append(berth_event("refuse", "cargo", "sb", "2.0"));
-    let port_b = free_port();
-    let daemon_b = PeerDaemon::start(config(
+    let payload_dir = tempfile::tempdir().expect("payload");
+    let payload =
+        eprfs_peer::open_payload_store(&payload_dir.path().join("payload")).expect("payload store");
+    let mut serving = policy();
+    serving["berth"]["artifacts"] = serde_json::json!({"serves": {"mesh-build": ["steward"]}});
+    let mut config_b = config(
         &b,
         &a.did,
         key_b,
         &side_b,
         &[&a, &b],
         Vec::new(),
-        local(port_b),
-    ))
-    .await
-    .expect("B starts");
+        local(free_port()),
+    );
+    let port_b = config_b.listen.expect("listen").port();
+    config_b.rules = Rules::from_policy(&serving).expect("serving policy");
+    config_b.payload_store = Some(payload.clone());
+    let daemon_b = PeerDaemon::start(config_b).await.expect("B starts");
     eventually("B announces", || side_b.table().own.is_some()).await;
     let root_b = side_b.table().own.expect("own head").root;
     // The head table names the one flow store this device's channel is projected from, and each
@@ -1014,6 +1086,16 @@ async fn a_started_daemon_serves_only_its_channel_tree() {
     let logged = table_b.own_log.last().expect("an own announce");
     assert_eq!(logged.events, 2);
     assert_eq!(logged.last, Some(refused.to_string()));
+    // Custody puts while B serves, as a daemon-up put lands: in its payload store and flow store.
+    let (granted, granted_manifest) =
+        put_artifact(&side_b, payload.as_ref(), "mesh-build", b"a granted build").await;
+    let (ungranted, _) = put_artifact(
+        &side_b,
+        payload.as_ref(),
+        "not-shared",
+        b"an ungranted build",
+    )
+    .await;
 
     let client = eprfs_peer::bind(&key_a, None, vec![])
         .await
@@ -1043,12 +1125,59 @@ async fn a_started_daemon_serves_only_its_channel_tree() {
     for root in [
         eprfs_core::BlobCid::parse(&refused.to_string()).expect("cid"),
         eprfs_core::BlobCid::compute(b"anything else this device holds"),
+        granted_manifest.clone(),
     ] {
         let answer = ask(eprfs_peer::TierRequest::List {
             root,
             path: eprfs_core::TreePath::root(),
         })
         .await;
+        assert!(
+            matches!(answer, eprfs_peer::TierAnswer::Unanswered { .. }),
+            "{answer:?}"
+        );
+    }
+    // A granted artifact's root passes the root gate, but the tree endpoint reads the channel
+    // store alone: it never lists or reads an artifact.
+    let as_tree = ask(eprfs_peer::TierRequest::List {
+        root: granted.clone(),
+        path: eprfs_core::TreePath::root(),
+    })
+    .await;
+    assert!(
+        matches!(
+            as_tree,
+            eprfs_peer::TierAnswer::Unanswered { .. } | eprfs_peer::TierAnswer::Failed { .. }
+        ),
+        "{as_tree:?}"
+    );
+    // The granted artifact's root is served, once the mount has indexed it on a tick.
+    let mut served = None;
+    for _ in 0..100 {
+        let answer = ask(eprfs_peer::TierRequest::Manifest {
+            artifact: granted.clone(),
+        })
+        .await;
+        if matches!(answer, eprfs_peer::TierAnswer::Blob { .. }) {
+            served = Some(answer);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(
+        matches!(served, Some(eprfs_peer::TierAnswer::Blob { ref cid, .. }) if *cid == granted_manifest),
+        "{served:?}"
+    );
+    // Nothing else is an artifact root: an ungranted method, a flow event, an unrelated CID, the
+    // manifest itself, the channel root.
+    for artifact in [
+        ungranted,
+        eprfs_core::BlobCid::parse(&refused.to_string()).expect("cid"),
+        eprfs_core::BlobCid::compute(b"anything else this device holds"),
+        granted_manifest,
+        root_b.clone(),
+    ] {
+        let answer = ask(eprfs_peer::TierRequest::Manifest { artifact }).await;
         assert!(
             matches!(answer, eprfs_peer::TierAnswer::Unanswered { .. }),
             "{answer:?}"

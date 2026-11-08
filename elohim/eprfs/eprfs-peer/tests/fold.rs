@@ -65,6 +65,9 @@ impl TestChannel {
             TierRequest::Diff { .. } => TierAnswer::Failed {
                 reason: "no diff".into(),
             },
+            TierRequest::Manifest { .. } | TierRequest::Blob { .. } => TierAnswer::Failed {
+                reason: "no artifacts".into(),
+            },
         }
     }
 
@@ -1002,6 +1005,8 @@ async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_he
         signer,
         verifier: h.verify.clone(),
         log: Arc::new(|_line: &str| {}),
+        payload_store: None,
+        install: Default::default(),
     })
     .await
     .expect("A daemon starts");

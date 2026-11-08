@@ -1286,6 +1286,10 @@ test('a native evaluator older than the verb names itself, not the closure', fun
   const dirty = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/new/epr' }, toolchain: '1.96.1',
     run: fake({ status: 0, stdout: JSON.stringify({ clean: false, status: ' M x', closureCid: '', closure: [] }) }) });
   assert.equal(dirty.miss, 'source closure dirty');
+  const sha2 = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/pre/epr' }, toolchain: '1.96.1',
+    run: fake({ status: 0, stdout: JSON.stringify({ clean: true, status: '', closureCid: 'bafkreihox342' + 'a'.repeat(47), closure: ['x'] }) }) });
+  assert.match(sha2.miss, /\/pre\/epr emitted closureCid bafkrei…, not a byte CID \(\^bafkr4i\); it predates abd66bdb1/);
+  assert.equal(sha2.key, undefined);
   assert.equal(nativeGateState(project, { root: '/nowhere', env: {} }).miss, 'no toolchain declared');
 });
 

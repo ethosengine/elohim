@@ -1,0 +1,11 @@
+You are an independent integrity reviewer (read-only). Do not edit files and do not run cargo, git or any build. Checkout: /projects/elohim/.worktrees/as-e3 (branch artifact-store/e3). The change: unified diff /var/tmp/as-e3.diff (base 303af86f3). Its specification is genesis/docs/superpowers/sprints/2026-11-07-artifact-store/design.md §0 and §1 (read §1.3 and §1.4 closely) and the author's report genesis/docs/superpowers/plans/task-as-e3-report.md (refusal shapes and listed deviations). Context: elohim/eprfs/eprfs-serve/src/lib.rs (TierEndpoint, root_refusal) and elohim/eprfs/eprfs-peer/src/{gate.rs, tier.rs, blob_mount.rs, serves.rs, daemon.rs}.
+
+Attack, as an admitted sibling device and as a stranger with a valid iroh key, and report what succeeds:
+1. Can any requester obtain bytes of an artifact (manifest or chunk) outside its grant — by asking via a different root, via the tree endpoint (List/Read/Diff) on an artifact root, via a chunk CID used as a root, via a manifest CID in the artifact slot, or via a CID that belongs to two artifacts with different methods? Is admit_object really called before every blob byte is served?
+2. Does a stranger learn anything (held vs unknown, method name, grant) from refusal bytes, timing classes, counters exposed over the wire, or different answer variants? The claim is byte-identical refusals.
+3. Grant parsing (serves.rs, Rules::digest): is the `berth.artifacts.serves` vocabulary fail-closed (unknown audience, malformed policy, empty list)? Does a policy reload drop a device's access on an open connection (claimed by a test)?
+4. The index (blob_mount.rs): can a malicious or corrupt local manifest, or a manifest whose method record is missing or names another method, get indexed or served? Is the index rebuilt from the device's own flow store only, never from a peer?
+5. The serve-blob Use event: can it cross the steward channel (must not: no `measure:` slot)? Can a requester make the holder write unbounded events (dedup window claim)?
+6. Deviations 1–10 in the report: does any of them weaken the design's rulings?
+
+Final message only: verdict (APPROVE / APPROVE-WITH-FOLLOWUPS / BLOCK) and numbered findings with file:line, the attack, impact and severity. Never claim to have run tests.

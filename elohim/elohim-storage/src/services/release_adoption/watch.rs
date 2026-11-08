@@ -2065,7 +2065,10 @@ enum CheckOutcome {
 /// channel deferred because WE are over budget has done nothing wrong, and
 /// putting it on the ladder would slow the channel down for a reason that is
 /// about us.
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the transition tuple is destructured once at the sweep; naming it would hide its three-way split"
+)]
 fn outcome_transition(
     outcome: CheckOutcome,
 ) -> Option<(
@@ -2309,6 +2312,30 @@ fn decide_tick(previous: Option<&FollowShape>, current: &FollowShape) -> TickDec
 /// so a stalled runtime coalesces missed ticks instead of catching up in a
 /// burst, and every per-tick cost capped by the budgets above.
 pub fn spawn(controller: AdoptionController) -> bool {
+    spawn_late_bound(controller, None)
+}
+
+/// [`spawn`], plus a conductor-wired controller that REPLACES the running one
+/// when it arrives on `late`.
+///
+/// The boot-order case (alpha, 2026-11-08): on a cold fleet storage boots
+/// before its conductor has installed the app, so the `lamad` bridge is not
+/// connected when the controller is built. The controller still spawns at
+/// boot — a follow has to land on a running node, and with no conductor every
+/// sweep reports the honest, TRANSIENT `conductor_unavailable` — and the
+/// caller sends the same build, wired through the conductor, once the client
+/// registry acquires the bridge. Before this the boot snapshot's `None` was
+/// kept for the life of the process: a permanent `conductor_unavailable` on a
+/// node whose conductor had been up for hours.
+///
+/// The swap happens at the top of a tick, never inside a sweep. In-process
+/// memos (settled rests, the installed-reality cache, ledger write dedupe)
+/// start fresh with the new controller, exactly as after a restart; the
+/// channel registry in [`state`] is process-global and is kept.
+pub fn spawn_late_bound(
+    controller: AdoptionController,
+    late: Option<tokio::sync::oneshot::Receiver<AdoptionController>>,
+) -> bool {
     let followed = followed_from_runtime_config();
     if followed.channels.is_empty() {
         tracing::info!(
@@ -2352,11 +2379,14 @@ pub fn spawn(controller: AdoptionController) -> bool {
     state::mark_controller_running(true);
 
     tokio::spawn(async move {
+        let mut controller = controller;
+        let mut late = late;
         let mut ticker = tokio::time::interval(Duration::from_secs(SWEEP_INTERVAL_SECS));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut previous = FollowShape::of(&followed);
         loop {
             ticker.tick().await;
+            adopt_late_wiring(&mut controller, &mut late);
             // Re-read the config every tick: rung 4's whole point is that a
             // follow/unfollow lands on a RUNNING node.
             let followed = followed_from_runtime_config();
@@ -2386,6 +2416,44 @@ pub fn spawn(controller: AdoptionController) -> bool {
         }
     });
     true
+}
+
+/// Replace `controller` with the conductor-wired one if it has arrived on
+/// `late`. Returns whether it did.
+///
+/// On a swap, every channel whose last verdict was `conductor_unavailable` has
+/// its backoff cleared: those refusals were about this node having no
+/// conductor, not about the channel, so the first sweep through the conductor
+/// checks every one of them instead of sitting out a ladder rung of up to
+/// [`state::TERMINAL_BACKOFF_SECS`] earned while it waited. A sender dropped
+/// without sending (the acquiring task saw shutdown) stops the polling and
+/// leaves the running controller as it is.
+fn adopt_late_wiring(
+    controller: &mut AdoptionController,
+    late: &mut Option<tokio::sync::oneshot::Receiver<AdoptionController>>,
+) -> bool {
+    use tokio::sync::oneshot::error::TryRecvError;
+    let Some(receiver) = late.as_mut() else {
+        return false;
+    };
+    match receiver.try_recv() {
+        Ok(wired) => {
+            *controller = wired;
+            *late = None;
+            let cleared = state::clear_conductor_unavailable_backoff();
+            tracing::info!(
+                cleared,
+                "release-adoption: conductor-wired controller adopted — this sweep resolves heads \
+                 through this node's conductor"
+            );
+            true
+        }
+        Err(TryRecvError::Empty) => false,
+        Err(TryRecvError::Closed) => {
+            *late = None;
+            false
+        }
+    }
 }
 
 /// Pre-touch every `(arm, reason)` series a real branch of this module can
@@ -2895,6 +2963,116 @@ mod tests {
             other => panic!("expected conductor_unavailable, got {other:?}"),
         }
         assert!(channel.resolved_head.is_none(), "unreachable is not a head");
+    }
+
+    /// A conductor that answers every channel with one present head.
+    struct PresentHead;
+
+    #[async_trait::async_trait]
+    impl head_reader::HeadReader for PresentHead {
+        async fn resolve(&self, channel_id: &str) -> Answer<ContentHeadWire> {
+            let head = serde_json::from_value(serde_json::json!({
+                "content_id": channel_id,
+                "head_action_hash": "uhCkkLateBoundHead",
+                "declared_at": 1_700_000_000_000_000i64,
+                "canonical": true,
+                "canonical_earned": Some(false),
+                "content": {
+                    "id": channel_id,
+                    "content_type": "concept",
+                    "title": "t",
+                    "description": "d",
+                    "content_format": "markdown",
+                    "reach": "commons",
+                    "metadata_json": "{}",
+                },
+            }))
+            .expect("ContentHeadWire fixture must deserialize");
+            Answer::Present(head)
+        }
+    }
+
+    fn last_refusal(channel_id: &str) -> Option<RefusalReason> {
+        match state::channel_state(channel_id)?.verdict? {
+            Verdict::Refused { refusal } => Some(refusal.reason_code()),
+            _ => None,
+        }
+    }
+
+    /// The boot-order bug (alpha, 2026-11-08): storage booted before its
+    /// conductor installed the app, the controller was built with no
+    /// conductor, and it kept that `None` for the life of the process. Now the
+    /// conductor-wired controller that arrives later is adopted by the RUNNING
+    /// loop, and the very next sweep resolves the head through it — despite
+    /// the backoff the waiting refusals earned.
+    #[tokio::test]
+    async fn a_conductor_that_arrives_after_boot_is_adopted_by_the_running_controller() {
+        let _serial = settled_rest::sweep_test_lock().lock().await;
+        let dir = tempfile::tempdir().unwrap();
+        let channel_id = "runtime:coordinators:elohim:late-bound";
+        let followed = state::parse_followed_channels(channel_id);
+        let (wired_tx, wired_rx) = tokio::sync::oneshot::channel();
+        let mut late = Some(wired_rx);
+        let mut controller = AdoptionController::new(dir.path());
+
+        // Boot: no conductor yet — the honest transient refusal.
+        assert_eq!(controller.sweep_once(&followed).await, 1);
+        assert_eq!(
+            last_refusal(channel_id),
+            Some(RefusalReason::ConductorUnavailable)
+        );
+
+        // Still waiting: nothing to adopt, and the channel keeps reporting
+        // conductor_unavailable (now backing off) rather than anything final.
+        assert!(!adopt_late_wiring(&mut controller, &mut late));
+        assert!(late.is_some(), "an empty channel keeps being polled");
+        controller.sweep_once(&followed).await;
+        assert_eq!(
+            last_refusal(channel_id),
+            Some(RefusalReason::ConductorUnavailable)
+        );
+        assert!(state::channel_state(channel_id)
+            .unwrap()
+            .is_backing_off(state::now_unix()));
+
+        // The bridge lands: the conductor-wired build arrives.
+        let mut wired = AdoptionController::new(dir.path());
+        wired.heads = Some(Arc::new(PresentHead));
+        assert!(wired_tx.send(wired).is_ok());
+        assert!(adopt_late_wiring(&mut controller, &mut late));
+        assert!(late.is_none(), "adopted once, never polled again");
+        assert!(
+            !state::channel_state(channel_id)
+                .unwrap()
+                .is_backing_off(state::now_unix()),
+            "a refusal about having no conductor does not outlive the conductor's arrival"
+        );
+
+        assert_eq!(controller.sweep_once(&followed).await, 1);
+        let channel = state::channel_state(channel_id).unwrap();
+        assert_eq!(
+            channel.resolved_head.as_ref().map(|h| h.cid.as_str()),
+            Some("uhCkkLateBoundHead"),
+            "the head resolved through the late conductor"
+        );
+        assert_ne!(
+            last_refusal(channel_id),
+            Some(RefusalReason::ConductorUnavailable)
+        );
+    }
+
+    /// The acquiring task gave up (shutdown) without sending: stop polling and
+    /// keep the running controller.
+    #[test]
+    fn a_dropped_late_wiring_stops_polling_and_keeps_the_running_controller() {
+        let dir = tempfile::tempdir().unwrap();
+        let (wired_tx, wired_rx) = tokio::sync::oneshot::channel::<AdoptionController>();
+        let mut late = Some(wired_rx);
+        let mut controller = AdoptionController::new(dir.path());
+        drop(wired_tx);
+        assert!(!adopt_late_wiring(&mut controller, &mut late));
+        assert!(late.is_none());
+        assert!(controller.heads.is_none());
     }
 
     /// A blob the store does not hold is `artifact_unavailable` — transient, so

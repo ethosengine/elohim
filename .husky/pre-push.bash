@@ -101,6 +101,13 @@ PNPM_HOME="${PNPM_HOME:-/nix/xdg/cache/pnpm}"
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 
+# A notes ref (refs/notes/brit/* receipts) points at a notes commit whose tree is not a source
+# tree: no style reach, no change detection, no gate closure applies. Every leg that iterates
+# pushed refs skips it here; branch refs keep their full gating.
+is_notes_ref() {
+  case "$1" in refs/notes/*) return 0 ;; *) return 1 ;; esac
+}
+
 # ── Lockfile Consistency Check ────────────────────────────────────
 # Catch uncommitted lockfile changes that would break CI's --frozen-lockfile
 if { git diff --name-only HEAD 2>/dev/null || true; } | grep -q 'pnpm-lock.yaml'; then
@@ -738,6 +745,7 @@ LIVE_DEV_SHA=""
 LIVE_TARGETS=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r _ L_SHA L_REF _ <<<"$PUSH_LINE"
+  is_notes_ref "$L_REF" && continue # reported once, by the change-detection loop below
   [ "$L_SHA" = "$ZERO_SHA" ] && continue
   LIVE_TARGETS="${LIVE_TARGETS:+$LIVE_TARGETS }$L_REF"
   LIVE_SHA="$L_SHA"
@@ -821,6 +829,10 @@ LAST_LOCAL_SHA=""
 DEV_LOCAL_SHA=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA <<<"$PUSH_LINE"
+  if is_notes_ref "$REMOTE_REF"; then
+    echo "notes: $REMOTE_REF skipped (not a commit tree)"
+    continue
+  fi
   # Skip delete pushes
   if [ "$LOCAL_SHA" = "$ZERO_SHA" ]; then
     continue

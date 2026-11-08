@@ -2388,6 +2388,50 @@ mod supervised_slot_tests {
         assert!(Arc::ptr_eq(&got, &supervised));
     }
 
+    /// The boot-order consumers (binding mint, release adoption) wait on this
+    /// when the conductor is not up yet: the acquisition stays pending for as
+    /// long as the dial has not landed, and resolves to the slot's handle the
+    /// moment it does.
+    #[tokio::test]
+    async fn an_absent_role_is_awaited_until_its_connection_lands() {
+        let slot = Arc::new(RwLock::new(None));
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let (_tx, rx) = shutdown_pair();
+        let conductor_up = Arc::new(tokio::sync::Notify::new());
+
+        let waiter = tokio::spawn({
+            let (slot, gate, conductor_up) = (
+                Arc::clone(&slot),
+                Arc::clone(&gate),
+                Arc::clone(&conductor_up),
+            );
+            async move {
+                acquire_through_slot(&slot, &gate, rx, |_| async move {
+                    // Stands in for `connect_role_forever` still retrying.
+                    conductor_up.notified().await;
+                    Some(Arc::new(Handle))
+                })
+                .await
+            }
+        });
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        assert!(
+            !waiter.is_finished(),
+            "keeps waiting while the role is absent"
+        );
+        assert!(in_slot(&slot).is_none());
+
+        conductor_up.notify_one();
+        let got = waiter
+            .await
+            .expect("joined")
+            .expect("acquired once it landed");
+        let supervised = in_slot(&slot).expect("stored in the slot");
+        assert!(Arc::ptr_eq(&got, &supervised));
+    }
+
     #[tokio::test]
     async fn a_connected_role_is_handed_out_without_dialing() {
         let boot = Arc::new(Handle);

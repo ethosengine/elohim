@@ -111,6 +111,8 @@ fn command_for(key_file: &Path, config: &Path, store: &Path) -> Command {
         .env(device_key::DEVICE_KEY_ENV, key_file)
         .env("XDG_CONFIG_HOME", config)
         .env("EPR_STORE", store)
+        // `epr peer serve` mounts a payload store; never the account's own.
+        .env("EPR_PAYLOAD_STORE", config.join("payload"))
         .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
         .env_remove("EPR_PEER_RELAY_URL")
         .env_remove("CLAUDE_CODE_SESSION_ID")
@@ -229,6 +231,8 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
         signer: Arc::new(move |m: &[u8]| b_signer.sign(m)),
         verifier: Arc::new(|d: &str, m: &[u8], s: &[u8]| device_key::verify(d, m, s)),
         log: Arc::new(|_: &str| {}),
+        payload_store: None,
+        install: Default::default(),
     })
     .await
     .unwrap();
