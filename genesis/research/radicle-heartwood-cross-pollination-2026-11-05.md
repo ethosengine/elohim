@@ -10,10 +10,6 @@ cites:
   - "artifact-store-sprint-2026-11-07 | the sprint 2 hub whose landed and branch-only work the After sprint 2 section reports | sha256:4b76fac9f23efae3 | path: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/plan.md"
   - "native-dev-plane-one-derivation-earned-reach-design | the design whose derivation key, one store per device and reach rulings the store follows | sha256:024a89c3dba2699f | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
   - "native-dev-tooling-over-peers-plan | the plan §7.3-7.4 that sorted this survey's lessons into tracks | sha256:a894a6f45fc92215 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
-  - elohim/rakia/docs/specs/2026-04-27-rakia-as-brit-attestation-executor-design.md
-  - elohim/rakia/docs/plans/stage-2-canopy.md
-  - elohim/rakia/docs/plans/build-attestation-integration.md
-  - elohim/rakia/schemas/v1/release-manifest.schema.json
 ---
 
 # Radicle / Heartwood Cross-Pollination — November 2026
