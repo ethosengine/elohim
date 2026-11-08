@@ -2048,12 +2048,14 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       cargo build --bin "$bin")
     # A recorded build (artifact-store review H3) runs cargo in an explicit environment: the
     # method's non-path inputs (the declared caps and toolchain, RUSTFLAGS, the native toolchain
-    # variables `describe` records) plus PATH/HOME/LANG/TMPDIR and where the toolchain lives.
+    # variables `describe` records, and a FIXED PATH, recorded too, under which the key also names
+    # the cc and ld it resolves) plus HOME/LANG/TMPDIR and where the toolchain lives.
     # Nothing else the caller exported (CARGO_ENCODED_RUSTFLAGS, CARGO_PROFILE_*, RUSTC_WRAPPER...)
     # reaches it, and `epr artifact key|put` refuse when anything unrecorded is set.
     local rec=(env)
+    local build_path="${CARGO_HOME:-$HOME/.cargo}/bin:/usr/local/bin:/usr/bin:/bin"
     if [ -n "$sources" ]; then
-      local base=("PATH=$PATH" "HOME=$HOME" "LANG=${LANG:-C.UTF-8}") v
+      local base=("PATH=$build_path" "HOME=$HOME" "LANG=${LANG:-C.UTF-8}") v
       for v in TMPDIR CARGO_HOME RUSTUP_HOME CC CXX AR LIBCLANG_PATH PKG_CONFIG_PATH \
         OPENSSL_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR PROTOC; do
         [ -n "${!v+x}" ] && base+=("$v=${!v}")
@@ -2087,6 +2089,7 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
         --rustflags "$rustflags" --sources "$sources" --crate "$crate" --repo "$REPO_ROOT" --out "$method")
       [ -n "$features" ] && describe+=(--features "$features")
       for line in "${envs[@]}"; do describe+=(--env "$line"); done
+      describe+=(--env "PATH=$build_path")
       if ! out=$("${describe[@]}" 2>&1); then
         unrecorded="the method is not described: ${out:-epr artifact describe failed}"
         method=""

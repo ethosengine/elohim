@@ -370,27 +370,56 @@ fn relay_bound(len: u64) -> Duration {
 /// The bytes one frame deadline must carry over a relay: 4 MiB.
 const RELAY_FRAME_BYTES: u64 = 4 * 1024 * 1024;
 
-/// How long one request to a holder may take: the stall bound, tightened to the relay floor on a
-/// relay-only path, and never past the fetch's deadline.
-fn request_bound(relay: bool, len: u64, budget: &FetchBudget, deadline: Instant) -> Duration {
-    let bound = if relay {
+/// How long one request or dial may take, and which limit set that: the holder's own bound (the
+/// stall bound, tightened to the relay floor on a relay-only path) or the fetch's deadline. When
+/// it elapses, the limit that set it is the one that fired, so a deadline-cut request is the
+/// deadline's gap and a holder's own stall is the holder's: no tolerance window decides.
+#[derive(Debug, Clone, Copy)]
+struct Bound {
+    wait: Duration,
+    by_deadline: bool,
+}
+
+fn request_bound(relay: bool, len: u64, budget: &FetchBudget, deadline: Instant) -> Bound {
+    let own = if relay {
         budget.stall.min(relay_bound(len))
     } else {
         budget.stall
     };
-    bound.min(deadline.saturating_duration_since(Instant::now()))
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining <= own {
+        Bound {
+            wait: remaining,
+            by_deadline: true,
+        }
+    } else {
+        Bound {
+            wait: own,
+            by_deadline: false,
+        }
+    }
 }
 
-/// Whether `deadline` has passed (or is within a scheduling tick of it): a request bounded by the
-/// time remaining that elapses then was cut by the fetch's deadline, not by its holder.
-fn past(deadline: Instant) -> bool {
-    Instant::now() + Duration::from_millis(20) >= deadline
+/// Why a dial did not connect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DialFailed {
+    /// The endpoint answered with an error.
+    Refused,
+    /// The bound elapsed, set by the fetch's deadline or not.
+    Elapsed { by_deadline: bool },
 }
 
-async fn dial(endpoint: &Endpoint, addr: &NodeAddr, bound: Duration) -> Option<Connection> {
-    match tokio::time::timeout(bound, endpoint.connect(addr.clone(), TIER_ALPN)).await {
-        Ok(Ok(connection)) => Some(connection),
-        Ok(Err(_)) | Err(_) => None,
+async fn dial(
+    endpoint: &Endpoint,
+    addr: &NodeAddr,
+    bound: Bound,
+) -> Result<Connection, DialFailed> {
+    match tokio::time::timeout(bound.wait, endpoint.connect(addr.clone(), TIER_ALPN)).await {
+        Ok(Ok(connection)) => Ok(connection),
+        Ok(Err(_)) => Err(DialFailed::Refused),
+        Err(_) => Err(DialFailed::Elapsed {
+            by_deadline: bound.by_deadline,
+        }),
     }
 }
 
@@ -449,13 +478,14 @@ async fn accept_manifest(
     for (index, holder) in holders.iter().enumerate() {
         let relay = relay_only(&holder.addr);
         let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
-        let Some(connection) = dial(endpoint, &holder.addr, bound).await else {
-            if past(deadline) {
-                return Err(FetchGap::DeadlineExceeded {
-                    fetched: 0,
-                    total: 0,
-                });
-            }
+        let dialled = dial(endpoint, &holder.addr, bound).await;
+        if matches!(dialled, Err(DialFailed::Elapsed { by_deadline: true })) {
+            return Err(FetchGap::DeadlineExceeded {
+                fetched: 0,
+                total: 0,
+            });
+        }
+        let Ok(connection) = dialled else {
             // Unreachable is a route gap; only a reached relay too slow for a frame is the
             // transport's.
             unreachable.insert(index);
@@ -470,7 +500,7 @@ async fn accept_manifest(
         let received = AtomicU64::new(0);
         let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
         let answer = tokio::time::timeout(
-            bound,
+            bound.wait,
             tier_request_counted(&connection, &request, budget.manifest_cap, &received),
         )
         .await;
@@ -526,7 +556,7 @@ async fn accept_manifest(
             Ok(Err(PeerError::TierFrameTooLarge { len, cap })) => {
                 FetchGap::ManifestTooLarge { len, cap }
             }
-            Err(_) if past(deadline) => {
+            Err(_) if bound.by_deadline => {
                 return Err(FetchGap::DeadlineExceeded {
                     fetched: 0,
                     total: 0,
@@ -677,7 +707,7 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
             }
             let (endpoint, addr) = (endpoint.clone(), holder.addr.clone());
             let bound = request_bound(false, 0, budget, deadline);
-            dials.spawn(async move { (index, dial(&endpoint, &addr, bound).await) });
+            dials.spawn(async move { (index, dial(&endpoint, &addr, bound).await.ok()) });
         }
         let mut dialled = Vec::new();
         while let Some(joined) = dials.join_next().await {
@@ -699,7 +729,7 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
 
     let cap = budget.in_flight_per_holder.max(1);
     let mut fetched_from = BTreeSet::from([holders[manifest_holder].device.clone()]);
-    let mut tasks: JoinSet<(usize, TierBlobChunk, ChunkOutcome, u64)> = JoinSet::new();
+    let mut tasks: JoinSet<(usize, TierBlobChunk, ChunkOutcome, u64, bool)> = JoinSet::new();
     let mut next = 0usize;
     let (mut chunks_fetched, mut bytes_fetched) = (0usize, 0u64);
     let close_all = |links: &[Link]| {
@@ -739,11 +769,12 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
                 let frame_cap = chunk.byte_len.saturating_add(CHUNK_FRAME_OVERHEAD);
                 let received = AtomicU64::new(0);
                 let answer = tokio::time::timeout(
-                    bound,
+                    bound.wait,
                     tier_request_counted(&connection, &request, frame_cap, &received),
                 )
                 .await;
-                (chosen, chunk, answer, received.load(Ordering::Relaxed))
+                let received = received.load(Ordering::Relaxed);
+                (chosen, chunk, answer, received, bound.by_deadline)
             });
         }
         if tasks.is_empty() {
@@ -755,7 +786,7 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
         let Some(joined) = tasks.join_next().await else {
             continue;
         };
-        let Ok((index, chunk, answer, received)) = joined else {
+        let Ok((index, chunk, answer, received, by_deadline)) = joined else {
             // A request task cannot panic short of a bug; its chunk is unaccounted for, so the
             // fetch stops rather than install a partial set.
             break Err(FetchGap::LocalStore {
@@ -813,8 +844,8 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
             Err(_) => {
                 // Stalled: whatever had arrived before the bound is discarded with the request.
                 discard(received);
-                if past(deadline) {
-                    // Cut short by the fetch's own deadline, not by the holder's pace.
+                if by_deadline {
+                    // The fetch's own deadline set this bound and fired: not the holder's pace.
                     break Err(FetchGap::DeadlineExceeded {
                         fetched: progress.held.load(Ordering::Relaxed),
                         total: manifest.byte_len,
@@ -900,25 +931,49 @@ impl TierBlobSink for FileSink {
 }
 
 /// A fresh staging directory beside the destination, on its filesystem: created exclusively
-/// (`mkdir` fails on any existing name), mode 0700, under a random name nobody can predict, and
-/// removed with everything in it when dropped, whatever path the install took.
+/// (`mkdir` fails on any existing name), mode 0700, named `.fetch-<destination name>.<128 random
+/// bits>`, and removed with everything in it when dropped, whatever path the install took.
+///
+/// It holds an advisory lock on its own `lock` file for as long as it lives, so a later install
+/// of the same destination can tell a live staging directory from one a killed run left behind
+/// ([`sweep_stale_staging`]); the kernel releases the lock however the process ends.
 struct Staging {
     dir: PathBuf,
+    _lock: std::fs::File,
+}
+
+/// The file inside a staging directory its installer holds locked while it lives.
+const STAGING_LOCK: &str = "lock";
+
+/// How long a staging directory without its lock file is presumed to be in its first moment
+/// (created, lock not yet taken) rather than orphaned.
+const STAGING_LOCKLESS_GRACE: Duration = Duration::from_secs(60);
+
+fn staging_prefix(name: &std::ffi::OsStr) -> String {
+    format!(".fetch-{}.", name.to_string_lossy())
 }
 
 impl Staging {
-    fn beside(parent: &Path) -> std::io::Result<Staging> {
-        use std::os::unix::fs::DirBuilderExt;
+    fn beside(parent: &Path, name: &std::ffi::OsStr) -> std::io::Result<Staging> {
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
         let mut last = None;
         for _ in 0..8 {
-            let name = format!(
-                ".fetch-{:016x}{:016x}",
+            let dir = parent.join(format!(
+                "{}{:016x}{:016x}",
+                staging_prefix(name),
                 rand::random::<u64>(),
                 rand::random::<u64>()
-            );
-            let dir = parent.join(name);
+            ));
             match std::fs::DirBuilder::new().mode(0o700).create(&dir) {
-                Ok(()) => return Ok(Staging { dir }),
+                Ok(()) => {
+                    let lock = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(dir.join(STAGING_LOCK))?;
+                    lock.try_lock().map_err(std::io::Error::other)?;
+                    return Ok(Staging { dir, _lock: lock });
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => last = Some(e),
                 Err(e) => return Err(e),
             }
@@ -932,6 +987,52 @@ impl Drop for Staging {
         // Best effort: an install that published renamed its file out already.
         let _ = std::fs::remove_dir_all(&self.dir);
     }
+}
+
+/// Remove the staging directories a killed install of `name` left in `parent` (review item 12),
+/// before a new install stages its own. Lock based: a directory is removed only when nobody holds
+/// its lock now (a live installer always does), or, lacking a lock file, when it is older than
+/// [`STAGING_LOCKLESS_GRACE`]. Only directories named for this destination are looked at, never
+/// followed through a link. Returns how many were removed.
+fn sweep_stale_staging(parent: &Path, name: &std::ffi::OsStr) -> usize {
+    let prefix = staging_prefix(name);
+    let Ok(entries) = std::fs::read_dir(parent) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.filter_map(Result::ok) {
+        let file_name = entry.file_name();
+        let Some(rest) = file_name.to_str().and_then(|n| n.strip_prefix(&prefix)) else {
+            continue;
+        };
+        if rest.len() != 32 || !rest.bytes().all(|b| b.is_ascii_hexdigit()) {
+            continue;
+        }
+        let dir = entry.path();
+        let Ok(meta) = std::fs::symlink_metadata(&dir) else {
+            continue;
+        };
+        if !meta.is_dir() {
+            continue;
+        }
+        let lock_path = dir.join(STAGING_LOCK);
+        let orphaned = match std::fs::symlink_metadata(&lock_path) {
+            Ok(lock_meta) if lock_meta.is_file() => std::fs::OpenOptions::new()
+                .write(true)
+                .open(&lock_path)
+                .is_ok_and(|lock| lock.try_lock().is_ok()),
+            Ok(_) => false,
+            Err(_) => meta
+                .modified()
+                .ok()
+                .and_then(|at| at.elapsed().ok())
+                .is_some_and(|age| age >= STAGING_LOCKLESS_GRACE),
+        };
+        if orphaned && std::fs::remove_dir_all(&dir).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// The (device, inode) of an open file or a path that is a regular file, never a link.
@@ -981,7 +1082,12 @@ where
             reason: "the destination names no directory".into(),
         })?;
     std::fs::create_dir_all(parent).map_err(local)?;
-    let staging = Staging::beside(parent).map_err(local)?;
+    let name = dest.file_name().ok_or_else(|| FetchGap::InstallRefused {
+        dest: dest.display().to_string(),
+        reason: "the destination names no file".into(),
+    })?;
+    sweep_stale_staging(parent, name);
+    let staging = Staging::beside(parent, name).map_err(local)?;
     let staged = staging.dir.join("artifact");
     let file = std::fs::OpenOptions::new()
         .write(true)

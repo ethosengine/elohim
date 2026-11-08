@@ -1682,3 +1682,67 @@ async fn a_fifo_in_the_queue_never_blocks_the_tick() {
     );
     c_daemon.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_orphaned_staging_dir_from_a_killed_run_is_removed_by_the_next_install() {
+    let key = key_for("closure-at-head");
+    let held = held_artifact(&key, artifact_bytes(131, 1024 * 1024)).await;
+    let fetched = FetchedArtifact {
+        manifest_cid: held.manifest_cid.clone(),
+        manifest: held.manifest.clone(),
+        manifest_from: "did:key:zDeviceA".into(),
+        fetched_from: ["did:key:zDeviceA".to_string()].into_iter().collect(),
+        chunks_fetched: distinct(&held.manifest).len(),
+        chunks_resumed: 0,
+        bytes_fetched: held.manifest.byte_len,
+        wasted: 0,
+        elapsed: Duration::ZERO,
+    };
+    let dir = tempfile::tempdir().expect("dest dir");
+    let dest = dir.path().join("elohim-storage");
+    let staging = |tag: &str| dir.path().join(format!(".fetch-elohim-storage.{tag}"));
+    // A killed run: its directory, its lock file (nobody holds it now) and a partial artifact.
+    let orphan = staging("0123456789abcdef0123456789abcdef");
+    std::fs::create_dir(&orphan).unwrap();
+    std::fs::write(orphan.join("lock"), b"").unwrap();
+    std::fs::write(orphan.join("artifact"), vec![7u8; 4096]).unwrap();
+    // A live run: its lock is held.
+    let live = staging("fedcba9876543210fedcba9876543210");
+    std::fs::create_dir(&live).unwrap();
+    let held_lock = std::fs::File::create(live.join("lock")).unwrap();
+    held_lock.lock().unwrap();
+    // A run in its first moment (no lock file yet), and another destination's orphan.
+    let young = staging("00000000000000000000000000000000");
+    std::fs::create_dir(&young).unwrap();
+    let other = dir
+        .path()
+        .join(".fetch-doorway.11111111111111111111111111111111");
+    std::fs::create_dir(&other).unwrap();
+    std::fs::write(other.join("lock"), b"").unwrap();
+
+    let mut flow = MemoryFlowStore::new();
+    install_fetched(
+        held.store.as_ref(),
+        &mut flow,
+        &fetched,
+        &context("did:key:zDeviceC"),
+        &dest,
+    )
+    .await
+    .expect("installed");
+    assert_eq!(std::fs::read(&dest).unwrap(), held.bytes.to_vec());
+    assert!(
+        !orphan.exists(),
+        "the killed run's staging directory is removed"
+    );
+    assert!(live.exists(), "a live installer's directory is kept");
+    assert!(
+        young.exists(),
+        "a lockless directory inside the grace period is kept"
+    );
+    assert!(
+        other.exists(),
+        "another destination's staging is not this install's to sweep"
+    );
+    drop(held_lock);
+}

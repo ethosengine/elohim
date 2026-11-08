@@ -185,6 +185,7 @@ fn method_file_with(
         non_path_inputs,
         deterministic: false,
     };
+    std::fs::create_dir_all(dir).unwrap();
     let path = dir.join("method.json");
     std::fs::write(&path, serde_json::to_string_pretty(&descriptor).unwrap()).unwrap();
     (path, descriptor)
@@ -718,4 +719,136 @@ fn a_completion_for_another_request_is_never_accepted() {
     let done = elohim_epr_cli::artifact::wait_for_answer(&done_path, &ours, wait).expect("ours");
     assert_eq!(done.for_request(), &ours);
     assert!(!done_path.exists(), "a taken answer is removed");
+}
+
+/// An executable `cc` in `dir` that answers `--version` with `version`.
+fn fake_cc(dir: &Path, version: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(dir).unwrap();
+    let cc = dir.join("cc");
+    std::fs::write(&cc, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
+    std::fs::set_permissions(&cc, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+#[test]
+fn changing_the_path_resolved_cc_moves_the_key() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    let first = tools.path().join("one");
+    let second = tools.path().join("two");
+    fake_cc(&first, "cc (Fixture) 14.3.1");
+    fake_cc(&second, "cc (Fixture) 14.3.1");
+    let path_one = format!("{}:/bin", first.display());
+    let path_two = format!("{}:/bin", second.display());
+    let (method_one, _) = method_file_with(
+        &scratch.path().join("m1"),
+        &["crate/src"],
+        &[("PATH", path_one.as_str())],
+    );
+    let (method_two, _) = method_file_with(
+        &scratch.path().join("m2"),
+        &["crate/src"],
+        &[("PATH", path_one.as_str())],
+    );
+    let before = key_of(&a, &method_one, &[]);
+    assert_eq!(
+        before,
+        key_of(&a, &method_two, &[]),
+        "one PATH, one cc: one key"
+    );
+    // The same cc answering another version moves the key.
+    fake_cc(&first, "cc (Fixture) 15.0.0");
+    let upgraded = key_of(&a, &method_one, &[]);
+    assert_ne!(before, upgraded, "the resolved cc's --version is keyed");
+    // A recorded PATH resolving another cc moves it too, even when it answers alike.
+    let (method_three, _) = method_file_with(
+        &scratch.path().join("m3"),
+        &["crate/src"],
+        &[("PATH", path_two.as_str())],
+    );
+    fake_cc(&second, "cc (Fixture) 15.0.0");
+    assert_ne!(
+        upgraded,
+        key_of(&a, &method_three, &[]),
+        "the resolved cc's path is keyed"
+    );
+}
+
+#[test]
+fn a_served_daemon_without_a_store_record_refuses_put() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, _) = method_file(scratch.path(), &["crate/src"]);
+    let (stub, _log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("elohim-storage");
+    std::fs::write(&bytes, b"a small built binary").unwrap();
+    let repo = a.root().to_str().unwrap().to_string();
+    let method = method.to_str().unwrap().to_string();
+    let input = {
+        let out = a.epr(&[
+            "artifact", "key", "--method", &method, "--repo", &repo, "--print", "input",
+        ]);
+        assert!(out.status.success(), "{}", text(&out));
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
+    };
+    let put = || {
+        a.command()
+            .env("BRIT_BUILD_REF_BIN", &stub)
+            .args([
+                "artifact",
+                "put",
+                "--method",
+                &method,
+                "--input",
+                &input,
+                "--bytes",
+                bytes.to_str().unwrap(),
+                "--project",
+                "elohim-storage",
+                "--cross",
+                "--repo",
+                &repo,
+            ])
+            .output()
+            .unwrap()
+    };
+    // This device's daemon is serving (its lock is held) and recorded no payload store.
+    let peer_dir = a.config.path().join("epr").join("peer");
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&peer_dir).unwrap();
+    let marker = peer_dir.join(elohim_epr_cli::peer::PAYLOAD_STORE_RECORD);
+    let out = put();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("unrecorded:"), "{}", text(&out));
+    assert!(
+        text(&out).contains("payload-store record"),
+        "{}",
+        text(&out)
+    );
+    // An empty record refuses alike; a record naming another store refuses.
+    std::fs::write(&marker, "").unwrap();
+    assert_eq!(put().status.code(), Some(3));
+    std::fs::write(&marker, "/somewhere/else\n").unwrap();
+    let out = put();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("serves the payload store /somewhere/else"),
+        "{}",
+        text(&out)
+    );
+    // The record naming this put's own store lets it through.
+    let ours = std::fs::canonicalize(a.payload()).unwrap();
+    std::fs::write(&marker, format!("{}\n", ours.display())).unwrap();
+    let out = put();
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(
+        events(a.root())
+            .iter()
+            .filter(|e| e.action == ReaVerb::Produce)
+            .count(),
+        1,
+        "only the put that knew its store recorded"
+    );
 }

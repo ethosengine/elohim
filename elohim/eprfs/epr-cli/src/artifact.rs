@@ -557,6 +557,74 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
     Ok(lines)
 }
 
+/// The `non_path_inputs` entry naming the fixed `PATH` a recorded mesh build runs cargo under.
+pub const PATH_INPUT: &str = "PATH";
+
+/// The tools cargo and the build scripts reach through `PATH` whose identity enters the key: the
+/// rustc default linker driver (`cc` on the gnu targets) and the linker it drives (`ld`), plus
+/// whatever `CC` names when the method records it.
+const KEYED_TOOLS: [&str; 2] = ["cc", "ld"];
+
+/// `name` resolved the way a process with `PATH=path` resolves it: as given when it names a
+/// path, else the first executable regular file of that name on `path`; canonicalized.
+fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let runnable = |candidate: &Path| {
+        std::fs::metadata(candidate)
+            .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+    };
+    let found = if name.contains('/') {
+        Some(PathBuf::from(name)).filter(|candidate| runnable(candidate))
+    } else {
+        std::env::split_paths(path)
+            .map(|dir| dir.join(name))
+            .find(|candidate| runnable(candidate))
+    }?;
+    std::fs::canonicalize(&found).ok()
+}
+
+/// One line per keyed tool under the method's recorded `PATH` (review H3): the canonical path it
+/// resolves to and the CID of its `--version` output (`-` when it does not resolve), so another
+/// compiler or linker selected through `PATH` moves the key. A method that records no `PATH`
+/// (built in an inherited environment) keys no tool and is refused by nothing here.
+fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String> {
+    let Some(path) = descriptor.non_path_inputs.get(PATH_INPUT) else {
+        return Ok(String::new());
+    };
+    let mut names: Vec<(String, String)> = KEYED_TOOLS
+        .iter()
+        .map(|tool| ((*tool).to_string(), (*tool).to_string()))
+        .collect();
+    if let Some(cc) = descriptor.non_path_inputs.get("CC") {
+        names.push(("CC".to_string(), cc.clone()));
+    }
+    let mut lines = String::new();
+    for (label, name) in names {
+        let Some(resolved) = resolve_tool(&name, path) else {
+            lines.push_str(&format!("tool:{label}\t-\n"));
+            continue;
+        };
+        let output = std::process::Command::new(&resolved)
+            .arg("--version")
+            .env_clear()
+            .env("PATH", path)
+            .env("LANG", "C")
+            .output()
+            .map_err(|e| {
+                ArtifactError::Gap(format!(
+                    "{} --version does not run: {e}",
+                    resolved.display()
+                ))
+            })?;
+        let version = BlobCid::compute_bytes(&[output.stdout, output.stderr].concat());
+        lines.push_str(&format!(
+            "tool:{label}\t{}\t{version}\n",
+            resolved.display()
+        ));
+    }
+    Ok(lines)
+}
+
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
 /// report names).
@@ -602,6 +670,7 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
         lines.push_str(&closure_line(repo, path, &mut gitlinks)?);
     }
     lines.push_str(&cargo_config_lines(repo, descriptor)?);
+    lines.push_str(&tool_lines(descriptor)?);
     let mut status_args = vec![
         "status",
         "--porcelain",
@@ -1006,10 +1075,28 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
     if ServeLock::held(&peer_dir) != Some(true) {
         return Ok(());
     }
-    let Ok(recorded) = std::fs::read_to_string(peer_dir.join(peer::PAYLOAD_STORE_RECORD)) else {
-        return Ok(());
+    // Serving, and no readable record of what it serves: fail closed (review M9, ruling item 9).
+    // `serve` writes the record right after taking the lock, so this also covers its first moment.
+    let marker = peer_dir.join(peer::PAYLOAD_STORE_RECORD);
+    let recorded = match std::fs::read_to_string(&marker) {
+        Ok(text) if !text.trim().is_empty() => PathBuf::from(text.trim()),
+        Ok(_) => {
+            return Err(unrecorded(format!(
+                "this device's epr peer serve is running and its payload-store record {} is \
+                 empty, so this put cannot tell it writes the store the daemon serves; restart \
+                 epr peer serve",
+                marker.display()
+            )))
+        }
+        Err(e) => {
+            return Err(unrecorded(format!(
+                "this device's epr peer serve is running and its payload-store record {} does \
+                 not read ({e}), so this put cannot tell it writes the store the daemon serves; \
+                 restart epr peer serve",
+                marker.display()
+            )))
+        }
     };
-    let recorded = PathBuf::from(recorded.trim());
     let ours = std::fs::canonicalize(payload_dir).unwrap_or_else(|_| payload_dir.to_path_buf());
     if ours == recorded {
         Ok(())
