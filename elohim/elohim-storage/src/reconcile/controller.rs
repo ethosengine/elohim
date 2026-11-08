@@ -590,6 +590,9 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // propagate as an error. This preserves backward compatibility with the
         // A.4 stub-only test suite.
         let mut may_publish = !preserve_supersession;
+        // A cross-signed binding can bind authors whose well-signed claims were held as
+        // unbound; they are replayed once this projection's connection is released.
+        let mut replay_held = false;
         match self.db_pool.as_ref() {
             Some(pool) => match pool.get() {
                 Ok(mut conn) => {
@@ -647,8 +650,10 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                     } else {
                         crate::db::peer_identity_bindings::upsert(&mut conn, &row).map(|()| true)
                     };
+                    let cross_signed = row.proof_status.is_cross_signed();
                     match write {
                         Ok(can_publish) => {
+                            replay_held = cross_signed;
                             may_publish = can_publish;
                             debug!(
                             peer_id = %signal.peer_id,
@@ -677,6 +682,11 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 "on_agent_peer_binding: no db_pool wired — projection write skipped \
                  (use new_with_storage for production or persistence tests)"
             ),
+        }
+        if replay_held {
+            if let Some(pool) = self.db_pool.as_ref() {
+                crate::p2p::gossip_dispatch::replay_held_unbound_with_pool(pool);
+            }
         }
 
         // Recovery cannot re-advertise a known superseded original, or one

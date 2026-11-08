@@ -2124,6 +2124,18 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    held_unbound_claims (id) {
+        id -> Integer,
+        topic -> Text,
+        author_peer -> Text,
+        plane -> Text,
+        gossipsub_source -> Nullable<Text>,
+        bytes -> Binary,
+        held_at_ms -> BigInt,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     acquisition_pins,
     accumulation_status,
@@ -2203,6 +2215,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposals,
     peer_transport_manifest,
     transport_links,
+    held_unbound_claims,
     ranked_votes,
     key_revocations,
     key_rotations,
