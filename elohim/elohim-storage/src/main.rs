@@ -3643,6 +3643,14 @@ async fn async_main(
             let mint_hc = hc_registry_for_http
                 .as_ref()
                 .and_then(|r| r.imagodei_client());
+            // DHT confirmation of gossip-arrived cross-signed bindings: only a binding
+            // the DHT confirms is authority (`p2p::transport_authority`). Independent of
+            // the mint kill switch; without the bridge nothing gossip-arrived binds.
+            if let (Some(hc), Some(pool)) = (mint_hc.clone(), db_pool.clone()) {
+                elohim_storage::p2p::transport_authority::confirm::spawn_binding_confirmer(
+                    hc, pool,
+                );
+            }
             match (mint_enabled, mint_hc, db_pool.clone()) {
                 (true, Some(hc), Some(pool)) => {
                     // The zome accepts only these four archetypes; anything else

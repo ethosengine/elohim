@@ -11,7 +11,7 @@
 //! A held claim is never projected and never counted. It is bounded per topic
 //! ([`HELD_UNBOUND_CAP`]), held once per distinct bytes, and expires after
 //! [`HELD_UNBOUND_TTL_MS`]. When a binding or link for its author is recorded,
-//! [`take_resolvable`] hands it back to be replayed through full admission; a claim that
+//! [`take_for_authors`] hands it back to be replayed through full admission; a claim that
 //! still fails is dropped by the replaying handler with its reason. Forged or badly
 //! signed claims are refused by admission and never reach this table. Category C,
 //! local.
@@ -24,8 +24,14 @@ use crate::error::StorageError;
 /// Claims held per topic (oldest evicted first).
 pub const HELD_UNBOUND_CAP: usize = 256;
 
-/// How long an unbound claim waits for its author's binding (15 minutes).
-pub const HELD_UNBOUND_TTL_MS: i64 = 15 * 60 * 1000;
+/// Claims held per author (oldest of that author evicted first), so one sender —
+/// or one key among many a Sybil mints — cannot occupy a whole topic's window alone.
+pub const HELD_UNBOUND_PER_AUTHOR: usize = 32;
+
+/// How long an unbound claim waits for its author's binding: 40 minutes. It must
+/// outlast DHT confirmation of a remote binding (`p2p::transport_authority::confirm` retries for
+/// about 33 minutes) plus the transport link's 30 s manifest cadence.
+pub const HELD_UNBOUND_TTL_MS: i64 = 40 * 60 * 1000;
 
 /// The plane a held claim arrived on, so its replay re-runs the same witness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +87,19 @@ pub fn hold(
                 held_unbound_claims::held_at_ms.eq(now_ms),
             ))
             .execute(conn)?;
+        let per_author = i64::try_from(HELD_UNBOUND_PER_AUTHOR).unwrap_or(i64::MAX);
+        let keep_author: Vec<i32> = held_unbound_claims::table
+            .filter(held_unbound_claims::author_peer.eq(&claim.author_peer))
+            .select(held_unbound_claims::id)
+            .order(held_unbound_claims::id.desc())
+            .limit(per_author)
+            .load(conn)?;
+        diesel::delete(
+            held_unbound_claims::table
+                .filter(held_unbound_claims::author_peer.eq(&claim.author_peer))
+                .filter(held_unbound_claims::id.ne_all(keep_author)),
+        )
+        .execute(conn)?;
         let cap = i64::try_from(HELD_UNBOUND_CAP).unwrap_or(i64::MAX);
         let keep: Vec<i32> = held_unbound_claims::table
             .filter(held_unbound_claims::topic.eq(&claim.topic))
@@ -107,19 +126,25 @@ fn purge(conn: &mut SqliteConnection, now_ms: i64) -> QueryResult<usize> {
     .execute(conn)
 }
 
-/// Remove and return every unexpired held claim whose author `resolves` (now has a
-/// binding). Expired claims are purged and never returned. The caller replays each
-/// through full admission.
-/// bounded-work: at most `HELD_UNBOUND_CAP` per topic are held at all.
-pub fn take_resolvable(
+/// Remove and return the unexpired held claims of `authors` (the transport ids just
+/// bound) whose author `resolves`. Expired claims are purged and never returned. Only
+/// the named authors' rows are read (indexed), so a binding or link recorded for one
+/// author never makes this node re-judge anyone else's claims.
+/// bounded-work: at most `HELD_UNBOUND_PER_AUTHOR` per author are held at all.
+pub fn take_for_authors(
     conn: &mut SqliteConnection,
     now_ms: i64,
+    authors: &[String],
     resolves: &mut dyn FnMut(&mut SqliteConnection, &str) -> bool,
 ) -> Result<Vec<HeldClaim>, StorageError> {
     type Row = (i32, String, String, String, Option<String>, Vec<u8>);
+    if authors.is_empty() {
+        return Ok(Vec::new());
+    }
     let rows: Vec<Row> = super::read_then_write_transaction(conn, |conn| {
         purge(conn, now_ms)?;
         held_unbound_claims::table
+            .filter(held_unbound_claims::author_peer.eq_any(authors))
             .select((
                 held_unbound_claims::id,
                 held_unbound_claims::topic,
@@ -131,7 +156,7 @@ pub fn take_resolvable(
             .order(held_unbound_claims::id.asc())
             .load::<Row>(conn)
     })
-    .map_err(|e| StorageError::Database(format!("held_unbound::take_resolvable: {e}")))?;
+    .map_err(|e| StorageError::Database(format!("held_unbound::take_for_authors: {e}")))?;
     let mut taken = Vec::new();
     for (id, topic, author_peer, plane, gossipsub_source, bytes) in rows {
         if !resolves(conn, &author_peer) {
@@ -188,9 +213,41 @@ mod tests {
         for i in 0..HELD_UNBOUND_CAP + 5 {
             hold(&mut conn, &claim("t/b", "author-2", &i.to_be_bytes()), 0).unwrap();
         }
-        assert_eq!(count(&mut conn).unwrap(), HELD_UNBOUND_CAP as i64 + 1);
-        let taken = take_resolvable(&mut conn, 1, &mut |_, a| a == "author-1").unwrap();
+        // One author's flood is capped per author before the topic cap.
+        assert_eq!(
+            count(&mut conn).unwrap(),
+            HELD_UNBOUND_PER_AUTHOR as i64 + 1
+        );
+        // Only the named, resolving authors' claims are taken.
+        let none = take_for_authors(&mut conn, 1, &["author-2".into()], &mut |_, _| false).unwrap();
+        assert!(none.is_empty());
+        let taken = take_for_authors(&mut conn, 1, &["author-1".into()], &mut |_, _| true).unwrap();
         assert_eq!(taken, vec![claim("t/a", "author-1", b"x")]);
-        assert_eq!(count(&mut conn).unwrap(), HELD_UNBOUND_CAP as i64);
+        assert_eq!(count(&mut conn).unwrap(), HELD_UNBOUND_PER_AUTHOR as i64);
+        for i in 0..HELD_UNBOUND_CAP + 5 {
+            hold(&mut conn, &claim("t/b", &format!("sybil-{i}"), b"y"), 0).unwrap();
+        }
+        // Distinct authors, identical bytes: held once per topic.
+        assert_eq!(
+            count(&mut conn).unwrap(),
+            HELD_UNBOUND_PER_AUTHOR as i64 + 1
+        );
+        for i in 0..HELD_UNBOUND_CAP + 5 {
+            hold(
+                &mut conn,
+                &claim("t/c", &format!("sybil-{i}"), &i.to_be_bytes()),
+                0,
+            )
+            .unwrap();
+        }
+        let in_c: i64 = held_unbound_claims::table
+            .filter(held_unbound_claims::topic.eq("t/c"))
+            .count()
+            .get_result(&mut conn)
+            .unwrap();
+        assert_eq!(
+            in_c, HELD_UNBOUND_CAP as i64,
+            "many senders still meet the topic cap"
+        );
     }
 }

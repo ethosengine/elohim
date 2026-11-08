@@ -355,6 +355,25 @@ pub fn admit(
     if !ids.iter().any(|id| id == &signed.author_peer) {
         return SalvageAdmission::Refused(SalvageRefusal::AuthorNotSigner(signed.author_peer));
     }
+    // Freshness and seq sanity are judged BEFORE the binding, so a stale or seq-ahead
+    // ad is refused outright rather than held as unbound for later replay.
+    let issued_at_ms = signed.body.issued_at_ms;
+    if issued_at_ms < now_ms.saturating_sub(SALVAGE_AD_MAX_AGE_MS) {
+        return SalvageAdmission::Refused(SalvageRefusal::Stale { issued_at_ms });
+    }
+    if issued_at_ms > now_ms.saturating_add(SALVAGE_AD_MAX_SKEW_MS) {
+        return SalvageAdmission::Refused(SalvageRefusal::FromTheFuture { issued_at_ms });
+    }
+    // The seq carries the advertiser's boot epoch in its high 32 bits
+    // (`p2p::sync_state`). A process cannot have booted after it signed, so an epoch
+    // past the ad's own issue time is a seq minted to run ahead of every honest one
+    // (a single such ad would freeze the agent's row: replay is judged by seq).
+    let seq = signed.body.seq;
+    let issued_epoch =
+        crate::p2p::sync_state::boot_epoch(u64::try_from(issued_at_ms.max(0) / 1000).unwrap_or(0));
+    if crate::p2p::sync_state::split_sequence(seq).0 > issued_epoch {
+        return SalvageAdmission::Refused(SalvageRefusal::SeqAheadOfIssue { seq, issued_at_ms });
+    }
     // The advertised agent is the agent the cross-signed chain binds to the signer's transport
     // identity (the claimed spelling first, then the key's other spelling).
     let bound = std::iter::once(signed.author_peer.as_str())
@@ -388,23 +407,6 @@ pub fn admit(
                 }
             }
         }
-    }
-    let issued_at_ms = signed.body.issued_at_ms;
-    if issued_at_ms < now_ms.saturating_sub(SALVAGE_AD_MAX_AGE_MS) {
-        return SalvageAdmission::Refused(SalvageRefusal::Stale { issued_at_ms });
-    }
-    if issued_at_ms > now_ms.saturating_add(SALVAGE_AD_MAX_SKEW_MS) {
-        return SalvageAdmission::Refused(SalvageRefusal::FromTheFuture { issued_at_ms });
-    }
-    // The seq carries the advertiser's boot epoch in its high 32 bits
-    // (`p2p::sync_state`). A process cannot have booted after it signed, so an epoch
-    // past the ad's own issue time is a seq minted to run ahead of every honest one
-    // (a single such ad would freeze the agent's row: replay is judged by seq).
-    let seq = signed.body.seq;
-    let issued_epoch =
-        crate::p2p::sync_state::boot_epoch(u64::try_from(issued_at_ms.max(0) / 1000).unwrap_or(0));
-    if crate::p2p::sync_state::split_sequence(seq).0 > issued_epoch {
-        return SalvageAdmission::Refused(SalvageRefusal::SeqAheadOfIssue { seq, issued_at_ms });
     }
     SalvageAdmission::Admitted {
         body: signed.body,

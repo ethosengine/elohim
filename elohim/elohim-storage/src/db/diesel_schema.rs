@@ -2136,6 +2136,17 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    binding_confirmations (peer_id, dht_anchor_hash) {
+        peer_id -> Text,
+        dht_anchor_hash -> Text,
+        agent_cid -> Text,
+        valid_from -> Text,
+        valid_until -> Nullable<Text>,
+        confirmed_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     acquisition_pins,
     accumulation_status,
@@ -2215,6 +2226,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposals,
     peer_transport_manifest,
     transport_links,
+    binding_confirmations,
     held_unbound_claims,
     ranked_votes,
     key_revocations,

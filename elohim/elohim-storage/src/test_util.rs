@@ -191,22 +191,20 @@ pub fn test_agent(name: &str) -> String {
     )
 }
 
-/// Insert an active, cross-signed `AgentPeerBinding` row binding [`test_agent`]`(name)`
-/// to the libp2p PeerId of `transport_secret` — both halves really signed and
-/// classified by the production chokepoint. Returns the PeerId.
+/// The fields of a really cross-signed binding of [`test_agent`]`(name)` to the libp2p
+/// PeerId of `transport_secret`, valid from a day ago for 30 days:
+/// `(agent_cid, peer_id, valid_from, valid_until, signature)`.
 #[cfg(feature = "p2p")]
-pub fn bind_cross_signed(
-    conn: &mut diesel::SqliteConnection,
+pub fn cross_signed_fields(
     name: &str,
     transport_secret: [u8; 32],
-) -> String {
+    nonce: &str,
+) -> (String, String, String, String, String) {
     use crate::p2p::binding_cross_signature::{
         canonical_bytes, BindingCore, CrossSignatureProof, AGENT_DOMAIN, SCHEME_VERSION,
         TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
     };
-    use crate::p2p::binding_proof_wire::{
-        classify_binding_signature, encode_proof, libp2p_peer_id_from_ed25519_pubkey,
-    };
+    use crate::p2p::binding_proof_wire::{encode_proof, libp2p_peer_id_from_ed25519_pubkey};
     use ed25519_dalek::Signer;
 
     let agent_sk = test_agent_key(name);
@@ -226,7 +224,7 @@ pub fn bind_cross_signed(
         transport_kind: TRANSPORT_KIND_LIBP2P,
         valid_from: from.clone(),
         valid_until: Some(until.clone()),
-        nonce: "dGVzdC1iaW5kaW5n".into(),
+        nonce: nonce.into(),
         issued_at: from.clone(),
     };
     let signature = encode_proof(&CrossSignatureProof {
@@ -243,6 +241,46 @@ pub fn bind_cross_signed(
         nonce: core.nonce.clone(),
         issued_at: from.clone(),
     });
+    (agent, peer_id, from, until, signature)
+}
+
+/// A gossip payload carrying [`cross_signed_fields`] under `anchor` — what any sender
+/// holding both keys can publish, DHT entry or not.
+#[cfg(feature = "p2p")]
+pub fn cross_signed_gossip(
+    name: &str,
+    transport_secret: [u8; 32],
+    anchor: &str,
+) -> crate::p2p::identity_binding_gossip::IdentityBindingGossip {
+    let (agent, peer_id, from, until, signature) =
+        cross_signed_fields(name, transport_secret, "dGVzdC1iaW5kaW5n");
+    crate::p2p::identity_binding_gossip::IdentityBindingGossip {
+        peer_id,
+        agent_cid: agent,
+        valid_from: from.clone(),
+        valid_until: Some(until),
+        device_archetype: "node".into(),
+        binding_action_hash: anchor.into(),
+        emitted_at: from,
+        signature,
+    }
+}
+
+/// Insert an active, cross-signed `AgentPeerBinding` row binding [`test_agent`]`(name)`
+/// to the libp2p PeerId of `transport_secret` — both halves really signed and
+/// classified by the production chokepoint — WITHOUT a DHT confirmation: a hint, not
+/// authority. Returns the PeerId.
+#[cfg(feature = "p2p")]
+pub fn bind_cross_signed_unconfirmed(
+    conn: &mut diesel::SqliteConnection,
+    name: &str,
+    transport_secret: [u8; 32],
+) -> String {
+    use crate::p2p::binding_cross_signature::TRANSPORT_KIND_LIBP2P;
+    use crate::p2p::binding_proof_wire::classify_binding_signature;
+
+    let (agent, peer_id, from, until, signature) =
+        cross_signed_fields(name, transport_secret, "dGVzdC1iaW5kaW5n");
     let proof_status = classify_binding_signature(
         &agent,
         &peer_id,
@@ -272,6 +310,42 @@ pub fn bind_cross_signed(
         },
     )
     .expect("insert cross-signed binding");
+    peer_id
+}
+
+/// Record the DHT confirmation of the binding row `(peer_id, anchor)` as it stands.
+#[cfg(feature = "p2p")]
+pub fn confirm_on_dht(conn: &mut diesel::SqliteConnection, peer_id: &str, anchor: &str) {
+    use crate::db::diesel_schema::peer_identity_bindings::dsl;
+    use diesel::prelude::*;
+    let row: crate::db::models::PeerIdentityBindingRow = dsl::peer_identity_bindings
+        .filter(dsl::peer_id.eq(peer_id))
+        .filter(dsl::dht_anchor_hash.eq(anchor))
+        .first(conn)
+        .expect("binding row");
+    crate::db::binding_confirmations::confirm(
+        conn,
+        &crate::db::binding_confirmations::DhtBinding {
+            peer_id: &row.peer_id,
+            dht_anchor_hash: &row.dht_anchor_hash,
+            agent_cid: &row.agent_cid,
+            valid_from: &row.valid_from,
+            valid_until: row.valid_until.as_deref(),
+        },
+    )
+    .expect("confirm");
+}
+
+/// [`bind_cross_signed_unconfirmed`] plus its DHT confirmation: an AUTHORITY binding,
+/// as a household peer's minted binding becomes. Returns the PeerId.
+#[cfg(feature = "p2p")]
+pub fn bind_cross_signed(
+    conn: &mut diesel::SqliteConnection,
+    name: &str,
+    transport_secret: [u8; 32],
+) -> String {
+    let peer_id = bind_cross_signed_unconfirmed(conn, name, transport_secret);
+    confirm_on_dht(conn, &peer_id, &format!("anchor-{peer_id}"));
     peer_id
 }
 

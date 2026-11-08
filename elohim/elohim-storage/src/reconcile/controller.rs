@@ -683,9 +683,37 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                  (use new_with_storage for production or persistence tests)"
             ),
         }
+        // The DHT-arrival projection IS DHT confirmation: this node's own conductor
+        // reports the AgentPeerBinding entry at this anchor with these fields. A
+        // cross-signed one becomes authority, and the claims held for its author are
+        // replayed (off this task, single-flight).
         if replay_held {
             if let Some(pool) = self.db_pool.as_ref() {
-                crate::p2p::gossip_dispatch::replay_held_unbound_with_pool(pool);
+                let from = signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                let until = signal
+                    .valid_until
+                    .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string());
+                match pool.get() {
+                    Ok(mut conn) => {
+                        if let Err(e) = crate::db::binding_confirmations::confirm(
+                            &mut conn,
+                            &crate::db::binding_confirmations::DhtBinding {
+                                peer_id: &signal.peer_id,
+                                dht_anchor_hash: &signal.binding_action_hash,
+                                agent_cid: &signal.agent_cid,
+                                valid_from: &from,
+                                valid_until: until.as_deref(),
+                            },
+                        ) {
+                            warn!(peer_id = %signal.peer_id, error = %e, "binding confirmation not recorded");
+                        }
+                    }
+                    Err(e) => warn!(error = %e, "binding confirmation: db pool checkout failed"),
+                }
+                crate::p2p::gossip_dispatch::schedule_replay(
+                    pool,
+                    crate::p2p::gossip_dispatch::authors_bound_by_peer(pool, &signal.peer_id),
+                );
             }
         }
 

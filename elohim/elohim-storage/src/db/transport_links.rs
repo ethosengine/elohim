@@ -13,8 +13,10 @@ use crate::error::StorageError;
 use crate::p2p::transport_link::TransportLink;
 
 /// Record a link that already verified ([`TransportLink::verify`]). Keeps the newest
-/// link per iroh NodeId; an older or equal one changes nothing. Returns whether the
-/// row changed.
+/// link per iroh NodeId AND per libp2p PeerId; an older or equal one changes nothing.
+/// Returns whether the row changed. (Links carry no expiry of their own: a link is a
+/// statement between two keys, retired by a newer link or by the PeerId's binding
+/// lapsing, which ends the chain.)
 pub fn record_verified(
     conn: &mut SqliteConnection,
     link: &TransportLink,
@@ -28,6 +30,24 @@ pub fn record_verified(
         if held.is_some_and(|held| link.issued_at_ms <= held) {
             return Ok::<bool, diesel::result::Error>(false);
         }
+        // Newest link per PeerId wins: a PeerId speaks through one iroh NodeId at a
+        // time, so an older link from another NodeId never displaces a newer one, and
+        // a newer one retires the rest.
+        let newer_for_peer: i64 = transport_links::table
+            .filter(transport_links::libp2p_peer_id.eq(&link.libp2p_peer_id))
+            .filter(transport_links::iroh_node_id.ne(&link.iroh_node_id))
+            .filter(transport_links::issued_at_ms.ge(link.issued_at_ms))
+            .count()
+            .get_result(conn)?;
+        if newer_for_peer > 0 {
+            return Ok(false);
+        }
+        diesel::delete(
+            transport_links::table
+                .filter(transport_links::libp2p_peer_id.eq(&link.libp2p_peer_id))
+                .filter(transport_links::iroh_node_id.ne(&link.iroh_node_id)),
+        )
+        .execute(conn)?;
         diesel::replace_into(transport_links::table)
             .values((
                 transport_links::iroh_node_id.eq(&link.iroh_node_id),

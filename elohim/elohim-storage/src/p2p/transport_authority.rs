@@ -7,10 +7,18 @@
 //!
 //! Authority comes from a cross-signed chain and nothing else:
 //!
-//! - a libp2p PeerId resolves through an active, non-superseded
-//!   `peer_identity_bindings` row that classified `cross_signed`
-//!   (`p2p::binding_proof_wire::classify_binding_signature`: the agent key and the
-//!   transport key each signed the binding);
+//! - a libp2p PeerId resolves through an active `peer_identity_bindings` row that
+//!   classified `cross_signed` (`p2p::binding_proof_wire::classify_binding_signature`:
+//!   the agent key and the transport key each signed the binding) AND that the DHT
+//!   has confirmed (`db::binding_confirmations`: an `AgentPeerBinding` entry at the
+//!   row's anchor with the same peer, agent and window). Cross-signing alone proves
+//!   only that the sender holds both keys — anyone can mint N such pairs and gossip
+//!   them — so a binding that only arrived by gossip is a hint that requests
+//!   confirmation (`p2p::transport_authority::confirm`), never authority by itself;
+//! - supersession applies to the signed core, not to the anchor: if ANY row carrying
+//!   the same signed core (agent, peer, kind, window, nonce, issued_at) is superseded,
+//!   every copy of that core is, so an old core re-published under a fresh anchor
+//!   does not revive;
 //! - an iroh NodeId resolves only through a verified [`TransportLink`] to a libp2p
 //!   PeerId (both keys signed it), and then through that PeerId's cross-signed
 //!   binding.
@@ -20,7 +28,7 @@
 //! decide where to dial, never whom a claim speaks for.
 //!
 //! An identity with no such chain resolves to `None` — including a peer whose
-//! manifest carries no transport link yet (an older build). Callers refuse its claims
+//! manifest carries no transport link yet (an older build). Callers hold its claims
 //! as unbound: never projected, never counted.
 //!
 //! [`TransportLink`]: crate::p2p::transport_link::TransportLink
@@ -40,22 +48,70 @@ fn now_iso() -> String {
     chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-/// The active cross-signed bindings for one libp2p PeerId.
-fn cross_signed_for_peer(
+/// The identity of a binding's SIGNED core — what both keys signed — independent of
+/// the unsigned `dht_anchor_hash` it was projected under. `None` for a row whose
+/// signature carries no proof (a sentinel can never be authority anyway).
+pub fn core_identity(row: &PeerIdentityBindingRow) -> Option<String> {
+    core_identity_of(
+        &row.agent_cid,
+        &row.peer_id,
+        &row.valid_from,
+        row.valid_until.as_deref(),
+        &row.signature,
+    )
+}
+
+/// [`core_identity`] from the fields themselves (a gossip payload, before projection).
+pub fn core_identity_of(
+    agent_cid: &str,
+    peer_id: &str,
+    valid_from: &str,
+    valid_until: Option<&str>,
+    signature: &str,
+) -> Option<String> {
+    let proof = crate::p2p::binding_proof_wire::decode_proof(signature).ok()?;
+    let mut hasher = blake3::Hasher::new();
+    for part in [
+        agent_cid,
+        peer_id,
+        &proof.transport_kind.to_string(),
+        valid_from,
+        valid_until.unwrap_or("\u{0}none"),
+        proof.nonce.as_str(),
+        proof.issued_at.as_str(),
+    ] {
+        hasher.update(&(part.len() as u64).to_be_bytes());
+        hasher.update(part.as_bytes());
+    }
+    Some(hasher.finalize().to_hex().to_string())
+}
+
+/// The bindings that are AUTHORITY for one libp2p PeerId: cross-signed, inside their
+/// window, DHT-confirmed, and whose signed core no row marks superseded.
+fn authority_for_peer(
     conn: &mut SqliteConnection,
     peer_id: &str,
     now: &str,
 ) -> Vec<PeerIdentityBindingRow> {
     use peer_identity_bindings::dsl;
-    dsl::peer_identity_bindings
+    let rows: Vec<PeerIdentityBindingRow> = dsl::peer_identity_bindings
         .filter(dsl::peer_id.eq(peer_id))
-        .filter(dsl::valid_from.le(now))
-        .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now)))
-        .filter(dsl::superseded_by.is_null())
         .load::<PeerIdentityBindingRow>(conn)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(PeerIdentityBindingRow::is_cross_signed)
+        .unwrap_or_default();
+    let superseded_cores: std::collections::HashSet<String> = rows
+        .iter()
+        .filter(|row| row.superseded_by.is_some())
+        .filter_map(core_identity)
+        .collect();
+    rows.into_iter()
+        .filter(|row| {
+            row.superseded_by.is_none()
+                && row.is_cross_signed()
+                && row.valid_from.as_str() <= now
+                && row.valid_until.as_deref().is_none_or(|until| until > now)
+                && core_identity(row).is_some_and(|core| !superseded_cores.contains(&core))
+        })
+        .filter(|row| crate::db::binding_confirmations::confirms(conn, row))
         .collect()
 }
 
@@ -71,7 +127,7 @@ pub fn authenticated_agent_for_transport(
     } else {
         transport_id.to_string()
     };
-    let rows = cross_signed_for_peer(conn, &peer_id, &now_iso());
+    let rows = authority_for_peer(conn, &peer_id, &now_iso());
     let mut agents = rows.into_iter().map(|row| row.agent_cid);
     let agent = agents.next()?;
     agents.all(|other| other == agent).then_some(agent)
@@ -107,3 +163,6 @@ pub fn authenticated_transports_for_agent(
     }
     ids
 }
+
+/// DHT confirmation of gossip-arrived cross-signed bindings (the confirmer task).
+pub mod confirm;

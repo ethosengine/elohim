@@ -133,6 +133,7 @@ pub mod held_envelopes;
 pub mod peer_blob_inventory;
 
 // Phase 3 — salvage_capacity projection (salvage-capacity gossip, Category C operational)
+pub mod binding_confirmations;
 pub mod held_unbound;
 pub mod salvage_capacity;
 pub mod transport_links;
