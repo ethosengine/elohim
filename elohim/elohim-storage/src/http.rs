@@ -4412,7 +4412,8 @@ impl HttpServer {
         let Ok(cid) = ByteCid::parse(address) else {
             return false;
         };
-        if self.blob_store.exists(&cid).await == Exists::Verified {
+        // Structural, as the doc says: no payload byte is hashed on this read path.
+        if self.blob_store.present(&cid).await {
             return true;
         }
         match self.resolve_manifest(address).await {
@@ -15889,7 +15890,9 @@ impl HttpServer {
         }
 
         let size = match ByteCid::parse(cid_str) {
-            Ok(byte_cid) if self.blob_store.exists(&byte_cid).await == Exists::Verified => {
+            // Structural probe: a remote HEAD never makes this node hash the payload;
+            // the GET that follows verifies.
+            Ok(byte_cid) if self.blob_store.present(&byte_cid).await => {
                 self.blob_store.size(&byte_cid).await.ok()
             }
             Ok(_) => None,
@@ -22810,6 +22813,32 @@ mod apps_resolver_heal_tests {
             resp.headers().get("X-Content-Slug").is_none(),
             "a content address is never a slug"
         );
+    }
+
+    #[tokio::test]
+    async fn remote_probes_never_hash_the_payload() {
+        use crate::blob_store::tests::{nothing_quarantined, spoil_inline_payload};
+        let server = test_server().await;
+        let stored = server
+            .blob_store
+            .store(b"a payload a peer probes")
+            .await
+            .unwrap();
+        spoil_inline_payload(&server.blob_store, &stored.cid);
+        let cid = stored.cid.to_string();
+        // `HEAD /ipfs/{cid}` and the candidate-head presence read answer structurally:
+        // they hash nothing and move nothing.
+        let head = server.handle_head_ipfs_block(&cid).await.unwrap();
+        assert_eq!(head.status(), StatusCode::OK);
+        assert!(server.blob_available_locally(&cid).await);
+        assert!(nothing_quarantined(&server.blob_store));
+        // The reading path is the one that verifies.
+        assert_eq!(
+            server.blob_store.exists(&stored.cid).await,
+            Exists::Quarantined
+        );
+        let head = server.handle_head_ipfs_block(&cid).await.unwrap();
+        assert_eq!(head.status(), StatusCode::NOT_FOUND);
     }
 }
 

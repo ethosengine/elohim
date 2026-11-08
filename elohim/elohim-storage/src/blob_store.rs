@@ -111,6 +111,24 @@ pub enum Exists {
     Quarantined,
 }
 
+/// The servable-unit index: every CID (verified unit, inline payload, chunked payload)
+/// this store has hashed good and not since lost. Maintained where verification
+/// already happens (a store, a verified read, `exists`), and pruned on delete and
+/// quarantine; `BlobStore::list_servable` answers from it without hashing a byte.
+///
+/// It is a cache of verification, not a guarantee about the disk: a file that rots
+/// after it was marked stays listed until a read or a [`BlobStore::scrub`] re-hashes
+/// it (a serving read hashes, so a peer is never handed bad bytes either way).
+#[derive(Default)]
+struct ServableIndex {
+    set: std::collections::HashSet<ByteCid>,
+    /// A scrub is walking the tree. Marks and removals that land meanwhile are kept
+    /// here so the scrub's (older) verdicts do not overwrite them.
+    scanning: bool,
+    marked_during_scan: std::collections::HashSet<ByteCid>,
+    removed_during_scan: std::collections::HashSet<ByteCid>,
+}
+
 /// What the hashing presence check concluded about a held payload.
 enum Verdict {
     /// Every byte hashed to its CID.
@@ -266,6 +284,8 @@ struct Inner {
     /// Stores hold it shared while their chunks are unreferenced by any marker; a delete
     /// holds it exclusively while it decides which chunks no layout record names.
     chunk_gc: RwLock<()>,
+    /// CIDs this store has verified and not since lost (see [`ServableIndex`]).
+    servable: Mutex<ServableIndex>,
     #[cfg(test)]
     faults: Mutex<tests::Faults>,
 }
@@ -290,6 +310,19 @@ impl BlobStore {
             bytes = stats.total_bytes,
             "Initialized blob store"
         );
+
+        // Verify what is already on disk once, off the serving path: recon answers from
+        // the servable index and sees it fill, never blocking on this walk.
+        if stats.total_blobs > 0 {
+            let scrubbing = Self {
+                inner: Arc::clone(&store.inner),
+            };
+            tokio::task::spawn_blocking(move || {
+                if let Err(error) = scrubbing.scrub() {
+                    warn!(%error, "startup servable-index scrub failed");
+                }
+            });
+        }
 
         if std::env::var("ELOHIM_COMPUTE_LOCAL_API").as_deref() == Ok("1") {
             let payload_root = store.inner.root.clone();
@@ -457,19 +490,49 @@ impl BlobStore {
         self.inner.exists(cid) == Exists::Verified || self.inner.get_chunk(cid).is_ok()
     }
 
-    /// Every CID this store can serve verified: the verified units of
-    /// [`BlobStore::list_units`] plus each chunked payload whose marker verifies
-    /// (`exists` == `Verified`). What a peer reconciling against this node may be told it
-    /// holds; a named-but-corrupt payload or chunk is left out (and quarantined).
+    /// Every CID this store can serve verified, answered from the servable index with no
+    /// hashing: the verified units and each chunked payload whose marker verified. The
+    /// index is kept at write time (a stored unit is servable the moment it is written
+    /// from hashed bytes), at verify time (a read or `exists` that hashed good) and
+    /// pruned on delete and quarantine. A node that has just started answers with what
+    /// it has verified so far while [`BlobStore::scrub`] (spawned by [`BlobStore::new`])
+    /// fills in the rest, so a recon peer sees a growing, never an over-claimed, set.
     pub fn list_servable(&self) -> Result<Vec<ByteCid>, StorageError> {
-        let mut servable: std::collections::HashSet<ByteCid> =
-            self.list_units()?.into_iter().collect();
-        for cid in self.list_cids()? {
-            if !servable.contains(&cid) && self.inner.exists(&cid) == Exists::Verified {
-                servable.insert(cid);
+        Ok(self.inner.index().set.iter().copied().collect())
+    }
+
+    /// Rebuild the servable index by hashing every unit and payload the tree names: the
+    /// one-time startup verification, and a way to re-check a store whose files may have
+    /// changed under it. Verified entries are kept; a named-but-corrupt unit or payload
+    /// is quarantined and dropped; stores and deletes that land during the walk win over
+    /// the walk's older verdicts. Synchronous and proportional to the bytes held: call
+    /// from a blocking context.
+    pub fn scrub(&self) -> Result<(), StorageError> {
+        {
+            let mut index = self.inner.index();
+            index.scanning = true;
+            index.marked_during_scan.clear();
+            index.removed_during_scan.clear();
+        }
+        let mut verified: std::collections::HashSet<ByteCid> = std::collections::HashSet::new();
+        for cid in self.unit_names() {
+            if self.inner.get_chunk(&cid).is_ok() {
+                verified.insert(cid);
             }
         }
-        Ok(servable.into_iter().collect())
+        for cid in self.list_cids()? {
+            if !verified.contains(&cid) && self.inner.exists(&cid) == Exists::Verified {
+                verified.insert(cid);
+            }
+        }
+        let mut index = self.inner.index();
+        verified.extend(index.marked_during_scan.drain());
+        for gone in index.removed_during_scan.drain() {
+            verified.remove(&gone);
+        }
+        index.set = verified;
+        index.scanning = false;
+        Ok(())
     }
 
     /// The names [`BlobStore::list_units`] would verify, with no byte read: a filename set,
@@ -592,9 +655,42 @@ impl Inner {
             tally: BlobTally::seeded(seeded),
             stripes: (0..MUTATION_STRIPES).map(|_| Mutex::new(())).collect(),
             chunk_gc: RwLock::new(()),
+            servable: Mutex::new(ServableIndex::default()),
             #[cfg(test)]
             faults: Mutex::new(tests::Faults::default()),
         })
+    }
+
+    fn index(&self) -> std::sync::MutexGuard<'_, ServableIndex> {
+        self.servable.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// `cid` was just hashed good (written from hashed bytes, or read back verified).
+    fn mark_servable(&self, cid: &ByteCid) {
+        let mut index = self.index();
+        index.set.insert(*cid);
+        if index.scanning {
+            index.removed_during_scan.remove(cid);
+            index.marked_during_scan.insert(*cid);
+        }
+    }
+
+    /// `cid` was deleted, quarantined or found bad: it is no longer servable.
+    fn unmark_servable(&self, cid: &ByteCid) {
+        let mut index = self.index();
+        index.set.remove(cid);
+        if index.scanning {
+            index.marked_during_scan.remove(cid);
+            index.removed_during_scan.insert(*cid);
+        }
+    }
+
+    /// Mark a payload and each of its chunks servable.
+    fn mark_payload(&self, cid: &ByteCid, chunks: &[ChunkRef]) {
+        self.mark_servable(cid);
+        for chunk in chunks {
+            self.mark_servable(&chunk.cid);
+        }
     }
 
     fn stripe(&self, cid: &ByteCid) -> std::sync::MutexGuard<'_, ()> {
@@ -727,6 +823,7 @@ impl Inner {
         // it vouches for. Anything less (absent, quarantined just now) is rewritten
         // below; `put_chunk` replaces a held chunk that fails its CID.
         if self.exists_locked(&cid) == Exists::Verified {
+            self.mark_payload(&cid, &chunk_refs);
             return Ok(result(true));
         }
 
@@ -739,6 +836,8 @@ impl Inner {
             }
             self.write_layout(&cid, byte_len, &layout_bytes, &layout_cid)?;
         }
+        // Written from bytes this call hashed: servable now, no later hashing needed.
+        self.mark_payload(&cid, &chunk_refs);
         info!(cid = %cid, size = byte_len, chunks = chunk_refs.len(), "Stored blob");
         Ok(result(false))
     }
@@ -822,6 +921,7 @@ impl Inner {
                 self.write_atomic(Area::Blob, &self.blob_path(&cid), &data)?;
                 self.tally.add(Footprint::inline(byte_len));
             }
+            self.mark_servable(&cid);
             let chunks = if data.is_empty() && chunks.is_empty() {
                 Vec::new()
             } else {
@@ -841,6 +941,7 @@ impl Inner {
         if !already_existed {
             self.write_layout(&cid, byte_len, &layout_bytes, &layout_cid)?;
         }
+        self.mark_payload(&cid, &chunks);
         Ok(StoreResult {
             cid,
             byte_len,
@@ -865,13 +966,18 @@ impl Inner {
     fn read_layout(&self, cid: &ByteCid, bound: &Cid) -> Result<Vec<ChunkRef>, String> {
         let bytes =
             fs::read(self.index_path(cid)).map_err(|error| format!("layout record: {error}"))?;
-        let actual = compute_record_cid(&bytes);
+        Self::layout_from(cid, bound, &bytes)
+    }
+
+    /// Decode layout-record `bytes`, refusing one the marker does not bind.
+    fn layout_from(cid: &ByteCid, bound: &Cid, bytes: &[u8]) -> Result<Vec<ChunkRef>, String> {
+        let actual = compute_record_cid(bytes);
         if &actual != bound {
             return Err(format!(
                 "layout record {actual} is not the {bound} the marker binds"
             ));
         }
-        LayoutRecord::decode_for(&bytes, cid).map(|(_, chunks)| chunks)
+        LayoutRecord::decode_for(bytes, cid).map(|(_, chunks)| chunks)
     }
 
     /// A whole verified read. A read holds no lock, so a racing delete or store can change
@@ -942,6 +1048,7 @@ impl Inner {
             }
             .into());
         }
+        self.mark_servable(cid);
         Ok(Bytes::from(data))
     }
 
@@ -1015,6 +1122,7 @@ impl Inner {
     fn verified(&self, cid: &ByteCid, bytes: Vec<u8>, area: Area) -> Result<Bytes, StorageError> {
         let actual = compute_bytes_cid(&bytes);
         if &actual == cid {
+            self.mark_servable(cid);
             return Ok(Bytes::from(bytes));
         }
         let reason = format!("bytes hash to {actual}");
@@ -1070,20 +1178,26 @@ impl Inner {
                     Verdict::Defect(format!("inline bytes hash to {actual}"))
                 }
             }
+            // One read of the layout record: its bytes are checked against the marker's
+            // binding below, never re-read, so a transient error cannot arrive between
+            // an existence check and a decode and be mistaken for a defect.
             Entry::Marker(bound) => match fs::read(self.index_path(cid)) {
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {
                     Verdict::Defect("layout record: missing".to_string())
                 }
                 // A failed read is not evidence of corruption (as in `read_entry`).
                 Err(error) => Verdict::Unknown(format!("layout record: {error}")),
-                Ok(_) => match self.read_layout(cid, &bound) {
+                Ok(bytes) => match Self::layout_from(cid, &bound, &bytes) {
                     Err(reason) => Verdict::Defect(reason),
                     Ok(chunks) => self.chunked_verdict(cid, &chunks),
                 },
             },
         };
         match verdict {
-            Verdict::Whole => Exists::Verified,
+            Verdict::Whole => {
+                self.mark_servable(cid);
+                Exists::Verified
+            }
             Verdict::Defect(reason) => {
                 warn!(cid = %cid, %reason, "held blob failed verification — quarantined");
                 let _ = self.quarantine_payload(cid, &reason);
@@ -1129,6 +1243,7 @@ impl Inner {
                 );
                 return Verdict::Defect(format!("chunk {} hashes to {actual}", chunk.cid));
             }
+            self.mark_servable(&chunk.cid);
             whole.update(&bytes);
         }
         let actual = ByteCid::from_digest(*whole.finalize().as_bytes());
@@ -1193,6 +1308,7 @@ impl Inner {
         paths: &[PathBuf],
         reason: &str,
     ) -> Result<Vec<bool>, StorageError> {
+        self.unmark_servable(cid);
         let micros = chrono::Utc::now().timestamp_micros();
         let dir = self.root.join("quarantine").join(format!("{cid}-{micros}"));
         fs::create_dir_all(&dir)?;
@@ -1239,6 +1355,7 @@ impl Inner {
             Some(Entry::Marker(bound)) => self.read_layout(cid, &bound).unwrap_or_default(),
             _ => Vec::new(),
         };
+        self.unmark_servable(cid);
         let blob = self.blob_path(cid);
         match fs::remove_file(&blob) {
             Ok(()) => {
@@ -1261,6 +1378,7 @@ impl Inner {
             let referenced = self.referenced_chunks();
             for chunk in chunks {
                 if !referenced.contains(&chunk.cid) {
+                    self.unmark_servable(&chunk.cid);
                     let _ = fs::remove_file(self.chunk_path(&chunk.cid));
                 }
             }
@@ -2382,6 +2500,9 @@ pub(crate) mod tests {
         fs::write(&path, b"an inline payload to spoiL").unwrap();
 
         assert!(store.list_cids().unwrap().contains(&broken.cid), "named");
+        // The index answers without hashing, so files spoiled after they were stored
+        // are found by a scrub (the startup pass) or by a read, not by the listing.
+        store.scrub().unwrap();
         let servable = store.list_servable().unwrap();
         assert!(servable.contains(&good.cid) && servable.contains(&inline.cid));
         for chunk in &good.chunks {
@@ -2461,5 +2582,139 @@ pub(crate) mod tests {
         assert!(!store.present(&result.cid).await);
         let absent = compute_bytes_cid(b"never stored");
         assert!(!store.present(&absent).await);
+    }
+
+    // ── servable index: recon answers without hashing ──
+
+    #[tokio::test]
+    async fn recon_answers_from_the_index_without_hashing() {
+        let (dir, store) = open().await;
+        let kept = store.store(&chunked_payload()).await.unwrap();
+        let spoiled = corrupt_chunk_in_place(&dir, &kept.chunks[1].cid, 7);
+        let before = fs::read(&spoiled).unwrap();
+        let listed = store.list_servable().unwrap();
+        // The listing read no unit: the spoiled chunk is still on disk, unmoved and
+        // unquarantined, and still listed (the index is a cache of verification).
+        assert!(listed.contains(&kept.cid) && listed.contains(&kept.chunks[1].cid));
+        assert_eq!(fs::read(&spoiled).unwrap(), before);
+        assert!(
+            fs::read_dir(dir.path().join("quarantine"))
+                .map(|mut d| d.next().is_none())
+                .unwrap_or(true),
+            "a listing quarantines nothing: it hashed nothing"
+        );
+        // A read that does hash drops it from the index.
+        assert!(store.get(&kept.cid).await.is_err());
+        let listed = store.list_servable().unwrap();
+        assert!(!listed.contains(&kept.cid) && !listed.contains(&kept.chunks[1].cid));
+    }
+
+    #[tokio::test]
+    async fn startup_scrub_fills_the_index_from_disk() {
+        let dir = TempDir::new().unwrap();
+        let (good, bad_chunk) = {
+            let store = BlobStore::new(dir.path()).await.unwrap();
+            let good = store.store(b"a payload that stays whole").await.unwrap();
+            let bad = store.store(&chunked_payload()).await.unwrap();
+            (good, bad.chunks[0].cid)
+        };
+        corrupt_chunk_in_place(&dir, &bad_chunk, 3);
+        let store = BlobStore::new(dir.path()).await.unwrap();
+        // The scrub runs in the background; wait for it to land.
+        let mut listed = Vec::new();
+        for _ in 0..200 {
+            listed = store.list_servable().unwrap();
+            if listed.contains(&good.cid) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        assert!(listed.contains(&good.cid));
+        store.scrub().unwrap();
+        assert!(!store.list_servable().unwrap().contains(&bad_chunk));
+    }
+
+    #[tokio::test]
+    async fn index_tracks_store_delete_and_quarantine() {
+        let (_dir, store) = open().await;
+        let chunked = store.store(&chunked_payload()).await.unwrap();
+        let inline = store.store(b"one inline unit").await.unwrap();
+        let listed: std::collections::HashSet<_> =
+            store.list_servable().unwrap().into_iter().collect();
+        assert!(listed.contains(&chunked.cid) && listed.contains(&inline.cid));
+        for chunk in &chunked.chunks {
+            assert!(listed.contains(&chunk.cid), "a stored chunk is servable");
+        }
+        // A streamed store is indexed too.
+        let streamed = store
+            .store_stream(std::io::Cursor::new(b"streamed bytes".to_vec()))
+            .await
+            .unwrap();
+        assert!(store.list_servable().unwrap().contains(&streamed.cid));
+
+        store.delete(&inline.cid).await.unwrap();
+        assert!(!store.list_servable().unwrap().contains(&inline.cid));
+
+        store.delete(&chunked.cid).await.unwrap();
+        let listed = store.list_servable().unwrap();
+        assert!(!listed.contains(&chunked.cid));
+        for chunk in &chunked.chunks {
+            assert!(
+                !listed.contains(&chunk.cid),
+                "an unreferenced chunk is gone"
+            );
+        }
+
+        let again = store.store(b"quarantine me").await.unwrap();
+        assert!(store.list_servable().unwrap().contains(&again.cid));
+        store.quarantine(&again.cid, "test").await.unwrap();
+        assert!(!store.list_servable().unwrap().contains(&again.cid));
+        // Stored anew, it is servable again.
+        store.store(b"quarantine me").await.unwrap();
+        assert!(store.list_servable().unwrap().contains(&again.cid));
+    }
+
+    #[tokio::test]
+    async fn a_transient_error_on_the_layout_read_never_quarantines() {
+        let (dir, store) = open().await;
+        let result = store.store(&chunked_payload()).await.unwrap();
+        let index = dir.path().join("index").join(result.cid.to_string());
+        let record = fs::read(&index).unwrap();
+        // The layout path unreadable for a reason other than absence: Unknown, nothing
+        // moves, and the payload verifies again once the fault clears.
+        fs::remove_file(&index).unwrap();
+        fs::create_dir(&index).unwrap();
+        assert_eq!(store.exists(&result.cid).await, Exists::Absent);
+        assert!(
+            fanout_path(&dir.path().join("blobs"), &result.cid.to_string()).exists(),
+            "the marker is untouched"
+        );
+        assert!(fs::read_dir(dir.path().join("quarantine"))
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(true));
+        fs::remove_dir(&index).unwrap();
+        fs::write(&index, &record).unwrap();
+        assert_eq!(store.exists(&result.cid).await, Exists::Verified);
+        // The layout is decoded from the one read: a record the marker does not bind is
+        // still a definitive defect.
+        let (cid, bound) = (result.cid, compute_record_cid(&record));
+        assert!(Inner::layout_from(&cid, &bound, &record).is_ok());
+        assert!(Inner::layout_from(&cid, &bound, b"other").is_err());
+    }
+
+    /// Flip a byte of an inline payload's file in place (same length): present and
+    /// well-shaped, no longer hashing to its CID. For probe tests.
+    pub(crate) fn spoil_inline_payload(store: &BlobStore, cid: &ByteCid) {
+        let path = fanout_path(&store.root_dir().join("blobs"), &cid.to_string());
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[0] ^= 0x01;
+        fs::write(&path, bytes).unwrap();
+    }
+
+    /// Nothing under `quarantine/`: no probe moved a file.
+    pub(crate) fn nothing_quarantined(store: &BlobStore) -> bool {
+        fs::read_dir(store.root_dir().join("quarantine"))
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(true)
     }
 }

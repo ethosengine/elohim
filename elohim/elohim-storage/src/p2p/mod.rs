@@ -66,6 +66,7 @@ pub mod private_receive; // station 3b receiver-side pre-authorization: keep a p
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
+pub mod recon_limit; // per-peer inbound limit on the recon responder
 pub mod recon_wire; // libp2p framing of /elohim/inventory-recon/1.0.0
 pub mod reconcile_peers; // transport-neutral peer source for the reconcile arms (libp2p | iroh)
 pub mod reconcile_rails;
@@ -996,6 +997,8 @@ pub struct P2PNode {
     /// run-loop broadcaster tick allocates the next value before each
     /// publish via `inventory_broadcaster::build_snapshot`.
     inventory_seq: inventory_broadcaster::SequenceAllocator,
+    /// Inbound recon requests per peer per minute; excess gets `RECON_BUSY_REPLY`.
+    recon_limiter: recon_limit::ReconLimiter<PeerId>,
     /// P3 salvage: monotonic sequence allocator for outgoing
     /// `SalvageCapacityAd` messages. Initialized at 0 in `new()`.
     salvage_seq: inventory_broadcaster::SequenceAllocator,
@@ -3384,6 +3387,7 @@ impl P2PNode {
             // Station 1 of the sync-state contract: sequences carry this
             // process's boot epoch in their high 32 bits, so a restart is
             // strictly ahead of the old run on the wire (see `p2p::sync_state`).
+            recon_limiter: recon_limit::ReconLimiter::standard(),
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(
                 crate::p2p::sync_state::epoch_base(crate::p2p::sync_state::boot_epoch(
                     std::time::SystemTime::now()
@@ -4624,18 +4628,37 @@ impl P2PNode {
     /// against this node's own byte CIDs, and send the reply back through the loop.
     fn answer_recon(
         &self,
+        peer: PeerId,
         request: inventory_recon::ReconRequest,
         channel: request_response::ResponseChannel<inventory_recon::ReconResponse>,
     ) {
         let blob_store = Arc::clone(&self.blob_store);
         let sequence = self.inventory_seq.current();
         let cmd_tx = self.command_tx.clone();
+        // The limit is checked before any work: a peer over it is told it is busy and
+        // costs this node one map lookup.
+        if !self.recon_limiter.admit(&peer, std::time::Instant::now()) {
+            debug!(target: "elohim_storage::inventory", peer = %peer, "recon request over the per-peer limit — busy");
+            tokio::spawn(async move {
+                let _ = cmd_tx
+                    .send(P2PCommand::SendReconResponse {
+                        channel: Box::new(channel),
+                        response: inventory_recon::ReconResponse {
+                            msg: recon_wire::RECON_BUSY_REPLY.to_vec(),
+                            sequence,
+                        },
+                    })
+                    .await;
+            });
+            return;
+        }
         tokio::spawn(async move {
             let reply = tokio::task::spawn_blocking(move || {
                 request.admit().map_err(|e| e.to_string())?;
-                // Only what this node can serve verified: a named-but-corrupt payload
-                // or chunk is not advertised, so a recon-witnessed row never describes
-                // an unservable payload.
+                // Only what this node can serve verified (the store's servable index,
+                // kept at write/verify/delete/quarantine time; no hashing here): a
+                // named-but-corrupt payload or chunk is not advertised, so a
+                // recon-witnessed row never describes an unservable payload.
                 let local = blob_store.list_servable().map_err(|e| e.to_string())?;
                 let set = inventory_recon::ReconSet::new(&local);
                 inventory_recon::Reconciler::responder(&set)
@@ -7516,11 +7539,11 @@ impl P2PNode {
 
             // Inventory range reconciliation (`/elohim/inventory-recon/1.0.0`).
             behaviour::ElohimStorageBehaviourEvent::InventoryRecon(
-                request_response::Event::Message { message, .. },
+                request_response::Event::Message { peer, message },
             ) => match message {
                 request_response::Message::Request {
                     request, channel, ..
-                } => self.answer_recon(request, channel),
+                } => self.answer_recon(peer, request, channel),
                 request_response::Message::Response {
                     request_id,
                     response,
