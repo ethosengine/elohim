@@ -76,6 +76,7 @@ fn config(
         verifier: verifier(devices),
         log: Arc::new(|_line: &str| {}),
         payload_store: None,
+        install: Default::default(),
     }
 }
 

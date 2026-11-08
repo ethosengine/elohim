@@ -232,6 +232,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
         verifier: Arc::new(|d: &str, m: &[u8], s: &[u8]| device_key::verify(d, m, s)),
         log: Arc::new(|_: &str| {}),
         payload_store: None,
+        install: Default::default(),
     })
     .await
     .unwrap();

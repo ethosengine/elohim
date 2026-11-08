@@ -93,11 +93,13 @@ pub fn usage() -> String {
     "usage: epr peer <\n  \
      id [--json]\n  \
      | serve [--check] [--root DIR] [--handle H] [--listen IP:PORT] \
-     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--payload-store DIR] [--json] \
+     [--peer NODE_ID@IP:PORT]... [--policy PATH] [--payload-store DIR] [--install-root DIR]... \
+     [--json] \
      (the device peer: the tier ALPN over this device's channel tree, the artifacts of its \
      payload store that berth.artifacts.serves grants, and the steward topic, admitted devices \
      only; runs until stopped. The payload store is --payload-store, else EPR_PAYLOAD_STORE, \
-     else $XDG_DATA_HOME/epr/payload. --check validates its read-only start floor; \
+     else $XDG_DATA_HOME/epr/payload. A fetch `epr artifact fetch` queues installs only under an \
+     --install-root, EPR_INSTALL_ROOTS, or a mesh-bin directory under the cargo pool. --check validates its read-only start floor; \
      EPR_PEER_RELAY_URL homes it to a relay; --peer names a device's direct address when there \
      is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
@@ -161,6 +163,8 @@ pub struct Options {
     pub policy: Option<PathBuf>,
     /// `serve`'s payload store directory (`--payload-store`).
     pub payload_store: Option<PathBuf>,
+    /// `serve`'s extra install roots for queued fetches (`--install-root`, repeatable).
+    pub install_roots: Vec<PathBuf>,
     pub project: Option<String>,
     pub closure: Option<String>,
     /// `artifacts`' derivation key CID (`--key`).
@@ -199,6 +203,7 @@ impl Options {
                 "--handle" => options.handle = Some(value),
                 "--policy" => options.policy = Some(PathBuf::from(value)),
                 "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
+                "--install-root" => options.install_roots.push(PathBuf::from(value)),
                 "--project" => options.project = Some(value),
                 "--closure" => options.closure = Some(value),
                 "--key" => options.key = Some(value),
@@ -657,6 +662,49 @@ fn termination() -> impl std::future::Future<Output = ()> {
 /// The environment variable naming `epr peer serve`'s payload store directory.
 pub const PAYLOAD_STORE_ENV: &str = "EPR_PAYLOAD_STORE";
 
+/// The file in the peer directory naming the payload store the serving daemon serves.
+pub const PAYLOAD_STORE_RECORD: &str = "payload-store";
+
+/// The environment variable naming extra install roots for queued fetches (`:`-separated).
+pub const INSTALL_ROOTS_ENV: &str = "EPR_INSTALL_ROOTS";
+
+/// Where this daemon's queued fetches may install: every `--install-root`, every root in
+/// [`INSTALL_ROOTS_ENV`], and a `mesh-bin` directory under the cargo pool
+/// (`CARGO_TARGET_POOL_ROOT`, else `/projects/.cargo-target-pool` when it exists).
+fn install_scope(options: &Options) -> eprfs_peer::InstallScope {
+    let mut roots = options.install_roots.clone();
+    if let Some(extra) = std::env::var_os(INSTALL_ROOTS_ENV) {
+        roots.extend(std::env::split_paths(&extra).filter(|p| p.is_absolute()));
+    }
+    let mesh_bin_pool = std::env::var_os("CARGO_TARGET_POOL_ROOT")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            let default = PathBuf::from("/projects/.cargo-target-pool");
+            default.is_dir().then_some(default)
+        });
+    eprfs_peer::InstallScope {
+        roots,
+        mesh_bin_pool,
+    }
+}
+
+fn describe_install(scope: &eprfs_peer::InstallScope) -> String {
+    let mut places: Vec<String> = scope
+        .roots
+        .iter()
+        .map(|root| root.display().to_string())
+        .collect();
+    if let Some(pool) = &scope.mesh_bin_pool {
+        places.push(format!("{}/**/mesh-bin", pool.display()));
+    }
+    if places.is_empty() {
+        "nowhere (no install root, no cargo pool)".into()
+    } else {
+        places.join(", ")
+    }
+}
+
 /// `serve`'s payload store: `--payload-store`, else [`PAYLOAD_STORE_ENV`], else
 /// `$XDG_DATA_HOME/epr/payload` (`$HOME/.local/share/epr/payload` when unset).
 pub(crate) fn payload_store_dir(options: &Options) -> PeerResult<PathBuf> {
@@ -705,6 +753,20 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
             .map(std::path::Path::new),
     )?;
     let _serving = ServeLock::acquire(&device.peer_dir)?;
+    // The payload store this daemon serves, recorded where `epr artifact put` checks it writes the
+    // same one (artifact-store review M9).
+    let payload_dir = payload_store_dir(&options)?;
+    let payload = open_payload_store(&payload_dir)?;
+    let payload_dir = std::fs::canonicalize(&payload_dir)?;
+    std::fs::write(
+        device.peer_dir.join(PAYLOAD_STORE_RECORD),
+        format!("{}\n", payload_dir.display()),
+    )?;
+    let install = install_scope(&options);
+    eprintln!(
+        "epr peer: a queued fetch installs only under {}",
+        describe_install(&install)
+    );
     if rules.allow().is_empty() {
         eprintln!(
             "epr peer: the crossing allow-list is empty — nothing of this device crosses until \
@@ -728,7 +790,8 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         signer: Arc::new(move |message: &[u8]| signer_key.sign(message)),
         verifier: Arc::new(verifier()),
         log: Arc::new(|line: &str| eprintln!("epr peer: {line}")),
-        payload_store: Some(open_payload_store(&payload_store_dir(&options)?)?),
+        payload_store: Some(payload),
+        install,
     };
     let runtime = runtime()?;
     runtime.block_on(async move {

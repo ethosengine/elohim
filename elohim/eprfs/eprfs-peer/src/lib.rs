@@ -93,11 +93,13 @@ pub use daemon::{
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
 pub use fetch::{
-    fetch_artifact, fetch_done_path, fetch_queue_dir, fetch_request_path, install_fetched, key_cid,
-    put_method_record, resolve_holders, write_queue_file, FetchBudget, FetchDone, FetchGap,
-    FetchRequest, FetchTransport, FetchedArtifact, Holder, RequestedHolder, SiblingRecord,
-    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_IN_FLIGHT, FETCH_MANIFEST_CAP,
-    FETCH_QUEUE, FETCH_STALL, FETCH_TOTAL,
+    ensure_queue_dir, fetch_artifact, fetch_artifact_until, fetch_cancel_path, fetch_done_path,
+    fetch_queue_dir, fetch_request_path, install_fetched, key_cid, put_method_record,
+    queue_dir_is_private, read_queue_file, resolve_holders, write_queue_file, FetchBudget,
+    FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport, FetchedArtifact, Holder,
+    InstallScope, RequestedHolder, SiblingRecord, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE,
+    FETCH_IN_FLIGHT, FETCH_MANIFEST_CAP, FETCH_QUEUE, FETCH_STALL, FETCH_TOTAL,
+    MAX_QUEUE_FILE_BYTES,
 };
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,

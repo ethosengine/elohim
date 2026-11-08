@@ -1012,7 +1012,14 @@ async fn a_chunk_that_fails_its_cid_is_metered_as_wasted_and_re_fetched() {
         b.tier.chunk_asks().contains(&bad.cid),
         "the chunk was re-fetched from B"
     );
-    assert_eq!(fetched.wasted, u64::from(bad.byte_len));
+    // Metered at what actually arrived and was discarded: the corrupt chunk's whole frame.
+    assert!(
+        fetched.wasted >= u64::from(bad.byte_len)
+            && fetched.wasted <= u64::from(bad.byte_len) + 4096,
+        "wasted {} for a {}-byte chunk",
+        fetched.wasted,
+        bad.byte_len
+    );
     let dest = tempfile::tempdir().expect("dest");
     let mut flow = MemoryFlowStore::new();
     install_fetched(
@@ -1030,7 +1037,7 @@ async fn a_chunk_that_fails_its_cid_is_metered_as_wasted_and_re_fetched() {
     );
     let used = uses(&flow);
     assert!(
-        slots(&used[0]).contains(&format!("wasted:{}", bad.byte_len).as_str()),
+        slots(&used[0]).contains(&format!("wasted:{}", fetched.wasted).as_str()),
         "{:?}",
         used[0].classified_as
     );
@@ -1288,7 +1295,91 @@ async fn a_held_manifest_with_a_missing_chunk_records_an_unavailable_use() {
 }
 
 // ---------------------------------------------------------------------------
-// the daemon's queue (design §3.b.2)
+// installation (review H1)
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_precreated_staging_link_never_receives_bytes() {
+    use std::os::unix::fs::PermissionsExt;
+    let key = key_for("closure-at-head");
+    let held = held_artifact(&key, artifact_bytes(121, 2 * 1024 * 1024)).await;
+    let fetched = FetchedArtifact {
+        manifest_cid: held.manifest_cid.clone(),
+        manifest: held.manifest.clone(),
+        manifest_from: "did:key:zDeviceA".into(),
+        fetched_from: ["did:key:zDeviceA".to_string()].into_iter().collect(),
+        chunks_fetched: distinct(&held.manifest).len(),
+        chunks_resumed: 0,
+        bytes_fetched: held.manifest.byte_len,
+        wasted: 0,
+        elapsed: Duration::ZERO,
+    };
+    let outside = tempfile::tempdir().expect("outside");
+    let victim = outside.path().join("victim");
+    std::fs::write(&victim, b"the victim's own bytes").expect("victim");
+    let dir = tempfile::tempdir().expect("dest dir");
+    let dest = dir.path().join("elohim-storage");
+    // Every name an attacker could predict, linked to the victim: the old staging sibling, and a
+    // hard link too.
+    std::os::unix::fs::symlink(&victim, dir.path().join(".elohim-storage.fetching")).unwrap();
+    std::fs::hard_link(&victim, dir.path().join(".elohim-storage.tmp")).unwrap();
+
+    // A failed install (a chunk missing) leaves the victim and the destination untouched.
+    let partial = MemoryStorage::default();
+    partial
+        .insert_blob(held.manifest_cid.clone(), held.manifest_bytes.clone())
+        .await;
+    let mut flow = MemoryFlowStore::new();
+    install_fetched(
+        &partial,
+        &mut flow,
+        &fetched,
+        &context("did:key:zDeviceC"),
+        &dest,
+    )
+    .await
+    .expect_err("a missing chunk installs nothing");
+    assert_eq!(std::fs::read(&victim).unwrap(), b"the victim's own bytes");
+    assert!(!dest.exists());
+
+    // A verified install publishes a fresh executable file and still never writes the victim.
+    let mut flow = MemoryFlowStore::new();
+    install_fetched(
+        held.store.as_ref(),
+        &mut flow,
+        &fetched,
+        &context("did:key:zDeviceC"),
+        &dest,
+    )
+    .await
+    .expect("installed");
+    assert_eq!(std::fs::read(&victim).unwrap(), b"the victim's own bytes");
+    let meta = std::fs::symlink_metadata(&dest).unwrap();
+    assert!(meta.file_type().is_file(), "a regular file, never a link");
+    assert_eq!(
+        meta.permissions().mode() & 0o777,
+        0o755,
+        "executable before publication"
+    );
+    assert_eq!(std::fs::read(&dest).unwrap(), held.bytes.to_vec());
+    let mut left: Vec<String> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort();
+    assert_eq!(
+        left,
+        vec![
+            ".elohim-storage.fetching",
+            ".elohim-storage.tmp",
+            "elohim-storage"
+        ],
+        "no staging directory is left behind"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// the daemon's queue (design §3.b.2; review H2, H5)
 // ---------------------------------------------------------------------------
 
 /// One device's checkout (flow store and roster), peer state and payload store, for a daemon.
@@ -1317,6 +1408,11 @@ impl Side {
         open_payload_store(&self.payload.path().join("payload")).expect("payload store")
     }
 
+    /// Where this side's daemon may install: under its payload directory only.
+    fn install_root(&self) -> std::path::PathBuf {
+        self.payload.path().join("mesh-bin")
+    }
+
     async fn start(
         &self,
         t: &Three,
@@ -1332,6 +1428,7 @@ impl Side {
             .expect("roster")
             .log_path()
             .to_path_buf();
+        std::fs::create_dir_all(self.install_root()).expect("install root");
         eprfs_peer::PeerDaemon::start(eprfs_peer::PeerConfig {
             key,
             device: me.did.clone(),
@@ -1351,9 +1448,17 @@ impl Side {
             verifier: verifier(&[&t.a, &t.b, &t.c]),
             log: Arc::new(|_line: &str| {}),
             payload_store: Some(self.store()),
+            install: eprfs_peer::InstallScope {
+                roots: vec![self.install_root()],
+                mesh_bin_pool: None,
+            },
         })
         .await
         .expect("daemon starts")
+    }
+
+    fn queue(&self) -> std::path::PathBuf {
+        eprfs_peer::fetch_queue_dir(self.state.path())
     }
 }
 
@@ -1362,6 +1467,54 @@ fn free_port() -> u16 {
         .and_then(|s| s.local_addr())
         .map(|a| a.port())
         .expect("a free port")
+}
+
+fn request_for(
+    key: &DerivationKey,
+    output: &BlobCid,
+    holders: Vec<eprfs_peer::RequestedHolder>,
+    dest: std::path::PathBuf,
+) -> eprfs_peer::FetchRequest {
+    eprfs_peer::FetchRequest {
+        nonce: eprfs_peer::FetchRequest::fresh_nonce(),
+        key: key.clone(),
+        key_cid: key_cid(key).expect("key cid"),
+        output: output.clone(),
+        holders,
+        dest,
+        scope: atom_cid(&"artifact-scope").expect("scope").to_string(),
+        transport: FetchTransport::Tier,
+        stall_s: 10,
+        total_s: 30,
+    }
+}
+
+/// Queue `request` in `queue` and wait for the answer that is for it.
+async fn queue_and_wait(
+    queue: &std::path::Path,
+    request: &eprfs_peer::FetchRequest,
+) -> eprfs_peer::FetchDone {
+    let stem = request.stem();
+    let done_path = eprfs_peer::fetch_done_path(queue, &stem);
+    eprfs_peer::write_queue_file(&eprfs_peer::fetch_request_path(queue, &stem), request)
+        .expect("queued");
+    within("an answer", async {
+        loop {
+            if let Ok(bytes) = std::fs::read(&done_path) {
+                if let Ok(done) = serde_json::from_slice::<eprfs_peer::FetchDone>(&bytes) {
+                    let _ = std::fs::remove_file(&done_path);
+                    assert_eq!(
+                        done.for_request(),
+                        &eprfs_peer::FetchFor::of(request),
+                        "the answer names its request"
+                    );
+                    return done;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1400,57 +1553,33 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
     let c_daemon = c_side
         .start(&t, &t.c, c_key, free_port(), vec![a_addr])
         .await;
-
-    let queue = eprfs_peer::fetch_queue_dir(c_side.state.path());
-    std::fs::create_dir_all(&queue).expect("queue");
-    let dest = c_side.payload.path().join("mesh-bin/elohim-storage");
-    let request = eprfs_peer::FetchRequest {
-        key: key.clone(),
-        key_cid: key_cid(&key).expect("key cid"),
-        output: output.clone(),
-        holders: vec![
-            eprfs_peer::RequestedHolder {
-                device: t.a.did.clone(),
-                manifest: put.manifest_cid.clone(),
-            },
-            // A device the roster does not admit is dropped by the daemon, never dialled.
-            eprfs_peer::RequestedHolder {
-                device: "did:key:zStranger".into(),
-                manifest: put.manifest_cid.clone(),
-            },
-        ],
-        dest: dest.clone(),
-        scope: atom_cid(&"artifact-scope").expect("scope").to_string(),
-        transport: FetchTransport::Tier,
-        stall_s: 10,
-        total_s: 30,
-    };
-    let done_path = eprfs_peer::fetch_done_path(&queue, &request.key_cid);
+    let queue = c_side.queue();
+    assert!(
+        eprfs_peer::queue_dir_is_private(&queue),
+        "the daemon made its queue 0700"
+    );
+    let dest = c_side.install_root().join("elohim-storage");
+    let holders = vec![
+        eprfs_peer::RequestedHolder {
+            device: t.a.did.clone(),
+            manifest: put.manifest_cid.clone(),
+        },
+        // A device the roster does not admit is dropped by the daemon, never dialled.
+        eprfs_peer::RequestedHolder {
+            device: "did:key:zStranger".into(),
+            manifest: put.manifest_cid.clone(),
+        },
+    ];
     // A's mount indexes on its own tick; until then A refuses, which is a gap, so ask again.
     let done = within("an installed answer", async {
         loop {
-            eprfs_peer::write_queue_file(
-                &eprfs_peer::fetch_request_path(&queue, &request.key_cid),
-                &request,
-            )
-            .expect("queued");
-            let answer = loop {
-                if let Ok(bytes) = std::fs::read(&done_path) {
-                    if let Ok(done) = serde_json::from_slice::<eprfs_peer::FetchDone>(&bytes) {
-                        let _ = std::fs::remove_file(&done_path);
-                        break done;
-                    }
-                }
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            };
-            match answer {
-                eprfs_peer::FetchDone::Installed { .. } => break answer,
+            let request = request_for(&key, &output, holders.clone(), dest.clone());
+            match queue_and_wait(&queue, &request).await {
+                done @ eprfs_peer::FetchDone::Installed { .. } => break done,
                 eprfs_peer::FetchDone::Gap {
                     gap: FetchGap::Refused { .. },
                     ..
-                } => {
-                    tokio::time::sleep(Duration::from_millis(300)).await;
-                }
+                } => tokio::time::sleep(Duration::from_millis(300)).await,
                 other => panic!("expected an installed answer, got {other:?}"),
             }
         }
@@ -1468,10 +1597,6 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
         other => panic!("{other:?}"),
     }
     assert_eq!(std::fs::read(&dest).expect("installed"), bytes.to_vec());
-    assert!(
-        !eprfs_peer::fetch_request_path(&queue, &key_cid(&key).unwrap()).exists(),
-        "the request was claimed"
-    );
     let installed: Vec<FlowEvent> = c_side
         .checkout
         .events()
@@ -1485,4 +1610,75 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
     assert_eq!(installed[0].resource, *output.as_cid());
     c_daemon.shutdown().await;
     a_daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_queue_entry_naming_an_outside_destination_is_refused() {
+    let t = three();
+    let key = key_for("closure-at-head");
+    let c_side = Side::new(&t.rows);
+    let c_key = PeerKey::load_or_generate(t._dirs[2].path()).expect("key c");
+    let c_daemon = c_side.start(&t, &t.c, c_key, free_port(), Vec::new()).await;
+    let elsewhere = tempfile::tempdir().expect("elsewhere");
+    let output = BlobCid::compute_bytes(b"anything");
+    for dest in [
+        elsewhere.path().join("bin"),
+        // Lexically under the root, but climbing out of it.
+        c_side.install_root().join("../../escape"),
+    ] {
+        let request = request_for(&key, &output, Vec::new(), dest.clone());
+        match queue_and_wait(&c_side.queue(), &request).await {
+            eprfs_peer::FetchDone::Gap {
+                gap: FetchGap::InstallRefused { .. },
+                reason,
+                ..
+            } => assert!(reason.contains("refused to install"), "{reason}"),
+            other => panic!(
+                "expected InstallRefused for {}, got {other:?}",
+                dest.display()
+            ),
+        }
+        assert!(!dest.exists(), "nothing written outside the install scope");
+    }
+    c_daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_fifo_in_the_queue_never_blocks_the_tick() {
+    let t = three();
+    let key = key_for("closure-at-head");
+    let c_side = Side::new(&t.rows);
+    let c_key = PeerKey::load_or_generate(t._dirs[2].path()).expect("key c");
+    let c_daemon = c_side.start(&t, &t.c, c_key, free_port(), Vec::new()).await;
+    let queue = c_side.queue();
+    // Sorted first, so the daemon meets it before the real request.
+    let fifo = queue.join("0000-fifo.json");
+    let made = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .expect("mkfifo runs");
+    assert!(made.success());
+    let link = queue.join("0001-link.json");
+    std::os::unix::fs::symlink("/dev/zero", &link).expect("link");
+    let request = request_for(
+        &key,
+        &BlobCid::compute_bytes(b"anything"),
+        Vec::new(),
+        tempfile::tempdir().unwrap().path().join("bin"),
+    );
+    // The daemon still answers the real request: neither entry blocked or redirected its read.
+    let done = queue_and_wait(&queue, &request).await;
+    assert!(
+        matches!(done, eprfs_peer::FetchDone::Gap { .. }),
+        "{done:?}"
+    );
+    assert!(
+        std::fs::symlink_metadata(&fifo).is_err(),
+        "the FIFO was removed unread"
+    );
+    assert!(
+        std::fs::symlink_metadata(&link).is_err(),
+        "the link was removed unread"
+    );
+    c_daemon.shutdown().await;
 }

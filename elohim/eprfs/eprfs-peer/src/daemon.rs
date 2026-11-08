@@ -51,8 +51,9 @@ use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
 use crate::fetch::{
-    admitted_holders, fetch_artifact, fetch_done_path, fetch_queue_dir, install_fetched, key_cid,
-    write_queue_file, FetchDone, FetchGap, FetchRequest,
+    admitted_holders, ensure_queue_dir, fetch_artifact_until, fetch_cancel_path, fetch_done_path,
+    fetch_queue_dir, install_fetched, key_cid, queue_dir_is_private, read_queue_file,
+    write_queue_file, FetchDone, FetchFor, FetchGap, FetchRequest, InstallScope,
 };
 use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
@@ -286,6 +287,8 @@ pub struct PeerConfig {
     /// The device's payload store, whose custody artifacts the tier serves to the devices
     /// `rules.serves()` grants; `None` for a channel-only daemon, which serves no artifact.
     pub payload_store: Option<Arc<dyn EprfsStorage>>,
+    /// Where a queued sibling fetch may install its artifact; the default admits nothing.
+    pub install: InstallScope,
 }
 
 /// A running device daemon.
@@ -325,6 +328,9 @@ impl PeerDaemon {
             });
         }
         table.save(&config.state_dir)?;
+        // The fetch queue is this device's own: created 0700 before anything can be queued.
+        ensure_queue_dir(&fetch_queue_dir(&config.state_dir))
+            .map_err(|e| ended(format!("the fetch queue cannot be created: {e}")))?;
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
         let book = ConnectionBook::default();
@@ -427,6 +433,8 @@ impl PeerDaemon {
             index_retry_at: None,
             serves,
             fetch_task: None,
+            queue_pruned: None,
+            queue_open_logged: false,
             config,
         };
         let (stop, stopped) = oneshot::channel();
@@ -553,18 +561,38 @@ fn seed_endpoint(
     }
 }
 
-/// The oldest-named queued fetch request in `queue` and its file stem (the key CID): a
-/// `<key>.json`, never an answer (`.done.json`) or a temporary (`.json.tmp`).
-fn next_request(queue: &std::path::Path) -> Option<(PathBuf, String)> {
-    let mut requests: Vec<(PathBuf, String)> = std::fs::read_dir(queue)
-        .ok()?
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let name = entry.file_name().into_string().ok()?;
-            let stem = name.strip_suffix(".json")?;
-            (!stem.ends_with(".done")).then(|| (entry.path(), stem.to_string()))
-        })
-        .collect();
+/// How long answered and withdrawn queue files are kept.
+const QUEUE_RETAIN: Duration = Duration::from_secs(3600);
+
+/// The oldest-named queued fetch request in `queue` and its stem (`<key>-<nonce>`): a `.json`
+/// entry, never an answer (`.done.json`). An entry that is not a regular file (a link, a FIFO, a
+/// device) is removed without being opened.
+fn next_request(
+    queue: &std::path::Path,
+    log: &(dyn Fn(&str) + Send + Sync),
+) -> Option<(PathBuf, String)> {
+    let mut requests: Vec<(PathBuf, String)> = Vec::new();
+    for entry in std::fs::read_dir(queue).ok()?.filter_map(Result::ok) {
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
+        };
+        let Some(stem) = name.strip_suffix(".json") else {
+            continue;
+        };
+        if stem.ends_with(".done") {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta) if meta.file_type().is_file() => requests.push((path, stem.to_string())),
+            _ => {
+                log(&format!(
+                    "fetch queue entry {name} is not a regular file; removed unread"
+                ));
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
     requests.sort();
     requests.into_iter().next()
 }
@@ -663,8 +691,13 @@ struct Run {
     index_retry_at: Option<Instant>,
     /// The artifact grant the tier's scope reads; replaced when the rules reload.
     serves: Arc<RwLock<ArtifactServeList>>,
-    /// The one queued sibling fetch in flight, off the loop (artifact-store design §3.b.2).
-    fetch_task: Option<JoinHandle<()>>,
+    /// The one queued sibling fetch in flight, off the loop (artifact-store design §3.b.2): its
+    /// task, its queue stem and who its answer is for.
+    fetch_task: Option<(JoinHandle<()>, String, FetchFor)>,
+    /// When answered and withdrawn queue files were last pruned.
+    queue_pruned: Option<Instant>,
+    /// Whether a queue directory that is not private has been reported.
+    queue_open_logged: bool,
 }
 
 impl Run {
@@ -760,7 +793,7 @@ impl Run {
         if let Some(task) = self.index_task.take() {
             task.abort();
         }
-        if let Some(task) = self.fetch_task.take() {
+        if let Some((task, _, _)) = self.fetch_task.take() {
             task.abort();
         }
         // Best effort on the way out: the counters are worth keeping, the head is already saved.
@@ -1212,63 +1245,98 @@ impl Run {
 
     /// Start the next fetch `epr artifact fetch` queued in `<state dir>/fetch-queue`, one at a
     /// time and on a task of its own (design §3.b.2): only this daemon holds the device's peer key,
-    /// so only it dials. The request is claimed (removed) before it runs; its answer is
-    /// `<key>.done.json`. Holders are re-resolved under this daemon's admission now, never taken
-    /// on the request's word, and every integrity rule is `fetch_artifact`'s and
-    /// `install_fetched`'s.
+    /// so only it dials.
+    ///
+    /// The queue is read only while it is private (0700). An entry is read only when it is a
+    /// regular file within the size cap, opened without following a link and without blocking;
+    /// anything else is removed unread. A request is claimed (removed) before it runs, is answered
+    /// in `<key>-<nonce>.done.json` naming its nonce, key, output and destination, and is withdrawn
+    /// by `<key>-<nonce>.cancel`. Holders are re-resolved under this daemon's admission now, the
+    /// destination must lie in its install scope, and every integrity rule is `fetch_artifact`'s
+    /// and `install_fetched`'s, under one deadline from the first dial through the install.
     fn fetch_queued(&mut self) {
-        if self
-            .fetch_task
-            .as_ref()
-            .is_some_and(|task| !task.is_finished())
-        {
-            return;
+        let queue = fetch_queue_dir(&self.config.state_dir);
+        if let Some((task, stem, for_request)) = &self.fetch_task {
+            if !task.is_finished() {
+                let cancel = fetch_cancel_path(&queue, stem);
+                if std::fs::symlink_metadata(&cancel).is_ok() {
+                    task.abort();
+                    let _ = std::fs::remove_file(&cancel);
+                    let (stem, for_request) = (stem.clone(), for_request.clone());
+                    self.write_done(
+                        &fetch_done_path(&queue, &stem),
+                        &FetchDone::gap(for_request, FetchGap::Cancelled),
+                    );
+                    self.log(&format!("fetch {stem} withdrawn by its requester"));
+                    self.fetch_task = None;
+                }
+                return;
+            }
         }
         self.fetch_task = None;
-        let queue = fetch_queue_dir(&self.config.state_dir);
-        let Some((path, stem)) = next_request(&queue) else {
+        if !queue_dir_is_private(&queue) {
+            if !self.queue_open_logged {
+                self.queue_open_logged = true;
+                self.log(&format!(
+                    "the fetch queue {} is not a private (0700) directory; nothing in it is read",
+                    queue.display()
+                ));
+            }
+            return;
+        }
+        self.queue_open_logged = false;
+        self.prune_queue(&queue);
+        let Some((path, stem)) = next_request(&queue, &*self.config.log) else {
             return;
         };
-        let read = std::fs::read(&path);
+        let read = read_queue_file(&path);
         // Claimed: a request runs once, whatever it holds.
         let _ = std::fs::remove_file(&path);
-        let Ok(key_cid_named) = eprfs_core::BlobCid::parse(&stem) else {
-            self.log(&format!(
-                "fetch request {} is not named by a key CID; dropped",
-                path.display()
-            ));
-            return;
-        };
-        let done = fetch_done_path(&queue, &key_cid_named);
-        let answer = |gap: FetchGap| FetchDone::gap(key_cid_named.clone(), gap);
-        let request = match read.map_err(|e| e.to_string()).and_then(|bytes| {
+        let request = match read.and_then(|bytes| {
             serde_json::from_slice::<FetchRequest>(&bytes).map_err(|e| e.to_string())
         }) {
             Ok(request) => request,
             Err(e) => {
-                self.write_done(
-                    &done,
-                    &answer(FetchGap::ManifestRejected {
-                        reason: format!("the queued request does not read: {e}"),
-                    }),
-                );
+                // Unreadable: nobody can be answered, because nothing names who asked.
+                self.log(&format!("fetch request {stem} dropped: {e}"));
                 return;
             }
         };
-        if key_cid(&request.key).ok().as_ref() != Some(&request.key_cid)
-            || request.key_cid != key_cid_named
-        {
-            self.write_done(
-                &done,
-                &answer(FetchGap::ManifestRejected {
-                    reason: "the queued request's key does not hash to the key CID it is named by"
-                        .into(),
-                }),
-            );
+        let for_request = FetchFor::of(&request);
+        let done = fetch_done_path(&queue, &stem);
+        let refused = |reason: String| {
+            FetchDone::gap(
+                for_request.clone(),
+                FetchGap::InstallRefused {
+                    dest: request.dest.display().to_string(),
+                    reason,
+                },
+            )
+        };
+        if request.stem() != stem || key_cid(&request.key).ok().as_ref() != Some(&request.key_cid) {
+            let answer =
+                refused("the request's key and nonce do not name the file it was queued in".into());
+            self.write_done(&done, &answer);
             return;
         }
+        let dest = match self.config.install.admits(&request.dest) {
+            Ok(dest) => dest,
+            Err(reason) => {
+                let answer = refused(reason);
+                self.write_done(&done, &answer);
+                return;
+            }
+        };
+        let Ok(scope) = request.scope.parse::<cid::Cid>() else {
+            let answer = refused(format!("the queued scope {} is not a CID", request.scope));
+            self.write_done(&done, &answer);
+            return;
+        };
         let Some(mount) = self.mount.clone() else {
-            self.write_done(&done, &answer(FetchGap::DaemonDown));
+            self.write_done(
+                &done,
+                &FetchDone::gap(for_request.clone(), FetchGap::DaemonDown),
+            );
             return;
         };
         let holders = admitted_holders(&request.holders, &self.config.device, |device| {
@@ -1281,35 +1349,30 @@ impl Run {
                 }
             }))
         });
-        let Ok(scope) = request.scope.parse::<cid::Cid>() else {
-            self.write_done(
-                &done,
-                &answer(FetchGap::ManifestRejected {
-                    reason: format!("the queued scope {} is not a CID", request.scope),
-                }),
-            );
-            return;
-        };
         let endpoint = self.endpoint.clone();
         let flow_root = self.config.flow_root.clone();
         let device = self.config.device.clone();
         let log = self.config.log.clone();
         self.log(&format!(
-            "fetching {} from {} holder(s)",
+            "fetching {} from {} holder(s) into {}",
             request.output,
-            holders.len()
+            holders.len(),
+            dest.display()
         ));
-        self.fetch_task = Some(tokio::spawn(async move {
+        let answer_for = for_request.clone();
+        let task = tokio::spawn(async move {
             let store = mount.store().clone();
             let budget = request.budget();
+            let deadline = Instant::now() + budget.total;
             let outcome = async {
-                let fetched = fetch_artifact(
+                let fetched = fetch_artifact_until(
                     &endpoint,
                     store.as_ref(),
                     &request.key,
                     &request.output,
                     &holders,
                     &budget,
+                    deadline,
                 )
                 .await?;
                 let mut flow =
@@ -1322,14 +1385,24 @@ impl Run {
                     occurred_at: rfc3339_utc(SystemTime::now()),
                     crossing: None,
                 };
-                install_fetched(store.as_ref(), &mut flow, &fetched, &context, &request.dest)
-                    .await?;
+                let installing =
+                    install_fetched(store.as_ref(), &mut flow, &fetched, &context, &dest);
+                let until = tokio::time::Instant::from_std(deadline);
+                match tokio::time::timeout_at(until, installing).await {
+                    Ok(installed) => installed?,
+                    Err(_) => {
+                        return Err(FetchGap::DeadlineExceeded {
+                            fetched: fetched.manifest.byte_len,
+                            total: fetched.manifest.byte_len,
+                        })
+                    }
+                }
                 Ok::<_, FetchGap>(fetched)
             }
             .await;
             let written = match &outcome {
-                Ok(fetched) => FetchDone::installed(request.key_cid.clone(), fetched),
-                Err(gap) => FetchDone::gap(request.key_cid.clone(), gap.clone()),
+                Ok(fetched) => FetchDone::installed(answer_for.clone(), fetched),
+                Err(gap) => FetchDone::gap(answer_for.clone(), gap.clone()),
             };
             match &outcome {
                 Ok(fetched) => log(&format!(
@@ -1341,7 +1414,40 @@ impl Run {
             if let Err(e) = write_queue_file(&done, &written) {
                 log(&format!("fetch answer {} not written: {e}", done.display()));
             }
-        }));
+        });
+        self.fetch_task = Some((task, stem, for_request));
+    }
+
+    /// Remove answers and withdrawals older than [`QUEUE_RETAIN`] (nobody waits that long), at
+    /// most once per [`REANNOUNCE_EVERY`].
+    fn prune_queue(&mut self, queue: &std::path::Path) {
+        let now = Instant::now();
+        if self
+            .queue_pruned
+            .is_some_and(|at| now.duration_since(at) < REANNOUNCE_EVERY)
+        {
+            return;
+        }
+        self.queue_pruned = Some(now);
+        let Ok(entries) = std::fs::read_dir(queue) else {
+            return;
+        };
+        for entry in entries.filter_map(Result::ok) {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if !(name.ends_with(".done.json") || name.ends_with(".cancel")) {
+                continue;
+            }
+            let old = entry
+                .metadata()
+                .ok()
+                .and_then(|meta| meta.modified().ok())
+                .and_then(|at| at.elapsed().ok())
+                .is_some_and(|age| age >= QUEUE_RETAIN);
+            if old {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
     }
 
     fn write_done(&self, path: &std::path::Path, done: &FetchDone) {

@@ -420,6 +420,7 @@ async fn start_holder_with(
         verifier: verifier(&[&p.a, &p.b]),
         log: Arc::new(|_line: &str| {}),
         payload_store: Some(side.payload()),
+        install: Default::default(),
     })
     .await
     .expect("A starts")
@@ -1874,6 +1875,7 @@ async fn failed_reconstruction_never_blocks_the_tick() {
         verifier: verifier(&[&p.a, &p.b]),
         log: Arc::new(|_line: &str| {}),
         payload_store: Some(slow),
+        install: Default::default(),
     })
     .await
     .expect("A starts");

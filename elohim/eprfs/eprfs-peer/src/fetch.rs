@@ -39,12 +39,13 @@ use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use elohim_epr_rea::FlowStore;
 use eprfs_core::{
-    BlobCid, BlobPresence, DerivationKey, EprfsStorage, ItemAbsence, MethodDescriptor, TreeLimits,
+    BlobCid, BlobPresence, DerivationKey, EprfsStorage, ItemAbsence, MethodDescriptor,
 };
 use eprfs_storage::{
     read_tier_manifest, MemoryStorage, TierBlobChunk, TierBlobManifest, TierBlobSink,
@@ -57,7 +58,7 @@ use tokio::task::JoinSet;
 
 use crate::error::PeerError;
 use crate::local_blob::{stream_local_blob_with, LocalBlobContext};
-use crate::tier::{tier_request_capped, TierAnswer, TierRequest, TIER_ALPN};
+use crate::tier::{tier_request_counted, TierAnswer, TierRequest, FRAME_DEADLINE, TIER_ALPN};
 
 /// The crossing measure an artifact's custody Produce carries, so it reaches the person's other
 /// devices (`berth.channel.crosses` in `pool-policy.json`).
@@ -197,6 +198,10 @@ pub enum FetchGap {
     TransportCannotDeliver { mode: String },
     /// This device's own payload store or flow store failed.
     LocalStore { reason: String },
+    /// The destination is not one this daemon installs into, or the request does not read.
+    InstallRefused { dest: String, reason: String },
+    /// The requester withdrew the fetch before it finished.
+    Cancelled,
 }
 
 impl FetchGap {
@@ -214,6 +219,8 @@ impl FetchGap {
             FetchGap::DaemonDown => "daemon-down",
             FetchGap::TransportCannotDeliver { .. } => "transport-cannot-deliver",
             FetchGap::LocalStore { .. } => "local-store",
+            FetchGap::InstallRefused { .. } => "install-refused",
+            FetchGap::Cancelled => "cancelled",
         }
     }
 }
@@ -266,6 +273,10 @@ impl fmt::Display for FetchGap {
                  per 10 s; iroh-blobs: no byte path this sprint)"
             ),
             FetchGap::LocalStore { reason } => write!(f, "this device's store failed: {reason}"),
+            FetchGap::InstallRefused { dest, reason } => {
+                write!(f, "the daemon refused to install at {dest}: {reason}")
+            }
+            FetchGap::Cancelled => f.write_str("the fetch was withdrawn before it finished"),
         }
     }
 }
@@ -348,8 +359,30 @@ fn refusal_text(why: &ItemAbsence) -> String {
     }
 }
 
-async fn dial(endpoint: &Endpoint, holder: &Holder, stall: Duration) -> Option<Connection> {
-    match tokio::time::timeout(stall, endpoint.connect(holder.addr.clone(), TIER_ALPN)).await {
+/// The relay floor (design §3.b.5): over a relay, an answer of `len` bytes must arrive within one
+/// [`FRAME_DEADLINE`] per 4 MiB (at least one), measured here on the client, not trusted to the
+/// holder's own write deadline.
+fn relay_bound(len: u64) -> Duration {
+    let frames = len.div_ceil(RELAY_FRAME_BYTES).max(1);
+    FRAME_DEADLINE.saturating_mul(u32::try_from(frames).unwrap_or(u32::MAX))
+}
+
+/// The bytes one frame deadline must carry over a relay: 4 MiB.
+const RELAY_FRAME_BYTES: u64 = 4 * 1024 * 1024;
+
+/// How long one request to a holder may take: the stall bound, tightened to the relay floor on a
+/// relay-only path, and never past the fetch's deadline.
+fn request_bound(relay: bool, len: u64, budget: &FetchBudget, deadline: Instant) -> Duration {
+    let bound = if relay {
+        budget.stall.min(relay_bound(len))
+    } else {
+        budget.stall
+    };
+    bound.min(deadline.saturating_duration_since(Instant::now()))
+}
+
+async fn dial(endpoint: &Endpoint, addr: &NodeAddr, bound: Duration) -> Option<Connection> {
+    match tokio::time::timeout(bound, endpoint.connect(addr.clone(), TIER_ALPN)).await {
         Ok(Ok(connection)) => Some(connection),
         Ok(Err(_)) | Err(_) => None,
     }
@@ -374,19 +407,43 @@ struct Accepted {
     manifest: TierBlobManifest,
 }
 
+/// What a fetch has moved so far, readable when its deadline cancels it.
+#[derive(Default)]
+struct Progress {
+    /// Bytes of the artifact held here (resumed plus fetched).
+    held: AtomicU64,
+    /// The artifact's length, once its manifest is accepted.
+    total: AtomicU64,
+    /// Bytes received and discarded.
+    wasted: AtomicU64,
+}
+
+/// One fetch's budget, absolute deadline and progress.
+struct Bounds<'a> {
+    budget: &'a FetchBudget,
+    deadline: Instant,
+    progress: &'a Progress,
+}
+
 /// Ask the holders for the manifest in order, until one serves a manifest this device accepts.
 async fn accept_manifest(
     endpoint: &Endpoint,
     key: &DerivationKey,
     output: &BlobCid,
     holders: &[Holder],
-    budget: &FetchBudget,
-    tree: &TreeLimits,
+    bounds: &Bounds<'_>,
     unreachable: &mut BTreeSet<usize>,
 ) -> Result<Accepted, FetchGap> {
+    let Bounds {
+        budget,
+        deadline,
+        progress,
+    } = *bounds;
     let mut last = FetchGap::NoRecord;
     for (index, holder) in holders.iter().enumerate() {
-        let Some(connection) = dial(endpoint, holder, budget.stall).await else {
+        let relay = relay_only(&holder.addr);
+        let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
+        let Some(connection) = dial(endpoint, &holder.addr, bound).await else {
             // Unreachable is a route gap; only a reached relay too slow for a frame is the
             // transport's.
             unreachable.insert(index);
@@ -398,13 +455,19 @@ async fn accept_manifest(
         let request = TierRequest::Manifest {
             artifact: output.clone(),
         };
+        let received = AtomicU64::new(0);
+        let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
         let answer = tokio::time::timeout(
-            budget.stall,
-            tier_request_capped(&connection, &request, tree, budget.manifest_cap),
+            bound,
+            tier_request_counted(&connection, &request, budget.manifest_cap, &received),
         )
         .await;
         let rejected = |reason: String| FetchGap::ManifestRejected { reason };
         let gap = match answer {
+            Ok(Ok(TierAnswer::Blob { cid, bytes })) if !cid.verifies(&bytes) => rejected(format!(
+                "{} served bytes that do not hash to {cid}",
+                holder.device
+            )),
             Ok(Ok(TierAnswer::Blob { cid, bytes })) => {
                 if cid != holder.manifest {
                     rejected(format!(
@@ -452,7 +515,7 @@ async fn accept_manifest(
                 FetchGap::ManifestTooLarge { len, cap }
             }
             Ok(Err(_)) | Err(_) => {
-                if relay_only(&holder.addr) {
+                if relay {
                     FetchGap::TransportCannotDeliver {
                         mode: "relay".into(),
                     }
@@ -463,6 +526,10 @@ async fn accept_manifest(
                 }
             }
         };
+        // Whatever arrived for a manifest that was not accepted was moved for nothing.
+        progress
+            .wasted
+            .fetch_add(received.load(Ordering::Relaxed), Ordering::Relaxed);
         connection.close(VarInt::from_u32(0), b"");
         unreachable.insert(index);
         last = gap;
@@ -470,8 +537,8 @@ async fn accept_manifest(
     Err(last)
 }
 
-/// Fetch the artifact `output` derived under `key` from `holders` into `store` (design §3.b.3).
-/// The install read is [`install_fetched`]'s.
+/// Fetch the artifact `output` derived under `key` from `holders` into `store` (design §3.b.3),
+/// within `budget.total` from now. The install read is [`install_fetched`]'s.
 ///
 /// # Errors
 ///
@@ -486,8 +553,26 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
     holders: &[Holder],
     budget: &FetchBudget,
 ) -> Result<FetchedArtifact, FetchGap> {
-    let started = Instant::now();
-    let deadline = started + budget.total;
+    let deadline = Instant::now() + budget.total;
+    fetch_artifact_until(endpoint, store, key, output, holders, budget, deadline).await
+}
+
+/// [`fetch_artifact`] under one absolute `deadline`: every dial, request, store write and resume
+/// check falls inside it, and when it passes the fetch is dropped where it stands (`total` is then
+/// how long it had, measured from the caller's start).
+///
+/// # Errors
+///
+/// As [`fetch_artifact`]; [`FetchGap::DeadlineExceeded`] when `deadline` passes.
+pub async fn fetch_artifact_until<S: EprfsStorage + ?Sized>(
+    endpoint: &Endpoint,
+    store: &S,
+    key: &DerivationKey,
+    output: &BlobCid,
+    holders: &[Holder],
+    budget: &FetchBudget,
+    deadline: Instant,
+) -> Result<FetchedArtifact, FetchGap> {
     if budget.transport == FetchTransport::IrohBlobs {
         return Err(FetchGap::TransportCannotDeliver {
             mode: FetchTransport::IrohBlobs.name().into(),
@@ -496,32 +581,45 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
     if holders.is_empty() {
         return Err(FetchGap::NoRecord);
     }
-    let tree = TreeLimits::default();
+    let progress = Progress::default();
+    let bounds = Bounds {
+        budget,
+        deadline,
+        progress: &progress,
+    };
+    let fetching = fetch_within(endpoint, store, key, output, holders, &bounds);
+    match tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), fetching).await {
+        Ok(outcome) => outcome,
+        Err(_) => Err(FetchGap::DeadlineExceeded {
+            fetched: progress.held.load(Ordering::Relaxed),
+            total: progress.total.load(Ordering::Relaxed),
+        }),
+    }
+}
+
+async fn fetch_within<S: EprfsStorage + ?Sized>(
+    endpoint: &Endpoint,
+    store: &S,
+    key: &DerivationKey,
+    output: &BlobCid,
+    holders: &[Holder],
+    bounds: &Bounds<'_>,
+) -> Result<FetchedArtifact, FetchGap> {
+    let Bounds {
+        budget,
+        deadline,
+        progress,
+    } = *bounds;
+    let started = Instant::now();
     let mut unreachable = BTreeSet::new();
-    let accepting = tokio::time::timeout(
-        budget.total,
-        accept_manifest(
-            endpoint,
-            key,
-            output,
-            holders,
-            budget,
-            &tree,
-            &mut unreachable,
-        ),
-    )
-    .await
-    .unwrap_or(Err(FetchGap::DeadlineExceeded {
-        fetched: 0,
-        total: 0,
-    }))?;
     let Accepted {
         holder: manifest_holder,
         connection,
         cid: manifest_cid,
         bytes: manifest_bytes,
         manifest,
-    } = accepting;
+    } = accept_manifest(endpoint, key, output, holders, bounds, &mut unreachable).await?;
+    progress.total.store(manifest.byte_len, Ordering::Relaxed);
 
     // Resume: only the distinct chunks not held here are asked for.
     let mut queue: VecDeque<TierBlobChunk> = VecDeque::new();
@@ -536,9 +634,16 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
             _ => queue.push_back(chunk.clone()),
         }
     }
+    let held_bytes: u64 = manifest
+        .chunks
+        .iter()
+        .filter(|chunk| !queue.iter().any(|missing| missing.cid == chunk.cid))
+        .map(|chunk| u64::from(chunk.byte_len))
+        .sum();
+    progress.held.store(held_bytes, Ordering::Relaxed);
 
     // One connection per holder for the whole artifact: the manifest's, then every other holder
-    // not already found unreachable or refusing.
+    // not already found unreachable or refusing, dialled together within the deadline.
     let mut links = vec![Link {
         device: holders[manifest_holder].device.clone(),
         connection,
@@ -547,33 +652,38 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
         abandoned: None,
     }];
     if !queue.is_empty() {
+        let mut dials = JoinSet::new();
         for (index, holder) in holders.iter().enumerate() {
             if index == manifest_holder || unreachable.contains(&index) {
                 continue;
             }
-            if let Some(connection) = dial(endpoint, holder, budget.stall).await {
-                links.push(Link {
-                    device: holder.device.clone(),
-                    connection,
-                    relay_only: relay_only(&holder.addr),
-                    in_flight: 0,
-                    abandoned: None,
-                });
+            let (endpoint, addr) = (endpoint.clone(), holder.addr.clone());
+            let bound = request_bound(false, 0, budget, deadline);
+            dials.spawn(async move { (index, dial(&endpoint, &addr, bound).await) });
+        }
+        let mut dialled = Vec::new();
+        while let Some(joined) = dials.join_next().await {
+            if let Ok((index, Some(connection))) = joined {
+                dialled.push((index, connection));
             }
+        }
+        dialled.sort_by_key(|(index, _)| *index);
+        for (index, connection) in dialled {
+            links.push(Link {
+                device: holders[index].device.clone(),
+                connection,
+                relay_only: relay_only(&holders[index].addr),
+                in_flight: 0,
+                abandoned: None,
+            });
         }
     }
 
     let cap = budget.in_flight_per_holder.max(1);
     let mut fetched_from = BTreeSet::from([holders[manifest_holder].device.clone()]);
-    let mut tasks: JoinSet<(usize, TierBlobChunk, ChunkOutcome)> = JoinSet::new();
+    let mut tasks: JoinSet<(usize, TierBlobChunk, ChunkOutcome, u64)> = JoinSet::new();
     let mut next = 0usize;
-    let (mut chunks_fetched, mut bytes_fetched, mut wasted) = (0usize, 0u64, 0u64);
-    let held_bytes: u64 = manifest
-        .chunks
-        .iter()
-        .filter(|chunk| !queue.iter().any(|missing| missing.cid == chunk.cid))
-        .map(|chunk| u64::from(chunk.byte_len))
-        .sum();
+    let (mut chunks_fetched, mut bytes_fetched) = (0usize, 0u64);
     let close_all = |links: &[Link]| {
         for link in links {
             link.connection.close(VarInt::from_u32(0), b"");
@@ -596,20 +706,26 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
             };
             links[chosen].in_flight += 1;
             let connection = links[chosen].connection.clone();
-            let stall = budget.stall;
+            let bound = request_bound(
+                links[chosen].relay_only,
+                u64::from(chunk.byte_len),
+                budget,
+                deadline,
+            );
             // A chunk is asked under the artifact (its output), never alone.
             let request = TierRequest::Blob {
                 artifact: output.clone(),
                 cid: chunk.cid.clone(),
             };
             tasks.spawn(async move {
-                let cap = chunk.byte_len.saturating_add(CHUNK_FRAME_OVERHEAD);
+                let frame_cap = chunk.byte_len.saturating_add(CHUNK_FRAME_OVERHEAD);
+                let received = AtomicU64::new(0);
                 let answer = tokio::time::timeout(
-                    stall,
-                    tier_request_capped(&connection, &request, &TreeLimits::default(), cap),
+                    bound,
+                    tier_request_counted(&connection, &request, frame_cap, &received),
                 )
                 .await;
-                (chosen, chunk, answer)
+                (chosen, chunk, answer, received.load(Ordering::Relaxed))
             });
         }
         if tasks.is_empty() {
@@ -618,19 +734,10 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
             }
             break Err(exhausted(&links, holders, manifest_holder));
         }
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        let joined = match tokio::time::timeout(remaining, tasks.join_next()).await {
-            Err(_) => {
-                tasks.abort_all();
-                break Err(FetchGap::DeadlineExceeded {
-                    fetched: held_bytes + bytes_fetched,
-                    total: manifest.byte_len,
-                });
-            }
-            Ok(None) => continue,
-            Ok(Some(joined)) => joined,
+        let Some(joined) = tasks.join_next().await else {
+            continue;
         };
-        let Ok((index, chunk, answer)) = joined else {
+        let Ok((index, chunk, answer, received)) = joined else {
             // A request task cannot panic short of a bug; its chunk is unaccounted for, so the
             // fetch stops rather than install a partial set.
             break Err(FetchGap::LocalStore {
@@ -643,15 +750,17 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
                 links[index].abandoned = Some(why);
             }
         };
+        let discard = |received: u64| {
+            progress.wasted.fetch_add(received, Ordering::Relaxed);
+        };
         match answer {
             Ok(Ok(TierAnswer::Blob { cid, bytes })) => {
-                // `tier_request` checked the CID asked and the bytes against it; checked again,
-                // with the manifest's length, before anything is stored.
+                // Checked here against the manifest: the object asked, its address, its length.
                 if cid != chunk.cid
                     || !chunk.cid.verifies(&bytes)
                     || bytes.len() != chunk.byte_len as usize
                 {
-                    wasted += bytes.len() as u64;
+                    discard(received);
                     abandon(&mut links, Abandon::Integrity(chunk.cid.clone()));
                     queue.push_front(chunk);
                     continue;
@@ -664,26 +773,28 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
                 fetched_from.insert(links[index].device.clone());
                 chunks_fetched += 1;
                 bytes_fetched += u64::from(chunk.byte_len);
-            }
-            Ok(Err(PeerError::TierLeafIntegrity { .. })) => {
-                // The answer arrived and failed its address: its declared length moved for nothing.
-                wasted += u64::from(chunk.byte_len);
-                abandon(&mut links, Abandon::Integrity(chunk.cid.clone()));
-                queue.push_front(chunk);
+                progress
+                    .held
+                    .fetch_add(u64::from(chunk.byte_len), Ordering::Relaxed);
             }
             Ok(Ok(TierAnswer::Unanswered { why, .. })) => {
+                discard(received);
                 abandon(&mut links, Abandon::Refused(refusal_text(&why.why)));
                 queue.push_front(chunk);
             }
             Ok(Ok(TierAnswer::Failed { reason })) => {
+                discard(received);
                 abandon(&mut links, Abandon::Refused(reason));
                 queue.push_front(chunk);
             }
             Ok(Ok(_)) | Ok(Err(_)) => {
+                discard(received);
                 abandon(&mut links, Abandon::Stream);
                 queue.push_front(chunk);
             }
             Err(_) => {
+                // Stalled: whatever had arrived before the bound is discarded with the request.
+                discard(received);
                 abandon(&mut links, Abandon::Stalled);
                 queue.push_front(chunk);
             }
@@ -707,7 +818,7 @@ pub async fn fetch_artifact<S: EprfsStorage + ?Sized>(
         chunks_fetched,
         chunks_resumed: resumed,
         bytes_fetched,
-        wasted,
+        wasted: progress.wasted.load(Ordering::Relaxed),
         elapsed: started.elapsed(),
     })
 }
@@ -763,25 +874,65 @@ impl TierBlobSink for FileSink {
     }
 }
 
-/// The temporary sibling `dest` is streamed into before the rename.
-fn staging_path(dest: &Path) -> PathBuf {
-    let name = dest
-        .file_name()
-        .map_or_else(|| "artifact".into(), |n| n.to_string_lossy().into_owned());
-    dest.with_file_name(format!(".{name}.fetching"))
+/// A fresh staging directory beside the destination, on its filesystem: created exclusively
+/// (`mkdir` fails on any existing name), mode 0700, under a random name nobody can predict, and
+/// removed with everything in it when dropped, whatever path the install took.
+struct Staging {
+    dir: PathBuf,
+}
+
+impl Staging {
+    fn beside(parent: &Path) -> std::io::Result<Staging> {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut last = None;
+        for _ in 0..8 {
+            let name = format!(
+                ".fetch-{:016x}{:016x}",
+                rand::random::<u64>(),
+                rand::random::<u64>()
+            );
+            let dir = parent.join(name);
+            match std::fs::DirBuilder::new().mode(0o700).create(&dir) {
+                Ok(()) => return Ok(Staging { dir }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => last = Some(e),
+                Err(e) => return Err(e),
+            }
+        }
+        Err(last.unwrap_or_else(|| std::io::Error::other("no staging name was free")))
+    }
+}
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        // Best effort: an install that published renamed its file out already.
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// The (device, inode) of an open file or a path that is a regular file, never a link.
+fn identity(meta: &std::fs::Metadata) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+    (meta.dev(), meta.ino())
 }
 
 /// The install read (design §3.b.3): stream the fetched artifact out of `store` into `dest` through
 /// [`stream_local_blob_with`], whose incremental whole-blob verify against the record's output is
 /// what admits the bytes, and whose one `Use` event records the draw: `draw:hit`, `copy:self`,
-/// `basis:sibling`, `fetched-from:<did>` (one per device that served), `wasted:<n>`. Only a
-/// completed, verified stream is renamed onto `dest`; anything else removes the staging file and
-/// leaves `dest` untouched, and the `Use` records `draw:unavailable` or `draw:miss` with its reason.
+/// `basis:sibling`, `fetched-from:<did>` (one per device that served), `wasted:<n>`.
+///
+/// The bytes are staged in a file created exclusively (`create_new`) in a fresh private directory
+/// beside `dest` (see [`Staging`]), so no precreated name or link can receive them. Only a
+/// completed, verified stream is published: the file is made executable (0755) and fsynced through
+/// its own descriptor, its path is checked to still name that inode, it is renamed onto `dest`,
+/// `dest` is checked to name that inode, and the directory is fsynced. Anything else leaves `dest`
+/// untouched, removes the staging directory, and the `Use` records `draw:unavailable` or
+/// `draw:miss` with its reason.
 ///
 /// # Errors
 ///
-/// [`FetchGap::IntegrityFailed`] (naming the manifest) when the stream does not complete;
-/// [`FetchGap::LocalStore`] when the file cannot be written or the `Use` event appended.
+/// [`FetchGap::IntegrityFailed`] (naming the manifest) when the stream does not complete or the
+/// staged path stopped naming the verified file; [`FetchGap::LocalStore`] when the file cannot be
+/// written or the `Use` event appended.
 pub async fn install_fetched<S, F>(
     store: &S,
     flow: &mut F,
@@ -793,14 +944,26 @@ where
     S: EprfsStorage + ?Sized,
     F: FlowStore + ?Sized,
 {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
     let local = |e: std::io::Error| FetchGap::LocalStore {
         reason: format!("{}: {e}", dest.display()),
     };
-    if let Some(parent) = dest.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent).map_err(local)?;
-    }
-    let staging = staging_path(dest);
-    let file = std::fs::File::create(&staging).map_err(local)?;
+    let parent = dest
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .ok_or_else(|| FetchGap::InstallRefused {
+            dest: dest.display().to_string(),
+            reason: "the destination names no directory".into(),
+        })?;
+    std::fs::create_dir_all(parent).map_err(local)?;
+    let staging = Staging::beside(parent).map_err(local)?;
+    let staged = staging.dir.join("artifact");
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&staged)
+        .map_err(local)?;
     let mut sink = FileSink {
         file: std::io::BufWriter::new(file),
     };
@@ -821,31 +984,120 @@ where
         slots,
     )
     .await;
-    let finish = |sink: FileSink| -> std::io::Result<()> {
-        let file = sink.file.into_inner().map_err(|e| e.into_error())?;
-        file.sync_all()
-    };
     match draw {
-        Ok(TierBlobStreamDraw::Completed { .. }) => {
-            if let Err(e) = finish(sink).and_then(|()| std::fs::rename(&staging, dest)) {
-                let _ = std::fs::remove_file(&staging);
-                return Err(local(e));
-            }
-            Ok(())
-        }
+        Ok(TierBlobStreamDraw::Completed { .. }) => {}
         Ok(TierBlobStreamDraw::Miss { .. } | TierBlobStreamDraw::Unavailable { .. }) => {
-            drop(sink);
-            let _ = std::fs::remove_file(&staging);
-            Err(FetchGap::IntegrityFailed {
+            return Err(FetchGap::IntegrityFailed {
                 cid: fetched.manifest_cid.clone(),
             })
         }
         Err(e) => {
-            drop(sink);
-            let _ = std::fs::remove_file(&staging);
-            Err(FetchGap::LocalStore {
+            return Err(FetchGap::LocalStore {
                 reason: e.to_string(),
             })
+        }
+    }
+    let file = sink.file.into_inner().map_err(|e| local(e.into_error()))?;
+    file.set_permissions(std::fs::Permissions::from_mode(0o755))
+        .map_err(local)?;
+    file.sync_all().map_err(local)?;
+    let verified = identity(&file.metadata().map_err(local)?);
+    let substituted = || FetchGap::IntegrityFailed {
+        cid: fetched.manifest_cid.clone(),
+    };
+    match std::fs::symlink_metadata(&staged) {
+        Ok(meta) if meta.file_type().is_file() && identity(&meta) == verified => {}
+        _ => return Err(substituted()),
+    }
+    std::fs::rename(&staged, dest).map_err(local)?;
+    match std::fs::symlink_metadata(dest) {
+        Ok(meta) if meta.file_type().is_file() && identity(&meta) == verified => {}
+        _ => return Err(substituted()),
+    }
+    std::fs::File::open(parent)
+        .and_then(|dir| dir.sync_all())
+        .map_err(local)?;
+    drop(staging);
+    Ok(())
+}
+
+/// Where a daemon may install a fetched artifact (design §3.b.2, review H5): under one of
+/// `roots`, or directly in a `mesh-bin` directory under `mesh_bin_pool` (the cargo pool the mesh
+/// build installs into). The default admits nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InstallScope {
+    pub roots: Vec<PathBuf>,
+    pub mesh_bin_pool: Option<PathBuf>,
+}
+
+impl InstallScope {
+    /// The destination `dest` resolves to, when this scope admits it: absolute, with no `.` or
+    /// `..` component, a file name, and its directory (resolved through every link to the nearest
+    /// existing ancestor) under an admitted place.
+    ///
+    /// # Errors
+    ///
+    /// A printable reason when it is not admitted.
+    pub fn admits(&self, dest: &Path) -> Result<PathBuf, String> {
+        use std::path::Component;
+        if !dest.is_absolute() {
+            return Err("the destination is not an absolute path".into());
+        }
+        if dest
+            .components()
+            .any(|c| !matches!(c, Component::RootDir | Component::Normal(_)))
+        {
+            return Err("the destination has a `.` or `..` component".into());
+        }
+        let name = dest
+            .file_name()
+            .ok_or("the destination names no file")?
+            .to_owned();
+        let parent = dest.parent().ok_or("the destination names no directory")?;
+        let resolved = resolve_existing(parent)?;
+        let canonical = |path: &Path| path.canonicalize().ok();
+        let under_root = self
+            .roots
+            .iter()
+            .filter_map(|root| canonical(root))
+            .any(|root| resolved.starts_with(&root));
+        let in_mesh_bin = self
+            .mesh_bin_pool
+            .as_deref()
+            .and_then(canonical)
+            .is_some_and(|pool| {
+                resolved.starts_with(&pool) && resolved.file_name().is_some_and(|n| n == "mesh-bin")
+            });
+        if under_root || in_mesh_bin {
+            Ok(resolved.join(name))
+        } else {
+            Err(format!(
+                "{} is outside this daemon's install roots (a mesh-bin directory under the cargo \
+                 pool, or an --install-root given at serve start)",
+                dest.display()
+            ))
+        }
+    }
+}
+
+/// `path` with its nearest existing ancestor canonicalized and the rest appended.
+fn resolve_existing(path: &Path) -> Result<PathBuf, String> {
+    let mut existing = path.to_path_buf();
+    let mut rest = Vec::new();
+    loop {
+        if let Ok(canonical) = existing.canonicalize() {
+            let mut resolved = canonical;
+            for part in rest.iter().rev() {
+                resolved.push(part);
+            }
+            return Ok(resolved);
+        }
+        let Some(name) = existing.file_name().map(std::ffi::OsStr::to_owned) else {
+            return Err(format!("{} has no existing ancestor", path.display()));
+        };
+        rest.push(name);
+        if !existing.pop() {
+            return Err(format!("{} has no existing ancestor", path.display()));
         }
     }
 }
@@ -906,14 +1158,17 @@ pub struct RequestedHolder {
 }
 
 /// A fetch `epr artifact fetch` queues for the daemon (design §3.b.2): the daemon holds the
-/// device's peer key, so only it dials. The daemon re-checks admission and every integrity rule
-/// itself; the request names what to look for, never what to trust.
+/// device's peer key, so only it dials. The daemon re-checks admission, the install scope and
+/// every integrity rule itself; the request names what to look for, never what to trust.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FetchRequest {
+    /// This request alone: its file names and its answer carry it, so no other request's answer is
+    /// ever taken for it.
+    pub nonce: String,
     /// The key this device computed.
     pub key: DerivationKey,
-    /// [`key_cid`] of `key`; the request's file name.
+    /// [`key_cid`] of `key`.
     pub key_cid: BlobCid,
     pub output: BlobCid,
     pub holders: Vec<RequestedHolder>,
@@ -936,6 +1191,43 @@ impl FetchRequest {
             ..FetchBudget::default()
         }
     }
+
+    /// The file stem this request is queued under: `<key CID>-<nonce>`.
+    pub fn stem(&self) -> String {
+        format!("{}-{}", self.key_cid, self.nonce)
+    }
+
+    /// A fresh nonce: 128 random bits, hex.
+    pub fn fresh_nonce() -> String {
+        format!(
+            "{:016x}{:016x}",
+            rand::random::<u64>(),
+            rand::random::<u64>()
+        )
+    }
+}
+
+/// Who an answer is for: the request's nonce, key, output and destination. A requester accepts an
+/// answer only when all four are its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FetchFor {
+    pub nonce: String,
+    pub key_cid: BlobCid,
+    pub output: BlobCid,
+    pub dest: PathBuf,
+}
+
+impl FetchFor {
+    /// The identity of `request`.
+    pub fn of(request: &FetchRequest) -> FetchFor {
+        FetchFor {
+            nonce: request.nonce.clone(),
+            key_cid: request.key_cid.clone(),
+            output: request.output.clone(),
+            dest: request.dest.clone(),
+        }
+    }
 }
 
 /// What the daemon writes back for one request: the installed artifact, or the gap.
@@ -947,9 +1239,9 @@ impl FetchRequest {
 )]
 pub enum FetchDone {
     Installed {
-        key_cid: BlobCid,
+        #[serde(rename = "for")]
+        for_request: FetchFor,
         manifest: BlobCid,
-        output: BlobCid,
         manifest_from: String,
         fetched_from: Vec<String>,
         chunks_fetched: usize,
@@ -959,28 +1251,28 @@ pub enum FetchDone {
         seconds: f64,
     },
     Gap {
-        key_cid: BlobCid,
+        #[serde(rename = "for")]
+        for_request: FetchFor,
         gap: FetchGap,
         reason: String,
     },
 }
 
 impl FetchDone {
-    /// The written-back gap for `key_cid`.
-    pub fn gap(key_cid: BlobCid, gap: FetchGap) -> FetchDone {
+    /// The written-back gap for `request`.
+    pub fn gap(request: FetchFor, gap: FetchGap) -> FetchDone {
         FetchDone::Gap {
-            key_cid,
+            for_request: request,
             reason: gap.to_string(),
             gap,
         }
     }
 
-    /// The written-back installation of `fetched`.
-    pub fn installed(key_cid: BlobCid, fetched: &FetchedArtifact) -> FetchDone {
+    /// The written-back installation of `fetched` for `request`.
+    pub fn installed(request: FetchFor, fetched: &FetchedArtifact) -> FetchDone {
         FetchDone::Installed {
-            key_cid,
+            for_request: request,
             manifest: fetched.manifest_cid.clone(),
-            output: fetched.manifest.record.output.clone(),
             manifest_from: fetched.manifest_from.clone(),
             fetched_from: fetched.fetched_from.iter().cloned().collect(),
             chunks_fetched: fetched.chunks_fetched,
@@ -990,34 +1282,118 @@ impl FetchDone {
             seconds: fetched.elapsed.as_secs_f64(),
         }
     }
+
+    /// The request this answer is for.
+    pub fn for_request(&self) -> &FetchFor {
+        match self {
+            FetchDone::Installed { for_request, .. } | FetchDone::Gap { for_request, .. } => {
+                for_request
+            }
+        }
+    }
 }
+
+/// The largest queue file a daemon or requester reads.
+pub const MAX_QUEUE_FILE_BYTES: u64 = 64 * 1024;
 
 /// `<state dir>/fetch-queue`.
 pub fn fetch_queue_dir(state_dir: &Path) -> PathBuf {
     state_dir.join(FETCH_QUEUE)
 }
 
-/// The request file for `key_cid` in `queue`.
-pub fn fetch_request_path(queue: &Path, key_cid: &BlobCid) -> PathBuf {
-    queue.join(format!("{key_cid}.json"))
+/// The request file for `stem` (see [`FetchRequest::stem`]) in `queue`.
+pub fn fetch_request_path(queue: &Path, stem: &str) -> PathBuf {
+    queue.join(format!("{stem}.json"))
 }
 
-/// The answer file for `key_cid` in `queue`.
-pub fn fetch_done_path(queue: &Path, key_cid: &BlobCid) -> PathBuf {
-    queue.join(format!("{key_cid}.done.json"))
+/// The answer file for `stem` in `queue`.
+pub fn fetch_done_path(queue: &Path, stem: &str) -> PathBuf {
+    queue.join(format!("{stem}.done.json"))
+}
+
+/// The withdrawal marker for `stem` in `queue`: its presence cancels the fetch.
+pub fn fetch_cancel_path(queue: &Path, stem: &str) -> PathBuf {
+    queue.join(format!("{stem}.cancel"))
+}
+
+/// Create `queue` (and its parents) with mode 0700, and hold it there.
+///
+/// # Errors
+///
+/// The I/O errors.
+pub fn ensure_queue_dir(queue: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(queue)?;
+    std::fs::set_permissions(queue, std::fs::Permissions::from_mode(0o700))
+}
+
+/// Whether `queue` is a directory only its owner can reach (mode 0700, no group or other bits).
+pub fn queue_dir_is_private(queue: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::symlink_metadata(queue)
+        .is_ok_and(|meta| meta.is_dir() && meta.permissions().mode() & 0o077 == 0)
 }
 
 /// Write `value` as JSON to `path` through a sibling temporary file and a rename, so a reader
-/// never sees half of it.
+/// never sees half of it. The temporary is created exclusively, mode 0600.
 ///
 /// # Errors
 ///
 /// The I/O and encoding errors.
 pub fn write_queue_file<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
-    let tmp = path.with_extension("json.tmp");
+    use std::os::unix::fs::OpenOptionsExt;
+    let tmp = path.with_extension(format!("tmp-{:016x}", rand::random::<u64>()));
     let bytes = serde_json::to_vec_pretty(value).map_err(std::io::Error::other)?;
-    std::fs::write(&tmp, bytes)?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&tmp)?;
+    file.write_all(&bytes)?;
+    file.sync_all()?;
     std::fs::rename(&tmp, path)
+}
+
+/// Read one queue file: a regular file (never a link, FIFO or device; the open itself never
+/// blocks and never follows a link) of at most [`MAX_QUEUE_FILE_BYTES`].
+///
+/// # Errors
+///
+/// A printable reason for anything else.
+pub fn read_queue_file(path: &Path) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let meta = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+    if !meta.file_type().is_file() {
+        return Err("not a regular file".into());
+    }
+    if meta.len() > MAX_QUEUE_FILE_BYTES {
+        return Err(format!(
+            "{} bytes, past the {MAX_QUEUE_FILE_BYTES}-byte cap",
+            meta.len()
+        ));
+    }
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|e| e.to_string())?;
+    // Checked again on the descriptor: the name may have changed since the first look.
+    let opened = file.metadata().map_err(|e| e.to_string())?;
+    if !opened.file_type().is_file() || opened.len() > MAX_QUEUE_FILE_BYTES {
+        return Err("not a regular file within the cap".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_QUEUE_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_QUEUE_FILE_BYTES {
+        return Err("grew past the cap while read".into());
+    }
+    Ok(bytes)
 }
 
 /// Holders resolved to addresses: the queued holders `addr_of` resolves (the daemon's admission

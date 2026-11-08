@@ -583,6 +583,29 @@ pub(crate) async fn tier_request_capped(
     Ok(answer)
 }
 
+/// One artifact-object request on an open connection, its answer frame capped at `answer_cap`,
+/// with every byte of the answer read so far added to `received` as it arrives, whether the
+/// answer then decodes or not, and whether the caller's deadline drops this future mid-frame. The
+/// fetcher meters discarded bytes from it. No [`check_answer`] here: the fetcher checks the answer
+/// against the manifest itself.
+pub(crate) async fn tier_request_counted(
+    connection: &Connection,
+    req: &TierRequest,
+    answer_cap: u32,
+    received: &AtomicU64,
+) -> Result<TierAnswer, PeerError> {
+    let frame = encode_frame(req, MAX_REQUEST_FRAME_BYTES)?;
+    let (mut send, mut recv) = connection.open_bi().await.map_err(stream_error)?;
+    send.write_all(&frame).await.map_err(stream_error)?;
+    send.finish().map_err(stream_error)?;
+    read_frame_counted(
+        &mut recv,
+        answer_cap.min(MAX_ANSWER_FRAME_BYTES),
+        Some(received),
+    )
+    .await
+}
+
 /// The client's checks on a served leaf or listing (see [`tier_request`]).
 fn check_answer(
     req: &TierRequest,
@@ -660,8 +683,23 @@ async fn read_frame<T: for<'de> Deserialize<'de>>(
     recv: &mut RecvStream,
     cap: u32,
 ) -> Result<T, PeerError> {
+    read_frame_counted(recv, cap, None).await
+}
+
+/// [`read_frame`], adding each byte read to `received` when given.
+async fn read_frame_counted<T: for<'de> Deserialize<'de>>(
+    recv: &mut RecvStream,
+    cap: u32,
+    received: Option<&AtomicU64>,
+) -> Result<T, PeerError> {
+    let count = |n: usize| {
+        if let Some(received) = received {
+            received.fetch_add(n as u64, Ordering::Relaxed);
+        }
+    };
     let mut header = [0u8; 4];
     recv.read_exact(&mut header).await.map_err(stream_error)?;
+    count(header.len());
     let len = u32::from_be_bytes(header);
     if len > cap {
         return Err(PeerError::TierFrameTooLarge { len, cap });
@@ -675,6 +713,7 @@ async fn read_frame<T: for<'de> Deserialize<'de>>(
             .await
             .map_err(stream_error)?
             .ok_or_else(|| frame_error("the stream ended inside a frame"))?;
+        count(chunk.bytes.len());
         body.extend_from_slice(&chunk.bytes);
     }
     serde_ipld_dagcbor::from_slice(&body).map_err(|e| frame_error(e.to_string()))

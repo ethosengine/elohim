@@ -33,9 +33,10 @@ use eprfs_core::{
     TreePath, View, Witness,
 };
 use eprfs_peer::{
-    fetch_done_path, fetch_queue_dir, fetch_request_path, key_cid, open_payload_store,
-    put_local_blob_with, put_method_record, resolve_holders, write_queue_file, Bytes, FetchDone,
-    FetchGap, FetchRequest, FetchTransport, LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND,
+    ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
+    key_cid, open_payload_store, put_local_blob_with, put_method_record, read_queue_file,
+    resolve_holders, write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest,
+    FetchTransport, LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND,
     ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
 };
 use serde::Serialize;
@@ -267,38 +268,300 @@ fn git(repo: &Path, args: &[&str]) -> ArtifactResult<crate::process::CommandOutp
         .map_err(|e| ArtifactError::Gap(format!("git {} failed: {e}", args.join(" "))))
 }
 
-/// The object a view path names at HEAD: `path\toid` for a tree or blob, the gitlink commit for a
-/// path at or under a submodule (git cannot see inside it from here), `-` when absent. The dirty
-/// check is extended to every gitlink so a moved or modified submodule counts.
-fn closure_line(repo: &Path, path: &str, gitlinks: &mut Vec<String>) -> ArtifactResult<String> {
-    let object = git(
-        repo,
-        &["rev-parse", "--verify", "--quiet", &format!("HEAD:{path}")],
-    )?;
-    if object.success && !object.stdout.is_empty() {
-        return Ok(format!("{path}\t{}\n", object.stdout));
+fn git_ok(repo: &Path, args: &[&str]) -> ArtifactResult<String> {
+    let out = git(repo, args)?;
+    if out.success {
+        Ok(out.stdout)
+    } else {
+        Err(ArtifactError::Gap(format!(
+            "git {} failed: {}",
+            args.join(" "),
+            out.stderr
+        )))
     }
-    // Absent, or inside a gitlink: the deepest ancestor that is a gitlink names the commit.
+}
+
+/// The `non_path_inputs` entry naming the crate directory (relative to the checkout), so the
+/// closure can find every Cargo configuration file cargo reads for that crate.
+pub const CRATE_INPUT: &str = "crate";
+
+/// Build variables cargo reads that change where or how fast a build runs, never its bytes.
+const BENIGN_BUILD_ENV: [&str; 7] = [
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "CARGO_TARGET_DIR",
+    "CARGO_BUILD_JOBS",
+    "RUST_TEST_THREADS",
+    "RUST_BACKTRACE",
+    "RUST_LOG",
+];
+
+/// The native toolchain variables a mesh build passes to cargo; `describe` records each one set.
+pub const NATIVE_BUILD_ENV: [&str; 9] = [
+    "CC",
+    "CXX",
+    "AR",
+    "LIBCLANG_PATH",
+    "PKG_CONFIG_PATH",
+    "OPENSSL_DIR",
+    "OPENSSL_LIB_DIR",
+    "OPENSSL_INCLUDE_DIR",
+    "PROTOC",
+];
+
+fn is_build_var(name: &str) -> bool {
+    name.starts_with("CARGO_") || name.starts_with("RUST") || NATIVE_BUILD_ENV.contains(&name)
+}
+
+/// Why `env` is not the environment `descriptor` records (review H3), or `None` when it is: every
+/// `CARGO_*`, `RUST*` and native toolchain variable set must be benign or recorded with the same
+/// value, and every recorded variable must be set to it (an empty `RUSTFLAGS` and an unset one are
+/// one build).
+pub fn build_env_refusal(
+    descriptor: &MethodDescriptor,
+    env: impl IntoIterator<Item = (String, String)>,
+) -> Option<String> {
+    let env: BTreeMap<String, String> = env.into_iter().collect();
+    for (name, value) in &env {
+        if !is_build_var(name) || BENIGN_BUILD_ENV.contains(&name.as_str()) {
+            continue;
+        }
+        let recorded = descriptor.non_path_inputs.get(name);
+        let toolchain =
+            name == "RUSTUP_TOOLCHAIN" && descriptor.tools.get("toolchain") == Some(value);
+        if recorded != Some(value) && !toolchain {
+            return Some(format!(
+                "{name} is set in the build environment and the method does not record it with \
+                 that value; build under the recorded environment (the mesh build scrubs it)"
+            ));
+        }
+    }
+    for (name, value) in &descriptor.non_path_inputs {
+        if name == CRATE_INPUT || !is_build_var(name) {
+            continue;
+        }
+        let unset_is_same = name == "RUSTFLAGS" && value.is_empty();
+        if !env.contains_key(name) && !unset_is_same {
+            return Some(format!(
+                "the method records {name}={value}, and it is not set in the build environment"
+            ));
+        }
+    }
+    None
+}
+
+/// One view path at HEAD: `path\t<mode> <type> <oid>` for a tree, blob or symlink (the mode is
+/// part of what was read), the gitlink commit for a path at or under a submodule (git cannot see
+/// inside it from here), `-` when absent. Every gitlink met is added to `gitlinks` for the dirty
+/// check.
+fn closure_line(repo: &Path, path: &str, gitlinks: &mut Vec<String>) -> ArtifactResult<String> {
     let parts: Vec<&str> = path.split('/').collect();
     for end in (1..=parts.len()).rev() {
         let prefix = parts[..end].join("/");
-        let entry = git(repo, &["ls-tree", "HEAD", "--", &prefix])?;
-        if let Some(line) = entry
-            .stdout
+        let listed = git_ok(repo, &["ls-tree", "HEAD", "--", &prefix])?;
+        let Some(entry) = listed
             .lines()
-            .find(|line| line.ends_with(&format!("\t{prefix}")))
-        {
-            if let Some(sha) = line
-                .strip_prefix("160000 commit ")
-                .and_then(|rest| rest.split('\t').next())
-            {
-                gitlinks.push(prefix.clone());
-                return Ok(format!("{path}\tgitlink:{prefix}@{sha}\n"));
-            }
-            break;
+            .find_map(|line| line.strip_suffix(&format!("\t{prefix}")))
+        else {
+            continue;
+        };
+        if let Some(sha) = entry.strip_prefix("160000 commit ") {
+            gitlinks.push(prefix.clone());
+            return Ok(format!("{path}\tgitlink:{prefix}@{sha}\n"));
         }
+        if end == parts.len() {
+            return Ok(format!("{path}\t{entry}\n"));
+        }
+        // An ancestor exists and is no gitlink, so the path itself is absent.
+        break;
     }
     Ok(format!("{path}\t-\n"))
+}
+
+/// `path` with `.` and `..` resolved lexically, or `None` when it climbs above the checkout.
+fn lexical(path: &str) -> Option<String> {
+    let mut kept: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                kept.pop()?;
+            }
+            other => kept.push(other),
+        }
+    }
+    Some(kept.join("/"))
+}
+
+fn under_view(path: &str, view: &[String]) -> bool {
+    view.iter()
+        .any(|v| path == v || path.starts_with(&format!("{v}/")))
+}
+
+/// Refuse a tracked symlink inside the view whose target leaves it (review H4): cargo would read
+/// bytes no closure line names.
+fn refuse_escaping_symlinks(repo: &Path, view: &[String]) -> ArtifactResult<()> {
+    let mut args = vec!["ls-tree", "-r", "HEAD", "--"];
+    args.extend(view.iter().map(String::as_str));
+    let listed = git_ok(repo, &args)?;
+    for line in listed.lines() {
+        let Some(rest) = line.strip_prefix("120000 blob ") else {
+            continue;
+        };
+        let Some((oid, link)) = rest.split_once('\t') else {
+            continue;
+        };
+        let target = git_ok(repo, &["cat-file", "blob", oid])?;
+        let dir = link.rsplit_once('/').map_or("", |(dir, _)| dir);
+        let resolved = if target.starts_with('/') {
+            None
+        } else {
+            lexical(&format!("{dir}/{target}"))
+        };
+        if !resolved.is_some_and(|resolved| under_view(&resolved, view)) {
+            return Err(ArtifactError::Gap(format!(
+                "the tracked symlink {link} points outside the method's view ({target}), so the \
+                 closure does not name what the build reads"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Refuse index flags that hide working-tree changes from `git status` inside the view:
+/// assume-unchanged (a lowercase `ls-files -v` tag) and skip-worktree (`S`).
+fn refuse_index_flags(repo: &Path, view: &[String]) -> ArtifactResult<()> {
+    let mut args = vec!["ls-files", "-v", "--"];
+    args.extend(view.iter().map(String::as_str));
+    let listed = git_ok(repo, &args)?;
+    let flagged: Vec<&str> = listed
+        .lines()
+        .filter(|line| {
+            line.chars()
+                .next()
+                .is_some_and(|tag| tag.is_ascii_lowercase() || tag == 'S')
+        })
+        .take(3)
+        .collect();
+    if flagged.is_empty() {
+        Ok(())
+    } else {
+        Err(ArtifactError::Gap(format!(
+            "index flags (assume-unchanged or skip-worktree) hide changes inside the view: {}",
+            flagged.join("; ")
+        )))
+    }
+}
+
+/// Refuse a submodule inside the view whose `ignore` setting would hide its changes.
+fn refuse_ignored_submodules(repo: &Path, view: &[String]) -> ArtifactResult<()> {
+    let gitmodules = repo.join(".gitmodules");
+    let config =
+        |args: &[&str]| -> String { git(repo, args).map(|out| out.stdout).unwrap_or_default() };
+    let mut ignoring = Vec::new();
+    for listed in [
+        config(&["config", "--get-regexp", r"^submodule\..*\.ignore$"]),
+        if gitmodules.is_file() {
+            config(&[
+                "config",
+                "-f",
+                ".gitmodules",
+                "--get-regexp",
+                r"^submodule\..*\.ignore$",
+            ])
+        } else {
+            String::new()
+        },
+    ] {
+        for line in listed.lines() {
+            let Some((key, value)) = line.split_once(' ') else {
+                continue;
+            };
+            if value.trim() == "none" {
+                continue;
+            }
+            if let Some(name) = key
+                .strip_prefix("submodule.")
+                .and_then(|k| k.strip_suffix(".ignore"))
+            {
+                ignoring.push(name.to_string());
+            }
+        }
+    }
+    for name in ignoring {
+        let mut path = config(&["config", "--get", &format!("submodule.{name}.path")]);
+        if path.is_empty() && gitmodules.is_file() {
+            path = config(&[
+                "config",
+                "-f",
+                ".gitmodules",
+                "--get",
+                &format!("submodule.{name}.path"),
+            ]);
+        }
+        let path = path.trim();
+        let overlaps =
+            under_view(path, view) || view.iter().any(|v| v.starts_with(&format!("{path}/")));
+        if !path.is_empty() && overlaps {
+            return Err(ArtifactError::Gap(format!(
+                "the submodule {path} inside the view is configured to ignore changes"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The Cargo configuration cargo reads for the crate, by content and never by path (so two
+/// checkouts at different places key alike): every `.cargo/config(.toml)` from the crate's
+/// directory up to the filesystem root, nearest first, and `$CARGO_HOME/config(.toml)` (`-` when
+/// absent).
+fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<String> {
+    let mut lines = String::new();
+    let Some(crate_dir) = descriptor.non_path_inputs.get(CRATE_INPUT) else {
+        return Ok(lines);
+    };
+    let content = |path: &Path| -> ArtifactResult<Option<String>> {
+        match std::fs::read(path) {
+            Ok(bytes) => Ok(Some(BlobCid::compute_bytes(&bytes).to_string())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(ArtifactError::Gap(format!(
+                "the cargo configuration {} does not read: {e}",
+                path.display()
+            ))),
+        }
+    };
+    let start = repo.join(crate_dir);
+    let mut found = 0usize;
+    for dir in start.ancestors() {
+        for name in ["config", "config.toml"] {
+            if let Some(cid) = content(&dir.join(".cargo").join(name))? {
+                lines.push_str(&format!("cargo-config:{found}:{name}\t{cid}\n"));
+                found += 1;
+            }
+        }
+    }
+    let home = std::env::var_os("CARGO_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo")));
+    for name in ["config", "config.toml"] {
+        let cid = match &home {
+            Some(home) => content(&home.join(name))?,
+            None => None,
+        };
+        lines.push_str(&format!(
+            "cargo-home:{name}\t{}\n",
+            cid.as_deref().unwrap_or("-")
+        ));
+    }
+    Ok(lines)
+}
+
+/// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
+/// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
+/// report names).
+fn is_excluded_ignored(path: &str) -> bool {
+    path.split('/').any(|part| part == "node_modules")
 }
 
 /// The derivation key of `descriptor` at `repo`'s HEAD (the interim `KeyInput::Raw` form; see the
@@ -306,19 +569,15 @@ fn closure_line(repo: &Path, path: &str, gitlinks: &mut Vec<String>) -> Artifact
 ///
 /// # Errors
 ///
-/// [`ArtifactError::Gap`] when git cannot answer or the descriptor does not encode.
+/// [`ArtifactError::Gap`] when git cannot answer, the descriptor does not encode, or the closure
+/// cannot name what a build would read: a tracked symlink leaving the view, an index flag or a
+/// submodule `ignore` hiding changes, or ignored untracked files inside the view.
 pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
     let method = descriptor
         .cid()
         .map_err(|e| ArtifactError::Gap(format!("the method descriptor does not encode: {e}")))?;
-    let head = git(repo, &["rev-parse", "HEAD"])?;
-    if !head.success {
-        return Err(ArtifactError::Gap(format!(
-            "{} has no HEAD commit: {}",
-            repo.display(),
-            head.stderr
-        )));
-    }
+    let head = git_ok(repo, &["rev-parse", "HEAD"])
+        .map_err(|e| ArtifactError::Gap(format!("{} has no HEAD commit: {e}", repo.display())))?;
     let view: View = descriptor.view();
     let mut paths = Vec::new();
     for path in view.paths() {
@@ -334,19 +593,45 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
             "the method declares no view (or the whole tree), so no closure is keyed".into(),
         ));
     }
+    refuse_escaping_symlinks(repo, &paths)?;
+    refuse_index_flags(repo, &paths)?;
+    refuse_ignored_submodules(repo, &paths)?;
     let mut lines = String::new();
     let mut gitlinks = Vec::new();
     for path in &paths {
         lines.push_str(&closure_line(repo, path, &mut gitlinks)?);
     }
-    let mut status_args = vec!["status", "--porcelain", "--untracked-files=normal", "--"];
+    lines.push_str(&cargo_config_lines(repo, descriptor)?);
+    let mut status_args = vec![
+        "status",
+        "--porcelain",
+        "--untracked-files=normal",
+        "--ignored=matching",
+        "--ignore-submodules=none",
+        "--",
+    ];
     status_args.extend(paths.iter().map(String::as_str));
     status_args.extend(gitlinks.iter().map(String::as_str));
-    let status = git(repo, &status_args)?;
-    if !status.success {
+    let status = git_ok(repo, &status_args)?;
+    let mut dirty = Vec::new();
+    let mut ignored = Vec::new();
+    for line in status.lines().map(str::trim_end).filter(|l| !l.is_empty()) {
+        match line.strip_prefix("!! ") {
+            Some(path) if !is_excluded_ignored(path) => ignored.push(path.to_string()),
+            Some(_) => {}
+            None => dirty.push(line.trim().to_string()),
+        }
+    }
+    if !ignored.is_empty() {
         return Err(ArtifactError::Gap(format!(
-            "git status failed: {}",
-            status.stderr
+            "ignored files exist inside the method's view ({}); a build could read them and no \
+             closure line names them",
+            ignored
+                .iter()
+                .take(3)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("; ")
         )));
     }
     let input = BlobCid::compute_bytes(lines.as_bytes());
@@ -360,13 +645,8 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
         input,
         key_cid,
         basis: BASIS_KEY_SLOT,
-        head: head.stdout,
-        dirty: status
-            .stdout
-            .lines()
-            .map(|line| line.trim().to_string())
-            .filter(|line| !line.is_empty())
-            .collect(),
+        head,
+        dirty,
         key,
     })
 }
@@ -401,8 +681,17 @@ fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<Closu
     Ok(key)
 }
 
+/// [`build_env_refusal`] against this process's environment.
+fn check_build_env(descriptor: &MethodDescriptor) -> ArtifactResult<()> {
+    match build_env_refusal(descriptor, std::env::vars()) {
+        Some(reason) => Err(ArtifactError::Gap(reason)),
+        None => Ok(()),
+    }
+}
+
 fn key(options: &Options) -> ArtifactResult<ExitCode> {
     let descriptor = read_descriptor(options)?;
+    check_build_env(&descriptor)?;
     let key = closure_key(&options.repo, &descriptor)?;
     if options.json {
         println!("{}", serde_json::to_string_pretty(&key)?);
@@ -594,6 +883,14 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
 
     let mut non_path_inputs = BTreeMap::new();
     non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
+    // The crate, so the closure reads every Cargo configuration cargo reads for it.
+    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
+    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
+    for name in NATIVE_BUILD_ENV {
+        if let Ok(value) = std::env::var(name) {
+            non_path_inputs.insert(name.to_string(), value);
+        }
+    }
     for pair in &options.env {
         let (key, value) = pair.split_once('=').ok_or_else(|| {
             ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
@@ -701,6 +998,32 @@ fn brit(repo: &Path, args: &[&str]) -> ArtifactResult<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+/// Refuse when this device's serving daemon serves another payload store than `payload_dir`
+/// (review M9): the custody record would reach its flow store and siblings while its bytes sit
+/// where it never serves from.
+fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
+    let peer_dir = peer::peer_dir()?;
+    if ServeLock::held(&peer_dir) != Some(true) {
+        return Ok(());
+    }
+    let Ok(recorded) = std::fs::read_to_string(peer_dir.join(peer::PAYLOAD_STORE_RECORD)) else {
+        return Ok(());
+    };
+    let recorded = PathBuf::from(recorded.trim());
+    let ours = std::fs::canonicalize(payload_dir).unwrap_or_else(|_| payload_dir.to_path_buf());
+    if ours == recorded {
+        Ok(())
+    } else {
+        Err(unrecorded(format!(
+            "this device's epr peer serve serves the payload store {}, and this put writes {}; \
+             pass --payload-store {} (or the same EPR_PAYLOAD_STORE)",
+            recorded.display(),
+            ours.display(),
+            recorded.display()
+        )))
+    }
+}
+
 fn put(options: &Options) -> ArtifactResult<ExitCode> {
     let project = Options::required(&options.project, "--project")?;
     let input = Options::required(&options.input, "--input")?;
@@ -716,7 +1039,9 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
             descriptor.step
         )));
     }
-    // The closure at record time must be the closure the build started from.
+    // The environment recording runs in must be the one the method records (the mesh build runs
+    // cargo in exactly it), and the closure must be the one the build started from.
+    check_build_env(&descriptor).map_err(unrecorded)?;
     let key = clean_key(repo, &descriptor).map_err(unrecorded)?;
     if key.input.to_string() != input {
         return Err(unrecorded(format!(
@@ -777,8 +1102,10 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         payload_store: options.payload_store.clone(),
         ..peer::Options::default()
     };
-    let store = open_payload_store(&peer::payload_store_dir(&peer_options)?)
+    let payload_dir = peer::payload_store_dir(&peer_options)?;
+    let store = open_payload_store(&payload_dir)
         .map_err(|e| unrecorded(format!("the payload store does not open: {e}")))?;
+    served_store_matches(&payload_dir)?;
     let flow_root = peer::served_root(repo).map_err(unrecorded)?;
     let scope = crate::flow::repository::repository_scope(repo)
         .map_err(|e| unrecorded(format!("this checkout has no repository scope: {e}")))?;
@@ -863,6 +1190,34 @@ fn gap(gap: &FetchGap) -> ArtifactError {
     ArtifactError::Gap(format!("fetch gap: {}: {gap}", gap.kind()))
 }
 
+/// Wait up to `wait` for the answer at `done_path` that is for `expected`: its nonce, key, output
+/// and destination all equal. Anything else there (another request's answer, a stale or forged
+/// one, a file that is not a regular file within the cap) is never taken for it, and is left
+/// unread or removed; the matching answer is removed once read.
+pub fn wait_for_answer(done_path: &Path, expected: &FetchFor, wait: Duration) -> Option<FetchDone> {
+    let started = Instant::now();
+    loop {
+        if let Ok(bytes) = read_queue_file(done_path) {
+            match serde_json::from_slice::<FetchDone>(&bytes) {
+                Ok(done) if done.for_request() == expected => {
+                    let _ = std::fs::remove_file(done_path);
+                    return Some(done);
+                }
+                // Not this request's: removed so the daemon's own answer can take its place.
+                Ok(_) => {
+                    let _ = std::fs::remove_file(done_path);
+                }
+                // Half-written or not an answer: looked at again on the next turn.
+                Err(_) => {}
+            }
+        }
+        if started.elapsed() >= wait {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
 fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     let dest = options.dest.as_ref().ok_or_else(|| {
         ArtifactError::InvalidArguments(format!("--dest needs a value\n{}", usage()))
@@ -905,6 +1260,7 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         options.total.unwrap_or(FETCH_TOTAL.as_secs()),
     );
     let request = FetchRequest {
+        nonce: FetchRequest::fresh_nonce(),
         key: key.key.clone(),
         key_cid: key.key_cid.clone(),
         output,
@@ -916,30 +1272,24 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         total_s: total,
     };
     let queue = fetch_queue_dir(&peer_dir);
-    std::fs::create_dir_all(&queue)?;
-    let request_path = fetch_request_path(&queue, &key.key_cid);
-    let done_path = fetch_done_path(&queue, &key.key_cid);
-    let _ = std::fs::remove_file(&done_path);
+    ensure_queue_dir(&queue)?;
+    let stem = request.stem();
+    let request_path = fetch_request_path(&queue, &stem);
+    let done_path = fetch_done_path(&queue, &stem);
+    let expected = FetchFor::of(&request);
     write_queue_file(&request_path, &request)?;
     let wait = Duration::from_secs(total.saturating_add(stall).saturating_add(30));
-    let started = Instant::now();
-    let done: FetchDone = loop {
-        if let Ok(bytes) = std::fs::read(&done_path) {
-            if let Ok(done) = serde_json::from_slice(&bytes) {
-                let _ = std::fs::remove_file(&done_path);
-                break done;
-            }
+    let Some(done) = wait_for_answer(&done_path, &expected, wait) else {
+        // Unclaimed: withdrawn here. Claimed: the daemon is told to stop, and whatever it
+        // answers later names this request's nonce, which nobody waits on any more.
+        if std::fs::remove_file(&request_path).is_err() {
+            let _ = write_queue_file(&fetch_cancel_path(&queue, &stem), &expected);
         }
-        if started.elapsed() >= wait {
-            // Unclaimed requests are withdrawn; a claimed one answers into a file nobody reads.
-            let _ = std::fs::remove_file(&request_path);
-            return Err(ArtifactError::Gap(format!(
-                "fetch gap: deadline-exceeded: this device's epr peer serve did not answer the \
-                 queued fetch within {} s",
-                wait.as_secs()
-            )));
-        }
-        std::thread::sleep(Duration::from_millis(200));
+        return Err(ArtifactError::Gap(format!(
+            "fetch gap: deadline-exceeded: this device's epr peer serve did not answer the \
+             queued fetch within {} s; it was withdrawn",
+            wait.as_secs()
+        )));
     };
     match done {
         FetchDone::Installed {

@@ -79,6 +79,16 @@ impl Device {
 
     fn command(&self) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+        // The build environment `epr artifact key|put` judges is this child's: none of the test
+        // harness's own cargo variables reach it.
+        for (name, _) in std::env::vars() {
+            if name.starts_with("CARGO_")
+                || name.starts_with("RUST")
+                || elohim_epr_cli::artifact::NATIVE_BUILD_ENV.contains(&name.as_str())
+            {
+                command.env_remove(name);
+            }
+        }
         command
             .env(device_key::DEVICE_KEY_ENV, &self.key_file)
             .env("XDG_CONFIG_HOME", self.config.path())
@@ -146,6 +156,20 @@ fn household() -> (TempDir, Device, Device) {
 
 /// A `mesh-build` descriptor whose view is `paths`, written outside the checkout.
 fn method_file(dir: &Path, paths: &[&str]) -> (PathBuf, MethodDescriptor) {
+    method_file_with(dir, paths, &[])
+}
+
+/// [`method_file`] with extra non-path inputs.
+fn method_file_with(
+    dir: &Path,
+    paths: &[&str],
+    inputs: &[(&str, &str)],
+) -> (PathBuf, MethodDescriptor) {
+    let mut non_path_inputs: std::collections::BTreeMap<String, String> =
+        [("RUSTFLAGS".to_string(), String::new())].into();
+    for (name, value) in inputs {
+        non_path_inputs.insert((*name).to_string(), (*value).to_string());
+    }
     let descriptor = MethodDescriptor {
         name: "mesh-build".into(),
         tools: [("toolchain".to_string(), "1.96.1".to_string())].into(),
@@ -158,7 +182,7 @@ fn method_file(dir: &Path, paths: &[&str]) -> (PathBuf, MethodDescriptor) {
             .iter()
             .map(|p| TreePath::from_slash_bytes(p.as_bytes()).unwrap())
             .collect(),
-        non_path_inputs: [("RUSTFLAGS".to_string(), String::new())].into(),
+        non_path_inputs,
         deterministic: false,
     };
     let path = dir.join("method.json");
@@ -473,4 +497,225 @@ fn fetch_without_a_daemon_is_daemon_down_with_a_cure() {
         !a.config.path().join("epr/peer/fetch-queue").exists(),
         "nothing queued for a daemon that is not there"
     );
+}
+
+/// `epr artifact key --print key` for `method` in `device`'s checkout, with `env` set.
+fn key_with(device: &Device, method: &Path, env: &[(&str, &str)]) -> Output {
+    let mut command = device.command();
+    for (name, value) in env {
+        command.env(name, value);
+    }
+    command
+        .args([
+            "artifact",
+            "key",
+            "--method",
+            method.to_str().unwrap(),
+            "--repo",
+            device.root().to_str().unwrap(),
+            "--print",
+            "key",
+        ])
+        .output()
+        .unwrap()
+}
+
+fn key_of(device: &Device, method: &Path, env: &[(&str, &str)]) -> String {
+    let out = key_with(device, method, env);
+    assert!(out.status.success(), "{}", text(&out));
+    String::from_utf8(out.stdout).unwrap().trim().to_string()
+}
+
+#[test]
+fn an_unrecorded_cargo_env_var_refuses_the_key() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, _) = method_file_with(scratch.path(), &["crate/src"], &[("CC", "gcc")]);
+    // The recorded environment keys.
+    key_of(&a, &method, &[("CC", "gcc"), ("CARGO_BUILD_JOBS", "1")]);
+    for (name, value) in [
+        ("CARGO_ENCODED_RUSTFLAGS", "-Copt-level=3"),
+        ("CARGO_PROFILE_DEV_OPT_LEVEL", "3"),
+        ("RUSTC_WRAPPER", "sccache"),
+        ("RUSTFLAGS", "--cfg other"),
+    ] {
+        let out = key_with(&a, &method, &[("CC", "gcc"), (name, value)]);
+        assert_eq!(out.status.code(), Some(3), "{name}: {}", text(&out));
+        assert!(text(&out).contains(name), "{name}: {}", text(&out));
+    }
+    // A recorded variable that is not set, or set otherwise, refuses too.
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("CC=gcc"), "{}", text(&out));
+    let out = key_with(&a, &method, &[("CC", "clang")]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+}
+
+#[test]
+fn an_ancestor_cargo_config_moves_the_key() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let cargo_home = TempDir::new().unwrap();
+    let home = cargo_home.path().to_str().unwrap().to_string();
+    let (method, _) = method_file_with(scratch.path(), &["crate/src"], &[("crate", "crate")]);
+    let env = [("CARGO_HOME", home.as_str())];
+    let first = key_of(&a, &method, &env);
+    // An ancestor configuration cargo would read, outside the view and untracked.
+    std::fs::create_dir_all(a.root().join(".cargo")).unwrap();
+    std::fs::write(
+        a.root().join(".cargo/config.toml"),
+        "[build]\nrustflags = [\"-Copt-level=3\"]\n",
+    )
+    .unwrap();
+    let second = key_of(&a, &method, &env);
+    assert_ne!(
+        first, second,
+        "an ancestor .cargo/config.toml moves the key"
+    );
+    // The user-level configuration under CARGO_HOME too.
+    std::fs::write(
+        cargo_home.path().join("config.toml"),
+        "[profile.dev]\nopt-level = 1\n",
+    )
+    .unwrap();
+    let third = key_of(&a, &method, &env);
+    assert_ne!(second, third, "$CARGO_HOME/config.toml moves the key");
+    // And the same configuration keys alike again.
+    assert_eq!(third, key_of(&a, &method, &env));
+}
+
+#[test]
+fn entry_mode_moves_the_key() {
+    use std::os::unix::fs::PermissionsExt;
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    std::fs::write(a.root().join("crate/build.sh"), "#!/bin/sh\necho hi\n").unwrap();
+    git(a.root(), &["add", "crate/build.sh"]);
+    git(a.root(), &["commit", "-q", "-m", "a build script"]);
+    let (method, _) = method_file(scratch.path(), &["crate/build.sh"]);
+    let before = key_of(&a, &method, &[]);
+    std::fs::set_permissions(
+        a.root().join("crate/build.sh"),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    git(a.root(), &["add", "crate/build.sh"]);
+    git(a.root(), &["commit", "-q", "-m", "executable"]);
+    let after = key_of(&a, &method, &[]);
+    assert_ne!(
+        before, after,
+        "a selected file's mode is part of what was read"
+    );
+}
+
+#[test]
+fn an_out_of_view_symlink_refuses() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, _) = method_file(scratch.path(), &["crate/src"]);
+    std::os::unix::fs::symlink("main.rs", a.root().join("crate/src/inside")).unwrap();
+    git(a.root(), &["add", "-A"]);
+    git(a.root(), &["commit", "-q", "-m", "an inside link"]);
+    key_of(&a, &method, &[]);
+    std::os::unix::fs::symlink("../../README.md", a.root().join("crate/src/escape")).unwrap();
+    git(a.root(), &["add", "-A"]);
+    git(a.root(), &["commit", "-q", "-m", "an escaping link"]);
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("points outside the method's view"),
+        "{}",
+        text(&out)
+    );
+}
+
+#[test]
+fn an_index_flag_refuses() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, _) = method_file(scratch.path(), &["crate/src"]);
+    key_of(&a, &method, &[]);
+    for (set, clear) in [
+        ("--assume-unchanged", "--no-assume-unchanged"),
+        ("--skip-worktree", "--no-skip-worktree"),
+    ] {
+        git(a.root(), &["update-index", set, "crate/src/main.rs"]);
+        let out = key_with(&a, &method, &[]);
+        assert_eq!(out.status.code(), Some(3), "{set}: {}", text(&out));
+        assert!(text(&out).contains("index flags"), "{set}: {}", text(&out));
+        git(a.root(), &["update-index", clear, "crate/src/main.rs"]);
+    }
+    // An ignored file inside the view refuses as well: the build could read it.
+    std::fs::write(a.root().join(".gitignore"), "*.generated\n").unwrap();
+    git(a.root(), &["add", ".gitignore"]);
+    git(a.root(), &["commit", "-q", "-m", "ignore"]);
+    std::fs::write(a.root().join("crate/src/schema.generated"), "x").unwrap();
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("ignored files"), "{}", text(&out));
+}
+
+#[test]
+fn a_completion_for_another_request_is_never_accepted() {
+    use eprfs_peer::{FetchDone, FetchFor, FetchGap};
+    let queue = TempDir::new().unwrap();
+    let ours = FetchFor {
+        nonce: "0123456789abcdef0123456789abcdef".into(),
+        key_cid: BlobCid::compute(b"\xa1\x61k\x61v"),
+        output: BlobCid::compute_bytes(b"the binary"),
+        dest: PathBuf::from("/pool/mesh-bin/elohim-storage"),
+    };
+    let done_path = eprfs_peer::fetch_done_path(queue.path(), "our-stem");
+    let installed = |for_request: FetchFor| FetchDone::Installed {
+        for_request,
+        manifest: BlobCid::compute(b"\xa0"),
+        manifest_from: "did:key:zA".into(),
+        fetched_from: vec!["did:key:zA".into()],
+        chunks_fetched: 1,
+        chunks_resumed: 0,
+        bytes_fetched: 10,
+        wasted: 0,
+        seconds: 0.1,
+    };
+    let wait = std::time::Duration::from_millis(600);
+    // Another request's answer, at our very path, differing in each field: never taken for ours.
+    let others = [
+        FetchFor {
+            nonce: "ffffffffffffffffffffffffffffffff".into(),
+            ..ours.clone()
+        },
+        FetchFor {
+            dest: PathBuf::from("/elsewhere/bin"),
+            ..ours.clone()
+        },
+        FetchFor {
+            output: BlobCid::compute_bytes(b"another binary"),
+            ..ours.clone()
+        },
+        FetchFor {
+            key_cid: BlobCid::compute(b"\xa1\x61k\x61w"),
+            ..ours.clone()
+        },
+    ];
+    for other in others {
+        eprfs_peer::write_queue_file(&done_path, &installed(other.clone())).unwrap();
+        assert!(
+            elohim_epr_cli::artifact::wait_for_answer(&done_path, &ours, wait).is_none(),
+            "an answer for {other:?} was taken for ours"
+        );
+    }
+    // Ours is.
+    eprfs_peer::write_queue_file(
+        &done_path,
+        &FetchDone::gap(ours.clone(), FetchGap::NoRecord),
+    )
+    .unwrap();
+    let done = elohim_epr_cli::artifact::wait_for_answer(&done_path, &ours, wait).expect("ours");
+    assert_eq!(done.for_request(), &ours);
+    assert!(!done_path.exists(), "a taken answer is removed");
 }

@@ -20,6 +20,9 @@ async-trait.workspace = true
 # The gossip topic is blake3 of its name, as elohim-storage derives its iroh topics.
 blake3 = "1"
 bytes.workspace = true
+# The fetch queue opens its entries O_NOFOLLOW | O_NONBLOCK, so a link or a FIFO placed in the
+# queue can never redirect a read or block the daemon's tick.
+libc = "0.2"
 # The CID type FlowStore names its records by.
 cid = "0.11"
 elohim-epr-rea = { path = "../../epr-rea" }

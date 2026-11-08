@@ -2046,6 +2046,27 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
     done < <(mesh_build_env "$project")
     local cmd=(env "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
       cargo build --bin "$bin")
+    # A recorded build (artifact-store review H3) runs cargo in an explicit environment: the
+    # method's non-path inputs (the declared caps and toolchain, RUSTFLAGS, the native toolchain
+    # variables `describe` records) plus PATH/HOME/LANG/TMPDIR and where the toolchain lives.
+    # Nothing else the caller exported (CARGO_ENCODED_RUSTFLAGS, CARGO_PROFILE_*, RUSTC_WRAPPER...)
+    # reaches it, and `epr artifact key|put` refuse when anything unrecorded is set.
+    local rec=(env)
+    if [ -n "$sources" ]; then
+      local base=("PATH=$PATH" "HOME=$HOME" "LANG=${LANG:-C.UTF-8}") v
+      for v in TMPDIR CARGO_HOME RUSTUP_HOME CC CXX AR LIBCLANG_PATH PKG_CONFIG_PATH \
+        OPENSSL_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR PROTOC; do
+        [ -n "${!v+x}" ] && base+=("$v=${!v}")
+      done
+      cmd=(env -i "${base[@]}" "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
+        cargo build --bin "$bin")
+      # The epr calls keep the caller's own environment (device key, peer and payload places)
+      # less every other cargo/rust variable, plus the build's.
+      while IFS= read -r v; do
+        case "$v" in CARGO_HOME|RUSTUP_HOME) ;; CARGO_*|RUST*) rec+=(-u "$v") ;; esac
+      done < <(compgen -e)
+      rec+=("${envs[@]}" "RUSTFLAGS=$rustflags")
+    fi
     [ -n "$features" ] && cmd+=(--features "$features")
     local built="$POOL/$slot/dev/debug/$bin"
     echo "[mesh build] $project -> $dest"
@@ -2062,15 +2083,16 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
     if [ -n "$sources" ]; then
       # The method and its key, computed BEFORE the build: the record names the closure the
       # build started from, and `put` refuses if it moved meanwhile.
-      local describe=(env "${envs[@]}" "$(_mesh_epr)" artifact describe --project "$project" --bin "$bin"
+      local describe=("${rec[@]}" "$(_mesh_epr)" artifact describe --project "$project" --bin "$bin"
         --rustflags "$rustflags" --sources "$sources" --crate "$crate" --repo "$REPO_ROOT" --out "$method")
       [ -n "$features" ] && describe+=(--features "$features")
       for line in "${envs[@]}"; do describe+=(--env "$line"); done
       if ! out=$("${describe[@]}" 2>&1); then
         unrecorded="the method is not described: ${out:-epr artifact describe failed}"
         method=""
-      elif ! input=$("$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" --print input 2>/dev/null); then
-        unrecorded="no key: the closure has uncommitted changes inside the method's view, or epr cannot key it"
+      elif ! input=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+          --print input 2>"$method.key-why"); then
+        unrecorded="no key: $(tail -n 1 "$method.key-why" 2>/dev/null || true)"
         input=""
       fi
       commit=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)
@@ -2095,7 +2117,7 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       # Record the install (design §3.a.4): one custody Produce that crosses. A failure is
       # explicit, never silent, and never fails the build.
       if [ -z "$unrecorded" ]; then
-        out=$("$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$dest" \
+        out=$("${rec[@]}" "$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$dest" \
           --project "$project" --commit "$commit" --duration-ms "$(( $(date +%s%3N) - started ))" \
           --cross --repo "$REPO_ROOT" 2>&1) || unrecorded="${out:-epr artifact put failed}"
       fi
