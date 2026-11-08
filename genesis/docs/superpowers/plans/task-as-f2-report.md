@@ -1,9 +1,9 @@
 ---
 id: task-as-f2-report
 title: the sibling fetch, producer and consumer (artifact-store F2a + F2b)
-status: claimed-not-verified
+status: verified-on-branch
 landed_commit: 5c53da02
-verified_by:
+verified_by: "astra review + re-review (evidence/f2-astra-review.md, f2-astra-rereview.md), orchestrator ruling (f2-ruling.md) and delta review of 5c53da02 (f2-delta-review.md, APPROVE); gates on e626043f eprfs EXIT=0, orchestrator EXIT=0"
 concerns: "Astra BLOCK on ed29026b6 addressed in fa3aba0f3 + 47b57023; named residuals: build-time TOCTOU, node_modules excluded from the ignored-file refusal, same-account staging swap between inode check and rename, env -i not yet run on a real cargo build (F2r), honest computation out of scope (F5/I6). The key input is the labelled interim KeyInput::Raw(git-tree closure CID) with slot basis-key:git-tree, not KeyInput::Projected: no producer of the HEAD tree as an eprfs Tree v1 closure exists on this tree, so an F2r receipt on this key does not close F2. The 454 MB receipt (F2r) and the two-device relay throughput floor are not run here."
 actor: agent:as-f2@claude-opus-5-5
 cites: []
