@@ -274,7 +274,9 @@ has nine entries; the count of ten in the first hand-off message was wrong.
 ### Re-review (`evidence/e3-astra-rereview.md`): N1, N2, N3
 
 The re-review confirmed H1, H2 (the receiver binding), M3, M4 and informational 7 closed, and
-found three defects introduced by those fixes. Fixed in the commit after `8f7432ab`.
+found three defects introduced by those fixes. Fixed in `dd5a148a`. `just gate eprfs` at
+`dd5a148a`: `evidence/gate-E3-eprfs.log`, **EXIT=0** (serve_blob 19/19). The green run at
+`5d93dc24` is kept as `gate-E3-eprfs.run3-review.log`.
 
 - **N1: supersession followed indexing order, not event order.**
   - Each rebuild now designates, per output, the manifest of the latest custody Produce of this
