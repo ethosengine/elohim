@@ -159,6 +159,60 @@ Supporting tests added: `salvage_gossip::tests::*` (roundtrip/admit, every signe
 - Added and ok: `only_an_exact_current_dht_entry_confirms`, `unmatched_and_null_household_share_the_undeclared_domain`.
 - No gate from me; the orchestrator runs the combined storage gate.
 
+### Pass 5 — the confirmer and the mint cannot be starved or give up (commit `f99fb0f3`)
+
+- **B2, confirmer starvation.** `transport_authority::confirm`:
+  - One worker owns a bounded queue (512). Duplicate requests are coalesced. A request past the cap, past 16 outstanding per relaying source or past 4 per PeerId is dropped and counted (`Confirmer::dropped`); the sweep re-requests it.
+  - Each attempt takes one of 8 slots only while its DHT read runs; waiting between attempts holds nothing.
+  - Due PeerIds with a verified transport link go first.
+- **M3, lazy client and sweep.**
+  - `conductor_reader` acquires the imagodei client through the hc registry (`HcClientRegistry::imagodei_client()`) on every attempt.
+  - The confirmer starts whenever there is a database pool, bridge or not.
+  - `Confirmer::sweep` re-requests every cross-signed, current, unconfirmed row at start, every 10 min, and when the conductor app becomes available.
+  - The handshake path (`identity_handshake_service`) now requests confirmation too.
+- **M5.** The held-claim worker queue is capped at 1024 jobs. When it is full a Hold job is dropped (counted); a Replay evicts the oldest Hold, or is merged into the newest Replay, and is never dropped.
+- **L1.** The DHT-arrival projection confirms only this node's own agent (`ReconcileController::with_own_agent_cid`, wired from the P2P identity in main.rs). Any other agent's signal goes through the confirmer.
+- **L5.** The `reconcile/placement.rs` doc is corrected.
+- **Binding mint (alpha cold-fleet finding).**
+  - `run_binding_mint_task` never gives up: backoff 5, 15, 45, 120, 300, then 600 s for the life of the process.
+  - It is woken at once by `binding_mint::conductor_app_available()`, called on every (re)connect of the imagodei signal stream in the reconcile loop. The same call sweeps the confirmer.
+  - Only `AgentCidMismatch` stays terminal.
+  - Client acquisition and the main.rs:3646/:6360 boot snapshots are left to ethosengine's `fix/storage-late-bind-conductor`, as directed. Pass 5 also removes the confirmer block pass 4 had put next to the main.rs:3646 site; it now starts beside the reconcile controller setup.
+- **Hold TTL raised to 4 h.** A cold fleet takes hours to reach confirmation.
+
+**Overlap with `fix/storage-late-bind-conductor`.**
+- `p2p/binding_mint.rs`: `MINT_RETRY_BACKOFF_SECS` doc, the new `MINT_WAKE`/`conductor_app_available`, the `spawn_binding_mint_task` doc comment (signature unchanged), `run_binding_mint_after_subscription`'s call and `run_binding_mint_task`'s body, plus its tests.
+- `main.rs`: none at :3646/:6360 in this commit. Pass 4 (`82d545cc`) added a block at :3646 and this commit removes it, so a rebase may need that one hunk taken from their side. The new reconcile-loop lines (~:5577, ~:5710) are away from their sites.
+
+**Cold-fleet sequence and the bound on each step.**
+
+| Step | What happens | Bound |
+|---|---|---|
+| 1. Storage boots | The mint waits for the imagodei signal subscription. The confirmer runs and sweeps; with no client its attempts find nothing. | — |
+| 2. Conductor installed and app enabled | The signal stream connects; `conductor_app_available()` wakes the mint and sweeps the confirmer at once. | The reconcile loop's reconnect backoff. Without the wake, the mint retries within 600 s. |
+| 3. Mint | `sign_for_agent` signs the agent half and the binding is committed. | Seconds once it answers; retried every ≤600 s until then. Measured on shem: about 3 min after boot. |
+| 4. Own projection | The own DHT signal confirms the node's own binding and publishes the gossip. | Immediate. |
+| 5. Gossip reaches peers | | Measured on shem: within 0.1 s. |
+| 6. Peers confirm on the DHT | Each peer requests confirmation and reads the DHT. | First read immediate, then 5 s … 900 s (~33 min); then a sweep every 10 min and on every app-available, forever. |
+| 7. Held claims replay | On confirmation, the claims held for that author replay on the worker. | Held claims wait up to 4 h. |
+
+**Follow-ups filed, not done:**
+- M1: first writer wins on the unsigned anchor (re-key on the core, or confirm under the DHT action hash).
+- M2: confirmations are never re-checked, there is no maximum validity, and revocations are not joined.
+- M4: the servable index keeps a phantom entry after delete (Worker C's).
+- L2: `test_util` is compiled into production.
+- L3: the authority lookup is O(rows) per PeerId.
+- L4: the recon responder cap is global.
+- The mint is a once-per-process task. A process that outlives its binding's 30-day window does not re-mint until restart.
+
+**Tests.** Focused runs, all EXIT=0; lib filters (binding_mint, transport_authority, held_unbound, held_queue, gossip_dispatch, identity_handshake, reconcile::controller, salvage) 134 passed; earlier pass-5 runs: default lib 580, iroh lib 39, iroh_planes 2.
+- `the_confirmer_is_not_starved_by_unconfirmable_bindings`, `a_late_connecting_client_still_confirms`, `unconfirmed_rows_are_swept_and_retried`
+- `held_queue_is_bounded_and_replay_is_never_starved`
+- `binding_mint_retries_until_the_conductor_answers`, `binding_mint_runs_when_the_app_becomes_available`
+- The existing mint retry tests, adjusted to the new signature.
+
+`cargo clippy -D warnings` passed on both the default and the `p2p p2p-iroh` legs. I did not run the gate.
+
 ## Worker B (Sonnet 5.5 — R4, R5, R6, R8, R9, R10, and red-team finding 5)
 
 Status: code complete in the worktree, focused tests green, **not yet committed and storage gate not yet run** (see Deviations 1). Ownership claims: `evidence/H-owner.md`.
