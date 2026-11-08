@@ -200,3 +200,24 @@ describe('buildContentInput carries authored edges in signed metadata', () => {
   });
 });
 
+
+describe('buildContentInput blobCid', () => {
+  // An empty blobCid means "populated at deploy" (spa-bundle rows such as
+  // imagodei-portal); storage's byte-CID validator refuses "" and fails the
+  // whole batch (elohim-genesis #1747), so it must not reach the wire.
+  it('omits an empty declared blobCid', () => {
+    expect(buildContentInput({ id: 'p', title: 'P', content: 'p', blobCid: '' }).blobCid).toBeUndefined();
+  });
+
+  it('keeps a declared byte CID', () => {
+    expect(buildContentInput({ id: 'q', title: 'Q', content: 'q', blobCid: CID_A }).blobCid).toBe(CID_A);
+  });
+
+  it('prefers the uploaded blob CID over the declared one', () => {
+    expect(buildContentInput({ id: 'r', title: 'R', content: 'r', blobCid: CID_A }, { blobCid: CID_B }).blobCid).toBe(CID_B);
+  });
+
+  it('uses the declared CID when the uploaded one is empty', () => {
+    expect(buildContentInput({ id: 's', title: 'S', content: 's', blobCid: CID_A }, { blobCid: '' }).blobCid).toBe(CID_A);
+  });
+});
