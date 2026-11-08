@@ -270,3 +270,52 @@ has nine entries; the count of ten in the first hand-off message was wrong.
     tick slower, so early polls are recorded as `draw:refused`.
   - Test 1 counts only non-refused draws (still exactly one, completed).
   - Test 2 waits for the labelled refusal, and asserts the label dedup on its own reason.
+
+### Re-review (`evidence/e3-astra-rereview.md`): N1, N2, N3
+
+The re-review confirmed H1, H2 (the receiver binding), M3, M4 and informational 7 closed, and
+found three defects introduced by those fixes. Fixed in the commit after `8f7432ab`.
+
+- **N1: supersession followed indexing order, not event order.**
+  - Each rebuild now designates, per output, the manifest of the latest custody Produce of this
+    device's own in flow-log order. Only that manifest is ever tried or served for the output.
+  - An older derivation never displaces a newer one, however late its method record arrives.
+  - When the newest is not yet indexable, the output is not served at all; an older derivation
+    does not stand in.
+  - The same log designates the same manifests after a restart.
+  - `index_manifest` is no longer public: indexing happens only through designation.
+  - Test: `a_late_indexable_older_derivation_never_evicts_a_newer_one`. A late older record
+    leaves the newer entry in place, an older derivation never stands in for an unindexable
+    newer one, and a fresh mount over the same store and log designates the same manifests.
+- **N2: every rebuild re-hashed every failed manifest, inside the tick.**
+  - Per-manifest retry state is keyed by the designating custody event. `MethodUnknown` and
+    `OutputUnverified` back off from `INDEX_RETRY_FIRST` (30 s), doubling to `INDEX_RETRY_MAX`
+    (1 h).
+  - A `ManifestInvalid` (corrupt, invalid, output mismatch, or a vanished indexed manifest) is
+    never retried for the same custody event. A new custody event naming that output — a re-put
+    through `put_local_blob`, which rewrites the chunks — is a new chance at once. Restoring a
+    store file by hand without a re-put does not retry it.
+  - The daemon runs the rebuild as a spawned, single-flight task. The tick only reads the log,
+    collects a finished rebuild's errors, and starts the next one when the log moved or a
+    backoff may have run out (at most every 30 s). Roster and policy reloads, projection and
+    announce never wait on reading or hashing an artifact. The task is aborted when the loop
+    ends.
+  - Tests:
+    - `failed_reconstruction_is_retried_with_backoff`: attempts at +0, +30 s and +90 s and none
+      in between; success at +210 s once the chunk is restored. A corrupt chunk is not retried
+      even at +3 h, and is indexed at once after a re-put.
+    - `failed_reconstruction_never_blocks_the_tick`: a payload store with a 1.5 s delay per
+      fetch, so a rebuild of several seconds. The daemon announces, re-projects a new crossing
+      event and announces again before the rebuild could have finished; the artifact is served
+      once it does.
+- **N3: the supersession history was unbounded.**
+  - The `superseded` set is gone. Each rebuild prunes every index entry, unindexed record and
+    retry state whose manifest is no longer designated.
+  - What the index tracks is bounded by the distinct outputs of this device's custody events,
+    not by their history (`BlobMount::tracked_manifests`).
+  - Test: `superseded_history_is_bounded`. Eight derivations of one output track one manifest;
+    a failing ninth replaces it as the one tracked record, and the output is then not served.
+- **Changed existing tests:** `a_manifest_without_its_method_record_is_unindexed_and_never_served`
+  and `an_output_its_chunks_do_not_reconstruct_here_is_not_served` now retry past the 30 s
+  backoff with `rebuild_from_flow_at`. The first also asserts that the immediate rebuild does not
+  retry.

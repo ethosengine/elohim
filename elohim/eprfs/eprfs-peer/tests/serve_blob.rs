@@ -8,7 +8,7 @@ mod support;
 
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use elohim_epr_rea::{
@@ -24,15 +24,15 @@ use eprfs_peer::{
     ArtifactServeList, BlobMount, ChannelStore, CrossingAllowList, DeviceScope, DrawOutcome,
     LocalBlobContext, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, ServedDraw,
     SharedAdmission, TierAnswer, TierLimits, TierProtocol, TierRequest, Unindexed,
-    REFUSALS_PER_WINDOW, TIER_ALPN,
+    INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, TIER_ALPN,
 };
 use eprfs_storage::{TierBlobManifest, TierBlobPut};
 use iroh::endpoint::Connection;
 use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{Endpoint, NodeAddr};
 use support::{
-    binding, contest, device, endpoint_row, genesis, household, loopback, peer_key, verifier,
-    Checkout, Device, Household, HANDLE,
+    berth_event, binding, contest, device, endpoint_row, genesis, household, loopback, peer_key,
+    verifier, Checkout, Device, Household, HANDLE,
 };
 use tokio::sync::mpsc;
 
@@ -100,7 +100,27 @@ async fn put_artifact<F: FlowStore + ?Sized>(
     bytes: Bytes,
     with_method: bool,
 ) -> TierBlobPut {
-    let descriptor = descriptor(method);
+    put_with(
+        store,
+        flow,
+        descriptor(method),
+        bytes,
+        with_method,
+        &context(),
+    )
+    .await
+}
+
+/// [`put_artifact`] under `descriptor` and `context`.
+async fn put_with<F: FlowStore + ?Sized>(
+    store: &dyn EprfsStorage,
+    flow: &mut F,
+    descriptor: MethodDescriptor,
+    bytes: Bytes,
+    with_method: bool,
+    context: &LocalBlobContext,
+) -> TierBlobPut {
+    let method = descriptor.name.clone();
     let method_cid = descriptor.cid().expect("method cid");
     if with_method {
         let encoded = serde_ipld_dagcbor::to_vec(&descriptor).expect("descriptor");
@@ -123,9 +143,18 @@ async fn put_artifact<F: FlowStore + ?Sized>(
             sig: "fixture-signature".into(),
         },
     };
-    put_local_blob(store, flow, record, bytes, &context())
+    put_local_blob(store, flow, record, bytes, context)
         .await
         .expect("put")
+}
+
+/// Put `descriptor`'s record in `store`.
+async fn put_method(store: &dyn EprfsStorage, descriptor: &MethodDescriptor) {
+    let encoded = serde_ipld_dagcbor::to_vec(descriptor).expect("descriptor");
+    store
+        .put_blob_verified(&descriptor.cid().expect("cid"), Bytes::from(encoded))
+        .await
+        .expect("method record");
 }
 
 fn output(put: &TierBlobPut) -> BlobCid {
@@ -226,6 +255,12 @@ impl Holder {
     async fn reindex(&self) -> Vec<PeerError> {
         let events = self.flow.events().expect("events");
         self.mount.rebuild_from_flow(&events).await
+    }
+
+    /// [`Self::reindex`] as of `at`.
+    async fn reindex_at(&self, at: Instant) -> Vec<PeerError> {
+        let events = self.flow.events().expect("events");
+        self.mount.rebuild_from_flow_at(&events, at).await
     }
 }
 
@@ -946,7 +981,13 @@ async fn a_manifest_without_its_method_record_is_unindexed_and_never_served() {
         .put_blob_verified(&descriptor.cid().expect("cid"), Bytes::from(encoded))
         .await
         .expect("method record");
+    // Not before its backoff has run out (or a new custody event names it).
     assert!(holder.reindex().await.is_empty());
+    assert!(holder.mount.held(&artifact).is_none());
+    assert!(holder
+        .reindex_at(Instant::now() + INDEX_RETRY_FIRST)
+        .await
+        .is_empty());
     let answer = call(&b, &holder.addr, TierRequest::Manifest { artifact }).await;
     served_bytes(answer, &put.manifest_cid);
 
@@ -1507,7 +1548,7 @@ async fn an_output_its_chunks_do_not_reconstruct_here_is_not_served() {
         typed(&output(&deferred), ReachReason::OutsideStanding, None)
     );
     write_object(&holder.object_path(&last), &kept);
-    let retried = holder.reindex().await;
+    let retried = holder.reindex_at(Instant::now() + INDEX_RETRY_FIRST).await;
     assert!(
         retried.is_empty(),
         "verified once the chunk is held: {retried:?}"
@@ -1553,5 +1594,383 @@ async fn an_output_its_chunks_do_not_reconstruct_here_is_not_served() {
         typed(&output(&deferred), ReachReason::OutsideStanding, None)
     );
     b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+/// A descriptor for the granted method, varied by `flag` so each is its own method CID.
+fn granted_variant(flag: &str) -> MethodDescriptor {
+    let mut descriptor = descriptor(GRANTED);
+    descriptor.flags = vec![flag.to_string()];
+    descriptor
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_late_indexable_older_derivation_never_evicts_a_newer_one() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let b = client(&h.key_b).await;
+    let t0 = Instant::now();
+
+    // Output 1: the older derivation's method record arrives late; the newer one is indexable.
+    let bytes = artifact_bytes(111, 400 * 1024);
+    let older = granted_variant("older");
+    let older_put = put_with(
+        holder.payload.as_ref(),
+        &mut holder.flow,
+        older.clone(),
+        bytes.clone(),
+        false,
+        &context(),
+    )
+    .await;
+    let newer_put = holder.put(GRANTED, bytes, true).await;
+    let artifact = output(&newer_put);
+    assert_eq!(output(&older_put), artifact);
+    assert!(
+        holder.reindex_at(t0).await.is_empty(),
+        "only the newer is designated"
+    );
+    assert_eq!(
+        holder.mount.held(&artifact).map(|held| held.manifest),
+        Some(newer_put.manifest_cid.clone())
+    );
+    // The older record lands; however long after, the newer derivation stays the entry.
+    put_method(holder.payload.as_ref(), &older).await;
+    for later in [t0, t0 + INDEX_RETRY_MAX, t0 + 2 * INDEX_RETRY_MAX] {
+        assert!(holder.reindex_at(later).await.is_empty());
+        assert_eq!(
+            holder.mount.held(&artifact).map(|held| held.manifest),
+            Some(newer_put.manifest_cid.clone())
+        );
+    }
+    let stale = call(
+        &b,
+        &holder.addr,
+        TierRequest::Blob {
+            artifact: artifact.clone(),
+            cid: older_put.manifest_cid.clone(),
+        },
+    )
+    .await;
+    assert_eq!(stale, typed(&artifact, ReachReason::NotUnderRoot, None));
+
+    // Output 2: the newer derivation is not indexable yet; the older one is never served for it.
+    let bytes = artifact_bytes(112, 400 * 1024);
+    holder.put(GRANTED, bytes.clone(), true).await;
+    let late = granted_variant("late");
+    let late_put = put_with(
+        holder.payload.as_ref(),
+        &mut holder.flow,
+        late.clone(),
+        bytes,
+        false,
+        &context(),
+    )
+    .await;
+    let second = output(&late_put);
+    let unindexed = holder.reindex_at(t0).await;
+    assert_eq!(unindexed.len(), 1, "{unindexed:?}");
+    assert!(
+        holder.mount.held(&second).is_none(),
+        "the older never stands in"
+    );
+    assert_eq!(
+        call(
+            &b,
+            &holder.addr,
+            TierRequest::Manifest {
+                artifact: second.clone()
+            }
+        )
+        .await,
+        typed(&second, ReachReason::OutsideStanding, None)
+    );
+    put_method(holder.payload.as_ref(), &late).await;
+    assert!(holder.reindex_at(t0 + INDEX_RETRY_FIRST).await.is_empty());
+    assert_eq!(
+        holder.mount.held(&second).map(|held| held.manifest),
+        Some(late_put.manifest_cid.clone())
+    );
+
+    // A restart (a fresh mount over the same store and log) designates the same manifests.
+    let (fresh, _served) = BlobMount::new(holder.payload.clone(), h.a.did.clone());
+    let events = holder.flow.events().expect("events");
+    assert!(fresh.rebuild_from_flow(&events).await.is_empty());
+    assert_eq!(
+        fresh.held(&artifact).map(|held| held.manifest),
+        Some(newer_put.manifest_cid)
+    );
+    assert_eq!(
+        fresh.held(&second).map(|held| held.manifest),
+        Some(late_put.manifest_cid)
+    );
+
+    b.close().await;
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn failed_reconstruction_is_retried_with_backoff() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let t0 = Instant::now();
+
+    // A missing chunk: retried after 30 s, then after a doubled wait, never in between.
+    let deferred = holder
+        .put(GRANTED, artifact_bytes(121, 3 * 1024 * 1024), true)
+        .await;
+    let last = chunks(&deferred).last().cloned().expect("a chunk");
+    let kept = std::fs::read(holder.object_path(&last)).expect("chunk file");
+    std::fs::remove_file(holder.object_path(&last)).expect("remove chunk");
+    assert_eq!(holder.reindex_at(t0).await.len(), 1);
+    assert_eq!(holder.mount.reconstructions(), 1);
+    for (at, attempts) in [
+        (t0 + Duration::from_secs(1), 1),
+        (t0 + INDEX_RETRY_FIRST, 2),
+        (t0 + INDEX_RETRY_FIRST + Duration::from_secs(45), 2),
+        (t0 + 3 * INDEX_RETRY_FIRST, 3),
+    ] {
+        holder.reindex_at(at).await;
+        assert_eq!(
+            holder.mount.reconstructions(),
+            attempts,
+            "at +{:?}",
+            at - t0
+        );
+    }
+    write_object(&holder.object_path(&last), &kept);
+    // The next try is a doubled wait (120 s) after the last one.
+    holder.reindex_at(t0 + 4 * INDEX_RETRY_FIRST).await;
+    assert!(holder.mount.held(&output(&deferred)).is_none());
+    assert!(holder
+        .reindex_at(t0 + 7 * INDEX_RETRY_FIRST)
+        .await
+        .is_empty());
+    assert!(holder.mount.held(&output(&deferred)).is_some());
+    let attempts = holder.mount.reconstructions();
+
+    // A corrupt chunk: never retried for the same custody event, however long it waits.
+    let bytes = artifact_bytes(122, 400 * 1024);
+    let corrupt = holder.put(GRANTED, bytes.clone(), true).await;
+    let chunk = chunks(&corrupt)[0].clone();
+    std::fs::remove_file(holder.object_path(&chunk)).expect("remove chunk");
+    write_object(&holder.object_path(&chunk), b"not the chunk");
+    holder.reindex_at(t0).await;
+    assert!(matches!(
+        holder.mount.unindexed(&corrupt.manifest_cid),
+        Some(Unindexed::ManifestInvalid { .. })
+    ));
+    assert_eq!(holder.mount.reconstructions(), attempts + 1);
+    holder.reindex_at(t0 + 3 * INDEX_RETRY_MAX).await;
+    assert_eq!(holder.mount.reconstructions(), attempts + 1, "not retried");
+    // A re-put is a new custody event: tried at once, and the repaired chunk verifies.
+    std::fs::remove_file(holder.object_path(&chunk)).expect("remove corrupt chunk");
+    let repaired = LocalBlobContext {
+        occurred_at: "2026-11-07T13:00:00Z".into(),
+        ..context()
+    };
+    put_local_blob(
+        holder.payload.as_ref(),
+        &mut holder.flow,
+        corrupt.manifest.record.clone(),
+        bytes,
+        &repaired,
+    )
+    .await
+    .expect("re-put");
+    assert!(holder.reindex_at(t0).await.is_empty());
+    assert_eq!(holder.mount.reconstructions(), attempts + 2);
+    assert!(holder.mount.held(&output(&corrupt)).is_some());
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+/// A payload store whose every fetch takes `delay`: a slow disk, or a large artifact.
+struct SlowStore {
+    inner: Arc<dyn EprfsStorage>,
+    delay: Duration,
+}
+
+#[async_trait::async_trait]
+impl EprfsStorage for SlowStore {
+    async fn resolve_epr(
+        &self,
+        reference: &eprfs_core::EprRef,
+    ) -> eprfs_core::Result<eprfs_core::EprRecord> {
+        self.inner.resolve_epr(reference).await
+    }
+
+    async fn has_blob(&self, cid: &BlobCid) -> eprfs_core::Result<eprfs_core::BlobPresence> {
+        self.inner.has_blob(cid).await
+    }
+
+    async fn fetch_blob(
+        &self,
+        cid: &BlobCid,
+        policy: eprfs_core::FetchPolicy,
+    ) -> eprfs_core::Result<eprfs_core::BlobHandle> {
+        tokio::time::sleep(self.delay).await;
+        self.inner.fetch_blob(cid, policy).await
+    }
+
+    async fn put_blob(&self, bytes: Bytes) -> eprfs_core::Result<BlobCid> {
+        self.inner.put_blob(bytes).await
+    }
+
+    async fn put_blob_verified(&self, cid: &BlobCid, bytes: Bytes) -> eprfs_core::Result<()> {
+        self.inner.put_blob_verified(cid, bytes).await
+    }
+
+    async fn publish_attestation(
+        &self,
+        draft: eprfs_core::AttestationDraft,
+    ) -> eprfs_core::Result<eprfs_core::EprRef> {
+        self.inner.publish_attestation(draft).await
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn failed_reconstruction_never_blocks_the_tick() {
+    let p = pair();
+    let side = Side::new(&p.rows);
+    // A slow store: the artifact's reconstruction takes many seconds.
+    let put = put_artifact(
+        side.payload().as_ref(),
+        &mut side.flow(),
+        GRANTED,
+        artifact_bytes(131, 3 * 1024 * 1024),
+        true,
+    )
+    .await;
+    let delay = Duration::from_millis(1500);
+    let fetches = 3 + put.manifest.chunks.len() as u32;
+    assert!(
+        delay * fetches >= Duration::from_secs(7),
+        "a rebuild of many seconds"
+    );
+    let slow: Arc<dyn EprfsStorage> = Arc::new(SlowStore {
+        inner: side.payload(),
+        delay,
+    });
+    let port = free_port();
+    let signer = p.a.signer();
+    let roster = SidecarRoster::open(side.checkout.dir.path(), HANDLE)
+        .expect("roster")
+        .log_path()
+        .to_path_buf();
+    let started = std::time::Instant::now();
+    let daemon = PeerDaemon::start(PeerConfig {
+        key: load_key(p.key_dir_a.path()),
+        device: p.a.did.clone(),
+        chain_root: p.a.did.clone(),
+        flow_root: side.checkout.dir.path().to_path_buf(),
+        roster,
+        state_dir: side.state.path().to_path_buf(),
+        rules: Rules::from_policy(&serve_policy()).expect("policy"),
+        policy: None,
+        relay: None,
+        listen: Some(local(port)),
+        peers: Vec::new(),
+        signer: Arc::new(signer),
+        verifier: verifier(&[&p.a, &p.b]),
+        log: Arc::new(|_line: &str| {}),
+        payload_store: Some(slow),
+    })
+    .await
+    .expect("A starts");
+    let table = || HeadTableView(side.state.path().to_path_buf());
+
+    // The loop announces, and re-projects a new crossing event, while the rebuild is in flight.
+    eventually("A announces", || table().events() >= 1).await;
+    side.checkout
+        .append(berth_event("claim", "cargo", "sa", "1.0"));
+    eventually("A re-projects and announces again", || {
+        table().events() >= 2
+    })
+    .await;
+    assert!(
+        started.elapsed() < delay * fetches,
+        "the tick did not wait for the rebuild ({:?})",
+        started.elapsed()
+    );
+    // The rebuild still finishes, off the loop, and the artifact is served.
+    let to_a = NodeAddr::new(daemon.node_id())
+        .with_direct_addresses([std::net::SocketAddr::V4(local(port))]);
+    let b = client(&load_key(p.key_dir_b.path())).await;
+    let served = tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            let answer = call(
+                &b,
+                &to_a,
+                TierRequest::Manifest {
+                    artifact: output(&put),
+                },
+            )
+            .await;
+            if matches!(answer, TierAnswer::Blob { .. }) {
+                return answer;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    })
+    .await
+    .expect("served once the rebuild finishes");
+    served_bytes(served, &put.manifest_cid);
+    b.close().await;
+    daemon.shutdown().await;
+}
+
+/// The events count of a daemon's last own announce, read from its head table.
+struct HeadTableView(std::path::PathBuf);
+
+impl HeadTableView {
+    fn events(&self) -> u64 {
+        eprfs_peer::HeadTable::load(&self.0)
+            .ok()
+            .and_then(|table| table.own_log.last().map(|own| own.events))
+            .unwrap_or(0)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn superseded_history_is_bounded() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let bytes = artifact_bytes(141, 300 * 1024);
+    let mut last = None;
+    for n in 0..8 {
+        let variant = granted_variant(&format!("v{n}"));
+        let put = put_with(
+            holder.payload.as_ref(),
+            &mut holder.flow,
+            variant,
+            bytes.clone(),
+            true,
+            &context(),
+        )
+        .await;
+        assert!(holder.reindex().await.is_empty());
+        // One output, eight derivations: the index tracks one manifest, never the history.
+        assert_eq!(holder.mount.tracked_manifests(), 1);
+        last = Some(put);
+    }
+    let last = last.expect("a put");
+    assert_eq!(
+        holder.mount.held(&output(&last)).map(|held| held.manifest),
+        Some(last.manifest_cid.clone())
+    );
+    // A designated manifest that fails is the one record kept for its output.
+    let failing = granted_variant("unrecorded");
+    put_with(
+        holder.payload.as_ref(),
+        &mut holder.flow,
+        failing,
+        bytes,
+        false,
+        &context(),
+    )
+    .await;
+    assert_eq!(holder.reindex().await.len(), 1);
+    assert_eq!(holder.mount.tracked_manifests(), 1);
+    assert!(holder.mount.held(&output(&last)).is_none());
     holder.router.shutdown().await.expect("shutdown");
 }

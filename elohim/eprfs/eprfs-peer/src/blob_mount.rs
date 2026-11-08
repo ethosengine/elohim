@@ -13,9 +13,10 @@
 //!   whose custodian (its receiver) is another device, or that was folded from another device
 //!   (`via:`), is never local custody. A manifest whose method record is not held here is
 //!   [`Unindexed::MethodUnknown`], one whose chunks do not reconstruct its output here is
-//!   [`Unindexed::OutputUnverified`] or [`Unindexed::ManifestInvalid`], and neither is served. A
-//!   second derivation of one output supersedes the first, whose objects leave the index with it;
-//!   an indexed manifest that no longer reads is dropped at the next rebuild;
+//!   [`Unindexed::OutputUnverified`] or [`Unindexed::ManifestInvalid`], and neither is served. For
+//!   each output, only the manifest of the latest custody event in log order is served; an
+//!   indexed manifest that no longer reads is dropped at the next rebuild. A failed manifest is
+//!   retried with a backoff, an invalid one only after a new custody event;
 //! - one `serve-blob` session per (requester, artifact), closed on the last distinct chunk, when
 //!   the connection closes, or after [`SERVE_IDLE`]; each closed session (and each refusal of an
 //!   admitted device) becomes one [`ServedDraw`], which the daemon records as one `Use` event.
@@ -124,24 +125,19 @@ pub struct ArtifactIndex {
     by_output: BTreeMap<BlobCid, Held>,
     /// Manifest and chunk CIDs → the outputs naming them.
     by_object: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
-    /// Manifests held and never served, with why.
+    /// Designated manifests held and not served, with why.
     unindexed: BTreeMap<BlobCid, Unindexed>,
-    /// Manifests superseded by a later derivation of the same output: never served again.
-    superseded: BTreeSet<BlobCid>,
+    /// When each designated manifest that failed may be tried again.
+    retry: BTreeMap<BlobCid, Retry>,
 }
 
 impl ArtifactIndex {
-    /// Index `held`, superseding any other derivation of its output. The superseded entry's
-    /// manifest and chunk memberships leave the index with it, so no object of it is served under
-    /// the new entry's method.
+    /// Index `held` as its output's entry, replacing (and removing every membership of) any
+    /// other entry of that output.
     fn insert(&mut self, held: Held) {
         self.unindexed.remove(&held.manifest);
-        self.superseded.remove(&held.manifest);
-        if let Some(old) = self.remove_output(&held.output) {
-            if old.manifest != held.manifest {
-                self.superseded.insert(old.manifest);
-            }
-        }
+        self.retry.remove(&held.manifest);
+        self.remove_output(&held.output);
         for object in std::iter::once(&held.manifest).chain(&held.chunks) {
             self.by_object
                 .entry(object.clone())
@@ -166,16 +162,63 @@ impl ArtifactIndex {
         Some(old)
     }
 
-    /// The output `manifest` is indexed for, when it is the current entry of that output.
-    fn output_of_manifest(&self, manifest: &BlobCid) -> Option<BlobCid> {
-        self.by_object.get(manifest)?.iter().find_map(|output| {
-            self.by_output
-                .get(output)
-                .filter(|held| &held.manifest == manifest)
-                .map(|_| output.clone())
-        })
+    /// Keep only what `designated` names: entries of other manifests or outputs, and failure
+    /// records of manifests no longer designated, leave the index. The index's size follows the
+    /// distinct outputs of this device's custody events, never its history.
+    fn retain_designated(&mut self, designated: &BTreeMap<BlobCid, Designated>) {
+        let stale: Vec<BlobCid> = self
+            .by_output
+            .iter()
+            .filter(|(output, held)| {
+                designated
+                    .get(*output)
+                    .is_none_or(|designation| designation.manifest != held.manifest)
+            })
+            .map(|(output, _)| output.clone())
+            .collect();
+        for output in stale {
+            self.remove_output(&output);
+        }
+        let live: BTreeSet<&BlobCid> = designated.values().map(|d| &d.manifest).collect();
+        self.unindexed.retain(|manifest, _| live.contains(manifest));
+        self.retry.retain(|manifest, _| live.contains(manifest));
+    }
+
+    /// How many manifests the index tracks, served or not.
+    fn tracked(&self) -> usize {
+        let mut manifests: BTreeSet<&BlobCid> =
+            self.by_output.values().map(|held| &held.manifest).collect();
+        manifests.extend(self.unindexed.keys());
+        manifests.extend(self.retry.keys());
+        manifests.len()
     }
 }
+
+/// The custody event that designates an output's manifest: the latest one in flow-log order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Designated {
+    manifest: BlobCid,
+    /// The custody event's own CID: a new event (a re-put) is a new chance to index.
+    event: cid::Cid,
+    in_scope_of: cid::Cid,
+    resource: cid::Cid,
+}
+
+/// The retry state of a designated manifest that failed to index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Retry {
+    /// The custody event the failure was for; a different designating event retries at once.
+    event: cid::Cid,
+    /// `None`: never again for this event (an invalid manifest or output mismatch).
+    next: Option<Instant>,
+    wait: Duration,
+}
+
+/// The first wait before a failed manifest is tried again.
+pub const INDEX_RETRY_FIRST: Duration = Duration::from_secs(30);
+
+/// The longest wait between tries of one failing manifest.
+pub const INDEX_RETRY_MAX: Duration = Duration::from_secs(3600);
 
 /// How a `serve-blob` session ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -304,6 +347,7 @@ pub struct BlobMount {
     refused: Mutex<HashMap<String, RefusalWindow>>,
     suppressed_refusals: AtomicU64,
     dropped_draws: AtomicU64,
+    reconstructions: AtomicU64,
 }
 
 impl std::fmt::Debug for BlobMount {
@@ -330,6 +374,7 @@ impl BlobMount {
                 refused: Mutex::new(HashMap::new()),
                 suppressed_refusals: AtomicU64::new(0),
                 dropped_draws: AtomicU64::new(0),
+                reconstructions: AtomicU64::new(0),
             },
             receiver,
         )
@@ -359,22 +404,19 @@ impl BlobMount {
         &self.store
     }
 
-    /// Index the artifact whose manifest is `manifest_cid`, put in custody in `in_scope_of`.
-    /// When `output` is given (the Produce event's resource) the manifest must name it. Fails
-    /// closed: a manifest that does not read, or whose method record is not held, is recorded as
-    /// unindexed and never served.
-    ///
-    /// # Errors
-    ///
-    /// [`PeerError::ArtifactUnindexed`] with [`Unindexed::MethodUnknown`] or
-    /// [`Unindexed::ManifestInvalid`].
-    pub async fn index_manifest(
+    /// Try to index `designated`, recording a failure with its retry state.
+    async fn try_index(
         &self,
-        manifest_cid: &BlobCid,
-        in_scope_of: cid::Cid,
-        output: Option<&cid::Cid>,
+        designated: &Designated,
+        now: Instant,
+        previous: Option<Retry>,
     ) -> Result<Held, PeerError> {
-        match self.read_held(manifest_cid, in_scope_of, output).await {
+        self.reconstructions.fetch_add(1, Ordering::Relaxed);
+        let manifest = &designated.manifest;
+        match self
+            .read_held(manifest, designated.in_scope_of, Some(&designated.resource))
+            .await
+        {
             Ok(held) => {
                 if let Ok(mut index) = self.index.write() {
                     index.insert(held.clone());
@@ -382,11 +424,33 @@ impl BlobMount {
                 Ok(held)
             }
             Err(reason) => {
+                let retry = match &reason {
+                    // Corrupt, invalid or not reconstructing its output: content addressed, so
+                    // only a new custody event (a re-put) is worth another try.
+                    Unindexed::ManifestInvalid { .. } => Retry {
+                        event: designated.event,
+                        next: None,
+                        wait: INDEX_RETRY_MAX,
+                    },
+                    Unindexed::MethodUnknown | Unindexed::OutputUnverified { .. } => {
+                        let wait = previous
+                            .filter(|retry| retry.event == designated.event)
+                            .map_or(INDEX_RETRY_FIRST, |retry| {
+                                retry.wait.saturating_mul(2).min(INDEX_RETRY_MAX)
+                            });
+                        Retry {
+                            event: designated.event,
+                            next: Some(now + wait),
+                            wait,
+                        }
+                    }
+                };
                 if let Ok(mut index) = self.index.write() {
-                    index.unindexed.insert(manifest_cid.clone(), reason.clone());
+                    index.unindexed.insert(manifest.clone(), reason.clone());
+                    index.retry.insert(manifest.clone(), retry);
                 }
                 Err(PeerError::ArtifactUnindexed {
-                    manifest: Box::new(manifest_cid.clone()),
+                    manifest: Box::new(manifest.clone()),
                     reason,
                 })
             }
@@ -456,56 +520,113 @@ impl BlobMount {
         })
     }
 
-    /// Index every custody manifest `events` (this device's flow store, in append order) put in
-    /// custody here by this device: a later derivation of one output supersedes an earlier one.
-    /// An unindexed manifest is tried again; an indexed one is re-read, and dropped from the
-    /// index when its bytes no longer read and validate. Returns what could not be indexed, for
-    /// the caller to report.
+    /// Rebuild the index from `events` (this device's flow store, in append order), now.
     pub async fn rebuild_from_flow(&self, events: &[(cid::Cid, FlowEvent)]) -> Vec<PeerError> {
-        let mut unindexed = Vec::new();
-        let mut seen = BTreeSet::new();
-        for (_, event) in events {
+        self.rebuild_from_flow_at(events, Instant::now()).await
+    }
+
+    /// Rebuild the index from `events` as of `now`.
+    ///
+    /// - **Designation follows event order.** For each output, the latest custody Produce of this
+    ///   device's own in the log designates its manifest; only that manifest is ever served for
+    ///   it. An older derivation never displaces a newer one, however late it becomes indexable,
+    ///   and the same log designates the same manifests after a restart.
+    /// - Everything else leaves the index: entries of undesignated manifests and their
+    ///   memberships, and failure records of manifests no longer designated.
+    /// - A designated manifest already indexed is re-read, and dropped when it no longer reads.
+    /// - One not indexed is tried, unless its last failure for the same custody event is waiting
+    ///   out its backoff ([`INDEX_RETRY_FIRST`] doubling to [`INDEX_RETRY_MAX`]) or was an
+    ///   invalid manifest, which only a new custody event (a re-put) tries again.
+    ///
+    /// Returns what could not be indexed this time, for the caller to report.
+    pub async fn rebuild_from_flow_at(
+        &self,
+        events: &[(cid::Cid, FlowEvent)],
+        now: Instant,
+    ) -> Vec<PeerError> {
+        let mut designated: BTreeMap<BlobCid, Designated> = BTreeMap::new();
+        for (event_cid, event) in events {
             let Some(manifest) = custody_manifest(event, &self.custodian) else {
                 continue;
             };
-            if !seen.insert(manifest.clone()) {
+            let Ok(output) = BlobCid::parse(&event.resource.to_string()) else {
                 continue;
-            }
-            let (current, superseded) = self.index.read().map_or((None, true), |index| {
+            };
+            designated.insert(
+                output,
+                Designated {
+                    manifest,
+                    event: *event_cid,
+                    in_scope_of: event.in_scope_of,
+                    resource: event.resource,
+                },
+            );
+        }
+        if let Ok(mut index) = self.index.write() {
+            index.retain_designated(&designated);
+        }
+        let mut unindexed = Vec::new();
+        for (output, designation) in &designated {
+            let (current, previous) = self.index.read().map_or((false, None), |index| {
                 (
-                    index.output_of_manifest(&manifest),
-                    index.superseded.contains(&manifest),
+                    index
+                        .by_output
+                        .get(output)
+                        .is_some_and(|held| held.manifest == designation.manifest),
+                    index.retry.get(&designation.manifest).cloned(),
                 )
             });
-            if let Some(output) = current {
+            if current {
                 // Revalidate: the manifest must still read as the one indexed.
-                let still = read_tier_manifest(self.store.as_ref(), &manifest).await;
-                if let Err(why) = still {
+                if let Err(why) =
+                    read_tier_manifest(self.store.as_ref(), &designation.manifest).await
+                {
                     let reason = Unindexed::ManifestInvalid {
                         reason: why.to_string(),
                     };
                     if let Ok(mut index) = self.index.write() {
-                        index.remove_output(&output);
-                        index.unindexed.insert(manifest.clone(), reason.clone());
+                        index.remove_output(output);
+                        index
+                            .unindexed
+                            .insert(designation.manifest.clone(), reason.clone());
+                        index.retry.insert(
+                            designation.manifest.clone(),
+                            Retry {
+                                event: designation.event,
+                                next: None,
+                                wait: INDEX_RETRY_MAX,
+                            },
+                        );
                     }
                     unindexed.push(PeerError::ArtifactUnindexed {
-                        manifest: Box::new(manifest),
+                        manifest: Box::new(designation.manifest.clone()),
                         reason,
                     });
                 }
                 continue;
             }
-            if superseded {
+            let waiting = previous.as_ref().is_some_and(|retry| {
+                retry.event == designation.event && retry.next.is_none_or(|next| now < next)
+            });
+            if waiting {
                 continue;
             }
-            if let Err(error) = self
-                .index_manifest(&manifest, event.in_scope_of, Some(&event.resource))
-                .await
-            {
+            if let Err(error) = self.try_index(designation, now, previous).await {
                 unindexed.push(error);
             }
         }
         unindexed
+    }
+
+    /// How many index attempts (each one reads, and may hash, a whole artifact) this mount made.
+    pub fn reconstructions(&self) -> u64 {
+        self.reconstructions.load(Ordering::Relaxed)
+    }
+
+    /// How many manifests the index tracks, served, unindexed or waiting to retry: bounded by
+    /// the distinct outputs of this device's custody events.
+    pub fn tracked_manifests(&self) -> usize {
+        self.index.read().map_or(0, |index| index.tracked())
     }
 
     /// The artifact `output` names, when indexed.

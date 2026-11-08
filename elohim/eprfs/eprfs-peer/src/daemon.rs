@@ -45,7 +45,7 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
-use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw};
+use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw, INDEX_RETRY_FIRST};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -418,6 +418,8 @@ impl PeerDaemon {
             served_rx,
             index_stamp: None,
             indexed_once: false,
+            index_task: None,
+            index_retry_at: None,
             serves,
             config,
         };
@@ -631,6 +633,12 @@ struct Run {
     /// The state of the flow log the mount was last indexed from.
     index_stamp: Stamp,
     indexed_once: bool,
+    /// The one rebuild of the mount in flight, off the loop: reading and hashing artifacts never
+    /// delays a tick (a roster or policy reload, a projection, an announce).
+    index_task: Option<JoinHandle<Vec<PeerError>>>,
+    /// When a rebuild next falls due with no change to the log, so a manifest whose backoff has
+    /// run out is tried again.
+    index_retry_at: Option<Instant>,
     /// The artifact grant the tier's scope reads; replaced when the rules reload.
     serves: Arc<RwLock<ArtifactServeList>>,
 }
@@ -725,6 +733,9 @@ impl Run {
                 },
             }
         };
+        if let Some(task) = self.index_task.take() {
+            task.abort();
+        }
         // Best effort on the way out: the counters are worth keeping, the head is already saved.
         let _ = self.save();
         ended
@@ -1097,19 +1108,42 @@ impl Run {
         }
     }
 
-    /// Re-index the artifact mount from the flow store when the log moved: every custody manifest
-    /// the device holds is indexed, or reported once as unindexed (never served).
+    /// Re-index the artifact mount from the flow store when the log moved, on a task of its own
+    /// and one at a time: a finished rebuild reports what it could not index, and a log that
+    /// moved meanwhile is rebuilt next. The tick itself only reads the log.
     async fn reindex(&mut self) {
         let Some(mount) = self.mount.clone() else {
             return;
         };
+        if self
+            .index_task
+            .as_ref()
+            .is_some_and(JoinHandle::is_finished)
+        {
+            if let Some(task) = self.index_task.take() {
+                match task.await {
+                    Ok(unindexed) => {
+                        for error in unindexed {
+                            self.log(&error.to_string());
+                        }
+                    }
+                    Err(e) => self.log(&format!("artifact index rebuild failed: {e}")),
+                }
+            }
+        }
+        if self.index_task.is_some() {
+            return;
+        }
         let now = stamp(self.flow.log_path());
-        if self.indexed_once && now == self.index_stamp {
+        // A rebuild also falls due when a failed manifest's backoff may have run out.
+        let retry_due = self.index_retry_at.is_some_and(|at| Instant::now() >= at);
+        if self.indexed_once && now == self.index_stamp && !retry_due {
             return;
         }
         // Settled per state of the log, failed or not: the next append is the next try.
         self.index_stamp = now;
         self.indexed_once = true;
+        self.index_retry_at = Some(Instant::now() + INDEX_RETRY_FIRST);
         let events = match self.flow.events() {
             Ok(events) => events,
             Err(e) => {
@@ -1119,9 +1153,9 @@ impl Run {
                 return;
             }
         };
-        for unindexed in mount.rebuild_from_flow(&events).await {
-            self.log(&unindexed.to_string());
-        }
+        self.index_task = Some(tokio::spawn(async move {
+            mount.rebuild_from_flow(&events).await
+        }));
     }
 
     /// Close idle `serve-blob` sessions and record every closed one as one Use event provided by
