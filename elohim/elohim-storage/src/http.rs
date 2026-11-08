@@ -32,7 +32,7 @@
 //! curl http://localhost:8090/manifest/sha256-xyz789
 //! ```
 
-use crate::blob_store::{BlobStore, Exists};
+use crate::blob_store::BlobStore;
 use crate::db::content_diesel::ContentQuery;
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
@@ -22408,6 +22408,7 @@ mod request_future_size_tests {
 #[cfg(test)]
 mod apps_resolver_heal_tests {
     use super::*;
+    use crate::blob_store::Exists;
     use http_body_util::BodyExt;
     use std::io::Write;
 

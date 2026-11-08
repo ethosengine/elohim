@@ -23,7 +23,7 @@ use elohim_epr::profile::{
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use serde::{Deserialize, Serialize};
 
-use crate::blob_store::{byte_cid_serde, BlobStore, ChunkRef, Exists};
+use crate::blob_store::{byte_cid_serde, BlobStore, ChunkRef};
 
 /// The most original bytes one stripe covers (16 MiB).
 pub const STRIPE_MAX: usize = 16 * 1024 * 1024;
@@ -589,6 +589,7 @@ pub async fn holds_as_shards(store: &BlobStore, manifest: &ShardManifest) -> boo
 mod tests {
     use super::*;
     use crate::blob_store::tests::xorshift_bytes;
+    use crate::blob_store::Exists;
 
     fn small_stripes() -> ShardEncoder {
         ShardEncoder {
