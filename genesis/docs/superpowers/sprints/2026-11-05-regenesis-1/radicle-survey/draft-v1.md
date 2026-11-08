@@ -1,7 +1,8 @@
 ---
 title: "Radicle / Heartwood — hard-earned lessons for artifact storage on the blob plane"
-id: radicle-heartwood-cross-pollination-2026-11-05
-status: Capture
+id: radicle-heartwood-cross-pollination-2026-11-05-draft-v1
+status: Superseded
+superseded-by: radicle-heartwood-cross-pollination-2026-11-05
 date: 2026-11-05
 sovereignty-frame: bounded
 ---
