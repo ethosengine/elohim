@@ -2,9 +2,9 @@
 id: task-as-f2-report
 title: the sibling fetch, producer and consumer (artifact-store F2a + F2b)
 status: claimed-not-verified
-landed_commit: ed29026b6
+landed_commit: 47b57023
 verified_by:
-concerns: "The key input is the labelled interim KeyInput::Raw(git-tree closure CID) with slot basis-key:git-tree, not KeyInput::Projected: no producer of the HEAD tree as an eprfs Tree v1 closure exists on this tree, so an F2r receipt on this key does not close F2. The 454 MB receipt (F2r) and the two-device relay throughput floor are not run here."
+concerns: "Astra BLOCK on ed29026b6 addressed in fa3aba0f3 + 47b57023; named residuals: build-time TOCTOU, node_modules excluded from the ignored-file refusal, same-account staging swap between inode check and rename, env -i not yet run on a real cargo build (F2r), honest computation out of scope (F5/I6). The key input is the labelled interim KeyInput::Raw(git-tree closure CID) with slot basis-key:git-tree, not KeyInput::Projected: no producer of the HEAD tree as an eprfs Tree v1 closure exists on this tree, so an F2r receipt on this key does not close F2. The 454 MB receipt (F2r) and the two-device relay throughput floor are not run here."
 actor: agent:as-f2@claude-opus-5-5
 cites: []
 ---
@@ -12,7 +12,7 @@ cites: []
 # F2: the sibling fetch (producer F2a, consumer F2b)
 
 Worktree `as-f2`, branch `artifact-store/f2`, based on `artifact-store/e3` (`a655b6ba3`).
-Specification: the sprint's `design.md` §3 (and §1 for the serving side). Commits: `ed29026b6` (implementation and tests) and the commit adding this report.
+Specification: the sprint's `design.md` §3 (and §1 for the serving side). Commits: `ed29026b6` (implementation and tests), `7a9833a24` (this report), `fa3aba0f3` (the astra review fixes), `47b57023` (the deadline-race fix), and the commit adding the review section.
 
 ## Which key input, and why
 
@@ -225,3 +225,155 @@ names.
     the commit printed the expected `UNMEASURED` line.
 14. **An extra daemon-level test** (`a_queued_fetch_is_run_by_the_devices_daemon_and_answered`),
     because the queue path is not otherwise exercised.
+
+## After review: astra BLOCK (`evidence/f2-astra-review.md`)
+
+The review confirmed the network core: manifest CID, key and output checks; chunks by CID and
+length; the whole output verified before `Completed`; a fetch confers neither custody nor onward
+serving. It blocked on five highs and four mediums. All nine are fixed in `fa3aba0f3`. Where a fix
+supersedes a deviation listed above, the deviation's number is given.
+
+- **H1, staging substitution** (`fetch.rs` `install_fetched`).
+  - The bytes are staged in `artifact`, created with `create_new` (O_EXCL, mode 0600) inside a
+    fresh directory beside the destination. `mkdir` is exclusive, the mode is 0700 and the name is
+    128 random bits.
+  - On `Completed` the file is made 0755 and fsynced through its own descriptor. The staged path
+    must still name that inode (device and inode, regular file). It is renamed onto `dest`, `dest`
+    must then name the same inode, and the directory is fsynced.
+  - The staging directory is removed on every exit path (a `Drop` guard), including a deadline
+    that drops the install.
+  - `mesh_fetch`'s `chmod` is no longer what publishes the executable.
+  - Test: `a_precreated_staging_link_never_receives_bytes`.
+- **H2, queue identity** (`fetch.rs` queue types, `artifact.rs` `wait_for_answer`).
+  - Every request carries a 128-bit nonce. Its files are `<key>-<nonce>.json`, `.done.json` and
+    `.cancel`.
+  - `FetchDone` names its request in `for`: nonce, key, output and destination. The CLI takes only
+    an answer whose four fields equal its own and removes any other answer at its path.
+  - A timed-out CLI withdraws an unclaimed request, or writes `.cancel` for a claimed one; the
+    daemon aborts the fetch and answers `Cancelled`. Answers nobody collected are pruned after an
+    hour.
+  - Test: `a_completion_for_another_request_is_never_accepted`.
+- **H3, effective build environment** (`artifact.rs` `build_env_refusal`, `cargo_config_lines`,
+  `describe`; `hc-mesh.sh`). Supersedes deviation 3's claim about wider views.
+  - A recorded mesh build runs cargo under `env -i`. What passes is: the method's own variables
+    (`mesh_build_env`, `RUSTFLAGS`, `CARGO_TARGET_DIR`); `PATH`, `HOME`, `LANG`, `TMPDIR`; where the
+    toolchain lives (`CARGO_HOME`, `RUSTUP_HOME`); and the native toolchain variables (`CC`, `CXX`,
+    `AR`, `LIBCLANG_PATH`, `PKG_CONFIG_PATH`, `OPENSSL_*`, `PROTOC`), each of which `describe`
+    records when set.
+  - `epr artifact key` and `put` refuse (exit 3) when any `CARGO_*`, `RUST*` or native variable is
+    set without being recorded with the same value, or a recorded one is unset. Only these are
+    benign: `CARGO_HOME`, `RUSTUP_HOME`, `CARGO_TARGET_DIR`, `CARGO_BUILD_JOBS`,
+    `RUST_TEST_THREADS`, `RUST_BACKTRACE`, `RUST_LOG`; plus `RUSTUP_TOOLCHAIN` equal to the
+    recorded toolchain.
+  - `hc-mesh.sh` runs the `epr` calls with every other cargo and rust variable unset.
+  - `describe` records the crate directory (`crate`). The closure adds one line per
+    `.cargo/config` and `.cargo/config.toml` found from the crate upward, nearest first, by content
+    CID and not by path (so two checkouts in different places key alike), plus
+    `$CARGO_HOME/config(.toml)` (`-` when absent).
+  - Tests: `an_unrecorded_cargo_env_var_refuses_the_key`, `an_ancestor_cargo_config_moves_the_key`.
+- **H4, "clean" was not what was read** (`artifact.rs` `closure_key`). Supersedes deviation 2's
+  during-build claim.
+  - Each closure line is `path\t<mode> <type> <oid>` from `git ls-tree`, so a selected file's mode
+    is keyed.
+  - A tracked symlink in the view whose target is absolute or resolves outside the view refuses.
+  - `assume-unchanged` or `skip-worktree` flags in the view refuse, and so does a submodule
+    overlapping the view with an `ignore` setting other than `none`.
+  - Status runs with `--ignored=matching --ignore-submodules=none`; ignored files inside the view
+    refuse.
+  - Tests: `entry_mode_moves_the_key`, `an_out_of_view_symlink_refuses`, `an_index_flag_refuses`
+    (which also covers an ignored file).
+- **H5, queue surface** (`daemon.rs` `fetch_queued`, `next_request`; `fetch.rs`
+  `read_queue_file`, `InstallScope`).
+  - The daemon creates the queue 0700 at start and reads it only while it stays private. The CLI
+    creates it the same way.
+  - An entry is read only when `symlink_metadata` says it is a regular file of at most 64 KiB. It
+    is opened `O_NOFOLLOW | O_NONBLOCK` and checked again on the descriptor. Anything else (a link,
+    a FIFO, a device) is removed unread.
+  - The destination must resolve, through its nearest existing ancestor and with no `.` or `..`
+    component, under an `--install-root`, `EPR_INSTALL_ROOTS`, or a `mesh-bin` directory under the
+    cargo pool (`CARGO_TARGET_POOL_ROOT`, else `/projects/.cargo-target-pool`). Otherwise the answer
+    is `InstallRefused`. `epr peer serve` logs where it will install.
+  - Tests: `a_queue_entry_naming_an_outside_destination_is_refused`,
+    `a_fifo_in_the_queue_never_blocks_the_tick` (a FIFO and a link to `/dev/zero` sorted ahead of
+    the real request).
+- **M6, one deadline.** Supersedes deviation 6.
+  - `fetch_artifact_until` runs the whole fetch under `timeout_at(deadline)`: manifest, resume
+    checks, dials, chunks and store writes.
+  - Secondary holders are dialled together, each bounded by what remains.
+  - The daemon's install runs under the same deadline. A cut-off fetch reports
+    `DeadlineExceeded { fetched, total }` from live counters.
+- **M7, wasted bytes.** Supersedes deviation 8.
+  - `tier_request_counted` (a counted frame read added to `tier.rs`) adds every answer byte to a
+    counter as it arrives, so the count survives a decode error, a stream error, or a deadline
+    that drops the request.
+  - Every discarded answer (corrupt, refused, failed, malformed, stalled) and every manifest not
+    accepted adds what actually arrived. The corrupt-chunk test now asserts the chunk's whole frame
+    (its length plus at most the frame overhead).
+- **M8, relay floor.** Supersedes deviation 7.
+  - On a relay-only holder each request is bounded by
+    `min(stall, 10 s × ceil(len / 4 MiB))`, measured on the client.
+  - A relay holder that stalls or loses its streams is abandoned, and when the remaining holders
+    are all relay paths so abandoned, the gap is `TransportCannotDeliver { "relay" }`. No test
+    reaches a relay-only path in-process.
+- **M9, two payload stores.** Supersedes deviation 10.
+  - `epr peer serve` records the canonical payload store it serves in `<peer dir>/payload-store`.
+  - `put` refuses (`unrecorded:`) when a serving daemon recorded a different store than the one
+    `put` would write.
+
+**Named residuals, not closed here.**
+1. **Time of check, time of use.** A source file changed after the key is computed and restored
+   before `put` re-checks passes both checks. The bytes are then recorded under a closure they were
+   not built from. Closing this needs the build to read from a snapshot (a fresh export of HEAD's
+   view), not the working tree.
+2. **`node_modules` is excluded from the ignored-file refusal by declaration.** Cargo does not read
+   it, but a `build.rs` could. Without the exclusion every storage build refuses, because
+   `elohim/sdk/**` holds pnpm's `node_modules`.
+3. **A same-account process can still swap the staging path** between the inode check and the
+   rename. The post-rename inode check then reports `IntegrityFailed`, and `mesh_fetch` builds
+   here and overwrites; until then the substituted file stands at `dest`. A cross-account process
+   cannot reach the private directory.
+4. **`env -i` is exercised by the dry run and by `describe` + `key` on the real views only.** On
+   this tree both keyed cleanly: storage `bafyreigehtzpexo…`, doorway `bafyreihu5mrawly…`, each
+   recording `CC` and `LIBCLANG_PATH`. A real cargo build under the allowlist, and so whether the
+   native variables suffice, is exercised at F2r.
+5. **Out of scope: an admitted builder that publishes bytes it did not compute.** Byte
+   verification proves the bytes correspond to the declared output, not that they were honestly
+   computed from the claimed sources. That is a question of reach and standing (F5/I6: signed
+   records, recomputation, agreement across builders).
+
+**Files beyond the brief's write-set for these fixes.** `eprfs-peer/Cargo.toml` adds
+`libc = "0.2"` (already in the lock) for `O_NOFOLLOW | O_NONBLOCK`. `eprfs-peer/src/tier.rs` adds
+the counted request. `PeerConfig` gains `install: InstallScope`, and every literal in
+`eprfs-peer/tests/{daemon,fold,relay_compat,serve_blob}.rs` and `epr-cli/tests/peer.rs` gains
+`install: Default::default()`. `FetchGap` gains `InstallRefused` and `Cancelled`.
+
+**Tests after the fix** (focused, `RUSTFLAGS=""`):
+- eprfs-peer: `fetch` 15/15 (the twelve above plus `a_precreated_staging_link_never_receives_bytes`,
+  `a_queue_entry_naming_an_outside_destination_is_refused`,
+  `a_fifo_in_the_queue_never_blocks_the_tick`), `serve_blob` 19/19, `daemon` 12/12, `local_blob`
+  5/5, `tier_alpn` 14/14.
+- epr-cli: `artifact` 9/9 (the three above plus `an_unrecorded_cargo_env_var_refuses_the_key`,
+  `an_ancestor_cargo_config_moves_the_key`, `entry_mode_moves_the_key`,
+  `an_out_of_view_symlink_refuses`, `an_index_flag_refuses`,
+  `a_completion_for_another_request_is_never_accepted`), `peer` 29/29.
+- `cargo clippy -p eprfs-peer -p elohim-epr-cli --all-targets -- -D warnings`: EXIT=0.
+- The first test run of the new CLI tests failed in the fixture, not the code: the workspace
+  exports `CC` and `LIBCLANG_PATH`, which the build-environment check correctly refused. The
+  fixture now scrubs them.
+
+**Gates after the fix:** both on committed `47b57023` (`fa3aba0f3` plus the deadline fix below), `EPR_BIN` per
+common.md.
+- `just gate eprfs`: `gate-F2-eprfs.log`, **EXIT=0** (`fetch` 15/15, `artifact` 9/9; 20 min).
+- `just gate orchestrator`: `gate-F2-orchestrator.log`, **EXIT=0**.
+- Earlier logs are kept beside them: `gate-F2-*.run1-pre-review.log` (the original EXIT=0 runs at
+  `ed29026b6`), `gate-F2-orchestrator.run2.log` (EXIT=0 at `fa3aba0f3`) and
+  `gate-F2-eprfs.run2-red.log` (EXIT=1 at `fa3aba0f3`).
+- The red was in `a_trickling_holder_is_abandoned_on_the_total_deadline_and_the_chunk_re_raced`,
+  phase 2: it got `NoRoute` instead of `DeadlineExceeded`. M6 caps each request's bound at the time
+  remaining, so near the deadline a request could elapse a tick before the outer `timeout_at` and
+  abandon its holder. Fixed in `47b57023`: a request, or a manifest-phase dial, that elapses at
+  the deadline is `DeadlineExceeded`. The `fetch` tests then passed five times in a row at four
+  threads.
+- Neither run recorded evidence. The runner names the three dirty paths in the closure: this
+  report while it was being written, and the two uncommitted brief copies
+  (`briefs/common.md`, `briefs/F2-sibling-fetch.md`).
