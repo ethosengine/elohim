@@ -349,12 +349,6 @@ spec:
             # an app-absent conductor first-installs without any flag.
             - name: ALLOW_DNA_REINSTALL
               value: "false"
-            # Re-genesis 1 (2026-11-07): the declared migration TO the address-crossing
-            # bundle (elohim-holochain #1528 on dev 2fb2f93c5; installed-form hashes with
-            # the `_alpha2` seeds and properties folded in). Same list as the template so
-            # both genesis peers resolve the same five hashes. Remove after the roll.
-            - name: DNA_MIGRATION_INTENT
-              value: "uhC0keVeFYqh1FAN7Zhye9iK3_mZPmHYQyKQrFU_4XHZ3IJKgmC6R,uhC0kVl3RQECBGTPvhGSUr8T1KfR_75c0t0-gRNmEk1empvGp9Dbz,uhC0kWcMKyH2gxgfuZgX-cb0p0sHQA8q0T5--LyOO1QcYBMEg1nyb,uhC0kT00zR88Qae1cngAyYXdP31vLvMmsQWv-Ac87neR1hha0ZRpR,uhC0keORQ2XO6tfRxWMY87iY6N968qpg-pT6qpK5uZIzcy1ibDvGP"
             - name: ALLOW_COORDINATOR_UPDATE
               value: "true"
             # Cooperative-cgroup CPU lever, now a no-op: storage and conductor
