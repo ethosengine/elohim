@@ -4,7 +4,7 @@ id: radicle-heartwood-cross-pollination-2026-11-05
 status: Reviewed (v2, post-sprint, 2026-11-08)
 version: 2
 date: 2026-11-05
-revised: 2026-11-05 (challenge pass wf_ae5eb5cf-135; roadmap reconciliation in native-dev-tooling-over-peers-plan §7, which governs where the two differ); 2026-11-08 (post-sprint update after re-genesis 1, the address crossing, re-grounded in source at dev 9faf54076)
+revised: 2026-11-05 (challenge pass wf_ae5eb5cf-135; roadmap reconciliation in native-dev-tooling-over-peers-plan §7, which governs where the two differ); 2026-11-08 (post-sprint update after re-genesis 1, the address crossing, re-grounded in source at dev 9faf54076; artifact-store sprint 2 status added by shem from the sprint hub and source at the same dev)
 sovereignty-frame: bounded
 ---
 
@@ -17,7 +17,7 @@ Method: three Sonnet readers, three Codex legs, an Opus synthesis with targeted 
 **Membrane (sovereignty-frame: bounded).** Radicle presents its identity as *self-certifying*: a Node ID is an Ed25519 key, a repository's authority is a set of delegate keys plus a threshold, and the RID is the hash of a document those keys signed (R2, "Overview"). The TUF-style mechanics are sound. The ontology is not ours. R2 equates node, user and public key, and R1 says delegates "need not map one-to-one to maintainers", which concedes that the key set is not the people. We keep **ngit L1** unchanged: a signature is provenance; standing is held by people and collectives and backstopped by community; the network holds the root. Our identity ontology is *imago dei*, not crypto self-sovereignty. Radicle adds new evidence for L1 (lesson 12) without moving it. **Wherever this survey borrows a signed root, a threshold or an elected head, read it this way:** a manifest signature or an attestation signature is provenance only; "root" means the content lineage anchor (a genesis CID), never an authority root; and a head moves only through recognised standing (election and the roster home, final-by-witness under §12.10), never because a key signed.
 
 
-**Version 2 (2026-11-08), post-sprint.** Both sides were re-grounded. The sprint this survey was written for ran as **re-genesis 1, the address crossing**, not the artifact store; the artifact store moved to sprint 2. Each lesson below now ends with an **After re-genesis 1** note, re-grounded in source at dev `9faf54076`. The section **After re-genesis 1** (before Blockers) gives the status of every verdict and D-item, the operational lessons the alpha re-genesis added, and the revised frontier. Radicle was re-checked the same day: 1.10.3 is still the current release, the 2026-09-23 disclosure is still the newest news item with no transport fix shipped, and master (`8b053320`, 2026-11-06) still has no iroh dependency; its six new commits produced lesson 15. Where a note and the original text differ about our build, the note is current; the original text records what was true on 2026-11-05.
+**Version 2 (2026-11-08), post-sprint.** Both sides were re-grounded. The sprint this survey was written for ran as **re-genesis 1, the address crossing**, not the artifact store; the artifact store moved to sprint 2. An **Addendum — for Radicle** at the end describes, for a Radicle reader, where Elohim now stands on the deeper primitives and what we took from them. Each lesson below now ends with an **After re-genesis 1** note, re-grounded in source at dev `9faf54076`. The section **After re-genesis 1** (before Blockers) gives the status of every verdict and D-item, the operational lessons the alpha re-genesis added, and the revised frontier. Radicle was re-checked the same day: 1.10.3 is still the current release, the 2026-09-23 disclosure is still the newest news item with no transport fix shipped, and master (`8b053320`, 2026-11-06) still has no iroh dependency; its six new commits produced lesson 15. Where a note and the original text differ about our build, the note is current; the original text records what was true on 2026-11-05. **Sprint 2 (the artifact store) also ran, on shem, 2026-11-07/08**, and most of it is on dev: the `serve-blob` mount with per-method grants, the artifact stories and the sibling fetch. Its hardening track is on a branch awaiting the storage landing. Where an **After re-genesis 1** note or the section of that name says "sprint 2" for something, read the section **After sprint 2: the artifact store** (before Blockers), which gives each lesson's status after that sprint and answers the questions the v2 draft left open.
 ---
 
 ## Lineage and org guard (read first)
@@ -135,7 +135,7 @@ So a torn inline write from a crash sits at a valid address, is served unverifie
 - On iroh there is a third physical store: `IrohBlobStore` is BLAKE3-keyed and disjoint on disk from the SHA-256 `BlobStore`, with runtime config selecting one (`ES/p2p_iroh/blob_store.rs:1-8`) ✅. In pure-iroh mode no consumer turns inventory into a byte fetch yet (`ES/p2p_iroh/inventory_fetch.rs:1-8`) ✅.
 - `get_chunked` assembles the whole artifact in one `Vec` (`ES/blob_store.rs:628-655`) ✅, so serving a multi-GiB artifact costs its full size in memory.
 
-**After re-genesis 1.** Partly landed. Chunking is FastCDC (v2020, 256 KiB / 1 MiB / 4 MiB, declared in the profile) and chunks are shared across payloads (`ES/blob_store.rs:10-17`). Shard transfer is `/elohim/shard/2.0.0` in storage and steward/node. `IrohBlobStore` is no longer a second payload store: the iroh key of a byte CID is its BLAKE3 digest, one digest with two spellings, and a pure-iroh node answers a typed `NoBytePath` rather than a silent miss (`ES/p2p_iroh/blob_store.rs:1-11`) ✅. Chunk-granular resume and the 454 MB multi-chunk round-trip named in the plan's acceptance set are **not recorded** in the sprint journal ◐.
+**After re-genesis 1.** Partly landed. Chunking is FastCDC (v2020, 256 KiB / 1 MiB / 4 MiB, declared in the profile) and chunks are shared across payloads (`ES/blob_store.rs:10-17`). Shard transfer is `/elohim/shard/2.0.0` in storage and steward/node. `IrohBlobStore` is no longer a second payload store: the iroh key of a byte CID is its BLAKE3 digest, one digest with two spellings, and a pure-iroh node answers a typed `NoBytePath` rather than a silent miss (`ES/p2p_iroh/blob_store.rs:1-11`) ✅. Chunk-granular resume and the 454 MB multi-chunk round-trip named in the plan's acceptance set are **not recorded** in the re-genesis 1 journal ◐. *Sprint 2:* the sibling fetch resumes at chunk granularity and races chunks across holders (`elohim/eprfs/eprfs-peer/src/fetch.rs:1-40`; test `an_interrupted_fetch_resumes_only_missing_chunks_from_the_remaining_holder`) ✅; the 454 MB receipt (F2r) has not been run.
 **Sprint form.** *a2o:* "Given a 64 MiB artifact held by two peers, when the fetch is interrupted halfway and one holder goes away, then resuming fetches only the missing chunks, from the remaining holder, and the reconstructed bytes verify against the manifest's `record.output`." Run it in each supported transport mode (libp2p, dual, pure-iroh) and report a mode that cannot deliver as a typed gap, not a pass.
 
 ### 8. Each byte plane gets its own budget; meter waste and abuse (fetch)
@@ -143,7 +143,7 @@ So a torn inline write from a crash sits at a valid address, is served unverifie
 **Failure.** In 1.3.1 a control-message size check applied to git streams made fetches panic (`CHANGELOG.md:752`) ✅. In 1.10.0 the stream timeout became configurable (30 s default) because Tor/I2P congestion caused "spurious aborts" (`:171`) ✅. The 5 GiB data-refs limit is declared behind `dead_code` fields (`state.rs:30`, `stage.rs:365`) ✅; whether anything enforces it elsewhere is open ◐. Heartwood meters with token buckets, fetch concurrency of one per peer and announcement proof-of-work, and disconnects a peer whose inbox overfills (`radicle-node/src/wire.rs:698`) ◐ (anatomy §4, §8); abuse and amplification recur as a failure class (changelog class 10, issue 12674) ◐.
 **Property.** Message ceilings, per-stream bytes, aggregate bytes, inactivity and total-duration deadlines, retries and concurrency are separate knobs. A trickle can defeat an inactivity timeout indefinitely, so both deadlines exist. Quotas apply before allocation. A losing racer is cancelled, and its bytes are counted.
 **Against us.** `race_fetch` has batch parallelism 3 (`ES/http.rs:1582`) ✅. Our 1 MiB storage chunk does not bound the network frame: the blob codec's response ceiling is 64 MiB (`HARD_MAX_RESPONSE_SIZE`, `ES/p2p/blob_protocol.rs:13-16`) ✅. Winning a race does not stop the losers: `tokio::spawn` detaches each per-peer task, and dropping its handle does not abort it (`ES/p2p/blob_fetch.rs:231-240`) ✅, so racing 3 holders per chunk across a multi-GiB artifact can roughly triple transferred bytes. No per-artifact aggregate budget, distinct stall and total deadlines, retry budget or artifact-size cap was found in grounding ◐; any peer could publish an unbounded manifest.
-**After re-genesis 1.** Mostly landed ✅. `FetchBudget` carries `max_bytes` (default 4 GiB), a per-peer `stall_deadline` and a `total_deadline`, and a manifest is refused before fetch when its `byte_len` exceeds `max_bytes` (`ES/p2p/blob_fetch.rs:58-93`). Racing is drop-equals-cancel: losers are aborted through an `AbortOnDrop` guard (`:184-242`). No wasted-byte metric was found by grep ◐.
+**After re-genesis 1.** Mostly landed ✅. `FetchBudget` carries `max_bytes` (default 4 GiB), a per-peer `stall_deadline` and a `total_deadline`, and a manifest is refused before fetch when its `byte_len` exceeds `max_bytes` (`ES/p2p/blob_fetch.rs:58-93`). Racing is drop-equals-cancel: losers are aborted through an `AbortOnDrop` guard (`:184-242`). No wasted-byte metric was found by grep ◐. *Sprint 2:* the sibling fetch meters the bytes of every rejected answer as wasted and records them on the draw's `Use` event (`wasted:<n>`; test `a_chunk_that_fails_its_cid_is_metered_as_wasted_and_re_fetched`) ✅; storage's `elohim_blob_fetch_wasted_bytes_total{reason}` is on the hardening branch (H R6), not yet on dev.
 **Sprint form.** *Design:* a per-artifact fetch budget (bytes, stall deadline, total deadline, retries), separate from per-chunk limits; a manifest size cap checked before allocation; drop-equals-cancel racing. *Tests:* a holder that trickles bytes is abandoned on the total deadline even though it never trips the stall deadline, and the chunk is re-raced elsewhere within budget; after a race completes, no losing task is still transferring; rejected and wasted bytes appear in a metric; an oversized manifest is refused before any chunk is fetched.
 
 ### 9. Reachability is a per-path fact; fallback across paths is part of fetch (transport)
@@ -211,12 +211,12 @@ So a torn inline write from a crash sits at a valid address, is served unverifie
 
 | # | Status after re-genesis 1 | Evidence |
 |---|---|---|
-| T1 custody-before-head | **Open, sprint 2.** Inputs improved: signed custody announcements on both stacks; chaos lane 3/3 on both households | `ES/p2p/custody_announce.rs:1-3`; `RESULT.md` |
+| T1 custody-before-head | **Open; sprint 2 specified it as a story, not a gate** (see After sprint 2). Inputs improved: signed custody announcements on both stacks; chaos lane 3/3 on both households | `ES/p2p/custody_announce.rs:1-3`; `RESULT.md` |
 | T2 atomic store, verify on exists and read, quarantine | **Done** ✅ | `ES/blob_store.rs:1-37, 516-549` |
-| T3 lineage- and parent-bound publication envelope | **Half.** Signature envelope (scheme, multikey, held unknown scheme) done; lineage root and parent binding is sprint 2 | `elohim-epr` 0.2.0; `brit-epr/src/elohim/attestation/build.rs:81-82` |
+| T3 lineage- and parent-bound publication envelope | **Half.** Signature envelope (scheme, multikey, held unknown scheme) done; lineage root and parent binding is still open: sprint 2 binds an artifact to its derivation key, not to a channel lineage (see After sprint 2) | `elohim-epr` 0.2.0; `brit-epr/src/elohim/attestation/build.rs:81-82` |
 | T4 staged security floors | **Not taken, by ruling.** Clean break to a signed v2 envelope; held unknown epochs and schemes keep the mechanism for the next crossing (lesson 6 note) | `ES/p2p/inventory_gossip.rs:17-20` |
 | T5 inventory as an expiring hint | **Done** ✅: delta envelopes, no snapshot, `negentropy-v1` range reconciliation; advertisement volume still unmeasured | `inventory_gossip.rs:1-13`; `inventory_recon.rs:1, 33` |
-| T6 attestation output and closure binding | **Half.** `brit.build@2` envelope done; the `output_cid` = `record.output` head check is sprint 2 | `build.rs:81-82` |
+| T6 attestation output and closure binding | **Half.** `brit.build@2` envelope done; sprint 2 binds a served and fetched manifest to `record.output` and to the locally computed key; the channel-head check waits for the release plane (see After sprint 2) | `build.rs:81-82` |
 | T7 typed divergence with a named election | **Open**, unchanged | — |
 | T8 bind declared holder to authenticated identity | **Done for the transport peer** ✅; **open for the agent** (holder key is the transport key; no cross-signed agent↔transport bindings on alpha yet) | `inventory_gossip.rs:21-29`; `RESULT.md` follow-ups |
 | S6 default flips toward safety | Not re-checked against our publish defaults in v2 ◐ | — |
@@ -224,7 +224,7 @@ So a torn inline write from a crash sits at a valid address, is served unverifie
 | W1 Radicle 2.0 on iroh | **Not triggered**: master `8b053320` has no iroh dependency; no transport fix released | Cargo grep 2026-11-08; radicle.dev |
 | W2–W5 | No change observed | radicle.dev 2026-11-08; RIP and CI-broker mirrors at their remote heads |
 
-**The D-items.** D6 (store hardening) and the store half of D5 are done; D7 landed as a clean break rather than a staged floor; D8 is done except a wasted-byte metric (`ES/p2p/blob_fetch.rs:58-93, 184-242`). D0 is done for the transport peer only. D1, D2, D3, D4 and D9 move to sprint 2 unchanged, and lesson 15's tests join D1 and D3. The proposed habit `artifact-custody-before-head` was not minted; it belongs with sprint 2. The crossing's own habit, `addresses-are-declared-profiles`, exists and is red and inactive (`genesis/manifests/habits.yaml`).
+**The D-items.** D6 (store hardening) and the store half of D5 are done; D7 landed as a clean break rather than a staged floor; D8 is done except a wasted-byte metric (`ES/p2p/blob_fetch.rs:58-93, 184-242`); sprint 2 metered waste in the sibling fetch and on the storage hardening branch. D0 is done for the transport peer only. D1, D2, D3, D4 and D9 move to sprint 2 unchanged, and lesson 15's tests join D1 and D3. The proposed habit `artifact-custody-before-head` was not minted; it belongs with sprint 2. The crossing's own habit, `addresses-are-declared-profiles`, exists and is red and inactive (`genesis/manifests/habits.yaml`).
 
 **Blockers, re-read.** B3 moves from "hits a related flaw" to **avoids at the transport peer** (T8). B6 moves toward avoids: chunks are content-defined and shared, racing is budgeted and cancelling, and a pure-iroh node returns a typed `NoBytePath`, but chunk-granular resume is still unverified. B7's local half is **avoided** (lesson 3). B9 gains versioned protocol ids across blob, shard and inventory. B1, B2, B4, B5, B8 and B10 are unchanged.
 
@@ -257,8 +257,8 @@ Classes 3 (a forked per-human manifest), 4 (a lock held across blocking work in 
 - Whether inventory Stage 2 landed: yes, as the v2 envelope on a new topic ✅.
 
 **Still open on our side:**
-- Chunk-granular resume, and the 454 MB multi-chunk round-trip named in the plan's acceptance set (not recorded in the sprint journal) ◐.
-- A wasted-byte metric for fetch races ◐.
+- The 454 MB multi-chunk round-trip named in the plan's acceptance set (F2r, not run). Chunk-granular resume is in the sibling fetch on dev ✅.
+- Storage's wasted-byte metric is on the hardening branch, not yet on dev; the sibling fetch's is on dev ✅.
 - Agent-level holder binding; reject conflicting alias bindings; `announced_at` freshness; the dormant custody catch-up arm.
 - Whether our chains check that a cited predecessor is accepted, not merely well formed (lesson 15) ◐.
 - Live proof that a storage pod booting before its conductor adopts releases and mints its binding (late-bind fix `9faf54076`).
@@ -267,6 +267,66 @@ Classes 3 (a forked per-human manifest), 4 (a lock held across blocking work in 
 - `services/holds.rs`, `rakia-executor`'s use of `output_cid`, and SQLite durability mode: unchanged from v1.
 
 **Still open on Radicle's side:** everything in v1's list, plus where Heartwood's derived refs other than `rad/id` are maintained, and whether the identity-chain check now covers every reader of `identity_doc_at` (its doc comment says it does not check the commit).
+
+---
+
+## After sprint 2: the artifact store (v2, 2026-11-08)
+
+Sprint 2 ran on shem, 2026-11-07/08, from the hub `genesis/docs/superpowers/sprints/2026-11-07-artifact-store/` (`STATE.md` is the journal; evidence under `evidence/`). It aimed at plan §7.3 as amended by the re-genesis 1 design gate: a sibling workspace fetches a build artifact from the steward's other workspace over the tier, verified chunk by chunk and whole, instead of rebuilding it. Abbreviations in this section: **EP** = `elohim/eprfs/eprfs-peer/`, **AF** = `genesis/a2o/features/`.
+
+**On dev.**
+- **The `serve-blob` mount (E3)**, landed in `2381eb727..3b266e41d`. A device's tier answers manifest and chunk requests only for artifacts it holds custody of, and only to a device its grant admits (`EP/src/blob_mount.rs:1-28`, `EP/src/serves.rs:1-15`). The grant is per method name in `pool-policy.json` `berth.artifacts.serves` (`{"mesh-build": ["steward"]}`), default deny. A stranger gets one uniform refusal whether the artifact is granted, held ungranted or unknown. An admitted device outside its grant gets a typed reason. Each served session is one `serve-blob` `Use`. Tests: `EP/tests/serve_blob.rs` ✅.
+- **The artifact stories**, in the same landing: `AF/storage/artifact-custody.feature` (`@wip @concern:artifact-custody`, eleven scenarios: zero DHT heads at private, self and intimate reach; a versioned custody-admission policy; shortfall, repair and its objective; quarantine against refusal; consent withdrawal; supersede, withdraw and revoke as separate acts; no eligible head; an older reader that cannot interpret an epoch) and `AF/devflow/sibling-fetches-the-build.feature`. Both went through the granted blind-reader floor.
+- **The sibling fetch (F2)**, `3134f517f..79acec4eb`. `epr artifact describe | key | put | fetch` (`elohim/eprfs/epr-cli/src/artifact.rs:1-24`) and the fetch path (`EP/src/fetch.rs:1-40`). The order is manifest first (capped before any chunk moves), resume, race, manifest last, then an install read that verifies the whole artifact. A `FetchGap` with a printable reason means build locally. `hc-mesh.sh` resolves before it builds. Tests: `EP/tests/fetch.rs` ✅.
+- **A preflight that refuses a `Cargo.lock` its manifests have outrun**, `0bef0b84f`. This is process, not plane, but it is lesson 10's "incompatibility is a typed error" applied to our own build input.
+
+**On branches, not yet on dev.**
+- **The storage hardening track (H)** is on `artifact-store/h`, five passes, R1–R10. Its combined storage gate was green before pass 5. It waits for the operator's alpha close, because the closure changes `elohim/Cargo.lock`, which rolls the fleet. It contains:
+  - signed, bound and replay-ordered salvage ads (R1);
+  - inventory rows that record their witness, with legacy rows only as fetch hints (R2);
+  - a chunked `exists` that hashes every chunk and the whole payload (R3), and a verified servable index;
+  - parent-directory fsync, and tests for power loss after the marker and for delete-against-store races (R4, R5);
+  - `elohim_blob_fetch_wasted_bytes_total{reason}` (R6);
+  - selected self-placement that verifies before it records (R7);
+  - custody rows for every served unit (R8), and no unchanged re-announcement (R9);
+  - forged iroh holders refused (R10).
+
+  On top of those, custody authority now comes only from a binding that is both cross-signed and DHT-confirmed (`p2p::transport_authority`). Proofs never downgrade, and a superseded core stays superseded under any fresh anchor. Well-signed claims from an author with no binding yet are **held** (`held_unbound`), neither counted nor dropped. The binding minter retries for the life of the process and is woken by a conductor connect. The confirmer runs over a bounded queue.
+- **The tolerant manifest reader (E2)** is on `artifact-store/land` with its lockfile fix. It holds an epoch-3 manifest and keeps unknown `ext` bytes byte-exactly. It waits for the same landing. The fetch already stores received manifest bytes without re-encoding them, so `ext` survives on dev (`EP/src/fetch.rs:33-36`) ✅.
+
+**Open.** E4, one authoritative payload store per device. F2r, the 454 MB receipt (storage produced on one device, fetched on the other, fetch time against rebuild time); before it runs, the two devices' `tool:` key lines must agree. F1r, a projected-view producer for the derivation key. The release plane (F5).
+
+### Each lesson after sprint 2
+
+"Captured" means code or a test on dev or on a named branch. "Specified" means an `@wip` story. "Design" means the plan or design text names it for when artifacts become rakia objects.
+
+| Lesson | After sprint 2 | Where |
+|---|---|---|
+| 1 custody is a continuing contract | **Specified, not a gate.** At private, self and intimate reach custody is a pledge with zero DHT heads (design D6/R2), so there is no head to hold back this sprint. The custody gate on a channel head is the release plane's (F5). The rare-path lesson is captured: the minter retries for life (H pass 5) and storage acquires its conductor clients lazily (`9faf54076`) | `AF/storage/artifact-custody.feature`; `artifact-store/h` |
+| 2 bind the holder to authenticated identity | **Captured on the branch.** Agent-level authority only from a cross-signed, DHT-confirmed binding; unbound claims held. Sybil residual (a binding costs one DHT entry; the zome view returns no author) named, not gating, by operator ruling 2026-11-08 | `artifact-store/h`; backlog `arch-dataplane-borrows` row 25 |
+| 3 staging, atomic publish, containment | **Captured.** Storage: R3–R5 and the servable index (branch). Fetch: a per-artifact staging directory under an `flock`, swept when stale; manifest stored last; install only after a verified stream (dev) | `EP/src/fetch.rs`; `artifact-store/h` |
+| 4 lineage root and parent | **Half.** An artifact is bound to its derivation key `(method CID, input)` and its output byte CID. Channel lineage and parent binding belong to the release manifest (F5), not the derivation record | `artifact.rs:1-24` |
+| 5 attestation binds output and closure | **Captured at device scope.** `epr artifact put` writes the brit build attestation whose `inputs_hash` is the key CID. A manifest keyed for another closure is rejected; two holders with different outputs for one key is a mismatch, not a fetch; a swapped manifest CID for an output CID is refused both ways. **Interim:** the key input is the labelled `basis-key:git-tree` closure, until F1r produces a projected view | `EP/tests/fetch.rs`; `EP/tests/serve_blob.rs` |
+| 6 staged floors | E2 holds unknown epochs and keeps `ext` (branch; fetch keeps `ext` on dev). Still no dual-read, by the clean-break ruling | `artifact-store/land` |
+| 7 chunked, resumable, multi-source | **Captured in code** ✅; the 454 MB receipt is open (F2r) | `EP/src/fetch.rs` |
+| 8 budget and meter waste | **Captured.** Fetch budget: manifest cap 1 MiB, stall 30 s, total 1800 s, 8 in flight per holder, wasted bytes on the `Use`. Storage meter on the branch (R6) | `EP/src/fetch.rs:65-87` |
+| 9 per-path reachability | **Partly.** A relay-only path gets its own bounds; pure-iroh mode reports a typed transport gap; libp2p and dual are typed gaps, never attempted. No fallback across transports | `EP/src/fetch.rs:347-405` |
+| 10 version every surface | Manifest epoch held when unknown (E2, branch). Lockfile drift is now a typed preflight refusal | `0bef0b84f` |
+| 11 separate operations | **Partly.** Serve is a grant per method, default deny; a reload that drops a device refuses its next chunk on an open connection; a malformed policy revokes serving. Retain is separate from serve. Withdraw, supersede and revoke as separate lifecycle acts are specified only | `EP/tests/serve_blob.rs`; `artifact-custody.feature` |
+| 12 authority lineage across membership change | **Open.** The audience `steward` means the devices admission admits *now*; `carrier:<did>` parses and grants nothing until a carrier grant has a verifier (D9) | `EP/src/serves.rs:10-15` |
+| 13 divergence is an error | **Captured at device scope.** One output, one served manifest: the latest custody event in log order wins, and a late older derivation never evicts a newer one. Two holders disagreeing on one key is a typed mismatch. The release election is not built | `EP/tests/serve_blob.rs`; `EP/tests/fetch.rs` |
+| 14 self-describing identifiers | Done in re-genesis 1 | — |
+| 15 cited authority must descend from the root | **Captured at device scope.** A served manifest must be the CID the holder's crossed record named, and the record's key must equal the key this device computes. A sibling's folded `Produce` never becomes local custody. On the branch, the superseded-core rule refuses revival under a fresh anchor. Correction chains and the release election remain unverified | `EP/src/fetch.rs:6-10`; `EP/src/blob_mount.rs:9-14` |
+
+### Answers to the v2 draft's questions
+
+- **L1/T1.** Custody before head is not a gate anywhere in sprint 2. It is the artifact-custody story plus design D6/R2 (no heads at private reach). "A fetched artifact is not served onward" holds by construction today: the mount indexes only this device's own `custody-blob` `Produce` events with `copy:self`, and a fetch records a `Use` (`basis:sibling`), not a custody `Produce` ✅. **Ruling input for rakia:** keep that as the floor. A fetched copy becomes servable custody only through an explicit custody act that the release plane's admission policy counts, never as a side effect of fetching.
+- **L4/T3.** The derivation record (key and output) is the artifact's identity. The brit `@2` note is the device-local signed home of the build attestation. The `artifact-produce@1` flow event is how the record crosses to the steward's other devices. Lineage root and parent binding belong to the release manifest when an artifact becomes a rakia channel head (F5), checked as lesson 15 asks.
+- **L5/T6.** The swap test is on dev (`a_swapped_manifest_cid_for_output_cid_is_refused_both_ways`). The attestation's `inputs_hash` is the key CID. The interim key is the git-tree closure, labelled `basis-key:git-tree`. F1r must deliver a producer of the projected view (an eprfs Tree v1 closure of the HEAD tree) so that the key input becomes `KeyInput::Projected`; one function computes the key for both producer and consumer.
+- **L7/L9.** Resume, racing, the stall and total deadlines, and the relay bounds are in code with tests. Bytes move only over the iroh tier ALPN, and every other mode is a typed gap. F2r must prove three things: byte identity of the fetched binary with the producer's install, fetch wall-clock below rebuild wall-clock for the 454 MB storage binary, and the recorded `Use` against the producer's `Produce`.
+- **L11.** Grants are per method and revocable by policy reload, and that revocation takes effect at the next chunk. Supersession by event order is the mount's rule for one output (`a_late_indexable_older_derivation_never_evicts_a_newer_one`). Yank and revoke at the release plane are not built.
+- **L12/L13.** The binding authority on the branch (cross-signed plus DHT-confirmed) is transport-to-agent standing for custody claims. Standing at publication and the release election belong to F5 and the roster home, unchanged from re-genesis 1.
+- **B1.** Within one steward's devices the code is past B1: a large binary moves chunked, verified per chunk and whole, resumable and budgeted, under a per-method grant. The 454 MB receipt is the evidence still owed. Cross-steward rakia objects still need a carrier grant with a verifier (D9), a second principal's admission, and the release plane's custody gate.
 
 ---
 
@@ -420,7 +480,7 @@ What they changed, concretely: (1) lesson 1 no longer rests on "never retried" o
 
 ## Method (v2)
 
-The v2 pass (2026-11-08) re-grounded every "Against us" claim in source at dev `9faf54076`, read the re-genesis 1 record (`RESULT.md`, `STATE.md`, `regression-classes.md`), re-fetched the Heartwood mirror (`2fce5b4e..8b053320`, six commits read) and compared the RIP and CI-broker mirrors with their remotes (both unchanged), and re-read radicle.dev's news. It added the post-sprint notes inside each lesson, lesson 15, and the **After re-genesis 1** section. It did not re-run the per-claim adversarial verification, and the Radicle-side claims of v1 that rest on the snapshot were not re-checked beyond the six new commits.
+The v2 pass (2026-11-08) re-grounded every "Against us" claim in source at dev `9faf54076`, read the re-genesis 1 record (`RESULT.md`, `STATE.md`, `regression-classes.md`), re-fetched the Heartwood mirror (`2fce5b4e..8b053320`, six commits read) and compared the RIP and CI-broker mirrors with their remotes (both unchanged), and re-read radicle.dev's news. It added the post-sprint notes inside each lesson, lesson 15, and the **After re-genesis 1** section. It did not re-run the per-claim adversarial verification, and the Radicle-side claims of v1 that rest on the snapshot were not re-checked beyond the six new commits. The artifact-store pass (shem, same day) read the sprint 2 hub (`genesis/docs/superpowers/sprints/2026-11-07-artifact-store/STATE.md`, task reports) and the landed source at dev `9faf54076`, corrected the draft's sprint 2 claims, added **After sprint 2: the artifact store** with a status per lesson and answers to the open questions, and added the **Addendum — for Radicle**. Branch-only work (`artifact-store/h`, `artifact-store/land`) is cited as branch, not as landed.
 
 ---
 
@@ -441,3 +501,48 @@ The v2 pass (2026-11-08) re-grounded every "Against us" claim in source at dev `
 - **Habit (proposed)**: `artifact-custody-before-head`, `unwired`, bound to the lesson-1 a2o scenarios.
 
 Repos read (registered in `research-manifest.json`): `heartwood` (GitHub mirror), `radicle-rips` and `radicle-ci-broker` (cloned over plain git HTTP from `seed.radicle.xyz`, which needs no Radicle node). Seed-API captures of RIP and Heartwood patches and issues, and the six evidence reports, are kept under `genesis/local-dev/radicle-survey/`.
+
+---
+
+## Addendum — for Radicle: how Elohim is approaching the deeper primitives (2026-11-08)
+
+*Written for a reader from the Radicle project, by the Elohim project (drafted by agents working for the project's steward, human:matthew, and his to review). It is offered in kind. This survey read your code, changelog, RIPs and disclosures closely and took more from them than from any other peer we studied. This section returns the favour: what we built after reading you, what we took, what we did differently and why, and what is not proven yet. Each claim names its evidence in our repository. None of it is a request to adopt anything.*
+
+**Who we are, briefly.** Elohim is a protocol for communities to hold content, value and governance together, built on Holochain for signed, validated shared state, with a separate peer-to-peer byte plane (libp2p and iroh) for blobs and build artifacts. Our developers' workspaces are themselves peers. A workspace that needs a binary another of the same person's devices already built fetches it, verified, instead of rebuilding it. That is the artifact store this survey was written for. We share your instincts: verify before apply, sign state, never trust a payload's claim about itself. We differ on one premise, stated under **Membrane** above. A key signature is provenance. Standing belongs to people and their communities, and the network, not a device, holds the root.
+
+### Primitives, and what we learned building them
+
+1. **A byte address declares its profile.** Every byte address is a CIDv1 whose codec and multihash name the hash (raw + BLAKE3-256, `bafkr4i…`). The chunker (FastCDC with stated sizes) and the erasure code are declared in a profile carried by the object. Records are dag-cbor + sha2-256, and parsers refuse anything they cannot decode exactly. We crossed from a bare `sha256-` string to this in one clean break (re-genesis 1, above). *What we learned from you:* RIDs began as bare SHA-1 and carry that form forever (lesson 14). *What we would offer:* when the address says which hash and which chunking produced it, the next hash change is a profile choice rather than a network partition. *Honest limit:* we could break cleanly only because our live network is one human's devices plus fixtures. The next crossing will need the staged floor your 1.7.0 → 1.7.1 revert taught (lesson 6).
+
+2. **A build output is a derivation, not a file.** An artifact is named by a derivation key, the method's content address together with the input closure's, and by the output's byte CID. The build attestation's `inputs_hash` is that key's CID. A consumer recomputes the key itself. It refuses a manifest keyed for another closure, and treats two holders disagreeing about one key's output as a typed mismatch, never a recency contest (`elohim/eprfs/eprfs-peer/tests/fetch.rs`, `serve_blob.rs`). *What we would offer:* your CI broker's results carry no output digest (lesson 5). A CI result that names its closure key and its output CID can be reused by any peer that computes the same key, so CI can be shared instead of re-run.
+
+3. **Custody is a continuing contract with evidence, not a replica count.** Our custody counts read only holder rows that are bound to an authenticated identity, witnessed and fresh. Unbound but well-signed claims are **held**: neither counted nor dropped. At private reach, custody is a pledge that creates no shared-state entries at all (`genesis/a2o/features/storage/artifact-custody.feature`; hardening on branch `artifact-store/h`). *What we learned from you:* `DEFAULT_REPLICATION_FACTOR = 3` is reached once and never held, and this is still the survey's first lesson. *What we would offer:* a repair loop has to read the same evidence the publish decision read. Otherwise "seeded" drifts from "held".
+
+4. **A holder claim inside a payload is bound to the identity the transport authenticated.** Inventory gossip admits a message only when the gossip layer's authenticated source equals the claimed author and the signing key is the one that peer embeds. Agent-level authority additionally requires a binding that is both cross-signed and confirmed in the shared DHT. Your 2026-09-23 disclosure is about the handshake. We had the same class **one layer up**, in identities declared inside payloads, and found it while reading you (lesson 2). *What we would offer:* when iroh fixes the handshake, payload-declared Node IDs in announcements still need binding to the authenticated peer, or the impersonation moves up a layer. *Honest limit:* our bindings are not yet Sybil-resistant. One binding costs one DHT entry. The steward ruled that Sybil resistance does not have to be perfect yet, and the gap is named in our security backlog, not closed.
+
+5. **Serving is scoped to a grant, and refusal reveals nothing.** A device serves an artifact only under a grant for its method, by default to no one. A device outside the grant gets a typed reason. A stranger gets one byte-identical refusal whether the artifact is granted, held but ungranted, or unknown. A policy reload that drops a device refuses its next chunk on a connection that is already open (`elohim/eprfs/eprfs-peer/src/serves.rs`, `blob_mount.rs`). *What we would offer:* for private repositories, an allow-list of nodes says who may connect, not what each may read. Per-object scope with a uniform refusal removes the "do you have it?" oracle.
+
+6. **The unknown is held, not refused or guessed.** An unknown epoch, signature scheme or custody-policy version is held with its reason, so a newer writer's data reaches an older reader without being refused or misread. Unknown record extensions keep their bytes and their CID through a fetch. *What we learned from you:* feature levels and dual-read before a floor (lesson 6).
+
+7. **Retry on the event, never on a tick or a boot snapshot.** Our worst night on the alpha fleet came from code that captured a conductor client once at boot, and from a binding minter that gave up after six tries before the conductors existed. Both now acquire lazily, retry for the life of the process, and wake on the connect event. *What we learned from you:* a fetch with no seed waits for the periodic tick rather than the seed's arrival (lesson 1). We had the same shape and paid for it.
+
+8. **Admit only what descends from the accepted root.** We took this from your week of 2026-11-02 (`eee5cb8d`, `df62b66d`; lesson 15). At device scope the sibling fetch already insists that the served manifest is the CID the holder's crossed record named, and that the record's key equals the locally computed key. A superseded binding core stays superseded under any fresh anchor. Whether every correction chain and our future release election check membership in the accepted chain, rather than only form, is **not verified yet**.
+
+### What we have not done
+
+- No release election and no threshold-elected channel heads in production. Your canonical-branch election is ahead of us there (lesson 13).
+- No serving across stewards. Carriers and a second person's admission are reserved in the grant vocabulary and grant nothing until they have a verifier.
+- The large-artifact case is in code (chunked, verified per chunk and whole, resumable, budgeted, raced across holders) but its 454 MB receipt between two real devices is still owed.
+- One payload store per device is designed, not built.
+- Everything above runs on one steward's devices and a test fleet, not on a network of independent people. Radicle has run that network for years.
+
+### What Radicle might take away, if anything
+
+Offered as a reading, not advice:
+- a declared byte profile before 2.0's transport change, so hash agility rides the same partition;
+- output digests and closure keys in CI results;
+- binding payload-declared Node IDs to the authenticated peer after the iroh handshake lands;
+- per-object serving scope with a uniform refusal for private repositories;
+- a repair loop that reads the same evidence as the publish decision.
+
+Where we diverge on identity, we diverge on purpose (see **Membrane**). Where we converge, much of the convergence came from reading your code and your changelog's honest failure descriptions. Thank you for writing them down.
