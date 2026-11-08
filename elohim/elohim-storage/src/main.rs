@@ -3786,7 +3786,10 @@ async fn async_main(
     // branch constructs its own SyncManager pointing at the same on-disk
     // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "one-shot boot destructure of the iroh branch's four handles; a named type adds nothing"
+    )]
     let (_iroh_node, iroh_blob_store_for_http, iroh_sync_manager, iroh_sync_backend): (
         Option<elohim_storage::p2p_iroh::IrohNode>,
         Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,

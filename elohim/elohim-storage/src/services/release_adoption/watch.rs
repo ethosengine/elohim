@@ -2065,7 +2065,10 @@ enum CheckOutcome {
 /// channel deferred because WE are over budget has done nothing wrong, and
 /// putting it on the ladder would slow the channel down for a reason that is
 /// about us.
-#[allow(clippy::type_complexity)]
+#[allow(
+    clippy::type_complexity,
+    reason = "the transition tuple is destructured once at the sweep; naming it would hide its three-way split"
+)]
 fn outcome_transition(
     outcome: CheckOutcome,
 ) -> Option<(
