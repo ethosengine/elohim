@@ -2,7 +2,7 @@
 id: task-as-f2-report
 title: the sibling fetch, producer and consumer (artifact-store F2a + F2b)
 status: claimed-not-verified
-landed_commit: 47b57023
+landed_commit: 5c53da02
 verified_by:
 concerns: "Astra BLOCK on ed29026b6 addressed in fa3aba0f3 + 47b57023; named residuals: build-time TOCTOU, node_modules excluded from the ignored-file refusal, same-account staging swap between inode check and rename, env -i not yet run on a real cargo build (F2r), honest computation out of scope (F5/I6). The key input is the labelled interim KeyInput::Raw(git-tree closure CID) with slot basis-key:git-tree, not KeyInput::Projected: no producer of the HEAD tree as an eprfs Tree v1 closure exists on this tree, so an F2r receipt on this key does not close F2. The 454 MB receipt (F2r) and the two-device relay throughput floor are not run here."
 actor: agent:as-f2@claude-opus-5-5
@@ -377,3 +377,83 @@ common.md.
 - Neither run recorded evidence. The runner names the three dirty paths in the closure: this
   report while it was being written, and the two uncommitted brief copies
   (`briefs/common.md`, `briefs/F2-sibling-fetch.md`).
+
+## After the re-review: astra BLOCK again, and the orchestrator's ruling
+
+The re-review (`evidence/f2-astra-rereview.md`, 13 items) was ruled in `evidence/f2-ruling.md`.
+F2 is a developer tool on the steward's own workspaces. A process running as the same account
+already holds what those attacks would win, so findings that need one are named residuals, not
+gates. Four items were ruled to fix; they are fixed in `5c53da02`.
+
+- **Item 3 (H3): a fixed PATH, and the tools it resolves, are keyed.**
+  - The recorded mesh build runs cargo under `env -i` with the fixed
+    `PATH=${CARGO_HOME:-$HOME/.cargo}/bin:/usr/local/bin:/usr/bin:/bin`, not the inherited one.
+  - `describe` records that PATH in `non_path_inputs`.
+  - The key adds one line per keyed tool resolved under it (`cc`, which is rustc's default linker
+    driver on the gnu targets; `ld`; and `$CC` when the method records it). Each line holds the
+    tool's canonical path and the CID of its `--version` output, or `-` when it does not resolve.
+  - Test: `changing_the_path_resolved_cc_moves_the_key` covers another version from the same cc and
+    another cc on another PATH.
+- **Item 9 (M9): a missing record fails closed.** While the serving lock is held, `put` refuses
+  (`unrecorded:`) when `<peer dir>/payload-store` is missing, unreadable or empty, as well as when
+  it names another store. Because `serve` writes the record just after taking the lock, the
+  interval between the two also refuses. Test: `a_served_daemon_without_a_store_record_refuses_put`
+  covers a missing record, an empty one, one naming another store, then the right one.
+- **Item 11: the bound that fired decides; there is no tolerance window.**
+  - Every dial and request now carries a `Bound { wait, by_deadline }`. `by_deadline` is true when
+    the time remaining, rather than the holder's own stall or relay bound, set the wait.
+  - When that bound elapses, the gap is `DeadlineExceeded`. When the holder's own bound elapses, the
+    holder is abandoned (stalled) and its chunk re-raced.
+  - A dial now tells an elapsed bound apart from a refusal.
+  - The 20 ms `past()` window is gone. The trickle test passed five consecutive runs at four
+    threads (16/16 each run; epr-cli `artifact` 11/11; clippy `-D warnings` clean).
+- **Item 12: crash-orphaned staging is swept.** This is lock based.
+  - A staging directory is named `.fetch-<destination name>.<32 hex>`. Its installer holds an
+    advisory lock (`File::try_lock`) on the directory's `lock` file for as long as it lives, and the
+    kernel releases the lock however the process ends.
+  - Before staging, an install removes each directory beside its destination with that
+    destination's prefix whose lock nobody holds now. A directory without a lock file is removed
+    only after a 60 s grace, since it may be a live installer's first moment. Links are not
+    followed, and other destinations' directories are not touched.
+  - Test: `an_orphaned_staging_dir_from_a_killed_run_is_removed_by_the_next_install`. The killed
+    run's directory is removed; a held one, a lockless young one and another destination's are kept.
+  - Residual: between a live installer creating its lock file and taking the lock, a concurrent
+    sweeper could take it first and remove the directory. That installer then fails `LocalStore`
+    and the caller builds here. One daemon runs one fetch at a time.
+
+**Residuals and follow-ups the ruling carries** (`evidence/f2-ruling.md`; numbers are the
+re-review's):
+1. **Item 1 (H1), same account.** In-place modification of the staged inode, and the rename race,
+   stay open. The inode checks detect neither the first nor, before publication, the second.
+2. **Item 2 (H2), same account.** A queue writer that reads a request's nonce can forge an
+   `Installed` answer, and the CLI does not re-verify the installed bytes. A `.cancel` entry is
+   honoured by its name, not its contents.
+3. **Item 4 (H4), same account / honest-rare.** An edit made during the build and restored before
+   `put` re-checks still passes. `node_modules` stays excluded from the ignored-file refusal, by
+   declaration. An edit that is not restored is caught by the dirty check.
+4. **Item 5 (H5), same account.** A parent directory of the destination swapped for a symlink
+   between the scope check and the install can redirect it. The daemon also trusts the queued
+   key, output and holder selection rather than re-resolving the crossed records.
+5. **Item 6 (M6), operational / same account.** The synchronous flush, fsync and rename cannot be
+   interrupted by the async deadline, so a publication can finish after the deadline. Withdrawal
+   races a claim already read. `abort()` is answered `Cancelled` without awaiting termination.
+6. **Item 10, frontier F5/I6.** An admitted builder can publish bytes it did not compute. Byte
+   verification proves the bytes match the declared output, not that the computation was honest;
+   independent computation evidence is the release plane's job.
+7. **Follow-up, item 7 (M7).** Wasted bytes are still undercounted when the outer deadline drops
+   in-flight request tasks or returns from the manifest phase, and partially read length headers
+   are not counted.
+8. **Follow-up, item 8 (M8).** Relay classification uses the advertised addresses. Enforcing the
+   floor on the actual path needs the connection's real route.
+9. **Item 13, carried to F2r.** No real cargo build has run under the `env -i` allowlist (now with
+   the fixed PATH); F2r's first build is the validation.
+
+**Brief copies.** The orchestrator's `briefs/common.md` was restored to HEAD in `as-f2` with
+`brit restore --worktree`. The untracked `briefs/F2-sibling-fetch.md` was moved out of the
+worktree, not deleted; the hub copy in the main checkout is canonical. Neither was committed or
+edited.
+
+**Gates on the final head.** Both run on the commit that adds this section, with the brief copies
+restored so the runner can record evidence: `evidence/gate-F2-eprfs.log` and
+`evidence/gate-F2-orchestrator.log`, each ending in its `EXIT=` line. The runs at `47b57023` are
+kept as `gate-F2-*.run3-47b57023.log`.
