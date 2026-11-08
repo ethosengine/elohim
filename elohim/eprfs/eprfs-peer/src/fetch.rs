@@ -381,6 +381,12 @@ fn request_bound(relay: bool, len: u64, budget: &FetchBudget, deadline: Instant)
     bound.min(deadline.saturating_duration_since(Instant::now()))
 }
 
+/// Whether `deadline` has passed (or is within a scheduling tick of it): a request bounded by the
+/// time remaining that elapses then was cut by the fetch's deadline, not by its holder.
+fn past(deadline: Instant) -> bool {
+    Instant::now() + Duration::from_millis(20) >= deadline
+}
+
 async fn dial(endpoint: &Endpoint, addr: &NodeAddr, bound: Duration) -> Option<Connection> {
     match tokio::time::timeout(bound, endpoint.connect(addr.clone(), TIER_ALPN)).await {
         Ok(Ok(connection)) => Some(connection),
@@ -444,6 +450,12 @@ async fn accept_manifest(
         let relay = relay_only(&holder.addr);
         let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
         let Some(connection) = dial(endpoint, &holder.addr, bound).await else {
+            if past(deadline) {
+                return Err(FetchGap::DeadlineExceeded {
+                    fetched: 0,
+                    total: 0,
+                });
+            }
             // Unreachable is a route gap; only a reached relay too slow for a frame is the
             // transport's.
             unreachable.insert(index);
@@ -513,6 +525,12 @@ async fn accept_manifest(
             },
             Ok(Err(PeerError::TierFrameTooLarge { len, cap })) => {
                 FetchGap::ManifestTooLarge { len, cap }
+            }
+            Err(_) if past(deadline) => {
+                return Err(FetchGap::DeadlineExceeded {
+                    fetched: 0,
+                    total: 0,
+                })
             }
             Ok(Err(_)) | Err(_) => {
                 if relay {
@@ -795,6 +813,13 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
             Err(_) => {
                 // Stalled: whatever had arrived before the bound is discarded with the request.
                 discard(received);
+                if past(deadline) {
+                    // Cut short by the fetch's own deadline, not by the holder's pace.
+                    break Err(FetchGap::DeadlineExceeded {
+                        fetched: progress.held.load(Ordering::Relaxed),
+                        total: manifest.byte_len,
+                    });
+                }
                 abandon(&mut links, Abandon::Stalled);
                 queue.push_front(chunk);
             }
