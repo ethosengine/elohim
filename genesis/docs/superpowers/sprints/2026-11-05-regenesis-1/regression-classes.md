@@ -61,7 +61,8 @@ The common thread: **state and contracts that live only at runtime** — in a ru
 - **What broke:** every storage node's binding minter gave up after 6 attempts (~18 min) because the conductors were not installed yet; conductors came up 45-70 min later and nothing retried, so no alpha node holds a cross-signed binding.
 - **Interface gap:** attempt-count retry with no readiness signal.
 - **Pattern:** retries keyed to a readiness event (app enabled, cell running), with an unbounded slow tail, not a fixed count.
-- **Status:** handed to shem (it gates shem's custody-authority hardening); filed on `elohim-storage` `p2p/binding_mint.rs`.
+- **Second instance, caught live:** the same shape broke delivery. Release adoption (`main.rs` ~6360) and binding mint (~3646) each snapshot their conductor role client ONCE at boot; the registry reconnects in the background, but those two keep the boot-time `None`. Matthew's and adam's storage booted while their conductors were broken, so both refused every release (`conductor_unavailable`) and both doorways served "App not found" for every release-channel app.
+- **Status:** binding-mint retry handed to shem (it gates shem's custody-authority hardening). Boot-snapshot fix in flight: both consumers acquire their client lazily through the registry, with tests; its edge roll restarts every storage node, which also clears matthew without a cluster act.
 
 ## 8. Floating artifact tags in a roll
 
@@ -69,6 +70,12 @@ The common thread: **state and contracts that live only at runtime** — in a ru
 - **Interface gap:** a deploy that references a mutable tag.
 - **Pattern:** rolls reference digests; a tag is only an input to resolving a digest once, at plan time, recorded in the roll plan.
 - **Status:** filed (edge Jenkinsfile, CI-gating).
+
+## Smaller frictions met while fixing in flight
+
+- **The style ratchet is invisible until push.** The late-bind fix touched `elohim-storage`, whose RS-GOV-04 rule requires every touched crate to pay down at least one finding; the pre-push gate refused after 322 s. Running `just gate rust-style` with the fix would have caught it in 20 s. Filed: the implementer brief template names `just gate rust-style` for any crate with debt.
+- **Freshness by directory mtime, not by the inputs that feed the artifact.** The household's stale-hApp check compares a zome's wasm against the newest file under the zome directory. The licence-tier commit (`a8d2af4d1`) touched only each zome's `Cargo.toml` licence field; cargo correctly rebuilt nothing (licence metadata does not feed the wasm), so the check reported every DNA stale forever and even `MESH_REBUILD_STALE_HAPP=1` refused "still stale after just build". Pattern: freshness from cargo's own fingerprint or a content hash of the build inputs. Worked around tonight with the declared `MESH_ALLOW_STALE_HAPP=1`; fix filed against `app/elohim-app/scripts/hc-mesh.sh`'s staleness check.
+- **`main.rs` is 6,967 lines against a 7,000-line hard ceiling**, and the late-bind fix added about 140 of them. Boot wiring for each consumer (binding mint, release adoption, retention) is the obvious seam to extract into its own module. Filed as a bounded modularization, not done mid-fix.
 
 ## What a re-genesis should prove before it touches alpha
 
