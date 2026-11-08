@@ -115,6 +115,50 @@ Supporting tests added: `salvage_gossip::tests::*` (roundtrip/admit, every signe
 
 `0ceb2fd1` fix(storage): hold well-signed unbound claims and replay them when the author binds (H pass 3). This replaces the pass-2 "refused as unbound" rule for mixed versions and fresh households: a custody announcement, salvage ad or inventory delta whose signature verified under its author's own key, but whose author has no cross-signed chain yet, is **held** in `held_unbound_claims` (migration `2026-11-07-140000`). Held claims are capped at 256 per topic, stored once per distinct bytes, expire after 15 min, and are never projected or counted. They are **replayed through full admission** (original plane and gossipsub source) when a transport link is recorded, a cross-signed binding arrives by gossip, or one is projected from the DHT. A claim that still fails on replay is dropped with its reason. Forged or badly signed claims stay refused and are never held. Tests (all ok, focused runs EXIT=0; default lib 179 passed, iroh lib 28, iroh_planes 2): `an_unbound_custody_announcement_is_held_and_admitted_when_its_link_arrives`, `a_held_claim_that_still_fails_on_replay_is_dropped`, `held_unbound_claims_expire`, `held_once_bounded_per_topic_and_taken_only_when_resolvable`. Residual: the per-topic cap means a sender minting many keys can push honest held claims out before their binding arrives. That costs only the recovery of those claims, never integrity.
 
+### Pass 4 — DHT-confirmed authority (commit `82d545cc`)
+
+`82d545cc` fix(storage): authority only from DHT-confirmed bindings; proofs never downgrade; scoped off-loop replay (H pass 4). Only my files; Worker B's `cf95610e` and the recon/exists worker's files are untouched.
+
+- **#1 Sybil starvation.** A binding is authority only when it is cross-signed AND DHT-confirmed (`db::binding_confirmations`, migration `2026-11-07-150000`): a current `AgentPeerBinding` entry at the row's anchor carries the row's peer, agent and window.
+  - Own bindings are confirmed by the DHT-arrival projection.
+  - Gossip-arrived ones only request confirmation from `transport_authority::confirm`. It is spawned in `main.rs` beside `binding_mint`, reads imagodei `get_bindings_for_peer` with backoff 5 s to 900 s (about 33 min), and then replays that author's held claims.
+  - Salvage candidates with no declared household share one `UNDECLARED_HOUSEHOLD` domain; an all-undeclared pool still ranks exactly as XOR.
+- **#2 Downgrade and revival.**
+  - Non-authoritative writers never replace an existing cross-signed row.
+  - Supersession is judged on the signed core (`core_identity`: agent, peer, kind, window, nonce, issued_at), so a superseded core under a fresh anchor stays superseded even when the DHT confirms that anchor.
+  - Deviation: the table's primary key stays `(peer_id, dht_anchor_hash)`; I did not rebuild it on a core hash. The never-lower rule closes the downgrade, core-level supersession plus confirmation-only authority close the revival, and rebuilding the primary key of a table with six writers was the riskier change.
+- **#4.**
+  - Replay is scoped to the author just bound or linked (`take_for_authors`, indexed).
+  - Identity-binding gossip dedups on the signed core.
+  - Hold and replay run on a single-flight blocking worker off the gossip event loop (inline when there is no runtime).
+  - Holds are capped at 32 per author as well as 256 per topic.
+- **#6.** Newest link per PeerId wins. Expiry was not added: a link is a two-key statement, retired by a newer link or by the PeerId's binding lapsing.
+- **#8.** Stale and seq-ahead salvage ads are refused before the binding check, so they are never held.
+- **#9, multi-device seq.** Several devices of one agent advertising salvage under one `agent_cid` compete on one per-agent seq row: the device with the later boot epoch wins and the others' ads replay as stale until it stops. Per-device rows would need the device's transport id in the key; filed as a follow-up.
+
+**Liveness (measured from the shem household's last recast, `logs/{matthew,jessica,james}.log`, 2026-11-07):**
+- Storage identities loaded at 02:57:35–02:57:47Z.
+- Each node's own cross-signed binding was minted at 03:00:42–03:00:56Z, about 3 minutes after boot (`sign_for_agent` becoming available).
+- Gossip delivered each binding to the other two within 0.1 s of the mint.
+- DHT confirmation of a REMOTE binding (a `get_links` read after the minter publishes) is not measured; it was not run on the mesh. The confirmer retries for about 33 minutes.
+- Hold TTL is now 40 minutes (was 15), so a claim held at boot outlives the mint (about 3 min) plus confirmation.
+
+**Residuals:**
+- The legacy DHT view carries neither the entry's author nor its signature. Confirmation therefore proves "a current entry with these fields at this anchor", not "authored by the named agent". The zome's `create_agent_peer_binding` carve-out lets any caller write a binding for an unregistered `agent_cid`, so a Sybil costs one DHT entry, not one source chain. Author-level confirmation needs a zome query that returns the record, which is a DNA change (KEEP).
+- A peer that missed a binding's one-time gossip never learns it: the DHT view cannot carry the proof.
+
+**Tests:** focused runs, all EXIT=0.
+- Default lib: 612 passed. With `--features "p2p p2p-iroh"`: lib 54, `iroh_planes` 13. `--test blob`: 11 passed, 1 ignored. `--test p2p federator`: 4 passed.
+- Named tests, all ok:
+  - `self_made_cross_signed_binding_is_not_authority_until_dht_confirmed`
+  - `sybil_salvage_ads_never_fill_the_candidate_pool`
+  - `junk_signed_copy_never_downgrades_a_cross_signed_row`
+  - `superseded_core_regossiped_under_a_fresh_anchor_does_not_revive`
+  - `replay_is_scoped_to_the_newly_bound_author`
+  - `binding_gossip_dedups_on_the_signed_core`
+- Added and ok: `only_an_exact_current_dht_entry_confirms`, `unmatched_and_null_household_share_the_undeclared_domain`.
+- No gate from me; the orchestrator runs the combined storage gate.
+
 ## Worker B (Sonnet 5.5 — R4, R5, R6, R8, R9, R10, and red-team finding 5)
 
 Status: code complete in the worktree, focused tests green, **not yet committed and storage gate not yet run** (see Deviations 1). Ownership claims: `evidence/H-owner.md`.
