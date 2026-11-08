@@ -203,3 +203,37 @@ All 30 `blob_store::` tests pass together, including Worker A's.
 2. **`list_units` semantics.** A chunked RS shard pushed to this node is a marker payload under `blobs/`, not a unit; its chunks are the units and the shard's own row comes from the existing `claim_held_shard` path. A striped upload's derived shards are not held by the uploader, so its rows are the payload's chunks.
 3. **R6 cancelled work.** Bytes of a racer aborted before its reply completed are unknowable at this layer and are not counted.
 4. A `get` that settles `Healthy` retries up to 4 times; after that it returns `Internal`.
+
+## Worker C (Sonnet 5.5 — red-team findings 3 and 5, nit 10)
+
+Ownership claims: `evidence/H-owner.md` ("C" lines). Report section left uncommitted for the last committer.
+
+### What changed
+
+- **Finding 3 (HIGH) — recon answers from an index, never hashes, and is rate limited.**
+  - `BlobStore` keeps a servable index (`ServableIndex`, `Inner::servable`): a CID enters when its bytes were hashed good — `store`/`store_stream` (written from bytes the call hashed, the payload and each chunk), a verified read (`get`, `get_chunk`), `exists_locked` returning `Verified` (and each chunk `chunked_verdict` hashed) — and leaves on delete (payload and the chunks it frees) and in `quarantine_files` (so every quarantine path).
+  - `list_servable()` is now a copy of that set: no file read, no hash. `BlobStore::scrub()` is the verification pass (old `list_servable` logic: hash every unit and payload the tree names, quarantine bad ones, rebuild the set; stores/deletes that land during the walk win). `BlobStore::new` spawns it once on a blocking thread when the store holds anything, so serving is never blocked; until it lands a recon peer sees a growing, never over-claimed, set. There was no existing periodic scrub, so none was added.
+  - `answer_recon` is unchanged apart from the comment: it calls `list_servable()` as before, and now first asks `P2PNode::recon_limiter` (new `p2p/recon_limit.rs`, sliding window, 60 requests/min/PeerId, map bounded at 4096 peers). Over the limit the responder replies `RECON_BUSY_REPLY` (`[0x62]`, new in `recon_wire.rs`) before admission or any index read. It is a typed refusal on the existing wire (no schema change): an initiator's reconcile rejects the unknown version byte, ending the session with its cursor unmoved, as for any refused message; a new initiator can match the constant to retry later.
+- **Finding 5 (MEDIUM) — remote paths no longer hash through `exists()`.** `HEAD /ipfs/{cid}` (`handle_head_ipfs_block`), `BlobSignal::Request` (`signals::handle_request`), `blob_available_locally` and `sharding::holds_as_shards` use `BlobStore::present` (structural: names and lengths). `holds_as_shards` is also what `trigger_courier::NodeBytePresence::held` calls, so that remote-triggered probe is structural too (a spoiled local copy now reads as held until a read or scrub finds it; the custody pass keeps `VerifiedPantry`/`holds_verified`). `exists()` stays on `store`'s idempotence branch, `settle`, and local custody acts.
+- **Nit 10.** `exists_locked` read the layout record, then `read_layout` read it again, and a transient error on the second read became a `Defect` (quarantine). It now reads once and decodes those bytes with the new `Inner::layout_from` (also used by `read_layout`).
+
+### Tests (focused, `--lib`, RUSTUP_TOOLCHAIN=1.96.1, CARGO_BUILD_JOBS=1, family as-h; EXIT=0)
+
+| Test | Result |
+|---|---|
+| `blob_store::tests::recon_answers_from_the_index_without_hashing` (a chunk spoiled on disk is still listed, unmoved and unquarantined by the listing; a hashing read drops it) | ok |
+| `blob_store::tests::index_tracks_store_delete_and_quarantine` (store, stream store, delete, chunk freed by delete, quarantine, re-store) | ok |
+| `blob_store::tests::startup_scrub_fills_the_index_from_disk` (reopen: scrub fills the index, a spoiled chunk is dropped) | ok |
+| `p2p::recon_limit::tests::inbound_recon_is_rate_limited_per_peer`, `the_peer_map_stays_bounded` | ok |
+| `blob_store::tests::a_transient_error_on_the_layout_read_never_quarantines` (+ `layout_from` still a defect on a record the marker does not bind) | ok |
+| `remote_probes_never_hash_the_payload` in `http::apps_resolver_heal_tests` (HEAD /ipfs, `blob_available_locally`), `sharding::tests`, `signals::remote_probe_tests` | ok (3) |
+| `blob_store::tests::recon_set_excludes_unverified_units` (adapted: calls `store.scrub()` before `list_servable`, since the listing no longer hashes) | ok |
+
+First run: `--lib blob_store:: recon_limit remote_probes_never` 39 passed, EXIT=0.
+
+### Deviations
+
+1. `recon_set_excludes_unverified_units` needed one added line (`store.scrub()`): it spoils files after storing and expected the listing itself to hash. The index is a cache of verification; a file that rots after it was marked stays listed until a hashing read or the scrub (a serving read always hashes, so no peer receives bad bytes). Recorded in the `ServableIndex` doc.
+2. The busy refusal is a one-byte sentinel reply, not a new message variant (no wire change).
+3. An unrelated unresolved name (`UNDECLARED_HOUSEHOLD` in `services/salvage_commitment_author.rs` tests) broke every `--lib` test build at the time; a one-line import fix was swept into Worker A's `82d545cc`.
+4. A `HEAD /ipfs/{cid}` over a same-length-corrupt local copy now answers 200 (structural); the GET verifies and quarantines.
