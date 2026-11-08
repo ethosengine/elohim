@@ -6,6 +6,8 @@
 
 pub mod actor;
 pub mod approver;
+#[cfg(feature = "peer")]
+pub mod artifact;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;

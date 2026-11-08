@@ -17,6 +17,13 @@
 //!   grants by method name; the gate judges roots and objects by a [`ServeScope`]. Each serve is
 //!   recorded as one `serve-blob` Use event that never crosses.
 //!
+//! - The sibling fetch (artifact-store design §3.b): [`fetch_artifact`] draws an artifact a
+//!   sibling holds over one tier connection per holder, manifest first and capped, every chunk
+//!   verified before it is stored and the manifest stored last; [`install_fetched`] is the
+//!   whole-blob verified install read. Every other outcome is a typed [`FetchGap`]. The daemon
+//!   runs the fetches `epr artifact fetch` queues ([`FetchRequest`]), because only it holds the
+//!   device's peer key.
+//!
 //! - The steward channel (§3.3): [`project_channel`] places this device's crossing events (the
 //!   [`CrossingAllowList`] from `pool-policy.json`) in a channel tree served from a
 //!   [`ChannelStore`]; [`ChannelHead`] is the signed head a device gossips on [`topic_for`] its
@@ -46,6 +53,7 @@ mod connections;
 mod daemon;
 mod endpoint;
 mod error;
+mod fetch;
 mod fold;
 mod gate;
 mod gossip;
@@ -70,6 +78,8 @@ pub use blob_mount::{
     Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, SERVED_QUEUE, SERVE_BLOB,
     SERVE_IDLE,
 };
+/// The byte buffer artifacts are put with, so a consumer needs no bytes dependency of its own.
+pub use bytes::Bytes;
 pub use channel::{
     channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,
     CHANNEL_EVENTS, CHANNEL_NACKS, RETAINED_ROOTS,
@@ -82,6 +92,13 @@ pub use daemon::{
 };
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
+pub use fetch::{
+    fetch_artifact, fetch_done_path, fetch_queue_dir, fetch_request_path, install_fetched, key_cid,
+    put_method_record, resolve_holders, write_queue_file, FetchBudget, FetchDone, FetchGap,
+    FetchRequest, FetchTransport, FetchedArtifact, Holder, RequestedHolder, SiblingRecord,
+    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_IN_FLIGHT, FETCH_MANIFEST_CAP,
+    FETCH_QUEUE, FETCH_STALL, FETCH_TOTAL,
+};
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,
     FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
@@ -104,7 +121,10 @@ pub use lease_view::{
     lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
     LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
-pub use local_blob::{put_local_blob, read_local_blob, stream_local_blob, LocalBlobContext};
+pub use local_blob::{
+    put_local_blob, put_local_blob_with, read_local_blob, stream_local_blob,
+    stream_local_blob_with, LocalBlobContext,
+};
 pub use rules::{Rules, RulesDigest, RulesState};
 pub use serves::{ArtifactServeList, CARRIER_AUDIENCE_PREFIX, STEWARD_AUDIENCE};
 pub use steward_scope::{

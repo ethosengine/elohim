@@ -47,6 +47,28 @@ where
     S: EprfsStorage + ?Sized,
     F: FlowStore + ?Sized,
 {
+    put_local_blob_with(store, flow, record, bytes, context, Vec::new()).await
+}
+
+/// [`put_local_blob`], with `extra` classification slots appended after the crossing slots: a
+/// crossing record's own fields, as `env:<k>=<v>` (artifact-store design §3.a.3). With no extra
+/// slot the event is byte-for-byte the one [`put_local_blob`] records.
+///
+/// # Errors
+///
+/// As [`put_local_blob`].
+pub async fn put_local_blob_with<S, F>(
+    store: &S,
+    flow: &mut F,
+    record: DerivationRecord,
+    bytes: Bytes,
+    context: &LocalBlobContext,
+    extra: Vec<String>,
+) -> Result<TierBlobPut, PeerError>
+where
+    S: EprfsStorage + ?Sized,
+    F: FlowStore + ?Sized,
+{
     let put = put_tier_blob(store, record, bytes)
         .await
         .map_err(PeerError::LocalBlob)?;
@@ -60,6 +82,7 @@ where
         classified_as.push(format!("{MEASURE_SLOT}{measure}"));
         classified_as.push(format!("{KIND_SLOT}{kind}"));
     }
+    classified_as.extend(extra);
     let event = FlowEvent {
         action: ReaVerb::Produce,
         provider: AgentRef(put.manifest.record.computed_by.clone()),
@@ -102,6 +125,29 @@ where
     F: FlowStore + ?Sized,
     T: TierBlobSink + ?Sized,
 {
+    stream_local_blob_with(store, flow, manifest_cid, context, sink, Vec::new()).await
+}
+
+/// [`stream_local_blob`], with `extra` classification slots after `copy:self` (a sibling fetch's
+/// install read adds `basis:sibling`, `fetched-from:<did>` and `wasted:<n>`). With no extra slot
+/// the event is byte-for-byte the one [`stream_local_blob`] records.
+///
+/// # Errors
+///
+/// As [`stream_local_blob`].
+pub async fn stream_local_blob_with<S, F, T>(
+    store: &S,
+    flow: &mut F,
+    manifest_cid: &BlobCid,
+    context: &LocalBlobContext,
+    sink: &mut T,
+    extra: Vec<String>,
+) -> Result<TierBlobStreamDraw, PeerError>
+where
+    S: EprfsStorage + ?Sized,
+    F: FlowStore + ?Sized,
+    T: TierBlobSink + ?Sized,
+{
     let draw = stream_tier_blob(store, manifest_cid, sink).await;
     let (resource, byte_len, outcome) = match &draw {
         TierBlobStreamDraw::Completed { manifest } => (
@@ -115,6 +161,7 @@ where
         }
     };
     let mut slots = vec![outcome, "copy:self".into()];
+    slots.extend(extra);
     if let Some(reason) = draw.reason() {
         slots.push(format!("reason:{reason}"));
     }

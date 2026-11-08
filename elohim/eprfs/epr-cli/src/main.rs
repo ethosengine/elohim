@@ -118,6 +118,18 @@ fn main() -> ExitCode {
             }
         };
     }
+    // `artifact` records the artifacts this device builds and draws its siblings' (artifact-store
+    // design §3); a typed refusal (unrecorded, a fetch gap) exits 3 and the caller proceeds.
+    #[cfg(feature = "peer")]
+    if raw.first().map(String::as_str) == Some("artifact") {
+        return match elohim_epr_cli::artifact::run(&raw[1..]) {
+            Ok(code) => code,
+            Err(error) => {
+                eprintln!("epr artifact: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     if raw.first().map(String::as_str) == Some("integrate") {
         return match elohim_epr_cli::integrate::run(&raw[1..]) {
             Ok(code) => code,
@@ -299,7 +311,7 @@ fn run() -> Result<(Report, bool)> {
 }
 
 /// Every top-level command, as a person types it.
-const COMMANDS: [&str; 14] = [
+const COMMANDS: [&str; 15] = [
     "setup",
     "doctor",
     "explain",
@@ -313,6 +325,7 @@ const COMMANDS: [&str; 14] = [
     "identity",
     "covenant",
     "peer",
+    "artifact",
     "lsp",
 ];
 
@@ -408,5 +421,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|artifact <describe|key|put|fetch> ...|lsp <attach|serve|show> ...>"
 }
