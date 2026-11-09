@@ -271,9 +271,11 @@ async fn two_instances_storing_one_chunk_converge_to_one_verified_copy() {
     assert_eq!(owner.exists(&cid).await, Exists::Verified);
     assert_eq!(&owner.get(&cid).await.unwrap()[..], &data[..]);
     assert_eq!(owner.exists(&small_cid).await, Exists::Verified);
-    // One copy of each: one marker, one inline file, one file per distinct chunk.
+    // One copy of each: a marker per payload under blobs/, one file per distinct chunk under
+    // chunks/ — the single-chunk payload's bytes included (one canonical location per CID).
     assert_eq!(copies(root, "blobs", &cid.to_string()), 1);
     assert_eq!(copies(root, "blobs", &small_cid.to_string()), 1);
+    assert_eq!(copies(root, "chunks", &small_cid.to_string()), 1);
     let distinct: std::collections::HashSet<ByteCid> = ra.chunks.iter().map(|c| c.cid).collect();
     for chunk in &distinct {
         assert_eq!(
@@ -282,8 +284,9 @@ async fn two_instances_storing_one_chunk_converge_to_one_verified_copy() {
             "chunk {chunk}"
         );
     }
-    assert_eq!(files_under(root, "chunks"), distinct.len());
+    assert_eq!(files_under(root, "chunks"), distinct.len() + 1);
     assert_eq!(files_under(root, "blobs"), 2);
+    assert_eq!(files_under(root, "index"), 2, "a layout record per payload");
     assert_eq!(files_under(root, "tmp"), 0, "no staging residue");
     assert_eq!(files_under(root, "quarantine"), 0);
 }

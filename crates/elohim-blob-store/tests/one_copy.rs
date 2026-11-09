@@ -1,9 +1,11 @@
-//! One physical copy per byte CID (artifact-store E4 review, finding 3).
+//! One physical copy per byte CID on owner and shared stores (artifact-store E4, review rounds
+//! 1 and 2).
 //!
-//! A byte CID can reach the store two ways: as a standalone object (an inline payload,
-//! `blobs/<cid>`) and as one chunk of a larger payload (`chunks/<cid>`). Whichever arrives
-//! first keeps the bytes; the second reuses them and writes no second copy. These tests put the
-//! same chunk both ways, in both orders, and follow reads, presence, listing and deletion.
+//! A byte CID can reach the store two ways: as a standalone object and as one chunk of a larger
+//! payload. On an owner or shared store its bytes live once, at `chunks/<cid>`, either way (see
+//! `tests/canonical.rs` for the rule itself and its races). These tests put the same chunk both
+//! ways, in both orders, and follow reads, presence, listing and deletion. The unlocked store
+//! keeps the legacy representation (`canonical::the_unlocked_store_keeps_the_legacy_representation`).
 
 use std::path::Path;
 
@@ -55,13 +57,9 @@ fn payload_and_chunk() -> (Vec<u8>, Vec<u8>) {
 
 #[tokio::test]
 async fn a_chunk_stored_standalone_after_its_payload_is_not_held_twice() {
-    for owner in [false, true] {
+    {
         let dir = private_root();
-        let store = if owner {
-            BlobStore::open_owner(dir.path()).await.unwrap()
-        } else {
-            BlobStore::new(dir.path()).await.unwrap()
-        };
+        let store = BlobStore::open_owner(dir.path()).await.unwrap();
         let (payload, chunk) = payload_and_chunk();
         let whole = store.store(&payload).await.unwrap();
         let standalone = store.store(&chunk).await.unwrap();
@@ -93,13 +91,9 @@ async fn a_chunk_stored_standalone_after_its_payload_is_not_held_twice() {
 
 #[tokio::test]
 async fn a_payload_stored_after_its_chunk_reuses_the_standalone_copy() {
-    for owner in [false, true] {
+    {
         let dir = private_root();
-        let store = if owner {
-            BlobStore::open_owner(dir.path()).await.unwrap()
-        } else {
-            BlobStore::new(dir.path()).await.unwrap()
-        };
+        let store = BlobStore::open_owner(dir.path()).await.unwrap();
         let (payload, chunk) = payload_and_chunk();
         let cid = compute_bytes_cid(&chunk);
         store.store(&chunk).await.unwrap();
@@ -135,13 +129,13 @@ async fn a_payload_stored_after_its_chunk_reuses_the_standalone_copy() {
 #[tokio::test]
 async fn a_standalone_copy_a_payload_reuses_is_verified_when_the_payload_is_read() {
     let dir = private_root();
-    let store = BlobStore::new(dir.path()).await.unwrap();
+    let store = BlobStore::open_owner(dir.path()).await.unwrap();
     let (payload, chunk) = payload_and_chunk();
     let cid = compute_bytes_cid(&chunk);
     store.store(&chunk).await.unwrap();
     let whole = store.store(&payload).await.unwrap();
     // Spoil the one copy (same length): the payload that reuses it no longer verifies.
-    let path = elohim_blob_store::fanout_path(&dir.path().join("blobs"), &cid.to_string());
+    let path = elohim_blob_store::fanout_path(&dir.path().join("chunks"), &cid.to_string());
     let mut held = std::fs::read(&path).unwrap();
     held[0] ^= 0x01;
     std::fs::write(&path, held).unwrap();

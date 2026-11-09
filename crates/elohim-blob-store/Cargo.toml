@@ -57,6 +57,6 @@ async-trait = { version = "0.1", optional = true }
 tempfile = "3"
 libc = "0.2"
 serde_json = "1"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "io-util"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "io-util", "sync"] }
 # The leaf-contract harness the tier adapter is held to. Path-only: stripped on publish.
 eprfs-serve = { path = "../../elohim/eprfs/eprfs-serve", features = ["testing"] }
