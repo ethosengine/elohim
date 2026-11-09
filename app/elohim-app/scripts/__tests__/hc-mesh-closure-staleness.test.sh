@@ -59,6 +59,9 @@ case "$verb" in
       "$method" "$input" "$key"
     ;;
   fetch)
+    case "${EPR_STUB_MODE:-equal}" in
+      fetchgap|putfail) echo 'fetch gap: no-record: fixture' >&2; exit 3 ;;
+    esac
     dest=""
     while [ $# -gt 0 ]; do
       case "$1" in --dest) dest="$2"; shift 2 ;; *) shift ;; esac
@@ -67,7 +70,13 @@ case "$verb" in
     printf '#!/usr/bin/env bash\nexit 0\n' > "$dest"
     echo 'fixture fetch'
     ;;
-  put) echo 'fixture put' ;;
+  put)
+    if [ "${EPR_STUB_MODE:-equal}" = putfail ]; then
+      echo 'unrecorded: the view moved during the build' >&2
+      exit 3
+    fi
+    echo 'fixture put'
+    ;;
   *) echo "usage: epr artifact <command>" >&2; exit 2 ;;
 esac
 STUB
@@ -157,6 +166,34 @@ t "fetched install writes a derivation projection" \
 printf '{"key":"stale","method":"stale","input":"stale"}\n' > "$record"
 EPR_STUB_MODE=nokey mesh_build storage >/dev/null 2>&1; build_rc=$?
 t "successful unkeyed install removes a stale derivation projection" \
+  '[ "$build_rc" -eq 0 ] && [ -x "$STORAGE_BIN" ] && [ ! -e "$record" ]'
+
+# Review M1: an explicit STORAGE_BIN naming the canonical mesh-slot path keeps the mtime rule, and is
+# not refused for a changed closure while its mtime check passes.
+write_record
+EPR_STUB_MODE=input
+STORAGE_BIN_EXPLICIT=1
+out="$(run_freshness)"
+STORAGE_BIN_EXPLICIT=0
+t "explicit canonical-slot STORAGE_BIN keeps the mtime rule" '[[ "$out" == *"ok elohim-storage binary is not older than elohim/elohim-storage/src (mtime rule: explicit binary)"* ]] && [[ "$out" == *"__RC__=0"* ]]'
+
+# No projection = the old mtime rule, including its refusal of a binary older than tracked src.
+rm -f "$record"
+EPR_STUB_MODE=equal
+touch -d '2000-01-01T00:00:00Z' "$STORAGE_BIN"
+out="$(run_freshness)"
+t "no projection refuses an old binary under the announced mtime rule" '[[ "$out" == *"REFUSED elohim-storage binary is STALE"* ]] && [[ "$out" == *"(mtime rule: no derivation record)"* ]] && [[ "$out" == *"__RC__=1"* ]]'
+
+# A locally built install with a recorded key writes a "built" projection.
+rm -f "$record" "$STORAGE_BIN"
+EPR_STUB_MODE=fetchgap mesh_build storage >/dev/null 2>&1; build_rc=$?
+t "built install with a record writes a built projection" \
+  '[ "$build_rc" -eq 0 ] && [ -f "$record" ] && grep -q '"'"'"via":"built"'"'"' "$record"'
+
+# Review M2: when artifact put refuses the build, the pre-build key is not projected.
+printf '{"key":"stale","method":"stale","input":"stale"}\n' > "$record"
+EPR_STUB_MODE=putfail mesh_build storage >/dev/null 2>&1; build_rc=$?
+t "refused record leaves no projection beside the installed bytes" \
   '[ "$build_rc" -eq 0 ] && [ -x "$STORAGE_BIN" ] && [ ! -e "$record" ]'
 
 exit "$fail"

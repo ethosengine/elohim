@@ -429,6 +429,9 @@ storage_bin_in_gate_slot() {
 # The doorway's own copy, for the same reason as _storage_mesh: the gate's `cargo test --lib
 # --bins` never refreshes dev/debug/doorway, and a hand build there is overwritten by the next one.
 _doorway_mesh="$POOL/doorway__doorway-service/mesh-bin/doorway"
+# Same meaning as STORAGE_BIN_EXPLICIT: a caller-named doorway keeps the src mtime rule.
+DOORWAY_BIN_EXPLICIT=0
+[ -n "${DOORWAY_BIN:-}" ] && DOORWAY_BIN_EXPLICIT=1
 if [ -z "${DOORWAY_BIN:-}" ] && [ -x "$_doorway_mesh" ]; then
   DOORWAY_BIN="$_doorway_mesh"
 fi
@@ -2224,6 +2227,9 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
         unrecorded="${unrecorded#unrecorded: }"
         echo "[mesh build] unrecorded: $unrecorded" >&2
         printf '%s\n' "$unrecorded" > "$(dirname "$dest")/.unrecorded" || true
+        # The pre-build key is not evidence for these bytes when the record was refused (e.g. the
+        # sources moved during the compile): drop the projection so preflight uses the mtime rule.
+        key_json=""
       else
         rm -f "$(dirname "$dest")/.unrecorded"
         echo "[mesh build] $out"
@@ -2329,13 +2335,20 @@ assert_binary_matches_closure() { # <binary> <bin-name> <project> <src-path…>
     return
   }
 
-  # A caller-named binary (including an explicit debug-slot path) retains the legacy judgement.
+  # A caller-named binary (STORAGE_BIN/DOORWAY_BIN set explicitly, even to the canonical mesh-slot
+  # path) and any binary outside the mesh slot keep the legacy src mtime judgement, announced.
+  local explicit=0
+  case "$MESH_BUILD_PROJECT" in
+    elohim-storage) explicit="${STORAGE_BIN_EXPLICIT:-0}" ;;
+    doorway) explicit="${DOORWAY_BIN_EXPLICIT:-0}" ;;
+  esac
+  if [ "$explicit" = "1" ]; then
+    binary_mtime_fallback "$binary" "$project" "explicit binary" "$@"
+    return
+  fi
   if [ "$binary" != "$MESH_BUILD_DEST" ]; then
-    if assert_binary_newer_than_source "$binary" "$@"; then
-      echo "ok $project binary is not older than $*"
-      return 0
-    fi
-    return 1
+    binary_mtime_fallback "$binary" "$project" "not the mesh slot" "$@"
+    return
   fi
 
   record="$(dirname "$binary")/.derivation-$bin.json"
