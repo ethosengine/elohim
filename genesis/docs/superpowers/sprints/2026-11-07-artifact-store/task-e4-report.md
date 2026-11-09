@@ -3,7 +3,7 @@ id: artifact-store-task-e4-report
 status: claimed-not-verified
 landed_commit:
 verified_by:
-concerns: [R4-integrity-class, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
+concerns: [R4-integrity-class, review-fixes-1-4, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
 actor: agent:e4@claude-opus-5-5 (Claude Opus 5.5, session f1769d1c)
 ---
 
@@ -91,8 +91,8 @@ Audit of every destructive path astra listed (`e4-gate.receipt.md` item 4):
 | `size` → `refuse` → `settle` | via `exists` | via `exists` → `Corrupt` → `HashMismatch` |
 | `exists` (incl. chunk verification) | verdict computed with no side effects, then condemn | `Exists::Corrupt` |
 | `list_units`, `holds_verified` | through `get_chunk` / `exists` | the same, nothing moved |
-| `store`/`store_stream` existing-object check | repair under the publication's shared lock (quarantine, rewrite) | `HashMismatch`, nothing overwritten (an unreadable held copy is refused too) |
-| `put_chunk` repair | quarantine + rewrite under the shared lock | `HashMismatch` |
+| `store`/`store_stream` existing-object check | reported; the publication steps out and repairs under the exclusive lock (review fix 1) | `HashMismatch`, nothing overwritten (an unreadable held copy is refused too) |
+| `put_chunk` repair | reported; repaired under the exclusive lock, then put again (review fix 1) | `HashMismatch` |
 | `delete` + chunk GC | exclusive | `SharedInstance` |
 | `quarantine` | exclusive (owner) / none (unlocked, as before) | `SharedInstance` |
 
@@ -141,8 +141,8 @@ The BlobStore format refuses a symlinked root or one open to group/other (`Unsaf
    schema may pin); `epr peer serve` logs `payload store <path> (<format>)` instead. Follow-up.
 6. **eprfs-peer's `open_payload_store` stays** as the DirectoryV1 backend; only epr-cli's callers
    moved to `payload::open_payload_store`.
-7. **An owner's repair inside `store`** (quarantining a corrupt held copy before rewriting it)
-   runs under the publication's *shared* lock, as R4 classifies `put_chunk` repair; taking the
+7. **(Superseded by review fix 1.)** An owner's repair inside `store` first ran under the
+   publication's *shared* lock, as R4 classifies `put_chunk` repair; taking the
    exclusive lock there would need a lock upgrade inside this process's own publication. The
    race it leaves is with another publication of the same CID; both write identical verified
    bytes by rename, and any defect left is refused and condemned by verify-on-read.
@@ -316,3 +316,119 @@ registry.
 - **Docker build of the storage image** not exercised (the sed was simulated on a copy).
 - **`concerns:` for the reviewer:** R4 is integrity class; review `Coordination`
   (`crates/elohim-blob-store/src/store.rs`) and the two race tests first.
+
+## Review fixes (astra's code review, `genesis/local-dev/as-e4/e4-review.receipt.md`)
+
+Each finding was fixed in its own commit, after a test that fails without the fix
+(`BEFORE_FIX_EXIT`, the test alone against the unfixed code) and passes with it (`EXIT`).
+
+### 1. BLOCKER — repair under the shared lock (`d95200630`)
+
+A publication no longer moves anything. `held()` (was `held_whole_or_repaired`) and `put_chunk`
+only *report* damage (`Held::Damaged`, `ChunkPut::Damaged`); the publication then drops its stripe
+and its share of `ops.lock`, takes the exclusive lock (`repair_payload` / `repair_chunk`, which
+re-verify under it and quarantine only what still fails), and starts again (`store`: up to four
+attempts). Nothing is upgraded while held. `store_stream` cannot replay its reader, so it repairs
+in place with the chunk still in memory and resumes; if it paused, it checks that every chunk it
+wrote earlier is still on disk before writing the marker, and otherwise fails with a retryable
+error rather than publish a marker naming a missing chunk. The unlocked `/blob` store now also
+repairs under its in-process write lock (it used to repair under the read lock).
+
+- `store::tests::a_stale_repair_never_quarantines_a_chunk_another_publication_healed` — two
+  payloads share a first chunk whose file is corrupt; publication B reads it and is held (a
+  test gate); publication A reads it too, repairs it and completes; B is released with its next
+  write failing (ENOSPC). A must still read whole and verified, and the healed chunk must still be
+  in place. BEFORE_FIX_EXIT=101 (A's payload `Quarantined`); after: lib EXIT=0 (43 passed), multi-process EXIT=0, clippy EXIT=0.
+
+### 2. MAJOR — `store_record` replaced records on a shared instance (`0a3613718`)
+
+`store_record` now tells verified / absent / corrupt / unreadable apart. A shared instance refuses
+a corrupt held record (`HashMismatch`) and an unreadable one (new `BlobStoreError::HeldCopyUnreadable`,
+which a shared `store` now also returns for an unreadable held payload) and writes nothing; owners
+and the unlocked store rewrite as before. elohim-storage's shim maps the new variant to `Internal`.
+
+- `multi_process::a_shared_instance_never_replaces_a_record` (core API) and
+  `multi_process::a_shared_tier_never_replaces_a_record` (`BlobStoreTier::put_blob_verified`,
+  feature `tier`), each for a corrupt and an unreadable record. BEFORE_FIX_EXIT=101 (both: the shared store returned `Ok` and replaced the record); after: multi_process EXIT=0 (8 passed).
+
+### 3. MAJOR — the same chunk held twice by the CLI custody path and a whole-payload put (`7b93f536b`)
+
+**Which representation wins:** whichever arrives first. Nothing moves when the second arrives.
+- A standalone object (≤ one chunk) whose CID is already a verified chunk file is published as a
+  one-chunk layout record + marker naming that chunk file: `blobs/<cid>` is a 52-byte marker,
+  the bytes stay in `chunks/<cid>`. (`LayoutRecord::decode_for` admits a one-chunk record only
+  when that chunk is the payload itself; its `layout_cid` is the one `StoreResult` always
+  reported for an inline payload.)
+- A chunked payload whose chunk CID is already held as a verified inline object reuses
+  `blobs/<cid>`: `put_chunk` writes no chunk file.
+- Readers find a unit in either place (`read_unit`, `unit_len`: `chunks/<cid>`, else an inline
+  `blobs/<cid>`), so `get`, `exists`, `present`, `size`, `get_chunk`, `list_units` and `scrub`
+  work over both. Existing stores, storage's `/blob` store included, are read exactly as before:
+  nothing is migrated; the fallback only adds a second place to look.
+
+**How GC counts references across them:** a chunk is named by every layout record under
+`index/` (a one-chunk alias record names its own chunk). Deleting a chunked payload removes its
+`chunks/` files that no remaining layout record names, as before; a chunk whose one copy is an
+inline object is untouched (that object is a payload of its own). Deleting an inline payload that
+some layout record still names, with no verified chunk file of it, *moves* its file to
+`chunks/<cid>` (one rename, under the exclusive lock; a corrupt chunk file in the way is
+quarantined first) instead of removing it. Deleting an alias removes its marker and record, then
+collects the chunk file if no other record names it.
+
+- `one_copy::a_chunk_stored_standalone_after_its_payload_is_not_held_twice`,
+  `one_copy::a_payload_stored_after_its_chunk_reuses_the_standalone_copy` (both on the unlocked
+  store and an owner; reads, size, presence, listing, idempotence, then deletion in both orders),
+  `one_copy::a_standalone_copy_a_payload_reuses_is_verified_when_the_payload_is_read`. BEFORE_FIX_EXIT=101 (all three; two physical copies); after: EXIT=0.
+- `epr-cli/tests/payload.rs::the_same_cid_is_never_held_twice_on_one_device_by_the_two_paths`,
+  rewritten: the real custody path (`payload::open_payload_store` as `epr artifact put` opens it,
+  then `put_local_blob_with`, which stores each chunk as its own object and a manifest record)
+  against storage's marker-gated tier doing a whole-payload put, in both orders, 9 MiB; every
+  chunk and the whole read verified through both; per chunk CID exactly one file carrying its
+  bytes across `blobs/` and `chunks/`; no file carrying the whole; byte-carrying files sum to the
+  payload length. BEFORE_FIX_EXIT=101 (`cli_first=true`: a chunk in both `blobs/` and `chunks/`); after: EXIT=0.
+
+### 4. MAJOR — concurrent first opens could refuse the winner (`116edee3a`)
+
+`detect` reads the marker again after its directory scan, before classifying an unmarked layout
+or refusing one: the marker is authoritative, and a first open racing this one may have published
+it (and built its layout) in between.
+
+- `payload::tests::an_open_that_loses_the_first_open_race_opens_the_winners_format` (through
+  `open_payload_store`'s own path, `open_with`, with a hook that runs the winner's marker
+  selection and layout between the loser's marker read and its scan). BEFORE_FIX_EXIT=101 ("holds a blob-store layout … but no STORE marker"); after: EXIT=0 with and without `blob-store`.
+- `epr-cli/tests/payload.rs::racing_first_opens_through_the_opener_all_open_one_format` (six
+  threads per round, 50 rounds, staggered, public `open_payload_store`). It passed before the fix too (the unsynchronised window is microseconds wide), so it is supplementary; the hooked test above is the one that reproduces the bug.
+
+### Verification after the fixes
+
+Run after all four commits, one cargo at a time, judged by `EXIT=` alone:
+
+- `crates/elohim-blob-store`: `cargo test --locked --all-features` EXIT=0 (43 unit, 8
+  multi-process, 3 one-copy); `cargo test --locked` (default) EXIT=0 three runs in a row;
+  `cargo clippy --locked --all-targets -D warnings` EXIT=0 both with and without `--all-features`;
+  `cargo fmt` clean.
+- elohim-storage: `cargo check --lib` EXIT=0; `cargo test --lib` EXIT=0 (4963 passed, 3 ignored —
+  the two rakia-schema tests that failed earlier pass now); `cargo test --test blob` EXIT=0
+  (41 passed, 1 ignored); `cargo clippy --all-targets -D warnings` EXIT=0; the shim is
+  rustfmt-clean.
+- eprfs: `cargo fmt --check` EXIT=0; `cargo clippy -p elohim-epr-cli --all-targets -D warnings`
+  EXIT=0 with and without `--features blob-store`; `cargo test --no-fail-fast -p elohim-epr-cli`
+  EXIT=0 with and without `--features blob-store` (after `cargo build -p elohim-device-runtime
+  --bins`, EXIT=0).
+- No `allow`/`expect` attribute was added.
+
+Also in `7b93f536b`: `a_second_owner_is_refused_while_the_first_holds_the_lock` retries its
+post-release owner opens. It failed once under default features: a sibling test forking a child
+shares the just-closed lock's file description until that child execs (std opens files
+close-on-exec), a few microseconds of `OwnerHeld`. In a long-lived `epr peer serve` the same window
+only delays a successor owner's open; it never admits two.
+
+Process note: the orchestrator's gate run on this worktree held the host's one-build slot
+(`cargo-disk-guard`) from about 13:35 to 16:12, so the fixes waited for it. While it ran, I held my
+edits outside the worktree and reset the tree to HEAD so the gate read only committed source. (A
+few uncommitted crate edits — the new error variant and the test hook — were in the tree for
+about 20 minutes at the start of the `epr-storage` project.)
+
+New frontier from finding 3: an inline object that a payload reuses stays a payload in its own
+right, and deleting one costs a scan of `index/` (`referenced_chunks`), the cost a chunked delete
+already paid.
