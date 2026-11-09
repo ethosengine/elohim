@@ -653,7 +653,10 @@ pub async fn race_fetch_dual(
 /// to settle before honoring a manifest would add up to `per_peer_timeout` to
 /// every sharded composite read.
 #[cfg(feature = "p2p-iroh")]
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the two planes' legs, the candidate set, the libp2p command channel, the connectedness probe and the two fetch budgets are each supplied by a different caller-side source; a bundling struct would only rename them"
+)]
 async fn race_both_planes(
     leg: &'static crate::p2p_iroh::IrohFetchLeg,
     blob_hash: &ByteCid,
