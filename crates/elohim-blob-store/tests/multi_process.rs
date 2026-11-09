@@ -478,3 +478,80 @@ async fn an_owner_opening_never_sweeps_a_shared_writers_staging() {
         );
     }
 }
+
+/// A record the owner stored, then damaged on disk: corrupt (same length, one bit) or
+/// unreadable (a directory where the file was). Returns the record's bytes, CID and path.
+async fn damaged_record(root: &Path, unreadable: bool) -> (Vec<u8>, cid::Cid, PathBuf) {
+    let canonical = serde_ipld_dagcbor::to_vec(&vec![7u8, 8, 9, 10]).unwrap();
+    let cid = {
+        let owner = BlobStore::open_owner(root).await.unwrap();
+        owner.store_record(&canonical).await.unwrap().cid
+    };
+    let path = elohim_blob_store::fanout_path(&root.join("records"), &cid.to_string());
+    if unreadable {
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+    } else {
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[1] ^= 0x01;
+        std::fs::write(&path, bytes).unwrap();
+    }
+    (canonical, cid, path)
+}
+
+#[tokio::test]
+async fn a_shared_instance_never_replaces_a_record() {
+    for unreadable in [false, true] {
+        let dir = private_root();
+        let (canonical, cid, path) = damaged_record(dir.path(), unreadable).await;
+        let before = snapshot(dir.path());
+        let shared = BlobStore::open_shared(dir.path()).await.unwrap();
+        let refused = shared.store_record(&canonical).await;
+        if unreadable {
+            assert!(
+                matches!(refused, Err(BlobStoreError::HeldCopyUnreadable { .. })),
+                "{refused:?}"
+            );
+            assert!(path.is_dir(), "the unreadable record was replaced");
+        } else {
+            assert!(
+                matches!(refused, Err(BlobStoreError::HashMismatch { .. })),
+                "{refused:?}"
+            );
+        }
+        assert!(shared.get_record(&cid).await.is_err());
+        assert_eq!(
+            snapshot(dir.path()),
+            before,
+            "a shared instance replaced a record"
+        );
+
+        // The owner keeps today's behaviour: it rewrites the record.
+        if !unreadable {
+            let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+            owner.store_record(&canonical).await.unwrap();
+            assert_eq!(&owner.get_record(&cid).await.unwrap()[..], &canonical[..]);
+        }
+    }
+}
+
+#[cfg(feature = "tier")]
+#[tokio::test]
+async fn a_shared_tier_never_replaces_a_record() {
+    use eprfs_core::{BlobCid, EprfsStorage};
+    for unreadable in [false, true] {
+        let dir = private_root();
+        let (canonical, cid, path) = damaged_record(dir.path(), unreadable).await;
+        let before = snapshot(dir.path());
+        let tier = elohim_blob_store::tier::BlobStoreTier::at(dir.path(), OpenMode::Shared)
+            .await
+            .unwrap();
+        let blob = BlobCid::parse(&cid.to_string()).unwrap();
+        assert!(tier
+            .put_blob_verified(&blob, bytes::Bytes::from(canonical.clone()))
+            .await
+            .is_err());
+        assert_eq!(snapshot(dir.path()), before, "the tier replaced a record");
+        assert_eq!(path.is_dir(), unreadable);
+    }
+}

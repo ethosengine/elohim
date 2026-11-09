@@ -2029,12 +2029,32 @@ impl Inner {
         let path = self.record_path(&cid);
         let byte_len = bytes.len() as u64;
         let _publication = self.coord.publication()?;
-        if fs::read(&path).is_ok_and(|held| compute_record_cid(&held) == cid) {
-            return Ok(RecordStoreResult {
-                cid,
-                byte_len,
-                already_existed: true,
-            });
+        // Verified, absent, corrupt or unreadable: only the first two are a shared instance's
+        // to answer; the others are left for the owner, which rewrites them as before.
+        match fs::read(&path) {
+            Ok(held) if compute_record_cid(&held) == cid => {
+                return Ok(RecordStoreResult {
+                    cid,
+                    byte_len,
+                    already_existed: true,
+                });
+            }
+            Ok(held) if self.shared() => {
+                return Err(BlobStoreError::HashMismatch {
+                    expected: cid.to_string(),
+                    actual: format!(
+                        "held record hashes to {}; left for the store's owner",
+                        compute_record_cid(&held)
+                    ),
+                });
+            }
+            Err(error) if error.kind() != io::ErrorKind::NotFound && self.shared() => {
+                return Err(BlobStoreError::HeldCopyUnreadable {
+                    cid: cid.to_string(),
+                    reason: error.to_string(),
+                });
+            }
+            Ok(_) | Err(_) => {}
         }
         self.write_atomic(Area::Record, &path, bytes)?;
         Ok(RecordStoreResult {
