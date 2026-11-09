@@ -1,8 +1,8 @@
 ---
 id: task-as-e3-report
 title: serve-blob mount with scope enforcement (artifact-store E3)
-status: landed-on-branch
-landed_commit:
+status: landed
+landed_commit: 3b266e41d
 verified_by: "Codex gpt-6-astra read review (BLOCK: H1 stale index, H2 folded events as local custody, M3, M4) + astra re-review (H1–H4 closed; N1–N3 new) + orchestrator (Claude Opus 5.5) hunk review of the gate/answer path and of the N1–N3 delta (event-order designation in rebuild_from_flow_at, receiver+no-via custody filter, spawned single-flight rebuild); serve_blob 19/19; eprfs gate EXIT=0 at dd5a148a (evidence/gate-E3-eprfs.log). Orchestrator gate red at this tree is environmental (pre-abd66bdb1 epr) and is re-run at integration."
 concerns: "TierRequest/TierAnswer gained variants (a breaking change to exhaustive matches; fold.rs's fixture updated). A granted artifact root passes admit_root for tree reads too (design §1.3 as written); the tree endpoint then answers Failed/Unanswered from the channel store and never serves artifact bytes. A session closes on connection close, so a fetcher that opens one connection per request records one partial Use per request: F2 should draw one artifact over one connection."
 actor: agent:as-e3@claude-opus-5-5

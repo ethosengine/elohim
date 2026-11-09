@@ -1,9 +1,9 @@
 ---
 id: task-as-h-report
-status: claimed-not-verified
+status: landed
 cites: []
-landed_commit:
-verified_by:
+landed_commit: 1b76c2327
+verified_by: "red-team third read + L3 combined gate evidence/gate-L3-storage.log; household chaos 3/3, blob-durability lane, epr-app-deliverability 7/7; L3 landing evidence/push-L3.log"
 concerns:
   - "R2 adds three witness values beyond the brief's three (recon, fetch-verified, self): those writers exist and needed a class; all three bind the row's peer id to the speaker"
   - "R2 (pass 1) joined the salvage floor through peer_transport_manifest — red-team BLOCK, superseded in pass 2 (beb0888b): every binding and floor read now goes through p2p::transport_authority (cross-signed chain only)"

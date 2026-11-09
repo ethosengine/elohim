@@ -1,9 +1,9 @@
 ---
 id: task-as-e2-report
-status: claimed-not-verified
+status: landed
 cites: []
-landed_commit:
-verified_by:
+landed_commit: 1b76c2327
+verified_by: "astra review evidence/e2-astra-review.md; L3 combined gate evidence/gate-L3-storage.log; L3 landing evidence/push-L3.log"
 concerns: see Deviations
 actor: agent:e2@claude-sonnet-5-5
 ---

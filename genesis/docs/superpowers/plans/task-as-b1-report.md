@@ -1,8 +1,8 @@
 ---
 id: task-as-b1-report
 cites: []
-status: landed-on-branch
-landed_commit:
+status: landed
+landed_commit: 3b266e41d
 verified_by: "orchestrator (Claude Opus 5.5): diff read + `just gate orchestrator` EXIT=0 at dc0a8b2f4 with EPR_BIN at bafyreif5zxb6… (evidence/gate-B1-orchestrator.log, 2026-11-07T23:23Z); the real notes push and the gospel change follow at landing"
 concerns: gate orchestrator red in this worktree for environmental reasons (see body)
 actor: agent:b1@claude-sonnet-5-5
