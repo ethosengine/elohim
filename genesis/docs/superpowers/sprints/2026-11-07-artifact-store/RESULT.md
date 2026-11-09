@@ -67,8 +67,13 @@ no DELTA. E4, one authoritative payload store per device, was not started.
   pending scenarios, the same count as before this sprint (#1751). The four alpha humans are bound
   and the seeder prints the doorway's identifiers.
 - eprfs #105, edge #1843, app #1798: SUCCESS.
-- Turning genesis green means defining those 37 scenarios' steps. That is story-authoring work
-  this sprint did not take on.
+- Turning genesis green means building those 37 scenarios' behaviour, not only their steps
+  (census 2026-11-09, `evidence/undefined-scenarios-census.md`): none of the four features is
+  glue-only, three of them omit `@wip` on purpose so the red stays visible, and 35 of the 37 are
+  already held by the Act I substrate gate. Cucumber still reports them undefined because it
+  classifies a missing definition before it applies the hold. The cheapest honest start, by source
+  reading, is `doorway/operator-standing` (a per-request, commitment-scoped capability check on
+  the existing admin mutations). That changes the doorway, so landing it rolls alpha.
 
 ## Operator items
 
