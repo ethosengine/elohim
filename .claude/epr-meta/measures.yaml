@@ -1726,6 +1726,69 @@ measures:
       concern, concern_routes.route() returns None for them, no measure reads elohim-edge
       results, and the habit that owns the clause still described the fleet check as unmeasured.
 
+  # ── algedonic-designer firing 2026-11-09 (seed 2255572718; waiting, repetition,
+  # contradiction / 8d). Re-genesis 1 on alpha: every storage node's binding minter spent its
+  # fixed six-attempt budget (~18 min) before the conductors installed 45–70 min later, and no
+  # node held a cross-signed binding until a person read Loki; genesis skipped its three delivery
+  # verify stages for two builds and the skip read as neither red nor unstable.
+  - id: storage-binding-unconfirmed
+    version: 1
+    family: identity
+    unit: nodes
+    procedure: >
+      For one environment (`--env env=alpha|household`), after a roll or recast has completed
+      (every conductor Ready) and at least 30 minutes have passed since the last storage process
+      in it started, count the storage nodes that hold NO current DHT-confirmed binding for their
+      own agent: on each node's storage SQLite, `SELECT count(*) FROM binding_confirmations
+      WHERE agent_cid = <the node's own agent_cid> AND (valid_until IS NULL OR valid_until >
+      datetime('now'))` returns 0 (table from migration 2026-11-07-150000_binding_confirmations,
+      written only by the DHT-arrival projection and transport_authority::confirm). Where the
+      SQLite is not readable (alpha), a node counts as unconfirmed when its storage log since that
+      boot holds no `binding mint: committed a CROSS-SIGNED AgentPeerBinding` line
+      (elohim/elohim-storage/src/p2p/binding_mint.rs). Fold the count on subject `.` with
+      `--env env=<env> --env nodes=<n read>`. A node whose state and log are both unreadable is
+      excluded and named in the reason; when none is readable, fold nothing (UNMEASURED, never 0).
+    env-sensitivity: [env, nodes]
+    provenance: "genesis/docs/superpowers/sprints/2026-11-07-artifact-store/STATE.md 05:55Z 2026-11-08 (ethosengine's Loki read of alpha: no cross-signed AgentPeerBinding anywhere; every binding_mint gave up after 6 attempts ~01:32→01:50Z, conductors installed 02:36–02:44Z, never retried) and genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/regression-classes.md class 7 (6 attempts ≈ 18 min against conductors 45–70 min later; no alpha node holds a cross-signed binding). Household reading for contrast: STATE.md 19:49Z 2026-11-08, every shem peer confirmed all three bindings ≤ 1 min after boot."
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-11-09
+    why: >
+      Since pass 4 (82d545cce) custody, salvage and inventory authority come only from a
+      cross-signed, DHT-confirmed binding, and a claim from an unbound author is held for at most
+      4 h and then lost. A node with no binding is therefore silent to the dataplane while every
+      probe that counts ready pods reads it healthy. The identity-cross-signed live check reads
+      attribution counters, which cannot tell "every binding verified" from "no binding exists";
+      nothing counted the bindings themselves, so the alpha fleet waited on a retry budget that
+      had already expired.
+
+  - id: genesis-verify-stage-skipped
+    version: 1
+    family: delivery
+    unit: builds
+    procedure: >
+      Over the newest ten completed elohim-genesis dev builds whose result is SUCCESS or UNSTABLE
+      and whose `Check Trigger` stage did not set PIPELINE_SKIPPED (a build that skipped
+      everything on purpose is excluded), read
+      `https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/<n>/wfapi/describe` and count
+      the builds in which any of the stages `Seed Custody Commitments`, `Verify Substrate
+      Propagation` or `Verify Delivery Events` (genesis/Jenkinsfile) is absent or has status
+      NOT_EXECUTED / SKIPPED. Fold the count on subject `.` with `--env job=elohim-genesis --env
+      first_build=<n> --env last_build=<n>`. When no wfapi read succeeds, fold nothing
+      (UNMEASURED, never 0).
+    env-sensitivity: [job, first_build, last_build]
+    provenance: "genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/regression-classes.md classes 9–10 (2026-11-08): `substrate-verify.ts` renamed its state files to `*_blob_cid` (44a8b99a8) while genesis/Jenkinsfile still read `*_blob_hash`; the read failed inside catchError, the env stayed empty, and three stages gated on `when { env.X != '' }` (custody seeding, propagation, delivery verify) skipped for two builds. Jenkins shows a skip as neither red nor unstable."
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-11-09
+    why: >
+      A skipped verify stage is a delivery claim nobody checked, and the build verdict cannot
+      carry it: a skip is green in Jenkins and UNSTABLE is already the resting state of this job
+      (.claude/data/ci-cursor.json elohim-genesis recent 15/15 UNSTABLE). The cure in class 10
+      removed the derived-value gates, but other `when` gates remain on these stages, so a skip
+      is still possible and still silent. No declared measure reads genesis stage status:
+      delivery-series.mjs reads only the elohim App job.
+
 lenses:
   - id: dialogue-blocked-ceiling
     version: 1
@@ -2763,3 +2826,54 @@ lenses:
       (16b82ec09dc5, to 2026-10-22); that cumulative count is provenance, not a newest-ten
       reading. Read with `epr flow report --bound edge-apex-root-unserved-ceiling`; the bound
       declares no headline slot.
+
+  # ── algedonic-designer firing 2026-11-09 (seed 2255572718; waiting, repetition,
+  # contradiction / 8d) ──
+  - id: storage-binding-unconfirmed-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [storage-binding-unconfirmed@1]
+    subject: .
+    env: { env: alpha }
+    context: session-headline
+    compare: at-or-above
+    hard: 1
+    concern: dataplane-convergence
+    retire-when: >
+      when binding authority no longer gates the dataplane (custody, salvage and inventory
+      admission stop requiring a DHT-confirmed binding), or when storage readiness itself refuses
+      while this node's own binding is unconfirmed, so an unbound node can no longer read ready
+    status: active
+    established_by: algedonic-designer-2026-11-09
+    why: >
+      Zero unbound nodes is the priced bound: since pass 4 (82d545cce) a node without a
+      confirmed binding has its custody announcements held for at most 4 h and then dropped, so
+      one unbound node is already a peer the dataplane cannot hear. The household proves zero is
+      reachable (every shem peer confirmed within 1 min of boot, 2026-11-08); the 30-minute grace
+      in the procedure is thirty times that. At mint the alpha reading was 7 of 7 (Loki,
+      2026-11-08 05:55Z), so 7 >= 1 reads red. The concern is the one regression-classes.md
+      declares in its `habits:` frontmatter.
+
+  - id: genesis-verify-stage-skipped-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [genesis-verify-stage-skipped@1]
+    subject: .
+    env: { job: elohim-genesis }
+    context: session-headline
+    compare: at-or-above
+    hard: 1
+    concern: dataplane-convergence
+    retire-when: >
+      when custody seeding, propagation and delivery verify no longer run as genesis Jenkins
+      stages (the proof moves to a peer-observed receipt), so there is no stage left to skip
+    status: active
+    established_by: algedonic-designer-2026-11-09
+    why: >
+      Regression class 10 prices the bound: "consumer stages no longer gate on the derived value.
+      A missing value is a named unstable(...)", so a skipped verify stage is never the intended
+      outcome and one in ten builds is already the defect. At mint the reading was 2 (the two
+      builds class 9 names), so 2 >= 1 reads red. The concern is the one regression-classes.md
+      declares in its `habits:` frontmatter.
