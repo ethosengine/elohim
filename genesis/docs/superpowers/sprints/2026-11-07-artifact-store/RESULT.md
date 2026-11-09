@@ -60,6 +60,16 @@ no DELTA. E4, one authoritative payload store per device, was not started.
    its input); libp2p/dual tier modes (typed gaps); F5 release-plane custody gate; source
    materialization by projected view.
 
+## CI state at the end of the shakeout (2026-11-09 ~06:00Z, dev 67ce33fd2)
+
+- orchestrator #2265 SUCCESS; #2266 UNSTABLE only through genesis.
+- **genesis #1758 UNSTABLE: 0 failed scenarios.** The cause is the long-standing 37 undefined and 5
+  pending scenarios, the same count as before this sprint (#1751). The four alpha humans are bound
+  and the seeder prints the doorway's identifiers.
+- eprfs #105, edge #1843, app #1798: SUCCESS.
+- Turning genesis green means defining those 37 scenarios' steps. That is story-authoring work
+  this sprint did not take on.
+
 ## Operator items
 
 - Close dialogue-stasis incidents :270, :288, :303 and :314. Each parked an effect after it had
