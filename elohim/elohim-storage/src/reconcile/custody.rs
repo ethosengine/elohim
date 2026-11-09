@@ -1004,7 +1004,7 @@ mod tests {
         id: &str,
         provider: &str,
         receiver: &str,
-        blob_hash: &str,
+        blob_cid: &str,
     ) {
         let row = NewReaCommitment {
             id,
@@ -1013,7 +1013,7 @@ mod tests {
             provider,
             receiver,
             resource_conforms_to: None,
-            resource_classified_as: Some(blob_hash),
+            resource_classified_as: Some(blob_cid),
             resource_quantity_value: Some(1024.0),
             resource_quantity_unit: Some("bytes"),
             effort_quantity_value: None,
@@ -1067,8 +1067,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         // Use a fresh timestamp so the inventory entry is within freshness window.
         let now = chrono::Utc::now();
@@ -1076,7 +1076,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1100,7 +1100,7 @@ mod tests {
         assert_eq!(outcome.kicks_fired, 1);
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
-        assert_eq!(kicks[0].0, blob_hash);
+        assert_eq!(kicks[0].0, blob_cid);
         assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
     }
 
@@ -1114,9 +1114,9 @@ mod tests {
         id: &str,
         provider: &str,
         receiver: &str,
-        blob_hash: &str,
+        blob_cid: &str,
     ) {
-        let classified = serde_json::to_string(&vec![blob_hash]).unwrap();
+        let classified = serde_json::to_string(&vec![blob_cid]).unwrap();
         let row = NewReaCommitment {
             id,
             h_app_id: "test",
@@ -1157,15 +1157,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('b');
-        insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('b');
+        insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1193,7 +1193,7 @@ mod tests {
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
         assert_eq!(
-            kicks[0].0, blob_hash,
+            kicks[0].0, blob_cid,
             "the kicked hash is the unwrapped real blob hash, not the [..] literal"
         );
     }
@@ -1205,15 +1205,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('c');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('c');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1235,7 +1235,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(outcome.kicks_fired, 1, "bare custody row still resolves");
-        assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_hash);
+        assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_cid);
     }
 
     /// Retry hygiene: a marker that is not a byte CID — a `sha256-<hex>`, bare hex,
@@ -1311,8 +1311,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1334,7 +1334,7 @@ mod tests {
         assert_eq!(outcome.fallback_kicks, 1);
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
-        assert_eq!(kicks[0].0, blob_hash);
+        assert_eq!(kicks[0].0, blob_cid);
         assert_eq!(kicks[0].1, connected);
     }
 
@@ -1345,8 +1345,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1377,15 +1377,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1417,8 +1417,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1454,8 +1454,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         // Fresh inventory entry from other_cid.
         let now = chrono::Utc::now();
@@ -1463,7 +1463,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "other_cid",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1492,8 +1492,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         // First pass: emit gap.
         let now = chrono::Utc::now();
@@ -1541,16 +1541,16 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
+        let blob_cid = cid_of('a');
         // provider = agent_cid (NOT the transport self_cid).
-        insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_hash);
+        insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1585,14 +1585,14 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
+        let blob_cid = cid_of('a');
         // provider = transport self_cid (legacy write).
         insert_custody_commitment(
             &mut conn,
             "c1",
             "12D3KooTransportSelfId",
             "steward-Z",
-            &blob_hash,
+            &blob_cid,
         );
 
         let now = chrono::Utc::now();
@@ -1600,7 +1600,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1634,8 +1634,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -2447,13 +2447,13 @@ mod tests {
             .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
             .await
             .expect("store");
-        let blob_hash = stored.cid.to_string();
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = stored.cid.to_string();
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
         let when = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
