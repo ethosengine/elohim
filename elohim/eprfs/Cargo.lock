@@ -1290,6 +1290,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-blob-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bytes",
+ "cid",
+ "elohim-epr",
+ "eprfs-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "elohim-cache-core"
 version = "0.1.0"
 dependencies = [
@@ -1367,10 +1385,12 @@ name = "elohim-epr-cli"
 version = "0.3.3"
 dependencies = [
  "base64 0.22.1",
+ "bytes",
  "chrono",
  "cid",
  "did-bridge",
  "elohim-ark-core",
+ "elohim-blob-store",
  "elohim-consent-grant",
  "elohim-device-runtime",
  "elohim-epr",
@@ -1660,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "async-trait",
  "blake3",
