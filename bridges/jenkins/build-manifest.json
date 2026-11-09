@@ -13,6 +13,7 @@
           ".epr-meta/collective.json",
           "elohim/epr/**",
           "crates/elohim-address/**",
+          "crates/elohim-blob-store/**",
           "elohim/epr-rea/**",
           "elohim/eprfs/**",
           "elohim/ark/core/**",

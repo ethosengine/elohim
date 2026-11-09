@@ -18,7 +18,7 @@ use elohim_epr_rea::{
     atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
 };
 use eprfs_core::{BlobCid, MethodDescriptor, TreePath};
-use eprfs_peer::{open_payload_store, BlobMount, CrossingAllowList};
+use eprfs_peer::{BlobMount, CrossingAllowList};
 use tempfile::TempDir;
 
 const HANDLE: &str = "matthew";
@@ -346,7 +346,15 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
     assert!(allow.admits(produce), "artifact-produce@1 produce crosses");
 
     // … and it is this device's local custody: the serve-blob mount indexes it from this event.
-    let store = open_payload_store(&a.payload()).unwrap();
+    // Opened as every epr process opens it: by the directory's format marker (artifact-store E4),
+    // so a blob-store directory is never read as a flat directory store.
+    let store = elohim_epr_cli::payload::open_payload_store(
+        &a.payload(),
+        elohim_epr_cli::payload::Access::Shared,
+    )
+    .await
+    .unwrap()
+    .store;
     let (mount, _served) = BlobMount::new(store, did.clone());
     let indexed: Vec<_> = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
     let unindexed = mount.rebuild_from_flow(&indexed).await;

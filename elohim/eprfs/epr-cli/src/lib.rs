@@ -26,6 +26,8 @@ pub mod integrate;
 #[cfg(feature = "lsp")]
 pub mod lsp;
 #[cfg(feature = "peer")]
+pub mod payload;
+#[cfg(feature = "peer")]
 pub mod peer;
 pub mod process;
 pub mod ready;

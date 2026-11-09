@@ -34,10 +34,10 @@ use eprfs_core::{
 };
 use eprfs_peer::{
     ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
-    key_cid, open_payload_store, put_local_blob_with, put_method_record, read_queue_file,
-    resolve_holders, write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest,
-    FetchTransport, LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND,
-    ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
+    key_cid, put_local_blob_with, put_method_record, read_queue_file, resolve_holders,
+    write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport,
+    LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL,
+    FETCH_TOTAL,
 };
 use serde::Serialize;
 
@@ -1190,8 +1190,18 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         ..peer::Options::default()
     };
     let payload_dir = peer::payload_store_dir(&peer_options)?;
-    let store = open_payload_store(&payload_dir)
-        .map_err(|e| unrecorded(format!("the payload store does not open: {e}")))?;
+    // The runtime the put runs on: a blob-store payload backend is opened inside it (shared: the
+    // serving daemon, when up, is the store's owner).
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let store = runtime
+        .block_on(crate::payload::open_payload_store(
+            &payload_dir,
+            crate::payload::Access::Shared,
+        ))
+        .map_err(|e| unrecorded(format!("the payload store does not open: {e}")))?
+        .store;
     served_store_matches(&payload_dir)?;
     let flow_root = peer::served_root(repo).map_err(unrecorded)?;
     let scope = crate::flow::repository::repository_scope(repo)
@@ -1229,9 +1239,6 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         format!("env:commit={}", key.head),
         format!("env:agentId={agent_id}"),
     ];
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
     let put = runtime.block_on(async {
         put_method_record(store.as_ref(), &descriptor)
             .await

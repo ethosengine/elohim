@@ -30,11 +30,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
-    lease_events, open_payload_store, other_devices, peer_from_arg, relay_from_env,
-    roster_rows_from_file, slots, steward_lease_view, via_device, Admission, CrossingAllowList,
-    HeadTable, LeaseVerdict, NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules,
-    RulesState, StewardScope, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT,
-    MEASURE_SLOT,
+    lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
+    steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
+    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
+    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -76,6 +75,11 @@ pub enum PeerCliError {
 
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// The payload store refused to open (a format this epr does not link, an unmarked layout
+    /// it does not recognise, a second owner).
+    #[error("{0}")]
+    PayloadStore(#[from] crate::payload::PayloadStoreError),
 
     /// This device's `epr peer serve` holds its serve lock.
     #[error(
@@ -756,7 +760,19 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
     // The payload store this daemon serves, recorded where `epr artifact put` checks it writes the
     // same one (artifact-store review M9).
     let payload_dir = payload_store_dir(&options)?;
-    let payload = open_payload_store(&payload_dir)?;
+    // The runtime the daemon runs on: a blob-store payload backend is opened inside it, since its
+    // filesystem work runs on that runtime's blocking pool.
+    let runtime = runtime()?;
+    let payload = runtime.block_on(crate::payload::open_payload_store(
+        &payload_dir,
+        crate::payload::Access::Owner,
+    ))?;
+    eprintln!(
+        "epr peer: payload store {} ({})",
+        payload.root.display(),
+        payload.format
+    );
+    let payload = payload.store;
     let payload_dir = std::fs::canonicalize(&payload_dir)?;
     std::fs::write(
         device.peer_dir.join(PAYLOAD_STORE_RECORD),
@@ -793,7 +809,6 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         payload_store: Some(payload),
         install,
     };
-    let runtime = runtime()?;
     runtime.block_on(async move {
         let mut daemon = PeerDaemon::start(config).await?;
         let stop = termination();
