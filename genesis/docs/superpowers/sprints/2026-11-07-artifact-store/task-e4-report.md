@@ -3,7 +3,7 @@ id: artifact-store-task-e4-report
 status: claimed-not-verified
 landed_commit:
 verified_by:
-concerns: [R4-integrity-class, review-fixes-1-4, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
+concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
 actor: agent:e4@claude-opus-5-5 (Claude Opus 5.5, session f1769d1c)
 ---
 
@@ -432,3 +432,98 @@ about 20 minutes at the start of the `epr-storage` project.)
 New frontier from finding 3: an inline object that a payload reuses stays a payload in its own
 right, and deleting one costs a scan of `index/` (`referenced_chunks`), the cost a chunked delete
 already paid.
+
+## Review fixes, round 2 (astra's re-review, `genesis/local-dev/as-e4/e4-rereview.receipt.md`)
+
+Findings 1, 2 and 4 were judged FIXED. Finding 3 was PARTIAL, with three new defects. After the
+rebase onto dev `07cc490a0`, round 1 is `a4431d418`, `234928dd0`, `69bab8483` and `c29c90373`.
+Round 2 is one commit, `b9032be34`, covering rulings A–E (one store module, one rule). F is a
+frontier, below.
+
+**A — one canonical byte location.** This replaces "first form wins". On a store opened with
+`open_owner`/`open_shared`, every byte CID's bytes live at exactly one path, `chunks/<cid>`,
+whether the CID arrived as a standalone object or as a chunk. A standalone object is a one-chunk
+layout record (`index/<cid>`) plus a marker (`blobs/<cid>`) naming that file.
+
+- **Publishing a chunk file:** stage the bytes in `tmp/`, fsync them, then `link(2)` the staging
+  file into place (`put_canonical_chunk` / `link_into`). The link never replaces an existing name.
+- **Losing the race:** the loser finds the name taken, verifies the winner's file
+  (`settle_existing_chunk`) and drops its own staging file. A damaged winner is repaired under
+  the exclusive lock, as in round-1 fix 1. Racing arrivals therefore converge across processes,
+  across instances, and across distinct payload CIDs in one instance. No check-then-write window
+  remains.
+- **No new inline copies:** owner/shared stores never write one.
+- **Legacy inline copies:** a legacy `blobs/<cid>` stays readable. When its CID is needed as a
+  chunk, it is hard-linked into `chunks/<cid>`, so one inode carries the bytes.
+- **Filesystems that refuse links:** the bytes are renamed into place, and the inline file is
+  retired to a marker under the exclusive lock once the publication ends
+  (`retire_copied_inline`). On such a filesystem two concurrent arrivals may both write
+  identical bytes; that is named in the docs.
+
+**B — the unlocked store is unchanged.** `BlobStore::new` (storage's `/blob`, alpha) keeps the
+legacy representation, as its doc comment now says:
+- inline small payloads, and its own chunk files for larger ones;
+- no reuse, no relocation, no inline read fallback.
+
+`the_unlocked_store_keeps_the_legacy_representation` asserts the two files dev has, in both
+orders. Two non-representation changes reach it from round 1: repairs re-verify under its
+in-process write lock (fix 1), and D's servable-index retention.
+
+**C — quarantine never strips shared good bytes.** On a canonical store, quarantining a CID whose
+bytes verify and that another layout names (`referenced_chunks_except`) retires only its
+standalone entry. That entry is the marker and record, or a legacy inline name once its bytes are
+linked into `chunks/`. The bytes stay, and the unit stays listed. Failing bytes go to quarantine
+with the entry, and every layout naming them reads `HashMismatch`.
+
+**D — delete never unlists a retained verified unit.** After a delete or a relocation, a unit
+whose verified chunk file remains stays in the servable index (`keep_listed_if_retained`). A GC'd
+chunk is unlisted only if no copy of it remains.
+
+**E — tests** (`crates/elohim-blob-store/tests/canonical.rs`). Before the fix: EXIT=101, with 6
+of the 7 failing. After: EXIT=0.
+
+| test | before |
+|---|---|
+| `a_standalone_object_on_an_owner_or_shared_store_lives_at_its_chunk_path` (owner and shared) | failed |
+| `a_legacy_inline_object_becomes_a_chunk_by_a_hard_link` (same `(dev, ino)`) | failed |
+| `the_unlocked_store_keeps_the_legacy_representation` (both orders) | failed |
+| `quarantining_a_standalone_object_leaves_a_payload_that_shares_its_bytes_readable` (both orders) | failed |
+| `quarantining_bytes_that_fail_leaves_every_layout_naming_them_damaged` (both orders) | failed |
+| `a_delete_never_unlists_a_retained_verified_unit` (both orders) | failed |
+| `concurrent_standalone_and_payload_arrivals_hold_one_copy` (200 rounds) | **passed** |
+
+The concurrency test races two `open_shared` instances (two open file descriptions of
+`ops.lock`) on two threads, 200 rounds. It counts distinct inodes carrying C's bytes across
+`blobs/` and `chunks/`, and checks both units read whole through both instances. It passed before
+the fix: the old check-then-write window did not open in 200 rounds. It is a regression guard;
+the deterministic location test is the one that shows the defect.
+
+Also:
+- `store::tests::without_hard_links_a_legacy_inline_chunk_is_copied_then_retired_to_one_copy`
+  covers the no-link fallback, through an injected `Unsupported` from `link`.
+- `one_copy.rs` runs on the owner store and spoils the canonical chunk file.
+- The convergence test in `multi_process.rs` now expects the single-chunk payload's bytes under
+  `chunks/`, plus one layout record per payload.
+- The 9 MiB both-orders custody test in epr-cli is unchanged and still passes.
+
+**F — frontier: lock acquisition has no deadline** (astra, item 1). `ops.lock` waits are
+blocking `flock` calls. Repairs retry at most four times, but under sustained contention a
+publication or a destructive act can wait without bound. A timed or try-lock acquisition with a
+typed `Busy` answer is the follow-up.
+
+### Verification after round 2
+
+One cargo at a time, `TMPDIR=/projects/.claude-config/tmp/gate-e4`, each judged by its `EXIT=` line:
+
+- `crates/elohim-blob-store`, `cargo test --locked --all-features`: EXIT=0. That is 44 unit
+  tests, 7 canonical, 8 multi-process and 3 one-copy.
+- `crates/elohim-blob-store`, `cargo test --locked` (default features): EXIT=0.
+- `crates/elohim-blob-store`, clippy `-D warnings`, all features and default: EXIT=0 both.
+- `crates/elohim-blob-store`, fmt: EXIT=0.
+- epr-cli: `cargo test --no-fail-fast -p elohim-epr-cli --features blob-store` EXIT=0 (75 test
+  binaries, no failures), and the same without the feature EXIT=0. This includes the 9 MiB
+  both-orders custody test.
+- elohim-storage: `cargo test --test blob` EXIT=0 (41 passed, 1 ignored), and `cargo test --lib`
+  EXIT=0 (4963 passed, 3 ignored), on the unlocked store's restored legacy representation.
+- No `allow`/`expect` attribute was added. `crates/elohim-blob-store/Cargo.toml` gained only the
+  dev-dependency tokio feature `sync`, for the race test's barrier; the lockfile is unchanged.
