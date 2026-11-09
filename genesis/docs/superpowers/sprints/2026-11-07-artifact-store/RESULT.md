@@ -32,13 +32,12 @@ no DELTA. E4, one authoritative payload store per device, was not started.
 | L3 | 1b76c2327 | H hardening passes 1–5 (cross-signed, DHT-confirmed holder bindings; bounded confirmer), E2 tolerant reader, P policy epoch, R1.4 receipts | combined gate `evidence/gate-L3-storage.log`; household chaos-peer-churn 3/3, blob-durability lane 8/0/3/3, epr-app-deliverability 7/7; edge #1840/#1841 SUCCESS; fleet quiesce sustained |
 | shakeout | 683b10ce3, 88f95922c | backlog rows from L3; the alpha orphaned-binding incident and its proof | genesis #1757 |
 | shakeout | 0452dc85e | gate key: a habit DELTA no longer re-keys its crate's gate; blob-durability and push-gate-pays-once DELTAs | `gate-evidence.test.mjs` 72/72; real-commit receipt on 2c413084f; pre-push ALL CLEAR 1258 s |
-| shakeout | (pending) | seeder reports the identifier the doorway stores | `seed-humans-binding.test.ts` 7/7, seeder 753 passed |
+| shakeout | 6a82e3c44 | seeder reports the identifier the doorway stores; close docs | `seed-humans-binding.test.ts` 7/7, seeder 753 passed |
 
-The pending row lands during this shakeout; STATE.md records its commit.
 
 ## Owed (what the next sprint picks up)
 
-1. **F2r, the 454 MB receipt** (runbook: `f2r-runbook.md`). On ethosengine run `just mesh build storage` (a Produce). On shem
+1. **F2r, the 454 MB receipt** (runbook: `f2r-runbook.md`). **Producer half done 2026-11-09 on shem** (`evidence/f2r-produce-shem.md`): 468 MB recorded under key `bafyreibz2qaq…`, and the record crossed. What remains is the fetching half, run on ethosengine. On ethosengine run `just mesh build storage` (a Produce). On shem
    the same build should resolve the record and fetch the binary instead of compiling it. Then run
    the reverse direction for doorway, then a second successive build to measure reuse. Compare
    both devices' `tool:` lines first (the key carries the resolved cc/ld paths and versions). The
