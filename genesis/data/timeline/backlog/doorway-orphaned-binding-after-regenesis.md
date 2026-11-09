@@ -42,9 +42,54 @@ Acts:
 A full wipe was rejected. `users` holds 4,039 rows, and a wipe would have dropped the passing node
 and device rows, Matthew's steward record and 23 accounts created after the re-genesis.
 
+**Proof run, genesis #1756 (2026-11-09, dispatched by 683b10ce3 `[build:genesis]`): half proven.**
+- Matthew is fixed: `[=] Matthew … doorway household=household-dowell (projection row exists — key
+  bound at registration)`.
+- Ezra, Maria and Ronald still fail, with the same `[X] … ORPHANED-BINDING` (log ~3040–3050). The
+  seeder reaches that line only on the `exists` path: register answered 409, or 503 "Agent
+  already has a Human profile", and the login that followed succeeded with no `installedAppId`.
+  A fresh registration would print `[+]`. So when #1756 seeded, an account row for each of them
+  existed and accepted the seed password, although the operator's delete reported success.
+- The same run's hosted reclaim freed nothing:
+  `reclaim-ephemeral-hosted: listed=132 candidates=78 freed=0 skipped-active=60 failed=18`. Each
+  failure was `DELETE /admin/hosted-users/<key> -> HTTP 500`. With 60 active hosted agents against
+  the doorway's default ceiling of 50 per conductor (`DEFAULT_MAX_AGENTS_PER_CONDUCTOR`), a fresh
+  hosted registration may have no conductor to provision on. In that case
+  `registration_agent_key` stores the custodial key with no hosted app, the same symptom.
+
+What decides between these is in `doorway-alpha.users` and the provisioning records, which
+operators read: whether the three rows exist now, their `created_at` against the delete, their
+`agent_pub_key`, whether more than one row matched each identifier (the delete matched
+identifier + old key only), and whether a provisioning record exists for them.
+
+**Correction, 2026-11-09 ~03:45Z: the first repair deleted the wrong rows (cause 1, not capacity).**
+The seeder sends and prints `ezra@test.elohim.host`. The doorway re-qualifies every identifier to
+its own gateway domain (`normalize_identifier`, `doorway/doorway-service/src/routes/auth_routes.rs`
+~:1513, `localpart@gateway`), so the row it reads is `ezra@alpha.elohim.host`. The doorway log for
+#1756 shows `Login successful: ezra@alpha.elohim.host` at 03:25:30, and the same for Maria and
+Ronald. The `@test` rows deleted first were unused leftovers. The rows actually in use:
+
+| row | created_at | agent_pub_key | rows per id | registry rows | provisioning intent |
+|---|---|---|---|---|---|
+| ezra@alpha | 2026-06-23 | uhCAkcWXXr5k… | 1 | 0 | none |
+| maria@alpha | 2026-06-23 | uhCAkvMaCT1Z… | 1 | 0 | none |
+| ronald@alpha | 2026-06-23 | uhCAkmihQ8a6… | 1 | 0 | none |
+
+They predate the re-genesis and name conductor-4 or conductor-5, now gertrude's and susan's pods,
+which do not host. So registration got a 409, the seed password still logged in, and there was no
+app to bind. Capacity is not the cause. The doorway counts it from `conductor_registry` by
+distinct agent, and the two hosting conductors (adam, matthew) hold 1 and 2 rows. The operator
+backed up the three `@alpha` rows and deleted each by identifier plus its exact old key
+(`deletedCount: 1` each; none remain).
+
 **Still owed:**
-1. **Proof.** The next `elohim-genesis/dev` run lists all four as created or bound, with no `[X]`.
-   Record the build number here, then close item 1.
+0. **The seeder reports an identifier the doorway does not store.** It prints what it sent
+   (`creds.identifier`, `genesis/seeder/src/seed-humans.ts` ~:216 and ~:719), not the doorway's
+   normalized identifier. That sent the first repair to the wrong rows. Print the identifier the
+   doorway answers with, or apply the same normalization. A re-genesis reset must target rows by
+   the doorway's own identifiers.
+1. **Proof.** Matthew is proven by #1756. Ezra, Maria and Ronald need the cause above found and a
+   genesis run showing them `[+]` or `[=]` with no `[X]`.
 2. **Live backstop.** Build a doorway invariant reporting orphaned bindings = 0: a chaperoned
    (`hosted` or `doorway` phase) account whose key no reached conductor hosts. Today only
    `store_verdict` exists, and it covers the opposite case (store lost, conductors intact). Until
@@ -54,7 +99,10 @@ and device rows, Matthew's steward record and 23 accounts created after the re-g
    in the repair above, and never wipes the store. Write it into the re-genesis runbook next to
    `DNA_MIGRATION_INTENT` and the PVC clear. The household's `MESH_RESET` already removes doorway
    identity state with the conductors; alpha needs the targeted form.
-4. **Low priority:**
+4. **The hosted reclaim frees nothing.** In #1756, `reclaim-ephemeral-hosted` hit 18 HTTP 500s on
+   `DELETE /admin/hosted-users/<key>` and freed 0 of 78 candidates. It did not cause this failure,
+   but ephemeral e2e hosted agents accumulate.
+5. **Low priority:**
    - A few `oauth_sessions` rows still reference Matthew and Maria. They are harmless and expire.
    - conductor-7 to conductor-13 hold about 220 registry rows from earlier runs that nothing
      prunes. This predates the re-genesis.
