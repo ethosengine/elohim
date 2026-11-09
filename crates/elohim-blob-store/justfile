@@ -1,0 +1,13 @@
+# Invoked through the manifest gate runner, which resolves the native pool slot.
+# The device payload store (artifact-store E4) is its own workspace: its consumers' gates
+# (elohim-storage, eprfs) never run a dependency's tests, so its store, tier and
+# multi-process tests run here, with default features (the store alone) and all features
+# (the eprfs tier).
+gate:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    run() { "$@"; result=$?; echo EXIT=$result; [ "$result" -eq 0 ] || exit "$result"; }
+    run cargo fmt --check
+    run cargo clippy --locked --all-features --all-targets -- -D warnings
+    run cargo test --locked
+    run cargo test --locked --all-features

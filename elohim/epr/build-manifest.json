@@ -90,8 +90,8 @@
           "buildProcess": []
         },
         "run": {
-          "kind": "root-just",
-          "recipe": "_gate-elohim-blob-store",
+          "kind": "just",
+          "recipe": "gate",
           "cargo": { "workspace": "crates/elohim-blob-store", "profile": "dev", "rustflags": "" }
         }
       },
