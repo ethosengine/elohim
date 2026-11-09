@@ -185,7 +185,10 @@ impl Store {
                 Some(row) => row.ingested_at = provenance.ingested_at,
                 None => release.sources.push(provenance),
             }
-            if release.ring != "landed" {
+            if !matches!(
+                release.ring.as_str(),
+                "landed" | "reverted" | "lineage-rebased"
+            ) {
                 release.ring = "dev-context".into();
             }
             self.save(&release)?;

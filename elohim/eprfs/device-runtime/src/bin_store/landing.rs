@@ -195,9 +195,18 @@ impl Store {
                     "current.json does not describe current",
                 ));
             }
-            if old != cid && transition.judges_ancestry() {
-                let descends =
-                    self.descends(repo, metadata["commit"].as_str().unwrap_or(""), commit)?;
+            let prior_commit = metadata["commit"].as_str().unwrap_or("");
+            // A transition is a change of bytes OR of source commit: identical release bytes
+            // re-ingested under another commit still move the committed head's lineage.
+            let moves = old != cid || prior_commit != commit;
+            if !moves && matches!(transition, Transition::RebaseLineage { .. }) {
+                return Err(Refusal::new(
+                    "rebase-not-needed",
+                    format!("{cid} at {commit} is already the committed head"),
+                ));
+            }
+            if moves && transition.judges_ancestry() {
+                let descends = self.descends(repo, prior_commit, commit)?;
                 if transition.requires_descent() && !descends {
                     return Err(Refusal::new(
                         "non-descendant",
@@ -299,7 +308,7 @@ impl Store {
             if let Some((kind, detail)) = health_note {
                 Self::add_note(&mut latest, kind, detail);
             }
-            if old.as_deref() == Some(cid) {
+            if old.as_deref() == Some(cid) && meta["commit"].as_str() == Some(commit) {
                 // Health/admission still run, but this is maintenance, not a landing.
                 if has_health_note {
                     self.save(&latest)?;
