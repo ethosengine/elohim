@@ -31,14 +31,14 @@ no DELTA. E4, one authoritative payload store per device, was not started.
 | survey | 364da4e09..4a1f41a69 | Radicle/Heartwood survey v2 | docs |
 | L3 | 1b76c2327 | H hardening passes 1–5 (cross-signed, DHT-confirmed holder bindings; bounded confirmer), E2 tolerant reader, P policy epoch, R1.4 receipts | combined gate `evidence/gate-L3-storage.log`; household chaos-peer-churn 3/3, blob-durability lane 8/0/3/3, epr-app-deliverability 7/7; edge #1840/#1841 SUCCESS; fleet quiesce sustained |
 | shakeout | 683b10ce3, 88f95922c | backlog rows from L3; the alpha orphaned-binding incident and its proof | genesis #1757 |
-| shakeout | (pending) | gate key: a habit DELTA no longer re-keys its crate's gate; blob-durability and push-gate-pays-once DELTAs | `gate-evidence.test.mjs` 72/72; real-commit receipt on 2c413084f |
+| shakeout | 0452dc85e | gate key: a habit DELTA no longer re-keys its crate's gate; blob-durability and push-gate-pays-once DELTAs | `gate-evidence.test.mjs` 72/72; real-commit receipt on 2c413084f; pre-push ALL CLEAR 1258 s |
 | shakeout | (pending) | seeder reports the identifier the doorway stores | `seed-humans-binding.test.ts` 7/7, seeder 753 passed |
 
-The two pending rows land during this shakeout; STATE.md records their commits.
+The pending row lands during this shakeout; STATE.md records its commit.
 
 ## Owed (what the next sprint picks up)
 
-1. **F2r, the 454 MB receipt.** On ethosengine run `just mesh build storage` (a Produce). On shem
+1. **F2r, the 454 MB receipt** (runbook: `f2r-runbook.md`). On ethosengine run `just mesh build storage` (a Produce). On shem
    the same build should resolve the record and fetch the binary instead of compiling it. Then run
    the reverse direction for doorway, then a second successive build to measure reuse. Compare
    both devices' `tool:` lines first (the key carries the resolved cc/ld paths and versions). The
@@ -50,10 +50,14 @@ The two pending rows land during this shakeout; STATE.md records their commits.
    needs the never-held-twice test.
 4. **B3, mesh staleness keyed by closure.** It was never briefed. hc-mesh.sh still judges binary
    freshness by `src/` mtime, so a path-dependency, Cargo.lock or feature change passes as fresh.
-5. **Debt:** rename `blob_hash` to `blob_cid` in `elohim-storage/src/reconcile/custody.rs`. The
+5. **E2's review fix never landed.** Branch `artifact-store/e2-null-ext` (d77171ffd) re-applies
+   d4cf5763b: an explicit null `ext` is refused, not normalized into a different CID. It needs an
+   `eprfs-storage` 0.3.7 bump and both lockfiles, which dispatches edge, so it lands with the
+   storage closure below. Details are in `task-as-e2-report.md`.
+6. **Debt:** rename `blob_hash` to `blob_cid` in `elohim-storage/src/reconcile/custody.rs`. The
    address-profile-lint ratchet baseline was raised by three for L3. This is a storage source
    change, so it dispatches edge.
-6. **Frontiers kept from the plan (§9):** bao range reads; the FsStore ruling (R1.4 receipts are
+7. **Frontiers kept from the plan (§9):** bao range reads; the FsStore ruling (R1.4 receipts are
    its input); libp2p/dual tier modes (typed gaps); F5 release-plane custody gate; source
    materialization by projected view.
 

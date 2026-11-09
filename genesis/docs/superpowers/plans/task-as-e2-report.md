@@ -2,7 +2,7 @@
 id: task-as-e2-report
 status: landed
 cites: []
-landed_commit: 1b76c2327
+landed_commit: 1b76c2327  # without the review fix d4cf5763b; see "Landing gap" below
 verified_by: "astra review evidence/e2-astra-review.md; L3 combined gate evidence/gate-L3-storage.log; L3 landing evidence/push-L3.log"
 concerns: see Deviations
 actor: agent:e2@claude-sonnet-5-5
@@ -29,3 +29,18 @@ actor: agent:e2@claude-sonnet-5-5
 - Not renamed to `UnsupportedManifestVersion`; the existing `UnsupportedEpoch` variant and message stay (the epoch-1 test pins them).
 - "Records an unavailable Use": Use recording lives in `eprfs-peer::stream_local_blob` (outside write-set and not a dev-dependency of eprfs-storage). The storage test asserts the `Unavailable` outcome that function records as `draw:unavailable` for every non-hit; no peer-level test was added.
 - Retention is canonical DAG-CBOR re-encode of the `ext` value (byte-exact for canonical writers; an explicit CBOR `null` ext decodes as absent). The nested `DerivationRecord` still discards its own `ext` on decode (derive.rs, Track A); derive.rs untouched.
+
+## Landing gap found 2026-11-09
+
+L3 (1b76c2327) carried E2 as it stood before the astra review fix. The branch's d4cf5763b ("refuse
+explicit null ext instead of normalizing it away") and its test
+`explicit_null_ext_is_refused_not_normalized` never reached dev. On dev, an explicit null `ext`
+decodes as absent and re-encodes without the key, changing the manifest's bytes and CID. Only a
+non-canonical (forged) manifest carries one.
+
+The fix is re-applied as d77171ffd on branch `artifact-store/e2-null-ext` (14/14 in
+`local_tier_blob`). It cannot land alone: eprfs's publish precheck requires an `eprfs-storage`
+version bump (0.3.6 → 0.3.7) for a changed `tier_blob.rs`. The bump rewrites `elohim/Cargo.lock`,
+which dispatches elohim-edge (an alpha roll) and the elohim-storage gate. It rides the next storage
+closure. Found while checking as-e2 for unlanded patches before removing it.
+
