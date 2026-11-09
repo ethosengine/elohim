@@ -188,9 +188,16 @@ pub enum Detected {
 /// [`PayloadStoreError::Layout`] for an unmarked blob-store, mixed or unrecognisable layout;
 /// [`PayloadStoreError::Io`] when the directory cannot be read.
 pub fn detect(root: &Path) -> Result<Detected, PayloadStoreError> {
+    detect_with(root, &|| {})
+}
+
+/// [`detect`], calling `after_marker_read` between the first marker read and the scan (the
+/// window a racing first open publishes its marker in; tests widen it).
+fn detect_with(root: &Path, after_marker_read: &dyn Fn()) -> Result<Detected, PayloadStoreError> {
     if let Some(marker) = read_marker(root)? {
         return Ok(Detected::Marked(marker));
     }
+    after_marker_read();
     let entries = match std::fs::read_dir(root) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Detected::New),
@@ -211,6 +218,12 @@ pub fn detect(root: &Path) -> Result<Detected, PayloadStoreError> {
         } else {
             other.push(name.into_owned());
         }
+    }
+    // The marker is authoritative. A first open racing this one may have published it (and
+    // built its layout) between the read above and the scan, so it is read again before an
+    // unmarked layout is classified or refused.
+    if let Some(marker) = read_marker(root)? {
+        return Ok(Detected::Marked(marker));
     }
     let refused = |reason: String| {
         Err(PayloadStoreError::Layout {
@@ -346,7 +359,16 @@ pub async fn open_payload_store(
     root: &Path,
     access: Access,
 ) -> Result<PayloadStore, PayloadStoreError> {
-    let format = match detect(root)? {
+    open_with(root, access, &|| {}).await
+}
+
+/// [`open_payload_store`] with [`detect_with`]'s hook.
+async fn open_with(
+    root: &Path,
+    access: Access,
+    after_marker_read: &dyn Fn(),
+) -> Result<PayloadStore, PayloadStoreError> {
+    let format = match detect_with(root, after_marker_read)? {
         Detected::Marked(marker) => linked_format(root, &marker)?,
         Detected::UnmarkedDirectory => PayloadFormat::DirectoryV1,
         Detected::New => {
@@ -422,5 +444,37 @@ mod tests {
         for name in [elohim_blob_store::OWNER_LOCK, elohim_blob_store::OPS_LOCK] {
             assert!(BLOB_STORE_NAMES.contains(&name), "{name}");
         }
+    }
+
+    #[test]
+    fn an_open_that_loses_the_first_open_race_opens_the_winners_format() {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("payload");
+        create_private_dir(&root).unwrap();
+        let winner = PayloadFormat::for_new_store();
+        // Between this open's marker read and its scan, another first open selects the
+        // format and builds its layout.
+        let race = || {
+            assert_eq!(select_format(&root, winner).unwrap(), winner.marker());
+            if winner == PayloadFormat::BlobStoreV1 {
+                for area in ["blobs", "chunks", "index", "records", "quarantine", "tmp"] {
+                    std::fs::create_dir_all(root.join(area)).unwrap();
+                }
+                std::fs::write(root.join("ops.lock"), b"").unwrap();
+            }
+        };
+        let opened = runtime
+            .block_on(open_with(&root, Access::Shared, &race))
+            .unwrap_or_else(|error| panic!("the race's loser refused the winner: {error}"));
+        assert_eq!(opened.format, winner);
+        assert_eq!(
+            detect(&root).unwrap(),
+            Detected::Marked(winner.marker().into())
+        );
     }
 }
