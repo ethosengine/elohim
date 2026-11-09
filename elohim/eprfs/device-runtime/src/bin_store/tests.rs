@@ -793,6 +793,195 @@ fn a_later_revert_does_not_keep_an_earlier_rebase_description() {
     assert!(!back.extra.contains_key("rebaseReason"));
 }
 
+fn rebase(reason: &str) -> Transition {
+    Transition::RebaseLineage {
+        reason: reason.into(),
+    }
+}
+
+#[test]
+fn lineage_rebase_moves_identical_bytes_onto_a_new_lineage_commit() {
+    let f = Fixture::new("epr");
+    let old_commit = f.commit();
+    let same = f.release("same-bytes");
+    f.land(&same).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let again = f.release("same-bytes");
+    assert_eq!(again.cid, same.cid);
+    f.state.lock().unwrap().descended = false;
+
+    let forward = f
+        .store
+        .land_expected(
+            &same.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Forward,
+            Some(&same.cid),
+        )
+        .unwrap_err();
+    assert_eq!(forward.kind, "non-descendant");
+
+    let landed = f
+        .store
+        .land_expected(
+            &same.cid,
+            &f.commit(),
+            f.tmp.path(),
+            rebase("dev was rewritten"),
+            Some(&same.cid),
+        )
+        .unwrap();
+    assert_eq!(landed.ring, "lineage-rebased");
+    assert_eq!(
+        landed.extra["rebasedFrom"],
+        json!({"cid":same.cid,"commit":old_commit})
+    );
+    let current: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert_eq!(current["commit"], f.commit());
+    assert_eq!(current["cid"], same.cid);
+}
+
+#[test]
+fn lineage_rebase_refuses_identical_bytes_on_a_descendant_or_unchanged_commit() {
+    let f = Fixture::new("epr");
+    let same = f.release("same-bytes");
+    f.land(&same).unwrap();
+    assert_eq!(
+        f.store
+            .land_expected(
+                &same.cid,
+                &f.commit(),
+                f.tmp.path(),
+                rebase("nothing moved"),
+                Some(&same.cid)
+            )
+            .unwrap_err()
+            .kind,
+        "rebase-not-needed"
+    );
+    f.state.lock().unwrap().head = "b".repeat(40);
+    f.release("same-bytes");
+    f.state.lock().unwrap().descended = true;
+    assert_eq!(
+        f.store
+            .land_expected(
+                &same.cid,
+                &f.commit(),
+                f.tmp.path(),
+                rebase("a descendant"),
+                Some(&same.cid)
+            )
+            .unwrap_err()
+            .kind,
+        "rebase-not-needed"
+    );
+}
+
+#[test]
+fn re_ingest_keeps_a_lineage_rebased_ring_and_its_fields() {
+    let f = Fixture::new("epr");
+    let old = f.release("old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let rebased = f.release("rebased-lineage");
+    f.state.lock().unwrap().descended = false;
+    f.store
+        .land_expected(
+            &rebased.cid,
+            &f.commit(),
+            f.tmp.path(),
+            rebase("dev was rewritten"),
+            Some(&old.cid),
+        )
+        .unwrap();
+    f.release("rebased-lineage");
+    let reloaded = f.store.record(&rebased.cid).unwrap();
+    assert_eq!(reloaded.ring, "lineage-rebased");
+    assert!(reloaded.extra.contains_key("rebasedFrom"));
+    assert_eq!(reloaded.extra["rebaseReason"], "dev was rewritten");
+}
+
+#[test]
+fn lineage_rebase_keeps_unpublished_and_unhealthy_refusals_with_head_unchanged() {
+    let f = Fixture::new("epr");
+    let old = f.release("old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("candidate");
+    {
+        let mut state = f.state.lock().unwrap();
+        state.descended = false;
+        state.published = false;
+    }
+    let unpublished = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            rebase("dev was rewritten"),
+            Some(&old.cid),
+        )
+        .unwrap_err();
+    assert_eq!(unpublished.kind, "unpublished", "{unpublished:?}");
+    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    {
+        let mut state = f.state.lock().unwrap();
+        state.published = true;
+        state.health_fail = true;
+    }
+    let unhealthy = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            rebase("dev was rewritten"),
+            Some(&old.cid),
+        )
+        .unwrap_err();
+    assert_ne!(unhealthy.kind, "rebase-not-needed", "{unhealthy:?}");
+    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+}
+
+#[test]
+fn a_forward_re_land_of_a_rebased_release_records_an_ordinary_landing() {
+    let f = Fixture::new("epr");
+    let old = f.release("old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let rebased = f.release("rebased-lineage");
+    f.state.lock().unwrap().descended = false;
+    f.store
+        .land_expected(
+            &rebased.cid,
+            &f.commit(),
+            f.tmp.path(),
+            rebase("dev was rewritten"),
+            Some(&old.cid),
+        )
+        .unwrap();
+    f.state.lock().unwrap().head = "c".repeat(40);
+    f.release("rebased-lineage");
+    f.state.lock().unwrap().descended = true;
+    let again = f
+        .store
+        .land_expected(
+            &rebased.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Forward,
+            Some(&rebased.cid),
+        )
+        .unwrap();
+    assert_eq!(again.ring, "landed");
+    assert!(!again.extra.contains_key("rebasedFrom"));
+    assert!(!again.extra.contains_key("rebaseReason"));
+    let current: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert_eq!(current["commit"], f.commit());
+}
+
 #[test]
 fn lineage_rebase_requires_an_existing_explicit_matching_prior() {
     let f = Fixture::new("epr");
