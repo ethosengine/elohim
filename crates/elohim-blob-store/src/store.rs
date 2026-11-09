@@ -203,6 +203,30 @@ enum Verdict {
     Unknown(String),
 }
 
+/// What a publication found already held under the payload's CID.
+enum Held {
+    /// A verified copy.
+    Whole,
+    /// Nothing (or, for an owner, a copy it could not read: it is rewritten).
+    Absent,
+    /// A copy that fails verification: the publication steps out and repairs it.
+    Damaged(String),
+}
+
+/// What [`Inner::put_chunk`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChunkPut {
+    /// The chunk's bytes were already held (as a chunk file or a verified inline payload).
+    Held,
+    /// The chunk file was written.
+    Written,
+    /// A held chunk file fails its CID: repair it under the exclusive lock, then put again.
+    Damaged,
+}
+
+/// How many times a publication steps out to repair damage before it gives up.
+const PUBLISH_ATTEMPTS: usize = 4;
+
 /// What a condemnation found once it held the right to move files.
 enum Condemned {
     /// Still defective: moved to quarantine.
@@ -1146,48 +1170,74 @@ impl Inner {
             already_existed,
         };
 
-        let _publication = self.coord.publication()?;
-        let _stripe = self.stripe(&cid);
-        // "Already exists" means exists AND verifies: the verdict hashes every byte it
-        // vouches for. A held copy that fails is quarantined and rewritten below (a shared
-        // instance refuses instead); `put_chunk` replaces a held chunk that fails its CID.
-        if self.held_whole_or_repaired(&cid)? {
-            self.mark_payload(&cid, &chunk_refs);
-            return Ok(result(true));
-        }
-
-        if chunks.len() <= 1 {
-            self.write_atomic(Area::Blob, &self.blob_path(&cid), data)?;
-            self.tally.add(Footprint::inline(byte_len));
-        } else {
-            for (chunk, &(offset, len)) in chunks.iter().zip(&cuts) {
-                self.put_chunk(chunk, &data[offset..offset + len])?;
+        // A publication that finds damage steps out (releasing its stripe and its share of
+        // the operation lock), repairs under the exclusive lock, and starts again: no file is
+        // moved on a read made under a shared lock, and nothing is upgraded while held.
+        for _ in 0..PUBLISH_ATTEMPTS {
+            let publication = self.coord.publication()?;
+            let stripe = self.stripe(&cid);
+            // "Already exists" means exists AND verifies: the verdict hashes every byte it
+            // vouches for.
+            match self.held(&cid)? {
+                Held::Whole => {
+                    self.mark_payload(&cid, &chunk_refs);
+                    return Ok(result(true));
+                }
+                Held::Damaged(reason) => {
+                    warn!(cid = %cid, %reason, "held blob failed verification — repairing");
+                    drop(stripe);
+                    drop(publication);
+                    self.repair_payload(&cid)?;
+                    continue;
+                }
+                Held::Absent => {}
             }
-            self.write_layout(&cid, byte_len, &layout_bytes, &layout_cid)?;
+            if chunks.len() <= 1 {
+                self.write_atomic(Area::Blob, &self.blob_path(&cid), data)?;
+                self.tally.add(Footprint::inline(byte_len));
+            } else {
+                let mut damaged = None;
+                for (chunk, &(offset, len)) in chunks.iter().zip(&cuts) {
+                    if self.put_chunk(chunk, &data[offset..offset + len])? == ChunkPut::Damaged {
+                        damaged = Some(chunk.cid);
+                        break;
+                    }
+                }
+                if let Some(bad) = damaged {
+                    drop(stripe);
+                    drop(publication);
+                    self.repair_chunk(&bad)?;
+                    continue;
+                }
+                self.write_layout(&cid, byte_len, &layout_bytes, &layout_cid)?;
+            }
+            // Written from bytes this call hashed: servable now, no later hashing needed.
+            self.mark_payload(&cid, &chunk_refs);
+            info!(cid = %cid, size = byte_len, chunks = chunk_refs.len(), "Stored blob");
+            return Ok(result(false));
         }
-        // Written from bytes this call hashed: servable now, no later hashing needed.
-        self.mark_payload(&cid, &chunk_refs);
-        info!(cid = %cid, size = byte_len, chunks = chunk_refs.len(), "Stored blob");
-        Ok(result(false))
+        Err(BlobStoreError::Internal(format!(
+            "payload {cid} kept failing verification while it was stored"
+        )))
     }
 
-    /// Under a publication and the payload's stripe: `true` when a verified copy is already
-    /// held. A held copy that fails verification is a repair: an owner (or the unlocked
-    /// store) moves it, and every chunk that fails its own CID, to quarantine so the store
-    /// can rewrite it (`false`); a shared instance overwrites nothing and refuses.
-    fn held_whole_or_repaired(&self, cid: &ByteCid) -> Result<bool> {
+    /// Under a publication and the payload's stripe: what is already held under `cid`. Moves
+    /// nothing. A held copy that fails verification is [`Held::Damaged`] for an owner (or the
+    /// unlocked store), whose publication then steps out and repairs it under the exclusive
+    /// lock ([`Inner::repair_payload`]); a shared instance overwrites nothing and refuses.
+    fn held(&self, cid: &ByteCid) -> Result<Held> {
         match self.verdict_locked(cid) {
-            Verdict::Whole => Ok(true),
-            Verdict::Absent => Ok(false),
+            Verdict::Whole => Ok(Held::Whole),
+            Verdict::Absent => Ok(Held::Absent),
             Verdict::Unknown(reason) => {
                 if self.shared() {
-                    return Err(BlobStoreError::Internal(format!(
-                        "the held copy of {cid} could not be read ({reason}); a shared \
-                         instance does not overwrite it"
-                    )));
+                    return Err(BlobStoreError::HeldCopyUnreadable {
+                        cid: cid.to_string(),
+                        reason,
+                    });
                 }
                 warn!(cid = %cid, %reason, "held blob could not be read — rewriting");
-                Ok(false)
+                Ok(Held::Absent)
             }
             Verdict::Defect(reason) => {
                 if self.shared() {
@@ -1200,21 +1250,57 @@ impl Inner {
                         ),
                     });
                 }
-                warn!(cid = %cid, %reason, "held blob failed verification — quarantined");
-                self.quarantine_bad_chunks(cid);
-                let _ = self.quarantine_payload(cid, &reason);
-                Ok(false)
+                Ok(Held::Damaged(reason))
             }
         }
     }
 
-    /// Write one chunk unless a file already holds exactly its bytes. A held file that
-    /// fails the chunk's CID is quarantined and rewritten, so a store heals it (a shared
-    /// instance refuses instead).
-    fn put_chunk(&self, chunk: &ChunkRef, bytes: &[u8]) -> Result<()> {
+    /// A publication found `cid`'s held copy damaged and has released its guards. Under the
+    /// exclusive lock and the stripe, verify again and quarantine it, with every chunk that
+    /// fails its own CID, only if it is still damaged (another publication may have repaired
+    /// it meanwhile).
+    fn repair_payload(&self, cid: &ByteCid) -> Result<()> {
+        let _exclusive = self.coord.destruction("repair")?;
+        let _stripe = self.stripe(cid);
+        if let Verdict::Defect(reason) = self.verdict_locked(cid) {
+            warn!(cid = %cid, %reason, "held blob failed verification — quarantined");
+            self.quarantine_bad_chunks(cid);
+            self.quarantine_payload(cid, &reason)?;
+        }
+        Ok(())
+    }
+
+    /// The same for one chunk file a publication found failing its CID: re-read it under the
+    /// exclusive lock and quarantine it only if it still fails.
+    fn repair_chunk(&self, cid: &ByteCid) -> Result<()> {
+        #[cfg(test)]
+        self.damage_noticed();
+        let _exclusive = self.coord.destruction("repair")?;
+        let path = self.chunk_path(cid);
+        match fs::read(&path) {
+            Ok(held) if &compute_bytes_cid(&held) != cid => {
+                self.quarantine_files(
+                    cid,
+                    std::slice::from_ref(&path),
+                    "held chunk fails its cid",
+                )?;
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        Ok(())
+    }
+
+    /// Write one chunk unless its bytes are already held: a chunk file of exactly its bytes,
+    /// or a verified inline payload of the same CID (one copy per byte CID). A held chunk file
+    /// that fails its CID is [`ChunkPut::Damaged`] — moved by nobody here: the owner's
+    /// publication steps out and repairs it ([`Inner::repair_chunk`]); a shared instance
+    /// refuses.
+    fn put_chunk(&self, chunk: &ChunkRef, bytes: &[u8]) -> Result<ChunkPut> {
         let path = self.chunk_path(&chunk.cid);
         match fs::read(&path) {
-            Ok(held) if compute_bytes_cid(&held) == chunk.cid => return Ok(()),
+            Ok(held) if compute_bytes_cid(&held) == chunk.cid => return Ok(ChunkPut::Held),
             Ok(_) => {
                 if self.shared() {
                     return Err(BlobStoreError::HashMismatch {
@@ -1222,17 +1308,37 @@ impl Inner {
                         actual: "held chunk fails its cid; left for the store's owner".into(),
                     });
                 }
-                self.quarantine_files(
-                    &chunk.cid,
-                    std::slice::from_ref(&path),
-                    "held chunk fails its cid",
-                )?;
+                return Ok(ChunkPut::Damaged);
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
         self.write_atomic(Area::Chunk, &path, bytes)?;
-        Ok(())
+        Ok(ChunkPut::Written)
+    }
+
+    /// [`Inner::put_chunk`] for a streamed publication: a damaged chunk is repaired with the
+    /// publication released (`publication` is dropped and taken again), then put again.
+    fn put_chunk_resuming<'a>(
+        &'a self,
+        chunk: &ChunkRef,
+        bytes: &[u8],
+        publication: &mut Option<Publication<'a>>,
+        paused: &mut bool,
+    ) -> Result<()> {
+        for _ in 0..PUBLISH_ATTEMPTS {
+            if self.put_chunk(chunk, bytes)? != ChunkPut::Damaged {
+                return Ok(());
+            }
+            *publication = None;
+            self.repair_chunk(&chunk.cid)?;
+            *publication = Some(self.coord.publication()?);
+            *paused = true;
+        }
+        Err(BlobStoreError::Internal(format!(
+            "chunk {} kept failing verification while it was stored",
+            chunk.cid
+        )))
     }
 
     /// Write the layout record, then the marker, and count the payload.
@@ -1255,7 +1361,12 @@ impl Inner {
     fn store_stream<R: Read>(&self, reader: R) -> Result<StoreResult> {
         let stream = chunk_stream(&STORE_PROFILE, reader)
             .map_err(|error| BlobStoreError::Internal(format!("chunker: {error}")))?;
-        let _publication = self.coord.publication()?;
+        // The stream cannot be replayed, so a damaged chunk is repaired in place: the
+        // publication steps out, the repair runs under the exclusive lock, and the
+        // publication resumes with the chunk still in memory. Chunks written before a pause
+        // are named by no marker yet, so they are checked again before the marker is written.
+        let mut publication = Some(self.coord.publication()?);
+        let mut paused = false;
         let mut whole = blake3::Hasher::new();
         let mut chunks: Vec<ChunkRef> = Vec::new();
         let mut first: Option<Vec<u8>> = None;
@@ -1273,11 +1384,18 @@ impl Inner {
                 1 => {
                     // A second chunk: the payload is chunked, so the first is a chunk file.
                     if let Some(held) = first.take() {
-                        self.put_chunk(&chunks[0], &held)?;
+                        self.put_chunk_resuming(&chunks[0], &held, &mut publication, &mut paused)?;
                     }
-                    self.put_chunk(&chunk_ref, &chunk.data)?;
+                    self.put_chunk_resuming(
+                        &chunk_ref,
+                        &chunk.data,
+                        &mut publication,
+                        &mut paused,
+                    )?;
                 }
-                _ => self.put_chunk(&chunk_ref, &chunk.data)?,
+                _ => {
+                    self.put_chunk_resuming(&chunk_ref, &chunk.data, &mut publication, &mut paused)?
+                }
             }
             chunks.push(chunk_ref);
         }
@@ -1286,8 +1404,41 @@ impl Inner {
         let layout_bytes = layout.encode()?;
         let layout_cid = compute_record_cid(&layout_bytes);
 
-        let _stripe = self.stripe(&cid);
-        let already_existed = self.held_whole_or_repaired(&cid)?;
+        let mut attempts = 0;
+        let (_stripe, already_existed) = loop {
+            let stripe = self.stripe(&cid);
+            match self.held(&cid)? {
+                Held::Whole => break (stripe, true),
+                Held::Absent => break (stripe, false),
+                Held::Damaged(reason) => {
+                    warn!(cid = %cid, %reason, "held blob failed verification — repairing");
+                    attempts += 1;
+                    if attempts >= PUBLISH_ATTEMPTS {
+                        return Err(BlobStoreError::Internal(format!(
+                            "payload {cid} kept failing verification while it was stored"
+                        )));
+                    }
+                    drop(stripe);
+                    drop(publication.take());
+                    self.repair_payload(&cid)?;
+                    publication = Some(self.coord.publication()?);
+                    paused = true;
+                }
+            }
+        };
+        if paused && !already_existed && chunks.len() > 1 {
+            for chunk in &chunks {
+                let held = fs::metadata(self.chunk_path(&chunk.cid)).map(|meta| meta.len());
+                if held.ok() != Some(u64::from(chunk.len)) {
+                    return Err(BlobStoreError::Internal(format!(
+                        "chunk {} left the store while the publication of {cid} paused for a \
+                         repair; store it again",
+                        chunk.cid
+                    )));
+                }
+            }
+        }
+        let _publication = publication;
         if chunks.len() <= 1 {
             let data = first.unwrap_or_default();
             if !already_existed {
@@ -2117,6 +2268,19 @@ impl Inner {
             .journal
             .push(area);
     }
+
+    /// A publication found a held chunk that fails its CID and is about to act on that read.
+    fn damage_noticed(&self) {
+        let gate = self
+            .faults
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .damage_gate
+            .clone();
+        if let Some(gate) = gate {
+            gate.pass();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2149,6 +2313,40 @@ mod tests {
         pub crash_after: Option<usize>,
         pub journal: Vec<Area>,
         pub events: Vec<Event>,
+        pub damage_gate: Option<Arc<DamageGate>>,
+    }
+
+    /// Holds the first publication that notices a damaged chunk until released; every later
+    /// one passes. Orders two publications' reads and repairs of one chunk.
+    #[derive(Debug, Default)]
+    pub(super) struct DamageGate {
+        state: Mutex<(usize, bool)>,
+        changed: std::sync::Condvar,
+    }
+
+    impl DamageGate {
+        pub(super) fn pass(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.0 += 1;
+            self.changed.notify_all();
+            if state.0 == 1 {
+                while !state.1 {
+                    state = self.changed.wait(state).unwrap();
+                }
+            }
+        }
+
+        fn wait_arrived(&self) {
+            let mut state = self.state.lock().unwrap();
+            while state.0 == 0 {
+                state = self.changed.wait(state).unwrap();
+            }
+        }
+
+        fn release(&self) {
+            self.state.lock().unwrap().1 = true;
+            self.changed.notify_all();
+        }
     }
 
     fn faults(store: &BlobStore) -> std::sync::MutexGuard<'_, Faults> {
@@ -3175,5 +3373,58 @@ mod tests {
         let (cid, bound) = (result.cid, compute_record_cid(&record));
         assert!(Inner::layout_from(&cid, &bound, &record).is_ok());
         assert!(Inner::layout_from(&cid, &bound, b"other").is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_stale_repair_never_quarantines_a_chunk_another_publication_healed() {
+        let (dir, store) = open().await;
+        let store = Arc::new(store);
+        let first = chunked_payload();
+        let mut second = chunked_payload();
+        second.extend_from_slice(&xorshift_bytes(9 * 1024 * 1024)[6 * 1024 * 1024..]);
+        // Both payloads begin with the same chunk; a corrupt file is held under its CID.
+        let (offset, len) = chunk_bytes(&ValidatedProfile::EPOCH_0, &first)[0];
+        assert_eq!(
+            chunk_bytes(&ValidatedProfile::EPOCH_0, &second)[0],
+            (offset, len)
+        );
+        let shared = compute_bytes_cid(&first[offset..offset + len]);
+        let path = fanout_path(&dir.path().join("chunks"), &shared.to_string());
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let mut spoiled = first[offset..offset + len].to_vec();
+        spoiled[9] ^= 0x01;
+        fs::write(&path, &spoiled).unwrap();
+
+        let gate = Arc::new(DamageGate::default());
+        faults(&store).damage_gate = Some(gate.clone());
+        // The second publication reads the damaged chunk first and is held there...
+        let late = {
+            let (store, second) = (store.clone(), second.clone());
+            tokio::spawn(async move { store.store(&second).await })
+        };
+        {
+            let gate = gate.clone();
+            tokio::task::spawn_blocking(move || gate.wait_arrived())
+                .await
+                .unwrap();
+        }
+        // ...while the first reads it too, repairs it and completes.
+        let healed = store.store(&first).await.unwrap();
+        assert_eq!(&store.get(&healed.cid).await.unwrap()[..], &first[..]);
+        // Then the held publication acts on its stale read, and its next write fails.
+        {
+            let mut faults = faults(&store);
+            faults.enospc_at = Some(faults.writes + 1);
+        }
+        gate.release();
+        let _ = late.await.unwrap();
+
+        assert_eq!(store.exists(&healed.cid).await, Exists::Verified);
+        assert_eq!(&store.get(&healed.cid).await.unwrap()[..], &first[..]);
+        assert_eq!(
+            compute_bytes_cid(&fs::read(&path).unwrap()),
+            shared,
+            "the healed chunk is still in place"
+        );
     }
 }

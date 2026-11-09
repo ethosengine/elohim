@@ -42,6 +42,7 @@ pub fn storage_error(error: BlobStoreError) -> StorageError {
         BlobStoreError::Internal(text) => StorageError::Internal(text),
         other @ (BlobStoreError::OwnerHeld { .. }
         | BlobStoreError::SharedInstance { .. }
+        | BlobStoreError::HeldCopyUnreadable { .. }
         | BlobStoreError::UnsafeRoot { .. }) => StorageError::Internal(other.to_string()),
     }
 }

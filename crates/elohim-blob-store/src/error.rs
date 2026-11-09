@@ -6,7 +6,7 @@ use std::path::PathBuf;
 /// Every failure of a [`crate::BlobStore`] operation.
 ///
 /// The first five variants are the ones the store has always produced (elohim-storage maps
-/// them onto its own `StorageError` variant for variant); the last three belong to the
+/// them onto its own `StorageError` variant for variant); the last four belong to the
 /// owner/shared split and to opening a store a peer shares with another process.
 #[derive(Debug, thiserror::Error)]
 pub enum BlobStoreError {
@@ -38,6 +38,11 @@ pub enum BlobStoreError {
     /// files.
     #[error("a shared payload-store instance may not {op}: only the store's owner moves or removes files")]
     SharedInstance { op: &'static str },
+
+    /// A shared instance found a held copy it could not read: it does not know what it would
+    /// overwrite, so it writes nothing and leaves the copy for the owner.
+    #[error("the held copy of {cid} could not be read ({reason}); left for the store's owner")]
+    HeldCopyUnreadable { cid: String, reason: String },
 
     /// The root of an owner or shared store is not a private, real directory.
     #[error("payload store root {} refused: {reason}", root.display())]
