@@ -319,11 +319,16 @@ impl Fixture {
     }
     fn land(&self, r: &Release) -> Result<Release> {
         self.store
-            .land(&r.cid, &self.commit(), self.tmp.path(), false)
+            .land(&r.cid, &self.commit(), self.tmp.path(), Transition::Forward)
     }
     fn land_expected(&self, r: &Release, expected: Option<&str>) -> Result<Release> {
-        self.store
-            .land_expected(&r.cid, &self.commit(), self.tmp.path(), false, expected)
+        self.store.land_expected(
+            &r.cid,
+            &self.commit(),
+            self.tmp.path(),
+            Transition::Forward,
+            expected,
+        )
     }
     fn install(&self) -> Result<Value> {
         atomic_bytes(&self.path("native"), b"#!/bin/sh\nexit 0\n", 0o755).unwrap();
@@ -664,6 +669,330 @@ fn test_land_updates_heads_under_lock() {
     assert_eq!(v["cid"], b.cid);
     assert_eq!(v["commit"], f.commit());
 }
+
+#[test]
+fn forward_refuses_a_non_descendant_and_lineage_rebase_records_the_truthful_prior() {
+    let f = Fixture::new("epr");
+    let old_commit = f.commit();
+    let old = f.release("old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("rebased-lineage");
+    f.state.lock().unwrap().descended = false;
+
+    let error = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Forward,
+            Some(&old.cid),
+        )
+        .unwrap_err();
+    assert_eq!(error.kind, "non-descendant");
+
+    let landed = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::RebaseLineage {
+                reason: "the published branch was rebased".into(),
+            },
+            Some(&old.cid),
+        )
+        .unwrap();
+
+    assert_eq!(landed.ring, "lineage-rebased");
+    assert_eq!(
+        landed.extra["rebasedFrom"],
+        json!({"cid":old.cid,"commit":old_commit})
+    );
+    assert_eq!(
+        landed.extra["rebaseReason"],
+        "the published branch was rebased"
+    );
+    assert_eq!(f.store.head("current"), Some(candidate.cid.clone()));
+    assert_eq!(f.store.head("previous"), Some(old.cid.clone()));
+    let current: Value = read_json(&f.store.root.join("current.json")).unwrap();
+    assert_eq!(current["previous"], old.cid);
+}
+
+#[test]
+fn lineage_rebase_refuses_an_ordinary_descendant() {
+    let f = Fixture::new("epr");
+    let old = f.release("old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("descendant");
+    f.state.lock().unwrap().descended = true;
+
+    let error = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::RebaseLineage {
+                reason: "no break here".into(),
+            },
+            Some(&old.cid),
+        )
+        .unwrap_err();
+    assert_eq!(error.kind, "rebase-not-needed");
+    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+}
+
+#[test]
+fn a_later_revert_does_not_keep_an_earlier_rebase_description() {
+    let f = Fixture::new("epr");
+    let first = f.release("first-lineage");
+    f.land(&first).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let rebased = f.release("rebased-lineage");
+    f.state.lock().unwrap().descended = false;
+    f.store
+        .land_expected(
+            &rebased.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::RebaseLineage {
+                reason: "the published branch was rebased".into(),
+            },
+            Some(&first.cid),
+        )
+        .unwrap();
+    f.state.lock().unwrap().head = "c".repeat(40);
+    let next = f.release("next-lineage");
+    f.state.lock().unwrap().descended = true;
+    f.store
+        .land_expected(
+            &next.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Forward,
+            Some(&rebased.cid),
+        )
+        .unwrap();
+
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let back = f
+        .store
+        .land_expected(
+            &rebased.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Revert,
+            Some(&next.cid),
+        )
+        .unwrap();
+    assert_eq!(back.ring, "reverted");
+    assert!(!back.extra.contains_key("rebasedFrom"));
+    assert!(!back.extra.contains_key("rebaseReason"));
+}
+
+#[test]
+fn lineage_rebase_requires_an_existing_explicit_matching_prior() {
+    let f = Fixture::new("epr");
+    let current = f.release("current-lineage");
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("candidate-lineage");
+    let wrong = f.release("wrong-prior");
+    f.state.lock().unwrap().descended = false;
+    let transition = || Transition::RebaseLineage {
+        reason: "the published branch was rebased".into(),
+    };
+
+    assert_eq!(
+        f.store
+            .land(&candidate.cid, &f.commit(), f.tmp.path(), transition())
+            .unwrap_err()
+            .kind,
+        "rebase-needs-expect"
+    );
+    assert_eq!(
+        f.store
+            .land_expected(
+                &candidate.cid,
+                &f.commit(),
+                f.tmp.path(),
+                transition(),
+                None,
+            )
+            .unwrap_err()
+            .kind,
+        "rebase-needs-expect"
+    );
+    assert_eq!(
+        f.store
+            .land_expected(
+                &candidate.cid,
+                &f.commit(),
+                f.tmp.path(),
+                transition(),
+                Some(&wrong.cid),
+            )
+            .unwrap_err()
+            .kind,
+        "current-moved"
+    );
+    assert_eq!(f.store.head("current"), Some(current.cid));
+
+    let empty = Fixture::new("epr");
+    let candidate = empty.release("candidate-without-current");
+    assert_eq!(
+        empty
+            .store
+            .land_expected(
+                &candidate.cid,
+                &empty.commit(),
+                empty.tmp.path(),
+                transition(),
+                Some(&candidate.cid),
+            )
+            .unwrap_err()
+            .kind,
+        "rebase-needs-expect"
+    );
+}
+
+#[test]
+fn lineage_rebase_refuses_an_empty_reason() {
+    let f = Fixture::new("epr");
+    let current = f.release("current-lineage");
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("candidate-lineage");
+    f.state.lock().unwrap().descended = false;
+
+    let error = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::RebaseLineage {
+                reason: "  ".into(),
+            },
+            Some(&current.cid),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, "rebase-needs-reason");
+    assert_eq!(f.store.head("current"), Some(current.cid));
+}
+
+#[test]
+fn lineage_rebase_refuses_when_current_moves_during_health() {
+    let f = Fixture::new("epr");
+    let current = f.release("current-lineage");
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("candidate-lineage");
+    let moved = f.release("concurrent-lineage");
+    {
+        let mut state = f.state.lock().unwrap();
+        state.descended = false;
+        state.health_move = Some(moved.cid.clone());
+    }
+
+    let error = f
+        .store
+        .land_expected(
+            &candidate.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::RebaseLineage {
+                reason: "the published branch was rebased".into(),
+            },
+            Some(&current.cid),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, "current-moved");
+    assert_eq!(f.store.head("current"), Some(moved.cid));
+}
+
+#[test]
+fn lineage_rebase_keeps_dirty_unverified_and_commit_mismatch_refusals() {
+    let transition = || Transition::RebaseLineage {
+        reason: "the published branch was rebased".into(),
+    };
+
+    let dirty = Fixture::new("epr");
+    let dirty_current = dirty.release("dirty-current");
+    dirty.land(&dirty_current).unwrap();
+    dirty.state.lock().unwrap().head = "b".repeat(40);
+    let mut dirty_candidate = dirty.release("dirty-candidate");
+    dirty_candidate.sources[0].tree_clean = false;
+    dirty.store.save(&dirty_candidate).unwrap();
+    assert_eq!(
+        dirty
+            .store
+            .land_expected(
+                &dirty_candidate.cid,
+                &dirty.commit(),
+                dirty.tmp.path(),
+                transition(),
+                Some(&dirty_current.cid),
+            )
+            .unwrap_err()
+            .kind,
+        "dirty-build"
+    );
+
+    let unverified = Fixture::new("epr");
+    let unverified_current = unverified.release("unverified-current");
+    unverified.land(&unverified_current).unwrap();
+    unverified.state.lock().unwrap().head = "b".repeat(40);
+    let unverified_candidate = unverified.release("unverified-candidate");
+    fs::write(
+        unverified
+            .store
+            .root
+            .join(&unverified_candidate.cid)
+            .join("epr"),
+        b"tampered",
+    )
+    .unwrap();
+    assert_eq!(
+        unverified
+            .store
+            .land_expected(
+                &unverified_candidate.cid,
+                &unverified.commit(),
+                unverified.tmp.path(),
+                transition(),
+                Some(&unverified_current.cid),
+            )
+            .unwrap_err()
+            .kind,
+        "candidate-absent"
+    );
+
+    let mismatch = Fixture::new("epr");
+    let mismatch_current = mismatch.release("mismatch-current");
+    mismatch.land(&mismatch_current).unwrap();
+    mismatch.state.lock().unwrap().head = "b".repeat(40);
+    let mismatch_candidate = mismatch.release("mismatch-candidate");
+    assert_eq!(
+        mismatch
+            .store
+            .land_expected(
+                &mismatch_candidate.cid,
+                &"c".repeat(40),
+                mismatch.tmp.path(),
+                transition(),
+                Some(&mismatch_current.cid),
+            )
+            .unwrap_err()
+            .kind,
+        "commit-mismatch"
+    );
+}
 #[test]
 fn land_refuses_current_moved_naming_both() {
     let f = Fixture::new("epr");
@@ -770,10 +1099,18 @@ fn revert_to_pre_s1_release_lands() {
 
     let landed = f
         .store
-        .land_expected(&old.cid, &f.commit(), f.tmp.path(), true, Some(&newer.cid))
+        .land_expected(
+            &old.cid,
+            &f.commit(),
+            f.tmp.path(),
+            Transition::Revert,
+            Some(&newer.cid),
+        )
         .unwrap();
 
     assert_eq!(landed.ring, "reverted");
+    assert!(!landed.extra.contains_key("rebasedFrom"));
+    assert!(!landed.extra.contains_key("rebaseReason"));
     assert_eq!(f.store.head("current"), Some(old.cid.clone()));
     assert!(f.state.lock().unwrap().calls.iter().any(|call| {
         call.program.contains(&old.cid)
@@ -922,7 +1259,7 @@ fn test_land_checks_record_head_and_checkout_cleanliness() {
     f.store.save(&r).unwrap();
     assert_eq!(
         f.store
-            .land(&r.cid, "missing", f.tmp.path(), false)
+            .land(&r.cid, "missing", f.tmp.path(), Transition::Forward)
             .unwrap_err()
             .kind,
         "commit-mismatch"
@@ -930,7 +1267,12 @@ fn test_land_checks_record_head_and_checkout_cleanliness() {
     f.state.lock().unwrap().head = "b".repeat(40);
     assert_eq!(
         f.store
-            .land(&r.cid, &r.provenance.source_commit, f.tmp.path(), false)
+            .land(
+                &r.cid,
+                &r.provenance.source_commit,
+                f.tmp.path(),
+                Transition::Forward,
+            )
             .unwrap_err()
             .kind,
         "head-mismatch"
@@ -949,7 +1291,7 @@ fn test_land_requires_descent_unless_revert() {
     assert_eq!(f.land(&b).unwrap_err().kind, "non-descendant");
     assert_eq!(
         f.store
-            .land(&b.cid, &f.commit(), f.tmp.path(), true)
+            .land(&b.cid, &f.commit(), f.tmp.path(), Transition::Revert)
             .unwrap()
             .ring,
         "reverted"
@@ -1925,7 +2267,16 @@ fn land_refuses_unpublished_initial_forward_and_revert() {
         let before = f.store.head("current");
         let error = f
             .store
-            .land(&next.cid, &f.commit(), f.tmp.path(), mode == "revert")
+            .land(
+                &next.cid,
+                &f.commit(),
+                f.tmp.path(),
+                if mode == "revert" {
+                    Transition::Revert
+                } else {
+                    Transition::Forward
+                },
+            )
             .unwrap_err();
         assert_eq!(error.kind, "unpublished", "{mode}");
         assert_eq!(f.store.head("current"), before);
@@ -2459,6 +2810,36 @@ fn following_a_paired_declaration_upgrades_same_commit_legacy_custody() {
 }
 
 #[test]
+fn declared_apply_follow_cannot_rebase_a_non_descendant() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let f = Fixture::new("epr");
+    let old = f.release("declared-old-lineage");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = f.release("declared-rebased-lineage");
+    f.state.lock().unwrap().descended = false;
+
+    let error = f
+        .store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Apply,
+                pin: Some(candidate.cid.clone()),
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(error.kind, "non-descendant");
+    assert_eq!(f.store.head("current"), Some(old.cid));
+    let candidate = f.store.record(&candidate.cid).unwrap();
+    assert_eq!(candidate.ring, "dev-context");
+    assert!(!candidate.extra.contains_key("rebasedFrom"));
+}
+
+#[test]
 fn observe_verifies_without_landing_and_pin_refuses_another_release() {
     use ark_core::declaration::{Follow, FollowMode};
     let f = Fixture::new("epr");
@@ -2588,7 +2969,7 @@ fn a_return_to_an_earlier_head_has_a_distinct_landing_transition() {
     assert!(first["landedAt"].as_str().unwrap().contains('.'));
     f.land(&b).unwrap();
     f.store
-        .land(&a.cid, &f.commit(), f.tmp.path(), true)
+        .land(&a.cid, &f.commit(), f.tmp.path(), Transition::Revert)
         .unwrap();
     let returned: Value = read_json(&f.store.root.join("current.json")).unwrap();
     assert_eq!(first["cid"], returned["cid"]);
@@ -2650,7 +3031,7 @@ fn repeated_landings_preserve_the_head_and_notice_only_transitions() {
     }
     f.land(&c).unwrap(); // no prompt while C is current
     f.store
-        .land(&b.cid, &f.commit(), f.tmp.path(), true)
+        .land(&b.cid, &f.commit(), f.tmp.path(), Transition::Revert)
         .unwrap();
     assert_eq!(notice(), 1);
     assert_eq!(notice(), 0);

@@ -1,6 +1,6 @@
 //! Thin command adapter for the device-runtime library.
 use elohim_device_runtime::{
-    bin_store::{self, IngestOptions, Refusal, Registry, Store},
+    bin_store::{self, IngestOptions, Refusal, Registry, Store, Transition},
     session,
 };
 use serde_json::{json, Value};
@@ -14,6 +14,38 @@ fn argument(detail: impl Into<String>) -> Refusal {
         kind: "arguments".into(),
         detail: detail.into(),
     }
+}
+fn land_transition(
+    flags: &BTreeSet<&str>,
+    options: &BTreeMap<&str, &str>,
+    expected: &str,
+) -> Result<Transition, Refusal> {
+    let rebase = flags.contains("--rebase-lineage");
+    let revert = flags.contains("--revert");
+    if rebase && revert {
+        return Err(argument(
+            "--rebase-lineage and --revert are mutually exclusive",
+        ));
+    }
+    if rebase {
+        if expected == "none" {
+            return Err(argument(
+                "--rebase-lineage requires --expect <current-cid>, not none",
+            ));
+        }
+        let reason = options
+            .get("--reason")
+            .filter(|reason| !reason.trim().is_empty())
+            .ok_or_else(|| argument("--rebase-lineage requires --reason <text>"))?;
+        return Ok(Transition::RebaseLineage {
+            reason: (*reason).to_owned(),
+        });
+    }
+    Ok(if revert {
+        Transition::Revert
+    } else {
+        Transition::Forward
+    })
 }
 /// Parse, call the device library, and render one bin command. Returns a process exit code.
 pub fn run(args: &[String]) -> i32 {
@@ -40,9 +72,9 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             break;
         }
         match arg.as_str() {
-            "--repair"|"--json"|"--revert"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
-            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
-            "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; land requires --expect <cid|none>".into()),
+            "--repair"|"--json"|"--revert"|"--rebase-lineage"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
+            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--reason"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
+            "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; land requires --expect <cid|none> [--revert | --rebase-lineage --reason <text>]".into()),
             _ if arg.starts_with('-')=>return Err(argument(format!("unknown flag {arg}"))),
             _=>positional.push(arg.as_str()),
         }
@@ -108,6 +140,7 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 .get("--expect")
                 .copied()
                 .ok_or_else(|| argument("land requires --expect <cid|none>"))?;
+            let transition = land_transition(&flags, &options, expected)?;
             json!(store.land_expected(
                 positional
                     .get(1)
@@ -117,7 +150,7 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                     .get("--commit")
                     .ok_or_else(|| argument("land requires --commit"))?,
                 &repo()?,
-                flags.contains("--revert"),
+                transition,
                 (expected != "none").then_some(expected)
             )?)
         }
@@ -230,4 +263,67 @@ pub(crate) fn daemon_store(
 /// Process table used to observe daemon owner lifetimes.
 pub(crate) fn daemon_proc_root() -> PathBuf {
     session::proc_root()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn flags(values: &[&'static str]) -> BTreeSet<&'static str> {
+        values.iter().copied().collect()
+    }
+
+    fn options(values: &[(&'static str, &'static str)]) -> BTreeMap<&'static str, &'static str> {
+        values.iter().copied().collect()
+    }
+
+    #[test]
+    fn land_arguments_refuse_rebase_lineage_with_revert() {
+        let error = land_transition(
+            &flags(&["--rebase-lineage", "--revert"]),
+            &options(&[("--reason", "history was rewritten")]),
+            "bafk-current",
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind, "arguments");
+        assert!(error.detail.contains("mutually exclusive"));
+    }
+
+    #[test]
+    fn land_arguments_refuse_rebase_lineage_without_prior() {
+        let error = land_transition(
+            &flags(&["--rebase-lineage"]),
+            &options(&[("--reason", "history was rewritten")]),
+            "none",
+        )
+        .unwrap_err();
+
+        assert_eq!(error.kind, "arguments");
+        assert!(error.detail.contains("--expect"));
+    }
+
+    #[test]
+    fn land_arguments_refuse_rebase_lineage_without_reason() {
+        let error = land_transition(&flags(&["--rebase-lineage"]), &options(&[]), "bafk-current")
+            .unwrap_err();
+
+        assert_eq!(error.kind, "arguments");
+        assert!(error.detail.contains("--reason"));
+    }
+
+    #[test]
+    fn land_arguments_build_rebase_lineage_transition() {
+        assert_eq!(
+            land_transition(
+                &flags(&["--rebase-lineage"]),
+                &options(&[("--reason", "history was rewritten")]),
+                "bafk-current",
+            )
+            .unwrap(),
+            Transition::RebaseLineage {
+                reason: "history was rewritten".into()
+            }
+        );
+    }
 }

@@ -1,6 +1,6 @@
 use super::{
     files,
-    landing::Expect,
+    landing::{Expect, Transition},
     source::{self, CommandSpec},
     IngestOptions, Pin, Refusal, Release, Result, Status, Store,
 };
@@ -177,7 +177,7 @@ impl Store {
                     &cid,
                     &commit,
                     repo,
-                    false,
+                    Transition::Forward,
                     true,
                     Expect::Prior(expected.clone()),
                 ) {
@@ -298,7 +298,14 @@ impl Store {
             ));
         }
         if mode.applies() {
-            return self.land_mode(&record.cid, commit, repo, false, false, expect);
+            return self.land_mode(
+                &record.cid,
+                commit,
+                repo,
+                Transition::Forward,
+                false,
+                expect,
+            );
         }
         self.require_published(repo, commit)?;
         self.require_attestation(&mut record, commit, repo, false)?;
