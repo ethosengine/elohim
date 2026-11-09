@@ -1495,6 +1495,10 @@ async fn async_main(
 
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
+    // The device payload store as this process's tier (artifact-store E4): composed, shared,
+    // only when EPR_PAYLOAD_STORE names a root whose marker is `blob-store-v1`; unset composes
+    // nothing. Held for the process's life; nothing reads it yet beyond `eprfs_tier`'s exports.
+    let _payload_tier = elohim_storage::eprfs_tier::compose_payload_tier_from_env().await;
     // The head-adoption trigger's courier (see `services::courier_obey`): the
     // trigger starts before the peer plane exists, so it gets a slot that is
     // filled once the reconcile peers are built.
