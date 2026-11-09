@@ -14,6 +14,10 @@
 //!
 //! This crate knows nothing of its consumers: elohim-storage maps [`BlobStoreError`] onto its
 //! own error type and schedules its own compute-payload cleanup beside the `/blob` store.
+//!
+//! It is a reusable primitive, licensed MPL-2.0 (see `LICENSE`) with no Exhibit B notice
+//! attached, so it stays compatible with secondary licences. Apache-2.0 epr-cli may therefore
+//! link it by default. elohim-storage, which consumes it, remains AGPL-3.0.
 
 pub mod error;
 pub mod marker;

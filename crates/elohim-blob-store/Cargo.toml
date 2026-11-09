@@ -18,8 +18,11 @@ edition = "2021"
 rust-version = "1.89"
 description = "Elohim Protocol content-addressed payload store: byte-profile-0 chunked payloads behind a marker, a dag-cbor record lane, verify-on-read with quarantine, and an owner/shared split for one store opened by several processes."
 authors = ["Elohim Protocol"]
-# The code moved out of elohim-storage (AGPL-3.0) unchanged in substance; its licence moves with it.
-license = "AGPL-3.0"
+# A reusable primitive, relicensed from AGPL-3.0 to MPL-2.0 by the steward's ruling ("Relicense
+# blob-store", covenant record bafyreiaeqtzxlcvpqqjrqwjbu2cv7h4c5oc3cd4mznvjqdyz4qk6dc65ma). No
+# Exhibit B notice is attached, so the code stays compatible with secondary licences. The code it
+# came from, elohim/elohim-storage, remains AGPL-3.0.
+license = "MPL-2.0"
 repository = "https://github.com/ethosengine/elohim"
 keywords = ["elohim", "content-addressing", "blake3", "storage"]
 categories = ["filesystem"]
