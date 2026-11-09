@@ -32,10 +32,9 @@ lane was in use for the artifact-store storage closure at the time. The only war
 expiry was a `t.diagnostic` line inside a passing test, printed in the last 48 h; no one reads
 it there.
 
-The steward ruled "Approve the renewal" (purpose clause
-`bafyreifmazeihdvoirkdojg7vvu44gm5klphumetcyn4jzexh4wioctnp4`). The new window runs
-2026-11-09T19:30Z → 2026-11-16T19:30Z, in commit `65fc3561f` on `artifact-store/e4`. The same
-refusal therefore recurs on **2026-11-16T19:30Z** unless the steward rules first.
+The steward approved a renewal. Two sessions acted on it in parallel; the one on dev is
+ethosengine's `4b1cf33b0` (window to **2026-11-16T16:00Z**), and shem's duplicate was dropped.
+The same refusal therefore recurs on **2026-11-16T16:00Z** unless the steward rules first.
 
 When the shift offered a cloud-routine reminder, the operator declined it: "this needs to be
 part of the native elohim harness".
@@ -54,4 +53,4 @@ part of the native elohim harness".
 
 ## Next expiry to beat
 
-adam G2 runner grant: **2026-11-16T19:30:00Z**.
+adam G2 runner grant: **2026-11-16T16:00:00Z**.
