@@ -787,6 +787,15 @@ _gate-elohim-address:
     cd crates/elohim-address && cargo fmt --check
     cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
+# The device payload store (artifact-store E4). Its own workspace: its consumers' gates
+# (elohim-storage, eprfs) never run a dependency's tests, so its store, tier and multi-process
+# tests run here: default features (the store alone) and all features (the eprfs tier).
+_gate-elohim-blob-store:
+    cd crates/elohim-blob-store && cargo test --locked
+    cd crates/elohim-blob-store && cargo test --locked --all-features
+    cd crates/elohim-blob-store && cargo clippy --locked --all-features --all-targets -- -D warnings
+    cd crates/elohim-blob-store && cargo fmt --check
+
 # The storage client is the only Rust reader of storage's blob wire shapes; its contract test
 # round-trips the producer's own view serializer, so a rename on either side fails here.
 _gate-elohim-storage-client:

@@ -1,4 +1,4 @@
-//! `BlobStoreTier`: the peer's own [`BlobStore`] as an eprfs tier (interfaces spec §2.A.6).
+//! `BlobStoreTier`: a [`BlobStore`] as an eprfs tier (interfaces spec §2.A.6).
 //!
 //! A leaf store. It answers from what it holds, treats `FetchIfMissing` as `LocalOnly` (contract
 //! 11: only the chain honours the policy), and inherits eprfs-core's default `fetch_at`,
@@ -13,11 +13,11 @@
 //!   profile is not held here. Bytes are verified by the address kernel's `verify_cid_any`, which
 //!   dispatches on the CID's declared `(codec, multihash, length)` and fails closed.
 //! - **Off the `/blob/{cid}` route.** That route serves any blob no content row references to an
-//!   anonymous caller (`blob_reach.rs`, honest absence), so a tree object held in the route's own
-//!   store would be served past its root's reach. The tier is therefore built only over a store of
-//!   its own, in [`TIER_SUBDIR`] beside the route's store ([`BlobStoreTier::dedicated`]): the only
-//!   door to its bytes is a `TierEndpoint` fronted by a [`super::RootReachGate`]. The cost is that
-//!   a leaf also published as public content is held twice.
+//!   anonymous caller (elohim-storage `blob_reach.rs`, honest absence), so a tree object held in
+//!   the route's own store would be served past its root's reach. The tier is therefore built only
+//!   over a store of its own: [`BlobStoreTier::dedicated`] (in [`TIER_SUBDIR`] beside the route's
+//!   store) or [`BlobStoreTier::at`] (the device's payload store, exactly the root it is given).
+//!   The only door to its bytes is a `TierEndpoint` fronted by a reach gate.
 //! - This tier never speaks iroh.
 
 use std::path::Path;
@@ -30,31 +30,39 @@ use eprfs_core::{
     EprfsStorage, FetchPolicy, Result,
 };
 
-use elohim_epr::address::{verify_cid_any, ByteCid, Verify};
+use elohim_epr::address::{verify_cid_any, ByteCid, Verify, RECORD_CODEC};
 
-use crate::blob_store::{BlobStore, Exists};
-use crate::epr_codec::DAG_CBOR_CODEC;
-use crate::error::StorageError;
+use crate::error::BlobStoreError;
+use crate::store::{BlobStore, Exists, OpenMode};
 
-/// The directory, under the storage root, that holds the tier's own store.
+/// The directory, under a storage root, that holds a [`BlobStoreTier::dedicated`] store.
 pub const TIER_SUBDIR: &str = "eprfs-tier";
 
-/// The peer's own store as an eprfs tier. `tier_id` is `own` (the default): a serving
-/// `TierEndpoint` stamps its agent key on what it answers for this store.
+/// A store as an eprfs tier. `tier_id` is `own` (the default): a serving `TierEndpoint` stamps
+/// its agent key on what it answers for this store.
 pub struct BlobStoreTier {
     store: Arc<BlobStore>,
 }
 
 impl BlobStoreTier {
-    /// Opens (creating it if needed) the tier's own store at `<storage_root>/eprfs-tier`, a store
+    /// Opens (creating it if needed) an unlocked store at `<storage_root>/eprfs-tier`, a store
     /// the `/blob/{cid}` route never reads (A1).
     pub async fn dedicated(
         storage_root: impl AsRef<Path>,
-    ) -> std::result::Result<Self, StorageError> {
+    ) -> std::result::Result<Self, BlobStoreError> {
         let store = BlobStore::new(storage_root.as_ref().join(TIER_SUBDIR)).await?;
-        Ok(Self {
-            store: Arc::new(store),
-        })
+        Ok(Self::over(Arc::new(store)))
+    }
+
+    /// Opens the store at exactly `root` as `mode`'s instance: the device's one payload store,
+    /// shared with the other processes that open it (see [`crate::store`]'s owner/shared rule).
+    pub async fn at(root: &Path, mode: OpenMode) -> std::result::Result<Self, BlobStoreError> {
+        Ok(Self::over(Arc::new(BlobStore::open(root, mode).await?)))
+    }
+
+    /// A tier over an already opened store.
+    pub fn over(store: Arc<BlobStore>) -> Self {
+        Self { store }
     }
 
     /// The store behind the tier, for the host that composes it (its stats, its disk probe).
@@ -64,7 +72,7 @@ impl BlobStoreTier {
 
     /// Where `cid` lives in the store: the record lane, the payload store, or nowhere.
     fn lane(cid: &BlobCid) -> Lane {
-        if cid.as_cid().codec() == DAG_CBOR_CODEC {
+        if cid.as_cid().codec() == RECORD_CODEC {
             return Lane::Record;
         }
         match ByteCid::try_from(*cid.as_cid()) {
@@ -73,11 +81,11 @@ impl BlobStoreTier {
         }
     }
 
-    async fn read(&self, cid: &BlobCid) -> std::result::Result<Bytes, StorageError> {
+    async fn read(&self, cid: &BlobCid) -> std::result::Result<Bytes, BlobStoreError> {
         match Self::lane(cid) {
             Lane::Record => self.store.get_record(cid.as_cid()).await,
             Lane::Payload(byte_cid) => self.store.get(&byte_cid).await,
-            Lane::NotHeld => Err(StorageError::NotFound(cid.to_string())),
+            Lane::NotHeld => Err(BlobStoreError::BlobNotFound(cid.to_string())),
         }
     }
 
@@ -85,13 +93,14 @@ impl BlobStoreTier {
     /// address the first time it reads them, so a later read sees no file; that object was held
     /// and corrupted, not absent, and stays `Corrupt` (a batch names it `Integrity`) rather than
     /// turning into a not-held answer.
-    async fn read_error(&self, cid: &BlobCid, error: StorageError) -> EprfsError {
-        if let (
-            StorageError::NotFound(_) | StorageError::BlobNotFound(_),
-            Lane::Payload(byte_cid),
-        ) = (&error, Self::lane(cid))
+    async fn read_error(&self, cid: &BlobCid, error: BlobStoreError) -> EprfsError {
+        if let (BlobStoreError::BlobNotFound(_), Lane::Payload(byte_cid)) =
+            (&error, Self::lane(cid))
         {
-            if self.store.exists(&byte_cid).await == Exists::Quarantined {
+            if matches!(
+                self.store.exists(&byte_cid).await,
+                Exists::Quarantined | Exists::Corrupt
+            ) {
                 return EprfsError::Corrupt(cid.clone());
             }
         }
@@ -110,15 +119,13 @@ fn verified(cid: &BlobCid, bytes: &[u8]) -> bool {
     verify_cid_any(cid.as_cid(), bytes) == Verify::Verified
 }
 
-/// `StorageError` → `EprfsError`, keeping absence apart from failure (A17): only a not-found is
-/// `BlobNotFound`; a reassembled object that fails its hash is `Corrupt`; anything else is a
+/// `BlobStoreError` → `EprfsError`, keeping absence apart from failure (A17): only a not-found
+/// is `BlobNotFound`; a reassembled object that fails its hash is `Corrupt`; anything else is a
 /// storage failure, which a reader maps to `Unreachable` (absence not established).
-fn storage_error(cid: &BlobCid, e: StorageError) -> EprfsError {
+fn storage_error(cid: &BlobCid, e: BlobStoreError) -> EprfsError {
     match e {
-        StorageError::NotFound(_) | StorageError::BlobNotFound(_) => {
-            EprfsError::BlobNotFound(cid.clone())
-        }
-        StorageError::HashMismatch { .. } => EprfsError::Corrupt(cid.clone()),
+        BlobStoreError::BlobNotFound(_) => EprfsError::BlobNotFound(cid.clone()),
+        BlobStoreError::HashMismatch { .. } => EprfsError::Corrupt(cid.clone()),
         other => EprfsError::Storage(other.to_string()),
     }
 }
@@ -139,18 +146,16 @@ impl EprfsStorage for BlobStoreTier {
             Lane::Payload(byte_cid) => match self.store.size(&byte_cid).await {
                 Ok(_) => match self.store.exists(&byte_cid).await {
                     Exists::Verified => Ok(BlobPresence::Local),
-                    Exists::Absent | Exists::Quarantined => Ok(BlobPresence::Missing),
+                    Exists::Absent | Exists::Quarantined | Exists::Corrupt => {
+                        Ok(BlobPresence::Missing)
+                    }
                 },
-                Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
-                    Ok(BlobPresence::Missing)
-                }
+                Err(BlobStoreError::BlobNotFound(_)) => Ok(BlobPresence::Missing),
                 Err(error) => Err(storage_error(cid, error)),
             },
             Lane::Record => match self.store.get_record(cid.as_cid()).await {
                 Ok(_) => Ok(BlobPresence::Local),
-                Err(StorageError::NotFound(_) | StorageError::BlobNotFound(_)) => {
-                    Ok(BlobPresence::Missing)
-                }
+                Err(BlobStoreError::BlobNotFound(_)) => Ok(BlobPresence::Missing),
                 Err(error) => Err(storage_error(cid, error)),
             },
             Lane::NotHeld => Ok(BlobPresence::Missing),
@@ -210,6 +215,33 @@ impl EprfsStorage for BlobStoreTier {
     }
 }
 
+/// What [`compose_shared_payload_tier`] found at a payload-store root.
+pub enum PayloadTier {
+    /// The root's marker names this crate's format: a shared tier over it.
+    Composed(BlobStoreTier),
+    /// The root's marker names another format, or there is none: nothing was opened or
+    /// created. `marker` is what the root's `STORE` said.
+    NotBlobStore { marker: Option<String> },
+}
+
+/// Compose a **shared** tier over the device's payload store at `root` when, and only when, its
+/// format marker says [`crate::marker::BLOB_STORE_V1`]: the opener elohim-storage composes from
+/// `EPR_PAYLOAD_STORE`. Any other marker, or none, opens no backend and creates nothing.
+///
+/// # Errors
+///
+/// An unreadable marker, or a blob-store root that does not open.
+pub async fn compose_shared_payload_tier(
+    root: &Path,
+) -> std::result::Result<PayloadTier, BlobStoreError> {
+    match crate::marker::read(root)? {
+        Some(marker) if marker == crate::marker::BLOB_STORE_V1 => Ok(PayloadTier::Composed(
+            BlobStoreTier::at(root, OpenMode::Shared).await?,
+        )),
+        marker => Ok(PayloadTier::NotBlobStore { marker }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,7 +290,7 @@ mod tests {
         let (node_cid, node_bytes) =
             eprfs_core::encode_tree(&node, &eprfs_core::TreeLimits::default()).unwrap();
         let node_bytes = Bytes::from(node_bytes);
-        assert_eq!(node_cid.as_cid().codec(), DAG_CBOR_CODEC);
+        assert_eq!(node_cid.as_cid().codec(), RECORD_CODEC);
         tier.put_blob_verified(&node_cid, node_bytes.clone())
             .await
             .unwrap();

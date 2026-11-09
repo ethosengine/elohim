@@ -1,0 +1,59 @@
+# crates/elohim-blob-store — the device's content-addressed payload store (artifact-store E4).
+#
+# Nested single-crate workspace root like its `crates/` siblings: the explicit `[workspace]`
+# table gives this crate its OWN Cargo.lock, and cargo treats it as a separate workspace root
+# (never an auto-member) wherever it is a path dependency.
+#
+# Consumers: elohim-storage (the `/blob` route's store, through its `blob_store` shim; the
+# `tier` adapter composed from `EPR_PAYLOAD_STORE`) and epr-cli (its `blob-store` payload
+# format). Internal dependencies are path + version + registry, as `crates/elohim-address`
+# and `elohim/epr` declare theirs: the path wins in-tree, the registry serves a published copy.
+[workspace]
+
+[package]
+name = "elohim-blob-store"
+version = "0.1.0"
+edition = "2021"
+# `File::lock` / `File::try_lock` (owner and operation locks) are stable since 1.89.
+rust-version = "1.89"
+description = "Elohim Protocol content-addressed payload store: byte-profile-0 chunked payloads behind a marker, a dag-cbor record lane, verify-on-read with quarantine, and an owner/shared split for one store opened by several processes."
+authors = ["Elohim Protocol"]
+# The code moved out of elohim-storage (AGPL-3.0) unchanged in substance; its licence moves with it.
+license = "AGPL-3.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "content-addressing", "blake3", "storage"]
+categories = ["filesystem"]
+publish = ["elohim"]
+
+[lib]
+name = "elohim_blob_store"
+path = "src/lib.rs"
+
+[features]
+default = []
+# `BlobStoreTier`: the store as an eprfs tier (`eprfs_core::EprfsStorage`).
+tier = ["dep:eprfs-core", "dep:async-trait"]
+
+[dependencies]
+# The byte profile (CIDv1 raw + BLAKE3-256 addresses through `elohim_epr::address`, the
+# fastcdc-2020 chunker through `elohim_epr::profile`).
+elohim-epr = { version = "0.2", path = "../../elohim/epr", registry = "elohim" }
+bytes = "1"
+cid = "0.11"
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_ipld_dagcbor = "0.6"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "io-util"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+eprfs-core = { version = "0.3.4", path = "../../elohim/eprfs/eprfs-core", registry = "elohim", optional = true }
+async-trait = { version = "0.1", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+libc = "0.2"
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "io-util"] }
+# The leaf-contract harness the tier adapter is held to. Path-only: stripped on publish.
+eprfs-serve = { path = "../../elohim/eprfs/eprfs-serve", features = ["testing"] }

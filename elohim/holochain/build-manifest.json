@@ -443,6 +443,7 @@
             "crates/elohim-storage-client/**",
             "crates/seam-contracts/**",
             "crates/consent-grant/**",
+            "crates/elohim-blob-store/**",
             "bridges/did/Cargo.toml",
             "bridges/did/did-bridge/**",
             "bridges/did/did-types/**",

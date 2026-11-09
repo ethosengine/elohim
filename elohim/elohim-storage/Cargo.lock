@@ -2460,6 +2460,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-blob-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bytes",
+ "cid",
+ "elohim-epr",
+ "eprfs-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "uuid 1.18.1",
+]
+
+[[package]]
 name = "elohim-cache-core"
 version = "0.1.0"
 dependencies = [
@@ -2695,6 +2713,7 @@ dependencies = [
  "dryoc",
  "ed25519-dalek",
  "elohim-ark-core",
+ "elohim-blob-store",
  "elohim-cache-core",
  "elohim-chrome-asset",
  "elohim-compute",
