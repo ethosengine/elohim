@@ -389,14 +389,17 @@ async fn a_second_owner_is_refused_while_the_first_holds_the_lock() {
         .await
         .unwrap();
 
-    // Released (the process is gone): ownership passes, and is exclusive in-process too.
-    let owner = BlobStore::open_owner(&root).await.unwrap();
+    // Released (the process is gone): ownership passes, and is exclusive in-process too. The
+    // opens after a release retry briefly: another test in this binary forking a child at that
+    // moment shares the just-closed lock description until the child execs (std opens files
+    // close-on-exec), which is a few microseconds of `OwnerHeld`.
+    let owner = open_owner_eventually(&root).await;
     assert!(matches!(
         BlobStore::open_owner(&root).await,
         Err(BlobStoreError::OwnerHeld { .. })
     ));
     drop(owner);
-    BlobStore::open_owner(&root).await.unwrap();
+    open_owner_eventually(&root).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

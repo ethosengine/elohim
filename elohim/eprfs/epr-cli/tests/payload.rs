@@ -247,62 +247,118 @@ fn a_marker_without_its_layout_opens_and_builds_the_layout() {
 #[cfg(feature = "blob-store")]
 #[test]
 fn the_same_cid_is_never_held_twice_on_one_device_by_the_two_paths() {
+    // The two real paths onto one device root: `epr artifact put`'s custody path (the payload
+    // opener as artifact.rs opens it, then `put_local_blob_with`, which stores each chunk as its
+    // own object plus a manifest) and storage's marker-gated tier (a whole-payload put, which
+    // the store chunks itself). Both orders, a multi-chunk payload.
+    for cli_first in [true, false] {
+        the_two_paths_hold_one_copy(cli_first);
+    }
+}
+
+#[cfg(feature = "blob-store")]
+fn the_two_paths_hold_one_copy(cli_first: bool) {
     use elohim_blob_store::tier::{compose_shared_payload_tier, PayloadTier};
     use elohim_epr::address::compute_bytes_cid;
     use elohim_epr::profile::{chunk_bytes, ValidatedProfile};
-    use eprfs_core::{BlobCid, EprfsStorage};
+    use elohim_epr_rea::{atom_cid, AgentRef, MemoryFlowStore};
+    use eprfs_core::{
+        BlobCid, DerivationBasis, DerivationKey, DerivationRecord, EprfsStorage, KeyInput, Witness,
+    };
+    use eprfs_peer::{put_local_blob_with, LocalBlobContext};
 
     let rt = runtime();
     let (dir, root) = layout();
-    // epr-cli's opener creates the device payload store (the serving daemon's owner instance)...
     let cli = rt
-        .block_on(open_payload_store(&root, Access::Owner))
+        .block_on(open_payload_store(&root, Access::Shared))
         .unwrap();
     assert_eq!(cli.format, PayloadFormat::BlobStoreV1);
-    // ...and storage composes its tier over the same root, from the marker, as main.rs does.
     let storage = match rt.block_on(compose_shared_payload_tier(&root)).unwrap() {
         PayloadTier::Composed(tier) => tier,
         PayloadTier::NotBlobStore { marker } => panic!("not composed: {marker:?}"),
     };
 
-    let first = deterministic(11, 9 * 1024 * 1024);
-    let second = deterministic(12, 7 * 1024 * 1024);
-    let payloads = [&first, &second];
+    let data = deterministic(if cli_first { 41 } else { 42 }, 9 * 1024 * 1024);
+    let output = BlobCid::compute_bytes(&data);
+    let record = DerivationRecord {
+        key: DerivationKey {
+            method: BlobCid::compute_raw(b"mesh-build"),
+            input: KeyInput::Raw(BlobCid::compute_raw(b"a source closure")),
+        },
+        output: output.clone(),
+        computed_by: "did:key:zDeviceA".into(),
+        basis: DerivationBasis::Computed,
+        deterministic: false,
+        witness: Witness::Signature {
+            sig: "fixture-signature".into(),
+        },
+    };
+    let context = LocalBlobContext {
+        custodian: AgentRef("did:key:zDeviceA".into()),
+        in_scope_of: atom_cid(&"artifact-scope").unwrap(),
+        occurred_at: "2026-11-09T12:00:00Z".into(),
+        crossing: None,
+    };
     rt.block_on(async {
-        // One payload put by each path first, then by the other.
-        let a = cli
-            .store
-            .put_blob(Bytes::from(first.clone()))
+        let cli_put = || async {
+            let mut flow = MemoryFlowStore::new();
+            put_local_blob_with(
+                cli.store.as_ref(),
+                &mut flow,
+                record.clone(),
+                Bytes::from(data.clone()),
+                &context,
+                Vec::new(),
+            )
             .await
-            .unwrap();
-        let b = storage.put_blob(Bytes::from(first.clone())).await.unwrap();
-        assert_eq!(a, b);
-        let c = storage.put_blob(Bytes::from(second.clone())).await.unwrap();
-        let d = cli
-            .store
-            .put_blob(Bytes::from(second.clone()))
-            .await
-            .unwrap();
-        assert_eq!(c, d);
-        for (cid, data) in [(&a, &first), (&c, &second)] {
+            .expect("the custody path puts")
+        };
+        let whole = || async {
+            let cid = storage
+                .put_blob(Bytes::from(data.clone()))
+                .await
+                .expect("the tier puts");
+            assert_eq!(cid, output);
+        };
+        let put = if cli_first {
+            let put = cli_put().await;
+            whole().await;
+            put
+        } else {
+            whole().await;
+            cli_put().await
+        };
+        // Every chunk the manifest names, and the whole artifact, read verified through both.
+        assert!(put.manifest.chunks.len() > 1, "the fixture is multi-chunk");
+        for chunk in &put.manifest.chunks {
             for reader in [cli.store.as_ref(), &storage as &dyn EprfsStorage] {
                 let got = reader
-                    .fetch_blob(cid, FetchPolicy::LocalOnly)
+                    .fetch_blob(&chunk.cid, FetchPolicy::LocalOnly)
                     .await
                     .unwrap();
-                assert_eq!(&got.bytes[..], &data[..], "a verified read");
+                assert!(chunk.cid.verifies(&got.bytes));
             }
+        }
+        for reader in [cli.store.as_ref(), &storage as &dyn EprfsStorage] {
+            let got = reader
+                .fetch_blob(&output, FetchPolicy::LocalOnly)
+                .await
+                .unwrap();
+            assert_eq!(&got.bytes[..], &data[..]);
         }
     });
 
-    // Physical copies, across every candidate root under the device's directory: the payload
-    // root, a dedicated `eprfs-tier` store, a flat directory store.
+    // Physical files carrying each byte CID's bytes, across blobs/ and chunks/ (and every other
+    // place under the device directory).
     let files = snapshot(dir.path());
-    let named = |name: &str| -> Vec<&PathBuf> {
+    let carriers = |cid: &str| -> Vec<&PathBuf> {
         files
             .iter()
             .filter(|(path, bytes)| {
-                bytes.is_some() && path.file_name().and_then(|n| n.to_str()) == Some(name)
+                path.file_name().and_then(|n| n.to_str()) == Some(cid)
+                    && bytes
+                        .as_ref()
+                        .is_some_and(|b| compute_bytes_cid(b).to_string() == cid)
             })
             .map(|(path, _)| path)
             .collect()
@@ -313,44 +369,69 @@ fn the_same_cid_is_never_held_twice_on_one_device_by_the_two_paths() {
             .any(|path| path.iter().any(|part| part == "eprfs-tier")),
         "no second (dedicated) store was opened"
     );
-    let mut chunk_bytes_on_disk = 0usize;
-    for data in payloads {
-        let cid = compute_bytes_cid(data).to_string();
-        // Its marker under blobs/ and its layout record under index/ (a record naming the
-        // chunks, not a copy of the bytes); nowhere else.
-        let held = named(&cid);
-        assert_eq!(held.len(), 2, "{cid}: {held:?}");
-        assert!(
-            held.iter().any(|path| path.starts_with("payload/blobs")),
-            "{held:?}"
+    let mut carried = 0usize;
+    for (offset, len) in chunk_bytes(&ValidatedProfile::EPOCH_0, &data) {
+        let chunk = compute_bytes_cid(&data[offset..offset + len]).to_string();
+        let held = carriers(&chunk);
+        assert_eq!(
+            held.len(),
+            1,
+            "cli_first={cli_first}: chunk {chunk} held {held:?}"
         );
         assert!(
-            held.iter().any(|path| path.starts_with("payload/index")),
+            held[0].starts_with("payload/blobs") || held[0].starts_with("payload/chunks"),
             "{held:?}"
         );
-        let cuts = chunk_bytes(&ValidatedProfile::EPOCH_0, data);
-        assert!(cuts.len() > 1, "the fixture is multi-chunk");
-        for (offset, len) in cuts {
-            let chunk = compute_bytes_cid(&data[offset..offset + len]).to_string();
-            let held = named(&chunk);
-            assert_eq!(held.len(), 1, "chunk {chunk}: {held:?}");
-            assert!(held[0].starts_with("payload/chunks"));
-        }
+        carried += len;
     }
-    for (path, bytes) in &files {
-        if path.starts_with("payload/chunks") {
-            chunk_bytes_on_disk += bytes.as_ref().map_or(0, Vec::len);
-        }
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            assert!(
-                path.parent() != Some(Path::new("payload")) || BlobCid::parse(name).is_err(),
-                "a flat directory object {name} beside the blob store"
+    assert!(
+        carriers(&output.to_string()).is_empty(),
+        "the whole artifact is held as its chunks, not as a second whole copy"
+    );
+    let byte_files: usize = files
+        .iter()
+        .filter(|(path, _)| path.starts_with("payload/blobs") || path.starts_with("payload/chunks"))
+        .filter_map(|(path, bytes)| {
+            let name = path.file_name()?.to_str()?;
+            let bytes = bytes.as_ref()?;
+            (compute_bytes_cid(bytes).to_string() == name).then_some(bytes.len())
+        })
+        .sum();
+    assert_eq!(
+        byte_files, carried,
+        "cli_first={cli_first}: every payload byte is on disk once"
+    );
+}
+
+#[test]
+fn racing_first_opens_through_the_opener_all_open_one_format() {
+    let rt = runtime();
+    for round in 0..50u64 {
+        let (_dir, root) = layout();
+        private_mkdir(&root);
+        let barrier = std::sync::Barrier::new(6);
+        let formats: Vec<Result<PayloadFormat, String>> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..6u64)
+                .map(|i| {
+                    let (root, barrier, rt) = (&root, &barrier, &rt);
+                    scope.spawn(move || {
+                        barrier.wait();
+                        // Stagger the arrivals across the winner's marker publication.
+                        std::thread::sleep(std::time::Duration::from_micros((round + i) % 7 * 150));
+                        rt.block_on(open_payload_store(root, Access::Shared))
+                            .map(|opened| opened.format)
+                            .map_err(|error| error.to_string())
+                    })
+                })
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        for format in &formats {
+            assert_eq!(
+                format.as_ref().ok(),
+                Some(&PayloadFormat::for_new_store()),
+                "round {round}: {formats:?}"
             );
         }
     }
-    assert_eq!(
-        chunk_bytes_on_disk,
-        first.len() + second.len(),
-        "every chunk byte is held once"
-    );
 }

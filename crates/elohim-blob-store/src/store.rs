@@ -314,8 +314,11 @@ impl LayoutRecord {
                 record.byte_len
             ));
         }
-        if chunks.len() < 2 {
-            return Err("a layout record names at least two chunks".to_string());
+        // Two or more chunks; or exactly one, the payload's own bytes held as a chunk file
+        // (a standalone object whose CID is already a chunk of another payload).
+        let single_self = chunks.len() == 1 && chunks[0].cid == *cid;
+        if chunks.len() < 2 && !single_self {
+            return Err("a layout record names at least two chunks, or only itself".to_string());
         }
         Ok((record, chunks))
     }
@@ -1059,6 +1062,60 @@ impl Inner {
         fanout_path(&self.root.join("chunks"), &cid.to_string())
     }
 
+    /// One unit's bytes, wherever its one copy is: `chunks/<cid>`, else an inline payload
+    /// `blobs/<cid>` (a standalone object a payload reuses as its chunk). Not verified here.
+    fn read_unit(&self, cid: &ByteCid) -> io::Result<Vec<u8>> {
+        match fs::read(self.chunk_path(cid)) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                match self.read_entry(cid).map_err(io::Error::other)? {
+                    Some(Entry::Inline(data)) => Ok(data),
+                    _ => Err(error),
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// A unit's length on disk, wherever its one copy is; `None` when it is held nowhere.
+    fn unit_len(&self, cid: &ByteCid) -> Option<u64> {
+        match fs::metadata(self.chunk_path(cid)) {
+            Ok(meta) => Some(meta.len()),
+            Err(_) => match self.read_entry(cid) {
+                Ok(Some(Entry::Inline(data))) => Some(data.len() as u64),
+                _ => None,
+            },
+        }
+    }
+
+    /// Whether `chunks/<cid>` holds exactly the bytes `cid` names.
+    fn chunk_holds(&self, cid: &ByteCid) -> bool {
+        fs::read(self.chunk_path(cid)).is_ok_and(|held| &compute_bytes_cid(&held) == cid)
+    }
+
+    /// Whether `blobs/<cid>` is an inline payload of exactly the bytes `cid` names.
+    fn inline_holds(&self, cid: &ByteCid) -> bool {
+        matches!(self.read_entry(cid), Ok(Some(Entry::Inline(data))) if &compute_bytes_cid(&data) == cid)
+    }
+
+    /// Publish a payload of at most one chunk. Its bytes go to `blobs/<cid>` unless a verified
+    /// chunk file already holds them: then a one-chunk layout record and marker name that file,
+    /// so the bytes are on disk once.
+    fn publish_single(
+        &self,
+        cid: &ByteCid,
+        data: &[u8],
+        layout_bytes: &[u8],
+        layout_cid: &Cid,
+    ) -> Result<()> {
+        let byte_len = data.len() as u64;
+        if byte_len > 0 && self.chunk_holds(cid) {
+            return self.write_layout(cid, byte_len, layout_bytes, layout_cid);
+        }
+        self.write_atomic(Area::Blob, &self.blob_path(cid), data)?;
+        self.tally.add(Footprint::inline(byte_len));
+        Ok(())
+    }
+
     fn index_path(&self, cid: &ByteCid) -> PathBuf {
         self.root.join("index").join(cid.to_string())
     }
@@ -1193,8 +1250,7 @@ impl Inner {
                 Held::Absent => {}
             }
             if chunks.len() <= 1 {
-                self.write_atomic(Area::Blob, &self.blob_path(&cid), data)?;
-                self.tally.add(Footprint::inline(byte_len));
+                self.publish_single(&cid, data, &layout_bytes, &layout_cid)?;
             } else {
                 let mut damaged = None;
                 for (chunk, &(offset, len)) in chunks.iter().zip(&cuts) {
@@ -1313,6 +1369,9 @@ impl Inner {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
+        if self.inline_holds(&chunk.cid) {
+            return Ok(ChunkPut::Held);
+        }
         self.write_atomic(Area::Chunk, &path, bytes)?;
         Ok(ChunkPut::Written)
     }
@@ -1428,8 +1487,7 @@ impl Inner {
         };
         if paused && !already_existed && chunks.len() > 1 {
             for chunk in &chunks {
-                let held = fs::metadata(self.chunk_path(&chunk.cid)).map(|meta| meta.len());
-                if held.ok() != Some(u64::from(chunk.len)) {
+                if self.unit_len(&chunk.cid) != Some(u64::from(chunk.len)) {
                     return Err(BlobStoreError::Internal(format!(
                         "chunk {} left the store while the publication of {cid} paused for a \
                          repair; store it again",
@@ -1442,8 +1500,7 @@ impl Inner {
         if chunks.len() <= 1 {
             let data = first.unwrap_or_default();
             if !already_existed {
-                self.write_atomic(Area::Blob, &self.blob_path(&cid), &data)?;
-                self.tally.add(Footprint::inline(byte_len));
+                self.publish_single(&cid, &data, &layout_bytes, &layout_cid)?;
             }
             self.mark_servable(&cid);
             let chunks = if data.is_empty() && chunks.is_empty() {
@@ -1546,7 +1603,7 @@ impl Inner {
                 let total: u64 = chunks.iter().map(|c| u64::from(c.len)).sum();
                 let mut data = Vec::with_capacity(usize::try_from(total).unwrap_or(0));
                 for chunk in &chunks {
-                    match fs::read(self.chunk_path(&chunk.cid)) {
+                    match self.read_unit(&chunk.cid) {
                         Ok(bytes) if bytes.len() == chunk.len as usize => {
                             data.extend_from_slice(&bytes)
                         }
@@ -1828,8 +1885,7 @@ impl Inner {
     fn chunked_verdict(&self, cid: &ByteCid, chunks: &[ChunkRef]) -> Verdict {
         let mut whole = blake3::Hasher::new();
         for chunk in chunks {
-            let path = self.chunk_path(&chunk.cid);
-            let bytes = match fs::read(&path) {
+            let bytes = match self.read_unit(&chunk.cid) {
                 Ok(bytes) => bytes,
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {
                     return Verdict::Defect(format!("chunk {}: missing", chunk.cid))
@@ -1869,10 +1925,9 @@ impl Inner {
         match self.read_entry(cid) {
             Ok(Some(Entry::Inline(_))) => true,
             Ok(Some(Entry::Marker(bound))) => self.read_layout(cid, &bound).is_ok_and(|chunks| {
-                chunks.iter().all(|chunk| {
-                    fs::metadata(self.chunk_path(&chunk.cid))
-                        .is_ok_and(|meta| meta.len() == u64::from(chunk.len))
-                })
+                chunks
+                    .iter()
+                    .all(|chunk| self.unit_len(&chunk.cid) == Some(u64::from(chunk.len)))
             }),
             Ok(None) | Err(_) => false,
         }
@@ -1974,6 +2029,35 @@ impl Inner {
         };
         self.unmark_servable(cid);
         let blob = self.blob_path(cid);
+        // An inline payload another payload reuses as a chunk keeps its one copy: it moves to
+        // `chunks/` (a rename, the same bytes) instead of leaving the disk.
+        if matches!(footprint, Some(Footprint { chunked: false, .. }))
+            && self.inline_holds(cid)
+            && !self.chunk_holds(cid)
+            && self.referenced_chunks().contains(cid)
+        {
+            let chunk = self.chunk_path(cid);
+            if chunk.exists() {
+                // A chunk file under that name that fails its CID: evidence, kept aside.
+                self.quarantine_files(
+                    cid,
+                    std::slice::from_ref(&chunk),
+                    "held chunk fails its cid",
+                )?;
+            }
+            if let Some(parent) = chunk.parent() {
+                self.ensure_bucket(parent)?;
+            }
+            fs::rename(&blob, &chunk)?;
+            for dir in [blob.parent(), chunk.parent()].into_iter().flatten() {
+                File::open(dir)?.sync_all()?;
+            }
+            if let Some(footprint) = footprint {
+                self.tally.remove(footprint);
+            }
+            info!(cid = %cid, "Deleted blob (its bytes stay as a chunk another payload names)");
+            return Ok(());
+        }
         match fs::remove_file(&blob) {
             Ok(()) => {
                 if let Some(parent) = blob.parent() {
