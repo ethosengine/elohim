@@ -267,19 +267,32 @@ interface RegisterResult {
  * Returns the greppable refusal line, or undefined when the binding resolves / does not apply.
  * Never repairs anything: remediation (rebind, re-register) is an operator act.
  */
+/**
+ * The identifier the doorway stored, from its auth response; the one we sent when it names none.
+ *
+ * The doorway re-qualifies every identifier with its own gateway domain (`normalize_identifier`
+ * in doorway-service `auth_routes.rs`), so `ezra@test.elohim.host` is stored and logged in as
+ * `ezra@alpha.elohim.host`. Reporting what we sent sent the 2026-11-09 alpha repair to unused
+ * rows (backlog doorway-orphaned-binding-after-regenesis); every line now names the row in use.
+ */
+export function storedIdentifier(auth: { identifier?: string }, sent: string): string {
+  return auth.identifier?.trim() || sent;
+}
+
 /** Agency phases whose sessions reach their conductor through the doorway chaperone. */
 export const CHAPERONED_PHASES: ReadonlySet<string> = new Set(['hosted', 'doorway']);
 
 export function orphanedBindingLine(
   human: Pick<HumansJsonHuman, 'displayName' | 'agencyPhase'>,
   doorwayUrl: string,
-  login: { installedAppId?: string; doorwayId?: string }
+  login: { installedAppId?: string; doorwayId?: string; identifier?: string }
 ): string | undefined {
   if (!CHAPERONED_PHASES.has(human.agencyPhase ?? 'hosted')) return undefined;
   if (login.installedAppId?.trim()) return undefined;
   const doorway = login.doorwayId?.trim() || doorwayUrl;
   return (
     `ORPHANED-BINDING human=${human.displayName} doorway=${doorway} ` +
+    (login.identifier?.trim() ? `identifier=${login.identifier.trim()} ` : '') +
     'reason=Session is missing its installed app binding ' +
     '(login returned no installedAppId; POST /hc/connect would answer 401)'
   );
@@ -360,10 +373,13 @@ export async function registerHuman(
     }), 'POST /auth/register');
 
     if (res.ok) {
-      const auth = (await res.json().catch(() => ({}))) as { agentPubKey?: string };
+      const auth = (await res.json().catch(() => ({}))) as {
+        agentPubKey?: string;
+        identifier?: string;
+      };
       return {
         displayName: human.displayName,
-        identifier: creds.identifier,
+        identifier: storedIdentifier(auth, creds.identifier),
         result: 'registered',
         agentPubKey: auth.agentPubKey,
       };
@@ -439,10 +455,11 @@ async function verifyExisting(
         agentPubKey?: string;
         installedAppId?: string;
         doorwayId?: string;
+        identifier?: string;
       };
       return {
         displayName,
-        identifier: creds.identifier,
+        identifier: storedIdentifier(auth, creds.identifier),
         result: 'exists',
         agentPubKey: auth.agentPubKey,
         installedAppId: auth.installedAppId,

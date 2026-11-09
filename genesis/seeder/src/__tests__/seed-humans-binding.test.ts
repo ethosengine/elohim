@@ -48,7 +48,7 @@ describe("seed-humans binding verification", () => {
     const r = await registerHuman(DOORWAY, matthew);
     expect(r.result).toBe("failed");
     expect(r.error).toMatch(
-      /^ORPHANED-BINDING human=Matthew doorway=alpha reason=Session is missing its installed app binding/,
+      /^ORPHANED-BINDING human=Matthew doorway=alpha identifier=matthew\.dowell@alpha\.elohim\.host reason=Session is missing its installed app binding/,
     );
   });
 
@@ -60,6 +60,41 @@ describe("seed-humans binding verification", () => {
     });
     expect(r.result).toBe("failed");
     expect(r.error).toMatch(/^ORPHANED-BINDING human=Matthew doorway=alpha /);
+  });
+
+  it("names the identifier the doorway stored, not the one sent (2026-11-09: @test re-qualified to @alpha)", async () => {
+    const fetch = fakeDoorway({
+      agentPubKey: "uhCAk-old",
+      doorwayId: "alpha",
+      identifier: "ezra@alpha.elohim.host",
+    });
+    const r = await registerHuman(DOORWAY, {
+      ...matthew,
+      id: "human-ezra",
+      displayName: "Ezra",
+    });
+    const sent = JSON.parse(String(fetch.mock.calls[0][1]?.body)).identifier;
+    expect(sent).toBe("ezra@test.elohim.host");
+    expect(r.identifier).toBe("ezra@alpha.elohim.host");
+    expect(r.error).toMatch(
+      /^ORPHANED-BINDING human=Ezra doorway=alpha identifier=ezra@alpha\.elohim\.host reason=/,
+    );
+  });
+
+  it("a fresh registration reports the doorway's stored identifier, falling back to the one sent", async () => {
+    for (const [answer, expected] of [
+      [{ agentPubKey: "uhCAk-new", identifier: "ezra@alpha.elohim.host" }, "ezra@alpha.elohim.host"],
+      [{ agentPubKey: "uhCAk-new" }, "ezra@test.elohim.host"],
+    ] as const) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify(answer), { status: 201 })),
+      );
+      const r = await registerHuman(DOORWAY, { ...matthew, id: "human-ezra", displayName: "Ezra" });
+      expect(r.result).toBe("registered");
+      expect(r.identifier).toBe(expected);
+      vi.unstubAllGlobals();
+    }
   });
 
   it("does not demand a doorway-installed app of a node human", async () => {

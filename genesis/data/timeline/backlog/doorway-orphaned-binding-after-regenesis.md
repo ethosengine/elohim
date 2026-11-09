@@ -82,14 +82,20 @@ distinct agent, and the two hosting conductors (adam, matthew) hold 1 and 2 rows
 backed up the three `@alpha` rows and deleted each by identifier plus its exact old key
 (`deletedCount: 1` each; none remain).
 
+**Proof run, genesis #1757 (2026-11-09 ~04:00Z, dispatched by 88f95922c): proven.**
+`[=] Matthew … doorway household=household-dowell (projection row exists — key bound at registration)`;
+`[+] Ezra`, `[+] Maria` and `[+] Ronald` (hosted) registered fresh; no `Failed humans` block, no
+ORPHANED-BINDING line. All four sign in with an installed app binding again. Item 1 below is closed.
+
 **Still owed:**
-0. **The seeder reports an identifier the doorway does not store.** It prints what it sent
+0. **Fixed 2026-11-09 (artifact-store/seeder-identifier): the seeder reported an identifier the doorway does not store.** Each result
+   now carries the identifier from the doorway's auth response (`storedIdentifier`), and the ORPHANED-BINDING line names it
+   (`identifier=…`). Tests: `seed-humans-binding.test.ts`. Original note: It prints what it sent
    (`creds.identifier`, `genesis/seeder/src/seed-humans.ts` ~:216 and ~:719), not the doorway's
    normalized identifier. That sent the first repair to the wrong rows. Print the identifier the
    doorway answers with, or apply the same normalization. A re-genesis reset must target rows by
    the doorway's own identifiers.
-1. **Proof.** Matthew is proven by #1756. Ezra, Maria and Ronald need the cause above found and a
-   genesis run showing them `[+]` or `[=]` with no `[X]`.
+1. **Proof: done.** Matthew by #1756; Ezra, Maria and Ronald by #1757 (above).
 2. **Live backstop.** Build a doorway invariant reporting orphaned bindings = 0: a chaperoned
    (`hosted` or `doorway` phase) account whose key no reached conductor hosts. Today only
    `store_verdict` exists, and it covers the opposite case (store lost, conductors intact). Until
