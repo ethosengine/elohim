@@ -1,6 +1,6 @@
 ---
 id: artifact-store-brief-k1-linker-truth-key
-status: proposed
+status: accepted
 ---
 
 # Brief K1: the derivation key names the linker that actually links
@@ -13,6 +13,19 @@ rustc 1.96.1 31fca3adb)` + `GCC: (GNU) 14.3.1 20251022 (Red Hat 14.3.1-4)`: rust
 `x86_64-unknown-linux-gnu` links through `cc` with its self-contained `rust-lld`. The key is
 over-specified on `ld` (a false miss) and under-specified on what the image really contributes:
 gcc's startup objects and glibc's link stubs.
+
+**Integrity class (ethosengine, 2026-11-09).** The key is unsound as well as over-specified. It
+keys `cc` and `ld` but not glibc's startup objects. Two devices with the same `ld` but different
+glibc-devel builds would compute the same key for different binaries, and the fetcher would install
+the producer's build as its own. Verify-before-install cannot catch this: it proves the bytes equal
+the producer's `record.output`, not that they equal what this device would have built. shem and
+ethosengine escaped only because their `ld` builds happen to differ too. The measured split:
+`crt1.o` and `Scrt1.o` differ (glibc-devel 2.39-128.el10_2.alma.1 vs 2.39-145.el10_2); gcc
+objects and `.comment` are identical. Until K1 lands, F2 reuse is safe only between devices whose
+images are known identical.
+
+**Owner:** ethosengine implements from this brief once the E4 storage closure lands; shem
+reviews (astra) and integrates.
 
 **Where.** `elohim/eprfs/epr-cli/src/artifact.rs`: `KEYED_TOOLS` (:566) and `tool_lines` (:590),
 plus `put`. Lands after the E4 storage closure (E4 also edits `artifact.rs`). eprfs gate only; no
