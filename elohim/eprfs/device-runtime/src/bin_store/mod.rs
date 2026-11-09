@@ -11,6 +11,7 @@ mod source;
 
 use eprfs_core::BlobCid;
 pub use files::{file_cid, sums_manifest};
+pub use landing::Transition;
 pub use launch::{launch, launch_os, Resolution};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -227,7 +228,7 @@ pub struct Release {
     /// Every observed source for these identical bytes.
     #[serde(default)]
     pub sources: Vec<Provenance>,
-    /// dev-context, landed, or reverted.
+    /// dev-context, landed, reverted, or lineage-rebased.
     pub ring: String,
     /// Attestation verdicts keyed by repo, SHA and check (serialized tuple key).
     #[serde(default)]
