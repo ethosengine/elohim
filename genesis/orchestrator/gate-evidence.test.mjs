@@ -25,7 +25,9 @@ import {
   emitGateVerdict,
   findEvidence,
   gateEvidence,
+  isHabitAtom,
   patternDigest,
+  projectTree,
   recordEvidence,
   reusableHit,
   resolveBin,
@@ -1342,4 +1344,54 @@ test('a basename read keys on every tracked match, and its dirt check finds a ne
   });
   assert.ok(dirty.some(path => path.startsWith('d/')), `a new untracked manifest is dirt: ${dirty}`);
   assert.ok(!dirty.includes('loose.txt'), 'an unread untracked file is not dirt');
+});
+
+// backlog gate-key-dirtree-rekeys-on-habit-atom-edit: a DELTA line in a habit atom under the
+// crate re-ran elohim-storage's whole gate on unchanged source.
+const lsTreeEntry = (oid, path) => `100644 blob ${oid}\t${path}`;
+const dirListing = atomOid => [
+  lsTreeEntry('aaa', 'elohim/elohim-storage/Cargo.toml'),
+  lsTreeEntry('bbb', 'elohim/elohim-storage/src/lib.rs'),
+  lsTreeEntry(atomOid, 'elohim/elohim-storage/.epr-meta/blob-durability.habit.md'),
+  lsTreeEntry('ddd', 'elohim/elohim-storage/.epr-meta/policies.yaml'),
+].join('\0') + '\0';
+const treeSpawn = (treeOid, listing) => fakeSpawn([
+  [isRevParse, { status: 0, stdout: `${treeOid}\n`, stderr: '' }],
+  [isTree, { status: 0, stdout: listing, stderr: '' }],
+]).spawn;
+
+test('a habit atom is a .epr-meta/<id>.habit.md file at any depth, nothing else', () => {
+  assert.ok(isHabitAtom('elohim/elohim-storage/.epr-meta/blob-durability.habit.md'));
+  assert.ok(isHabitAtom('.epr-meta/x.habit.md'));
+  assert.ok(isHabitAtom('a/src/.epr-meta/y.habit.md'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/.epr-meta/policies.yaml'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/docs/x.habit.md'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/.epr-meta/sub/x.habit.md'));
+});
+
+test('a commit that edits only a habit atom under the project keeps the project tree key', () => {
+  const before = projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', dirListing('atom-1')));
+  const after = projectTree('/r', 'c2', 'elohim/elohim-storage', treeSpawn('tree-2', dirListing('atom-2')));
+  assert.match(before, /^tree-minus-habit-atoms:[0-9a-f]{64}$/);
+  assert.equal(after, before);
+});
+
+test('every other edit under the project, governance files included, moves the project tree key', () => {
+  const base = projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', dirListing('atom-1')));
+  const source = dirListing('atom-1').replace('bbb', 'bbb2');
+  const policy = dirListing('atom-1').replace('ddd', 'ddd2');
+  assert.notEqual(projectTree('/r', 'c2', 'elohim/elohim-storage', treeSpawn('tree-2', source)), base);
+  assert.notEqual(projectTree('/r', 'c3', 'elohim/elohim-storage', treeSpawn('tree-3', policy)), base);
+});
+
+test('a project with no habit atom keys on its plain tree OID; an unreadable listing keeps the atoms in', () => {
+  const noAtoms = [lsTreeEntry('aaa', 'elohim/elohim-storage/Cargo.toml')].join('\0') + '\0';
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', noAtoms)), 'tree-1');
+  const unreadable = fakeSpawn([
+    [isRevParse, { status: 0, stdout: 'tree-1\n', stderr: '' }],
+    [isTree, { status: 128, stdout: '', stderr: 'fatal' }],
+  ]).spawn;
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', unreadable), 'tree-1');
+  const absent = fakeSpawn([[isRevParse, { status: 128, stdout: '', stderr: '' }]]).spawn;
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', absent), null);
 });

@@ -7,7 +7,7 @@ title: "A native gate's closure key takes the project directory's whole tree OID
 slug: "gate-key-dirtree-rekeys-on-habit-atom-edit"
 written: "2026-11-08"
 author: "artifact-store sprint 2 orchestrator (claude-opus-5-5, shem)"
-status: "open"
+status: "resolved"
 priority: "high"
 jobs: [pre-push]
 cluster: "push-gate-pays-once"
@@ -28,3 +28,5 @@ deliverable CLAUDE.md asks every finished lane to write — therefore invalidate
 governance paths), or let `gate-input-audit.mjs` declare `.epr-meta` a non-read for native gates;
 add a test: a commit touching only `<dir>/.epr-meta/*.habit.md` keeps the closure key. Habit
 `push-gate-pays-once`.
+
+**Resolved 2026-11-09:** `projectTree()` in `gate-evidence.mjs` keys the project tree without its habit atoms (`*.habit.md` directly under any `.epr-meta/`). Tests are in `gate-evidence.test.mjs`. On 2c413084f the old key moved and the new one holds. The broader cure this row offered, excluding all of `.epr-meta/**`, was rejected: other files there (policies, dispatch and strict bindings) are governance a gate can depend on. DELTA on `push-gate-pays-once`.
