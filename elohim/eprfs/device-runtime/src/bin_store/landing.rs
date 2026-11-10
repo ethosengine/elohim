@@ -2,6 +2,20 @@ use super::{files, source::CommandSpec, Refusal, Release, Result, Store};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// Explicit intent for a committed-head transition.
+pub enum Transition {
+    /// Move to a release whose commit descends from the committed head.
+    Forward,
+    /// Elect an older release and record the move as a revert.
+    Revert,
+    /// Cross a known source-lineage break without describing the move as a revert.
+    RebaseLineage {
+        /// Human-supplied explanation retained with the landing record.
+        reason: String,
+    },
+}
+
 #[derive(Clone)]
 /// Expected committed head for one landing attempt.
 pub(super) enum Expect {
@@ -30,13 +44,88 @@ impl Expect {
     }
 }
 
+impl Transition {
+    fn check_expect(&self, expect: &Expect, found: &Option<String>) -> Result<()> {
+        if let Self::RebaseLineage { reason } = self {
+            if reason.trim().is_empty() {
+                return Err(Refusal::new(
+                    "rebase-needs-reason",
+                    "lineage rebase requires a non-empty reason",
+                ));
+            }
+            if !matches!(expect, Expect::Prior(Some(_))) {
+                return Err(Refusal::new(
+                    "rebase-needs-expect",
+                    "lineage rebase requires an explicit current CID",
+                ));
+            }
+            if found.is_none() {
+                return Err(Refusal::new(
+                    "rebase-needs-expect",
+                    "lineage rebase requires an existing current release",
+                ));
+            }
+        }
+        expect.check(found)
+    }
+
+    fn requires_descent(&self) -> bool {
+        matches!(self, Self::Forward)
+    }
+
+    /// Forward must descend and a lineage rebase must not; a revert never consults ancestry.
+    fn judges_ancestry(&self) -> bool {
+        !matches!(self, Self::Revert)
+    }
+
+    fn ring(&self) -> &'static str {
+        match self {
+            Self::Forward => "landed",
+            Self::Revert => "reverted",
+            Self::RebaseLineage { .. } => "lineage-rebased",
+        }
+    }
+
+    fn record_lineage_rebase(
+        &self,
+        release: &mut Release,
+        old: &Option<String>,
+        metadata: &Value,
+    ) -> Result<()> {
+        let Self::RebaseLineage { reason } = self else {
+            // The record persists across landings: a release once landed by rebase and landed
+            // again forward or by revert must not keep describing the earlier crossing.
+            release.extra.remove("rebasedFrom");
+            release.extra.remove("rebaseReason");
+            return Ok(());
+        };
+        let cid = old.as_deref().ok_or_else(|| {
+            Refusal::new(
+                "rebase-needs-expect",
+                "lineage rebase requires an existing current release",
+            )
+        })?;
+        let commit = metadata["commit"].as_str().ok_or_else(|| {
+            Refusal::new(
+                "current-metadata-invalid",
+                "current.json does not name the current commit",
+            )
+        })?;
+        release
+            .extra
+            .insert("rebasedFrom".into(), json!({"cid":cid,"commit":commit}));
+        release.extra.insert("rebaseReason".into(), json!(reason));
+        Ok(())
+    }
+}
+
 impl Store {
     fn validate_land(
         &self,
         cid: &str,
         commit: &str,
         repo: &Path,
-        revert: bool,
+        transition: &Transition,
         cached: bool,
     ) -> Result<(Release, Option<String>, Value)> {
         self.require_migrated()?;
@@ -106,22 +195,48 @@ impl Store {
                     "current.json does not describe current",
                 ));
             }
-            if old != cid
-                && !revert
-                && !self.descends(repo, metadata["commit"].as_str().unwrap_or(""), commit)?
-            {
+            let prior_commit = metadata["commit"].as_str().unwrap_or("");
+            // A transition is a change of bytes OR of source commit: identical release bytes
+            // re-ingested under another commit still move the committed head's lineage.
+            let moves = old != cid || prior_commit != commit;
+            if !moves && matches!(transition, Transition::RebaseLineage { .. }) {
                 return Err(Refusal::new(
-                    "non-descendant",
-                    format!("{commit} does not descend from {}", metadata["commit"]),
+                    "rebase-not-needed",
+                    format!("{cid} at {commit} is already the committed head"),
                 ));
+            }
+            if moves && transition.judges_ancestry() {
+                let descends = self.descends(repo, prior_commit, commit)?;
+                if transition.requires_descent() && !descends {
+                    return Err(Refusal::new(
+                        "non-descendant",
+                        format!("{commit} does not descend from {}", metadata["commit"]),
+                    ));
+                }
+                if !transition.requires_descent() && descends {
+                    // A rebase record on an ordinary descendant would misdescribe the move.
+                    return Err(Refusal::new(
+                        "rebase-not-needed",
+                        format!(
+                            "{commit} descends from {}; land it forward instead",
+                            metadata["commit"]
+                        ),
+                    ));
+                }
             }
         }
         Ok((record, old, metadata))
     }
     /// Promote a verified, clean, descended and healthy candidate without a caller-supplied prior.
     /// Health runs outside the lock; source state and metadata are revalidated before the move.
-    pub fn land(&self, cid: &str, commit: &str, repo: &Path, revert: bool) -> Result<Release> {
-        self.land_mode(cid, commit, repo, revert, false, Expect::Any)
+    pub fn land(
+        &self,
+        cid: &str,
+        commit: &str,
+        repo: &Path,
+        transition: Transition,
+    ) -> Result<Release> {
+        self.land_mode(cid, commit, repo, transition, false, Expect::Any)
     }
     /// Promote a candidate only when the committed head equals `expected`; `None` expects no head.
     pub fn land_expected(
@@ -129,7 +244,7 @@ impl Store {
         cid: &str,
         commit: &str,
         repo: &Path,
-        revert: bool,
+        transition: Transition,
         expected: Option<&str>,
     ) -> Result<Release> {
         if let Some(expected) = expected {
@@ -139,7 +254,7 @@ impl Store {
             cid,
             commit,
             repo,
-            revert,
+            transition,
             false,
             Expect::Prior(expected.map(str::to_owned)),
         )
@@ -149,7 +264,7 @@ impl Store {
         cid: &str,
         commit: &str,
         repo: &Path,
-        revert: bool,
+        transition: Transition,
         cached: bool,
         expect: Expect,
     ) -> Result<Release> {
@@ -162,8 +277,8 @@ impl Store {
                     .is_file()
                     .then(|| self.head("current"))
                     .flatten();
-                expect.check(&found)?;
-                let state = self.validate_land(cid, commit, repo, revert, cached)?;
+                transition.check_expect(&expect, &found)?;
+                let state = self.validate_land(cid, commit, repo, &transition, cached)?;
                 files::touch(&self.artifact(cid)?.join(".used"))?;
                 state
             };
@@ -176,8 +291,9 @@ impl Store {
                 .is_file()
                 .then(|| self.head("current"))
                 .flatten();
-            expect.check(&found)?;
-            let (mut latest, old, meta) = self.validate_land(cid, commit, repo, revert, cached)?;
+            transition.check_expect(&expect, &found)?;
+            let (mut latest, old, meta) =
+                self.validate_land(cid, commit, repo, &transition, cached)?;
             if old != expected || meta != expected_meta {
                 return Err(Refusal::new(
                     "current-moved",
@@ -192,7 +308,7 @@ impl Store {
             if let Some((kind, detail)) = health_note {
                 Self::add_note(&mut latest, kind, detail);
             }
-            if old.as_deref() == Some(cid) {
+            if old.as_deref() == Some(cid) && meta["commit"].as_str() == Some(commit) {
                 // Health/admission still run, but this is maintenance, not a landing.
                 if has_health_note {
                     self.save(&latest)?;
@@ -201,13 +317,14 @@ impl Store {
                 return Ok(latest);
             }
             latest.attestations.extend(record.attestations);
-            latest.ring = if revert { "reverted" } else { "landed" }.into();
+            latest.ring = transition.ring().into();
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .subsec_nanos();
             let at = format!("{}.{nanos:09}Z", files::now().trim_end_matches('Z'));
             latest.extra.insert("landedAt".into(), json!(at));
+            transition.record_lineage_rebase(&mut latest, &old, &meta)?;
             self.save(&latest)?;
             if cached {
                 latest.extra.insert("source".into(), json!("cache"));

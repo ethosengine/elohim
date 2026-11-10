@@ -1662,8 +1662,9 @@ class StewardClaimTest(unittest.TestCase):
         # 2026-10-30, after a power loss: the view had not folded the override row yet, the
         # pending verdict carried no device, and the reason formatter raised. The claim then
         # released and every retry wrote a fresh lease and a fresh override, never converging.
-        # The clock and sleep are virtual: do not race real Python startup against the final
-        # 100 ms read budget. Keep the parser and timeout calculation, supplying only process I/O.
+        # The clock and sleep are virtual: do not race real Python startup against the final read's
+        # budget (READ_FLOOR_S since 2026-11-10). Keep the parser and timeout calculation, supplying
+        # only process I/O.
         answers = iter([view(), view(dev_integration=unconfirmed_a())])
 
         def read(command, **kwargs):
@@ -1672,7 +1673,8 @@ class StewardClaimTest(unittest.TestCase):
 
         with mock.patch("subprocess.run", side_effect=read) as runner:
             ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
-        self.assertEqual(runner.call_args.kwargs["timeout"], 0.1)
+        # The last read past the deadline still gets the floor, never the leftover.
+        self.assertEqual(runner.call_args.kwargs["timeout"], _NS["READ_FLOOR_S"])
         self.assertFalse(ok)
         self.assertEqual(reason, f"unconfirmed: {DEVICE_A} has not acknowledged yet — override on the record")
         self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
@@ -1682,7 +1684,7 @@ class StewardClaimTest(unittest.TestCase):
         answers = iter([view(), view(dev_integration=unconfirmed_a())])
 
         def read(command, **kwargs):
-            if kwargs["timeout"] == 0.1:
+            if kwargs["timeout"] == _NS["READ_FLOOR_S"]:
                 raise subprocess.TimeoutExpired(command, kwargs["timeout"])
             answer = next(answers, view(dev_integration=pending()))
             return subprocess.CompletedProcess(command, 0, json.dumps(answer), "")
@@ -1692,7 +1694,7 @@ class StewardClaimTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIsNone(lease)
         self.assertIn("the steward lease view did not answer:", reason)
-        self.assertIn("timed out after 0.1 seconds", reason)
+        self.assertIn(f"timed out after {_NS['READ_FLOOR_S']} seconds", reason)
         local = self.berth.who("dev-integration")
         self.assertEqual(local["holder"], "codex-1")
         self.assertEqual(self.berth.override_wait,
@@ -2178,6 +2180,31 @@ class StewardClaimTest(unittest.TestCase):
         # Every read during the settle was given at most the time left.
         self.assertTrue(all(t <= self.berth.confirm_wait_s + 1 for t in timeouts[1:]), timeouts)
         self.assertLess(timeouts[-1], timeouts[1])
+
+    def test_the_last_settle_read_is_never_starved_below_the_views_cost(self):
+        # 2026-11-10 (shem): the lease view took ~0.53 s; polling `pending` to the deadline left the final
+        # read ~0.3 s, it timed out, and the claim refused, even under --offline-ok. A slow view that
+        # settles just before the deadline must be read in full and claim.
+        cost, timeouts, settle = 0.53, [], []
+
+        def leases(timeout=10):
+            self.berth._channel_read = True
+            self.berth.channel_root, self.berth.channel_standing = CHANNEL_STORE, "device"
+            timeouts.append(timeout)
+            if timeout < cost:
+                self.clock[0] += timeout
+                return None, f"the steward lease view did not answer: timed out after {timeout:.2f} s"
+            self.clock[0] += cost
+            if len(timeouts) == 1:
+                settle.append(self.clock[0])
+                return view(), None
+            done = self.clock[0] >= settle[0] + self.berth.confirm_wait_s + 0.5
+            return view(dev_integration=effective() if done else pending()), None
+
+        self.berth.peer_leases = leases
+        ok, _, reason, _ = self.claim()
+        self.assertTrue(ok, (reason, timeouts))
+        self.assertTrue(all(t >= _NS["READ_FLOOR_S"] for t in timeouts[1:]), timeouts)
 
     def test_a_policy_that_does_not_parse_or_names_an_unknown_scope_refuses(self):
         for text in ('{"berth": {"resources": {"dev-integration": ', 
