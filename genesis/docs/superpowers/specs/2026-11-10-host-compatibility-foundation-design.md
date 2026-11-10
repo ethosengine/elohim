@@ -697,10 +697,23 @@ has several bespoke feedback implementations, each with its own identity scheme:
 A conformance failure, a witnessed death and a finding are the same kind of thing as each of
 these: an attributed observation about a content-addressed subject, of a declared kind, at a
 declared reach, from which pain is folded against a declared bound. This spec does not add an
-eighth implementation. It needs one channel with those properties and consumes it. The storage
-observation plane and the algedonic design
-(`2026-08-10-algedonic-feedback-signal-design.md`) already describe most of that channel, so the
-unification belongs there, as an amendment, and not in this document.
+eighth implementation. It needs one channel with those properties and consumes it.
+
+The parent record for that channel already exists. `elohim/epr` defines `WitnessedInteraction`:
+an REA-shaped record `(object CID, substrate, action, magnitude)` that a witness emits about a
+content-addressed object, carried in the shared envelope with its reach, proof and supersession,
+and aggregated on the object CID. Its own design
+(`2026-07-15-frame-witness-primitive-architecture-design.md`) names the DHT `FeedbackSignal` as
+one of its specializations. The unification therefore belongs to that design, with the algedonic
+design and the storage observation plane as the fold and the carriage, and not in this document.
+
+On whether this needs a new crate (the steward is open to revisiting that): it does not. Almost
+every crate that would mint feedback already depends on `elohim/epr` (ark, placement, the epr
+CLI, storage, and brit through the registry). What is in the wrong place is the storage
+`Observation` type, which lives inside `elohim-storage` where no other tool can mint it. A crate
+named for the Viable System Model is still not proposed: nothing would consume Systems 1 to 5 as
+types. Open: whether a pass or a fail fits the existing magnitudes (`Vote` is the likely one) and
+which member of the closed substrate vocabulary a conformance observation uses.
 
 Corrections this reading forced on earlier drafts of this spec: §3.2 said the death witness names
 the variant, which it does not; a `lineage` field on variant entries duplicated the fabric's
@@ -797,7 +810,8 @@ Missing nodes added by §7.4 and §7.5:
   channel that the bespoke implementations above are re-expressed through, with a probe that one
   CI finding, one death witness and one conformance failure are read back by the same query on
   subject CID and kind / current state: seven implementations, four identity schemes, none
-  crossing devices. Owner: the algedonic and observation-plane designs, not this spec`.
+  crossing devices. Owner: the frame and witness primitive design, with the algedonic and
+  observation-plane designs, not this spec`.
 - `immune loop / between "many devices hurt by one variant" → "the hurt is visible" / missing node:
   an algedonic emitter over a declared bound on a variant's death or restore rate / current state:
   the evidence type exists and nothing emits it`.
