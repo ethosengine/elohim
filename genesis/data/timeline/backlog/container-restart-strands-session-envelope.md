@@ -44,6 +44,17 @@ cites:
   envelope records a per-container identity that is provably retired (the container's own start
   marker on the RWO PVC, or a flock the live owner holds on the PVC), so that `gc` can seal it.
   Until then the steward needs a recorded way to close an envelope whose owner is unprovable.
+  Weigh it against `security-session-successor-admitted-before-facet-release.md`: successor
+  admission (`existing`, ~:234) repeats `owner_dead(/proc)`, so a hand-set `closedAt` alone does
+  not admit a successor.
+- **The generation question.** The 2026-11-10 unblock (steward ruling, journalled in the
+  artifact-store `STATE.md` 11-10 16:37Z) moved the stranded record aside unedited, and `open`
+  minted a fresh generation 1. That keeps the covenant session key, so the session's clauses stayed
+  in force. A proper successor would be generation 2 and inherit no clauses. Decide which a restart
+  successor should be, and whether the steward re-offers its clauses.
+- **Stale PATH epr.** `~/.local/bin/epr` (bin-launch) resolves the old build bafyreibrqq…, which has
+  no `session commit-trailers`, so every commit hook prints `UNMEASURED`. `epr device arrive`
+  reports "epr has no verified current" for the head build bafyreiexj56….
 - `just status device` gains lines for the pinned toolchain, git hooks-path trust, peer daemon
   liveness (sibling head age, not process presence) and the object store's pack count against
   the gix slot limit; each REFUSED line names its cure.
