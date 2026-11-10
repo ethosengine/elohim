@@ -176,8 +176,10 @@ compares; which sources are good enough at which reach is decided by the existin
 Evidence can also be withdrawn:
 
 - A crash that contradicts a requirement (an illegal-instruction death, a loader failure) is
-  counter-evidence. ark's death witness already records the death; the witness names the variant,
-  and the claim is withdrawn for that host class. Counter-evidence is floor-protected.
+  counter-evidence. ark's death witness already records the death, content-addressed. Today it
+  names the artifact by SHA-256 and path, not by variant CID, and has no exit class for an illegal
+  instruction or a loader failure (§9, gaps). Once it names the variant, the claim is withdrawn for
+  that host class. Counter-evidence is floor-protected.
 
 ### 3.3 Refusals
 
@@ -362,7 +364,7 @@ VariantSet {
   family:      key of the derivation with the declared target erased
   conformance: CID of the suite every variant must pass (§7.1)
   variants:    [ { requires: Requires, artifact: CID, key: derivation key, proofs: [attestation CID],
-                   lineage: optional { parent: variant CID, answers: [finding CID] } } ]
+                   produced_by: optional CID of the Process that made it (§9, inherited ontology) } ]
 }
 ```
 
@@ -519,17 +521,24 @@ other variant.
 | Quarantine | the device stops offering the variant at reach, and may keep running it confined while it decides | offering: in this spec. Confinement: the envelope enforces nothing today |
 | Observe | the suspect variant runs under the envelope with its witness, to capture the input that exposes the flaw | not designed |
 | Experiment, adapt | the device makes an adapted variant at private reach (§7.1) | in this spec |
-| Repair | an adapted variant that passes the suite and the new vector; its `lineage` names its parent and the finding it answers | field reserved here |
+| Repair | an adapted variant that passes the suite and the new vector; the `Process` that made it lists its parent and the vector as inputs | expressible in the fabric today (§9) |
 | Restore | the last working variant is kept, and returning to it is a pin move | in this spec (§7) |
 | Update | adopting a new variant set does not evict what runs | in this spec (§7) |
 | Propagate | the finding and the repair travel at their reach; each device evaluates them locally | below |
 
 **A finding is a conformance vector.** A device that discovers a flaw publishes the input that
 exposes it and the behaviour the contract expects, as a proposed vector for the set's suite,
-signed, with the CID of the variant it was observed on. Every device that holds the finding runs
+signed, with the CID of the variant it was observed on. "Finding" is a name for a use of existing
+records, not a new record type (§9, inherited ontology). Every device that holds the finding runs
 the vector against its own variant, on its own hardware, and learns privately whether it is
 affected. No device reports what it is. A device may adopt a finding into the suite it holds at
 its steward's reach before any wider election, exactly as it may hold a wider variant set.
+
+**Pain is separate from a finding.** The algedonic signal already in `elohim/epr` reports a
+device's own numeric state against a limit it declared, accuses no one, and is advisory to
+standing. A single failed vector is not that. What fits it is a rate: deaths of one variant, or
+restores, against a declared bound. The finding carries the specific flaw; the algedonic signal
+carries how much it hurts.
 
 **A repair is an adapted variant with lineage.** This is the fork-and-patch cycle a developer
 already works in, with the loop closed: the patch is attributed, proven against the vector that
@@ -545,7 +554,9 @@ yet.
    the device concerned.
 3. **Everything is attributed and has lineage.** A variant, a finding and a repair each name their
    signer and what they derive from.
-4. **A finding informs; it does not command.** A finding can stop a variant being offered. Whether
+4. **A finding informs; it does not command.** This is the existing algedonic rule (`"advisory"`
+   standing impact: pain does not debit standing by itself) applied to findings. A finding can
+   stop a variant being offered. Whether
    to stop running it is the device's own decision. A false finding therefore costs a re-proof and
    cannot halt a device.
 5. **Findings climb the reach ladder too.** A vector that exposes a flaw is also a recipe for
@@ -627,6 +638,53 @@ request, naming a declared target, can be prepared and kept.
 
 No new DHT entry type, table or route is proposed.
 
+### Ontology inherited, not minted
+
+The substrate crates state two rules this spec follows. "Admit a new primitive when a SECOND
+independent framework needs the same missing distinction" (guidestar spec, §3a,
+`2026-08-12-requisite-variety-guidestar-epr-family-composition.md`). And, paraphrasing
+`epr-cli`'s `retract.rs`: a new social move on existing data is a new tag and not a new type.
+
+Read for this table on 2026-11-10, on this branch: `elohim/epr`, `elohim/epr-rea`,
+`elohim/elohim-compute`, ark's witness, the storage observation plane, the DHT `FeedbackSignal`
+entry and the feedback-signal schemas. brit's attestation types were read at the main checkout's
+pin, which may differ from this branch's.
+
+| Spec term | Expressed as | Class | Gap |
+|---|---|---|---|
+| `Requires`, `Provides`, axis, bundle | new documents and a pure function | novel: none of the three substrate crates describes what bytes need of a host. Placement's requirements cover capacity and consent | none |
+| `admit`'s verdict (§3.3) | `elohim_epr::verdict::Verdict` (`Permit`, `Refuse`, `Refer`, with check outcomes) | inherit | open: whether an unknown axis is a `Refuse` or a `Refer` for a novel situation. Either way the bytes do not run |
+| Variant set, closure | content-addressed documents | novel | none |
+| Build recipe, conformance suite | `ProcessSpec`, pinned, with its validators | inherit | none |
+| Build job, proving job (§7.3) | two `Process` runs under two specs. Promised work is a `Commitment` with provider and receiver, discharged by `fulfills` | inherit | none |
+| Build attestation | brit `BuildAttestationContentNode` | inherit | `hardware_profile` is free-form |
+| Conformance attestation (§7.1) | brit `ValidationAttestationContentNode`: artifact CID, check name, result, findings CID, signature. In the fabric, an `Affirm` or `Dismiss` event on the variant CID | inherit | no host-class field; the ref is keyed by name and overwritten; brit notes refs are not pushed today |
+| A variant's standing in its set | the epistemic fold over `Affirm`, `Dismiss` and `Cite` events (`Emergent`, `Reviewed`, `Contested`, `Canon`, `Superseded`) and its cite gate | inherit | none |
+| Crash evidence | ark `DeathWitness`, a CIDv1 over the whole record | inherit | names a SHA-256 and a path, not a variant CID or the clause contradicted; no exit class for illegal instruction or loader failure; kept in a local spool only |
+| Finding (§7.4) | not a type. The vector is a content-addressed resource. The claim is a `Dismiss` event on the variant CID that cites the vector or the death witness. Proposing it for the suite is an `Intent` scoped to the suite. brit's attestation already has a `findings_cid` slot | a tag on existing records | flow records carry no signature; the brit CLI exposes no way to set `findings_cid` |
+| Quarantine, vouch, retraction, correction at notarized reach | the DHT `FeedbackSignal` entry already has these four kinds, with a target CID, an evidence CID and a standing impact | inherit | no new signal kind is proposed |
+| Repair lineage (§7.4) | a `Process` whose inputs are the parent variant and the vector and whose output is the repair, a `Produce` event, and `satisfies` on the finding's `Intent`. Read back by the fabric's lineage walk | inherit | inputs are untyped, so parent and vector are told apart by classification |
+| Pain about a variant population | `AlgedonicEvidence`, minted by the fold from a `Bound` on a `Commitment`, with the approach, breach and recovered latch | inherit | no production emitter; evidence is ceiling-only; the DHT kind is not shipped |
+| Carrying a finding between devices | the storage observation plane: signed, keyed by subject CID, each kind declared with a reach | inherit, as the candidate | its announcement publisher has no caller |
+| The elohim as actor (§7.4) | `ParticipantRef::Agent` with its `ActorClaim`; the guidestar's agent at the boundary | inherit | signatures are defined over actor records only |
+| Device, household, wider (recursion) | `scope::Scopes`, one tree per axis over `in_scope_of` | inherit | none |
+| Custody of variant bytes | nothing: no custody fold and no transfer verb | absent | already a missing node below |
+
+Three things the repo does not have, said plainly:
+
+- There is no `epr-vsm` crate or module. The Viable System Model material is the algedonic module
+  in `elohim/epr`, the bounds, stocks and scopes in `elohim/epr-rea`, and prose. Systems 1 to 5 are
+  not types. Reading devices as System 1 would be this spec's inference, so it is not made.
+- There is no variety measure, and the guidestar refuses one.
+- There is no connected pipeline from a content-addressed failure to an algedonic signal to brit.
+  The parts exist separately: CID-addressed witnesses, signed attestations and the algedonic
+  evidence type. Joining them is the work §7.4 names.
+
+Corrections this reading forced on earlier drafts of this spec: §3.2 said the death witness names
+the variant, which it does not; a `lineage` field on variant entries duplicated the fabric's
+`Process` and is replaced by a reference to it; and "finding" was listed as a missing entity when
+it is a use of existing records with four gaps.
+
 ### Entity: Requires
 - **Classification**: Linked (A2) where the artifact is notarized (it is an attribute of a release's
   artifact row); otherwise it rides the artifact's `DerivationRecord` on the steward channel.
@@ -706,11 +764,15 @@ Missing nodes, in mintable shape:
 Missing nodes added by §7.4 and §7.5:
 
 - `immune loop / between "a device observes a flaw" → "other devices learn whether they are
-  affected" / missing node: a finding, a signed proposed conformance vector naming the variant it
-  was observed on, with a probe that a second device's variant fails it locally / current state:
-  not an entity. It is a content-addressed document and proposes no entry type; it must pass this
-  gate before anything is built, with its reach, its custody and the cost of each device re-running
-  vectors stated`.
+  affected" / missing node: a signed, carried finding, with a probe that a second device's variant
+  fails the vector locally / current state: the records exist (table above) and four joins do
+  not: a signature over flow records, the death witness naming a variant CID and the clause
+  contradicted, a host-class field on the validation attestation, and a live channel between
+  devices. Each join is a change to an existing type and passes this gate when proposed, with the
+  reach, the custody and the cost of each device re-running vectors stated`.
+- `immune loop / between "many devices hurt by one variant" → "the hurt is visible" / missing node:
+  an algedonic emitter over a declared bound on a variant's death or restore rate / current state:
+  the evidence type exists and nothing emits it`.
 - `immune loop / between "variant suspected" → "flaw captured" / missing node: confined
   observation under the envelope / current state: the envelope's effective tier is none`.
 - `new device / between "hardware with no variant" → "runs the portable tier" / missing node: a
@@ -807,6 +869,12 @@ Until then they are named axes with no supported claim.
   variant, replacing hand-kept flavor tags?
 - **lvi**: check §6.2 against the `DevspaceSeed` projection. Is the build closure the missing
   toolchain-marker encoding?
+- **epr and epr-rea stewards**: check the inherited-ontology table in §9. Is each "inherit" a true
+  fit, and is `admit` returning the shared `Verdict` type acceptable?
+- **brit session**: the same table names three gaps in the validation attestation (host class,
+  overwritten ref, no way to set `findings_cid`). Are they changes brit would take?
+- **ark session**: can the death witness name a variant CID and the contradicted clause, and gain
+  exit classes for illegal instruction and loader failure?
 - **rakia session**: check §7.3. Does rakia's job planning have a place for a provider-answered
   build-closure admission, and for a proving job separate from the build job? This spec states the
   requirement without having read rakia's planner.
@@ -845,8 +913,8 @@ the list open, the observation local, and the proof earned per host class.
 | Universal artifact | One with an empty `Requires`; a single form, pinned by its own CID |
 | Conformance suite | The content-addressed harness and vectors every variant in a set must pass |
 | Conformance attestation | A signed record that one variant passed one suite on one host class |
-| Finding | A signed proposed conformance vector that exposes a flaw, naming the variant it was observed on |
-| Lineage | What a variant derives from: its parent variant and the findings it answers |
+| Finding | A proposed conformance vector that exposes a flaw in a named variant. A use of existing records (§9), not a record type |
+| Lineage | What a variant derives from, read from the `Process` that produced it |
 | Seed | The smallest native member set that carries the portable tier and reaches a peer |
 | Adapted variant | A variant made by changing source or recipe for a device or class; it joins a set by attestation |
 | Carrier | A delivery format, such as an OCI image, rendered from a closure |
