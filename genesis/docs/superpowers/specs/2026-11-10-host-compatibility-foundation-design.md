@@ -361,7 +361,8 @@ One logical artifact has several variants. A **variant set** is a small content-
 VariantSet {
   family:      key of the derivation with the declared target erased
   conformance: CID of the suite every variant must pass (§7.1)
-  variants:    [ { requires: Requires, artifact: CID, key: derivation key, proofs: [attestation CID] } ]
+  variants:    [ { requires: Requires, artifact: CID, key: derivation key, proofs: [attestation CID],
+                   lineage: optional { parent: variant CID, answers: [finding CID] } } ]
 }
 ```
 
@@ -489,6 +490,79 @@ can make a variant that does not exist yet. It is the same contract applied to t
 
 The job is complete when the variant's entry, with its attestation against the set's suite, is
 appended. A build with no proof is a candidate and is not offered at wider reach.
+
+### 7.4 The immune loop
+
+This section states the direction the contract is built to carry. Parts of it are in this spec
+already; the rest is named so that nothing designed now forecloses it. It has one proof rung (H11)
+and no implementation.
+
+The steward's ruling on direction, 2026-11-10: variety among devices is the protocol's strength.
+Exploits and failures are expected. The network is built so that damage stays cheap, restoration
+is robust, and the discovery and repair of a flaw happen at the edge that met it, then inform the
+devices the discovery helps. No central rule set or security authority decides for the devices.
+
+| Act | Mechanism | State |
+|---|---|---|
+| Sense | a witnessed death that contradicts a requirement; a conformance failure; an observation by a person or an agent on the device | crashes and conformance are in this spec; other observation has no witness yet |
+| Respond | the device refuses the variant and withdraws its own claim for its host class | in this spec (§3.2) |
+| Quarantine | the device stops offering the variant at reach, and may keep running it confined while it decides | offering: in this spec. Confinement: the envelope enforces nothing today |
+| Observe | the suspect variant runs under the envelope with its witness, to capture the input that exposes the flaw | not designed |
+| Experiment, adapt | the device makes an adapted variant at private reach (§7.1) | in this spec |
+| Repair | an adapted variant that passes the suite and the new vector; its `lineage` names its parent and the finding it answers | field reserved here |
+| Restore | the last working variant is kept, and returning to it is a pin move | in this spec (§7) |
+| Update | adopting a new variant set does not evict what runs | in this spec (§7) |
+| Propagate | the finding and the repair travel at their reach; each device evaluates them locally | below |
+
+**A finding is a conformance vector.** A device that discovers a flaw publishes the input that
+exposes it and the behaviour the contract expects, as a proposed vector for the set's suite,
+signed, with the CID of the variant it was observed on. Every device that holds the finding runs
+the vector against its own variant, on its own hardware, and learns privately whether it is
+affected. No device reports what it is. A device may adopt a finding into the suite it holds at
+its steward's reach before any wider election, exactly as it may hold a wider variant set.
+
+**A repair is an adapted variant with lineage.** This is the fork-and-patch cycle a developer
+already works in, with the loop closed: the patch is attributed, proven against the vector that
+motivated it, and offered back through the same reach ladder as any other variant. When a suite
+that includes the vector is elected, variants that do not pass it are no longer members.
+
+Rules the direction places on this contract now. Each is a proposed requirement with no enforcer
+yet.
+
+1. **No closed lists.** Axes, bundles, variant sets and suites grow by anyone's contribution and
+   are narrowed only by evidence.
+2. **Judgement is local.** Admission, conformance and whether a finding applies are evaluated on
+   the device concerned.
+3. **Everything is attributed and has lineage.** A variant, a finding and a repair each name their
+   signer and what they derive from.
+4. **A finding informs; it does not command.** A finding can stop a variant being offered. Whether
+   to stop running it is the device's own decision. A false finding therefore costs a re-proof and
+   cannot halt a device.
+5. **Findings climb the reach ladder too.** A vector that exposes a flaw is also a recipe for
+   exploiting it. It starts at a narrow reach and widens as repairs land. A finding with no
+   standing behind it is weighed as any unattested claim is.
+6. **Restoration does not depend on the network.** What a device needs to return to its last
+   working state is held on the device.
+
+### 7.5 A device the network has not seen
+
+The same loop admits new hardware without anyone preparing for it.
+
+1. **Seed.** The device obtains the smallest native member set that can carry the portable tier
+   and reach a peer: an engine and a transport. On hardware with no existing variant this seed is
+   ported by a person or an agent, or runs in its slowest form (an interpreter). The seed's size is
+   therefore a design constraint on the native kernel: the less it contains, the cheaper every new
+   kind of device is.
+2. **Join.** With the seed, the device runs the portable tier and takes part in the layers where
+   peers must agree (§5.1). It is a full participant there from the first day, only slower.
+3. **Develop.** The device builds or adapts native variants for itself from the recipes, proves
+   them against the suites on its own hardware, and holds them at its steward's reach.
+4. **Contribute.** Its variants and proofs climb the attestation and reach ladders. Once they
+   stand, a later device of the same class resolves them directly and skips steps 1 and 3. The
+   first device of a class pays for the class.
+
+Open: what the seed contains, and whether one seed can serve devices too small to build. A phone
+or a watch cannot develop its own variants (§8); a sibling device or a builder does that for it.
 
 ## 8. Local-first reading
 
@@ -619,6 +693,20 @@ Missing nodes, in mintable shape:
 - `floor redistribution / between "sysroot built" → "sysroot shared at commons reach" / missing
   node: a licence reading of each floor and toolchain member / current state: unread`.
 
+Missing nodes added by §7.4 and §7.5:
+
+- `immune loop / between "a device observes a flaw" → "other devices learn whether they are
+  affected" / missing node: a finding, a signed proposed conformance vector naming the variant it
+  was observed on, with a probe that a second device's variant fails it locally / current state:
+  not an entity. It is a content-addressed document and proposes no entry type; it must pass this
+  gate before anything is built, with its reach, its custody and the cost of each device re-running
+  vectors stated`.
+- `immune loop / between "variant suspected" → "flaw captured" / missing node: confined
+  observation under the envelope / current state: the envelope's effective tier is none`.
+- `new device / between "hardware with no variant" → "runs the portable tier" / missing node: a
+  declared seed, the minimal native member set, with a probe that it builds for a target no
+  existing variant covers / current state: no binary is scoped as a seed`.
+
 ### Decision predicate: `admit`
 A pure decision predicate, to be registered in its crate's `seam-registry.yaml` at implementation
 with all sixteen concern answers. The answers that shape the design now:
@@ -675,6 +763,8 @@ Each rung is a receipt, not a design claim. A rung does not start until the one 
 | H9 | One conformance suite judges two variants of one binary on the two devices, with expected outputs minted by the other device's variant. A deliberately wrong variant is refused | two attestations naming one suite CID, and one refusal |
 | H10 | The reverse reading: a planner asks for a missing variant, a device that admits the build closure builds it by cross-compilation, a device that admits the output proves it, and the entry is appended | the appended variant-set CID with its attestation |
 
+| H11 | The immune loop on two devices: one mints a finding, the other's variant fails the vector locally and is no longer offered, a repair with lineage is appended and adopted, and the earlier variant is restored on request with no peer reachable | the finding, the failing run, the repair's attestation and the restore record |
+
 RISC-V and every other target enter at H6's shape: an observed build, run and mixed-peer exchange.
 Until then they are named axes with no supported claim.
 
@@ -691,6 +781,7 @@ Until then they are named axes with no supported claim.
 | H7 | May a coarse host class be published in a build attestation? | Yes, limited to the bundle names of the clauses proven, not raw `Provides` |
 | H8 | Is the line between portable and native drawn by "must agree" against "may differ" (§5.1)? | Yes. Agreed in conversation by the steward on 2026-11-10; recorded here for the reviewing sessions |
 | H9 | Are variant sets open, with membership decided by a named conformance suite and not by who built the variant (§7.1)? | Yes, same agreement. Adapted variants join by attestation; wider reach needs the device's own run or converging independent proofs |
+| H11 | Do the six rules of §7.4 bind every later change to this contract, and is the seed (§7.5) a design constraint on the native kernel? | Yes. The direction was ruled by the steward in conversation on 2026-11-10; the six rules and the seed are this spec's reading of it and need the steward's confirmation as written |
 | H10 | Does rakia plan native builds by asking providers to admit the build closure (§7.3), with building and proving as separate jobs? | Yes, pending the rakia session's check against how rakia plans jobs today, which this spec has not read |
 
 ## 13. Review asks, by session
@@ -744,5 +835,8 @@ the list open, the observation local, and the proof earned per host class.
 | Universal artifact | One with an empty `Requires`; a single form, pinned by its own CID |
 | Conformance suite | The content-addressed harness and vectors every variant in a set must pass |
 | Conformance attestation | A signed record that one variant passed one suite on one host class |
+| Finding | A signed proposed conformance vector that exposes a flaw, naming the variant it was observed on |
+| Lineage | What a variant derives from: its parent variant and the findings it answers |
+| Seed | The smallest native member set that carries the portable tier and reaches a peer |
 | Adapted variant | A variant made by changing source or recipe for a device or class; it joins a set by attestation |
 | Carrier | A delivery format, such as an OCI image, rendered from a closure |
