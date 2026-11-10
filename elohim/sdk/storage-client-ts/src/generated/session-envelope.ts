@@ -42,6 +42,23 @@ export interface SessionEnvelope {
      * Canonical berth authority store bound before the first mooring or lease; null means unused.
      */
     berthStore: string | null;
+    /**
+     * Armed owner-holder lock; absent when unarmed. A free lock proves death only to an observer in another pid namespace on the same boot.
+     */
+    ownerHolder?: {
+      lock: string;
+      generation: number;
+      armedAt: string;
+      inode: number;
+    };
+    /**
+     * Raw CID of the verified facet-release receipt; absent until close verified release.
+     */
+    releaseReceipt?: string;
+    /**
+     * Raw CID of the steward's retirement record: authorization to close and (when it says so) admit a successor, never death evidence.
+     */
+    retirement?: string;
   };
   berth: Record<string, unknown>;
   claims: Record<string, unknown>[];
