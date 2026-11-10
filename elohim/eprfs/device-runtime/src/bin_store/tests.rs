@@ -728,6 +728,7 @@ fn lineage_rebase_refuses_an_ordinary_descendant() {
     f.state.lock().unwrap().head = "b".repeat(40);
     let candidate = f.release("descendant");
     f.state.lock().unwrap().descended = true;
+    let before = landing_state(&f);
 
     let error = f
         .store
@@ -742,7 +743,7 @@ fn lineage_rebase_refuses_an_ordinary_descendant() {
         )
         .unwrap_err();
     assert_eq!(error.kind, "rebase-not-needed");
-    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    assert_eq!(landing_state(&f), before);
 }
 
 #[test]
@@ -799,6 +800,17 @@ fn rebase(reason: &str) -> Transition {
     }
 }
 
+/// Everything a refused landing must leave untouched: the whole `current.json` (commit, ring and
+/// rebase fields, not only the CID) and both heads. A CID comparison alone cannot see the
+/// commit-only movement a lineage rebase makes.
+fn landing_state(f: &Fixture) -> (Option<Value>, Option<String>, Option<String>) {
+    (
+        read_json(&f.store.root.join("current.json")),
+        f.store.head("current"),
+        f.store.head("previous"),
+    )
+}
+
 #[test]
 fn lineage_rebase_moves_identical_bytes_onto_a_new_lineage_commit() {
     let f = Fixture::new("epr");
@@ -809,6 +821,7 @@ fn lineage_rebase_moves_identical_bytes_onto_a_new_lineage_commit() {
     let again = f.release("same-bytes");
     assert_eq!(again.cid, same.cid);
     f.state.lock().unwrap().descended = false;
+    let before = landing_state(&f);
 
     let forward = f
         .store
@@ -821,6 +834,7 @@ fn lineage_rebase_moves_identical_bytes_onto_a_new_lineage_commit() {
         )
         .unwrap_err();
     assert_eq!(forward.kind, "non-descendant");
+    assert_eq!(landing_state(&f), before);
 
     let landed = f
         .store
@@ -847,6 +861,7 @@ fn lineage_rebase_refuses_identical_bytes_on_a_descendant_or_unchanged_commit() 
     let f = Fixture::new("epr");
     let same = f.release("same-bytes");
     f.land(&same).unwrap();
+    let before = landing_state(&f);
     assert_eq!(
         f.store
             .land_expected(
@@ -860,9 +875,11 @@ fn lineage_rebase_refuses_identical_bytes_on_a_descendant_or_unchanged_commit() 
             .kind,
         "rebase-not-needed"
     );
+    assert_eq!(landing_state(&f), before);
     f.state.lock().unwrap().head = "b".repeat(40);
     f.release("same-bytes");
     f.state.lock().unwrap().descended = true;
+    let before = landing_state(&f);
     assert_eq!(
         f.store
             .land_expected(
@@ -876,6 +893,7 @@ fn lineage_rebase_refuses_identical_bytes_on_a_descendant_or_unchanged_commit() 
             .kind,
         "rebase-not-needed"
     );
+    assert_eq!(landing_state(&f), before);
 }
 
 #[test]
@@ -914,6 +932,7 @@ fn lineage_rebase_keeps_unpublished_and_unhealthy_refusals_with_head_unchanged()
         state.descended = false;
         state.published = false;
     }
+    let before = landing_state(&f);
     let unpublished = f
         .store
         .land_expected(
@@ -925,7 +944,7 @@ fn lineage_rebase_keeps_unpublished_and_unhealthy_refusals_with_head_unchanged()
         )
         .unwrap_err();
     assert_eq!(unpublished.kind, "unpublished", "{unpublished:?}");
-    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    assert_eq!(landing_state(&f), before);
     {
         let mut state = f.state.lock().unwrap();
         state.published = true;
@@ -941,8 +960,8 @@ fn lineage_rebase_keeps_unpublished_and_unhealthy_refusals_with_head_unchanged()
             Some(&old.cid),
         )
         .unwrap_err();
-    assert_ne!(unhealthy.kind, "rebase-not-needed", "{unhealthy:?}");
-    assert_eq!(f.store.head("current"), Some(old.cid.clone()));
+    assert_eq!(unhealthy.kind, "health-flow-failed", "{unhealthy:?}");
+    assert_eq!(landing_state(&f), before);
 }
 
 #[test]
@@ -994,6 +1013,7 @@ fn lineage_rebase_requires_an_existing_explicit_matching_prior() {
     let transition = || Transition::RebaseLineage {
         reason: "the published branch was rebased".into(),
     };
+    let before = landing_state(&f);
 
     assert_eq!(
         f.store
@@ -1028,7 +1048,7 @@ fn lineage_rebase_requires_an_existing_explicit_matching_prior() {
             .kind,
         "current-moved"
     );
-    assert_eq!(f.store.head("current"), Some(current.cid));
+    assert_eq!(landing_state(&f), before);
 
     let empty = Fixture::new("epr");
     let candidate = empty.release("candidate-without-current");
@@ -1056,6 +1076,7 @@ fn lineage_rebase_refuses_an_empty_reason() {
     f.state.lock().unwrap().head = "b".repeat(40);
     let candidate = f.release("candidate-lineage");
     f.state.lock().unwrap().descended = false;
+    let before = landing_state(&f);
 
     let error = f
         .store
@@ -1071,7 +1092,7 @@ fn lineage_rebase_refuses_an_empty_reason() {
         .unwrap_err();
 
     assert_eq!(error.kind, "rebase-needs-reason");
-    assert_eq!(f.store.head("current"), Some(current.cid));
+    assert_eq!(landing_state(&f), before);
 }
 
 #[test]
