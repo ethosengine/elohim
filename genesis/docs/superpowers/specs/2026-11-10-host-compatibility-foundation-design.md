@@ -239,6 +239,32 @@ How the tiers are used:
 This is the answer to "level the floor without levelling the devices". No device changes its
 image. The floor is a property of the artifact.
 
+An artifact whose `Requires` is empty (an image, a text, a data file) is **universal**: every host
+admits it, it has one form, and a pin names its CID directly with no variant set. Variants exist
+only where `Requires` names a host axis.
+
+### 5.1 What must agree, and what may differ
+
+The tiers say how far bytes travel. They do not say which code belongs in which tier. That line is
+drawn by whether peers must compute the same result.
+
+| Kind of code | Examples | Form |
+|---|---|---|
+| **Must agree** | validation, content addressing, `admit`, elections | one deterministic form shared by all peers. Portable is right here because two peers must reach the same answer, not because of build cost |
+| **May differ** | how bytes move, how storage is laid out, how an accelerator is used, how the kernel is driven | a population of native variants, each fitted to its hardware and judged only at the contract (§7.1) |
+
+The portable tier is not a virtual machine laid over the devices to make them alike. Hardware
+variety is treated as an ecology: many variants, selected by evidence. Three things are durable and
+are designed with care, because many peers depend on them and no single peer can regenerate them:
+
+- the **contract**: the axis vocabulary and the interfaces a native member is judged at;
+- the **conformance suite** (§7.1), which is the selection pressure;
+- the **attestation** of who built a variant, from what, and where it passed.
+
+Implementations are the disposable side. A native variant may be generated or adapted for one
+device and replaced freely, provided it passes. The cost that remains is proving, and proving is
+parallel by construction: each device proves its own variant on its own hardware.
+
 ## 6. Closure, not image
 
 ### 6.1 What is wrong with the image as the unit
@@ -265,6 +291,7 @@ its own `Requires`. A berth mounts the members it needs; it does not unpack laye
 | Native member | `elohim-storage`, `doorway`, `ark`, the conductor, `epr`, `brit` | floor-carried or host-bound |
 | Floor member | a C runtime, loader and library set that floor-carried members link against or load | carries only `arch`, `isa.*`, `kernel.*` |
 | Toolchain member | compiler, linker, sysroot (build closures only) | native |
+| Conformance member | the suite a variant set names: harness, vectors and expected outputs (§7.1) | portable |
 
 Two closures use the same machinery:
 
@@ -332,8 +359,9 @@ One logical artifact has several variants. A **variant set** is a small content-
 
 ```
 VariantSet {
-  family:   key of the derivation with the declared target erased
-  variants: [ { requires: Requires, artifact: CID, key: derivation key } ]
+  family:      key of the derivation with the declared target erased
+  conformance: CID of the suite every variant must pass (§7.1)
+  variants:    [ { requires: Requires, artifact: CID, key: derivation key, proofs: [attestation CID] } ]
 }
 ```
 
@@ -346,8 +374,10 @@ VariantSet {
 - Each variant's record is indexed under both its own key and its family key. A fetch that misses
   on its own key reads the records under the family key. Lookup stays by key or CID; no query
   plane is added.
-- Whoever publishes a release assembles its variant set from the variants it holds proofs for. A
-  device may hold a wider set at its steward's reach that adds variants it built itself.
+- A variant set is an open population, not a list one party closes. Whoever publishes a release
+  assembles the first set from the variants it holds proofs for. Any device may contribute a
+  variant by appending an entry with its proof (§7.1). A device may hold a wider set at its
+  steward's reach than the one a release elected.
 - A pin names the **variant set CID**. Peers on different hardware therefore share one pin, and one
   `RuntimeManifest` CID, which restores "peers on one declaration share one manifest CID".
 - The berth records which variant its device resolved. That is a per-device fact, which is what a
@@ -374,6 +404,91 @@ Different builders of the same variant key may produce different bytes, because 
 builds are not deterministic. That is the existing `Mismatch` case in the artifact store and is
 unchanged here. It is one more reason shared variants should be built from a declared target with
 a release profile.
+
+### 7.1 The conformance suite: how different variants agree
+
+Variants differ in bytes by design, so agreement cannot be a byte comparison. It is a behavioural
+one. Each variant set names one **conformance suite** by CID. A variant belongs to the set because
+it passes that suite, and for no other reason.
+
+- The suite is a portable closure member: a harness, input vectors and expected outputs. It drives
+  a variant only through the interface the contract names (its command line, its wire protocol,
+  its files) and compares observable behaviour in a canonical form. It does not compare bytes,
+  timing or layout.
+- Expected outputs are minted by something other than the variant under test: the portable
+  reference where one exists, otherwise a different variant. A suite whose expectations came from
+  the variant it judges proves only self-consistency.
+- A run produces a **conformance attestation**: variant CID, suite CID, the bundle names of the
+  host class it ran on, the verdict and the signer. This is the `proven` clause source of §3.2 and
+  the build-provenance attestation named as a missing node in §9.
+- A proof is valid for the host class it ran on. A pass on one class does not transfer to another.
+- Changing the suite makes a new variant set. Proofs against the old suite do not carry over.
+
+Two kinds of variant join the same set:
+
+| Kind | How it is made | Key | How it is found |
+|---|---|---|---|
+| Same recipe, different declared target | the release recipe built for another target | its own key, sharing the family key | under the family key, or in the set |
+| Adapted | source or recipe changed for one device or class, by a person or an agent | its own key, outside the family | only through its entry in the set |
+
+What a device needs before it runs a variant it did not build:
+
+| Relationship | Evidence that suffices |
+|---|---|
+| The steward's own devices | a sibling's attestation for the same host class |
+| Wider reach | the device runs the suite itself before first adoption, or holds converging attestations from independent provers, as the reach ladder requires |
+
+Limits stated plainly:
+
+- A suite proves what it tests. Code where peers must reach the same answer does not rest on a
+  suite; it has one form (§5.1).
+- Conformance says behaviour agrees. It does not say a variant is harmless. Native code runs with
+  the authority its envelope gives it, and today the envelope enforces nothing
+  (`EffectiveTier::None`). Provenance, reach and envelope confinement govern that risk, and an
+  adapted variant widens it.
+- A variant that fails is refused and the device keeps what it runs (§7, "What already runs keeps
+  running").
+
+### 7.2 Finding a variant, and who holds it
+
+Two questions, answered by two existing mechanisms. No index of variants by hardware is added.
+
+1. **Which bytes?** The variant set answers. A device reads the set it pins, admits locally, and
+   has a CID.
+2. **From whom?** A variant is an ordinary content-addressed blob. Its holders are resolved the way
+   any blob's are, by CID. Universal artifacts and variants share one store and one lookup.
+
+What content addressing buys the network:
+
+- Universal and portable members are held once and shared by every host class. Only the native
+  members differ between classes, so a new class adds its native variants and nothing else.
+- Each host class carries its own variants. A device does not hold variants it cannot run unless
+  it chooses to serve them for others.
+- An identical variant built by two devices is one CID and one copy.
+
+Open: custody per variant. A variant for uncommon hardware has few holders (missing node, §9).
+
+### 7.3 Building a variant: the reverse reading
+
+Selection asks which existing variant a host can run. Build planning asks the reverse: which host
+can make a variant that does not exist yet. It is the same contract applied to the build closure.
+
+- A build closure's toolchain members carry their own `Requires`. A cross-compiler requires an
+  x86 host and produces aarch64 output. "Can this device build for target T" is
+  `admit(build closure for T, Provides)`, evaluated on the device that would build.
+- A build planner (rakia) therefore sends the job with the build closure's variant set, and the
+  provider answers which toolchain variant it will take, or refuses. The planner does not hold a
+  table of what each device is.
+- **Building and proving are separate jobs.** A variant may be built on any host that admits the
+  build closure. It is proven only on a host that admits the output. A proof under emulation is
+  recorded as such and counts for the build and run rungs only (ruling H6).
+- Cross-compilation from a declared target is preferred to emulated building, which is slower and
+  proves nothing more.
+- A request for a missing variant names a declared target. That is the requester's own disclosure,
+  scoped to the request (§4).
+
+The job is complete when the variant's entry, with its attestation against the set's suite, is
+appended. A build with no proof is a candidate and is not offered at wider reach.
 
 ## 8. Local-first reading
 
@@ -557,6 +672,8 @@ Each rung is a receipt, not a design claim. A rung does not start until the one 
 | H6 | A second architecture (aarch64): build, run, and exchange declared content with x86 peers both ways | first non-x86 receipt |
 | H7 | The portable tier beyond zomes: one wasm guest under the envelope, identical bytes on two architectures | tevah `Wasm` driver receipt |
 | H8 | One accelerator axis: an inference workload admitted on a host with the API and refused on one without | first `accel.*` receipt |
+| H9 | One conformance suite judges two variants of one binary on the two devices, with expected outputs minted by the other device's variant. A deliberately wrong variant is refused | two attestations naming one suite CID, and one refusal |
+| H10 | The reverse reading: a planner asks for a missing variant, a device that admits the build closure builds it by cross-compilation, a device that admits the output proves it, and the entry is appended | the appended variant-set CID with its attestation |
 
 RISC-V and every other target enter at H6's shape: an observed build, run and mixed-peer exchange.
 Until then they are named axes with no supported claim.
@@ -572,6 +689,9 @@ Until then they are named axes with no supported claim.
 | H5 | Where does the contract's code live? | A small pure crate under `crates/`, registered in the seam registry |
 | H6 | Which second architecture proves H6, and on what hardware? | aarch64 on a household single-board computer; emulation is acceptable for the build and run rungs, not for the mixed-peer exchange |
 | H7 | May a coarse host class be published in a build attestation? | Yes, limited to the bundle names of the clauses proven, not raw `Provides` |
+| H8 | Is the line between portable and native drawn by "must agree" against "may differ" (§5.1)? | Yes. Agreed in conversation by the steward on 2026-11-10; recorded here for the reviewing sessions |
+| H9 | Are variant sets open, with membership decided by a named conformance suite and not by who built the variant (§7.1)? | Yes, same agreement. Adapted variants join by attestation; wider reach needs the device's own run or converging independent proofs |
+| H10 | Does rakia plan native builds by asking providers to admit the build closure (§7.3), with building and proving as separate jobs? | Yes, pending the rakia session's check against how rakia plans jobs today, which this spec has not read |
 
 ## 13. Review asks, by session
 
@@ -586,6 +706,11 @@ Until then they are named axes with no supported claim.
   variant, replacing hand-kept flavor tags?
 - **lvi**: check §6.2 against the `DevspaceSeed` projection. Is the build closure the missing
   toolchain-marker encoding?
+- **rakia session**: check §7.3. Does rakia's job planning have a place for a provider-answered
+  build-closure admission, and for a proving job separate from the build job? This spec states the
+  requirement without having read rakia's planner.
+- **Artifact-store sessions, second ask**: check §7.2. Is resolving a variant's holders by CID
+  enough, or does an adapted variant outside the family key need anything the store lacks?
 - **All sessions**: name any place this spec levels devices, publishes host facts, or adds a store.
   Each would be a defect.
 
@@ -616,4 +741,8 @@ the list open, the observation local, and the proof earned per host class.
 | Closure | An unordered set of content-addressed members, each with its own requirement |
 | Variant | One build of a logical artifact for one declared target |
 | Variant set | The content-addressed list of an artifact's variants; what a pin names |
+| Universal artifact | One with an empty `Requires`; a single form, pinned by its own CID |
+| Conformance suite | The content-addressed harness and vectors every variant in a set must pass |
+| Conformance attestation | A signed record that one variant passed one suite on one host class |
+| Adapted variant | A variant made by changing source or recipe for a device or class; it joins a set by attestation |
 | Carrier | A delivery format, such as an OCI image, rendered from a closure |
