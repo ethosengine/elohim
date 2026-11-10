@@ -215,6 +215,14 @@ function gitDirs(root) {
   return gitDir && commonDir ? { gitDir, commonDir } : null;
 }
 
+// Findings belong to this device's shared ledger, while recipes and measures
+// still come from the checkout being gated. Non-git fixtures remain local.
+export function architectureLedgerPath(root, git = gitDirs) {
+  const dirs = git(root);
+  const main = dirs && dirs.gitDir !== dirs.commonDir ? dirname(dirs.commonDir) : root;
+  return resolve(main, '.claude/data/architecture-findings.jsonl');
+}
+
 // One snapshot per repository per process, including unreadable sidecars.
 const cycleRowsByRoot = new Map();
 
@@ -355,7 +363,7 @@ export function runProject(project, printOnly, namesOnly, {
   const cycleDeps = {
     root,
     measuresPath: resolve(root, '.claude/epr-meta/measures.yaml'),
-    ledgerPath: resolve(root, '.claude/data/architecture-findings.jsonl'),
+    ledgerPath: architectureLedgerPath(root),
     runEpr: eprArgs => spawn(env.EPR_BIN || 'epr', eprArgs, { cwd: root, stdio: 'ignore', timeout: 30000 }).status,
     print: line => write(`${line}\n`),
     now: () => new Date().toISOString().replace(/\.\d+Z$/, 'Z'),

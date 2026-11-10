@@ -266,6 +266,7 @@ impl Cli {
     /// Run `epr` as a child of the fake runtime process `owner`, with the fixture's isolation.
     fn epr(&self, owner: u32, args: &[&str], extra: &[(&str, &str)]) -> Output {
         let base = self.base.path();
+        // gate-reads: genesis/agentic/agent-runtimes.json
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
         let mut command = Command::new("python3");
         command

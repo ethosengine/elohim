@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkCargoLocks, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
+  checkArk, checkCargoDeny, checkCargoLocks, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -177,12 +177,22 @@ test('rows stream as each check completes', (t) => {
 function readSetFixture(t) {
   const root = scratch(t);
   const registry = new Map();
-  for (const name of NAMED_READ_SET_PROJECTS) {
+  for (const name of PREFLIGHT_READ_SET_PROJECTS) {
     put(root, `${name}/build-manifest.json`, JSON.stringify({ steps: { s: { inputs: { sources: [`${name}/**`] } } } }));
     registry.set(name, { name, dir: name, manifestPath: `${name}/build-manifest.json`, steps: ['s'] });
   }
   return { root, registry };
 }
+
+test('read sets: eprfs is audited, so a new unnamed test-file read refuses before the gates', (t) => {
+  const { root, registry } = readSetFixture(t);
+  const read = ({ project }) => (project.name === 'eprfs'
+    ? { paths: [], unresolved: [{ file: 'eprfs/epr-cli/tests/session_envelope.rs', line: 269, expr: 'CARGO_MANIFEST_DIR/../../..' }] }
+    : { paths: [], unresolved: [] });
+  const red = checkReadSets({ root, registry, projects: [{ name: 'eprfs' }], changed: ['eprfs/epr-cli/tests/session_envelope.rs'], read });
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /session_envelope\.rs:269/);
+});
 
 test('read sets: an unnamed read in a changed crate refuses with file:line, unchanged crates are not audited', (t) => {
   const { root, registry } = readSetFixture(t);

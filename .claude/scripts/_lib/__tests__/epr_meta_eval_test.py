@@ -193,6 +193,38 @@ with tempfile.TemporaryDirectory() as _wtd:
     check("witness() without actor= omits the actor key entirely",
           "actor" not in _without_actor)
 
+# Findings from linked worktrees share the main checkout's ledger, resolved from files alone
+# (no git subprocess). A submodule's gitdir has no commondir and keeps its own ledger; an
+# unreadable gitdir keeps the checkout's own ledger rather than dropping the finding.
+with tempfile.TemporaryDirectory() as _wtd:
+    _main = Path(_wtd) / "main"
+    _linked = Path(_wtd) / "linked"
+    _sub = Path(_wtd) / "sub"
+    _broken = Path(_wtd) / "broken"
+    for _d in (_main, _linked, _sub, _broken):
+        _d.mkdir()
+    (_main / ".git" / "worktrees" / "linked").mkdir(parents=True)
+    (_main / ".git" / "worktrees" / "linked" / "commondir").write_text("../..\n")
+    (_main / ".git" / "modules" / "sub").mkdir(parents=True)
+    (_linked / ".git").write_text("gitdir: ../main/.git/worktrees/linked\n")
+    (_sub / ".git").write_text("gitdir: ../main/.git/modules/sub\n")
+    (_broken / ".git").write_text("gitdir: ../main/.git/worktrees/gone\n")
+    check("a linked worktree resolves to its main checkout",
+          epr_meta.findings_root(_linked) == _main.resolve())
+    check("the main checkout keeps its own ledger", epr_meta.findings_root(_main) == _main.resolve())
+    check("a submodule gitfile retains its own checkout root",
+          epr_meta.findings_root(_sub) == _sub.resolve())
+    check("an unreadable gitdir keeps the checkout's own ledger",
+          epr_meta.findings_root(_broken) == _broken.resolve())
+    epr_meta.witness(_linked, runtime="codex", gate="test", subject="linked/f.py",
+                     decision="permit", cls=None)
+    epr_meta.witness(_main, runtime="codex", gate="test", subject="main/f.py",
+                     decision="permit", cls=None)
+    _rows = [_json.loads(line) for line in (_main / epr_meta.FINDINGS_LEDGER_REL).read_text().splitlines()]
+    check("main and linked witnesses append to one ledger without changing subjects",
+          [row["subject"] for row in _rows] == ["linked/f.py", "main/f.py"])
+    check("linked witness leaves no worktree ledger", not (_linked / epr_meta.FINDINGS_LEDGER_REL).exists())
+
 # ═══════════════════════════════════════════════════════════════
 # A CHILD inject is not swallowed by an ANCESTOR inject
 #

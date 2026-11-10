@@ -2150,6 +2150,34 @@ def combine(verdicts: list[Verdict]) -> Verdict | None:
 FINDINGS_LEDGER_REL = ".claude/data/governance-findings.jsonl"
 
 
+def findings_root(root: Path) -> Path:
+    """Device findings live in the main checkout, including from a linked worktree.
+
+    Read from files alone: this runs on every governed tool call, and a git subprocess both
+    costs latency and fails (dubious ownership) exactly when a restart has dropped trust. A
+    linked worktree's `.git` file names a gitdir holding a `commondir` file; a submodule's
+    gitdir has none. Anything unreadable keeps the checkout's own ledger, never no ledger."""
+    root = Path(root).resolve()
+    try:
+        text = (root / ".git").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return root  # an ordinary checkout (.git is a directory) or a non-git fixture
+    line = next((l for l in text.splitlines() if l.startswith("gitdir:")), None)
+    if line is None:
+        return root
+    gitdir = Path(line[len("gitdir:"):].strip())
+    if not gitdir.is_absolute():
+        gitdir = root / gitdir
+    try:
+        common = Path((gitdir / "commondir").read_text(encoding="utf-8").strip())
+    except (OSError, UnicodeDecodeError):
+        return root  # a submodule, or a gitdir that is not a linked worktree's
+    if not common.is_absolute():
+        common = gitdir / common
+    main = common.resolve().parent
+    return main if (main / ".git").is_dir() else root
+
+
 def evaluator_identity() -> dict:
     """Content address of the PYTHON evaluator — this module's own source.
 
@@ -2193,7 +2221,7 @@ def witness(root: Path, *, runtime: str, gate: str, subject, decision: str, cls:
         # plane consulted", never as "unclaimed" (that is a value `actor` itself carries).
         if actor is not None:
             entry["actor"] = actor
-        ledger = Path(root) / FINDINGS_LEDGER_REL
+        ledger = findings_root(root) / FINDINGS_LEDGER_REL
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with open(ledger, "a", encoding="utf-8", errors="replace") as fh:
             locked = fcntl is None

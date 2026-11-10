@@ -37,6 +37,12 @@ export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
  * Rust-style checker. The checker consumes published EPRFS crates and does not read their source tree.
  */
 export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr'];
+// Every path-scoped gate whose key one unnamed read would widen to the whole tree. eprfs keys on
+// named paths since 6cba5805a but is audited separately from the list above (whose REAL test also
+// asserts the runtime services' shared-crate reads). Without it here, one new test-file read
+// (epr-cli/tests/session_envelope.rs, 2026-11-10) put eprfs back on whole-tree keying unseen, and a
+// dirty ledger then cost a 47-minute re-run.
+export const PREFLIGHT_READ_SET_PROJECTS = [...NAMED_READ_SET_PROJECTS, 'eprfs'];
 
 const ELEMENTS_DIR = 'app/elohim-elements';
 const STORAGE_CLIENT_DIST = 'elohim/sdk/storage-client-ts/dist/index.js';
@@ -233,11 +239,11 @@ function memoRead(read) {
  */
 export function checkReadSets({ root, projects, registry, changed = null, read = readSet }) {
   const names = new Set(projects.map(p => p.name));
-  if (!names.has('orchestrator') && !NAMED_READ_SET_PROJECTS.some(n => names.has(n)) && !names.has('epr-storage')) return null;
+  if (!names.has('orchestrator') && !PREFLIGHT_READ_SET_PROJECTS.some(n => names.has(n)) && !names.has('epr-storage')) return null;
   const relevant = changed === null ? null : changed.filter(f => f.endsWith('.rs') || f.endsWith('build-manifest.json'));
   const problems = [];
   let audited = 0;
-  for (const name of NAMED_READ_SET_PROJECTS) {
+  for (const name of PREFLIGHT_READ_SET_PROJECTS) {
     const project = registry.get(name);
     if (!project) continue;
     const sources = sourcesOf(root, project);

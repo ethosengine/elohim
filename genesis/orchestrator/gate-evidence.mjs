@@ -350,6 +350,16 @@ export function closureKey(closure) {
   return createHash('sha256').update(closureMaterial(closure)).digest('hex');
 }
 
+// Machine-written observations, never recipe inputs. Keep this promise beside the
+// dirty-tree decision; gate-input-audit.test.mjs checks every registered gate.
+// Cursors are the harvesters' progress, not configuration (other JSON stays input).
+export const GATE_EXHAUST = Object.freeze([
+  '.claude/data/*.jsonl',
+  '.claude/data/ci-cursor.json',
+  '.claude/data/governance-cursor.json',
+  '.claude/data/runtime-cursor.json',
+]);
+
 /**
  * Paths under the project's dir, manifest, declared inputs, reads and recipe that are modified,
  * staged, or untracked. The closure key names the COMMIT's bytes; the recipe runs
@@ -362,7 +372,8 @@ export function dirtyPaths(project, { root, spawn = spawnSync, commit = 'HEAD', 
   const pathspec = path => (isReadPattern(path) ? `:(glob)${path}` : path);
   const paths = [project.dir, project.manifestPath, ...sources.map(source => source.endsWith('/**') ? source.slice(0, -2) : source), recipePath,
     ...(reads.scope === 'paths' ? reads.oids.map(row => pathspec(row.path)) : ['.'])];
-  const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths)], spawn);
+  const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths),
+    ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)], spawn);
   if (out === null) return null;
   return out.split('\n').map(line => line.slice(3).trim()).filter(Boolean);
 }
