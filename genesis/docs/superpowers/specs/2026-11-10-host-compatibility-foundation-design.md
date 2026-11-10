@@ -735,6 +735,67 @@ reading the registry finds the walk, its stages and what each edge checks, and e
 takes is a `Process` under that specification, so a walk in progress is visible in the fabric's
 lineage like any other work.
 
+### 7.7 Channels: where variant sets are published, found and followed
+
+A variant set is fixed once written. Something has to say which set is current for a given
+purpose, so that devices can find it, several parties can add to it, and a later device can reuse
+it. That is a **channel**. The repo already has the parts, and this section composes them:
+
+- release channels in storage, named `runtime:<class>:<network>:<name>`, each the only writer of
+  the pointer it elects (`elohim/elohim-storage/src/release_channel.rs`);
+- ark's `ArtifactRef::Channel`, declared and unresolved today (`elohim/ark/core/src/manifest.rs`);
+- a runtime manifest's `follows`: the channels a device has declared it follows, held privately;
+- the steward-space rule that every shared head move (a lease, a landing tip, a rakia channel
+  head, the bin store's `current`) is one compare-and-swap naming its expected prior head;
+- rakia as the package manifest over the dataplane store: it gives blobs their meaning and
+  relationships, and "latest" means a channel head, not the most recent write.
+
+**What a channel is here.** A channel's head names a **variant-set CID**, not a single artifact.
+So one channel serves every hardware class: each device follows the channel, reads the set its
+head names, and admits its own variant (§7). Moving the head is appending to the population: a
+new variant or a new proof makes a new set CID, and the head moves to it by compare-and-swap. Two
+devices adding variants at once do not overwrite each other; the second is refused, re-reads,
+and appends to the new head.
+
+**Creating a channel.** Any steward may create one, at a reach no wider than its own. A channel
+records its steward, its reach, the family it carries, and the conformance suite its sets name.
+The default reach is private. Three uses:
+
+| Use | Example | Reach |
+|---|---|---|
+| Release | the channel a published release elects for `elohim-storage` | the release's reach |
+| Collaboration | the household's channel where its devices pool variants they built | the steward's devices |
+| Repair | a channel an elohim opens for one walk (§7.6), holding the adapted variant and the finding it answers | private, widening as proofs converge |
+
+A repair channel is how a fix becomes reusable without being forced on anyone: it exists, it is
+findable at its reach, and a device chooses to follow it.
+
+**Selecting a channel.** Selection belongs to the device, under its person:
+
+- A device follows only channels its manifest declares. Following a channel is a declared act,
+  held on the device.
+- A device may follow a release channel and a repair channel for the same family. The selection
+  rule of §7 runs over the union of their sets, preferring the release channel's set where both
+  admit a variant, unless the person or the elohim chose the repair.
+- Switching what a device follows passes the same floor as any adoption: probation, and the last
+  working variant kept (§7.6).
+- A channel head this device cannot run anything from is reported as "a newer version exists that
+  this device cannot run yet", not adopted.
+
+**Finding channels.** For an elohim walking §7.6, discovery means: which channels at a reach it can
+read carry a set for this family, and does any of them hold an admitted variant or a finding for
+this device's class? Inside the steward's devices this is a read of the steward space. Beyond them
+it needs a listing of channels at commons reach, which is the commons rung §7.2 already names as
+missing. A channel listing carries channel id, family and suite, not which devices follow it:
+who follows a channel reveals their hardware class and is private (§4).
+
+Open:
+
+- whether a variant set's channel is named in the set itself or only in the channel record;
+- how a channel's steward retires it, and what its followers are told;
+- whether storage's release-channel id shape is reused as is for native variant channels or
+  given a class segment of its own.
+
 ## 8. Local-first reading
 
 Read from the person's side: what works on one device with nothing else reachable.

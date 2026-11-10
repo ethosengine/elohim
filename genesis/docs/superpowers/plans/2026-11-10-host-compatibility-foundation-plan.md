@@ -233,3 +233,30 @@ Verify: the proposed recipe is in the item's report with each validator named ag
 - [ ] **R3 — dogfood one walk: an agent takes a real failure (the v3-on-v2 case from K6 or V5) through every step of the recipe, recording each step as a `Process` under it, and stops where a step's gap is still open, naming it** (serves dataplane-convergence)
 
 Verify: `epr flow ledger` on the walk's first record shows the chain of steps taken; the report lists the step where it stopped and the gap item that blocks it.
+
+## Lane C — channels (spec §7.7; appended 2026-11-10)
+
+Appended after lane R so earlier gap ids stay stable. It runs after V1.
+
+Chain: S5 → spec §7.7 → storage's release channel, ark's `ArtifactRef::Channel` and `follows`, the
+steward-space head move → a repair reused by a second device.
+
+- [ ] **S5 — a story for reuse through a channel: one device's elohim repairs a variant and publishes it on a repair channel at the steward's reach; a second device of the same class follows that channel and adopts the repair after probation; a third device of another class follows it and is told nothing there fits it** (serves dataplane-convergence)
+
+Verify: `@concern:dataplane-convergence`; one fresh blind reader returns READY with no correctness finding.
+
+- [ ] **C1 — a channel head names a variant-set CID: resolve ark's `ArtifactRef::Channel` through the device's declared `follows`, reusing storage's release-channel id rule (`elohim/elohim-storage/src/release_channel.rs`) and the steward-space compare-and-swap head move** (serves dataplane-convergence)
+
+Verify: one channel head resolves to different admitted variants on the two devices; a stale head move is refused and the second writer re-reads and appends.
+
+- [ ] **C2 — creating a channel records its steward, reach (private by default), family and suite; a repair channel is opened by the R3 walk for its adapted variant** (serves dataplane-convergence)
+
+Verify: the R3 walk's report names the repair channel and its record; the channel is not readable outside its reach.
+
+- [ ] **C3 — selection over the union of a device's followed channels for one family, preferring the release channel unless the person or the elohim chose the repair; switching follows passes probation** (serves workspace-device-arrival)
+
+Verify: the S5 scenario's second device adopts the repair after its health window; the third device reports that nothing fits.
+
+- [ ] **C4 — channel discovery inside the steward's devices (channel id, family, suite; not followers), and the commons-reach listing named as a missing node with the commons rung of spec §7.2** (serves dataplane-convergence)
+
+Verify: an elohim on one device lists the channels carrying a family from the steward space; the missing node for commons reach is recorded in the spec or the backlog.
