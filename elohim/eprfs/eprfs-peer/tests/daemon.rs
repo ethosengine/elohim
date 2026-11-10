@@ -304,6 +304,11 @@ async fn skewed_allow_lists_settle_on_nacks_not_digest() {
             .any(|(_, event)| via_device(event) == Some(a.did.as_str()))
     })
     .await;
+    // B can fold A's event before its head table records A's head: wait for the head itself.
+    eventually("B records A's head", || {
+        side_b.table().devices.contains_key(&a.did)
+    })
+    .await;
     let a_seq = side_b.table().devices[&a.did].seq;
     eventually("A sees B acknowledge the admitted claim", || {
         side_a
@@ -400,6 +405,11 @@ async fn two_daemons_fold_each_others_heads_and_drop_a_contested_device() {
     assert!(known.contains(&claim));
 
     // B's head carrying the claim is acknowledged: A's announced ack reaches B.
+    // A can fold B's event before its head table records B's head: wait for the head itself.
+    eventually("A records B's head", || {
+        side_a.table().devices.contains_key(&b.did)
+    })
+    .await;
     let b_seq = side_a.table().devices[&b.did].seq;
     eventually("B sees A acknowledge its claim", || {
         side_b

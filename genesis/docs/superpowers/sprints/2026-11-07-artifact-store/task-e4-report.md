@@ -869,3 +869,9 @@ own exit status.
 | elohim-storage `--test blob` | EXIT=0 (41 passed, 1 ignored) |
 | elohim-storage `--lib` (full suite, which round 4 skipped) | EXIT=0 (4964 passed, 3 ignored) |
 | Plan V V1 `e4::` (external check) | EXIT=0 (2 passed) |
+
+## Orchestrator rulings after round 5 (2026-11-10)
+
+- **Claim-temp sweep (astra round 5, ruling 1):** the owner's stale-temp sweep can unlink a concurrent claimant's in-flight `.STORE.claim-*` temp. Ruled harmless by construction and accepted: the owner sweeps only after it has published `STORE` and holds EXCLUSIVE, and a claimant whose temp vanished gets `NotFound` from `link()` and re-reads the published `STORE` (marker.rs:116), so every opener converges on one format. The invariant is one format per root. **E4b frontier:** a deterministic test of this interleaving.
+- **Overlap guard:** a dangling symlink in `EPR_PAYLOAD_STORE` is not guaranteed overlap classification. **E4b frontier.**
+- **Gate run 7:** eprfs was red only on a test race in `eprfs-peer/tests/daemon.rs` (`skewed_allow_lists_settle_on_nacks_not_digest`, plus the same pattern at the B-head read): the head table was read before the head was recorded. Both reads now wait for the head first. Not an E4 code path.
