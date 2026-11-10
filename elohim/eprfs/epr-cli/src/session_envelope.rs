@@ -153,10 +153,15 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
         closed_at: None,
         covenant_seal: None,
         witness: None,
+        owner_holder: None,
+        release_receipt: None,
+        retirement: None,
     };
     proposed.validate_proposed(&proc_root).map_err(err)?;
     // Reentrant facet subprocesses (berth fold emission) may already hold a shared
-    // lifecycle guard. A fully initialized lazy open is a read, never a lock upgrade.
+    // lifecycle guard. A fully initialized lazy open is a read, never a lock upgrade; only an
+    // unarmed holder asks for the exclusive guard, without waiting, and otherwise stays a read.
+    let mut unarmed = None;
     {
         let store = Store::shared(&key_path).map_err(err)?;
         if let Some(record) = store.existing(&proposed, &proc_root).map_err(err)? {
@@ -166,12 +171,26 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
                 .join("continuation.json")
                 .is_file()
             {
-                return Ok(record);
+                if record.holder_held() {
+                    return Ok(record);
+                }
+                unarmed = Some(record);
             }
         }
     }
-    let store = Store::lock(&key_path).map_err(err)?;
-    let record = store.open(proposed, &proc_root).map_err(err)?;
+    let store = match unarmed {
+        Some(record) => match Store::try_lock(&key_path) {
+            Ok(store) => store,
+            Err(_) => return Ok(record),
+        },
+        None => Store::lock(&key_path).map_err(err)?,
+    };
+    let exe = std::env::current_exe().ok();
+    let record = store
+        .open_armed(proposed, &proc_root, &|store, record| {
+            envelope::arm_holder(store, record, exe.as_deref()?)
+        })
+        .map_err(err)?;
     if root
         .join(recall::RECALL_DIR_REL)
         .join(record.id())
@@ -350,7 +369,7 @@ pub fn open_lazily() -> Result<()> {
 /// `open` proposes the current checkout and would refuse a bound one called from a worktree.
 // Called before any shared mutation guard: lazy creation and reference binding both
 // need the exclusive lock. The caller then takes the shared lock and revalidates.
-fn prepare_berth(id: &str, path: &Path) -> Result<()> {
+fn prepare_berth(id: &str, path: &Path) -> Result<u32> {
     if current_id()? != id {
         return Err(format!("envelope-owner-mismatch: {id}"));
     }
@@ -382,7 +401,7 @@ fn prepare_berth(id: &str, path: &Path) -> Result<()> {
         record.berth_store = Some(path);
         store.save(&record).map_err(err)?;
     }
-    Ok(())
+    Ok(record.generation)
 }
 
 fn berth(record: &Envelope, verb: &str) -> Result<Value> {
@@ -414,9 +433,14 @@ fn berth(record: &Envelope, verb: &str) -> Result<Value> {
         .map_err(err)?;
     if !output.status.success() {
         return Err(format!(
-            "envelope-berth-release: {}: {}",
+            "envelope-berth-release: {}: {}{}",
             record.id(),
-            String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(&output.stderr),
+            if verb == "verify-released" {
+                String::from_utf8_lossy(&output.stdout).into_owned()
+            } else {
+                String::new()
+            }
         ));
     }
     if verb == "session-show" {
@@ -472,18 +496,50 @@ pub fn view(record: &Envelope) -> Result<Value> {
         "capabilityTier": tier, "recallSession": record.id(), "pinnedTools": pins(record)?}),
     )
 }
+/// Verify the berth facet is released and save the receipt beside the archive.
+fn verify_release(store: &Store, record: &mut Envelope) -> Result<()> {
+    if record.release_receipt.is_some() {
+        return Ok(());
+    }
+    // An envelope that never bound a berth store acquired nothing through it.
+    if berth_path(record)?.is_some() {
+        berth(record, "verify-released")?;
+    }
+    let receipt = json!({
+        "session": record.id(),
+        "generation": record.generation,
+        "berthStore": record.berth_store,
+        "verifiedAt": envelope::now(),
+        "verifier": "berth verify-released",
+    });
+    record.release_receipt = Some(
+        store
+            .save_record(record.id(), record.generation, "release", &receipt)
+            .map_err(err)?,
+    );
+    store.save(record).map_err(err)?;
+    Ok(())
+}
 fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
+    if record.closed_at.is_some() && record.release_receipt.is_some() {
+        return Ok(record);
+    }
+    if record.closed_at.is_none() {
+        berth_path(&record)?;
+        // Checkpoint the seal before release. Retry reuses it and never invents a grant/revocation.
+        if record.covenant_seal.is_none() {
+            let clauses =
+                covenant::show(&record.repository, record.id(), &record.covenant_session())?;
+            record.covenant_seal = Some(store.seal_covenant(&clauses).map_err(err)?);
+            store.save(&record).map_err(err)?;
+        }
+        berth(&record, "unmoor")?;
+    }
+    // A legacy closed record has no receipt: only verification repeats, never unmooring.
+    verify_release(store, &mut record)?;
     if record.closed_at.is_some() {
         return Ok(record);
     }
-    berth_path(&record)?;
-    // Checkpoint the seal before release. Retry reuses it and never invents a grant/revocation.
-    if record.covenant_seal.is_none() {
-        let clauses = covenant::show(&record.repository, record.id(), &record.covenant_session())?;
-        record.covenant_seal = Some(store.seal_covenant(&clauses).map_err(err)?);
-        store.save(&record).map_err(err)?;
-    }
-    berth(&record, "unmoor")?;
     if record.witness.is_none() {
         let reason = format!(
             "session {} closed; opened {}; covenant {}",
@@ -525,6 +581,199 @@ fn close(store: &Store, mut record: Envelope) -> Result<Envelope> {
     store.save(&record).map_err(err)?;
     Ok(record)
 }
+/// Predecessor history for a restart successor's offer: the sealed view's held clauses,
+/// labelled as history. Absent for a first generation or a predecessor that never sealed.
+pub(crate) fn predecessor_history(id: &str) -> Result<Option<Value>> {
+    let key = home()?;
+    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+        return Ok(None);
+    }
+    let store = Store::shared(&key).map_err(err)?;
+    let Some(record) = store.read(id).map_err(err)? else {
+        return Ok(None);
+    };
+    let Some(seal) = record
+        .predecessor
+        .as_ref()
+        .and_then(|p| p.covenant_seal.clone())
+    else {
+        return Ok(None);
+    };
+    if record.generation < 2 {
+        return Ok(None);
+    }
+    let view = store
+        .read_seal(&seal)
+        .ok_or_else(|| format!("envelope-seal-unreadable: {id}: {seal}"))?;
+    let clauses: Vec<Value> = view["clauses"]
+        .as_array()
+        .map(|all| {
+            all.iter()
+                .filter(|c| c["honoured"] == true)
+                .map(|c| json!({"kind": c["kind"], "quote": c["quote"], "cid": c["cid"]}))
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(Some(json!({
+        "generation": record.generation - 1,
+        "sealCid": seal,
+        "clauses": clauses,
+    })))
+}
+
+/// Hidden verb spawned by `open`: hold one generation's owner lock until its owner is gone.
+fn hold(args: &[String]) -> Result<ExitCode> {
+    let (mut session, mut generation, mut pid, mut start) = (None, None, None, None);
+    let mut i = 0;
+    while i < args.len() {
+        let value = args.get(i + 1).ok_or("flag needs a value")?;
+        match args[i].as_str() {
+            "--session" => session = Some(value.clone()),
+            "--generation" => generation = Some(value.parse::<u32>().map_err(err)?),
+            "--owner-pid" => pid = Some(value.parse::<u32>().map_err(err)?),
+            "--owner-start" => start = Some(value.parse::<u64>().map_err(err)?),
+            other => return Err(format!("unexpected hold argument {other}")),
+        }
+        i += 2;
+    }
+    let session = session.ok_or("--session is required")?;
+    if !envelope::is_envelope_id(&session) {
+        return Err(format!("session-invalid: {session}"));
+    }
+    let sessions = Store::sessions_directory(&home()?).map_err(err)?;
+    let lock = envelope::holder_lock(
+        &sessions,
+        &session,
+        generation.ok_or("--generation is required")?,
+    );
+    envelope::hold_owner(
+        &lock,
+        pid.ok_or("--owner-pid is required")?,
+        start.ok_or("--owner-start is required")?,
+        &proc_root(),
+    )
+    .map_err(err)?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Explicit steward retirement of a stranded session, then the ordinary close. It records
+/// authorization, never death: `owner_dead` is untouched.
+fn retire(args: &[String]) -> Result<ExitCode> {
+    let (mut session, mut generation, mut record_cid) = (None, None, None);
+    let (mut party, mut quote, mut admit) = (None, None, false);
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--admit-successor" {
+            admit = true;
+            i += 1;
+            continue;
+        }
+        let value = args.get(i + 1).ok_or("flag needs a value")?.clone();
+        match args[i].as_str() {
+            "--session" => session = Some(value),
+            "--expect-generation" => generation = Some(value.parse::<u32>().map_err(err)?),
+            "--expect-record" => record_cid = Some(value),
+            "--party" => party = Some(value),
+            "--quote" => quote = Some(value),
+            other => return Err(format!("unexpected retire argument {other}")),
+        }
+        i += 2;
+    }
+    let id = session.ok_or("--session is required")?;
+    let generation = generation.ok_or("--expect-generation is required")?;
+    let record_cid = record_cid.ok_or("--expect-record is required")?;
+    let party = party.ok_or("--party is required")?;
+    let quote = quote.ok_or("--quote is required")?;
+    if !envelope::is_envelope_id(&id) {
+        return Err(format!("session-invalid: {id}"));
+    }
+    if quote.trim().is_empty() {
+        return Err("retire-quote-blank: the steward's words are required".into());
+    }
+    let key = home()?;
+    if !key.parent().is_some_and(|p| p.join("sessions").is_dir()) {
+        return Err(format!("session is not open: {id}"));
+    }
+    // Never lazy-opens the target: only the exclusive lifecycle guard and a plain read.
+    let store = Store::lock(&key).map_err(err)?;
+    let mut record = store
+        .read(&id)
+        .map_err(err)?
+        .ok_or_else(|| format!("session is not open: {id}"))?;
+    if record.generation != generation {
+        return Err(format!(
+            "envelope-generation-mismatch: {id}: record is generation {}",
+            record.generation
+        ));
+    }
+    if store.record_cid(&id).map_err(err)?.as_deref() != Some(record_cid.as_str()) {
+        return Err(format!("envelope-record-mismatch: {id}"));
+    }
+    let actor = current_id()?;
+    // The acting session speaks in ITS covenant namespace (its own generation), read under the
+    // lifecycle guard already held: a generation-one claim never authorizes a generation-two actor.
+    let actor_scope = store
+        .read(&actor)
+        .map_err(err)?
+        .map_or_else(|| actor.clone(), |acting| acting.covenant_session());
+    let standing = covenant::steward_standing(&root()?, &actor_scope)?;
+    if party != record.steward || standing.as_deref() != Some(party.as_str()) {
+        return Err(format!(
+            "retire-party-refused: {party} is not the steward of record with standing here \
+             (steward {}, standing {})",
+            record.steward,
+            standing.as_deref().unwrap_or("none")
+        ));
+    }
+    let observed = envelope::admission_proc_root(&proc_root());
+    let dead = record.owner_dead(&observed);
+    if !dead && record.owner_observably_alive(&observed) {
+        return Err(format!(
+            "envelope-owner-live: {id}: the owner is alive in this namespace"
+        ));
+    }
+    let (namespace, boot) = envelope::owner_context(&observed);
+    let liveness = if dead {
+        "dead"
+    } else if record.owner_pid_namespace.is_none() || record.owner_boot_id.is_none() {
+        "absent"
+    } else if namespace != record.owner_pid_namespace || boot != record.owner_boot_id {
+        "foreign-namespace"
+    } else {
+        "unknown"
+    };
+    let prior = record
+        .retirement
+        .as_deref()
+        .and_then(|cid| store.read_record(&id, generation, "retirement", cid));
+    // A recorded retirement that already admits (or was not asked to) stands; otherwise supersede.
+    let reuse = prior
+        .as_ref()
+        .is_some_and(|p| p["party"] == party.as_str() && (!admit || p["admitSuccessor"] == true));
+    if !reuse {
+        let retirement = json!({
+            "session": id,
+            "generation": generation,
+            "recordCid": record_cid,
+            "party": party,
+            "quote": quote,
+            "actorSession": actor,
+            "observedLiveness": liveness,
+            "admitSuccessor": admit,
+            "supersedes": record.retirement,
+            "at": envelope::now(),
+        });
+        record.retirement = Some(
+            store
+                .save_record(&id, generation, "retirement", &retirement)
+                .map_err(err)?,
+        );
+        store.save(&record).map_err(err)?;
+    }
+    let closed = close(&store, record)?;
+    println!("{}", serde_json::to_string_pretty(&closed).map_err(err)?);
+    Ok(ExitCode::SUCCESS)
+}
 /// Command entry point, including observed-owner collection through the explicit close path.
 pub fn run(args: &[String]) -> Result<ExitCode> {
     // `epr session stasis ...` is the dialogue-stasis fold; it renders its own output and exits.
@@ -534,9 +783,15 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     let verb = args.first().map(String::as_str).unwrap_or("help");
     if args.iter().any(|s| s == "--help") || verb == "help" {
         println!(
-            "epr session id|open [--model MODEL]|show|commit-trailers|close|gc [--json]|stasis fold|decide|status"
+            "epr session id|open [--model MODEL]|show|commit-trailers|close|retire|gc [--json]|stasis fold|decide|status"
         );
         return Ok(ExitCode::SUCCESS);
+    }
+    if verb == "hold" {
+        return hold(&args[1..]);
+    }
+    if verb == "retire" {
+        return retire(&args[1..]);
     }
     let mut model = None;
     let mut explicit_session = None;
@@ -562,10 +817,11 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
         i += 1;
     }
     if verb == "prepare-berth" {
-        prepare_berth(
+        let generation = prepare_berth(
             &explicit_session.map(Ok).unwrap_or_else(current_id)?,
             &berth_store.ok_or("--store is required")?,
         )?;
+        println!("{}", json!({"generation": generation}));
         return Ok(ExitCode::SUCCESS);
     }
     // Internal, output-free validation used by the Python adapter while it holds the

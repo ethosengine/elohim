@@ -492,6 +492,12 @@ fn standing_subject(root: &Path, session: &str) -> CovResult<Option<String>> {
         .map(|s| s.subject))
 }
 
+/// The human a session speaks for on this checkout's device, for callers outside this module
+/// (steward retirement checks the same standing a record here would).
+pub(crate) fn steward_standing(root: &Path, session: &str) -> CovResult<Option<String>> {
+    standing_subject(root, session)
+}
+
 // ---------------------------------------------------------------------------
 // honouring
 // ---------------------------------------------------------------------------
@@ -785,13 +791,19 @@ fn offer(root: &Path, session: &str, facet_session: &str) -> CovResult<Value> {
         .filter(|(_, v)| v.honoured)
         .map(|(c, v)| clause_json(c, v))
         .collect();
-    Ok(json!({
+    let mut offer = json!({
         "session": session,
         "standing": covenant.standing,
         "pending": pending,
         "variable": variable,
         "held": held,
-    }))
+    });
+    // A restart successor sees its predecessor's sealed view as labelled history. Nothing is
+    // copied into this generation's namespace: its pending items stay pending.
+    if let Some(predecessor) = crate::session_envelope::predecessor_history(session)? {
+        offer["predecessor"] = predecessor;
+    }
+    Ok(offer)
 }
 
 // ---------------------------------------------------------------------------

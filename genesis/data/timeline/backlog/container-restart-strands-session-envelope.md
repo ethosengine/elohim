@@ -59,3 +59,33 @@ cites:
   liveness (sibling head age, not process presence) and the object store's pack count against
   the gix slot limit; each REFUSED line names its cure.
 - `peer-serve` and a repack-when-over-limit step join the devfile postStart, or arrival runs them.
+
+## Rulings and design (2026-11-10, session 785ceff4, steward human:matthew)
+
+- **Design gate (Codex astra).** No in-container fact proves the old owner dead. A helper's flock
+  can be freed while its harness lives, and a container id or postStart marker identifies a new
+  container without retiring the old one (an RWO volume allows overlapping pods on one node).
+  Proof needs a host/runtime termination receipt, and no such issuer exists today.
+- **Death proof, ruled "Both".** (1) An automatic path: `epr session open` arms a lifetime holder
+  flock on `sessions/<id>.gen<N>.owner.lock`, and a foreign-namespace observer reads a free lock
+  as death. Accepted residual: a false death when the holder dies while its owner lives AND an
+  overlapping pod observes it. Re-arming on every open by the live owner narrows the window.
+  (2) An explicit path: `epr session retire`, steward-quoted and bound to the exact record CID and
+  generation. It closes, verifies release, and may admit a successor without ever making
+  `owner_dead` true.
+- **Successor, ruled "Gen 2, re-offer, release first".** A restart successor is generation n+1 in
+  its own covenant namespace. `epr covenant offer` cites the predecessor's sealed clauses by CID as
+  history for a fresh affirmation. Admission requires a release receipt from
+  `berth verify-released`; this closes `security-session-successor-admitted-before-facet-release`.
+- **Option 2 (arrival lines)** shipped beside this: a serve-lock liveness line for the peer daemon,
+  plus rust toolchain, git hooks, brit trust and object packs lines. Finding: gix caps index
+  slots at 32 only at *reduced* trust (`gix/src/open/options.rs` `resolve_object_store_slots`), so
+  the 45-pack failure came from the missing trust, and the device's `epr device trust`
+  declaration never reaches brit.
+- **peer-serve stays out of postStart (steward ruling).** "hooking that into the devfile.yaml the
+  container will fail if anything in the postHook fails to boot. The risk isn't worth it." It stays
+  a routine restart step: the arrival line's peer-daemon cure names the devfile `peer-serve`
+  command. This row's "join postStart" wish for peer-serve is withdrawn; a repack step is likewise
+  left to the `object packs` line's cure rather than postStart.
+- **Left open.** A host-issued termination receipt (the strong death proof) is the operator's
+  frontier.

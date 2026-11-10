@@ -2400,6 +2400,127 @@ fi
         self.assertEqual(rival.returncode, 0, rival.stderr)
 
 
+class ReleaseAndGenerationTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.berth = Berth(str(self.root / "berth"), obs=FakeObservation(),
+                           policy_path=MISSING_POLICY)
+        self.berth.pid_alive = lambda pid: True
+        self.berth.pid_start = lambda pid: 100
+
+    def cli(self, *args):
+        out, err = io.StringIO(), io.StringIO()
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda **kw: self.berth}), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(["berth", *args])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_verify_released_absent_mooring_single_and_slot_leases(self):
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0:2],
+                         (0, '{"released": true}\n'))
+        self.berth.moor("a")
+        code, out, _ = self.cli("verify-released", "--session", "a", "--generation", "2")
+        self.assertEqual(code, 3)
+        self.assertEqual(len(json.loads(out)["moorings"]), 1)
+        self.berth.unmoor("a")
+        for leases in ({"cargo": {"holder": "a", "generation": 1}},
+                       {"cargo/slots": [{"holder": "a"}, {"holder": "b"}]}):
+            self.berth._write_leases(leases)
+            before = Path(self.berth.leases_path).read_bytes()
+            code, out, _ = self.cli("verify-released", "--session", "a", "--generation", "2")
+            self.assertEqual(code, 3)
+            self.assertEqual(len(json.loads(out)["leases"]), 1)
+            self.assertEqual(Path(self.berth.leases_path).read_bytes(), before)
+
+    def test_corrupt_leases_fail_closed_for_callers(self):
+        self.berth.moor("a")
+        mooring = Path(self.berth._moor_path("a")).read_bytes()
+        for corrupt in ('{', '[]', '{"cargo": null}', '{"cargo/slots": {}}'):
+            Path(self.berth.leases_path).write_text(corrupt)
+            for args in (("verify-released", "--session", "a"),
+                         ("claim", "cargo", "--session", "a"),
+                         ("release", "cargo", "--session", "a"),
+                         ("unmoor", "--session", "a"), ("reap",), ("status",),
+                         ("who", "cargo"), ("session-show", "--session", "a"),
+                         ("owner-check", "cargo", "--session", "a"), ("overrun-check", "cargo")):
+                code, out, err = self.cli(*args)
+                self.assertEqual(code, 2, (args, err))
+                self.assertIn("cannot read leases", err)
+                self.assertEqual(out, "")
+            self.assertEqual(Path(self.berth.leases_path).read_text(), corrupt)
+            self.assertEqual(Path(self.berth._moor_path("a")).read_bytes(), mooring)
+
+    def test_unreadable_leases_and_corrupt_or_unreadable_moorings(self):
+        Path(self.berth.leases_path).mkdir()  # unreadable as a file, even for root
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0], 2)
+        self.assertEqual(self.cli("claim", "cargo", "--session", "a")[0], 2)
+        Path(self.berth.leases_path).rmdir()
+        path = Path(self.berth._moor_path("a"))
+        for corrupt in ('{', '[]', '{}'):
+            path.write_text(corrupt)
+            code, out, err = self.cli("verify-released", "--session", "a")
+            self.assertEqual(code, 2)
+            self.assertEqual(out, "")
+            self.assertIn("cannot read moorings", err)
+        path.unlink()
+        path.mkdir()
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0], 2)
+
+    def test_verify_missing_store_is_read_only_and_requires_explicit_session(self):
+        store = self.root / "absent"
+        env = dict(os.environ, BERTH_DIR=str(store), EPR_UNDER_TEST="1")
+        for args, code in ((("--session", "a"), 0), ((), 2),
+                           (("--session", "a", "--generation", "bad"), 2)):
+            result = subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"),
+                                     "verify-released", *args], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, code, result.stderr)
+            self.assertFalse(store.exists())
+
+    def test_old_generation_never_refreshes_or_counts_live(self):
+        b = self.berth
+        guard_globals = Berth.moor.__globals__
+        with mock.patch.dict(guard_globals, {"envelope_guard": lambda *args: contextlib.nullcontext(1)}):
+            b.moor("a", pid=10)
+            ok, lease, _ = b.claim("cargo", "a")
+        self.assertTrue(ok)
+        self.assertEqual(lease["generation"], 1)
+        self.assertEqual(b.mooring("a")["generation"], 1)
+        before = Path(b._moor_path("a")).read_bytes()
+        key = self.root / "device/ed25519.seed"
+        sessions = key.parent / "sessions"
+        sessions.mkdir(parents=True)
+        (sessions / "a.json").write_text('{"generation": 2}')
+        with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key)}), \
+                mock.patch.dict(guard_globals, {"envelope_guard": lambda *args: contextlib.nullcontext(2)}):
+            self.assertFalse(b.holder_is_live(lease))
+            self.assertFalse(b.is_live(b.mooring("a")))
+            for action in (b.moor, b.touch):
+                with self.assertRaises(BerthUsage):
+                    action("a", pid=20)
+            self.assertEqual(Path(b._moor_path("a")).read_bytes(), before)
+            self.assertEqual(b.leases()["cargo"], lease)
+            b.unmoor("a")
+            b.moor("a", pid=20)
+            self.assertEqual(b.claim("cargo", "a")[1]["generation"], 2)
+            self.assertFalse(b.holder_is_live(lease))
+
+    def test_prepare_berth_generation_is_yielded(self):
+        key = self.root / "device/ed25519.seed"
+        (key.parent / "sessions").mkdir(parents=True)
+        key.write_bytes(b"0" * 32)
+        guard = Berth.moor.__globals__["envelope_guard"]
+        for payload, expected in (({"generation": 2}, 2), ({}, None)):
+            results = [subprocess.CompletedProcess([], 0, json.dumps(payload), ""),
+                       subprocess.CompletedProcess([], 0, "", "")]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key)}), \
+                    mock.patch("subprocess.run", side_effect=results):
+                with guard("a", self.berth.dir) as generation:
+                    self.assertEqual(generation, expected)
+
+
 class EnvelopeGuardTest(unittest.TestCase):
     """The real lifecycle guard, which the other berth suites stub out."""
 

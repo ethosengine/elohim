@@ -26,6 +26,7 @@ Commands:
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
                 [--writes a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
+  berth verify-released --session S [--generation N]               read-only release proof (0/3/2)
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
                 [--closure KEY] [--offline-ok]                      take one unit; exit 3 if held or refused
@@ -138,6 +139,27 @@ def _predates_envelopes(result):
     return result.stdout.startswith("epr session id")
 
 
+def envelope_directory():
+    key = os.environ.get("ELOHIM_DEVICE_KEY_FILE")
+    config = os.environ.get("XDG_CONFIG_HOME", "")
+    if not key:
+        config = config if os.path.isabs(config) else os.path.expanduser("~/.config")
+        key = os.path.join(config, "elohim/device/ed25519.seed")
+    return key, os.path.join(os.path.dirname(key), "sessions")
+
+
+def envelope_generation(session):
+    """Read current native authority without preparing or opening another session."""
+    if not session or _safe(session) != session:
+        return None
+    try:
+        with open(os.path.join(envelope_directory()[1], session + ".json")) as f:
+            generation = json.load(f).get("generation")
+        return generation if type(generation) is int else None
+    except (OSError, ValueError, AttributeError):
+        return None  # Unknown authority is never proof of a dead predecessor.
+
+
 @contextlib.contextmanager
 def envelope_guard(session, berth_store):
     """Hold the native lifecycle flock across mutations, including direct Berth callers.
@@ -145,12 +167,7 @@ def envelope_guard(session, berth_store):
     Native validation owns the binding and closure predicates. Standalone berth stores
     without a device retain their existing behavior. Initialize before taking the lock.
     """
-    key = os.environ.get("ELOHIM_DEVICE_KEY_FILE")
-    config = os.environ.get("XDG_CONFIG_HOME", "")
-    if not key:
-        config = config if os.path.isabs(config) else os.path.expanduser("~/.config")
-        key = os.path.join(config, "elohim/device/ed25519.seed")
-    directory = os.path.join(os.path.dirname(key), "sessions")
+    key, directory = envelope_directory()
     if not os.path.isdir(directory) and not os.path.isfile(key):
         yield
         return
@@ -170,6 +187,12 @@ def envelope_guard(session, berth_store):
         return
     if result.returncode:
         raise BerthUsage(result.stderr.strip() or "envelope preparation failed")
+    try:
+        generation = json.loads(result.stdout).get("generation")
+    except (ValueError, AttributeError):
+        generation = None  # Legacy successful preparation supplied no JSON metadata.
+    if generation is not None and (type(generation) is not int or generation < 1):
+        raise BerthUsage("invalid envelope generation")
     with open(os.path.join(directory, ".lock"), "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_SH)
         result = subprocess.run(
@@ -177,7 +200,7 @@ def envelope_guard(session, berth_store):
             capture_output=True, text=True, timeout=10)
         if result.returncode:
             raise BerthUsage(result.stderr.strip() or "envelope validation failed")
-        yield
+        yield generation
 
 
 # The checkout this berth lives in, fixed at load (tests may repoint REPO_ROOT; this never moves).
@@ -197,6 +220,10 @@ STALE_EPR_HINT = ("{path} predates the peer verbs: replace it (epr device arrive
 
 class BerthUsage(ValueError):
     """A claim the caller mis-stated (unknown class, override without a ttl) — exit 2, no record."""
+
+
+class BerthStateError(ValueError):
+    """Unreadable coordination state; never permission to proceed unleased."""
 
 
 class BerthAmbiguous(LookupError):
@@ -365,10 +392,11 @@ def _safe(name):
 
 
 class Berth:
-    def __init__(self, d=None, now=None, obs=None, policy_path=POLICY_FILE):
+    def __init__(self, d=None, now=None, obs=None, policy_path=POLICY_FILE, read_only=False):
         self.dir = d or store_dir()
         self.moor_dir = os.path.join(self.dir, "moorings")
-        os.makedirs(self.moor_dir, exist_ok=True)
+        if not read_only:
+            os.makedirs(self.moor_dir, exist_ok=True)
         self.leases_path = os.path.join(self.dir, "leases.json")
         self.ledger_path = os.path.join(self.dir, "ledger.jsonl")
         self.lock_path = os.path.join(self.dir, "berth.lock")
@@ -396,6 +424,7 @@ class Berth:
         self._withdrawing = False
         self.pid_alive = pid_alive  # injectable: tests model liveness and incarnation
         self.pid_start = pid_start_time
+        self.generations = {}
 
     # ------------------------------------------------------------ records
     def _moor_path(self, session):
@@ -891,6 +920,7 @@ class Berth:
         """
         removed = {"moorings": [], "leases": []}
         with self._locked():
+            leases = self.leases()  # Validate before removing any mooring.
             now = self.now()
             for session, m in self.moorings().items():
                 if now - m.get("last_seen", 0) < m.get("ttl_s", self.mooring_ttl_s):
@@ -903,7 +933,6 @@ class Berth:
                 os.remove(self._moor_path(session))
                 removed["moorings"].append(session)
                 self.record("unmoor", session=session, reason="reap")
-            leases = self.leases()
             for key, value in list(leases.items()):
                 slots = isinstance(value, list)
                 kept = []
@@ -948,6 +977,8 @@ class Berth:
         asserted pid, that process is alive in the SAME incarnation (start time) it moored with."""
         if not m:
             return False
+        if self._predecessor(m, m.get("session")):
+            return False
         pid = m.get("pid")
         if pid:
             if not self.pid_alive(pid):
@@ -975,12 +1006,40 @@ class Berth:
             else:
                 m.pop("pid_start", None)
 
+    @contextlib.contextmanager
+    def _envelope_guard(self, session):
+        with envelope_guard(session, self.dir) as generation:
+            previous = self.generations.get(session)
+            self.generations[session] = generation
+            try:
+                yield
+            finally:
+                if previous is None:
+                    self.generations.pop(session, None)
+                else:
+                    self.generations[session] = previous
+
+    def _generation(self, session):
+        if session in self.generations:
+            return self.generations[session]
+        return envelope_generation(session)
+
+    def _predecessor(self, record, session):
+        recorded = record.get("generation")
+        current = self._generation(session)
+        return type(recorded) is int and current is not None and recorded < current
+
     def moor(self, session, **fields):
-        with envelope_guard(session, self.dir), self._locked():
+        with self._envelope_guard(session), self._locked():
             return self._moor_locked(session, **fields)
 
     def _moor_locked(self, session, **fields):
         m = self._read_mooring(session) or {"session": session, "moored_at": round(self.now(), 3)}
+        if self._predecessor(m, session):
+            raise BerthUsage("predecessor mooring must be released before moor")
+        generation = self._generation(session)
+        if generation is not None:
+            m["generation"] = generation
         pid = fields.pop("pid", None)
         for k, v in fields.items():
             if v is not None:
@@ -1006,17 +1065,22 @@ class Berth:
         """Heartbeat (and, from a hook, re-assert the runtime pid + incarnation). Serialized with every
         other mooring/lease writer and published atomically, so a concurrent claimant never reads a
         half-written mooring as a dead holder."""
-        with envelope_guard(session, self.dir), self._locked():
+        with self._envelope_guard(session), self._locked():
             m = self._read_mooring(session)
             if not m:
                 return None
+            if self._predecessor(m, session):
+                raise BerthUsage("predecessor mooring must be released before touch")
+            generation = self._generation(session)
+            if generation is not None:
+                m["generation"] = generation
             m["last_seen"] = round(self.now(), 3)
             self._assert_pid(m, pid)
             write_json_atomic(self._moor_path(session), m)
             return m
 
     def unmoor(self, session):
-        with envelope_guard(session, self.dir):
+        with self._envelope_guard(session):
             return self._unmoor(session)
 
     def _unmoor(self, session):
@@ -1039,15 +1103,56 @@ class Berth:
     def leases(self):
         try:
             with open(self.leases_path) as f:
-                return json.load(f)
-        except Exception:
+                leases = json.load(f)
+            if not isinstance(leases, dict):
+                raise ValueError("expected resource map")
+            for resource, value in leases.items():
+                rows = value if resource.endswith("/slots") else [value]
+                if not isinstance(rows, list) or any(
+                        not isinstance(row, dict) or not isinstance(row.get("holder"), str)
+                        for row in rows):
+                    raise ValueError(f"invalid lease for {resource}")
+            return leases
+        except FileNotFoundError:
             return {}
+        except (OSError, ValueError) as exc:
+            raise BerthStateError(f"cannot read leases {self.leases_path}: {exc}") from exc
+
+    def verify_released(self, session, generation=None):
+        # Generation is caller context, not a filter: ANY remaining facet blocks release,
+        # including legacy records with no generation and newer records for the same ID.
+        leases = self.leases()
+        moorings = []
+        try:
+            try:
+                names = os.listdir(self.moor_dir)
+            except FileNotFoundError:
+                names = []
+            for name in names:
+                if not name.endswith(".json"):
+                    continue
+                with open(os.path.join(self.moor_dir, name)) as f:
+                    mooring = json.load(f)
+                if not isinstance(mooring, dict) or not isinstance(mooring.get("session"), str):
+                    raise ValueError(f"invalid mooring {name}")
+                if mooring["session"] == session:
+                    moorings.append(mooring)
+        except (OSError, ValueError) as exc:
+            raise BerthStateError(f"cannot read moorings {self.moor_dir}: {exc}") from exc
+        held = [row for value in leases.values()
+                for row in (value if isinstance(value, list) else [value])
+                if row["holder"] == session]
+        if moorings or held:
+            return {"released": False, "moorings": moorings, "leases": held}
+        return {"released": True}
 
     def _write_leases(self, leases):
         write_json_atomic(self.leases_path, leases)
 
     def holder_is_live(self, lease):
         if not lease:
+            return False
+        if self._predecessor(lease, lease.get("holder")):
             return False
         ttl = lease.get("ttl_s")
         if ttl is not None and (self.now() - lease.get("since", 0)) > ttl:
@@ -1106,6 +1211,9 @@ class Berth:
                     return (f"the {lease_class} hold reached its {cap}s cap (claimed {_age(now - claimed)} ago) — "
                             f"release it, or renew with an explicit --ttl (capped at {cap}s)")
                 ttl = min(ttl, remaining) if ttl is not None else remaining
+        generation = self._generation(lease.get("holder"))
+        if generation is not None:
+            lease["generation"] = generation
         lease["since"] = now
         lease["claimed_at"] = claimed
         lease["ttl_s"] = ttl
@@ -1125,6 +1233,9 @@ class Berth:
         now = round(self.now(), 3)
         lease = {"resource": resource, "holder": session, "since": now, "claimed_at": now,
                  "note": note, "ttl_s": ttl_s, "class": klass, "action": "use"}
+        generation = self._generation(session)
+        if generation is not None:
+            lease["generation"] = generation
         if seat:
             lease["seat"] = seat
         if closure is not None:
@@ -1185,7 +1296,7 @@ class Berth:
         reason = self.claim_preflight(resource, ttl_s, klass, override)
         if reason:
             return False, None, reason
-        with envelope_guard(session, self.dir):
+        with self._envelope_guard(session):
             return self._claim_live(resource, session, note, ttl_s, klass, seat, override,
                                     session_source, offline_ok, closure)
 
@@ -1323,7 +1434,7 @@ class Berth:
         a different generation before deletion; without one this is an explicit operator release of
         every local generation found under the lock. `force` gives back every holder. Each removed
         generation gets its own bound release record."""
-        with envelope_guard(session, self.dir):
+        with self._envelope_guard(session):
             return self._release(resource, session, reason, force, expected_claimed_at)
 
     @staticmethod
@@ -2000,6 +2111,9 @@ def main(argv):
     store = store_dir()
     try:
         return _main(argv)
+    except (BerthStateError, BerthUsage) as e:
+        print(f"berth: {e}", file=sys.stderr)
+        return 2
     except OSError as e:
         if not _store_unavailable(e, store):
             raise
@@ -2017,9 +2131,18 @@ def _main(argv):
         # A flag is never a resource: `berth claim --help` once took a lease named "--help".
         print(__doc__.split("Commands:")[1].split("Resources")[0])
         return 0
-    b = Berth()
+    b = Berth(read_only=True) if cmd == "verify-released" else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None
+    if cmd == "verify-released":
+        generation = _opt(argv, "--generation")
+        if not session or argv or (generation is not None and
+                                  (not generation.isdigit() or int(generation) < 1)):
+            print("usage: berth verify-released --session S [--generation N]", file=sys.stderr)
+            return 2
+        result = b.verify_released(session, int(generation) if generation else None)
+        print(json.dumps(result))
+        return 0 if result["released"] else 3
     if cmd == "status":
         print(render_status(b))
         return 0
@@ -2036,6 +2159,8 @@ def _main(argv):
         # Hook-facing (ram-guard's prompt event): never fails the caller, prints only on an emit.
         try:
             held = b.overrun_check(argv[0] if argv else "mesh")
+        except BerthStateError:
+            raise
         except Exception:
             held = None
         if held:
@@ -2168,6 +2293,10 @@ def _main(argv):
         return 1 if failed else 0
     if cmd == "claim":
         res, note, ttl_s, klass, override, offline_ok, closure = claim_args
+        # The envelope's store binding is checked first (a foreign store is never read), then
+        # corrupt state refuses before any touch/moor write.
+        with envelope_guard(session, b.dir):
+            b.leases()
         # Claiming is a liveness act: a stale mooring would make the fresh lease look abandoned.
         if not b.touch(session):
             b.moor(session, pid=resolve_session_identity().get("ownerPid"))
