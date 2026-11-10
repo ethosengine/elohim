@@ -3,7 +3,7 @@ id: artifact-store-task-e4-report
 status: claimed-not-verified
 landed_commit:
 verified_by:
-concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, review-round-3-link-only-and-stream-revalidation, orphan-retention-frontier, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
+concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, review-round-3-link-only-and-stream-revalidation, review-round-4-format-marker-admission, orphan-retention-frontier, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
 actor: agent:e4@claude-opus-5-5 (Claude Opus 5.5, session f1769d1c)
 ---
 
@@ -300,16 +300,18 @@ registry.
   `hc-mesh.sh:4779-4815`, and the restart overlay, `:4136-4159`); migrate unmarked directories.
   Migration must also decide the one ambiguity this slice leaves: an existing *empty* directory
   is treated as new, so with the feature on an older, marker-unaware epr could still write flat
-  objects into a directory a newer one marked `blob-store-v1`. Since round 3, `open_owner` and
-  `open_shared` refuse a root that holds legacy inline objects (`LegacyLayout`), so a legacy root
-  reaches the owner/shared store only through an explicit migration. Nothing adopts one in place.
+  objects into a directory a newer one marked `blob-store-v1`. Since round 4, `open_owner` and
+  `open_shared` admit only an empty root, which they claim, or one marked `blob-store-v1`. Any
+  other root is refused before a write (`LegacyLayout`, `Format`), so a legacy root reaches the
+  owner/shared store only through an explicit migration that ends by writing the marker. Nothing
+  adopts one in place.
 - **Iroh index without a copy** (`an_iroh_index_references_a_tier_payload_and_never_copies_it`):
   tied to the R1.4 / FsStore ruling; vacuous until iroh reads the tier.
 - **`epr peer status` prints the format** (deviation 5).
 - **CI home for the crate's tests.** The new gate project runs them locally; no Jenkinsfile runs
   them (Jenkinsfiles are KEEP for this sprint). Candidate: the epr pipeline, beside
   `elohim-address`.
-- **`store.rs` is 3934 lines** after round 3, over the 3000-line soft ceiling (the test module
+- **`store.rs` is 4161 lines** after round 4, over the 3000-line soft ceiling (the test module
   is most of the growth). Moving the test module to a sibling file is a bounded follow-up.
 - **Orphan retention after a crash** (review round 3, ruling 4). A crash before the index or the
   marker is published leaves an unreferenced chunk or an orphan index. Startup collects neither,
@@ -580,8 +582,9 @@ publication it holds at that moment, before any layout record or marker is writt
 **Ruling 3 — B amended, accepted.** D's servable-index change also reaches `BlobStore::new`:
 deleting a payload no longer unlists a retained inline unit. This is now documented in the
 shim's module docs and asserted by
-`canonical::the_unlocked_store_keeps_a_retained_inline_unit_listed_after_a_delete`. Everything
-else about `new()` is as on dev.
+`canonical::the_unlocked_store_keeps_a_retained_inline_unit_listed_after_a_delete`. (Corrected
+in round 4: this said "Everything else about `new()` is as on dev", which was inaccurate. Round 4,
+ruling 4 lists every `new()` change exactly.)
 
 **Ruling 4 — frontier: orphan retention after a crash before marker or index publication**
 (defect 5). A crash before the index is published leaves an unreferenced chunk. A crash after
@@ -638,3 +641,145 @@ The first crate test run in this round failed (EXIT=101) in
 marker as a legacy inline object. The check now flags a file only when it is not a marker and its
 bytes hash to its own name; a damaged file is still left for verification to quarantine. The
 crate rows above are from the rerun after that change.
+
+## Review fixes, round 4 (astra's third re-review, `genesis/local-dev/as-e4/e4-rereview3.receipt.md`)
+
+Verdict FIX FIRST. Rulings 2, 4 and 5 of round 3 were fixed, and so was ruling 3, though
+`new()` had picked up one more change. Ruling 1 was partial. Its legacy-layout detection was a
+heuristic: it refused only hash-valid inline files that did not look like markers. So a corrupt
+inline file passed. So did marker-shaped bytes that hash to their own name, which a stream then
+copied a second time. A file under a name that is not a CID was ignored. Round 4 is `f3bff4503`
+(code) and this section.
+
+**Ruling 1: the format marker decides who may open a root.** `open_owner` and `open_shared`
+admit a root in two cases only:
+- it is empty or absent, and then they claim it by writing `STORE` = `blob-store-v1` before any
+  other file, lock or directory;
+- its `STORE` already reads `blob-store-v1`.
+
+Anything else is refused before any write: no lock file, no directory, no sweep, no scrub.
+- A non-empty root with no marker is refused with `LegacyLayout { path: <root> }`.
+- A root whose marker names another format, or cannot be read, is refused with the new
+  `Format { path, found }`.
+
+The claim is `elohim_blob_store::marker::claim`. It stages the marker whole under a reserved
+`.STORE-` name, hard-links it to `STORE` (refused if the name exists, so nothing is replaced),
+then fsyncs the root. Concurrent first opens race to one winner, and a loser re-reads the
+winner's marker. Staging names count as a claim in flight, not as content. Because a first open
+writes `STORE` before anything else, an opener that finds content but no marker reads the marker
+once more before refusing.
+
+**Ruling 2: `BlobStore::new` refuses a marked root.** It returns the new `MarkedRoot { path,
+found }` and writes nothing when the root carries any `STORE`, including an unreadable one.
+Storage's `/blob` root carries none, so nothing changes on alpha.
+
+**Ruling 3: the heuristic is deleted.** `refuse_legacy_layout` is gone, and with it the open-time
+test that told legacy files from canonical ones by shape. Inside a marked root, `classify` reads
+every `blobs/` file as a marker or as the empty payload's zero-length file. Anything else is the
+new `Entry::Damaged`, never `Entry::Inline`. The self-hash rule that tells an inline payload from
+a marker now applies only to the unlocked store, whose own representation needs it.
+- **A damaged entry under a byte CID is a defect.** An owner's read or `exists` quarantines it,
+  and so does its scrub. A shared instance leaves the file in place and refuses that unit: `get`
+  returns `HashMismatch`, `exists` returns `Exists::Corrupt`, and a store over it is refused.
+- **The scrub on a canonical store walks every byte-CID name under `blobs/`**, zero-length
+  files included, so a zero-length file under a non-empty CID is quarantined rather than
+  skipped.
+- **A stray name** is a file that is not a byte CID filed in its own bucket. The owner moves
+  every such file under `blobs/` to `quarantine/unnamed-<micros>-<n>/` (with a `reason` file)
+  at open, under the exclusive lock. A shared instance leaves it.
+
+The defects astra found no longer reach the store. A corrupt inline object or a marker-shaped
+self-hashing payload makes its root an unmarked, non-empty root, and that is refused at open.
+Inside a marked root, the same bytes are a damaged entry, so the second copy through
+`store_stream` cannot happen.
+
+**Ruling 4: B amended again, accepted.** The resumed-stream change that reaches `new()` is now
+documented in the shim's module docs and pinned by a unit test on a `new()` store,
+`store::tests::the_unlocked_store_fails_a_resumed_stream_whose_chunk_left_typed`. That test
+damages P's layout record so the stream repairs it and pauses, then removes one of P's chunks
+in the pause; the stream must fail with `PublicationLost` and write no marker. The round-3
+sentence "Everything else about `new()` is as on dev" was inaccurate. Three behaviours of
+`new()` differ from dev:
+1. Deleting a payload keeps a retained, verified unit in `list_servable` (round 3, ruling 3).
+2. A multi-chunk stream that paused for a repair re-hashes every chunk it wrote before it
+   writes a layout record or marker. It fails with `PublicationLost` when one no longer
+   verifies, and this check runs before the check for an already-held copy. On dev, the stream
+   held the GC lock throughout and nothing re-checked its chunks (round 4, ruling 4).
+3. A root carrying a `STORE` marker is refused with `MarkedRoot` (round 4, ruling 2).
+
+The on-disk representation is unchanged.
+
+**Ruling 6: the consumers call the crate's one marker API.**
+- elohim-storage composes its tier through `tier::compose_shared_payload_tier`, which reads the
+  marker with `marker::read` and opens shared, where admission reads it again. It never writes
+  a marker. It had no second implementation, and it is unchanged.
+- epr-cli `payload.rs` had one, and it is deleted: its own marker reader, its staging prefix
+  and its stage-and-link writer. It now reads through `marker::read`, recognises staging names
+  through `marker::is_staging`, and writes a new `directory-v1` marker through `marker::claim`.
+- A new `blob-store-v1` directory is no longer marked by `payload.rs` at all: `open_new` opens
+  the store, whose admission claims the root, so `STORE` is written once. If another first
+  open claimed the root for a different format, the open re-reads the marker and opens the
+  winner's format.
+- To make that the only implementation, `peer` now links elohim-blob-store, and its eprfs tier
+  stays behind `blob-store` (`blob-store = ["peer", "elohim-blob-store/tier"]`). `payload.rs`
+  is compiled only under `peer`. The bridges that reuse epr-cli's library take it without
+  default features, so they still do not link the crate, and their lockfiles are unchanged.
+
+**Ruling 5: tests.** `tests/format_marker.rs` is new. It replaces
+`canonical::an_owner_or_shared_open_refuses_a_legacy_layout_and_writes_nothing`, which encoded
+the heuristic. Failing-first runs used a scratch copy of the crate at `d416bde21` with the same
+test file. The only change was that the two typed-refusal helpers became `is_err()`, because the
+new variants do not exist there.
+
+| test | at `d416bde21` | now |
+|---|---|---|
+| `an_unmarked_root_that_is_not_empty_is_refused_by_owner_and_shared_and_left_untouched` (whole inline, corrupt inline, marker-shaped self-hashing, stray name; owner and shared; snapshot of every path and its bytes unchanged) | fails: `CorruptInline, owner=true` opened (`Ok`); the whole-inline case was refused by the heuristic | passes |
+| `the_unlocked_store_refuses_a_marked_root_and_writes_nothing` (`blob-store-v1` and another format) | fails: `new()` opened a `blob-store-v1` root (`Ok`) | passes |
+| `concurrent_first_opens_by_an_owner_and_a_shared_instance_claim_one_marker` (20 rounds, root present and absent; both open, one `STORE`, no staging residue) | fails: no `STORE` was ever written (`left: None`) | passes |
+| `a_stray_blobs_name_in_a_marked_root_is_quarantined_by_the_owner_and_left_by_a_shared_one` | fails: the owner left `blobs/zzzz/not-a-cid` in place | passes |
+| `a_damaged_entry_under_a_byte_cid_is_corruption_never_an_inline_payload` (inline bytes where the marker belongs, a zero-length file under another CID; shared refuses typed and moves nothing; owner scrub quarantines) | fails earlier, at `open_shared`: the heuristic refused the planted inline bytes (`LegacyLayout` on `blobs/…`), so the root could not even be opened | passes |
+| `store::tests::the_unlocked_store_fails_a_resumed_stream_whose_chunk_left_typed` (ruling 4; pins an accepted change, so not failing-first) | — | passes |
+| `marker::tests::concurrent_claims_install_one_marker_and_every_claimant_reads_it` | — | passes |
+
+### External check: Plan V's V1 E4 cases against round 4
+
+Plan V's own E4 cases (`artifact-store/v` at `d26d6245`, which is after its rebase onto
+`d416bde21`; `crates/elohim-fetch/tests/engine.rs`, `e4::`) were run against this crate. They ran
+from a fresh scratch copy of `elohim-fetch` with a path override, in their own target directory.
+Nothing was committed on their branch. With `--all-features`, `e4::e4s_store_passes_every_v1_case_over_one_root`
+and `e4::concurrent_arrivals_through_owner_and_shared_handles_keep_one_physical_copy` both pass
+(2 passed, EXIT=0). Their 104 copy lines cover 21 store roots. Each is one file under `chunks/`
+with one `(dev, ino)` per CID per root: no second copy, and nothing outside `chunks/`. Every V1
+root opens under the format marker, because each is created fresh.
+
+### Verification after round 4
+
+Run one at a time on toolchain 1.96.1, with `TMPDIR` outside `/tmp`. Each verdict is cargo's
+own exit status.
+
+| check | result |
+|---|---|
+| crate `cargo test --offline --locked --all-features` | EXIT=0 (lib 49, canonical 7, format_marker 5, multi_process 8, one_copy 3) |
+| crate `cargo test --offline --locked` | EXIT=0 (lib 43, canonical 7, format_marker 5, multi_process 7, one_copy 3) |
+| crate `cargo fmt --check`; clippy `--all-targets -D warnings`, all features and default | EXIT=0; EXIT=0, EXIT=0 |
+| failing-first: `tests/format_marker.rs` on the `d416bde21` copy | EXIT=101 (0 passed, 5 failed) |
+| epr-cli `--features blob-store` tests `payload`, `artifact`, `peer` | EXIT=0 (11, 6, 29) |
+| epr-cli default features, test `payload` | EXIT=0 (5) |
+| epr-cli `--features blob-store --lib payload::` | EXIT=0 (3) |
+| epr-cli clippy `--all-targets -D warnings`, `blob-store` and default | EXIT=0, EXIT=0 |
+| elohim-storage `cargo check --all-targets` | EXIT=0 |
+| elohim-storage `--test blob` | EXIT=0 (41 passed, 1 ignored) |
+| elohim-storage `--lib eprfs_tier::` | EXIT=0 (12) |
+| Plan V V1 `e4::` (external check) | EXIT=0 (2 passed) |
+
+`elohim/eprfs/Cargo.lock`, the crate's own lockfile and the bridges' lockfiles are unchanged.
+The full storage lib suite (4963 passed in round 3) was not rerun this round. In storage itself,
+only the shim's docs and error mapping changed. The crate change reaches storage through
+`new()`'s marked-root refusal, which `--test blob` and `eprfs_tier::` exercise.
+
+The first crate run in this round failed (EXIT=101) in
+`a_damaged_entry_under_a_byte_cid_is_corruption_never_an_inline_payload`. The scrub hashed C's
+chunk file first and counted C as verified, so it never looked at the damaged `blobs/` entry of
+the same name. On an owner or shared store a verified unit can sit beside a damaged entry under
+that name, so the scrub now also classifies that entry, and a damaged one is condemned. The rows
+above are from the rerun after that fix.
