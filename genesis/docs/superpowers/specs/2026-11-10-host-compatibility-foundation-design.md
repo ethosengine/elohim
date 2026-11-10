@@ -680,6 +680,28 @@ Three things the repo does not have, said plainly:
   The parts exist separately: CID-addressed witnesses, signed attestations and the algedonic
   evidence type. Joining them is the work §7.4 names.
 
+**Feedback is a signal channel of the primitives, not a feature of one tool.** The steward's
+direction, 2026-11-10: brit's attestations are one emerging example, not the home. The repo today
+has several bespoke feedback implementations, each with its own identity scheme:
+
+| Implementation | Identity today | Travels |
+|---|---|---|
+| CI, runtime and deprecation finding ledgers | a 12-hex truncated hash of a normalised line | repo-local |
+| Gate failure tap | none | device-local |
+| ark death witness | CIDv1 of the record | local spool |
+| brit build and validation attestations | a named ref, overwritten | notes refs, not pushed |
+| `epr flow` notes and sensed measures | CIDv1 of the flow atom | repo sidecar |
+| Storage observations | signed, in a per-observer log, keyed by subject CID and kind | gossip defined, not published |
+| Jenkins end-to-end reports; brit exception and usage telemetry | not read for this spec; named by the steward | not read |
+
+A conformance failure, a witnessed death and a finding are the same kind of thing as each of
+these: an attributed observation about a content-addressed subject, of a declared kind, at a
+declared reach, from which pain is folded against a declared bound. This spec does not add an
+eighth implementation. It needs one channel with those properties and consumes it. The storage
+observation plane and the algedonic design
+(`2026-08-10-algedonic-feedback-signal-design.md`) already describe most of that channel, so the
+unification belongs there, as an amendment, and not in this document.
+
 Corrections this reading forced on earlier drafts of this spec: §3.2 said the death witness names
 the variant, which it does not; a `lineage` field on variant entries duplicated the fabric's
 `Process` and is replaced by a reference to it; and "finding" was listed as a missing entity when
@@ -770,6 +792,12 @@ Missing nodes added by §7.4 and §7.5:
   contradicted, a host-class field on the validation attestation, and a live channel between
   devices. Each join is a change to an existing type and passes this gate when proposed, with the
   reach, the custody and the cost of each device re-running vectors stated`.
+- `feedback / between "something observed about a subject, on any device, by any tool" → "it is
+  attributed, addressed, carried at its reach and folded into pain" / missing node: one feedback
+  channel that the bespoke implementations above are re-expressed through, with a probe that one
+  CI finding, one death witness and one conformance failure are read back by the same query on
+  subject CID and kind / current state: seven implementations, four identity schemes, none
+  crossing devices. Owner: the algedonic and observation-plane designs, not this spec`.
 - `immune loop / between "many devices hurt by one variant" → "the hurt is visible" / missing node:
   an algedonic emitter over a declared bound on a variant's death or restore rate / current state:
   the evidence type exists and nothing emits it`.
@@ -872,7 +900,9 @@ Until then they are named axes with no supported claim.
 - **epr and epr-rea stewards**: check the inherited-ontology table in §9. Is each "inherit" a true
   fit, and is `admit` returning the shared `Verdict` type acceptable?
 - **brit session**: the same table names three gaps in the validation attestation (host class,
-  overwritten ref, no way to set `findings_cid`). Are they changes brit would take?
+  overwritten ref, no way to set `findings_cid`). brit is one example of the feedback channel, not
+  its home: would brit's attestations and its exception and usage telemetry be re-expressed
+  through a shared channel, and what would they lose?
 - **ark session**: can the death witness name a variant CID and the contradicted clause, and gain
   exit classes for illegal instruction and loader failure?
 - **rakia session**: check §7.3. Does rakia's job planning have a place for a provider-answered
