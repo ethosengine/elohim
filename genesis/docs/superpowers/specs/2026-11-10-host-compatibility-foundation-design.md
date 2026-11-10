@@ -502,6 +502,16 @@ Exploits and failures are expected. The network is built so that damage stays ch
 is robust, and the discovery and repair of a flaw happen at the edge that met it, then inform the
 devices the discovery helps. No central rule set or security authority decides for the devices.
 
+**Who acts.** The acts below are carried out at each edge by the device's elohim, the agent that
+serves that device's person, together with that person. The steward's image, same date: the elohim
+carry the diversity and are the white blood cells of this immune system. An elohim holds the
+context no central party has: this device's hardware, its history, and what its person needs of
+it. That is what lets variety be carried and not flattened. It acts within its steward's standing.
+Its adapted variants start at private reach; its findings and repairs are signed as its own acts
+under its steward and climb the same ladders as anyone's. It holds no authority over the device
+that its person lacks, and its native changes are judged by the same suite and envelope as any
+other variant.
+
 | Act | Mechanism | State |
 |---|---|---|
 | Sense | a witnessed death that contradicts a requirement; a conformance failure; an observation by a person or an agent on the device | crashes and conformance are in this spec; other observation has no witness yet |
