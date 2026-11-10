@@ -30,7 +30,10 @@ cites:
 
 Status: **Draft for review by all working sessions.** Nothing here is built, so each rule below is a
 proposed requirement with no enforcer yet. §12 lists the rulings this
-spec asks the steward for, and §13 lists what each working session should check it against.
+spec asks the steward for, and §13 lists what each working session should check it against. The
+artifact-store seat's three reviews (F1–F6, G1–G4, B1–B5) are folded into §6.3, §7, §7.1, §7.2,
+§7.4 and §7.5. The work is planned in
+`genesis/docs/superpowers/plans/2026-11-10-host-compatibility-foundation-plan.md`.
 
 ## 1. Why this exists
 
@@ -337,6 +340,28 @@ Consequences:
 The declared target is part of the method, so it is part of the key. The standing sentence stays
 literally true: a differing toolchain computes a different key.
 
+What has to change in today's key for that to hold (artifact-store review F1, F3, B2):
+
+- Today `epr artifact` keys host tool identity in the **input**, not the method: the input root is
+  the source tree plus the cargo configuration plus a `cc` and `ld` path and version line from a
+  fixed list of keyed tools. Two hosts with different system linkers therefore get different input
+  roots even when the build does not use that linker, which is the whole of the F2r split. The input
+  should hold source and cargo configuration only.
+- Host tool identity moves into the method. With a declared target it is the sysroot CID. Without
+  one it is the effective linker (read from `rustc -vV`) and the CIDs of the link inputs the link
+  actually read. The keyed set is derived from the build, not from a hand list, which is rule 1 of
+  §7.4 applied here: a hand list is how the real F2r input (the glibc startup objects) went unkeyed.
+- The instruction-set level today lives inside the `RUSTFLAGS` string. It is lifted out into the
+  declared target and must not be repeated in the flags, or two variants differ in a non-target
+  field and land in different families. Each recorded build-environment variable is classified as
+  either target or method.
+- A key computed on the interim `basis-key:git-tree` basis moves once. The basis is labelled interim,
+  so this is not a record epoch.
+
+A minor limit: the libc floor is known before the build, but the host requirements of C
+dependencies a build script links from the system are not. The produced bytes stay the record of
+truth for those clauses (§3.2, `extracted`).
+
 How the floor is realised for a given binary is a measured choice between three mechanisms, and
 this spec does not pick one for all binaries:
 
@@ -372,11 +397,26 @@ VariantSet {
   is an identity hit on that variant's key. Nothing is admitted under a key it was not built under.
 - A derivation key is the CID of a method descriptor (recipe, tools, flags, declared target) paired
   with an input root. The **family key** is the same descriptor hashed with its declared-target
-  fields left out. A device that can compute its own key can therefore compute the family key
-  locally, with or without a manifest.
-- Each variant's record is indexed under both its own key and its family key. A fetch that misses
-  on its own key reads the records under the family key. Lookup stays by key or CID; no query
-  plane is added.
+  fields and host-bound tool entries left out. A device that can compute its own key can therefore
+  compute the family key locally, with or without a manifest.
+- **How the target is carried (review F2).** The method descriptor refuses unknown fields and has
+  no extension slot, so a new typed field would re-encode every descriptor and move every method
+  CID. The declared target is therefore carried under a reserved `target.` prefix of the
+  descriptor's existing non-path inputs (`target.arch`, `target.isa`, `target.os`,
+  `target.sysroot`, `target.cflags`). The family rule is one named function beside the key
+  derivation in `eprfs-core`, not a convention in the CLI. Existing CIDs stay put and no epoch is
+  needed.
+- **How the family is found (review F4).** Lookup is by key end to end today, and two outputs under
+  one key read as a mismatch, so a record cannot simply be indexed under two keys. Instead the
+  `Produce` event that records a build gains two additive slots, `env:family` and `env:requires`
+  (the CID of its `Requires`). On a miss for its own key, a fetch reads the rows for its family,
+  groups them by key, admits each variant's `Requires`, chooses by the rule below, and resolves
+  holders for the chosen key only. No query plane is added.
+- **Whose key is trusted (review F5).** Fetch accepts a holder's record only if its key equals the
+  key this device computed. That law is kept by having the device re-derive the selected variant's
+  key itself: its own family descriptor plus that variant's `target.*` values, over its own input
+  root. The rule becomes "the key this device derived for the selected variant", so the device does
+  not take a key on another device's word.
 - A variant set is an open population, not a list one party closes. Whoever publishes a release
   assembles the first set from the variants it holds proofs for. Any device may contribute a
   variant by appending an entry with its proof (§7.1). A device may hold a wider set at its
@@ -404,9 +444,19 @@ adds it. No existing pin or peer is disturbed until a new variant-set CID is ele
 same channel that elects any release.
 
 Different builders of the same variant key may produce different bytes, because development
-builds are not deterministic. That is the existing `Mismatch` case in the artifact store and is
-unchanged here. It is one more reason shared variants should be built from a declared target with
-a release profile.
+builds are not deterministic. Today that is the artifact store's `Mismatch`, and it refuses the
+whole fetch from every holder. Under this design that is a claim that commands (§7.4 rule 4): one
+device's wrong or hostile record would halt the fetch for every other device. It changes (reviews
+F6, B1):
+
+- A second output under one key **narrows** the holders, to the CID the variant set names where
+  there is one, or by trust policy where there is not. The disagreeing output is recorded as
+  divergence evidence, which is what the immune loop's sense step reads. It does not refuse the
+  fetch on its own.
+- Once a set names one CID per variant, a differing build is simply another CID, a candidate that
+  is not in the set.
+- Shared variants should still be built reproducibly (release profile, path remapping, fixed
+  codegen units, a fixed source date), so that more than one device can serve the named CID.
 
 ### 7.1 The conformance suite: how different variants agree
 
@@ -434,6 +484,21 @@ Two kinds of variant join the same set:
 | Same recipe, different declared target | the release recipe built for another target | its own key, sharing the family key | under the family key, or in the set |
 | Adapted | source or recipe changed for one device or class, by a person or an agent | its own key, outside the family | only through its entry in the set |
 
+**Admitting an adapted variant needs a second path (reviews G2, G3, B5).** A same-recipe variant
+keeps the fetch law above, because the device re-derives its key. An adapted variant cannot: its
+source or recipe is not the device's, so the device has no key to derive. Its anchor is instead
+"the output CID a variant set names, in a set this device accepts, with a conformance attestation
+that meets the evidence table below". That is a second admission path in the fetch daemon, naming
+a set CID and a member CID with no key, with its own typed refusals: `not-in-set`,
+`set-not-accepted`, `attestation-insufficient`. The existing output and chunk CID checks stay. It
+is the only route for adapted variants.
+
+The same holds for installing one as a device tool. The bin store accepts a tool only if it
+descends from the landed commit, so an adapted variant is refused as non-descendant even when the
+device's own proof says it is better. Landing a set member is judged by membership in an accepted
+set, through an explicit, recorded transition of the kind the bin store already has for lineage
+rebases. Without that, adapted variants cannot be device tools.
+
 What a device needs before it runs a variant it did not build:
 
 | Relationship | Evidence that suffices |
@@ -454,12 +519,18 @@ Limits stated plainly:
 
 ### 7.2 Finding a variant, and who holds it
 
-Two questions, answered by two existing mechanisms. No index of variants by hardware is added.
+Two questions. No index of variants by hardware is added.
 
 1. **Which bytes?** The variant set answers. A device reads the set it pins, admits locally, and
    has a CID.
-2. **From whom?** A variant is an ordinary content-addressed blob. Its holders are resolved the way
-   any blob's are, by CID. Universal artifacts and variants share one store and one lookup.
+2. **From whom?** A variant is an ordinary content-addressed blob, so its holders should be
+   resolvable by CID. Today they are not on this path (review G1): the artifact fetch finds holders
+   by derivation key. The same `Produce` rows already carry the output CID, so a lookup by output
+   CID is the same fold filtered on another slot. It is a small addition, not a new store or index.
+
+The holders today's lookup can see are the steward's own devices. Provers and holders on other
+stewards' devices, which §7.1's wider reach relies on, need the commons rung of the reach ladder,
+which the artifact store does not have (review G4; missing node, §9).
 
 What content addressing buys the network:
 
@@ -469,7 +540,9 @@ What content addressing buys the network:
   it chooses to serve them for others.
 - An identical variant built by two devices is one CID and one copy.
 
-Open: custody per variant. A variant for uncommon hardware has few holders (missing node, §9).
+Custody per variant: a variant for uncommon hardware has few holders (missing node, §9). The same
+`Produce` rows already count holders per output, so a "fewer than N holders" warning can be read
+from the existing fold.
 
 ### 7.3 Building a variant: the reverse reading
 
@@ -479,9 +552,12 @@ can make a variant that does not exist yet. It is the same contract applied to t
 - A build closure's toolchain members carry their own `Requires`. A cross-compiler requires an
   x86 host and produces aarch64 output. "Can this device build for target T" is
   `admit(build closure for T, Provides)`, evaluated on the device that would build.
-- A build planner (rakia) therefore sends the job with the build closure's variant set, and the
-  provider answers which toolchain variant it will take, or refuses. The planner does not hold a
-  table of what each device is.
+- A build planner therefore sends the job with the build closure's variant set, and the provider
+  answers which toolchain variant it will take, or refuses. The planner does not hold a table of
+  what each device is. Who plans and who runs is already ruled: rakia names and plans (its plan is
+  topological levels of steps with no host field today), and `ark task run` is the only executor
+  (ruling D8 of the native dev plane). So the declared target becomes an input of a rakia step, and
+  the admission happens inside `ark task run` on the provider.
 - **Building and proving are separate jobs.** A variant may be built on any host that admits the
   build closure. It is proven only on a host that admits the output. A proof under emulation is
   recorded as such and counts for the build and run rungs only (ruling H6).
@@ -546,24 +622,32 @@ motivated it, and offered back through the same reach ladder as any other varian
 that includes the vector is elected, variants that do not pass it are no longer members.
 
 Rules the direction places on this contract now. Each is a proposed requirement with no enforcer
-yet.
+yet. The artifact-store review (B1–B5) read each against today's store, fetch and bin store; its
+verdict is given after each rule.
 
 1. **No closed lists.** Axes, bundles, variant sets and suites grow by anyone's contribution and
-   are narrowed only by evidence.
+   are narrowed only by evidence. *Today: breaks.* The keyed tools, build-environment names and
+   resource caps are fixed lists, and the method descriptor refuses unknown fields (§6.3, §7).
 2. **Judgement is local.** Admission, conformance and whether a finding applies are evaluated on
-   the device concerned.
+   the device concerned. *Today: holds for fetch and health checks; at risk in the bin store,*
+   which judges a landing by ancestry against the dev lineage (§7.1).
 3. **Everything is attributed and has lineage.** A variant, a finding and a repair each name their
-   signer and what they derive from.
+   signer and what they derive from. *Today: partial.* Records carry who computed them and installs
+   record where they came from, but a mismatch is discarded, so there is no divergence evidence.
 4. **A finding informs; it does not command.** This is the existing algedonic rule (`"advisory"`
    standing impact: pain does not debit standing by itself) applied to findings. A finding can
    stop a variant being offered. Whether
    to stop running it is the device's own decision. A false finding therefore costs a re-proof and
-   cannot halt a device.
+   cannot halt a device. *Today: breaks.* One disagreeing record refuses the fetch from every
+   holder (§7, the mismatch change).
 5. **Findings climb the reach ladder too.** A vector that exposes a flaw is also a recipe for
    exploiting it. It starts at a narrow reach and widens as repairs land. A finding with no
-   standing behind it is weighed as any unattested claim is.
+   standing behind it is weighed as any unattested claim is. *Today: breaks.* Crossing between the
+   steward's devices is all-or-nothing, with no rung narrower than it.
 6. **Restoration does not depend on the network.** What a device needs to return to its last
-   working state is held on the device.
+   working state is held on the device. *Today: holds.* The bin store keeps current and previous
+   heads and every ingested release locally, and revert is a local pin move. Any future collection
+   of old releases has to keep the last working one.
 
 ### 7.5 A device the network has not seen
 
@@ -582,8 +666,14 @@ The same loop admits new hardware without anyone preparing for it.
    stand, a later device of the same class resolves them directly and skips steps 1 and 3. The
    first device of a class pays for the class.
 
-Open: what the seed contains, and whether one seed can serve devices too small to build. A phone
-or a watch cannot develop its own variants (§8); a sibling device or a builder does that for it.
+What the seed is today, from the artifact-store seat: not "an engine and a transport" but several
+native binaries. `epr` carries the device key, berth, peer daemon, bin store and artifact fetch;
+`brit` and `ark` come with it; none has a portable form; and bootstrapping with no sibling also
+needs a cargo toolchain. Naming the seed's members and measuring their size is the first concrete
+step toward a small seed.
+
+Open: whether one seed can serve devices too small to build. A phone or a watch cannot develop its
+own variants (§8); a sibling device or a builder does that for it.
 
 ## 8. Local-first reading
 
@@ -692,28 +782,52 @@ has several bespoke feedback implementations, each with its own identity scheme:
 | brit build and validation attestations | a named ref, overwritten | notes refs, not pushed |
 | `epr flow` notes and sensed measures | CIDv1 of the flow atom | repo sidecar |
 | Storage observations | signed, in a per-observer log, keyed by subject CID and kind | gossip defined, not published |
-| Jenkins end-to-end reports; brit exception and usage telemetry | not read for this spec; named by the steward | not read |
+| a2o sprint-report findings (Jenkins and household lanes) | a 12-hex truncated hash of the normalised message; only the household attestation carries a CID (over the system under test) | written as report files; read by hand, by the measure listener and by receipt checks |
+| brit command use and exceptions | none: an error prints to stderr and exits; nothing is recorded. The nearest thing is opt-in parity measurements written as `epr flow` notes | not recorded |
 
-A conformance failure, a witnessed death and a finding are the same kind of thing as each of
-these: an attributed observation about a content-addressed subject, of a declared kind, at a
-declared reach, from which pain is folded against a declared bound. This spec does not add an
-eighth implementation. It needs one channel with those properties and consumes it.
+**Rails, not one pipe.** The steward's framing, 2026-11-10: there may be several channels; what is
+durable is the rails that make each implementation legible and refactorable. This spec states
+the rails as five properties any feedback path should have, and judges each implementation
+against them:
 
-The parent record for that channel already exists. `elohim/epr` defines `WitnessedInteraction`:
-an REA-shaped record `(object CID, substrate, action, magnitude)` that a witness emits about a
-content-addressed object, carried in the shared envelope with its reach, proof and supersession,
-and aggregated on the object CID. Its own design
-(`2026-07-15-frame-witness-primitive-architecture-design.md`) names the DHT `FeedbackSignal` as
-one of its specializations. The unification therefore belongs to that design, with the algedonic
-design and the storage observation plane as the fold and the carriage, and not in this document.
+1. **Attributed**: it names who or what observed it.
+2. **Addressed subject**: what it is about is named by CID.
+3. **Declared kind and reach**: its kind is declared, and the kind carries how far it may travel.
+4. **One identity derivation**: its own identity is a CID of its canonical bytes, so two tools
+   recording the same observation agree.
+5. **Pain is folded, not asserted**: how much it hurts is folded against a declared bound, not
+   stated by the emitter.
+
+A conformance failure, a witnessed death and a finding are the same kind of thing as each row
+above. This spec does not add another implementation; it consumes paths that meet the rails.
+
+**What producers already converge on.** Two records exist, with different jobs:
+
+| Record | Job | Built today by |
+|---|---|---|
+| `FlowEvent` (`elohim/epr-rea`) | an attributed event about a content-addressed resource, with an action, a magnitude and a `classified_as` tag | the Jenkins bridge (success as `Produce`, failure as `Dismiss`), the cargo bridge, ark's death witness projection, `epr flow note` |
+| `AlgedonicEvidence` (`elohim/epr`) | a device's own numeric state against a limit it declared | the fold, embedded in ark's witness; no emitter of a full signal |
+
+`WitnessedInteraction` in `elohim/epr` is the designed parent of both families
+(`2026-07-15-frame-witness-primitive-architecture-design.md`), but no production code builds one.
+So the rail this spec relies on is `FlowEvent` as it is used today, not the designed parent.
+
+**Misfits, recorded as open decisions and not forced:**
+
+- A node, a CI service or ark has no witness identity in the parent record's closed list.
+- Failure has no verb of its own; `Dismiss` is used for it by precedent, which conflates
+  "this failed" with "I do not endorse this".
+- The runtime finding ledger closes a finding by deleting its line, which conflicts with
+  append-only records; closing would need supersession.
+- The 12-hex fingerprints in the CI, runtime and a2o ledgers are index keys, not addresses. They
+  can stay as keys if each finding also gets a CID.
 
 On whether this needs a new crate (the steward is open to revisiting that): it does not. Almost
-every crate that would mint feedback already depends on `elohim/epr` (ark, placement, the epr
-CLI, storage, and brit through the registry). What is in the wrong place is the storage
-`Observation` type, which lives inside `elohim-storage` where no other tool can mint it. A crate
-named for the Viable System Model is still not proposed: nothing would consume Systems 1 to 5 as
-types. Open: whether a pass or a fail fits the existing magnitudes (`Vote` is the likely one) and
-which member of the closed substrate vocabulary a conformance observation uses.
+every crate that would mint feedback already depends on `elohim/epr` and `elohim/epr-rea` (ark,
+placement, the epr CLI, storage, and brit through the registry). What is in the wrong place is the
+storage `Observation` type, which lives inside `elohim-storage` where no other tool can mint it. A
+crate named for the Viable System Model is still not proposed: nothing would consume Systems 1 to
+5 as types.
 
 Corrections this reading forced on earlier drafts of this spec: §3.2 said the death witness names
 the variant, which it does not; a `lineage` field on variant entries duplicated the fabric's
@@ -806,12 +920,12 @@ Missing nodes added by §7.4 and §7.5:
   devices. Each join is a change to an existing type and passes this gate when proposed, with the
   reach, the custody and the cost of each device re-running vectors stated`.
 - `feedback / between "something observed about a subject, on any device, by any tool" → "it is
-  attributed, addressed, carried at its reach and folded into pain" / missing node: one feedback
-  channel that the bespoke implementations above are re-expressed through, with a probe that one
-  CI finding, one death witness and one conformance failure are read back by the same query on
-  subject CID and kind / current state: seven implementations, four identity schemes, none
-  crossing devices. Owner: the frame and witness primitive design, with the algedonic and
-  observation-plane designs, not this spec`.
+  attributed, addressed, carried at its reach and folded into pain" / missing node: the five
+  rails stated once as an amendment to the algedonic design, with each implementation audited
+  against them, and a probe that one CI or a2o finding, one death witness and one conformance
+  failure are read back by the same query on subject CID and kind / current state: eight
+  implementations, four identity schemes, none crossing devices. Owner: the algedonic design's
+  steward, with the frame and witness design and the observation plane; not this spec`.
 - `immune loop / between "many devices hurt by one variant" → "the hurt is visible" / missing node:
   an algedonic emitter over a declared bound on a variant's death or restore rate / current state:
   the evidence type exists and nothing emits it`.
@@ -856,8 +970,11 @@ all depend on it without depending on each other (ruling H5, §12).
 | Derivation key (K1) | keys a linker the build does not use | keys the declared target and the real link inputs |
 | `just mesh preflight` | freshness and pin checks | adds one line: each binary admitted on this host, or the refusal |
 
-Order of checks wherever several apply, each separately measurable as the harvest requires:
-compatibility, then capacity, then authority and consent, then protocol contract.
+Order of checks wherever several apply, each separately measurable as the harvest requires.
+Placement's `admit` already runs consent, then the scope and isolation gate, then capacity. That
+order is kept: compatibility enters between the gate and capacity, with its own refusal reason, so
+a host is asked whether it can run the bytes before it is asked whether it has room. Protocol
+contract checks follow.
 
 ## 11. Proof ladder
 
@@ -884,6 +1001,11 @@ Until then they are named axes with no supported claim.
 
 ## 12. Rulings asked of the steward
 
+State on 2026-11-10: the steward ruled H1 to H7 as recommended. H8 and H9 were agreed in
+conversation the same day. H10 and H11 remain open. The sprint plan
+(`genesis/docs/superpowers/plans/2026-11-10-host-compatibility-foundation-plan.md`) builds on the
+ruled items only.
+
 | Id | Question | Recommendation |
 |---|---|---|
 | H1 | Does K1 stay a key-honesty fix only, with no cross-key admission in it? | Yes. K1 keys the linker and link inputs the build really uses |
@@ -896,7 +1018,7 @@ Until then they are named axes with no supported claim.
 | H8 | Is the line between portable and native drawn by "must agree" against "may differ" (§5.1)? | Yes. Agreed in conversation by the steward on 2026-11-10; recorded here for the reviewing sessions |
 | H9 | Are variant sets open, with membership decided by a named conformance suite and not by who built the variant (§7.1)? | Yes, same agreement. Adapted variants join by attestation; wider reach needs the device's own run or converging independent proofs |
 | H11 | Do the six rules of §7.4 bind every later change to this contract, and is the seed (§7.5) a design constraint on the native kernel? | Yes. The direction was ruled by the steward in conversation on 2026-11-10; the six rules and the seed are this spec's reading of it and need the steward's confirmation as written |
-| H10 | Does rakia plan native builds by asking providers to admit the build closure (§7.3), with building and proving as separate jobs? | Yes, pending the rakia session's check against how rakia plans jobs today, which this spec has not read |
+| H10 | Does rakia plan native builds with the declared target as a step input and building and proving as separate steps, with admission inside `ark task run` on the provider (§7.3)? | Yes, pending the rakia steward's check. rakia's plan today is topological levels of steps with no host field, and its manifest schema carries no target |
 
 ## 13. Review asks, by session
 
