@@ -153,7 +153,11 @@ def main() -> int:
 
     # The bound lives in .claude/epr-meta (claude-md-structural-signal@1). Structural ops are
     # rare and high-impact, so each affected scope gets its own fold rather than a batched score.
+    # The notes are independent appends this hook never reads, so they are handed off without
+    # waiting (`emit_many(wait=False)`), as claude-md-drift-signal does: a `mkdir -p … && cat >`
+    # under a loaded host took this 2 s hook to 2014 ms (2026-11-10, session 785ceff4).
     if _obs.available():
+        notes: list[dict] = []
         for op, paths in ops:
             for raw in paths:
                 p = Path(raw)
@@ -164,10 +168,12 @@ def main() -> int:
                         rel = str(cm.relative_to(repo))
                     except ValueError:
                         rel = str(cm)
-                    _obs.emit(
-                        "claude-md-structural-signal@1", rel, 1,
-                        reason=f"gospel drift: structural op `{op}` inside this CLAUDE.md scope",
-                        env={"op": op.replace(" ", "-")}, root=str(repo))
+                    notes.append({
+                        "measure": "claude-md-structural-signal@1", "subject": rel, "value": 1,
+                        "reason": f"gospel drift: structural op `{op}` inside this CLAUDE.md scope",
+                        "env": {"op": op.replace(" ", "-")}, "root": str(repo)})
+        if notes:
+            _obs.emit_many(notes, wait=False)
 
     return 0  # best-effort; never block
 
