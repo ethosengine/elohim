@@ -18,13 +18,56 @@ pub const FILE: &str = "STORE";
 /// The marker spelling of this crate's format.
 pub const BLOB_STORE_V1: &str = "blob-store-v1";
 
-/// The reserved prefix of a marker being staged in the root: an opener scanning the root reads
-/// such a name as a claim in flight, never as content.
-pub const STAGING_PREFIX: &str = ".STORE-";
+/// The prefix of the one temporary file [`claim`] writes in a root: `.STORE.claim-` followed by
+/// exactly 32 lowercase hex digits.
+pub const CLAIM_TEMP_PREFIX: &str = ".STORE.claim-";
 
-/// Whether a root entry's name is a marker being staged ([`STAGING_PREFIX`]).
-pub fn is_staging(name: &str) -> bool {
-    name.starts_with(STAGING_PREFIX)
+/// The most bytes a claim temp can hold: one format name and a newline.
+pub const CLAIM_TEMP_MAX_BYTES: u64 = 64;
+
+/// Whether `name` is exactly a claim temp's name ([`CLAIM_TEMP_PREFIX`] and 32 lowercase hex).
+fn is_claim_temp_name(name: &str) -> bool {
+    name.strip_prefix(CLAIM_TEMP_PREFIX).is_some_and(|rest| {
+        rest.len() == 32
+            && rest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    })
+}
+
+/// Whether the root entry `path` is a claim in flight (or a crashed claim's residue) and nothing
+/// else: a regular file, not a symlink or directory, named exactly as [`claim`] names its temp,
+/// and no larger than [`CLAIM_TEMP_MAX_BYTES`]. Every other entry, a `.STORE-…` or
+/// `.STORE.claim-…` look-alike included, is content.
+pub fn is_claim_temp(path: &Path) -> bool {
+    let named = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(is_claim_temp_name);
+    named
+        && std::fs::symlink_metadata(path)
+            .is_ok_and(|meta| meta.file_type().is_file() && meta.len() <= CLAIM_TEMP_MAX_BYTES)
+}
+
+/// Remove every claim temp ([`is_claim_temp`]) in `root`: the residue of claims that crashed
+/// between staging and cleanup. For an owner at open, under its exclusive lock; a claim racing
+/// this sweep re-reads the marker it lost its temp to ([`claim`]).
+///
+/// # Errors
+///
+/// A root that cannot be listed, or a temp that cannot be removed.
+pub fn sweep_claim_temps(root: &Path) -> io::Result<()> {
+    for entry in std::fs::read_dir(root)? {
+        let path = entry?.path();
+        if is_claim_temp(&path) {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The marker's content, trimmed: `Ok(None)` when the root holds no marker (or does not
@@ -44,8 +87,8 @@ pub fn read(root: &Path) -> io::Result<Option<String>> {
 }
 
 /// Claim the existing directory `root` for `format`, unless another opener claimed it first, and
-/// return the marker that won. The marker is written whole and fsynced under a reserved
-/// [`STAGING_PREFIX`] name, then hard-linked to [`FILE`] (which fails if it exists, so nothing is
+/// return the marker that won. The marker is written whole and fsynced under a claim temp's name
+/// ([`is_claim_temp`]), then hard-linked to [`FILE`] (which fails if it exists, so nothing is
 /// ever replaced), then the root is fsynced. Two first openers race to one winner; the loser
 /// reads the winner's marker. Writes nothing but the marker (and its staging name, removed).
 ///
@@ -54,7 +97,10 @@ pub fn read(root: &Path) -> io::Result<Option<String>> {
 /// Any failure to stage, link (other than an existing marker) or read back the marker.
 pub fn claim(root: &Path, format: &str) -> io::Result<String> {
     let target = root.join(FILE);
-    let staging = root.join(format!("{STAGING_PREFIX}{}", uuid::Uuid::new_v4()));
+    let staging = root.join(format!(
+        "{CLAIM_TEMP_PREFIX}{}",
+        uuid::Uuid::new_v4().simple()
+    ));
     let written = (|| {
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -72,6 +118,8 @@ pub fn claim(root: &Path, format: &str) -> io::Result<String> {
     match linked {
         Ok(()) => std::fs::File::open(root)?.sync_all()?,
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+        // An owner swept the temp: it only does so once a marker exists, so read that one.
+        Err(error) if error.kind() == io::ErrorKind::NotFound && read(root)?.is_some() => {}
         Err(error) => return Err(error),
     }
     read(root)?.ok_or_else(|| io::Error::other("the STORE marker vanished after it was claimed"))
@@ -94,6 +142,45 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(FILE), format!("{BLOB_STORE_V1}\n")).unwrap();
         assert_eq!(read(dir.path()).unwrap().as_deref(), Some(BLOB_STORE_V1));
+    }
+
+    #[test]
+    fn only_a_small_regular_file_named_exactly_as_a_claim_temp_is_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let genuine = dir.path().join(format!(
+            "{CLAIM_TEMP_PREFIX}{}",
+            "0123456789abcdef".repeat(2)
+        ));
+        std::fs::write(&genuine, format!("{BLOB_STORE_V1}\n")).unwrap();
+        assert!(is_claim_temp(&genuine));
+        let oversized = dir
+            .path()
+            .join(format!("{CLAIM_TEMP_PREFIX}{}", "f".repeat(32)));
+        std::fs::write(&oversized, vec![b'x'; CLAIM_TEMP_MAX_BYTES as usize + 1]).unwrap();
+        assert!(!is_claim_temp(&oversized));
+        let as_dir = dir
+            .path()
+            .join(format!("{CLAIM_TEMP_PREFIX}{}", "e".repeat(32)));
+        std::fs::create_dir(&as_dir).unwrap();
+        assert!(!is_claim_temp(&as_dir));
+        for name in [
+            ".STORE-data".to_string(),
+            format!("{CLAIM_TEMP_PREFIX}{}", "A".repeat(32)),
+            format!("{CLAIM_TEMP_PREFIX}{}", "a".repeat(31)),
+            format!("{CLAIM_TEMP_PREFIX}{}x", "a".repeat(32)),
+        ] {
+            let path = dir.path().join(&name);
+            std::fs::write(&path, b"x").unwrap();
+            assert!(!is_claim_temp(&path), "{name}");
+        }
+        #[cfg(unix)]
+        {
+            let link = dir
+                .path()
+                .join(format!("{CLAIM_TEMP_PREFIX}{}", "d".repeat(32)));
+            std::os::unix::fs::symlink(&genuine, &link).unwrap();
+            assert!(!is_claim_temp(&link));
+        }
     }
 
     #[test]

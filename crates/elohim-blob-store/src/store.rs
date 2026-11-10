@@ -45,7 +45,14 @@
 //! before any other file, lock or directory — or when its marker already says `blob-store-v1`.
 //! Any other root (unmarked but not empty, another format, an unreadable marker) is refused
 //! ([`BlobStoreError::LegacyLayout`], [`BlobStoreError::Format`]) before anything is written.
-//! The unlocked store refuses a root that carries any marker ([`BlobStoreError::MarkedRoot`]).
+//! "Empty" ignores exactly one thing: the claim protocol's own temp file, a small regular file
+//! named `.STORE.claim-<32 hex>` ([`crate::marker::is_claim_temp`]), which an owner removes at
+//! open under the exclusive lock and a shared instance leaves. Any other entry is content.
+//! The unlocked store refuses a root that carries any marker ([`BlobStoreError::MarkedRoot`]),
+//! checking before and again after it creates its directories, so an owner that claims the root
+//! in between is seen. One race remains, only on a misconfigured root used as both stores: a
+//! claim after the unlocked store's second check. elohim-storage refuses that configuration
+//! (`EPR_PAYLOAD_STORE` overlapping the `/blob` root composes no tier).
 //! So every file under a marked root's `blobs/` is, by construction, a marker (or the empty
 //! payload's zero-length file): one that is not — unparseable, or under a name that is not a
 //! byte CID filed in its bucket — is corruption. The owner moves it to quarantine (a stray
@@ -549,8 +556,9 @@ impl BlobStore {
     ///
     /// # Errors
     ///
-    /// [`BlobStoreError::MarkedRoot`], with nothing written, when the root carries a format
-    /// marker: it belongs to an owner/shared store (module docs).
+    /// [`BlobStoreError::MarkedRoot`], with nothing moved, when the root carries a format
+    /// marker, before its directories are created or after (an owner that claimed the root
+    /// meanwhile; the empty directories made stay): it belongs to an owner/shared store.
     pub async fn new<P: AsRef<Path>>(root_dir: P) -> Result<Self> {
         Self::open_as(root_dir.as_ref().to_path_buf(), Mode::Unlocked).await
     }
@@ -1043,9 +1051,9 @@ fn admit_canonical_root(root: &Path) -> Result<()> {
     match fs::read_dir(root) {
         Ok(entries) => {
             for entry in entries {
-                let name = entry?.file_name();
-                if crate::marker::is_staging(&name.to_string_lossy()) {
-                    // Another first open's claim in flight.
+                if crate::marker::is_claim_temp(&entry?.path()) {
+                    // Another first open's claim in flight, or a crashed claim's residue: the
+                    // claim protocol's own small temp file, never content.
                     continue;
                 }
                 // A first open writes its marker before any other file, so content without a
@@ -1153,6 +1161,22 @@ fn sweep_staging(root: &Path) {
     }
 }
 
+/// Test-only pauses of [`BlobStore::new`] between its marker check and its directories, by root.
+#[cfg(test)]
+static UNLOCKED_ADMISSION_GAPS: Mutex<Vec<(PathBuf, Arc<tests::DamageGate>)>> =
+    Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn unlocked_admission_gap(root: &Path) {
+    let gate = guard(&UNLOCKED_ADMISSION_GAPS)
+        .iter()
+        .find(|(at, _)| at == root)
+        .map(|(_, gate)| gate.clone());
+    if let Some(gate) = gate {
+        gate.pass();
+    }
+}
+
 /// Microseconds since the epoch, for quarantine directory names.
 fn now_micros() -> u128 {
     std::time::SystemTime::now()
@@ -1165,9 +1189,16 @@ impl Inner {
         let coord = match mode {
             Mode::Unlocked => {
                 refuse_marked_root(&root)?;
+                #[cfg(test)]
+                unlocked_admission_gap(&root);
                 for dir in AREAS {
                     fs::create_dir_all(root.join(dir))?;
                 }
+                // An owner or shared open may have claimed the root between the check above and
+                // the directories: look again before anything is moved. The directories made
+                // here stay, empty. (A claim after this check is the frontier the report names:
+                // one root configured as both stores.)
+                refuse_marked_root(&root)?;
                 // Crash residue: a write that never reached its rename. This store is the
                 // only process on its root.
                 sweep_staging(&root);
@@ -1206,6 +1237,7 @@ impl Inner {
             let _sweeping = coord.destruction("sweep staging")?;
             sweep_staging(&root);
             quarantine_stray_blob_names(&root)?;
+            crate::marker::sweep_claim_temps(&root)?;
         }
         let seeded = scan_blob_tree(&root, mode != Mode::Unlocked);
         Ok(Self {
@@ -4059,6 +4091,41 @@ mod tests {
             assert!(tmp_is_empty(&dir), "the staging file was dropped");
             assert_eq!(store.exists(&cid).await, Exists::Absent);
         }
+    }
+
+    /// Review round 5, ruling 2b: an owner that claims an empty root between `new()`'s marker
+    /// check and its directories makes `new()` refuse, before it sweeps or seeds anything.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn an_owner_claim_between_new_and_its_second_marker_check_refuses_new() {
+        let dir = private_dir();
+        let root = dir.path().to_path_buf();
+        let gate = Arc::new(DamageGate::default());
+        guard(&UNLOCKED_ADMISSION_GAPS).push((root.clone(), gate.clone()));
+        let opening = {
+            let root = root.clone();
+            tokio::spawn(async move { BlobStore::new(&root).await })
+        };
+        {
+            let gate = gate.clone();
+            tokio::task::spawn_blocking(move || gate.wait_arrived())
+                .await
+                .unwrap();
+        }
+        // The root is still empty: the owner claims it and opens.
+        let owner = BlobStore::open_owner(&root).await.unwrap();
+        gate.release();
+        let result = opening.await.unwrap();
+        guard(&UNLOCKED_ADMISSION_GAPS).retain(|(at, _)| at != &root);
+        assert!(
+            matches!(result, Err(BlobStoreError::MarkedRoot { .. })),
+            "new() opened a root an owner had claimed: {:?}",
+            result.map(|_| ())
+        );
+        let stored = owner.store(b"written after the race").await.unwrap();
+        assert_eq!(
+            &owner.get(&stored.cid).await.unwrap()[..],
+            b"written after the race"
+        );
     }
 
     /// Review round 4, ruling 4: the accepted strictness change that reaches the unlocked store

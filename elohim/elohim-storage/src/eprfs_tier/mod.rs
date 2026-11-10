@@ -16,7 +16,8 @@
 //!   `private_reach::private_serve_verdict` for `private` records. It reads only records this
 //!   peer holds, through [`ReachRecords`]; an unknown record refuses (`NoRecord`).
 //! - [`compose_payload_tier_from_env`]: the device payload store as this process's tier, when
-//!   `EPR_PAYLOAD_STORE` names a root whose marker says `blob-store-v1` (opened shared).
+//!   `EPR_PAYLOAD_STORE` names a root whose marker says `blob-store-v1` (opened shared) and that
+//!   neither is, contains, nor lies inside the `/blob` store's root ([`BlobRootOverlap`]).
 //!
 //! Neither adapter is wired into a route or the reconcile loop yet: the `POST /eprfs/v1/blobs`
 //! host over `TierEndpoint`, `PeerTransportTier`, this crate's own `ForwardGate` and the custody
@@ -38,14 +39,79 @@ use tracing::{info, warn};
 pub const PAYLOAD_STORE_ENV: &str = "EPR_PAYLOAD_STORE";
 
 /// The storage process's payload tier, from [`PAYLOAD_STORE_ENV`]: unset composes nothing and
-/// logs nothing (today's behaviour). Set, its root's marker decides: `blob-store-v1` composes
-/// a **shared** [`BlobStoreTier`] over exactly that root and logs one line naming the path and
-/// format; any other marker, none, or a root that does not open logs one warning and composes
-/// nothing — no backend is opened and nothing is created there. The caller holds the returned
-/// tier for the process's lifetime.
-pub async fn compose_payload_tier_from_env() -> Option<BlobStoreTier> {
+/// logs nothing (today's behaviour). Set, a root that overlaps `blobs_dir`, the `/blob` store's
+/// root ([`blob_root_overlap`]), logs one warning naming the overlap and composes nothing: one
+/// directory configured as both the unlocked `/blob` store and the device's owner/shared store is
+/// the one way the two representations could meet. Otherwise its marker decides:
+/// `blob-store-v1` composes a **shared** [`BlobStoreTier`] over exactly that root and logs one
+/// line naming the path and format; any other marker, none, or a root that does not open logs
+/// one warning and composes nothing — no backend is opened and nothing is created there. The
+/// caller holds the returned tier for the process's lifetime.
+pub async fn compose_payload_tier_from_env(blobs_dir: &Path) -> Option<BlobStoreTier> {
     let root = std::env::var_os(PAYLOAD_STORE_ENV).filter(|value| !value.is_empty())?;
-    compose_payload_tier(&PathBuf::from(root)).await
+    compose_payload_tier_beside(&PathBuf::from(root), blobs_dir).await
+}
+
+/// How a payload-store root overlaps the `/blob` store's root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlobRootOverlap {
+    /// They are the same directory.
+    Same,
+    /// The payload root contains the `/blob` root.
+    PayloadIsAncestor,
+    /// The payload root lies inside the `/blob` root.
+    PayloadIsDescendant,
+}
+
+/// Whether `payload` and `blobs` overlap, compared as resolved paths: each is made absolute and
+/// canonicalized, and a path that does not exist yet is resolved through its nearest existing
+/// ancestor (so a payload root not created yet still compares by where it would be made).
+pub fn blob_root_overlap(payload: &Path, blobs: &Path) -> Option<BlobRootOverlap> {
+    let (payload, blobs) = (resolved(payload), resolved(blobs));
+    if payload == blobs {
+        Some(BlobRootOverlap::Same)
+    } else if blobs.starts_with(&payload) {
+        Some(BlobRootOverlap::PayloadIsAncestor)
+    } else if payload.starts_with(&blobs) {
+        Some(BlobRootOverlap::PayloadIsDescendant)
+    } else {
+        None
+    }
+}
+
+/// `path` absolute and canonical through its nearest existing ancestor, the rest appended.
+fn resolved(path: &Path) -> PathBuf {
+    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut existing = absolute.as_path();
+    let mut missing = Vec::new();
+    loop {
+        if let Ok(real) = existing.canonicalize() {
+            return missing.iter().rev().fold(real, |acc, part| acc.join(part));
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name.to_os_string());
+                existing = parent;
+            }
+            _ => return absolute,
+        }
+    }
+}
+
+/// [`compose_payload_tier_from_env`] for an explicit payload root beside an explicit `/blob`
+/// root.
+pub async fn compose_payload_tier_beside(root: &Path, blobs_dir: &Path) -> Option<BlobStoreTier> {
+    if let Some(overlap) = blob_root_overlap(root, blobs_dir) {
+        warn!(
+            path = %root.display(),
+            blobs_dir = %blobs_dir.display(),
+            ?overlap,
+            "{PAYLOAD_STORE_ENV} overlaps the /blob store's root: no payload tier composed (one \
+             directory must not hold both the unlocked store and the device payload store)"
+        );
+        return None;
+    }
+    compose_payload_tier(root).await
 }
 
 /// [`compose_payload_tier_from_env`] for an explicit root.
@@ -138,5 +204,71 @@ mod tests {
         let absent = dir.path().join("never-made");
         assert!(compose_payload_tier(&absent).await.is_none());
         assert!(!absent.exists(), "an absent root is never created");
+    }
+
+    #[tokio::test]
+    async fn a_payload_root_overlapping_the_blob_root_composes_nothing() {
+        let dir = private_dir();
+        let blobs = dir.path().join("storage").join("blobs");
+        std::fs::create_dir_all(&blobs).unwrap();
+        let marked = |root: &Path| {
+            std::fs::create_dir_all(root).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            }
+            std::fs::write(
+                root.join(elohim_blob_store::marker::FILE),
+                format!("{}\n", elohim_blob_store::marker::BLOB_STORE_V1),
+            )
+            .unwrap();
+        };
+        let cases = [
+            (blobs.clone(), BlobRootOverlap::Same),
+            (
+                dir.path().join("storage"),
+                BlobRootOverlap::PayloadIsAncestor,
+            ),
+            (blobs.join("payload"), BlobRootOverlap::PayloadIsDescendant),
+        ];
+        for (root, overlap) in cases {
+            assert_eq!(
+                blob_root_overlap(&root, &blobs),
+                Some(overlap),
+                "{}",
+                root.display()
+            );
+            marked(&root);
+            let before = entries(&root);
+            assert!(
+                compose_payload_tier_beside(&root, &blobs).await.is_none(),
+                "{overlap:?}: composed"
+            );
+            assert_eq!(entries(&root), before, "{overlap:?}: nothing created");
+        }
+        // The same path spelled through `..`, and a payload root not created yet inside blobs.
+        let spelled = dir
+            .path()
+            .join("storage")
+            .join("x")
+            .join("..")
+            .join("blobs");
+        std::fs::create_dir_all(dir.path().join("storage").join("x")).unwrap();
+        assert_eq!(
+            blob_root_overlap(&spelled, &blobs),
+            Some(BlobRootOverlap::Same)
+        );
+        assert_eq!(
+            blob_root_overlap(&blobs.join("not").join("yet"), &blobs),
+            Some(BlobRootOverlap::PayloadIsDescendant)
+        );
+        // A sibling does not overlap, even when its name extends the blob root's.
+        let sibling = dir.path().join("storage").join("blobs-payload");
+        assert_eq!(blob_root_overlap(&sibling, &blobs), None);
+        marked(&sibling);
+        assert!(compose_payload_tier_beside(&sibling, &blobs)
+            .await
+            .is_some());
     }
 }

@@ -18,7 +18,7 @@
 //!   [`PayloadFormat::DirectoryV1`]. A new blob-store directory is claimed by the store's own open,
 //!   which writes the marker before any other file; a new directory-store one by
 //!   [`select_format`]. Both claim through `elohim_blob_store::marker::claim`, the one
-//!   implementation of the marker: it is staged under a reserved `.STORE-` name and hard-linked
+//!   implementation of the marker: it is staged in a small claim temp and hard-linked
 //!   into place, so first openers race to one winner and a loser opens the winner's format. A
 //!   crash between the marker and the layout leaves a marked, empty store that the next open
 //!   completes.
@@ -205,12 +205,13 @@ fn detect_with(root: &Path, after_marker_read: &dyn Fn()) -> Result<Detected, Pa
     };
     let (mut blob_store, mut legacy, mut other) = (Vec::new(), false, Vec::new());
     for entry in entries {
-        let name = entry.map_err(io_error(root))?.file_name();
-        let name = name.to_string_lossy();
-        if marker::is_staging(&name) {
+        let entry = entry.map_err(io_error(root))?;
+        if marker::is_claim_temp(&entry.path()) {
             // Another opener is selecting the format: it is a new store.
             continue;
         }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
         if BLOB_STORE_NAMES.contains(&name.as_ref()) {
             blob_store.push(name.into_owned());
         } else if name.starts_with(".tmp") || BlobCid::parse(&name).is_ok() {

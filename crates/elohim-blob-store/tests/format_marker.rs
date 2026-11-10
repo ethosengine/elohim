@@ -98,6 +98,10 @@ enum Unmarked {
     MarkerShaped,
     /// A `blobs/` entry under a name that is not a byte CID.
     StrayName,
+    /// A file whose name only begins like the marker's staging (review round 5, ruling 1).
+    StoreLookalikeFile,
+    /// A populated directory under such a name.
+    StoreLookalikeDir,
 }
 
 async fn plant(root: &Path, case: Unmarked) {
@@ -132,6 +136,13 @@ async fn plant(root: &Path, case: Unmarked) {
             std::fs::create_dir_all(root.join("blobs").join("zzzz")).unwrap();
             std::fs::write(root.join("blobs").join("zzzz").join("not-a-cid"), b"x").unwrap();
         }
+        Unmarked::StoreLookalikeFile => {
+            std::fs::write(root.join(".STORE-data"), bytes(10, 4096)).unwrap();
+        }
+        Unmarked::StoreLookalikeDir => {
+            std::fs::create_dir(root.join(".STORE-x")).unwrap();
+            std::fs::write(root.join(".STORE-x").join("inside"), b"content").unwrap();
+        }
     }
 }
 
@@ -142,6 +153,8 @@ async fn an_unmarked_root_that_is_not_empty_is_refused_by_owner_and_shared_and_l
         Unmarked::CorruptInline,
         Unmarked::MarkerShaped,
         Unmarked::StrayName,
+        Unmarked::StoreLookalikeFile,
+        Unmarked::StoreLookalikeDir,
     ] {
         for owner in [true, false] {
             let dir = private_root();
@@ -219,7 +232,7 @@ async fn concurrent_first_opens_by_an_owner_and_a_shared_instance_claim_one_mark
             .unwrap()
             .flatten()
             .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|name| name.starts_with("STORE") || name.starts_with(".STORE-"))
+            .filter(|name| name.starts_with("STORE") || name.starts_with(".STORE"))
             .collect();
         assert_eq!(markers, vec![marker::FILE.to_string()], "round {round}");
     }
@@ -332,4 +345,32 @@ async fn a_damaged_entry_under_a_byte_cid_is_corruption_never_an_inline_payload(
     // The bytes themselves were never the defect: storing the object again republishes it.
     owner.store(&chunk).await.unwrap();
     assert_eq!(&owner.get(&cid).await.unwrap()[..], &chunk[..]);
+}
+
+#[tokio::test]
+async fn a_stale_claim_temp_is_tolerated_and_removed_only_by_the_owner() {
+    for owner_first in [false, true] {
+        let dir = private_root();
+        // A claim that crashed after staging its marker and before linking it.
+        let temp = dir.path().join(format!(
+            "{}{}",
+            marker::CLAIM_TEMP_PREFIX,
+            "0123456789abcdef".repeat(2)
+        ));
+        std::fs::write(&temp, format!("{}\n", marker::BLOB_STORE_V1)).unwrap();
+        if !owner_first {
+            let shared = BlobStore::open_shared(dir.path()).await.unwrap();
+            shared.store(&bytes(13, 4096)).await.unwrap();
+            assert!(temp.exists(), "a shared instance removed the temp");
+        }
+        let _owner = BlobStore::open_owner(dir.path()).await.unwrap();
+        assert!(
+            !temp.exists(),
+            "owner_first={owner_first}: the owner left the temp"
+        );
+        assert_eq!(
+            marker::read(dir.path()).unwrap().as_deref(),
+            Some(marker::BLOB_STORE_V1)
+        );
+    }
 }
