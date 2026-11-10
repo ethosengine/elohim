@@ -3,7 +3,7 @@ id: artifact-store-task-e4-report
 status: claimed-not-verified
 landed_commit:
 verified_by:
-concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, review-round-3-link-only-and-stream-revalidation, review-round-4-format-marker-admission, orphan-retention-frontier, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
+concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, review-round-3-link-only-and-stream-revalidation, review-round-4-format-marker-admission, review-round-5-claim-temp-and-overlap-bound, new-vs-claim-race-frontier, orphan-retention-frontier, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
 actor: agent:e4@claude-opus-5-5 (Claude Opus 5.5, session f1769d1c)
 ---
 
@@ -313,6 +313,10 @@ registry.
   `elohim-address`.
 - **`store.rs` is 4161 lines** after round 4, over the 3000-line soft ceiling (the test module
   is most of the growth). Moving the test module to a sibling file is a bounded follow-up.
+- **`new()`/claim race on a root configured as both stores** (review round 5, ruling 2c; tied
+  to E4b). After `new()`'s second marker check, a canonical claim on the same root is unseen.
+  elohim-storage refuses a payload root that overlaps `/blob`. When E4b flips the `blob-store`
+  default, it must keep the two roots disjoint everywhere or add cross-format coordination.
 - **Orphan retention after a crash** (review round 3, ruling 4). A crash before the index or the
   marker is published leaves an unreferenced chunk or an orphan index. Startup collects neither,
   and delete finds chunks only through markers. This leaks retention but loses no correctness.
@@ -783,3 +787,85 @@ chunk file first and counted C as verified, so it never looked at the damaged `b
 the same name. On an owner or shared store a verified unit can sit beside a damaged entry under
 that name, so the scrub now also classifies that entry, and a damaged one is condemned. The rows
 above are from the rerun after that fix.
+
+## Review fixes, round 5 (astra's fourth re-review, `genesis/local-dev/as-e4/e4-rereview4.receipt.md`)
+
+Verdict FIX FIRST. Rulings 3, 4 and 6 of round 4 were fixed, and round-2 defect 4 is closed.
+Two items remained. First, the admission empty-check ignored any entry whose name began
+`.STORE-`. Second, `new()` and an owner could interleave their admissions on one root. After the
+orchestrator's rebase, round 4 is `5ace98d11` (code) and `f0ca85d3b` (report). Round 5 is
+`5d5f5f59b` (code) and this section.
+
+**Ruling 1: only the claim protocol's own temp is ignored.** `marker::claim` now stages its
+marker as `.STORE.claim-<32 lowercase hex>`. `marker::is_claim_temp` accepts an entry only when
+all three hold:
+- its name is exactly that pattern;
+- it is a regular file, not a symlink, directory or anything else;
+- it holds at most `CLAIM_TEMP_MAX_BYTES` (64).
+
+Every other entry counts as content. That includes `.STORE-data`, a `.STORE-x/` directory, an
+uppercase or wrong-length look-alike, and an oversized file under the exact name. Admission and
+epr-cli's `detect` both use the check.
+- **A stale genuine temp** (a claim that crashed before its cleanup) is tolerated. An owner
+  removes it at open under the exclusive lock (`marker::sweep_claim_temps`); a shared instance
+  leaves it.
+- **A claim whose temp the owner swept** before the link re-reads the marker. The owner sweeps
+  only once a marker exists, so that read finds one.
+
+**Ruling 2: the `new()`/owner race is bounded, not locked.**
+- (a) elohim-storage composes no tier when `EPR_PAYLOAD_STORE` overlaps `config.blobs_dir()`.
+  Overlap means the same path, an ancestor or a descendant. Each path is compared resolved: made
+  absolute and canonicalized through its nearest existing ancestor, so a root not created yet
+  still compares by where it would be made. `compose_payload_tier_from_env(blobs_dir)` logs one
+  warning carrying the typed `BlobRootOverlap` (`Same`, `PayloadIsAncestor`,
+  `PayloadIsDescendant`) and opens and creates nothing. main.rs passes the `/blob` root it has
+  just opened.
+- (b) `BlobStore::new` checks `root/STORE` again after creating its directories and before it
+  sweeps `tmp/`, seeds or scrubs. If a marker appeared, it returns `MarkedRoot`; the empty
+  directories it made stay.
+- (c) **Frontier, tied to E4b.** One interleaving remains, and only on a root misconfigured as
+  both stores: a `new()` handle passes its second check, then a canonical claim lands on the
+  same root. Storage refuses that configuration by (a). Any other process that opens the unlocked
+  store on a payload root is outside this bound. That matters when E4b flips the `blob-store`
+  default and exports `EPR_PAYLOAD_STORE` into the storage daemon. E4b must keep the payload
+  root and `/blob` disjoint, which (a) enforces for storage, or add cross-format coordination.
+
+**Tests.**
+
+| test | covers | result |
+|---|---|---|
+| `format_marker::an_unmarked_root_that_is_not_empty_…` (two new cases: a `.STORE-data` file of arbitrary bytes, a populated `.STORE-x/` directory) | ruling 1: refused by owner and shared before any write, snapshot unchanged | passes |
+| `format_marker::a_stale_claim_temp_is_tolerated_and_removed_only_by_the_owner` (shared first, then owner; and owner first) | ruling 1: stale temp | passes |
+| `marker::tests::only_a_small_regular_file_named_exactly_as_a_claim_temp_is_one` (genuine, oversized, directory, symlink, `.STORE-data`, uppercase, short, long) | ruling 1 | passes |
+| `store::tests::an_owner_claim_between_new_and_its_second_marker_check_refuses_new` (a test-only gate holds `new()` after its first check; the owner claims the empty root and opens; released, `new()` returns `MarkedRoot`, and the owner stores and reads) | ruling 2b | passes |
+| `eprfs_tier::tests::a_payload_root_overlapping_the_blob_root_composes_nothing` (same, ancestor, descendant, each marked: nothing composed or created; a `..` spelling; a not-yet-created descendant; a sibling `blobs-payload` that does compose) | ruling 2a | passes |
+
+No failing-first runs were made this round. The two look-alike cases are admitted by round 4's
+prefix check, as the review showed from the source. The `new()` race needs the new test-only
+gate, which the earlier code does not have.
+
+### External check: Plan V's V1 E4 cases against round 5
+
+Plan V's E4 cases (`artifact-store/v` at `d26d6245`, `crates/elohim-fetch/tests/engine.rs`,
+`e4::`) were run from a fresh scratch copy with a path override to this crate, in their own
+target directory. Nothing was committed on their branch. With `--all-features`, both cases pass
+(2 passed, EXIT=0). Their 104 copy lines cover 21 roots. Each is one file under `chunks/`, with
+one per CID per root.
+
+### Verification after round 5
+
+Run one at a time on toolchain 1.96.1, with `TMPDIR` outside `/tmp`. Each verdict is cargo's
+own exit status.
+
+| check | result |
+|---|---|
+| crate `cargo test --offline --locked --all-features` | EXIT=0 (lib 51, canonical 7, format_marker 6, multi_process 8, one_copy 3) |
+| crate `cargo test --offline --locked` | EXIT=0 (lib 45, canonical 7, format_marker 6, multi_process 7, one_copy 3) |
+| crate `cargo fmt --check`; clippy `--all-targets -D warnings`, all features and default | EXIT=0; EXIT=0, EXIT=0 |
+| epr-cli `--features blob-store` tests `payload`, `artifact`, `peer` | EXIT=0 (11, 6, 29) |
+| epr-cli default features, test `payload` | EXIT=0 (5) |
+| epr-cli clippy `--all-targets -D warnings`, `blob-store` and default | EXIT=0, EXIT=0 |
+| elohim-storage `cargo check --all-targets`; clippy `--all-targets -D warnings` | EXIT=0; EXIT=0 |
+| elohim-storage `--test blob` | EXIT=0 (41 passed, 1 ignored) |
+| elohim-storage `--lib` (full suite, which round 4 skipped) | EXIT=0 (4964 passed, 3 ignored) |
+| Plan V V1 `e4::` (external check) | EXIT=0 (2 passed) |
