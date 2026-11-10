@@ -511,11 +511,28 @@ if _iroh_config_rs.is_file():
             ),
             str(kp.writes),
         )
+        # LIVE TRUTH MOVED 2026-11-08: 2381eb727 brought adam-firstman.yaml, the template's
+        # declared hand-baked twin ("keep this file and the shared storage template in
+        # lockstep"), back to parity, so two manifests now set the knob on purpose. The two
+        # real failures this guarded stay guarded: a write outside this checkout's humans/
+        # manifests (a duplicate checkout leaked into the walk), and manifests that disagree.
+        def _written_value(w):
+            lines = (REPO_ROOT / w.path).read_text(encoding="utf-8").splitlines()
+            following = lines[w.line:w.line + 2] if w.line < len(lines) else []
+            return next((l.split("value:", 1)[1].strip() for l in following if "value:" in l), None)
+
         check(
-            "LIVE: exactly one surface sets it (a second write site means a duplicate "
-            "checkout leaked into the walk, or two manifests disagree)",
-            len(kp.writes) == 1,
+            "LIVE: every surface that sets it is a humans/ k8s manifest in this checkout "
+            "(a write elsewhere means a duplicate checkout leaked into the walk)",
+            all(w.kind == "k8s-env" and w.path.startswith("genesis/orchestrator/manifests/humans/")
+                for w in kp.writes),
             str(kp.writes),
+        )
+        _values = {_written_value(w) for w in kp.writes}
+        check(
+            "LIVE: the manifests that set it agree on its value (twins kept in lockstep)",
+            len(_values) == 1 and None not in _values,
+            str(_values),
         )
         check(
             "LIVE: verdict is 'set' (read by p2p_iroh config, written by the edgenode template)",
