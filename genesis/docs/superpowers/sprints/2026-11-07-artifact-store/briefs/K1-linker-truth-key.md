@@ -1,9 +1,12 @@
 ---
 id: artifact-store-brief-k1-linker-truth-key
-status: accepted
+status: superseded
+superseded_by: host-compatibility-foundation-plan K1
 ---
 
 # Brief K1: the derivation key names the linker that actually links
+
+> **Superseded (2026-11-10)** by item K1 of `genesis/docs/superpowers/plans/2026-11-10-host-compatibility-foundation-plan.md` (steward rulings H1–H7): the derivation input keeps source and cargo configuration only, and host tool identity moves into the method, derived from the build. The evidence below (rust-lld links; `ld` is the probable key-split cause; glibc's `crt1.o`/`Scrt1.o` are the soundness gap) still stands as input to that item; the rulings below do not.
 
 **Why.** F2r's cross-device fetch missed because shem's and ethosengine's keys differ. The F2 method
 and the git-tree view are byte-identical; only `tool:ld` differs (shem `GNU ld version
