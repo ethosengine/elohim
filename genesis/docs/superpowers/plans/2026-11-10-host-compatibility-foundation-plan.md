@@ -206,3 +206,30 @@ Verify: a table of members, sizes and what each carries, in the item's report.
 - [ ] **X2 — open frontier, each a later plan: second architecture (rung H6), the `Wasm` driver (H7), one accelerator axis (H8), the immune loop on two devices (H11), a finding reach narrower than the steward's crossing (review B4), and commons-rung holders for wider reach (review G4)** (serves dataplane-convergence)
 
 Verify: each frontier item has a named home (backlog entry or spec section) before this plan closes.
+
+## Lane R — the reconciliation walk (spec §7.6; appended 2026-11-10)
+
+Appended after lane X so earlier gap ids stay stable. It runs after F3 and V1, beside V and P.
+
+Chain: S4 → spec §7.6 (path, floor, ceiling) → the walk recipe, the berth and bin store, the
+update offer → one walk taken end to end by an agent.
+
+- [ ] **S4 — a story for the update that cannot run here: a device is offered a release one of whose components needs instructions its CPU lacks; it is not offered that variant, stays on what it runs, is told why in plain words, and is shown its path (a compatible variant, a local build, or waiting for one)** (serves workspace-device-arrival)
+
+Verify: `@concern:workspace-device-arrival`; one fresh blind reader returns READY with no correctness finding.
+
+- [ ] **V5 — probation before adoption: a new variant becomes current only after a health window; a death in the window restores the previous variant automatically, records the witness, and withdraws the variant's claim for that host class** (serves dataplane-convergence)
+
+Verify: under emulation, a v3 variant adopted on a v2 host dies with an illegal instruction, the previous variant is running again with no person acting, and the witness names the variant and the ISA clause.
+
+- [ ] **R1 — the update offer filters by admission: an update is presented only when one of its variants is admitted on this device; otherwise the person is told a newer version exists that this device cannot run yet, and why** (serves workspace-device-arrival)
+
+Verify: the S4 scenario passes on the v2 device; the same release is offered normally on the v3 device.
+
+- [ ] **R2 — the walk as a recipe: propose a `host-reconciliation` process specification for `.claude/epr-meta/recipes.yaml` with one stage per step of spec §7.6 (exception, restore, pain, finding, variant, proof, reach) and the floor checks as edge validators; the registry's steward rules before it lands** (serves dataplane-convergence)
+
+Verify: the proposed recipe is in the item's report with each validator named against an existing check or a gap item in this plan; the steward's ruling is recorded as a note on this plan.
+
+- [ ] **R3 — dogfood one walk: an agent takes a real failure (the v3-on-v2 case from K6 or V5) through every step of the recipe, recording each step as a `Process` under it, and stops where a step's gap is still open, naming it** (serves dataplane-convergence)
+
+Verify: `epr flow ledger` on the walk's first record shows the chain of steps taken; the report lists the step where it stopped and the gap item that blocks it.

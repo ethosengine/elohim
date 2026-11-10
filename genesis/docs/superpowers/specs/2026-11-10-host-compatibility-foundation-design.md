@@ -675,6 +675,66 @@ step toward a small seed.
 Open: whether one seed can serve devices too small to build. A phone or a watch cannot develop its
 own variants (§8); a sibling device or a builder does that for it.
 
+### 7.6 The reconciliation walk
+
+§7.4 names the acts. This section names the path an agent walks from one failure to a durable
+reconciliation, so that the network's own adaptation is something an elohim can discover and
+follow, not something a developer re-derives each time. It is the same path a developer walks
+today when they hit a crash, fork, patch, test and send the fix upstream.
+
+The walk does not try to anticipate every failure. It has a small fixed **floor** that costs
+little and stops the cheap mistakes, and an open **ceiling** where judgement handles whatever the
+floor did not foresee.
+
+**The path**, each step an existing record or a gap named in this spec:
+
+| Step | What happens | Record | Gap today |
+|---|---|---|---|
+| 1. Exception | a variant dies, fails a vector, or behaves against its contract | ark `DeathWitness`; a `Dismiss` flow event from a conformance run | the witness does not name the variant or the clause (F3) |
+| 2. Restore | the device returns to its last working variant at once, before any diagnosis | a pin move in the berth and bin store | no probation window: adoption is final on start (V5) |
+| 3. Pain | deaths or restores of one variant are folded against a declared bound | `AlgedonicEvidence` from the fold over a `Bound` on a `Commitment` | no emitter (§9) |
+| 4. Finding | the input that exposes the flaw is captured as a proposed vector | a `Dismiss` event citing the witness, the vector as a resource, an `Intent` on the suite | not signed; not carried between devices (§9) |
+| 5. Variant | a new or adapted variant is built: rakia plans the step, the build closure (lvi's `DevspaceSeed`) supplies the toolchain, `ark task run` executes on a device that admits it | a `Process` with the parent and the vector as inputs; a `Produce` event | rakia has no target field (H10) |
+| 6. Proof | the variant passes the suite including the new vector, on a device of the affected class | a conformance attestation | host class not recorded (V2) |
+| 7. Reach | the repair is appended to the variant set and climbs from private to the steward's devices to wider reach as attestations converge | variant-set append; the reach ladder | no rung narrower than the crossing; no commons rung (§7.2) |
+
+Steps 1 and 2 are owed by every device unconditionally. Steps 3 to 7 are taken by an elohim when
+it judges the failure worth pursuing, and any device may stop after step 2 and stay safe.
+
+**The floor**: protections that are cheap, mechanical, and do not depend on knowing the failure.
+
+1. **Admit before fetch.** Bytes whose requirements this host does not meet are not fetched or
+   started (§3.3).
+2. **Do not offer what cannot run.** An update is presented to the person only when one of its
+   variants is admitted here. Otherwise the person is told a newer version exists that this
+   device cannot run yet, and why.
+3. **Keep the last working variant.** It is held locally and not collected while it is the restore
+   target (§7.4 rule 6).
+4. **Probation before adoption.** A new variant becomes current only after a health window. A death
+   in the window restores the previous variant automatically and records the witness.
+5. **Unknown means refuse.** An axis this device does not know refuses; nothing is guessed.
+6. **Unproven stays private.** A variant with no attestation for a host class is not offered to
+   other devices of that class.
+7. **A claim does not command.** A finding or a disagreeing record narrows what is offered; it does
+   not stop a device running what works (§7.4 rule 4).
+8. **Every step is attributed.** Each record in the path names its signer and what it derives
+   from, so a wrong step can be traced and undone.
+
+None of these requires knowing what went wrong. Each is a check a device can run on its own.
+
+**The ceiling**: everything above the floor is open. The walk names steps, not handlers. An elohim
+facing a failure the floor did not anticipate does not look it up in a table; it follows the path,
+uses the records at each step, and refers to its person or steward where its standing runs out.
+A failure class that recurs is the signal to add a vector to a suite or a clause to an axis,
+which is how the floor itself grows by evidence (§7.4 rule 1).
+
+**Making the walk discoverable.** The path is written as a process specification in the valueflow
+recipe registry (`.claude/epr-meta/recipes.yaml`), beside the development pipeline recipe: one
+stage per step, and the floor checks as the validators on the edges between stages. An agent
+reading the registry finds the walk, its stages and what each edge checks, and each step it
+takes is a `Process` under that specification, so a walk in progress is visible in the fabric's
+lineage like any other work.
+
 ## 8. Local-first reading
 
 Read from the person's side: what works on one device with nothing else reachable.
