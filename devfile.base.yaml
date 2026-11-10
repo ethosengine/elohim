@@ -102,10 +102,14 @@ components:
       # Built via Jenkins (devspaces-udi-plus, devspaces-rust-nix-dev). Image name
       # rust-nix-dev:latest is historical — current source folder is rust-dev/.
       #
-      # The image TAG and the memory/CPU numbers are set by each child (the LAN node
-      # runs the x86-64-v3 build, shem's Sandy Bridge Xeons need the x86-64-v2 build).
-      # This default is what a child gets if it overrides nothing.
-      image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
+      # ONE image for every device, set here and never in a child: the x86-64-v2 flavor
+      # (AlmaLinux 10 base, che-devworkspaces containers/base-developer-v2) runs on shem's
+      # Sandy Bridge Xeons and on the x86-64-v3 LAN node alike. One image means one gcc,
+      # glibc and libgcc, so the devices' build derivation keys agree and each can reuse the
+      # other's artifacts (artifact-store F2r, 2026-11-09: the v3/UBI and v2/Alma images
+      # differed in glibc-devel's crt1.o/Scrt1.o, so every key differed). A child sets only
+      # its memory/CPU envelope, volume size and placement.
+      image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:v2-latest
       memoryLimit: 30Gi
       memoryRequest: 8Gi
       cpuLimit: '10'

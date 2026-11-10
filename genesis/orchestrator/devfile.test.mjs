@@ -23,6 +23,8 @@ test('both workspace children inherit the tools environment and commands', () =>
     const child = read(file);
     assert.match(child.parent.uri, /\/dev\/devfile\.base\.yaml$/);
     assert.equal(child.parent.components?.find(item => item.name === 'tools')?.container.env, undefined);
+    // One image for every device (one toolchain, so build derivation keys agree): only the base sets it.
+    assert.equal(child.parent.components?.find(item => item.name === 'tools')?.container.image, undefined);
     assert.equal(child.parent.commands, undefined);
     assert.equal(child.commands, undefined);
     assert.equal(child.events, undefined);
