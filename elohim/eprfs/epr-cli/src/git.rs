@@ -296,7 +296,9 @@ fn config_env(existing: Option<&str>, root: &Path) -> Vec<(String, String)> {
     ]
 }
 
-fn native_command(cwd: &Path) -> std::process::Command {
+/// A git command with no declared checkout trust: for reads that must see what git itself (and
+/// gitoxide, which never sees this device's declaration) sees.
+pub(crate) fn native_command(cwd: &Path) -> std::process::Command {
     let mut command = std::process::Command::new("git");
     command.current_dir(cwd);
     for key in crate::process::GIT_LOCATION_ENV {

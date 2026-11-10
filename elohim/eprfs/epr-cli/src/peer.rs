@@ -273,14 +273,27 @@ impl ServeLock {
             .create(true)
             .append(true)
             .open(&path)?;
-        match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-            Ok(()) => Ok(ServeLock { _file: file }),
-            Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => {
-                Err(PeerCliError::Serving(path))
+        // A status read (`epr device status`) probes this lock with a momentary shared flock. A
+        // few short retries keep that probe from reading as a live daemon to a starting `serve`;
+        // a real daemon holds it for its whole life, so the retries end in `Serving`.
+        let mut attempts = Self::CONTENDED_RETRIES;
+        loop {
+            match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+                Ok(()) => return Ok(ServeLock { _file: file }),
+                Err(errno) if errno == rustix::io::Errno::WOULDBLOCK && attempts > 0 => {
+                    attempts -= 1;
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => {
+                    return Err(PeerCliError::Serving(path))
+                }
+                Err(errno) => return Err(PeerCliError::Io(errno.into())),
             }
-            Err(errno) => Err(PeerCliError::Io(errno.into())),
         }
     }
+
+    /// Retries of a contended exclusive take before reporting `Serving` (20 ms apart).
+    const CONTENDED_RETRIES: u32 = 5;
 
     /// Whether a daemon holds this device's serve lock now: `Some(true)` when it is held,
     /// `Some(false)` when it is free, `None` when the lock could not be probed. The probe takes
