@@ -115,6 +115,12 @@ DEFAULT_FENCE_MARGIN_S = 30
 DEFAULT_MAX_SKEW_S = 30
 POLL_S = 1.0  # how often a steward claim re-reads the lease view (each read parses the whole flow store)
 PEER_TIMEOUT_S = 10
+# A settle read is never given less than this, even past its deadline: the lease view parses the whole
+# flow store (~0.5 s on 2026-11-10, and growing), so the final read after polling `pending` to the deadline
+# used to get the ~0.4 s left, time out, and refuse the claim even under --offline-ok. A settle loop may
+# therefore overrun its deadline (confirm_wait_s + 1 s grace) by up to this much: ~13 s at the default
+# confirm_wait_s of 10, per loop.
+READ_FLOOR_S = 2.0
 OVERRUN_MEASURE = "dev-berth-held-by-measure@1"
 EVENTS_MEASURE = "dev-berth-events@1"
 # The berth record kinds that cross to the steward's other devices (pool-policy berth.channel.crosses).
@@ -1612,7 +1618,8 @@ class Berth:
 
     def _settle_steward(self, resource, session, lease, offline_ok, renewal=False):
         """The lease is written (it crosses on this device's next head); read the view until it leaves
-        pending, within confirm_wait_s (plus one second's grace; each read is given only the time left).
+        pending, within confirm_wait_s (plus one second's grace; each read is given the time left, never less than
+        READ_FLOOR_S, so the last read is not starved below the view's own cost).
         Effective → claimed, and remembered as effective. held by → refused. unconfirmed → refused;
         offline_ok keeps it unconfirmed and writes the delayed override naming the silent device. A
         refusal releases the lease, so a claim that did not hold never blocks anyone — except that a
@@ -1620,7 +1627,7 @@ class Berth:
         or confirm."""
         deadline = self.now() + self.confirm_wait_s + 1
         while True:
-            view, err = self.peer_leases(timeout=min(PEER_TIMEOUT_S, deadline - self.now()))
+            view, err = self.peer_leases(timeout=min(PEER_TIMEOUT_S, max(READ_FLOOR_S, deadline - self.now())))
             verdict = (view or {}).get(resource)
             kind = verdict.get("verdict") if isinstance(verdict, dict) else None
             left = deadline - self.now()
@@ -1661,7 +1668,7 @@ class Berth:
                 deadline2 = self.now() + self.confirm_wait_s + 1
                 while True:
                     delayed, delayed_err = self.peer_leases(
-                        timeout=min(PEER_TIMEOUT_S, deadline2 - self.now()))
+                        timeout=min(PEER_TIMEOUT_S, max(READ_FLOOR_S, deadline2 - self.now())))
                     delayed_verdict = (delayed or {}).get(resource)
                     delayed_kind = (delayed_verdict.get("verdict")
                                     if isinstance(delayed_verdict, dict) else None)
