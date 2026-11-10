@@ -15,10 +15,13 @@
 //!   a mix of both, or entries that are neither are refused ([`PayloadStoreError::Layout`]).
 //! - **A new directory** (absent, or empty) selects its format before any layout exists:
 //!   [`PayloadFormat::BlobStoreV1`] when this binary is built with feature `blob-store`, else
-//!   [`PayloadFormat::DirectoryV1`]. The marker is staged under a reserved `.STORE-` name in the
-//!   root and hard-linked into place, so two first openers race to one winner and the loser reads
-//!   the winner's marker ([`select_format`]); a crash between the marker and the layout leaves a
-//!   marked, empty store that the next open completes.
+//!   [`PayloadFormat::DirectoryV1`]. A new blob-store directory is claimed by the store's own open,
+//!   which writes the marker before any other file; a new directory-store one by
+//!   [`select_format`]. Both claim through `elohim_blob_store::marker::claim`, the one
+//!   implementation of the marker: it is staged under a reserved `.STORE-` name and hard-linked
+//!   into place, so first openers race to one winner and a loser opens the winner's format. A
+//!   crash between the marker and the layout leaves a marked, empty store that the next open
+//!   completes.
 //!
 //! [`PayloadFormat::BlobStoreV1`] is `elohim-blob-store`'s owner/shared store: `epr peer serve`
 //! opens it as the owner ([`Access::Owner`]), the daemon-down `epr artifact put` as a shared
@@ -27,17 +30,14 @@
 //! `eprfs_peer::open_payload_store`, unchanged.
 
 use std::fmt;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use elohim_blob_store::marker;
 use eprfs_core::{BlobCid, EprfsStorage};
 
 /// The marker's file name, in the payload directory's root.
-pub const MARKER_FILE: &str = "STORE";
-
-/// The reserved prefix of a marker being staged in the root.
-const MARKER_STAGING_PREFIX: &str = ".STORE-";
+pub const MARKER_FILE: &str = marker::FILE;
 
 /// The names a blob-store layout puts in its root.
 const BLOB_STORE_NAMES: [&str; 8] = [
@@ -64,7 +64,7 @@ impl PayloadFormat {
     /// The marker spelling.
     pub const fn marker(self) -> &'static str {
         match self {
-            Self::BlobStoreV1 => "blob-store-v1",
+            Self::BlobStoreV1 => marker::BLOB_STORE_V1,
             Self::DirectoryV1 => "directory-v1",
         }
     }
@@ -207,7 +207,7 @@ fn detect_with(root: &Path, after_marker_read: &dyn Fn()) -> Result<Detected, Pa
     for entry in entries {
         let name = entry.map_err(io_error(root))?.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with(MARKER_STAGING_PREFIX) {
+        if marker::is_staging(&name) {
             // Another opener is selecting the format: it is a new store.
             continue;
         }
@@ -253,60 +253,19 @@ fn detect_with(root: &Path, after_marker_read: &dyn Fn()) -> Result<Detected, Pa
 /// The marker's trimmed content; `None` when there is none. A marker another opener has just
 /// linked is complete (it is written before the link), so an empty one is refused as found.
 fn read_marker(root: &Path) -> Result<Option<String>, PayloadStoreError> {
-    let path = root.join(MARKER_FILE);
-    match std::fs::read(&path) {
-        Ok(bytes) => Ok(Some(String::from_utf8_lossy(&bytes).trim().to_string())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(io_error(&path)(error)),
-    }
+    marker::read(root).map_err(io_error(&root.join(MARKER_FILE)))
 }
 
-/// Select a new payload directory's format: write `wanted`'s marker unless another opener got
-/// there first, and return the marker that won. The marker is staged under a reserved name and
-/// hard-linked to [`MARKER_FILE`] (which fails if it exists), so exactly one opener's marker is
-/// ever installed and it is complete when it appears.
+/// Select a new payload directory's format: claim it for `wanted` unless another opener got
+/// there first, and return the marker that won (`elohim_blob_store::marker::claim`: exactly one
+/// opener's marker is ever installed, and it is complete when it appears).
 ///
 /// # Errors
 ///
 /// [`PayloadStoreError::Io`] when the root or the marker cannot be written.
 pub fn select_format(root: &Path, wanted: PayloadFormat) -> Result<String, PayloadStoreError> {
     create_private_dir(root)?;
-    let target = root.join(MARKER_FILE);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_nanos());
-    let staging = root.join(format!(
-        "{MARKER_STAGING_PREFIX}{}-{nanos}-{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    ));
-    let written = (|| {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&staging)?;
-        file.write_all(format!("{}\n", wanted.marker()).as_bytes())?;
-        file.sync_all()
-    })();
-    if let Err(error) = written {
-        let _ = std::fs::remove_file(&staging);
-        return Err(io_error(&staging)(error));
-    }
-    let linked = std::fs::hard_link(&staging, &target);
-    let _ = std::fs::remove_file(&staging);
-    match linked {
-        Ok(()) => {
-            std::fs::File::open(root)
-                .and_then(|dir| dir.sync_all())
-                .map_err(io_error(root))?;
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-        Err(error) => return Err(io_error(&target)(error)),
-    }
-    read_marker(root)?.ok_or_else(|| PayloadStoreError::Io {
-        path: target,
-        source: std::io::Error::other("the marker vanished after it was selected"),
-    })
+    marker::claim(root, wanted.marker()).map_err(io_error(&root.join(MARKER_FILE)))
 }
 
 /// `root` (and any missing parent) as a directory private to this account (0700).
@@ -368,19 +327,47 @@ async fn open_with(
     access: Access,
     after_marker_read: &dyn Fn(),
 ) -> Result<PayloadStore, PayloadStoreError> {
-    let format = match detect_with(root, after_marker_read)? {
-        Detected::Marked(marker) => linked_format(root, &marker)?,
-        Detected::UnmarkedDirectory => PayloadFormat::DirectoryV1,
-        Detected::New => {
-            linked_format(root, &select_format(root, PayloadFormat::for_new_store())?)?
+    let (format, store) = match detect_with(root, after_marker_read)? {
+        Detected::Marked(marker) => {
+            let format = linked_format(root, &marker)?;
+            (format, open_backend(root, format, access).await?)
         }
+        Detected::UnmarkedDirectory => (
+            PayloadFormat::DirectoryV1,
+            open_backend(root, PayloadFormat::DirectoryV1, access).await?,
+        ),
+        Detected::New => open_new(root, access).await?,
     };
-    let store = open_backend(root, format, access).await?;
     Ok(PayloadStore {
         format,
         root: root.to_path_buf(),
         store,
     })
+}
+
+/// Open a new (absent or empty) payload directory in [`PayloadFormat::for_new_store`]. A blob
+/// store claims its own root as it opens (it writes the marker before any other file), so the
+/// marker is written once. When another first open claimed the root for a different format, the
+/// root opens in the winner's format.
+async fn open_new(
+    root: &Path,
+    access: Access,
+) -> Result<(PayloadFormat, Arc<dyn EprfsStorage>), PayloadStoreError> {
+    let wanted = PayloadFormat::for_new_store();
+    if wanted == PayloadFormat::DirectoryV1 {
+        let format = linked_format(root, &select_format(root, wanted)?)?;
+        return Ok((format, open_backend(root, format, access).await?));
+    }
+    match open_backend(root, wanted, access).await {
+        Ok(store) => Ok((wanted, store)),
+        Err(refused) => match read_marker(root)? {
+            Some(won) if won != wanted.marker() => {
+                let format = linked_format(root, &won)?;
+                Ok((format, open_backend(root, format, access).await?))
+            }
+            _ => Err(refused),
+        },
+    }
 }
 
 async fn open_backend(

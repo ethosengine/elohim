@@ -5,18 +5,32 @@
 //! crate's callers use: [`BlobStore`] is a newtype whose methods delegate to
 //! [`elohim_blob_store::BlobStore`] and return [`StorageError`], mapped from
 //! [`BlobStoreError`] variant for variant (`Internal`, `BlobNotFound`, `HashMismatch`,
-//! `InvalidContentAddress`, `Io`; the owner/shared refusals, which the unlocked `/blob` store
-//! never produces, become `Internal`). The value types re-export unchanged.
+//! `InvalidContentAddress`, `Io`; every other variant becomes `Internal`: the owner/shared
+//! refusals, which the unlocked `/blob` store never produces, and the two it can, `MarkedRoot`
+//! and `PublicationLost`, below). The value types re-export unchanged.
 //!
 //! [`BlobStore::new`] opens the crate's **unlocked** store (no lock files: this process is the
 //! only one on `blobs_dir`), then schedules what the store itself must not know about: the
 //! node-local compute-payload cleanup (`crate::compute_payload_store`), when
 //! `ELOHIM_COMPUTE_LOCAL_API=1`.
 //!
-//! One behaviour differs from the store as it was on dev before the move, by an accepted
-//! correctness fix (artifact-store E4, review round 3 ruling 3): deleting a payload no longer
-//! unlists a unit whose verified bytes remain — an inline object one of the payload's chunks
-//! duplicated stays in `list_servable`. The on-disk representation is unchanged.
+//! Three behaviours differ from the store as it was on dev before the move, each accepted by a
+//! review ruling (artifact-store E4). The on-disk representation is unchanged.
+//!
+//! - **Delete keeps a retained unit listed** (round 3, ruling 3): deleting a payload no longer
+//!   unlists a unit whose verified bytes remain. An inline object that one of the payload's
+//!   chunks duplicated stays in `list_servable`.
+//! - **A resumed stream re-verifies its chunks** (round 4, ruling 4). On dev a stream held the GC
+//!   lock throughout and quarantined a damaged held copy in place. Now a repair releases the
+//!   lock and the stream resumes afterwards. After such a pause, a streamed payload of more than
+//!   one chunk re-hashes every chunk it wrote before writing its layout record and marker. A
+//!   chunk that no longer verifies fails the store with `PublicationLost` (mapped to
+//!   `Internal`), and nothing naming it is written. The re-hash runs before the check for an
+//!   already-held copy. On dev, nothing re-checked a stream's chunks before its marker.
+//! - **A marked root is refused** (round 4, ruling 2): `new` returns `MarkedRoot` (mapped to
+//!   `Internal`), and writes nothing, for a root carrying a `STORE` format marker. Such a root
+//!   belongs to an owner/shared store. `/blob` roots carry no marker, so no deployed root is
+//!   refused.
 //!
 //! See the crate's module docs for the layout, write protocol and read verification.
 
@@ -49,6 +63,8 @@ pub fn storage_error(error: BlobStoreError) -> StorageError {
         | BlobStoreError::SharedInstance { .. }
         | BlobStoreError::HeldCopyUnreadable { .. }
         | BlobStoreError::LegacyLayout { .. }
+        | BlobStoreError::Format { .. }
+        | BlobStoreError::MarkedRoot { .. }
         | BlobStoreError::UnsupportedFilesystem { .. }
         | BlobStoreError::PublicationLost { .. }
         | BlobStoreError::UnsafeRoot { .. }) => StorageError::Internal(other.to_string()),

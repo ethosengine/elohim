@@ -44,10 +44,23 @@ pub enum BlobStoreError {
     #[error("the held copy of {cid} could not be read ({reason}); left for the store's owner")]
     HeldCopyUnreadable { cid: String, reason: String },
 
-    /// An owner or shared open found an inline standalone object (written by the unlocked
-    /// store) in the root: such stores are only ever created fresh. Nothing was written.
-    #[error("the payload store at {} holds a legacy inline object; an owner or shared store is created fresh", path.display())]
+    /// An owner or shared open found a root that is neither empty nor marked
+    /// [`crate::marker::BLOB_STORE_V1`]: a store written before the format marker (the unlocked
+    /// store's representation, a directory store, anything else). Owner and shared stores are
+    /// only ever created fresh, so nothing was written to it.
+    #[error("the payload store at {} holds no {} marker and is not empty; an owner or shared store is created fresh", path.display(), crate::marker::FILE)]
     LegacyLayout { path: PathBuf },
+
+    /// An owner or shared open found a format marker naming another format, or one it could not
+    /// read. Nothing was written.
+    #[error("the payload store marker {} says `{found}`, not `{}`", path.display(), crate::marker::BLOB_STORE_V1)]
+    Format { path: PathBuf, found: String },
+
+    /// [`crate::BlobStore::new`] (the unlocked store) found a format marker in its root: the root
+    /// belongs to an owner/shared store, whose files the unlocked representation must never
+    /// touch. Nothing was written.
+    #[error("the unlocked store does not open {}: it carries a {} marker (`{found}`)", path.display(), crate::marker::FILE)]
+    MarkedRoot { path: PathBuf, found: String },
 
     /// The filesystem refused `link(2)`, the only way an owner or shared store publishes a
     /// chunk file (no rename fallback, which could replace a concurrent winner).

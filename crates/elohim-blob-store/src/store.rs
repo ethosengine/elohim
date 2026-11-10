@@ -32,12 +32,26 @@
 //! the winner's file and dropping its own. A corrupt winner is repaired by the owner under the
 //! exclusive lock and refused by a shared instance. Nothing is ever renamed into `chunks/`: a
 //! filesystem that refuses `link(2)` is refused ([`BlobStoreError::UnsupportedFilesystem`]).
-//! Owner and shared stores are only ever created fresh, so they hold no legacy inline object:
-//! opening a root that holds one is refused ([`BlobStoreError::LegacyLayout`]), writing nothing.
 //!
 //! The unlocked store ([`BlobStore::new`], elohim-storage's `/blob`) keeps the legacy
 //! representation unchanged: a payload of at most one chunk is an inline `blobs/<cid>`, a
 //! larger one has its own chunk files, and nothing is shared between the two.
+//!
+//! ## Which root a store may open: the format marker
+//!
+//! The two representations never share a root, and the format marker `root/STORE`
+//! ([`crate::marker`]) decides which one a root holds. An owner or shared open accepts a root
+//! only when it is empty or absent — and then claims it, writing the `blob-store-v1` marker
+//! before any other file, lock or directory — or when its marker already says `blob-store-v1`.
+//! Any other root (unmarked but not empty, another format, an unreadable marker) is refused
+//! ([`BlobStoreError::LegacyLayout`], [`BlobStoreError::Format`]) before anything is written.
+//! The unlocked store refuses a root that carries any marker ([`BlobStoreError::MarkedRoot`]).
+//! So every file under a marked root's `blobs/` is, by construction, a marker (or the empty
+//! payload's zero-length file): one that is not — unparseable, or under a name that is not a
+//! byte CID filed in its bucket — is corruption. The owner moves it to quarantine (a stray
+//! name at open, under the exclusive lock; a damaged entry when a read or its startup scrub
+//! verifies it); a shared instance leaves it in place and refuses that unit, typed. It is never
+//! read as an inline payload.
 //!
 //! ## Write protocol
 //!
@@ -59,7 +73,7 @@
 //! A root is opened one of three ways:
 //!
 //! - [`BlobStore::new`] — **unlocked**, today's `/blob` store: one process, no lock files.
-//!   It must only be used on a root no other process opens.
+//!   It must only be used on a root no other process opens, and it refuses a marked root.
 //! - [`BlobStore::open_owner`] — the one instance allowed to move or remove files. It holds
 //!   an exclusive, non-blocking `flock` on `owner.lock` for its whole life (a second owner
 //!   gets [`BlobStoreError::OwnerHeld`]).
@@ -532,22 +546,30 @@ impl BlobStore {
     /// Empties `tmp/` (no write is in flight before the store exists) and walks the
     /// payload tree once, on a blocking thread, to seed the running tally; then verifies
     /// what is already on disk in the background ([`BlobStore::scrub`]).
+    ///
+    /// # Errors
+    ///
+    /// [`BlobStoreError::MarkedRoot`], with nothing written, when the root carries a format
+    /// marker: it belongs to an owner/shared store (module docs).
     pub async fn new<P: AsRef<Path>>(root_dir: P) -> Result<Self> {
         Self::open_as(root_dir.as_ref().to_path_buf(), Mode::Unlocked).await
     }
 
     /// Open (or create, private) the **owner** instance at `root`, under the canonical
-    /// one-location rule (module docs): takes `owner.lock`
+    /// one-location rule (module docs): admits the root by its format marker (claiming an
+    /// empty one), takes `owner.lock`
     /// exclusively for this instance's life, sweeps crash residue from `tmp/` under the
-    /// exclusive operation lock (never a staging file a shared writer is about to rename),
-    /// and scrubs in the background. The background scrub keeps the instance, and its lock,
+    /// exclusive operation lock (never a staging file a shared writer is about to rename) and
+    /// quarantines any `blobs/` file not filed under a byte CID, and scrubs in the background. The background scrub keeps the instance, and its lock,
     /// alive until it finishes.
     ///
     /// # Errors
     ///
     /// [`BlobStoreError::OwnerHeld`] when another instance (in any process) owns the root;
     /// [`BlobStoreError::UnsafeRoot`] when the root is a symlink, not a directory, or open
-    /// to group/other.
+    /// to group/other; [`BlobStoreError::LegacyLayout`] for a root that is neither empty nor
+    /// marked, and [`BlobStoreError::Format`] for a marker naming another format or one that
+    /// cannot be read — each before anything is written (module docs).
     pub async fn open_owner<P: AsRef<Path>>(root: P) -> Result<Self> {
         Self::open_as(root.as_ref().to_path_buf(), Mode::Owner).await
     }
@@ -558,7 +580,8 @@ impl BlobStore {
     ///
     /// # Errors
     ///
-    /// [`BlobStoreError::UnsafeRoot`] as for [`BlobStore::open_owner`].
+    /// [`BlobStoreError::UnsafeRoot`], [`BlobStoreError::LegacyLayout`] and
+    /// [`BlobStoreError::Format`] as for [`BlobStore::open_owner`].
     pub async fn open_shared<P: AsRef<Path>>(root: P) -> Result<Self> {
         Self::open_as(root.as_ref().to_path_buf(), Mode::Shared).await
     }
@@ -797,8 +820,18 @@ impl BlobStore {
                 verified.insert(cid);
             }
         }
-        for cid in self.list_cids()? {
-            if !verified.contains(&cid) && self.inner.exists(&cid) == Exists::Verified {
+        for cid in self.payload_names()? {
+            if verified.contains(&cid) {
+                // On an owner or shared store a unit's verified chunk file can sit beside a
+                // damaged `blobs/` entry of the same name: condemn that entry (module docs).
+                if self.inner.canonical()
+                    && matches!(self.inner.read_entry(&cid), Ok(Some(Entry::Damaged { .. })))
+                {
+                    let _ = self.inner.exists(&cid);
+                }
+                continue;
+            }
+            if self.inner.exists(&cid) == Exists::Verified {
                 verified.insert(cid);
             }
         }
@@ -810,6 +843,22 @@ impl BlobStore {
         index.set = verified;
         index.scanning = false;
         Ok(())
+    }
+
+    /// The payload names a scrub verifies: [`BlobStore::list_cids`], and on an owner or shared
+    /// store every byte-CID name under `blobs/` however long, since a zero-length file there is
+    /// corruption to quarantine (module docs), not an unadvertisable payload to skip.
+    fn payload_names(&self) -> Result<Vec<ByteCid>> {
+        if !self.inner.canonical() {
+            return self.list_cids();
+        }
+        let mut cids = Vec::new();
+        walk_fanout(&self.inner.root.join("blobs"), |_, name, _| {
+            if let Ok(cid) = ByteCid::parse(name) {
+                cids.push(cid);
+            }
+        });
+        Ok(cids)
     }
 
     /// The names [`BlobStore::list_units`] would verify, with no byte read: a filename set,
@@ -888,6 +937,12 @@ enum Area {
 enum Entry {
     Inline(Vec<u8>),
     Marker(Cid),
+    /// On an owner or shared store, a file that is neither a marker nor the empty payload:
+    /// corruption, never an inline payload (module docs). `len` is its length.
+    Damaged {
+        len: u64,
+        reason: String,
+    },
 }
 
 /// How many times a read re-reads a payload a writer changed under it.
@@ -915,25 +970,19 @@ enum Settled {
     Refused(BlobStoreError),
 }
 
-/// Create `root` private (0700, with any missing parents) if absent, then refuse a root
-/// that is not a real directory or that group/other may enter — the same refusal
-/// eprfs-storage's `DirectoryStorage::open` makes for the directory format.
-fn prepare_private_root(root: &Path) -> Result<()> {
-    let mut builder = fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
-    if fs::symlink_metadata(root).is_err() {
-        builder.create(root)?;
-    }
+/// Refuse a root that is not a real directory or that group/other may enter — the same refusal
+/// eprfs-storage's `DirectoryStorage::open` makes for the directory format. Writes nothing; an
+/// absent root passes (it is created private).
+fn check_private_root(root: &Path) -> Result<()> {
+    let metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
     let refused = |reason: &str| BlobStoreError::UnsafeRoot {
         root: root.to_path_buf(),
         reason: reason.to_string(),
     };
-    let metadata = fs::symlink_metadata(root)?;
     if metadata.file_type().is_symlink() {
         return Err(refused("it is a symlink"));
     }
@@ -947,36 +996,140 @@ fn prepare_private_root(root: &Path) -> Result<()> {
             return Err(refused("it permits group/other access"));
         }
     }
-    for area in AREAS {
-        builder.create(root.join(area))?;
-    }
     Ok(())
 }
 
-/// An owner or shared store holds no inline standalone object: every `blobs/` entry is a
-/// marker (or the empty payload's zero-length file, or a damaged file left for verification). A root that holds one was written by the
-/// unlocked store, and is refused before anything is created or moved.
-fn refuse_legacy_layout(root: &Path) -> Result<()> {
-    let empty = compute_bytes_cid(&[]).to_string();
-    let mut legacy = None;
-    walk_fanout(&root.join("blobs"), |path, name, len| {
-        if legacy.is_some() || (len == 0 && name == empty) {
-            return;
-        }
-        // A legacy inline object is whole bytes filed under their own CID. A marker is not, and
-        // neither is a damaged file (verification finds and quarantines that one later).
-        let inline = fs::read(path).is_ok_and(|bytes| {
-            !(bytes.len() == MARKER_LEN && bytes.starts_with(MARKER_MAGIC))
-                && compute_bytes_cid(&bytes).to_string() == name
-        });
-        if inline {
-            legacy = Some(path.to_path_buf());
-        }
-    });
-    match legacy {
-        Some(path) => Err(BlobStoreError::LegacyLayout { path }),
-        None => Ok(()),
+/// A directory builder for private (0700) directories, with any missing parents.
+fn private_dirs() -> fs::DirBuilder {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
     }
+    builder
+}
+
+/// The root's format marker, as an owner or shared open reads it: an unreadable marker is a
+/// [`BlobStoreError::Format`] refusal, never absence.
+fn read_store_marker(root: &Path) -> Result<Option<String>> {
+    crate::marker::read(root).map_err(|error| BlobStoreError::Format {
+        path: root.join(crate::marker::FILE),
+        found: format!("<unreadable: {error}>"),
+    })
+}
+
+/// `Ok` only for the marker this store's format writes.
+fn expect_blob_store_v1(root: &Path, found: String) -> Result<()> {
+    if found == crate::marker::BLOB_STORE_V1 {
+        Ok(())
+    } else {
+        Err(BlobStoreError::Format {
+            path: root.join(crate::marker::FILE),
+            found,
+        })
+    }
+}
+
+/// Admit `root` for an owner or shared open (module docs): marked `blob-store-v1`, or empty (or
+/// absent) and then claimed by writing the marker before anything else. Every refusal comes
+/// before any write.
+fn admit_canonical_root(root: &Path) -> Result<()> {
+    check_private_root(root)?;
+    if let Some(found) = read_store_marker(root)? {
+        return expect_blob_store_v1(root, found);
+    }
+    match fs::read_dir(root) {
+        Ok(entries) => {
+            for entry in entries {
+                let name = entry?.file_name();
+                if crate::marker::is_staging(&name.to_string_lossy()) {
+                    // Another first open's claim in flight.
+                    continue;
+                }
+                // A first open writes its marker before any other file, so content without a
+                // marker is either a claim that has just landed or a root this format never
+                // wrote: look once more.
+                return match read_store_marker(root)? {
+                    Some(found) => expect_blob_store_v1(root, found),
+                    None => Err(BlobStoreError::LegacyLayout {
+                        path: root.to_path_buf(),
+                    }),
+                };
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    private_dirs().create(root)?;
+    check_private_root(root)?;
+    let won = crate::marker::claim(root, crate::marker::BLOB_STORE_V1)?;
+    expect_blob_store_v1(root, won)
+}
+
+/// The unlocked store's refusal of a marked root: it must never write its representation into
+/// an owner/shared store's root (module docs).
+fn refuse_marked_root(root: &Path) -> Result<()> {
+    let found = match crate::marker::read(root) {
+        Ok(None) => return Ok(()),
+        Ok(Some(found)) => found,
+        Err(error) => format!("<unreadable: {error}>"),
+    };
+    Err(BlobStoreError::MarkedRoot {
+        path: root.join(crate::marker::FILE),
+        found,
+    })
+}
+
+/// Under an owner's exclusive lock at open: move every `blobs/` file that is not a byte CID
+/// filed in its own bucket to quarantine. In a marked root such a file can only be corruption
+/// (module docs); nothing would ever read or list it.
+fn quarantine_stray_blob_names(root: &Path) -> Result<()> {
+    let blobs = root.join("blobs");
+    let mut stray = Vec::new();
+    let Ok(top) = fs::read_dir(&blobs) else {
+        return Ok(());
+    };
+    for entry in top.flatten() {
+        let path = entry.path();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if !kind.is_dir() {
+            stray.push(path);
+            continue;
+        }
+        let Ok(files) = fs::read_dir(&path) else {
+            continue;
+        };
+        for file in files.flatten() {
+            let name = file.file_name().to_string_lossy().into_owned();
+            let filed = ByteCid::parse(&name).is_ok() && fanout_path(&blobs, &name) == file.path();
+            if !filed {
+                stray.push(file.path());
+            }
+        }
+    }
+    for (i, path) in stray.iter().enumerate() {
+        let dir = root
+            .join("quarantine")
+            .join(format!("unnamed-{}-{i}", now_micros()));
+        fs::create_dir_all(&dir)?;
+        fs::write(
+            dir.join("reason"),
+            format!(
+                "{} is not a byte cid filed in its blobs/ bucket",
+                path.display()
+            ),
+        )?;
+        fs::rename(path, dir.join("0-blobs-entry"))?;
+        warn!(path = %path.display(), "stray blobs/ entry quarantined");
+    }
+    if !stray.is_empty() {
+        File::open(root.join("quarantine"))?.sync_all()?;
+    }
+    Ok(())
 }
 
 /// Open (creating it, private, if absent; never truncating or recreating it) a lock file.
@@ -1011,6 +1164,7 @@ impl Inner {
     fn open(root: PathBuf, mode: Mode) -> Result<Self> {
         let coord = match mode {
             Mode::Unlocked => {
+                refuse_marked_root(&root)?;
                 for dir in AREAS {
                     fs::create_dir_all(root.join(dir))?;
                 }
@@ -1020,8 +1174,10 @@ impl Inner {
                 Coordination::unlocked()
             }
             Mode::Owner | Mode::Shared => {
-                refuse_legacy_layout(&root)?;
-                prepare_private_root(&root)?;
+                admit_canonical_root(&root)?;
+                for area in AREAS {
+                    private_dirs().create(root.join(area))?;
+                }
                 let owner = if mode == Mode::Owner {
                     let file = open_lock_file(&root.join(OWNER_LOCK))?;
                     match file.try_lock() {
@@ -1049,8 +1205,9 @@ impl Inner {
             // Exclusive: no shared writer's staging file is in flight while it is swept.
             let _sweeping = coord.destruction("sweep staging")?;
             sweep_staging(&root);
+            quarantine_stray_blob_names(&root)?;
         }
-        let seeded = scan_blob_tree(&root);
+        let seeded = scan_blob_tree(&root, mode != Mode::Unlocked);
         Ok(Self {
             root,
             tally: BlobTally::seeded(seeded),
@@ -1662,7 +1819,7 @@ impl Inner {
             // A failed read is not evidence of absence.
             Err(error) => return Err(error.into()),
         };
-        Ok(Some(classify(cid, bytes)))
+        Ok(Some(classify(cid, bytes, self.canonical())))
     }
 
     /// Load the layout record the marker names, refusing a substituted one.
@@ -1717,6 +1874,7 @@ impl Inner {
         };
         let data = match entry {
             Entry::Inline(data) => data,
+            Entry::Damaged { reason, .. } => return Err(ReadFailure::Structural(reason)),
             Entry::Marker(bound) => {
                 let chunks = match self.read_layout(cid, &bound) {
                     Ok(chunks) => chunks,
@@ -1924,6 +2082,7 @@ impl Inner {
         match self.read_entry(cid)? {
             None => Err(BlobStoreError::BlobNotFound(cid.to_string())),
             Some(Entry::Inline(data)) => Ok(data.len() as u64),
+            Some(Entry::Damaged { reason, .. }) => Err(self.refuse(cid, &reason)),
             Some(Entry::Marker(bound)) => self
                 .read_layout(cid, &bound)
                 .map(|chunks| chunks.iter().map(|c| u64::from(c.len)).sum())
@@ -1984,6 +2143,7 @@ impl Inner {
                     Verdict::Defect(format!("inline bytes hash to {actual}"))
                 }
             }
+            Entry::Damaged { reason, .. } => Verdict::Defect(reason),
             // One read of the layout record: its bytes are checked against the marker's
             // binding below, never re-read, so a transient error cannot arrive between
             // an existence check and a decode and be mistaken for a defect.
@@ -2046,6 +2206,7 @@ impl Inner {
         let _stripe = self.stripe(cid);
         match self.read_entry(cid) {
             Ok(Some(Entry::Inline(_))) => true,
+            Ok(Some(Entry::Damaged { .. })) => false,
             Ok(Some(Entry::Marker(bound))) => self.read_layout(cid, &bound).is_ok_and(|chunks| {
                 chunks
                     .iter()
@@ -2146,6 +2307,7 @@ impl Inner {
     fn footprint(&self, cid: &ByteCid) -> Option<Footprint> {
         match self.read_entry(cid).ok()?? {
             Entry::Inline(data) => Some(Footprint::inline(data.len() as u64)),
+            Entry::Damaged { len, .. } => Some(Footprint::inline(len)),
             Entry::Marker(bound) => Some(Footprint::chunked(
                 self.read_layout(cid, &bound)
                     .map(|chunks| chunks.iter().map(|c| u64::from(c.len)).sum())
@@ -2323,10 +2485,26 @@ impl Inner {
     }
 }
 
-/// Classify a `blobs/` file. A marker is exactly [`MARKER_LEN`] bytes, starts with
-/// [`MARKER_MAGIC`] and does not itself hash to the CID it is filed under (an inline
-/// payload whose bytes happen to look like a marker does).
-fn classify(cid: &ByteCid, bytes: Vec<u8>) -> Entry {
+/// Classify a `blobs/` file. On an owner or shared store (`canonical`) every such file is a
+/// marker or the empty payload's zero-length file, so anything else is [`Entry::Damaged`]. On
+/// the unlocked store a marker is exactly [`MARKER_LEN`] bytes, starts with [`MARKER_MAGIC`]
+/// and does not itself hash to the CID it is filed under (an inline payload whose bytes happen
+/// to look like a marker does).
+fn classify(cid: &ByteCid, bytes: Vec<u8>, canonical: bool) -> Entry {
+    if canonical {
+        if bytes.is_empty() && *cid == compute_bytes_cid(&[]) {
+            return Entry::Inline(bytes);
+        }
+        if bytes.len() == MARKER_LEN && bytes.starts_with(MARKER_MAGIC) {
+            if let Ok(layout) = Cid::try_from(&bytes[MARKER_MAGIC.len()..]) {
+                return Entry::Marker(layout);
+            }
+        }
+        return Entry::Damaged {
+            len: bytes.len() as u64,
+            reason: format!("blobs/ entry is not a marker ({} bytes)", bytes.len()),
+        };
+    }
     if bytes.len() == MARKER_LEN && bytes.starts_with(MARKER_MAGIC) {
         if let Ok(layout) = Cid::try_from(&bytes[MARKER_MAGIC.len()..]) {
             if &compute_bytes_cid(&bytes) != cid {
@@ -2366,7 +2544,7 @@ fn walk_fanout(root: &Path, mut visit: impl FnMut(&Path, &str, u64)) {
 
 /// Walk `blobs/` once (at open) for the tally: every parseable payload counts; a marker
 /// counts its layout record's length.
-fn scan_blob_tree(root: &Path) -> StorageStats {
+fn scan_blob_tree(root: &Path, canonical: bool) -> StorageStats {
     let mut stats = StorageStats::default();
     let index = root.join("index");
     walk_fanout(&root.join("blobs"), |path, name, len| {
@@ -2374,7 +2552,7 @@ fn scan_blob_tree(root: &Path) -> StorageStats {
             return;
         };
         let footprint = if len == MARKER_LEN as u64 {
-            match fs::read(path).map(|bytes| classify(&cid, bytes)) {
+            match fs::read(path).map(|bytes| classify(&cid, bytes, canonical)) {
                 Ok(Entry::Marker(_)) => Footprint::chunked(
                     fs::read(index.join(name))
                         .ok()
@@ -3881,6 +4059,55 @@ mod tests {
             assert!(tmp_is_empty(&dir), "the staging file was dropped");
             assert_eq!(store.exists(&cid).await, Exists::Absent);
         }
+    }
+
+    /// Review round 4, ruling 4: the accepted strictness change that reaches the unlocked store
+    /// (`BlobStore::new`). A streamed multi-chunk payload whose publication paused for a repair
+    /// re-hashes every chunk before it writes a layout record or marker, and fails typed when one
+    /// is gone, rather than naming bytes the store no longer holds.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_unlocked_store_fails_a_resumed_stream_whose_chunk_left_typed() {
+        let dir = TempDir::new().unwrap();
+        let store = Arc::new(BlobStore::new(dir.path()).await.unwrap());
+        let payload = chunked_payload();
+        let stored = store.store(&payload).await.unwrap();
+        assert!(stored.chunks.len() > 1);
+        let lost = stored.chunks[1].cid;
+        // P's entry is damaged, so streaming P again repairs it, releasing the GC lock.
+        fs::write(
+            dir.path().join("index").join(stored.cid.to_string()),
+            b"not the bound record",
+        )
+        .unwrap();
+        let gate = Arc::new(DamageGate::default());
+        faults(&store).repair_gap = Some(gate.clone());
+        let stream = {
+            let (store, payload) = (store.clone(), payload.clone());
+            tokio::spawn(async move { store.store_stream(std::io::Cursor::new(payload)).await })
+        };
+        {
+            let gate = gate.clone();
+            tokio::task::spawn_blocking(move || gate.wait_arrived())
+                .await
+                .unwrap();
+        }
+        // In the gap, one of the chunks the stream already placed leaves the store.
+        let chunk = fanout_path(&dir.path().join("chunks"), &lost.to_string());
+        fs::remove_file(&chunk).unwrap();
+        gate.release();
+        match stream.await.unwrap() {
+            Err(BlobStoreError::PublicationLost { cid, .. }) => {
+                assert_eq!(cid, stored.cid.to_string())
+            }
+            other => panic!(
+                "a resumed stream named a lost chunk: {:?}",
+                other.map(|s| s.cid)
+            ),
+        }
+        assert!(
+            !fanout_path(&dir.path().join("blobs"), &stored.cid.to_string()).exists(),
+            "no marker names the lost chunk"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
