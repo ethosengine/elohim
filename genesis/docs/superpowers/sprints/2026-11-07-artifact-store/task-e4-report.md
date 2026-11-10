@@ -3,7 +3,7 @@ id: artifact-store-task-e4-report
 status: claimed-not-verified
 landed_commit:
 verified_by:
-concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
+concerns: [R4-integrity-class, review-fixes-1-4, review-round-2-A-E, review-round-3-link-only-and-stream-revalidation, orphan-retention-frontier, lock-acquisition-deadline-frontier, store.rs-over-soft-LoC-ceiling, no-CI-home-for-the-new-crate's-tests, licence-of-the-moved-code]
 actor: agent:e4@claude-opus-5-5 (Claude Opus 5.5, session f1769d1c)
 ---
 
@@ -300,15 +300,20 @@ registry.
   `hc-mesh.sh:4779-4815`, and the restart overlay, `:4136-4159`); migrate unmarked directories.
   Migration must also decide the one ambiguity this slice leaves: an existing *empty* directory
   is treated as new, so with the feature on an older, marker-unaware epr could still write flat
-  objects into a directory a newer one marked `blob-store-v1`.
+  objects into a directory a newer one marked `blob-store-v1`. Since round 3, `open_owner` and
+  `open_shared` refuse a root that holds legacy inline objects (`LegacyLayout`), so a legacy root
+  reaches the owner/shared store only through an explicit migration. Nothing adopts one in place.
 - **Iroh index without a copy** (`an_iroh_index_references_a_tier_payload_and_never_copies_it`):
   tied to the R1.4 / FsStore ruling; vacuous until iroh reads the tier.
 - **`epr peer status` prints the format** (deviation 5).
 - **CI home for the crate's tests.** The new gate project runs them locally; no Jenkinsfile runs
   them (Jenkinsfiles are KEEP for this sprint). Candidate: the epr pipeline, beside
   `elohim-address`.
-- **`store.rs` is 3179 lines**, over the 3000-line soft ceiling (about 1060 are tests); moving the
-  test module to a sibling file is a bounded follow-up.
+- **`store.rs` is 3934 lines** after round 3, over the 3000-line soft ceiling (the test module
+  is most of the growth). Moving the test module to a sibling file is a bounded follow-up.
+- **Orphan retention after a crash** (review round 3, ruling 4). A crash before the index or the
+  marker is published leaves an unreferenced chunk or an orphan index. Startup collects neither,
+  and delete finds chunks only through markers. This leaks retention but loses no correctness.
 - **No owner, no maintenance** (documented): corrupt objects and unreferenced chunks wait for an
   owner. `flock` grants no writer preference, so a continuous stream of shared publications can
   delay an owner's exclusive act. An owner's startup scrub keeps `owner.lock` until it finishes.
@@ -527,3 +532,109 @@ One cargo at a time, `TMPDIR=/projects/.claude-config/tmp/gate-e4`, each judged 
   EXIT=0 (4963 passed, 3 ignored), on the unlocked store's restored legacy representation.
 - No `allow`/`expect` attribute was added. `crates/elohim-blob-store/Cargo.toml` gained only the
   dev-dependency tokio feature `sync`, for the race test's barrier; the lockfile is unchanged.
+
+## Review fixes, round 3 (astra's second re-review, `genesis/local-dev/as-e4/e4-rereview2.receipt.md`)
+
+Verdict FIX FIRST: D was fixed; A, B and C were partial; there were three majors and two
+mediums. Round 2 is now `55b706e10` (code) and `0203a9391` (report) after the rebase onto dev
+`4b1cf33b0`. Round 3 is `d89615cca` (code) and this section.
+
+**Ruling 1 — the legacy-adoption path is deleted** (defects 1, 2 and 4). Owner and shared stores
+are only ever created fresh (a `blob-store-v1` root), so they never legitimately hold a legacy
+inline object.
+
+Round 2's text above on filesystems that refuse links, inline retirement and hard-link adoption
+is superseded by this ruling.
+
+- **Removed code:**
+  - inline → `chunks/` hard-link adoption;
+  - the copy fallback and its in-memory retirement queue (`retire_copied_inline`,
+    `Inner::retire_inline`);
+  - the inline read fallback (`read_unit`/`unit_len` read `chunks/` only);
+  - quarantine's legacy-link branch;
+  - delete's canonical inline relocation and linked-name cleanup.
+- **Legacy roots are refused:** `open_owner`/`open_shared` reject a root whose `blobs/` holds
+  anything but markers (or the empty payload's zero-length file) with the typed
+  `BlobStoreError::LegacyLayout { path }`. The check runs before any directory, lock file or
+  layout is created, so nothing is written or moved.
+- **Publication is link-only:** a chunk file is published only by `link(2)` from a verified,
+  fsynced staging file, with no replace and no rename fallback anywhere.
+  - Any link failure but `EEXIST` is the typed `BlobStoreError::UnsupportedFilesystem`.
+  - A failure after a successful link (the directory fsync) is an I/O error with the link left
+    in place. Nothing renames over it; the next store finds and verifies it.
+  - `EEXIST` keeps the verify-winner path: the owner repairs a corrupt winner under the
+    exclusive lock, and a shared instance refuses.
+
+**Ruling 2 — a resumed stream revalidates or republishes before any marker** (defect 3).
+`store_stream`'s final loop rechecks every chunk it will name on each pass, under the
+publication it holds at that moment, before any layout record or marker is written.
+- A single-chunk payload's bytes are still in memory, so they are republished through
+  `put_chunk_resuming` (link, or verify the winner). This now applies to single-chunk streams
+  too.
+- A larger payload's chunks are no longer in memory. After a pause they are each re-hashed, and
+  one that no longer verifies fails the store with the typed
+  `BlobStoreError::PublicationLost { cid, reason }`.
+- A repair releases the publication, so the loop runs again after it. A marker is written only
+  under a publication taken after its chunk was verified.
+
+**Ruling 3 — B amended, accepted.** D's servable-index change also reaches `BlobStore::new`:
+deleting a payload no longer unlists a retained inline unit. This is now documented in the
+shim's module docs and asserted by
+`canonical::the_unlocked_store_keeps_a_retained_inline_unit_listed_after_a_delete`. Everything
+else about `new()` is as on dev.
+
+**Ruling 4 — frontier: orphan retention after a crash before marker or index publication**
+(defect 5). A crash before the index is published leaves an unreferenced chunk. A crash after
+the index but before the marker leaves an orphan index that pins its chunks. Startup collects
+neither, and delete finds chunks only through markers. This is a pre-existing retention leak,
+with no correctness loss: nothing unverified is served, and nothing referenced is lost. It is not
+fixed this round.
+
+**Ruling 5 — the race test can fail** (test-only hooks, `store::tests`).
+
+| test | on the earlier logic | now |
+|---|---|---|
+| `racing_publications_of_one_chunk_through_two_instances_hold_one_inode`: two `open_shared` instances; a `std::sync::Barrier` holds both writers after their absence checks and before publication, then releases them together; 20 rounds; distinct `(dev, ino)` across `blobs/` and `chunks/` must be 1 | fails, EXIT=101: "round 0: one physical copy of C", left 2, right 1 (round-1 logic, `3385bf5b`, barrier at its absence-check → write points) | passes |
+| `a_corrupt_winner_is_repaired_by_the_owner_and_refused_by_a_shared_instance`: a corrupt file takes the name between the writer's absence check and its link | — | passes |
+| `a_refused_link_is_a_typed_error_and_renames_nothing`: injected `link` refusal, standalone and multi-chunk; `UnsupportedFilesystem`, empty `blobs/`, `chunks/` and `tmp/` | — | passes |
+| `a_resumed_single_chunk_stream_never_publishes_a_marker_for_collected_bytes`: C's entry damaged, the stream held in its repair-to-resume gap, P deleted there (C's chunk collected), then released; it must republish C or fail typed | fails, EXIT=101: the stream returned `Ok` and C's chunk file was gone (`NotFound` at the republished assertion) (round-2 logic, `55b706e10`, same gap hook) | passes |
+| `canonical::an_owner_or_shared_open_refuses_a_legacy_layout_and_writes_nothing` (replaces the hard-link adoption test) | — | passes |
+
+The failing-first runs used scratch copies of the crate at the earlier commits, with the same
+hook added at the matching point and the test appended. Those copies are not part of the branch.
+
+### External check: Plan V's V1 E4 cases against round 3
+
+Plan V's own E4 cases (`artifact-store/v`, `crates/elohim-fetch/tests/engine.rs`, `e4::`)
+were run against this crate from a scratch copy of `elohim-fetch` with a path override, in its own
+target directory. Nothing was committed on their branch. With `--all-features`:
+`e4::e4s_store_passes_every_v1_case_over_one_root` ok, and
+`e4::concurrent_arrivals_through_owner_and_shared_handles_keep_one_physical_copy` ok (2 passed,
+EXIT=0). The test prints one line per copy of each CID. There were 104 lines across 21 store roots,
+and every one is a single file under `chunks/` with one `(dev, ino)` per CID per root, so there is
+no second copy and nothing outside `chunks/`. Per the orchestrator's update, Plan V now counts by
+content, so this is a cross-check rather than a defect probe.
+
+### Verification after round 3
+
+Run one at a time on toolchain 1.96.1, with `TMPDIR` outside `/tmp`. Each verdict is cargo's
+own exit status.
+
+| check | result |
+|---|---|
+| crate `cargo fmt --check` | EXIT=0 |
+| crate `cargo test --offline --locked --all-features` | EXIT=0 (lib 47, canonical 8, multi_process 8, one_copy 3) |
+| crate `cargo test --offline --locked` | EXIT=0 (lib 41, canonical 8, multi_process 7, one_copy 3) |
+| crate clippy `--all-targets -D warnings`, all features and default | EXIT=0, EXIT=0 |
+| epr-cli `--features blob-store` tests `payload`, `artifact`, `peer` | EXIT=0 |
+| epr-cli clippy `--features blob-store --all-targets -D warnings` | EXIT=0 |
+| elohim-storage `cargo check --all-targets` | EXIT=0 |
+| elohim-storage `--test blob` | EXIT=0 (41 passed, 1 ignored) |
+| elohim-storage `--lib` | EXIT=0 (4963 passed, 3 ignored) |
+| Plan V V1 `e4::` (external check) | EXIT=0 (2 passed) |
+
+The first crate test run in this round failed (EXIT=101) in
+`multi_process::a_shared_instance_never_moves_a_file`. The legacy check had classed a corrupted
+marker as a legacy inline object. The check now flags a file only when it is not a marker and its
+bytes hash to its own name; a damaged file is still left for verification to quarantine. The
+crate rows above are from the rerun after that change.
