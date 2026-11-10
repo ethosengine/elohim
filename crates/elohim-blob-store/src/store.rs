@@ -26,14 +26,14 @@
 //! On an owner or shared store every byte CID's bytes live at exactly one path,
 //! `chunks/<cid>`, whether the CID arrived as a standalone object or as a chunk of a larger
 //! payload; a standalone object is a one-chunk layout record and a marker naming that file.
-//! Chunk files are published by linking a verified staging file into place without replacing
-//! (`link(2)` fails when the name exists), so concurrent arrivals — in one process or several,
-//! for one payload or for distinct payloads sharing a chunk — converge on one file: the loser
-//! verifies the winner's file and drops its own. An inline `blobs/<cid>` written by an older
-//! store stays readable; when its CID is needed as a chunk it is hard-linked into
-//! `chunks/<cid>` (one inode), or, where the filesystem refuses links, copied and the inline
-//! file retired under the exclusive lock. Owner and shared instances never write a new inline
-//! copy.
+//! Chunk files are published only by linking a verified staging file into place (`link(2)`,
+//! which fails when the name exists): concurrent arrivals — in one process or several, for one
+//! payload or for distinct payloads sharing a chunk — converge on one file, the loser verifying
+//! the winner's file and dropping its own. A corrupt winner is repaired by the owner under the
+//! exclusive lock and refused by a shared instance. Nothing is ever renamed into `chunks/`: a
+//! filesystem that refuses `link(2)` is refused ([`BlobStoreError::UnsupportedFilesystem`]).
+//! Owner and shared stores are only ever created fresh, so they hold no legacy inline object:
+//! opening a root that holds one is refused ([`BlobStoreError::LegacyLayout`]), writing nothing.
 //!
 //! The unlocked store ([`BlobStore::new`], elohim-storage's `/blob`) keeps the legacy
 //! representation unchanged: a payload of at most one chunk is an inline `blobs/<cid>`, a
@@ -409,9 +409,6 @@ struct Inner {
     coord: Coordination,
     /// CIDs this store has verified and not since lost (see [`ServableIndex`]).
     servable: Mutex<ServableIndex>,
-    /// Legacy inline objects copied into `chunks/` where the filesystem refused a hard link;
-    /// each is retired (made a marker) under the exclusive lock once its publication ends.
-    retire_inline: Mutex<std::collections::HashSet<ByteCid>>,
     #[cfg(test)]
     faults: Mutex<tests::Faults>,
 }
@@ -956,6 +953,32 @@ fn prepare_private_root(root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// An owner or shared store holds no inline standalone object: every `blobs/` entry is a
+/// marker (or the empty payload's zero-length file, or a damaged file left for verification). A root that holds one was written by the
+/// unlocked store, and is refused before anything is created or moved.
+fn refuse_legacy_layout(root: &Path) -> Result<()> {
+    let empty = compute_bytes_cid(&[]).to_string();
+    let mut legacy = None;
+    walk_fanout(&root.join("blobs"), |path, name, len| {
+        if legacy.is_some() || (len == 0 && name == empty) {
+            return;
+        }
+        // A legacy inline object is whole bytes filed under their own CID. A marker is not, and
+        // neither is a damaged file (verification finds and quarantines that one later).
+        let inline = fs::read(path).is_ok_and(|bytes| {
+            !(bytes.len() == MARKER_LEN && bytes.starts_with(MARKER_MAGIC))
+                && compute_bytes_cid(&bytes).to_string() == name
+        });
+        if inline {
+            legacy = Some(path.to_path_buf());
+        }
+    });
+    match legacy {
+        Some(path) => Err(BlobStoreError::LegacyLayout { path }),
+        None => Ok(()),
+    }
+}
+
 /// Open (creating it, private, if absent; never truncating or recreating it) a lock file.
 fn open_lock_file(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
@@ -997,6 +1020,7 @@ impl Inner {
                 Coordination::unlocked()
             }
             Mode::Owner | Mode::Shared => {
+                refuse_legacy_layout(&root)?;
                 prepare_private_root(&root)?;
                 let owner = if mode == Mode::Owner {
                     let file = open_lock_file(&root.join(OWNER_LOCK))?;
@@ -1033,7 +1057,6 @@ impl Inner {
             stripes: (0..MUTATION_STRIPES).map(|_| Mutex::new(())).collect(),
             coord,
             servable: Mutex::new(ServableIndex::default()),
-            retire_inline: Mutex::new(std::collections::HashSet::new()),
             #[cfg(test)]
             faults: Mutex::new(tests::Faults::default()),
         })
@@ -1095,33 +1118,16 @@ impl Inner {
         fanout_path(&self.root.join("chunks"), &cid.to_string())
     }
 
-    /// One unit's bytes, wherever its one copy is: `chunks/<cid>`, else an inline payload
-    /// `blobs/<cid>` (a standalone object a payload reuses as its chunk). Not verified here.
+    /// A chunk's bytes, from `chunks/<cid>`. Not verified here.
     fn read_unit(&self, cid: &ByteCid) -> io::Result<Vec<u8>> {
-        if !self.canonical() {
-            return fs::read(self.chunk_path(cid));
-        }
-        match fs::read(self.chunk_path(cid)) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                match self.read_entry(cid).map_err(io::Error::other)? {
-                    Some(Entry::Inline(data)) => Ok(data),
-                    _ => Err(error),
-                }
-            }
-            other => other,
-        }
+        fs::read(self.chunk_path(cid))
     }
 
-    /// A unit's length on disk, wherever its one copy is; `None` when it is held nowhere.
+    /// A chunk file's length; `None` when there is none.
     fn unit_len(&self, cid: &ByteCid) -> Option<u64> {
-        match fs::metadata(self.chunk_path(cid)) {
-            Ok(meta) => Some(meta.len()),
-            Err(_) if !self.canonical() => None,
-            Err(_) => match self.read_entry(cid) {
-                Ok(Some(Entry::Inline(data))) => Some(data.len() as u64),
-                _ => None,
-            },
-        }
+        fs::metadata(self.chunk_path(cid))
+            .ok()
+            .map(|meta| meta.len())
     }
 
     /// Whether `chunks/<cid>` holds exactly the bytes `cid` names.
@@ -1129,24 +1135,21 @@ impl Inner {
         fs::read(self.chunk_path(cid)).is_ok_and(|held| &compute_bytes_cid(&held) == cid)
     }
 
-    /// Whether `blobs/<cid>` is an inline payload of exactly the bytes `cid` names.
-    fn inline_holds(&self, cid: &ByteCid) -> bool {
-        matches!(self.read_entry(cid), Ok(Some(Entry::Inline(data))) if &compute_bytes_cid(&data) == cid)
-    }
-
     /// Link `src` to `dest` without replacing anything, making `dest`'s bucket durable first
-    /// and its directory entry durable after. `Ok(false)` when `dest` already exists.
-    fn link_into(&self, src: &Path, dest: &Path) -> io::Result<bool> {
+    /// and its directory entry durable after. `Ok(false)` when `dest` already exists. A link
+    /// the filesystem refuses is [`BlobStoreError::UnsupportedFilesystem`]; a failure after the
+    /// link (the directory fsync) is an I/O error with the link in place — the next store finds
+    /// and verifies it. Nothing here renames.
+    fn link_into(&self, src: &Path, dest: &Path) -> Result<bool> {
         let parent = dest
             .parent()
             .ok_or_else(|| io::Error::other("destination has no parent"))?;
         self.ensure_bucket(parent)?;
         #[cfg(test)]
         if self.no_hard_links() {
-            return Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "injected: no hard links",
-            ));
+            return Err(BlobStoreError::UnsupportedFilesystem {
+                reason: format!("link(2) into {}: injected refusal", dest.display()),
+            });
         }
         match fs::hard_link(src, dest) {
             Ok(()) => {
@@ -1154,7 +1157,9 @@ impl Inner {
                 Ok(true)
             }
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(false),
-            Err(error) => Err(error),
+            Err(error) => Err(BlobStoreError::UnsupportedFilesystem {
+                reason: format!("link(2) into {}: {error}", dest.display()),
+            }),
         }
     }
 
@@ -1186,72 +1191,19 @@ impl Inner {
         }
     }
 
-    /// The canonical publication of one byte CID at `chunks/<cid>` (module docs): reuse a
-    /// legacy inline copy by a hard link, else link a verified staging file into place. Where
-    /// the filesystem refuses links, a rename publishes it (and a legacy inline copy is retired
-    /// once the publication ends): on such a filesystem two concurrent arrivals may both write,
-    /// and the last rename of identical bytes wins.
+    /// The canonical publication of one byte CID at `chunks/<cid>` (module docs): link a
+    /// verified staging file into place, never replacing. `EEXIST` verifies the winner.
     fn put_canonical_chunk(&self, chunk: &ChunkRef, bytes: &[u8]) -> Result<ChunkPut> {
         let path = self.chunk_path(&chunk.cid);
-        if self.inline_holds(&chunk.cid) {
-            match self.link_into(&self.blob_path(&chunk.cid), &path) {
-                Ok(true) => return Ok(ChunkPut::Held),
-                Ok(false) => return self.settle_existing_chunk(chunk),
-                Err(error) => {
-                    warn!(cid = %chunk.cid, %error, "no hard link: copying the legacy inline object");
-                    guard(&self.retire_inline).insert(chunk.cid);
-                }
-            }
-        }
         let tmp = self.stage(bytes)?;
+        #[cfg(test)]
+        self.before_publication(&chunk.cid);
         let linked = self.link_into(&tmp, &path);
-        let put = match linked {
-            Ok(true) => Ok(ChunkPut::Written),
-            Ok(false) => self.settle_existing_chunk(chunk),
-            Err(_) => match fs::rename(&tmp, &path) {
-                Ok(()) => {
-                    if let Some(parent) = path.parent() {
-                        File::open(parent)?.sync_all()?;
-                    }
-                    Ok(ChunkPut::Written)
-                }
-                Err(error) => Err(error.into()),
-            },
-        };
         let _ = fs::remove_file(&tmp);
-        put
-    }
-
-    /// Retire every legacy inline object a publication copied (no hard links) into `chunks/`:
-    /// under the exclusive lock, replace the inline file with a one-chunk layout record and
-    /// marker naming the chunk file, so the bytes are held once. Called with no guard held.
-    fn retire_copied_inline(&self) -> Result<()> {
-        let pending: Vec<ByteCid> = guard(&self.retire_inline).drain().collect();
-        if pending.is_empty() {
-            return Ok(());
+        match linked? {
+            true => Ok(ChunkPut::Written),
+            false => self.settle_existing_chunk(chunk),
         }
-        let _exclusive = self.coord.destruction("retire an inline copy")?;
-        for cid in pending {
-            let _stripe = self.stripe(&cid);
-            if !(self.chunk_holds(&cid) && self.inline_holds(&cid)) {
-                continue;
-            }
-            let len = fs::metadata(self.chunk_path(&cid))?.len();
-            let unit = [ChunkRef {
-                cid,
-                len: len as u32,
-            }];
-            let layout_bytes = LayoutRecord::new(&cid, len, &unit).encode()?;
-            let layout_cid = compute_record_cid(&layout_bytes);
-            self.write_atomic(Area::Index, &self.index_path(&cid), &layout_bytes)?;
-            let mut marker = Vec::with_capacity(MARKER_LEN);
-            marker.extend_from_slice(MARKER_MAGIC);
-            marker.extend_from_slice(&layout_cid.to_bytes());
-            self.write_atomic(Area::Blob, &self.blob_path(&cid), &marker)?;
-            self.tally.remove(Footprint::inline(len));
-            self.tally.add(Footprint::chunked(len));
-        }
-        Ok(())
     }
 
     fn index_path(&self, cid: &ByteCid) -> PathBuf {
@@ -1422,9 +1374,6 @@ impl Inner {
             // Written from bytes this call hashed: servable now, no later hashing needed.
             self.mark_payload(&cid, &chunk_refs);
             info!(cid = %cid, size = byte_len, chunks = chunk_refs.len(), "Stored blob");
-            drop(stripe);
-            drop(publication);
-            self.retire_copied_inline()?;
             return Ok(result(false));
         }
         Err(BlobStoreError::Internal(format!(
@@ -1504,7 +1453,7 @@ impl Inner {
     }
 
     /// Write one chunk unless a chunk file already holds exactly its bytes; on a canonical
-    /// store through [`Inner::put_canonical_chunk`] (no-replace link, legacy inline reuse), on
+    /// store through [`Inner::put_canonical_chunk`] (no-replace link), on
     /// the unlocked store by an atomic rename, as ever. A held chunk file that fails its CID is
     /// [`ChunkPut::Damaged`] — moved by nobody here: the owner's publication steps out and
     /// repairs it ([`Inner::repair_chunk`]); a shared instance refuses.
@@ -1617,16 +1566,29 @@ impl Inner {
         let layout = LayoutRecord::new(&cid, byte_len, &chunks);
         let layout_bytes = layout.encode()?;
         let layout_cid = compute_record_cid(&layout_bytes);
-        // A single-chunk payload on a canonical store is its chunk file and a marker: the
-        // chunk is placed now, before the stripe is taken (a repair must hold none).
-        if self.canonical() && chunks.len() == 1 {
-            if let Some(held) = &first {
-                self.put_chunk_resuming(&chunks[0], held, &mut publication, &mut paused)?;
-            }
-        }
-
         let mut attempts = 0;
         let (_stripe, already_existed) = loop {
+            // Before any marker or layout record is written, every chunk it will name is placed
+            // or verified under the publication now held: a pause for a repair released the
+            // operation lock, and an owner's GC may have collected what this stream wrote. A
+            // single-chunk payload's bytes are still in memory and are republished; a larger
+            // payload's are not, so a chunk that no longer verifies fails the store, typed.
+            if self.canonical() && chunks.len() == 1 {
+                if let Some(held) = &first {
+                    self.put_chunk_resuming(&chunks[0], held, &mut publication, &mut paused)?;
+                }
+            } else if paused && chunks.len() > 1 {
+                if let Some(lost) = chunks.iter().find(|chunk| !self.chunk_holds(&chunk.cid)) {
+                    return Err(BlobStoreError::PublicationLost {
+                        cid: cid.to_string(),
+                        reason: format!(
+                            "chunk {} left the store while the publication paused for a repair; \
+                             store it again",
+                            lost.cid
+                        ),
+                    });
+                }
+            }
             let stripe = self.stripe(&cid);
             match self.held(&cid)? {
                 Held::Whole => break (stripe, true),
@@ -1642,22 +1604,14 @@ impl Inner {
                     drop(stripe);
                     drop(publication.take());
                     self.repair_payload(&cid)?;
+                    #[cfg(test)]
+                    self.repair_gap();
                     publication = Some(self.coord.publication()?);
                     paused = true;
                 }
             }
         };
-        if paused && !already_existed && chunks.len() > 1 {
-            for chunk in &chunks {
-                if self.unit_len(&chunk.cid) != Some(u64::from(chunk.len)) {
-                    return Err(BlobStoreError::Internal(format!(
-                        "chunk {} left the store while the publication of {cid} paused for a \
-                         repair; store it again",
-                        chunk.cid
-                    )));
-                }
-            }
-        }
+        let _publication = publication;
         let stored = if chunks.len() <= 1 {
             let data = first.unwrap_or_default();
             if !already_existed {
@@ -1697,9 +1651,6 @@ impl Inner {
                 already_existed,
             }
         };
-        drop(_stripe);
-        drop(publication);
-        self.retire_copied_inline()?;
         Ok(stored)
     }
 
@@ -2120,8 +2071,7 @@ impl Inner {
 
     /// The public quarantine: under the right to move files and the payload's stripe. On a
     /// canonical store, a CID whose bytes verify and that another layout still names keeps its
-    /// bytes: only its standalone entry (marker and layout record, or a legacy inline name,
-    /// after linking its bytes into `chunks/`) is retired. Bytes that fail are moved to
+    /// bytes: only its standalone entry (marker and layout record) is retired. Bytes that fail are moved to
     /// quarantine with the entry, and every layout naming them then reads as damaged.
     fn quarantine(&self, cid: &ByteCid, reason: &str) -> Result<()> {
         let _right = self.coord.quarantine_right("quarantine")?;
@@ -2129,14 +2079,6 @@ impl Inner {
         if self.canonical() {
             match self.verdict_locked(cid) {
                 Verdict::Whole if self.referenced_chunks_except(cid).contains(cid) => {
-                    if !self.chunk_holds(cid) && self.inline_holds(cid) {
-                        let chunk = self.chunk_path(cid);
-                        if !self.link_into(&self.blob_path(cid), &chunk)? {
-                            return Err(BlobStoreError::Internal(format!(
-                                "{cid}: a chunk file that fails verification is in the way"
-                            )));
-                        }
-                    }
                     self.quarantine_payload(cid, reason)?;
                     // Its bytes stay, verified just now, and a layout still names them.
                     self.mark_servable(cid);
@@ -2224,43 +2166,6 @@ impl Inner {
         };
         self.unmark_servable(cid);
         let blob = self.blob_path(cid);
-        // A legacy inline object another layout names, on a canonical store, keeps its one
-        // copy: it moves to `chunks/` (a rename, the same bytes) instead of leaving the disk.
-        if self.canonical()
-            && matches!(footprint, Some(Footprint { chunked: false, .. }))
-            && self.inline_holds(cid)
-            && !self.chunk_holds(cid)
-            && self.referenced_chunks().contains(cid)
-        {
-            let chunk = self.chunk_path(cid);
-            if chunk.exists() {
-                // A chunk file under that name that fails its CID: evidence, kept aside.
-                self.quarantine_files(
-                    cid,
-                    std::slice::from_ref(&chunk),
-                    "held chunk fails its cid",
-                )?;
-            }
-            if let Some(parent) = chunk.parent() {
-                self.ensure_bucket(parent)?;
-            }
-            fs::rename(&blob, &chunk)?;
-            for dir in [blob.parent(), chunk.parent()].into_iter().flatten() {
-                File::open(dir)?.sync_all()?;
-            }
-            if let Some(footprint) = footprint {
-                self.tally.remove(footprint);
-            }
-            self.keep_listed_if_retained(cid);
-            info!(cid = %cid, "Deleted blob (its bytes stay as a chunk another payload names)");
-            return Ok(());
-        }
-        // A legacy inline object hard-linked into `chunks/`: the chunk name goes with it unless
-        // a layout still names it.
-        let linked_inline = self.canonical()
-            && matches!(footprint, Some(Footprint { chunked: false, .. }))
-            && self.chunk_path(cid).exists()
-            && !self.referenced_chunks().contains(cid);
         match fs::remove_file(&blob) {
             Ok(()) => {
                 if let Some(parent) = blob.parent() {
@@ -2277,9 +2182,6 @@ impl Inner {
             Ok(()) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
-        }
-        if linked_inline {
-            let _ = fs::remove_file(self.chunk_path(cid));
         }
         if !chunks.is_empty() {
             let referenced = self.referenced_chunks();
@@ -2621,6 +2523,49 @@ impl Inner {
             .push(area);
     }
 
+    /// A canonical publication passed its absence check and staged its bytes for `cid`, and is
+    /// about to link them into place.
+    fn before_publication(&self, cid: &ByteCid) {
+        let (barrier, hold) = {
+            let faults = self
+                .faults
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            (
+                faults
+                    .publish_barrier
+                    .as_ref()
+                    .filter(|(at, _)| at == cid)
+                    .map(|(_, barrier)| barrier.clone()),
+                faults
+                    .publish_hold
+                    .as_ref()
+                    .filter(|(at, _)| at == cid)
+                    .map(|(_, gate)| gate.clone()),
+            )
+        };
+        if let Some(barrier) = barrier {
+            barrier.wait();
+        }
+        if let Some(gate) = hold {
+            gate.pass();
+        }
+    }
+
+    /// A streamed publication repaired its payload's entry and has not yet taken the operation
+    /// lock again.
+    fn repair_gap(&self) {
+        let gate = self
+            .faults
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .repair_gap
+            .clone();
+        if let Some(gate) = gate {
+            gate.pass();
+        }
+    }
+
     /// Whether the test asked this store's filesystem to refuse hard links.
     fn no_hard_links(&self) -> bool {
         self.faults
@@ -2675,6 +2620,11 @@ mod tests {
         pub events: Vec<Event>,
         pub damage_gate: Option<Arc<DamageGate>>,
         pub no_hard_links: bool,
+        /// Every publication of this chunk waits here until all parties arrive.
+        pub publish_barrier: Option<(ByteCid, Arc<std::sync::Barrier>)>,
+        /// The first publication of this chunk is held here until released.
+        pub publish_hold: Option<(ByteCid, Arc<DamageGate>)>,
+        pub repair_gap: Option<Arc<DamageGate>>,
     }
 
     /// Holds the first publication that notices a damaged chunk until released; every later
@@ -3789,36 +3739,196 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn without_hard_links_a_legacy_inline_chunk_is_copied_then_retired_to_one_copy() {
+    /// A fresh private root (owner and shared stores refuse one open to group/other).
+    fn private_dir() -> TempDir {
         let dir = TempDir::new().unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
         }
+        dir
+    }
+
+    /// A multi-chunk payload and its first chunk.
+    fn payload_and_first_chunk() -> (Vec<u8>, Vec<u8>) {
         let payload = chunked_payload();
         let (offset, len) = chunk_bytes(&ValidatedProfile::EPOCH_0, &payload)[0];
         let chunk = payload[offset..offset + len].to_vec();
-        let cid = compute_bytes_cid(&chunk);
-        // The legacy representation: an inline object written by the unlocked store.
-        BlobStore::new(dir.path())
-            .await
-            .unwrap()
-            .store(&chunk)
-            .await
-            .unwrap();
-        let owner = BlobStore::open_owner(dir.path()).await.unwrap();
-        faults(&owner).no_hard_links = true;
-        let whole = owner.store(&payload).await.unwrap();
-        let carriers = ["blobs", "chunks"]
+        (payload, chunk)
+    }
+
+    /// The distinct inodes under `blobs/` and `chunks/` carrying exactly `cid`'s bytes.
+    #[cfg(unix)]
+    fn carrier_inodes(root: &Path, cid: &ByteCid) -> std::collections::BTreeSet<(u64, u64)> {
+        use std::os::unix::fs::MetadataExt;
+        ["blobs", "chunks"]
             .iter()
-            .map(|area| fanout_path(&dir.path().join(area), &cid.to_string()))
-            .filter(|path| fs::read(path).is_ok_and(|held| compute_bytes_cid(&held) == cid))
-            .count();
-        assert_eq!(carriers, 1, "the inline copy was retired to a marker");
-        assert_eq!(&owner.get(&cid).await.unwrap()[..], &chunk[..]);
-        assert_eq!(&owner.get(&whole.cid).await.unwrap()[..], &payload[..]);
-        assert_eq!(owner.exists(&cid).await, Exists::Verified);
+            .map(|area| fanout_path(&root.join(area), &cid.to_string()))
+            .filter(|path| fs::read(path).is_ok_and(|held| &compute_bytes_cid(&held) == cid))
+            .map(|path| {
+                let meta = fs::metadata(path).unwrap();
+                (meta.dev(), meta.ino())
+            })
+            .collect()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn racing_publications_of_one_chunk_through_two_instances_hold_one_inode() {
+        let (payload, chunk) = payload_and_first_chunk();
+        let cid = compute_bytes_cid(&chunk);
+        for round in 0..20 {
+            let dir = private_dir();
+            // Two instances: two open file descriptions of ops.lock, two servable indexes.
+            let a = Arc::new(BlobStore::open_shared(dir.path()).await.unwrap());
+            let b = Arc::new(BlobStore::open_shared(dir.path()).await.unwrap());
+            // Both writers are held after their absence checks, before they publish, and are
+            // released together: the standalone object C and the payload P containing C.
+            let barrier = Arc::new(std::sync::Barrier::new(2));
+            faults(&a).publish_barrier = Some((cid, barrier.clone()));
+            faults(&b).publish_barrier = Some((cid, barrier.clone()));
+            let (standalone, whole) = tokio::join!(a.store(&chunk), b.store(&payload));
+            let (standalone, whole) = (standalone.unwrap(), whole.unwrap());
+            assert_eq!(
+                carrier_inodes(dir.path(), &cid).len(),
+                1,
+                "round {round}: one physical copy of C"
+            );
+            for store in [&a, &b] {
+                assert_eq!(&store.get(&standalone.cid).await.unwrap()[..], &chunk[..]);
+                assert_eq!(&store.get(&whole.cid).await.unwrap()[..], &payload[..]);
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_corrupt_winner_is_repaired_by_the_owner_and_refused_by_a_shared_instance() {
+        let (_, chunk) = payload_and_first_chunk();
+        let cid = compute_bytes_cid(&chunk);
+        for owner in [true, false] {
+            let dir = private_dir();
+            let store = Arc::new(if owner {
+                BlobStore::open_owner(dir.path()).await.unwrap()
+            } else {
+                BlobStore::open_shared(dir.path()).await.unwrap()
+            });
+            let gate = Arc::new(DamageGate::default());
+            faults(&store).publish_hold = Some((cid, gate.clone()));
+            let writer = {
+                let (store, chunk) = (store.clone(), chunk.clone());
+                tokio::spawn(async move { store.store(&chunk).await })
+            };
+            {
+                let gate = gate.clone();
+                tokio::task::spawn_blocking(move || gate.wait_arrived())
+                    .await
+                    .unwrap();
+            }
+            // Between the writer's absence check and its link, a corrupt file takes the name.
+            let path = fanout_path(&dir.path().join("chunks"), &cid.to_string());
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let mut spoiled = chunk.clone();
+            spoiled[4] ^= 0x01;
+            fs::write(&path, &spoiled).unwrap();
+            gate.release();
+            let stored = writer.await.unwrap();
+            if owner {
+                stored.unwrap();
+                assert_eq!(
+                    compute_bytes_cid(&fs::read(&path).unwrap()),
+                    cid,
+                    "repaired"
+                );
+                assert_eq!(&store.get(&cid).await.unwrap()[..], &chunk[..]);
+                assert!(
+                    fs::read_dir(dir.path().join("quarantine")).unwrap().count() > 0,
+                    "the corrupt winner is kept aside, not overwritten"
+                );
+            } else {
+                assert!(
+                    matches!(stored, Err(BlobStoreError::HashMismatch { .. })),
+                    "{stored:?}"
+                );
+                assert_eq!(
+                    fs::read(&path).unwrap(),
+                    spoiled,
+                    "a shared instance moves nothing"
+                );
+                assert!(!fanout_path(&dir.path().join("blobs"), &cid.to_string()).exists());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_refused_link_is_a_typed_error_and_renames_nothing() {
+        let (payload, chunk) = payload_and_first_chunk();
+        for data in [chunk, payload] {
+            let dir = private_dir();
+            let store = BlobStore::open_owner(dir.path()).await.unwrap();
+            faults(&store).no_hard_links = true;
+            let refused = store.store(&data).await;
+            assert!(
+                matches!(refused, Err(BlobStoreError::UnsupportedFilesystem { .. })),
+                "{refused:?}"
+            );
+            let cid = compute_bytes_cid(&data);
+            for area in ["blobs", "chunks"] {
+                let mut held = 0;
+                walk_fanout(&dir.path().join(area), |_, _, _| held += 1);
+                assert_eq!(held, 0, "nothing was renamed into {area}/");
+            }
+            assert!(tmp_is_empty(&dir), "the staging file was dropped");
+            assert_eq!(store.exists(&cid).await, Exists::Absent);
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_resumed_single_chunk_stream_never_publishes_a_marker_for_collected_bytes() {
+        let dir = private_dir();
+        let store = Arc::new(BlobStore::open_owner(dir.path()).await.unwrap());
+        let (payload, chunk) = payload_and_first_chunk();
+        let cid = compute_bytes_cid(&chunk);
+        store.store(&chunk).await.unwrap();
+        let whole = store.store(&payload).await.unwrap();
+        // C's entry is damaged, so streaming C again repairs it, releasing the operation lock.
+        fs::write(
+            dir.path().join("index").join(cid.to_string()),
+            b"not the bound record",
+        )
+        .unwrap();
+        let gate = Arc::new(DamageGate::default());
+        faults(&store).repair_gap = Some(gate.clone());
+        let stream = {
+            let (store, chunk) = (store.clone(), chunk.clone());
+            tokio::spawn(async move { store.store_stream(std::io::Cursor::new(chunk)).await })
+        };
+        {
+            let gate = gate.clone();
+            tokio::task::spawn_blocking(move || gate.wait_arrived())
+                .await
+                .unwrap();
+        }
+        // In the gap, P is deleted: no layout names C's chunk any more, and GC collects it.
+        store.delete(&whole.cid).await.unwrap();
+        let path = fanout_path(&dir.path().join("chunks"), &cid.to_string());
+        assert!(!path.exists(), "the gap really lost C's bytes");
+        gate.release();
+        match stream.await.unwrap() {
+            Ok(stored) => {
+                assert_eq!(stored.cid, cid);
+                assert_eq!(
+                    compute_bytes_cid(&fs::read(&path).unwrap()),
+                    cid,
+                    "republished"
+                );
+                assert_eq!(&store.get(&cid).await.unwrap()[..], &chunk[..]);
+                assert_eq!(store.exists(&cid).await, Exists::Verified);
+            }
+            Err(error) => assert!(
+                matches!(error, BlobStoreError::PublicationLost { .. }),
+                "a failure is typed: {error:?}"
+            ),
+        }
     }
 }

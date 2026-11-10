@@ -6,7 +6,7 @@ use std::path::PathBuf;
 /// Every failure of a [`crate::BlobStore`] operation.
 ///
 /// The first five variants are the ones the store has always produced (elohim-storage maps
-/// them onto its own `StorageError` variant for variant); the last four belong to the
+/// them onto its own `StorageError` variant for variant); the remaining variants belong to the
 /// owner/shared split and to opening a store a peer shares with another process.
 #[derive(Debug, thiserror::Error)]
 pub enum BlobStoreError {
@@ -43,6 +43,21 @@ pub enum BlobStoreError {
     /// overwrite, so it writes nothing and leaves the copy for the owner.
     #[error("the held copy of {cid} could not be read ({reason}); left for the store's owner")]
     HeldCopyUnreadable { cid: String, reason: String },
+
+    /// An owner or shared open found an inline standalone object (written by the unlocked
+    /// store) in the root: such stores are only ever created fresh. Nothing was written.
+    #[error("the payload store at {} holds a legacy inline object; an owner or shared store is created fresh", path.display())]
+    LegacyLayout { path: PathBuf },
+
+    /// The filesystem refused `link(2)`, the only way an owner or shared store publishes a
+    /// chunk file (no rename fallback, which could replace a concurrent winner).
+    #[error("this filesystem cannot hold an owner or shared payload store: {reason}")]
+    UnsupportedFilesystem { reason: String },
+
+    /// A streamed publication paused for a repair and a chunk it had written left the store
+    /// meanwhile; nothing naming it was published. Store the payload again.
+    #[error("the publication of {cid} lost a chunk: {reason}")]
+    PublicationLost { cid: String, reason: String },
 
     /// The root of an owner or shared store is not a private, real directory.
     #[error("payload store root {} refused: {reason}", root.display())]

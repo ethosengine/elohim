@@ -13,6 +13,11 @@
 //! node-local compute-payload cleanup (`crate::compute_payload_store`), when
 //! `ELOHIM_COMPUTE_LOCAL_API=1`.
 //!
+//! One behaviour differs from the store as it was on dev before the move, by an accepted
+//! correctness fix (artifact-store E4, review round 3 ruling 3): deleting a payload no longer
+//! unlists a unit whose verified bytes remain — an inline object one of the payload's chunks
+//! duplicated stays in `list_servable`. The on-disk representation is unchanged.
+//!
 //! See the crate's module docs for the layout, write protocol and read verification.
 
 use std::path::Path;
@@ -43,6 +48,9 @@ pub fn storage_error(error: BlobStoreError) -> StorageError {
         other @ (BlobStoreError::OwnerHeld { .. }
         | BlobStoreError::SharedInstance { .. }
         | BlobStoreError::HeldCopyUnreadable { .. }
+        | BlobStoreError::LegacyLayout { .. }
+        | BlobStoreError::UnsupportedFilesystem { .. }
+        | BlobStoreError::PublicationLost { .. }
         | BlobStoreError::UnsafeRoot { .. }) => StorageError::Internal(other.to_string()),
     }
 }

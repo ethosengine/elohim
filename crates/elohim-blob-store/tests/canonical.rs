@@ -95,31 +95,82 @@ async fn a_standalone_object_on_an_owner_or_shared_store_lives_at_its_chunk_path
 }
 
 #[tokio::test]
-async fn a_legacy_inline_object_becomes_a_chunk_by_a_hard_link() {
-    let dir = private_root();
-    let (payload, chunk) = payload_and_chunk(7);
-    let cid = compute_bytes_cid(&chunk);
-    // Written by the unlocked store: an inline file, the legacy representation.
-    BlobStore::new(dir.path())
-        .await
-        .unwrap()
-        .store(&chunk)
-        .await
-        .unwrap();
-    assert!(!is_marker(&path_of(dir.path(), "blobs", &cid)));
+async fn an_owner_or_shared_open_refuses_a_legacy_layout_and_writes_nothing() {
+    for owner in [true, false] {
+        let dir = private_root();
+        // Written by the unlocked store: an inline file, the legacy representation.
+        let chunk = bytes(7, 4096);
+        let cid = compute_bytes_cid(&chunk);
+        BlobStore::new(dir.path())
+            .await
+            .unwrap()
+            .store(&chunk)
+            .await
+            .unwrap();
+        let before: Vec<_> = walk(dir.path());
+        let refused = if owner {
+            BlobStore::open_owner(dir.path()).await.map(|_| ())
+        } else {
+            BlobStore::open_shared(dir.path()).await.map(|_| ())
+        };
+        match refused {
+            Err(BlobStoreError::LegacyLayout { path }) => {
+                assert_eq!(path, path_of(dir.path(), "blobs", &cid))
+            }
+            other => panic!("owner={owner}: a legacy root was opened: {other:?}"),
+        }
+        assert_eq!(
+            walk(dir.path()),
+            before,
+            "owner={owner}: nothing written or moved"
+        );
+    }
+}
 
-    let owner = BlobStore::open_owner(dir.path()).await.unwrap();
-    let whole = owner.store(&payload).await.unwrap();
-    let inline = std::fs::metadata(path_of(dir.path(), "blobs", &cid)).unwrap();
-    let linked = std::fs::metadata(path_of(dir.path(), "chunks", &cid)).unwrap();
-    assert_eq!(
-        (inline.dev(), inline.ino()),
-        (linked.dev(), linked.ino()),
-        "one inode"
+/// Every path under `root` with its length, sorted.
+fn walk(root: &Path) -> Vec<(std::path::PathBuf, u64)> {
+    fn visit(dir: &Path, out: &mut Vec<(std::path::PathBuf, u64)>) {
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            let meta = std::fs::metadata(&path).unwrap();
+            out.push((path.clone(), meta.len()));
+            if meta.is_dir() {
+                visit(&path, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    visit(root, &mut out);
+    out.sort();
+    out
+}
+
+#[tokio::test]
+async fn the_unlocked_store_keeps_a_retained_inline_unit_listed_after_a_delete() {
+    // Review round 3, ruling 3: the one behaviour of `new()` that differs from dev. A payload
+    // whose chunk duplicates an inline object is deleted; the inline unit stays verified on disk
+    // and stays listed (dev unlisted it until the next scrub).
+    let dir = private_root();
+    let store = BlobStore::new(dir.path()).await.unwrap();
+    let (payload, chunk) = payload_and_chunk(23);
+    let cid = compute_bytes_cid(&chunk);
+    store.store(&chunk).await.unwrap();
+    let whole = store.store(&payload).await.unwrap();
+    store.delete(&whole.cid).await.unwrap();
+    assert!(
+        !path_of(dir.path(), "chunks", &cid).exists(),
+        "the payload's own chunk file went"
     );
-    assert_eq!(carriers(dir.path(), &cid).len(), 1);
-    assert_eq!(&owner.get(&whole.cid).await.unwrap()[..], &payload[..]);
-    assert_eq!(&owner.get(&cid).await.unwrap()[..], &chunk[..]);
+    assert_eq!(
+        std::fs::read(path_of(dir.path(), "blobs", &cid)).unwrap(),
+        chunk,
+        "the inline object stays"
+    );
+    assert!(
+        store.list_servable().unwrap().contains(&cid),
+        "and stays listed"
+    );
+    assert!(store.holds_verified(&cid));
 }
 
 #[tokio::test]
