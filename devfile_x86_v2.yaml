@@ -2,10 +2,10 @@
 # Launch with ?devfilePath=devfile_x86_v2.yaml.
 #
 # This file is a CHILD of devfile.base.yaml (everything a workspace needs lives there once).
-# It states only what differs from the default workspace: the name, the memory/CPU envelope, the
-# volume size, and the three placement attributes. The image is the base's x86-64-v2 flavor, the
-# same for every device (shem's Sandy Bridge Xeons cannot run the UBI 10 x86-64-v3 image: "CPU does
-# not support x86-64-v3"; a workspace launched from this file ran on shem on 2026-10-09).
+# It states only what differs from the default workspace: the name, the image tag (shem's Sandy
+# Bridge Xeons are x86-64-v2 — the UBI 10 x86-64-v3 image dies on them with "CPU does not support
+# x86-64-v3"; a workspace launched from this file ran on shem on 2026-10-09), the memory/CPU
+# envelope, the volume size, and the three placement attributes.
 #
 # Launch notes for shem:
 #   - storage: the `devworkspace-config-shem` DevWorkspaceOperatorConfig in `eclipse-che`
@@ -89,6 +89,7 @@ parent:
   components:
     - name: tools
       container:
+        image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:v2-latest
         # cpu limit 8 / request 2 so builds do not starve the fleet peers on shem.
         memoryLimit: 40Gi
         memoryRequest: 8Gi

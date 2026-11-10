@@ -1,8 +1,8 @@
 # devfile.yaml — the DEFAULT elohim workspace: the LAN node, the x86-64-v3 image.
 #
 # This file is a CHILD of devfile.base.yaml (everything a workspace needs lives there once).
-# It states only what this workspace is: its name, the memory/CPU envelope and the volume
-# size. The image is the base's, the same for every device. A capacity variant is another child of the same base — see
+# It states only what this workspace is: its name, the image tag, the memory/CPU envelope,
+# the volume size. A capacity variant is another child of the same base — see
 # devfile_x86_v2.yaml for the shem workspace — not a copy of this file.
 #
 # Overrides of parent components go under `parent.components` (naming the parent's component);
@@ -36,6 +36,7 @@ parent:
   components:
     - name: tools
       container:
+        image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
         memoryLimit: 30Gi
         memoryRequest: 8Gi
         cpuLimit: '10'
