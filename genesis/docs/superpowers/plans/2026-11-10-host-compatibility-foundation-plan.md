@@ -236,7 +236,10 @@ Verify: `epr flow ledger` on the walk's first record shows the chain of steps ta
 
 ## Lane C — channels (spec §7.7; appended 2026-11-10)
 
-Appended after lane R so earlier gap ids stay stable. It runs after V1.
+Appended after lane R so earlier gap ids stay stable. It runs after V1. Open discovery and
+advertisement are held back by the steward's ruling (spec §7.7, "Held back by design"): this lane
+covers channels a device follows and what the steward's own devices can read, and C4's commons
+listing is named only, not built.
 
 Chain: S5 → spec §7.7 → storage's release channel, ark's `ArtifactRef::Channel` and `follows`, the
 steward-space head move → a repair reused by a second device.

@@ -789,6 +789,31 @@ it needs a listing of channels at commons reach, which is the commons rung §7.2
 missing. A channel listing carries channel id, family and suite, not which devices follow it:
 who follows a channel reveals their hardware class and is private (§4).
 
+**A channel is not an advertisement.** The two are kept apart:
+
+| | Channel | Advertisement (a reach broadcast) |
+|---|---|---|
+| Direction | pull: a device reads the head of a channel it chose to follow | push: a peer announces something to whoever is in reach |
+| What it says | this variant set is current for this purpose | this exists, or I hold this |
+| Authority | decides what a follower may adopt, still through `admit` and probation | decides nothing; it is a hint |
+| Persistence | a durable record with a steward, reach, family and suite | ephemeral; missing one does no harm |
+| Privacy | following is private and held on the device | advertising what you hold can reveal your hardware class, so it carries a reach |
+
+The local-first rule joins them: a heartbeat hints, the record decides. An advertisement points
+at a channel head or a variant-set CID, and the receiver verifies by reading the channel and
+admitting locally. Nothing is adopted because it was announced, so a loud or hostile announcer
+cannot push bytes onto anyone. The `admit` concern C7 (a peer that offers a variant holds its
+bytes) is already a rule about advertisements, and the storage observation plane's announcement
+publisher, defined and uncalled, is their natural carrier.
+
+**Held back by design.** The steward's ruling, 2026-11-10: open discovery and advertisement are an
+intentionally backlogged cluster of concerns, like money, fiat and tokens. They are held back
+because solving them safely needs mastery of the new primitives first. So this spec designs only
+what a device does with channels it already follows and what its steward's devices can read of
+each other. Advertisements, a commons listing of channels, and announcing findings beyond the
+steward's devices are named here so that nothing built now forecloses them, and are not designed
+or planned.
+
 Open:
 
 - whether a variant set's channel is named in the set itself or only in the channel record;
