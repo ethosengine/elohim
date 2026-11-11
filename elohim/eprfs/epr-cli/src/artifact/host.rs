@@ -51,7 +51,7 @@ fn output_bytes(output: Output) -> Vec<u8> {
 }
 
 mod selections;
-pub(super) use selections::check_cargo_config;
+pub(super) use selections::{merge_configs, resolve, target, Selections};
 
 fn tool_version(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
     let version = BlobCid::compute_bytes(&output_bytes(probe(tool, &["--version"], path)?));
@@ -128,36 +128,26 @@ fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> Art
     Ok(())
 }
 
-/// Probe the final-link driver independently of the build-script C compiler. All recorded driver
-/// selections must resolve to the same executable; conflicting targets need a target-aware key.
-pub(super) fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String> {
-    let selections = selections::selected(descriptor)?;
+/// Probe only the effective final-link driver, independently of the build-script C compiler.
+pub(super) fn tool_lines(
+    descriptor: &MethodDescriptor,
+    selections: &Selections,
+) -> ArtifactResult<String> {
     let Some(path) = descriptor.non_path_inputs.get(PATH_INPUT) else {
-        if !selections.drivers.is_empty() || !selections.linkers.is_empty() {
+        if selections.driver != "cc" || selections.external_linker.is_some() {
             return Err(ArtifactError::Gap(
                 "selected linker has no recorded PATH".into(),
             ));
         }
         return Ok(String::new());
     };
-    let mut driver = None;
-    for (label, name) in &selections.drivers {
-        let resolved = resolve_tool(name, path).ok_or_else(|| {
-            ArtifactError::Gap(format!(
-                "selected linker {label}={name} does not resolve under recorded PATH"
-            ))
-        })?;
-        if driver
-            .as_ref()
-            .is_some_and(|previous| previous != &resolved)
-        {
-            return Err(ArtifactError::Gap(
-                "conflicting link drivers: the key does not model that linker selection yet".into(),
-            ));
-        }
-        driver = Some(resolved);
+    let driver = resolve_tool(&selections.driver, path);
+    if driver.is_none() && selections.driver != "cc" {
+        return Err(ArtifactError::Gap(format!(
+            "selected linker {} does not resolve under recorded PATH",
+            selections.driver
+        )));
     }
-    let driver = driver.or_else(|| resolve_tool("cc", path));
     let mut lines = String::new();
     if let Some(driver) = &driver {
         tool_version(&mut lines, "link-driver", driver, path)?;
@@ -190,13 +180,14 @@ pub(super) fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String
             driver_defaults(&mut lines, "CC", &cc, path)?;
         }
     }
-    for (label, name) in selections.linkers {
-        let resolved = resolve_tool(&name, path).ok_or_else(|| {
+    if let Some(name) = &selections.external_linker {
+        let label = "external-linker";
+        let resolved = resolve_tool(name, path).ok_or_else(|| {
             ArtifactError::Gap(format!(
                 "selected linker {label}={name} does not resolve under recorded PATH"
             ))
         })?;
-        tool_version(&mut lines, &label, &resolved, path)?;
+        tool_version(&mut lines, label, &resolved, path)?;
     }
     Ok(lines)
 }
@@ -221,8 +212,11 @@ fn linker_identity(text: &str) -> Option<(&str, &str)> {
 
 /// Read only ELF section bytes. Missing, malformed or unaccounted linker evidence refuses before
 /// `put` writes an attestation or a custody record; an old descriptor must be described again.
-pub(super) fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> ArtifactResult<()> {
-    let selections = selections::selected(descriptor)?;
+pub(super) fn check_linker(
+    descriptor: &MethodDescriptor,
+    selections: &Selections,
+    bytes: &[u8],
+) -> ArtifactResult<()> {
     let kind = object::FileKind::parse(bytes).map_err(|e| {
         ArtifactError::Gap(format!(
             "artifact format does not read: {e}; no .comment Linker line"
@@ -271,16 +265,17 @@ pub(super) fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> Artif
         })
         .map(str::trim);
     let mut accounted = Vec::new();
-    if let Some(version) = llvm.filter(|v| !v.is_empty() && !selections.external) {
+    if let Some(version) = llvm.filter(|v| !v.is_empty() && selections.bundled_lld_authorized) {
         accounted.push(format!("LLD {version} (rustc LLVM)"));
     }
-    for (label, name) in selections.linkers {
+    if let Some(name) = &selections.external_linker {
+        let label = "external-linker";
         let path = descriptor.non_path_inputs.get(PATH_INPUT).ok_or_else(|| {
             ArtifactError::Gap(format!(
                 "selected linker {label}={name} has no recorded PATH"
             ))
         })?;
-        let resolved = resolve_tool(&name, path).ok_or_else(|| {
+        let resolved = resolve_tool(name, path).ok_or_else(|| {
             ArtifactError::Gap(format!("selected linker {label}={name} does not resolve"))
         })?;
         let version =
@@ -318,6 +313,15 @@ mod fixture;
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+
+    fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> ArtifactResult<()> {
+        let selection = resolve(
+            &mut descriptor.non_path_inputs.clone(),
+            &toml::Value::Table(Default::default()),
+            target(descriptor),
+        )?;
+        super::check_linker(descriptor, &selection, bytes)
+    }
 
     fn descriptor() -> MethodDescriptor {
         MethodDescriptor {
@@ -384,6 +388,7 @@ mod tests {
         for flags in [
             "",
             "-C link-arg=-fuse-ld=lld",
+            "-C link-arg=-fuse-ld=bfd -C link-arg=-fuse-ld=lld",
             "-C linker=gcc",
             "-Clinker=gcc -C link-arg=-fuse-ld=lld",
         ] {
@@ -392,9 +397,10 @@ mod tests {
                 .insert("RUSTFLAGS".into(), flags.into());
             check_linker(&descriptor, &fixture::artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
         }
-        descriptor
-            .non_path_inputs
-            .insert("RUSTFLAGS".into(), "-Clink-self-contained=-linker".into());
+        descriptor.non_path_inputs.insert(
+            "RUSTFLAGS".into(),
+            "--codegen=link-self-contained=-linker".into(),
+        );
         let error =
             check_linker(&descriptor, &fixture::artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap_err();
         assert!(error.to_string().contains("link-self-contained"));

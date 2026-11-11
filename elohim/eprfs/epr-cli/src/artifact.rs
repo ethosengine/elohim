@@ -519,17 +519,18 @@ fn refuse_ignored_submodules(repo: &Path, view: &[String]) -> ArtifactResult<()>
 /// checkouts at different places key alike): every `.cargo/config(.toml)` from the crate's
 /// directory up to the filesystem root, nearest first, and `$CARGO_HOME/config(.toml)` (`-` when
 /// absent).
-fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<String> {
+fn cargo_config_lines(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(String, toml::Value)> {
     let mut lines = String::new();
+    let mut configs = Vec::new();
     let Some(crate_dir) = descriptor.non_path_inputs.get(CRATE_INPUT) else {
-        return Ok(lines);
+        return Ok((lines, toml::Value::Table(Default::default())));
     };
-    let content = |path: &Path| -> ArtifactResult<Option<String>> {
+    let content = |path: &Path| -> ArtifactResult<Option<(String, Vec<u8>)>> {
         match std::fs::read(path) {
-            Ok(bytes) => {
-                host::check_cargo_config(path, &bytes)?;
-                Ok(Some(BlobCid::compute_bytes(&bytes).to_string()))
-            }
+            Ok(bytes) => Ok(Some((BlobCid::compute_bytes(&bytes).to_string(), bytes))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(ArtifactError::Gap(format!(
                 "the cargo configuration {} does not read: {e}",
@@ -539,9 +540,16 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
     };
     let start = repo.join(crate_dir);
     let mut found = 0usize;
+    let mut seen = std::collections::BTreeSet::new();
     for dir in start.ancestors() {
+        let mut active = true;
         for name in ["config", "config.toml"] {
-            if let Some(cid) = content(&dir.join(".cargo").join(name))? {
+            let path = dir.join(".cargo").join(name);
+            if let Some((cid, bytes)) = content(&path)? {
+                if active && seen.insert(path.clone()) {
+                    configs.push((path, bytes));
+                }
+                active = false;
                 lines.push_str(&format!("cargo-config:{found}:{name}\t{cid}\n"));
                 found += 1;
             }
@@ -551,17 +559,28 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo")));
+    let mut active = true;
     for name in ["config", "config.toml"] {
-        let cid = match &home {
+        let content = match &home {
             Some(home) => content(&home.join(name))?,
             None => None,
         };
+        let cid = content.map(|(cid, bytes)| {
+            if let Some(home) = &home {
+                let path = home.join(name);
+                if active && seen.insert(path.clone()) {
+                    configs.push((path, bytes));
+                }
+            }
+            active = false;
+            cid
+        });
         lines.push_str(&format!(
             "cargo-home:{name}\t{}\n",
             cid.as_deref().unwrap_or("-")
         ));
     }
-    Ok(lines)
+    Ok((lines, host::merge_configs(configs)?))
 }
 
 /// The `non_path_inputs` entry naming the fixed `PATH` a recorded mesh build runs cargo under.
@@ -597,6 +616,8 @@ fn is_excluded_ignored(path: &str) -> bool {
 
 /// The derivation key of `descriptor` at `repo`'s HEAD (the interim `KeyInput::Raw` form; see the
 /// module docs). The one key derivation for this closure: `put` and `fetch` both call it.
+/// Inactive flag sources and unrelated target linker variables are omitted from the descriptor
+/// used for the method CID; the supplied descriptor is left intact.
 ///
 /// # Errors
 ///
@@ -604,7 +625,21 @@ fn is_excluded_ignored(path: &str) -> bool {
 /// cannot name what a build would read: a tracked symlink leaving the view, an index flag or a
 /// submodule `ignore` hiding changes, or ignored untracked files inside the view.
 pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    let method = descriptor
+    closure_selection(repo, descriptor).map(|(key, _)| key)
+}
+
+fn closure_selection(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(ClosureKey, host::Selections)> {
+    let (config_lines, config) = cargo_config_lines(repo, descriptor)?;
+    let mut effective = descriptor.clone();
+    let selections = host::resolve(
+        &mut effective.non_path_inputs,
+        &config,
+        host::target(descriptor),
+    )?;
+    let method = effective
         .cid()
         .map_err(|e| ArtifactError::Gap(format!("the method descriptor does not encode: {e}")))?;
     let head = git_ok(repo, &["rev-parse", "HEAD"])
@@ -632,8 +667,8 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
     for path in &paths {
         lines.push_str(&closure_line(repo, path, &mut gitlinks)?);
     }
-    lines.push_str(&cargo_config_lines(repo, descriptor)?);
-    lines.push_str(&tool_lines(descriptor)?);
+    lines.push_str(&config_lines);
+    lines.push_str(&tool_lines(descriptor, &selections)?);
     let mut status_args = vec![
         "status",
         "--porcelain",
@@ -672,15 +707,18 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
         input: KeyInput::Raw(input.clone()),
     };
     let key_cid = key_cid(&key).map_err(|e| ArtifactError::Gap(e.to_string()))?;
-    Ok(ClosureKey {
-        method,
-        input,
-        key_cid,
-        basis: BASIS_KEY_SLOT,
-        head,
-        dirty,
-        key,
-    })
+    Ok((
+        ClosureKey {
+            method,
+            input,
+            key_cid,
+            basis: BASIS_KEY_SLOT,
+            head,
+            dirty,
+            key,
+        },
+        selections,
+    ))
 }
 
 fn read_descriptor(options: &Options) -> ArtifactResult<MethodDescriptor> {
@@ -702,7 +740,14 @@ fn read_descriptor(options: &Options) -> ArtifactResult<MethodDescriptor> {
 }
 
 fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    let key = closure_key(repo, descriptor)?;
+    clean_selection(repo, descriptor).map(|(key, _)| key)
+}
+
+fn clean_selection(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(ClosureKey, host::Selections)> {
+    let (key, selections) = closure_selection(repo, descriptor)?;
     if !key.dirty.is_empty() {
         return Err(ArtifactError::Gap(format!(
             "the closure has uncommitted changes inside the method's view ({}), so the bytes \
@@ -710,7 +755,7 @@ fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<Closu
             key.dirty.join("; ")
         )));
     }
-    Ok(key)
+    Ok((key, selections))
 }
 
 /// [`build_env_refusal`] against this process's environment.
@@ -1085,7 +1130,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     // The environment recording runs in must be the one the method records (the mesh build runs
     // cargo in exactly it), and the closure must be the one the build started from.
     check_build_env(&descriptor).map_err(unrecorded)?;
-    let key = clean_key(repo, &descriptor).map_err(unrecorded)?;
+    let (key, selections) = clean_selection(repo, &descriptor).map_err(unrecorded)?;
     if key.input.to_string() != input {
         return Err(unrecorded(format!(
             "the closure moved during the build: it was {input}, it is {} now",
@@ -1104,7 +1149,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         std::fs::read(bytes_path)
             .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
     );
-    check_linker(&descriptor, &bytes).map_err(unrecorded)?;
+    check_linker(&descriptor, &selections, &bytes).map_err(unrecorded)?;
     let output = BlobCid::compute_bytes(&bytes);
 
     let signer: serde_json::Value = serde_json::from_str(&brit(repo, &["signer", "--json"])?)

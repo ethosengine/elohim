@@ -180,7 +180,7 @@ fn method_file_with(
             ("toolchain".to_string(), "1.96.1".to_string()),
             (
                 "rustc".to_string(),
-                "rustc fixture\nLLVM version: 22.1.2\n".to_string(),
+                "rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n".to_string(),
             ),
         ]
         .into(),
@@ -1095,12 +1095,13 @@ fn artifact_link_driver_is_independent_of_cc() {
         "#define __BMI2__ 1",
         &input,
     );
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
     for (variable, flags) in [
         ("RUSTFLAGS", "-C linker=selected-cc"),
         ("CARGO_ENCODED_RUSTFLAGS", "-Clinker=selected-cc"),
         (
             "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
-            "-C\u{1f}linker=selected-cc",
+            "-C linker=selected-cc",
         ),
         (
             "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
@@ -1131,6 +1132,10 @@ fn artifact_unsupported_linker_selections_refuse_before_probing() {
     let repo = checkout();
     let tools = TempDir::new().unwrap();
     let (_, mut descriptor) = method_file_with(tools.path(), &["crate/src"], &[]);
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    descriptor
+        .flags
+        .push("--target=i686-unknown-linux-gnu".into());
     for variable in [
         "RUSTFLAGS",
         "CARGO_ENCODED_RUSTFLAGS",
@@ -1195,7 +1200,10 @@ fn artifact_unsupported_linker_selections_refuse_before_probing() {
         "[target.'cfg(unix)']\nrustflags = ['-C', 'opt-level=2']\n",
     )
     .unwrap();
-    closure_key(repo.path(), &descriptor).unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("cfg(unix)"));
 }
 
 #[test]
@@ -1373,4 +1381,158 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
         .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
     elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
     eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
+}
+
+#[test]
+fn artifact_codegen_long_form_keys_driver() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    for flag in ["--codegen linker=chosen", "--codegen=linker=chosen"] {
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), flag.into());
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("chosen"));
+        fixture_driver(
+            tools.path(),
+            "chosen",
+            "driver 1",
+            "#define X 1",
+            &tools.path().join("input"),
+        );
+        std::fs::write(tools.path().join("input"), "one").unwrap();
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        std::fs::write(tools.path().join("input"), "two").unwrap();
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::remove_file(tools.path().join("chosen")).unwrap();
+    }
+}
+
+#[test]
+fn artifact_codegen_long_form_refuses_self_contained() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file(tools.path(), &["crate/src"]);
+    for flag in [
+        "--codegen link-self-contained=-linker",
+        "--codegen=link-self-contained=-linker",
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), flag.into());
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("link-self-contained"));
+    }
+}
+
+#[test]
+fn artifact_build_rustflags_refuse_unmodelled_selection() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(tools.path(), &["crate/src"], &[("crate", "crate")]);
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    std::fs::create_dir_all(repo.path().join("crate/.cargo")).unwrap();
+    std::fs::write(
+        repo.path().join("crate/.cargo/config.toml"),
+        "[build]\nrustflags = ['--codegen=link-self-contained=-linker']\n",
+    )
+    .unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("link-self-contained"));
+    // Even an empty present higher-priority source makes this config flag inactive.
+    descriptor
+        .non_path_inputs
+        .insert("RUSTFLAGS".into(), String::new());
+    closure_key(repo.path(), &descriptor).unwrap();
+}
+
+#[test]
+fn artifact_last_bundled_lld_clears_external_tool() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            (
+                "RUSTFLAGS",
+                "-C link-arg=-fuse-ld=bfd -C link-arg=-fuse-ld=lld",
+            ),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld.bfd", "echo 'GNU ld 999'");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_encoded_flags_ignore_overridden_rustflags_in_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}link-arg=-fuse-ld=lld"),
+            ("RUSTFLAGS", "--codegen=linker=/nonexistent/ignored"),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_other_target_linker_does_not_affect_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[(
+            "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER",
+            "/nonexistent/ignored",
+        )],
+    );
+    descriptor
+        .flags
+        .push("--target=x86_64-unknown-linux-gnu".into());
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    descriptor
+        .non_path_inputs
+        .remove("CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
 }
