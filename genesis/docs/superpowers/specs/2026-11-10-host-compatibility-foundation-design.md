@@ -821,6 +821,84 @@ Open:
 - whether storage's release-channel id shape is reused as is for native variant channels or
   given a class segment of its own.
 
+### 7.8 Who holds the floor, and who may draw it: reach on the object, not a grant per method
+
+Added 2026-11-11 from a gradient reading of the first cross-device floor need. ethosengine's
+RHEL 10 glibc is a v3 build: its `Scrt1.o`, `libc.so.6` and `libm.so.6` declare
+`x86 ISA needed: … x86-64-v3`, so no v2 variant can be linked there however the compiler is
+flagged. shem's AlmaLinux v2 glibc declares v2 at most. A v2 variant built on ethosengine therefore
+needs shem's floor. K6 slice 1 made a floor a recorded artifact (`epr artifact sysroot pack|put`,
+fetchable by output CID), and serving it then hit the artifact store's serve policy: a list of method
+names, default deny (`berth.artifacts.serves`). Each new kind of artifact needs a new grant row.
+
+**The reading.** On this path, between two devices of one person, the relationship is
+`trustful-self`: the roster admitted both. The cost is `friction-verify`, a decision the roster
+already made, re-asked once per kind of artifact, and `friction-blind`, because the v2 build cannot
+happen at all. The planes are fused: large, self-certifying bytes wait on a meaning-plane ceremony.
+The unit is per method. That is the compressible shape: one trust act per relationship has
+become one per kind of thing. The §9 shape table had already declared floor and toolchain members
+`public bytes`, held by builders only, pinned by CID. The serve policy had no way to read that.
+
+**The design.**
+
+1. **Reach is declared on the record, not inferred from the method's name.** Every `Produce` for an
+   artifact carries `env:reach=<level>` in the protocol's own vocabulary (`epr::Reach`, private to
+   commons). It is the narrowest reach among the method's inputs. Source from this repository is
+   `self`: the steward's devices. A floor packed from distribution packages, whose payloads are
+   named by package and content CID in the manifest, is `public`. A build that read private material
+   is `private`, and the gate refuses to serve it. An absent slot is read as `self`, which is today's behaviour
+   for `mesh-build`.
+2. **Serving judges reach against relationship.** The peer gate serves an artifact to an admitted
+   requester whose relationship meets the declared reach. Every admitted device of the person meets
+   `self` and wider, so this one act covers every current and future artifact kind between one
+   person's devices. `serves` becomes a **narrowing** list: the steward may still deny a method, and
+   a missing row denies nothing that reach allows. `discloseMethod` follows the same rule: a method
+   record is disclosed at the reach of the artifact it describes.
+3. **Widening stays a ceremony.** Above `self` (`trusted`, `community`, `public`, `commons`) the
+   reach ladder still decides: earned relationships, converging independent proofs (§7.1), and for
+   floors a licence reading of each member (missing node below). Reach on the object compresses the
+   per-method grant between one's own devices; it does not skip any rung beyond them.
+4. **Floors travel as channel members.** A household collaboration channel (§7.7) names the
+   variant sets and the floors they were built against, by CID. A device that needs a floor finds
+   its holders by output CID (K5) and draws it like any other blob. Nothing is pushed.
+
+**Custody of floors.** A floor is needed only by devices that build for its target:
+`custody-subset`. Its resilience need is low, because the origin of last resort is the distribution's
+own signed packages, which the manifest names. The holder count that matters is one reachable
+builder per target the person builds, and the existing "fewer than N holders" warning reads it. Two
+holders of one floor built from one distribution's packages are not independent failure domains.
+Independence for a floor means two distributions' payloads agreeing on the ABI the conformance
+suite checks, and that is a proof (§7.1), not a copy count.
+
+**Compiler closures.** shem's and ethosengine's `cc1` and `as` differ byte for byte (their
+`crtbeginS.o` agree), so one floor alone does not make their keys equal. The working posture,
+ruled by the lane K owner on 2026-11-11 and asked of the steward as H13, is per-compiler variants:
+the two builds share a family, not a key, and both join a variant set through the conformance
+suite. A CID-pinned compiler closure, held as a floor member and mounted beside each device's native
+toolchain, is a later optimisation. It would let keys match without levelling either device onto
+the other's image.
+
+| Object | Reach | Custody | Freshness | Linkability | Cost bearer |
+|---|---|---|---|---|---|
+| Floor (sysroot archive) | `public` bytes; a reference to it in a private manifest is a private reference | builders of that target; origin of last resort is the distribution | pinned by CID; a newer floor is a new CID and a new variant | serving or fetching it reveals that a device builds for that target | the builder that packed it; every builder of the target benefits |
+| Compiler closure (later) | `public` bytes | builders that choose to pin it | pinned by CID | as above | as above |
+| `env:reach` slot | follows the record | with the record | fixed at production | none beyond the record | the producer |
+
+Prices paid on purpose: a reach declared too wide serves bytes it should not. So the slot is
+derived from the inputs rather than typed by hand, and a derivation that cannot classify an input
+declares `private`, the narrowest level.
+
+Missing nodes, in mintable shape:
+
+- `artifact reach / between "artifact recorded" → "artifact served to a peer" / missing node:
+  env:reach on Produce, derived as the narrowest input reach, and the peer gate judging reach
+  against the requester's relationship, with serves as a narrowing list / current state: serving
+  decides by method name alone (berth.artifacts.serves, default deny)`.
+- `floor reach / between "floor packed from packages" → "floor declared public" / missing node:
+  the packer classifies each payload by its package provenance and refuses public for any file it
+  cannot attribute to a named package / current state: the manifest names files and CIDs, not
+  packages`.
+
 ## 8. Local-first reading
 
 Read from the person's side: what works on one device with nothing else reachable.
@@ -1148,7 +1226,7 @@ Until then they are named axes with no supported claim.
 ## 12. Rulings asked of the steward
 
 State on 2026-11-10: the steward ruled H1 to H7 as recommended. H8 and H9 were agreed in
-conversation the same day. H10 and H11 remain open. The sprint plan
+conversation the same day. H10 and H11 remain open. H12 and H13 were added on 2026-11-11 from §7.8 and are open. The sprint plan
 (`genesis/docs/superpowers/plans/2026-11-10-host-compatibility-foundation-plan.md`) builds on the
 ruled items only.
 
@@ -1165,6 +1243,8 @@ ruled items only.
 | H9 | Are variant sets open, with membership decided by a named conformance suite and not by who built the variant (§7.1)? | Yes, same agreement. Adapted variants join by attestation; wider reach needs the device's own run or converging independent proofs |
 | H11 | Do the six rules of §7.4 bind every later change to this contract, and is the seed (§7.5) a design constraint on the native kernel? | Yes. The direction was ruled by the steward in conversation on 2026-11-10; the six rules and the seed are this spec's reading of it and need the steward's confirmation as written |
 | H10 | Does rakia plan native builds with the declared target as a step input and building and proving as separate steps, with admission inside `ark task run` on the provider (§7.3)? | Yes, pending the rakia steward's check. rakia's plan today is topological levels of steps with no host field, and its manifest schema carries no target |
+| H12 | Does an artifact's own declared reach (`env:reach`, derived from its inputs) decide who may draw it, with `berth.artifacts.serves` kept only as a narrowing list, so that no new grant is needed per kind of artifact between one person's devices (§7.8)? | Yes. It replaces the per-method `sysroot-pack` grant proposed on 2026-11-11, which is withdrawn. Widening above `self` keeps the reach ladder and the floor licence reading |
+| H13 | Until a pinned compiler closure exists, do builds from different native compilers stay distinct variants that share a family but not a key (§7.8)? | Yes (posture B, ruled by the lane K owner 2026-11-11). A CID-pinned compiler closure as a floor member is a later optimisation, not a prerequisite |
 
 ## 13. Review asks, by session
 
