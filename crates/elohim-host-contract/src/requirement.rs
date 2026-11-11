@@ -28,6 +28,27 @@ pub struct Clause {
     pub predicate: Predicate,
     /// Where this requirement was learned.
     pub source: ClauseSource,
+    /// Features removed from an extracted clause because evidence bound to the bytes
+    /// shows they are reached only behind a runtime feature check (spec §3.2, plan K10).
+    /// Provenance only: [`crate::admit`] compares the predicate and never reads this.
+    /// Absent on the wire when `None`, so documents without it are unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub narrowing: Option<Narrowing>,
+}
+
+/// Why an extracted clause requires less than the bytes' instructions alone suggest.
+///
+/// When narrowing removes every feature above the floor, the clause is omitted rather
+/// than kept empty (spec §3.1 rule 4), and this record then travels with the artifact
+/// record instead: an empty clause would still be refused as `unknown-axis` by a host
+/// that does not observe the axis.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Narrowing {
+    /// The features taken out of the extracted requirement.
+    pub removed: BTreeSet<String>,
+    /// CID of the dispatch evidence that justified the removal.
+    pub evidence: String,
 }
 
 /// The stricter requirement for an axis, with all contributing original evidence.

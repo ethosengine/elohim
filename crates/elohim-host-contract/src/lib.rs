@@ -8,10 +8,13 @@
 
 mod admission;
 mod bundle;
+pub mod names;
 mod requirement;
 mod vocabulary;
 
 pub use admission::{admit, Provides, Refusal};
 pub use bundle::{Bundle, BundleSpec, X86_64_V2, X86_64_V3};
-pub use requirement::{Clause, ClauseSource, Disagreement, MergeError, MergedClause, Requires};
+pub use requirement::{
+    Clause, ClauseSource, Disagreement, MergeError, MergedClause, Narrowing, Requires,
+};
 pub use vocabulary::{AxisId, AxisValue, ComparisonKind, Predicate, Version};

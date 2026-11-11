@@ -12,6 +12,7 @@ fn clause(predicate: Predicate, source: ClauseSource) -> Clause {
         axis: AxisId("test.axis".into()),
         predicate,
         source,
+        narrowing: None,
     }
 }
 
@@ -155,4 +156,41 @@ fn unknown_predicate_kinds_and_fields_are_rejected() {
     ] {
         assert!(serde_json::from_str::<Requires>(json).is_err());
     }
+}
+
+#[test]
+fn narrowing_is_provenance_that_admit_ignores_and_the_wire_omits_when_absent() {
+    use host_contract::Narrowing;
+    let mut narrowed = clause(
+        Predicate::Subset(["sse4_2".to_owned()].into()),
+        ClauseSource::Extracted,
+    );
+    narrowed.narrowing = Some(Narrowing {
+        removed: ["avx2".to_owned(), "bmi2".to_owned()].into(),
+        evidence: "bafkreiexampledispatchevidence".to_owned(),
+    });
+    let requires = Requires::try_from(vec![narrowed.clone()]).expect("one clause merges");
+
+    let wire = serde_json::to_value(&requires).expect("requires serializes");
+    let decoded: Requires = serde_json::from_value(wire.clone()).expect("round trip decodes");
+    assert_eq!(decoded, requires);
+    assert!(wire.to_string().contains("\"narrowing\""));
+
+    let plain = Requires::try_from(vec![clause(
+        Predicate::Subset(["sse4_2".to_owned()].into()),
+        ClauseSource::Extracted,
+    )])
+    .expect("one clause merges");
+    let plain_wire = serde_json::to_value(&plain).expect("requires serializes");
+    assert!(!plain_wire.to_string().contains("narrowing"));
+
+    let mut host = Provides::default();
+    host.observe(
+        AxisId("test.axis".into()),
+        AxisValue::Names(["sse4_2".to_owned()].into()),
+    );
+    assert_eq!(
+        admit(&requires, &host).decision,
+        admit(&plain, &host).decision
+    );
 }
