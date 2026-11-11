@@ -51,7 +51,7 @@ fn output_bytes(output: Output) -> Vec<u8> {
 }
 
 mod selections;
-pub(super) use selections::{merge_configs, resolve, target, Selections};
+pub(super) use selections::{codegen_options, merge_configs, resolve, target, Selections};
 
 fn tool_version(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
     let version = BlobCid::compute_bytes(&output_bytes(probe(tool, &["--version"], path)?));

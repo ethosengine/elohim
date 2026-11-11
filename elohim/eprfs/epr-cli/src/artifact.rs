@@ -83,8 +83,8 @@ type ArtifactResult<T> = Result<T, ArtifactError>;
 pub fn usage() -> String {
     "usage: epr artifact <\n  \
      describe --project P --bin B [--features F] --rustflags R --sources MANIFEST#STEP \
-     --crate DIR [--env K=V]... [--repo ROOT] [--out FILE] \
-     (the mesh-build method descriptor: tools, flags, declared view, non-path inputs)\n  \
+     --crate DIR [--env K=V]... [--target-isa LEVEL] [--target-<name> VALUE]... [--repo ROOT] [--out FILE] \
+     (the mesh-build method descriptor; target names: arch, isa, os, libc, cflags, sysroot)\n  \
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
@@ -147,6 +147,7 @@ struct Options {
     sources: Option<String>,
     crate_dir: Option<String>,
     env: Vec<String>,
+    target: Vec<(String, String)>,
     out: Option<PathBuf>,
     method: Option<PathBuf>,
     print: Option<String>,
@@ -203,6 +204,10 @@ impl Options {
                 "--sources" => options.sources = Some(value),
                 "--crate" => options.crate_dir = Some(value),
                 "--env" => options.env.push(value),
+                flag if flag.starts_with("--target-") => {
+                    let name = format!("target.{}", &flag[9..]);
+                    options.target.push((name, value));
+                }
                 "--out" => options.out = Some(PathBuf::from(value)),
                 "--method" => options.method = Some(PathBuf::from(value)),
                 "--print" => options.print = Some(value),
@@ -312,6 +317,97 @@ pub const NATIVE_BUILD_ENV: [&str; 9] = [
     "OPENSSL_INCLUDE_DIR",
     "PROTOC",
 ];
+
+/// The sole classification table for recorded environment and declared-target inputs.
+/// Benign variables remain method-class if explicitly recorded (resource caps are omitted).
+/// The final fallback covers caller-declared `--env` names, including Cargo's dynamic names.
+/// Only the reserved target namespace is target-class; no environment variable is erased
+/// by `MethodDescriptor::family_cid`.
+const BUILD_INPUT_CLASSES: &[(&str, BuildInputClass)] = &[
+    ("CC", BuildInputClass::Method),
+    ("CXX", BuildInputClass::Method),
+    ("AR", BuildInputClass::Method),
+    ("LIBCLANG_PATH", BuildInputClass::Method),
+    ("PKG_CONFIG_PATH", BuildInputClass::Method),
+    ("OPENSSL_DIR", BuildInputClass::Method),
+    ("OPENSSL_LIB_DIR", BuildInputClass::Method),
+    ("OPENSSL_INCLUDE_DIR", BuildInputClass::Method),
+    ("PROTOC", BuildInputClass::Method),
+    ("CARGO_HOME", BuildInputClass::Method),
+    ("RUSTUP_HOME", BuildInputClass::Method),
+    ("CARGO_TARGET_DIR", BuildInputClass::Method),
+    ("CARGO_BUILD_JOBS", BuildInputClass::Method),
+    ("RUST_TEST_THREADS", BuildInputClass::Method),
+    ("RUST_BACKTRACE", BuildInputClass::Method),
+    ("RUST_LOG", BuildInputClass::Method),
+    ("RUSTFLAGS", BuildInputClass::Method),
+    ("RUSTUP_TOOLCHAIN", BuildInputClass::Method),
+    ("target.*", BuildInputClass::Target),
+    ("*", BuildInputClass::Method),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BuildInputClass {
+    Method,
+    Target,
+}
+
+fn build_input_class(name: &str) -> BuildInputClass {
+    BUILD_INPUT_CLASSES
+        .iter()
+        .find(|(pattern, _)| {
+            pattern
+                .strip_suffix('*')
+                .map_or(*pattern == name, |prefix| name.starts_with(prefix))
+        })
+        .expect("classification table has a final fallback")
+        .1
+}
+
+/// `target.*` is the extension point for declared targets, closed to these six slots for now.
+/// K6 supplies the sysroot artifact; K2 only validates its content address, never its availability.
+fn validate_target_inputs(inputs: &BTreeMap<String, String>) -> ArtifactResult<()> {
+    for (name, value) in inputs {
+        if build_input_class(name) != BuildInputClass::Target {
+            continue;
+        }
+        match name.as_str() {
+            "target.arch" | "target.isa" | "target.os" | "target.libc" | "target.cflags" => {}
+            "target.sysroot" => {
+                BlobCid::parse(value)
+                    .map_err(|e| ArtifactError::Gap(format!("{name} must be a CID: {e}")))?;
+            }
+            _ => {
+                return Err(ArtifactError::Gap(format!(
+                    "unknown declared target input `{name}`"
+                )))
+            }
+        }
+        if value.trim().is_empty() && name != "target.cflags" {
+            return Err(ArtifactError::Gap(format!("{name} needs a nonempty value")));
+        }
+    }
+    if inputs.contains_key("target.isa") {
+        for (name, value) in inputs {
+            if name == "RUSTFLAGS" || name.ends_with("_RUSTFLAGS") {
+                let flags: Vec<String> = if name == "CARGO_ENCODED_RUSTFLAGS" {
+                    value.split('\u{1f}').map(str::to_owned).collect()
+                } else {
+                    value.split_whitespace().map(str::to_owned).collect()
+                };
+                if host::codegen_options(&flags)
+                    .iter()
+                    .any(|(key, _)| key == "target-cpu")
+                {
+                    return Err(ArtifactError::Gap(format!(
+                        "target.isa and {name} target-cpu both declare the ISA; remove target-cpu from {name}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
 fn is_build_var(name: &str) -> bool {
     name.starts_with("CARGO_") || name.starts_with("RUST") || NATIVE_BUILD_ENV.contains(&name)
@@ -633,6 +729,7 @@ fn effective_selection(
     descriptor: &MethodDescriptor,
     config: &toml::Value,
 ) -> ArtifactResult<(MethodDescriptor, host::Selections)> {
+    validate_target_inputs(&descriptor.non_path_inputs)?;
     let mut effective = descriptor.clone();
     let selections = host::resolve(
         &mut effective.non_path_inputs,
@@ -845,6 +942,41 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
     let repo = &options.repo;
     let crate_path = repo.join(crate_dir);
 
+    let mut non_path_inputs = BTreeMap::new();
+    non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
+    // The crate, so the closure reads every Cargo configuration cargo reads for it.
+    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
+    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
+    for name in NATIVE_BUILD_ENV {
+        if let Ok(value) = std::env::var(name) {
+            non_path_inputs.insert(name.to_string(), value);
+        }
+    }
+    for pair in &options.env {
+        let (key, value) = pair.split_once('=').ok_or_else(|| {
+            ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
+        })?;
+        if RESOURCE_CAPS.contains(&key) {
+            continue;
+        }
+        if non_path_inputs
+            .insert(key.to_string(), value.to_string())
+            .is_some()
+            && build_input_class(key) == BuildInputClass::Target
+        {
+            return Err(ArtifactError::Gap(format!("{key} is declared twice")));
+        }
+    }
+    for (name, value) in &options.target {
+        if non_path_inputs
+            .insert(name.clone(), value.clone())
+            .is_some()
+        {
+            return Err(ArtifactError::Gap(format!("{name} is declared twice")));
+        }
+    }
+    validate_target_inputs(&non_path_inputs)?;
+
     let rustc = tool_line("rustc", &["-vV"], &crate_path)?;
     let field = |name: &str| {
         rustc
@@ -961,25 +1093,6 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
             .map_err(|e| ArtifactError::Gap(format!("a view path is invalid: {e}")))?,
     );
 
-    let mut non_path_inputs = BTreeMap::new();
-    non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
-    // The crate, so the closure reads every Cargo configuration cargo reads for it.
-    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
-    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
-    for name in NATIVE_BUILD_ENV {
-        if let Ok(value) = std::env::var(name) {
-            non_path_inputs.insert(name.to_string(), value);
-        }
-    }
-    for pair in &options.env {
-        let (key, value) = pair.split_once('=').ok_or_else(|| {
-            ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
-        })?;
-        if RESOURCE_CAPS.contains(&key) {
-            continue;
-        }
-        non_path_inputs.insert(key.to_string(), value.to_string());
-    }
     let descriptor = MethodDescriptor {
         name: MESH_BUILD.into(),
         tools,
@@ -992,6 +1105,8 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
         non_path_inputs,
         deterministic: false,
     };
+    let (_, config) = cargo_config_lines(&options.repo, &descriptor)?;
+    let (effective, _) = effective_selection(&descriptor, &config)?;
     let text = serde_json::to_string_pretty(&descriptor)?;
     match &options.out {
         Some(out) => {
@@ -999,8 +1114,6 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(out, format!("{text}\n"))?;
-            let (_, config) = cargo_config_lines(&options.repo, &descriptor)?;
-            let (effective, _) = effective_selection(&descriptor, &config)?;
             let method = effective
                 .cid()
                 .map_err(|e| ArtifactError::Gap(e.to_string()))?;
@@ -1436,3 +1549,7 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         FetchDone::Gap { gap: why, .. } => Err(gap(&why)),
     }
 }
+
+#[cfg(test)]
+#[path = "artifact/target_tests.rs"]
+mod target_tests;

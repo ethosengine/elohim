@@ -42,6 +42,28 @@ fn words(value: &str) -> Vec<String> {
     value.split_whitespace().map(str::to_owned).collect()
 }
 
+/// Rustc's joined/separate codegen spellings and underscore aliases have one normalization.
+/// Shared by linker selection and declared-ISA conflict validation.
+pub(crate) fn codegen_options(flags: &[String]) -> Vec<(String, &str)> {
+    let mut options = Vec::new();
+    let mut args = flags.iter();
+    while let Some(arg) = args.next() {
+        let option = match arg.as_str() {
+            "-C" | "--codegen" | "-Z" => args.next().map(String::as_str),
+            _ => arg
+                .strip_prefix("--codegen=")
+                .or_else(|| arg.strip_prefix("-C"))
+                .or_else(|| arg.strip_prefix("-Z")),
+        };
+        let Some(option) = option else { continue };
+        let option = option.strip_prefix('=').unwrap_or(option);
+        let (key, value) = option.split_once('=').unwrap_or((option, ""));
+        let key = key.replace('_', "-");
+        options.push((key, value));
+    }
+    options
+}
+
 fn config_flags(value: &toml::Value) -> ArtifactResult<Vec<String>> {
     match value {
         toml::Value::String(value) => Ok(words(value)),
@@ -148,22 +170,20 @@ pub(crate) fn resolve(
             flags
         }
     };
+    if inputs.contains_key("target.isa")
+        && codegen_options(&flags)
+            .iter()
+            .any(|(key, _)| key == "target-cpu")
+    {
+        return Err(ArtifactError::Gap(
+            "target.isa and effective rustflags target-cpu both declare the ISA".into(),
+        ));
+    }
     let mut external_linker = None;
-    let mut args = flags.iter();
-    while let Some(arg) = args.next() {
-        let option = match arg.as_str() {
-            "-C" | "--codegen" | "-Z" => args.next().map(String::as_str),
-            _ => arg
-                .strip_prefix("--codegen=")
-                .or_else(|| arg.strip_prefix("-C"))
-                .or_else(|| arg.strip_prefix("-Z")),
-        };
-        let Some(option) = option else { continue };
-        let (key, value) = option.split_once('=').unwrap_or((option, ""));
-        let key = key.replace('_', "-");
+    for (key, value) in codegen_options(&flags) {
         match key.as_str() {
             "link-self-contained" | "linker-flavor" | "linker-features" => {
-                return Err(unsupported(&format!("{arg} {option}")));
+                return Err(unsupported(&flags.join(" ")));
             }
             "linker" => driver = Some(value.to_owned()),
             "link-arg" | "link-args" => {
