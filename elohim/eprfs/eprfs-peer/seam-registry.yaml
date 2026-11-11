@@ -726,7 +726,7 @@ decisionPoints:
         justification: "Expected output, own Produce, then distinct-device plurality narrow candidates; daemon admission and CID checks still judge every byte."
       - id: C6a
         status: answered
-        justification: "One ordered map fold over existing records; one current claim per device and key."
+        justification: "One ordered map fold over existing records; custody is held per device, key and output, so a later production does not erase an earlier output the device still serves."
       - id: C6b
         status: answered
         justification: "The selection is pure; CLI divergence check and append share an exclusive flow transaction, deduplicated by key and sorted output set."
@@ -738,7 +738,7 @@ decisionPoints:
         justification: "The result names expected, own or plurality; CLI prints divergence and records own/plurality divergence as Cite observation."
       - id: C9
         status: answered
-        justification: "Existing key and output CIDs and roster device DIDs are retained; newest claim is scoped by both device and key."
+        justification: "Existing key and output CIDs and roster device DIDs are retained; membership is per device, key and output, and the latest own production is only the preference input for the own rule, which applies only when another device holds that output (fetch sources and counts exclude this device)."
       - id: C10
         status: answered
         justification: "Optional expectOutput defaults to None for existing queued requests; daemon refuses a contradictory expected output."
@@ -756,7 +756,7 @@ decisionPoints:
         justification: "Custody claims are not live availability or failure-domain independence; the byte transfer can still return existing typed gaps."
     contractTests:
       - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
-        testName: holder_selection_prefers_expected_then_own_then_distinct_plurality
+        testName: holder_selection_prefers_expected_then_latest_own_with_remote_custody
         kind: integration
       - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
         testName: plurality_fetch_uses_only_the_chosen_outputs_holders
