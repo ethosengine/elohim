@@ -2,13 +2,13 @@
 id: task-brit-feedback-source-report-20261111
 gap: plans__2026-11-11-brit-feedback-operation#2
 actor: agent:orchestrator@gpt-6-astra
-status: HOLD
-commits: []
+status: DONE
+commits: [4487b67b2f80def79bd851c9845e0461fea6c9c5, 7ba27c3f497b382e72431d75a294339ac16bf54c]
 ---
 
 # Retained feedback source implementation
 
-Implementation and focused verification are complete. HOLD reserves the terminal native act for the integrator's owning gate and independent review; this delegated seat does not discharge the root's actor-bound commitment.
+Implementation and owning-gate verification are complete for the retained-source station. Publication, installed qualification and experienced recovery remain separate sprint stations; this report does not claim them.
 
 `EvidenceResources` now exposes explicitly supplied feedback entries. The repository path implementation uses the existing contextual policy loader and verified `FeedbackStore` reader. A `feedback:repair` Intent selects that boundary; the reader checks the exact occurrence CID and record kind. Descriptive labels cannot replace native evidence. Ordinary document sources retain their body-CID verification. Captured immutable views default to an unavailable private resource rather than reading device files.
 
@@ -28,4 +28,8 @@ The initial focused batch used jobs=2 instead of the configured eprfs cap=1 and 
 
 Changed paths: `src/flow/acceptance.rs`, `src/flow/reconciliation.rs`, the shared `load_policy` extraction in `src/feedback/mod.rs`, a private-view unit test in `src/view/readings.rs`, `tests/flow_feedback_source.rs`, and the existing reconciliation entry in `seam-registry.yaml`, all under `elohim/eprfs/epr-cli/`.
 
-Owning gate: **`just gate eprfs` pending integrator**. Rust-style reach gate and independent technical/appointed acceptance remain with the integrator. No source commit, publication, artifact promotion or native fulfilment was performed by this seat. Shared cargo lease was handed to the qualification implementer under root coordination, not released while root's Brit build remained active.
+Owning gate: **`just gate eprfs` passed, EXIT=0**, at integrated commit `7ba27c3f497b382e72431d75a294339ac16bf54c`: 2,292 Rust tests across 147 suites, zero failures or ignored tests, plus the invoked Python fixtures. Evidence: `delivery-eprfs-boundary-retry.log`. The first full run is retained in `delivery-eprfs-final.log`: the dependency-boundary test read the new source subdirectory as a file. The repaired walker recursively checks production Rust files and preserves its assertions and test-file exclusion. The package-only focused attempt was interrupted while rebuilding a different feature closure; it is not passing evidence.
+
+The integrated executable re-read the original installation occurrence and returned the unchanged Intent and commitment CIDs, eligible actor attribution, `issues: []` and `acceptance-unestablished` (`integrated-source-live-context.json`). Independent integration and delta reviews found no actionable issue. Rust-style, the 460-test EPR core gate, the five-scenario/29-step story, a2o lint/format/types, Gherkin and 2,372 package projection checks also passed within their recorded source boundaries. Technical verdict and appointed acceptance remain separate native acts.
+
+Story review after the wording revision returned READY with correctness 0, interpretability 1 low and preference 0 in one fresh round. It resolved the fifth scenario's ambiguous source-reading wording; the retained low note is that “capacity returns below reset” leaves the retained-byte quantity implicit. The preceding round had correctness 0 and interpretability 1 on the fifth scenario. Evidence: `story-blind-final.md` and `story-cucumber-isolated.log`.
