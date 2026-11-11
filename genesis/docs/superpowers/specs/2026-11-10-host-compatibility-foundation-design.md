@@ -923,7 +923,7 @@ Recording a partial artifact as if it were complete is the failure this rule exi
 | Born with | What it lets another host do | Where it lives |
 |---|---|---|
 | The recipe: the method descriptor, the view's tree and the source commit | rebuild the same thing | method record by CID (exists) |
-| The build inputs as a document, line by line: compiler identity and its default target, link driver, link inputs and the libraries std links, all by content | see which host input made its key differ, and why | a stored document by the key input's CID, readable like the method record (K9) |
+| The build inputs as a document, line by line: compiler identity and its default target, link driver, link inputs and the libraries std links, all by content | see which host input made its key differ, and why | a stored document by the key input's CID, at reach `self` only: its lines reveal the building host's default ISA and sysroot layout, a host fact §4 keeps local; at wider reach a declared-target build names its floor by CID instead (K9) |
 | The family | find every variant of the same recipe | `env:family` (exists) |
 | `Requires`, extracted from the bytes at record time, with each clause's source | admit or refuse before fetching or launching | `env:requires` filled by `put` itself, not by the caller (K8) |
 | Dispatch evidence for code above the floor (§3.2) | not treat runtime-dispatched paths as requirements | inside the Requires document (K10) |
