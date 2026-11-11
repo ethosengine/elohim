@@ -387,7 +387,15 @@ class DriftObservationCase(unittest.TestCase):
                       {"tool_name": "Bash",
                        "tool_input": {"command": f"mv {self.project}/a.md {self.project}/b.md"}},
                       MEASURE_VERB="1")
-        notes = [c for c in self.stub_calls() if c[:2] == ["flow", "note"] and "--help" not in c]
+        # Structural notes use the same asynchronous handoff as edit notes above.
+        import time
+        deadline = time.monotonic() + 5
+        while True:
+            notes = [c for c in self.stub_calls()
+                     if c[:2] == ["flow", "note"] and "--help" not in c]
+            if notes or time.monotonic() > deadline:
+                break
+            time.sleep(0.05)
         self.assertTrue(notes, self.stub_calls())
         self.assertEqual({n[n.index("--measure") + 1] for n in notes},
                          {"claude-md-structural-signal@1"})
