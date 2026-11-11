@@ -1913,6 +1913,13 @@ fn fetch_plurality_queues_only_chosen_holders_and_records_divergence_once() {
                     .filter_map(Result::ok)
                     .find_map(|entry| {
                         let path = entry.path();
+                        // Only a renamed `<stem>.json` is a queued request. The CLI writes it
+                        // through a sibling `<stem>.tmp-…` and renames; claiming (and deleting)
+                        // the temporary raced that rename and failed the fetch with ENOENT
+                        // whenever the worker scanned between the write and the rename.
+                        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                            return None;
+                        }
                         let request =
                             serde_json::from_slice::<FetchRequest>(&std::fs::read(&path).ok()?)
                                 .ok()?;
