@@ -5,10 +5,18 @@ use crate::artifact::{closure_key, host, PATH_INPUT};
 use eprfs_core::TreePath;
 
 fn stub(dir: &Path, name: &str, body: &str) {
+    let identity = if name == "rustc" {
+        format!(
+            "if [ \"$1\" = -vV ]; then printf '%s' '{}'; exit 0; fi\n",
+            host::fixture::RUSTC_IDENTITY
+        )
+    } else {
+        String::new()
+    };
     let file = dir.join(name);
     std::fs::write(
         &file,
-        format!("#!/bin/sh\nif [ \"$1\" = --version ]; then exit 0; fi\n{body}\n"),
+        format!("#!/bin/sh\nif [ \"$1\" = --version ]; then exit 0; fi\n{identity}{body}\n"),
     )
     .unwrap();
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -19,7 +27,7 @@ fn descriptor(path: &str) -> MethodDescriptor {
     MethodDescriptor {
         name: "mesh-build".into(),
         tools: [
-            ("rustc".into(), "host: x86_64-unknown-linux-gnu".into()),
+            ("rustc".into(), host::fixture::RUSTC_IDENTITY.into()),
             ("toolchain".into(), "1.96.1".into()),
         ]
         .into(),
@@ -173,7 +181,8 @@ fn artifact_native_library_probe_uses_recorded_environment_target_and_private_sc
 test "$RUSTUP_TOOLCHAIN" = fixture-toolchain || exit 1
 test "$RECORDED_INPUT" = recorded || exit 2
 test "$LANG" = C || exit 3
-test -z "$HOME" || exit 4
+test "$RUSTUP_AUTO_INSTALL" = 0 || exit 4
+test -z "$UNRECORDED_INPUT" || exit 9
 test "$TMPDIR" = "$PWD" || exit 5
 test "$(/usr/bin/stat -c %a "$PWD")" = 700 || exit 8
 test "$*" = '--print native-static-libs --crate-type staticlib --target fixture-target -o probe.a -' || exit 6
@@ -217,11 +226,6 @@ fn artifact_real_toolchain_native_link_lines() {
     descriptor
         .tools
         .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
-    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME"] {
-        if let Ok(value) = std::env::var(name) {
-            descriptor.non_path_inputs.insert(name.into(), value);
-        }
-    }
     let linked = lines(&descriptor).unwrap();
     for name in ["m", "pthread", "dl", "rt", "util", "c", "gcc_s"] {
         assert!(
@@ -235,4 +239,69 @@ fn artifact_real_toolchain_native_link_lines() {
     for line in linked.lines().filter(|line| line.starts_with("link:")) {
         eprintln!("{}", line.split('\t').next().unwrap());
     }
+}
+
+#[test]
+fn artifact_native_library_requires_full_matching_identity_before_probing() {
+    let repo = tempfile::tempdir().unwrap();
+    checkout(repo.path());
+    let tools = tempfile::tempdir().unwrap();
+    let path = tools.path().to_str().unwrap();
+    let mut descriptor = descriptor(path);
+    stub(
+        tools.path(),
+        "cc",
+        "case \"$1\" in -print-file-name=*) echo \"${1#*=}\" ;; esac",
+    );
+    // PATH selects another compiler which ignores the pinned RUSTUP_TOOLCHAIN. No library
+    // response is needed: the identity mismatch must stop the second invocation.
+    for actual in [
+        host::fixture::RUSTC_IDENTITY.replace("release: 1.96.1", "release: 1.99.1"),
+        host::fixture::RUSTC_IDENTITY.replace("fixture-hash", "other-hash"),
+        host::fixture::RUSTC_IDENTITY.replace("22.1.2", "23.0.0"),
+    ] {
+        let rustc = tools.path().join("rustc");
+        std::fs::write(&rustc, format!(
+            "#!/bin/sh\n[ \"$1\" = --version ] && exit 0\n[ \"$1\" = -vV ] || exit 99\nprintf '%s' '{actual}'\n"
+        )).unwrap();
+        std::fs::set_permissions(&rustc, std::fs::Permissions::from_mode(0o755)).unwrap();
+        host::fixture::wait_for_stub(&rustc);
+        let Err(ArtifactError::Gap(message)) = closure_key(repo.path(), &descriptor) else {
+            panic!("compiler mismatch must be a typed Gap");
+        };
+        assert!(message.contains("rustc identity mismatch"), "{message}");
+        for identity in [host::fixture::RUSTC_IDENTITY, &actual] {
+            for line in identity
+                .lines()
+                .filter(|line| line.starts_with("release: ") || line.starts_with("commit-hash: "))
+            {
+                assert!(message.contains(line), "{message}");
+            }
+        }
+    }
+    for incomplete in [None, Some("rustc fixture\nhost: x86_64-unknown-linux-gnu")] {
+        descriptor.tools.remove("rustc");
+        if let Some(identity) = incomplete {
+            descriptor.tools.insert("rustc".into(), identity.into());
+        }
+        assert!(
+            matches!(closure_key(repo.path(), &descriptor), Err(ArtifactError::Gap(message))
+            if message.contains("full rustc -vV identity; describe again"))
+        );
+    }
+}
+
+#[test]
+fn artifact_native_library_missing_toolchain_refuses_without_installing() {
+    let path = std::env::var("PATH").unwrap();
+    let mut descriptor = descriptor(&path);
+    descriptor
+        .tools
+        .insert("toolchain".into(), "9.99.99".into());
+    let Err(ArtifactError::Gap(message)) = probe(&descriptor, &path) else {
+        panic!("uninstalled toolchain must refuse");
+    };
+    assert!(message.contains("not installed"), "{message}");
+    assert!(!message.contains("syncing channel"), "{message}");
+    assert!(!message.contains("downloading"), "{message}");
 }

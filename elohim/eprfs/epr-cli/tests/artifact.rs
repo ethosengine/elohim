@@ -178,10 +178,7 @@ fn method_file_with(
         name: "mesh-build".into(),
         tools: [
             ("toolchain".to_string(), "1.96.1".to_string()),
-            (
-                "rustc".to_string(),
-                "rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n".to_string(),
-            ),
+            ("rustc".to_string(), fixture::RUSTC_IDENTITY.to_string()),
         ]
         .into(),
         flags: vec!["--bin=elohim-storage".into(), "--profile=dev".into()],
@@ -950,7 +947,7 @@ fn fake_tool(dir: &Path, name: &str, body: &str) {
         fake_tool(
             dir,
             "rustc",
-            "echo 'note: native-static-libs: -lgcc_s -lc' >&2",
+            &format!("if [ \"$1\" = -vV ]; then printf '%s' '{}'; else echo 'note: native-static-libs: -lgcc_s -lc' >&2; fi", fixture::RUSTC_IDENTITY),
         );
     }
 }
@@ -959,7 +956,11 @@ fn fake_tool(dir: &Path, name: &str, body: &str) {
 fn artifact_descriptor_without_path_preserves_legacy_key() {
     let repo = checkout();
     let scratch = TempDir::new().unwrap();
-    let (_, descriptor) = method_file(scratch.path(), &["crate/src"]);
+    let (_, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    descriptor.tools.insert(
+        "rustc".into(),
+        "rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n".into(),
+    );
     let key = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
     // Captured at dev 6b8006579. This synthetic descriptor has no recorded PATH and
     // probes no host tools: this golden covers legacy descriptors, not link inputs.
@@ -1591,13 +1592,122 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
     descriptor
         .tools
         .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
-    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME"] {
-        if let Ok(value) = std::env::var(name) {
-            descriptor.non_path_inputs.insert(name.into(), value);
-        }
-    }
     elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
     eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
+}
+
+#[test]
+fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_input() {
+    let repo = checkout();
+    let scratch = TempDir::new().unwrap();
+    let tools = scratch.path().join("bin");
+    std::fs::create_dir_all(&tools).unwrap();
+    // Keep Cargo's metadata response synthetic: describe runs its actual parser/writer and
+    // the real rustc, without nesting another cargo command inside the test's cargo process.
+    fake_tool(&tools, "cargo", "case \"$1\" in -V|--version) echo 'cargo fixture';; metadata) echo '{\"packages\":[]}';; *) exit 1;; esac");
+    // fake_tool supplies rustc for other fixtures; this test must resolve the real proxy.
+    std::fs::remove_file(tools.join("rustc")).unwrap();
+    std::fs::write(
+        repo.path().join("crate/Cargo.toml"),
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.path().join("manifest.json"),
+        r#"{"steps":{"build":{"inputs":{"sources":["crate/src/**"]}}}}"#,
+    )
+    .unwrap();
+    git(repo.path(), &["add", "crate/Cargo.toml", "manifest.json"]);
+    git(repo.path(), &["commit", "-qm", "describe fixture"]);
+
+    let build_path = std::env::var("PATH").unwrap();
+    let mut describe = Command::new(env!("CARGO_BIN_EXE_epr"));
+    describe
+        .env_clear()
+        .env("PATH", format!("{}:{build_path}", tools.display()))
+        .env("RUSTUP_TOOLCHAIN", "1.96.1")
+        .env("RUSTUP_AUTO_INSTALL", "0")
+        .env("XDG_CONFIG_HOME", scratch.path().join("config"));
+    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME", "TMPDIR"] {
+        if let Some(value) = std::env::var_os(name) {
+            describe.env(name, value);
+        }
+    }
+    // mesh_describe_method passes configured build variables and PATH via --env. Homes are
+    // inherited by the process only, exactly as they are for its later key/fetch/put calls.
+    describe
+        .args([
+            "artifact",
+            "describe",
+            "--project",
+            "doorway",
+            "--bin",
+            "fixture",
+            "--crate",
+            "crate",
+            "--sources",
+            "manifest.json#build",
+            "--rustflags",
+            "",
+            "--env",
+            "CC=cc",
+            "--env",
+            "RUSTUP_TOOLCHAIN=1.96.1",
+            "--env",
+        ])
+        .arg(format!("PATH={build_path}"))
+        .arg("--repo")
+        .arg(repo.path());
+    let out = describe.output().unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    let descriptor: MethodDescriptor = serde_json::from_slice(&out.stdout).unwrap();
+    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME"] {
+        assert!(!descriptor.non_path_inputs.contains_key(name), "{name}");
+    }
+    assert_eq!(descriptor.non_path_inputs["PATH"], build_path);
+    assert_eq!(descriptor.non_path_inputs["CC"], "cc");
+    assert!(descriptor.tools["rustc"].contains("release: 1.96.1"));
+    let method = scratch.path().join("method.json");
+    std::fs::write(&method, &out.stdout).unwrap();
+    let baseline = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+
+    // Isolated children vary HOME without mutating the parallel test process's environment.
+    // RUSTUP_HOME continues to locate the same installed compiler in both cases.
+    let rustup_home = std::env::var_os("RUSTUP_HOME").expect("device has RUSTUP_HOME");
+    for home in ["home-a", "home-b"] {
+        let home = scratch.path().join(home);
+        std::fs::create_dir(&home).unwrap();
+        let mut key_command = Command::new(env!("CARGO_BIN_EXE_epr"));
+        key_command
+            .env_clear()
+            .env("PATH", &build_path)
+            .env("CC", "cc")
+            .env("RUSTFLAGS", "")
+            .env("RUSTUP_TOOLCHAIN", "1.96.1")
+            .env("HOME", &home)
+            .env("RUSTUP_HOME", &rustup_home)
+            .env("XDG_CONFIG_HOME", scratch.path().join("config"));
+        for name in ["CARGO_HOME", "TMPDIR"] {
+            if let Some(value) = std::env::var_os(name) {
+                key_command.env(name, value);
+            }
+        }
+        let out = key_command
+            .args(["artifact", "key", "--json", "--repo"])
+            .arg(repo.path())
+            .arg("--method")
+            .arg(&method)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{}", text(&out));
+        let key: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(key["keyCid"], baseline.key_cid.to_string());
+        assert_eq!(
+            std::fs::read_dir(home).unwrap().count(),
+            0,
+            "proxy must not write in HOME"
+        );
+    }
 }
 
 #[test]
