@@ -625,20 +625,29 @@ fn is_excluded_ignored(path: &str) -> bool {
 /// cannot name what a build would read: a tracked symlink leaving the view, an index flag or a
 /// submodule `ignore` hiding changes, or ignored untracked files inside the view.
 pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    closure_selection(repo, descriptor).map(|(key, _)| key)
+    closure_selection(repo, descriptor).map(|(key, _, _)| key)
+}
+
+/// Preserve the exact descriptor whose canonical bytes identify the resolved method.
+fn effective_selection(
+    descriptor: &MethodDescriptor,
+    config: &toml::Value,
+) -> ArtifactResult<(MethodDescriptor, host::Selections)> {
+    let mut effective = descriptor.clone();
+    let selections = host::resolve(
+        &mut effective.non_path_inputs,
+        config,
+        host::target(descriptor),
+    )?;
+    Ok((effective, selections))
 }
 
 fn closure_selection(
     repo: &Path,
     descriptor: &MethodDescriptor,
-) -> ArtifactResult<(ClosureKey, host::Selections)> {
+) -> ArtifactResult<(ClosureKey, host::Selections, MethodDescriptor)> {
     let (config_lines, config) = cargo_config_lines(repo, descriptor)?;
-    let mut effective = descriptor.clone();
-    let selections = host::resolve(
-        &mut effective.non_path_inputs,
-        &config,
-        host::target(descriptor),
-    )?;
+    let (effective, selections) = effective_selection(descriptor, &config)?;
     let method = effective
         .cid()
         .map_err(|e| ArtifactError::Gap(format!("the method descriptor does not encode: {e}")))?;
@@ -718,6 +727,7 @@ fn closure_selection(
             key,
         },
         selections,
+        effective,
     ))
 }
 
@@ -740,14 +750,14 @@ fn read_descriptor(options: &Options) -> ArtifactResult<MethodDescriptor> {
 }
 
 fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    clean_selection(repo, descriptor).map(|(key, _)| key)
+    clean_selection(repo, descriptor).map(|(key, _, _)| key)
 }
 
 fn clean_selection(
     repo: &Path,
     descriptor: &MethodDescriptor,
-) -> ArtifactResult<(ClosureKey, host::Selections)> {
-    let (key, selections) = closure_selection(repo, descriptor)?;
+) -> ArtifactResult<(ClosureKey, host::Selections, MethodDescriptor)> {
+    let (key, selections, effective) = closure_selection(repo, descriptor)?;
     if !key.dirty.is_empty() {
         return Err(ArtifactError::Gap(format!(
             "the closure has uncommitted changes inside the method's view ({}), so the bytes \
@@ -755,7 +765,7 @@ fn clean_selection(
             key.dirty.join("; ")
         )));
     }
-    Ok((key, selections))
+    Ok((key, selections, effective))
 }
 
 /// [`build_env_refusal`] against this process's environment.
@@ -989,7 +999,9 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(out, format!("{text}\n"))?;
-            let method = descriptor
+            let (_, config) = cargo_config_lines(&options.repo, &descriptor)?;
+            let (effective, _) = effective_selection(&descriptor, &config)?;
+            let method = effective
                 .cid()
                 .map_err(|e| ArtifactError::Gap(e.to_string()))?;
             println!("{method}");
@@ -1130,7 +1142,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     // The environment recording runs in must be the one the method records (the mesh build runs
     // cargo in exactly it), and the closure must be the one the build started from.
     check_build_env(&descriptor).map_err(unrecorded)?;
-    let (key, selections) = clean_selection(repo, &descriptor).map_err(unrecorded)?;
+    let (key, selections, effective) = clean_selection(repo, &descriptor).map_err(unrecorded)?;
     if key.input.to_string() != input {
         return Err(unrecorded(format!(
             "the closure moved during the build: it was {input}, it is {} now",
@@ -1242,7 +1254,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         format!("env:agentId={agent_id}"),
     ];
     let put = runtime.block_on(async {
-        put_method_record(store.as_ref(), &descriptor)
+        put_method_record(store.as_ref(), &effective)
             .await
             .map_err(|e| unrecorded(format!("the method record is not stored: {e}")))?;
         let mut flow = SidecarFlowStore::open(&flow_root)

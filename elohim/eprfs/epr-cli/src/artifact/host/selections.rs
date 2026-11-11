@@ -160,7 +160,8 @@ pub(crate) fn resolve(
         };
         let Some(option) = option else { continue };
         let (key, value) = option.split_once('=').unwrap_or((option, ""));
-        match key {
+        let key = key.replace('_', "-");
+        match key.as_str() {
             "link-self-contained" | "linker-flavor" | "linker-features" => {
                 return Err(unsupported(&format!("{arg} {option}")));
             }
@@ -261,9 +262,45 @@ mod tests {
     }
 
     #[test]
+    fn artifact_underscore_link_args_work_in_every_codegen_form() {
+        for prefix in [
+            "-C",
+            "-C\x1f",
+            "--codegen\x1f",
+            "--codegen=",
+            "-Z",
+            "-Z\x1f",
+        ] {
+            let result = selection(&format!("{prefix}link_arg=-fuse-ld=/some/path"));
+            assert_eq!(result.external_linker.as_deref(), Some("/some/path"));
+            assert!(!result.bundled_lld_authorized);
+            let result = selection(&format!(
+                "-Clink-arg=-fuse-ld=gold\x1f{prefix}link_args=-fuse-ld=bfd -fuse-ld=lld"
+            ));
+            assert_eq!(result.external_linker, None);
+            assert!(result.bundled_lld_authorized);
+        }
+    }
+
+    #[test]
     fn artifact_every_unsupported_codegen_form_refuses_even_before_override() {
-        for flag in ["link-self-contained=-linker", "linker-flavor=gnu"] {
-            for prefix in ["-C", "-C\x1f", "--codegen\x1f", "--codegen="] {
+        for flag in [
+            "link-self-contained=-linker",
+            "link_self_contained=-linker",
+            "link-self_contained=-linker",
+            "link_self-contained=-linker",
+            "linker-flavor=gnu",
+            "linker_flavor=gnu",
+            "linker_features=-lld",
+        ] {
+            for prefix in [
+                "-C",
+                "-C\x1f",
+                "--codegen\x1f",
+                "--codegen=",
+                "-Z",
+                "-Z\x1f",
+            ] {
                 let mut inputs = [(
                     "CARGO_ENCODED_RUSTFLAGS".into(),
                     format!("{prefix}{flag}\x1f-Clink-arg=-fuse-ld=lld"),

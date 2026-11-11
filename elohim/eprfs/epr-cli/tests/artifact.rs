@@ -245,10 +245,40 @@ fn events(root: &Path) -> Vec<FlowEvent> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
+    put_and_mount(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn artifact_overridden_flags_store_the_keyed_method_and_mount() {
+    put_and_mount(true).await;
+}
+
+async fn put_and_mount(overridden: bool) {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
-    let (method, descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
+    if overridden {
+        descriptor.non_path_inputs.insert(
+            "CARGO_ENCODED_RUSTFLAGS".into(),
+            "-Clink-arg=-fuse-ld=lld".into(),
+        );
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), "-Clinker=/nonexistent/ignored".into());
+        std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    }
+    let command = || {
+        let mut command = a.command();
+        command.envs(descriptor.non_path_inputs.iter());
+        command
+    };
+    let mut effective = descriptor.clone();
+    if overridden {
+        effective.non_path_inputs.remove("RUSTFLAGS");
+        assert_ne!(effective.cid().unwrap(), descriptor.cid().unwrap());
+    }
+    let method_cid = effective.cid().unwrap();
     let (stub, log) = brit_stub(scratch.path());
     let bytes = scratch.path().join("elohim-storage");
     let mut artifact = artifact_elf(b"Linker: LLD 22.1.2\0");
@@ -257,22 +287,25 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
 
-    let out = a.epr(&[
-        "artifact", "key", "--method", &method, "--repo", &repo, "--json",
-    ]);
+    let out = command()
+        .args([
+            "artifact", "key", "--method", &method, "--repo", &repo, "--json",
+        ])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", text(&out));
     let key: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     let input = key["input"].as_str().unwrap().to_string();
     let key_cid = key["keyCid"].as_str().unwrap().to_string();
     assert_eq!(key["basis"], "basis-key:git-tree");
-    assert_eq!(key["method"], descriptor.cid().unwrap().to_string());
+    assert_eq!(key["method"], method_cid.to_string());
     assert!(
         key_cid.starts_with("bafyrei"),
         "the key is a DAG-CBOR CID: {key_cid}"
     );
 
     let put = |input: &str| {
-        a.command()
+        command()
             .env("BRIT_BUILD_REF_BIN", &stub)
             .args([
                 "artifact",
@@ -313,7 +346,7 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
         "--step mesh-build:elohim-storage".to_string(),
         format!("--inputs-hash {key_cid}"),
         format!("--output {output}"),
-        format!("--manifest {}", descriptor.cid().unwrap()),
+        format!("--manifest {method_cid}"),
         "--duration-ms 1234".to_string(),
     ] {
         assert!(build.contains(&part), "{part} in {build}");
@@ -369,6 +402,12 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
     .await
     .unwrap()
     .store;
+    let stored = store
+        .fetch_blob(&method_cid, eprfs_core::FetchPolicy::LocalOnly)
+        .await
+        .unwrap();
+    assert_eq!(BlobCid::compute(&stored.bytes).to_string(), key["method"]);
+    assert_eq!(stored.cid, effective.cid().unwrap());
     let (mount, _served) = BlobMount::new(store, did.clone());
     let indexed: Vec<_> = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
     let unindexed = mount.rebuild_from_flow(&indexed).await;
@@ -1388,6 +1427,7 @@ fn artifact_codegen_long_form_keys_driver() {
     use elohim_epr_cli::artifact::closure_key;
     let repo = checkout();
     let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "build cc");
     let (_, mut descriptor) = method_file_with(
         tools.path(),
         &["crate/src"],
@@ -1535,4 +1575,89 @@ fn artifact_other_target_linker_does_not_affect_key() {
         before.key_cid,
         closure_key(repo.path(), &descriptor).unwrap().key_cid
     );
+}
+
+#[test]
+fn artifact_explicit_driver_still_keys_implicit_cc_defaults_and_version() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup").unwrap();
+    fixture_driver(
+        tools.path(),
+        "driver",
+        "driver 1",
+        "#define DRIVER 1",
+        &input,
+    );
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", "-Clinker=driver"),
+        ],
+    );
+    assert!(!descriptor.non_path_inputs.contains_key("CC"));
+    let compiler = |version, macros| {
+        fake_tool(
+            tools.path(),
+            "cc",
+            &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '{macros}' ;;\n*) exit 1 ;;\nesac"
+    ),
+        )
+    };
+    compiler("cc 1", "#define DEFAULT 1");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    compiler("cc 1", "#define DEFAULT 2");
+    let defaults_changed = closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, defaults_changed.key_cid);
+    compiler("cc 2", "#define DEFAULT 2");
+    assert_ne!(
+        defaults_changed.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_underscore_link_args_key_external_path() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let external = tools.path().join("external-ld");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    for flags in [
+        format!("-Clink_arg=-fuse-ld={}", external.display()),
+        format!(
+            "--codegen=link_args=-fuse-ld=lld -fuse-ld={}",
+            external.display()
+        ),
+        format!(
+            "-Clink-arg=-fuse-ld=lld\x1f-C\x1flink_args=-fuse-ld=bfd -fuse-ld={}",
+            external.display()
+        ),
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert("CARGO_ENCODED_RUSTFLAGS".into(), flags);
+        fake_tool(tools.path(), "external-ld", "echo 'GNU ld 1'");
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        fake_tool(tools.path(), "external-ld", "echo 'GNU ld 2'");
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::remove_file(&external).unwrap();
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains(external.to_str().unwrap()));
+    }
 }

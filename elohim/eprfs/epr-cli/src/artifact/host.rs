@@ -128,7 +128,7 @@ fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> Art
     Ok(())
 }
 
-/// Probe only the effective final-link driver, independently of the build-script C compiler.
+/// Probe the effective final-link driver and the independently selected build-script C compiler.
 pub(super) fn tool_lines(
     descriptor: &MethodDescriptor,
     selections: &Selections,
@@ -169,12 +169,17 @@ pub(super) fn tool_lines(
     } else {
         lines.push_str("tool:link-driver\t-\n");
     }
-    if let Some(cc) = descriptor.non_path_inputs.get("CC") {
-        let cc = resolve_tool(cc, path).ok_or_else(|| {
-            ArtifactError::Gap(format!(
-                "build-script C compiler CC={cc} does not resolve under recorded PATH"
-            ))
-        })?;
+    let cc_name = descriptor
+        .non_path_inputs
+        .get("CC")
+        .map_or("cc", String::as_str);
+    let cc = resolve_tool(cc_name, path);
+    if cc.is_none() && descriptor.non_path_inputs.contains_key("CC") {
+        return Err(ArtifactError::Gap(format!(
+            "build-script C compiler CC={cc_name} does not resolve under recorded PATH"
+        )));
+    }
+    if let Some(cc) = cc {
         if driver.as_ref() != Some(&cc) {
             tool_version(&mut lines, "CC", &cc, path)?;
             driver_defaults(&mut lines, "CC", &cc, path)?;
