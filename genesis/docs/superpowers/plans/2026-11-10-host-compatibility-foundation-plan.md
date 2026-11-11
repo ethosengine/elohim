@@ -187,9 +187,9 @@ Verify: one admitted and three refused fetches, each refusal naming its reason; 
 
 Verify: an adapted member lands with its recorded transition; a non-member is refused as before.
 
-- [ ] **V6 — contribution to a binary family as an attributed, valued event (spec §7 framing): an adapted variant, a packed floor or a replication of a family's leaves is recorded as a `Commitment` naming the family's collective, reusing the commons-pool-as-collective-party shape (no new entry type), with REA `EconomicEvent`s when others draw on it. BLOCKED on the commons-pool slice (held, no habit) and on elohim-storage's per-object custody and collection health (`arch-dataplane-refactor-backlog` row 23)** (serves dataplane-convergence)
+- [ ] **V6 — contribution to a binary family as an attributed, valued event (spec §7 framing): an adapted variant, a packed floor or a replication of a family's leaves is recorded as a `Commitment` naming the collective (an ordinary, network-type `Collective`; nothing binary-specific), reusing the commons-pool-as-collective-party shape (no new entry type), with REA `EconomicEvent`s when others draw on it. BLOCKED on the commons-pool slice (held, no habit) and on elohim-storage's per-object custody and collection health (`arch-dataplane-refactor-backlog` row 23)** (serves dataplane-convergence)
 
-Verify: an adapted variant appended to a family on one device is credited to its contributor; a second device's fetch of it records a draw against the family's collective; the family's health reads the collection-health fold from elohim-storage, not an artifact-store count.
+Verify: an adapted variant appended to a family on one device is credited to its contributor; a second device's fetch of it records a draw against the collective; the family's health reads the collection-health fold from elohim-storage, not an artifact-store count.
 
 ## Lane P — placement, measure and rakia (spec §7.3, §10; rung H5; H10)
 
@@ -282,9 +282,9 @@ steward-space head move → a repair reused by a second device.
 
 Verify: `@concern:dataplane-convergence`; one fresh blind reader returns READY with no correctness finding.
 
-- [ ] **S6 — a story for the binary as a collective (spec §7 framing): a person whose device class nobody has seen runs the family's portable variant on day one, contributes an adaptation for their hardware, and later sees that adaptation become what other devices of their class rely on, with the contribution credited to them** (serves dataplane-convergence)
+- [ ] **S6 — the next scenarios in the unseen-device arc, extending S3's `devflow/unseen-device-builds-its-variant.feature` (or a new file that cites it, so the story stays in one place), for the binary as a collective (spec §7 framing): a person whose device class nobody has seen runs the family's portable variant on day one, contributes an adaptation for their hardware, and later sees that adaptation become what other devices of their class rely on, with the contribution credited to them** (serves dataplane-convergence)
 
-Verify: `@concern:dataplane-convergence`; one fresh blind reader returns READY with no correctness finding; the story names no artifact-store-specific mechanism the framing table does not map to an existing EPR concept.
+Verify: `@concern:dataplane-convergence`; its author runs the a2o blind-reader loop (one fresh reader returns READY with no correctness finding; S3's run does not carry over); the story speaks of a generic collective and names no artifact-store-specific mechanism the framing table does not map to an existing EPR concept.
 
 - [ ] **C1 — a channel head names a variant-set CID: resolve ark's `ArtifactRef::Channel` through the device's declared `follows`, reusing storage's release-channel id rule (`elohim/elohim-storage/src/release_channel.rs`) and the steward-space compare-and-swap head move** (serves dataplane-convergence)
 

@@ -416,6 +416,8 @@ rely on, which is the belonging layer.
 | The cloud is healthy | every leaf meets its declared custody target across independent holders, with five diverse peers as the high-availability benchmark. Owned by the blob plane, not the artifact store | storage physics benchmark (2026-10-05) §8; elohim-storage `CoverageRollup`; feedback row: `arch-dataplane-refactor-backlog` row 23 |
 | Rising to the belonging layer | conformance-suite membership (§7.1) plus the reach ladder (§3.2), widening by proof, not by vote or authority | §7.1, §7.4, §7.8 |
 
+The collective here is not a special kind. It is an ordinary `Collective`: a network-type collective, held across many peers and governed by proof. The binary cloud is only the case that made it visible. It is a protocol primitive that every collective relies on to keep the protocol's evolution sound at scale, which is why it is worth mastering here first.
+
 Read as EPR, this is story, value and governance again. The **story** is a person whose device
 nobody has seen: it works on day one, and what they contribute later carries others. The **value** is
 contribution as an attributed event, not anonymous lineage. The **governance** is the conformance
@@ -426,8 +428,8 @@ belong to elohim-storage's blob plane. The gaps found while writing this section
 backlog (`arch-dataplane-refactor-backlog` row 23), so every consumer of the blob plane inherits the
 fix. Missing nodes:
 
-- `binary collective / between "variant contributed with lineage" → "contributor credited when others rely on it" / missing node: the contribution recorded as a Commitment naming the family's collective, with REA events on use / current state: lineage is recorded; nothing credits it; the commons-pool slice it would use is held`.
-- `binary collective / between "family published" → "family healthy" / missing node: a collection-health fold over the family's leaves reading per-object custody targets / current state: owed by elohim-storage (backlog row above)`.
+- `collective / between "variant contributed with lineage" → "contributor credited when others rely on it" / missing node: the contribution recorded as a Commitment naming the collective, with REA events on use / current state: lineage is recorded; nothing credits it; the commons-pool slice it would use is held`.
+- `collective / between "family published" → "family healthy" / missing node: a collection-health fold over the family's leaves reading per-object custody targets / current state: owed by elohim-storage (backlog row above)`.
 
 One logical artifact has several variants. A **variant set** is a small content-addressed document:
 
