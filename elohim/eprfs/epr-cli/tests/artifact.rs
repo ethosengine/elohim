@@ -2705,3 +2705,84 @@ fn artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority() {
         text(&missing)
     );
 }
+
+#[test]
+fn artifact_executable_put_refuses_reserved_archive_method_before_recording() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "reserved");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    descriptor.name = "sysroot-pack".into();
+    descriptor.step = Some("sysroot-pack:elohim-storage".into());
+    let rustc = Command::new("rustc").arg("-vV").output().unwrap();
+    assert!(rustc.status.success());
+    let rustc = String::from_utf8(rustc.stdout).unwrap();
+    let llvm = rustc
+        .lines()
+        .find_map(|line| line.strip_prefix("LLVM version: "))
+        .unwrap()
+        .to_owned();
+    descriptor.tools.insert("rustc".into(), rustc);
+    std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let key = elohim_epr_cli::artifact::closure_key(device.root(), &descriptor).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    std::fs::write(
+        &bytes,
+        artifact_elf(format!("Linker: LLD {llvm}\0").as_bytes()),
+    )
+    .unwrap();
+    let out = device
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .args([
+            "artifact",
+            "put",
+            "--method",
+            method.to_str().unwrap(),
+            "--input",
+            &key.input.to_string(),
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--repo",
+            device.root().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("method/validator mismatch"),
+        "{}",
+        text(&out)
+    );
+    assert!(!log.exists());
+    assert!(events(device.root()).is_empty());
+}
+
+#[test]
+fn artifact_sysroot_put_bounds_initial_archive_read() {
+    let scratch = TempDir::new().unwrap();
+    let archive = scratch.path().join("oversize.eprsys");
+    std::fs::File::create(&archive)
+        .unwrap()
+        .set_len(elohim_epr_cli::artifact::sysroot::limits::MAX_ARCHIVE_BYTES + 1)
+        .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args([
+            "artifact",
+            "sysroot",
+            "put",
+            "--archive",
+            archive.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("archive read byte limit"),
+        "{}",
+        text(&out)
+    );
+}

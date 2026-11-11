@@ -183,7 +183,7 @@ fn isa_notes_record_v3_payload_and_tampered_evidence_refuses() {
     let mut false_manifest = manifest;
     false_manifest.isa_notes.clear();
     let mut remaining = &archive[8..];
-    sized(&mut remaining).unwrap();
+    sized(&mut remaining, Limit::ManifestBytes).unwrap();
     let json = false_manifest.canonical_bytes().unwrap();
     let mut forged = MAGIC.to_vec();
     forged.extend_from_slice(&(json.len() as u64).to_le_bytes());
@@ -193,4 +193,170 @@ fn isa_notes_record_v3_payload_and_tampered_evidence_refuses() {
         .unwrap_err()
         .to_string()
         .contains("evidence disagrees"));
+}
+
+#[test]
+fn script_comments_unsupported_first_and_empty_operands_cannot_bypass_validation() {
+    let dir = tree();
+    let script = dir.path().join("lib64/libc.so");
+    for text in [
+        "# comment\nINPUT ( /outside/missing.so )",
+        "# comment\nINPUT ( ../../outside )",
+        "SEARCH_DIR(/lib64) INPUT(libc.so.6)",
+        "INPUT ()",
+        "GROUP(AS_NEEDED())",
+        "INPUT(/* empty */)",
+        "INPUT ( missing.so )",
+        "OUTPUT_FORMAT(SEARCH_DIR(/lib64)) INPUT(libc.so.6)",
+    ] {
+        fs::write(&script, text).unwrap();
+        assert!(pack(dir.path(), "test").is_err(), "accepted {text}");
+    }
+    fs::write(&script, b"# \xff\nINPUT(/outside/missing.so)").unwrap();
+    assert!(pack(dir.path(), "test").is_err());
+    fs::write(
+        &script,
+        "# leading\n/* first */ INPUT/* adjacent */(libc.so.6/* operand */) /* trailing */",
+    )
+    .unwrap();
+    let (archive, manifest) = pack(dir.path(), "test").unwrap();
+    assert_eq!(manifest.scripts[0].operands, ["lib64/libc.so.6"]);
+    assert_eq!(verify(&archive).unwrap(), manifest);
+}
+
+fn assert_limit<T: std::fmt::Debug>(result: ArtifactResult<T>, expected: Limit) {
+    assert!(
+        matches!(result, Err(ArtifactError::SysrootLimit(actual)) if actual == expected),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn expanded_acyclic_symlink_fanout_refuses_count_and_depth() {
+    for (levels, expected) in [(16, Limit::Members), (65, Limit::Depth)] {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..levels {
+            let path = dir.path().join(format!("d{i:02}"));
+            fs::create_dir(&path).unwrap();
+            if i + 1 < levels {
+                symlink(format!("../d{:02}", i + 1), path.join("a")).unwrap();
+                symlink(format!("../d{:02}", i + 1), path.join("b")).unwrap();
+            }
+        }
+        let root = fs::canonicalize(dir.path()).unwrap();
+        assert_limit(
+            walk(
+                &root,
+                &root.join("d00"),
+                "d00",
+                &mut Vec::new(),
+                &mut Members::new(),
+                &mut Budget::default(),
+            ),
+            expected,
+        );
+    }
+}
+
+#[test]
+fn manifest_count_and_byte_prefixes_refuse_before_decode_or_copy() {
+    use limits::*;
+    let mut prefix = MAGIC.to_vec();
+    prefix.extend_from_slice(&(MAX_MANIFEST_BYTES + 1).to_le_bytes());
+    assert_limit(verify(&prefix), Limit::ManifestBytes);
+    let json = format!(
+        "{{\"files\":[{}]}}",
+        vec!["{}"; MAX_MEMBERS as usize + 1].join(",")
+    );
+    prefix.truncate(8);
+    prefix.extend_from_slice(&(json.len() as u64).to_le_bytes());
+    prefix.extend_from_slice(json.as_bytes());
+    assert_limit(verify(&prefix), Limit::Members);
+    let length = (MAX_FILE_BYTES + 1).to_le_bytes();
+    assert_limit(
+        file_body(&mut length.as_slice(), &mut Budget::default()),
+        Limit::FileBytes,
+    );
+    let length = 1u64.to_le_bytes();
+    assert_limit(
+        file_body(
+            &mut length.as_slice(),
+            &mut Budget {
+                members: 0,
+                bytes: MAX_TOTAL_BYTES,
+            },
+        ),
+        Limit::TotalBytes,
+    );
+}
+
+#[test]
+fn byte_limits_accept_exact_maximum_and_refuse_next_byte() {
+    use limits::*;
+    for limit in [
+        Limit::Members,
+        Limit::Depth,
+        Limit::ManifestBytes,
+        Limit::FileBytes,
+        Limit::TotalBytes,
+        Limit::ArchiveBytes,
+    ] {
+        limit.check(limit.maximum()).unwrap();
+        assert_limit(limit.check(limit.maximum() + 1), limit);
+    }
+    // Exercise the actual encoder at exactly the maximum and one byte beyond it.
+    let mut manifest = Manifest {
+        version: 1,
+        triple: String::new(),
+        files: vec![],
+        scripts: vec![],
+        isa_notes: vec![],
+        libc_version: None,
+    };
+    let overhead = manifest.canonical_bytes().unwrap().len();
+    manifest.triple = "x".repeat(MAX_MANIFEST_BYTES as usize - overhead);
+    assert_eq!(
+        manifest.canonical_bytes().unwrap().len() as u64,
+        MAX_MANIFEST_BYTES
+    );
+    manifest.triple.push('x');
+    assert_limit(manifest.canonical_bytes(), Limit::ManifestBytes);
+    // Sparse files avoid disk pressure; the accepted per-file boundary exercises the real reader.
+    let file = tempfile::NamedTempFile::new().unwrap();
+    file.as_file().set_len(MAX_FILE_BYTES).unwrap();
+    assert_eq!(
+        limits::read_file(file.path(), 0).unwrap().len() as u64,
+        MAX_FILE_BYTES
+    );
+    file.as_file().set_len(MAX_FILE_BYTES + 1).unwrap();
+    assert_limit(limits::read_file(file.path(), 0), Limit::FileBytes);
+    file.as_file().set_len(1).unwrap();
+    assert_eq!(
+        limits::read_file(file.path(), MAX_TOTAL_BYTES - 1).unwrap(),
+        [0]
+    );
+    assert_limit(
+        limits::read_file(file.path(), MAX_TOTAL_BYTES),
+        Limit::TotalBytes,
+    );
+    file.as_file().set_len(MAX_ARCHIVE_BYTES + 1).unwrap();
+    assert_limit(limits::read_archive(file.path()), Limit::ArchiveBytes);
+}
+
+#[test]
+fn ordinary_header_macros_are_not_linker_script_candidates() {
+    let dir = tree();
+    fs::write(
+        dir.path().join("usr/include/unistd.h"),
+        b"#define N 1\n__SC_COMP(N, sys_io, compat_io)\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("usr/include/sysmacros.h"),
+        b"#define N 1\nDECLARE_RC_STRUCT(N)\n",
+    )
+    .unwrap();
+    let (archive, manifest) = pack(dir.path(), "test").unwrap();
+    assert!(manifest.scripts.is_empty());
+    verify(&archive).unwrap();
 }

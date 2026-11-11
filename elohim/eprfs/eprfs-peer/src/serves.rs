@@ -7,6 +7,10 @@
 //! any other method is held and never served. Default deny: a policy with no
 //! `berth.artifacts.serves` serves nothing.
 //!
+//! Method records require the additional `berth.artifacts.discloseMethod: ["method", ...]`
+//! permission. It defaults to deny, does not itself grant an audience, and enters the rules
+//! digest independently of `serves`. Reloading either permission takes effect on the next request.
+//!
 //! Audience vocabulary:
 //! - `"steward"` — every device of the person [`Admission::admits_device`] admits now;
 //! - `"carrier:<did:key>"` — reserved for a carrier grant (D9). It parses, enters the rules
@@ -35,6 +39,7 @@ pub const CARRIER_AUDIENCE_PREFIX: &str = "carrier:";
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ArtifactServeList {
     by_method: BTreeMap<String, BTreeSet<String>>,
+    disclose_method: BTreeSet<String>,
 }
 
 impl ArtifactServeList {
@@ -50,6 +55,23 @@ impl ArtifactServeList {
             reason,
         };
         let mut list = ArtifactServeList::default();
+        if let Some(disclosure) = policy.pointer("/berth/artifacts/discloseMethod") {
+            let methods = disclosure.as_array().ok_or_else(|| {
+                invalid("berth.artifacts.discloseMethod: not an array of method names".into())
+            })?;
+            for method in methods {
+                let method = method
+                    .as_str()
+                    .filter(|name| !name.is_empty())
+                    .ok_or_else(|| {
+                        invalid(
+                            "berth.artifacts.discloseMethod: expected a nonempty method name"
+                                .into(),
+                        )
+                    })?;
+                list.disclose_method.insert(method.to_owned());
+            }
+        }
         let Some(serves) = POLICY_KEYS
             .iter()
             .try_fold(policy, |value, key| value.get(key))
@@ -104,6 +126,16 @@ impl ArtifactServeList {
             .get(method_name)
             .is_some_and(|audiences| audiences.contains(STEWARD_AUDIENCE))
             && admission.admits_device(device)
+    }
+
+    /// Additional permission for descriptor bytes; callers must still enforce the audience grant.
+    pub fn discloses_method(&self, method: &str) -> bool {
+        self.disclose_method.contains(method)
+    }
+
+    /// Ordered descriptor permissions for the rules digest.
+    pub(crate) fn disclosed_methods(&self) -> &BTreeSet<String> {
+        &self.disclose_method
     }
 
     /// Whether the grant serves nothing.

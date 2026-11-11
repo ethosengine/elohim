@@ -37,6 +37,10 @@ pub trait ServeScope: Send + Sync {
     fn methods_of(&self, cid: &BlobCid) -> Vec<String>;
     /// Whether `device` (a did:key) may be served artifacts of the method named `method_name`.
     fn grants(&self, device: &str, method_name: &str) -> bool;
+    /// Additional method-record permission; existing scopes default to deny.
+    fn discloses_method(&self, _method: &str) -> bool {
+        false
+    }
 }
 
 /// The scope of a tier serving one tree store and nothing else: every root is the store's to
@@ -149,6 +153,19 @@ impl StewardDevicesGate {
                 .read()
                 .is_ok_and(|admission| admission.admits_device(device))
         })
+    }
+
+    /// Descriptor disclosure requires both the audience grant and its explicit extra permission.
+    pub(crate) fn admit_method(&self, who: &Requester, method: &str) -> Result<(), ReachRefusal> {
+        let device = self.admit(who)?;
+        if self.scope.grants(device, method) && self.scope.discloses_method(method) {
+            Ok(())
+        } else {
+            Err(ReachRefusal::new(
+                ReachReason::OutsideStanding,
+                Some(format!("disclose-method:{method}")),
+            ))
+        }
     }
 
     fn admit<'w>(&self, who: &'w Requester) -> Result<&'w str, ReachRefusal> {

@@ -205,7 +205,7 @@ async fn real_holder(t: &Three, me: &Device, key: &PeerKey) -> RealHolder {
     let admission = Arc::new(RwLock::new(elohim_epr_rea_admission(t)));
     let channel = Arc::new(ChannelStore::default());
     let mut policy = support::policy();
-    policy["berth"]["artifacts"] = serde_json::json!({ "serves": { "mesh-build": ["steward"] } });
+    policy["berth"]["artifacts"] = serde_json::json!({ "serves": { "mesh-build": ["steward"] }, "discloseMethod": ["mesh-build"] });
     let serves = Rules::from_policy(&policy).expect("rules").serves().clone();
     let scope = DeviceScope::new(
         channel.clone(),
@@ -1436,8 +1436,7 @@ impl Side {
         peers: Vec<NodeAddr>,
     ) -> eprfs_peer::PeerDaemon {
         let mut policy = support::policy();
-        policy["berth"]["artifacts"] =
-            serde_json::json!({ "serves": { "mesh-build": ["steward"] } });
+        policy["berth"]["artifacts"] = serde_json::json!({ "serves": { "mesh-build": ["steward"] }, "discloseMethod": ["mesh-build"] });
         let roster = elohim_epr_rea::SidecarRoster::open(self.checkout.dir.path(), support::HANDLE)
             .expect("roster")
             .log_path()

@@ -2225,10 +2225,10 @@ decisionPoints:
     - { id: C0, status: answered, justification: "Reuses private artifact custody; the cache is reconstructable from one archive CID, with no per-file heads." }
     - { id: C1, status: n-a, justification: "Content verification confers no device standing." }
     - { id: C2, status: n-a, justification: "No promotion or policy override." }
-    - { id: C3, status: answered, justification: "Finite in-memory archive, checked lengths and symlink cycle refusal; no subprocess or host library search." }
+    - { id: C3, status: answered, justification: "Named byte, member-count and depth budgets are checked before allocation/copy; symlink expansion is bounded even without cycles. No subprocess or host library search." }
     - { id: C4, status: answered, justification: "Malformed archive, unsupported script, missing operand and CID mismatch refuse with a sysroot gap." }
-    - { id: C5, status: answered, justification: "Manifest evidence is recomputed from payload bytes; executable put retains its ELF linker witness." }
-    - { id: C6a, status: answered, justification: "Sorted paths, canonical JSON, fixed modes and no owner, timestamp or source path fields." }
+    - { id: C5, status: answered, justification: "Manifest evidence is recomputed from payload bytes; executable put retains its ELF linker witness and the recording boundary refuses reserved archive method/validator mismatches." }
+    - { id: C6a, status: answered, justification: "32,768 members, depth 64, 16 MiB manifest, 64 MiB per file and 512 MiB payload; the archive read includes only bounded framing overhead. Sorted paths and normalized metadata preserve identity." }
     - { id: C6b, status: answered, justification: "Materialize stages then renames; existing hits are reverified, incomplete trees refused." }
     - { id: C7, status: n-a, justification: "No new network route; existing tier serves the archive." }
     - { id: C8, status: answered, justification: "Manifest carries ISA notes and observable glibc header version; absent notes do not claim baseline compatibility." }
@@ -2243,3 +2243,56 @@ decisionPoints:
     - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: script_absolute_operands_are_rebased_and_missing_host_files_refuse, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: materialize_verifies_every_file_and_hits_without_replacing, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: isa_notes_record_v3_payload_and_tampered_evidence_refuses, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: expanded_acyclic_symlink_fanout_refuses_count_and_depth, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: manifest_count_and_byte_prefixes_refuse_before_decode_or_copy, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: script_comments_unsupported_first_and_empty_operands_cannot_bypass_validation, kind: unit }
+- name: sysroot_resource_limit
+  kind: reason-outcome-enum
+  sourceLocation:
+    file: src/artifact/sysroot_limits.rs
+    modulePath: elohim_epr_cli::artifact::sysroot::limits::Limit
+  summary: "Six distinct parser/IO budget refusals; the CLI retains gap exit 3. Bounds are checked before allocation or copying."
+  concernIds:
+    - { id: C0, status: answered, justification: "Reuses private artifact custody; the cache is reconstructable from one archive CID, with no per-file heads." }
+    - { id: C1, status: n-a, justification: "Content verification confers no device standing." }
+    - { id: C2, status: n-a, justification: "No promotion or policy override." }
+    - { id: C3, status: answered, justification: "Named byte, member-count and depth budgets are checked before allocation/copy; symlink expansion is bounded even without cycles. No subprocess or host library search." }
+    - { id: C4, status: answered, justification: "Malformed archive, unsupported script, missing operand and CID mismatch refuse with a sysroot gap." }
+    - { id: C5, status: answered, justification: "Manifest evidence is recomputed from payload bytes; executable put retains its ELF linker witness and the recording boundary refuses reserved archive method/validator mismatches." }
+    - { id: C6a, status: answered, justification: "32,768 members, depth 64, 16 MiB manifest, 64 MiB per file and 512 MiB payload; the archive read includes only bounded framing overhead. Sorted paths and normalized metadata preserve identity." }
+    - { id: C6b, status: answered, justification: "Materialize stages then renames; existing hits are reverified, incomplete trees refused." }
+    - { id: C7, status: n-a, justification: "No new network route; existing tier serves the archive." }
+    - { id: C8, status: answered, justification: "Manifest carries ISA notes and observable glibc header version; absent notes do not claim baseline compatibility." }
+    - { id: C9, status: answered, justification: "Archive, manifest and members use existing raw-byte CIDs; recipe changes alter method identity." }
+    - { id: C10, status: answered, justification: "Explicit format version; unknown versions and noncanonical encodings refuse." }
+    - { id: C11, status: answered, justification: "One archive and manifest per pack, no head or recurring per-file reconciliation cost." }
+    - { id: C12, status: answered, justification: "Private local payload; explicit cross uses existing Produce crossing and steward grants." }
+    - { id: C13, status: n-a, justification: "No agency or authority tier." }
+    - { id: C14, status: partial, justification: "Recorded ISA requirements are observations, not instruction coverage or host admission. Target realization stays deferred." }
+  contractTests:
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: byte_limits_accept_exact_maximum_and_refuse_next_byte, kind: unit }
+- name: archive_method_validator_pairing
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/artifact.rs
+    modulePath: elohim_epr_cli::artifact::check_payload_method
+  summary: "Reserve sysroot-pack for the archive validator at executable entry and again at the shared recording boundary, before any record."
+  concernIds:
+    - { id: C0, status: answered, justification: "Reuses private artifact custody; the cache is reconstructable from one archive CID, with no per-file heads." }
+    - { id: C1, status: n-a, justification: "Content verification confers no device standing." }
+    - { id: C2, status: n-a, justification: "No promotion or policy override." }
+    - { id: C3, status: answered, justification: "Named byte, member-count and depth budgets are checked before allocation/copy; symlink expansion is bounded even without cycles. No subprocess or host library search." }
+    - { id: C4, status: answered, justification: "Malformed archive, unsupported script, missing operand and CID mismatch refuse with a sysroot gap." }
+    - { id: C5, status: answered, justification: "Manifest evidence is recomputed from payload bytes; executable put retains its ELF linker witness and the recording boundary refuses reserved archive method/validator mismatches." }
+    - { id: C6a, status: answered, justification: "32,768 members, depth 64, 16 MiB manifest, 64 MiB per file and 512 MiB payload; the archive read includes only bounded framing overhead. Sorted paths and normalized metadata preserve identity." }
+    - { id: C6b, status: answered, justification: "Materialize stages then renames; existing hits are reverified, incomplete trees refused." }
+    - { id: C7, status: n-a, justification: "No new network route; existing tier serves the archive." }
+    - { id: C8, status: answered, justification: "Manifest carries ISA notes and observable glibc header version; absent notes do not claim baseline compatibility." }
+    - { id: C9, status: answered, justification: "Archive, manifest and members use existing raw-byte CIDs; recipe changes alter method identity." }
+    - { id: C10, status: answered, justification: "Explicit format version; unknown versions and noncanonical encodings refuse." }
+    - { id: C11, status: answered, justification: "One archive and manifest per pack, no head or recurring per-file reconciliation cost." }
+    - { id: C12, status: answered, justification: "Private local payload; explicit cross uses existing Produce crossing and steward grants." }
+    - { id: C13, status: n-a, justification: "No agency or authority tier." }
+    - { id: C14, status: partial, justification: "Recorded ISA requirements are observations, not instruction coverage or host admission. Target realization stays deferred." }
+  contractTests:
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_cli.rs, testName: recording_boundary_refuses_both_method_validator_mismatches_before_any_write, kind: unit }

@@ -155,3 +155,38 @@ fn serves_enters_the_rules_digest_and_relays_still_do_not() {
         .serves()
         .is_empty());
 }
+
+#[test]
+fn descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant() {
+    let base = json!({"berth":{"artifacts":{"serves":{"mesh-build":["steward"]}}}});
+    let original = Rules::from_policy(&base).unwrap();
+    assert!(!original.serves().discloses_method("mesh-build"));
+    let mut explicit = base.clone();
+    explicit["berth"]["artifacts"]["discloseMethod"] = json!(["mesh-build"]);
+    let granted = Rules::from_policy(&explicit).unwrap();
+    assert_ne!(original.digest(), granted.digest());
+    assert!(granted.serves().discloses_method("mesh-build"));
+    assert!(!granted.serves().discloses_method("sysroot-pack"));
+    let disclosure_only =
+        Rules::from_policy(&json!({"berth":{"artifacts":{"discloseMethod":["sysroot-pack"]}}}))
+            .unwrap();
+    assert!(disclosure_only.serves().is_empty());
+    assert_ne!(
+        disclosure_only.digest(),
+        Rules::from_policy(&json!({})).unwrap().digest()
+    );
+    explicit["berth"]["artifacts"]["discloseMethod"] = json!([]);
+    assert_eq!(
+        original.digest(),
+        Rules::from_policy(&explicit).unwrap().digest()
+    );
+    for malformed in [
+        json!(true),
+        json!({"mesh-build":true}),
+        json!([""]),
+        json!([1]),
+    ] {
+        explicit["berth"]["artifacts"]["discloseMethod"] = malformed;
+        assert!(Rules::from_policy(&explicit).is_err());
+    }
+}

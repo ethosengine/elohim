@@ -2645,9 +2645,9 @@ habits:
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
       DELTA 2026-11-11g (RED preserved, inactive; host-compatibility A1 and S2 on shem): the contract a fetch must admit against now exists. `crates/elohim-host-contract` (A1) holds `Requires`, a non-serializable `Provides` and `admit` returning the epr `Verdict`; 21 vectors pass, including v3 on v2 refused naming the missing features, and `just gate host-contract` is green on rustc 1.96.1. S2 states the v2 device's pre-launch refusal and the divergence-as-evidence fetch in `devflow/sibling-fetches-the-build.feature` and `device-declared-target.feature` (@wip until bound). Also measured: shem compiles C at -march=x86-64-v2, and ethosengine at v3, so an epr cc-built on ethosengine carries BMI2/MOVBE in sqlite3 and ring and cannot run here; no K DELTA above says the key sees cc's effective -march yet, so that split stays open for lane K. Nothing in the invariant is kept yet: K1-K7 own the receipt.
-    evidence-fingerprint: sha256:fed2b8c530b883a4
-    evidence-bytes: 17200
-    evidence-entries: 13
+    evidence-fingerprint: sha256:02dd6a502bb5e2e7
+    evidence-bytes: 18985
+    evidence-entries: 14
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

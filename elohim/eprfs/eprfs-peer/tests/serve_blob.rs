@@ -188,6 +188,7 @@ struct Holder {
     mount: Arc<BlobMount>,
     served: mpsc::Receiver<ServedDraw>,
     admission: SharedAdmission,
+    serves: Arc<RwLock<ArtifactServeList>>,
     protocol: TierProtocol,
     router: Router,
     addr: NodeAddr,
@@ -205,10 +206,11 @@ async fn holder(h: &Household) -> Holder {
         .expect("rules")
         .serves()
         .clone();
+    let serves = Arc::new(RwLock::new(serves));
     let scope = DeviceScope::new(
         channel.clone(),
         Some(mount.clone()),
-        Arc::new(RwLock::new(serves)),
+        serves.clone(),
         admission.clone(),
     );
     let protocol = TierProtocol::with_scope(
@@ -233,6 +235,7 @@ async fn holder(h: &Household) -> Holder {
         mount,
         served,
         admission,
+        serves,
         protocol,
         router,
         addr,
@@ -1975,4 +1978,92 @@ async fn superseded_history_is_bounded() {
     assert_eq!(holder.mount.tracked_manifests(), 1);
     assert!(holder.mount.held(&output(&last)).is_none());
     holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn descriptor_disclosure_requires_explicit_permission_and_revokes_on_reload() {
+    let h = household();
+    let mut a = holder(&h).await;
+    let put = a.put(GRANTED, Bytes::from_static(b"payload"), true).await;
+    let archive = a
+        .put("sysroot-pack", Bytes::from_static(b"archive"), true)
+        .await;
+    assert!(a.reindex().await.is_empty());
+    let scope = DeviceScope::new(
+        Arc::new(ChannelStore::default()),
+        Some(a.mount.clone()),
+        a.serves.clone(),
+        a.admission.clone(),
+    );
+    let method = descriptor(GRANTED).cid().unwrap();
+    assert!(eprfs_peer::ServeScope::methods_of(&scope, &method).is_empty());
+    let b = client(&h.key_b).await;
+    let request = TierRequest::Blob {
+        artifact: output(&put),
+        cid: descriptor(GRANTED).cid().unwrap(),
+    };
+    let denied = typed(
+        &output(&put),
+        ReachReason::OutsideStanding,
+        Some("disclose-method:mesh-build"),
+    );
+    assert_eq!(call(&b, &a.addr, request.clone()).await, denied);
+    assert!(matches!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Manifest {
+                artifact: output(&put)
+            }
+        )
+        .await,
+        TierAnswer::Blob { .. }
+    ));
+    assert_eq!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Manifest {
+                artifact: output(&archive)
+            }
+        )
+        .await,
+        typed(
+            &output(&archive),
+            ReachReason::OutsideStanding,
+            Some("serve-blob:sysroot-pack")
+        )
+    );
+    let mut policy = serve_policy();
+    policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!(["mesh-build"]);
+    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    assert_eq!(
+        eprfs_peer::ServeScope::methods_of(&scope, &method),
+        [GRANTED]
+    );
+    assert!(matches!(
+        call(&b, &a.addr, request.clone()).await,
+        TierAnswer::Blob { .. }
+    ));
+    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&serve_policy()).unwrap();
+    assert_eq!(call(&b, &a.addr, request).await, denied);
+    assert!(eprfs_peer::ServeScope::methods_of(&scope, &method).is_empty());
+    // Sysroot serving/disclosure is authorized only in this test-local fixture.
+    policy["berth"]["artifacts"]["serves"]["sysroot-pack"] = serde_json::json!(["steward"]);
+    policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!(["sysroot-pack"]);
+    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    assert!(matches!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Blob {
+                artifact: output(&archive),
+                cid: descriptor("sysroot-pack").cid().unwrap()
+            }
+        )
+        .await,
+        TierAnswer::Blob { .. }
+    ));
+    b.close().await;
+    a.router.shutdown().await.unwrap();
 }

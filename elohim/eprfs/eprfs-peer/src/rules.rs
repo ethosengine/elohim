@@ -107,6 +107,8 @@ impl Rules {
             steward: Steward<'a>,
             #[serde(skip_serializing_if = "serves_nothing")]
             serves: &'a BTreeMap<String, BTreeSet<String>>,
+            #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+            disclose_method: &'a BTreeSet<String>,
         }
 
         let canonical = Canonical {
@@ -116,6 +118,7 @@ impl Rules {
                 prefixes: self.scope.prefixes(),
             },
             serves: self.serves.by_method(),
+            disclose_method: self.serves.disclosed_methods(),
         };
         let bytes = serde_json::to_vec(&canonical)
             .expect("canonical rules contain only JSON strings and ordered collections");

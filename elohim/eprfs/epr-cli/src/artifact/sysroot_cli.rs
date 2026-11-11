@@ -44,7 +44,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         .archive
         .as_ref()
         .ok_or_else(|| ArtifactError::InvalidArguments("sysroot put requires --archive".into()))?;
-    let bytes = Bytes::from(std::fs::read(path)?);
+    let bytes = Bytes::from(sysroot::limits::read_archive(path)?);
     let manifest = sysroot::verify(&bytes)?;
     let input = manifest.cid()?;
     let project = options.project.as_deref().unwrap_or("sysroot");
@@ -53,6 +53,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     let recipe = [
         include_bytes!("sysroot.rs").as_slice(),
         include_bytes!("sysroot_evidence.rs").as_slice(),
+        include_bytes!("sysroot_limits.rs").as_slice(),
     ]
     .concat();
     let descriptor = MethodDescriptor {
@@ -107,4 +108,63 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         key.basis,
         Some(&manifest),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recording_boundary_refuses_both_method_validator_mismatches_before_any_write() {
+        let root = tempfile::tempdir().unwrap();
+        let (bytes, manifest) = sysroot::pack(root.path(), "test").unwrap();
+        for (method, validated) in [("mesh-build", Some(&manifest)), ("sysroot-pack", None)] {
+            let descriptor = MethodDescriptor {
+                name: method.into(),
+                tools: BTreeMap::new(),
+                flags: vec![],
+                params: None,
+                exec: None,
+                step: None,
+                embedder: None,
+                view: vec![],
+                non_path_inputs: BTreeMap::new(),
+                deterministic: true,
+            };
+            let method = descriptor.cid().unwrap();
+            let input = manifest.cid().unwrap();
+            let derivation = DerivationKey {
+                method: method.clone(),
+                input: KeyInput::Raw(input.clone()),
+            };
+            let key = ClosureKey {
+                method,
+                input,
+                key_cid: key_cid(&derivation).unwrap(),
+                basis: "test",
+                head: "test".into(),
+                dirty: vec![],
+                key: derivation,
+            };
+            // No repository or signer exists here: pairing must refuse before inspecting or writing either.
+            let options = Options {
+                repo: root.path().to_path_buf(),
+                ..Options::default()
+            };
+            let error = record_artifact(
+                &options,
+                &descriptor,
+                &key,
+                Bytes::from(bytes.clone()),
+                "test",
+                validated,
+            )
+            .unwrap_err();
+            assert!(
+                error.to_string().contains("method/validator mismatch"),
+                "{error}"
+            );
+            assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        }
+    }
 }

@@ -21,6 +21,9 @@ use super::{ArtifactError, ArtifactResult};
 
 #[path = "sysroot_evidence.rs"]
 mod evidence;
+#[path = "sysroot_limits.rs"]
+pub mod limits;
+use limits::{Budget, Limit};
 #[cfg(test)]
 #[path = "sysroot_tests.rs"]
 mod tests;
@@ -71,6 +74,7 @@ fn refused(reason: impl std::fmt::Display) -> ArtifactError {
 impl Manifest {
     /// Canonical JSON bytes, with lexicographically sorted object keys and no whitespace.
     pub fn canonical_bytes(&self) -> ArtifactResult<Vec<u8>> {
+        limits::manifest_size(self)?;
         let mut value = serde_json::to_value(self)?;
         // Remain canonical even when another workspace consumer enables preserve_order.
         value.sort_all_objects();
@@ -100,7 +104,11 @@ fn walk(
     relative: &str,
     ancestors: &mut Vec<PathBuf>,
     members: &mut Members,
+    budget: &mut Budget,
 ) -> ArtifactResult<()> {
+    if !relative.is_empty() {
+        budget.member(relative)?;
+    }
     let resolved = fs::canonicalize(source).map_err(refused)?;
     if !resolved.starts_with(root) {
         return Err(refused(format!("symlink escapes root: {relative}")));
@@ -128,11 +136,13 @@ fn walk(
             if !valid_path(&child) {
                 return Err(refused("invalid member path"));
             }
-            walk(root, &entry.path(), &child, ancestors, members)?;
+            walk(root, &entry.path(), &child, ancestors, members, budget)?;
         }
         ancestors.pop();
     } else if meta.is_file() {
-        members.insert(relative.into(), Some(fs::read(resolved)?));
+        let bytes = limits::read_file(&resolved, budget.bytes)?;
+        budget.file(bytes.len() as u64)?;
+        members.insert(relative.into(), Some(bytes));
     } else {
         return Err(refused(format!(
             "not a regular file or directory: {relative}"
@@ -187,10 +197,17 @@ pub fn pack(input_dir: &Path, triple: &str) -> ArtifactResult<(Vec<u8>, Manifest
         return Err(refused("input is not a directory"));
     }
     let mut members = Members::new();
-    walk(&root, &root, "", &mut Vec::new(), &mut members)?;
+    let mut budget = Budget::default();
+    walk(&root, &root, "", &mut Vec::new(), &mut members, &mut budget)?;
     let manifest = manifest(triple, &members)?;
     let json = manifest.canonical_bytes()?;
-    let mut archive = MAGIC.to_vec();
+    let archive_len = 16 + json.len() as u64 + budget.members * 8 + budget.bytes;
+    Limit::ArchiveBytes.check(archive_len)?;
+    let mut archive = Vec::new();
+    archive
+        .try_reserve_exact(usize::try_from(archive_len).map_err(refused)?)
+        .map_err(std::io::Error::other)?;
+    archive.extend_from_slice(MAGIC);
     archive.extend_from_slice(&(json.len() as u64).to_le_bytes());
     archive.extend(json);
     for bytes in members.values().flatten() {
@@ -209,25 +226,68 @@ fn take<'a>(bytes: &mut &'a [u8], len: usize) -> ArtifactResult<&'a [u8]> {
     Ok(head)
 }
 
-fn sized<'a>(bytes: &mut &'a [u8]) -> ArtifactResult<&'a [u8]> {
+fn length(bytes: &mut &[u8]) -> ArtifactResult<u64> {
     let mut len = [0; 8];
     len.copy_from_slice(take(bytes, 8)?);
-    let len = usize::try_from(u64::from_le_bytes(len)).map_err(refused)?;
-    take(bytes, len)
+    Ok(u64::from_le_bytes(len))
+}
+
+fn sized<'a>(bytes: &mut &'a [u8], limit: Limit) -> ArtifactResult<&'a [u8]> {
+    let len = length(bytes)?;
+    limit.check(len)?;
+    take(bytes, usize::try_from(len).map_err(refused)?)
+}
+
+fn file_body<'a>(bytes: &mut &'a [u8], budget: &mut Budget) -> ArtifactResult<&'a [u8]> {
+    let len = length(bytes)?;
+    budget.file(len)?;
+    take(bytes, usize::try_from(len).map_err(refused)?)
+}
+
+/// Count the files array without allocating members; manifest bytes were already bounded.
+fn preflight_manifest(json: &[u8]) -> ArtifactResult<()> {
+    fn count<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+        struct Counter;
+        impl<'de> serde::de::Visitor<'de> for Counter {
+            type Value = u64;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a bounded member array")
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<u64, A::Error> {
+                let mut count = 0;
+                while seq.next_element::<serde::de::IgnoredAny>()?.is_some() {
+                    count += 1;
+                }
+                Ok(count)
+            }
+        }
+        deserializer.deserialize_seq(Counter)
+    }
+    #[derive(Deserialize)]
+    struct Counts {
+        #[serde(deserialize_with = "count")]
+        files: u64,
+    }
+    let counts: Counts = serde_json::from_slice(json).map_err(refused)?;
+    Limit::Members.check(counts.files)
 }
 
 fn decode(mut archive: &[u8]) -> ArtifactResult<(Manifest, Members)> {
+    Limit::ArchiveBytes.check(archive.len() as u64)?;
     if take(&mut archive, MAGIC.len())? != MAGIC {
         return Err(refused("unknown archive format"));
     }
-    let json = sized(&mut archive)?;
+    let json = sized(&mut archive, Limit::ManifestBytes)?;
+    preflight_manifest(json)?;
     let declared: Manifest = serde_json::from_slice(json).map_err(refused)?;
     if declared.version != 1 || declared.canonical_bytes()? != json {
         return Err(refused("noncanonical manifest or unknown version"));
     }
     let mut members = Members::new();
+    let mut budget = Budget::default();
     let mut previous = "";
     for file in &declared.files {
+        budget.member(&file.path)?;
         if !valid_path(&file.path) || file.path.as_str() <= previous {
             return Err(refused("unsafe, duplicate or unsorted path"));
         }
@@ -238,7 +298,10 @@ fn decode(mut archive: &[u8]) -> ArtifactResult<(Manifest, Members)> {
             }
         }
         let bytes = match file.mode {
-            FILE => Some(sized(&mut archive)?.to_vec()),
+            FILE => {
+                let bytes = file_body(&mut archive, &mut budget)?;
+                Some(bytes.to_vec())
+            }
             DIR => None,
             _ => return Err(refused("non-normalized mode")),
         };
@@ -262,7 +325,15 @@ pub fn verify(archive: &[u8]) -> ArtifactResult<Manifest> {
 }
 
 fn check_cache(root: &Path, members: &Members) -> ArtifactResult<()> {
-    fn visit(root: &Path, relative: &str, found: &mut Members) -> ArtifactResult<()> {
+    fn visit(
+        root: &Path,
+        relative: &str,
+        found: &mut Members,
+        budget: &mut Budget,
+    ) -> ArtifactResult<()> {
+        if !relative.is_empty() {
+            budget.member(relative)?;
+        }
         let path = root.join(relative);
         let meta = fs::symlink_metadata(&path)?;
         if meta.is_dir() && meta.permissions().mode() & 0o7777 == 0o555 {
@@ -279,10 +350,12 @@ fn check_cache(root: &Path, members: &Members) -> ArtifactResult<()> {
                 } else {
                     format!("{relative}/{name}")
                 };
-                visit(root, &child, found)?;
+                visit(root, &child, found, budget)?;
             }
         } else if meta.is_file() && meta.permissions().mode() & 0o7777 == 0o444 {
-            found.insert(relative.into(), Some(fs::read(path)?));
+            let bytes = limits::read_file(&path, budget.bytes)?;
+            budget.file(bytes.len() as u64)?;
+            found.insert(relative.into(), Some(bytes));
         } else {
             return Err(refused(
                 "cache contains a link, special file or writable member",
@@ -291,7 +364,7 @@ fn check_cache(root: &Path, members: &Members) -> ArtifactResult<()> {
         Ok(())
     }
     let mut found = Members::new();
-    visit(root, "", &mut found)?;
+    visit(root, "", &mut found, &mut Budget::default())?;
     if &found != members {
         return Err(refused("incomplete or corrupt materialization"));
     }

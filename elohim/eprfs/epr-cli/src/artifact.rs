@@ -77,6 +77,8 @@ pub enum ArtifactError {
     /// A typed refusal: the work proceeds without the record or the fetch.
     #[error("{0}")]
     Gap(String),
+    #[error(transparent)]
+    SysrootLimit(#[from] sysroot::limits::Limit),
     #[error("{0}")]
     Peer(#[from] PeerCliError),
     #[error("io: {0}")]
@@ -148,7 +150,8 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         None => return Err(ArtifactError::InvalidArguments(usage())),
     };
     match outcome {
-        Err(ArtifactError::Gap(reason)) => {
+        Err(error @ (ArtifactError::Gap(_) | ArtifactError::SysrootLimit(_))) => {
+            let reason = error.to_string();
             if options.json {
                 println!("{}", serde_json::json!({ "gap": reason }));
             } else {
@@ -1286,6 +1289,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     })?;
     let repo = &options.repo;
     let descriptor = read_descriptor(options).map_err(unrecorded)?;
+    check_payload_method(&descriptor.name, false)?;
     let step = format!("{}:{project}", descriptor.name);
     if descriptor.step.as_deref() != Some(step.as_str()) {
         return Err(unrecorded(format!(
@@ -1332,6 +1336,15 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     record_artifact(options, &effective, &key, bytes, BASIS_KEY_SLOT, None)
 }
 
+/// Archive method names are reserved for their validators, not selected by an executable's
+/// supplied descriptor. Add future archive methods here together with their validator dispatch.
+fn check_payload_method(method: &str, archive: bool) -> ArtifactResult<()> {
+    if (method == "sysroot-pack") != archive {
+        return Err(unrecorded(format!("method/validator mismatch: {method}; sysroot-pack is reserved for the sysroot archive validator")));
+    }
+    Ok(())
+}
+
 // The only recording tail. Each caller must validate its payload first: ELF linker witness for
 // executable put, complete manifest/evidence verification for sysroot put.
 fn record_artifact(
@@ -1344,6 +1357,15 @@ fn record_artifact(
 ) -> ArtifactResult<ExitCode> {
     // Shape only: host_contract will decode and merge clauses at the consumer in K3 part 2.
     let requires = options.requires.as_deref().map(read_requires).transpose()?;
+
+    check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
+    if let Some(manifest) = sysroot_manifest {
+        if &sysroot::verify(&bytes)? != manifest {
+            return Err(unrecorded(
+                "archive validator manifest disagrees with payload",
+            ));
+        }
+    }
     let project = options.project.as_deref().unwrap_or("sysroot");
     let repo = &options.repo;
     let step = format!("{}:{project}", descriptor.name);

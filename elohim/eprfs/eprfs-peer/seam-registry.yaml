@@ -799,3 +799,61 @@ decisionPoints:
       - { path: elohim/eprfs/eprfs-peer/tests/fetch.rs, testName: output_authority_fetches_producer_method_and_exact_bytes_without_a_local_key, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/fetch.rs, testName: a_queued_expected_fetch_installs_retained_output_after_a_newer_production, kind: integration }
       - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority, kind: integration }
+  - name: admit_method
+    kind: verdict-fn
+    sourceLocation:
+      file: src/gate.rs
+      modulePath: eprfs_peer::StewardDevicesGate::admit_method
+    summary: "Method descriptors require an existing audience grant AND digest-covered berth.artifacts.discloseMethod membership, default deny. Reload takes effect per request. Both tier answers and direct object admission filter descriptor bytes; holding a descriptor does not authorize disclosure."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A stranger receives the same refusal, carrying no standing label, for a held root and an unknown one; its request never reaches the store."
+      - id: C1
+        status: answered
+        justification: "The requester's identity is the node id iroh authenticated in the handshake, mapped through the device's own roster; nothing the peer sends names it."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Synchronous read of the shared admission; a poisoned lock refuses rather than waits."
+      - id: C4
+        status: answered
+        justification: "Not admitted is one refusal (OutsideStanding, no label) whatever the reason: unknown, contested, rotated away or anonymous."
+      - id: C5
+        status: answered
+        justification: "Admission re-verifies every roster row on reload; the gate only reads its verdict."
+      - id: C6a
+        status: answered
+        justification: "Two map reads per request."
+      - id: C6b
+        status: answered
+        justification: "Read-only; reload replaces admission under the write lock."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "Admitted refusals carry disclose-method:<name>; strangers receive uniform refusals. The existing served/refused ledger records each answer."
+      - id: C9
+        status: answered
+        justification: "Admission is read on every request, so a reload that contests or rotates a device takes effect at its next request on an already-open connection."
+      - id: C10
+        status: answered
+        justification: "Old serves-only policies continue serving manifests/chunks, but do not disclose methods; adding disclosure changes the rules digest."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Default deny; no admit-on-error path, and a poisoned lock admits nobody."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Refusals are counted, not witnessed."
+    contractTests:
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: descriptor_disclosure_requires_explicit_permission_and_revokes_on_reload, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/rules.rs, testName: descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant, kind: unit }

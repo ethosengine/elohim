@@ -663,7 +663,7 @@ impl BlobMount {
         })
     }
 
-    fn methods_of(&self, cid: &BlobCid) -> Vec<String> {
+    fn methods_of(&self, cid: &BlobCid, serves: &ArtifactServeList) -> Vec<String> {
         let Ok(index) = self.index.read() else {
             return Vec::new();
         };
@@ -673,6 +673,7 @@ impl BlobMount {
             .into_iter()
             .flatten()
             .filter_map(|output| index.by_output.get(output))
+            .filter(|held| held.method != *cid || serves.discloses_method(&held.method_name))
             .map(|held| held.method_name.clone())
             .collect()
     }
@@ -876,6 +877,11 @@ pub(crate) async fn answer(
         return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
     };
     let object = asked.unwrap_or(&held.manifest);
+    if *object == held.method {
+        if let Err(refusal) = gate.admit_method(who, &held.method_name) {
+            return refuse(refusal);
+        }
+    }
     if let Err(refusal) = gate.admit_object(who, object) {
         return refuse(refusal);
     }
@@ -971,10 +977,21 @@ impl ServeScope for DeviceScope {
     }
 
     fn methods_of(&self, cid: &BlobCid) -> Vec<String> {
-        self.mount
-            .as_ref()
-            .map(|mount| mount.methods_of(cid))
+        self.serves
+            .read()
+            .map(|serves| {
+                self.mount
+                    .as_ref()
+                    .map(|mount| mount.methods_of(cid, &serves))
+                    .unwrap_or_default()
+            })
             .unwrap_or_default()
+    }
+
+    fn discloses_method(&self, method: &str) -> bool {
+        self.serves
+            .read()
+            .is_ok_and(|serves| serves.discloses_method(method))
     }
 
     fn grants(&self, device: &str, method_name: &str) -> bool {

@@ -84,41 +84,45 @@ pub(super) fn libc_version(bytes: &[u8]) -> Option<String> {
     ))
 }
 
-fn tokens(text: &str) -> ArtifactResult<Vec<String>> {
-    let mut rest = text;
-    let mut result = Vec::new();
-    while !rest.is_empty() {
-        rest = rest.trim_start();
+/// One shared, borrowing tokenizer for detection and validation. Non-script headers stop after
+/// the first two tokens rather than allocating a token vector for their entire contents.
+fn token<'a>(rest: &mut &'a str) -> ArtifactResult<Option<&'a str>> {
+    loop {
+        *rest = rest.trim_start();
         if rest.is_empty() {
-            break;
+            return Ok(None);
         }
         if let Some(comment) = rest.strip_prefix("/*") {
-            rest = &comment[comment
+            *rest = &comment[comment
                 .find("*/")
                 .ok_or_else(|| refused("unterminated script comment"))?
                 + 2..];
         } else if rest.starts_with('#') {
-            rest = rest.split_once('\n').map_or("", |(_, tail)| tail);
-        } else if rest.starts_with(['(', ')', ',', ';']) {
-            result.push(rest[..1].into());
-            rest = &rest[1..];
-        } else if rest.starts_with(['\'', '"']) {
-            let quote = rest.as_bytes()[0] as char;
-            let end = rest[1..]
-                .find(quote)
-                .ok_or_else(|| refused("unterminated script quote"))?
-                + 1;
-            result.push(rest[1..end].into());
-            rest = &rest[end + 1..];
+            *rest = rest.split_once('\n').map_or("", |(_, tail)| tail);
         } else {
-            let end = rest
-                .find(|c: char| c.is_whitespace() || "(),;".contains(c))
-                .unwrap_or(rest.len());
-            result.push(rest[..end].into());
-            rest = &rest[end..];
+            break;
         }
     }
-    Ok(result)
+    let (value, consumed) = if rest.starts_with(['(', ')', ',', ';']) {
+        (&rest[..1], 1)
+    } else if rest.starts_with(['\'', '"']) {
+        let quote = rest.as_bytes()[0] as char;
+        let end = rest[1..]
+            .find(quote)
+            .ok_or_else(|| refused("unterminated script quote"))?
+            + 1;
+        (&rest[1..end], end + 1)
+    } else {
+        let end = rest
+            .find(|c: char| c.is_whitespace() || "(),;".contains(c))
+            .unwrap_or(rest.len());
+        let end = rest[..end]
+            .find("/*")
+            .map_or(end, |comment| end.min(comment));
+        (&rest[..end], end)
+    };
+    *rest = &rest[consumed..];
+    Ok(Some(value))
 }
 
 fn normalize(path: &str) -> Option<String> {
@@ -173,26 +177,66 @@ pub(super) fn script(
     bytes: &[u8],
     members: &Members,
 ) -> ArtifactResult<Option<Vec<String>>> {
+    if bytes.starts_with(b"\x7fELF") || bytes.starts_with(b"!<arch>\n") {
+        return Ok(None);
+    }
+    let extension = std::path::Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str());
+    let named_script = matches!(extension, Some("ld" | "lds" | "so"));
     let Ok(text) = std::str::from_utf8(bytes) else {
+        if named_script {
+            return Err(refused("non-UTF-8 linker script"));
+        }
         return Ok(None);
     };
-    let mut prefix = text.trim_start();
-    while let Some(comment) = prefix.strip_prefix("/*") {
-        let Some(end) = comment.find("*/") else {
-            return Ok(None);
-        };
-        prefix = comment[end + 2..].trim_start();
+    let mut rest = text;
+    let mut first = token(&mut rest)?.unwrap_or("");
+    while first == ";" {
+        first = token(&mut rest)?.unwrap_or("");
     }
-    let first = prefix
-        .split(|c: char| c.is_whitespace() || c == '(')
-        .next()
-        .unwrap_or("");
-    if !matches!(first, "GROUP" | "INPUT" | "OUTPUT_FORMAT" | "OUTPUT_ARCH")
-        && !text.contains("/* GNU ld script")
-    {
+    let second = token(&mut rest)?;
+    let directive = first.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
+        && first.bytes().all(|b| b.is_ascii_uppercase() || b == b'_');
+    // C headers also start with uppercase function-like macros after their # lines. Known
+    // linker directives still identify scripts regardless of filename; unknown macros in a
+    // header alone do not. Explicit script filenames are always validated.
+    let candidate = matches!(
+        first,
+        "GROUP"
+            | "INPUT"
+            | "AS_NEEDED"
+            | "OUTPUT_FORMAT"
+            | "OUTPUT_ARCH"
+            | "SEARCH_DIR"
+            | "SECTIONS"
+            | "MEMORY"
+            | "PHDRS"
+            | "VERSION"
+            | "INCLUDE"
+            | "ENTRY"
+            | "EXTERN"
+            | "OUTPUT"
+            | "TARGET"
+            | "STARTUP"
+            | "ASSERT"
+            | "PROVIDE"
+            | "PROVIDE_HIDDEN"
+            | "REGION_ALIAS"
+            | "INSERT"
+    ) || (directive
+        && matches!(second, Some("(" | "{"))
+        && !matches!(extension, Some("h" | "hpp")))
+        || named_script
+        || text.contains("/* GNU ld script");
+    if !candidate {
         return Ok(None);
     }
-    let tokens = tokens(text)?;
+    let mut tokens = vec![first];
+    tokens.extend(second);
+    while let Some(next) = token(&mut rest)? {
+        tokens.push(next);
+    }
     let mut i = 0;
     let mut operands = BTreeSet::new();
     while i < tokens.len() {
@@ -200,7 +244,7 @@ pub(super) fn script(
             i += 1;
             continue;
         }
-        let directive = tokens[i].as_str();
+        let directive = tokens[i];
         let inputs = matches!(directive, "GROUP" | "INPUT");
         if !inputs && !matches!(directive, "OUTPUT_FORMAT" | "OUTPUT_ARCH") {
             return Err(refused(format!(
@@ -208,31 +252,43 @@ pub(super) fn script(
             )));
         }
         i += 1;
-        if tokens.get(i).map(String::as_str) != Some("(") {
+        if tokens.get(i).copied() != Some("(") {
             return Err(refused("script directive missing parenthesis"));
         }
         i += 1;
-        let mut depth = 1;
-        while depth > 0 {
+        let mut counts = vec![0usize];
+        while !counts.is_empty() {
             let token = tokens
                 .get(i)
                 .ok_or_else(|| refused("unclosed script directive"))?;
             i += 1;
-            match token.as_str() {
-                ")" => depth -= 1,
+            match *token {
+                ")" => {
+                    if counts.pop() == Some(0) {
+                        return Err(refused("script directive has no operand"));
+                    }
+                }
                 "," => {}
                 "AS_NEEDED" if inputs => {
-                    if tokens.get(i).map(String::as_str) != Some("(") {
+                    if tokens.get(i).copied() != Some("(") {
                         return Err(refused("AS_NEEDED missing parenthesis"));
                     }
                     i += 1;
-                    depth += 1;
+                    *counts.last_mut().expect("inside directive") += 1;
+                    counts.push(0);
                 }
                 "(" | ";" => return Err(refused("unsupported script syntax")),
-                _ if inputs => {
-                    operands.insert(resolve(path, token, members)?);
+                _ => {
+                    if tokens.get(i).copied() == Some("(") {
+                        return Err(refused(format!(
+                            "script {path}: unsupported directive {token}"
+                        )));
+                    }
+                    *counts.last_mut().expect("inside directive") += 1;
+                    if inputs {
+                        operands.insert(resolve(path, token, members)?);
+                    }
                 }
-                _ => {}
             }
         }
     }
