@@ -77,11 +77,16 @@ pub(super) fn probe(descriptor: &MethodDescriptor, path: &str) -> ArtifactResult
         .env("TMPDIR", scratch.path());
     // Location context is process-local, not descriptor/key material. Remove stale recorded
     // locations even when the caller has no replacement. Snapshot once for both invocations.
-    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME"] {
+    // A rustup or cargo home is passed through only when it already exists. Otherwise it points
+    // inside the private scratch dir: a rustup proxy that compiler() did not recognise (a
+    // standalone copy or hardlink named rustc) creates its home before honouring
+    // RUSTUP_AUTO_INSTALL=0, and that write must land in scratch, never outside it. A real
+    // compiler ignores both variables; a disguised proxy then fails verify_identity.
+    for name in LOCATION_VARS {
         command.env_remove(name);
-        if let Some(value) = std::env::var_os(name) {
-            command.env(name, value);
-        }
+    }
+    for (name, value) in location_env(scratch.path(), |name| std::env::var_os(name)) {
+        command.env(name, value);
     }
     // Clone the prepared environment/cwd, keeping the identical resolved executable. Arguments
     // belong to each invocation so -vV cannot accidentally suppress the library probe.
@@ -146,6 +151,33 @@ pub(super) fn probe(descriptor: &MethodDescriptor, path: &str) -> ArtifactResult
 
 /// Resolve an installed compiler without executing rustup, which creates its home even with
 /// RUSTUP_AUTO_INSTALL=0. Location context stays process-local and outside the descriptor/key.
+/// The toolchain-location variables the probe takes from this process, never from the descriptor.
+const LOCATION_VARS: [&str; 3] = ["RUSTUP_HOME", "CARGO_HOME", "HOME"];
+
+/// Location context for the probe. `HOME` passes through when set. `RUSTUP_HOME` and `CARGO_HOME`
+/// pass through only when they name an existing directory; otherwise each points at a path inside
+/// `scratch`, so a rustup proxy `compiler()` did not recognise (it creates its home before it reads
+/// `RUSTUP_AUTO_INSTALL`) can only write inside the private scratch dir.
+fn location_env(
+    scratch: &Path,
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    let mut env = Vec::new();
+    for name in LOCATION_VARS {
+        match var(name) {
+            Some(value) if name == "HOME" || Path::new(&value).is_dir() => env.push((name, value)),
+            _ if name != "HOME" => env.push((
+                name,
+                scratch
+                    .join(format!("{}-absent", name.to_ascii_lowercase()))
+                    .into_os_string(),
+            )),
+            _ => {}
+        }
+    }
+    env
+}
+
 fn compiler(executable: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<PathBuf> {
     let resolved = std::fs::canonicalize(executable).map_err(|e| {
         ArtifactError::Gap(format!(

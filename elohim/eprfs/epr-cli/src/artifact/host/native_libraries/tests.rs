@@ -312,3 +312,37 @@ fn artifact_native_library_missing_toolchain_refuses_without_installing() {
     assert!(!message.contains("syncing channel"), "{message}");
     assert!(!message.contains("downloading"), "{message}");
 }
+
+#[test]
+fn artifact_native_library_location_vars_stay_inside_scratch_unless_they_exist() {
+    let scratch = tempfile::tempdir().unwrap();
+    let existing = tempfile::tempdir().unwrap();
+    let outside = existing.path().join("never-created");
+    let existing_path = existing.path().to_path_buf();
+    let outside_path = outside.clone();
+    let env: std::collections::BTreeMap<_, _> = location_env(scratch.path(), |name| match name {
+        "RUSTUP_HOME" => Some(outside_path.clone().into_os_string()),
+        "CARGO_HOME" => Some(existing_path.clone().into_os_string()),
+        "HOME" => Some("/home/somebody".into()),
+        _ => None,
+    })
+    .into_iter()
+    .collect();
+    // A nonexistent RUSTUP_HOME is never handed to the child: a disguised proxy could create it.
+    let rustup_home = std::path::PathBuf::from(&env["RUSTUP_HOME"]);
+    assert!(rustup_home.starts_with(scratch.path()), "{rustup_home:?}");
+    assert_ne!(rustup_home, outside);
+    // An existing home passes through unchanged; HOME passes through when set.
+    assert_eq!(
+        std::path::PathBuf::from(&env["CARGO_HOME"]),
+        existing.path()
+    );
+    assert_eq!(env["HOME"], std::ffi::OsString::from("/home/somebody"));
+    // Unset homes also point inside scratch; unset HOME stays unset.
+    let unset: std::collections::BTreeMap<_, _> =
+        location_env(scratch.path(), |_| None).into_iter().collect();
+    assert!(std::path::PathBuf::from(&unset["RUSTUP_HOME"]).starts_with(scratch.path()));
+    assert!(std::path::PathBuf::from(&unset["CARGO_HOME"]).starts_with(scratch.path()));
+    assert!(!unset.contains_key("HOME"));
+    assert!(!outside.exists());
+}
