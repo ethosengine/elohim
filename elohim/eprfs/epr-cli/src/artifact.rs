@@ -1492,21 +1492,6 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     .map_err(|why| gap(&why))?;
     let scope = crate::flow::repository::repository_scope(&options.repo)
         .map_err(|e| ArtifactError::Gap(format!("fetch gap: local-store: {e}")))?;
-    custody::record_divergence(&found.served_root, &found.device, &key.key_cid, &selection)?;
-    if !options.json && selection.outputs.len() > 1 {
-        println!(
-            "divergence: key {} outputs {} chosen {} rule {}",
-            key.key_cid,
-            selection
-                .outputs
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(","),
-            selection.output,
-            selection.rule
-        );
-    }
     let (stall, total) = (
         options.stall.unwrap_or(FETCH_STALL.as_secs()),
         options.total.unwrap_or(FETCH_TOTAL.as_secs()),
@@ -1554,6 +1539,26 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
             manifest,
             ..
         } => {
+            custody::record_divergence(
+                &found.served_root,
+                &found.device,
+                &key.key_cid,
+                &selection,
+            )?;
+            if !options.json && selection.outputs.len() > 1 {
+                println!(
+                    "divergence: key {} outputs {} chosen {} rule {}",
+                    key.key_cid,
+                    selection
+                        .outputs
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    selection.output,
+                    selection.rule
+                );
+            }
             if options.json {
                 println!(
                     "{}",

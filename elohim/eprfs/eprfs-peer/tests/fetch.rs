@@ -1527,7 +1527,7 @@ async fn queue_and_wait(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
+async fn a_queued_expected_fetch_installs_retained_output_after_a_newer_production() {
     let t = three();
     let key = key_for("closure-at-head");
     let bytes = artifact_bytes(111, 3 * 1024 * 1024);
@@ -1548,6 +1548,34 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
     )
     .await
     .expect("put");
+    let newer_bytes = artifact_bytes(112, 1024);
+    let newer = put_local_blob(
+        a_store.as_ref(),
+        &mut a_side.checkout.store(),
+        record(&key, &newer_bytes),
+        newer_bytes,
+        &context(&t.a.did),
+    )
+    .await
+    .expect("later production retains the earlier output");
+    let records = vec![
+        SiblingRecord {
+            key: key_cid(&key).unwrap(),
+            device: t.a.did.clone(),
+            output: output.clone(),
+            manifest: put.manifest_cid.clone(),
+        },
+        SiblingRecord {
+            key: key_cid(&key).unwrap(),
+            device: t.a.did.clone(),
+            output: newer.manifest.record.output.clone(),
+            manifest: newer.manifest_cid,
+        },
+    ];
+    let selection =
+        resolve_holders(&key_cid(&key).unwrap(), &records, &t.c.did, Some(&output)).unwrap();
+    assert_eq!(selection.holders.len(), 1);
+    assert_eq!(selection.holders[0].device, t.a.did);
     let a_port = free_port();
     let a_key = PeerKey::load_or_generate(t._dirs[0].path()).expect("key a");
     let a_daemon = a_side.start(&t, &t.a, a_key, a_port, Vec::new()).await;
@@ -1569,10 +1597,7 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
     );
     let dest = c_side.install_root().join("elohim-storage");
     let holders = vec![
-        eprfs_peer::RequestedHolder {
-            device: t.a.did.clone(),
-            manifest: put.manifest_cid.clone(),
-        },
+        selection.holders[0].clone(),
         // A device the roster does not admit is dropped by the daemon, never dialled.
         eprfs_peer::RequestedHolder {
             device: "did:key:zStranger".into(),
@@ -1582,7 +1607,8 @@ async fn a_queued_fetch_is_run_by_the_devices_daemon_and_answered() {
     // A's mount indexes on its own tick; until then A refuses, which is a gap, so ask again.
     let done = within("an installed answer", async {
         loop {
-            let request = request_for(&key, &output, holders.clone(), dest.clone());
+            let mut request = request_for(&key, &output, holders.clone(), dest.clone());
+            request.expect_output = Some(output.clone());
             match queue_and_wait(&queue, &request).await {
                 done @ eprfs_peer::FetchDone::Installed { .. } => break done,
                 eprfs_peer::FetchDone::Gap {
@@ -1772,67 +1798,141 @@ async fn an_orphaned_staging_dir_from_a_killed_run_is_removed_by_the_next_instal
     drop(held_lock);
 }
 
-#[test]
-fn holder_selection_prefers_expected_then_own_then_distinct_plurality() {
-    let key = BlobCid::compute(b"key");
-    let x = BlobCid::compute_bytes(b"x");
-    let y = BlobCid::compute_bytes(b"y");
-    let row = |device: &str, output: &BlobCid| SiblingRecord {
+fn custody_record(key: &BlobCid, device: &str, output: &BlobCid) -> SiblingRecord {
+    SiblingRecord {
         key: key.clone(),
         device: device.into(),
         output: output.clone(),
         manifest: BlobCid::compute(device.as_bytes()),
-    };
-    let mut records = vec![row("a", &x), row("b", &x), row("own", &y)];
-    records.extend([row("own", &y), row("own", &y)]);
+    }
+}
+
+#[test]
+fn holder_selection_prefers_expected_then_latest_own_with_remote_custody() {
+    let key = BlobCid::compute(b"key");
+    let x = BlobCid::compute_bytes(b"x");
+    let y = BlobCid::compute_bytes(b"y");
+    let row = |device, output| custody_record(&key, device, output);
+    let records = vec![
+        row("a", &x),
+        row("b", &x),
+        row("c", &x),
+        row("d", &y),
+        row("own", &x),
+        row("own", &y),
+        row("own", &y),
+    ];
     let expected = resolve_holders(&key, &records, "own", Some(&x)).unwrap();
     assert_eq!(
         (expected.output, expected.rule, expected.holders.len()),
-        (x.clone(), "expected", 2)
+        (x.clone(), "expected", 3)
+    );
+    let own = resolve_holders(&key, &records, "own", None).unwrap();
+    assert_eq!((own.output, own.rule), (y.clone(), "own"));
+    assert_eq!(
+        own.holders
+            .iter()
+            .map(|h| h.device.as_str())
+            .collect::<Vec<_>>(),
+        ["d"]
     );
     let minority = resolve_holders(&key, &records, "a", Some(&y)).unwrap();
     assert_eq!(
         (minority.output, minority.rule, minority.holders.len()),
-        (y.clone(), "expected", 1)
+        (y.clone(), "expected", 2)
     );
-    let own = resolve_holders(&key, &records, "own", None).unwrap();
-    assert_eq!((own.output, own.rule), (y.clone(), "own"));
     let plurality = resolve_holders(&key, &records, "elsewhere", None).unwrap();
-    assert_eq!((plurality.output, plurality.rule), (x.clone(), "plurality"));
     assert_eq!(
-        plurality
+        (plurality.output, plurality.rule, plurality.holders.len()),
+        (x, "plurality", 4)
+    );
+    let absent = BlobCid::compute_bytes(b"absent");
+    for candidates in [&records[..], &[]] {
+        assert_eq!(
+            resolve_holders(&key, candidates, "own", Some(&absent)),
+            Err(FetchGap::ExpectedOutputUnavailable {
+                output: absent.clone()
+            })
+        );
+    }
+    assert_eq!(
+        resolve_holders(&key, &[], "own", None),
+        Err(FetchGap::NoRecord)
+    );
+}
+
+#[test]
+fn retained_output_remains_fetchable_and_overlapping_holders_tie() {
+    let key = BlobCid::compute(b"key");
+    let x = BlobCid::compute_bytes(b"x");
+    let y = BlobCid::compute_bytes(b"y");
+    let row = |device, output| custody_record(&key, device, output);
+    let mut records = vec![row("a", &x), row("a", &y), row("a", &y)];
+    let retained = resolve_holders(&key, &records, "fetcher", Some(&x)).unwrap();
+    assert_eq!(retained.output, x);
+    assert_eq!(
+        retained
             .holders
             .iter()
             .map(|h| h.device.as_str())
             .collect::<Vec<_>>(),
-        ["a", "b"]
+        ["a"]
     );
-    let absent = BlobCid::compute_bytes(b"absent");
+    records.extend([row("b", &x), row("c", &y)]);
+    let mut outputs = vec![x.clone(), y.clone()];
+    outputs.sort();
     assert_eq!(
-        resolve_holders(&key, &records, "own", Some(&absent)),
-        Err(FetchGap::ExpectedOutputUnavailable {
-            output: absent.clone()
-        })
+        resolve_holders(&key, &records, "fetcher", None),
+        Err(FetchGap::Mismatch { outputs })
     );
-    assert_eq!(
-        resolve_holders(&key, &[], "own", Some(&absent)),
-        Err(FetchGap::ExpectedOutputUnavailable { output: absent })
-    );
-    records.push(row("b", &y));
-    assert_eq!(
-        resolve_holders(&key, &records, "elsewhere", None)
-            .unwrap()
-            .output,
-        y
-    );
-    let mut unrelated = row("a", &y);
-    unrelated.key = BlobCid::compute(b"other-key");
-    records.push(unrelated);
+    let other_key = BlobCid::compute(b"other-key");
+    records.push(custody_record(&other_key, "a", &y));
     let held = eprfs_peer::fold_holders(&records);
-    assert_eq!(held.len(), 4);
+    assert_eq!(held.len(), 5);
     assert!(held
         .iter()
         .any(|r| r.device == "a" && r.output == x && r.key == key));
+}
+
+#[test]
+fn local_only_own_custody_falls_through_to_remote_plurality_or_a_typed_gap() {
+    let key = BlobCid::compute(b"key");
+    let x = BlobCid::compute_bytes(b"x");
+    let y = BlobCid::compute_bytes(b"y");
+    let z = BlobCid::compute_bytes(b"z");
+    let row = |device, output| custody_record(&key, device, output);
+    let local = vec![row("own", &x)];
+    for expected in [None, Some(&x)] {
+        let gap = resolve_holders(&key, &local, "own", expected).unwrap_err();
+        assert_eq!(
+            gap,
+            FetchGap::LocalOnlyCustody {
+                outputs: vec![x.clone()]
+            }
+        );
+        assert_eq!(gap.kind(), "local-only-custody");
+        assert!(gap.to_string().contains(&x.to_string()));
+        assert!(gap.to_string().contains("remote holder"));
+    }
+    let mut records = vec![row("own", &x), row("a", &y), row("b", &y), row("c", &z)];
+    let chosen = resolve_holders(&key, &records, "own", None).unwrap();
+    assert_eq!(
+        (chosen.output, chosen.rule, chosen.holders.len()),
+        (y.clone(), "plurality", 2)
+    );
+    // The latest own production alone supplies rule (b); earlier remote-held own output is not a fallback.
+    records.insert(0, row("own", &z));
+    assert_eq!(
+        resolve_holders(&key, &records, "own", None).unwrap().rule,
+        "plurality"
+    );
+    // Counting local custody would break this remote tie in favour of y.
+    records.insert(0, row("own", &y));
+    records.push(row("d", &z));
+    assert!(matches!(
+        resolve_holders(&key, &records, "own", None),
+        Err(FetchGap::Mismatch { .. })
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -1764,6 +1764,12 @@ fn holders_by_output_and_key_share_distinct_counts_and_advisory_warning() {
     let two: serde_json::Value = serde_json::from_slice(&two.stdout).unwrap();
     assert_eq!(two["holders"].as_array().unwrap().len(), 2);
     assert_eq!(two["belowMin"], false);
+    for holder in two["holders"].as_array().unwrap() {
+        assert_eq!(holder["self"], holder["device"] == b.key.did_key());
+    }
+    let marked = query("--output", &output.to_string(), false);
+    assert!(String::from_utf8_lossy(&marked.stdout)
+        .contains(&format!("{} {output} self", b.key.did_key())));
     let by_key = query("--key", &key, true);
     assert_eq!(
         two,
@@ -1784,6 +1790,25 @@ fn holders_by_output_and_key_share_distinct_counts_and_advisory_warning() {
     ]);
     assert!(higher.status.success());
     assert!(String::from_utf8_lossy(&higher.stderr).contains("fewer than 3"));
+    // Later production under the same key retains A's older output in either lookup.
+    let newer = BlobCid::compute_bytes(b"newer-holder-output");
+    store
+        .append(FlowRecord::Event(produce_record(
+            &key,
+            &newer,
+            &manifest,
+            Some(&a.key.did_key()),
+        )))
+        .unwrap();
+    let retained = query("--output", &output.to_string(), true);
+    assert!(retained.status.success());
+    assert_eq!(
+        two,
+        serde_json::from_slice::<serde_json::Value>(&retained.stdout).unwrap()
+    );
+    let by_key = query("--key", &key, true);
+    let by_key: serde_json::Value = serde_json::from_slice(&by_key.stdout).unwrap();
+    assert_eq!(by_key["holders"].as_array().unwrap().len(), 3);
     let absent = BlobCid::compute_bytes(b"absent");
     let zero = query("--output", &absent.to_string(), true);
     assert!(zero.status.success());
@@ -1869,13 +1894,14 @@ fn fetch_plurality_queues_only_chosen_holders_and_records_divergence_once() {
     let queue = eprfs_peer::fetch_queue_dir(&peer_dir);
     eprfs_peer::ensure_queue_dir(&queue).unwrap();
     let expected_devices: std::collections::BTreeSet<_> = [a.key.did_key(), c.key.did_key()].into();
-    let own_devices: std::collections::BTreeSet<_> = [b.key.did_key(), d.key.did_key()].into();
+    let own_devices: std::collections::BTreeSet<_> = [a.key.did_key(), d.key.did_key()].into();
     let expected_requests = [
         (x.clone(), expected_devices.clone(), None),
         (x.clone(), expected_devices.clone(), None),
         (x.clone(), expected_devices, Some(x.clone())),
         (y.clone(), own_devices, None),
     ];
+    let later_manifest = manifest.to_string();
     let worker = std::thread::spawn(move || {
         // Exercise the CLI/daemon queue boundary. The peer transport test independently moves
         // actual bytes from this same selection, including proving the divergent holder is idle.
@@ -1930,6 +1956,17 @@ fn fetch_plurality_queues_only_chosen_holders_and_records_divergence_once() {
         }
     });
     for rule in ["plurality", "plurality", "expected", "own"] {
+        if rule == "expected" {
+            // A's later Y does not erase its X custody: --expect-output X still queues A.
+            store
+                .append(FlowRecord::Event(produce_record(
+                    &key,
+                    &y,
+                    &later_manifest,
+                    Some(&a.key.did_key()),
+                )))
+                .unwrap();
+        }
         if rule == "own" {
             let mut own = produce_record(
                 &key,
@@ -1985,4 +2022,156 @@ fn fetch_plurality_queues_only_chosen_holders_and_records_divergence_once() {
         }
     }
     worker.join().unwrap();
+}
+
+#[test]
+fn daemon_install_refusal_records_and_prints_no_divergence() {
+    use std::time::{Duration, Instant};
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let (method, descriptor) = method_file(scratch.path(), &["crate"]);
+    let result = b
+        .command()
+        .envs(descriptor.non_path_inputs.iter())
+        .args([
+            "artifact",
+            "key",
+            "--method",
+            method.to_str().unwrap(),
+            "--repo",
+            b.root().to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(result.status.success(), "{}", text(&result));
+    let key = serde_json::from_slice::<serde_json::Value>(&result.stdout).unwrap()["keyCid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let x = BlobCid::compute_bytes(b"remote-output");
+    let y = BlobCid::compute_bytes(b"local-only-output");
+    let manifest = BlobCid::compute(b"manifest").to_string();
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let mut own = produce_record(&key, &y, &manifest, None);
+    own.receiver = AgentRef(b.key.did_key());
+    own.classified_as
+        .retain(|s| !s.starts_with("measure:") && !s.starts_with("reason:"));
+    store.append(FlowRecord::Event(own)).unwrap();
+
+    let policy = scratch.path().join("policy.json");
+    std::fs::write(
+        &policy,
+        r#"{"berth":{"channel":{"crosses":{"artifact-produce@1":["produce"]}}}}"#,
+    )
+    .unwrap();
+    let allowed = scratch.path().join("allowed");
+    std::fs::create_dir(&allowed).unwrap();
+    let log = scratch.path().join("daemon.log");
+    // Only this test's child is stopped, including on an assertion failure.
+    struct Daemon(std::process::Child);
+    impl Drop for Daemon {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let mut daemon = Daemon(
+        b.command()
+            .args([
+                "peer",
+                "serve",
+                "--root",
+                b.root().to_str().unwrap(),
+                "--policy",
+                policy.to_str().unwrap(),
+                "--listen",
+                "127.0.0.1:0",
+                "--install-root",
+                allowed.to_str().unwrap(),
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::fs::File::create(&log).unwrap())
+            .spawn()
+            .unwrap(),
+    );
+    let peer_dir = b.config.path().join("epr/peer");
+    let started = Instant::now();
+    loop {
+        assert!(
+            daemon.0.try_wait().unwrap().is_none(),
+            "{}",
+            std::fs::read_to_string(&log).unwrap()
+        );
+        if eprfs_peer::queue_dir_is_private(&eprfs_peer::fetch_queue_dir(&peer_dir))
+            && elohim_epr_cli::peer::ServeLock::held(&peer_dir) == Some(true)
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "daemon ready: {}",
+            std::fs::read_to_string(&log).unwrap()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let dest = scratch.path().join("outside");
+    let fetch = || {
+        b.command()
+            .envs(descriptor.non_path_inputs.iter())
+            .args([
+                "artifact",
+                "fetch",
+                "--method",
+                method.to_str().unwrap(),
+                "--repo",
+                b.root().to_str().unwrap(),
+                "--dest",
+                dest.to_str().unwrap(),
+                "--stall",
+                "1",
+                "--total",
+                "1",
+            ])
+            .output()
+            .unwrap()
+    };
+    let local_only = fetch();
+    assert!(!local_only.status.success());
+    assert!(
+        text(&local_only).contains("local-only-custody"),
+        "{}",
+        text(&local_only)
+    );
+    assert!(text(&local_only).contains(&y.to_string()));
+    // Rule (b) cannot select local-only Y. X is now the remote plurality, but installation refuses.
+    store
+        .append(FlowRecord::Event(produce_record(
+            &key,
+            &x,
+            &manifest,
+            Some(&a.key.did_key()),
+        )))
+        .unwrap();
+    let refused = fetch();
+    assert!(!refused.status.success());
+    assert!(
+        text(&refused).contains("install-refused"),
+        "{}",
+        text(&refused)
+    );
+    assert!(
+        text(&refused).contains("outside this daemon's install roots"),
+        "{}",
+        text(&refused)
+    );
+    assert!(!text(&refused).contains("divergence:"));
+    assert!(!dest.exists());
+    assert_eq!(
+        events(b.root())
+            .iter()
+            .filter(|e| e.classified_as.contains(&"env:kind=divergence".into()))
+            .count(),
+        0
+    );
 }

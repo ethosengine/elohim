@@ -68,9 +68,11 @@ pub(super) fn holders(options: &Options) -> ArtifactResult<ExitCode> {
             serde_json::json!({"output": output, "count": devices.len(), "belowMin": below_min}),
         );
         for device in &devices {
-            holders.push(serde_json::json!({"device": device, "output": output}));
+            let is_self = device == &found.device;
+            holders.push(serde_json::json!({"device": device, "output": output, "self": is_self}));
             if !options.json {
-                println!("{device} {output}");
+                let marker = if is_self { " self" } else { "" };
+                println!("{device} {output}{marker}");
             }
         }
         if below_min && !options.json {
