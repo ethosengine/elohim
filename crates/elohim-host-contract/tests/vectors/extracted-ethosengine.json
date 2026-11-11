@@ -1,0 +1,393 @@
+{
+  "schema": "elohim-host-contract/extracted-vectors@0 (draft; A1 owns the final shape)",
+  "device": "ethosengine",
+  "extractedAt": "2026-11-11T04:08:43Z",
+  "spec": "genesis/docs/superpowers/specs/2026-11-10-host-compatibility-foundation-design.md \u00a73.1-3.2",
+  "providesExported": false,
+  "artifacts": [
+    {
+      "name": "epr",
+      "sha256": "8e5c418f4919dea2a02079b2b3a2600c1366b02bec5b7cfd3e99941d8cb42b10",
+      "binStoreRelease": "bafyreibnwgff6acemmhas3y7quefr54u2seq3o343n7x4vpbcgwieutjgq",
+      "sourceCommit": "caf7cf491c6708d49bc8920ad39b89c52073d5e7",
+      "profile": "debug",
+      "installed": "bin-store current",
+      "comment": [
+        "Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)",
+        "rustc version 1.96.1 (31fca3adb 2026-06-26)",
+        "GCC: (GNU) 14.3.1 20251022 (Red Hat 14.3.1-4)"
+      ],
+      "requires": [
+        {
+          "axis": "arch",
+          "kind": "equal",
+          "value": "x86_64",
+          "source": "extracted",
+          "evidence": "ELF e_machine: Advanced Micro Devices X86-64"
+        },
+        {
+          "axis": "os",
+          "kind": "equal",
+          "value": "linux",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG OS: Linux"
+        },
+        {
+          "axis": "kernel.linux",
+          "kind": "at-least",
+          "value": "3.2.0",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG ABI"
+        },
+        {
+          "axis": "abi.loader",
+          "kind": "present",
+          "value": [
+            "/lib64/ld-linux-x86-64.so.2"
+          ],
+          "source": "extracted",
+          "evidence": "PT_INTERP"
+        },
+        {
+          "axis": "abi.libc",
+          "kind": "at-least",
+          "value": "glibc 2.39",
+          "source": "extracted",
+          "evidence": "highest GLIBC_ version needed (of 2.32, 2.33, 2.34, 2.39)"
+        },
+        {
+          "axis": "lib",
+          "kind": "present",
+          "value": [
+            "libgcc_s.so.1",
+            "libm.so.6",
+            "libc.so.6",
+            "ld-linux-x86-64.so.2"
+          ],
+          "source": "extracted",
+          "evidence": "DT_NEEDED"
+        },
+        {
+          "axis": "isa.x86",
+          "kind": "subset",
+          "value": "x86-64-v3",
+          "source": "extracted",
+          "evidence": "above-v1 instructions in C code that has no runtime CPU dispatch: c:ring avx x5450 (e.g. ring_core_0_17_14__x25519_ge_frombytes_vartime); c:ring bmi2 x666 (e.g. ring_core_0_17_14__x25519_ge_frombytes_vartime); c:ring movbe x4 (e.g. ring_core_0_17_14__aes_nohw_ctr32_encrypt_blocks); c:sqlite3 avx x2527 (e.g. sqlite3AtoF); c:sqlite3 bmi2 x101 (e.g. sqlite3AtoF); c:sqlite3 lzcnt x2 (e.g. sqlite3LogEst); c:sqlite3 movbe x52 (e.g. sqlite3VdbeSerialGet). The C deps were compiled at this build image's gcc default -march=x86-64-v3."
+        }
+      ],
+      "isaDetermination": "determined: v3 (these bytes will not run on a v2-only CPU)",
+      "isaScan": [
+        {
+          "family": "c:ring",
+          "class": "avx",
+          "count": 5450,
+          "example": "ring_core_0_17_14__x25519_ge_frombytes_vartime"
+        },
+        {
+          "family": "c:ring",
+          "class": "bmi1",
+          "count": 13,
+          "example": "ring_core_0_17_14__bn_from_montgomery_in_place"
+        },
+        {
+          "family": "c:ring",
+          "class": "bmi2",
+          "count": 666,
+          "example": "ring_core_0_17_14__x25519_ge_frombytes_vartime"
+        },
+        {
+          "family": "c:ring",
+          "class": "movbe",
+          "count": 4,
+          "example": "ring_core_0_17_14__aes_nohw_ctr32_encrypt_blocks"
+        },
+        {
+          "family": "c:sqlite3",
+          "class": "avx",
+          "count": 2527,
+          "example": "sqlite3AtoF"
+        },
+        {
+          "family": "c:sqlite3",
+          "class": "bmi1",
+          "count": 7,
+          "example": "sqlite3VdbeSerialGet"
+        },
+        {
+          "family": "c:sqlite3",
+          "class": "bmi2",
+          "count": 101,
+          "example": "sqlite3AtoF"
+        },
+        {
+          "family": "c:sqlite3",
+          "class": "lzcnt",
+          "count": 2,
+          "example": "sqlite3LogEst"
+        },
+        {
+          "family": "c:sqlite3",
+          "class": "movbe",
+          "count": 52,
+          "example": "sqlite3VdbeSerialGet"
+        },
+        {
+          "family": "other",
+          "class": "avx",
+          "count": 10007,
+          "example": "dekkerMul2"
+        },
+        {
+          "family": "other",
+          "class": "bmi1",
+          "count": 48,
+          "example": "serialGet7"
+        },
+        {
+          "family": "other",
+          "class": "bmi2",
+          "count": 568,
+          "example": "computeFloor"
+        },
+        {
+          "family": "other",
+          "class": "fma",
+          "count": 13,
+          "example": "dekkerMul2"
+        },
+        {
+          "family": "other",
+          "class": "lzcnt",
+          "count": 4,
+          "example": "whereLoopAddBtreeIndex"
+        },
+        {
+          "family": "other",
+          "class": "movbe",
+          "count": 253,
+          "example": "serialGet7"
+        },
+        {
+          "family": "rust",
+          "class": "avx",
+          "count": 4922,
+          "example": "_ZN8chacha208backends4avx25inner17h3cde23389058d8e2E"
+        },
+        {
+          "family": "rust",
+          "class": "bmi1",
+          "count": 1271,
+          "example": "_ZN9hashbrown3raw13RawTableInner16fix_insert_index17h4c54bdb"
+        },
+        {
+          "family": "rust",
+          "class": "fma",
+          "count": 2,
+          "example": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_mat"
+        }
+      ]
+    },
+    {
+      "name": "brit",
+      "sha256": "e29ece22cf46229f411cfe32e69b7eed9fef5e7b1a9f49c25dd6dd0aa3950351",
+      "binStoreRelease": "bafyreigyeqffmbspykd24czwbjobb62cecm7sgio43tfpyfzfvu45trvhe",
+      "profile": "release (stripped)",
+      "installed": "bin-store current",
+      "comment": [
+        "Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)",
+        "rustc version 1.96.1 (31fca3adb 2026-06-26)",
+        "GCC: (GNU) 14.3.1 20251022 (Red Hat 14.3.1-4)"
+      ],
+      "requires": [
+        {
+          "axis": "arch",
+          "kind": "equal",
+          "value": "x86_64",
+          "source": "extracted",
+          "evidence": "ELF e_machine: Advanced Micro Devices X86-64"
+        },
+        {
+          "axis": "os",
+          "kind": "equal",
+          "value": "linux",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG OS: Linux"
+        },
+        {
+          "axis": "kernel.linux",
+          "kind": "at-least",
+          "value": "3.2.0",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG ABI"
+        },
+        {
+          "axis": "abi.loader",
+          "kind": "present",
+          "value": [
+            "/lib64/ld-linux-x86-64.so.2"
+          ],
+          "source": "extracted",
+          "evidence": "PT_INTERP"
+        },
+        {
+          "axis": "abi.libc",
+          "kind": "at-least",
+          "value": "glibc 2.39",
+          "source": "extracted",
+          "evidence": "highest GLIBC_ version needed (of 2.33, 2.34, 2.38, 2.39)"
+        },
+        {
+          "axis": "lib",
+          "kind": "present",
+          "value": [
+            "libgcc_s.so.1",
+            "libm.so.6",
+            "libc.so.6"
+          ],
+          "source": "extracted",
+          "evidence": "DT_NEEDED"
+        }
+      ],
+      "isaDetermination": "undetermined: binary is stripped, so above-v1 instructions cannot be told apart from runtime-dispatched paths; no isa.x86 clause is emitted (absent clause, not a guess). Counts are in isaScan.",
+      "isaScan": [
+        {
+          "family": "other",
+          "class": "avx",
+          "count": 163175,
+          "example": ".text"
+        },
+        {
+          "family": "other",
+          "class": "bmi1",
+          "count": 3628,
+          "example": ".text"
+        },
+        {
+          "family": "other",
+          "class": "bmi2",
+          "count": 6532,
+          "example": ".text"
+        },
+        {
+          "family": "other",
+          "class": "movbe",
+          "count": 245,
+          "example": ".text"
+        },
+        {
+          "family": "other",
+          "class": "popcnt(v2)",
+          "count": 10,
+          "example": ".text"
+        }
+      ]
+    },
+    {
+      "name": "ark",
+      "sha256": "2b625f9015b78446bb049507fd7c150acb64cdd9d0d9a4cf48a40891e5923b16",
+      "profile": "debug",
+      "installed": "not in the bin store on this device; newest local build (cargo pool slot family/artifact/elohim, 2026-11-10T18:01Z)",
+      "comment": [
+        "Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)",
+        "rustc version 1.96.1 (31fca3adb 2026-06-26)",
+        "GCC: (GNU) 14.3.1 20251022 (Red Hat 14.3.1-4)"
+      ],
+      "requires": [
+        {
+          "axis": "arch",
+          "kind": "equal",
+          "value": "x86_64",
+          "source": "extracted",
+          "evidence": "ELF e_machine: Advanced Micro Devices X86-64"
+        },
+        {
+          "axis": "os",
+          "kind": "equal",
+          "value": "linux",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG OS: Linux"
+        },
+        {
+          "axis": "kernel.linux",
+          "kind": "at-least",
+          "value": "3.2.0",
+          "source": "extracted",
+          "evidence": "NT_GNU_ABI_TAG ABI"
+        },
+        {
+          "axis": "abi.loader",
+          "kind": "present",
+          "value": [
+            "/lib64/ld-linux-x86-64.so.2"
+          ],
+          "source": "extracted",
+          "evidence": "PT_INTERP"
+        },
+        {
+          "axis": "abi.libc",
+          "kind": "at-least",
+          "value": "glibc 2.39",
+          "source": "extracted",
+          "evidence": "highest GLIBC_ version needed (of 2.32, 2.33, 2.34, 2.39)"
+        },
+        {
+          "axis": "lib",
+          "kind": "present",
+          "value": [
+            "libgcc_s.so.1",
+            "libc.so.6",
+            "ld-linux-x86-64.so.2"
+          ],
+          "source": "extracted",
+          "evidence": "DT_NEEDED"
+        }
+      ],
+      "isaDetermination": "no above-v1 requirement found: the only VEX instructions sit in runtime-dispatched paths (blake3 *_avx2, core::arch); tzcnt decodes as bsf on pre-BMI CPUs. No isa.x86 clause emitted.",
+      "isaScan": [
+        {
+          "family": "other",
+          "class": "avx",
+          "count": 6021,
+          "example": "_blake3_hash_many_avx2"
+        },
+        {
+          "family": "rust",
+          "class": "avx",
+          "count": 1376,
+          "example": "_ZN4core9core_arch3x863avx16_mm256_set1_epi817h6aec816948447"
+        },
+        {
+          "family": "rust",
+          "class": "bmi1",
+          "count": 57,
+          "example": "_ZN9hashbrown3raw13RawTableInner16fix_insert_index17headf7f3"
+        }
+      ]
+    }
+  ],
+  "k1": {
+    "artifact": "epr",
+    "rustcVV": [
+      "rustc 1.96.1 (31fca3adb 2026-06-26)",
+      "binary: rustc",
+      "commit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd",
+      "commit-date: 2026-06-26",
+      "host: x86_64-unknown-linux-gnu",
+      "release: 1.96.1",
+      "LLVM version: 22.1.2"
+    ],
+    "effectiveLinker": "rust-lld (LLD 22.1.2, bundled with rustc 1.96.1), read from the epr binary's .comment; the system ld is not in the link",
+    "cc": "cc (GCC) 14.3.1 20251022 (Red Hat 14.3.1-4)",
+    "ccEffectiveDefaults": {
+      "march": "x86-64-v3",
+      "mtune": "generic"
+    },
+    "ccNote": "cc-built C deps (libsqlite3-sys bundled, ring) take gcc's default -march when no CFLAGS name one; on this image that default is x86-64-v3. The build key does not see it today (the cc tool line is only 'cc --version').",
+    "toolchainPackages": [
+      "gcc-14.3.1-4.4.el10.x86_64",
+      "glibc-devel-2.39-145.el10_2.x86_64",
+      "binutils-2.41-63.el10.x86_64"
+    ],
+    "buildEnv": "CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/artifact/elohim__eprfs/dev RUSTUP_TOOLCHAIN=1.96.1 RUSTFLAGS=\"\" cargo build -p elohim-epr-cli --bin epr"
+  }
+}
