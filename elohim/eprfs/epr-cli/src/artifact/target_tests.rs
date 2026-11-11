@@ -98,11 +98,11 @@ fn artifact_requires_is_opaque_array_with_canonical_object_order() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("requires.json");
     // No predicate interpretation here, including future shapes and array ordering.
-    std::fs::write(&path, r#"[ {"z":[2,1],"a":{"z":true,"a":"é"}}, 1.5 ]"#).unwrap();
+    std::fs::write(&path, r#"[ {"z":[2,1],"a":{"z":"true","a":"é"}}, 1 ]"#).unwrap();
     let (cid, bytes) = read_requires(&path).unwrap();
     assert_eq!(
         bytes.as_ref(),
-        "[{\"a\":{\"a\":\"é\",\"z\":true},\"z\":[2,1]},1.5]".as_bytes()
+        "[{\"a\":{\"a\":\"é\",\"z\":\"true\"},\"z\":[2,1]},1]".as_bytes()
     );
     std::fs::write(&path, &bytes).unwrap();
     assert_eq!(read_requires(&path).unwrap().0, cid);

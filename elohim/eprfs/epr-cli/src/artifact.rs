@@ -45,6 +45,8 @@ use eprfs_peer::{
 use serde::Serialize;
 
 mod custody;
+mod requires;
+use requires::read_requires;
 
 use crate::device_key::{self, DeviceKey};
 use crate::peer::{self, PeerCliError, ServeLock};
@@ -75,6 +77,8 @@ pub enum ArtifactError {
     Peer(#[from] PeerCliError),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
+    #[error("invalid Requires number at {path}: {number}; expected a plain-decimal u64")]
+    RequiresNumber { path: String, number: String },
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -92,6 +96,8 @@ pub fn usage() -> String {
      [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
      crosses with --cross; absent --requires makes no compatibility claim; \
+     --requires stores the document locally, not yet served to siblings (K3 part 2: \
+     explicit default-deny disclosure permission with admit, following K6 slice 1); \
      exits 3 `unrecorded: <reason>`)\n  \
      | fetch --method FILE --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
      [--stall S] [--total S] [--expect-output CID] [--json] \
@@ -1442,21 +1448,6 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         );
     }
     Ok(ExitCode::SUCCESS)
-}
-
-/// Opaque JSON with sorted object keys, compact UTF-8 encoding and unchanged array order.
-/// Absence of this document means nothing is claimed, not "requires nothing". Even a supplied
-/// array is only a claim: semantic validation and admission belong to host_contract, not put.
-fn read_requires(path: &Path) -> ArtifactResult<(BlobCid, Bytes)> {
-    let mut value: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
-    if !value.is_array() {
-        return Err(ArtifactError::InvalidArguments(
-            "--requires must contain a JSON array".into(),
-        ));
-    }
-    value.sort_all_objects();
-    let bytes = Bytes::from(serde_json::to_vec(&value)?);
-    Ok((BlobCid::compute_bytes(&bytes), bytes))
 }
 
 // ---------------------------------------------------------------------------
