@@ -74,7 +74,11 @@ fn range(offset: u64, size: u64, file_size: usize, label: &str) -> ArtifactResul
 pub(super) fn validate(file: &Elf<'_>, bytes: &[u8]) -> ArtifactResult<Value> {
     let endian = file.endian();
     let mut loads = Vec::new();
+    let mut notes = Budget::new(bytes.len(), 1, "notes (program headers and sections)");
     for p in file.elf_program_headers() {
+        if p.p_type(endian) == elf::PT_NOTE {
+            notes.take(usize::try_from(p.p_filesz(endian)).map_err(unrecorded)?)?;
+        }
         if p.p_type(endian) == elf::PT_LOAD {
             let r = range(
                 p.p_offset(endian),
@@ -90,11 +94,11 @@ pub(super) fn validate(file: &Elf<'_>, bytes: &[u8]) -> ArtifactResult<Value> {
             loads.push((p, r));
         }
     }
+    validate_load_overlap(file)?;
     let table = file.elf_section_table();
     let mut executable = Vec::new();
     let mut symbols = Budget::new(bytes.len(), 24, "symbols");
     let mut dynamic = Budget::new(bytes.len(), 16, "dynamic entries / DT_NEEDED");
-    let mut notes = Budget::new(bytes.len(), 1, "section notes");
     for s in table.iter() {
         let kind = s.sh_type(endian);
         // Aggregate physical table sizes before any iterator can revisit aliased tables.
@@ -164,6 +168,57 @@ fn gap(start: u64, end: u64, count: &mut u64, examples: &mut Vec<Value>) {
             examples.push(json!({"file_offset": start, "length": end - start}));
         }
     }
+}
+
+/// A later load can replace executable bytes even when section metadata matches an
+/// earlier load. Sweep rounded virtual ranges before trusting any section. Keeping
+/// the furthest end for all loads and executable loads avoids quadratic alias work.
+fn validate_load_overlap(file: &Elf<'_>) -> ArtifactResult<()> {
+    let e = file.endian();
+    let mut ranges = Vec::new();
+    for (index, p) in file.elf_program_headers().iter().enumerate() {
+        if p.p_type(e) != elf::PT_LOAD {
+            continue;
+        }
+        let align = match p.p_align(e) {
+            0 | 1 => 4096,
+            align => align,
+        };
+        let start = p.p_vaddr(e) - p.p_vaddr(e) % align;
+        let end = p
+            .p_vaddr(e)
+            .checked_add(p.p_memsz(e))
+            .ok_or_else(|| unrecorded(format!("PT_LOAD[{index}]: virtual range overflow")))?;
+        let end = end
+            .checked_add((align - end % align) % align)
+            .ok_or_else(|| {
+                unrecorded(format!(
+                    "PT_LOAD[{index}]: page-rounded virtual range overflow"
+                ))
+            })?;
+        if start < end {
+            ranges.push((start, end, index, p.p_flags(e) & elf::PF_X != 0));
+        }
+    }
+    ranges.sort_unstable();
+    let mut furthest: Option<(u64, usize)> = None;
+    let mut executable: Option<(u64, usize)> = None;
+    for (start, end, index, is_executable) in ranges {
+        if let Some((_, other)) = (if is_executable { furthest } else { executable })
+            .filter(|(previous_end, _)| start < *previous_end)
+        {
+            return Err(unrecorded(format!(
+                "page-rounded virtual overlap: PT_LOAD[{other}] and PT_LOAD[{index}]"
+            )));
+        }
+        if furthest.is_none_or(|(previous_end, _)| end > previous_end) {
+            furthest = Some((end, index));
+        }
+        if is_executable && executable.is_none_or(|(previous_end, _)| end > previous_end) {
+            executable = Some((end, index));
+        }
+    }
+    Ok(())
 }
 
 fn mapped_offset(file: &Elf<'_>, address: u64, size: u64) -> ArtifactResult<u64> {

@@ -1,6 +1,6 @@
 {
   "task": "host-compatibility-foundation K8",
-  "status": "round-4 complete: all seven findings fixed; required checks and Rust-style gate green; no push",
+  "status": "round-5 complete: N1 and N2 fixed; all four required Cargo checks green; no push",
   "measurement": [
     {
       "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
@@ -1545,5 +1545,99 @@
   "remaining": [
     "K10 runtime-dispatch narrowing remains outside K8.",
     "Uncovered section data islands and segment padding are explicitly reported, not claimed as decoded instructions."
-  ]
+  ],
+  "round5": {
+    "review": "/projects/elohim/genesis/local-dev/one-image/astra-k8/review-r2.md",
+    "base": "b679507c4",
+    "findings": [
+      {
+        "id": "N1",
+        "severity": "P1",
+        "decision": "Refuse page-rounded virtual overlap between any PT_LOAD pair with at least one executable member, naming both program-header indices. Round each range by its p_align, or 4096 for 0/1. Overflow refuses. Sorted sweep avoids quadratic load-pair work.",
+        "test": "artifact_overlapping_rx_loads_refuse_before_stub_decode",
+        "coverage": "8960-byte overlapping RX replacement with AVX2 at entry; disjoint adjacent pages succeed; page-only overlaps refuse for RX/RX, RX/R and R/RX, with alignments 0, 1, 4096 and 8192."
+      },
+      {
+        "id": "N2",
+        "severity": "P2",
+        "decision": "Charge program-header and section note payload sizes to one file-sized budget before any note iterator runs; refuse exhaustion.",
+        "test": "artifact_thousand_aliased_program_notes_exhaust_shared_budget",
+        "coverage": "1000 PT_NOTE headers aliasing 10000 valid notes refuse with the shared-budget reason. One payload succeeds; adding a section alias refuses, proving both tables use the same budget."
+      }
+    ],
+    "measurement": [
+      {
+        "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
+        "bytes": 128590816,
+        "elapsed_ms": 5210.820687,
+        "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+        "requires_bytes_unchanged": true,
+        "requires_cid_unchanged": true,
+        "exit": 0
+      },
+      {
+        "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+        "bytes": 136156696,
+        "elapsed_ms": 5224.701483,
+        "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+        "requires_bytes_unchanged": true,
+        "requires_cid_unchanged": true,
+        "exit": 0
+      }
+    ],
+    "checks": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 0,
+        "log": "artifact-host.log",
+        "passed": 121
+      },
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli",
+        "exit": 0,
+        "passed": 1463,
+        "log": "full.log"
+      },
+      {
+        "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+        "exit": 0,
+        "log": "clippy.log"
+      },
+      {
+        "command": "cargo fmt -p elohim-epr-cli -- --check",
+        "exit": 0,
+        "log": "fmt.log"
+      },
+      {
+        "command": "epr check",
+        "exit": 0,
+        "log": "epr-check.log"
+      },
+      {
+        "command": "just gate rust-style",
+        "exit": 0,
+        "log": "rust-style.log",
+        "debt": "epr-cli 0 -> 0; no suppressions added"
+      }
+    ],
+    "validation_history": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 101,
+        "log": "artifact.log",
+        "reason": "Fixed new fixture string-length typo; existing sysroot ownership fixture requires host access (chown EINVAL in sandbox). Host rerun passes."
+      }
+    ],
+    "log_directory": "genesis/a2o/reports/recovery/hostcompat-k8-round5/",
+    "story_harvest": {
+      "chain": "host-compatibility K8 -> K10",
+      "between": "loader mappings / note metadata -> extracted Requires",
+      "missing_node": "Executable virtual pages have one load mapping; total note visits are bounded by file size across both tables.",
+      "probe": "The two round-5 regressions above.",
+      "current_state": "green by focused native regressions",
+      "scenario": "@regression Given two loads sharing an executable page or 1000 headers aliasing 10000 notes; When Matthew puts the artifact; Then extraction refuses before recording.",
+      "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regressions execute now)"
+    },
+    "repository_operations": "Installed launchers refused read-only filesystem access; direct installed Brit/epr binaries used for initial inspection. epr doctor coherent; Codex shell invocation adapter unsupported/unmeasured. All Cargo commands serialized with the requested process guard. no Cargo.lock or host_contract edits; no push. Native commit trailers measured gpt-6-astra and Codex session 01a1cc50-bb54-7a62-bd5e-af9c54d23e82; native envelope opened and implementer claim registered. Brit path-scoped staging succeeded; commit refused untrusted core.hooksPath with EXIT=1. Inspection confirmed HEAD still b679507c4 and exactly the six intended paths staged. The authorized new local commit uses Git fallback with hooks enabled; no amend, force or push."
+  }
 }

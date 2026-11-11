@@ -488,6 +488,8 @@ fn artifact_measure_requested_elf() {
 fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
     let old_offset = u64::from_le_bytes(bytes[40..48].try_into().unwrap()) as usize;
     let mut headers = bytes[old_offset..].to_vec();
+    // Read-only dynamic metadata occupies a different virtual page from code.
+    bytes.resize((bytes.len() + 4095) & !4095, 0);
     let mut strings = vec![0u8];
     let mut offset = |name: &str| {
         let offset = strings.len() as u32;

@@ -31,6 +31,112 @@ fn data_offset(bytes: &[u8], index: usize) -> usize {
 }
 
 #[test]
+fn artifact_overlapping_rx_loads_refuse_before_stub_decode() {
+    // Two different file pages replace the same virtual page. The two baseline
+    // stubs describe complete sections, but the later map puts AVX2 at the entry.
+    let mut bytes = vec![0; 8960];
+    bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    bytes[7] = 3;
+    bytes[16..18].copy_from_slice(&elf::ET_EXEC.to_le_bytes());
+    bytes[18..20].copy_from_slice(&elf::EM_X86_64.to_le_bytes());
+    bytes[20..24].copy_from_slice(&1u32.to_le_bytes());
+    bytes[24..32].copy_from_slice(&0x400200u64.to_le_bytes());
+    bytes[32..40].copy_from_slice(&64u64.to_le_bytes());
+    bytes[40..48].copy_from_slice(&8704u64.to_le_bytes());
+    for (offset, value) in [(52, 64u16), (54, 56), (56, 2), (58, 64), (60, 4), (62, 3)] {
+        bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+    }
+    bytes[64..120].copy_from_slice(&program(elf::PT_LOAD, 5, 0, 4096, 0x400000));
+    bytes[120..176].copy_from_slice(&program(elf::PT_LOAD, 5, 4096, 4096, 0x400000));
+    bytes[512] = 0xc3;
+    bytes[4608..4612].copy_from_slice(&[0xc5, 0xfd, 0xef, 0xc0]);
+    bytes[4624] = 0xc3;
+    bytes[8192..8217].copy_from_slice(b"\0.plt\0.plt.got\0.shstrtab\0");
+    for (index, name, address, offset) in [(1, 1u32, 0x400200u64, 512u64), (2, 6, 0x400210, 4624)] {
+        let s = 8704 + index * 64;
+        bytes[s..s + 4].copy_from_slice(&name.to_le_bytes());
+        bytes[s + 4..s + 8].copy_from_slice(&elf::SHT_PROGBITS.to_le_bytes());
+        bytes[s + 8..s + 16].copy_from_slice(&6u64.to_le_bytes());
+        bytes[s + 16..s + 24].copy_from_slice(&address.to_le_bytes());
+        bytes[s + 24..s + 32].copy_from_slice(&offset.to_le_bytes());
+        bytes[s + 32..s + 40].copy_from_slice(&1u64.to_le_bytes());
+    }
+    let s = 8896;
+    bytes[s..s + 4].copy_from_slice(&15u32.to_le_bytes());
+    bytes[s + 4..s + 8].copy_from_slice(&elf::SHT_STRTAB.to_le_bytes());
+    bytes[s + 24..s + 32].copy_from_slice(&8192u64.to_le_bytes());
+    bytes[s + 32..s + 40].copy_from_slice(&25u64.to_le_bytes());
+    let mut disjoint = bytes.clone();
+    disjoint[136..144].copy_from_slice(&0x401000u64.to_le_bytes());
+    disjoint[8848..8856].copy_from_slice(&0x401210u64.to_le_bytes());
+    let result = extract(Path::new("disjoint.elf"), &disjoint).unwrap();
+    assert_eq!(result.requires.clauses().count(), 2);
+    refusal(
+        &bytes,
+        "page-rounded virtual overlap: PT_LOAD[0] and PT_LOAD[1]",
+    );
+
+    // Disjoint byte ranges still share a rounded page, including RX/R and R/RX.
+    for align in [0u64, 1, 4096, 8192] {
+        for (first_flags, second_flags) in [(5u32, 5u32), (5, 4), (4, 5)] {
+            let mut bad = bytes.clone();
+            for (p, flags, address) in [
+                (64, first_flags, 0x400200u64),
+                (120, second_flags, 0x400800),
+            ] {
+                bad[p + 4..p + 8].copy_from_slice(&flags.to_le_bytes());
+                bad[p + 16..p + 24].copy_from_slice(&address.to_le_bytes());
+                bad[p + 32..p + 40].copy_from_slice(&4u64.to_le_bytes());
+                bad[p + 40..p + 48].copy_from_slice(&4u64.to_le_bytes());
+                bad[p + 48..p + 56].copy_from_slice(&align.to_le_bytes());
+            }
+            refusal(
+                &bad,
+                "page-rounded virtual overlap: PT_LOAD[0] and PT_LOAD[1]",
+            );
+        }
+    }
+}
+
+#[test]
+fn artifact_thousand_aliased_program_notes_exhaust_shared_budget() {
+    let mut bytes = fixture(elf::EM_X86_64, 3, &[0xc3], None, None);
+    let p = phoff(&bytes);
+    let load = bytes[p..p + 56].to_vec();
+    let note_offset = bytes.len() as u64;
+    // 10,000 valid 16-byte notes: the old path revisited these ten million times.
+    for _ in 0..10_000 {
+        bytes.extend([4u32, 0, 0].into_iter().flat_map(u32::to_le_bytes));
+        bytes.extend(b"GNU\0");
+    }
+    let note = program(elf::PT_NOTE, 4, note_offset, 160_000, 0);
+    let new_ph = bytes.len() as u64;
+    bytes[32..40].copy_from_slice(&new_ph.to_le_bytes());
+    bytes[56..58].copy_from_slice(&1001u16.to_le_bytes());
+    bytes.extend(load);
+    for _ in 0..1000 {
+        bytes.extend(note);
+    }
+    refusal(
+        &bytes,
+        "metadata budget exhausted: notes (program headers and sections)",
+    );
+
+    // One program-header payload fits; sharing it with a section must consume
+    // the same budget, rather than getting a fresh allowance for each table.
+    bytes.truncate(new_ph as usize + 2 * 56);
+    bytes[56..58].copy_from_slice(&2u16.to_le_bytes());
+    extract(Path::new("one-note-payload.elf"), &bytes).unwrap();
+    let s = section_offset(&bytes, 2);
+    bytes[s + 24..s + 32].copy_from_slice(&note_offset.to_le_bytes());
+    bytes[s + 32..s + 40].copy_from_slice(&160_000u64.to_le_bytes());
+    refusal(
+        &bytes,
+        "metadata budget exhausted: notes (program headers and sections)",
+    );
+}
+
+#[test]
 fn artifact_standalone_encoding_prerequisites_precede_level_selection() {
     for (code, extra, v4, vl) in [
         (&[0xc4, 0xe2, 0x7d, 0xdc, 0xc0][..], "vaes", false, false),
