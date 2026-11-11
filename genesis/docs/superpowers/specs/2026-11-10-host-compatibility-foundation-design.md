@@ -165,6 +165,15 @@ note that would reveal it is often absent. So each clause records its source:
 | `extracted` | Read from the artifact's bytes | ELF machine, interpreter, needed libraries, highest symbol version |
 | `proven` | The exact bytes ran on a host or emulator of that class | brit's qemu Nehalem and Haswell runs |
 
+**Runtime-dispatched code is not a requirement.** Function multi-versioning, `target_clones`,
+ifuncs and explicit feature checks (`is_x86_feature_detected!`) let one binary carry code above its
+floor that runs only when the host has the feature. An extracted ISA clause counts only code reached
+without such a check. The exemption must rest on evidence bound to the bytes: the compiler's
+multi-versioning resolver metadata, or a build-time attestation naming the guarded functions by
+content. A symbol-name pattern is not evidence. Code whose dispatch cannot be shown counts as a
+requirement. Without this rule an extracted `Requires` overstates what the artifact needs, and the
+variant count grows with no gain.
+
 Clauses from different sources are merged by taking the stricter one, meaning the one fewer hosts
 satisfy: the higher version, or the larger feature set. A disagreement between
 `declared` and `extracted` (the build said glibc 2.34, the bytes need 2.39) is recorded and the
@@ -898,6 +907,39 @@ Missing nodes, in mintable shape:
   the packer classifies each payload by its package provenance and refuses public for any file it
   cannot attribute to a named package / current state: the manifest names files and CIDs, not
   packages`.
+
+### 7.9 An artifact is born self-describing
+
+Added 2026-11-11. The test this section sets: a person checks out a workspace with the installed
+`epr`, builds an artifact and records it. A device of another architecture or class that later
+finds the record must be able to tell, from the record alone, whether it can run the bytes. If it
+cannot run them, it must be able to tell what it would have to change to build a variant that it
+can run. The second device does not need to ask the first one anything that was not
+published.
+
+So `put` records, or refuses to record, each of the following. A refusal names the missing item.
+Recording a partial artifact as if it were complete is the failure this rule exists to prevent.
+
+| Born with | What it lets another host do | Where it lives |
+|---|---|---|
+| The recipe: the method descriptor, the view's tree and the source commit | rebuild the same thing | method record by CID (exists) |
+| The build inputs as a document, line by line: compiler identity and its default target, link driver, link inputs and the libraries std links, all by content | see which host input made its key differ, and why | a stored document by the key input's CID, readable like the method record (K9) |
+| The family | find every variant of the same recipe | `env:family` (exists) |
+| `Requires`, extracted from the bytes at record time, with each clause's source | admit or refuse before fetching or launching | `env:requires` filled by `put` itself, not by the caller (K8) |
+| Dispatch evidence for code above the floor (§3.2) | not treat runtime-dispatched paths as requirements | inside the Requires document (K10) |
+| The declared target, when there is one: floor CID, ISA, C flags | build the same variant, or choose a different floor | `target.*` realized (K6) |
+| Reach | know whether it may draw the bytes at all | `env:reach` (§7.8, K12) |
+
+Reading it from the second device's side: it reads the family, admits each variant against its own
+`Provides`, and finds nothing it can run. It reads the refusals and the build-input document:
+for example, ISA v3, because `Scrt1.o` declares v3 and the compiler's default `-march` is v3. It
+then rebuilds from the recipe against a floor it holds or can fetch, and appends its variant with
+lineage (§7.4, §7.6). Every step reads something the first device already published.
+
+The rule binds every way an artifact is made, not only the household mesh build. A recipe kind
+that cannot yet produce these items records nothing, and says why. It does not record a thinner
+artifact. Whether `epr artifact describe` covers an arbitrary project in a fresh workspace, and not
+only the cargo binaries the mesh builds, is K11.
 
 ## 8. Local-first reading
 
