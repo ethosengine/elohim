@@ -17,12 +17,25 @@ fn dependency_boundary() {
         );
     }
     assert!(manifest.contains("eprfs-core"));
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/src/bin_store")).unwrap() {
-        let path = entry.unwrap().path();
-        if path.file_name().unwrap() == "tests.rs" {
+    let mut pending = vec![std::path::PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bin_store"
+    ))];
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            pending.extend(
+                std::fs::read_dir(path)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path()),
+            );
             continue;
         }
-        let source = std::fs::read_to_string(path).unwrap();
+        if path.file_name() == Some(std::ffi::OsStr::new("tests.rs"))
+            || path.extension() != Some(std::ffi::OsStr::new("rs"))
+        {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).unwrap();
         for forbidden in [
             "tokio::",
             "reqwest::",
@@ -30,7 +43,11 @@ fn dependency_boundary() {
             "eprfs_peer::",
             ".unwrap()",
         ] {
-            assert!(!source.contains(forbidden), "unexpected {forbidden}");
+            assert!(
+                !source.contains(forbidden),
+                "{}: unexpected {forbidden}",
+                path.display()
+            );
         }
     }
 }
