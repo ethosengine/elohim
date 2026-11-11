@@ -2644,10 +2644,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-11m (RED preserved, inactive; K8 round 2): sized STT_FUNC symbols union .eh_frame FDE ranges now bound instruction decoding; uncovered bytes are counted and unknown executable-section boundaries refuse. Artifact tests 103 passed, full epr-cli suite 1445 passed, clippy, fmt and native Rust-style scan EXIT=0 with prescribed exports. Installed and built epr pass the ring attribution-data location but both refuse .init/.fini/.plt (27/13/736 bytes, each uncovered); strict extraction takes 3.505/3.730 s. Known ranges use v3 plus extensions including FMA4, ADX, AES, IBT, SHA, VAES and VPCLMULQDQ; no full Requires or dispatch narrowing is claimed. Evidence: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-extraction-ethosengine.json. No Cargo.lock or host_contract edits; new local commit only, no push.
-    evidence-fingerprint: sha256:41e9920d0736be00
-    evidence-bytes: 30139
-    evidence-entries: 21
+      DELTA 2026-11-11n (RED preserved, inactive; K8 round 3 complete): six exact ABI stub sections decode linearly when ranges are absent; ENDBR32/64 remain notRequired evidence; selected-level osxsave implies xsave. Artifact/full CLI tests 106/1448, clippy and fmt each EXIT=0. Installed and built epr now emit identical seven-clause canonical Requires (v3 plus adx/aes/fma4/pclmulqdq/sha_ni/vaes/vpclmulqdq); host_contract::admit refuses both synthetic v2/v3 only on ISA. Extraction/process wall seconds: installed 3.481/3.505, built 3.777/3.801. Stub coverage is complete; uncovered .text remains explicit. Evidence: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-extraction-ethosengine.json. Additional just gate rust-style EXIT=1 is the missing-submodule preflight (brit/rakia/sophia); its style recipe PASSes with epr-cli debt 0 -> 0. No Cargo.lock or host_contract edits; K10 narrowing stays separate; local commit only, no push.
+    evidence-fingerprint: sha256:473e33d73682e4df
+    evidence-bytes: 31096
+    evidence-entries: 22
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

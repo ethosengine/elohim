@@ -2313,16 +2313,20 @@ decisionPoints:
     - { id: C6a, status: partial, justification: "Work is bounded by section bytes and symbol count, examples capped at three per feature; executable put still reads the entire output without a global size cap." }
     - { id: C6b, status: answered, justification: "Canonical JSON and existing verified blob puts give stable content identities; extraction itself has no effects." }
     - { id: C7, status: n-a, justification: "No new network serving surface; documents remain local as before." }
-    - { id: C8, status: answered, justification: "Evidence retains ELF machine, ABI note, interpreter, needed libraries, libc version needs and instruction counts/addresses with available symbols." }
+    - { id: C8, status: answered, justification: "Evidence retains ELF machine, ABI note, interpreter, needed libraries, libc version needs, coverage and instruction counts/addresses with available symbols; ENDBR32/64 are retained under notRequired with the unsupported-NOP reason." }
     - { id: C9, status: answered, justification: "Both document CIDs are attached to the same Produce as the output CID, using existing BlobCid semantics." }
-    - { id: C10, status: answered, justification: "Canonical axis/line constants and host_contract serde are reused; unmapped CPUID features refuse instead of being guessed." }
+    - { id: C10, status: answered, justification: "Canonical axis/line constants and host_contract serde are reused; unmapped CPUID features refuse. Only six named ABI stub sections fall back to whole-section decoding; selected-level OSXSAVE implies XSAVE, and only ENDBR32/64 are exempted as NOP hints. Runtime-dispatched extensions remain required." }
     - { id: C11, status: n-a, justification: "Local synchronous put input, no remote request or queue added." }
     - { id: C12, status: answered, justification: "No widening of reach, disclosure or serving permissions." }
     - { id: C13, status: n-a, justification: "No authority ladder or escalation introduced." }
     - { id: C14, status: answered, justification: "No clause is silently weakened; original extracted and declared clauses survive in the Requires document, with separate extraction evidence." }
   contractTests:
-    - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_current_executable_extracts_and_round_trips_against_v2, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_elf_extracts_and_round_trips_against_v2, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_instruction_bytes_raise_isa_without_symbols, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_caller_only_tightens_and_never_forges_provenance, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_unreadable_requirements_refuse_with_output_name, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_glibc_floor_is_numeric_and_scoped_to_libc, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/extract_ranges_tests.rs, testName: artifact_abi_stubs_without_ranges_decode_whole_section, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/extract_ranges_tests.rs, testName: artifact_unknown_function_boundaries_names_section, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_endbr_is_evidence_not_a_requirement, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_xgetbv_is_extra_only_below_osxsave_level, kind: unit }

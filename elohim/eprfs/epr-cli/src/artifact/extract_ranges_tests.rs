@@ -128,6 +128,64 @@ fn artifact_unknown_function_boundaries_names_section() {
     }
 }
 
+fn rename_text(bytes: &mut Vec<u8>, name: &str) {
+    let strings = section_offset(bytes, 4);
+    let offset = bytes.len();
+    bytes.extend([b"\0", name.as_bytes(), b"\0"].concat());
+    bytes[strings + 24..strings + 32].copy_from_slice(&(offset as u64).to_le_bytes());
+    bytes[strings + 32..strings + 40].copy_from_slice(&((name.len() + 2) as u64).to_le_bytes());
+    // Only .text needs a name in this fixture; the other sections are not executable.
+    for index in 2..6 {
+        let header = section_offset(bytes, index);
+        bytes[header..header + 4].fill(0);
+    }
+}
+
+#[test]
+fn artifact_abi_stubs_without_ranges_decode_whole_section() {
+    for name in [".init", ".fini", ".plt", ".plt.got", ".plt.sec", ".iplt"] {
+        // vpxor ymm0,ymm0,ymm0; ret. No symbols or FDE ranges.
+        let mut bytes = fixture(
+            elf::EM_X86_64,
+            elf::ELFOSABI_LINUX,
+            &[0xc5, 0xfd, 0xef, 0xc0, 0xc3],
+            None,
+            None,
+        );
+        no_frames(&mut bytes);
+        rename_text(&mut bytes, name);
+        let result = extract(Path::new("stub.elf"), &bytes).unwrap();
+        assert_eq!(
+            predicate(&result.requires, axis::ISA_X86),
+            &Predicate::Subset(names(X86_64_V3.features))
+        );
+        let scan = &result.evidence[axis::ISA_X86];
+        assert_eq!(scan["instructions"], 2);
+        assert_eq!(scan["sections"][0]["covered_bytes"], 5);
+        assert_eq!(scan["sections"][0]["uncovered_bytes"], 0);
+        assert_eq!(scan["used"]["avx2"]["examples"][0]["section"], name);
+
+        bytes[0x78] = 0x06; // Invalid in 64-bit mode, including ABI stubs.
+        let error = extract(Path::new("invalid-stub.elf"), &bytes)
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(
+            error.contains(name) && error.contains("invalid instruction"),
+            "{error}"
+        );
+    }
+    // A similar name is not a policy exception.
+    let mut bytes = fixture(elf::EM_X86_64, elf::ELFOSABI_LINUX, &[0xc3], None, None);
+    no_frames(&mut bytes);
+    rename_text(&mut bytes, ".plt.custom");
+    assert!(extract(Path::new("custom.elf"), &bytes)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("function boundaries are unknown"));
+}
+
 #[test]
 fn artifact_ranges_union_merges_overlaps_but_not_adjacent_functions() {
     let mut bytes = sized(&[0x90, 0xc3, 0x06], 1);

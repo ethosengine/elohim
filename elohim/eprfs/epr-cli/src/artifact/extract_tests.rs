@@ -44,6 +44,57 @@ fn artifact_isa_level_selection() {
 }
 
 #[test]
+fn artifact_endbr_is_evidence_not_a_requirement() {
+    for opcode in [0xfa, 0xfb] {
+        // ENDBR64 and ENDBR32
+        let mut bytes = fixture(
+            elf::EM_X86_64,
+            elf::ELFOSABI_LINUX,
+            &[0xf3, 0x0f, 0x1e, opcode],
+            None,
+            None,
+        );
+        add_symbols(&mut bytes, &[(0, 4, "hint_target")], false);
+        let result = extract(Path::new("hint.elf"), &bytes).unwrap();
+        assert!(!result
+            .requires
+            .clauses()
+            .any(|c| c.axis().0 == axis::ISA_X86));
+        let scan = &result.evidence[axis::ISA_X86];
+        assert_eq!(scan["instructions"], 1);
+        assert!(scan["used"].as_object().unwrap().is_empty());
+        assert_eq!(
+            scan["notRequired"],
+            json!([{
+                "feature": "ibt", "reason": "executes as NOP where unsupported", "count": 1,
+                "examples": [{"address": 0x400078, "section": ".text", "symbol": "hint_target"}]
+            }])
+        );
+    }
+}
+
+#[test]
+fn artifact_xgetbv_is_extra_only_below_osxsave_level() {
+    for (suffix, expected) in [
+        (&[0xc3][..], names(&["xsave"])),
+        (
+            &[0xc5, 0xfd, 0xef, 0xc0, 0xc3][..],
+            names(X86_64_V3.features),
+        ),
+    ] {
+        let code = [&[0x0f, 0x01, 0xd0][..], suffix].concat(); // XGETBV
+        let bytes = fixture(elf::EM_X86_64, elf::ELFOSABI_LINUX, &code, None, None);
+        let result = extract(Path::new("xgetbv.elf"), &bytes).unwrap();
+        assert_eq!(
+            predicate(&result.requires, axis::ISA_X86),
+            &Predicate::Subset(expected)
+        );
+        assert_eq!(result.evidence[axis::ISA_X86]["used"]["xsave"]["count"], 1);
+        assert_eq!(result.evidence[axis::ISA_X86]["notRequired"], json!([]));
+    }
+}
+
+#[test]
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
 fn artifact_elf_extracts_and_round_trips_against_v2() {
     let path = std::path::PathBuf::from("round-trip.elf");
@@ -373,8 +424,28 @@ fn artifact_measure_requested_elf() {
         json!({"path": path, "bytes": bytes.len(), "elapsed_ms": elapsed.as_secs_f64() * 1000.0});
     match &result {
         Ok(result) => {
-            report["requires"] = json!(result.requires);
+            let (cid, document) = canonical(&result.requires).unwrap();
+            report["requires"] = serde_json::from_slice(&document).unwrap();
+            report["requires_cid"] = json!(cid.to_string());
+            report["requires_canonical_json"] = json!(std::str::from_utf8(&document).unwrap());
             report["evidence"] = json!(result.evidence);
+            let recorded: Requires = serde_json::from_slice(&document).unwrap();
+            for level in ["v2", "v3"] {
+                let vector_path = format!("../../../crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-{level}.json");
+                let vector: Value = serde_json::from_slice(
+                    &std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join(&vector_path))
+                        .unwrap(),
+                )
+                .unwrap();
+                let mut provides = Provides::default();
+                for (axis, value) in vector["provides"]["observed"].as_object().unwrap() {
+                    provides.observe(
+                        AxisId(axis.clone()),
+                        serde_json::from_value::<AxisValue>(value.clone()).unwrap(),
+                    );
+                }
+                report["admissions"][level] = json!({"vector": vector_path, "provides": vector["provides"], "verdict": admit(&recorded, &provides)});
+            }
         }
         Err(error) => {
             report["requires"] = Value::Null;

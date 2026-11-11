@@ -1,4 +1,4 @@
-//! Decode the union of sized function symbols and FDE ranges; report uncovered bytes.
+//! Decode function/FDE ranges and ABI stub sections; report uncovered bytes.
 use std::collections::{BTreeMap, BTreeSet};
 
 use host_contract::{X86_64_V2, X86_64_V3};
@@ -12,6 +12,13 @@ const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"]
 const BASELINE: &[&str] = &[
     "fpu", "cx8", "cmov", "mmx", "fxsr", "sse", "sse2", "syscall", "clflush", "tsc", "msr", "cpuid",
 ];
+// ELF gABI §4 Special Sections (.init/.fini) and x86-64 psABI §5.2 Procedure Linkage
+// Table: these ABI-shaped code sections, including linker PLT variants, contain code
+// from start to end. This fallback does not apply to arbitrary executable sections.
+const ABI_STUB_SECTIONS: &[&str] = &[".init", ".fini", ".plt", ".plt.got", ".plt.sec", ".iplt"];
+// psABI v3+ requires OSXSAVE: its enabled XSAVE state already implies XSAVE support.
+// Keep this implication scoped to level closure, not dispatch or symbol heuristics.
+const LEVEL_IMPLICATIONS: &[(&str, &str)] = &[("osxsave", "xsave")];
 
 /// Round up to the smallest psABI level covering used level features; retain every extension
 /// outside those levels. Baseline features alone create no clause (spec §3.1 rule 4).
@@ -44,20 +51,48 @@ pub(super) fn level_features(used: &BTreeSet<String>) -> Option<BTreeSet<String>
     if level >= 4 {
         required.extend(V4.iter().map(|name| (*name).into()));
     }
+    for (level_feature, implied) in LEVEL_IMPLICATIONS {
+        if required.contains(*level_feature) {
+            required.remove(*implied);
+        }
+    }
     (!required.is_empty()).then_some(required)
 }
 
 #[derive(Serialize)]
 pub(super) struct Scan {
     pub used: BTreeMap<String, FeatureUse>,
+    #[serde(rename = "notRequired")]
+    not_required: Vec<NotRequired>,
     instructions: u64,
     sections: Vec<Coverage>,
+}
+
+#[derive(Serialize)]
+struct NotRequired {
+    feature: &'static str,
+    reason: &'static str,
+    #[serde(flatten)]
+    usage: FeatureUse,
 }
 
 #[derive(Default, Serialize)]
 pub(super) struct FeatureUse {
     count: u64,
     examples: Vec<Example>,
+}
+
+impl FeatureUse {
+    fn record(&mut self, address: u64, section: &str, symbol: Option<&str>) {
+        self.count += 1;
+        if self.examples.len() < 3 && !self.examples.iter().any(|e| e.symbol.as_deref() == symbol) {
+            self.examples.push(Example {
+                address,
+                section: section.into(),
+                symbol: symbol.map(str::to_owned),
+            });
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -131,6 +166,7 @@ pub(super) fn scan(file: &Elf<'_>) -> ArtifactResult<Scan> {
 pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
     let mut scan = Scan {
         used: BTreeMap::new(),
+        not_required: Vec::new(),
         instructions: 0,
         sections: Vec::new(),
     };
@@ -187,6 +223,9 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
             let to = end.min(r.end);
             (from < to).then_some(from..to)
         }));
+        if ranges.is_empty() && start < end && ABI_STUB_SECTIONS.contains(&name) {
+            ranges.push(start..end);
+        }
         ranges.sort_unstable_by_key(|r| (r.start, r.end));
         let mut merged: Vec<std::ops::Range<u64>> = Vec::new();
         for range in ranges {
@@ -247,6 +286,27 @@ fn decode(
         scan.instructions += 1;
         let mut features = Vec::new();
         for cpuid in instruction.cpuid_features() {
+            // Intel SDM Vol. 2, ENDBR32/ENDBR64 (and Vol. 1 §17 CET): these
+            // hint-space encodings execute as NOP on processors without CET.
+            // No other CPUID feature is exempted by this rule.
+            if *cpuid == CpuidFeature::CET_IBT
+                && matches!(
+                    instruction.mnemonic(),
+                    Mnemonic::Endbr32 | Mnemonic::Endbr64
+                )
+            {
+                if scan.not_required.is_empty() {
+                    scan.not_required.push(NotRequired {
+                        feature: "ibt",
+                        reason: "executes as NOP where unsupported",
+                        usage: FeatureUse::default(),
+                    });
+                }
+                scan.not_required[0]
+                    .usage
+                    .record(instruction.ip(), section, symbol);
+                continue;
+            }
             if let Some(feature) = cpu_name(*cpuid)
                 .map_err(|e| unrecorded(format!("isa.x86 at 0x{:x}: {e}", instruction.ip())))?
             {
@@ -259,17 +319,7 @@ fn decode(
         }
         for feature in features {
             let usage = scan.used.entry(feature.into()).or_default();
-            usage.count += 1;
-            if usage.examples.len() >= 3
-                || usage.examples.iter().any(|e| e.symbol.as_deref() == symbol)
-            {
-                continue;
-            }
-            usage.examples.push(Example {
-                address: instruction.ip(),
-                section: section.into(),
-                symbol: symbol.map(str::to_owned),
-            });
+            usage.record(instruction.ip(), section, symbol);
         }
     }
     Ok(())
