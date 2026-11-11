@@ -17,9 +17,13 @@ use super::{unrecorded, ArtifactResult};
 mod frames;
 #[path = "extract_isa.rs"]
 mod isa;
+#[path = "extract_layout.rs"]
+mod layout;
 #[cfg(test)]
 #[path = "extract_tests.rs"]
 mod tests;
+#[path = "extract_versions.rs"]
+mod versions;
 
 type Elf<'a> = ElfFile64<'a, Endianness>;
 
@@ -29,7 +33,13 @@ pub(super) struct Extraction {
 }
 
 impl Extraction {
-    fn insert(&mut self, axis: &str, predicate: Predicate, evidence: Value) -> ArtifactResult<()> {
+    fn insert(
+        &mut self,
+        axis: &str,
+        predicate: Predicate,
+        mut evidence: Value,
+    ) -> ArtifactResult<()> {
+        layout::trim_evidence(&mut evidence);
         self.requires
             .insert(Clause {
                 axis: AxisId(axis.into()),
@@ -69,8 +79,10 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
     if !matches!(header.e_type(endian), elf::ET_EXEC | elf::ET_DYN) {
         return Err(unrecorded("ELF is not an executable or shared output"));
     }
-    if machine == elf::EM_X86_64 && !file.is_little_endian() {
-        return Err(unrecorded("x86_64 ELF is not little endian"));
+    if !file.is_little_endian() {
+        return Err(unrecorded(
+            "big-endian ELF unsupported; byte order is not yet an axis",
+        ));
     }
     // Without section metadata we cannot prove that we decoded all executable sections or
     // read the version needs. Refuse instead of interpreting missing tables as empty needs.
@@ -79,10 +91,14 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
             "ELF section table missing; executable sections and version needs unreadable",
         ));
     }
+    let loader_evidence = layout::validate(&file, bytes)?;
     let mut result = Extraction {
         requires: Requires::default(),
         evidence: BTreeMap::new(),
     };
+    result
+        .evidence
+        .insert("elf.loader-view".into(), loader_evidence);
     result.insert(
         axis::ARCH,
         Predicate::Equal(arch.into()),
@@ -153,7 +169,7 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
             json!({"DT_NEEDED": needed}),
         )?;
     }
-    let glibc = glibc_versions(&file, bytes)?;
+    let glibc = versions::glibc_versions(&file, bytes)?;
     let musl = loader.as_deref().is_some_and(|name| {
         name.rsplit('/')
             .next()
@@ -202,6 +218,10 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
                 .insert(axis::ISA_X86.into(), serde_json::to_value(&scan)?);
         }
     }
+    for value in result.evidence.values_mut() {
+        layout::trim_evidence(value);
+    }
+    layout::evidence_limit(&result.evidence)?;
     Ok(result)
 }
 
@@ -286,6 +306,9 @@ fn needed_libraries(
             .strings(file.endian(), bytes, strings)
             .map_err(unrecorded)?;
         for entry in dynamic {
+            if entry.tag32(file.endian()) == Some(elf::DT_NULL) {
+                break;
+            }
             if entry.tag32(file.endian()) == Some(elf::DT_NEEDED) {
                 needed.insert(text(
                     entry.string(file.endian(), strings).map_err(unrecorded)?,
@@ -298,40 +321,4 @@ fn needed_libraries(
         ));
     }
     Ok(needed)
-}
-
-fn glibc_versions(file: &Elf<'_>, bytes: &[u8]) -> ArtifactResult<BTreeMap<String, Vec<u32>>> {
-    let table = file.elf_section_table();
-    let mut versions = BTreeMap::new();
-    if let Some((mut needs, strings)) = table
-        .gnu_verneed(file.endian(), bytes)
-        .map_err(unrecorded)?
-    {
-        let strings = table
-            .strings(file.endian(), bytes, strings)
-            .map_err(unrecorded)?;
-        while let Some((need, mut aux)) = needs.next().map_err(unrecorded)? {
-            let libc = need.file(file.endian(), strings).map_err(unrecorded)? == b"libc.so.6";
-            while let Some(version) = aux.next().map_err(unrecorded)? {
-                let name = text(version.name(file.endian(), strings).map_err(unrecorded)?)?;
-                if !libc {
-                    continue;
-                }
-                if let Some(number) = name.strip_prefix("GLIBC_") {
-                    let components = number
-                        .split('.')
-                        .map(str::parse::<u32>)
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(|_| {
-                            unrecorded(format!("unsupported libc.so.6 version need {name}"))
-                        })?;
-                    if components.len() < 2 {
-                        return Err(unrecorded(format!("invalid GLIBC version {name}")));
-                    }
-                    versions.insert(name, components);
-                }
-            }
-        }
-    }
-    Ok(versions)
 }

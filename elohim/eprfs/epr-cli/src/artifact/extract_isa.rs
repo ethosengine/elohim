@@ -2,11 +2,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use host_contract::{X86_64_V2, X86_64_V3};
-use iced_x86::{CpuidFeature, Decoder, DecoderOptions, Instruction, Mnemonic};
+use iced_x86::{CpuidFeature, Decoder, DecoderOptions, EncodingKind, Instruction, Mnemonic};
 use object::{elf, Object, ObjectSection, ObjectSymbol, SectionFlags, SymbolFlags};
 use serde::Serialize;
 
-use super::{unrecorded, ArtifactResult, Elf};
+use super::{layout::name as bounded_name, unrecorded, ArtifactResult, Elf};
 
 const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
@@ -14,7 +14,7 @@ const BASELINE: &[&str] = &[
 ];
 // ELF gABI §4 Special Sections (.init/.fini) and x86-64 psABI §5.2 Procedure Linkage
 // Table: these ABI-shaped code sections, including linker PLT variants, contain code
-// from start to end. This fallback does not apply to arbitrary executable sections.
+// from start to end. This whole-section rule does not apply to arbitrary executable sections.
 const ABI_STUB_SECTIONS: &[&str] = &[".init", ".fini", ".plt", ".plt.got", ".plt.sec", ".iplt"];
 // psABI v3+ requires OSXSAVE: its enabled XSAVE state already implies XSAVE support.
 // Keep this implication scoped to level closure, not dispatch or symbol heuristics.
@@ -88,8 +88,8 @@ impl FeatureUse {
         if self.examples.len() < 3 && !self.examples.iter().any(|e| e.symbol.as_deref() == symbol) {
             self.examples.push(Example {
                 address,
-                section: section.into(),
-                symbol: symbol.map(str::to_owned),
+                section: bounded_name(section).into(),
+                symbol: symbol.map(|s| bounded_name(s).to_owned()),
             });
         }
     }
@@ -124,16 +124,51 @@ struct Symbol<'a> {
     size: u64,
     name: &'a str,
     function: bool,
-    section: object::SectionIndex,
 }
 
-fn containing<'a>(symbols: &[&Symbol<'a>], address: u64) -> Option<&'a str> {
-    let index = symbols.partition_point(|symbol| symbol.start <= address);
-    symbols[..index]
-        .iter()
-        .rev()
-        .find(|s| s.function && address - s.start < s.size)
-        .map(|s| s.name)
+// Disjoint intervals from a sweep of function starts/ends. Lookup is logarithmic even
+// for nested aliases and a long uncovered tail (no per-instruction backward scan).
+struct SymbolIntervals<'a>(Vec<(u64, u64, &'a str)>);
+
+impl<'a> SymbolIntervals<'a> {
+    fn new(symbols: &[&Symbol<'a>]) -> Self {
+        let mut events = Vec::new();
+        for (index, s) in symbols
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.function && s.size != 0)
+        {
+            events.push((s.start, true, index));
+            events.push((s.start.saturating_add(s.size), false, index));
+        }
+        events.sort_unstable();
+        let mut active = BTreeSet::new();
+        let mut intervals = Vec::new();
+        let mut previous = 0;
+        for (address, begins, index) in events {
+            if previous < address {
+                if let Some(&i) = active.last() {
+                    let s: &Symbol<'a> = symbols[i];
+                    intervals.push((previous, address, s.name));
+                }
+            }
+            if begins {
+                active.insert(index);
+            } else {
+                active.remove(&index);
+            }
+            previous = address;
+        }
+        Self(intervals)
+    }
+
+    fn containing(&self, address: u64) -> Option<&'a str> {
+        let index = self.0.partition_point(|(start, _, _)| *start <= address);
+        index.checked_sub(1).and_then(|i| {
+            let (_, end, name) = self.0[i];
+            (address < end).then_some(name)
+        })
+    }
 }
 
 fn uncovered(start: u64, end: u64, symbols: &[&Symbol<'_>], examples: &mut Vec<Uncovered>) {
@@ -144,7 +179,9 @@ fn uncovered(start: u64, end: u64, symbols: &[&Symbol<'_>], examples: &mut Vec<U
     examples.push(Uncovered {
         start,
         length: end - start,
-        nearest_preceding_symbol: index.checked_sub(1).map(|i| symbols[i].name.into()),
+        nearest_preceding_symbol: index
+            .checked_sub(1)
+            .map(|i| bounded_name(symbols[i].name).into()),
     });
 }
 
@@ -179,15 +216,19 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
     } else {
         file.dynamic_symbols()
     };
-    let mut symbols: Vec<_> = table.filter(|s| s.is_definition()).filter_map(|s| {
-        Some(Symbol {
-            start: s.address(), size: s.size(), section: s.section_index()?,
-            name: s.name().unwrap_or("<unnamed>"),
-            function: matches!(s.flags(), SymbolFlags::Elf { st_info, .. } if st_info & 0xf == elf::STT_FUNC),
-        })
-    }).collect();
-    symbols.sort_unstable_by_key(|s| (s.start, s.size, s.name));
-    let frames = super::frames::ranges(file)?;
+    let mut symbols: BTreeMap<usize, Vec<Symbol<'_>>> = BTreeMap::new();
+    for s in table.filter(|s| s.is_definition()) {
+        if let Some(section) = s.section_index() {
+            symbols.entry(section.0).or_default().push(Symbol {
+                start: s.address(), size: s.size(), name: s.name().unwrap_or("<unnamed>"),
+                function: matches!(s.flags(), SymbolFlags::Elf { st_info, .. } if st_info & 0xf == elf::STT_FUNC),
+            });
+        }
+    }
+    for local in symbols.values_mut() {
+        local.sort_unstable_by_key(|s| (s.start, s.size, s.name));
+    }
+    let frames = merge_ranges(super::frames::ranges(file)?);
     for section in file.sections() {
         if !matches!(section.flags(), SectionFlags::Elf { sh_flags } if sh_flags & u64::from(elf::SHF_EXECINSTR) != 0)
         {
@@ -200,8 +241,9 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
             .checked_add(data.len() as u64)
             .ok_or_else(|| unrecorded("executable section address overflow"))?;
         let local: Vec<_> = symbols
-            .iter()
-            .filter(|s| s.section == section.index())
+            .get(&section.index().0)
+            .into_iter()
+            .flatten()
             .collect();
         let mut ranges = Vec::new();
         for symbol in local.iter().filter(|s| s.function && s.size != 0) {
@@ -218,30 +260,29 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
             ranges.push(symbol.start..symbol_end);
         }
         // An FDE is a virtual-address range. Intersect it with this section's bytes.
-        ranges.extend(frames.iter().filter_map(|r| {
-            let from = start.max(r.start);
-            let to = end.min(r.end);
-            (from < to).then_some(from..to)
-        }));
-        if ranges.is_empty() && start < end && ABI_STUB_SECTIONS.contains(&name) {
+        let first = frames.partition_point(|r| r.end <= start);
+        ranges.extend(
+            frames[first..]
+                .iter()
+                .take_while(|r| r.start < end)
+                .filter_map(|r| {
+                    let from = start.max(r.start);
+                    let to = end.min(r.end);
+                    (from < to).then_some(from..to)
+                }),
+        );
+        if start < end && ABI_STUB_SECTIONS.contains(&name) {
             ranges.push(start..end);
         }
-        ranges.sort_unstable_by_key(|r| (r.start, r.end));
-        let mut merged: Vec<std::ops::Range<u64>> = Vec::new();
-        for range in ranges {
-            if let Some(last) = merged.last_mut().filter(|last| range.start < last.end) {
-                last.end = last.end.max(range.end);
-            } else {
-                merged.push(range);
-            }
-        }
+        let merged = merge_ranges(ranges);
         let mut coverage = Coverage {
-            section: name.into(),
+            section: bounded_name(name).into(),
             total_bytes: data.len() as u64,
             covered_bytes: 0,
             uncovered_bytes: 0,
             uncovered_examples: Vec::new(),
         };
+        let intervals = SymbolIntervals::new(&local);
         let mut cursor = start;
         for range in merged {
             uncovered(
@@ -253,7 +294,7 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
             coverage.covered_bytes += range.end - range.start;
             cursor = range.end;
             let code = &data[(range.start - start) as usize..(range.end - start) as usize];
-            decode(code, range.start, name, &local, &mut scan)?;
+            decode(code, range.start, name, &intervals, &mut scan)?;
         }
         uncovered(cursor, end, &local, &mut coverage.uncovered_examples);
         coverage.uncovered_bytes = coverage.total_bytes - coverage.covered_bytes;
@@ -265,18 +306,33 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
     Ok(scan)
 }
 
+// Merge overlap, preserving adjacent function boundaries. Index FDEs once so neither
+// duplicate FDEs nor many sections multiply metadata traversal or instruction decoding.
+fn merge_ranges(mut ranges: Vec<std::ops::Range<u64>>) -> Vec<std::ops::Range<u64>> {
+    ranges.sort_unstable_by_key(|r| (r.start, r.end));
+    let mut merged: Vec<std::ops::Range<u64>> = Vec::new();
+    for range in ranges {
+        if let Some(last) = merged.last_mut().filter(|last| range.start < last.end) {
+            last.end = last.end.max(range.end);
+        } else {
+            merged.push(range);
+        }
+    }
+    merged
+}
+
 fn decode(
     data: &[u8],
     start: u64,
     section: &str,
-    symbols: &[&Symbol<'_>],
+    symbols: &SymbolIntervals<'_>,
     scan: &mut Scan,
 ) -> ArtifactResult<()> {
     let mut decoder = Decoder::with_ip(64, data, start, DecoderOptions::NONE);
     let mut instruction = Instruction::default();
     while decoder.can_decode() {
         decoder.decode_out(&mut instruction);
-        let symbol = containing(symbols, instruction.ip());
+        let symbol = symbols.containing(instruction.ip());
         if instruction.is_invalid() || instruction.next_ip() > start + data.len() as u64 {
             return Err(unrecorded(format!(
                 "isa.x86: invalid instruction or instruction past range end in {section} at 0x{:x}, containing symbol {}",
@@ -317,12 +373,41 @@ fn decode(
         if matches!(instruction.mnemonic(), Mnemonic::Lahf | Mnemonic::Sahf) {
             features.push("lahf_lm");
         }
+        features.extend(prerequisites(&instruction));
+        features.sort_unstable();
+        features.dedup();
         for feature in features {
             let usage = scan.used.entry(feature.into()).or_default();
             usage.record(instruction.ip(), section, symbol);
         }
     }
     Ok(())
+}
+
+// Intel SDM Vol. 2 §2.3 (VEX), §2.6 (EVEX), Vol. 1 §14 (AVX state),
+// and AMD APM Vol. 6 (128/256-bit media instructions: XOP/FMA4 exceptions).
+// CPUID lists describe extensions, not the complete state prerequisites. Apply this
+// one encoding table to the used set BEFORE selecting a psABI level; retain extras.
+const ENCODING_PREREQUISITES: &[(EncodingKind, bool, &[&str])] = &[
+    (EncodingKind::VEX, false, &["avx", "osxsave"]), // Includes AMD FMA4.
+    (EncodingKind::XOP, false, &["avx", "osxsave"]),
+    (EncodingKind::EVEX, false, &["avx512f", "osxsave"]),
+    (EncodingKind::EVEX, true, &["avx512vl"]), // 128/256-bit vectors only.
+];
+
+fn prerequisites(instruction: &Instruction) -> Vec<&'static str> {
+    let encoding = instruction.encoding();
+    // Use decoded vector width, not EVEX.L'L, whose bits also encode embedded
+    // rounding for 512-bit operations. The widest operand defines vector length.
+    let registers = || (0..instruction.op_count()).map(|i| instruction.op_register(i));
+    let narrow = encoding == EncodingKind::EVEX
+        && !registers().any(|r| r.is_zmm())
+        && registers().any(|r| r.is_xmm() || r.is_ymm());
+    ENCODING_PREREQUISITES
+        .iter()
+        .filter(|(kind, narrow_only, _)| *kind == encoding && (!narrow_only || narrow))
+        .flat_map(|(_, _, features)| features.iter().copied())
+        .collect()
 }
 
 /// Explicit decoder-to-contract spelling. Unknown extensions refuse rather than disappear or

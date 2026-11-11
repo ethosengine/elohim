@@ -1,4 +1,6 @@
 use super::*;
+#[path = "extract_hardening_tests.rs"]
+mod hardening;
 #[path = "extract_ranges_tests.rs"]
 mod ranges;
 use crate::artifact::requires::{canonical, documents};
@@ -249,6 +251,23 @@ fn fixture(
     while !bytes.len().is_multiple_of(8) {
         bytes.push(0);
     }
+    // Keep code at 0x78; put the program table before the section headers.
+    let mut programs = if interp.is_some() {
+        bytes[64..120].to_vec()
+    } else {
+        Vec::new()
+    };
+    programs.extend(hardening::program(
+        elf::PT_LOAD,
+        elf::PF_R | elf::PF_X,
+        0x78,
+        code.len() as u64,
+        0x400078,
+    ));
+    let phoff = bytes.len() as u64;
+    bytes[32..40].copy_from_slice(&phoff.to_le_bytes());
+    bytes[56..58].copy_from_slice(&((programs.len() / 56) as u16).to_le_bytes());
+    bytes.extend(programs);
     let shoff = bytes.len() as u64;
     bytes[40..48].copy_from_slice(&shoff.to_le_bytes());
     bytes[60..62].copy_from_slice(&(sections.len() as u16).to_le_bytes());
@@ -481,10 +500,23 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
     let low = offset("GLIBC_2.9");
     let high = offset("GLIBC_2.39");
     let unrelated = offset("GLIBC_9.99");
+    let strings_start = (bytes.len() + 7) & !7;
+    let dynamic_start = (strings_start + strings.len() + 7) & !7;
+    // 2 NEEDED, STRTAB, STRSZ, VERNEED, VERNEEDNUM, NULL.
+    let needs_start = dynamic_start + 7 * 16;
     let mut dynamic = Vec::new();
     for library in [libc, libm] {
         dynamic.extend(u64::from(elf::DT_NEEDED).to_le_bytes());
         dynamic.extend(u64::from(library).to_le_bytes());
+    }
+    for (tag, value) in [
+        (elf::DT_STRTAB, 0x400000 + strings_start as u64),
+        (elf::DT_STRSZ, strings.len() as u64),
+        (elf::DT_VERNEED, 0x400000 + needs_start as u64),
+        (elf::DT_VERNEEDNUM, 2),
+    ] {
+        dynamic.extend(u64::from(tag).to_le_bytes());
+        dynamic.extend(value.to_le_bytes());
     }
     dynamic.extend([0u8; 16]);
     let mut needs = Vec::new();
@@ -519,6 +551,10 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
         bytes.extend(&data);
         let mut header = [0u8; 64];
         header[4..8].copy_from_slice(&kind.to_le_bytes());
+        header[16..24].copy_from_slice(&(0x400000 + start as u64).to_le_bytes());
+        if kind == elf::SHT_GNU_VERNEED {
+            header[44..48].copy_from_slice(&2u32.to_le_bytes());
+        }
         header[24..32].copy_from_slice(&(start as u64).to_le_bytes());
         header[32..40].copy_from_slice(&(data.len() as u64).to_le_bytes());
         header[40..44].copy_from_slice(&6u32.to_le_bytes());
@@ -529,6 +565,27 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
     while !bytes.len().is_multiple_of(8) {
         bytes.push(0);
     }
+    let old_ph = u64::from_le_bytes(bytes[32..40].try_into().unwrap()) as usize;
+    let ph_count = u16::from_le_bytes(bytes[56..58].try_into().unwrap()) as usize;
+    let mut programs = bytes[old_ph..old_ph + ph_count * 56].to_vec();
+    programs.extend(hardening::program(
+        elf::PT_LOAD,
+        elf::PF_R,
+        strings_start as u64,
+        (bytes.len() - strings_start) as u64,
+        0x400000 + strings_start as u64,
+    ));
+    programs.extend(hardening::program(
+        elf::PT_DYNAMIC,
+        elf::PF_R,
+        dynamic_start as u64,
+        7 * 16,
+        0x400000 + dynamic_start as u64,
+    ));
+    let phoff = bytes.len() as u64;
+    bytes[32..40].copy_from_slice(&phoff.to_le_bytes());
+    bytes[56..58].copy_from_slice(&((programs.len() / 56) as u16).to_le_bytes());
+    bytes.extend(programs);
     let start = bytes.len();
     bytes[40..48].copy_from_slice(&(start as u64).to_le_bytes());
     bytes[60..62].copy_from_slice(&9u16.to_le_bytes());

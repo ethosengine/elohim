@@ -15,18 +15,19 @@ pub(super) fn frame_bytes(pc: u64, size: u64) -> Vec<u8> {
     bytes
 }
 
-fn section_offset(bytes: &[u8], index: usize) -> usize {
+pub(super) fn section_offset(bytes: &[u8], index: usize) -> usize {
     u64::from_le_bytes(bytes[40..48].try_into().unwrap()) as usize + index * 64
 }
 
-fn no_frames(bytes: &mut [u8]) {
+pub(super) fn no_frames(bytes: &mut [u8]) {
     let frame = section_offset(bytes, 5);
     bytes[frame + 32..frame + 40].copy_from_slice(&0u64.to_le_bytes());
 }
 
 pub(super) fn add_symbols(bytes: &mut Vec<u8>, functions: &[(u64, u64, &str)], dynamic: bool) {
     let old = section_offset(bytes, 0);
-    let mut headers = bytes[old..].to_vec();
+    let count = u16::from_le_bytes(bytes[60..62].try_into().unwrap()) as usize;
+    let mut headers = bytes[old..old + count * 64].to_vec();
     let count = headers.len() / 64;
     let mut strings = vec![0];
     let mut symbols = vec![0; 24];
@@ -128,7 +129,7 @@ fn artifact_unknown_function_boundaries_names_section() {
     }
 }
 
-fn rename_text(bytes: &mut Vec<u8>, name: &str) {
+pub(super) fn rename_text(bytes: &mut Vec<u8>, name: &str) {
     let strings = section_offset(bytes, 4);
     let offset = bytes.len();
     bytes.extend([b"\0", name.as_bytes(), b"\0"].concat());

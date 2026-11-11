@@ -466,6 +466,8 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
 
     // A readable ELF with unknown OS must fail extraction before even a brit attestation.
     let calls_before = std::fs::read(&log).unwrap();
+    let events_before =
+        serde_json::to_value(SidecarFlowStore::open(a.root()).unwrap().events().unwrap()).unwrap();
     let mut unknown_os = artifact.clone();
     unknown_os[7] = 0; // Generic System V, with neither interpreter nor ABI tag.
     std::fs::write(&bytes, &unknown_os).unwrap();
@@ -482,7 +484,31 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
         text(&out)
     );
     assert_eq!(std::fs::read(&log).unwrap(), calls_before);
-    assert!(mount.held(&BlobCid::compute_bytes(&unknown_os)).is_none());
+    let reopened = elohim_epr_cli::payload::open_payload_store(
+        &a.payload(),
+        elohim_epr_cli::payload::Access::Shared,
+    )
+    .await
+    .unwrap()
+    .store;
+    let rejected_cid = BlobCid::compute_bytes(&unknown_os);
+    let absence = reopened
+        .fetch_blob(&rejected_cid, eprfs_core::FetchPolicy::LocalOnly)
+        .await;
+    assert!(
+        matches!(absence,
+            Err(eprfs_core::EprfsError::BlobNotFound(ref cid) | eprfs_core::EprfsError::BlobNotLocal(ref cid))
+                if cid == &rejected_cid
+        ),
+        "expected local payload absence: {absence:?}"
+    );
+    let after = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
+    assert_eq!(serde_json::to_value(&after).unwrap(), events_before);
+    let (fresh_mount, _) = BlobMount::new(reopened, did.clone());
+    assert!(fresh_mount.rebuild_from_flow(&after).await.is_empty());
+    assert!(fresh_mount
+        .held(&BlobCid::compute_bytes(&unknown_os))
+        .is_none());
     std::fs::write(&bytes, &artifact).unwrap();
 
     // A closure that moved since the build started is never recorded.

@@ -122,6 +122,21 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
     symbol[if is64 { 4 } else { 12 }] = 0x12; // STB_GLOBAL | STT_FUNC
     bytes.extend(symbol);
     bytes.extend(b"\0fixture\0");
+    if is64 && little {
+        let phoff = bytes.len() as u64;
+        bytes[32..40].copy_from_slice(&phoff.to_le_bytes());
+        bytes[54..56].copy_from_slice(&56u16.to_le_bytes());
+        bytes[56..58].copy_from_slice(&1u16.to_le_bytes());
+        let mut load = [0u8; 56];
+        load[..4].copy_from_slice(&1u32.to_le_bytes()); // PT_LOAD
+        load[4..8].copy_from_slice(&5u32.to_le_bytes()); // PF_R | PF_X
+        load[8..16].copy_from_slice(&((data + names.len() + comment.len()) as u64).to_le_bytes());
+        // .text and its sized symbol both start at virtual address zero.
+        load[32..40].copy_from_slice(&1u64.to_le_bytes());
+        load[40..48].copy_from_slice(&1u64.to_le_bytes());
+        load[48..56].copy_from_slice(&1u64.to_le_bytes());
+        bytes.extend(load);
+    }
     bytes
 }
 

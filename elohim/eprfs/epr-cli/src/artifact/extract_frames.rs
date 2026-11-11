@@ -28,6 +28,7 @@ pub(super) fn read(data: &[u8], address: u64) -> ArtifactResult<Vec<Range<u64>>>
         pos: 0,
         address,
     };
+    let mut budget = super::layout::Budget::new(data.len(), 8, "CIE/FDE records");
     let mut cies = BTreeMap::new();
     let mut ranges = Vec::new();
     while reader.pos < data.len() {
@@ -39,6 +40,7 @@ pub(super) fn read(data: &[u8], address: u64) -> ArtifactResult<Vec<Range<u64>>>
             }
             break;
         }
+        budget.take(1)?;
         let length = if length == u64::from(u32::MAX) {
             reader.uint(8)?
         } else if length >= 0xfffffff0 {
