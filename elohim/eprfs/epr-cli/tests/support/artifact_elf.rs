@@ -1,18 +1,19 @@
 /// Full compiler identity shared by the synthetic descriptor and its executable stub.
 pub const RUSTC_IDENTITY: &str = "rustc fixture\nbinary: rustc\ncommit-hash: fixture-hash\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.1\nLLVM version: 22.1.2\n";
 
-/// Three section headers: null, section names and .comment. No binary fixture is stored.
+/// Static Linux ELF: null, section names, .comment and baseline .text (ret).
 pub fn artifact_elf(comment: &[u8]) -> Vec<u8> {
     artifact_elf_format(comment, true, true)
 }
 
 pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> {
-    let names = b"\0.shstrtab\0.comment\0";
+    let names = b"\0.shstrtab\0.comment\0.text\0";
     let header_size = if is64 { 64 } else { 52 };
     let section_size = if is64 { 64 } else { 40 };
-    let data = header_size + 3 * section_size;
+    let data = header_size + 4 * section_size;
     let mut bytes = vec![0u8; data];
     bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
+    bytes[7] = 3; // ELFOSABI_LINUX; no ABI-tag version floor.
     bytes[4] = if is64 { 2 } else { 1 };
     bytes[5] = if little { 1 } else { 2 };
     let mut write = |offset: usize, width: usize, value: u64| {
@@ -35,7 +36,7 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
     let sizes = if is64 { 52 } else { 40 };
     write(sizes, 2, header_size as u64);
     write(sizes + 6, 2, section_size as u64);
-    write(sizes + 8, 2, 3);
+    write(sizes + 8, 2, 4);
     write(sizes + 10, 2, 1);
     for (header, name, kind, offset, size) in [
         (
@@ -52,6 +53,13 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
             (data + names.len()) as u64,
             comment.len() as u64,
         ),
+        (
+            header_size + 3 * section_size,
+            20,
+            1,
+            (data + names.len() + comment.len()) as u64,
+            1,
+        ),
     ] {
         write(header, 4, name);
         write(header + 4, 4, kind);
@@ -66,8 +74,14 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
             size,
         );
     }
+    write(
+        header_size + 3 * section_size + 8,
+        if is64 { 8 } else { 4 },
+        6,
+    );
     bytes.extend_from_slice(names);
     bytes.extend_from_slice(comment);
+    bytes.push(0xc3);
     bytes
 }
 

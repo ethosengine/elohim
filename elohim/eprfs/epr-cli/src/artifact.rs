@@ -46,7 +46,9 @@ use eprfs_peer::{
 use serde::Serialize;
 
 mod custody;
+mod extract;
 mod requires;
+#[cfg(test)]
 use requires::read_requires;
 pub mod sysroot;
 #[path = "artifact/sysroot_cli.rs"]
@@ -103,8 +105,8 @@ pub fn usage() -> String {
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
      [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
-     crosses with --cross; absent --requires makes no compatibility claim; \
-     --requires stores the document locally, not yet served to siblings (K3 part 2: \
+     crosses with --cross; extracts ELF Requires and evidence; --requires may only tighten; \
+     Requires and evidence are stored locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
      exits 3 `unrecorded: <reason>`)\n  \
      | sysroot pack --from DIR --triple T --out FILE [--json]\n  \
@@ -1343,7 +1345,8 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         std::fs::read(bytes_path)
             .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
     );
-    check_linker(&descriptor, &selections, &bytes).map_err(unrecorded)?;
+    check_linker(&descriptor, &selections, &bytes)
+        .map_err(|e| unrecorded(format!("{}: {e}", bytes_path.display())))?;
     record_artifact(options, &effective, &key, bytes, BASIS_KEY_SLOT, None)
 }
 
@@ -1366,10 +1369,19 @@ fn record_artifact(
     basis: &str,
     sysroot_manifest: Option<&sysroot::Manifest>,
 ) -> ArtifactResult<ExitCode> {
-    // Shape only: host_contract will decode and merge clauses at the consumer in K3 part 2.
-    let requires = options.requires.as_deref().map(read_requires).transpose()?;
-
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
+    // Validate and canonicalize both documents before any attestation or blob is written.
+    // Archives retain their existing validator and optional caller document.
+    let (requires, requires_evidence) = requires::documents(
+        &bytes,
+        options
+            .bytes
+            .as_deref()
+            .unwrap_or_else(|| Path::new("sysroot archive")),
+        options.requires.as_deref(),
+        sysroot_manifest.is_some(),
+    )?;
+
     if let Some(manifest) = sysroot_manifest {
         if &sysroot::verify(&bytes)? != manifest {
             return Err(unrecorded(
@@ -1478,6 +1490,9 @@ fn record_artifact(
     if let Some((cid, _)) = &requires {
         extra.push(format!("env:requires={cid}"));
     }
+    if let Some((cid, _)) = &requires_evidence {
+        extra.push(format!("env:requires-evidence={cid}"));
+    }
     let put = runtime.block_on(async {
         if let Some(manifest) = sysroot_manifest {
             store
@@ -1493,6 +1508,12 @@ fn record_artifact(
                 .put_blob_verified(&cid, bytes)
                 .await
                 .map_err(|e| unrecorded(format!("the Requires document is not stored: {e}")))?;
+        }
+        if let Some((cid, bytes)) = requires_evidence {
+            store
+                .put_blob_verified(&cid, bytes)
+                .await
+                .map_err(|e| unrecorded(format!("the Requires evidence is not stored: {e}")))?;
         }
         let mut flow = SidecarFlowStore::open(&flow_root)
             .map_err(|e| unrecorded(format!("the flow store does not open: {e}")))?;

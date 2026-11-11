@@ -1,0 +1,92 @@
+{
+  "task": "host-compatibility-foundation K8",
+  "status": "implementation-tested; real-epr verification remains open",
+  "measurement": [
+    {
+      "subject": "installed",
+      "path": "/projects/.claude-config/tools/bin-store/epr/bafyreibnwgff6acemmhas3y7quefr54u2seq3o343n7x4vpbcgwieutjgq/epr",
+      "bytes": 128590816,
+      "wall_seconds_including_test_process": 1.1754512030165642,
+      "exit": 101,
+      "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.claude-config/tools/bin-store/epr/current/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x3294f67\")"
+    },
+    {
+      "subject": "built",
+      "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+      "bytes": 135172824,
+      "wall_seconds_including_test_process": 1.1535378659609705,
+      "exit": 101,
+      "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x354d427\")"
+    }
+  ],
+  "measurement_limitation": "No full Requires document or full used-feature set was produced for either epr: strict decoding refused data embedded in .text. No symbol-name dispatch heuristic or byte skipping was added.",
+  "diagnosis": {
+    "installed_address": "0x3294f67",
+    "rebuilt_address": "0x354d427",
+    "read": "ring x86_64-mont assembly embeds a Montgomery Multiplication attribution string after the sized function and before padding/the next function; a section-wide linear decode loses alignment in that data",
+    "assembly_source": "ring-0.17.14/crypto/fipsmodule/bn/asm/x86_64-mont.pl:1370"
+  },
+  "axes": {
+    "arch": "ELF e_machine (x86_64 or aarch64)",
+    "os": "NT_GNU_ABI_TAG, otherwise recognized PT_INTERP or ELF OSABI",
+    "kernel.linux": "NT_GNU_ABI_TAG Linux ABI tuple, absent when no note",
+    "abi.loader": "PT_INTERP; absent on static outputs",
+    "abi.libc": "numeric maximum GLIBC_x.y version need scoped to libc.so.6, or musl loader line with empty components",
+    "lib": "DT_NEEDED",
+    "isa.x86": "iced-x86 CPUID features from every executable section, psABI level closure plus used extensions; baseline alone omits clause"
+  },
+  "decisions": [
+    "Sysroot put keeps its existing validator and optional opaque Requires document.",
+    "Weaker caller clauses refuse with MergeError; caller provenance is normalized to declared and narrowing is refused.",
+    "musl uses empty version components because loader names do not prove a version floor.",
+    "Unmapped CPUID features, undecodable instructions, missing section metadata and unknown OS refuse; no guessing.",
+    "iced-x86 manifest requirement 1.21.0 resolves to the existing locked 1.22.0; no lockfile or contract-crate edits.",
+    "SHA uses Linux flag spelling sha_ni; psABI exceptions remain sse3 and lzcnt, matching host_contract.",
+    "Installed launchers refused read-only filesystem access; direct installed binaries were used. Shell invocation adapter coverage remains unmeasured."
+  ],
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+      "exit": 0,
+      "passed": 95,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8/artifact-final.log"
+    },
+    {
+      "command": "cargo test --offline --locked -p elohim-epr-cli",
+      "exit": 101,
+      "environment": "TMPDIR=/var/tmp/hc-k8; sandbox-created empty .git marker makes existing covenant key fixtures appear inside a repository",
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests.log"
+    },
+    {
+      "command": "cargo test --offline --locked -p elohim-epr-cli",
+      "exit": 0,
+      "environment": "isolated /var/tmp/epr-k8-tests.* outside the synthetic sandbox mount; same toolchain/target/flags/jobs",
+      "passed": 1437,
+      "ignored": 0,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests-isolated.log"
+    },
+    {
+      "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+      "exit": 0,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8/clippy-final.log"
+    },
+    {
+      "command": "cargo fmt -p elohim-epr-cli -- --check",
+      "exit": 0
+    },
+    {
+      "command": "epr-rust-style --root /projects/elohim/.worktrees/hc-k8 (existing pool binary)",
+      "exit": 0,
+      "debt": "epr-cli 0 -> 0; no suppressions added",
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8/rust-style.log"
+    }
+  ],
+  "story_harvest": {
+    "chain": "host-compatibility-foundation K8 -> K10",
+    "between": "ELF section bytes -> complete used instruction features",
+    "missing_node": "Executable sections may contain non-instruction data; a byte-bound code/data policy must preserve instruction coverage before dispatch narrowing is considered.",
+    "probe": "Run artifact_measure_requested_elf on installed epr; inspect the refusal address against ELF function sizes and assembly bytes.",
+    "current_state": "red: strict decoder refuses; task asks the operator whether function-boundary recovery is admissible."
+  },
+  "repository_operations": "Brit status/log/diff used. Brit add initially refused read-only index.lock; inspection confirmed an empty index and unchanged HEAD, and host-access Brit add succeeded. Brit commit refused untrusted core.hooksPath before moving HEAD; Git fallback used for the local commit with hooks enabled."
+}
