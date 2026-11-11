@@ -1,0 +1,45 @@
+{
+  "name": "mesh-build",
+  "tools": {
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.1\nLLVM version: 22.1.2",
+    "toolchain": "1.96.1"
+  },
+  "flags": [
+    "--bin=doorway",
+    "--profile=dev",
+    "--target=x86_64-unknown-linux-gnu"
+  ],
+  "params": null,
+  "exec": null,
+  "step": "mesh-build:doorway",
+  "embedder": null,
+  "view": [
+    "bridges/did/did-bridge",
+    "bridges/did/did-types",
+    "crates/doorway-client",
+    "crates/elohim-address",
+    "crates/elohim-views",
+    "crates/seam-contracts",
+    "doorway/doorway-service",
+    "elohim/constitution",
+    "elohim/elohim-agent/elohim-agent-service",
+    "elohim/elohim-agent/gate-client",
+    "elohim/elohim-agent/gate-types",
+    "elohim/elohim-agent/specialists/defender",
+    "elohim/elohim-cache-core",
+    "elohim/elohim-chrome-asset",
+    "elohim/elohim-compute",
+    "elohim/elohim-peer-fabric",
+    "elohim/elohim-render",
+    "elohim/sdk/domains/imagodei/types",
+    "elohim/sdk/domains/infrastructure/types"
+  ],
+  "nonPathInputs": {
+    "CC": "gcc",
+    "LIBCLANG_PATH": "/usr/lib64",
+    "RUSTFLAGS": "",
+    "crate": "doorway/doorway-service"
+  },
+  "deterministic": false
+}

@@ -21,6 +21,10 @@
 //! producer and the consumer alike, so the two sides cannot derive two keys for one closure. A
 //! closure with uncommitted changes inside the view has no key: the bytes would not be the HEAD
 //! tree's.
+//!
+//! Host tool lines name the selected C driver, its target defaults and resolved link inputs.
+//! System linkers enter only through a recorded selection; rustc's full identity accounts for
+//! its bundled linker. `put` checks the ELF linker witness before recording any build evidence.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -36,10 +40,11 @@ use eprfs_peer::{
     ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
     key_cid, put_local_blob_with, put_method_record, read_queue_file, resolve_holders,
     write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport,
-    LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL,
-    FETCH_TOTAL,
+    LocalBlobContext, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
 };
 use serde::Serialize;
+
+mod custody;
 
 use crate::device_key::{self, DeviceKey};
 use crate::peer::{self, PeerCliError, ServeLock};
@@ -79,8 +84,8 @@ type ArtifactResult<T> = Result<T, ArtifactError>;
 pub fn usage() -> String {
     "usage: epr artifact <\n  \
      describe --project P --bin B [--features F] --rustflags R --sources MANIFEST#STEP \
-     --crate DIR [--env K=V]... [--repo ROOT] [--out FILE] \
-     (the mesh-build method descriptor: tools, flags, declared view, non-path inputs)\n  \
+     --crate DIR [--env K=V]... [--target-isa LEVEL] [--target-<name> VALUE]... [--repo ROOT] [--out FILE] \
+     (the mesh-build method descriptor; target names: arch, isa, os, libc, cflags, sysroot)\n  \
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
@@ -88,9 +93,10 @@ pub fn usage() -> String {
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
      crosses with --cross; exits 3 `unrecorded: <reason>`)\n  \
      | fetch --method FILE --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
-     [--stall S] [--total S] [--json] \
+     [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
-     serve; exits 3 `fetch gap: <kind>: <reason>`)>"
+     serve; exits 3 `fetch gap: <kind>: <reason>`)\n  \
+     | holders (--key CID | --output CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
         .to_string()
 }
 
@@ -107,13 +113,14 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         Some("key") => key(&options),
         Some("put") => put(&options),
         Some("fetch") => fetch(&options),
+        Some("holders") => custody::holders(&options),
         Some(other) => {
             return Err(ArtifactError::InvalidArguments(format!(
                 "unknown artifact verb `{other}`{}\n{}",
                 crate::hint::did_you_mean(
                     other,
                     "epr artifact",
-                    &["describe", "key", "put", "fetch"]
+                    &["describe", "key", "put", "fetch", "holders"]
                 ),
                 usage()
             )))
@@ -143,6 +150,7 @@ struct Options {
     sources: Option<String>,
     crate_dir: Option<String>,
     env: Vec<String>,
+    target: Vec<(String, String)>,
     out: Option<PathBuf>,
     method: Option<PathBuf>,
     print: Option<String>,
@@ -157,6 +165,10 @@ struct Options {
     transport: FetchTransport,
     stall: Option<u64>,
     total: Option<u64>,
+    expect_output: Option<BlobCid>,
+    key: Option<BlobCid>,
+    output: Option<BlobCid>,
+    min: Option<u64>,
     json: bool,
 }
 
@@ -199,6 +211,10 @@ impl Options {
                 "--sources" => options.sources = Some(value),
                 "--crate" => options.crate_dir = Some(value),
                 "--env" => options.env.push(value),
+                flag if flag.starts_with("--target-") => {
+                    let name = format!("target.{}", &flag[9..]);
+                    options.target.push((name, value));
+                }
                 "--out" => options.out = Some(PathBuf::from(value)),
                 "--method" => options.method = Some(PathBuf::from(value)),
                 "--print" => options.print = Some(value),
@@ -209,6 +225,10 @@ impl Options {
                 "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
                 "--dest" => options.dest = Some(PathBuf::from(value)),
                 "--handle" => options.handle = Some(value),
+                "--expect-output" => options.expect_output = Some(custody::parse_cid(&value)?),
+                "--key" => options.key = Some(custody::parse_cid(&value)?),
+                "--output" => options.output = Some(custody::parse_cid(&value)?),
+                "--min" => options.min = Some(seconds(&value)?),
                 "--transport" => {
                     options.transport = match value.as_str() {
                         "tier" => FetchTransport::Tier,
@@ -308,6 +328,97 @@ pub const NATIVE_BUILD_ENV: [&str; 9] = [
     "OPENSSL_INCLUDE_DIR",
     "PROTOC",
 ];
+
+/// The sole classification table for recorded environment and declared-target inputs.
+/// Benign variables remain method-class if explicitly recorded (resource caps are omitted).
+/// The final fallback covers caller-declared `--env` names, including Cargo's dynamic names.
+/// Only the reserved target namespace is target-class; no environment variable is erased
+/// by `MethodDescriptor::family_cid`.
+const BUILD_INPUT_CLASSES: &[(&str, BuildInputClass)] = &[
+    ("CC", BuildInputClass::Method),
+    ("CXX", BuildInputClass::Method),
+    ("AR", BuildInputClass::Method),
+    ("LIBCLANG_PATH", BuildInputClass::Method),
+    ("PKG_CONFIG_PATH", BuildInputClass::Method),
+    ("OPENSSL_DIR", BuildInputClass::Method),
+    ("OPENSSL_LIB_DIR", BuildInputClass::Method),
+    ("OPENSSL_INCLUDE_DIR", BuildInputClass::Method),
+    ("PROTOC", BuildInputClass::Method),
+    ("CARGO_HOME", BuildInputClass::Method),
+    ("RUSTUP_HOME", BuildInputClass::Method),
+    ("CARGO_TARGET_DIR", BuildInputClass::Method),
+    ("CARGO_BUILD_JOBS", BuildInputClass::Method),
+    ("RUST_TEST_THREADS", BuildInputClass::Method),
+    ("RUST_BACKTRACE", BuildInputClass::Method),
+    ("RUST_LOG", BuildInputClass::Method),
+    ("RUSTFLAGS", BuildInputClass::Method),
+    ("RUSTUP_TOOLCHAIN", BuildInputClass::Method),
+    ("target.*", BuildInputClass::Target),
+    ("*", BuildInputClass::Method),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BuildInputClass {
+    Method,
+    Target,
+}
+
+fn build_input_class(name: &str) -> BuildInputClass {
+    BUILD_INPUT_CLASSES
+        .iter()
+        .find(|(pattern, _)| {
+            pattern
+                .strip_suffix('*')
+                .map_or(*pattern == name, |prefix| name.starts_with(prefix))
+        })
+        .expect("classification table has a final fallback")
+        .1
+}
+
+/// `target.*` is the extension point for declared targets, closed to these six slots for now.
+/// K6 supplies the sysroot artifact; K2 only validates its content address, never its availability.
+fn validate_target_inputs(inputs: &BTreeMap<String, String>) -> ArtifactResult<()> {
+    for (name, value) in inputs {
+        if build_input_class(name) != BuildInputClass::Target {
+            continue;
+        }
+        match name.as_str() {
+            "target.arch" | "target.isa" | "target.os" | "target.libc" | "target.cflags" => {}
+            "target.sysroot" => {
+                BlobCid::parse(value)
+                    .map_err(|e| ArtifactError::Gap(format!("{name} must be a CID: {e}")))?;
+            }
+            _ => {
+                return Err(ArtifactError::Gap(format!(
+                    "unknown declared target input `{name}`"
+                )))
+            }
+        }
+        if value.trim().is_empty() && name != "target.cflags" {
+            return Err(ArtifactError::Gap(format!("{name} needs a nonempty value")));
+        }
+    }
+    if inputs.contains_key("target.isa") {
+        for (name, value) in inputs {
+            if name == "RUSTFLAGS" || name.ends_with("_RUSTFLAGS") {
+                let flags: Vec<String> = if name == "CARGO_ENCODED_RUSTFLAGS" {
+                    value.split('\u{1f}').map(str::to_owned).collect()
+                } else {
+                    value.split_whitespace().map(str::to_owned).collect()
+                };
+                if host::codegen_options(&flags)
+                    .iter()
+                    .any(|(key, _)| key == "target-cpu")
+                {
+                    return Err(ArtifactError::Gap(format!(
+                        "target.isa and {name} target-cpu both declare the ISA; remove target-cpu from {name}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
 fn is_build_var(name: &str) -> bool {
     name.starts_with("CARGO_") || name.starts_with("RUST") || NATIVE_BUILD_ENV.contains(&name)
@@ -515,14 +626,18 @@ fn refuse_ignored_submodules(repo: &Path, view: &[String]) -> ArtifactResult<()>
 /// checkouts at different places key alike): every `.cargo/config(.toml)` from the crate's
 /// directory up to the filesystem root, nearest first, and `$CARGO_HOME/config(.toml)` (`-` when
 /// absent).
-fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<String> {
+fn cargo_config_lines(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(String, toml::Value)> {
     let mut lines = String::new();
+    let mut configs = Vec::new();
     let Some(crate_dir) = descriptor.non_path_inputs.get(CRATE_INPUT) else {
-        return Ok(lines);
+        return Ok((lines, toml::Value::Table(Default::default())));
     };
-    let content = |path: &Path| -> ArtifactResult<Option<String>> {
+    let content = |path: &Path| -> ArtifactResult<Option<(String, Vec<u8>)>> {
         match std::fs::read(path) {
-            Ok(bytes) => Ok(Some(BlobCid::compute_bytes(&bytes).to_string())),
+            Ok(bytes) => Ok(Some((BlobCid::compute_bytes(&bytes).to_string(), bytes))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(ArtifactError::Gap(format!(
                 "the cargo configuration {} does not read: {e}",
@@ -532,9 +647,16 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
     };
     let start = repo.join(crate_dir);
     let mut found = 0usize;
+    let mut seen = std::collections::BTreeSet::new();
     for dir in start.ancestors() {
+        let mut active = true;
         for name in ["config", "config.toml"] {
-            if let Some(cid) = content(&dir.join(".cargo").join(name))? {
+            let path = dir.join(".cargo").join(name);
+            if let Some((cid, bytes)) = content(&path)? {
+                if active && seen.insert(path.clone()) {
+                    configs.push((path, bytes));
+                }
+                active = false;
                 lines.push_str(&format!("cargo-config:{found}:{name}\t{cid}\n"));
                 found += 1;
             }
@@ -544,26 +666,32 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cargo")));
+    let mut active = true;
     for name in ["config", "config.toml"] {
-        let cid = match &home {
+        let content = match &home {
             Some(home) => content(&home.join(name))?,
             None => None,
         };
+        let cid = content.map(|(cid, bytes)| {
+            if let Some(home) = &home {
+                let path = home.join(name);
+                if active && seen.insert(path.clone()) {
+                    configs.push((path, bytes));
+                }
+            }
+            active = false;
+            cid
+        });
         lines.push_str(&format!(
             "cargo-home:{name}\t{}\n",
             cid.as_deref().unwrap_or("-")
         ));
     }
-    Ok(lines)
+    Ok((lines, host::merge_configs(configs)?))
 }
 
 /// The `non_path_inputs` entry naming the fixed `PATH` a recorded mesh build runs cargo under.
 pub const PATH_INPUT: &str = "PATH";
-
-/// The tools cargo and the build scripts reach through `PATH` whose identity enters the key: the
-/// rustc default linker driver (`cc` on the gnu targets) and the linker it drives (`ld`), plus
-/// whatever `CC` names when the method records it.
-const KEYED_TOOLS: [&str; 2] = ["cc", "ld"];
 
 /// `name` resolved the way a process with `PATH=path` resolves it: as given when it names a
 /// path, else the first executable regular file of that name on `path`; canonicalized.
@@ -583,47 +711,8 @@ fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
     std::fs::canonicalize(&found).ok()
 }
 
-/// One line per keyed tool under the method's recorded `PATH` (review H3): the canonical path it
-/// resolves to and the CID of its `--version` output (`-` when it does not resolve), so another
-/// compiler or linker selected through `PATH` moves the key. A method that records no `PATH`
-/// (built in an inherited environment) keys no tool and is refused by nothing here.
-fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String> {
-    let Some(path) = descriptor.non_path_inputs.get(PATH_INPUT) else {
-        return Ok(String::new());
-    };
-    let mut names: Vec<(String, String)> = KEYED_TOOLS
-        .iter()
-        .map(|tool| ((*tool).to_string(), (*tool).to_string()))
-        .collect();
-    if let Some(cc) = descriptor.non_path_inputs.get("CC") {
-        names.push(("CC".to_string(), cc.clone()));
-    }
-    let mut lines = String::new();
-    for (label, name) in names {
-        let Some(resolved) = resolve_tool(&name, path) else {
-            lines.push_str(&format!("tool:{label}\t-\n"));
-            continue;
-        };
-        let output = std::process::Command::new(&resolved)
-            .arg("--version")
-            .env_clear()
-            .env("PATH", path)
-            .env("LANG", "C")
-            .output()
-            .map_err(|e| {
-                ArtifactError::Gap(format!(
-                    "{} --version does not run: {e}",
-                    resolved.display()
-                ))
-            })?;
-        let version = BlobCid::compute_bytes(&[output.stdout, output.stderr].concat());
-        lines.push_str(&format!(
-            "tool:{label}\t{}\t{version}\n",
-            resolved.display()
-        ));
-    }
-    Ok(lines)
-}
+mod host;
+use host::{check_linker, tool_lines};
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
@@ -634,6 +723,8 @@ fn is_excluded_ignored(path: &str) -> bool {
 
 /// The derivation key of `descriptor` at `repo`'s HEAD (the interim `KeyInput::Raw` form; see the
 /// module docs). The one key derivation for this closure: `put` and `fetch` both call it.
+/// Inactive flag sources and unrelated target linker variables are omitted from the descriptor
+/// used for the method CID; the supplied descriptor is left intact.
 ///
 /// # Errors
 ///
@@ -641,7 +732,31 @@ fn is_excluded_ignored(path: &str) -> bool {
 /// cannot name what a build would read: a tracked symlink leaving the view, an index flag or a
 /// submodule `ignore` hiding changes, or ignored untracked files inside the view.
 pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    let method = descriptor
+    closure_selection(repo, descriptor).map(|(key, _, _)| key)
+}
+
+/// Preserve the exact descriptor whose canonical bytes identify the resolved method.
+fn effective_selection(
+    descriptor: &MethodDescriptor,
+    config: &toml::Value,
+) -> ArtifactResult<(MethodDescriptor, host::Selections)> {
+    validate_target_inputs(&descriptor.non_path_inputs)?;
+    let mut effective = descriptor.clone();
+    let selections = host::resolve(
+        &mut effective.non_path_inputs,
+        config,
+        host::target(descriptor),
+    )?;
+    Ok((effective, selections))
+}
+
+fn closure_selection(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(ClosureKey, host::Selections, MethodDescriptor)> {
+    let (config_lines, config) = cargo_config_lines(repo, descriptor)?;
+    let (effective, selections) = effective_selection(descriptor, &config)?;
+    let method = effective
         .cid()
         .map_err(|e| ArtifactError::Gap(format!("the method descriptor does not encode: {e}")))?;
     let head = git_ok(repo, &["rev-parse", "HEAD"])
@@ -669,8 +784,8 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
     for path in &paths {
         lines.push_str(&closure_line(repo, path, &mut gitlinks)?);
     }
-    lines.push_str(&cargo_config_lines(repo, descriptor)?);
-    lines.push_str(&tool_lines(descriptor)?);
+    lines.push_str(&config_lines);
+    lines.push_str(&tool_lines(descriptor, &selections)?);
     let mut status_args = vec![
         "status",
         "--porcelain",
@@ -709,15 +824,19 @@ pub fn closure_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult
         input: KeyInput::Raw(input.clone()),
     };
     let key_cid = key_cid(&key).map_err(|e| ArtifactError::Gap(e.to_string()))?;
-    Ok(ClosureKey {
-        method,
-        input,
-        key_cid,
-        basis: BASIS_KEY_SLOT,
-        head,
-        dirty,
-        key,
-    })
+    Ok((
+        ClosureKey {
+            method,
+            input,
+            key_cid,
+            basis: BASIS_KEY_SLOT,
+            head,
+            dirty,
+            key,
+        },
+        selections,
+        effective,
+    ))
 }
 
 fn read_descriptor(options: &Options) -> ArtifactResult<MethodDescriptor> {
@@ -739,7 +858,14 @@ fn read_descriptor(options: &Options) -> ArtifactResult<MethodDescriptor> {
 }
 
 fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<ClosureKey> {
-    let key = closure_key(repo, descriptor)?;
+    clean_selection(repo, descriptor).map(|(key, _, _)| key)
+}
+
+fn clean_selection(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<(ClosureKey, host::Selections, MethodDescriptor)> {
+    let (key, selections, effective) = closure_selection(repo, descriptor)?;
     if !key.dirty.is_empty() {
         return Err(ArtifactError::Gap(format!(
             "the closure has uncommitted changes inside the method's view ({}), so the bytes \
@@ -747,7 +873,7 @@ fn clean_key(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<Closu
             key.dirty.join("; ")
         )));
     }
-    Ok(key)
+    Ok((key, selections, effective))
 }
 
 /// [`build_env_refusal`] against this process's environment.
@@ -827,6 +953,41 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
     let repo = &options.repo;
     let crate_path = repo.join(crate_dir);
 
+    let mut non_path_inputs = BTreeMap::new();
+    non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
+    // The crate, so the closure reads every Cargo configuration cargo reads for it.
+    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
+    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
+    for name in NATIVE_BUILD_ENV {
+        if let Ok(value) = std::env::var(name) {
+            non_path_inputs.insert(name.to_string(), value);
+        }
+    }
+    for pair in &options.env {
+        let (key, value) = pair.split_once('=').ok_or_else(|| {
+            ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
+        })?;
+        if RESOURCE_CAPS.contains(&key) {
+            continue;
+        }
+        if non_path_inputs
+            .insert(key.to_string(), value.to_string())
+            .is_some()
+            && build_input_class(key) == BuildInputClass::Target
+        {
+            return Err(ArtifactError::Gap(format!("{key} is declared twice")));
+        }
+    }
+    for (name, value) in &options.target {
+        if non_path_inputs
+            .insert(name.clone(), value.clone())
+            .is_some()
+        {
+            return Err(ArtifactError::Gap(format!("{name} is declared twice")));
+        }
+    }
+    validate_target_inputs(&non_path_inputs)?;
+
     let rustc = tool_line("rustc", &["-vV"], &crate_path)?;
     let field = |name: &str| {
         rustc
@@ -842,14 +1003,7 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
     }
     let cargo = tool_line("cargo", &["-V"], &crate_path)?;
     let mut tools = BTreeMap::new();
-    tools.insert(
-        "rustc".to_string(),
-        format!(
-            "{} commit-hash {} host {host}",
-            field("release"),
-            field("commit-hash")
-        ),
-    );
+    tools.insert("rustc".to_string(), rustc.clone());
     tools.insert(
         "cargo".to_string(),
         cargo.lines().next().unwrap_or_default().to_string(),
@@ -950,25 +1104,6 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
             .map_err(|e| ArtifactError::Gap(format!("a view path is invalid: {e}")))?,
     );
 
-    let mut non_path_inputs = BTreeMap::new();
-    non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
-    // The crate, so the closure reads every Cargo configuration cargo reads for it.
-    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
-    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
-    for name in NATIVE_BUILD_ENV {
-        if let Ok(value) = std::env::var(name) {
-            non_path_inputs.insert(name.to_string(), value);
-        }
-    }
-    for pair in &options.env {
-        let (key, value) = pair.split_once('=').ok_or_else(|| {
-            ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
-        })?;
-        if RESOURCE_CAPS.contains(&key) {
-            continue;
-        }
-        non_path_inputs.insert(key.to_string(), value.to_string());
-    }
     let descriptor = MethodDescriptor {
         name: MESH_BUILD.into(),
         tools,
@@ -981,6 +1116,8 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
         non_path_inputs,
         deterministic: false,
     };
+    let (_, config) = cargo_config_lines(&options.repo, &descriptor)?;
+    let (effective, _) = effective_selection(&descriptor, &config)?;
     let text = serde_json::to_string_pretty(&descriptor)?;
     match &options.out {
         Some(out) => {
@@ -988,7 +1125,7 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(out, format!("{text}\n"))?;
-            let method = descriptor
+            let method = effective
                 .cid()
                 .map_err(|e| ArtifactError::Gap(e.to_string()))?;
             println!("{method}");
@@ -1126,10 +1263,23 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
             descriptor.step
         )));
     }
+    // A declared target is recorded and keyed, but nothing yet applies it to the compiler: the
+    // bytes would be the host default's build under a variant's key. Until the declared target is
+    // realized by the build itself (plan K6: pinned sysroot and the flags it implies), refuse.
+    if let Some(name) = descriptor
+        .non_path_inputs
+        .keys()
+        .find(|name| name.starts_with("target."))
+    {
+        return Err(unrecorded(format!(
+            "the method declares {name}, and no build applies a declared target yet (K6); \
+             these bytes would be recorded under a variant key they were not built for"
+        )));
+    }
     // The environment recording runs in must be the one the method records (the mesh build runs
     // cargo in exactly it), and the closure must be the one the build started from.
     check_build_env(&descriptor).map_err(unrecorded)?;
-    let key = clean_key(repo, &descriptor).map_err(unrecorded)?;
+    let (key, selections, effective) = clean_selection(repo, &descriptor).map_err(unrecorded)?;
     if key.input.to_string() != input {
         return Err(unrecorded(format!(
             "the closure moved during the build: it was {input}, it is {} now",
@@ -1148,6 +1298,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         std::fs::read(bytes_path)
             .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
     );
+    check_linker(&descriptor, &selections, &bytes).map_err(unrecorded)?;
     let output = BlobCid::compute_bytes(&bytes);
 
     let signer: serde_json::Value = serde_json::from_str(&brit(repo, &["signer", "--json"])?)
@@ -1240,7 +1391,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         format!("env:agentId={agent_id}"),
     ];
     let put = runtime.block_on(async {
-        put_method_record(store.as_ref(), &descriptor)
+        put_method_record(store.as_ref(), &effective)
             .await
             .map_err(|e| unrecorded(format!("the method record is not stored: {e}")))?;
         let mut flow = SidecarFlowStore::open(&flow_root)
@@ -1329,24 +1480,16 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     if ServeLock::held(&peer_dir) != Some(true) {
         return Err(gap(&FetchGap::DaemonDown));
     }
-    let found = peer::sibling_artifacts(
-        &options.repo,
-        options.handle.as_deref(),
-        &key.key_cid.to_string(),
+    let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())
+        .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-record: {e}")))?;
+    let records = custody::records(&found);
+    let selection = resolve_holders(
+        &key.key_cid,
+        &records,
+        &found.device,
+        options.expect_output.as_ref(),
     )
-    .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-record: {e}")))?;
-    let records: Vec<SiblingRecord> = found
-        .rows
-        .iter()
-        .filter_map(|row| {
-            Some(SiblingRecord {
-                device: row.device.clone(),
-                output: BlobCid::parse(&row.output).ok()?,
-                manifest: BlobCid::parse(&row.manifest).ok()?,
-            })
-        })
-        .collect();
-    let (output, holders) = resolve_holders(&records).map_err(|why| gap(&why))?;
+    .map_err(|why| gap(&why))?;
     let scope = crate::flow::repository::repository_scope(&options.repo)
         .map_err(|e| ArtifactError::Gap(format!("fetch gap: local-store: {e}")))?;
     let (stall, total) = (
@@ -1357,8 +1500,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         nonce: FetchRequest::fresh_nonce(),
         key: key.key.clone(),
         key_cid: key.key_cid.clone(),
-        output,
-        holders,
+        output: selection.output.clone(),
+        expect_output: options.expect_output.clone(),
+        holders: selection.holders.clone(),
         dest: dest.clone(),
         scope: scope.to_string(),
         transport: options.transport,
@@ -1395,12 +1539,35 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
             manifest,
             ..
         } => {
+            custody::record_divergence(
+                &found.served_root,
+                &found.device,
+                &key.key_cid,
+                &selection,
+            )?;
+            if !options.json && selection.outputs.len() > 1 {
+                println!(
+                    "divergence: key {} outputs {} chosen {} rule {}",
+                    key.key_cid,
+                    selection
+                        .outputs
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    selection.output,
+                    selection.rule
+                );
+            }
             if options.json {
                 println!(
                     "{}",
                     serde_json::json!({
                         "installed": dest,
                         "keyCid": key.key_cid,
+                        "output": selection.output,
+                        "rule": selection.rule,
+                        "outputs": selection.outputs,
                         "manifest": manifest,
                         "fetchedFrom": fetched_from,
                         "chunksFetched": chunks_fetched,
@@ -1411,10 +1578,11 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
                 );
             } else {
                 println!(
-                    "fetched {} from {} ({chunks_fetched} chunks, {chunks_resumed} resumed, \
+                    "fetched {} from {} (rule {}, {chunks_fetched} chunks, {chunks_resumed} resumed, \
                      {wasted} bytes wasted, {seconds:.1} s)",
                     dest.display(),
-                    fetched_from.join(", ")
+                    fetched_from.join(", "),
+                    selection.rule
                 );
             }
             Ok(ExitCode::SUCCESS)
@@ -1422,3 +1590,7 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         FetchDone::Gap { gap: why, .. } => Err(gap(&why)),
     }
 }
+
+#[cfg(test)]
+#[path = "artifact/target_tests.rs"]
+mod target_tests;

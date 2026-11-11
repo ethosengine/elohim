@@ -77,6 +77,10 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 chrono = "0.4"
 cid = "0.11"
 glob = "0.3"
+# ELF section bytes for the artifact's post-build linker check.
+object = { version = "0.37.3", default-features = false, features = ["read", "std"] }
+# Parse the Cargo configuration already included in artifact keys.
+toml = "0.8.23"
 # Advisory file locking for the recall executor's session continuation — a safe `flock`
 # wrapper, so the lock needs no `unsafe` block in this crate.
 rustix = { version = "1", features = ["fs"] }

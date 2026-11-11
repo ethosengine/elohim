@@ -1406,6 +1406,7 @@ dependencies = [
  "glob",
  "jsonschema",
  "libc",
+ "object",
  "rand_core 0.6.4",
  "rusqlite",
  "rustix",
@@ -1416,6 +1417,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "toml 0.8.23",
  "ts-rs",
  "unicode-normalization",
 ]
@@ -1583,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",

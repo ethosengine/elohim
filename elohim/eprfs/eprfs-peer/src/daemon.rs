@@ -1319,6 +1319,16 @@ impl Run {
             self.write_done(&done, &answer);
             return;
         }
+        if request
+            .expect_output
+            .as_ref()
+            .is_some_and(|output| output != &request.output)
+        {
+            let answer =
+                refused("the selected output differs from the caller's expected output".into());
+            self.write_done(&done, &answer);
+            return;
+        }
         let dest = match self.config.install.admits(&request.dest) {
             Ok(dest) => dest,
             Err(reason) => {

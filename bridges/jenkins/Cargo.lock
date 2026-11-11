@@ -599,6 +599,7 @@ dependencies = [
  "eprfs-meta",
  "glob",
  "libc",
+ "object",
  "rand_core",
  "rusqlite",
  "rustix",
@@ -608,6 +609,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
+ "toml",
  "ts-rs",
  "unicode-normalization",
 ]
@@ -697,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1142,6 +1144,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "object"
+version = "0.37.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

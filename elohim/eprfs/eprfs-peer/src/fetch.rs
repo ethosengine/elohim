@@ -176,9 +176,12 @@ pub struct FetchedArtifact {
 pub enum FetchGap {
     /// No admitted sibling has recorded a build for this key.
     NoRecord,
-    /// Admitted siblings recorded different outputs for one key: the method is not reproducible
-    /// enough to pick one, so nothing is fetched.
+    /// No expected output, own output or strict plurality resolves the differing outputs.
     Mismatch { outputs: Vec<BlobCid> },
+    /// The explicitly requested output has no holder for this key.
+    ExpectedOutputUnavailable { output: BlobCid },
+    /// The requested custody exists only on this device; fetching needs a remote holder.
+    LocalOnlyCustody { outputs: Vec<BlobCid> },
     /// The holder could not be dialled, or its connection failed.
     NoRoute { device: String },
     /// The holder refused or did not answer what was asked.
@@ -210,6 +213,8 @@ impl FetchGap {
         match self {
             FetchGap::NoRecord => "no-record",
             FetchGap::Mismatch { .. } => "mismatch",
+            FetchGap::ExpectedOutputUnavailable { .. } => "expected-output-unavailable",
+            FetchGap::LocalOnlyCustody { .. } => "local-only-custody",
             FetchGap::NoRoute { .. } => "no-route",
             FetchGap::Refused { .. } => "refused",
             FetchGap::ManifestTooLarge { .. } => "manifest-too-large",
@@ -233,8 +238,8 @@ impl fmt::Display for FetchGap {
             ),
             FetchGap::Mismatch { outputs } => write!(
                 f,
-                "admitted siblings recorded {} different outputs for this key ({}); not \
-                 reproducible enough to pick one, build here",
+                "admitted siblings recorded {} different outputs for this key ({}); no \
+                 expected output, own output or strict plurality decides; build here",
                 outputs.len(),
                 outputs
                     .iter()
@@ -242,6 +247,20 @@ impl fmt::Display for FetchGap {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            FetchGap::ExpectedOutputUnavailable { output } => {
+                write!(
+                    f,
+                    "no holder of expected output {output} for this key; build here"
+                )
+            }
+            FetchGap::LocalOnlyCustody { outputs } => {
+                write!(
+                f,
+                "custody of {} is local-only; fetch requires another device holding the output; \
+                 no remote holder is available",
+                outputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+            )
+            }
             FetchGap::NoRoute { device } => {
                 write!(f, "the holder {device} could not be reached")
             }
@@ -1233,51 +1252,113 @@ fn resolve_existing(path: &Path) -> Result<PathBuf, String> {
     }
 }
 
-/// One admitted sibling's custody record for a key, in flow order, as resolution reads it.
+/// One local or admitted sibling custody record for a key, in flow order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SiblingRecord {
+    pub key: BlobCid,
     pub device: String,
     pub output: BlobCid,
     pub manifest: BlobCid,
 }
 
-/// The holders for one key (design §3.b.1): each device's newest record, and the one output they
-/// all name. No record is [`FetchGap::NoRecord`]; two outputs for one key is
-/// [`FetchGap::Mismatch`], not a fetch: nothing is asked of anyone.
+/// The newest custody claim per (device, key, output), in deterministic order. Producing
+/// another output does not relinquish custody of a previously produced output.
+pub fn fold_holders(records: &[SiblingRecord]) -> Vec<&SiblingRecord> {
+    let mut newest = std::collections::BTreeMap::new();
+    for record in records {
+        newest.insert((&record.device, &record.key, &record.output), record);
+    }
+    newest.into_values().collect()
+}
+
+/// A local choice among custody claims; it does not grant admission or prove byte integrity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HolderSelection {
+    pub output: BlobCid,
+    pub holders: Vec<RequestedHolder>,
+    /// The first applicable rule: expected, own, or plurality.
+    pub rule: &'static str,
+    /// Sorted distinct outputs, including those not chosen.
+    pub outputs: Vec<BlobCid>,
+}
+
+/// Choose holders for a key, preferring an explicit output, then this device's own newest
+/// Produce when another device holds it, then a strict plurality of distinct remote devices.
+/// Local custody remains visible in `outputs` but cannot supply a fetch. A tie remains a mismatch.
 ///
 /// # Errors
 ///
-/// [`FetchGap::NoRecord`] and [`FetchGap::Mismatch`].
+/// No record, no remote holder, no holder of the expected output, or an unresolved tie.
 pub fn resolve_holders(
+    key: &BlobCid,
     records: &[SiblingRecord],
-) -> Result<(BlobCid, Vec<RequestedHolder>), FetchGap> {
-    let mut newest: std::collections::BTreeMap<&str, &SiblingRecord> =
-        std::collections::BTreeMap::new();
-    for record in records {
-        newest.insert(&record.device, record);
-    }
-    let outputs: BTreeSet<&BlobCid> = newest.values().map(|record| &record.output).collect();
-    let output = match outputs.len() {
-        0 => return Err(FetchGap::NoRecord),
-        1 => outputs
-            .into_iter()
-            .next()
-            .cloned()
-            .ok_or(FetchGap::NoRecord)?,
-        _ => {
-            return Err(FetchGap::Mismatch {
-                outputs: outputs.into_iter().cloned().collect(),
-            })
-        }
-    };
-    let holders = newest
-        .values()
-        .map(|record| RequestedHolder {
-            device: record.device.clone(),
-            manifest: record.manifest.clone(),
-        })
+    own_device: &str,
+    expected: Option<&BlobCid>,
+) -> Result<HolderSelection, FetchGap> {
+    let current: Vec<_> = fold_holders(records)
+        .into_iter()
+        .filter(|r| &r.key == key)
         .collect();
-    Ok((output, holders))
+    let mut by_output: std::collections::BTreeMap<BlobCid, Vec<RequestedHolder>> =
+        std::collections::BTreeMap::new();
+    let outputs: Vec<_> = current
+        .iter()
+        .map(|record| record.output.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    for record in current.iter().filter(|record| record.device != own_device) {
+        by_output
+            .entry(record.output.clone())
+            .or_default()
+            .push(RequestedHolder {
+                device: record.device.clone(),
+                manifest: record.manifest.clone(),
+            });
+    }
+    let own = records
+        .iter()
+        .rev()
+        .find(|record| &record.key == key && record.device == own_device)
+        .filter(|record| by_output.contains_key(&record.output));
+    let (output, rule) = if let Some(expected) = expected {
+        if !by_output.contains_key(expected) {
+            if outputs.contains(expected) {
+                return Err(FetchGap::LocalOnlyCustody {
+                    outputs: vec![expected.clone()],
+                });
+            }
+            return Err(FetchGap::ExpectedOutputUnavailable {
+                output: expected.clone(),
+            });
+        }
+        (expected.clone(), "expected")
+    } else if let Some(own) = own {
+        (own.output.clone(), "own")
+    } else {
+        let max = by_output.values().map(Vec::len).max().ok_or_else(|| {
+            if outputs.is_empty() {
+                FetchGap::NoRecord
+            } else {
+                FetchGap::LocalOnlyCustody {
+                    outputs: outputs.clone(),
+                }
+            }
+        })?;
+        let mut winners = by_output.iter().filter(|(_, holders)| holders.len() == max);
+        let output = winners.next().ok_or(FetchGap::NoRecord)?.0.clone();
+        if winners.next().is_some() {
+            return Err(FetchGap::Mismatch { outputs });
+        }
+        (output, "plurality")
+    };
+    let holders = by_output.remove(&output).ok_or(FetchGap::NoRecord)?;
+    Ok(HolderSelection {
+        output,
+        holders,
+        rule,
+        outputs,
+    })
 }
 
 /// One holder named in a queued request: a device and the manifest its crossed record names.
@@ -1302,6 +1383,9 @@ pub struct FetchRequest {
     /// [`key_cid`] of `key`.
     pub key_cid: BlobCid,
     pub output: BlobCid,
+    /// Optional caller constraint, rechecked by the daemon before any bytes move.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expect_output: Option<BlobCid>,
     pub holders: Vec<RequestedHolder>,
     /// Where the verified artifact is installed.
     pub dest: PathBuf,

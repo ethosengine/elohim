@@ -51,6 +51,7 @@ pub struct MethodDescriptor {
     /// The declared input paths (no root), normalized as `TreeView`'s.
     pub view: Vec<TreePath>,
     /// Declared identities with no path (a DNA hash, an `A2O_SUT_*` value).
+    /// `target.*` is reserved for declared-target inputs; see [`Self::family_cid`].
     pub non_path_inputs: BTreeMap<String, String>,
     /// Bound to the method CID; a record's flag must equal it.
     pub deterministic: bool,
@@ -65,6 +66,19 @@ impl MethodDescriptor {
         let bytes = serde_ipld_dagcbor::to_vec(&canonical)
             .map_err(|error| EprfsError::Storage(format!("method descriptor encoding: {error}")))?;
         Ok(BlobCid::compute(&bytes))
+    }
+
+    /// The family CID is the method CID with every `target.*` non-path input removed,
+    /// and nothing else removed. Two variants of one recipe differ only in `target.*`.
+    /// In particular, host tools, link inputs, flags and build environment stay in the family.
+    /// A descriptor without declared-target entries has its own method CID as its family CID.
+    /// This pure projection neither changes the descriptor nor resolves a foreign variant key.
+    pub fn family_cid(&self) -> Result<BlobCid> {
+        let mut family = self.clone();
+        family
+            .non_path_inputs
+            .retain(|name, _| !name.starts_with("target."));
+        family.cid()
     }
 
     pub fn view(&self) -> View {
@@ -964,6 +978,58 @@ mod tests {
         assert_eq!(a.cid().unwrap(), b.cid().unwrap());
         let c = descriptor(vec![tp("elohim/epr")]);
         assert_ne!(a.cid().unwrap(), c.cid().unwrap());
+    }
+
+    #[test]
+    fn family_cid_erases_only_target_inputs() {
+        let original = descriptor(vec![tp("doorway/doorway-service")]);
+        let family = original.cid().unwrap();
+        assert_eq!(original.family_cid().unwrap(), family);
+        let mut v2 = original.clone();
+        for name in ["arch", "isa", "os", "libc", "cflags", "sysroot"] {
+            v2.non_path_inputs
+                .insert(format!("target.{name}"), "v2".into());
+        }
+        v2.non_path_inputs
+            .insert("target.isa".into(), "x86-64-v2".into());
+        let mut v3 = v2.clone();
+        v3.non_path_inputs
+            .insert("target.isa".into(), "x86-64-v3".into());
+        assert_ne!(v2.cid().unwrap(), v3.cid().unwrap());
+        assert_eq!(v2.family_cid().unwrap(), family);
+        assert_eq!(v3.family_cid().unwrap(), family);
+        assert_eq!(v2.non_path_inputs.len(), 6); // Projection does not mutate the variant.
+        v2.non_path_inputs
+            .retain(|name, _| !name.starts_with("target."));
+        assert_eq!(v2.family_cid().unwrap(), original.family_cid().unwrap());
+
+        for name in [
+            "target",
+            "targeted.isa",
+            "RUSTFLAGS",
+            "CC",
+            "host-tools",
+            "link-inputs",
+        ] {
+            let mut changed = v3.clone();
+            changed
+                .non_path_inputs
+                .insert(name.into(), "changed".into());
+            assert_ne!(changed.family_cid().unwrap(), family, "{name}");
+        }
+        let mut changes = vec![v3.clone(); 9];
+        changes[0].tools.insert("cc".into(), "changed".into());
+        changes[1].flags.push("--target=other".into());
+        changes[2].view.push(tp("another/input"));
+        changes[3].name.push_str("-changed");
+        changes[4].params = Some(BlobCid::compute(b"params"));
+        changes[5].exec = Some(BlobCid::compute(b"exec"));
+        changes[6].step = None;
+        changes[7].embedder = Some("changed".into());
+        changes[8].deterministic = false;
+        for changed in changes {
+            assert_ne!(changed.family_cid().unwrap(), family);
+        }
     }
 
     #[test]

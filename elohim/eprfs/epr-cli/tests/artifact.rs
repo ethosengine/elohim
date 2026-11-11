@@ -21,6 +21,10 @@ use eprfs_core::{BlobCid, MethodDescriptor, TreePath};
 use eprfs_peer::{BlobMount, CrossingAllowList};
 use tempfile::TempDir;
 
+#[path = "support/artifact_elf.rs"]
+mod fixture;
+use fixture::artifact_elf;
+
 const HANDLE: &str = "matthew";
 const AGENT_ID: &str = "4f5e3d2c1b0a99887766554433221100ffeeddccbbaa00998877665544332211";
 
@@ -172,7 +176,14 @@ fn method_file_with(
     }
     let descriptor = MethodDescriptor {
         name: "mesh-build".into(),
-        tools: [("toolchain".to_string(), "1.96.1".to_string())].into(),
+        tools: [
+            ("toolchain".to_string(), "1.96.1".to_string()),
+            (
+                "rustc".to_string(),
+                "rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n".to_string(),
+            ),
+        ]
+        .into(),
         flags: vec!["--bin=elohim-storage".into(), "--profile=dev".into()],
         params: None,
         exec: None,
@@ -206,6 +217,8 @@ fn brit_stub(dir: &Path) -> (PathBuf, PathBuf) {
     .unwrap();
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+    wait_for_stub(&stub);
+    std::fs::remove_file(&log).unwrap();
     (stub, log)
 }
 
@@ -232,33 +245,67 @@ fn events(root: &Path) -> Vec<FlowEvent> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
+    put_and_mount(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn artifact_overridden_flags_store_the_keyed_method_and_mount() {
+    put_and_mount(true).await;
+}
+
+async fn put_and_mount(overridden: bool) {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
-    let (method, descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
+    if overridden {
+        descriptor.non_path_inputs.insert(
+            "CARGO_ENCODED_RUSTFLAGS".into(),
+            "-Clink-arg=-fuse-ld=lld".into(),
+        );
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), "-Clinker=/nonexistent/ignored".into());
+        std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    }
+    let command = || {
+        let mut command = a.command();
+        command.envs(descriptor.non_path_inputs.iter());
+        command
+    };
+    let mut effective = descriptor.clone();
+    if overridden {
+        effective.non_path_inputs.remove("RUSTFLAGS");
+        assert_ne!(effective.cid().unwrap(), descriptor.cid().unwrap());
+    }
+    let method_cid = effective.cid().unwrap();
     let (stub, log) = brit_stub(scratch.path());
     let bytes = scratch.path().join("elohim-storage");
-    let artifact: Vec<u8> = (0..700_000u32).map(|i| (i * 31 % 251) as u8).collect();
+    let mut artifact = artifact_elf(b"Linker: LLD 22.1.2\0");
+    artifact.extend((0..700_000u32).map(|i| (i * 31 % 251) as u8));
     std::fs::write(&bytes, &artifact).unwrap();
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
 
-    let out = a.epr(&[
-        "artifact", "key", "--method", &method, "--repo", &repo, "--json",
-    ]);
+    let out = command()
+        .args([
+            "artifact", "key", "--method", &method, "--repo", &repo, "--json",
+        ])
+        .output()
+        .unwrap();
     assert!(out.status.success(), "{}", text(&out));
     let key: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     let input = key["input"].as_str().unwrap().to_string();
     let key_cid = key["keyCid"].as_str().unwrap().to_string();
     assert_eq!(key["basis"], "basis-key:git-tree");
-    assert_eq!(key["method"], descriptor.cid().unwrap().to_string());
+    assert_eq!(key["method"], method_cid.to_string());
     assert!(
         key_cid.starts_with("bafyrei"),
         "the key is a DAG-CBOR CID: {key_cid}"
     );
 
     let put = |input: &str| {
-        a.command()
+        command()
             .env("BRIT_BUILD_REF_BIN", &stub)
             .args([
                 "artifact",
@@ -299,7 +346,7 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
         "--step mesh-build:elohim-storage".to_string(),
         format!("--inputs-hash {key_cid}"),
         format!("--output {output}"),
-        format!("--manifest {}", descriptor.cid().unwrap()),
+        format!("--manifest {method_cid}"),
         "--duration-ms 1234".to_string(),
     ] {
         assert!(build.contains(&part), "{part} in {build}");
@@ -355,6 +402,12 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
     .await
     .unwrap()
     .store;
+    let stored = store
+        .fetch_blob(&method_cid, eprfs_core::FetchPolicy::LocalOnly)
+        .await
+        .unwrap();
+    assert_eq!(BlobCid::compute(&stored.bytes).to_string(), key["method"]);
+    assert_eq!(stored.cid, effective.cid().unwrap());
     let (mount, _served) = BlobMount::new(store, did.clone());
     let indexed: Vec<_> = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
     let unindexed = mount.rebuild_from_flow(&indexed).await;
@@ -731,11 +784,9 @@ fn a_completion_for_another_request_is_never_accepted() {
 
 /// An executable `cc` in `dir` that answers `--version` with `version`.
 fn fake_cc(dir: &Path, version: &str) {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::create_dir_all(dir).unwrap();
-    let cc = dir.join("cc");
-    std::fs::write(&cc, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
-    std::fs::set_permissions(&cc, std::fs::Permissions::from_mode(0o755)).unwrap();
+    fake_tool(dir, "cc", &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac\n"
+    ));
 }
 
 #[test]
@@ -792,7 +843,7 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
     let (method, _) = method_file(scratch.path(), &["crate/src"]);
     let (stub, _log) = brit_stub(scratch.path());
     let bytes = scratch.path().join("elohim-storage");
-    std::fs::write(&bytes, b"a small built binary").unwrap();
+    std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
     let input = {
@@ -858,5 +909,1394 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
             .count(),
         1,
         "only the put that knew its store recorded"
+    );
+}
+
+/// A newly closed script can still report ETXTBSY on the workspace filesystem.
+fn wait_for_stub(path: &Path) {
+    for _ in 0..100 {
+        match Command::new(path).arg("--version").output() {
+            Ok(output) => {
+                assert!(output.status.success());
+                return;
+            }
+            Err(error) if error.raw_os_error() == Some(26) => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(error) => panic!("{}: {error}", path.display()),
+        }
+    }
+    panic!("{} stayed ETXTBSY", path.display());
+}
+
+fn fake_tool(dir: &Path, name: &str, body: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(dir).unwrap();
+    let file = dir.join(name);
+    std::fs::write(&file, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+    wait_for_stub(&file);
+}
+
+#[test]
+fn artifact_no_linker_selection_preserves_pre_k1_followup_key() {
+    let repo = checkout();
+    let scratch = TempDir::new().unwrap();
+    let (_, descriptor) = method_file(scratch.path(), &["crate/src"]);
+    let key = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    // Captured at dev 6b8006579 before the explicit-driver correction.
+    assert_eq!(
+        key.key_cid.to_string(),
+        "bafyreiccytmiybrzfdgsbctsti6jq3pmtflee4iadyezcxfaeng6d2wsvm"
+    );
+}
+
+#[test]
+fn artifact_unused_system_ld_does_not_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 1'");
+    let (_, first) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let second = first.clone();
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &first).unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2'");
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &second).unwrap();
+    assert_eq!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_explicit_driver_keys_default_ld_unless_bare_lld_selected() {
+    use elohim_epr_cli::artifact::{closure_key, ArtifactError};
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "gcc fixture");
+    let gcc = tools.path().join("gcc");
+    std::fs::copy(tools.path().join("cc"), &gcc).unwrap();
+    wait_for_stub(&gcc);
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", &format!("-Clinker={}", gcc.display())),
+        ],
+    );
+    let error = closure_key(repo.path(), &descriptor).unwrap_err();
+    assert!(matches!(error, ArtifactError::Gap(_)));
+    assert!(
+        error
+            .to_string()
+            .contains("external-linker=ld does not resolve under recorded PATH"),
+        "{error}"
+    );
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.42'");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+
+    descriptor.non_path_inputs.insert(
+        "RUSTFLAGS".into(),
+        format!("-Clinker={} -Clink-arg=-fuse-ld=lld", gcc.display()),
+    );
+    let bundled = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::remove_file(tools.path().join("ld")).unwrap();
+    assert_eq!(
+        bundled.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_put_explicit_driver_without_gnu_ld_witness_refuses_before_recording() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "gnu-ld");
+    let scratch = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "gcc fixture");
+    fake_tool(tools.path(), "ld", "echo 'GNU ld (GNU Binutils) 2.41'");
+    // CLI plumbing uses git, but the recorded build PATH contains only the fixture tools.
+    let build_path = tools.path().to_str().unwrap();
+    let flags = format!("-Clinker={}/cc", build_path);
+    let (method, descriptor) = method_file_with(
+        scratch.path(),
+        &["crate/src"],
+        &[("PATH", build_path), ("RUSTFLAGS", &flags)],
+    );
+    let key = elohim_epr_cli::artifact::closure_key(device.root(), &descriptor).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    // GNU ld preserves compiler comments but emits no linker identity.
+    std::fs::write(&bytes, artifact_elf(b"GCC: (GNU) 14.3.1\0")).unwrap();
+    let out = device
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .env(
+            "PATH",
+            format!("{build_path}:{}", std::env::var("PATH").unwrap()),
+        )
+        .env("RUSTFLAGS", &flags)
+        .args([
+            "artifact",
+            "put",
+            "--method",
+            method.to_str().unwrap(),
+            "--input",
+            &key.input.to_string(),
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--repo",
+            device.root().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out)
+            .contains("an external GNU ld leaves no linker witness; this build cannot be recorded"),
+        "{}",
+        text(&out)
+    );
+    assert!(!log.exists(), "refused before any brit call");
+    assert!(events(device.root()).is_empty());
+}
+
+#[test]
+fn artifact_link_input_bytes_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("Scrt1.o");
+    std::fs::write(&input, b"glibc 2.39-128").unwrap();
+    fake_tool(tools.path(), "cc", &format!(
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac",
+        input.display()
+    ));
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&input, b"glibc 2.39-145").unwrap();
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_cc_target_defaults_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let cc = |march| {
+        fake_tool(tools.path(), "cc", &format!(
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define {march} 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac"
+    ))
+    };
+    cc("__SSE2__");
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    cc("__AVX2__");
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_recorded_linker_version_moves_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    for (variable, value, tool) in [
+        ("RUSTFLAGS", "-C linker=ld", "ld"),
+        ("RUSTFLAGS", "-Clinker=ld", "ld"),
+        ("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "ld", "ld"),
+        ("RUSTFLAGS", "-C link-arg=-fuse-ld=bfd", "ld.bfd"),
+        ("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}linker=ld", "ld"),
+    ] {
+        fake_tool(tools.path(), tool, "case \"$1\" in\n--version) echo 'GNU ld 1' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${1#*=}\" ;;\nesac");
+        let (_, descriptor) = method_file_with(
+            tools.path(),
+            &["crate/src"],
+            &[("PATH", tools.path().to_str().unwrap()), (variable, value)],
+        );
+        let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+        fake_tool(tools.path(), tool, "case \"$1\" in\n--version) echo 'GNU ld 2' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${1#*=}\" ;;\nesac");
+        let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+        assert_ne!(before.key_cid, after.key_cid, "{variable}={value}");
+    }
+}
+
+#[test]
+fn artifact_put_checks_elf_linker_before_recording() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "linker");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    let rustc = Command::new("rustc").arg("-vV").output().unwrap();
+    assert!(rustc.status.success());
+    let rustc = String::from_utf8(rustc.stdout).unwrap();
+    let llvm = rustc
+        .lines()
+        .find_map(|line| line.strip_prefix("LLVM version: "))
+        .unwrap()
+        .to_string();
+    descriptor.tools.insert("rustc".into(), rustc);
+    std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let key = elohim_epr_cli::artifact::closure_key(device.root(), &descriptor).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    for comment in [
+        "Linker: GNU ld 2.41\0",
+        "Linker: LLD 0.0.0\0",
+        "GCC: 14.3.1\0",
+    ] {
+        std::fs::write(&bytes, artifact_elf(comment.as_bytes())).unwrap();
+        let out = device
+            .command()
+            .env("BRIT_BUILD_REF_BIN", &stub)
+            .args([
+                "artifact",
+                "put",
+                "--method",
+                method.to_str().unwrap(),
+                "--input",
+                &key.input.to_string(),
+                "--bytes",
+                bytes.to_str().unwrap(),
+                "--project",
+                "elohim-storage",
+                "--repo",
+                device.root().to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+        {
+            assert!(!log.exists(), "refused before any brit call");
+            assert!(events(device.root()).is_empty());
+            assert!(text(&out).contains("Linker"), "{}", text(&out));
+            if comment.starts_with("Linker:") {
+                assert!(
+                    text(&out).contains(&format!("LLD {llvm}")),
+                    "{}",
+                    text(&out)
+                );
+                assert!(
+                    text(&out).contains(comment.trim_end_matches('\0')),
+                    "{}",
+                    text(&out)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn artifact_put_refuses_a_declared_target_no_build_applies_yet() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "declared-target");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    descriptor
+        .non_path_inputs
+        .insert("target.isa".into(), "x86-64-v3".into());
+    std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
+    let out = device
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .args([
+            "artifact",
+            "put",
+            "--method",
+            method.to_str().unwrap(),
+            "--input",
+            "bafkreiaaaa",
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--repo",
+            device.root().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("target.isa"), "{}", text(&out));
+    assert!(text(&out).contains("K6"), "{}", text(&out));
+    assert!(!log.exists(), "refused before any brit call");
+    assert!(events(device.root()).is_empty());
+}
+
+fn fixture_driver(dir: &Path, name: &str, version: &str, macros: &str, input: &Path) {
+    fake_tool(dir, name, &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) test \"$*\" = '-E -dM -x c -' || exit 1; read ignored && exit 1; printf '%s\\n' '{macros}' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\n*) exit 1 ;;\nesac", input.display()
+    ));
+}
+
+#[test]
+fn artifact_link_driver_is_independent_of_cc() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup one").unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "driver one",
+        "#define __SSE2__ 1",
+        &input,
+    );
+    // A build-script compiler must never receive link-input probes.
+    fake_tool(tools.path(), "build-cc", "case \"$1\" in\n--version) echo 'build cc 1' ;;\n-E) echo '#define __SSE2__ 1' ;;\n*) exit 1 ;;\nesac");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap()), ("CC", "build-cc")],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&input, "startup two").unwrap();
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "build-cc", "case \"$1\" in\n--version) echo 'build cc 2' ;;\n-E) echo '#define __AVX2__ 1' ;;\n*) exit 1 ;;\nesac");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    fixture_driver(
+        tools.path(),
+        "selected-cc",
+        "selected driver",
+        "#define __BMI2__ 1",
+        &input,
+    );
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    for (variable, flags) in [
+        ("RUSTFLAGS", "-C linker=selected-cc"),
+        ("CARGO_ENCODED_RUSTFLAGS", "-Clinker=selected-cc"),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+            "-C linker=selected-cc",
+        ),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+            "selected-cc",
+        ),
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert(variable.into(), flags.into());
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        fake_cc(tools.path(), "unused cc changed");
+        assert_eq!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::write(&input, flags).unwrap();
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        descriptor.non_path_inputs.remove(variable);
+    }
+}
+
+#[test]
+fn artifact_unsupported_linker_selections_refuse_before_probing() {
+    use elohim_epr_cli::artifact::{closure_key, ArtifactError};
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(tools.path(), &["crate/src"], &[]);
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    descriptor
+        .flags
+        .push("--target=i686-unknown-linux-gnu".into());
+    for variable in [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+    ] {
+        for flag in [
+            "-Clink-self-contained=-linker",
+            "-C link-self-contained=no",
+            "-Zlinker-features=-lld",
+            "-Z linker-features=-lld",
+            "-Clinker-flavor=gcc",
+            "-C linker-flavor=gnu",
+        ] {
+            let value = if variable == "CARGO_ENCODED_RUSTFLAGS" {
+                flag.replace(' ', "\u{1f}")
+            } else {
+                flag.into()
+            };
+            descriptor.non_path_inputs.insert(variable.into(), value);
+            let error = closure_key(repo.path(), &descriptor).unwrap_err();
+            assert!(matches!(error, ArtifactError::Gap(_)));
+            assert!(
+                error
+                    .to_string()
+                    .contains("does not model that linker selection yet"),
+                "{error}"
+            );
+            assert!(
+                error
+                    .to_string()
+                    .contains(flag.split_whitespace().last().unwrap()),
+                "{error}"
+            );
+            descriptor.non_path_inputs.remove(variable);
+        }
+    }
+    descriptor
+        .non_path_inputs
+        .insert("crate".into(), "crate".into());
+    let config = repo.path().join("crate/.cargo/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    for setting in [
+        "linker = 'gcc'",
+        "rustflags = ['-C', 'link-self-contained=-linker']",
+        "rustflags = '-Zlinker-features=-lld'",
+        "rustflags = ['-Clinker-flavor=gcc']",
+        "rustflags = ['-Clinker=gcc']",
+        "rustflags = ['-C', 'link-arg=-fuse-ld=bfd']",
+    ] {
+        std::fs::write(&config, format!("[target.'cfg(unix)']\n{setting}\n")).unwrap();
+        let error = closure_key(repo.path(), &descriptor).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not model that linker selection yet"),
+            "{error}"
+        );
+        assert!(error.to_string().contains("target.cfg(unix)"), "{error}");
+    }
+    std::fs::write(
+        config,
+        "[target.'cfg(unix)']\nrustflags = ['-C', 'opt-level=2']\n",
+    )
+    .unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("cfg(unix)"));
+}
+
+#[test]
+fn artifact_bare_lld_uses_rustc_but_external_flavors_and_paths_are_keyed() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", "-Clinker=cc -C link-arg=-fuse-ld=lld"),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld.lld", "echo 'LLD unrelated 999'");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    for flavor in ["bfd", "gold", "mold"] {
+        descriptor.non_path_inputs.insert(
+            "RUSTFLAGS".into(),
+            format!("-Clinker=cc -C link-arg=-fuse-ld={flavor}"),
+        );
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("does not resolve"));
+        fake_tool(tools.path(), &format!("ld.{flavor}"), "echo 'linker 1'");
+        closure_key(repo.path(), &descriptor).unwrap();
+    }
+    let linker = tools.path().join("external-lld");
+    descriptor.non_path_inputs.insert(
+        "RUSTFLAGS".into(),
+        format!("-Clinker=cc -C link-arg=-fuse-ld={}", linker.display()),
+    );
+    fake_tool(tools.path(), "external-lld", "echo 'LLD 1'");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "external-lld", "echo 'LLD 2'");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_linker_script_referents_move_key_and_missing_or_deep_inputs_refuse() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let script = tools.path().join("input.so");
+    let nested = tools.path().join("nested.so");
+    let library = tools.path().join("library.so.1");
+    std::fs::write(
+        &script,
+        format!(
+            "/* GNU ld script /not/an/input */\nGROUP ( AS_NEEDED ( {} ) )",
+            nested.display()
+        ),
+    )
+    .unwrap();
+    std::fs::write(&nested, format!("INPUT ( {} )", library.display())).unwrap();
+    std::fs::write(&library, b"library one").unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "cc fixture",
+        "#define __SSE2__ 1",
+        &script,
+    );
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&library, b"library two").unwrap();
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    std::fs::remove_file(&library).unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("does not resolve"));
+    std::fs::write(&library, format!("INPUT ( {} )", script.display())).unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("depth 4"));
+}
+
+#[test]
+fn artifact_macro_order_is_stable_and_target_default_changes_move_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup").unwrap();
+    let macros = "#define __SSE2__ 1\n#define __BMI2__ 1";
+    fixture_driver(tools.path(), "cc", "clang fixture", macros, &input);
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "clang fixture",
+        "#define __BMI2__ 1\n#define __SSE2__ 1",
+        &input,
+    );
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "clang fixture",
+        "#define __AVX2__ 1",
+        &input,
+    );
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_native_build_env_excludes_unpassed_c_flags() {
+    for name in ["CFLAGS", "CXXFLAGS", "LDFLAGS"] {
+        assert!(!elohim_epr_cli::artifact::NATIVE_BUILD_ENV.contains(&name));
+    }
+}
+
+#[test]
+fn artifact_real_gcc_accepts_rustc_bundled_lld() {
+    let Ok(cc) = Command::new("cc").arg("--version").output() else {
+        eprintln!("SKIP: real cc is unavailable");
+        return;
+    };
+    if !cc.status.success() || !text(&cc).contains("Free Software Foundation") {
+        eprintln!("SKIP: real cc on PATH is not gcc");
+        return;
+    }
+    let Ok(rustc) = Command::new("rustup")
+        .args(["run", "1.96.1", "rustc", "-vV"])
+        .output()
+    else {
+        eprintln!("SKIP: rustup / rustc 1.96.1 is unavailable");
+        return;
+    };
+    if !rustc.status.success() {
+        eprintln!("SKIP: rustc 1.96.1 is not installed");
+        return;
+    }
+    let repo = checkout();
+    let scratch = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(
+        scratch.path(),
+        &["crate/src"],
+        &[
+            ("PATH", &std::env::var("PATH").unwrap()),
+            ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
+        ],
+    );
+    descriptor
+        .tools
+        .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
+    elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
+}
+
+#[test]
+fn artifact_codegen_long_form_keys_driver() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
+    fake_cc(tools.path(), "build cc");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    for flag in ["--codegen linker=chosen", "--codegen=linker=chosen"] {
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), flag.into());
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("chosen"));
+        fixture_driver(
+            tools.path(),
+            "chosen",
+            "driver 1",
+            "#define X 1",
+            &tools.path().join("input"),
+        );
+        std::fs::write(tools.path().join("input"), "one").unwrap();
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        std::fs::write(tools.path().join("input"), "two").unwrap();
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::remove_file(tools.path().join("chosen")).unwrap();
+    }
+}
+
+#[test]
+fn artifact_codegen_long_form_refuses_self_contained() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file(tools.path(), &["crate/src"]);
+    for flag in [
+        "--codegen link-self-contained=-linker",
+        "--codegen=link-self-contained=-linker",
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), flag.into());
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("link-self-contained"));
+    }
+}
+
+#[test]
+fn artifact_build_rustflags_refuse_unmodelled_selection() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(tools.path(), &["crate/src"], &[("crate", "crate")]);
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    std::fs::create_dir_all(repo.path().join("crate/.cargo")).unwrap();
+    std::fs::write(
+        repo.path().join("crate/.cargo/config.toml"),
+        "[build]\nrustflags = ['--codegen=link-self-contained=-linker']\n",
+    )
+    .unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("link-self-contained"));
+    // Even an empty present higher-priority source makes this config flag inactive.
+    descriptor
+        .non_path_inputs
+        .insert("RUSTFLAGS".into(), String::new());
+    closure_key(repo.path(), &descriptor).unwrap();
+}
+
+#[test]
+fn artifact_last_bundled_lld_clears_external_tool() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            (
+                "RUSTFLAGS",
+                "-C link-arg=-fuse-ld=bfd -C link-arg=-fuse-ld=lld",
+            ),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld.bfd", "echo 'GNU ld 999'");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_encoded_flags_ignore_overridden_rustflags_in_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}link-arg=-fuse-ld=lld"),
+            ("RUSTFLAGS", "--codegen=linker=/nonexistent/ignored"),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    descriptor.non_path_inputs.remove("RUSTFLAGS");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_other_target_linker_does_not_affect_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[(
+            "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER",
+            "/nonexistent/ignored",
+        )],
+    );
+    descriptor
+        .flags
+        .push("--target=x86_64-unknown-linux-gnu".into());
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    descriptor
+        .non_path_inputs
+        .remove("CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_explicit_driver_still_keys_implicit_cc_defaults_and_version() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup").unwrap();
+    fixture_driver(
+        tools.path(),
+        "driver",
+        "driver 1",
+        "#define DRIVER 1",
+        &input,
+    );
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", "-Clinker=driver"),
+        ],
+    );
+    assert!(!descriptor.non_path_inputs.contains_key("CC"));
+    let compiler = |version, macros| {
+        fake_tool(
+            tools.path(),
+            "cc",
+            &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '{macros}' ;;\n*) exit 1 ;;\nesac"
+    ),
+        )
+    };
+    compiler("cc 1", "#define DEFAULT 1");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    compiler("cc 1", "#define DEFAULT 2");
+    let defaults_changed = closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, defaults_changed.key_cid);
+    compiler("cc 2", "#define DEFAULT 2");
+    assert_ne!(
+        defaults_changed.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_underscore_link_args_key_external_path() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let external = tools.path().join("external-ld");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    for flags in [
+        format!("-Clink_arg=-fuse-ld={}", external.display()),
+        format!(
+            "--codegen=link_args=-fuse-ld=lld -fuse-ld={}",
+            external.display()
+        ),
+        format!(
+            "-Clink-arg=-fuse-ld=lld\x1f-C\x1flink_args=-fuse-ld=bfd -fuse-ld={}",
+            external.display()
+        ),
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert("CARGO_ENCODED_RUSTFLAGS".into(), flags);
+        fake_tool(tools.path(), "external-ld", "echo 'GNU ld 1'");
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        fake_tool(tools.path(), "external-ld", "echo 'GNU ld 2'");
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::remove_file(&external).unwrap();
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains(external.to_str().unwrap()));
+    }
+}
+
+#[test]
+fn holders_by_output_and_key_share_distinct_counts_and_advisory_warning() {
+    let (_keys, a, b) = household();
+    let key = BlobCid::compute(b"holder-key").to_string();
+    let other_key = BlobCid::compute(b"other-holder-key").to_string();
+    let output = BlobCid::compute_bytes(b"holder-output");
+    let manifest = BlobCid::compute(b"manifest").to_string();
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let row = produce_record(&key, &output, &manifest, Some(&a.key.did_key()));
+    store.append(FlowRecord::Event(row.clone())).unwrap();
+    let mut repeated = row;
+    repeated.occurred_at = "2026-11-09T10:00:00Z".into();
+    store.append(FlowRecord::Event(repeated)).unwrap();
+    let query = |flag: &str, value: &str, json: bool| {
+        let mut args = vec![
+            "artifact",
+            "holders",
+            flag,
+            value,
+            "--repo",
+            b.root().to_str().unwrap(),
+        ];
+        if json {
+            args.push("--json");
+        }
+        b.epr(&args)
+    };
+    let by_key = query("--key", &key, true);
+    let by_output = query("--output", &output.to_string(), true);
+    assert!(by_key.status.success(), "{}", text(&by_key));
+    assert!(by_output.status.success(), "{}", text(&by_output));
+    let one: serde_json::Value = serde_json::from_slice(&by_key.stdout).unwrap();
+    assert_eq!(
+        one,
+        serde_json::from_slice::<serde_json::Value>(&by_output.stdout).unwrap()
+    );
+    assert_eq!(one["holders"].as_array().unwrap().len(), 1);
+    assert_eq!(one["belowMin"], true);
+    let warning = query("--output", &output.to_string(), false);
+    assert!(warning.status.success());
+    assert_eq!(
+        String::from_utf8(warning.stderr).unwrap().trim(),
+        format!("warning: 1 holder(s) of {output}, fewer than 2")
+    );
+    // Local, uncrossed Produce is custody too; another key by the same device is not another holder.
+    let mut local = produce_record(&key, &output, &manifest, None);
+    local.receiver = AgentRef(b.key.did_key());
+    local
+        .classified_as
+        .retain(|s| !s.starts_with("measure:") && !s.starts_with("reason:"));
+    store.append(FlowRecord::Event(local)).unwrap();
+    store
+        .append(FlowRecord::Event(produce_record(
+            &other_key,
+            &output,
+            &manifest,
+            Some(&a.key.did_key()),
+        )))
+        .unwrap();
+    let two = query("--output", &output.to_string(), true);
+    let two: serde_json::Value = serde_json::from_slice(&two.stdout).unwrap();
+    assert_eq!(two["holders"].as_array().unwrap().len(), 2);
+    assert_eq!(two["belowMin"], false);
+    for holder in two["holders"].as_array().unwrap() {
+        assert_eq!(holder["self"], holder["device"] == b.key.did_key());
+    }
+    let marked = query("--output", &output.to_string(), false);
+    assert!(String::from_utf8_lossy(&marked.stdout)
+        .contains(&format!("{} {output} self", b.key.did_key())));
+    let by_key = query("--key", &key, true);
+    assert_eq!(
+        two,
+        serde_json::from_slice::<serde_json::Value>(&by_key.stdout).unwrap()
+    );
+    let quiet = query("--output", &output.to_string(), false);
+    assert!(quiet.status.success());
+    assert!(!String::from_utf8_lossy(&quiet.stderr).contains("warning:"));
+    let higher = b.epr(&[
+        "artifact",
+        "holders",
+        "--output",
+        &output.to_string(),
+        "--min",
+        "3",
+        "--repo",
+        b.root().to_str().unwrap(),
+    ]);
+    assert!(higher.status.success());
+    assert!(String::from_utf8_lossy(&higher.stderr).contains("fewer than 3"));
+    // Later production under the same key retains A's older output in either lookup.
+    let newer = BlobCid::compute_bytes(b"newer-holder-output");
+    store
+        .append(FlowRecord::Event(produce_record(
+            &key,
+            &newer,
+            &manifest,
+            Some(&a.key.did_key()),
+        )))
+        .unwrap();
+    let retained = query("--output", &output.to_string(), true);
+    assert!(retained.status.success());
+    assert_eq!(
+        two,
+        serde_json::from_slice::<serde_json::Value>(&retained.stdout).unwrap()
+    );
+    let by_key = query("--key", &key, true);
+    let by_key: serde_json::Value = serde_json::from_slice(&by_key.stdout).unwrap();
+    assert_eq!(by_key["holders"].as_array().unwrap().len(), 3);
+    let absent = BlobCid::compute_bytes(b"absent");
+    let zero = query("--output", &absent.to_string(), true);
+    assert!(zero.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&zero.stdout).unwrap()["outputs"][0]["count"],
+        0
+    );
+    assert!(!b
+        .epr(&[
+            "artifact",
+            "holders",
+            "--key",
+            &key,
+            "--output",
+            &output.to_string()
+        ])
+        .status
+        .success());
+    assert!(!b
+        .epr(&["artifact", "holders", "--output", "invalid-cid"])
+        .status
+        .success());
+}
+
+#[test]
+fn fetch_plurality_queues_only_chosen_holders_and_records_divergence_once() {
+    use eprfs_peer::{FetchDone, FetchFor, FetchRequest};
+    use std::time::{Duration, Instant};
+    let (keys, a, b) = household();
+    let c = Device::new(&keys, "c");
+    let d = Device::new(&keys, "d");
+    for device in [&c, &d] {
+        let request = device_enroll(a.root(), HANDLE, &device.key).unwrap();
+        let authorization =
+            device_authorize(a.root(), &serde_json::to_string(&request).unwrap(), &a.key).unwrap();
+        device_bind(
+            a.root(),
+            &serde_json::to_string(&authorization).unwrap(),
+            &device.key,
+        )
+        .unwrap();
+        device_endpoint(a.root(), None, &device.node_id(), &device.key).unwrap();
+    }
+    let roster = format!(".eprfs/status/participants/{HANDLE}.jsonl");
+    std::fs::copy(a.root().join(&roster), b.root().join(&roster)).unwrap();
+    let scratch = TempDir::new().unwrap();
+    let (method, descriptor) = method_file(scratch.path(), &["crate"]);
+    let key_result = b
+        .command()
+        .envs(descriptor.non_path_inputs.iter())
+        .args([
+            "artifact",
+            "key",
+            "--method",
+            method.to_str().unwrap(),
+            "--repo",
+            b.root().to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(key_result.status.success(), "{}", text(&key_result));
+    let key = serde_json::from_slice::<serde_json::Value>(&key_result.stdout).unwrap()["keyCid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let x = BlobCid::compute_bytes(b"majority");
+    let y = BlobCid::compute_bytes(b"minority");
+    let manifest = BlobCid::compute(b"manifest");
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    for (device, output) in [(&a, &x), (&c, &x), (&d, &y)] {
+        store
+            .append(FlowRecord::Event(produce_record(
+                &key,
+                output,
+                &manifest.to_string(),
+                Some(&device.key.did_key()),
+            )))
+            .unwrap();
+    }
+    let peer_dir = b.config.path().join("epr/peer");
+    let _lock = elohim_epr_cli::peer::ServeLock::acquire(&peer_dir).unwrap();
+    let queue = eprfs_peer::fetch_queue_dir(&peer_dir);
+    eprfs_peer::ensure_queue_dir(&queue).unwrap();
+    let expected_devices: std::collections::BTreeSet<_> = [a.key.did_key(), c.key.did_key()].into();
+    let own_devices: std::collections::BTreeSet<_> = [a.key.did_key(), d.key.did_key()].into();
+    let expected_requests = [
+        (x.clone(), expected_devices.clone(), None),
+        (x.clone(), expected_devices.clone(), None),
+        (x.clone(), expected_devices, Some(x.clone())),
+        (y.clone(), own_devices, None),
+    ];
+    let later_manifest = manifest.to_string();
+    let worker = std::thread::spawn(move || {
+        // Exercise the CLI/daemon queue boundary. The peer transport test independently moves
+        // actual bytes from this same selection, including proving the divergent holder is idle.
+        for (selected, expected_devices, expected_output) in expected_requests {
+            let started = Instant::now();
+            let (path, request) = loop {
+                let found = std::fs::read_dir(&queue)
+                    .unwrap()
+                    .filter_map(Result::ok)
+                    .find_map(|entry| {
+                        let path = entry.path();
+                        // Only a renamed `<stem>.json` is a queued request. The CLI writes it
+                        // through a sibling `<stem>.tmp-…` and renames; claiming (and deleting)
+                        // the temporary raced that rename and failed the fetch with ENOENT
+                        // whenever the worker scanned between the write and the rename.
+                        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                            return None;
+                        }
+                        let request =
+                            serde_json::from_slice::<FetchRequest>(&std::fs::read(&path).ok()?)
+                                .ok()?;
+                        Some((path, request))
+                    });
+                if let Some(found) = found {
+                    break found;
+                }
+                assert!(
+                    started.elapsed() < Duration::from_secs(30),
+                    "request queued"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            };
+            assert_eq!(request.output, selected);
+            assert_eq!(request.expect_output, expected_output);
+            assert_eq!(
+                request
+                    .holders
+                    .iter()
+                    .map(|h| h.device.clone())
+                    .collect::<std::collections::BTreeSet<_>>(),
+                expected_devices
+            );
+            std::fs::remove_file(path).unwrap();
+            eprfs_peer::write_queue_file(
+                &eprfs_peer::fetch_done_path(&queue, &request.stem()),
+                &FetchDone::Installed {
+                    for_request: FetchFor::of(&request),
+                    manifest: manifest.clone(),
+                    manifest_from: request.holders[0].device.clone(),
+                    fetched_from: vec![request.holders[0].device.clone()],
+                    chunks_fetched: 1,
+                    chunks_resumed: 0,
+                    bytes_fetched: 8,
+                    wasted: 0,
+                    seconds: 0.01,
+                },
+            )
+            .unwrap();
+        }
+    });
+    for rule in ["plurality", "plurality", "expected", "own"] {
+        if rule == "expected" {
+            // A's later Y does not erase its X custody: --expect-output X still queues A.
+            store
+                .append(FlowRecord::Event(produce_record(
+                    &key,
+                    &y,
+                    &later_manifest,
+                    Some(&a.key.did_key()),
+                )))
+                .unwrap();
+        }
+        if rule == "own" {
+            let mut own = produce_record(
+                &key,
+                &y,
+                &BlobCid::compute(b"own-manifest").to_string(),
+                None,
+            );
+            own.receiver = AgentRef(b.key.did_key());
+            own.classified_as
+                .retain(|slot| !slot.starts_with("measure:") && !slot.starts_with("reason:"));
+            store.append(FlowRecord::Event(own)).unwrap();
+        }
+        let mut command = b.command();
+        command.envs(descriptor.non_path_inputs.iter()).args([
+            "artifact",
+            "fetch",
+            "--method",
+            method.to_str().unwrap(),
+            "--dest",
+            scratch.path().join("binary").to_str().unwrap(),
+            "--repo",
+            b.root().to_str().unwrap(),
+        ]);
+        if rule == "expected" {
+            command.args(["--expect-output", &x.to_string()]);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{}", text(&out));
+        let said = String::from_utf8_lossy(&out.stdout);
+        assert_eq!(
+            said.lines()
+                .filter(|line| line.starts_with("divergence:"))
+                .count(),
+            1
+        );
+        assert!(said.contains(&format!("rule {rule}")), "{said}");
+        let observations: Vec<_> = events(b.root())
+            .into_iter()
+            .filter(|e| e.classified_as.contains(&"env:kind=divergence".into()))
+            .collect();
+        assert_eq!(observations.len(), 1);
+        let observation = &observations[0];
+        assert_eq!(observation.action, ReaVerb::Cite);
+        let mut outputs = [x.to_string(), y.to_string()];
+        outputs.sort();
+        for tag in [
+            format!("env:key={key}"),
+            format!("env:outputs={}", outputs.join(",")),
+            format!("env:chosen={x}"),
+            "env:rule=plurality".into(),
+        ] {
+            assert!(observation.classified_as.contains(&tag), "{tag}");
+        }
+    }
+    worker.join().unwrap();
+}
+
+#[test]
+fn daemon_install_refusal_records_and_prints_no_divergence() {
+    use std::time::{Duration, Instant};
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let (method, descriptor) = method_file(scratch.path(), &["crate"]);
+    let result = b
+        .command()
+        .envs(descriptor.non_path_inputs.iter())
+        .args([
+            "artifact",
+            "key",
+            "--method",
+            method.to_str().unwrap(),
+            "--repo",
+            b.root().to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(result.status.success(), "{}", text(&result));
+    let key = serde_json::from_slice::<serde_json::Value>(&result.stdout).unwrap()["keyCid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let x = BlobCid::compute_bytes(b"remote-output");
+    let y = BlobCid::compute_bytes(b"local-only-output");
+    let manifest = BlobCid::compute(b"manifest").to_string();
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let mut own = produce_record(&key, &y, &manifest, None);
+    own.receiver = AgentRef(b.key.did_key());
+    own.classified_as
+        .retain(|s| !s.starts_with("measure:") && !s.starts_with("reason:"));
+    store.append(FlowRecord::Event(own)).unwrap();
+
+    let policy = scratch.path().join("policy.json");
+    std::fs::write(
+        &policy,
+        r#"{"berth":{"channel":{"crosses":{"artifact-produce@1":["produce"]}}}}"#,
+    )
+    .unwrap();
+    let allowed = scratch.path().join("allowed");
+    std::fs::create_dir(&allowed).unwrap();
+    let log = scratch.path().join("daemon.log");
+    // Only this test's child is stopped, including on an assertion failure.
+    struct Daemon(std::process::Child);
+    impl Drop for Daemon {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let mut daemon = Daemon(
+        b.command()
+            .args([
+                "peer",
+                "serve",
+                "--root",
+                b.root().to_str().unwrap(),
+                "--policy",
+                policy.to_str().unwrap(),
+                "--listen",
+                "127.0.0.1:0",
+                "--install-root",
+                allowed.to_str().unwrap(),
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::fs::File::create(&log).unwrap())
+            .spawn()
+            .unwrap(),
+    );
+    let peer_dir = b.config.path().join("epr/peer");
+    let started = Instant::now();
+    loop {
+        assert!(
+            daemon.0.try_wait().unwrap().is_none(),
+            "{}",
+            std::fs::read_to_string(&log).unwrap()
+        );
+        if eprfs_peer::queue_dir_is_private(&eprfs_peer::fetch_queue_dir(&peer_dir))
+            && elohim_epr_cli::peer::ServeLock::held(&peer_dir) == Some(true)
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "daemon ready: {}",
+            std::fs::read_to_string(&log).unwrap()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let dest = scratch.path().join("outside");
+    let fetch = || {
+        b.command()
+            .envs(descriptor.non_path_inputs.iter())
+            .args([
+                "artifact",
+                "fetch",
+                "--method",
+                method.to_str().unwrap(),
+                "--repo",
+                b.root().to_str().unwrap(),
+                "--dest",
+                dest.to_str().unwrap(),
+                "--stall",
+                "1",
+                "--total",
+                "1",
+            ])
+            .output()
+            .unwrap()
+    };
+    let local_only = fetch();
+    assert!(!local_only.status.success());
+    assert!(
+        text(&local_only).contains("local-only-custody"),
+        "{}",
+        text(&local_only)
+    );
+    assert!(text(&local_only).contains(&y.to_string()));
+    // Rule (b) cannot select local-only Y. X is now the remote plurality, but installation refuses.
+    store
+        .append(FlowRecord::Event(produce_record(
+            &key,
+            &x,
+            &manifest,
+            Some(&a.key.did_key()),
+        )))
+        .unwrap();
+    let refused = fetch();
+    assert!(!refused.status.success());
+    assert!(
+        text(&refused).contains("install-refused"),
+        "{}",
+        text(&refused)
+    );
+    assert!(
+        text(&refused).contains("outside this daemon's install roots"),
+        "{}",
+        text(&refused)
+    );
+    assert!(!text(&refused).contains("divergence:"));
+    assert!(!dest.exists());
+    assert_eq!(
+        events(b.root())
+            .iter()
+            .filter(|e| e.classified_as.contains(&"env:kind=divergence".into()))
+            .count(),
+        0
     );
 }
