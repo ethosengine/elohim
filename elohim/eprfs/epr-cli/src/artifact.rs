@@ -301,12 +301,9 @@ const BENIGN_BUILD_ENV: [&str; 7] = [
 ];
 
 /// The native toolchain variables a mesh build passes to cargo; `describe` records each one set.
-pub const NATIVE_BUILD_ENV: [&str; 12] = [
+pub const NATIVE_BUILD_ENV: [&str; 9] = [
     "CC",
     "CXX",
-    "CFLAGS",
-    "CXXFLAGS",
-    "LDFLAGS",
     "AR",
     "LIBCLANG_PATH",
     "PKG_CONFIG_PATH",
@@ -529,7 +526,10 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
     };
     let content = |path: &Path| -> ArtifactResult<Option<String>> {
         match std::fs::read(path) {
-            Ok(bytes) => Ok(Some(BlobCid::compute_bytes(&bytes).to_string())),
+            Ok(bytes) => {
+                host::check_cargo_config(path, &bytes)?;
+                Ok(Some(BlobCid::compute_bytes(&bytes).to_string()))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(ArtifactError::Gap(format!(
                 "the cargo configuration {} does not read: {e}",

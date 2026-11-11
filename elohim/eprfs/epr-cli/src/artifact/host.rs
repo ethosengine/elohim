@@ -1,8 +1,7 @@
 //! Host inputs observed before a build, and the linker witness checked before recording it.
 
-use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use object::{Object, ObjectSection};
 
@@ -24,6 +23,7 @@ const LINK_INPUTS: [&str; 10] = [
 fn probe(tool: &Path, args: &[&str], path: &str) -> ArtifactResult<Output> {
     let output = Command::new(tool)
         .args(args)
+        .stdin(Stdio::null())
         .env_clear()
         .env("PATH", path)
         .env("LANG", "C")
@@ -50,112 +50,153 @@ fn output_bytes(output: Output) -> Vec<u8> {
     [output.stdout, output.stderr].concat()
 }
 
-/// Only recorded selections name system linkers. The ordinary rustc linker is accounted for by
-/// its recorded compiler identity, not by whichever `ld` happens to be on PATH.
-fn selected_linkers(descriptor: &MethodDescriptor) -> BTreeMap<String, String> {
-    let mut selected = BTreeMap::new();
-    for (name, value) in &descriptor.non_path_inputs {
-        if name.starts_with("CARGO_TARGET_") && name.ends_with("_LINKER") {
-            selected.insert(name.clone(), value.clone());
-        }
-        if name == "RUSTFLAGS"
-            || name == "CARGO_ENCODED_RUSTFLAGS"
-            || name.ends_with("_RUSTFLAGS")
-            || name == "CFLAGS"
-            || name == "CXXFLAGS"
-            || name == "LDFLAGS"
+mod selections;
+pub(super) use selections::check_cargo_config;
+
+fn tool_version(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
+    let version = BlobCid::compute_bytes(&output_bytes(probe(tool, &["--version"], path)?));
+    lines.push_str(&format!("tool:{label}\t{}\t{version}\n", tool.display()));
+    Ok(())
+}
+
+fn driver_defaults(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
+    let output = probe(tool, &["-E", "-dM", "-x", "c", "-"], path)?;
+    let macros = String::from_utf8(output.stdout).map_err(|e| {
+        ArtifactError::Gap(format!("{} macro dump is not UTF-8: {e}", tool.display()))
+    })?;
+    let mut macros: Vec<_> = macros.lines().collect();
+    macros.sort_unstable();
+    let defaults = BlobCid::compute_bytes(macros.join("\n").as_bytes());
+    lines.push_str(&format!(
+        "tool:{label}:target\t{}\t{defaults}\n",
+        tool.display()
+    ));
+    Ok(())
+}
+
+fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> ArtifactResult<()> {
+    if depth > 4 {
+        return Err(ArtifactError::Gap(format!(
+            "link input {label}: linker script recursion exceeds depth 4"
+        )));
+    }
+    let resolved = std::fs::canonicalize(file).map_err(|e| {
+        ArtifactError::Gap(format!(
+            "link input {label} at {} does not resolve: {e}",
+            file.display()
+        ))
+    })?;
+    let bytes = std::fs::read(&resolved).map_err(|e| {
+        ArtifactError::Gap(format!(
+            "link input {label} at {} does not read: {e}",
+            resolved.display()
+        ))
+    })?;
+    lines.push_str(&format!(
+        "link:{label}\t{}\t{}\n",
+        resolved.display(),
+        BlobCid::compute_bytes(&bytes)
+    ));
+    if let Ok(text) = std::str::from_utf8(&bytes) {
+        if text.contains("GROUP") || text.contains("INPUT") || text.starts_with("/* GNU ld script")
         {
-            let mut codegen = false;
-            for word in value.split(|c: char| c.is_whitespace() || c == '\u{1f}') {
-                if let Some(linker) = word
-                    .strip_prefix("-Clinker=")
-                    .or_else(|| codegen.then(|| word.strip_prefix("linker=")).flatten())
-                {
-                    selected.insert(format!("{name}:linker"), linker.to_string());
-                }
-                if let Some((_, linker)) = word.split_once("-fuse-ld=") {
-                    let linker = if linker.contains('/') || linker.starts_with("ld") {
-                        linker.to_string()
-                    } else {
-                        format!("ld.{linker}")
-                    };
-                    selected.insert(format!("{name}:fuse-ld"), linker);
-                }
-                codegen = word == "-C";
+            // Remove C comments before looking for paths; paths in explanatory prose are not inputs.
+            let mut uncommented = String::new();
+            let mut rest = text;
+            while let Some((before, comment)) = rest.split_once("/*") {
+                uncommented.push_str(before);
+                uncommented.push(' ');
+                rest = comment.split_once("*/").map_or("", |(_, tail)| tail);
+            }
+            uncommented.push_str(rest);
+            let referents: std::collections::BTreeSet<_> = uncommented
+                .split(|c: char| {
+                    c.is_whitespace() || matches!(c, '(' | ')' | ',' | ';' | '\'' | '"')
+                })
+                .filter(|word| word.starts_with('/'))
+                .collect();
+            for referent in referents {
+                link_input(
+                    lines,
+                    &format!("{label}>{referent}"),
+                    Path::new(referent),
+                    depth + 1,
+                )?;
             }
         }
     }
-    selected
+    Ok(())
 }
 
-/// Canonical tool paths and output CIDs under the recorded PATH, plus the driver's target defaults
-/// and link input bytes. A driver echoing an unresolved input name contributes an explicit `-`.
+/// Probe the final-link driver independently of the build-script C compiler. All recorded driver
+/// selections must resolve to the same executable; conflicting targets need a target-aware key.
 pub(super) fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String> {
+    let selections = selections::selected(descriptor)?;
     let Some(path) = descriptor.non_path_inputs.get(PATH_INPUT) else {
-        return Ok(String::new());
-    };
-    let (label, cc) = descriptor
-        .non_path_inputs
-        .get("CC")
-        .map_or(("cc", "cc"), |cc| ("CC", cc.as_str()));
-    let mut names = selected_linkers(descriptor);
-    names.insert(label.to_string(), cc.to_string());
-    let mut lines = String::new();
-    for (label, name) in names {
-        let Some(resolved) = resolve_tool(&name, path) else {
-            if label != "cc" && label != "CC" {
-                return Err(ArtifactError::Gap(format!(
-                    "selected linker {label}={name} does not resolve under recorded PATH"
-                )));
-            }
-            lines.push_str(&format!("tool:{label}\t-\n"));
-            continue;
-        };
-        let version =
-            BlobCid::compute_bytes(&output_bytes(probe(&resolved, &["--version"], path)?));
-        lines.push_str(&format!(
-            "tool:{label}\t{}\t{version}\n",
-            resolved.display()
-        ));
-        if label != "cc" && label != "CC" {
-            continue;
-        }
-        let defaults = BlobCid::compute_bytes(&output_bytes(probe(
-            &resolved,
-            &["-Q", "--help=target"],
-            path,
-        )?));
-        lines.push_str(&format!(
-            "tool:{label}:target\t{}\t{defaults}\n",
-            resolved.display()
-        ));
-        for input in LINK_INPUTS {
-            let output = probe(&resolved, &[&format!("-print-file-name={input}")], path)?;
-            let file = String::from_utf8(output.stdout).map_err(|e| {
-                ArtifactError::Gap(format!("{cc} returned a non-UTF-8 path for {input}: {e}"))
-            })?;
-            let file = file.trim();
-            if file == input {
-                lines.push_str(&format!("link:{input}\t-\n"));
-                continue;
-            }
-            let resolved = std::fs::canonicalize(file).map_err(|e| {
-                ArtifactError::Gap(format!(
-                    "link input {input} at {file} does not resolve: {e}"
-                ))
-            })?;
-            let bytes = std::fs::read(&resolved).map_err(|e| {
-                ArtifactError::Gap(format!(
-                    "link input {input} at {} does not read: {e}",
-                    resolved.display()
-                ))
-            })?;
-            lines.push_str(&format!(
-                "link:{input}\t{}\t{}\n",
-                resolved.display(),
-                BlobCid::compute_bytes(&bytes)
+        if !selections.drivers.is_empty() || !selections.linkers.is_empty() {
+            return Err(ArtifactError::Gap(
+                "selected linker has no recorded PATH".into(),
             ));
         }
+        return Ok(String::new());
+    };
+    let mut driver = None;
+    for (label, name) in &selections.drivers {
+        let resolved = resolve_tool(name, path).ok_or_else(|| {
+            ArtifactError::Gap(format!(
+                "selected linker {label}={name} does not resolve under recorded PATH"
+            ))
+        })?;
+        if driver
+            .as_ref()
+            .is_some_and(|previous| previous != &resolved)
+        {
+            return Err(ArtifactError::Gap(
+                "conflicting link drivers: the key does not model that linker selection yet".into(),
+            ));
+        }
+        driver = Some(resolved);
+    }
+    let driver = driver.or_else(|| resolve_tool("cc", path));
+    let mut lines = String::new();
+    if let Some(driver) = &driver {
+        tool_version(&mut lines, "link-driver", driver, path)?;
+        driver_defaults(&mut lines, "link-driver", driver, path)?;
+        for input in LINK_INPUTS {
+            let output = probe(driver, &[&format!("-print-file-name={input}")], path)?;
+            let file = String::from_utf8(output.stdout).map_err(|e| {
+                ArtifactError::Gap(format!(
+                    "{} returned a non-UTF-8 path for {input}: {e}",
+                    driver.display()
+                ))
+            })?;
+            if file.trim() == input {
+                lines.push_str(&format!("link:{input}\t-\n"));
+            } else {
+                link_input(&mut lines, input, Path::new(file.trim()), 0)?;
+            }
+        }
+    } else {
+        lines.push_str("tool:link-driver\t-\n");
+    }
+    if let Some(cc) = descriptor.non_path_inputs.get("CC") {
+        let cc = resolve_tool(cc, path).ok_or_else(|| {
+            ArtifactError::Gap(format!(
+                "build-script C compiler CC={cc} does not resolve under recorded PATH"
+            ))
+        })?;
+        if driver.as_ref() != Some(&cc) {
+            tool_version(&mut lines, "CC", &cc, path)?;
+            driver_defaults(&mut lines, "CC", &cc, path)?;
+        }
+    }
+    for (label, name) in selections.linkers {
+        let resolved = resolve_tool(&name, path).ok_or_else(|| {
+            ArtifactError::Gap(format!(
+                "selected linker {label}={name} does not resolve under recorded PATH"
+            ))
+        })?;
+        tool_version(&mut lines, &label, &resolved, path)?;
     }
     Ok(lines)
 }
@@ -181,7 +222,18 @@ fn linker_identity(text: &str) -> Option<(&str, &str)> {
 /// Read only ELF section bytes. Missing, malformed or unaccounted linker evidence refuses before
 /// `put` writes an attestation or a custody record; an old descriptor must be described again.
 pub(super) fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> ArtifactResult<()> {
-    let elf = object::read::elf::ElfFile64::<object::Endianness>::parse(bytes).map_err(|e| {
+    let selections = selections::selected(descriptor)?;
+    let kind = object::FileKind::parse(bytes).map_err(|e| {
+        ArtifactError::Gap(format!(
+            "artifact format does not read: {e}; no .comment Linker line"
+        ))
+    })?;
+    if !matches!(kind, object::FileKind::Elf32 | object::FileKind::Elf64) {
+        return Err(ArtifactError::Gap(format!(
+            "artifact format {kind:?} is not ELF"
+        )));
+    }
+    let elf = object::File::parse(bytes).map_err(|e| {
         ArtifactError::Gap(format!(
             "artifact ELF does not read: {e}; no .comment Linker line"
         ))
@@ -195,7 +247,14 @@ pub(super) fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> Artif
         .split(|byte| *byte == 0)
         .filter_map(|bytes| std::str::from_utf8(bytes).ok())
         .flat_map(str::lines)
-        .filter_map(|line| line.strip_prefix("Linker: "))
+        .filter_map(|line| {
+            line.strip_prefix("Linker: ").or_else(|| {
+                ["mold ", "GNU gold ", "GNU ld "]
+                    .iter()
+                    .any(|prefix| line.starts_with(prefix))
+                    .then_some(line)
+            })
+        })
         .collect();
     if observed.is_empty() {
         return Err(ArtifactError::Gap(
@@ -212,10 +271,10 @@ pub(super) fn check_linker(descriptor: &MethodDescriptor, bytes: &[u8]) -> Artif
         })
         .map(str::trim);
     let mut accounted = Vec::new();
-    if let Some(version) = llvm.filter(|v| !v.is_empty()) {
+    if let Some(version) = llvm.filter(|v| !v.is_empty() && !selections.external) {
         accounted.push(format!("LLD {version} (rustc LLVM)"));
     }
-    for (label, name) in selected_linkers(descriptor) {
+    for (label, name) in selections.linkers {
         let path = descriptor.non_path_inputs.get(PATH_INPUT).ok_or_else(|| {
             ArtifactError::Gap(format!(
                 "selected linker {label}={name} has no recorded PATH"
@@ -258,6 +317,90 @@ mod fixture;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+
+    fn descriptor() -> MethodDescriptor {
+        MethodDescriptor {
+            name: "mesh-build".into(),
+            tools: [("rustc".into(), "LLVM version: 22.1.2".into())].into(),
+            flags: vec![],
+            params: None,
+            exec: None,
+            step: None,
+            embedder: None,
+            view: vec![],
+            non_path_inputs: BTreeMap::new(),
+            deterministic: false,
+        }
+    }
+
+    #[test]
+    fn artifact_elf_class_and_endian_are_generic_and_other_formats_refuse_by_name() {
+        for is64 in [false, true] {
+            for little in [false, true] {
+                let bytes = fixture::artifact_elf_format(b"Linker: LLD 22.1.2\0", is64, little);
+                check_linker(&descriptor(), &bytes).unwrap();
+            }
+        }
+        let mut macho = vec![0; 32];
+        macho[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+        let error = check_linker(&descriptor(), &macho).unwrap_err();
+        assert!(error.to_string().contains("MachO64 is not ELF"), "{error}");
+    }
+
+    #[test]
+    fn artifact_actual_linker_comment_formats_and_bundled_lld_authority() {
+        use std::os::unix::fs::PermissionsExt;
+        let tools = tempfile::tempdir().unwrap();
+        let linker = tools.path().join("selected-linker");
+        let mut descriptor = descriptor();
+        descriptor
+            .non_path_inputs
+            .insert(PATH_INPUT.into(), tools.path().to_string_lossy().into());
+        for (version, comment) in [
+            (
+                "mold 2.40.0 (compatible with GNU ld)",
+                "mold 2.40.0 (compatible with GNU ld)",
+            ),
+            (
+                "GNU gold (GNU Binutils 2.41) 1.16",
+                "GNU gold (GNU Binutils 2.41) 1.16",
+            ),
+            ("GNU ld (GNU Binutils) 2.41", "GNU ld (GNU Binutils) 2.41"),
+        ] {
+            std::fs::write(&linker, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
+            std::fs::set_permissions(&linker, std::fs::Permissions::from_mode(0o755)).unwrap();
+            descriptor.non_path_inputs.insert(
+                "RUSTFLAGS".into(),
+                format!("-C link-arg=-fuse-ld={}", linker.display()),
+            );
+            check_linker(&descriptor, &fixture::artifact_elf(comment.as_bytes())).unwrap();
+            let bundled = fixture::artifact_elf(b"Linker: LLD 22.1.2\0");
+            assert!(
+                check_linker(&descriptor, &bundled).is_err(),
+                "external selection cannot authorize bundled LLD"
+            );
+        }
+        for flags in [
+            "",
+            "-C link-arg=-fuse-ld=lld",
+            "-C linker=gcc",
+            "-Clinker=gcc -C link-arg=-fuse-ld=lld",
+        ] {
+            descriptor
+                .non_path_inputs
+                .insert("RUSTFLAGS".into(), flags.into());
+            check_linker(&descriptor, &fixture::artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
+        }
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), "-Clink-self-contained=-linker".into());
+        let error =
+            check_linker(&descriptor, &fixture::artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap_err();
+        assert!(error.to_string().contains("link-self-contained"));
+        descriptor.non_path_inputs.clear();
+        assert!(check_linker(&descriptor, &fixture::artifact_elf(b"GCC: 14\0")).is_err());
+    }
 
     #[test]
     fn artifact_linker_witness_matches_recorded_rustc_llvm() {

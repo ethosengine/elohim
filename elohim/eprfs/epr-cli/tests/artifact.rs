@@ -746,7 +746,7 @@ fn a_completion_for_another_request_is_never_accepted() {
 /// An executable `cc` in `dir` that answers `--version` with `version`.
 fn fake_cc(dir: &Path, version: &str) {
     fake_tool(dir, "cc", &format!(
-        "case \"$1\" in\n--version) echo '{version}' ;;\n-Q) echo '-march=x86-64-v2' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac\n"
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac\n"
     ));
 }
 
@@ -924,7 +924,7 @@ fn artifact_link_input_bytes_move_key() {
     let input = tools.path().join("Scrt1.o");
     std::fs::write(&input, b"glibc 2.39-128").unwrap();
     fake_tool(tools.path(), "cc", &format!(
-        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-Q) echo '-march=x86-64-v2' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac",
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac",
         input.display()
     ));
     let (_, descriptor) = method_file_with(
@@ -944,17 +944,17 @@ fn artifact_cc_target_defaults_move_key() {
     let tools = TempDir::new().unwrap();
     let cc = |march| {
         fake_tool(tools.path(), "cc", &format!(
-        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-Q) echo '-march={march}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac"
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define {march} 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac"
     ))
     };
-    cc("x86-64-v2");
+    cc("__SSE2__");
     let (_, descriptor) = method_file_with(
         tools.path(),
         &["crate/src"],
         &[("PATH", tools.path().to_str().unwrap())],
     );
     let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
-    cc("x86-64-v3");
+    cc("__AVX2__");
     let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
     assert_ne!(before.key_cid, after.key_cid);
 }
@@ -971,14 +971,14 @@ fn artifact_recorded_linker_version_moves_key() {
         ("RUSTFLAGS", "-C link-arg=-fuse-ld=bfd", "ld.bfd"),
         ("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}linker=ld", "ld"),
     ] {
-        fake_tool(tools.path(), tool, "echo 'GNU ld 1'");
+        fake_tool(tools.path(), tool, "case \"$1\" in\n--version) echo 'GNU ld 1' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${1#*=}\" ;;\nesac");
         let (_, descriptor) = method_file_with(
             tools.path(),
             &["crate/src"],
             &[("PATH", tools.path().to_str().unwrap()), (variable, value)],
         );
         let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
-        fake_tool(tools.path(), tool, "echo 'GNU ld 2'");
+        fake_tool(tools.path(), tool, "case \"$1\" in\n--version) echo 'GNU ld 2' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${1#*=}\" ;;\nesac");
         let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
         assert_ne!(before.key_cid, after.key_cid, "{variable}={value}");
     }
@@ -1047,4 +1047,330 @@ fn artifact_put_checks_elf_linker_before_recording() {
             }
         }
     }
+}
+
+fn fixture_driver(dir: &Path, name: &str, version: &str, macros: &str, input: &Path) {
+    fake_tool(dir, name, &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) test \"$*\" = '-E -dM -x c -' || exit 1; read ignored && exit 1; printf '%s\\n' '{macros}' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\n*) exit 1 ;;\nesac", input.display()
+    ));
+}
+
+#[test]
+fn artifact_link_driver_is_independent_of_cc() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup one").unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "driver one",
+        "#define __SSE2__ 1",
+        &input,
+    );
+    // A build-script compiler must never receive link-input probes.
+    fake_tool(tools.path(), "build-cc", "case \"$1\" in\n--version) echo 'build cc 1' ;;\n-E) echo '#define __SSE2__ 1' ;;\n*) exit 1 ;;\nesac");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap()), ("CC", "build-cc")],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&input, "startup two").unwrap();
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "build-cc", "case \"$1\" in\n--version) echo 'build cc 2' ;;\n-E) echo '#define __AVX2__ 1' ;;\n*) exit 1 ;;\nesac");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    fixture_driver(
+        tools.path(),
+        "selected-cc",
+        "selected driver",
+        "#define __BMI2__ 1",
+        &input,
+    );
+    for (variable, flags) in [
+        ("RUSTFLAGS", "-C linker=selected-cc"),
+        ("CARGO_ENCODED_RUSTFLAGS", "-Clinker=selected-cc"),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+            "-C\u{1f}linker=selected-cc",
+        ),
+        (
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+            "selected-cc",
+        ),
+    ] {
+        descriptor
+            .non_path_inputs
+            .insert(variable.into(), flags.into());
+        let before = closure_key(repo.path(), &descriptor).unwrap();
+        fake_cc(tools.path(), "unused cc changed");
+        assert_eq!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        std::fs::write(&input, flags).unwrap();
+        assert_ne!(
+            before.key_cid,
+            closure_key(repo.path(), &descriptor).unwrap().key_cid
+        );
+        descriptor.non_path_inputs.remove(variable);
+    }
+}
+
+#[test]
+fn artifact_unsupported_linker_selections_refuse_before_probing() {
+    use elohim_epr_cli::artifact::{closure_key, ArtifactError};
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(tools.path(), &["crate/src"], &[]);
+    for variable in [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+    ] {
+        for flag in [
+            "-Clink-self-contained=-linker",
+            "-C link-self-contained=no",
+            "-Zlinker-features=-lld",
+            "-Z linker-features=-lld",
+            "-Clinker-flavor=gcc",
+            "-C linker-flavor=gnu",
+        ] {
+            let value = if variable == "CARGO_ENCODED_RUSTFLAGS" {
+                flag.replace(' ', "\u{1f}")
+            } else {
+                flag.into()
+            };
+            descriptor.non_path_inputs.insert(variable.into(), value);
+            let error = closure_key(repo.path(), &descriptor).unwrap_err();
+            assert!(matches!(error, ArtifactError::Gap(_)));
+            assert!(
+                error
+                    .to_string()
+                    .contains("does not model that linker selection yet"),
+                "{error}"
+            );
+            assert!(
+                error
+                    .to_string()
+                    .contains(flag.split_whitespace().last().unwrap()),
+                "{error}"
+            );
+            descriptor.non_path_inputs.remove(variable);
+        }
+    }
+    descriptor
+        .non_path_inputs
+        .insert("crate".into(), "crate".into());
+    let config = repo.path().join("crate/.cargo/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    for setting in [
+        "linker = 'gcc'",
+        "rustflags = ['-C', 'link-self-contained=-linker']",
+        "rustflags = '-Zlinker-features=-lld'",
+        "rustflags = ['-Clinker-flavor=gcc']",
+        "rustflags = ['-Clinker=gcc']",
+        "rustflags = ['-C', 'link-arg=-fuse-ld=bfd']",
+    ] {
+        std::fs::write(&config, format!("[target.'cfg(unix)']\n{setting}\n")).unwrap();
+        let error = closure_key(repo.path(), &descriptor).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not model that linker selection yet"),
+            "{error}"
+        );
+        assert!(error.to_string().contains("target.cfg(unix)"), "{error}");
+    }
+    std::fs::write(
+        config,
+        "[target.'cfg(unix)']\nrustflags = ['-C', 'opt-level=2']\n",
+    )
+    .unwrap();
+    closure_key(repo.path(), &descriptor).unwrap();
+}
+
+#[test]
+fn artifact_bare_lld_uses_rustc_but_external_flavors_and_paths_are_keyed() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
+        ],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld.lld", "echo 'LLD unrelated 999'");
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    for flavor in ["bfd", "gold", "mold"] {
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), format!("-C link-arg=-fuse-ld={flavor}"));
+        assert!(closure_key(repo.path(), &descriptor)
+            .unwrap_err()
+            .to_string()
+            .contains("does not resolve"));
+        fake_tool(tools.path(), &format!("ld.{flavor}"), "echo 'linker 1'");
+        closure_key(repo.path(), &descriptor).unwrap();
+    }
+    let linker = tools.path().join("external-lld");
+    descriptor.non_path_inputs.insert(
+        "RUSTFLAGS".into(),
+        format!("-C link-arg=-fuse-ld={}", linker.display()),
+    );
+    fake_tool(tools.path(), "external-lld", "echo 'LLD 1'");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "external-lld", "echo 'LLD 2'");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_linker_script_referents_move_key_and_missing_or_deep_inputs_refuse() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let script = tools.path().join("input.so");
+    let nested = tools.path().join("nested.so");
+    let library = tools.path().join("library.so.1");
+    std::fs::write(
+        &script,
+        format!(
+            "/* GNU ld script /not/an/input */\nGROUP ( AS_NEEDED ( {} ) )",
+            nested.display()
+        ),
+    )
+    .unwrap();
+    std::fs::write(&nested, format!("INPUT ( {} )", library.display())).unwrap();
+    std::fs::write(&library, b"library one").unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "cc fixture",
+        "#define __SSE2__ 1",
+        &script,
+    );
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&library, b"library two").unwrap();
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    std::fs::remove_file(&library).unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("does not resolve"));
+    std::fs::write(&library, format!("INPUT ( {} )", script.display())).unwrap();
+    assert!(closure_key(repo.path(), &descriptor)
+        .unwrap_err()
+        .to_string()
+        .contains("depth 4"));
+}
+
+#[test]
+fn artifact_macro_order_is_stable_and_target_default_changes_move_key() {
+    use elohim_epr_cli::artifact::closure_key;
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("startup.o");
+    std::fs::write(&input, "startup").unwrap();
+    let macros = "#define __SSE2__ 1\n#define __BMI2__ 1";
+    fixture_driver(tools.path(), "cc", "clang fixture", macros, &input);
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "clang fixture",
+        "#define __BMI2__ 1\n#define __SSE2__ 1",
+        &input,
+    );
+    assert_eq!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+    fixture_driver(
+        tools.path(),
+        "cc",
+        "clang fixture",
+        "#define __AVX2__ 1",
+        &input,
+    );
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_native_build_env_excludes_unpassed_c_flags() {
+    for name in ["CFLAGS", "CXXFLAGS", "LDFLAGS"] {
+        assert!(!elohim_epr_cli::artifact::NATIVE_BUILD_ENV.contains(&name));
+    }
+}
+
+#[test]
+fn artifact_real_gcc_accepts_rustc_bundled_lld() {
+    let Ok(cc) = Command::new("cc").arg("--version").output() else {
+        eprintln!("SKIP: real cc is unavailable");
+        return;
+    };
+    if !cc.status.success() || !text(&cc).contains("Free Software Foundation") {
+        eprintln!("SKIP: real cc on PATH is not gcc");
+        return;
+    }
+    let Ok(rustc) = Command::new("rustup")
+        .args(["run", "1.96.1", "rustc", "-vV"])
+        .output()
+    else {
+        eprintln!("SKIP: rustup / rustc 1.96.1 is unavailable");
+        return;
+    };
+    if !rustc.status.success() {
+        eprintln!("SKIP: rustc 1.96.1 is not installed");
+        return;
+    }
+    let repo = checkout();
+    let scratch = TempDir::new().unwrap();
+    let (_, mut descriptor) = method_file_with(
+        scratch.path(),
+        &["crate/src"],
+        &[
+            ("PATH", &std::env::var("PATH").unwrap()),
+            ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
+        ],
+    );
+    descriptor
+        .tools
+        .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
+    elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
 }
