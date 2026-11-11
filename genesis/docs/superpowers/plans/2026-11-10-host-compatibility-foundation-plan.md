@@ -137,6 +137,30 @@ Verify: the F2r receipt names the sysroot CID and shows one identity hit each wa
 
 Verify: both receipts in `sprints/2026-11-07-artifact-store/evidence/`, linked from its `RESULT.md`.
 
+Items K8–K12 were added 2026-11-11 from spec §7.9 (an artifact is born self-describing) and §7.8
+(reach on the object). Each one is a precondition for a second device to close a gap from the
+record alone. State at addition: K1, K2, K3 part 1, K4, K5 and K6 slice 1 are on dev (6e8c1e2a1).
+
+- [ ] **K8 — `put` extracts `Requires` from the bytes itself (arch, OS, loader, needed libraries, libc symbol floor, kernel ABI note, ISA level) with `host_contract::Requires` and writes `env:requires`; a caller-supplied `--requires` may only make a clause stricter; an artifact whose requirements cannot be extracted refuses** (serves sprint-lands-each-closure-once)
+
+Verify: recording the epr built on ethosengine yields `isa.x86` at v3 with `source: extracted` and its sqlite3 evidence, plus `abi.libc ≥ glibc 2.39`; the same record admitted against a synthetic v2 `Provides` refuses naming the missing features; an unreadable artifact refuses.
+
+- [ ] **K9 — the key's input lines are stored as a document by the input CID, readable by an admitted device like the method record, so another host can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
+
+Verify: on two devices, the same descriptor's input documents are fetched and diffed, and the diff names exactly the differing lines (on ethosengine and shem: `link:Scrt1.o`, `link:crt1.o` and the macro dump); the stored document's CID equals the key's input CID.
+
+- [ ] **K10 — dispatch evidence (spec §3.2): the ISA extraction counts only code reached without a runtime feature check, on evidence bound to the bytes (compiler multi-versioning metadata or a build-time attestation naming guarded functions by content), not a symbol-name pattern; unproven dispatch counts as a requirement** (serves sprint-lands-each-closure-once)
+
+Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when their guard is evidenced; with the evidence withheld, the same bytes extract v3; epr's sqlite3 v3 code stays a requirement.
+
+- [ ] **K11 — `epr artifact describe|put` generalised beyond the mesh's cargo binaries: a fresh lvi workspace with only the installed `epr` can record a cargo project of its own, and a recipe kind that cannot yet satisfy spec §7.9 refuses with the missing items named, rather than recording a thinner artifact** (serves workspace-device-arrival)
+
+Verify: a fresh workspace records a small cargo binary end to end; a non-cargo recipe refuses naming each missing §7.9 item.
+
+- [ ] **K12 — `env:reach` on every `Produce`, derived as the narrowest input reach (`epr::Reach`), and the peer gate serving when the requester's relationship meets it, with `berth.artifacts.serves` as a narrowing list (spec §7.8). BLOCKED on steward ruling H12; do not start before it is ruled** (serves dataplane-convergence)
+
+Verify: with an unchanged `pool-policy.json`, an admitted device of the person draws a `public` floor and a `self` mesh build without a new grant row; a `private` artifact refuses; a `serves` row naming a method denies it even when reach allows.
+
 ## Lane V — variant sets and conformance (spec §7, §7.1; rungs H4, H9; reviews G2, G3, B5)
 
 Chain: S2 → spec §7 and §7.1 → the variant-set document, the daemon, the bin store → berth records.
