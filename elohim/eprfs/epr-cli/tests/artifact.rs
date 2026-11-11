@@ -2534,6 +2534,15 @@ fn artifact_family_preserves_conflicts_older_holders_and_local_availability() {
 
 #[test]
 fn artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority() {
+    sysroot_put_then_output_fetch(false);
+}
+
+#[test]
+fn artifact_sysroot_put_records_family_and_canonical_requires() {
+    sysroot_put_then_output_fetch(true);
+}
+
+fn sysroot_put_then_output_fetch(with_requires: bool) {
     use eprfs_peer::{FetchAuthority, FetchDone, FetchFor, FetchRequest};
     use std::time::{Duration, Instant};
     let (_keys, a, b) = household();
@@ -2558,35 +2567,61 @@ fn artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority() {
     let bytes = std::fs::read(&archive).unwrap();
     let output = BlobCid::compute_bytes(&bytes);
     let (stub, log) = brit_stub(scratch.path());
-    let put = a
-        .command()
-        .env("BRIT_BUILD_REF_BIN", &stub)
-        .args([
-            "artifact",
-            "sysroot",
-            "put",
-            "--archive",
-            archive.to_str().unwrap(),
-            "--repo",
-            a.root().to_str().unwrap(),
-            "--cross",
-            "--json",
-        ])
-        .output()
-        .unwrap();
+    let requires_file = scratch.path().join("requires.json");
+    let canonical_requires = br#"[{"axis":"isa.x86","predicate":{"kind":"equal","value":"x86-64-v3"},"source":"declared"}]"#;
+    std::fs::write(
+        &requires_file,
+        br#"[ { "source": "declared", "predicate": { "value": "x86-64-v3", "kind": "equal" }, "axis": "isa.x86" } ]"#,
+    )
+    .unwrap();
+    let requires_cid = BlobCid::compute_bytes(canonical_requires);
+    let mut command = a.command();
+    command.env("BRIT_BUILD_REF_BIN", &stub).args([
+        "artifact",
+        "sysroot",
+        "put",
+        "--archive",
+        archive.to_str().unwrap(),
+        "--repo",
+        a.root().to_str().unwrap(),
+        "--cross",
+        "--json",
+    ]);
+    if with_requires {
+        command.arg("--requires").arg(&requires_file);
+    }
+    let put = command.output().unwrap();
     assert!(put.status.success(), "{}", text(&put));
     let recorded: serde_json::Value = serde_json::from_slice(&put.stdout).unwrap();
     assert_eq!(recorded["output"], output.to_string());
     let verified = elohim_epr_cli::artifact::sysroot::verify(&bytes).unwrap();
     assert_eq!(recorded["input"], verified.cid().unwrap().to_string());
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
+    let family = runtime.block_on(async {
         let store = eprfs_peer::open_payload_store(&a.payload()).unwrap();
         let held = store
             .fetch_blob(&verified.cid().unwrap(), eprfs_core::FetchPolicy::LocalOnly)
             .await
             .unwrap();
         assert_eq!(held.bytes.as_ref(), verified.canonical_bytes().unwrap());
+        let method_cid = BlobCid::parse(recorded["method"].as_str().unwrap()).unwrap();
+        let method_bytes = store
+            .fetch_blob(&method_cid, eprfs_core::FetchPolicy::LocalOnly)
+            .await
+            .unwrap();
+        let method: MethodDescriptor =
+            serde::Deserialize::deserialize(elohim_epr::cbor::decode(&method_bytes.bytes).unwrap())
+                .unwrap();
+        assert_eq!(method.name, "sysroot-pack");
+        assert_eq!(method.cid().unwrap(), method_cid);
+        if with_requires {
+            let held = store
+                .fetch_blob(&requires_cid, eprfs_core::FetchPolicy::LocalOnly)
+                .await
+                .unwrap();
+            assert_eq!(held.bytes.as_ref(), canonical_requires);
+        }
+        method.family_cid().unwrap()
     });
     assert!(std::fs::read_to_string(log)
         .unwrap()
@@ -2597,6 +2632,23 @@ fn artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority() {
         .filter(|e| e.action == ReaVerb::Produce)
         .collect();
     assert_eq!(produces.len(), 1);
+    assert!(produces[0]
+        .classified_as
+        .contains(&format!("env:family={family}")));
+    let requires_slots: Vec<_> = produces[0]
+        .classified_as
+        .iter()
+        .filter(|slot| slot.starts_with("env:requires="))
+        .cloned()
+        .collect();
+    assert_eq!(
+        requires_slots,
+        if with_requires {
+            vec![format!("env:requires={requires_cid}")]
+        } else {
+            Vec::<String>::new()
+        }
+    );
     assert!(produces[0]
         .classified_as
         .contains(&"basis-key:sysroot-manifest".into()));

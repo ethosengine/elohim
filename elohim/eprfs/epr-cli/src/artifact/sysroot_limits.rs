@@ -8,6 +8,9 @@ use std::path::Path;
 pub const MAX_MEMBERS: u64 = 32_768;
 pub const MAX_DEPTH: u64 = 64;
 pub const MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
+/// glibc/gcc scripts on the build device use at most four operands including OUTPUT_FORMAT.
+/// Count duplicates too, before resolution; 8,192 admits the 5,000-target budget regression.
+pub const MAX_SCRIPT_OPERANDS: u64 = 8_192;
 pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
 /// Magic + manifest length + bounded manifest + one length per member + bounded payload.
@@ -17,6 +20,8 @@ pub const MAX_ARCHIVE_BYTES: u64 = 16 + MAX_MANIFEST_BYTES + 8 * MAX_MEMBERS + M
 pub enum Limit {
     #[error("sysroot: expanded member count limit exceeded")]
     Members,
+    #[error("sysroot: per-script operand count limit exceeded")]
+    ScriptOperands,
     #[error("sysroot: directory depth limit exceeded")]
     Depth,
     #[error("sysroot: manifest byte limit exceeded")]
@@ -33,6 +38,7 @@ impl Limit {
     pub(super) fn maximum(self) -> u64 {
         match self {
             Self::Members => MAX_MEMBERS,
+            Self::ScriptOperands => MAX_SCRIPT_OPERANDS,
             Self::Depth => MAX_DEPTH,
             Self::ManifestBytes => MAX_MANIFEST_BYTES,
             Self::FileBytes => MAX_FILE_BYTES,
@@ -47,6 +53,28 @@ impl Limit {
         } else {
             Ok(())
         }
+    }
+}
+
+/// One counter shared by every manifest entry and evidence producer. Charge before retaining
+/// strings, including repeated paths and duplicate script resolutions. The encoder separately
+/// bounds JSON framing/escaping; neither check replaces the other.
+#[derive(Default)]
+pub(super) struct EvidenceBudget {
+    pub bytes: u64,
+}
+
+impl EvidenceBudget {
+    pub fn retain(&mut self, text: &str) -> ArtifactResult<String> {
+        self.charge(text.len())?;
+        Ok(text.to_owned())
+    }
+
+    pub fn charge(&mut self, len: usize) -> ArtifactResult<()> {
+        let next = self.bytes.saturating_add(len as u64);
+        Limit::ManifestBytes.check(next)?;
+        self.bytes = next;
+        Ok(())
     }
 }
 

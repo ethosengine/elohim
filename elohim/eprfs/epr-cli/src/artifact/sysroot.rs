@@ -23,7 +23,7 @@ use super::{ArtifactError, ArtifactResult};
 mod evidence;
 #[path = "sysroot_limits.rs"]
 pub mod limits;
-use limits::{Budget, Limit};
+use limits::{Budget, EvidenceBudget, Limit};
 #[cfg(test)]
 #[path = "sysroot_tests.rs"]
 mod tests;
@@ -152,12 +152,20 @@ fn walk(
 }
 
 fn manifest(triple: &str, members: &Members) -> ArtifactResult<Manifest> {
+    manifest_with_budget(triple, members, &mut EvidenceBudget::default())
+}
+
+fn manifest_with_budget(
+    triple: &str,
+    members: &Members,
+    budget: &mut EvidenceBudget,
+) -> ArtifactResult<Manifest> {
     if triple.is_empty() {
         return Err(refused("empty target triple"));
     }
     let mut result = Manifest {
         version: 1,
-        triple: triple.into(),
+        triple: budget.retain(triple)?,
         files: Vec::new(),
         scripts: Vec::new(),
         isa_notes: Vec::new(),
@@ -165,25 +173,25 @@ fn manifest(triple: &str, members: &Members) -> ArtifactResult<Manifest> {
     };
     for (path, content) in members {
         result.files.push(Member {
-            path: path.clone(),
+            path: budget.retain(path)?,
             mode: if content.is_some() { FILE } else { DIR },
             cid: BlobCid::compute_bytes(content.as_deref().unwrap_or_default()),
         });
         if let Some(bytes) = content {
-            if let Some(operands) = evidence::script(path, bytes, members)? {
+            if let Some(operands) = evidence::script(path, bytes, members, budget)? {
                 result.scripts.push(Script {
-                    path: path.clone(),
+                    path: budget.retain(path)?,
                     operands,
                 });
             }
-            if let Some(needed) = evidence::isa(bytes)? {
+            if let Some(needed) = evidence::isa(bytes, budget)? {
                 result.isa_notes.push(IsaNote {
-                    path: path.clone(),
+                    path: budget.retain(path)?,
                     needed,
                 });
             }
             if path == "usr/include/features.h" {
-                result.libc_version = evidence::libc_version(bytes);
+                result.libc_version = evidence::libc_version(bytes, budget)?;
             }
         }
     }

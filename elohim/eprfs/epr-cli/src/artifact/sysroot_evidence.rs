@@ -1,10 +1,15 @@
 //! Payload-only observations: linker-script operands, ELF GNU properties and glibc headers.
 //! No host library lookup, command execution, or assumption that absent notes imply v2.
-use super::{refused, ArtifactResult, Members};
+use super::{
+    limits::EvidenceBudget, limits::Limit, refused, ArtifactError, ArtifactResult, Members,
+};
 use object::read::elf::{ElfFile, FileHeader, NoteIterator, ProgramHeader, SectionHeader};
 use std::collections::BTreeSet;
 
-pub(super) fn isa(bytes: &[u8]) -> ArtifactResult<Option<Vec<String>>> {
+pub(super) fn isa(
+    bytes: &[u8],
+    budget: &mut EvidenceBudget,
+) -> ArtifactResult<Option<Vec<String>>> {
     if !bytes.starts_with(b"\x7fELF") {
         return Ok(None);
     }
@@ -21,11 +26,11 @@ pub(super) fn isa(bytes: &[u8]) -> ArtifactResult<Option<Vec<String>>> {
         (8, "x86-64-v4"),
     ] {
         if bits & bit != 0 {
-            needed.push(name.into());
+            needed.push(budget.retain(name)?);
         }
     }
     if bits & !15 != 0 {
-        needed.push(format!("unknown-x86-isa-bits:0x{:08x}", bits & !15));
+        needed.push(budget.retain(&format!("unknown-x86-isa-bits:0x{:08x}", bits & !15))?);
     }
     Ok(Some(needed))
 }
@@ -66,8 +71,13 @@ fn note_bits<Elf: FileHeader>(
     Ok(bits)
 }
 
-pub(super) fn libc_version(bytes: &[u8]) -> Option<String> {
-    let text = std::str::from_utf8(bytes).ok()?;
+pub(super) fn libc_version(
+    bytes: &[u8],
+    budget: &mut EvidenceBudget,
+) -> ArtifactResult<Option<String>> {
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return Ok(None);
+    };
     let define = |name: &str| {
         text.lines().find_map(|line| {
             let mut words = line.trim_start().strip_prefix('#')?.split_whitespace();
@@ -77,15 +87,13 @@ pub(super) fn libc_version(bytes: &[u8]) -> Option<String> {
             words.next()?.parse::<u32>().ok()
         })
     };
-    Some(format!(
-        "{}.{}",
-        define("__GLIBC__")?,
-        define("__GLIBC_MINOR__")?
-    ))
+    let (Some(major), Some(minor)) = (define("__GLIBC__"), define("__GLIBC_MINOR__")) else {
+        return Ok(None);
+    };
+    Ok(Some(budget.retain(&format!("{major}.{minor}"))?))
 }
 
-/// One shared, borrowing tokenizer for detection and validation. Non-script headers stop after
-/// the first two tokens rather than allocating a token vector for their entire contents.
+/// Borrow tokens on demand: no token vector proportional to the untrusted file size.
 fn token<'a>(rest: &mut &'a str) -> ArtifactResult<Option<&'a str>> {
     loop {
         *rest = rest.trim_start();
@@ -140,7 +148,7 @@ fn normalize(path: &str) -> Option<String> {
     super::valid_path(&path).then_some(path)
 }
 
-fn resolve(script: &str, operand: &str, members: &Members) -> ArtifactResult<String> {
+fn resolve<'a>(script: &str, operand: &str, members: &'a Members) -> ArtifactResult<&'a str> {
     let operand = operand.strip_prefix('=').unwrap_or(operand);
     let parent = script.rsplit_once('/').map_or("", |(parent, _)| parent);
     let candidates = if operand.starts_with('/') {
@@ -161,7 +169,11 @@ fn resolve(script: &str, operand: &str, members: &Members) -> ArtifactResult<Str
     candidates
         .iter()
         .filter_map(|path| normalize(path))
-        .find(|path| matches!(members.get(path), Some(Some(_))))
+        .find_map(|path| {
+            members
+                .get_key_value(&path)
+                .and_then(|(key, value)| value.as_ref().map(|_| key.as_str()))
+        })
         .ok_or_else(|| {
             refused(format!(
                 "script {script}: operand {operand} is absent inside the root"
@@ -176,93 +188,69 @@ pub(super) fn script(
     path: &str,
     bytes: &[u8],
     members: &Members,
+    budget: &mut EvidenceBudget,
 ) -> ArtifactResult<Option<Vec<String>>> {
-    if bytes.starts_with(b"\x7fELF") || bytes.starts_with(b"!<arch>\n") {
+    // Classification is entirely by location and magic, never suffix or first directive.
+    // The sole data exception is *.pc directly in <library-dir>/pkgconfig: build
+    // metadata, retained in the archive but not interpreted by ld. Libtool archives,
+    // gconv lists and all other nonbinary library data refuse with the member path.
+    let parent = path.rsplit_once('/').map_or("", |(parent, _)| parent);
+    if !parent
+        .split('/')
+        .any(|part| matches!(part, "lib" | "lib64" | "lib32" | "libx32"))
+        || bytes.starts_with(b"\x7fELF")
+        || bytes.starts_with(b"!<arch>\n")
+    {
         return Ok(None);
     }
-    let extension = std::path::Path::new(path)
-        .extension()
-        .and_then(|ext| ext.to_str());
-    let named_script = matches!(extension, Some("ld" | "lds" | "so"));
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        if named_script {
-            return Err(refused("non-UTF-8 linker script"));
-        }
-        return Ok(None);
-    };
-    let mut rest = text;
-    let mut first = token(&mut rest)?.unwrap_or("");
-    while first == ";" {
-        first = token(&mut rest)?.unwrap_or("");
-    }
-    let second = token(&mut rest)?;
-    let directive = first.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
-        && first.bytes().all(|b| b.is_ascii_uppercase() || b == b'_');
-    // C headers also start with uppercase function-like macros after their # lines. Known
-    // linker directives still identify scripts regardless of filename; unknown macros in a
-    // header alone do not. Explicit script filenames are always validated.
-    let candidate = matches!(
-        first,
-        "GROUP"
-            | "INPUT"
-            | "AS_NEEDED"
-            | "OUTPUT_FORMAT"
-            | "OUTPUT_ARCH"
-            | "SEARCH_DIR"
-            | "SECTIONS"
-            | "MEMORY"
-            | "PHDRS"
-            | "VERSION"
-            | "INCLUDE"
-            | "ENTRY"
-            | "EXTERN"
-            | "OUTPUT"
-            | "TARGET"
-            | "STARTUP"
-            | "ASSERT"
-            | "PROVIDE"
-            | "PROVIDE_HIDDEN"
-            | "REGION_ALIAS"
-            | "INSERT"
-    ) || (directive
-        && matches!(second, Some("(" | "{"))
-        && !matches!(extension, Some("h" | "hpp")))
-        || named_script
-        || text.contains("/* GNU ld script");
-    if !candidate {
+    if path.ends_with(".pc")
+        && parent.rsplit_once('/').is_some_and(|(library, leaf)| {
+            leaf == "pkgconfig"
+                && matches!(
+                    library.rsplit('/').next(),
+                    Some("lib" | "lib64" | "lib32" | "libx32")
+                )
+        })
+    {
         return Ok(None);
     }
-    let mut tokens = vec![first];
-    tokens.extend(second);
-    while let Some(next) = token(&mut rest)? {
-        tokens.push(next);
-    }
-    let mut i = 0;
+    parse_script(path, bytes, members, budget)
+        .map(Some)
+        .map_err(|error| match error {
+            ArtifactError::Gap(reason) => ArtifactError::SysrootScript {
+                path: path.into(),
+                reason,
+            },
+            other => other,
+        })
+}
+
+fn parse_script(
+    path: &str,
+    bytes: &[u8],
+    members: &Members,
+    budget: &mut EvidenceBudget,
+) -> ArtifactResult<Vec<String>> {
+    let mut rest = std::str::from_utf8(bytes).map_err(|_| refused("non-UTF-8 linker script"))?;
     let mut operands = BTreeSet::new();
-    while i < tokens.len() {
-        if tokens[i] == ";" {
-            i += 1;
+    let mut operand_count = 0u64;
+    let mut directives = 0;
+    while let Some(directive) = token(&mut rest)? {
+        if directive == ";" {
             continue;
         }
-        let directive = tokens[i];
         let inputs = matches!(directive, "GROUP" | "INPUT");
         if !inputs && !matches!(directive, "OUTPUT_FORMAT" | "OUTPUT_ARCH") {
-            return Err(refused(format!(
-                "script {path}: unsupported directive {directive}"
-            )));
+            return Err(refused(format!("unsupported directive {directive}")));
         }
-        i += 1;
-        if tokens.get(i).copied() != Some("(") {
+        directives += 1;
+        if token(&mut rest)? != Some("(") {
             return Err(refused("script directive missing parenthesis"));
         }
-        i += 1;
         let mut counts = vec![0usize];
         while !counts.is_empty() {
-            let token = tokens
-                .get(i)
-                .ok_or_else(|| refused("unclosed script directive"))?;
-            i += 1;
-            match *token {
+            let next = token(&mut rest)?.ok_or_else(|| refused("unclosed script directive"))?;
+            match next {
                 ")" => {
                     if counts.pop() == Some(0) {
                         return Err(refused("script directive has no operand"));
@@ -270,27 +258,38 @@ pub(super) fn script(
                 }
                 "," => {}
                 "AS_NEEDED" if inputs => {
-                    if tokens.get(i).copied() != Some("(") {
+                    if token(&mut rest)? != Some("(") {
                         return Err(refused("AS_NEEDED missing parenthesis"));
                     }
-                    i += 1;
+                    Limit::Depth.check(counts.len() as u64 + 1)?;
                     *counts.last_mut().expect("inside directive") += 1;
                     counts.push(0);
                 }
                 "(" | ";" => return Err(refused("unsupported script syntax")),
                 _ => {
-                    if tokens.get(i).copied() == Some("(") {
-                        return Err(refused(format!(
-                            "script {path}: unsupported directive {token}"
-                        )));
+                    // Peek through comments without retaining tokens. An unknown nested
+                    // directive cannot masquerade as an OUTPUT_FORMAT/OUTPUT_ARCH operand.
+                    let mut peek = rest;
+                    if token(&mut peek)? == Some("(") {
+                        return Err(refused(format!("unsupported directive {next}")));
                     }
+                    if next.is_empty() {
+                        return Err(refused("script directive has no operand"));
+                    }
+                    operand_count += 1;
+                    Limit::ScriptOperands.check(operand_count)?;
                     *counts.last_mut().expect("inside directive") += 1;
                     if inputs {
-                        operands.insert(resolve(path, token, members)?);
+                        let resolved = resolve(path, next, members)?;
+                        // Charge on EVERY resolution, before cloning even a duplicate.
+                        operands.insert(budget.retain(resolved)?);
                     }
                 }
             }
         }
     }
-    Ok(Some(operands.into_iter().collect()))
+    if directives == 0 {
+        return Err(refused("script has no directive"));
+    }
+    Ok(operands.into_iter().collect())
 }

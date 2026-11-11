@@ -79,6 +79,8 @@ pub enum ArtifactError {
     Gap(String),
     #[error(transparent)]
     SysrootLimit(#[from] sysroot::limits::Limit),
+    #[error("sysroot script {path}: {reason}")]
+    SysrootScript { path: String, reason: String },
     #[error("{0}")]
     Peer(#[from] PeerCliError),
     #[error("io: {0}")]
@@ -150,7 +152,11 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         None => return Err(ArtifactError::InvalidArguments(usage())),
     };
     match outcome {
-        Err(error @ (ArtifactError::Gap(_) | ArtifactError::SysrootLimit(_))) => {
+        Err(
+            error @ (ArtifactError::Gap(_)
+            | ArtifactError::SysrootLimit(_)
+            | ArtifactError::SysrootScript { .. }),
+        ) => {
             let reason = error.to_string();
             if options.json {
                 println!("{}", serde_json::json!({ "gap": reason }));
@@ -1453,7 +1459,10 @@ fn record_artifact(
         basis.to_string(),
         format!("env:project={project}"),
         format!("env:method={}", key.method),
-        format!("env:family={}", descriptor.family_cid().map_err(unrecorded)?),
+        format!(
+            "env:family={}",
+            descriptor.family_cid().map_err(unrecorded)?
+        ),
         format!("env:input={}", key.input),
         format!("env:key={}", key.key_cid),
         format!("env:output={output}"),

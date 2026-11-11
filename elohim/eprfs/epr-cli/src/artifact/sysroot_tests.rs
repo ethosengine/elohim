@@ -11,7 +11,7 @@ fn tree() -> tempfile::TempDir {
         b"#define __GLIBC__ 2\n#define __GLIBC_MINOR__ 39\n",
     )
     .unwrap();
-    fs::write(dir.path().join("lib64/libc.so.6"), b"library").unwrap();
+    fs::write(dir.path().join("lib64/libc.so.6"), b"!<arch>\n").unwrap();
     dir
 }
 
@@ -359,4 +359,233 @@ fn ordinary_header_macros_are_not_linker_script_candidates() {
     let (archive, manifest) = pack(dir.path(), "test").unwrap();
     assert!(manifest.scripts.is_empty());
     verify(&archive).unwrap();
+}
+
+#[test]
+fn evidence_budget_charges_every_retained_string_and_refuses_before_growth() {
+    let mut members = Members::new();
+    members.insert("lib64/libreal.so".into(), Some(isa_fixture()));
+    members.insert(
+        "lib64/libscript.a".into(),
+        Some(b"INPUT(libreal.so)".to_vec()),
+    );
+    members.insert(
+        "usr/include/features.h".into(),
+        Some(b"#define __GLIBC__ 2\n#define __GLIBC_MINOR__ 39".to_vec()),
+    );
+    let mut budget = EvidenceBudget::default();
+    let result = manifest_with_budget("test", &members, &mut budget).unwrap();
+    let strings = result.triple.len()
+        + result.files.iter().map(|f| f.path.len()).sum::<usize>()
+        + result
+            .scripts
+            .iter()
+            .map(|s| s.path.len() + s.operands.iter().map(String::len).sum::<usize>())
+            .sum::<usize>()
+        + result
+            .isa_notes
+            .iter()
+            .map(|n| n.path.len() + n.needed.iter().map(String::len).sum::<usize>())
+            .sum::<usize>()
+        + result.libc_version.as_ref().unwrap().len();
+    assert_eq!(budget.bytes, strings as u64);
+    budget.bytes = limits::MAX_MANIFEST_BYTES - 1;
+    assert_eq!(budget.retain("x").unwrap(), "x");
+    assert_limit(budget.retain("y"), Limit::ManifestBytes);
+    assert_eq!(budget.bytes, limits::MAX_MANIFEST_BYTES);
+}
+
+#[test]
+fn many_scripts_with_deep_resolved_targets_refuse_on_shared_counter() {
+    // Review shape: 5,000 targets, 500 scripts, a 2,509-byte prefix. Use in-memory
+    // members to avoid filesystem PATH_MAX. ar headers make targets binary under P2.
+    let prefix = format!("lib/{}", vec!["d".repeat(249); 10].join("/"));
+    assert_eq!(prefix.len(), 2503);
+    let prefix = format!("{prefix}/child");
+    assert_eq!(prefix.len(), 2509);
+    let mut members = Members::new();
+    for i in 0..5000 {
+        members.insert(format!("{prefix}/t{i:04}"), Some(b"!<arch>\n".to_vec()));
+    }
+    let script = format!(
+        "INPUT({})",
+        (0..5000)
+            .map(|i| format!("t{i:04}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    for i in 0..500 {
+        members.insert(
+            format!("{prefix}/s{i:04}"),
+            Some(script.as_bytes().to_vec()),
+        );
+    }
+    let mut budget = EvidenceBudget::default();
+    assert_limit(
+        manifest_with_budget("test", &members, &mut budget),
+        Limit::ManifestBytes,
+    );
+    let path_bytes = (prefix.len() + 6) as u64;
+    // First script completes; second stops at the first charge over budget. No RSS probe:
+    // triple + two Member paths + one Script path + accepted operand resolutions.
+    let accepted_operands = (limits::MAX_MANIFEST_BYTES - 4 - 3 * path_bytes) / path_bytes;
+    assert!(accepted_operands > 5000 && accepted_operands < 10000);
+    assert_eq!(budget.bytes, 4 + (3 + accepted_operands) * path_bytes);
+    assert!(budget.bytes <= limits::MAX_MANIFEST_BYTES);
+    assert!(budget.bytes + path_bytes > limits::MAX_MANIFEST_BYTES);
+}
+
+#[test]
+fn script_operand_cap_counts_duplicates_and_format_operands() {
+    let members = Members::from([("lib/x".into(), Some(b"!<arch>\n".to_vec()))]);
+    for directive in ["INPUT", "OUTPUT_FORMAT"] {
+        let script = format!(
+            "{directive}({})",
+            vec!["x"; limits::MAX_SCRIPT_OPERANDS as usize].join(" ")
+        );
+        evidence::script(
+            "lib/script",
+            script.as_bytes(),
+            &members,
+            &mut EvidenceBudget::default(),
+        )
+        .unwrap();
+        let excess = format!("{script} {directive}(x)");
+        assert_limit(
+            evidence::script(
+                "lib/script",
+                excess.as_bytes(),
+                &members,
+                &mut EvidenceBudget::default(),
+            ),
+            Limit::ScriptOperands,
+        );
+    }
+}
+
+#[test]
+fn all_nonbinary_library_files_are_validated_regardless_of_name_or_first_token() {
+    for directory in ["lib", "usr/lib64", "nested/lib32/deep", "usr/libx32"] {
+        for bytes in [
+            &b"FORCE_COMMON_ALLOCATION\nINPUT(/outside/missing.so)"[..],
+            &b"# \xff\nINPUT(/outside/missing.so)"[..],
+            &b"OUTPUT_FORMAT(elf64-x86-64) FORCE_COMMON_ALLOCATION"[..],
+            &b"INPUT()"[..],
+            &b"INPUT(\"\")"[..],
+            &b"/* no directive */"[..],
+        ] {
+            let path = format!("{directory}/libfoo.a");
+            let members = Members::from([(path.clone(), Some(bytes.to_vec()))]);
+            assert!(
+                matches!(manifest("test", &members), Err(ArtifactError::SysrootScript { path: actual, .. }) if actual == path)
+            );
+        }
+    }
+    let members = Members::from([
+        ("usr/lib64/libelf.so".into(), Some(isa_fixture())),
+        ("lib/libarchive.a".into(), Some(b"!<arch>\n".to_vec())),
+        (
+            "usr/include/header.h".into(),
+            Some(b"# \xff\nINPUT(outside)".to_vec()),
+        ),
+        ("library/libfoo.a".into(), Some(b"not a candidate".to_vec())),
+    ]);
+    let result = manifest("test", &members).unwrap();
+    assert!(result.scripts.is_empty());
+    assert_eq!(result.isa_notes.len(), 1);
+}
+
+#[test]
+fn library_data_types_are_explicit_refusals_not_silent_exclusions() {
+    for (path, bytes) in [
+        ("usr/lib64/glibc.pc", "prefix=/usr\nName: glibc"),
+        (
+            "usr/lib64/libexample.la",
+            "# libtool archive\ndlname='libexample.so'",
+        ),
+        (
+            "usr/lib64/gconv/gconv-modules",
+            "module UTF-8// INTERNAL ISO8859-1 1",
+        ),
+        ("usr/lib64/gconv/gconv-modules.cache", "\0\u{fffd}"),
+        ("usr/lib64/cmake/ZLIB/ZLIB.cmake", "set(ZLIB_FOUND TRUE)"),
+        ("usr/lib64/python3.12/data.py", "import sys"),
+        ("usr/lib64/libfreebl3.chk", "checksum"),
+    ] {
+        let members = Members::from([(path.into(), Some(bytes.as_bytes().to_vec()))]);
+        assert!(
+            matches!(manifest("test", &members), Err(ArtifactError::SysrootScript { path: actual, .. }) if actual == path)
+        );
+    }
+}
+
+#[test]
+fn real_glibc_library_and_header_sysroot_packs_when_installed() {
+    if !Path::new("/usr/lib64/libc.so").exists() {
+        eprintln!("real glibc fixture unavailable on this device");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let mut paths = vec![
+        "/usr/lib64/libc.so",
+        "/usr/lib64/libm.so",
+        "/lib64/libc.so.6",
+        "/usr/lib64/libc_nonshared.a",
+        "/lib64/ld-linux-x86-64.so.2",
+        "/lib64/libm.so.6",
+        "/lib64/libmvec.so.1",
+        "/usr/include/features.h",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect::<Vec<_>>();
+    let mut gcc_scripts = 0;
+    let gcc_root = Path::new("/usr/lib/gcc");
+    if gcc_root.exists() {
+        for target in fs::read_dir(gcc_root).unwrap() {
+            for version in fs::read_dir(target.unwrap().path()).unwrap() {
+                let version = version.unwrap().path();
+                let script = version.join("libgcc_s.so");
+                if script.is_file() {
+                    paths.extend([script, version.join("libgcc.a")]);
+                    gcc_scripts += 1;
+                }
+            }
+        }
+        if gcc_scripts > 0 {
+            paths.push("/lib64/libgcc_s.so.1".into());
+        }
+    }
+    for source in paths {
+        let destination = dir.path().join(source.strip_prefix("/").unwrap());
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::copy(source, destination).unwrap();
+    }
+    let (archive, manifest) = pack(dir.path(), "x86_64-unknown-linux-gnu").unwrap();
+    assert_eq!(manifest.scripts.len(), 2 + gcc_scripts);
+    assert_eq!(verify(&archive).unwrap(), manifest);
+    eprintln!("real glibc pack+verify: libc.so, libm.so, {gcc_scripts} gcc libgcc_s.so scripts");
+}
+
+#[test]
+fn only_named_pkgconfig_data_is_excluded_and_remains_content_addressed() {
+    let dir = tree();
+    let path = dir.path().join("usr/lib64/pkgconfig/glibc.pc");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "prefix=/usr\nName: glibc").unwrap();
+    let (archive, manifest) = pack(dir.path(), "test").unwrap();
+    assert!(manifest.scripts.is_empty());
+    assert!(manifest
+        .files
+        .iter()
+        .any(|f| f.path == "usr/lib64/pkgconfig/glibc.pc"));
+    assert_eq!(verify(&archive).unwrap(), manifest);
+    fs::write(&path, "prefix=/changed").unwrap();
+    assert_ne!(pack(dir.path(), "test").unwrap().0, archive);
+    // Directory alone is not an exclusion: an archive-looking filename still parses.
+    fs::write(path.with_file_name("libfoo.a"), "FORCE_COMMON_ALLOCATION").unwrap();
+    assert!(matches!(
+        pack(dir.path(), "test"),
+        Err(ArtifactError::SysrootScript { .. })
+    ));
 }

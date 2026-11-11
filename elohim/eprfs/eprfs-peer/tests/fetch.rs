@@ -2116,18 +2116,24 @@ fn output_holders_fold_across_keys_and_report_missing_or_local_only() {
     let rows = vec![
         SiblingRecord {
             key: BlobCid::compute(b"key1"),
+            family: None,
+            requires: None,
             device: "a".into(),
             output: output.clone(),
             manifest: BlobCid::compute(b"m1"),
         },
         SiblingRecord {
             key: BlobCid::compute(b"key2"),
+            family: None,
+            requires: None,
             device: "a".into(),
             output: output.clone(),
             manifest: BlobCid::compute(b"m2"),
         },
         SiblingRecord {
             key: BlobCid::compute(b"key3"),
+            family: None,
+            requires: None,
             device: "b".into(),
             output: output.clone(),
             manifest: BlobCid::compute(b"m3"),
