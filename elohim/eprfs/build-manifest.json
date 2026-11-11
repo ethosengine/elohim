@@ -42,6 +42,7 @@
           "scripts/ci/test_publish_eprfs.py",
           "crates/consent-grant/**",
           "crates/seam-contracts/**",
+          "crates/elohim-host-contract/**",
           "vendor/iroh-quinn-proto-0.13.0/**"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]

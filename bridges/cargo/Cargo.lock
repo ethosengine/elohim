@@ -609,12 +609,14 @@ dependencies = [
  "elohim-epr",
  "elohim-epr-index",
  "elohim-epr-rea",
+ "elohim-host-contract",
  "elohim-rust-style-scan",
  "eprfs-agent",
  "eprfs-core",
  "eprfs-host",
  "eprfs-meta",
  "glob",
+ "iced-x86",
  "libc",
  "object",
  "rand_core",
@@ -656,6 +658,15 @@ dependencies = [
  "serde_ipld_dagcbor",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "elohim-host-contract"
+version = "0.1.0"
+dependencies = [
+ "elohim-epr",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -961,6 +972,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "iced-x86"
+version = "1.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c23ad4d19dca41180e835ef6fbd2c1ee655777eca086ad80dd517e0513322879"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]

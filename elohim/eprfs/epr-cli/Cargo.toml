@@ -79,6 +79,10 @@ cid = "0.11"
 glob = "0.3"
 # ELF section bytes for the artifact's post-build linker check.
 object = { version = "0.37.3", default-features = false, features = ["read", "std"] }
+# Host compatibility vocabulary: put records the artifact's extracted Requires (K8).
+elohim-host-contract = { path = "../../../crates/elohim-host-contract" }
+# Decode x86-64 code sections to find the CPU features the bytes use (K8 isa.x86 extraction).
+iced-x86 = { version = "1.21.0", default-features = false, features = ["std", "decoder", "instr_info"] }
 # Parse the Cargo configuration already included in artifact keys.
 toml = "0.8.23"
 # Advisory file locking for the recall executor's session continuation — a safe `flock`
