@@ -2214,3 +2214,32 @@ decisionPoints:
   - path: elohim/eprfs/epr-cli/tests/flow_claim_habit.rs
     testName: unsafe_unknown_ambiguous_and_stale_owners_refuse_without_append
     kind: integration
+
+- name: sysroot_manifest_verification
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/artifact/sysroot.rs
+    modulePath: elohim_epr_cli::artifact::sysroot::verify
+  summary: "Verify a canonical sysroot archive, every file CID, in-root linker-script operands and payload ELF ISA evidence before the shared Produce tail or immutable cache materialization."
+  concernIds:
+    - { id: C0, status: answered, justification: "Reuses private artifact custody; the cache is reconstructable from one archive CID, with no per-file heads." }
+    - { id: C1, status: n-a, justification: "Content verification confers no device standing." }
+    - { id: C2, status: n-a, justification: "No promotion or policy override." }
+    - { id: C3, status: answered, justification: "Finite in-memory archive, checked lengths and symlink cycle refusal; no subprocess or host library search." }
+    - { id: C4, status: answered, justification: "Malformed archive, unsupported script, missing operand and CID mismatch refuse with a sysroot gap." }
+    - { id: C5, status: answered, justification: "Manifest evidence is recomputed from payload bytes; executable put retains its ELF linker witness." }
+    - { id: C6a, status: answered, justification: "Sorted paths, canonical JSON, fixed modes and no owner, timestamp or source path fields." }
+    - { id: C6b, status: answered, justification: "Materialize stages then renames; existing hits are reverified, incomplete trees refused." }
+    - { id: C7, status: n-a, justification: "No new network route; existing tier serves the archive." }
+    - { id: C8, status: answered, justification: "Manifest carries ISA notes and observable glibc header version; absent notes do not claim baseline compatibility." }
+    - { id: C9, status: answered, justification: "Archive, manifest and members use existing raw-byte CIDs; recipe changes alter method identity." }
+    - { id: C10, status: answered, justification: "Explicit format version; unknown versions and noncanonical encodings refuse." }
+    - { id: C11, status: answered, justification: "One archive and manifest per pack, no head or recurring per-file reconciliation cost." }
+    - { id: C12, status: answered, justification: "Private local payload; explicit cross uses existing Produce crossing and steward grants." }
+    - { id: C13, status: n-a, justification: "No agency or authority tier." }
+    - { id: C14, status: partial, justification: "Recorded ISA requirements are observations, not instruction coverage or host admission. Target realization stays deferred." }
+  contractTests:
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: pack_is_relocation_metadata_and_creation_order_independent, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: script_absolute_operands_are_rebased_and_missing_host_files_refuse, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: materialize_verifies_every_file_and_hits_without_replacing, kind: unit }
+    - { path: elohim/eprfs/epr-cli/src/artifact/sysroot_tests.rs, testName: isa_notes_record_v3_payload_and_tampered_evidence_refuses, kind: unit }

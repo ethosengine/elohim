@@ -138,7 +138,10 @@ impl ArtifactIndex {
         self.unindexed.remove(&held.manifest);
         self.retry.remove(&held.manifest);
         self.remove_output(&held.output);
-        for object in std::iter::once(&held.manifest).chain(&held.chunks) {
+        for object in std::iter::once(&held.manifest)
+            .chain(std::iter::once(&held.method))
+            .chain(&held.chunks)
+        {
             self.by_object
                 .entry(object.clone())
                 .or_default()
@@ -150,7 +153,10 @@ impl ArtifactIndex {
     /// Drop the entry for `output` and every membership it gave its objects.
     fn remove_output(&mut self, output: &BlobCid) -> Option<Held> {
         let old = self.by_output.remove(output)?;
-        for object in std::iter::once(&old.manifest).chain(&old.chunks) {
+        for object in std::iter::once(&old.manifest)
+            .chain(std::iter::once(&old.method))
+            .chain(&old.chunks)
+        {
             let emptied = self.by_object.get_mut(object).is_some_and(|outputs| {
                 outputs.remove(output);
                 outputs.is_empty()
@@ -874,7 +880,8 @@ pub(crate) async fn answer(
         return refuse(refusal);
     }
     // Membership in the very entry whose method admitted the root, and in the index now.
-    let in_held = *object == held.manifest || held.chunks.contains(object);
+    let in_held =
+        *object == held.manifest || *object == held.method || held.chunks.contains(object);
     if !in_held || !mount.object_of(artifact, object) {
         return refuse(ReachRefusal::new(ReachReason::NotUnderRoot, None));
     }

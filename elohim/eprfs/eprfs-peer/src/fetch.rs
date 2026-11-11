@@ -7,8 +7,9 @@
 //!    its answer frame capped at [`FetchBudget::manifest_cap`] so an oversized manifest is refused
 //!    before any chunk moves. The served bytes must be the manifest the holder's crossed record
 //!    named, must decode under this reader's epoch, and must carry a record whose `key` equals the
-//!    key *this* device computed and whose `output` equals the output asked: a manifest keyed for
-//!    another closure is rejected however well it verifies.
+//!    key *this* device computed (derivation authority) or the explicit output CID (output
+//!    authority). Both require exact output equality. Output authority also retrieves and
+//!    verifies the producer's method record; it never claims a locally computed key.
 //! 2. **Resume.** A chunk already held here is not asked again.
 //! 3. **Race.** Missing chunks are spread round-robin across every holder, at most
 //!    [`FetchBudget::in_flight_per_holder`] on one connection, each under [`FetchBudget::stall`].
@@ -454,6 +455,7 @@ async fn decode_manifest(cid: &BlobCid, bytes: &Bytes) -> Result<TierBlobManifes
 
 /// The accepted manifest and the connection it came on.
 struct Accepted {
+    method: Option<Bytes>,
     holder: usize,
     connection: Connection,
     cid: BlobCid,
@@ -482,7 +484,7 @@ struct Bounds<'a> {
 /// Ask the holders for the manifest in order, until one serves a manifest this device accepts.
 async fn accept_manifest(
     endpoint: &Endpoint,
-    key: &DerivationKey,
+    key: Option<&DerivationKey>,
     output: &BlobCid,
     holders: &[Holder],
     bounds: &Bounds<'_>,
@@ -538,24 +540,40 @@ async fn accept_manifest(
                 } else {
                     match decode_manifest(&cid, &bytes).await {
                         Err(reason) => rejected(format!("{cid}: {reason}")),
-                        Ok(manifest) if manifest.record.key != *key => rejected(format!(
+                        Ok(manifest) if key.is_some_and(|key| manifest.record.key != *key) => {
+                            rejected(format!(
                             "{cid} is keyed for another closure (method {}, input {}), not the \
                              one computed here",
                             manifest.record.key.method,
                             manifest.record.key.input.cid()
-                        )),
+                        ))
+                        }
                         Ok(manifest) if manifest.record.output != *output => rejected(format!(
                             "{cid} names output {}, not {output}",
                             manifest.record.output
                         )),
                         Ok(manifest) => {
+                            let method = if key.is_none() {
+                                match fetch_method(&connection, &manifest, bounds, relay).await {
+                                    Ok(bytes) => Some(bytes),
+                                    Err(reason) => {
+                                        connection.close(VarInt::from_u32(0), b"");
+                                        last = rejected(reason);
+                                        unreachable.insert(index);
+                                        continue;
+                                    }
+                                }
+                            } else {
+                                None
+                            };
                             return Ok(Accepted {
+                                method,
                                 holder: index,
                                 connection,
                                 cid,
                                 bytes,
                                 manifest,
-                            })
+                            });
                         }
                     }
                 }
@@ -604,6 +622,46 @@ async fn accept_manifest(
     Err(last)
 }
 
+// A method is an existing member of an admitted artifact, served under that artifact's grant.
+async fn fetch_method(
+    connection: &Connection,
+    manifest: &TierBlobManifest,
+    bounds: &Bounds<'_>,
+    relay: bool,
+) -> Result<Bytes, String> {
+    let cid = &manifest.record.key.method;
+    let request = TierRequest::Blob {
+        artifact: manifest.record.output.clone(),
+        cid: cid.clone(),
+    };
+    let received = AtomicU64::new(0);
+    let bound = request_bound(
+        relay,
+        u64::from(bounds.budget.manifest_cap),
+        bounds.budget,
+        bounds.deadline,
+    );
+    let answer = tokio::time::timeout(
+        bound.wait,
+        tier_request_counted(connection, &request, bounds.budget.manifest_cap, &received),
+    )
+    .await;
+    let Ok(Ok(TierAnswer::Blob { cid: got, bytes })) = answer else {
+        return Err("the producer's method record could not be fetched within the bound".into());
+    };
+    if got != *cid || !cid.verifies(&bytes) {
+        return Err("method CID mismatch".into());
+    }
+    let descriptor: MethodDescriptor =
+        serde_ipld_dagcbor::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if descriptor.cid().ok().as_ref() != Some(cid)
+        || descriptor.deterministic != manifest.record.deterministic
+    {
+        return Err("method record disagrees with the derivation".into());
+    }
+    Ok(bytes)
+}
+
 /// Fetch the artifact `output` derived under `key` from `holders` into `store` (design §3.b.3),
 /// within `budget.total` from now. The install read is [`install_fetched`]'s.
 ///
@@ -640,6 +698,39 @@ pub async fn fetch_artifact_until<S: EprfsStorage + ?Sized>(
     budget: &FetchBudget,
     deadline: Instant,
 ) -> Result<FetchedArtifact, FetchGap> {
+    fetch_authorized_until(
+        endpoint,
+        store,
+        &FetchAuthority::Derivation {
+            key: key.clone(),
+            key_cid: key_cid(key).map_err(|e| FetchGap::ManifestRejected {
+                reason: e.to_string(),
+            })?,
+        },
+        output,
+        holders,
+        budget,
+        deadline,
+    )
+    .await
+}
+
+/// Fetch under an explicit authority, rechecked before any dial. Output authority never claims
+/// that this device reproduced the producer's key; its method record is verified and retained.
+///
+/// # Errors
+/// The same bounded transport/integrity gaps as [`fetch_artifact_until`].
+pub async fn fetch_authorized_until<S: EprfsStorage + ?Sized>(
+    endpoint: &Endpoint,
+    store: &S,
+    authority: &FetchAuthority,
+    output: &BlobCid,
+    holders: &[Holder],
+    budget: &FetchBudget,
+    deadline: Instant,
+) -> Result<FetchedArtifact, FetchGap> {
+    authority.validate(output)?;
+    let key = authority.key();
     if budget.transport == FetchTransport::IrohBlobs {
         return Err(FetchGap::TransportCannotDeliver {
             mode: FetchTransport::IrohBlobs.name().into(),
@@ -667,7 +758,7 @@ pub async fn fetch_artifact_until<S: EprfsStorage + ?Sized>(
 async fn fetch_within<S: EprfsStorage + ?Sized>(
     endpoint: &Endpoint,
     store: &S,
-    key: &DerivationKey,
+    key: Option<&DerivationKey>,
     output: &BlobCid,
     holders: &[Holder],
     bounds: &Bounds<'_>,
@@ -685,7 +776,16 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
         cid: manifest_cid,
         bytes: manifest_bytes,
         manifest,
+        method,
     } = accept_manifest(endpoint, key, output, holders, bounds, &mut unreachable).await?;
+    if let Some(bytes) = method {
+        store
+            .put_blob_verified(&manifest.record.key.method, bytes)
+            .await
+            .map_err(|e| FetchGap::LocalStore {
+                reason: e.to_string(),
+            })?;
+    }
     progress.total.store(manifest.byte_len, Ordering::Relaxed);
 
     // Resume: only the distinct chunks not held here are asked for.
@@ -1363,6 +1463,106 @@ pub fn resolve_holders(
     })
 }
 
+/// Resolve an exact output through K5's custody fold, across producer keys. Local-only custody
+/// and an absent CID remain typed gaps. The output pin is the authority, never a guessed key.
+///
+/// # Errors
+/// [`FetchGap::ExpectedOutputUnavailable`] or [`FetchGap::LocalOnlyCustody`].
+pub fn resolve_output_holders(
+    output: &BlobCid,
+    records: &[SiblingRecord],
+    own_device: &str,
+) -> Result<HolderSelection, FetchGap> {
+    let current: Vec<_> = fold_holders(records)
+        .into_iter()
+        .filter(|r| &r.output == output)
+        .collect();
+    if current.is_empty() {
+        return Err(FetchGap::ExpectedOutputUnavailable {
+            output: output.clone(),
+        });
+    }
+    let mut devices = BTreeSet::new();
+    // The serving index retains the latest manifest for an output. If one device produced
+    // identical bytes under several keys, choose its newest claim, not the first sorted key.
+    let holders: Vec<_> = records
+        .iter()
+        .rev()
+        .filter(|r| {
+            &r.output == output && r.device != own_device && devices.insert(r.device.clone())
+        })
+        .map(|r| RequestedHolder {
+            device: r.device.clone(),
+            manifest: r.manifest.clone(),
+        })
+        .collect();
+    if holders.is_empty() {
+        return Err(FetchGap::LocalOnlyCustody {
+            outputs: vec![output.clone()],
+        });
+    }
+    Ok(HolderSelection {
+        output: output.clone(),
+        holders,
+        rule: "output",
+        outputs: vec![output.clone()],
+    })
+}
+
+/// The request's authority: either a locally computed derivation or an exact byte CID.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum FetchAuthority {
+    Derivation {
+        key: DerivationKey,
+        key_cid: BlobCid,
+    },
+    Output {
+        cid: BlobCid,
+    },
+}
+
+impl FetchAuthority {
+    /// Identity used in the private queue's filename.
+    pub fn cid(&self) -> &BlobCid {
+        match self {
+            Self::Derivation { key_cid, .. } => key_cid,
+            Self::Output { cid } => cid,
+        }
+    }
+
+    /// The computed key, only for derivation authority.
+    pub fn key(&self) -> Option<&DerivationKey> {
+        match self {
+            Self::Derivation { key, .. } => Some(key),
+            Self::Output { .. } => None,
+        }
+    }
+
+    /// Recheck a queued authority before transport, independently of the CLI.
+    ///
+    /// # Errors
+    /// A manifest rejection for an inconsistent key or output pin.
+    pub fn validate(&self, output: &BlobCid) -> Result<(), FetchGap> {
+        let valid = match self {
+            Self::Derivation { key, key_cid: cid } => key_cid(key).ok().as_ref() == Some(cid),
+            Self::Output { cid } => cid == output,
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(FetchGap::ManifestRejected {
+                reason: "request authority disagrees with its key or output".into(),
+            })
+        }
+    }
+}
+
 /// One holder named in a queued request: a device and the manifest its crossed record names.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1380,10 +1580,7 @@ pub struct FetchRequest {
     /// This request alone: its file names and its answer carry it, so no other request's answer is
     /// ever taken for it.
     pub nonce: String,
-    /// The key this device computed.
-    pub key: DerivationKey,
-    /// [`key_cid`] of `key`.
-    pub key_cid: BlobCid,
+    pub authority: FetchAuthority,
     pub output: BlobCid,
     /// Optional caller constraint, rechecked by the daemon before any bytes move.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1409,9 +1606,9 @@ impl FetchRequest {
         }
     }
 
-    /// The file stem this request is queued under: `<key CID>-<nonce>`.
+    /// The file stem this request is queued under: `<authority CID>-<nonce>`.
     pub fn stem(&self) -> String {
-        format!("{}-{}", self.key_cid, self.nonce)
+        format!("{}-{}", self.authority.cid(), self.nonce)
     }
 
     /// A fresh nonce: 128 random bits, hex.
@@ -1430,7 +1627,7 @@ impl FetchRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FetchFor {
     pub nonce: String,
-    pub key_cid: BlobCid,
+    pub authority: FetchAuthority,
     pub output: BlobCid,
     pub dest: PathBuf,
 }
@@ -1440,7 +1637,7 @@ impl FetchFor {
     pub fn of(request: &FetchRequest) -> FetchFor {
         FetchFor {
             nonce: request.nonce.clone(),
-            key_cid: request.key_cid.clone(),
+            authority: request.authority.clone(),
             output: request.output.clone(),
             dest: request.dest.clone(),
         }

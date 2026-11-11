@@ -394,6 +394,7 @@ mod tests {
         ] {
             std::fs::write(&linker, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
             std::fs::set_permissions(&linker, std::fs::Permissions::from_mode(0o755)).unwrap();
+            fixture::wait_for_stub(&linker);
             descriptor.non_path_inputs.insert(
                 "RUSTFLAGS".into(),
                 format!("-C link-arg=-fuse-ld={}", linker.display()),

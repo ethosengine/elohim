@@ -51,9 +51,9 @@ use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
 use crate::fetch::{
-    admitted_holders, ensure_queue_dir, fetch_artifact_until, fetch_cancel_path, fetch_done_path,
-    fetch_queue_dir, install_fetched, key_cid, queue_dir_is_private, read_queue_file,
-    write_queue_file, FetchDone, FetchFor, FetchGap, FetchRequest, InstallScope,
+    admitted_holders, ensure_queue_dir, fetch_authorized_until, fetch_cancel_path, fetch_done_path,
+    fetch_queue_dir, install_fetched, queue_dir_is_private, read_queue_file, write_queue_file,
+    FetchDone, FetchFor, FetchGap, FetchRequest, InstallScope,
 };
 use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
@@ -1313,7 +1313,7 @@ impl Run {
                 },
             )
         };
-        if request.stem() != stem || key_cid(&request.key).ok().as_ref() != Some(&request.key_cid) {
+        if request.stem() != stem || request.authority.validate(&request.output).is_err() {
             let answer =
                 refused("the request's key and nonce do not name the file it was queued in".into());
             self.write_done(&done, &answer);
@@ -1375,10 +1375,10 @@ impl Run {
             let budget = request.budget();
             let deadline = Instant::now() + budget.total;
             let outcome = async {
-                let fetched = fetch_artifact_until(
+                let fetched = fetch_authorized_until(
                     &endpoint,
                     store.as_ref(),
-                    &request.key,
+                    &request.authority,
                     &request.output,
                     &holders,
                     &budget,

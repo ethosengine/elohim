@@ -172,7 +172,8 @@
     "artifacts": {
       "_comment": "Which derivation artifacts this device's tier serves, and to whom (artifact-store design 2026-11-07 §1.4). `serves` is {method name: [audiences]}, default deny: an artifact is served only when the name of the method descriptor its derivation record keys is listed here, and only to an audience listed for that name. `steward` = every device of the person the roster admits now; `carrier:<did:key>` is reserved for a carrier grant (D9) and grants nothing yet. Every other artifact is held and never served. An admitted device asking outside its grant is refused with a typed reason (`serve-blob:<method>`); anyone else gets the tier's uniform refusal. The grant enters the rules digest `epr peer status` compares.",
       "serves": {
-        "mesh-build": ["steward"]
+        "mesh-build": ["steward"],
+        "sysroot-pack": ["steward"]
       }
     },
     "classes": {

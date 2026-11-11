@@ -39,14 +39,18 @@ use eprfs_core::{
 use eprfs_peer::{
     ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
     key_cid, put_local_blob_with, put_method_record, read_queue_file, resolve_holders,
-    write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport,
-    LocalBlobContext, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
+    resolve_output_holders, write_queue_file, Bytes, FetchAuthority, FetchDone, FetchFor, FetchGap,
+    FetchRequest, FetchTransport, LocalBlobContext, ARTIFACT_PRODUCE_KIND,
+    ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
 };
 use serde::Serialize;
 
 mod custody;
 mod requires;
 use requires::read_requires;
+pub mod sysroot;
+#[path = "artifact/sysroot_cli.rs"]
+mod sysroot_cli;
 
 use crate::device_key::{self, DeviceKey};
 use crate::peer::{self, PeerCliError, ServeLock};
@@ -99,7 +103,9 @@ pub fn usage() -> String {
      --requires stores the document locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
      exits 3 `unrecorded: <reason>`)\n  \
-     | fetch --method FILE --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
+     | sysroot pack --from DIR --triple T --out FILE [--json]\n  \
+     | sysroot put --archive FILE [--project P] [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json]\n  \
+     | fetch (--method FILE | --output CID) --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
      [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
      serve; exits 3 `fetch gap: <kind>: <reason>`)\n  \
@@ -114,8 +120,15 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         println!("{}", usage());
         return Ok(ExitCode::SUCCESS);
     }
-    let options = Options::parse(args.get(1..).unwrap_or_default())?;
+    let sysroot_verb = (verb == Some("sysroot"))
+        .then(|| args.get(1).map(String::as_str))
+        .flatten();
+    let options = Options::parse(
+        args.get(if verb == Some("sysroot") { 2 } else { 1 }..)
+            .unwrap_or_default(),
+    )?;
     let outcome = match verb {
+        Some("sysroot") => sysroot_cli::run(sysroot_verb, &options),
         Some("describe") => describe(&options),
         Some("key") => key(&options),
         Some("put") => put(&options),
@@ -150,6 +163,9 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
 #[derive(Debug, Default)]
 struct Options {
     repo: PathBuf,
+    from: Option<PathBuf>,
+    triple: Option<String>,
+    archive: Option<PathBuf>,
     project: Option<String>,
     bin: Option<String>,
     features: Option<String>,
@@ -212,6 +228,9 @@ impl Options {
                     .map_err(|e| ArtifactError::InvalidArguments(format!("{flag} {value}: {e}")))
             };
             match flag {
+                "--from" => options.from = Some(PathBuf::from(value)),
+                "--triple" => options.triple = Some(value),
+                "--archive" => options.archive = Some(PathBuf::from(value)),
                 "--repo" => options.repo = PathBuf::from(value),
                 "--project" => options.project = Some(value),
                 "--bin" => options.bin = Some(value),
@@ -1260,8 +1279,6 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
 }
 
 fn put(options: &Options) -> ArtifactResult<ExitCode> {
-    // Shape only: host_contract will decode and merge clauses at the consumer in K3 part 2.
-    let requires = options.requires.as_deref().map(read_requires).transpose()?;
     let project = Options::required(&options.project, "--project")?;
     let input = Options::required(&options.input, "--input")?;
     let bytes_path = options.bytes.as_ref().ok_or_else(|| {
@@ -1312,6 +1329,24 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
             .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
     );
     check_linker(&descriptor, &selections, &bytes).map_err(unrecorded)?;
+    record_artifact(options, &effective, &key, bytes, BASIS_KEY_SLOT, None)
+}
+
+// The only recording tail. Each caller must validate its payload first: ELF linker witness for
+// executable put, complete manifest/evidence verification for sysroot put.
+fn record_artifact(
+    options: &Options,
+    descriptor: &MethodDescriptor,
+    key: &ClosureKey,
+    bytes: Bytes,
+    basis: &str,
+    sysroot_manifest: Option<&sysroot::Manifest>,
+) -> ArtifactResult<ExitCode> {
+    // Shape only: host_contract will decode and merge clauses at the consumer in K3 part 2.
+    let requires = options.requires.as_deref().map(read_requires).transpose()?;
+    let project = options.project.as_deref().unwrap_or("sysroot");
+    let repo = &options.repo;
+    let step = format!("{}:{project}", descriptor.name);
     let output = BlobCid::compute_bytes(&bytes);
 
     let signer: serde_json::Value = serde_json::from_str(&brit(repo, &["signer", "--json"])?)
@@ -1393,10 +1428,10 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
     };
     let byte_len = bytes.len() as u64;
     let mut extra = vec![
-        BASIS_KEY_SLOT.to_string(),
+        basis.to_string(),
         format!("env:project={project}"),
         format!("env:method={}", key.method),
-        format!("env:family={}", effective.family_cid().map_err(unrecorded)?),
+        format!("env:family={}", descriptor.family_cid().map_err(unrecorded)?),
         format!("env:input={}", key.input),
         format!("env:key={}", key.key_cid),
         format!("env:output={output}"),
@@ -1408,7 +1443,13 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         extra.push(format!("env:requires={cid}"));
     }
     let put = runtime.block_on(async {
-        put_method_record(store.as_ref(), &effective)
+        if let Some(manifest) = sysroot_manifest {
+            store
+                .put_blob_verified(&manifest.cid()?, Bytes::from(manifest.canonical_bytes()?))
+                .await
+                .map_err(unrecorded)?;
+        }
+        put_method_record(store.as_ref(), descriptor)
             .await
             .map_err(|e| unrecorded(format!("the method record is not stored: {e}")))?;
         if let Some((cid, bytes)) = requires {
@@ -1495,10 +1536,30 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     } else {
         std::env::current_dir()?.join(dest)
     };
-    let descriptor = read_descriptor(options)
-        .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-key: {e}")))?;
-    let key = clean_key(&options.repo, &descriptor)
-        .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-key: {e}")))?;
+    if options.method.is_some() == options.output.is_some() {
+        return Err(ArtifactError::InvalidArguments(
+            "fetch needs exactly one of --method or --output".into(),
+        ));
+    }
+    if options.output.is_some() && options.expect_output.is_some() {
+        return Err(ArtifactError::InvalidArguments(
+            "--expect-output belongs to method fetch; --output is already an exact pin".into(),
+        ));
+    }
+    let authority = if let Some(output) = &options.output {
+        FetchAuthority::Output {
+            cid: output.clone(),
+        }
+    } else {
+        let descriptor = read_descriptor(options)
+            .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-key: {e}")))?;
+        let key = clean_key(&options.repo, &descriptor)
+            .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-key: {e}")))?;
+        FetchAuthority::Derivation {
+            key: key.key,
+            key_cid: key.key_cid,
+        }
+    };
     let peer_dir = peer::peer_dir()?;
     if ServeLock::held(&peer_dir) != Some(true) {
         return Err(gap(&FetchGap::DaemonDown));
@@ -1506,12 +1567,15 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())
         .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-record: {e}")))?;
     let records = custody::records(&found);
-    let selection = resolve_holders(
-        &key.key_cid,
-        &records,
-        &found.device,
-        options.expect_output.as_ref(),
-    )
+    let selection = match &authority {
+        FetchAuthority::Derivation { key_cid, .. } => resolve_holders(
+            key_cid,
+            &records,
+            &found.device,
+            options.expect_output.as_ref(),
+        ),
+        FetchAuthority::Output { cid } => resolve_output_holders(cid, &records, &found.device),
+    }
     .map_err(|why| gap(&why))?;
     let scope = crate::flow::repository::repository_scope(&options.repo)
         .map_err(|e| ArtifactError::Gap(format!("fetch gap: local-store: {e}")))?;
@@ -1521,8 +1585,7 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     );
     let request = FetchRequest {
         nonce: FetchRequest::fresh_nonce(),
-        key: key.key.clone(),
-        key_cid: key.key_cid.clone(),
+        authority: authority.clone(),
         output: selection.output.clone(),
         expect_output: options.expect_output.clone(),
         holders: selection.holders.clone(),
@@ -1562,16 +1625,13 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
             manifest,
             ..
         } => {
-            custody::record_divergence(
-                &found.served_root,
-                &found.device,
-                &key.key_cid,
-                &selection,
-            )?;
+            if let FetchAuthority::Derivation { key_cid, .. } = &authority {
+                custody::record_divergence(&found.served_root, &found.device, key_cid, &selection)?;
+            }
             if !options.json && selection.outputs.len() > 1 {
                 println!(
                     "divergence: key {} outputs {} chosen {} rule {}",
-                    key.key_cid,
+                    authority.cid(),
                     selection
                         .outputs
                         .iter()
@@ -1587,7 +1647,8 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
                     "{}",
                     serde_json::json!({
                         "installed": dest,
-                        "keyCid": key.key_cid,
+                        "keyCid": authority.key().map(|_| authority.cid()),
+                        "authority": authority,
                         "output": selection.output,
                         "rule": selection.rule,
                         "outputs": selection.outputs,

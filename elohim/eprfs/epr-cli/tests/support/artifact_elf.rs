@@ -67,3 +67,21 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
     bytes.extend_from_slice(comment);
     bytes
 }
+
+/// Newly written executable fixtures can briefly return ETXTBSY on overlay-backed /tmp.
+/// Wait only for that transient publication condition; other errors remain immediate failures.
+pub fn wait_for_stub(path: &std::path::Path) {
+    for _ in 0..100 {
+        match std::process::Command::new(path).arg("--version").output() {
+            Ok(output) => {
+                assert!(output.status.success());
+                return;
+            }
+            Err(error) if error.raw_os_error() == Some(26) => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(error) => panic!("{}: {error}", path.display()),
+        }
+    }
+    panic!("{} stayed ETXTBSY", path.display());
+}

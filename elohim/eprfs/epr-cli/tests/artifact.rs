@@ -23,7 +23,7 @@ use tempfile::TempDir;
 
 #[path = "support/artifact_elf.rs"]
 mod fixture;
-use fixture::artifact_elf;
+use fixture::{artifact_elf, wait_for_stub};
 
 const HANDLE: &str = "matthew";
 const AGENT_ID: &str = "4f5e3d2c1b0a99887766554433221100ffeeddccbbaa00998877665544332211";
@@ -750,7 +750,9 @@ fn a_completion_for_another_request_is_never_accepted() {
     let queue = TempDir::new().unwrap();
     let ours = FetchFor {
         nonce: "0123456789abcdef0123456789abcdef".into(),
-        key_cid: BlobCid::compute(b"\xa1\x61k\x61v"),
+        authority: eprfs_peer::FetchAuthority::Output {
+            cid: BlobCid::compute(b"\xa1\x61k\x61v"),
+        },
         output: BlobCid::compute_bytes(b"the binary"),
         dest: PathBuf::from("/pool/mesh-bin/elohim-storage"),
     };
@@ -782,7 +784,9 @@ fn a_completion_for_another_request_is_never_accepted() {
             ..ours.clone()
         },
         FetchFor {
-            key_cid: BlobCid::compute(b"\xa1\x61k\x61w"),
+            authority: eprfs_peer::FetchAuthority::Output {
+                cid: BlobCid::compute(b"\xa1\x61k\x61w"),
+            },
             ..ours.clone()
         },
     ];
@@ -932,23 +936,6 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
         1,
         "only the put that knew its store recorded"
     );
-}
-
-/// A newly closed script can still report ETXTBSY on the workspace filesystem.
-fn wait_for_stub(path: &Path) {
-    for _ in 0..100 {
-        match Command::new(path).arg("--version").output() {
-            Ok(output) => {
-                assert!(output.status.success());
-                return;
-            }
-            Err(error) if error.raw_os_error() == Some(26) => {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Err(error) => panic!("{}: {error}", path.display()),
-        }
-    }
-    panic!("{} stayed ETXTBSY", path.display());
 }
 
 fn fake_tool(dir: &Path, name: &str, body: &str) {
@@ -2543,4 +2530,178 @@ fn artifact_family_preserves_conflicts_older_holders_and_local_availability() {
         b.key.did_key(),
         output
     )));
+}
+
+#[test]
+fn artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority() {
+    use eprfs_peer::{FetchAuthority, FetchDone, FetchFor, FetchRequest};
+    use std::time::{Duration, Instant};
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let input = scratch.path().join("input");
+    std::fs::create_dir(&input).unwrap();
+    std::fs::write(input.join("header.h"), b"/* content-pinned header */").unwrap();
+    let archive = scratch.path().join("sysroot.eprsys");
+    let packed = a.epr(&[
+        "artifact",
+        "sysroot",
+        "pack",
+        "--from",
+        input.to_str().unwrap(),
+        "--triple",
+        "x86_64-unknown-linux-gnu",
+        "--out",
+        archive.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(packed.status.success(), "{}", text(&packed));
+    let bytes = std::fs::read(&archive).unwrap();
+    let output = BlobCid::compute_bytes(&bytes);
+    let (stub, log) = brit_stub(scratch.path());
+    let put = a
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .args([
+            "artifact",
+            "sysroot",
+            "put",
+            "--archive",
+            archive.to_str().unwrap(),
+            "--repo",
+            a.root().to_str().unwrap(),
+            "--cross",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(put.status.success(), "{}", text(&put));
+    let recorded: serde_json::Value = serde_json::from_slice(&put.stdout).unwrap();
+    assert_eq!(recorded["output"], output.to_string());
+    let verified = elohim_epr_cli::artifact::sysroot::verify(&bytes).unwrap();
+    assert_eq!(recorded["input"], verified.cid().unwrap().to_string());
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let store = eprfs_peer::open_payload_store(&a.payload()).unwrap();
+        let held = store
+            .fetch_blob(&verified.cid().unwrap(), eprfs_core::FetchPolicy::LocalOnly)
+            .await
+            .unwrap();
+        assert_eq!(held.bytes.as_ref(), verified.canonical_bytes().unwrap());
+    });
+    assert!(std::fs::read_to_string(log)
+        .unwrap()
+        .contains("--step sysroot-pack:sysroot"));
+    let manifest = BlobCid::parse(recorded["manifest"].as_str().unwrap()).unwrap();
+    let produces: Vec<_> = events(a.root())
+        .into_iter()
+        .filter(|e| e.action == ReaVerb::Produce)
+        .collect();
+    assert_eq!(produces.len(), 1);
+    assert!(produces[0]
+        .classified_as
+        .contains(&"basis-key:sysroot-manifest".into()));
+    let mut crossed = produces[0].clone();
+    crossed
+        .classified_as
+        .push(format!("via:{}", a.key.did_key()));
+    SidecarFlowStore::open(b.root())
+        .unwrap()
+        .append(FlowRecord::Event(crossed))
+        .unwrap();
+    let peer_dir = b.config.path().join("epr/peer");
+    let _lock = elohim_epr_cli::peer::ServeLock::acquire(&peer_dir).unwrap();
+    let queue = eprfs_peer::fetch_queue_dir(&peer_dir);
+    eprfs_peer::ensure_queue_dir(&queue).unwrap();
+    let expected = output.clone();
+    let holder = a.key.did_key();
+    let expected_bytes = bytes.clone();
+    let worker = std::thread::spawn(move || {
+        // This fixture tests CLI/custody/queue integration. The peer suite separately exercises
+        // real tier method verification, bounded transfer, whole-blob verification and install.
+        let started = Instant::now();
+        let (path, request) = loop {
+            let found = std::fs::read_dir(&queue)
+                .unwrap()
+                .filter_map(Result::ok)
+                .find_map(|entry| {
+                    let path = entry.path();
+                    if path.extension().and_then(|x| x.to_str()) != Some("json") {
+                        return None;
+                    }
+                    let request: FetchRequest =
+                        serde_json::from_slice(&std::fs::read(&path).ok()?).ok()?;
+                    if path != eprfs_peer::fetch_request_path(&queue, &request.stem()) {
+                        return None;
+                    }
+                    Some((path, request))
+                });
+            if let Some(found) = found {
+                break found;
+            }
+            assert!(started.elapsed() < Duration::from_secs(30));
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(
+            request.authority,
+            FetchAuthority::Output {
+                cid: expected.clone()
+            }
+        );
+        request.authority.validate(&request.output).unwrap();
+        assert_eq!(request.output, expected);
+        assert_eq!(request.holders.len(), 1);
+        assert_eq!(request.holders[0].device, holder);
+        assert_eq!(request.holders[0].manifest, manifest);
+        assert_eq!(BlobCid::compute_bytes(&expected_bytes), request.output);
+        let stage = request.dest.with_extension("stage");
+        std::fs::write(&stage, expected_bytes).unwrap();
+        std::fs::rename(stage, &request.dest).unwrap();
+        std::fs::remove_file(path).unwrap();
+        eprfs_peer::write_queue_file(
+            &eprfs_peer::fetch_done_path(&queue, &request.stem()),
+            &FetchDone::Installed {
+                for_request: FetchFor::of(&request),
+                manifest,
+                manifest_from: holder.clone(),
+                fetched_from: vec![holder],
+                chunks_fetched: 1,
+                chunks_resumed: 0,
+                bytes_fetched: bytes.len() as u64,
+                wasted: 0,
+                seconds: 0.01,
+            },
+        )
+        .unwrap();
+    });
+    let dest = scratch.path().join("fetched.eprsys");
+    let fetch = |cid: &BlobCid| {
+        b.epr(&[
+            "artifact",
+            "fetch",
+            "--output",
+            &cid.to_string(),
+            "--dest",
+            dest.to_str().unwrap(),
+            "--repo",
+            b.root().to_str().unwrap(),
+            "--json",
+        ])
+    };
+    let result = fetch(&output);
+    worker.join().unwrap();
+    assert!(result.status.success(), "{}", text(&result));
+    let answer: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert!(answer["keyCid"].is_null());
+    assert_eq!(answer["authority"]["kind"], "output");
+    assert_eq!(
+        BlobCid::compute_bytes(&std::fs::read(&dest).unwrap()),
+        output
+    );
+    let missing = fetch(&BlobCid::compute_bytes(b"unheld"));
+    assert_eq!(missing.status.code(), Some(3));
+    assert!(
+        text(&missing).contains("expected-output-unavailable"),
+        "{}",
+        text(&missing)
+    );
 }

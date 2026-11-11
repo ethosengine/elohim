@@ -1491,8 +1491,10 @@ fn request_for(
 ) -> eprfs_peer::FetchRequest {
     eprfs_peer::FetchRequest {
         nonce: eprfs_peer::FetchRequest::fresh_nonce(),
-        key: key.clone(),
-        key_cid: key_cid(key).expect("key cid"),
+        authority: eprfs_peer::FetchAuthority::Derivation {
+            key: key.clone(),
+            key_cid: key_cid(key).expect("key cid"),
+        },
         output: output.clone(),
         expect_output: None,
         holders,
@@ -1653,6 +1655,27 @@ async fn a_queued_expected_fetch_installs_retained_output_after_a_newer_producti
         .collect();
     assert_eq!(installed.len(), 1, "one install Use on the fetching device");
     assert_eq!(installed[0].resource, *output.as_cid());
+    // CID authority goes through the same real daemon. It must survive without a locally
+    // computed key, while a contradictory pin is refused before installation.
+    let mut pinned = request_for(&key, &output, holders, dest.clone());
+    pinned.authority = eprfs_peer::FetchAuthority::Output {
+        cid: output.clone(),
+    };
+    assert!(matches!(
+        queue_and_wait(&queue, &pinned).await,
+        eprfs_peer::FetchDone::Installed { .. }
+    ));
+    assert!(is_held(c_side.store().as_ref(), &key.method).await);
+    pinned.nonce = eprfs_peer::FetchRequest::fresh_nonce();
+    pinned.output = BlobCid::compute_bytes(b"contradictory pin");
+    assert!(matches!(
+        queue_and_wait(&queue, &pinned).await,
+        eprfs_peer::FetchDone::Gap {
+            gap: FetchGap::InstallRefused { .. },
+            ..
+        }
+    ));
+    assert_eq!(std::fs::read(&dest).unwrap(), bytes.to_vec());
     c_daemon.shutdown().await;
     a_daemon.shutdown().await;
 }
@@ -2008,5 +2031,170 @@ async fn plurality_fetch_uses_only_the_chosen_outputs_holders() {
     assert!(
         c.tier.asked.lock().unwrap().is_empty(),
         "the divergent holder receives no request"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn output_authority_fetches_producer_method_and_exact_bytes_without_a_local_key() {
+    use eprfs_peer::{fetch_authorized_until, FetchAuthority};
+    let t = three();
+    let mut a = real_holder(&t, &t.a, &t.key_a).await;
+    let key = key_for("only-the-producer-has-this-closure");
+    let bytes = artifact_bytes(23, 700_000);
+    let manifest = a.put(&t.a.did, &key, bytes.clone()).await;
+    let output = BlobCid::compute_bytes(&bytes);
+    let authority = FetchAuthority::Output {
+        cid: output.clone(),
+    };
+    let endpoint = fetcher(&t.key_c).await;
+    let (dir, store) = payload();
+    let fetched = fetch_authorized_until(
+        &endpoint,
+        store.as_ref(),
+        &authority,
+        &output,
+        &[a.holder(&t.a.did, &manifest)],
+        &budget(),
+        Instant::now() + WITHIN,
+    )
+    .await
+    .unwrap();
+    assert!(
+        is_held(store.as_ref(), &key.method).await,
+        "verified method record is retained"
+    );
+    let dest = dir.path().join("archive");
+    install_fetched(
+        store.as_ref(),
+        &mut MemoryFlowStore::new(),
+        &fetched,
+        &context(&t.c.did),
+        &dest,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        BlobCid::compute_bytes(&std::fs::read(&dest).unwrap()),
+        output
+    );
+    let wrong = BlobCid::compute_bytes(b"different-output");
+    assert!(matches!(
+        fetch_authorized_until(
+            &endpoint,
+            store.as_ref(),
+            &authority,
+            &wrong,
+            &[],
+            &budget(),
+            Instant::now() + WITHIN
+        )
+        .await,
+        Err(FetchGap::ManifestRejected { .. })
+    ));
+    let wrong_authority = FetchAuthority::Output { cid: wrong.clone() };
+    assert!(fetch_authorized_until(
+        &endpoint,
+        store.as_ref(),
+        &wrong_authority,
+        &wrong,
+        &[a.holder(&t.a.did, &manifest)],
+        &budget(),
+        Instant::now() + WITHIN
+    )
+    .await
+    .is_err());
+    assert_eq!(
+        BlobCid::compute_bytes(&std::fs::read(dest).unwrap()),
+        output,
+        "refusal preserves installed bytes"
+    );
+}
+
+#[test]
+fn output_holders_fold_across_keys_and_report_missing_or_local_only() {
+    use eprfs_peer::resolve_output_holders;
+    let output = BlobCid::compute_bytes(b"archive");
+    let rows = vec![
+        SiblingRecord {
+            key: BlobCid::compute(b"key1"),
+            device: "a".into(),
+            output: output.clone(),
+            manifest: BlobCid::compute(b"m1"),
+        },
+        SiblingRecord {
+            key: BlobCid::compute(b"key2"),
+            device: "a".into(),
+            output: output.clone(),
+            manifest: BlobCid::compute(b"m2"),
+        },
+        SiblingRecord {
+            key: BlobCid::compute(b"key3"),
+            device: "b".into(),
+            output: output.clone(),
+            manifest: BlobCid::compute(b"m3"),
+        },
+    ];
+    let selection = resolve_output_holders(&output, &rows, "b").unwrap();
+    assert_eq!(selection.holders.len(), 1);
+    assert_eq!(selection.holders[0].device, "a");
+    assert_eq!(
+        selection.holders[0].manifest, rows[1].manifest,
+        "newest manifest for the same bytes across keys"
+    );
+    assert!(matches!(
+        resolve_output_holders(&output, &rows[..2], "a"),
+        Err(FetchGap::LocalOnlyCustody { .. })
+    ));
+    assert!(matches!(
+        resolve_output_holders(&BlobCid::compute_bytes(b"missing"), &rows, "b"),
+        Err(FetchGap::ExpectedOutputUnavailable { .. })
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn output_fetch_rejects_wrong_manifest_output_and_corrupt_method_before_chunks() {
+    use eprfs_peer::{fetch_authorized_until, FetchAuthority};
+    let (_, peer) = peer_key();
+    let endpoint = fetcher(&peer).await;
+    let key = key_for("producer");
+    let held = held_artifact(&key, artifact_bytes(24, 1024)).await;
+    put_method_record(held.store.as_ref(), &descriptor())
+        .await
+        .unwrap();
+    let server = scripted(
+        &held,
+        Faults {
+            corrupt: Some(key.method.clone()),
+            ..Faults::default()
+        },
+    )
+    .await;
+    let output = &held.manifest.record.output;
+    let wrong = BlobCid::compute_bytes(b"wrong");
+    for pinned in [&wrong, output] {
+        let (_, store) = payload();
+        let authority = FetchAuthority::Output {
+            cid: pinned.clone(),
+        };
+        let result = fetch_authorized_until(
+            &endpoint,
+            store.as_ref(),
+            &authority,
+            pinned,
+            &[server.holder("producer", &held.manifest_cid)],
+            &budget(),
+            Instant::now() + WITHIN,
+        )
+        .await;
+        assert!(
+            matches!(result, Err(FetchGap::ManifestRejected { .. })),
+            "{result:?}"
+        );
+        assert!(!is_held(store.as_ref(), &held.manifest_cid).await);
+    }
+    assert_eq!(
+        server.tier.chunk_asks(),
+        [key.method],
+        "only the method, no payload chunk, was asked"
     );
 }
