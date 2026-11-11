@@ -42,5 +42,5 @@ Feature: A participant can carry an unmet need through private feedback
     Given a private feedback workspace with no Git repository
     When a participant records a need for bounded history
     And the participant proposes work from that retained need
-    Then the work reader recognizes the original private evidence without a document label
+    Then EPR shows the original need as the available source for the proposal
     And recognizing the evidence grants no repair acceptance

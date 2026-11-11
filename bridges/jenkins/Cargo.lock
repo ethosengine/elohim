@@ -632,6 +632,7 @@ dependencies = [
 name = "elohim-epr-rea"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "cid",
  "elohim-epr",
  "multihash-codetable",
@@ -722,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-meta"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "eprfs-core",
  "serde",

@@ -146,7 +146,7 @@ When('the participant proposes work from that retained need', function (this: Fe
   this.feedbackContext = JSON.parse(result.stdout) as FeedbackWorld['feedbackContext'];
 });
 Then(
-  'the work reader recognizes the original private evidence without a document label',
+  'EPR shows the original need as the available source for the proposal',
   function (this: FeedbackWorld) {
     const assertions = this.feedbackContext?.reconciliation.assertions;
     assert.equal(assertions?.length, 1);
