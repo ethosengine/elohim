@@ -16,13 +16,13 @@ Feature: A peer runs one of the household's CI stages and the household can chec
   file it will exercise are each named by the hash of their own bytes, so the peer cannot
   swap in different code without changing the name the requester agreed to. In this proof
   the pinned stage is the household's own federation-convergence check — normally run
-  wherever a developer happens to be — but the path proven here is generic: any pinned a2o
-  stage could ride it the same way.
+  wherever a developer happens to be. Other stages are intended to use the same path;
+  this scenario demonstrates it with the federation-convergence check.
 
   What comes back is not a green tick. It is the report the run actually produced, carried
   as expiring bytes leased to the stage's own address, plus a signed completion — a receipt
-  — stating that the peer ran this exact stage under this exact grant. A receipt proves who
-  ran it; only the report proves what happened. The household reads the report and does not
+  — claiming that the peer ran this exact stage under this exact grant. The receipt identifies
+  the provider making that claim; the report supplies the scenario results. The household reads the report and does not
   take the peer's word for the verdict, because a signature proves who spoke, never that
   what they said is true. The same run also leaves one economic event behind: the
   household's own record that it spent one use of the neighbour's grant. That event is the
@@ -31,6 +31,20 @@ Feature: A peer runs one of the household's CI stages and the household can chec
 
   Background:
     Given a household compute provider with a signed compute grant for this requester
+
+  # Mixed-variant exchange steps are not wired yet. The variants are native builds
+  # for different CPU instruction sets; both must obey the household's content-verification protocol.
+  @wip @requires:owned-substrate @concern:measure-runs-on-a-peer
+  Scenario: Peers running different variants exchange verified content both ways
+    A stage's result must stay verifiable when the requester and provider run different CPU variants of the same tools.
+    Given one household peer runs a pinned v2 variant on a compatible x86-64-v2 machine
+    And another runs a pinned v3 variant on a compatible x86-64-v3 machine
+    And both retain their existing identities and permission to participate in the household's content-verification protocol
+    When each peer sends the same content-addressed item to the other
+    Then each receiving peer verifies the content's fingerprint and bytes under that protocol
+    And the verified content has the same fingerprint and bytes in both directions
+    And the exchange evidence names both runtime fingerprints and the result in each direction
+    And neither peer changes its identity or relaxes content verification for the exchange
 
   # WRITES: the pinned stage picked for this proof stages a real disagreement on two peers
   # and flips an operator flag to heal it, so this scenario is only ever acceptable on
@@ -65,10 +79,11 @@ Feature: A peer runs one of the household's CI stages and the household can chec
     And the requester receives the fingerprint of the build's output and a record of which script and which input tree produced it
     And the requester downloads only the output files it opens, and none of the others
 
-  @wip @requires:owned-substrate
+  @wip @requires:owned-substrate @concern:measure-runs-on-a-peer
   Scenario: a heavy build stage with nowhere to run is kept and shown as not carried, not lost
     Given a build stage too heavy for the requester's own machine to run
     And the provider's peer is switched off, and no other peer holds a compute grant for this requester
+    And the provider's grant remains valid when it returns and the kept request is available to it
     When the requester asks for the build
     Then the request is kept on the requester's machine and shown as not carried, waiting for a provider
     And the build does not start on the requester's own machine unless the requester chooses to run it there

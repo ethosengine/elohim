@@ -10,27 +10,59 @@ Feature: A long check finds its way to a neighbour's peer instead of holding the
   that lets a desk run anything against it at all. A quick check takes that lease and gives
   it back in moments; a long check that takes the same lease from the developer's own desk
   holds it for as long as the run lasts. A neighbour who needed that same lease waits behind
-  it, sometimes for hours, for a run that was never theirs to wait on. This is the shape of
-  that problem and the shape of its fix: a long check has its own place to run, and that
-  place is never the desk it was born at.
+  it, sometimes for hours, for a run that was never theirs to wait on. Delegation releases
+  the submitting desk from running the check. It does not by itself prove the shared mesh
+  lease is free: a provider using that mesh may still hold it. The separate-machine scenario
+  below additionally checks that the developer can continue ordinary local verification.
 
   The place is a neighbour's peer — a household compute provider who has already signed a
   grant naming this developer as allowed to spend some of that peer's capacity, for this
   kind of work, up to a stated rate. Nothing runs on the strength of a mere request; the
   grant is what makes the run legitimate before a byte of it executes. The developer's own
-  desk stays free the whole time the run is out; the neighbour does the work and signs what
-  it found. What comes back is read the way any peer's work is read here: a signature proves
-  who ran it, never that what they found is true, so the household reads the report the run
+  desk holds no lease for the delegated run; the neighbour does the work and signs what
+  it found. What comes back is read the way any peer's work is read here: a signature identifies
+  who claims to have run it, never that what they found is true, so the household reads the report the run
   actually produced rather than taking a claimed verdict on faith.
+
+  A pinned task names the exact work to run by its content fingerprint. Its variants
+  are native builds for different CPU instructions and runtime libraries. The provider
+  checks compatibility locally and returns its selection or refusal.
 
   Background:
     Given a household compute provider with a signed compute grant for this requester
 
-  @requires:household-nodes
+  # Host-compatibility steps are not wired yet. A variant is one native build of the
+  # same pinned task; its requirements say which CPU instructions and runtime libraries it needs.
+  @wip @regression @requires:household-nodes @concern:measure-runs-on-a-peer
+  Scenario: The older provider chooses a task variant it can run
+    Given the provider observes an x86-64-v2 CPU with AVX but without AVX2 on its own machine
+    And the task's pin offers v2 and v3 variants with runtime library requirements the provider meets
+    When the developer sends the pinned task to the provider
+    Then the provider refuses the v3 variant before launch with reason "unmet" on axis "isa.x86"
+    And the local refusal names the required features and the observed features, including the missing AVX2
+    And the provider selects the v2 variant by its exact content fingerprint
+    And the provider answers with its selection while keeping its detailed hardware observations on its own machine
+
+  @wip @requires:household-nodes @concern:measure-runs-on-a-peer
+  Scenario Outline: Missing compatibility evidence cannot turn into permission to launch
+    Given the task offers only one variant whose requirement names <axis>
+    And the provider <observation>
+    When the developer sends the pinned task to the provider
+    Then the provider refuses before fetching the variant's bytes or launching it
+    And the refusal names <axis> with reason <reason>
+    And no successful completion is reported
+
+    Examples:
+      | axis          | observation                                     | reason         |
+      | "future.cpu"  | does not know that axis                         | "unknown-axis" |
+      | "abi.libc"    | knows that axis but cannot observe its libraries | "unobserved"   |
+
+  # The revised refusal wording needs a step binding.
+  @wip @requires:household-nodes @concern:measure-runs-on-a-peer
   Scenario: a long check refused at the developer's own desk is told where it belongs
     Given the developer is at their own desk, where ordinary work already holds the household mesh's one lease
     When the developer tries to start a long check there too
-    Then the desk refuses the run outright — a long check is never allowed to compete for that lease, held or not
+    Then the desk refuses the long check before it can compete for the household mesh's lease
     And the refusal names the neighbour's-peer path as where it belongs instead
     And the refusal does not offer to queue the run and wait for the lease
 
@@ -41,8 +73,11 @@ Feature: A long check finds its way to a neighbour's peer instead of holding the
     Then that one command returns to the developer without waiting for the run to finish
     And the developer's own desk holds no lease for the run that just left it
 
-  @requires:household-nodes
+  @requires:household-nodes @concern:measure-runs-on-a-peer
   Scenario: the neighbour's signed answer counts as household evidence because of the grant, not whose key signed it
+    Admission makes the report eligible for examination; it does not declare its results true.
+    The signature must identify the provider bound to the applicable grant. No special signing
+    key substitutes for that grant, and an unrelated signer cannot use it.
     Given the household compute provider has run the developer's long check to completion
     When the developer's own workspace reads back what the provider signed
     Then the workspace admits it as household evidence
@@ -60,7 +95,9 @@ Feature: A long check finds its way to a neighbour's peer instead of holding the
     Then the developer's own record shows the neighbour's capacity as spent, not merely offered
     And that record did not exist before this read
 
-  @requires:shem
+  # The clarified lease assertion needs a step binding. shem is the remote substrate
+  # that carries Adam, separate from the household's local machines.
+  @wip @requires:shem @concern:measure-runs-on-a-peer
   Scenario: the same long check on Adam leaves the developer's desk free the whole time
     # The scenarios above prove delegation within the household's own mesh — neighbours who
     # already share the same machines. Adam is a household compute provider on a separate
@@ -69,14 +106,15 @@ Feature: A long check finds its way to a neighbour's peer instead of holding the
     # holds even when the long check travels all the way off the household's own hardware.
     Given Adam is provisioned as a household compute provider on a machine of his own, apart from the household mesh
     When the developer sends the same long check to Adam
-    Then the developer's desk holds no lease on the household mesh at any point while Adam runs it
+    Then the developer's desk holds no lease on the household mesh for the delegated run while Adam runs it
     And the developer's desk is free to run its own ordinary verification at the same time
 
   # Held: no peer yet keeps its own witnessed record of work it carried for someone else, so
   # this scenario cannot pass until that exists. @wip: no step has a definition yet.
-  @wip @requires:household-nodes
+  @wip @requires:household-nodes @concern:measure-runs-on-a-peer
   Scenario: the household compute provider's own record that it ran the check is kept by other peers, not only on the developer's desk
     Given the household compute provider has run the developer's long check to completion
+    And the developer's workspace has read back that completed run and recorded the neighbour's capacity as spent
     When a third peer on the same household mesh, which neither sent the check nor ran it, looks up the provider's record of that run
     Then it finds a record of the run signed by the provider itself, not by the developer
     And that record was checked and kept by peers other than the provider, so neither the provider nor the developer can quietly change or withdraw it later
