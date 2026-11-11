@@ -1406,6 +1406,7 @@ dependencies = [
  "glob",
  "jsonschema",
  "libc",
+ "object",
  "rand_core 0.6.4",
  "rusqlite",
  "rustix",

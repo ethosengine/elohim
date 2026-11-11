@@ -21,6 +21,10 @@
 //! producer and the consumer alike, so the two sides cannot derive two keys for one closure. A
 //! closure with uncommitted changes inside the view has no key: the bytes would not be the HEAD
 //! tree's.
+//!
+//! Host tool lines name the selected C driver, its target defaults and resolved link inputs.
+//! System linkers enter only through a recorded selection; rustc's full identity accounts for
+//! its bundled linker. `put` checks the ELF linker witness before recording any build evidence.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -297,9 +301,12 @@ const BENIGN_BUILD_ENV: [&str; 7] = [
 ];
 
 /// The native toolchain variables a mesh build passes to cargo; `describe` records each one set.
-pub const NATIVE_BUILD_ENV: [&str; 9] = [
+pub const NATIVE_BUILD_ENV: [&str; 12] = [
     "CC",
     "CXX",
+    "CFLAGS",
+    "CXXFLAGS",
+    "LDFLAGS",
     "AR",
     "LIBCLANG_PATH",
     "PKG_CONFIG_PATH",
@@ -560,11 +567,6 @@ fn cargo_config_lines(repo: &Path, descriptor: &MethodDescriptor) -> ArtifactRes
 /// The `non_path_inputs` entry naming the fixed `PATH` a recorded mesh build runs cargo under.
 pub const PATH_INPUT: &str = "PATH";
 
-/// The tools cargo and the build scripts reach through `PATH` whose identity enters the key: the
-/// rustc default linker driver (`cc` on the gnu targets) and the linker it drives (`ld`), plus
-/// whatever `CC` names when the method records it.
-const KEYED_TOOLS: [&str; 2] = ["cc", "ld"];
-
 /// `name` resolved the way a process with `PATH=path` resolves it: as given when it names a
 /// path, else the first executable regular file of that name on `path`; canonicalized.
 fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
@@ -583,47 +585,8 @@ fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
     std::fs::canonicalize(&found).ok()
 }
 
-/// One line per keyed tool under the method's recorded `PATH` (review H3): the canonical path it
-/// resolves to and the CID of its `--version` output (`-` when it does not resolve), so another
-/// compiler or linker selected through `PATH` moves the key. A method that records no `PATH`
-/// (built in an inherited environment) keys no tool and is refused by nothing here.
-fn tool_lines(descriptor: &MethodDescriptor) -> ArtifactResult<String> {
-    let Some(path) = descriptor.non_path_inputs.get(PATH_INPUT) else {
-        return Ok(String::new());
-    };
-    let mut names: Vec<(String, String)> = KEYED_TOOLS
-        .iter()
-        .map(|tool| ((*tool).to_string(), (*tool).to_string()))
-        .collect();
-    if let Some(cc) = descriptor.non_path_inputs.get("CC") {
-        names.push(("CC".to_string(), cc.clone()));
-    }
-    let mut lines = String::new();
-    for (label, name) in names {
-        let Some(resolved) = resolve_tool(&name, path) else {
-            lines.push_str(&format!("tool:{label}\t-\n"));
-            continue;
-        };
-        let output = std::process::Command::new(&resolved)
-            .arg("--version")
-            .env_clear()
-            .env("PATH", path)
-            .env("LANG", "C")
-            .output()
-            .map_err(|e| {
-                ArtifactError::Gap(format!(
-                    "{} --version does not run: {e}",
-                    resolved.display()
-                ))
-            })?;
-        let version = BlobCid::compute_bytes(&[output.stdout, output.stderr].concat());
-        lines.push_str(&format!(
-            "tool:{label}\t{}\t{version}\n",
-            resolved.display()
-        ));
-    }
-    Ok(lines)
-}
+mod host;
+use host::{check_linker, tool_lines};
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
@@ -842,14 +805,7 @@ fn describe(options: &Options) -> ArtifactResult<ExitCode> {
     }
     let cargo = tool_line("cargo", &["-V"], &crate_path)?;
     let mut tools = BTreeMap::new();
-    tools.insert(
-        "rustc".to_string(),
-        format!(
-            "{} commit-hash {} host {host}",
-            field("release"),
-            field("commit-hash")
-        ),
-    );
+    tools.insert("rustc".to_string(), rustc.clone());
     tools.insert(
         "cargo".to_string(),
         cargo.lines().next().unwrap_or_default().to_string(),
@@ -1148,6 +1104,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         std::fs::read(bytes_path)
             .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
     );
+    check_linker(&descriptor, &bytes).map_err(unrecorded)?;
     let output = BlobCid::compute_bytes(&bytes);
 
     let signer: serde_json::Value = serde_json::from_str(&brit(repo, &["signer", "--json"])?)

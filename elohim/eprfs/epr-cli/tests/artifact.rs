@@ -21,6 +21,10 @@ use eprfs_core::{BlobCid, MethodDescriptor, TreePath};
 use eprfs_peer::{BlobMount, CrossingAllowList};
 use tempfile::TempDir;
 
+#[path = "support/artifact_elf.rs"]
+mod fixture;
+use fixture::artifact_elf;
+
 const HANDLE: &str = "matthew";
 const AGENT_ID: &str = "4f5e3d2c1b0a99887766554433221100ffeeddccbbaa00998877665544332211";
 
@@ -172,7 +176,14 @@ fn method_file_with(
     }
     let descriptor = MethodDescriptor {
         name: "mesh-build".into(),
-        tools: [("toolchain".to_string(), "1.96.1".to_string())].into(),
+        tools: [
+            ("toolchain".to_string(), "1.96.1".to_string()),
+            (
+                "rustc".to_string(),
+                "rustc fixture\nLLVM version: 22.1.2\n".to_string(),
+            ),
+        ]
+        .into(),
         flags: vec!["--bin=elohim-storage".into(), "--profile=dev".into()],
         params: None,
         exec: None,
@@ -206,6 +217,8 @@ fn brit_stub(dir: &Path) -> (PathBuf, PathBuf) {
     .unwrap();
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+    wait_for_stub(&stub);
+    std::fs::remove_file(&log).unwrap();
     (stub, log)
 }
 
@@ -238,7 +251,8 @@ async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
     let (method, descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
     let (stub, log) = brit_stub(scratch.path());
     let bytes = scratch.path().join("elohim-storage");
-    let artifact: Vec<u8> = (0..700_000u32).map(|i| (i * 31 % 251) as u8).collect();
+    let mut artifact = artifact_elf(b"Linker: LLD 22.1.2\0");
+    artifact.extend((0..700_000u32).map(|i| (i * 31 % 251) as u8));
     std::fs::write(&bytes, &artifact).unwrap();
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
@@ -731,11 +745,9 @@ fn a_completion_for_another_request_is_never_accepted() {
 
 /// An executable `cc` in `dir` that answers `--version` with `version`.
 fn fake_cc(dir: &Path, version: &str) {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::create_dir_all(dir).unwrap();
-    let cc = dir.join("cc");
-    std::fs::write(&cc, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
-    std::fs::set_permissions(&cc, std::fs::Permissions::from_mode(0o755)).unwrap();
+    fake_tool(dir, "cc", &format!(
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-Q) echo '-march=x86-64-v2' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac\n"
+    ));
 }
 
 #[test]
@@ -792,7 +804,7 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
     let (method, _) = method_file(scratch.path(), &["crate/src"]);
     let (stub, _log) = brit_stub(scratch.path());
     let bytes = scratch.path().join("elohim-storage");
-    std::fs::write(&bytes, b"a small built binary").unwrap();
+    std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
     let input = {
@@ -859,4 +871,180 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
         1,
         "only the put that knew its store recorded"
     );
+}
+
+/// A newly closed script can still report ETXTBSY on the workspace filesystem.
+fn wait_for_stub(path: &Path) {
+    for _ in 0..100 {
+        match Command::new(path).arg("--version").output() {
+            Ok(output) => {
+                assert!(output.status.success());
+                return;
+            }
+            Err(error) if error.raw_os_error() == Some(26) => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(error) => panic!("{}: {error}", path.display()),
+        }
+    }
+    panic!("{} stayed ETXTBSY", path.display());
+}
+
+fn fake_tool(dir: &Path, name: &str, body: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::create_dir_all(dir).unwrap();
+    let file = dir.join(name);
+    std::fs::write(&file, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+    wait_for_stub(&file);
+}
+
+#[test]
+fn artifact_unused_system_ld_does_not_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 1'");
+    let (_, first) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let second = first.clone();
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &first).unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2'");
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &second).unwrap();
+    assert_eq!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_link_input_bytes_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let input = tools.path().join("Scrt1.o");
+    std::fs::write(&input, b"glibc 2.39-128").unwrap();
+    fake_tool(tools.path(), "cc", &format!(
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-Q) echo '-march=x86-64-v2' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac",
+        input.display()
+    ));
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::write(&input, b"glibc 2.39-145").unwrap();
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_cc_target_defaults_move_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    let cc = |march| {
+        fake_tool(tools.path(), "cc", &format!(
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-Q) echo '-march={march}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac"
+    ))
+    };
+    cc("x86-64-v2");
+    let (_, descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[("PATH", tools.path().to_str().unwrap())],
+    );
+    let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    cc("x86-64-v3");
+    let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    assert_ne!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_recorded_linker_version_moves_key() {
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "cc fixture");
+    for (variable, value, tool) in [
+        ("RUSTFLAGS", "-C linker=ld", "ld"),
+        ("RUSTFLAGS", "-Clinker=ld", "ld"),
+        ("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "ld", "ld"),
+        ("RUSTFLAGS", "-C link-arg=-fuse-ld=bfd", "ld.bfd"),
+        ("CARGO_ENCODED_RUSTFLAGS", "-C\u{1f}linker=ld", "ld"),
+    ] {
+        fake_tool(tools.path(), tool, "echo 'GNU ld 1'");
+        let (_, descriptor) = method_file_with(
+            tools.path(),
+            &["crate/src"],
+            &[("PATH", tools.path().to_str().unwrap()), (variable, value)],
+        );
+        let before = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+        fake_tool(tools.path(), tool, "echo 'GNU ld 2'");
+        let after = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+        assert_ne!(before.key_cid, after.key_cid, "{variable}={value}");
+    }
+}
+
+#[test]
+fn artifact_put_checks_elf_linker_before_recording() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "linker");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    let rustc = Command::new("rustc").arg("-vV").output().unwrap();
+    assert!(rustc.status.success());
+    let rustc = String::from_utf8(rustc.stdout).unwrap();
+    let llvm = rustc
+        .lines()
+        .find_map(|line| line.strip_prefix("LLVM version: "))
+        .unwrap()
+        .to_string();
+    descriptor.tools.insert("rustc".into(), rustc);
+    std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let key = elohim_epr_cli::artifact::closure_key(device.root(), &descriptor).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    for comment in [
+        "Linker: GNU ld 2.41\0",
+        "Linker: LLD 0.0.0\0",
+        "GCC: 14.3.1\0",
+    ] {
+        std::fs::write(&bytes, artifact_elf(comment.as_bytes())).unwrap();
+        let out = device
+            .command()
+            .env("BRIT_BUILD_REF_BIN", &stub)
+            .args([
+                "artifact",
+                "put",
+                "--method",
+                method.to_str().unwrap(),
+                "--input",
+                &key.input.to_string(),
+                "--bytes",
+                bytes.to_str().unwrap(),
+                "--project",
+                "elohim-storage",
+                "--repo",
+                device.root().to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+        {
+            assert!(!log.exists(), "refused before any brit call");
+            assert!(events(device.root()).is_empty());
+            assert!(text(&out).contains("Linker"), "{}", text(&out));
+            if comment.starts_with("Linker:") {
+                assert!(
+                    text(&out).contains(&format!("LLD {llvm}")),
+                    "{}",
+                    text(&out)
+                );
+                assert!(
+                    text(&out).contains(comment.trim_end_matches('\0')),
+                    "{}",
+                    text(&out)
+                );
+            }
+        }
+    }
 }
