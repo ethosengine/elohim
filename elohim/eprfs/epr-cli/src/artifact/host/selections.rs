@@ -83,6 +83,8 @@ fn config_flags(value: &toml::Value) -> ArtifactResult<Vec<String>> {
 
 /// Resolve once, removing only inactive selection inputs from a *copy* of the descriptor's
 /// environment. Otherwise those ignored values still perturb the method CID even without probes.
+/// An explicit driver disables rustc's bundled-lld default: absent a fuse-ld selection it uses
+/// PATH's `ld`. A final bare `-fuse-ld=lld` authorizes bundled lld again; other values are external.
 pub(crate) fn resolve(
     inputs: &mut BTreeMap<String, String>,
     config: &toml::Value,
@@ -180,6 +182,7 @@ pub(crate) fn resolve(
         ));
     }
     let mut external_linker = None;
+    let mut fuse_ld_selected = false;
     for (key, value) in codegen_options(&flags) {
         match key.as_str() {
             "link-self-contained" | "linker-flavor" | "linker-features" => {
@@ -194,6 +197,7 @@ pub(crate) fn resolve(
                 };
                 for arg in driver_args {
                     if let Some(flavor) = arg.strip_prefix("-fuse-ld=") {
+                        fuse_ld_selected = true;
                         external_linker = match flavor {
                             "lld" => None,
                             path if path.contains('/') => Some(path.to_owned()),
@@ -204,6 +208,9 @@ pub(crate) fn resolve(
             }
             _ => {}
         }
+    }
+    if driver.is_some() && !fuse_ld_selected {
+        external_linker = Some("ld".into());
     }
     Ok(Selections {
         driver: driver.unwrap_or_else(|| "cc".into()),
@@ -279,6 +286,51 @@ mod tests {
             result.external_linker.as_deref(),
             Some("/path with spaces/lld")
         );
+    }
+
+    #[test]
+    fn artifact_explicit_driver_defaults_to_external_ld_in_every_active_source() {
+        for name in [
+            "RUSTFLAGS",
+            "CARGO_ENCODED_RUSTFLAGS",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
+            "CARGO_BUILD_RUSTFLAGS",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+        ] {
+            let value = if name.ends_with("_LINKER") {
+                "gcc"
+            } else {
+                "-Clinker=gcc"
+            };
+            let result = resolve(
+                &mut [(name.into(), value.into())].into(),
+                &toml::Value::Table(Default::default()),
+                TARGET,
+            )
+            .unwrap();
+            assert_eq!(result.driver, "gcc", "{name}");
+            assert_eq!(result.external_linker.as_deref(), Some("ld"), "{name}");
+            assert!(!result.bundled_lld_authorized, "{name}");
+        }
+        for config in [
+            "[target.x86_64-unknown-linux-gnu]\nlinker='gcc'",
+            "[target.x86_64-unknown-linux-gnu]\nrustflags=['-Clinker=gcc']",
+            "[build]\nrustflags=['-Clinker=gcc']",
+        ] {
+            let result = resolve(&mut BTreeMap::new(), &config.parse().unwrap(), TARGET).unwrap();
+            assert_eq!(result.external_linker.as_deref(), Some("ld"), "{config}");
+            assert!(!result.bundled_lld_authorized, "{config}");
+        }
+        // Naming the default driver is still an explicit selection.
+        assert_eq!(
+            selection("-Clinker=cc").external_linker.as_deref(),
+            Some("ld")
+        );
+        assert!(selection("").bundled_lld_authorized);
+        assert_eq!(selection("").external_linker, None);
+        let bundled = selection("-Clinker=gcc\x1f-Clink-arg=-fuse-ld=lld");
+        assert_eq!(bundled.external_linker, None);
+        assert!(bundled.bundled_lld_authorized);
     }
 
     #[test]

@@ -939,6 +939,19 @@ fn fake_tool(dir: &Path, name: &str, body: &str) {
 }
 
 #[test]
+fn artifact_no_linker_selection_preserves_pre_k1_followup_key() {
+    let repo = checkout();
+    let scratch = TempDir::new().unwrap();
+    let (_, descriptor) = method_file(scratch.path(), &["crate/src"]);
+    let key = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
+    // Captured at dev 6b8006579 before the explicit-driver correction.
+    assert_eq!(
+        key.key_cid.to_string(),
+        "bafyreiccytmiybrzfdgsbctsti6jq3pmtflee4iadyezcxfaeng6d2wsvm"
+    );
+}
+
+#[test]
 fn artifact_unused_system_ld_does_not_move_key() {
     let repo = checkout();
     let tools = TempDir::new().unwrap();
@@ -954,6 +967,107 @@ fn artifact_unused_system_ld_does_not_move_key() {
     fake_tool(tools.path(), "ld", "echo 'GNU ld 2'");
     let after = elohim_epr_cli::artifact::closure_key(repo.path(), &second).unwrap();
     assert_eq!(before.key_cid, after.key_cid);
+}
+
+#[test]
+fn artifact_explicit_driver_keys_default_ld_unless_bare_lld_selected() {
+    use elohim_epr_cli::artifact::{closure_key, ArtifactError};
+    let repo = checkout();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "gcc fixture");
+    let gcc = tools.path().join("gcc");
+    std::fs::copy(tools.path().join("cc"), &gcc).unwrap();
+    wait_for_stub(&gcc);
+    let (_, mut descriptor) = method_file_with(
+        tools.path(),
+        &["crate/src"],
+        &[
+            ("PATH", tools.path().to_str().unwrap()),
+            ("RUSTFLAGS", &format!("-Clinker={}", gcc.display())),
+        ],
+    );
+    let error = closure_key(repo.path(), &descriptor).unwrap_err();
+    assert!(matches!(error, ArtifactError::Gap(_)));
+    assert!(
+        error
+            .to_string()
+            .contains("external-linker=ld does not resolve under recorded PATH"),
+        "{error}"
+    );
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
+    let before = closure_key(repo.path(), &descriptor).unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.42'");
+    assert_ne!(
+        before.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+
+    descriptor.non_path_inputs.insert(
+        "RUSTFLAGS".into(),
+        format!("-Clinker={} -Clink-arg=-fuse-ld=lld", gcc.display()),
+    );
+    let bundled = closure_key(repo.path(), &descriptor).unwrap();
+    std::fs::remove_file(tools.path().join("ld")).unwrap();
+    assert_eq!(
+        bundled.key_cid,
+        closure_key(repo.path(), &descriptor).unwrap().key_cid
+    );
+}
+
+#[test]
+fn artifact_put_explicit_driver_without_gnu_ld_witness_refuses_before_recording() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "gnu-ld");
+    let scratch = TempDir::new().unwrap();
+    let tools = TempDir::new().unwrap();
+    fake_cc(tools.path(), "gcc fixture");
+    fake_tool(tools.path(), "ld", "echo 'GNU ld (GNU Binutils) 2.41'");
+    // CLI plumbing uses git, but the recorded build PATH contains only the fixture tools.
+    let build_path = tools.path().to_str().unwrap();
+    let flags = format!("-Clinker={}/cc", build_path);
+    let (method, descriptor) = method_file_with(
+        scratch.path(),
+        &["crate/src"],
+        &[("PATH", build_path), ("RUSTFLAGS", &flags)],
+    );
+    let key = elohim_epr_cli::artifact::closure_key(device.root(), &descriptor).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    // GNU ld preserves compiler comments but emits no linker identity.
+    std::fs::write(&bytes, artifact_elf(b"GCC: (GNU) 14.3.1\0")).unwrap();
+    let out = device
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .env(
+            "PATH",
+            format!("{build_path}:{}", std::env::var("PATH").unwrap()),
+        )
+        .env("RUSTFLAGS", &flags)
+        .args([
+            "artifact",
+            "put",
+            "--method",
+            method.to_str().unwrap(),
+            "--input",
+            &key.input.to_string(),
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--repo",
+            device.root().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out)
+            .contains("an external GNU ld leaves no linker witness; this build cannot be recorded"),
+        "{}",
+        text(&out)
+    );
+    assert!(!log.exists(), "refused before any brit call");
+    assert!(events(device.root()).is_empty());
 }
 
 #[test]
@@ -1138,6 +1252,7 @@ fn artifact_link_driver_is_independent_of_cc() {
     use elohim_epr_cli::artifact::closure_key;
     let repo = checkout();
     let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
     let input = tools.path().join("startup.o");
     std::fs::write(&input, "startup one").unwrap();
     fixture_driver(
@@ -1295,7 +1410,7 @@ fn artifact_bare_lld_uses_rustc_but_external_flavors_and_paths_are_keyed() {
         &["crate/src"],
         &[
             ("PATH", tools.path().to_str().unwrap()),
-            ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
+            ("RUSTFLAGS", "-Clinker=cc -C link-arg=-fuse-ld=lld"),
         ],
     );
     let before = closure_key(repo.path(), &descriptor).unwrap();
@@ -1305,9 +1420,10 @@ fn artifact_bare_lld_uses_rustc_but_external_flavors_and_paths_are_keyed() {
         closure_key(repo.path(), &descriptor).unwrap().key_cid
     );
     for flavor in ["bfd", "gold", "mold"] {
-        descriptor
-            .non_path_inputs
-            .insert("RUSTFLAGS".into(), format!("-C link-arg=-fuse-ld={flavor}"));
+        descriptor.non_path_inputs.insert(
+            "RUSTFLAGS".into(),
+            format!("-Clinker=cc -C link-arg=-fuse-ld={flavor}"),
+        );
         assert!(closure_key(repo.path(), &descriptor)
             .unwrap_err()
             .to_string()
@@ -1318,7 +1434,7 @@ fn artifact_bare_lld_uses_rustc_but_external_flavors_and_paths_are_keyed() {
     let linker = tools.path().join("external-lld");
     descriptor.non_path_inputs.insert(
         "RUSTFLAGS".into(),
-        format!("-C link-arg=-fuse-ld={}", linker.display()),
+        format!("-Clinker=cc -C link-arg=-fuse-ld={}", linker.display()),
     );
     fake_tool(tools.path(), "external-lld", "echo 'LLD 1'");
     let before = closure_key(repo.path(), &descriptor).unwrap();
@@ -1466,6 +1582,7 @@ fn artifact_codegen_long_form_keys_driver() {
     use elohim_epr_cli::artifact::closure_key;
     let repo = checkout();
     let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
     fake_cc(tools.path(), "build cc");
     let (_, mut descriptor) = method_file_with(
         tools.path(),
@@ -1621,6 +1738,7 @@ fn artifact_explicit_driver_still_keys_implicit_cc_defaults_and_version() {
     use elohim_epr_cli::artifact::closure_key;
     let repo = checkout();
     let tools = TempDir::new().unwrap();
+    fake_tool(tools.path(), "ld", "echo 'GNU ld 2.41'");
     let input = tools.path().join("startup.o");
     std::fs::write(&input, "startup").unwrap();
     fixture_driver(

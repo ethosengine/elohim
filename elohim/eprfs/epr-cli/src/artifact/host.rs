@@ -129,6 +129,8 @@ fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> Art
 }
 
 /// Probe the effective final-link driver and the independently selected build-script C compiler.
+/// An explicit driver without fuse-ld also keys PATH's `ld` as an external linker. No selection,
+/// or a final bare fuse-ld=lld, uses rustc's bundled linker identity instead.
 pub(super) fn tool_lines(
     descriptor: &MethodDescriptor,
     selections: &Selections,
@@ -217,6 +219,9 @@ fn linker_identity(text: &str) -> Option<(&str, &str)> {
 
 /// Read only ELF section bytes. Missing, malformed or unaccounted linker evidence refuses before
 /// `put` writes an attestation or a custody record; an old descriptor must be described again.
+/// External GNU ld normally emits no linker witness. Its keyed --version proves which tool was
+/// selected, not which tool produced these bytes: without a witness this build cannot be recorded.
+/// Do not substitute the driver/compiler comment or the selected tool's version for that evidence.
 pub(super) fn check_linker(
     descriptor: &MethodDescriptor,
     selections: &Selections,
@@ -237,29 +242,6 @@ pub(super) fn check_linker(
             "artifact ELF does not read: {e}; no .comment Linker line"
         ))
     })?;
-    let comment = elf
-        .section_by_name(".comment")
-        .ok_or_else(|| ArtifactError::Gap("artifact has no .comment Linker line".into()))?
-        .data()
-        .map_err(|e| ArtifactError::Gap(format!("artifact .comment does not read: {e}")))?;
-    let observed: Vec<&str> = comment
-        .split(|byte| *byte == 0)
-        .filter_map(|bytes| std::str::from_utf8(bytes).ok())
-        .flat_map(str::lines)
-        .filter_map(|line| {
-            line.strip_prefix("Linker: ").or_else(|| {
-                ["mold ", "GNU gold ", "GNU ld "]
-                    .iter()
-                    .any(|prefix| line.starts_with(prefix))
-                    .then_some(line)
-            })
-        })
-        .collect();
-    if observed.is_empty() {
-        return Err(ArtifactError::Gap(
-            "artifact has no .comment Linker line".into(),
-        ));
-    }
     let llvm = descriptor
         .tools
         .get("rustc")
@@ -289,6 +271,39 @@ pub(super) fn check_linker(
         if let Some((kind, version)) = linker_identity(&version) {
             accounted.push(format!("{kind} {version} ({label}={name})"));
         }
+    }
+    let missing_witness = || {
+        ArtifactError::Gap(
+            if accounted
+                .iter()
+                .any(|expected| matches!(linker_identity(expected), Some(("GNU ld", _))))
+            {
+                "an external GNU ld leaves no linker witness; this build cannot be recorded".into()
+            } else {
+                "artifact has no .comment Linker line".into()
+            },
+        )
+    };
+    let comment = elf
+        .section_by_name(".comment")
+        .ok_or_else(missing_witness)?
+        .data()
+        .map_err(|e| ArtifactError::Gap(format!("artifact .comment does not read: {e}")))?;
+    let observed: Vec<&str> = comment
+        .split(|byte| *byte == 0)
+        .filter_map(|bytes| std::str::from_utf8(bytes).ok())
+        .flat_map(str::lines)
+        .filter_map(|line| {
+            line.strip_prefix("Linker: ").or_else(|| {
+                ["mold ", "GNU gold ", "GNU ld "]
+                    .iter()
+                    .any(|prefix| line.starts_with(prefix))
+                    .then_some(line)
+            })
+        })
+        .collect();
+    if observed.is_empty() {
+        return Err(missing_witness());
     }
     for line in observed {
         let identity = linker_identity(line);
@@ -394,13 +409,35 @@ mod tests {
             "",
             "-C link-arg=-fuse-ld=lld",
             "-C link-arg=-fuse-ld=bfd -C link-arg=-fuse-ld=lld",
-            "-C linker=gcc",
             "-Clinker=gcc -C link-arg=-fuse-ld=lld",
         ] {
             descriptor
                 .non_path_inputs
                 .insert("RUSTFLAGS".into(), flags.into());
             check_linker(&descriptor, &fixture::artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
+        }
+        std::os::unix::fs::symlink(&linker, tools.path().join("ld")).unwrap();
+        descriptor
+            .non_path_inputs
+            .insert("RUSTFLAGS".into(), "-Clinker=gcc".into());
+        let bundled = fixture::artifact_elf(b"Linker: LLD 22.1.2\0");
+        assert!(check_linker(&descriptor, &bundled).is_err());
+        let comment_only = fixture::artifact_elf(b"GCC: 14.3.1\0");
+        let mut no_comment = comment_only.clone();
+        let name = no_comment
+            .windows(8)
+            .position(|bytes| bytes == b".comment")
+            .unwrap();
+        no_comment[name..name + 8].copy_from_slice(b".unknown");
+        for bytes in [comment_only, no_comment] {
+            let error = check_linker(&descriptor, &bytes).unwrap_err();
+            assert!(matches!(error, ArtifactError::Gap(_)));
+            assert!(
+                error.to_string().contains(
+                    "an external GNU ld leaves no linker witness; this build cannot be recorded"
+                ),
+                "{error}"
+            );
         }
         descriptor.non_path_inputs.insert(
             "RUSTFLAGS".into(),
