@@ -13,6 +13,8 @@ use serde_json::{json, Value};
 
 use super::{unrecorded, ArtifactResult};
 
+#[path = "extract_frames.rs"]
+mod frames;
 #[path = "extract_isa.rs"]
 mod isa;
 #[cfg(test)]

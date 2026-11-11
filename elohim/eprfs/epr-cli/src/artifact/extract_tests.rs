@@ -1,6 +1,9 @@
 use super::*;
+#[path = "extract_ranges_tests.rs"]
+mod ranges;
 use crate::artifact::requires::{canonical, documents};
 use host_contract::{admit, AxisValue, Provides, X86_64_V2, X86_64_V3};
+use ranges::{add_symbols, frame_bytes};
 
 fn names(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|s| (*s).into()).collect()
@@ -42,9 +45,16 @@ fn artifact_isa_level_selection() {
 
 #[test]
 #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-fn artifact_current_executable_extracts_and_round_trips_against_v2() {
-    let path = std::env::current_exe().unwrap();
-    let bytes = std::fs::read(&path).unwrap();
+fn artifact_elf_extracts_and_round_trips_against_v2() {
+    let path = std::path::PathBuf::from("round-trip.elf");
+    let mut bytes = with_dynamic(fixture(
+        elf::EM_X86_64,
+        0,
+        &[0xc5, 0xfd, 0xef, 0xc0, 0xc3],
+        Some("/lib64/ld-linux-x86-64.so.2"),
+        Some([0, 3, 2, 0]),
+    ));
+    add_symbols(&mut bytes, &[(0, 5, "round_trip")], false);
     let extraction = extract(&path, &bytes).unwrap();
     assert_eq!(
         predicate(&extraction.requires, axis::ARCH),
@@ -134,7 +144,7 @@ fn fixture(
     bytes[52..54].copy_from_slice(&64u16.to_le_bytes());
     bytes[54..56].copy_from_slice(&56u16.to_le_bytes());
     bytes[58..60].copy_from_slice(&64u16.to_le_bytes());
-    let strings = b"\0.text\0.note.ABI-tag\0.interp\0.shstrtab\0";
+    let strings = b"\0.text\0.note.ABI-tag\0.interp\0.shstrtab\0.eh_frame\0";
     let mut sections = vec![(0u32, 0u32, 0u64, 0usize, 0usize)];
     for (name, kind, flags, data) in [
         (1, elf::SHT_PROGBITS, 6, code.to_vec()),
@@ -164,6 +174,12 @@ fn fixture(
                 .unwrap_or_default(),
         ),
         (29, elf::SHT_STRTAB, 0, strings.to_vec()),
+        (
+            39,
+            elf::SHT_PROGBITS,
+            2,
+            frame_bytes(0x400078, code.len() as u64),
+        ),
     ] {
         while !bytes.len().is_multiple_of(8) {
             bytes.push(0);
@@ -351,14 +367,30 @@ fn artifact_measure_requested_elf() {
     let path = std::path::PathBuf::from(path);
     let started = std::time::Instant::now();
     let bytes = std::fs::read(&path).unwrap();
-    let result = extract(&path, &bytes).unwrap();
+    let result = extract(&path, &bytes);
     let elapsed = started.elapsed();
-    let report = json!({"path": path, "bytes": bytes.len(), "elapsed_ms": elapsed.as_secs_f64() * 1000.0,
-        "requires": result.requires, "evidence": result.evidence});
+    let mut report =
+        json!({"path": path, "bytes": bytes.len(), "elapsed_ms": elapsed.as_secs_f64() * 1000.0});
+    match &result {
+        Ok(result) => {
+            report["requires"] = json!(result.requires);
+            report["evidence"] = json!(result.evidence);
+        }
+        Err(error) => {
+            report["requires"] = Value::Null;
+            report["error"] = json!(error.to_string());
+            let file = Elf::parse(&*bytes).unwrap();
+            let audit = isa::scan_ranges(&file).unwrap();
+            report["known_range_audit"] = json!(audit);
+            report["known_range_isa_features"] =
+                json!(isa::level_features(&audit.used.keys().cloned().collect()));
+        }
+    }
     if let Some(path) = std::env::var_os("EPR_EXTRACT_REPORT") {
         std::fs::write(path, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
     }
     println!("{}", serde_json::to_string_pretty(&report).unwrap());
+    result.unwrap(); // A refusal is still a failing measurement, even though its evidence is saved.
 }
 
 /// Add independently encoded dynamic and GNU version-needs sections. The higher GLIBC need
@@ -418,7 +450,7 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
         header[4..8].copy_from_slice(&kind.to_le_bytes());
         header[24..32].copy_from_slice(&(start as u64).to_le_bytes());
         header[32..40].copy_from_slice(&(data.len() as u64).to_le_bytes());
-        header[40..44].copy_from_slice(&5u32.to_le_bytes());
+        header[40..44].copy_from_slice(&6u32.to_le_bytes());
         header[48..56].copy_from_slice(&8u64.to_le_bytes());
         header[56..64].copy_from_slice(&entry_size.to_le_bytes());
         headers.extend(header);
@@ -428,7 +460,7 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
     }
     let start = bytes.len();
     bytes[40..48].copy_from_slice(&(start as u64).to_le_bytes());
-    bytes[60..62].copy_from_slice(&8u16.to_le_bytes());
+    bytes[60..62].copy_from_slice(&9u16.to_le_bytes());
     bytes.extend(headers);
     bytes
 }

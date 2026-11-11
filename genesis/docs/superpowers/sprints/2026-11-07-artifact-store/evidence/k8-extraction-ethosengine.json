@@ -1,25 +1,1247 @@
 {
   "task": "host-compatibility-foundation K8",
-  "status": "implementation-tested; real-epr verification remains open",
+  "status": "round-2 implemented and tested; real-epr extraction refuses .init/.fini/.plt under the required boundary policy; K8 verification remains open",
   "measurement": [
     {
-      "subject": "installed",
-      "path": "/projects/.claude-config/tools/bin-store/epr/bafyreibnwgff6acemmhas3y7quefr54u2seq3o343n7x4vpbcgwieutjgq/epr",
       "bytes": 128590816,
-      "wall_seconds_including_test_process": 1.1754512030165642,
+      "elapsed_ms": 3505.015641,
+      "error": "unrecorded: /projects/.claude-config/tools/bin-store/epr/current/epr: Requires extraction: unrecorded: isa.x86: executable sections .init, .fini, .plt: function boundaries are unknown (no sized function symbols or FDE ranges)",
+      "known_range_audit": {
+        "instructions": 8697956,
+        "sections": [
+          {
+            "covered_bytes": 41280132,
+            "section": ".text",
+            "total_bytes": 42396064,
+            "uncovered_bytes": 1115932,
+            "uncovered_examples": [
+              {
+                "length": 202,
+                "nearest_preceding_symbol": "_start",
+                "start": 15540646
+              },
+              {
+                "length": 3,
+                "nearest_preceding_symbol": "_ZN4core3num23_$LT$impl$u20$usize$GT$13unchecked_add18precondition_check17h0ee87e4357b9d01fE",
+                "start": 15540893
+              },
+              {
+                "length": 12,
+                "nearest_preceding_symbol": "_ZN68_$LT$std..process..ExitCode$u20$as$u20$std..process..Termination$GT$6report17h4eb264367045dfdcE",
+                "start": 15540900
+              },
+              {
+                "length": 12,
+                "nearest_preceding_symbol": "_ZN72_$LT$std..process..ExitCode$u20$as$u20$core..convert..From$LT$u8$GT$$GT$4from17h18bb8d005ce4d42cE",
+                "start": 15540916
+              },
+              {
+                "length": 8,
+                "nearest_preceding_symbol": "_ZN4core4iter6traits8iterator8Iterator12try_for_each4call28_$u7b$$u7b$closure$u7d$$u7d$17hfc1dc18c17766c4bE",
+                "start": 15540936
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".init",
+            "total_bytes": 27,
+            "uncovered_bytes": 27,
+            "uncovered_examples": [
+              {
+                "length": 27,
+                "nearest_preceding_symbol": "_init",
+                "start": 57936672
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".fini",
+            "total_bytes": 13,
+            "uncovered_bytes": 13,
+            "uncovered_examples": [
+              {
+                "length": 13,
+                "nearest_preceding_symbol": "_fini",
+                "start": 57936700
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".plt",
+            "total_bytes": 736,
+            "uncovered_bytes": 736,
+            "uncovered_examples": [
+              {
+                "length": 736,
+                "nearest_preceding_symbol": null,
+                "start": 57936720
+              }
+            ]
+          }
+        ],
+        "used": {
+          "adx": {
+            "count": 520,
+            "examples": [
+              {
+                "address": 53006892,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+              },
+              {
+                "address": 53007485,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+              },
+              {
+                "address": 53037768,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__bn_mulx4x_mont"
+              }
+            ]
+          },
+          "aes": {
+            "count": 362,
+            "examples": [
+              {
+                "address": 53021889,
+                "section": ".text",
+                "symbol": "_aesni_ctr32_ghash_6x"
+              },
+              {
+                "address": 53023616,
+                "section": ".text",
+                "symbol": "_aesni_ctr32_6x"
+              },
+              {
+                "address": 53025024,
+                "section": ".text",
+                "symbol": "_aesni_encrypt2"
+              }
+            ]
+          },
+          "avx": {
+            "count": 11240,
+            "examples": [
+              {
+                "address": 35810675,
+                "section": ".text",
+                "symbol": "dekkerMul2"
+              },
+              {
+                "address": 35811348,
+                "section": ".text",
+                "symbol": "sqlite3AtoF"
+              },
+              {
+                "address": 35817864,
+                "section": ".text",
+                "symbol": "rowSetNDeepTree"
+              }
+            ]
+          },
+          "avx2": {
+            "count": 5421,
+            "examples": [
+              {
+                "address": 35879254,
+                "section": ".text",
+                "symbol": "walIndexTryHdr"
+              },
+              {
+                "address": 36199249,
+                "section": ".text",
+                "symbol": "walTryBeginRead"
+              },
+              {
+                "address": 36316968,
+                "section": ".text",
+                "symbol": "sqlite3_randomness"
+              }
+            ]
+          },
+          "bmi1": {
+            "count": 1339,
+            "examples": [
+              {
+                "address": 31487838,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner16fix_insert_index17h4c54bdbc8daa3fd8E"
+              },
+              {
+                "address": 31488512,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner26find_insert_index_in_group17h78a942481f18d0daE"
+              },
+              {
+                "address": 31489021,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner31find_or_find_insert_index_inner17h258e6e9e0783aeb8E"
+              }
+            ]
+          },
+          "bmi2": {
+            "count": 1338,
+            "examples": [
+              {
+                "address": 35809602,
+                "section": ".text",
+                "symbol": "computeFloor"
+              },
+              {
+                "address": 35812126,
+                "section": ".text",
+                "symbol": "sqlite3AtoF"
+              },
+              {
+                "address": 35815769,
+                "section": ".text",
+                "symbol": "sqlite3LogEstToInt"
+              }
+            ]
+          },
+          "cmov": {
+            "count": 74867,
+            "examples": [
+              {
+                "address": 15543135,
+                "section": ".text",
+                "symbol": "_ZN5alloc5boxed14box_new_uninit17hc4d19523af7c273dE"
+              },
+              {
+                "address": 15543305,
+                "section": ".text",
+                "symbol": "_ZN4core4iter6traits8iterator8Iterator3nth17hc7584d86076b67deE"
+              },
+              {
+                "address": 15543533,
+                "section": ".text",
+                "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17h77a77d623f9b6fa3E"
+              }
+            ]
+          },
+          "cpuid": {
+            "count": 51,
+            "examples": [
+              {
+                "address": 47242954,
+                "section": ".text",
+                "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner11cpuid_count17h9387750168fd42fcE"
+              },
+              {
+                "address": 47243082,
+                "section": ".text",
+                "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner5cpuid17h208137b4b6d26847E"
+              },
+              {
+                "address": 47245610,
+                "section": ".text",
+                "symbol": "_ZN8poly13057backend10autodetect10avx2_cpuid8init_get10init_inner11cpuid_count17h1508bbfce5032fdfE.llvm.10503493605127406368"
+              }
+            ]
+          },
+          "fma": {
+            "count": 14,
+            "examples": [
+              {
+                "address": 35810754,
+                "section": ".text",
+                "symbol": "dekkerMul2"
+              },
+              {
+                "address": 35858795,
+                "section": ".text",
+                "symbol": "computeJD.part.0"
+              },
+              {
+                "address": 35865174,
+                "section": ".text",
+                "symbol": "parseHhMmSs"
+              }
+            ]
+          },
+          "fma4": {
+            "count": 1,
+            "examples": [
+              {
+                "address": 57936064,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma13fma_with_fma4"
+              }
+            ]
+          },
+          "ibt": {
+            "count": 2,
+            "examples": [
+              {
+                "address": 15540608,
+                "section": ".text",
+                "symbol": "_start"
+              },
+              {
+                "address": 57936656,
+                "section": ".text",
+                "symbol": "pthread_atfork"
+              }
+            ]
+          },
+          "lzcnt": {
+            "count": 6,
+            "examples": [
+              {
+                "address": 35847479,
+                "section": ".text",
+                "symbol": "sqlite3LogEst"
+              },
+              {
+                "address": 36149019,
+                "section": ".text",
+                "symbol": "whereLoopAddBtreeIndex"
+              },
+              {
+                "address": 36159101,
+                "section": ".text",
+                "symbol": "wherePathSolver.isra.0"
+              }
+            ]
+          },
+          "movbe": {
+            "count": 309,
+            "examples": [
+              {
+                "address": 35820352,
+                "section": ".text",
+                "symbol": "serialGet7"
+              },
+              {
+                "address": 35820496,
+                "section": ".text",
+                "symbol": "sqlite3VdbeSerialGet"
+              },
+              {
+                "address": 35835744,
+                "section": ".text",
+                "symbol": "fts5GetU64"
+              }
+            ]
+          },
+          "pclmulqdq": {
+            "count": 210,
+            "examples": [
+              {
+                "address": 53017832,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+              },
+              {
+                "address": 53018219,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_ghash_vpclmulqdq_avx2_1"
+              },
+              {
+                "address": 53020042,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              }
+            ]
+          },
+          "sha_ni": {
+            "count": 168,
+            "examples": [
+              {
+                "address": 53119083,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__sha256_block_data_order_hw"
+              },
+              {
+                "address": 57058910,
+                "section": ".text",
+                "symbol": "_ZN4sha26sha2563x8613digest_blocks17hdcd58eced56c0880E"
+              },
+              {
+                "address": 57297198,
+                "section": ".text",
+                "symbol": "_ZN4sha26sha2567x86_sha8compress17h632160eef136f407E"
+              }
+            ]
+          },
+          "sse": {
+            "count": 336613,
+            "examples": [
+              {
+                "address": 15541892,
+                "section": ".text",
+                "symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17h1c4c4eebe63e726aE"
+              },
+              {
+                "address": 15543555,
+                "section": ".text",
+                "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17h77a77d623f9b6fa3E"
+              },
+              {
+                "address": 15543941,
+                "section": ".text",
+                "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17he4730c52799d6d10E"
+              }
+            ]
+          },
+          "sse2": {
+            "count": 34221,
+            "examples": [
+              {
+                "address": 15670882,
+                "section": ".text",
+                "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$3map17heee12e0ba96b2511E"
+              },
+              {
+                "address": 15695480,
+                "section": ".text",
+                "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17h293e56b2c745461eE"
+              },
+              {
+                "address": 15729971,
+                "section": ".text",
+                "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17h89cfb4d9a134e27bE"
+              }
+            ]
+          },
+          "sse3": {
+            "count": 1,
+            "examples": [
+              {
+                "address": 53259480,
+                "section": ".text",
+                "symbol": "_ZN8httparse4simd5sse4227match_header_value_vectored17h136e01b7aa129f56E.llvm.6939497599259762489"
+              }
+            ]
+          },
+          "sse4_1": {
+            "count": 29,
+            "examples": [
+              {
+                "address": 49760783,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+              },
+              {
+                "address": 49762566,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+              },
+              {
+                "address": 51882957,
+                "section": ".text",
+                "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hf9a479d8a95e3716E"
+              }
+            ]
+          },
+          "ssse3": {
+            "count": 730,
+            "examples": [
+              {
+                "address": 49759381,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+              },
+              {
+                "address": 49761985,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+              },
+              {
+                "address": 51210811,
+                "section": ".text",
+                "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hd62de5c423b0872dE"
+              }
+            ]
+          },
+          "syscall": {
+            "count": 20,
+            "examples": [
+              {
+                "address": 19394282,
+                "section": ".text",
+                "symbol": "_ZN6rustix7backend2io8syscalls3dup17ha86812b9d16114c1E"
+              },
+              {
+                "address": 28342248,
+                "section": ".text",
+                "symbol": "_ZN6rustix2fs3abs4open28_$u7b$$u7b$closure$u7d$$u7d$17h148648d9b8b9e4c8E"
+              },
+              {
+                "address": 28342344,
+                "section": ".text",
+                "symbol": "_ZN6rustix2fs3abs4open28_$u7b$$u7b$closure$u7d$$u7d$17h4518b77bc20151dbE"
+              }
+            ]
+          },
+          "vaes": {
+            "count": 136,
+            "examples": [
+              {
+                "address": 53018480,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              },
+              {
+                "address": 53020449,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+              }
+            ]
+          },
+          "vpclmulqdq": {
+            "count": 88,
+            "examples": [
+              {
+                "address": 53017910,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+              },
+              {
+                "address": 53018812,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              },
+              {
+                "address": 53020588,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+              }
+            ]
+          },
+          "xsave": {
+            "count": 9,
+            "examples": [
+              {
+                "address": 47242930,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv"
+              },
+              {
+                "address": 47245458,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv.llvm.10503493605127406368"
+              },
+              {
+                "address": 53001594,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__OPENSSL_cpuid_setup"
+              }
+            ]
+          }
+        }
+      },
+      "known_range_isa_features": [
+        "adx",
+        "aes",
+        "avx",
+        "avx2",
+        "bmi1",
+        "bmi2",
+        "cx16",
+        "f16c",
+        "fma",
+        "fma4",
+        "ibt",
+        "lahf_lm",
+        "lzcnt",
+        "movbe",
+        "osxsave",
+        "pclmulqdq",
+        "popcnt",
+        "sha_ni",
+        "sse3",
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "vaes",
+        "vpclmulqdq",
+        "xsave"
+      ],
+      "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
+      "requires": null,
+      "subject": "installed",
       "exit": 101,
-      "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.claude-config/tools/bin-store/epr/current/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x3294f67\")"
+      "wall_seconds_including_test_process": 6.9472686590161175,
+      "resolved_path": "/projects/.claude-config/tools/bin-store/epr/bafyreibnwgff6acemmhas3y7quefr54u2seq3o343n7x4vpbcgwieutjgq/epr",
+      "sha256": "8e5c418f4919dea2a02079b2b3a2600c1366b02bec5b7cfd3e99941d8cb42b10",
+      "non_isa_observations": {
+        "source": "readelf -h -l -d -n -V /projects/.claude-config/tools/bin-store/epr/current/epr",
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/installed-elf-metadata.txt",
+        "note": "Readable ELF metadata, not a successfully emitted Requires document.",
+        "arch": "x86_64",
+        "os": "linux",
+        "kernel.linux": [
+          3,
+          2,
+          0
+        ],
+        "abi.loader": "/lib64/ld-linux-x86-64.so.2",
+        "abi.libc": {
+          "line": "glibc",
+          "components": [
+            2,
+            39
+          ]
+        },
+        "lib": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libm.so.6"
+        ],
+        "libc_version_needs": [
+          "2.2.5",
+          "2.3",
+          "2.3.2",
+          "2.3.4",
+          "2.4",
+          "2.6",
+          "2.7",
+          "2.9",
+          "2.10",
+          "2.12",
+          "2.14",
+          "2.15",
+          "2.16",
+          "2.17",
+          "2.18",
+          "2.25",
+          "2.28",
+          "2.29",
+          "2.30",
+          "2.32",
+          "2.33",
+          "2.34",
+          "2.39"
+        ]
+      }
     },
     {
-      "subject": "built",
+      "bytes": 135439008,
+      "elapsed_ms": 3729.75682,
+      "error": "unrecorded: /projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr: Requires extraction: unrecorded: isa.x86: executable sections .init, .fini, .plt: function boundaries are unknown (no sized function symbols or FDE ranges)",
+      "known_range_audit": {
+        "instructions": 9089782,
+        "sections": [
+          {
+            "covered_bytes": 43210037,
+            "section": ".text",
+            "total_bytes": 44375920,
+            "uncovered_bytes": 1165883,
+            "uncovered_examples": [
+              {
+                "length": 202,
+                "nearest_preceding_symbol": "_start",
+                "start": 16540070
+              },
+              {
+                "length": 11,
+                "nearest_preceding_symbol": "_ZN5alloc5boxed14box_new_uninit17h5733e23d6f951867E",
+                "start": 16540357
+              },
+              {
+                "length": 9,
+                "nearest_preceding_symbol": "_ZN3epr10ready_args28_$u7b$$u7b$closure$u7d$$u7d$17h482a1ec366c27c2eE",
+                "start": 16540455
+              },
+              {
+                "length": 11,
+                "nearest_preceding_symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17h2fbf01af09fb4f1bE",
+                "start": 16540613
+              },
+              {
+                "length": 15,
+                "nearest_preceding_symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17hf621eb7b0d9b7e4eE",
+                "start": 16540881
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".init",
+            "total_bytes": 27,
+            "uncovered_bytes": 27,
+            "uncovered_examples": [
+              {
+                "length": 27,
+                "nearest_preceding_symbol": "_init",
+                "start": 60915952
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".fini",
+            "total_bytes": 13,
+            "uncovered_bytes": 13,
+            "uncovered_examples": [
+              {
+                "length": 13,
+                "nearest_preceding_symbol": "_fini",
+                "start": 60915980
+              }
+            ]
+          },
+          {
+            "covered_bytes": 0,
+            "section": ".plt",
+            "total_bytes": 736,
+            "uncovered_bytes": 736,
+            "uncovered_examples": [
+              {
+                "length": 736,
+                "nearest_preceding_symbol": null,
+                "start": 60916000
+              }
+            ]
+          }
+        ],
+        "used": {
+          "adx": {
+            "count": 520,
+            "examples": [
+              {
+                "address": 55954028,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+              },
+              {
+                "address": 55954621,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+              },
+              {
+                "address": 55984904,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__bn_mulx4x_mont"
+              }
+            ]
+          },
+          "aes": {
+            "count": 362,
+            "examples": [
+              {
+                "address": 55969025,
+                "section": ".text",
+                "symbol": "_aesni_ctr32_ghash_6x"
+              },
+              {
+                "address": 55970752,
+                "section": ".text",
+                "symbol": "_aesni_ctr32_6x"
+              },
+              {
+                "address": 55972160,
+                "section": ".text",
+                "symbol": "_aesni_encrypt2"
+              }
+            ]
+          },
+          "avx": {
+            "count": 11240,
+            "examples": [
+              {
+                "address": 38030643,
+                "section": ".text",
+                "symbol": "dekkerMul2"
+              },
+              {
+                "address": 38031316,
+                "section": ".text",
+                "symbol": "sqlite3AtoF"
+              },
+              {
+                "address": 38037832,
+                "section": ".text",
+                "symbol": "rowSetNDeepTree"
+              }
+            ]
+          },
+          "avx2": {
+            "count": 5421,
+            "examples": [
+              {
+                "address": 38099222,
+                "section": ".text",
+                "symbol": "walIndexTryHdr"
+              },
+              {
+                "address": 38419217,
+                "section": ".text",
+                "symbol": "walTryBeginRead"
+              },
+              {
+                "address": 38536936,
+                "section": ".text",
+                "symbol": "sqlite3_randomness"
+              }
+            ]
+          },
+          "bmi1": {
+            "count": 1345,
+            "examples": [
+              {
+                "address": 19447838,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner16fix_insert_index17h4fc05d192a626858E"
+              },
+              {
+                "address": 19448512,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner26find_insert_index_in_group17hac38c77724487b4fE"
+              },
+              {
+                "address": 19449021,
+                "section": ".text",
+                "symbol": "_ZN9hashbrown3raw13RawTableInner31find_or_find_insert_index_inner17h04c801ce9d3a23caE"
+              }
+            ]
+          },
+          "bmi2": {
+            "count": 1338,
+            "examples": [
+              {
+                "address": 38029586,
+                "section": ".text",
+                "symbol": "computeFloor"
+              },
+              {
+                "address": 38032094,
+                "section": ".text",
+                "symbol": "sqlite3AtoF"
+              },
+              {
+                "address": 38035737,
+                "section": ".text",
+                "symbol": "sqlite3LogEstToInt"
+              }
+            ]
+          },
+          "cmov": {
+            "count": 78821,
+            "examples": [
+              {
+                "address": 16540319,
+                "section": ".text",
+                "symbol": "_ZN5alloc5boxed14box_new_uninit17h5733e23d6f951867E"
+              },
+              {
+                "address": 16542117,
+                "section": ".text",
+                "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$6expect17h1bda24ac2e3190dfE"
+              },
+              {
+                "address": 16542313,
+                "section": ".text",
+                "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17hb20e996d475a2361E"
+              }
+            ]
+          },
+          "cpuid": {
+            "count": 51,
+            "examples": [
+              {
+                "address": 50190330,
+                "section": ".text",
+                "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner11cpuid_count17h9387750168fd42fcE"
+              },
+              {
+                "address": 50190458,
+                "section": ".text",
+                "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner5cpuid17h208137b4b6d26847E"
+              },
+              {
+                "address": 50192986,
+                "section": ".text",
+                "symbol": "_ZN8poly13057backend10autodetect10avx2_cpuid8init_get10init_inner11cpuid_count17h1508bbfce5032fdfE.llvm.10503493605127406368"
+              }
+            ]
+          },
+          "fma": {
+            "count": 14,
+            "examples": [
+              {
+                "address": 38030722,
+                "section": ".text",
+                "symbol": "dekkerMul2"
+              },
+              {
+                "address": 38078763,
+                "section": ".text",
+                "symbol": "computeJD.part.0"
+              },
+              {
+                "address": 38085142,
+                "section": ".text",
+                "symbol": "parseHhMmSs"
+              }
+            ]
+          },
+          "fma4": {
+            "count": 1,
+            "examples": [
+              {
+                "address": 60915344,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma13fma_with_fma4"
+              }
+            ]
+          },
+          "ibt": {
+            "count": 2,
+            "examples": [
+              {
+                "address": 16540032,
+                "section": ".text",
+                "symbol": "_start"
+              },
+              {
+                "address": 60915936,
+                "section": ".text",
+                "symbol": "pthread_atfork"
+              }
+            ]
+          },
+          "lzcnt": {
+            "count": 6,
+            "examples": [
+              {
+                "address": 38067447,
+                "section": ".text",
+                "symbol": "sqlite3LogEst"
+              },
+              {
+                "address": 38368987,
+                "section": ".text",
+                "symbol": "whereLoopAddBtreeIndex"
+              },
+              {
+                "address": 38379069,
+                "section": ".text",
+                "symbol": "wherePathSolver.isra.0"
+              }
+            ]
+          },
+          "movbe": {
+            "count": 309,
+            "examples": [
+              {
+                "address": 38040320,
+                "section": ".text",
+                "symbol": "serialGet7"
+              },
+              {
+                "address": 38040464,
+                "section": ".text",
+                "symbol": "sqlite3VdbeSerialGet"
+              },
+              {
+                "address": 38055712,
+                "section": ".text",
+                "symbol": "fts5GetU64"
+              }
+            ]
+          },
+          "pclmulqdq": {
+            "count": 210,
+            "examples": [
+              {
+                "address": 55964968,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+              },
+              {
+                "address": 55965355,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_ghash_vpclmulqdq_avx2_1"
+              },
+              {
+                "address": 55967178,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              }
+            ]
+          },
+          "sha_ni": {
+            "count": 168,
+            "examples": [
+              {
+                "address": 56066219,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__sha256_block_data_order_hw"
+              },
+              {
+                "address": 60037582,
+                "section": ".text",
+                "symbol": "_ZN4sha26sha2563x8613digest_blocks17hdcd58eced56c0880E"
+              },
+              {
+                "address": 60275870,
+                "section": ".text",
+                "symbol": "_ZN4sha26sha2567x86_sha8compress17h632160eef136f407E"
+              }
+            ]
+          },
+          "sse": {
+            "count": 354562,
+            "examples": [
+              {
+                "address": 16540708,
+                "section": ".text",
+                "symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17hf621eb7b0d9b7e4eE"
+              },
+              {
+                "address": 16544560,
+                "section": ".text",
+                "symbol": "_ZN3epr10ready_args17h1c7420655c31ed04E"
+              },
+              {
+                "address": 16546582,
+                "section": ".text",
+                "symbol": "_ZN3epr11global_args17h9780dfd3765909efE"
+              }
+            ]
+          },
+          "sse2": {
+            "count": 34574,
+            "examples": [
+              {
+                "address": 16795574,
+                "section": ".text",
+                "symbol": "_ZN14elohim_epr_cli4flow4note11Observation14derived_reason17hcf232b153412ba01E"
+              },
+              {
+                "address": 16796454,
+                "section": ".text",
+                "symbol": "_ZN14elohim_epr_cli4flow4note11Observation5slots17h02f73fb396517f2fE"
+              },
+              {
+                "address": 16806017,
+                "section": ".text",
+                "symbol": "_ZN14elohim_epr_cli4flow4note16canonical_number17ha58941f6e852370dE"
+              }
+            ]
+          },
+          "sse3": {
+            "count": 1,
+            "examples": [
+              {
+                "address": 56206616,
+                "section": ".text",
+                "symbol": "_ZN8httparse4simd5sse4227match_header_value_vectored17h136e01b7aa129f56E.llvm.6939497599259762489"
+              }
+            ]
+          },
+          "sse4_1": {
+            "count": 29,
+            "examples": [
+              {
+                "address": 52708143,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+              },
+              {
+                "address": 52709926,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+              },
+              {
+                "address": 54830077,
+                "section": ".text",
+                "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hf9a479d8a95e3716E"
+              }
+            ]
+          },
+          "ssse3": {
+            "count": 730,
+            "examples": [
+              {
+                "address": 52706741,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+              },
+              {
+                "address": 52709345,
+                "section": ".text",
+                "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+              },
+              {
+                "address": 54157931,
+                "section": ".text",
+                "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hd62de5c423b0872dE"
+              }
+            ]
+          },
+          "syscall": {
+            "count": 20,
+            "examples": [
+              {
+                "address": 29192431,
+                "section": ".text",
+                "symbol": "_ZN6rustix7backend2fs8syscalls11fcntl_getfl17hedd8e6552c86cc25E"
+              },
+              {
+                "address": 29192713,
+                "section": ".text",
+                "symbol": "_ZN6rustix7backend2fs8syscalls6linkat17h32b0232c3efe3260E"
+              },
+              {
+                "address": 29192852,
+                "section": ".text",
+                "symbol": "_ZN6rustix7backend2fs8syscalls6openat17h85db73239b688913E"
+              }
+            ]
+          },
+          "vaes": {
+            "count": 136,
+            "examples": [
+              {
+                "address": 55965616,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              },
+              {
+                "address": 55967585,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+              }
+            ]
+          },
+          "vpclmulqdq": {
+            "count": 88,
+            "examples": [
+              {
+                "address": 55965046,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+              },
+              {
+                "address": 55965948,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+              },
+              {
+                "address": 55967724,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+              }
+            ]
+          },
+          "xsave": {
+            "count": 9,
+            "examples": [
+              {
+                "address": 50190306,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv"
+              },
+              {
+                "address": 50192834,
+                "section": ".text",
+                "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv.llvm.10503493605127406368"
+              },
+              {
+                "address": 55948730,
+                "section": ".text",
+                "symbol": "ring_core_0_17_14__OPENSSL_cpuid_setup"
+              }
+            ]
+          }
+        }
+      },
+      "known_range_isa_features": [
+        "adx",
+        "aes",
+        "avx",
+        "avx2",
+        "bmi1",
+        "bmi2",
+        "cx16",
+        "f16c",
+        "fma",
+        "fma4",
+        "ibt",
+        "lahf_lm",
+        "lzcnt",
+        "movbe",
+        "osxsave",
+        "pclmulqdq",
+        "popcnt",
+        "sha_ni",
+        "sse3",
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "vaes",
+        "vpclmulqdq",
+        "xsave"
+      ],
       "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
-      "bytes": 135172824,
-      "wall_seconds_including_test_process": 1.1535378659609705,
+      "requires": null,
+      "subject": "built",
       "exit": 101,
-      "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x354d427\")"
+      "wall_seconds_including_test_process": 7.158032825042028,
+      "resolved_path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+      "sha256": "317a383c0337b9ca494c71482873581a7a26fe64493f5106cc03c86b7cf37b86",
+      "non_isa_observations": {
+        "source": "readelf -h -l -d -n -V /projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/built-elf-metadata.txt",
+        "note": "Readable ELF metadata, not a successfully emitted Requires document.",
+        "arch": "x86_64",
+        "os": "linux",
+        "kernel.linux": [
+          3,
+          2,
+          0
+        ],
+        "abi.loader": "/lib64/ld-linux-x86-64.so.2",
+        "abi.libc": {
+          "line": "glibc",
+          "components": [
+            2,
+            39
+          ]
+        },
+        "lib": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libm.so.6"
+        ],
+        "libc_version_needs": [
+          "2.2.5",
+          "2.3",
+          "2.3.2",
+          "2.3.4",
+          "2.4",
+          "2.6",
+          "2.7",
+          "2.9",
+          "2.10",
+          "2.12",
+          "2.14",
+          "2.15",
+          "2.16",
+          "2.17",
+          "2.18",
+          "2.25",
+          "2.28",
+          "2.29",
+          "2.30",
+          "2.32",
+          "2.33",
+          "2.34",
+          "2.39"
+        ]
+      }
     }
   ],
-  "measurement_limitation": "No full Requires document or full used-feature set was produced for either epr: strict decoding refused data embedded in .text. No symbol-name dispatch heuristic or byte skipping was added.",
+  "measurement_limitation": "Both unmodified epr binaries refuse under decision 3: .init (27 bytes), .fini (13 bytes), and .plt (736 bytes) have neither sized STT_FUNC symbols nor FDE ranges. No full Requires document is emitted (requires=null). known_range_audit and known_range_isa_features describe only the ranges actually decoded and are not an admitted Requires document. elapsed_ms measures read+strict extraction; process wall time also includes a second diagnostic scan and report writing. No section exceptions, guessed sizes, or dispatch narrowing were added.",
   "diagnosis": {
     "installed_address": "0x3294f67",
     "rebuilt_address": "0x354d427",
@@ -33,7 +1255,7 @@
     "abi.loader": "PT_INTERP; absent on static outputs",
     "abi.libc": "numeric maximum GLIBC_x.y version need scoped to libc.so.6, or musl loader line with empty components",
     "lib": "DT_NEEDED",
-    "isa.x86": "iced-x86 CPUID features from every executable section, psABI level closure plus used extensions; baseline alone omits clause"
+    "isa.x86": "iced-x86 CPUID features from the union of sized STT_FUNC symbols (.symtab, else .dynsym) and .eh_frame FDE PC ranges, intersected with executable sections; overlapping ranges merged, adjacent boundaries retained. Outside bytes are evidence-only; an executable section with bytes but no range refuses. psABI level closure plus every used extension; baseline alone omits clause."
   },
   "decisions": [
     "Sysroot put keeps its existing validator and optional opaque Requires document.",
@@ -48,45 +1270,150 @@
     {
       "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
       "exit": 0,
-      "passed": 95,
-      "log": "genesis/a2o/reports/recovery/hostcompat-k8/artifact-final.log"
-    },
-    {
-      "command": "cargo test --offline --locked -p elohim-epr-cli",
-      "exit": 101,
-      "environment": "TMPDIR=/var/tmp/hc-k8; sandbox-created empty .git marker makes existing covenant key fixtures appear inside a repository",
-      "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests.log"
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/artifact-final-strengthened.log",
+      "passed": 103
     },
     {
       "command": "cargo test --offline --locked -p elohim-epr-cli",
       "exit": 0,
-      "environment": "isolated /var/tmp/epr-k8-tests.* outside the synthetic sandbox mount; same toolchain/target/flags/jobs",
-      "passed": 1437,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/full-tests.log",
+      "passed": 1445,
       "ignored": 0,
-      "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests-isolated.log"
+      "note": "Final production implementation; overlap/adjacency fixture strengthened afterward and all artifact tests rerun."
     },
     {
       "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
       "exit": 0,
-      "log": "genesis/a2o/reports/recovery/hostcompat-k8/clippy-final.log"
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/clippy-final.log"
     },
     {
       "command": "cargo fmt -p elohim-epr-cli -- --check",
-      "exit": 0
+      "exit": 0,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/fmt-final.log"
     },
     {
       "command": "epr-rust-style --root /projects/elohim/.worktrees/hc-k8 (existing pool binary)",
       "exit": 0,
-      "debt": "epr-cli 0 -> 0; no suppressions added",
-      "log": "genesis/a2o/reports/recovery/hostcompat-k8/rust-style.log"
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/rust-style-final.log",
+      "debt": "epr-cli 0 -> 0; no suppressions added"
     }
   ],
   "story_harvest": {
     "chain": "host-compatibility-foundation K8 -> K10",
-    "between": "ELF section bytes -> complete used instruction features",
-    "missing_node": "Executable sections may contain non-instruction data; a byte-bound code/data policy must preserve instruction coverage before dispatch narrowing is considered.",
-    "probe": "Run artifact_measure_requested_elf on installed epr; inspect the refusal address against ELF function sizes and assembly bytes.",
-    "current_state": "red: strict decoder refuses; task asks the operator whether function-boundary recovery is admissible."
+    "between": "ELF executable bytes -> complete Requires",
+    "missing_node": "Every nonempty executable section must have at least one range under the declared boundary policy; linker-generated .init/.fini/.plt can have zero-sized or no function symbols and no FDE.",
+    "probe": "artifact_unknown_function_boundaries_names_section and artifact_measure_requested_elf on both unmodified epr binaries",
+    "current_state": "red for real epr: both strict measurements EXIT=101 naming .init, .fini, .plt; ring data-after-function regression is green",
+    "scenario": "Given executable sections without sized functions or FDEs, when Requires is extracted, then recording refuses naming those sections and diagnostics retain uncovered byte counts.",
+    "suggested_placement": "genesis/a2o/features/devflow/landing-queue.feature, host-compatibility K8 station; runnable regression is currently in extract_ranges_tests.rs"
   },
-  "repository_operations": "Brit status/log/diff used. Brit add initially refused read-only index.lock; inspection confirmed an empty index and unchanged HEAD, and host-access Brit add succeeded. Brit commit refused untrusted core.hooksPath before moving HEAD; Git fallback used for the local commit with hooks enabled."
+  "repository_operations": "Direct installed Brit used for status, log and diff after launchers refused read-only filesystem access. Brit log piped to head reported a broken pipe; no repository mutation resulted. Native doctor is coherent; configured hooks do not establish shell adapter coverage. Native commit attribution measured gpt-6-astra and the current Codex session. No push performed. Brit add initially returned EXIT=2 because literal paths require the -- separator; no files were staged. Brit commit returned EXIT=1: refusing to ignore an untrusted core.hooksPath. Inspection confirmed unchanged HEAD 0c47ec13 and an empty staged diff. Corrected path-scoped Brit staging; Git fallback for the requested new local commit, preserving hooks and native attribution.",
+  "round_1": {
+    "status": "implementation-tested; real-epr verification remains open",
+    "measurement": [
+      {
+        "subject": "installed",
+        "path": "/projects/.claude-config/tools/bin-store/epr/bafyreibnwgff6acemmhas3y7quefr54u2seq3o343n7x4vpbcgwieutjgq/epr",
+        "bytes": 128590816,
+        "wall_seconds_including_test_process": 1.1754512030165642,
+        "exit": 101,
+        "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.claude-config/tools/bin-store/epr/current/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x3294f67\")"
+      },
+      {
+        "subject": "built",
+        "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+        "bytes": 135172824,
+        "wall_seconds_including_test_process": 1.1535378659609705,
+        "exit": 101,
+        "error": "called `Result::unwrap()` on an `Err` value: Gap(\"unrecorded: /projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr: Requires extraction: unrecorded: isa.x86: invalid instruction in .text at 0x354d427\")"
+      }
+    ],
+    "measurement_limitation": "No full Requires document or full used-feature set was produced for either epr: strict decoding refused data embedded in .text. No symbol-name dispatch heuristic or byte skipping was added.",
+    "checks": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 0,
+        "passed": 95,
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8/artifact-final.log"
+      },
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli",
+        "exit": 101,
+        "environment": "TMPDIR=/var/tmp/hc-k8; sandbox-created empty .git marker makes existing covenant key fixtures appear inside a repository",
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests.log"
+      },
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli",
+        "exit": 0,
+        "environment": "isolated /var/tmp/epr-k8-tests.* outside the synthetic sandbox mount; same toolchain/target/flags/jobs",
+        "passed": 1437,
+        "ignored": 0,
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8/full-tests-isolated.log"
+      },
+      {
+        "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+        "exit": 0,
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8/clippy-final.log"
+      },
+      {
+        "command": "cargo fmt -p elohim-epr-cli -- --check",
+        "exit": 0
+      },
+      {
+        "command": "epr-rust-style --root /projects/elohim/.worktrees/hc-k8 (existing pool binary)",
+        "exit": 0,
+        "debt": "epr-cli 0 -> 0; no suppressions added",
+        "log": "genesis/a2o/reports/recovery/hostcompat-k8/rust-style.log"
+      }
+    ],
+    "repository_operations": "Brit status/log/diff used. Brit add initially refused read-only index.lock; inspection confirmed an empty index and unchanged HEAD, and host-access Brit add succeeded. Brit commit refused untrusted core.hooksPath before moving HEAD; Git fallback used for the local commit with hooks enabled."
+  },
+  "round_2_decisions": [
+    "object 0.37.3 exposes section bytes, not an FDE reader. Added a range-only bounded reader; no dependencies, manifests, Cargo.lock files, or crates/elohim-host-contract edits.",
+    "FDE reader supports DWARF32/64, CIE versions 1/3, empty or z/L/P/R/S augmentations, absolute and PC-relative pointer forms, fixed signed/unsigned widths and LEB128. Unsupported pointer applications, indirect FDE PCs, malformed lengths/references, and overflow refuse. CFI instructions are not needed to locate ranges. DWARF64 still uses 32-bit CIE IDs/pointers in .eh_frame; reviewed against locally cached gimli parser source, not added as a dependency.",
+    "A present symbol table is authoritative even when it contains no eligible functions. Zero-size functions label gaps but create no range. Sized symbols outside their executable section refuse.",
+    "Instruction decoding is bounded by each merged range. Invalid or truncated instructions name the address and containing symbol, or explicitly identify the absence of a symbol in an FDE-only range.",
+    "Coverage includes total, covered, uncovered bytes and at most five gaps per executable section with nearest preceding symbol. Unknown sections refuse together by name.",
+    "The previous current-executable round-trip test now uses a fully bounded synthetic ELF because real linker sections legitimately refuse under decision 3; captured real .eh_frame is separately tested to cover the test executable main.",
+    "Both measured known-range ISA closures are v3 plus extensions, not plain v3. There are no decoded AVX-512 features; no claim of a complete binary ISA clause is possible while unknown sections refuse."
+  ],
+  "new_tests": [
+    "artifact_data_after_sized_function_is_uncovered",
+    "artifact_invalid_or_truncated_instruction_names_containing_symbol",
+    "artifact_unknown_function_boundaries_names_section",
+    "artifact_ranges_union_merges_overlaps_but_not_adjacent_functions",
+    "artifact_dynamic_symbols_are_fallback_only",
+    "artifact_fde_reader_covers_current_main",
+    "artifact_fde_reader_rejects_malformed_records",
+    "artifact_fde_reader_pc_relative_v3_and_dwarf64"
+  ],
+  "stripped_style_test": "artifact_instruction_bytes_raise_isa_without_symbols now has no symbols and only an .eh_frame FDE for its four decoded instructions.",
+  "measurement_environment": "Read-only measurement via artifact_measure_requested_elf in the built test executable; full-suite validation was running concurrently. Strict extraction timing includes file read; process wall time includes a second diagnostic scan after refusal.",
+  "validation_environment": {
+    "CARGO_TARGET_DIR": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev",
+    "RUSTUP_TOOLCHAIN": "1.96.1",
+    "RUSTFLAGS": "",
+    "CARGO_BUILD_JOBS": "6",
+    "TMPDIR": "/var/tmp/hc-k8/t",
+    "cargo_serialization": "while pgrep -x rustc >/dev/null || pgrep -x cargo >/dev/null; do sleep 15; done",
+    "execution": "host access, preserving prescribed exports; sandbox initial run failed chown and a concurrent sandbox mount exposed a synthetic .git ancestor to temporary key fixtures"
+  },
+  "round_2_validation_history": [
+    {
+      "exit": 101,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/artifact-first.log",
+      "reason": "Sandbox UID mapping rejects existing sysroot fixture chown; new extraction tests passed."
+    },
+    {
+      "exit": 101,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/artifact.log",
+      "reason": "Synthetic sandbox .git ancestor rejected temporary key paths; existing integration ELF fixture needed sized function metadata. Fixed the fixture, retained prescribed exports, and reran with host access and without concurrent sandbox mounts."
+    },
+    {
+      "exit": 0,
+      "log": "genesis/a2o/reports/recovery/hostcompat-k8-round2/full-tests-before-review.log",
+      "passed": 1445,
+      "reason": "First full run, followed by correction of the DWARF64 CIE-pointer width and another full run."
+    }
+  ]
 }

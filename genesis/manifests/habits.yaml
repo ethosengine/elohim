@@ -2644,10 +2644,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-11l (RED preserved, inactive; K8 extraction implemented, real-epr verification open): executable put now extracts host_contract Requires and a local evidence document before recording, merges only stricter caller declarations, and writes both CIDs on Produce; sysroot behavior is unchanged. Artifact tests 95 passed, full epr-cli suite passed with an isolated temp directory (the prescribed TMPDIR's sandbox-created .git marker caused covenant fixture refusals), clippy, fmt and native Rust-style scan each EXIT=0. Strict ISA decoding refuses installed epr at 0x3294f67 and the rebuilt epr at 0x354d427 on ring attribution data embedded in .text; no full ISA result or v3 claim is made, and K8 stays open pending an explicit code/data policy. Evidence and timings: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-extraction-ethosengine.json; raw logs: genesis/a2o/reports/recovery/hostcompat-k8/. No lockfiles, host_contract sources, dispatch narrowing or host Provides changed.
-    evidence-fingerprint: sha256:60e2f5f56e606f5f
-    evidence-bytes: 29296
-    evidence-entries: 20
+      DELTA 2026-11-11m (RED preserved, inactive; K8 round 2): sized STT_FUNC symbols union .eh_frame FDE ranges now bound instruction decoding; uncovered bytes are counted and unknown executable-section boundaries refuse. Artifact tests 103 passed, full epr-cli suite 1445 passed, clippy, fmt and native Rust-style scan EXIT=0 with prescribed exports. Installed and built epr pass the ring attribution-data location but both refuse .init/.fini/.plt (27/13/736 bytes, each uncovered); strict extraction takes 3.505/3.730 s. Known ranges use v3 plus extensions including FMA4, ADX, AES, IBT, SHA, VAES and VPCLMULQDQ; no full Requires or dispatch narrowing is claimed. Evidence: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-extraction-ethosengine.json. No Cargo.lock or host_contract edits; new local commit only, no push.
+    evidence-fingerprint: sha256:41e9920d0736be00
+    evidence-bytes: 30139
+    evidence-entries: 21
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

@@ -1,9 +1,9 @@
-//! Complete executable-section scan. Symbols label evidence only; they never narrow it.
+//! Decode the union of sized function symbols and FDE ranges; report uncovered bytes.
 use std::collections::{BTreeMap, BTreeSet};
 
 use host_contract::{X86_64_V2, X86_64_V3};
 use iced_x86::{CpuidFeature, Decoder, DecoderOptions, Instruction, Mnemonic};
-use object::{elf, Object, ObjectSection, ObjectSymbol, SectionFlags, SymbolKind};
+use object::{elf, Object, ObjectSection, ObjectSymbol, SectionFlags, SymbolFlags};
 use serde::Serialize;
 
 use super::{unrecorded, ArtifactResult, Elf};
@@ -51,7 +51,7 @@ pub(super) fn level_features(used: &BTreeSet<String>) -> Option<BTreeSet<String>
 pub(super) struct Scan {
     pub used: BTreeMap<String, FeatureUse>,
     instructions: u64,
-    sections: Vec<String>,
+    sections: Vec<Coverage>,
 }
 
 #[derive(Default, Serialize)]
@@ -68,100 +68,211 @@ struct Example {
     symbol: Option<String>,
 }
 
+#[derive(Serialize)]
+struct Coverage {
+    section: String,
+    total_bytes: u64,
+    covered_bytes: u64,
+    uncovered_bytes: u64,
+    uncovered_examples: Vec<Uncovered>,
+}
+
+#[derive(Serialize)]
+struct Uncovered {
+    start: u64,
+    length: u64,
+    nearest_preceding_symbol: Option<String>,
+}
+
+struct Symbol<'a> {
+    start: u64,
+    size: u64,
+    name: &'a str,
+    function: bool,
+    section: object::SectionIndex,
+}
+
+fn containing<'a>(symbols: &[&Symbol<'a>], address: u64) -> Option<&'a str> {
+    let index = symbols.partition_point(|symbol| symbol.start <= address);
+    symbols[..index]
+        .iter()
+        .rev()
+        .find(|s| s.function && address - s.start < s.size)
+        .map(|s| s.name)
+}
+
+fn uncovered(start: u64, end: u64, symbols: &[&Symbol<'_>], examples: &mut Vec<Uncovered>) {
+    if start >= end || examples.len() >= 5 {
+        return;
+    }
+    let index = symbols.partition_point(|symbol| symbol.start <= start);
+    examples.push(Uncovered {
+        start,
+        length: end - start,
+        nearest_preceding_symbol: index.checked_sub(1).map(|i| symbols[i].name.into()),
+    });
+}
+
 pub(super) fn scan(file: &Elf<'_>) -> ArtifactResult<Scan> {
+    let scan = scan_ranges(file)?;
+    let unknown: Vec<_> = scan
+        .sections
+        .iter()
+        .filter(|s| s.total_bytes != 0 && s.covered_bytes == 0)
+        .map(|s| s.section.as_str())
+        .collect();
+    if !unknown.is_empty() {
+        return Err(unrecorded(format!("isa.x86: executable sections {}: function boundaries are unknown (no sized function symbols or FDE ranges)", unknown.join(", "))));
+    }
+    Ok(scan)
+}
+
+// An audit can describe unknown coverage, but scan() must refuse before producing Requires.
+pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
     let mut scan = Scan {
         used: BTreeMap::new(),
         instructions: 0,
         sections: Vec::new(),
     };
-    // Merge regular and dynamic symbols for sized and zero-sized labels. Only evidence
-    // uses names; decoding uses section bytes.
-    let mut symbols: Vec<_> = file
-        .symbols()
-        .chain(file.dynamic_symbols())
-        .filter(|symbol| symbol.kind() == SymbolKind::Text && symbol.is_definition())
-        .filter_map(|symbol| {
-            Some((
-                symbol.address(),
-                symbol.size(),
-                symbol.section_index()?,
-                symbol.name().ok()?,
-            ))
+    // A present .symtab is authoritative; use .dynsym only when it is absent.
+    let table = if file.elf_section_table().iter().any(|s| {
+        use object::read::elf::SectionHeader;
+        s.sh_type(file.endian()) == elf::SHT_SYMTAB
+    }) {
+        file.symbols()
+    } else {
+        file.dynamic_symbols()
+    };
+    let mut symbols: Vec<_> = table.filter(|s| s.is_definition()).filter_map(|s| {
+        Some(Symbol {
+            start: s.address(), size: s.size(), section: s.section_index()?,
+            name: s.name().unwrap_or("<unnamed>"),
+            function: matches!(s.flags(), SymbolFlags::Elf { st_info, .. } if st_info & 0xf == elf::STT_FUNC),
         })
-        .collect();
-    symbols.sort_unstable_by_key(|s| (s.0, s.1, s.2 .0, s.3));
-    symbols.dedup();
-    let mut instruction = Instruction::default();
+    }).collect();
+    symbols.sort_unstable_by_key(|s| (s.start, s.size, s.name));
+    let frames = super::frames::ranges(file)?;
     for section in file.sections() {
         if !matches!(section.flags(), SectionFlags::Elf { sh_flags } if sh_flags & u64::from(elf::SHF_EXECINSTR) != 0)
         {
             continue;
         }
         let data = section.data().map_err(unrecorded)?;
-        if data.is_empty() {
-            continue;
-        }
         let name = section.name().map_err(unrecorded)?;
-        scan.sections.push(name.into());
-        let local_symbols: Vec<_> = symbols
+        let start = section.address();
+        let end = start
+            .checked_add(data.len() as u64)
+            .ok_or_else(|| unrecorded("executable section address overflow"))?;
+        let local: Vec<_> = symbols
             .iter()
-            .filter(|symbol| symbol.2 == section.index())
+            .filter(|s| s.section == section.index())
             .collect();
-        let mut decoder = Decoder::with_ip(64, data, section.address(), DecoderOptions::NONE);
-        while decoder.can_decode() {
-            decoder.decode_out(&mut instruction);
-            if instruction.is_invalid() {
+        let mut ranges = Vec::new();
+        for symbol in local.iter().filter(|s| s.function && s.size != 0) {
+            let symbol_end = symbol
+                .start
+                .checked_add(symbol.size)
+                .ok_or_else(|| unrecorded("symbol range overflow"))?;
+            if symbol.start < start || symbol_end > end {
                 return Err(unrecorded(format!(
-                    "isa.x86: invalid instruction in {name} at 0x{:x}",
-                    instruction.ip()
+                    "function {} range outside executable section {name}",
+                    symbol.name
                 )));
             }
-            scan.instructions += 1;
-            let mut features = Vec::new();
-            for cpuid in instruction.cpuid_features() {
-                if let Some(feature) = cpu_name(*cpuid)
-                    .map_err(|e| unrecorded(format!("isa.x86 at 0x{:x}: {e}", instruction.ip())))?
-                {
-                    features.push(feature);
-                }
-            }
-            // iced labels these X64, but LAHF/SAHF in long mode require the v2 LAHF_LM bit.
-            if matches!(instruction.mnemonic(), Mnemonic::Lahf | Mnemonic::Sahf) {
-                features.push("lahf_lm");
-            }
-            for feature in features {
-                let usage = scan.used.entry(feature.into()).or_default();
-                usage.count += 1;
-                if usage.examples.len() >= 3 {
-                    continue;
-                }
-                let index = local_symbols.partition_point(|symbol| symbol.0 <= instruction.ip());
-                let symbol = index
-                    .checked_sub(1)
-                    .and_then(|index| local_symbols.get(index))
-                    .filter(|symbol| symbol.1 == 0 || instruction.ip() - symbol.0 < symbol.1)
-                    .map(|symbol| symbol.3);
-                // Prefer distinct containing symbols, so the three examples describe code
-                // locations instead of three adjacent instructions in the same function.
-                if usage
-                    .examples
-                    .iter()
-                    .any(|example| example.symbol.as_deref() == symbol)
-                {
-                    continue;
-                }
-                usage.examples.push(Example {
-                    address: instruction.ip(),
-                    section: name.into(),
-                    symbol: symbol.map(str::to_owned),
-                });
+            ranges.push(symbol.start..symbol_end);
+        }
+        // An FDE is a virtual-address range. Intersect it with this section's bytes.
+        ranges.extend(frames.iter().filter_map(|r| {
+            let from = start.max(r.start);
+            let to = end.min(r.end);
+            (from < to).then_some(from..to)
+        }));
+        ranges.sort_unstable_by_key(|r| (r.start, r.end));
+        let mut merged: Vec<std::ops::Range<u64>> = Vec::new();
+        for range in ranges {
+            if let Some(last) = merged.last_mut().filter(|last| range.start < last.end) {
+                last.end = last.end.max(range.end);
+            } else {
+                merged.push(range);
             }
         }
+        let mut coverage = Coverage {
+            section: name.into(),
+            total_bytes: data.len() as u64,
+            covered_bytes: 0,
+            uncovered_bytes: 0,
+            uncovered_examples: Vec::new(),
+        };
+        let mut cursor = start;
+        for range in merged {
+            uncovered(
+                cursor,
+                range.start,
+                &local,
+                &mut coverage.uncovered_examples,
+            );
+            coverage.covered_bytes += range.end - range.start;
+            cursor = range.end;
+            let code = &data[(range.start - start) as usize..(range.end - start) as usize];
+            decode(code, range.start, name, &local, &mut scan)?;
+        }
+        uncovered(cursor, end, &local, &mut coverage.uncovered_examples);
+        coverage.uncovered_bytes = coverage.total_bytes - coverage.covered_bytes;
+        scan.sections.push(coverage);
     }
-    if scan.sections.is_empty() {
+    if !scan.sections.iter().any(|s| s.total_bytes != 0) {
         return Err(unrecorded("isa.x86: no readable executable sections"));
     }
     Ok(scan)
+}
+
+fn decode(
+    data: &[u8],
+    start: u64,
+    section: &str,
+    symbols: &[&Symbol<'_>],
+    scan: &mut Scan,
+) -> ArtifactResult<()> {
+    let mut decoder = Decoder::with_ip(64, data, start, DecoderOptions::NONE);
+    let mut instruction = Instruction::default();
+    while decoder.can_decode() {
+        decoder.decode_out(&mut instruction);
+        let symbol = containing(symbols, instruction.ip());
+        if instruction.is_invalid() || instruction.next_ip() > start + data.len() as u64 {
+            return Err(unrecorded(format!(
+                "isa.x86: invalid instruction or instruction past range end in {section} at 0x{:x}, containing symbol {}",
+                instruction.ip(), symbol.unwrap_or("<unknown; FDE range>")
+            )));
+        }
+        scan.instructions += 1;
+        let mut features = Vec::new();
+        for cpuid in instruction.cpuid_features() {
+            if let Some(feature) = cpu_name(*cpuid)
+                .map_err(|e| unrecorded(format!("isa.x86 at 0x{:x}: {e}", instruction.ip())))?
+            {
+                features.push(feature);
+            }
+        }
+        // iced labels these X64, but LAHF/SAHF in long mode require the v2 LAHF_LM bit.
+        if matches!(instruction.mnemonic(), Mnemonic::Lahf | Mnemonic::Sahf) {
+            features.push("lahf_lm");
+        }
+        for feature in features {
+            let usage = scan.used.entry(feature.into()).or_default();
+            usage.count += 1;
+            if usage.examples.len() >= 3
+                || usage.examples.iter().any(|e| e.symbol.as_deref() == symbol)
+            {
+                continue;
+            }
+            usage.examples.push(Example {
+                address: instruction.ip(),
+                section: section.into(),
+                symbol: symbol.map(str::to_owned),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Explicit decoder-to-contract spelling. Unknown extensions refuse rather than disappear or
