@@ -1256,6 +1256,8 @@ fn resolve_existing(path: &Path) -> Result<PathBuf, String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SiblingRecord {
     pub key: BlobCid,
+    pub family: Option<BlobCid>,
+    pub requires: Option<BlobCid>,
     pub device: String,
     pub output: BlobCid,
     pub manifest: BlobCid,

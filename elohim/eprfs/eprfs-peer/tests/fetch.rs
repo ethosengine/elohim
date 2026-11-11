@@ -881,12 +881,16 @@ async fn two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetc
     let y = held_artifact(&key, artifact_bytes(52, 300 * 1024)).await;
     let records = vec![
         SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceA".into(),
             output: x.manifest.record.output.clone(),
             manifest: x.manifest_cid.clone(),
         },
         SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceB".into(),
             output: y.manifest.record.output.clone(),
@@ -908,6 +912,8 @@ async fn two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetc
         records[0].clone(),
         records[1].clone(),
         SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceB".into(),
             output: x.manifest.record.output.clone(),
@@ -1560,12 +1566,16 @@ async fn a_queued_expected_fetch_installs_retained_output_after_a_newer_producti
     .expect("later production retains the earlier output");
     let records = vec![
         SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: t.a.did.clone(),
             output: output.clone(),
             manifest: put.manifest_cid.clone(),
         },
         SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: t.a.did.clone(),
             output: newer.manifest.record.output.clone(),
@@ -1800,6 +1810,8 @@ async fn an_orphaned_staging_dir_from_a_killed_run_is_removed_by_the_next_instal
 
 fn custody_record(key: &BlobCid, device: &str, output: &BlobCid) -> SiblingRecord {
     SiblingRecord {
+        family: None,
+        requires: None,
         key: key.clone(),
         device: device.into(),
         output: output.clone(),
@@ -1951,6 +1963,8 @@ async fn plurality_fetch_uses_only_the_chosen_outputs_holders() {
     let records: Vec<_> = candidates
         .iter()
         .map(|h| SiblingRecord {
+            family: None,
+            requires: None,
             key: key_cid(&key).unwrap(),
             device: h.device.clone(),
             manifest: h.manifest.clone(),

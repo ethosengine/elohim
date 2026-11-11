@@ -7,7 +7,7 @@ use elohim_epr_rea::{
     AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
 };
 use eprfs_core::BlobCid;
-use eprfs_peer::{fold_holders, HolderSelection, SiblingRecord};
+use eprfs_peer::{family_variants, fold_holders, HolderSelection, Requires, SiblingRecord};
 
 use super::{ArtifactError, ArtifactResult, Options};
 use crate::peer::{self, SiblingArtifacts};
@@ -23,6 +23,14 @@ pub(super) fn records(found: &SiblingArtifacts) -> Vec<SiblingRecord> {
         .filter_map(|row| {
             Some(SiblingRecord {
                 key: BlobCid::parse(&row.key).ok()?,
+                family: row
+                    .family
+                    .as_deref()
+                    .and_then(|cid| BlobCid::parse(cid).ok()),
+                requires: row
+                    .requires
+                    .as_deref()
+                    .and_then(|cid| BlobCid::parse(cid).ok()),
                 device: row.device.clone(),
                 output: BlobCid::parse(&row.output).ok()?,
                 manifest: BlobCid::parse(&row.manifest).ok()?,
@@ -31,14 +39,152 @@ pub(super) fn records(found: &SiblingArtifacts) -> Vec<SiblingRecord> {
         .collect()
 }
 
+/// Availability is local possession only; this query never fetches from siblings.
+fn requires_availability(
+    options: &Options,
+    cids: &BTreeSet<BlobCid>,
+) -> ArtifactResult<BTreeMap<BlobCid, &'static str>> {
+    let mut availability: BTreeMap<_, _> = cids
+        .iter()
+        .cloned()
+        .map(|cid| (cid, "unavailable"))
+        .collect();
+    if cids.is_empty() {
+        return Ok(availability);
+    }
+    let payload_dir = peer::payload_store_dir(&peer::Options {
+        root: options.repo.clone(),
+        payload_store: options.payload_store.clone(),
+        ..peer::Options::default()
+    })?;
+    if !payload_dir.exists() {
+        return Ok(availability);
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        let store =
+            crate::payload::open_payload_store(&payload_dir, crate::payload::Access::Shared)
+                .await
+                .map_err(|e| ArtifactError::Gap(format!("local Requires store: {e}")))?
+                .store;
+        for (cid, status) in &mut availability {
+            if store
+                .fetch_blob(cid, eprfs_core::FetchPolicy::LocalOnly)
+                .await
+                .is_ok_and(|blob| BlobCid::compute_bytes(&blob.bytes) == *cid)
+            {
+                *status = "local";
+            }
+        }
+        Ok(availability)
+    })
+}
+
+fn requires_text(requires: &Requires, availability: &BTreeMap<BlobCid, &'static str>) -> String {
+    let claim = |cid: &Option<BlobCid>| {
+        cid.as_ref().map_or_else(
+            || "Unclaimed".into(),
+            |cid| format!("{cid} ({})", availability[cid]),
+        )
+    };
+    match requires {
+        Requires::Unanimous(cid) => format!("Unanimous({})", claim(&Some(cid.clone()))),
+        Requires::Unclaimed => "Unclaimed".into(),
+        Requires::Conflict(claims) => format!(
+            "Conflict{{{}}}",
+            claims.iter().map(claim).collect::<Vec<_>>().join(", ")
+        ),
+    }
+}
+
 pub(super) fn holders(options: &Options) -> ArtifactResult<ExitCode> {
-    if options.key.is_some() == options.output.is_some() {
+    if [
+        options.key.is_some(),
+        options.output.is_some(),
+        options.family.is_some(),
+    ]
+    .into_iter()
+    .filter(|present| *present)
+    .count()
+        != 1
+    {
         return Err(ArtifactError::InvalidArguments(
-            "holders needs exactly one of --key or --output".into(),
+            "holders needs exactly one of --key, --output or --family".into(),
         ));
     }
     let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())?;
     let records = records(&found);
+    if let Some(family) = &options.family {
+        let variants = family_variants(&records, family);
+        let cids: BTreeSet<_> = variants
+            .iter()
+            .flat_map(|v| v.claims.values().flatten())
+            .filter_map(|c| c.requires.clone())
+            .collect();
+        let availability = requires_availability(options, &cids)?;
+        let variants: Vec<_> = variants
+            .into_iter()
+            .map(|variant| {
+                if !options.json {
+                    println!(
+                        "key {} requires {}",
+                        variant.key,
+                        requires_text(&variant.requires, &availability)
+                    );
+                }
+                let holders: Vec<_> = variant
+                    .holders
+                    .iter()
+                    .map(|row| {
+                        let requires = Requires::from_claims(
+                            variant.claims[&row.output]
+                                .iter()
+                                .filter(|claim| claim.device == row.device)
+                                .map(|claim| claim.requires.clone()),
+                        );
+                        if !options.json {
+                            let marker = if row.device == found.device {
+                                " self"
+                            } else {
+                                ""
+                            };
+                            println!(
+                                "  {} {} requires {}{marker}",
+                                row.device,
+                                row.output,
+                                requires_text(&requires, &availability)
+                            );
+                        }
+                        serde_json::json!({"device": row.device, "output": row.output,
+                    "requires": requires, "self": row.device == found.device})
+                    })
+                    .collect();
+                let claims: Vec<_> = variant
+                    .claims
+                    .iter()
+                    .flat_map(|(output, claims)| {
+                        let availability = &availability;
+                        claims.iter().map(move |claim| {
+                            serde_json::json!({"output": output, "device": claim.device,
+                    "requires": claim.requires,
+                    "availability": claim.requires.as_ref().map(|cid| availability[cid])})
+                        })
+                    })
+                    .collect();
+                serde_json::json!({"key": variant.key, "outputs": variant.outputs,
+                "requires": variant.requires, "holders": holders, "claims": claims})
+            })
+            .collect();
+        if options.json {
+            println!(
+                "{}",
+                serde_json::json!({"family": family, "variants": variants})
+            );
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
     let mut outputs: BTreeMap<BlobCid, BTreeSet<String>> = BTreeMap::new();
     // An output with no recorded holders still has a meaningful zero-custody warning.
     if let Some(output) = &options.output {

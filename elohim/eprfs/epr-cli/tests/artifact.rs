@@ -245,15 +245,15 @@ fn events(root: &Path) -> Vec<FlowEvent> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
-    put_and_mount(false).await;
+    put_and_mount(false, false).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn artifact_overridden_flags_store_the_keyed_method_and_mount() {
-    put_and_mount(true).await;
+    put_and_mount(true, true).await;
 }
 
-async fn put_and_mount(overridden: bool) {
+async fn put_and_mount(overridden: bool, with_requires: bool) {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
@@ -304,29 +304,34 @@ async fn put_and_mount(overridden: bool) {
         "the key is a DAG-CBOR CID: {key_cid}"
     );
 
+    let requires_file = scratch.path().join("requires.json");
+    std::fs::write(&requires_file, r#"[ {"source":"declared", "predicate":{"value":["avx2"], "kind":"subset"}, "axis":"isa.x86"} ]"#).unwrap();
+    let canonical_requires = br#"[{"axis":"isa.x86","predicate":{"kind":"subset","value":["avx2"]},"source":"declared"}]"#;
+    let requires_cid = BlobCid::compute_bytes(canonical_requires);
     let put = |input: &str| {
-        command()
-            .env("BRIT_BUILD_REF_BIN", &stub)
-            .args([
-                "artifact",
-                "put",
-                "--method",
-                &method,
-                "--input",
-                input,
-                "--bytes",
-                bytes.to_str().unwrap(),
-                "--project",
-                "elohim-storage",
-                "--duration-ms",
-                "1234",
-                "--cross",
-                "--repo",
-                &repo,
-                "--json",
-            ])
-            .output()
-            .unwrap()
+        let mut command = command();
+        command.env("BRIT_BUILD_REF_BIN", &stub).args([
+            "artifact",
+            "put",
+            "--method",
+            &method,
+            "--input",
+            input,
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--duration-ms",
+            "1234",
+            "--cross",
+            "--repo",
+            &repo,
+            "--json",
+        ]);
+        if with_requires {
+            command.args(["--requires", requires_file.to_str().unwrap()]);
+        }
+        command.output().unwrap()
     };
     let out = put(&input);
     assert!(out.status.success(), "{}", text(&out));
@@ -373,6 +378,7 @@ async fn put_and_mount(overridden: bool) {
         "reason:produce".into(),
         "basis-key:git-tree".into(),
         format!("env:key={key_cid}"),
+        format!("env:family={}", effective.family_cid().unwrap()),
         format!("env:input={input}"),
         format!("env:output={output}"),
         format!("env:bytes={}", artifact.len()),
@@ -385,6 +391,14 @@ async fn put_and_mount(overridden: bool) {
             produce.classified_as
         );
     }
+
+    assert_eq!(
+        produce
+            .classified_as
+            .iter()
+            .find_map(|s| s.strip_prefix("env:requires=")),
+        with_requires.then(|| requires_cid.to_string()).as_deref()
+    );
 
     // It crosses under the repository's own allow-list …
     let policy =
@@ -408,6 +422,14 @@ async fn put_and_mount(overridden: bool) {
         .unwrap();
     assert_eq!(BlobCid::compute(&stored.bytes).to_string(), key["method"]);
     assert_eq!(stored.cid, effective.cid().unwrap());
+    if with_requires {
+        let stored = store
+            .fetch_blob(&requires_cid, eprfs_core::FetchPolicy::LocalOnly)
+            .await
+            .unwrap();
+        assert_eq!(stored.bytes.as_ref(), canonical_requires);
+        assert_eq!(BlobCid::compute_bytes(&stored.bytes), requires_cid);
+    }
     let (mount, _served) = BlobMount::new(store, did.clone());
     let indexed: Vec<_> = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
     let unindexed = mount.rebuild_from_flow(&indexed).await;
@@ -2299,4 +2321,226 @@ fn daemon_install_refusal_records_and_prints_no_divergence() {
             .count(),
         0
     );
+}
+
+#[test]
+fn artifact_family_lists_v2_v3_keys_requires_and_self_without_selection() {
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let (_, base) = method_file(scratch.path(), &["crate/src"]);
+    let input = eprfs_core::KeyInput::Raw(BlobCid::compute_bytes(b"source"));
+    let mut expected = std::collections::BTreeMap::new();
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let mut family = None;
+    // K2 refuses declared target.* at put until the build applies it (K6). Construct Produce
+    // records at the fold boundary to prove family grouping without claiming such builds ran.
+    for isa in ["x86-64-v2", "x86-64-v3"] {
+        let mut descriptor = base.clone();
+        descriptor
+            .non_path_inputs
+            .insert("target.isa".into(), isa.into());
+        let this_family = descriptor.family_cid().unwrap();
+        assert_eq!(family.get_or_insert(this_family.clone()), &this_family);
+        let key = eprfs_peer::key_cid(&eprfs_core::DerivationKey {
+            method: descriptor.cid().unwrap(),
+            input: input.clone(),
+        })
+        .unwrap()
+        .to_string();
+        let output = BlobCid::compute_bytes(isa.as_bytes());
+        let requires = BlobCid::compute_bytes(
+            &serde_json::to_vec(&serde_json::json!([{
+                "axis": "isa.x86", "predicate": {"kind": "equal", "value": isa},
+                "source": "declared"
+            }]))
+            .unwrap(),
+        )
+        .to_string();
+        let mut row = produce_record(
+            &key,
+            &output,
+            &BlobCid::compute(b"manifest").to_string(),
+            Some(&a.key.did_key()),
+        );
+        row.classified_as.extend([
+            format!("env:family={this_family}"),
+            format!("env:requires={requires}"),
+        ]);
+        store.append(FlowRecord::Event(row.clone())).unwrap();
+        row.classified_as.retain(|slot| !slot.starts_with("via:"));
+        row.receiver = AgentRef(b.key.did_key());
+        store.append(FlowRecord::Event(row)).unwrap();
+        expected.insert(key, (output.to_string(), requires));
+    }
+    assert_eq!(expected.len(), 2);
+    let family = family.unwrap().to_string();
+    let out = b.epr(&[
+        "artifact",
+        "holders",
+        "--family",
+        &family,
+        "--repo",
+        b.root().to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(out.status.success(), "{}", text(&out));
+    let result: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let variants = result["variants"].as_array().unwrap();
+    assert_eq!(variants.len(), 2);
+    for variant in variants {
+        let (output, requires) = &expected[variant["key"].as_str().unwrap()];
+        assert_eq!(variant["outputs"], serde_json::json!([output]));
+        assert_eq!(variant["requires"]["Unanimous"], *requires);
+        assert!(variant["claims"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|claim| claim["availability"] == "unavailable"));
+        let holders = variant["holders"].as_array().unwrap();
+        assert_eq!(holders.len(), 2);
+        assert_eq!(holders.iter().filter(|h| h["self"] == true).count(), 1);
+        for holder in holders {
+            assert_eq!(holder["self"], holder["device"] == b.key.did_key());
+            assert_eq!(holder["output"], *output);
+            assert_eq!(holder["requires"]["Unanimous"], *requires);
+        }
+    }
+    let out = b.epr(&[
+        "artifact",
+        "holders",
+        "--family",
+        &family,
+        "--repo",
+        b.root().to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains(" self"));
+    for (key, (_, requires)) in expected {
+        assert!(text(&out).contains(&format!(
+            "key {key} requires Unanimous({requires} (unavailable))"
+        )));
+    }
+}
+
+#[test]
+fn artifact_family_preserves_conflicts_older_holders_and_local_availability() {
+    let (_keys, a, b) = household();
+    let family = BlobCid::compute(b"family").to_string();
+    let key = BlobCid::compute(b"key").to_string();
+    let output = BlobCid::compute_bytes(b"output");
+    let first_bytes = eprfs_peer::Bytes::from_static(b"[1]");
+    let first = BlobCid::compute_bytes(&first_bytes);
+    let second = BlobCid::compute_bytes(b"[2]");
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let mut row = produce_record(
+        &key,
+        &output,
+        &BlobCid::compute(b"manifest").to_string(),
+        Some(&a.key.did_key()),
+    );
+    // B's own pre-K3 custody has neither family nor Requires. A later tags the key.
+    let mut older = row.clone();
+    older.classified_as.retain(|slot| !slot.starts_with("via:"));
+    older.receiver = AgentRef(b.key.did_key());
+    store.append(FlowRecord::Event(older)).unwrap();
+    row.classified_as.extend([
+        format!("env:family={family}"),
+        format!("env:requires={first}"),
+    ]);
+    store.append(FlowRecord::Event(row.clone())).unwrap();
+    row.classified_as
+        .retain(|slot| !slot.starts_with("env:requires=") && !slot.starts_with("env:family="));
+    row.classified_as.push(format!("env:requires={second}"));
+    store.append(FlowRecord::Event(row)).unwrap();
+
+    // Only the first contract is present on the querying device. No peer retrieval is involved.
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let store = elohim_epr_cli::payload::open_payload_store(
+            &b.payload(),
+            elohim_epr_cli::payload::Access::Shared,
+        )
+        .await
+        .unwrap()
+        .store;
+        store.put_blob_verified(&first, first_bytes).await.unwrap();
+    });
+    let args = [
+        "artifact",
+        "holders",
+        "--family",
+        &family,
+        "--repo",
+        b.root().to_str().unwrap(),
+    ];
+    let out = b.epr(&[args.as_slice(), &["--json"]].concat());
+    assert!(out.status.success(), "{}", text(&out));
+    let result: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let variant = &result["variants"][0];
+    let conflicts = variant["requires"]["Conflict"].as_array().unwrap();
+    assert_eq!(conflicts.len(), 3);
+    assert!(conflicts.contains(&serde_json::json!(first)));
+    assert!(conflicts.contains(&serde_json::json!(second)));
+    assert!(conflicts.contains(&serde_json::Value::Null));
+    let holders = variant["holders"].as_array().unwrap();
+    assert_eq!(holders.len(), 2);
+    let self_holder = holders
+        .iter()
+        .find(|h| h["device"] == b.key.did_key())
+        .unwrap();
+    assert_eq!(self_holder["requires"], "Unclaimed");
+    assert_eq!(self_holder["self"], true);
+    let remote_holder = holders
+        .iter()
+        .find(|h| h["device"] == a.key.did_key())
+        .unwrap();
+    assert_eq!(
+        remote_holder["requires"]["Conflict"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let claims = variant["claims"].as_array().unwrap();
+    assert_eq!(claims.len(), 3);
+    for (cid, status) in [(&first, "local"), (&second, "unavailable")] {
+        assert!(claims
+            .iter()
+            .any(|c| c["requires"] == cid.to_string() && c["availability"] == status));
+    }
+    let by_key = b.epr(&[
+        "artifact",
+        "holders",
+        "--key",
+        &key,
+        "--repo",
+        b.root().to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(by_key.status.success(), "{}", text(&by_key));
+    let by_key: serde_json::Value = serde_json::from_slice(&by_key.stdout).unwrap();
+    assert_eq!(by_key["holders"].as_array().unwrap().len(), holders.len());
+    for holder in holders {
+        assert!(by_key["holders"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|h| h["device"] == holder["device"]
+                && h["output"] == holder["output"]
+                && h["self"] == holder["self"]));
+    }
+    let out = b.epr(&args);
+    assert!(out.status.success(), "{}", text(&out));
+    let printed = text(&out);
+    assert!(printed.contains("Conflict{"));
+    assert!(printed.contains(&format!("{first} (local)")));
+    assert!(printed.contains(&format!("{second} (unavailable)")));
+    assert!(printed.contains(&format!(
+        "{} {} requires Unclaimed self",
+        b.key.did_key(),
+        output
+    )));
 }

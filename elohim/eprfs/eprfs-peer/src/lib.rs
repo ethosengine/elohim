@@ -53,6 +53,7 @@ mod connections;
 mod daemon;
 mod endpoint;
 mod error;
+mod family;
 mod fetch;
 mod fold;
 mod gate;
@@ -92,6 +93,7 @@ pub use daemon::{
 };
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
+pub use family::{family_variants, Requires, RequiresClaim, Variant};
 pub use fetch::{
     ensure_queue_dir, fetch_artifact, fetch_artifact_until, fetch_cancel_path, fetch_done_path,
     fetch_queue_dir, fetch_request_path, fold_holders, install_fetched, key_cid, put_method_record,
