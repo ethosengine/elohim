@@ -143,6 +143,8 @@ record alone. State at addition: K1, K2, K3 part 1, K4, K5 and K6 slice 1 are on
 
 - [ ] **K8 — `put` extracts `Requires` from the bytes itself (arch, OS, loader, needed libraries, libc symbol floor, kernel ABI note, ISA level) with `host_contract::Requires` and writes `env:requires`; a caller-supplied `--requires` may only make a clause stricter; an artifact whose requirements cannot be extracted refuses** (serves sprint-lands-each-closure-once)
 
+Constraints from the A1 owner (shem, 2026-11-11): `put` builds `Requires` through `Requires::try_from(Vec<Clause>)` or `insert`, so a conflict between a declared and an extracted clause surfaces as `MergeError` and never silently weakens; extracted clauses carry `source: extracted`; the building host's `Provides` is never recorded (it is not serializable by design).
+
 Verify: recording the epr built on ethosengine yields `isa.x86` at v3 with `source: extracted` and its sqlite3 evidence, plus `abi.libc ≥ glibc 2.39`; the same record admitted against a synthetic v2 `Provides` refuses naming the missing features; an unreadable artifact refuses.
 
 - [ ] **K9 — the key's input lines are stored as a document by the input CID, readable by an admitted device like the method record, so another host can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
@@ -150,6 +152,8 @@ Verify: recording the epr built on ethosengine yields `isa.x86` at v3 with `sour
 Verify: on two devices, the same descriptor's input documents are fetched and diffed, and the diff names exactly the differing lines (on ethosengine and shem: `link:Scrt1.o`, `link:crt1.o` and the macro dump); the stored document's CID equals the key's input CID.
 
 - [ ] **K10 — dispatch evidence (spec §3.2): the ISA extraction counts only code reached without a runtime feature check, on evidence bound to the bytes (compiler multi-versioning metadata or a build-time attestation naming guarded functions by content), not a symbol-name pattern; unproven dispatch counts as a requirement** (serves sprint-lands-each-closure-once)
+
+Constraint from the A1 owner: dispatch evidence never adds an `isa` clause; it removes the above-floor features it covers from the extracted clause, and when nothing above the floor remains the clause is absent (spec §3.1 rule 4: an absent clause requires nothing).
 
 Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when their guard is evidenced; with the evidence withheld, the same bytes extract v3; epr's sqlite3 v3 code stays a requirement.
 
