@@ -93,3 +93,44 @@ bafyreifpy6oz3yohb6y4ocnq7he6mm3oahhsphcuwdwmhuwkda5tjk3uhq.
 5. Lane K review (Codex astra, quotes grep-verified, relayed to ethosengine): a fixed
    LINK_INPUTS list; host tools in the key input rather than the method; the family
    keeps host tools; Mismatch on tied holder counts. ethosengine judges each.
+
+## Open-items ledger, agreed between shem and ethosengine (2026-11-11)
+
+At the steward's request the two devices assigned every open item an owner and a
+working posture, so none is left open. A steward ruling overrides any posture.
+
+| # | Item | Owner | Posture or decision | State |
+|---|---|---|---|---|
+| 1 | Parked local rebase (stasis :17) | shem | No standing ruling asked; shem integrates by merge only, never a local rebase | adopted |
+| 2 | A1 README loop close | shem | Round 5 fresh read: 0 correctness, 3 interpretability; its glosses applied (psABI, DAG-CBOR, `compile_fail`, toolchain), with no fresh read of them; closed under the 2026-10-20 no-fixed-point ruling. Rounds: 0/4/0, 0/3/2, 0/3/2, 0/2/3, 0/3/0 | closed |
+| 3 | Sysroot serves grant | steward signs; ethosengine drafts | Unapplied `berth.artifacts.serves` proposal (shem to ethosengine, sysroot-pack only, private reach, with expiry); until signed, K6 proves with a sysroot packed on the consuming device | awaiting steward |
+| 4 | Compiler closure, A or B | ethosengine (lane K designer) | **B**: per-compiler variants share a family, never a key. A (a CID-pinned gcc closure as a seed member, X1) is a later optimisation | decided; steward ratifies |
+| 5 | Lane K review findings | ethosengine | (1) HIGH, fixed by deriving keyed libs from rustc's native-static-libs; (2) host tool lines stay in the key input until K6 slice 2; (3) the family carries rustc/cargo identity plus target.* only; (4) a tie refuses rather than guess, open to the steward; (6) the daemon serves its own CLI, which derived the key | dispositions in the K DELTA |
+| 6 | ethosengine's extracted vectors | shem | Raw extraction kept under `tests/vectors/extracted/`; two derived vectors: epr on a synthetic v3 host (permit) and on a synthetic v2 host (refuse; missing avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave). A mutation check confirmed both are evaluated | landed with this commit |
+| 7 | cc -march second F2r split (per-build CFLAGS) | ethosengine | K6 slice 2 runs the `-dM` probe with the realised per-build CFLAGS | planned |
+| 8 | A2-A4 (ark) | unassigned | Neither covenant covers `elohim/ark`. Whoever first holds a covenant with that write-set takes it and notes the other | awaiting a covenant |
+| 9 | K3 part 2, K6, K7 | ethosengine | Lane K continues | in flight |
+| 10 | Preflight checks: worktree hook path, setgid TMPDIR | next covenant covering `genesis/orchestrator` | Backlog row below; neither device's write-set covers it tonight | row ready |
+| 11 | `epr flow claim` refused from a worktree | next covenant covering the backlog | Backlog row below | row ready |
+| 12 | shem's leftover worktrees | shem | hc-k12 (unused K partial, superseded) and the merged hostcompat, hc-a1, hc-stories and hc-review are removed after this lands | after landing |
+| 13 | DELTA label collisions | both | Read the atom's top label just before writing; land DELTAs only in the landing commit | adopted |
+| 14 | Residual findings in device-declared-target scenario 2 | shem | Folded into the S2 step-binding work when lane V/P binds the steps | deferred to binding |
+| 15 | ethosengine's merged worktrees | ethosengine | Remove the merged ones; keep hc-k6 and hc-k1c until they land | in hand |
+| 16 | Explicit `-C linker` plus bare `-fuse-ld=lld` may lose the rustc gcc-ld shim | ethosengine | K6 slice 2 | planned |
+| 17 | Sibling notes dropped by an exact-id filter | ethosengine | Watcher now matches by prefix | done |
+
+### Backlog-ready rows (to be filed by whoever holds the backlog write-set)
+
+- **gate-preflight: two worktree traps.** (a) A push from a fresh worktree runs the main
+  checkout's `.husky/pre-push`, because the shim resolves the script next to itself.
+  A check should refuse when `core.hooksPath` resolves outside the pushing worktree, or
+  name the cure (copy `h` and `pre-push` into `<wt>/.husky/_` and push with
+  `-c core.hooksPath=<wt>/.husky/_`). (b) A setgid TMPDIR (anything under `/projects`,
+  mode 2775) makes `hc-mesh-initialization-continuation.test.sh` see 2700 and fail
+  silently inside the orchestrator `test-suite`. The check is `stat -c %a "$TMPDIR"`
+  having no setgid bit. Habit `careless-reds-cost-seconds`.
+- **epr flow claim from a worktree.** `epr flow claim` and `epr actor claim` refuse with
+  `envelope-checkout-mismatch` when run from a linked worktree, because the session
+  envelope is bound to the main checkout. That checkout's flow store may also lack items
+  minted only on the worktree's tree. Plan items in a sprint that runs in worktrees go
+  unclaimed. Habit `sprint-lands-each-closure-once`.

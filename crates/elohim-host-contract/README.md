@@ -31,8 +31,8 @@ neither Serialize nor Deserialize; synthetic test hosts use a separate fixture
 shape. This crate never observes a host: reading CPU flags, the loaded libc and
 loader paths is done by the caller on the device that will run the bytes (for
 ark, `elohim/ark/supervisor/src/driver.rs`). Map Linux `/proc/cpuinfo` spellings
-onto the psABI (the x86-64 processor supplement to the System V ABI, which defines the
-microarchitecture levels v2, v3 and v4) names used here. For the shipped x86-64 bundles exactly two
+onto the psABI (processor-specific ABI: the x86-64 supplement to the System V ABI, which
+defines the microarchitecture levels v2, v3 and v4) names used here. For the shipped x86-64 bundles exactly two
 differ:
 
 | `/proc/cpuinfo` flag | name used here |
@@ -52,7 +52,7 @@ execution permission or prove fitness for wider reach.
 
 `X86_64_V2.to_bundle()` and `X86_64_V3.to_bundle()` create the shipped psABI
 feature documents. `Bundle::cid()` addresses the name, axis and sorted features
-using `elohim-epr`'s canonical DAG-CBOR encoder (`elohim_epr::cbor`) and its
+using `elohim-epr`'s canonical DAG-CBOR (IPLD's deterministic CBOR) encoder (`elohim_epr::cbor`) and its
 record CID helper (`elohim_epr::cid`), so every peer derives the same CID.
 
 From the repository root:
@@ -62,9 +62,10 @@ just gate host-contract
 ```
 
 The gate runs `cargo fmt --check`, clippy with `-D warnings` and `cargo test` in the
-cargo target slot and toolchain its `build-manifest.json` names. Success means
-passing contract tests, vector tests and the compile-fail doctests that prohibit
-serializing `Provides`.
+cargo target slot its `build-manifest.json` names, on the repository's pinned
+Rust toolchain (1.96.1, edition 2021). Success means
+passing contract tests, vector tests and the `compile_fail` doctests, which prove that
+serializing `Provides` does not compile.
 
 To add a synthetic conformance case, copy a JSON file in `tests/vectors/`. Every
 `*.json` there is loaded automatically. Required fields are `requires` (an array
