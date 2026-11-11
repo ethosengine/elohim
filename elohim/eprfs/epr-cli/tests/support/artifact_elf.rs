@@ -1,3 +1,6 @@
+/// Full compiler identity shared by the synthetic descriptor and its executable stub.
+pub const RUSTC_IDENTITY: &str = "rustc fixture\nbinary: rustc\ncommit-hash: fixture-hash\ncommit-date: 2026-01-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.1\nLLVM version: 22.1.2\n";
+
 /// Three section headers: null, section names and .comment. No binary fixture is stored.
 pub fn artifact_elf(comment: &[u8]) -> Vec<u8> {
     artifact_elf_format(comment, true, true)

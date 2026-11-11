@@ -7,7 +7,8 @@ use object::{Object, ObjectSection};
 
 use super::{resolve_tool, ArtifactError, ArtifactResult, BlobCid, MethodDescriptor, PATH_INPUT};
 
-const LINK_INPUTS: [&str; 10] = [
+/// Startup and support objects selected by the gcc driver, not rustc's native-library set.
+const DRIVER_INPUTS: [&str; 8] = [
     "crt1.o",
     "Scrt1.o",
     "crti.o",
@@ -15,9 +16,7 @@ const LINK_INPUTS: [&str; 10] = [
     "crtbeginS.o",
     "crtendS.o",
     "libgcc.a",
-    "libgcc_s.so",
     "libc_nonshared.a",
-    "libc.so",
 ];
 
 fn probe(tool: &Path, args: &[&str], path: &str) -> ArtifactResult<Output> {
@@ -50,6 +49,7 @@ fn output_bytes(output: Output) -> Vec<u8> {
     [output.stdout, output.stderr].concat()
 }
 
+mod native_libraries;
 mod selections;
 pub(super) use selections::{codegen_options, merge_configs, resolve, target, Selections};
 
@@ -154,18 +154,24 @@ pub(super) fn tool_lines(
     if let Some(driver) = &driver {
         tool_version(&mut lines, "link-driver", driver, path)?;
         driver_defaults(&mut lines, "link-driver", driver, path)?;
-        for input in LINK_INPUTS {
-            let output = probe(driver, &[&format!("-print-file-name={input}")], path)?;
-            let file = String::from_utf8(output.stdout).map_err(|e| {
-                ArtifactError::Gap(format!(
-                    "{} returned a non-UTF-8 path for {input}: {e}",
-                    driver.display()
-                ))
-            })?;
-            if file.trim() == input {
-                lines.push_str(&format!("link:{input}\t-\n"));
+        for input in DRIVER_INPUTS {
+            if let Some(file) = native_libraries::driver_file(driver, input, path)? {
+                link_input(&mut lines, input, Path::new(&file), 0)?;
             } else {
-                link_input(&mut lines, input, Path::new(file.trim()), 0)?;
+                lines.push_str(&format!("link:{input}\t-\n"));
+            }
+        }
+        for name in native_libraries::probe(descriptor, path)? {
+            let shared = format!("lib{name}.so");
+            if let Some(file) = native_libraries::driver_file(driver, &shared, path)? {
+                link_input(&mut lines, &shared, Path::new(&file), 0)?;
+            } else {
+                let archive = format!("lib{name}.a");
+                if let Some(file) = native_libraries::driver_file(driver, &archive, path)? {
+                    link_input(&mut lines, &archive, Path::new(&file), 0)?;
+                } else {
+                    lines.push_str(&format!("link:lib{name}\t-\n"));
+                }
             }
         }
     } else {

@@ -735,6 +735,11 @@ pub const PATH_INPUT: &str = "PATH";
 /// `name` resolved the way a process with `PATH=path` resolves it: as given when it names a
 /// path, else the first executable regular file of that name on `path`; canonicalized.
 fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
+    std::fs::canonicalize(resolve_tool_path(name, path)?).ok()
+}
+
+/// Preserve the executable name for argv[0]-dispatched proxies such as rustup's rustc.
+fn resolve_tool_path(name: &str, path: &str) -> Option<PathBuf> {
     use std::os::unix::fs::PermissionsExt;
     let runnable = |candidate: &Path| {
         std::fs::metadata(candidate)
@@ -747,7 +752,7 @@ fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
             .map(|dir| dir.join(name))
             .find(|candidate| runnable(candidate))
     }?;
-    std::fs::canonicalize(&found).ok()
+    std::path::absolute(found).ok()
 }
 
 mod host;
