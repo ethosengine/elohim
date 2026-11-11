@@ -1,0 +1,39 @@
+{
+  "requires": [
+    {
+      "axis": "arch",
+      "predicate": {
+        "kind": "equal",
+        "value": "aarch64"
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "arch": {
+        "kind": "scalar",
+        "value": "x86_64"
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unmet",
+      "axis": "arch",
+      "required": {
+        "kind": "equal",
+        "value": "aarch64"
+      },
+      "host": {
+        "kind": "scalar",
+        "value": "x86_64"
+      },
+      "missing": []
+    }
+  ]
+}

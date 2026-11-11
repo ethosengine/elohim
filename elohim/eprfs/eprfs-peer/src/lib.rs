@@ -11,6 +11,18 @@
 //! - [`TierProtocol`] serves this device's eprfs store on [`TIER_ALPN`] behind
 //!   [`StewardDevicesGate`], which answers only admitted devices; everyone else gets
 //!   eprfs-serve's uniform refusal. [`tier_call`] and [`tier_request`] ask a peer's tier.
+//! - The artifact mount (artifact-store design §1): [`BlobMount`] answers
+//!   [`TierRequest::Manifest`] and [`TierRequest::Blob`] for the derivation artifacts this device
+//!   holds custody of, indexed from its own flow store, to the devices [`ArtifactServeList`]
+//!   grants by method name; the gate judges roots and objects by a [`ServeScope`]. Each serve is
+//!   recorded as one `serve-blob` Use event that never crosses.
+//!
+//! - The sibling fetch (artifact-store design §3.b): [`fetch_artifact`] draws an artifact a
+//!   sibling holds over one tier connection per holder, manifest first and capped, every chunk
+//!   verified before it is stored and the manifest stored last; [`install_fetched`] is the
+//!   whole-blob verified install read. Every other outcome is a typed [`FetchGap`]. The daemon
+//!   runs the fetches `epr artifact fetch` queues ([`FetchRequest`]), because only it holds the
+//!   device's peer key.
 //!
 //! - The steward channel (§3.3): [`project_channel`] places this device's crossing events (the
 //!   [`CrossingAllowList`] from `pool-policy.json`) in a channel tree served from a
@@ -35,11 +47,14 @@
 mod admission;
 mod allow;
 mod announce;
+mod blob_mount;
 mod channel;
 mod connections;
 mod daemon;
 mod endpoint;
 mod error;
+mod family;
+mod fetch;
 mod fold;
 mod gate;
 mod gossip;
@@ -50,6 +65,7 @@ mod lease_view;
 mod local_blob;
 mod proof;
 mod rules;
+mod serves;
 mod steward_scope;
 mod tier;
 
@@ -58,6 +74,13 @@ pub use allow::{slots, via_device, CrossingAllowList, KIND_SLOT, MEASURE_SLOT, V
 pub use announce::{
     topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
 };
+pub use blob_mount::{
+    open_payload_store, ArtifactIndex, BlobMount, DeviceScope, DrawOutcome, Held, ServedDraw,
+    Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, SERVED_QUEUE, SERVE_BLOB,
+    SERVE_IDLE,
+};
+/// The byte buffer artifacts are put with, so a consumer needs no bytes dependency of its own.
+pub use bytes::Bytes;
 pub use channel::{
     channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,
     CHANNEL_EVENTS, CHANNEL_NACKS, RETAINED_ROOTS,
@@ -70,12 +93,25 @@ pub use daemon::{
 };
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
+pub use family::{family_variants, Requires, RequiresClaim, Variant};
+pub use fetch::{
+    ensure_queue_dir, fetch_artifact, fetch_artifact_until, fetch_authorized_until,
+    fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path, fold_holders,
+    install_fetched, key_cid, put_method_record, queue_dir_is_private, read_queue_file,
+    resolve_holders, resolve_output_holders, write_queue_file, FetchAuthority, FetchBudget,
+    FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport, FetchedArtifact, Holder,
+    HolderSelection, InstallScope, RequestedHolder, SiblingRecord, ARTIFACT_PRODUCE_KIND,
+    ARTIFACT_PRODUCE_MEASURE, FETCH_IN_FLIGHT, FETCH_MANIFEST_CAP, FETCH_QUEUE, FETCH_STALL,
+    FETCH_TOTAL, MAX_QUEUE_FILE_BYTES,
+};
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,
     FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
     MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
-pub use gate::{SharedAdmission, StewardDevicesGate};
+pub use gate::{
+    serve_blob_standing, ServeScope, Served, SharedAdmission, StewardDevicesGate, WholeStoreScope,
+};
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
@@ -90,8 +126,12 @@ pub use lease_view::{
     lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
     LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
-pub use local_blob::{put_local_blob, read_local_blob, stream_local_blob, LocalBlobContext};
+pub use local_blob::{
+    put_local_blob, put_local_blob_with, read_local_blob, stream_local_blob,
+    stream_local_blob_with, LocalBlobContext,
+};
 pub use rules::{Rules, RulesDigest, RulesState};
+pub use serves::{ArtifactServeList, CARRIER_AUDIENCE_PREFIX, STEWARD_AUDIENCE};
 pub use steward_scope::{
     Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,
 };

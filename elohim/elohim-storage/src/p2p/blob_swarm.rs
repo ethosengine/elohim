@@ -336,6 +336,7 @@ pub async fn fetch_shards_via_swarm(
                         "Q4: swarm-fetched shard failed to persist"
                     );
                     crate::metrics::inc_blob_swarm_shard_fetched("miss");
+                    crate::metrics::add_blob_fetch_wasted_bytes("unpersisted_shard", bytes.len());
                     continue;
                 }
                 source_peers.insert(source_peer);
@@ -652,7 +653,10 @@ pub async fn race_fetch_dual(
 /// to settle before honoring a manifest would add up to `per_peer_timeout` to
 /// every sharded composite read.
 #[cfg(feature = "p2p-iroh")]
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the two planes' legs, the candidate set, the libp2p command channel, the connectedness probe and the two fetch budgets are each supplied by a different caller-side source; a bundling struct would only rename them"
+)]
 async fn race_both_planes(
     leg: &'static crate::p2p_iroh::IrohFetchLeg,
     blob_hash: &ByteCid,
@@ -834,6 +838,10 @@ async fn race_both_planes(
                                 "iroh blob fetch: bytes do not hash to the requested address"
                             );
                             crate::metrics::inc_iroh_blob_fetch("verify_failed");
+                            crate::metrics::add_blob_fetch_wasted_bytes(
+                                "hash_failure",
+                                bytes.len(),
+                            );
                             crate::p2p::transport_paths::global().record(
                                 &peer_id,
                                 crate::p2p::transport_paths::Transport::Iroh,

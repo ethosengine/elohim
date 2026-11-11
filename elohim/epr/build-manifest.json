@@ -73,6 +73,40 @@
           "cargo": { "workspace": "crates/elohim-address", "profile": "dev", "rustflags": "" }
         }
       },
+      "elohim-blob-store": {
+        "dir": "crates/elohim-blob-store",
+        "inputs": {
+          "sources": [
+            "crates/elohim-blob-store/**",
+            "elohim/epr/**",
+            "crates/elohim-address/**",
+            "elohim/Cargo.toml",
+            "elohim/eprfs/Cargo.toml",
+            "elohim/eprfs/eprfs-core/**",
+            "elohim/eprfs/eprfs-serve/**",
+            "crates/seam-contracts/**",
+            "vendor/iroh-quinn-proto-0.13.0/**"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": { "workspace": "crates/elohim-blob-store", "profile": "dev", "rustflags": "" }
+        }
+      },
+      "elohim-storage-client": {
+        "dir": "crates/elohim-storage-client",
+        "inputs": {
+          "sources": ["crates/elohim-storage-client/**", "crates/elohim-address/**", "crates/elohim-views/**"],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-elohim-storage-client",
+          "cargo": { "workspace": "crates/elohim-storage-client", "profile": "dev", "rustflags": "" }
+        }
+      },
       "epr-ts": {
         "dir": "elohim/sdk/epr-ts",
         "steps": ["ts-test"],

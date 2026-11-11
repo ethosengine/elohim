@@ -585,8 +585,11 @@ test(
         join(f.state, "private-home", name),
         "utf8",
       ).trim();
-      assert.doesNotMatch(run.stdout, new RegExp(secret));
-      assert.doesNotMatch(run.stderr, new RegExp(secret));
+      // Literal containment, never `new RegExp(secret)`: the secret is random base64, and a
+      // `+` in it is a regex quantifier ("Nothing to repeat"), which made this test fail at
+      // random under pre-push (2026-11-08) while asserting nothing about the wrapper.
+      assert.ok(!run.stdout.includes(secret), `${name} leaked to stdout`);
+      assert.ok(!run.stderr.includes(secret), `${name} leaked to stderr`);
     }
     assert.equal(
       statSync(join(f.state, "mesh/matthew/runtime-config.toml")).mode & 0o002,

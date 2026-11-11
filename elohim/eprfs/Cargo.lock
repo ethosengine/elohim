@@ -1290,6 +1290,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-blob-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bytes",
+ "cid",
+ "elohim-epr",
+ "eprfs-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "elohim-cache-core"
 version = "0.1.0"
 dependencies = [
@@ -1367,10 +1385,12 @@ name = "elohim-epr-cli"
 version = "0.3.3"
 dependencies = [
  "base64 0.22.1",
+ "bytes",
  "chrono",
  "cid",
  "did-bridge",
  "elohim-ark-core",
+ "elohim-blob-store",
  "elohim-consent-grant",
  "elohim-device-runtime",
  "elohim-epr",
@@ -1386,6 +1406,7 @@ dependencies = [
  "glob",
  "jsonschema",
  "libc",
+ "object",
  "rand_core 0.6.4",
  "rusqlite",
  "rustix",
@@ -1396,6 +1417,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "toml 0.8.23",
  "ts-rs",
  "unicode-normalization",
 ]
@@ -1564,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1634,6 +1656,7 @@ dependencies = [
  "futures-lite",
  "iroh",
  "iroh-gossip",
+ "libc",
  "rand 0.8.8",
  "serde",
  "serde_ipld_dagcbor",
@@ -1660,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1668,6 +1691,7 @@ dependencies = [
  "elohim-epr",
  "eprfs-core",
  "eprfs-serve",
+ "ipld-core",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

@@ -66,6 +66,7 @@ pub mod private_receive; // station 3b receiver-side pre-authorization: keep a p
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod projection_reconcile; // P1 reconciliation stream — REA commitments converge from own conductor
 pub mod reach_authorization;
+pub mod recon_limit; // per-peer inbound limit on the recon responder
 pub mod recon_wire; // libp2p framing of /elohim/inventory-recon/1.0.0
 pub mod reconcile_peers; // transport-neutral peer source for the reconcile arms (libp2p | iroh)
 pub mod reconcile_rails;
@@ -83,6 +84,8 @@ pub mod sync_protocol;
 pub mod sync_round;
 pub mod sync_state; // the sync-state contract: epoch before position, caught-up is a comparison
 pub mod topics;
+pub mod transport_authority;
+pub mod transport_link;
 pub mod transport_manifest_gossip;
 pub mod transport_paths; // PathObservation + select_path — transport self-awareness (spec 2026-08-24 §3.1)
 pub mod trigger_courier; // the node's half of the adoption trigger's courier path: owned head-record fetcher + byte presence
@@ -994,6 +997,8 @@ pub struct P2PNode {
     /// run-loop broadcaster tick allocates the next value before each
     /// publish via `inventory_broadcaster::build_snapshot`.
     inventory_seq: inventory_broadcaster::SequenceAllocator,
+    /// Inbound recon requests per peer per minute; excess gets `RECON_BUSY_REPLY`.
+    recon_limiter: recon_limit::ReconLimiter<PeerId>,
     /// P3 salvage: monotonic sequence allocator for outgoing
     /// `SalvageCapacityAd` messages. Initialized at 0 in `new()`.
     salvage_seq: inventory_broadcaster::SequenceAllocator,
@@ -2374,7 +2379,6 @@ impl P2PHandle {
         };
 
         let mut distributed = 0usize;
-        let mut self_placement_recorded = false;
         let now = chrono::Utc::now().to_rfc3339();
 
         // Pre-resolve each SELECTED peer's `agent_cid` → dialable libp2p `PeerId`
@@ -2420,49 +2424,36 @@ impl P2PHandle {
         // `SelectedPeer::peer_id` is an agent_cid (it is `humans.agent_pub_key`).
         // NEVER compared against a libp2p/iroh transport id.
         //
-        // The local pantry snapshot is taken ONCE (same idiom as the custody
-        // reconcile pass) and is the verify-before-record gate: a self-held
-        // location row is written only for shards whose bytes are demonstrably
-        // present locally. See `services::self_stewardship`.
+        // Verify before record (R7). A self-held location row, its custody
+        // announcement and the custody pledge rest only on bytes this node read back
+        // VERIFIED: a custody unit whose bytes hash to its CID (`verified_unit_read`,
+        // via `BlobStore::get_chunk`, which re-derives the CID before returning a
+        // byte), or — for the pledge — the whole payload (`self_full_copy_verified`).
+        // Never a filename listing: `BlobStore::list_cids` names what `blobs/` holds,
+        // not whether the bytes are whole, and a corrupt or chunk-missing payload keeps
+        // its name. See `services::self_stewardship`.
         let self_agent_cid: Option<String> = pool.get().ok().and_then(|mut conn| {
             crate::reconcile::custody::resolve_self_agent_cid(
                 &mut conn,
                 Some(self.agent_pubkey.as_str()),
             )
         });
-        // The pantry snapshot is taken whenever this node has an identity, not only
-        // when the selector picked it: an uploader that holds a verified full copy
-        // is a holder whether or not placement chose it (storage-owner ruling,
+        // The pantry is consulted whenever this node has an identity, not only when
+        // the selector picked it: an uploader that holds a verified full copy is a
+        // holder whether or not placement chose it (storage-owner ruling,
         // regenesis-1, on chaos-peer-churn:112).
-        let local_pantry: Option<crate::reconcile::custody::BlobStoreSnapshot> =
-            if self_agent_cid.is_some() {
-                match self.blob_store.as_ref() {
-                    Some(store) => {
-                        match crate::reconcile::custody::BlobStoreSnapshot::from_store(store) {
-                            Ok(snap) => Some(snap),
-                            Err(e) => {
-                                tracing::warn!(
-                                    content_id,
-                                    error = %e,
-                                    "self-stewardship: local pantry snapshot failed; \
-                                     self-held locations not recorded this pass"
-                                );
-                                None
-                            }
-                        }
-                    }
-                    None => {
-                        tracing::debug!(
-                            content_id,
-                            "self-stewardship: no local pantry on this handle; \
-                             self-held locations not recorded"
-                        );
-                        None
-                    }
-                }
-            } else {
-                None
-            };
+        let pantry: Option<&BlobStore> = if self_agent_cid.is_some() {
+            if self.blob_store.is_none() {
+                tracing::debug!(
+                    content_id,
+                    "self-stewardship: no local pantry on this handle; \
+                     self-held locations not recorded"
+                );
+            }
+            self.blob_store.as_deref()
+        } else {
+            None
+        };
 
         // Full verified local copy: the whole payload reads back from this node's
         // own pantry with its BLAKE3 recomputed over every chunk (`BlobStore::get`
@@ -2518,13 +2509,14 @@ impl P2PHandle {
 
             // SELF-selected: record what we can verify, never dial ourselves.
             if self_agent_cid.as_deref() == Some(peer.peer_id.as_str()) {
-                let Some(ref pantry) = local_pantry else {
+                let Some(store) = pantry else {
                     continue;
                 };
+                let held = VerifiedRead::of(store, hash).await;
                 let Ok(mut conn) = pool.get() else { continue };
                 match crate::services::self_stewardship::record_self_held_shard(
                     &mut conn,
-                    pantry,
+                    &held,
                     hash,
                     &peer.peer_id,
                     h_app_id,
@@ -2534,7 +2526,7 @@ impl P2PHandle {
                             content_id,
                             shard_index = i,
                             peer = %peer.peer_id,
-                            "Shard recorded as self-held (bytes verified in local pantry; no push)"
+                            "Shard recorded as self-held (unit read back verified from the local pantry; no push)"
                         );
                         // Cross-pod convergence: announce this self-held custody
                         // claim so peers (and other doorways) can project it.
@@ -2546,7 +2538,20 @@ impl P2PHandle {
                         )
                         .await;
                         self_recorded_units.insert(*hash);
-                        self_placement_recorded = true;
+                        distributed += 1;
+                    }
+                    Ok(crate::services::self_stewardship::SelfHeldOutcome::Unchanged) => {
+                        // Held and already rowed exactly so: still held (it counts
+                        // toward placement), but nothing changed, so nothing is
+                        // announced. Liveness after a restart is inventory freshness
+                        // and recon, not a re-announcement of unchanged custody.
+                        tracing::debug!(
+                            content_id,
+                            shard_index = i,
+                            peer = %peer.peer_id,
+                            "Self-held shard unchanged (no announcement)"
+                        );
+                        self_recorded_units.insert(*hash);
                         distributed += 1;
                     }
                     Ok(outcome) => {
@@ -2652,14 +2657,24 @@ impl P2PHandle {
         // `distributed`: placement gaps still measure the selected holders alone,
         // and nothing here dials or pushes (no-self-dial contract).
         if self_full_copy_verified {
-            if let (Some(me), Some(pantry)) = (self_agent_cid.as_deref(), local_pantry.as_ref()) {
-                for (unit_cid, _) in &units {
+            if let (Some(me), Some(store)) = (self_agent_cid.as_deref(), pantry) {
+                // A striped manifest's custody units are derived shards this pantry does
+                // not hold; what it serves is the payload's own chunks, so those are
+                // the units it can honestly row.
+                let served_chunks: Vec<ByteCid> = if manifest.stripes.is_empty() {
+                    Vec::new()
+                } else {
+                    manifest.chunks.iter().map(|c| c.cid).collect()
+                };
+                let uploader_units = units.iter().map(|(cid, _)| cid).chain(served_chunks.iter());
+                for unit_cid in uploader_units {
                     if self_recorded_units.contains(unit_cid) {
                         continue;
                     }
+                    let held = VerifiedRead::of(store, unit_cid).await;
                     let Ok(mut conn) = pool.get() else { continue };
                     match crate::services::self_stewardship::record_self_held_shard(
-                        &mut conn, pantry, unit_cid, me, h_app_id,
+                        &mut conn, &held, unit_cid, me, h_app_id,
                     ) {
                         Ok(crate::services::self_stewardship::SelfHeldOutcome::Recorded) => {
                             tracing::info!(
@@ -2676,13 +2691,15 @@ impl P2PHandle {
                             )
                             .await;
                             self_recorded_units.insert(*unit_cid);
-                            self_placement_recorded = true;
+                        }
+                        Ok(crate::services::self_stewardship::SelfHeldOutcome::Unchanged) => {
+                            self_recorded_units.insert(*unit_cid);
                         }
                         Ok(outcome) => tracing::debug!(
                             content_id,
                             shard_cid = %unit_cid,
                             ?outcome,
-                            "Uploader unit NOT recorded self-held (derived bytes not in the pantry)"
+                            "Uploader unit NOT recorded self-held (no verified read of its bytes in the pantry)"
                         ),
                         Err(e) => tracing::warn!(
                             content_id,
@@ -2707,7 +2724,11 @@ impl P2PHandle {
         // manifest + shard_locations remain truthful and the gap stays visible.
         // A verified full local copy pledges the blob too, even when every unit
         // is a derived stripe shard the pantry does not hold as such.
-        if self_placement_recorded || self_full_copy_verified {
+        //
+        // The pledge names the whole blob, so it rests on the whole payload read back
+        // verified (`self_full_copy_verified`); a verified unit proves only that unit
+        // and earns its own row and announcement above, never the blob's pledge.
+        if self_full_copy_verified {
             match (self_agent_cid.as_deref(), self.hc_lamad.as_ref()) {
                 (Some(provider), Some(hc)) => match pool.get() {
                     Ok(mut conn) => {
@@ -3366,6 +3387,7 @@ impl P2PNode {
             // Station 1 of the sync-state contract: sequences carry this
             // process's boot epoch in their high 32 bits, so a restart is
             // strictly ahead of the old run on the wire (see `p2p::sync_state`).
+            recon_limiter: recon_limit::ReconLimiter::standard(),
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(
                 crate::p2p::sync_state::epoch_base(crate::p2p::sync_state::boot_epoch(
                     std::time::SystemTime::now()
@@ -3374,7 +3396,17 @@ impl P2PNode {
                         .unwrap_or(0),
                 )),
             ),
-            salvage_seq: inventory_broadcaster::SequenceAllocator::new(0),
+            // Same boot-epoch seeding as `inventory_seq`: a receiver projects a salvage
+            // ad only when its `seq` is above the one it holds, so a restarted
+            // advertiser must be strictly ahead of its old run.
+            salvage_seq: inventory_broadcaster::SequenceAllocator::new(
+                crate::p2p::sync_state::epoch_base(crate::p2p::sync_state::boot_epoch(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                )),
+            ),
             gossip_publisher: default_gossip_publisher,
             inventory_signer,
             custody_signer,
@@ -3776,7 +3808,7 @@ impl P2PNode {
     /// **Lock contract:** does NOT acquire the swarm lock. Callers from the
     /// `run()` select! arms must drop their swarm guard before invoking.
     pub(crate) async fn run_custody_reconcile(&self) {
-        use crate::reconcile::custody::{reconcile_pass, BlobStoreSnapshot, ReconcileConfig};
+        use crate::reconcile::custody::{reconcile_pass, ReconcileConfig};
         use crate::reconcile::custody_sweep::RaceFetchKicker;
         use std::sync::atomic::Ordering;
 
@@ -3820,17 +3852,9 @@ impl P2PNode {
             self.config.self_cellkey_agent_cid.as_deref(),
         );
 
-        let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
-            Ok(s) => s,
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::reconcile",
-                    error = %e,
-                    "T23: BlobStoreSnapshot build failed; skipping custody reconcile pass"
-                );
-                return;
-            }
-        };
+        // A verified pantry, not a filename listing: a corrupt local copy is not held, so
+        // the pass re-fetches it instead of skipping on its name.
+        let snapshot = crate::reconcile::custody::VerifiedPantry::new(&self.blob_store);
 
         // T23 review fix #4: warn (once per pass) if a misconfigured
         // 0-value will be silently clamped to 1 inside `RaceFetchKicker`.
@@ -3921,7 +3945,6 @@ impl P2PNode {
                 // and could not tell a dead sweep from a quiet one.
                 tracing::info!(
                     target: "elohim_storage::reconcile",
-                    snapshot_size = snapshot.len(),
                     commitments_examined = outcome.commitments_examined,
                     kicks_fired = outcome.kicks_fired,
                     fallback_kicks = outcome.fallback_kicks,
@@ -4605,16 +4628,38 @@ impl P2PNode {
     /// against this node's own byte CIDs, and send the reply back through the loop.
     fn answer_recon(
         &self,
+        peer: PeerId,
         request: inventory_recon::ReconRequest,
         channel: request_response::ResponseChannel<inventory_recon::ReconResponse>,
     ) {
         let blob_store = Arc::clone(&self.blob_store);
         let sequence = self.inventory_seq.current();
         let cmd_tx = self.command_tx.clone();
+        // The limit is checked before any work: a peer over it is told it is busy and
+        // costs this node one map lookup.
+        if !self.recon_limiter.admit(&peer, std::time::Instant::now()) {
+            debug!(target: "elohim_storage::inventory", peer = %peer, "recon request over the per-peer limit — busy");
+            tokio::spawn(async move {
+                let _ = cmd_tx
+                    .send(P2PCommand::SendReconResponse {
+                        channel: Box::new(channel),
+                        response: inventory_recon::ReconResponse {
+                            msg: recon_wire::RECON_BUSY_REPLY.to_vec(),
+                            sequence,
+                        },
+                    })
+                    .await;
+            });
+            return;
+        }
         tokio::spawn(async move {
             let reply = tokio::task::spawn_blocking(move || {
                 request.admit().map_err(|e| e.to_string())?;
-                let local = blob_store.list_cids().map_err(|e| e.to_string())?;
+                // Only what this node can serve verified (the store's servable index,
+                // kept at write/verify/delete/quarantine time; no hashing here): a
+                // named-but-corrupt payload or chunk is not advertised, so a
+                // recon-witnessed row never describes an unservable payload.
+                let local = blob_store.list_servable().map_err(|e| e.to_string())?;
                 let set = inventory_recon::ReconSet::new(&local);
                 inventory_recon::Reconciler::responder(&set)
                     .reconcile(&request.msg)
@@ -4655,9 +4700,10 @@ impl P2PNode {
     /// (`node` / `steward`) — only always-on peers advertise by default. A node
     /// is never conscripted (the imago-dei floor); silently no-ops otherwise.
     ///
-    /// **Identity**: advertises `self_cid` (the agent_cid namespace), NOT the
-    /// libp2p peer id — the candidate pool is agent_cid-keyed so the XOR
-    /// placement metric never crosses namespaces.
+    /// **Identity**: advertises the resolved self `agent_cid`, NOT a transport id —
+    /// the candidate pool is agent_cid-keyed so the XOR placement metric never
+    /// crosses namespaces — and signs it with the custody signer, whose transport
+    /// identity receivers bind to that agent (`p2p::salvage_gossip::admit`).
     ///
     /// **Lock contract**: does NOT acquire the swarm lock; publish routes through
     /// the gossip publisher (command channel). Callers from `run()` select! arms
@@ -4665,7 +4711,9 @@ impl P2PNode {
     ///
     /// Idempotent and safe to call repeatedly.
     async fn broadcast_salvage_capacity(&self) {
-        use crate::p2p::salvage_gossip::{SalvageCapacityAd, SALVAGE_CAPACITY_TOPIC};
+        use crate::p2p::salvage_gossip::{
+            SalvageCapacityAd, SignedSalvageAd, SALVAGE_CAPACITY_TOPIC,
+        };
 
         if !self.config.salvage_capacity_enabled {
             return; // opt-in consent gate (default off) — never conscripted
@@ -4675,10 +4723,19 @@ impl P2PNode {
         if !matches!(archetype.as_str(), "node" | "steward") {
             return;
         }
-        let Some(agent_cid) = self.config.self_cid.clone() else {
+        // The advertised identity is this node's `agent_cid` (the active session, else
+        // the boot agent key) — the agent receivers bind to the signing transport key.
+        // `Config::self_cid` is a TRANSPORT id and would be refused as unbound.
+        let Some(agent_cid) = self.db_pool.as_ref().and_then(|pool| {
+            let mut conn = pool.get().ok()?;
+            crate::reconcile::custody::resolve_self_agent_cid(
+                &mut conn,
+                Some(self.identity.agent_pubkey()),
+            )
+        }) else {
             debug!(
                 target: "elohim_storage::salvage",
-                "P3: self_cid not configured; skipping salvage-capacity advertisement"
+                "P3: self agent_cid unresolved; skipping salvage-capacity advertisement"
             );
             return;
         };
@@ -4689,17 +4746,27 @@ impl P2PNode {
         // ignores spare_bytes, so 0 here is harmless for placement; advertise 0
         // until the probe lands.
         let spare_bytes: u64 = 0;
-        let seq = self.salvage_seq.next();
 
+        // Signed with the custody signer (the transport identity
+        // `peer_transport_manifest` binds to this node's agent): an unsigned ad is
+        // refused by every receiver, so a node without a signer advertises nothing.
+        let Some((signer, author_peer)) = self.custody_signer.as_ref() else {
+            debug!(
+                target: "elohim_storage::salvage",
+                "P3: no transport signer; skipping salvage-capacity advertisement"
+            );
+            return;
+        };
+        let seq = self.salvage_seq.next();
         let ad = SalvageCapacityAd {
             agent_cid: agent_cid.clone(),
             spare_bytes,
             archetype: archetype.clone(),
             seq,
-            signature: vec![0x00], // Stage 1 structural non-empty
+            issued_at_ms: chrono::Utc::now().timestamp_millis(),
         };
 
-        let bytes = match ad.to_bytes() {
+        let bytes = match SignedSalvageAd::sign(signer, author_peer, ad).to_bytes() {
             Ok(b) => b,
             Err(e) => {
                 warn!(
@@ -7472,11 +7539,11 @@ impl P2PNode {
 
             // Inventory range reconciliation (`/elohim/inventory-recon/1.0.0`).
             behaviour::ElohimStorageBehaviourEvent::InventoryRecon(
-                request_response::Event::Message { message, .. },
+                request_response::Event::Message { peer, message },
             ) => match message {
                 request_response::Message::Request {
                     request, channel, ..
-                } => self.answer_recon(request, channel),
+                } => self.answer_recon(peer, request, channel),
                 request_response::Message::Response {
                     request_id,
                     response,
@@ -10850,6 +10917,49 @@ pub(crate) fn publish_inventory_delta(
         }
     }
     sent
+}
+
+/// A custody unit's bytes read back from this node's own pantry and hashed to the
+/// unit's CID (`BlobStore::get_chunk` refuses, and quarantines, bytes that do not).
+/// An unstriped payload's chunks are units; an inline payload is its own single unit;
+/// a striped payload's shards are derived bytes the pantry holds only when one was
+/// pushed and stored under its own CID.
+async fn verified_unit_read(store: &BlobStore, unit: &ByteCid) -> bool {
+    match store.get_chunk(unit).await {
+        Ok(_) => true,
+        Err(error) => {
+            debug!(
+                target: "elohim_storage::custody",
+                unit = %unit,
+                %error,
+                "no verified read of this unit in the local pantry"
+            );
+            false
+        }
+    }
+}
+
+/// The verdict of one [`verified_unit_read`], as the
+/// `services::self_stewardship::record_self_held_shard` probe. It vouches for the one
+/// unit it read and nothing else: `has` answers `false` for any other CID.
+struct VerifiedRead {
+    unit: ByteCid,
+    verified: bool,
+}
+
+impl VerifiedRead {
+    async fn of(store: &BlobStore, unit: &ByteCid) -> Self {
+        Self {
+            unit: *unit,
+            verified: verified_unit_read(store, unit).await,
+        }
+    }
+}
+
+impl crate::reconcile::custody::LocalBlobStore for VerifiedRead {
+    fn has(&self, cid: &ByteCid) -> bool {
+        self.verified && *cid == self.unit
+    }
 }
 
 /// What a completed recon session changed.

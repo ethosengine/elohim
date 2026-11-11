@@ -133,7 +133,10 @@ pub mod held_envelopes;
 pub mod peer_blob_inventory;
 
 // Phase 3 — salvage_capacity projection (salvage-capacity gossip, Category C operational)
+pub mod binding_confirmations;
+pub mod held_unbound;
 pub mod salvage_capacity;
+pub mod transport_links;
 
 // Recovery Protocol Phase 2 — M4 revocation projection (key_revocations + revocation_votes)
 // + recovery_flows state-machine projection (T6 schema, T7 CRUD)

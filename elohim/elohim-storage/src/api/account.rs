@@ -497,7 +497,10 @@ async fn get_portal_hosts(
 /// it is the early-exit response that route handlers return directly to the
 /// caller, avoiding an unwrap chain. Boxing would break the uniform response
 /// pattern used by every handler in this module.
-#[allow(clippy::result_large_err)]
+#[allow(
+    clippy::result_large_err,
+    reason = "the Err variant is the early-exit response handlers return directly; boxing would break the module's uniform response pattern"
+)]
 fn verify_caller_owns_cell(
     owner: &dyn crate::hc_client::CellOwner,
     agent_key: &str,

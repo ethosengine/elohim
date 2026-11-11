@@ -9,8 +9,8 @@ use eprfs_core::{
     DerivationRecord, EprRecord, EprRef, EprfsStorage, FetchPolicy, KeyInput, Witness,
 };
 use eprfs_storage::{
-    put_tier_blob, read_tier_blob, DirectoryStorage, MemoryStorage, TierBlobDraw, TierBlobManifest,
-    TierBlobUnavailable, TIER_BLOB_MANIFEST_EPOCH, TIER_BLOB_PROFILE,
+    put_tier_blob, read_tier_blob, stream_tier_blob, DirectoryStorage, MemoryStorage, TierBlobDraw,
+    TierBlobManifest, TierBlobUnavailable, TIER_BLOB_MANIFEST_EPOCH, TIER_BLOB_PROFILE,
 };
 use serde::Serialize;
 use tokio::sync::Notify;
@@ -429,5 +429,190 @@ async fn an_unsupported_output_profile_is_unavailable_never_a_hit() {
             manifest_cid: cid,
             why: TierBlobUnavailable::UnsupportedProfile { cid: dag_pb },
         }
+    );
+}
+
+/// Re-encode a stored epoch-2 manifest with its epoch replaced and, optionally, an extra top-level
+/// `ext` value, through a generic map so no epoch-specific type shapes the bytes.
+fn forged_manifest(
+    base: &TierBlobManifest,
+    epoch: u32,
+    ext: Option<ipld_core::ipld::Ipld>,
+) -> (BlobCid, Bytes) {
+    let mut value: ipld_core::ipld::Ipld =
+        serde_ipld_dagcbor::from_slice(&serde_ipld_dagcbor::to_vec(base).unwrap()).unwrap();
+    let ipld_core::ipld::Ipld::Map(map) = &mut value else {
+        panic!("manifest is a map");
+    };
+    map.insert("epoch".into(), ipld_core::ipld::Ipld::Integer(epoch.into()));
+    if let Some(ext) = ext {
+        map.insert("ext".into(), ext);
+    }
+    let (cid, bytes) = BlobCid::encode_manifest(&value).unwrap();
+    (cid, Bytes::from(bytes))
+}
+
+fn opaque_ext() -> ipld_core::ipld::Ipld {
+    use ipld_core::ipld::Ipld;
+    Ipld::Map(
+        [(
+            "newWriter".to_string(),
+            Ipld::List(vec![
+                Ipld::Bytes(vec![0, 255, 7]),
+                Ipld::Integer(-3),
+                Ipld::String("opaque".into()),
+            ]),
+        )]
+        .into_iter()
+        .collect(),
+    )
+}
+
+#[tokio::test]
+async fn epoch_3_manifest_is_held_with_version_named() {
+    let store = MemoryStorage::default();
+    let bytes = Bytes::from_static(b"payload a future writer chunked");
+    let put = put_tier_blob(&store, record_for(&bytes), bytes.clone())
+        .await
+        .unwrap();
+    // A future epoch may reshape fields the epoch-2 schema knows; it is answered by its epoch.
+    let (cid, manifest_bytes) = forged_manifest(&put.manifest, 3, Some(opaque_ext()));
+    store.put_blob_verified(&cid, manifest_bytes).await.unwrap();
+
+    let draw = read_tier_blob(&store, &cid).await;
+    assert_eq!(draw.bytes(), None);
+    assert_eq!(
+        draw,
+        TierBlobDraw::Unavailable {
+            manifest_cid: cid.clone(),
+            why: TierBlobUnavailable::UnsupportedEpoch { epoch: 3 },
+        }
+    );
+    assert_eq!(
+        draw.reason().as_deref(),
+        Some("manifest epoch 3 is unsupported")
+    );
+    // Held, not discarded.
+    assert!(store.fetch_blob(&cid, FetchPolicy::LocalOnly).await.is_ok());
+}
+
+#[tokio::test]
+async fn unknown_ext_bytes_survive_roundtrip() {
+    let store = MemoryStorage::default();
+    let bytes = Bytes::from_static(b"payload with a future extension");
+    let put = put_tier_blob(&store, record_for(&bytes), bytes.clone())
+        .await
+        .unwrap();
+    let (cid, manifest_bytes) = forged_manifest(&put.manifest, 2, Some(opaque_ext()));
+    store
+        .put_blob_verified(&cid, manifest_bytes.clone())
+        .await
+        .unwrap();
+
+    // Known epoch, unknown content under `ext`: the draw is a hit and the extension is retained.
+    let TierBlobDraw::Hit {
+        manifest,
+        bytes: read,
+    } = read_tier_blob(&store, &cid).await
+    else {
+        panic!("a known-epoch manifest with ext content is read");
+    };
+    assert_eq!(read, bytes);
+    assert_eq!(
+        manifest.ext.as_ref().map(|ext| ext.as_bytes().to_vec()),
+        Some(serde_ipld_dagcbor::to_vec(&opaque_ext()).unwrap())
+    );
+    // Decode then re-encode reproduces the stored bytes exactly, so the manifest CID is stable.
+    let (recid, rebytes) = BlobCid::encode_manifest(&*manifest).unwrap();
+    assert_eq!(recid, cid);
+    assert_eq!(Bytes::from(rebytes), manifest_bytes);
+
+    // Unknown fields OUTSIDE `ext` at a known epoch refuse (they could carry a restriction).
+    let mut value: ipld_core::ipld::Ipld = serde_ipld_dagcbor::from_slice(&manifest_bytes).unwrap();
+    let ipld_core::ipld::Ipld::Map(map) = &mut value else {
+        unreachable!()
+    };
+    map.insert("restriction".into(), ipld_core::ipld::Ipld::Bool(true));
+    let (bad, bad_bytes) = BlobCid::encode_manifest(&value).unwrap();
+    store
+        .put_blob_verified(&bad, Bytes::from(bad_bytes))
+        .await
+        .unwrap();
+    let draw = read_tier_blob(&store, &bad).await;
+    assert_eq!(draw.bytes(), None);
+    assert!(matches!(
+        draw,
+        TierBlobDraw::Unavailable {
+            why: TierBlobUnavailable::ManifestInvalid { .. },
+            ..
+        }
+    ));
+}
+
+#[tokio::test]
+async fn held_manifest_is_never_a_hit_and_records_unavailable_use() {
+    let store = MemoryStorage::default();
+    let bytes = Bytes::from_static(b"payload behind a held manifest");
+    let put = put_tier_blob(&store, record_for(&bytes), bytes.clone())
+        .await
+        .unwrap();
+    for epoch in [1u32, 3, 4, u32::MAX] {
+        let (cid, manifest_bytes) = forged_manifest(&put.manifest, epoch, None);
+        store.put_blob_verified(&cid, manifest_bytes).await.unwrap();
+        // Both draw shapes answer `Unavailable` (the outcome `stream_local_blob` records as a
+        // `draw:unavailable` Use with the printable reason), never `Hit`/`Completed`.
+        let draw = read_tier_blob(&store, &cid).await;
+        assert_eq!(draw.bytes(), None, "epoch {epoch}");
+        assert!(
+            matches!(
+                draw,
+                TierBlobDraw::Unavailable {
+                    why: TierBlobUnavailable::UnsupportedEpoch { epoch: e },
+                    ..
+                } if e == epoch
+            ),
+            "epoch {epoch}"
+        );
+        assert_eq!(
+            draw.reason(),
+            Some(format!("manifest epoch {epoch} is unsupported"))
+        );
+        let mut sink = |_: &eprfs_storage::TierBlobChunk, _: Bytes| Ok(());
+        let streamed = stream_tier_blob(&store, &cid, &mut sink).await;
+        assert!(
+            matches!(
+                streamed,
+                eprfs_storage::TierBlobStreamDraw::Unavailable {
+                    why: TierBlobUnavailable::UnsupportedEpoch { .. },
+                    ..
+                }
+            ),
+            "epoch {epoch}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn explicit_null_ext_is_refused_not_normalized() {
+    let store = MemoryStorage::default();
+    let bytes = Bytes::from_static(b"payload with a null extension");
+    let put = put_tier_blob(&store, record_for(&bytes), bytes.clone())
+        .await
+        .unwrap();
+    let (cid, manifest_bytes) =
+        forged_manifest(&put.manifest, 2, Some(ipld_core::ipld::Ipld::Null));
+    store.put_blob_verified(&cid, manifest_bytes).await.unwrap();
+
+    let draw = read_tier_blob(&store, &cid).await;
+    assert_eq!(draw.bytes(), None);
+    assert!(
+        matches!(
+            draw,
+            TierBlobDraw::Unavailable {
+                why: TierBlobUnavailable::ManifestInvalid { ref reason },
+                ..
+            } if reason.contains("null ext")
+        ),
+        "{draw:?}"
     );
 }

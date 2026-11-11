@@ -122,7 +122,360 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         repository_check(root),
         peer_daemon_check(),
         supervisor_check(root),
+        // Restart-arrival facts (backlog container-restart-strands-session-envelope): appended
+        // so earlier positions stay stable for readers that index them.
+        toolchain_check(root, &env),
+        hooks_check(root),
+        brit_trust_check(root),
+        packs_check(root),
     ]
+}
+
+/// The Rust toolchain the local gate pins (`pool-policy.json` `cargo_env_overrides["*"]`),
+/// looked up in rustup's home. `$HOME` is wiped on a workspace restart, and a rustup home under
+/// it loses the pin; the gate then refuses every cargo project. A read: never installs.
+fn toolchain_check(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> Check {
+    let pin = fs::read(root.join("genesis/agentic/pool-policy.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|policy| {
+            policy["cargo_env_overrides"]["*"]["RUSTUP_TOOLCHAIN"]
+                .as_str()
+                .map(str::to_owned)
+        });
+    let Some(pin) = pin else {
+        return Check::new(
+            "rust toolchain",
+            State::Ok,
+            "this checkout pins no gate toolchain",
+            None,
+        );
+    };
+    let home = env("RUSTUP_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".rustup")));
+    let Some(home) = home else {
+        return Check::new(
+            "rust toolchain",
+            State::Unknown,
+            format!("pin {pin}; neither RUSTUP_HOME nor HOME is set"),
+            Some("set RUSTUP_HOME to rustup's home".into()),
+        );
+    };
+    let toolchains = home.join("toolchains");
+    let entries = match fs::read_dir(&toolchains) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return toolchain_missing(&pin, &toolchains)
+        }
+        Err(e) => {
+            return Check::new(
+                "rust toolchain",
+                State::Unknown,
+                format!("pin {pin}; {}: {e}", toolchains.display()),
+                None,
+            )
+        }
+    };
+    let prefix = format!("{pin}-");
+    let installed = entries.filter_map(Result::ok).find(|entry| {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        (*name == *pin || name.starts_with(&prefix)) && entry.path().join("bin/cargo").is_file()
+    });
+    match installed {
+        Some(entry) => Check::new(
+            "rust toolchain",
+            State::Ok,
+            format!("pin {pin} at {}", entry.path().display()),
+            None,
+        ),
+        None => toolchain_missing(&pin, &toolchains),
+    }
+}
+fn toolchain_missing(pin: &str, toolchains: &Path) -> Check {
+    Check::new(
+        "rust toolchain",
+        State::Degraded,
+        format!(
+            "gate pin {pin} is not installed under {}; every cargo gate refuses",
+            toolchains.display()
+        ),
+        Some(format!(
+            "rustup toolchain install {pin} --profile minimal --component clippy,rustfmt"
+        )),
+    )
+}
+
+/// Hooks `.husky/hooks-path.mjs` requires in `core.hooksPath` (its `GOVERNED_HOOKS` plus the
+/// husky runner `h`). Keep the two lists equal.
+const GOVERNED_HOOKS: [&str; 6] = [
+    "pre-push",
+    "pre-commit",
+    "pre-merge-commit",
+    "prepare-commit-msg",
+    "commit-msg",
+    "h",
+];
+
+/// Whether this checkout's governed hooks run: `core.hooksPath` is absolute (a relative one is
+/// resolved against each worktree, where no shims exist) and holds every governed hook. Without
+/// them a push runs no gate, so this refuses. A checkout with no `.husky/hooks-path.mjs`
+/// declares no governed hooks.
+fn hooks_check(root: &Path) -> Check {
+    let cure = Some("node .husky/hooks-path.mjs (after pnpm install)".to_owned());
+    if !root.join(".husky/hooks-path.mjs").is_file() {
+        return Check::new(
+            "git hooks",
+            State::Ok,
+            "this checkout declares no governed hooks",
+            None,
+        );
+    }
+    let output = git::command(root)
+        .args(["config", "--get", "core.hooksPath"])
+        .output();
+    let value = match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_owned(),
+        // `git config --get` exits 1 when the key is unset, 128 when git refuses the repository.
+        Ok(out) if out.status.code() == Some(1) => String::new(),
+        Ok(out) => {
+            return Check::new(
+                "git hooks",
+                State::Unknown,
+                format!(
+                    "git could not read core.hooksPath: {}",
+                    String::from_utf8_lossy(&out.stderr).trim()
+                ),
+                Some("cure the repository trusted line first".into()),
+            )
+        }
+        Err(e) => {
+            return Check::new("git hooks", State::Unknown, format!("git: {e}"), None);
+        }
+    };
+    if value.is_empty() {
+        return Check::new(
+            "git hooks",
+            State::Refused,
+            "core.hooksPath is unset; pushes run no pre-push gate",
+            cure,
+        );
+    }
+    let dir = PathBuf::from(&value);
+    if !dir.is_absolute() {
+        return Check::new(
+            "git hooks",
+            State::Refused,
+            format!("core.hooksPath {value} is relative; a worktree push runs no pre-push gate"),
+            cure,
+        );
+    }
+    let missing: Vec<_> = GOVERNED_HOOKS
+        .iter()
+        .filter(|hook| !crate::doctor::is_executable(&dir.join(hook)))
+        .copied()
+        .collect();
+    if missing.is_empty() {
+        Check::new(
+            "git hooks",
+            State::Ok,
+            format!("core.hooksPath {value}"),
+            None,
+        )
+    } else {
+        Check::new(
+            "git hooks",
+            State::Refused,
+            format!(
+                "core.hooksPath {value} lacks executable {}",
+                missing.join(", ")
+            ),
+            cure,
+        )
+    }
+}
+
+/// This checkout's own git directory: `.git` itself, or the `gitdir:` its `.git` file names.
+fn private_git_dir(root: &Path) -> Option<PathBuf> {
+    let dot_git = root.join(".git");
+    if dot_git.is_dir() {
+        return Some(dot_git);
+    }
+    let text = fs::read_to_string(&dot_git).ok()?;
+    let gitdir = PathBuf::from(
+        text.lines()
+            .find_map(|l| l.strip_prefix("gitdir: "))?
+            .trim(),
+    );
+    Some(if gitdir.is_absolute() {
+        gitdir
+    } else {
+        root.join(gitdir)
+    })
+}
+
+/// The repository's shared object directory: `.git` itself, or for a linked worktree the
+/// `commondir` its git directory names.
+fn common_git_dir(root: &Path) -> Option<PathBuf> {
+    let gitdir = private_git_dir(root)?;
+    match fs::read_to_string(gitdir.join("commondir")) {
+        Ok(common) => {
+            let common = PathBuf::from(common.trim());
+            Some(if common.is_absolute() {
+                common
+            } else {
+                gitdir.join(common)
+            })
+        }
+        Err(_) => Some(gitdir),
+    }
+}
+
+/// gix's `check_safe_directories` over values in effective order (system, then global): `*`
+/// grants, an empty value resets, a trailing `/*` grants by prefix, otherwise an exact realpath
+/// match. Relative entries are ignored, as gix ignores them.
+fn safe_directory_grants(test_dir: &Path, values: &[String]) -> bool {
+    let real = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_owned());
+    let test_dir = real(test_dir);
+    let mut safe = false;
+    for value in values {
+        let value = value.trim();
+        if value == "*" {
+            safe = true;
+            continue;
+        }
+        if value.is_empty() {
+            safe = false;
+            continue;
+        }
+        if safe {
+            continue;
+        }
+        let dir = Path::new(value);
+        if !dir.is_absolute() {
+            continue;
+        }
+        if let Some(prefix) = value.strip_suffix("/*") {
+            safe = test_dir.strip_prefix(real(Path::new(prefix))).is_ok();
+        } else {
+            safe = real(dir) == test_dir;
+        }
+    }
+    safe
+}
+
+/// Whether brit (gitoxide) opens this repository at full trust, by gix's own rule
+/// (`gix/src/open/repository.rs`): the git directory and the worktree are both owned by this
+/// user, or the effective global/system `safe.directory` list grants the worktree. This device's
+/// own declaration (`epr device trust`) reaches only git, never brit. At reduced trust brit
+/// ignores `core.hooksPath` (its commits run no hooks) and caps object index slots at 32.
+fn brit_trust(root: &Path) -> Option<(bool, String)> {
+    use std::os::unix::fs::MetadataExt;
+    // SAFETY: geteuid takes no arguments, touches no memory and cannot fail (POSIX).
+    let euid = unsafe { libc::geteuid() };
+    let gitdir = private_git_dir(root)?;
+    let foreign: Vec<_> = [gitdir.as_path(), root]
+        .into_iter()
+        .filter_map(|path| {
+            let uid = fs::metadata(path).ok()?.uid();
+            (uid != euid).then(|| format!("{} (uid {uid})", path.display()))
+        })
+        .collect();
+    if foreign.is_empty() && fs::metadata(&gitdir).is_ok() && fs::metadata(root).is_ok() {
+        return Some((
+            true,
+            "git directory and worktree are owned by this user".into(),
+        ));
+    }
+    let mut values = Vec::new();
+    for scope in ["--system", "--global"] {
+        if let Ok(out) = git::native_command(root)
+            .args(["config", scope, "--get-all", "safe.directory"])
+            .output()
+        {
+            values.extend(
+                String::from_utf8_lossy(&out.stdout)
+                    .lines()
+                    .map(str::to_owned),
+            );
+        }
+    }
+    if safe_directory_grants(root, &values) {
+        return Some((
+            true,
+            "the effective safe.directory list grants this worktree".into(),
+        ));
+    }
+    Some((
+        false,
+        format!(
+            "not owned by this user ({}) and the effective global/system safe.directory list does not grant it",
+            foreign.join(", ")
+        ),
+    ))
+}
+fn brit_trust_check(root: &Path) -> Check {
+    match brit_trust(root) {
+        Some((true, detail)) => Check::new("brit trust", State::Ok, detail, None),
+        Some((false, detail)) => Check::new(
+            "brit trust",
+            State::Degraded,
+            format!("{detail}; brit runs at reduced trust (no hooks, 32 index slots)"),
+            Some("git config --global --add safe.directory '*' (devfile setup-git)".into()),
+        ),
+        None => Check::new(
+            "brit trust",
+            State::Unknown,
+            "the repository's git directory could not be read",
+            None,
+        ),
+    }
+}
+
+/// gix's object-index slot cap at reduced trust (`gix/src/open/options.rs`,
+/// `resolve_object_store_slots`). Full trust sizes slots from disk.
+const REDUCED_TRUST_SLOTS: usize = 32;
+
+/// Pack count against the reduced-trust slot cap. Over it, every brit read fails ("too few index
+/// slots") whenever trust falls to reduced, as it does on each restart before setup-git runs.
+fn packs_check(root: &Path) -> Check {
+    let Some(common) = common_git_dir(root) else {
+        return Check::new(
+            "object packs",
+            State::Unknown,
+            "the repository's git directory could not be read",
+            None,
+        );
+    };
+    let packs = match fs::read_dir(common.join("objects/pack")) {
+        Ok(entries) => entries
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
+            .count(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
+        Err(e) => {
+            return Check::new("object packs", State::Unknown, e.to_string(), None);
+        }
+    };
+    let trust = match brit_trust(root) {
+        Some((true, _)) => "full trust now",
+        Some((false, _)) => "reduced trust now",
+        None => "trust unknown",
+    };
+    let detail =
+        format!("{packs} pack index(es); reduced-trust cap {REDUCED_TRUST_SLOTS} ({trust})");
+    if packs < REDUCED_TRUST_SLOTS {
+        Check::new("object packs", State::Ok, detail, None)
+    } else {
+        Check::new(
+            "object packs",
+            State::Degraded,
+            format!("{detail}; brit reads fail at reduced trust"),
+            Some("git repack -a -d".into()),
+        )
+    }
 }
 
 /// Whether ark runs the device's declared manifest at its head with every child ready.
@@ -138,7 +491,71 @@ fn supervisor_check(root: &Path) -> Check {
     )
 }
 
+/// Whether this device's `epr peer serve` holds its serve lock, probed without creating the
+/// file. A flock is released by the kernel however its holder ends, container teardown
+/// included, so unlike a recorded pid it cannot read a previous container's daemon as live.
+#[cfg(feature = "peer")]
+fn serve_liveness() -> std::result::Result<(bool, Option<String>), String> {
+    use rustix::fs::{flock, FlockOperation};
+    let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
+    let path = dir.join(crate::peer::ServeLock::FILE_NAME);
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((false, None)),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let held = match flock(&file, FlockOperation::NonBlockingLockShared) {
+        // Shared and dropped at once; `ServeLock::acquire` retries a contended exclusive take,
+        // so this momentary probe does not read as a live daemon to a starting `serve`.
+        Ok(()) => false,
+        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => true,
+        Err(errno) => return Err(format!("{}: {errno}", path.display())),
+    };
+    drop(file);
+    // Evidence, not state: a head is refolded only when its sibling's root moves, so an idle
+    // sibling ages here while every daemon is healthy.
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    let newest = eprfs_peer::HeadTable::load(&dir)
+        .ok()
+        .and_then(|table| table.devices.values().map(|h| h.folded_at).max())
+        .map(|at| {
+            format!(
+                "newest sibling head folded {}s ago",
+                now.saturating_sub(at) / 1000
+            )
+        });
+    Ok((held, newest))
+}
+#[cfg(not(feature = "peer"))]
+fn serve_liveness() -> std::result::Result<(bool, Option<String>), String> {
+    Err("this epr was built without the peer feature".into())
+}
+
 fn peer_daemon_check() -> Check {
+    match serve_liveness() {
+        Ok((false, evidence)) => Check::new(
+            "peer daemon",
+            State::Degraded,
+            format!(
+                "no epr peer serve holds this device's serve lock; admitted siblings read it as silent{}",
+                evidence.map(|e| format!(" ({e})")).unwrap_or_default()
+            ),
+            Some("start the devfile peer-serve command (it carries EPR_PEER_RELAY_URL)".into()),
+        ),
+        Ok((true, evidence)) => peer_daemon_version_check(evidence),
+        Err(error) => Check::new(
+            "peer daemon",
+            State::Unknown,
+            error,
+            Some("restore access to the epr peer directory".into()),
+        ),
+    }
+}
+
+fn peer_daemon_version_check(evidence: Option<String>) -> Check {
+    let evidence = evidence.map(|e| format!("; {e}")).unwrap_or_default();
     let observed = (|| {
         let store = crate::bin::daemon_store()?;
         let leases = store.live_daemons(&crate::bin::daemon_proc_root())?;
@@ -156,7 +573,7 @@ fn peer_daemon_check() -> Check {
                 Check::new(
                     "peer daemon",
                     State::Ok,
-                    "at current or no daemon running",
+                    format!("serving at current{evidence}"),
                     None,
                 )
             } else {
@@ -164,7 +581,7 @@ fn peer_daemon_check() -> Check {
                     "peer daemon",
                     State::Degraded,
                     format!(
-                        "running {}; current {}",
+                        "running {}; current {}{evidence}",
                         stale.join(", "),
                         head.as_deref().unwrap_or("absent")
                     ),
@@ -621,6 +1038,122 @@ mod tests {
             State::Degraded
         );
         assert_eq!(berth_check(dir.path(), None).state, State::Ok);
+    }
+    #[test]
+    fn toolchain_pin_is_read_from_pool_policy_and_found_under_rustup_home() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        let rustup = dir.path().join("rustup");
+        let env = |k: &str| (k == "RUSTUP_HOME").then(|| rustup.display().to_string());
+        assert_eq!(
+            toolchain_check(&root, &env).state,
+            State::Ok,
+            "no pin declared"
+        );
+        fs::create_dir_all(root.join("genesis/agentic")).unwrap();
+        fs::write(
+            root.join("genesis/agentic/pool-policy.json"),
+            r#"{"cargo_env_overrides":{"*":{"RUSTUP_TOOLCHAIN":"1.96.1"}}}"#,
+        )
+        .unwrap();
+        let missing = toolchain_check(&root, &env);
+        assert_eq!(missing.state, State::Degraded);
+        assert!(missing
+            .cure
+            .unwrap()
+            .contains("rustup toolchain install 1.96.1"));
+        // Another version's toolchain does not satisfy the pin.
+        let other = rustup.join("toolchains/1.96.10-x86_64-unknown-linux-gnu/bin");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join("cargo"), "").unwrap();
+        assert_eq!(toolchain_check(&root, &env).state, State::Degraded);
+        let pinned = rustup.join("toolchains/1.96.1-x86_64-unknown-linux-gnu/bin");
+        fs::create_dir_all(&pinned).unwrap();
+        fs::write(pinned.join("cargo"), "").unwrap();
+        assert_eq!(toolchain_check(&root, &env).state, State::Ok);
+    }
+    #[test]
+    fn governed_hooks_need_an_absolute_hooks_path_holding_every_shim() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        fs::create_dir_all(root.join(".husky")).unwrap();
+        let git = |args: &[&str]| {
+            assert!(git::native_command(&root)
+                .args(args)
+                .status()
+                .unwrap()
+                .success());
+        };
+        git(&["init", "-q"]);
+        assert_eq!(
+            hooks_check(&root).state,
+            State::Ok,
+            "no governed hooks declared"
+        );
+        fs::write(root.join(".husky/hooks-path.mjs"), "").unwrap();
+        assert_eq!(hooks_check(&root).state, State::Refused, "unset");
+        git(&["config", "core.hooksPath", ".husky/_"]);
+        assert!(hooks_check(&root).detail.contains("relative"));
+        let shims = root.join(".husky/_");
+        fs::create_dir_all(&shims).unwrap();
+        git(&["config", "core.hooksPath", shims.to_str().unwrap()]);
+        let partial = hooks_check(&root);
+        assert_eq!(partial.state, State::Refused);
+        assert!(partial.detail.contains("pre-push"));
+        for hook in GOVERNED_HOOKS {
+            fs::write(shims.join(hook), "#!/bin/sh\n").unwrap();
+            fs::set_permissions(shims.join(hook), fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        assert_eq!(hooks_check(&root).state, State::Ok);
+    }
+    #[test]
+    fn packs_are_counted_in_the_common_dir_of_a_linked_worktree() {
+        let dir = tempfile::tempdir().unwrap();
+        let common = dir.path().join("main/.git");
+        let gitdir = common.join("worktrees/wt");
+        fs::create_dir_all(&gitdir).unwrap();
+        fs::write(gitdir.join("commondir"), "../..\n").unwrap();
+        let worktree = dir.path().join("wt");
+        fs::create_dir_all(&worktree).unwrap();
+        fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", gitdir.display()),
+        )
+        .unwrap();
+        assert_eq!(
+            common_git_dir(&worktree).unwrap().canonicalize().unwrap(),
+            common.canonicalize().unwrap()
+        );
+        let packs = common.join("objects/pack");
+        fs::create_dir_all(&packs).unwrap();
+        for n in 0..REDUCED_TRUST_SLOTS - 1 {
+            fs::write(packs.join(format!("pack-{n}.idx")), "").unwrap();
+            fs::write(packs.join(format!("pack-{n}.pack")), "").unwrap();
+        }
+        assert_eq!(packs_check(&worktree).state, State::Ok);
+        fs::write(packs.join("pack-last.idx"), "").unwrap();
+        let over = packs_check(&worktree);
+        assert_eq!(over.state, State::Degraded);
+        assert!(over.cure.unwrap().contains("repack"));
+        // This user owns the fixture, so gix would grant full trust.
+        assert_eq!(brit_trust_check(&worktree).state, State::Ok);
+    }
+    #[test]
+    fn safe_directory_follows_gix_order_reset_and_prefix_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let wt = dir.path().join("wt");
+        fs::create_dir(&wt).unwrap();
+        let v = |values: &[&str]| -> Vec<String> { values.iter().map(|s| (*s).into()).collect() };
+        let here = wt.display().to_string();
+        let parent = format!("{}/*", dir.path().display());
+        assert!(safe_directory_grants(&wt, &v(&["*"])));
+        // A later empty value resets an earlier wildcard.
+        assert!(!safe_directory_grants(&wt, &v(&["*", ""])));
+        assert!(safe_directory_grants(&wt, &v(&["*", "", &here])));
+        assert!(safe_directory_grants(&wt, &v(&[&parent])));
+        assert!(!safe_directory_grants(&wt, &v(&["relative/wt"])));
+        assert!(!safe_directory_grants(&wt, &v(&["/elsewhere"])));
+        assert!(!safe_directory_grants(&wt, &v(&[])));
     }
     #[test]
     fn candidates_and_absence_are_read_through_bin_store() {

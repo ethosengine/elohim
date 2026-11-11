@@ -41,6 +41,8 @@ import {
   type StorageClientLike,
   type StreamName,
   type StreamState,
+  UPLOAD_EXPORTS,
+  UPLOAD_EXPORTS_FILE,
 } from './substrate-verify.js';
 
 // ---------------------------------------------------------------------------
@@ -620,6 +622,26 @@ async function uploadCases(): Promise<void> {
         check(
           readFileSync(join(h.stateDir, 'content_blob_size'), 'utf8').trim() === '12',
           'content_blob_size is the byte length'
+        );
+        // The exports contract: one KEY=value line per declared export, none empty. Jenkins reads
+        // this file generically, so the declared map is the only place a name is spelled.
+        const exportsPath = join(h.stateDir, UPLOAD_EXPORTS_FILE);
+        check(existsSync(exportsPath), `${UPLOAD_EXPORTS_FILE} written`);
+        const exported = new Map(
+          readFileSync(exportsPath, 'utf8')
+            .split('\n')
+            .filter(Boolean)
+            .map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)] as [string, string])
+        );
+        eqDeep(
+          [...exported.keys()].sort(),
+          Object.keys(UPLOAD_EXPORTS).sort(),
+          'exports.env carries exactly the declared keys'
+        );
+        check(
+          /^bafkr4i[a-z2-7]{52}$/.test(exported.get('CONTENT_BLOB_HASH') ?? ''),
+          'CONTENT_BLOB_HASH export is the uploaded byte CID',
+          exported.get('CONTENT_BLOB_HASH')
         );
         const probe = readFileSync(join(h.stateDir, 'propagation-probe.txt'), 'utf8');
         check(
@@ -1387,6 +1409,25 @@ function cliUsageExitCode(): void {
   }
 }
 
+function jenkinsfileSpellsNoStateFile(): void {
+  testCase('genesis Jenkinsfile reads the upload exports only through exports.env');
+  // The 2026-11 drift: the script renamed content_blob_hash → content_blob_cid and the // address-lint: allow (history)
+  // Jenkinsfile kept `cat`ing the old name, so three stages skipped for two builds. The fix is
+  // structural — the Jenkinsfile names no state file — and this pins it.
+  const jenkinsfile = readFileSync(
+    fileURLToPath(new URL('../../Jenkinsfile', import.meta.url)),
+    'utf8'
+  );
+  const spelled = [...jenkinsfile.matchAll(/\/tmp\/substrate-verify\/([A-Za-z0-9_.-]+)/g)].map(
+    m => m[1]
+  );
+  eqDeep(
+    [...new Set(spelled)],
+    [UPLOAD_EXPORTS_FILE],
+    'the only state file the Jenkinsfile spells is exports.env'
+  );
+}
+
 // ===========================================================================
 
 async function main(): Promise<void> {
@@ -1405,6 +1446,7 @@ async function main(): Promise<void> {
   await federationCases();
   await resilienceCases();
   cliUsageExitCode();
+  jenkinsfileSpellsNoStateFile();
 
   console.log(`\n${'─'.repeat(59)}`);
   if (failures === 0) {

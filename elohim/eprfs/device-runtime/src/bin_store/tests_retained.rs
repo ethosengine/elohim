@@ -74,7 +74,8 @@ fn historical_install_upgrade_session_and_rollback_keep_one_release() -> Result<
     assert!(absent.detail.contains(&old.cid));
 
     f.state.lock().expect("fixture state").head = "a".repeat(40);
-    f.store.land(&old.cid, &f.commit(), f.tmp.path(), true)?;
+    f.store
+        .land(&old.cid, &f.commit(), f.tmp.path(), Transition::Revert)?;
     assert_eq!(f.store.resolve_current(None)?.cid, Some(old.cid.clone()));
     assert!(f
         .store

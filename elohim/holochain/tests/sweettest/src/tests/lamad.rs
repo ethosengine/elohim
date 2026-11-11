@@ -343,7 +343,10 @@ struct BatchResolveFailure {
         reason = "mirrors content_store's wire type so responses deserialize; no test reads this field"
     )]
     reason: BatchFailureReason,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test constructs or reads it"
+    )]
     phase: BatchResolvePhase,
 }
 
@@ -351,7 +354,10 @@ struct BatchResolveFailure {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum BatchHeadOutcome {
     Resolved(Option<ContentHeadOutput>),
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test constructs or reads it"
+    )]
     Failed(BatchResolveFailure),
 }
 
@@ -366,7 +372,10 @@ struct BatchHeadAttempt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum BatchElectionOutcome {
     Resolved(Option<CanonicalElectionOutput>),
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test constructs or reads it"
+    )]
     Failed(BatchResolveFailure),
 }
 
@@ -381,9 +390,15 @@ struct BatchElectionAttempt {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 enum BatchStopReason {
     BudgetExhausted,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test constructs or reads it"
+    )]
     IdCeiling,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "mirrors content_store's wire type so responses deserialize; no test constructs or reads it"
+    )]
     SharedFailure(BatchFailureReason),
 }
 

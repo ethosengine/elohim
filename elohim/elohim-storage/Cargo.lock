@@ -2435,6 +2435,7 @@ dependencies = [
  "cid",
  "data-encoding",
  "multihash-codetable",
+ "serde",
  "thiserror 2.0.17",
 ]
 
@@ -2456,6 +2457,24 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "elohim-blob-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bytes",
+ "cid",
+ "elohim-epr",
+ "eprfs-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "uuid 1.18.1",
 ]
 
 [[package]]
@@ -2694,6 +2713,7 @@ dependencies = [
  "dryoc",
  "ed25519-dalek",
  "elohim-ark-core",
+ "elohim-blob-store",
  "elohim-cache-core",
  "elohim-chrome-asset",
  "elohim-compute",
@@ -2790,6 +2810,7 @@ dependencies = [
  "automerge",
  "base64 0.22.1",
  "cid",
+ "elohim-address",
  "elohim-views",
  "hex",
  "reqwest",
@@ -2908,7 +2929,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",

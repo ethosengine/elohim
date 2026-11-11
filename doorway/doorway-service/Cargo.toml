@@ -4,7 +4,7 @@ description = "WebSocket gateway for Elohim Holochain - 'Knock and it shall be o
 version = "0.1.0"
 edition = "2021"
 authors = ["Elohim Protocol"]
-license = "Apache-2.0"
+license = "AGPL-3.0"
 
 [dependencies]
 # Async runtime

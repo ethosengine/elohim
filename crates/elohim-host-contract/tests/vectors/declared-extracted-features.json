@@ -1,0 +1,72 @@
+{
+  "requires": [
+    {
+      "axis": "isa.x86",
+      "predicate": {
+        "kind": "subset",
+        "value": [
+          "sse3"
+        ]
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "isa.x86": {
+        "kind": "names",
+        "value": [
+          "sse3"
+        ]
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unmet",
+      "axis": "isa.x86",
+      "required": {
+        "kind": "subset",
+        "value": [
+          "avx2",
+          "sse3"
+        ]
+      },
+      "host": {
+        "kind": "names",
+        "value": [
+          "sse3"
+        ]
+      },
+      "missing": [
+        "avx2"
+      ]
+    }
+  ],
+  "merge": [
+    {
+      "axis": "isa.x86",
+      "predicate": {
+        "kind": "subset",
+        "value": [
+          "avx2"
+        ]
+      },
+      "source": "extracted"
+    }
+  ],
+  "expected_merged": {
+    "isa.x86": {
+      "kind": "subset",
+      "value": [
+        "avx2",
+        "sse3"
+      ]
+    }
+  },
+  "expected_disagreements": 1
+}

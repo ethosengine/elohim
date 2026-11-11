@@ -153,6 +153,11 @@ on (a)'s evidence and on the seed leg for `delegates-compute` being exercised in
 
 ## 2026-10-22 harvest — a consenting peer also needs a compatible execution flavor
 
+> **2026-11-10:** the matching rule below is drafted as a general contract (requires, provides,
+> admit, variant sets, beyond x86) in
+> `genesis/docs/superpowers/specs/2026-11-10-host-compatibility-foundation-design.md`. The four
+> stations and scenarios here are its proof rung H5 and are unchanged.
+
 This adds stations before `measure-runs-on-a-peer`'s existing finish line: a real
 peer executes the authorized feature and returns verifiable results. It does not
 replace that finish line with a successful image build, change rung (a) above, or

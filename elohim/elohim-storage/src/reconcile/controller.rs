@@ -149,6 +149,12 @@ pub struct ReconcileController<S: DnaSignalStream> {
     /// projection sweep is silently skipped (logged at debug level). Set via
     /// `with_manifest_registry(registry)`. Existing constructors are unchanged.
     manifest_registry: Option<Arc<ManifestRegistry>>,
+
+    /// This node's own agent (`uhCAk…`). An `AgentPeerBindingCreated` signal for this
+    /// agent is its own commit, so the projection itself is DHT confirmation; a signal
+    /// for any other agent (a hosted agent sharing the conductor, a recovery replay)
+    /// is routed through the DHT confirmer instead. `None`: every signal is routed.
+    own_agent_cid: Option<String>,
 }
 
 impl<S: DnaSignalStream> ReconcileController<S> {
@@ -167,6 +173,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             pubkey_cache: None,
             swarm_tx: None,
             manifest_registry: None,
+            own_agent_cid: None,
         }
     }
 
@@ -186,6 +193,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             pubkey_cache: Some(pubkey_cache),
             swarm_tx: None,
             manifest_registry: None,
+            own_agent_cid: None,
         }
     }
 
@@ -196,6 +204,12 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     /// `Option` preserves backward compatibility — the A.4 unit-test suite
     /// constructs controllers without a live swarm. When `None`, gossip publish
     /// is silently skipped (logged at debug level).
+    /// Name this node's own agent (see the `own_agent_cid` field).
+    pub fn with_own_agent_cid(mut self, agent_cid: Option<String>) -> Self {
+        self.own_agent_cid = agent_cid;
+        self
+    }
+
     pub fn with_swarm_tx(mut self, tx: mpsc::Sender<P2PCommand>) -> Self {
         self.swarm_tx = Some(tx);
         self
@@ -590,6 +604,9 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // propagate as an error. This preserves backward compatibility with the
         // A.4 stub-only test suite.
         let mut may_publish = !preserve_supersession;
+        // A cross-signed binding can bind authors whose well-signed claims were held as
+        // unbound; they are replayed once this projection's connection is released.
+        let mut replay_held = false;
         match self.db_pool.as_ref() {
             Some(pool) => match pool.get() {
                 Ok(mut conn) => {
@@ -647,8 +664,10 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                     } else {
                         crate::db::peer_identity_bindings::upsert(&mut conn, &row).map(|()| true)
                     };
+                    let cross_signed = row.proof_status.is_cross_signed();
                     match write {
                         Ok(can_publish) => {
+                            replay_held = cross_signed;
                             may_publish = can_publish;
                             debug!(
                             peer_id = %signal.peer_id,
@@ -677,6 +696,47 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 "on_agent_peer_binding: no db_pool wired — projection write skipped \
                  (use new_with_storage for production or persistence tests)"
             ),
+        }
+        // The DHT-arrival projection IS DHT confirmation: this node's own conductor
+        // reports the AgentPeerBinding entry at this anchor with these fields. A
+        // cross-signed one becomes authority, and the claims held for its author are
+        // replayed (off this task, single-flight).
+        if replay_held && self.own_agent_cid.as_deref() != Some(signal.agent_cid.as_str()) {
+            // Not this node's own agent: a local signal is not proof of a DHT entry
+            // for someone else's binding — confirm it like any other.
+            crate::p2p::transport_authority::confirm::request_confirmation(
+                &signal.peer_id,
+                &signal.binding_action_hash,
+                None,
+            );
+        } else if replay_held {
+            if let Some(pool) = self.db_pool.as_ref() {
+                let from = signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                let until = signal
+                    .valid_until
+                    .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string());
+                match pool.get() {
+                    Ok(mut conn) => {
+                        if let Err(e) = crate::db::binding_confirmations::confirm(
+                            &mut conn,
+                            &crate::db::binding_confirmations::DhtBinding {
+                                peer_id: &signal.peer_id,
+                                dht_anchor_hash: &signal.binding_action_hash,
+                                agent_cid: &signal.agent_cid,
+                                valid_from: &from,
+                                valid_until: until.as_deref(),
+                            },
+                        ) {
+                            warn!(peer_id = %signal.peer_id, error = %e, "binding confirmation not recorded");
+                        }
+                    }
+                    Err(e) => warn!(error = %e, "binding confirmation: db pool checkout failed"),
+                }
+                crate::p2p::gossip_dispatch::schedule_replay(
+                    pool,
+                    crate::p2p::gossip_dispatch::authors_bound_by_peer(pool, &signal.peer_id),
+                );
+            }
         }
 
         // Recovery cannot re-advertise a known superseded original, or one

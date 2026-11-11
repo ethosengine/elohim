@@ -195,6 +195,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../crates/elohim-sdk"|path = "crates/elohim-sdk"|' Cargo.toml && \
     sed -i 's|path = "../../crates/seam-contracts"|path = "crates/seam-contracts"|' Cargo.toml && \
     sed -i 's|path = "../../crates/consent-grant"|path = "crates/consent-grant"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-blob-store"|path = "crates/elohim-blob-store"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/epr"|path = "../../epr"|' crates/consent-grant/Cargo.toml && \
     sed -i -e 's|path = "../../crates/elohim-address"|path = "../crates/elohim-address"|' -e 's|, registry = "elohim"||' epr/Cargo.toml && \
     sed -i 's|path = "../../crates/elohim-address"|path = "../crates/elohim-address"|' elohim-render/Cargo.toml && \
@@ -220,6 +221,23 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../bridges/valueflows/valueflows-types"|path = "bridges/valueflows/valueflows-types"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml
+
+# elohim-blob-store (artifact-store E4, 2026-11-09): the payload store, a non-optional path-dep
+# (src/blob_store.rs is a shim over it). It rides the wholesale `COPY crates`, declares its own
+# `[workspace]` and every package field literally, so only its paths need re-rooting to the
+# flattened layout (../../elohim/epr → /app/epr, ../../elohim/eprfs/* → /app/eprfs/*) and its
+# `registry = "elohim"` keys dropping (the registry is configured only in the repo's
+# .cargo/config.toml). Without this the resolve aborts: "failed to read /elohim/epr/Cargo.toml".
+RUN sed -i \
+    -e 's|path = "../../elohim/epr"|path = "../../epr"|' \
+    -e 's|path = "../../elohim/eprfs/eprfs-core"|path = "../../eprfs/eprfs-core"|' \
+    -e 's|path = "../../elohim/eprfs/eprfs-serve"|path = "../../eprfs/eprfs-serve"|' \
+    -e 's|, registry = "elohim"||' \
+    crates/elohim-blob-store/Cargo.toml && \
+    grep -q 'path = "../../epr"' crates/elohim-blob-store/Cargo.toml && \
+    if grep -n 'elohim/' crates/elohim-blob-store/Cargo.toml | grep -v '^[0-9]*:#' | grep 'path = '; then \
+      echo "elohim-blob-store still names an in-repo path (lines above); add a rewrite to this RUN" >&2; exit 1; \
+    fi
 
 # elohim-views lives under crates/ (2026-09-23), so the crates/<name> path deps (`../elohim-views`)
 # resolve inside the copied crates/ tree. elohim-facings is COPY'd flattened to /app/elohim-facings,

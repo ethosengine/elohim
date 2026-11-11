@@ -158,6 +158,25 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
                     "IdentityBindingGossip failed structural verify — dropped"
                 ),
                 Ok(()) => {
+                    // Dedup on the SIGNED core: the same proof re-gossiped (under any
+                    // anchor, on either plane) is judged once.
+                    if let Some(core) = crate::p2p::transport_authority::core_identity_of(
+                        &payload.agent_cid,
+                        &payload.peer_id,
+                        &payload.valid_from,
+                        payload.valid_until.as_deref(),
+                        &payload.signature,
+                    ) {
+                        if !ctx.dedup.insert(&format!("IdentityBindingCore:{core}")) {
+                            debug!(
+                                target: "elohim_storage::dedup",
+                                from = %source,
+                                peer_id = %payload.peer_id,
+                                "identity binding with an already-seen signed core — dropped"
+                            );
+                            return;
+                        }
+                    }
                     let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
                     let row = crate::p2p::identity_binding_gossip::binding_row_from_gossip(
                         &payload, &now_iso,
@@ -168,13 +187,33 @@ pub fn handle_gossip(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sour
                                 match crate::db::peer_identity_bindings::upsert_preserving_supersession(
                                     &mut conn, &row,
                                 ) {
-                                    Ok(()) => info!(
-                                        target: "elohim_storage::identity",
-                                        from = %source,
-                                        peer_id = %payload.peer_id,
-                                        agent_cid = %payload.agent_cid,
-                                        "IdentityBindingGossip upserted with source='gossip'"
-                                    ),
+                                    Ok(()) => {
+                                        info!(
+                                            target: "elohim_storage::identity",
+                                            from = %source,
+                                            peer_id = %payload.peer_id,
+                                            agent_cid = %payload.agent_cid,
+                                            "IdentityBindingGossip upserted with source='gossip'"
+                                        );
+                                        // A gossip-arrived cross-signed binding is a HINT:
+                                        // it proves only that the sender holds both keys.
+                                        // It becomes authority once the DHT confirms it
+                                        // (`p2p::transport_authority::confirm`), which also replays
+                                        // the claims held for its author.
+                                        if row.proof_status.is_cross_signed() {
+                                            let relay = match source {
+                                                GossipSource::Libp2p { author, peer, .. } => {
+                                                    author.as_deref().unwrap_or(peer.as_str())
+                                                }
+                                                GossipSource::Iroh { node } => node.as_str(),
+                                            };
+                                            crate::p2p::transport_authority::confirm::request_confirmation(
+                                                &row.peer_id,
+                                                &row.dht_anchor_hash,
+                                                Some(relay),
+                                            );
+                                        }
+                                    }
                                     Err(e) => warn!(
                                         target: "elohim_storage::identity",
                                         from = %source,
@@ -350,52 +389,37 @@ fn handle_revocation_message(
     }
 }
 
-/// The holder key a receiver expects for a transport author: admitted only when
-/// `peer_transport_manifest` binds the peer (libp2p PeerId or iroh NodeId column), and
-/// derived from the peer id itself (both embed the node's ed25519 key).
-pub struct ManifestHolderResolver<'c, 'a> {
+/// The holder key a receiver expects for a transport author: admitted only when the
+/// author is authenticated to an agent through a cross-signed chain
+/// ([`crate::p2p::transport_authority`]), and derived from the peer id itself (a libp2p
+/// PeerId and an iroh NodeId both embed the node's ed25519 key).
+pub struct BoundHolderResolver<'c, 'a> {
     conn: &'c std::cell::RefCell<&'a mut diesel::SqliteConnection>,
 }
 
-impl crate::p2p::inventory_gossip::HolderResolver for ManifestHolderResolver<'_, '_> {
+impl crate::p2p::inventory_gossip::HolderResolver for BoundHolderResolver<'_, '_> {
     fn expected_holder(&self, author_peer: &str) -> Option<elohim_epr::signature::Multikey> {
         bound_agent_for_author(&mut self.conn.borrow_mut(), author_peer)?;
         transport_key(author_peer)
     }
 }
 
-/// The `agent_cid` the transport manifest binds to `author_peer`, if any.
+/// The `agent_cid` `author_peer` (a libp2p PeerId or an iroh NodeId) is authenticated
+/// to speak for, through a cross-signed binding (and, for an iroh author, a verified
+/// two-key transport link). Never `peer_transport_manifest`: its `agent_cid` is a
+/// self-asserted routing hint.
 pub fn bound_agent_for_author(
     conn: &mut diesel::SqliteConnection,
     author_peer: &str,
 ) -> Option<String> {
-    use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-    use diesel::prelude::*;
-    t::peer_transport_manifest
-        .filter(
-            t::libp2p_peer_id
-                .eq(author_peer)
-                .or(t::iroh_node_id.eq(author_peer)),
-        )
-        .select(t::agent_cid)
-        .first::<String>(conn)
-        .optional()
-        .ok()
-        .flatten()
+    crate::p2p::transport_authority::authenticated_agent_for_transport(conn, author_peer)
 }
 
-/// The agent any binding this node holds attributes to a relaying transport id:
-/// `peer_transport_manifest` (libp2p or iroh column), else an active
-/// `peer_identity_bindings` row (libp2p PeerId).
+/// The agent a relaying gossipsub source is authenticated to speak for (the same
+/// cross-signed chain). Used only to REFUSE a claim its relay contradicts; a source
+/// that resolves to no agent refuses nothing.
 pub fn relay_agent(conn: &mut diesel::SqliteConnection, transport_id: &str) -> Option<String> {
-    if let Some(agent) = bound_agent_for_author(conn, transport_id) {
-        return Some(agent);
-    }
-    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    crate::db::peer_identity_bindings::lookup_active(conn, transport_id, &now_iso)
-        .ok()
-        .flatten()
-        .map(|row| row.agent_cid)
+    bound_agent_for_author(conn, transport_id)
 }
 
 /// The ed25519 key a transport peer id embeds: a libp2p PeerId's identity multihash
@@ -419,6 +443,8 @@ pub fn transport_key(author_peer: &str) -> Option<elohim_epr::signature::Multike
 /// `peer_blob_inventory` + `held_envelopes` behind the transport-neutral sink.
 struct DbInventorySink<'c, 'a> {
     conn: &'c std::cell::RefCell<&'a mut diesel::SqliteConnection>,
+    /// The witness the arriving plane gives every row this delivery applies.
+    witness: crate::db::peer_blob_inventory::InventoryWitness,
 }
 
 impl crate::p2p::inventory_gossip::InventorySink for DbInventorySink<'_, '_> {
@@ -427,7 +453,7 @@ impl crate::p2p::inventory_gossip::InventorySink for DbInventorySink<'_, '_> {
         peer: &str,
         delta: &crate::p2p::inventory_gossip::InventoryDelta,
     ) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
-        apply_delta_row(&mut self.conn.borrow_mut(), peer, delta)
+        apply_delta_row(&mut self.conn.borrow_mut(), peer, delta, self.witness)
     }
 
     fn retain_held(&mut self, held: crate::p2p::inventory_gossip::HeldEnvelope) {
@@ -454,6 +480,7 @@ fn apply_delta_row(
     conn: &mut diesel::SqliteConnection,
     peer: &str,
     delta: &crate::p2p::inventory_gossip::InventoryDelta,
+    witness: crate::db::peer_blob_inventory::InventoryWitness,
 ) -> Result<crate::p2p::inventory_gossip::DeltaOutcome, String> {
     use crate::db::peer_blob_inventory::DeltaApplyOutcome as Db;
     use crate::p2p::inventory_gossip::DeltaOutcome;
@@ -468,6 +495,7 @@ fn apply_delta_row(
         &removed,
         delta.sequence as i64,
         &when,
+        witness,
     ) {
         Ok(Db::Applied) => Ok(DeltaOutcome::Applied),
         Ok(Db::Replay) => Ok(DeltaOutcome::Replay),
@@ -479,7 +507,11 @@ fn apply_delta_row(
 }
 
 /// Apply every held page that is now contiguous with the cursor, in order. Held pages
-/// were admitted (signature-verified) before they were stashed.
+/// were admitted (signature-verified) before they were stashed; the stash does not
+/// keep the plane each arrived on, so each is recorded under the witness every
+/// admitted envelope carries on both planes, [`InventoryWitness::EndToEnd`].
+///
+/// [`InventoryWitness::EndToEnd`]: crate::db::peer_blob_inventory::InventoryWitness::EndToEnd
 /// bounded-work: at most the per-peer window (`MAX_PENDING_PER_PEER`) applies per call.
 fn flush_held_pages(
     ctx: &GossipDispatchCtx<'_>,
@@ -491,7 +523,12 @@ fn flush_held_pages(
     use crate::p2p::inventory_reorder::with_reorder;
     let mut flushed = 0usize;
     while let Some(held) = with_reorder(|r| r.take_next(peer_id, next_seq)) {
-        match apply_delta_row(conn, peer_id, &held.body) {
+        match apply_delta_row(
+            conn,
+            peer_id,
+            &held.body,
+            crate::db::peer_blob_inventory::InventoryWitness::EndToEnd,
+        ) {
             Ok(DeltaOutcome::Applied) => {
                 flushed += 1;
                 crate::metrics::inc_inventory_page("delta", "flushed");
@@ -561,8 +598,19 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sourc
     };
     let conn_ref: &mut diesel::SqliteConnection = &mut conn;
     let cell = std::cell::RefCell::new(conn_ref);
-    let resolver = ManifestHolderResolver { conn: &cell };
-    let mut sink = DbInventorySink { conn: &cell };
+    let resolver = BoundHolderResolver { conn: &cell };
+    // libp2p admission required the signed `message.source` to be the author; iroh
+    // admission rests on the envelope signature alone.
+    let row_witness = match witness {
+        AuthorWitness::Gossipsub(_) => {
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor
+        }
+        AuthorWitness::EndToEnd => crate::db::peer_blob_inventory::InventoryWitness::EndToEnd,
+    };
+    let mut sink = DbInventorySink {
+        conn: &cell,
+        witness: row_witness,
+    };
     let receipt = receive(topic, data, witness, &peer_hint, &resolver, &mut sink);
     let conn: &mut diesel::SqliteConnection = cell.into_inner();
     match receipt {
@@ -623,6 +671,12 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sourc
                 "Inventory envelope held (unknown epoch or scheme) — retained, not projected"
             );
         }
+        Receipt::Refused(crate::p2p::inventory_gossip::RefuseReason::UnboundAuthor)
+            if inventory_is_well_signed(data) =>
+        {
+            crate::metrics::inc_inventory_page("delta", "held_unbound");
+            hold_unbound(conn, pool, topic, data, source, inventory_author(data));
+        }
         Receipt::Refused(reason) => {
             crate::metrics::inc_inventory_page("delta", reason.label());
             warn!(
@@ -646,61 +700,391 @@ fn handle_inventory(ctx: &GossipDispatchCtx<'_>, topic: &str, data: &[u8], sourc
     }
 }
 
+/// Salvage-capacity ads into `salvage_capacity`. Admission is
+/// [`crate::p2p::salvage_gossip::admit`] (signature, signer = author, the advertised
+/// agent bound to the signer, no contradicting gossipsub source, freshness); an
+/// unknown epoch or scheme is held, bounded, never projected; replay is judged by the
+/// per-agent `seq` at projection. An unsigned, unbound, stale or replayed ad changes
+/// nothing.
 fn handle_salvage(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &GossipSource) {
-    use crate::p2p::salvage_gossip::SalvageCapacityAd;
+    use crate::db::salvage_capacity::CapacityApply;
+    use crate::p2p::inventory_gossip::AuthorWitness;
+    use crate::p2p::salvage_gossip::{admit, SalvageAdmission, SALVAGE_CAPACITY_TOPIC};
 
-    match SalvageCapacityAd::from_bytes(data) {
-        Ok(ad) => {
-            if let Err(e) = ad.verify_structural() {
-                warn!(
-                    target: "elohim_storage::salvage",
-                    from = %source,
-                    error = ?e,
-                    "Salvage-capacity ad failed structural verify — dropped"
-                );
-            } else if let Some(pool) = ctx.db_pool {
-                match pool.get() {
-                    Ok(mut conn) => {
-                        let when = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-                        match crate::db::salvage_capacity::apply_capacity(
-                            &mut conn,
-                            &ad.agent_cid,
-                            ad.spare_bytes as i64,
-                            &ad.archetype,
-                            &when,
-                            ad.seq as i64,
-                        ) {
-                            Ok(()) => debug!(
-                                target: "elohim_storage::salvage",
-                                from = %source,
-                                agent_cid = %ad.agent_cid,
-                                spare_bytes = ad.spare_bytes,
-                                archetype = %ad.archetype,
-                                seq = ad.seq,
-                                "Salvage-capacity ad applied"
-                            ),
-                            Err(e) => warn!(
-                                target: "elohim_storage::salvage",
-                                from = %source,
-                                error = %e,
-                                "apply_capacity failed"
-                            ),
-                        }
-                    }
-                    Err(e) => warn!(
-                        target: "elohim_storage::salvage",
-                        error = %e,
-                        "salvage: db pool exhausted"
-                    ),
-                }
-            }
+    let Some(pool) = ctx.db_pool else {
+        return;
+    };
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            warn!(target: "elohim_storage::salvage", error = %e, "salvage: db pool exhausted");
+            return;
         }
-        Err(e) => debug!(
+    };
+    let witness = match source {
+        GossipSource::Libp2p { author, .. } => AuthorWitness::Gossipsub(author.as_deref()),
+        GossipSource::Iroh { .. } => AuthorWitness::EndToEnd,
+    };
+    let now = chrono::Utc::now();
+    let verdict = {
+        let conn_ref: &mut diesel::SqliteConnection = &mut conn;
+        let cell = std::cell::RefCell::new(conn_ref);
+        admit(
+            data,
+            witness,
+            &mut |transport_id: &str| bound_agent_for_author(&mut cell.borrow_mut(), transport_id),
+            &mut |transport_id: &str| relay_agent(&mut cell.borrow_mut(), transport_id),
+            now.timestamp_millis(),
+        )
+    };
+    let (ad, author_peer) = match verdict {
+        SalvageAdmission::Admitted { body, author_peer } => (body, author_peer),
+        SalvageAdmission::Held { reason, bytes } => {
+            if let Err(e) = crate::db::held_envelopes::retain(
+                &mut conn,
+                SALVAGE_CAPACITY_TOPIC,
+                &reason.as_reason(),
+                &bytes,
+            ) {
+                warn!(target: "elohim_storage::salvage", error = %e, "held salvage ad not retained");
+            }
+            info!(
+                target: "elohim_storage::salvage",
+                from = %source, ?reason,
+                "salvage-capacity ad held (unknown epoch or scheme) — retained, not projected"
+            );
+            return;
+        }
+        SalvageAdmission::Refused(crate::p2p::salvage_gossip::SalvageRefusal::Binding(
+            crate::p2p::custody_announce::BindingError::UnboundAuthor,
+        )) => {
+            // Well signed by an author not bound YET: held for replay.
+            let author = crate::p2p::salvage_gossip::SignedSalvageAd::from_bytes(data)
+                .ok()
+                .map(|signed| signed.author_peer);
+            hold_unbound(
+                &mut conn,
+                pool,
+                SALVAGE_CAPACITY_TOPIC,
+                data,
+                source,
+                author,
+            );
+            return;
+        }
+        SalvageAdmission::Refused(reason) => {
+            warn!(
+                target: "elohim_storage::salvage",
+                from = %source, label = reason.label(), %reason,
+                "salvage-capacity ad refused"
+            );
+            return;
+        }
+    };
+    // `last_seen_at` is the signed issue time (never later than this clock), so the
+    // pool's freshness window ages the ad from when its author made it.
+    let issued = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ad.issued_at_ms)
+        .map_or(now, |issued| issued.min(now));
+    let when = issued.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    match crate::db::salvage_capacity::apply_capacity(
+        &mut conn,
+        &ad.agent_cid,
+        i64::try_from(ad.spare_bytes).unwrap_or(i64::MAX),
+        &ad.archetype,
+        &when,
+        i64::try_from(ad.seq).unwrap_or(i64::MAX),
+    ) {
+        Ok(CapacityApply::Applied) => debug!(
+            target: "elohim_storage::salvage",
+            from = %source,
+            author = %author_peer,
+            agent_cid = %ad.agent_cid,
+            spare_bytes = ad.spare_bytes,
+            archetype = %ad.archetype,
+            seq = ad.seq,
+            "Salvage-capacity ad applied"
+        ),
+        Ok(CapacityApply::Replay) => debug!(
+            target: "elohim_storage::salvage",
+            from = %source,
+            agent_cid = %ad.agent_cid,
+            seq = ad.seq,
+            "Salvage-capacity ad at or below the projected seq — replay, not re-projected"
+        ),
+        Err(e) => warn!(
             target: "elohim_storage::salvage",
             from = %source,
             error = %e,
-            "Salvage-capacity ad failed to decode — dropped"
+            "apply_capacity failed"
         ),
+    }
+}
+
+/// Hold a well-signed claim whose author is not bound yet
+/// ([`crate::db::held_unbound`]): never projected or counted, replayed through full
+/// admission when a binding or transport link for the author is recorded. On a running
+/// node the write leaves the gossip event loop ([`submit_held_job`]); without a runtime
+/// (sync tests, tools) it is made inline on the caller's connection.
+fn hold_unbound(
+    conn: &mut diesel::SqliteConnection,
+    pool: &crate::db::DbPool,
+    topic: &str,
+    data: &[u8],
+    source: &GossipSource,
+    author_peer: Option<String>,
+) {
+    use crate::db::held_unbound::{HeldClaim, HeldPlane};
+    let Some(author_peer) = author_peer else {
+        return;
+    };
+    let (plane, gossipsub_source) = match source {
+        GossipSource::Libp2p { author, .. } => (HeldPlane::Libp2p, author.clone()),
+        GossipSource::Iroh { .. } => (HeldPlane::Iroh, None),
+    };
+    let claim = HeldClaim {
+        topic: topic.to_string(),
+        author_peer,
+        plane,
+        gossipsub_source,
+        bytes: data.to_vec(),
+    };
+    info!(
+        target: "elohim_storage::held_unbound",
+        from = %source, topic, author = %claim.author_peer,
+        "well-signed claim from an author not bound yet — held for replay, not projected"
+    );
+    if !submit_held_job(pool, HeldJob::Hold(claim.clone())) {
+        run_hold(conn, &claim);
+    }
+}
+
+fn run_hold(conn: &mut diesel::SqliteConnection, claim: &crate::db::held_unbound::HeldClaim) {
+    if let Err(e) =
+        crate::db::held_unbound::hold(conn, claim, chrono::Utc::now().timestamp_millis())
+    {
+        warn!(target: "elohim_storage::held_unbound", error = %e, "unbound claim not held");
+    }
+}
+
+/// The author of an inventory envelope, when it decodes.
+fn inventory_author(data: &[u8]) -> Option<String> {
+    crate::p2p::inventory_gossip::InventoryEnvelope::from_bytes(data)
+        .ok()
+        .map(|envelope| envelope.author_peer)
+}
+
+/// Inventory admission refuses an unbound author BEFORE it checks the signature, so
+/// hold only an envelope whose holder is the key its author's id embeds and whose
+/// signature verifies under it: a forged or badly signed envelope is never held.
+fn inventory_is_well_signed(data: &[u8]) -> bool {
+    let Ok(envelope) = crate::p2p::inventory_gossip::InventoryEnvelope::from_bytes(data) else {
+        return false;
+    };
+    let Some(key) = transport_key(&envelope.author_peer) else {
+        return false;
+    };
+    envelope.holder == key
+        && envelope.check_for(&key) == elohim_epr::signature::SignatureCheck::Verified
+}
+
+/// Work on held unbound claims, kept off the gossip event loop.
+enum HeldJob {
+    Hold(crate::db::held_unbound::HeldClaim),
+    /// Replay the held claims of these transport ids (just bound or linked).
+    Replay(Vec<String>),
+}
+
+/// Jobs the held-claim worker queues at most.
+const HELD_QUEUE_CAP: usize = 1024;
+
+/// Hold jobs dropped because the worker's queue was full.
+static HELD_JOBS_DROPPED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// What [`HeldQueue::push`] did with a job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pushed {
+    Queued,
+    /// Full: a Hold job is dropped (a lost hold costs one claim's recovery).
+    DroppedHold,
+    /// Full: the oldest queued Hold job made room for this Replay.
+    EvictedHold,
+    /// Full of Replay jobs: this one's authors merged into the newest Replay.
+    Coalesced,
+}
+
+/// The single-flight worker's queue: one blocking drain at a time, in order, bounded
+/// by [`HELD_QUEUE_CAP`]. When full, Hold jobs give way so a Replay — which turns held
+/// claims into projected ones — is never starved.
+struct HeldQueue<P> {
+    running: bool,
+    jobs: std::collections::VecDeque<(P, HeldJob)>,
+}
+
+impl<P> HeldQueue<P> {
+    fn push(&mut self, pool: P, job: HeldJob) -> Pushed {
+        if self.jobs.len() < HELD_QUEUE_CAP {
+            self.jobs.push_back((pool, job));
+            return Pushed::Queued;
+        }
+        let authors = match job {
+            HeldJob::Hold(_) => return Pushed::DroppedHold,
+            HeldJob::Replay(authors) => authors,
+        };
+        if let Some(index) = self
+            .jobs
+            .iter()
+            .position(|(_, queued)| matches!(queued, HeldJob::Hold(_)))
+        {
+            self.jobs.remove(index);
+            self.jobs.push_back((pool, HeldJob::Replay(authors)));
+            return Pushed::EvictedHold;
+        }
+        if let Some((_, HeldJob::Replay(newest))) = self.jobs.back_mut() {
+            for author in authors {
+                if !newest.contains(&author) {
+                    newest.push(author);
+                }
+            }
+        }
+        Pushed::Coalesced
+    }
+}
+
+static HELD_QUEUE: std::sync::LazyLock<std::sync::Mutex<HeldQueue<crate::db::DbPool>>> =
+    std::sync::LazyLock::new(|| {
+        std::sync::Mutex::new(HeldQueue {
+            running: false,
+            jobs: std::collections::VecDeque::new(),
+        })
+    });
+
+/// Queue `job` for the single-flight blocking worker, starting it if idle. Returns
+/// `false` when there is no tokio runtime here: the caller runs the job inline.
+/// bounded-work: at most `HELD_QUEUE_CAP` jobs are queued; the drain owns one
+/// connection at a time.
+fn submit_held_job(pool: &crate::db::DbPool, job: HeldJob) -> bool {
+    let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+        return false;
+    };
+    let start = {
+        let mut queue = HELD_QUEUE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if queue.push(pool.clone(), job) == Pushed::DroppedHold {
+            let dropped = HELD_JOBS_DROPPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            warn!(
+                target: "elohim_storage::held_unbound",
+                dropped,
+                "held-claim worker queue full — an unbound claim was not held"
+            );
+        }
+        !std::mem::replace(&mut queue.running, true)
+    };
+    if start {
+        runtime.spawn_blocking(drain_held_queue);
+    }
+    true
+}
+
+fn drain_held_queue() {
+    loop {
+        let next = {
+            let mut queue = HELD_QUEUE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            match queue.jobs.pop_front() {
+                Some(next) => next,
+                None => {
+                    queue.running = false;
+                    return;
+                }
+            }
+        };
+        match next {
+            (pool, HeldJob::Hold(claim)) => match pool.get() {
+                Ok(mut conn) => run_hold(&mut conn, &claim),
+                Err(e) => {
+                    warn!(target: "elohim_storage::held_unbound", error = %e, "hold: db pool exhausted")
+                }
+            },
+            (pool, HeldJob::Replay(authors)) => run_replay(&pool, &authors),
+        }
+    }
+}
+
+/// Replay the held claims of `authors` — the transport ids a binding or link was just
+/// recorded for — once each resolves to an agent. Off the event loop on a running node;
+/// inline without a runtime.
+pub fn schedule_replay(pool: &crate::db::DbPool, authors: Vec<String>) {
+    if authors.is_empty() {
+        return;
+    }
+    if !submit_held_job(pool, HeldJob::Replay(authors.clone())) {
+        run_replay(pool, &authors);
+    }
+}
+
+/// The transport ids whose held claims a newly confirmed binding of libp2p `peer_id`
+/// can bind: the PeerId itself and every iroh NodeId a verified link ties to it.
+pub fn authors_bound_by_peer(pool: &crate::db::DbPool, peer_id: &str) -> Vec<String> {
+    let mut authors = vec![peer_id.to_string()];
+    if let Ok(mut conn) = pool.get() {
+        authors.extend(
+            crate::db::transport_links::iroh_for_libp2p(&mut conn, &[peer_id.to_string()])
+                .unwrap_or_default(),
+        );
+    }
+    authors
+}
+
+/// Replay through the same handler (full admission) on the plane each claim arrived
+/// on. A claim that still fails is refused there and logged with its reason.
+fn run_replay(pool: &crate::db::DbPool, authors: &[String]) {
+    let taken = match pool.get() {
+        Ok(mut conn) => crate::db::held_unbound::take_for_authors(
+            &mut conn,
+            chrono::Utc::now().timestamp_millis(),
+            authors,
+            &mut |conn, author| bound_agent_for_author(conn, author).is_some(),
+        ),
+        Err(e) => {
+            warn!(target: "elohim_storage::held_unbound", error = %e, "replay: db pool exhausted");
+            return;
+        }
+    };
+    let taken = match taken {
+        Ok(taken) => taken,
+        Err(e) => {
+            warn!(target: "elohim_storage::held_unbound", error = %e, "replay: held claims unreadable");
+            return;
+        }
+    };
+    let dedup = crate::p2p::dedup::DedupLru::new();
+    let ctx = GossipDispatchCtx {
+        db_pool: Some(pool),
+        dedup: &dedup,
+        agent_info_inbound_tx: None,
+        inventory_fetch: None,
+        transport_manifest_sink: None,
+        self_iroh_node_id: None,
+    };
+    for claim in taken {
+        let source = match claim.plane {
+            crate::db::held_unbound::HeldPlane::Libp2p => GossipSource::Libp2p {
+                peer: "held-replay".to_string(),
+                message_id: "held-replay".to_string(),
+                author: claim.gossipsub_source.clone(),
+            },
+            crate::db::held_unbound::HeldPlane::Iroh => GossipSource::Iroh {
+                node: "held-replay".to_string(),
+            },
+        };
+        info!(
+            target: "elohim_storage::held_unbound",
+            topic = %claim.topic, author = %claim.author_peer,
+            "replaying a held claim — its author is now bound"
+        );
+        handle_gossip(&ctx, &claim.topic, &claim.bytes, &source);
     }
 }
 
@@ -731,6 +1115,38 @@ fn handle_transport_manifest(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &
         crate::metrics::inc_iroh_manifest_announcement("self");
         return;
     }
+    // The two-key transport link, when carried: both halves verify independently of
+    // the manifest's own signature, and it must link THIS announcer's NodeId. A
+    // recorded link is the only step from an iroh NodeId toward an agent
+    // (`p2p::transport_authority`); the manifest's `agent_cid` never is.
+    if let (Some(link), Some(pool)) = (ann.transport_link.as_ref(), ctx.db_pool) {
+        if link.iroh_node_id != ann.iroh_node_id {
+            debug!(from = %source, node = %ann.iroh_node_id, "transport link names another NodeId — ignored");
+        } else {
+            match link.verify(chrono::Utc::now().timestamp_millis()) {
+                Ok(()) => match pool.get() {
+                    Ok(mut conn) => {
+                        match crate::db::transport_links::record_verified(&mut conn, link) {
+                            Ok(true) => {
+                                drop(conn);
+                                schedule_replay(
+                                    pool,
+                                    vec![link.iroh_node_id.clone(), link.libp2p_peer_id.clone()],
+                                );
+                            }
+                            Ok(false) => {}
+                            Err(e) => debug!(error = %e, "transport link not recorded"),
+                        }
+                    }
+                    Err(e) => debug!(error = %e, "transport link: db pool exhausted"),
+                },
+                Err(e) => {
+                    debug!(from = %source, node = %ann.iroh_node_id, error = %e, "transport link does not verify — ignored")
+                }
+            }
+        }
+    }
+
     // Dedup on the full identity incl. timestamp (exact replay dropped, a
     // fresher re-announce rides through — same rule as custody announce).
     let dedup_key = format!(
@@ -768,7 +1184,7 @@ fn handle_transport_manifest(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &
                 .filter_map(|p| crate::p2p_iroh::peer_map::Plane::parse(p))
                 .collect();
             let relays: Vec<String> = ann.iroh_relay_url.iter().cloned().collect();
-            if let Err(e) = crate::p2p_iroh::peer_map::record_iroh_observation(
+            if let Err(e) = crate::p2p_iroh::peer_map::record_manifest_hint(
                 &mut conn,
                 agent_cid,
                 &ann.iroh_node_id,
@@ -815,7 +1231,7 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
     };
 
     // The announcement is signed: the signature is the end-to-end author witness on
-    // both planes. C1: the holder is the agent `peer_transport_manifest` binds to the
+    // both planes. C1: the holder is the agent the cross-signed chain binds to the
     // signer's transport identity. On libp2p the gossipsub author is a relay identity
     // that refuses only when bound to a different agent. An unsigned announcement is
     // refused on either plane.
@@ -849,6 +1265,25 @@ fn handle_custody_announce(ctx: &GossipDispatchCtx<'_>, data: &[u8], source: &Go
                 target: "elohim_storage::custody",
                 from = %source, ?reason,
                 "custody announcement held (unknown epoch or scheme) — retained, not projected"
+            );
+            return;
+        }
+        CustodyAdmission::Refused(crate::p2p::custody_announce::CustodyRefusal::Binding(
+            crate::p2p::custody_announce::BindingError::UnboundAuthor,
+        )) => {
+            // Well signed (the signature verified before the binding check) by an
+            // author not bound YET: held for replay when its binding/link arrives.
+            crate::metrics::inc_custody_announce("held_unbound");
+            let author = crate::p2p::custody_announce::SignedCustodyAnnouncement::from_bytes(data)
+                .ok()
+                .map(|signed| signed.author_peer);
+            hold_unbound(
+                &mut conn,
+                pool,
+                CUSTODY_ANNOUNCE_TOPIC,
+                data,
+                source,
+                author,
             );
             return;
         }
@@ -1085,39 +1520,26 @@ mod tests {
         )
     }
 
-    /// `peer_transport_manifest` binds `libp2p_peer` to `agent`.
-    fn bind_agent(pool: &crate::db::DbPool, agent: &str, libp2p_peer: &str) {
-        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-        use diesel::prelude::*;
-        let mut conn = pool.get().expect("conn");
-        diesel::insert_into(t::peer_transport_manifest)
-            .values((
-                t::agent_cid.eq(agent),
-                t::libp2p_peer_id.eq(libp2p_peer),
-                t::discovery_methods_json.eq("[]"),
-                t::capability_level.eq(1),
-                t::last_observed.eq(1_i64),
-            ))
-            .execute(&mut conn)
-            .expect("bind author");
+    /// A real agent_cid for a readable test name (see `test_util::test_agent`).
+    fn agent(name: &str) -> String {
+        crate::test_util::test_agent(name)
     }
 
-    /// `peer_transport_manifest` binds iroh NodeId `node` to `agent` and no libp2p
-    /// PeerId — the shape the transport-manifest gossip projects in a household.
-    fn bind_iroh_agent(pool: &crate::db::DbPool, agent: &str, node: &str) {
-        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-        use diesel::prelude::*;
+    /// A cross-signed `AgentPeerBinding` binds [`agent`]`(name)` to the libp2p PeerId
+    /// of `secret` — the only libp2p authority admission reads.
+    fn bind_agent(pool: &crate::db::DbPool, name: &str, secret: [u8; 32]) -> String {
         let mut conn = pool.get().expect("conn");
-        diesel::insert_into(t::peer_transport_manifest)
-            .values((
-                t::agent_cid.eq(agent),
-                t::iroh_node_id.eq(node),
-                t::discovery_methods_json.eq("[]"),
-                t::capability_level.eq(5),
-                t::last_observed.eq(1_i64),
-            ))
-            .execute(&mut conn)
-            .expect("bind iroh author");
+        crate::test_util::bind_cross_signed(&mut conn, name, secret)
+    }
+
+    /// The household shape for an iroh-signed claim: [`agent`]`(name)` cross-signs a
+    /// libp2p PeerId, and that PeerId's key and the iroh key `iroh_secret` link each
+    /// other (a verified two-key transport link). Returns the iroh NodeId.
+    fn bind_iroh_agent(pool: &crate::db::DbPool, name: &str, iroh_secret: [u8; 32]) -> String {
+        let libp2p_secret = iroh_secret.map(|b| b ^ 0x5a);
+        let mut conn = pool.get().expect("conn");
+        crate::test_util::bind_cross_signed(&mut conn, name, libp2p_secret);
+        crate::test_util::link_transports(&mut conn, libp2p_secret, iroh_secret)
     }
 
     fn custody_claim(
@@ -1169,6 +1591,955 @@ mod tests {
         }
     }
 
+    // ── R1: salvage-capacity ads are signed, bound, fresh and replay-ordered ──
+
+    fn salvage_ad(
+        agent: &str,
+        seq: u64,
+        spare: u64,
+    ) -> crate::p2p::salvage_gossip::SalvageCapacityAd {
+        crate::p2p::salvage_gossip::SalvageCapacityAd {
+            agent_cid: agent.to_string(),
+            spare_bytes: spare,
+            archetype: "node".to_string(),
+            seq,
+            issued_at_ms: chrono::Utc::now().timestamp_millis(),
+        }
+    }
+
+    fn salvage_row(
+        pool: &crate::db::DbPool,
+        agent: &str,
+    ) -> Option<crate::db::models::SalvageCapacityRow> {
+        let mut conn = pool.get().expect("conn");
+        crate::db::salvage_capacity::lookup_capacity(&mut conn, agent).unwrap()
+    }
+
+    fn salvage_row_count(pool: &crate::db::DbPool) -> i64 {
+        use crate::db::diesel_schema::salvage_capacity::dsl as t;
+        use diesel::prelude::*;
+        let mut conn = pool.get().expect("conn");
+        t::salvage_capacity.count().get_result(&mut conn).unwrap()
+    }
+
+    #[test]
+    fn unsigned_salvage_ad_is_refused_and_projects_nothing() {
+        use crate::p2p::salvage_gossip::SALVAGE_CAPACITY_TOPIC;
+        #[derive(serde::Serialize)]
+        struct Stage1Ad {
+            agent_cid: String,
+            spare_bytes: u64,
+            archetype: String,
+            seq: u64,
+            signature: Vec<u8>,
+        }
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (_, peer) = custody_signer([41u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", [41u8; 32]);
+        // The retired Stage-1 wire: a placeholder null-byte "signature", nothing signed.
+        let unsigned = rmp_serde::to_vec_named(&Stage1Ad {
+            agent_cid: "uhCAkSalvager".to_string(),
+            spare_bytes: 1 << 30,
+            archetype: "node".to_string(),
+            seq: 1,
+            signature: vec![0x00],
+        })
+        .unwrap();
+        // Even the bare body, without any envelope, from the bound author itself.
+        let body_only =
+            rmp_serde::to_vec_named(&salvage_ad(&agent("uhCAkSalvager"), 2, 1 << 30)).unwrap();
+        for bytes in [&unsigned, &body_only] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                bytes,
+                &libp2p_from(Some(&peer)),
+            );
+            handle_gossip(&ctx, SALVAGE_CAPACITY_TOPIC, bytes, &iroh_from("neighbour"));
+        }
+        assert_eq!(salvage_row_count(&pool), 0, "an unsigned ad never lands");
+    }
+
+    #[test]
+    fn salvage_ad_from_unbound_source_is_refused() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+
+        // A validly signed ad whose signer no manifest binds to any agent.
+        let (unbound_key, unbound_peer) = custody_signer([42u8; 32]);
+        let bytes = SignedSalvageAd::sign(
+            &unbound_key,
+            &unbound_peer,
+            salvage_ad(&agent("uhCAkUnboundSalvager"), 1, 4096),
+        )
+        .to_bytes()
+        .unwrap();
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&unbound_peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &iroh_from("neighbour"),
+        );
+        assert!(salvage_row(&pool, &agent("uhCAkUnboundSalvager")).is_none());
+
+        // A bound signer's ad relayed under a gossipsub source this node binds to a
+        // DIFFERENT agent contradicts the ad and is refused.
+        let (key, peer) = custody_signer([43u8; 32]);
+        bind_agent(&pool, "uhCAkBoundSalvager", [43u8; 32]);
+        let (_, other_peer) = custody_signer([44u8; 32]);
+        bind_agent(&pool, "uhCAkSomeoneElse", [44u8; 32]);
+        let bytes = SignedSalvageAd::sign(
+            &key,
+            &peer,
+            salvage_ad(&agent("uhCAkBoundSalvager"), 1, 4096),
+        )
+        .to_bytes()
+        .unwrap();
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&other_peer)),
+        );
+        assert!(salvage_row(&pool, &agent("uhCAkBoundSalvager")).is_none());
+
+        // The same bytes from the bound author itself project.
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &bytes,
+            &libp2p_from(Some(&peer)),
+        );
+        assert_eq!(
+            salvage_row(&pool, &agent("uhCAkBoundSalvager"))
+                .unwrap()
+                .spare_bytes,
+            4096
+        );
+        assert_eq!(salvage_row_count(&pool), 1);
+    }
+
+    #[test]
+    fn replayed_salvage_ad_does_not_reproject() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (key, peer) = custody_signer([45u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", [45u8; 32]);
+        let sign = |seq, spare| {
+            SignedSalvageAd::sign(&key, &peer, salvage_ad(&agent("uhCAkSalvager"), seq, spare))
+                .to_bytes()
+                .unwrap()
+        };
+        let older = sign(10, 100);
+        let newer = sign(11, 200);
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &older,
+            &libp2p_from(Some(&peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &newer,
+            &iroh_from("neighbour"),
+        );
+        let applied = salvage_row(&pool, &agent("uhCAkSalvager")).unwrap();
+        assert_eq!((applied.seq, applied.spare_bytes), (11, 200));
+
+        // Replays — the older ad, and the newest one again, on either plane — change
+        // nothing: not the spare bytes, not the seq, not the freshness stamp.
+        handle_gossip(&ctx, SALVAGE_CAPACITY_TOPIC, &older, &iroh_from("relay"));
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &older,
+            &libp2p_from(Some(&peer)),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &newer,
+            &libp2p_from(Some(&peer)),
+        );
+        let after = salvage_row(&pool, &agent("uhCAkSalvager")).unwrap();
+        assert_eq!(
+            (after.seq, after.spare_bytes, after.last_seen_at),
+            (applied.seq, applied.spare_bytes, applied.last_seen_at)
+        );
+    }
+
+    #[test]
+    fn forged_iroh_salvage_ad_naming_another_holder_is_refused() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        // Victim and forger are both bound by iroh NodeId, as in a household.
+        let victim = elohim_epr::AgentKeypair::from_secret(&[46u8; 32]).unwrap();
+        let victim_node = hex::encode(victim.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkVictim", [46u8; 32]);
+        let forger = elohim_epr::AgentKeypair::from_secret(&[47u8; 32]).unwrap();
+        let forger_node = hex::encode(forger.public_key_bytes());
+        bind_iroh_agent(&pool, "uhCAkForger", [47u8; 32]);
+
+        // The forger signs with its own key and names the victim as the advertiser…
+        let as_victim_agent = SignedSalvageAd::sign(
+            &forger,
+            &forger_node,
+            salvage_ad(&agent("uhCAkVictim"), 1, 1 << 40),
+        );
+        // …or claims the victim's NodeId as author while signing with its own key.
+        let as_victim_author = SignedSalvageAd::sign(
+            &forger,
+            &victim_node,
+            salvage_ad(&agent("uhCAkVictim"), 2, 1 << 40),
+        );
+        for forged in [as_victim_agent, as_victim_author] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &forged.to_bytes().unwrap(),
+                &iroh_from(&victim_node),
+            );
+        }
+        assert!(
+            salvage_row(&pool, &agent("uhCAkVictim")).is_none(),
+            "no ad the victim did not sign may place it in the salvage pool"
+        );
+
+        // The victim's own signed ad over iroh is end-to-end authenticated and lands.
+        let genuine = SignedSalvageAd::sign(
+            &victim,
+            &victim_node,
+            salvage_ad(&agent("uhCAkVictim"), 3, 4096),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &genuine.to_bytes().unwrap(),
+            &iroh_from(&forger_node),
+        );
+        assert_eq!(
+            salvage_row(&pool, &agent("uhCAkVictim"))
+                .unwrap()
+                .spare_bytes,
+            4096
+        );
+    }
+
+    #[test]
+    fn unknown_scheme_salvage_ad_is_held_not_projected() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (key, peer) = custody_signer([48u8; 32]);
+        bind_agent(&pool, "uhCAkSalvager", [48u8; 32]);
+        let mut unknown_scheme =
+            SignedSalvageAd::sign(&key, &peer, salvage_ad(&agent("uhCAkSalvager"), 1, 4096));
+        unknown_scheme.sig.scheme = 77;
+        let mut unknown_epoch =
+            SignedSalvageAd::sign(&key, &peer, salvage_ad(&agent("uhCAkSalvager"), 2, 4096));
+        unknown_epoch.epoch = 3;
+        for held in [unknown_scheme, unknown_epoch] {
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &held.to_bytes().unwrap(),
+                &libp2p_from(Some(&peer)),
+            );
+        }
+        assert!(
+            salvage_row(&pool, &agent("uhCAkSalvager")).is_none(),
+            "held, never projected"
+        );
+        let mut conn = pool.get().unwrap();
+        assert_eq!(
+            crate::db::held_envelopes::count(&mut conn).unwrap(),
+            2,
+            "both kept opaque in the bounded held table"
+        );
+    }
+
+    // ── Binding authority: a transport manifest never binds an agent ──────────
+
+    /// Publish, through the real gossip path, a transport manifest signed with the
+    /// iroh key `iroh_secret` that names `agent_cid` (and optionally carries a link).
+    fn announce_manifest(
+        ctx: &GossipDispatchCtx<'_>,
+        iroh_secret: [u8; 32],
+        agent_cid: &str,
+        link: Option<crate::p2p::transport_link::TransportLink>,
+    ) -> String {
+        use crate::p2p::transport_manifest_gossip::{
+            TransportManifestAnnouncement, TRANSPORT_MANIFEST_TOPIC,
+        };
+        let mut ann = TransportManifestAnnouncement::sign(
+            &iroh_secret,
+            vec!["127.0.0.1:4433".to_string()],
+            None,
+            Some(agent_cid.to_string()),
+            None,
+            vec!["gossip".to_string()],
+            chrono::Utc::now().timestamp_millis(),
+        );
+        ann.transport_link = link;
+        assert_eq!(ann.verify(), Ok(()), "a well-formed signed manifest");
+        handle_gossip(
+            ctx,
+            TRANSPORT_MANIFEST_TOPIC,
+            &ann.to_bytes().unwrap(),
+            &iroh_from("neighbour"),
+        );
+        ann.iroh_node_id
+    }
+
+    fn authority(pool: &crate::db::DbPool, transport_id: &str) -> Option<String> {
+        let mut conn = pool.get().unwrap();
+        bound_agent_for_author(&mut conn, transport_id)
+    }
+
+    /// The red-team hijack: anyone can sign a manifest `{iroh_node_id: theirs,
+    /// agent_cid: victim}` (its signature proves only the iroh key). Driven through
+    /// the real manifest gossip path, it binds nothing — and neither does a transport
+    /// link the forger signs naming the victim's PeerId without the victim's key.
+    #[test]
+    fn forged_manifest_cannot_bind_a_victim_agent() {
+        use crate::p2p::transport_link::TransportLink;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let victim_node = bind_iroh_agent(&pool, "uhCAkVictim", [51u8; 32]);
+        let victim = agent("uhCAkVictim");
+        assert_eq!(authority(&pool, &victim_node), Some(victim.clone()));
+
+        let forger_iroh = [52u8; 32];
+        let forged_node = announce_manifest(&ctx, forger_iroh, &victim, None);
+        assert_eq!(
+            authority(&pool, &forged_node),
+            None,
+            "a manifest binds no agent"
+        );
+
+        // A link the forger signs with its own two keys links only its own keys…
+        let own_link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&[53u8; 32]).unwrap(),
+            &elohim_epr::AgentKeypair::from_secret(&forger_iroh).unwrap(),
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        // …and relabelling it to the victim's PeerId breaks its libp2p half.
+        let mut relabelled = own_link.clone();
+        relabelled.libp2p_peer_id = custody_signer([51u8 ^ 0x5a; 32]).1;
+        announce_manifest(&ctx, forger_iroh, &victim, Some(relabelled));
+        assert_eq!(authority(&pool, &forged_node), None);
+        announce_manifest(&ctx, forger_iroh, &victim, Some(own_link));
+        assert_eq!(
+            authority(&pool, &forged_node),
+            None,
+            "linked to the forger's own PeerId, which no agent cross-signed"
+        );
+        // The victim's own authority is untouched.
+        assert_eq!(authority(&pool, &victim_node), Some(victim));
+    }
+
+    /// An honest dual node's iroh NodeId speaks for its agent only through its
+    /// verified transport link to a cross-signed PeerId: no link, or a link to a
+    /// PeerId no agent cross-signed, resolves to no one.
+    #[test]
+    fn iroh_author_resolves_only_through_the_cross_signed_iroh_half() {
+        use crate::p2p::transport_link::TransportLink;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (iroh_secret, libp2p_secret) = ([54u8; 32], [55u8; 32]);
+        let node = hex::encode(
+            elohim_epr::AgentKeypair::from_secret(&iroh_secret)
+                .unwrap()
+                .public_key_bytes(),
+        );
+        let honest = agent("uhCAkHonest");
+
+        // Cross-signed PeerId, but no link yet (an older build): no authority.
+        bind_agent(&pool, "uhCAkHonest", libp2p_secret);
+        announce_manifest(&ctx, iroh_secret, &honest, None);
+        assert_eq!(authority(&pool, &node), None, "no link, no authority");
+
+        // The node's manifest now carries its two-key link: the chain closes.
+        let link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&libp2p_secret).unwrap(),
+            &elohim_epr::AgentKeypair::from_secret(&iroh_secret).unwrap(),
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        announce_manifest(&ctx, iroh_secret, &honest, Some(link));
+        assert_eq!(authority(&pool, &node), Some(honest));
+
+        // A linked PeerId nobody cross-signed gives its iroh NodeId no agent either.
+        let (lone_iroh, lone_libp2p) = ([56u8; 32], [57u8; 32]);
+        let lone = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&lone_libp2p).unwrap(),
+            &elohim_epr::AgentKeypair::from_secret(&lone_iroh).unwrap(),
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        let lone_node = announce_manifest(&ctx, lone_iroh, &agent("uhCAkHonest"), Some(lone));
+        assert_eq!(authority(&pool, &lone_node), None);
+    }
+
+    #[test]
+    fn forged_salvage_ad_via_manifest_hijack_is_refused() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let victim_node = bind_iroh_agent(&pool, "uhCAkVictim", [58u8; 32]);
+        let victim = agent("uhCAkVictim");
+
+        let forger = [59u8; 32];
+        let forged_node = announce_manifest(&ctx, forger, &victim, None);
+        // The red-team payload: a seq that would freeze the victim's row forever, and
+        // a plausible one, both signed by the hijacking key as the victim.
+        for seq in [3, u64::MAX] {
+            let ad = SignedSalvageAd::sign(
+                &elohim_epr::AgentKeypair::from_secret(&forger).unwrap(),
+                &forged_node,
+                salvage_ad(&victim, seq, 1 << 40),
+            );
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &ad.to_bytes().unwrap(),
+                &iroh_from("neighbour"),
+            );
+        }
+        assert!(
+            salvage_row(&pool, &victim).is_none(),
+            "the hijack places nothing"
+        );
+
+        // The victim's own ad still lands, and later ones keep landing.
+        let genuine = SignedSalvageAd::sign(
+            &elohim_epr::AgentKeypair::from_secret(&[58u8; 32]).unwrap(),
+            &victim_node,
+            salvage_ad(&victim, 4, 4096),
+        );
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &genuine.to_bytes().unwrap(),
+            &iroh_from("neighbour"),
+        );
+        assert_eq!(salvage_row(&pool, &victim).unwrap().spare_bytes, 4096);
+    }
+
+    #[test]
+    fn custody_announcement_via_manifest_hijack_is_refused() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        bind_iroh_agent(&pool, "uhCAkVictim", [60u8; 32]);
+        let victim = agent("uhCAkVictim");
+        let forger = [61u8; 32];
+        let forged_node = announce_manifest(&ctx, forger, &victim, None);
+        let shard = elohim_epr::address::compute_bytes_cid(b"hijacked custody");
+        let forged = SignedCustodyAnnouncement::sign(
+            &elohim_epr::AgentKeypair::from_secret(&forger).unwrap(),
+            &forged_node,
+            custody_claim(shard, &victim),
+        );
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &forged.to_bytes().unwrap(),
+            &iroh_from("neighbour"),
+        );
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &forged.to_bytes().unwrap(),
+            &libp2p_from(Some("12D3KooWRelay")),
+        );
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "no custody credited to the victim"
+        );
+    }
+
+    /// A manifest naming an agent never replaces the iroh NodeId already recorded for
+    /// it (dial hints cannot be hijacked either), unless the new NodeId is itself
+    /// authenticated to that agent.
+    #[cfg(feature = "p2p-iroh")]
+    #[test]
+    fn a_forged_manifest_does_not_replace_a_recorded_node_id() {
+        use crate::p2p::transport_link::TransportLink;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let victim = agent("uhCAkVictim");
+        let honest_node = announce_manifest(&ctx, [62u8; 32], &victim, None);
+        let recorded = |pool: &crate::db::DbPool| {
+            let mut conn = pool.get().unwrap();
+            crate::p2p_iroh::peer_map::lookup_by_agent_cid(&mut conn, &victim)
+                .unwrap()
+                .and_then(|m| m.iroh.map(|i| i.node_id))
+        };
+        assert_eq!(recorded(&pool), Some(honest_node.clone()));
+        announce_manifest(&ctx, [63u8; 32], &victim, None);
+        assert_eq!(
+            recorded(&pool),
+            Some(honest_node),
+            "the hijack is not recorded"
+        );
+
+        // The victim's rotated key, linked to its cross-signed PeerId, does replace it.
+        let libp2p_secret = [64u8; 32];
+        bind_agent(&pool, "uhCAkVictim", libp2p_secret);
+        let link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&libp2p_secret).unwrap(),
+            &elohim_epr::AgentKeypair::from_secret(&[65u8; 32]).unwrap(),
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        let rotated = announce_manifest(&ctx, [65u8; 32], &victim, Some(link));
+        assert_eq!(recorded(&pool), Some(rotated));
+    }
+
+    // ── Unbound-but-well-signed claims are held, then replayed on binding ──
+
+    fn held_count(pool: &crate::db::DbPool) -> i64 {
+        let mut conn = pool.get().unwrap();
+        crate::db::held_unbound::count(&mut conn).unwrap()
+    }
+
+    /// A dual node's iroh-signed custody claim that arrives before its transport link:
+    /// a forged copy is refused and never held; the genuine one is held (not
+    /// projected), then admitted when the node's manifest brings its link.
+    #[test]
+    fn an_unbound_custody_announcement_is_held_and_admitted_when_its_link_arrives() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        use crate::p2p::transport_link::TransportLink;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (iroh_secret, libp2p_secret) = ([81u8; 32], [82u8; 32]);
+        bind_agent(&pool, "uhCAkLateHolder", libp2p_secret);
+        let holder = agent("uhCAkLateHolder");
+        let iroh_key = elohim_epr::AgentKeypair::from_secret(&iroh_secret).unwrap();
+        let node = hex::encode(iroh_key.public_key_bytes());
+        let shard = elohim_epr::address::compute_bytes_cid(b"claimed before the link");
+        let signed =
+            SignedCustodyAnnouncement::sign(&iroh_key, &node, custody_claim(shard, &holder));
+
+        let mut forged = signed.clone();
+        forged.body.status = "verified".into();
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &forged.to_bytes().unwrap(),
+            &iroh_from("n"),
+        );
+        assert_eq!(
+            held_count(&pool),
+            0,
+            "a badly signed claim is refused, never held"
+        );
+
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &signed.to_bytes().unwrap(),
+            &iroh_from("n"),
+        );
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "held, not projected"
+        );
+        assert_eq!(held_count(&pool), 1);
+
+        let link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&libp2p_secret).unwrap(),
+            &iroh_key,
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        announce_manifest(&ctx, iroh_secret, &holder, Some(link));
+        let rows = custody_rows(&pool, &shard);
+        assert_eq!(
+            rows.len(),
+            1,
+            "replayed through full admission and projected"
+        );
+        assert_eq!(rows[0].peer_id, holder);
+        assert_eq!(held_count(&pool), 0);
+    }
+
+    /// The author's binding arrives but names another agent than the held claim's
+    /// holder: replay re-runs full admission, the claim fails, and it is dropped.
+    #[test]
+    fn a_held_claim_that_still_fails_on_replay_is_dropped() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        use crate::p2p::transport_link::TransportLink;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (iroh_secret, libp2p_secret) = ([83u8; 32], [84u8; 32]);
+        let iroh_key = elohim_epr::AgentKeypair::from_secret(&iroh_secret).unwrap();
+        let node = hex::encode(iroh_key.public_key_bytes());
+        let shard = elohim_epr::address::compute_bytes_cid(b"claims someone else");
+        let signed = SignedCustodyAnnouncement::sign(
+            &iroh_key,
+            &node,
+            custody_claim(shard, &agent("uhCAkClaimedHolder")),
+        );
+        handle_gossip(
+            &ctx,
+            CUSTODY_ANNOUNCE_TOPIC,
+            &signed.to_bytes().unwrap(),
+            &iroh_from("n"),
+        );
+        assert_eq!(held_count(&pool), 1);
+
+        // The key's chain binds a different agent.
+        bind_agent(&pool, "uhCAkActualAgent", libp2p_secret);
+        let link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&libp2p_secret).unwrap(),
+            &iroh_key,
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        announce_manifest(&ctx, iroh_secret, &agent("uhCAkActualAgent"), Some(link));
+        assert!(
+            custody_rows(&pool, &shard).is_empty(),
+            "still refused on replay"
+        );
+        assert_eq!(held_count(&pool), 0, "dropped, not held again");
+    }
+
+    /// A held claim whose author stays unbound past the TTL is purged: a binding that
+    /// arrives later projects nothing.
+    #[test]
+    fn held_unbound_claims_expire() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        use crate::p2p::transport_link::TransportLink;
+        use diesel::prelude::*;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let (iroh_secret, libp2p_secret) = ([85u8; 32], [86u8; 32]);
+        let iroh_key = elohim_epr::AgentKeypair::from_secret(&iroh_secret).unwrap();
+        let node = hex::encode(iroh_key.public_key_bytes());
+        let advertiser = agent("uhCAkSlowAdvertiser");
+        let ad = SignedSalvageAd::sign(&iroh_key, &node, salvage_ad(&advertiser, 1, 4096));
+        handle_gossip(
+            &ctx,
+            SALVAGE_CAPACITY_TOPIC,
+            &ad.to_bytes().unwrap(),
+            &iroh_from("n"),
+        );
+        assert_eq!(held_count(&pool), 1, "a well-signed unbound ad is held");
+
+        // Age it past the TTL.
+        {
+            use crate::db::diesel_schema::held_unbound_claims::dsl as h;
+            let mut conn = pool.get().unwrap();
+            diesel::update(h::held_unbound_claims)
+                .set(h::held_at_ms.eq(chrono::Utc::now().timestamp_millis()
+                    - crate::db::held_unbound::HELD_UNBOUND_TTL_MS
+                    - 1))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        bind_agent(&pool, "uhCAkSlowAdvertiser", libp2p_secret);
+        let link = TransportLink::sign(
+            &elohim_epr::AgentKeypair::from_secret(&libp2p_secret).unwrap(),
+            &iroh_key,
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .unwrap();
+        announce_manifest(&ctx, iroh_secret, &advertiser, Some(link));
+        assert!(
+            salvage_row(&pool, &advertiser).is_none(),
+            "an expired claim is never replayed"
+        );
+        assert_eq!(held_count(&pool), 0, "and it is gone");
+    }
+
+    // ── Authority is DHT-confirmed; proofs never downgrade; cores supersede ──
+
+    fn gossip_binding(
+        ctx: &GossipDispatchCtx<'_>,
+        payload: &crate::p2p::identity_binding_gossip::IdentityBindingGossip,
+    ) {
+        handle_gossip(
+            ctx,
+            crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
+            &payload.to_bytes().unwrap(),
+            &libp2p_from(Some("12D3KooWRelay")),
+        );
+    }
+
+    fn binding_row(
+        pool: &crate::db::DbPool,
+        peer: &str,
+        anchor: &str,
+    ) -> Option<crate::db::models::PeerIdentityBindingRow> {
+        use crate::db::diesel_schema::peer_identity_bindings::dsl;
+        use diesel::prelude::*;
+        let mut conn = pool.get().unwrap();
+        dsl::peer_identity_bindings
+            .filter(dsl::peer_id.eq(peer))
+            .filter(dsl::dht_anchor_hash.eq(anchor))
+            .first(&mut conn)
+            .optional()
+            .unwrap()
+    }
+
+    /// A binding anyone can mint — both keys of their own, gossiped — classifies
+    /// `cross_signed` (it is) but is a hint: authority only once the DHT confirms an
+    /// entry at its anchor with its fields.
+    #[test]
+    fn self_made_cross_signed_binding_is_not_authority_until_dht_confirmed() {
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let payload =
+            crate::test_util::cross_signed_gossip("uhCAkSelfMade", [92u8; 32], "uhCkkAnchorA");
+        gossip_binding(&ctx, &payload);
+        let row = binding_row(&pool, &payload.peer_id, "uhCkkAnchorA").expect("projected");
+        assert!(row.is_cross_signed(), "the proof itself is genuine");
+        assert_eq!(
+            authority(&pool, &payload.peer_id),
+            None,
+            "gossip alone is not authority"
+        );
+
+        let mut conn = pool.get().unwrap();
+        crate::test_util::confirm_on_dht(&mut conn, &payload.peer_id, "uhCkkAnchorA");
+        drop(conn);
+        assert_eq!(
+            authority(&pool, &payload.peer_id),
+            Some(agent("uhCAkSelfMade"))
+        );
+    }
+
+    /// The Sybil starvation attack: many self-made agent↔PeerId bindings, each with a
+    /// signed salvage ad. None is DHT-confirmed, so no ad lands in the candidate pool;
+    /// each is merely held (bounded) awaiting a confirmation that never comes.
+    #[test]
+    fn sybil_salvage_ads_never_fill_the_candidate_pool() {
+        use crate::p2p::salvage_gossip::{SignedSalvageAd, SALVAGE_CAPACITY_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        for i in 0..12u8 {
+            let secret = [100 + i; 32];
+            let name = format!("uhCAkSybil{i}");
+            let payload =
+                crate::test_util::cross_signed_gossip(&name, secret, &format!("uhCkkSybil{i}"));
+            gossip_binding(&ctx, &payload);
+            let (key, peer) = custody_signer(secret);
+            let ad = SignedSalvageAd::sign(&key, &peer, salvage_ad(&agent(&name), 1, 1 << 40));
+            handle_gossip(
+                &ctx,
+                SALVAGE_CAPACITY_TOPIC,
+                &ad.to_bytes().unwrap(),
+                &libp2p_from(Some(&peer)),
+            );
+        }
+        assert_eq!(salvage_row_count(&pool), 0, "no Sybil reaches the pool");
+        let mut conn = pool.get().unwrap();
+        let pool_rows =
+            crate::db::salvage_capacity::list_fresh(&mut conn, "2000-01-01T00:00:00Z").unwrap();
+        assert!(pool_rows.is_empty());
+        assert_eq!(
+            crate::db::held_unbound::count(&mut conn).unwrap(),
+            12,
+            "held, never counted"
+        );
+    }
+
+    /// `dht_anchor_hash` is unsigned: a copy reusing a cross-signed row's anchor with a
+    /// junk signature must never replace it (and so can never strip its authority).
+    #[test]
+    fn junk_signed_copy_never_downgrades_a_cross_signed_row() {
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let peer = bind_agent(&pool, "uhCAkHonestPeer", [93u8; 32]);
+        let anchor = format!("anchor-{peer}");
+        assert_eq!(authority(&pool, &peer), Some(agent("uhCAkHonestPeer")));
+        let mut junk =
+            crate::test_util::cross_signed_gossip("uhCAkHonestPeer", [93u8; 32], &anchor);
+        junk.signature = crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL.into();
+        gossip_binding(&ctx, &junk);
+        let mut other =
+            crate::test_util::cross_signed_gossip("uhCAkHonestPeer", [93u8; 32], &anchor);
+        other.signature = "elohim:apb:1:garbage".into();
+        gossip_binding(&ctx, &other);
+        let row = binding_row(&pool, &peer, &anchor).unwrap();
+        assert!(row.is_cross_signed(), "the cross-signed row stands");
+        assert_eq!(authority(&pool, &peer), Some(agent("uhCAkHonestPeer")));
+    }
+
+    /// Supersession belongs to the signed core: once a core is superseded, the same core
+    /// re-published under a fresh anchor (even one the DHT confirms) does not revive.
+    #[test]
+    fn superseded_core_regossiped_under_a_fresh_anchor_does_not_revive() {
+        use crate::db::diesel_schema::peer_identity_bindings::dsl;
+        use diesel::prelude::*;
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let peer = bind_agent(&pool, "uhCAkRotated", [94u8; 32]);
+        {
+            let mut conn = pool.get().unwrap();
+            diesel::update(dsl::peer_identity_bindings.filter(dsl::peer_id.eq(&peer)))
+                .set(dsl::superseded_by.eq(Some("uhCkkTheSuccessor")))
+                .execute(&mut conn)
+                .unwrap();
+        }
+        assert_eq!(authority(&pool, &peer), None, "superseded");
+
+        // The same signed core, copied from the stored row, under a fresh anchor.
+        let stored = binding_row(&pool, &peer, &format!("anchor-{peer}")).unwrap();
+        let revived = crate::p2p::identity_binding_gossip::IdentityBindingGossip {
+            peer_id: stored.peer_id.clone(),
+            agent_cid: stored.agent_cid.clone(),
+            valid_from: stored.valid_from.clone(),
+            valid_until: stored.valid_until.clone(),
+            device_archetype: "node".into(),
+            binding_action_hash: "uhCkkFreshAnchor".into(),
+            emitted_at: stored.valid_from.clone(),
+            signature: stored.signature.clone(),
+        };
+        gossip_binding(&ctx, &revived);
+        let mut conn = pool.get().unwrap();
+        crate::test_util::confirm_on_dht(&mut conn, &peer, "uhCkkFreshAnchor");
+        drop(conn);
+        assert!(binding_row(&pool, &peer, "uhCkkFreshAnchor")
+            .unwrap()
+            .is_cross_signed());
+        assert_eq!(
+            authority(&pool, &peer),
+            None,
+            "the superseded core stays superseded"
+        );
+    }
+
+    /// A binding (or link) recorded for one author replays only that author's held
+    /// claims, even if another held author has meanwhile become resolvable.
+    #[test]
+    fn replay_is_scoped_to_the_newly_bound_author() {
+        use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let claim_by = |secret: [u8; 32], name: &str, text: &[u8]| {
+            let (key, peer) = custody_signer(secret);
+            let shard = elohim_epr::address::compute_bytes_cid(text);
+            let signed =
+                SignedCustodyAnnouncement::sign(&key, &peer, custody_claim(shard, &agent(name)));
+            handle_gossip(
+                &ctx,
+                CUSTODY_ANNOUNCE_TOPIC,
+                &signed.to_bytes().unwrap(),
+                &iroh_from("n"),
+            );
+            (peer, shard)
+        };
+        let (peer_a, shard_a) = claim_by([95u8; 32], "uhCAkAuthorA", b"held for A");
+        let (peer_b, shard_b) = claim_by([96u8; 32], "uhCAkAuthorB", b"held for B");
+        assert_eq!(held_count(&pool), 2);
+        // Both become resolvable, but only B's binding is the one "just recorded".
+        bind_agent(&pool, "uhCAkAuthorA", [95u8; 32]);
+        bind_agent(&pool, "uhCAkAuthorB", [96u8; 32]);
+        schedule_replay(&pool, authors_bound_by_peer(&pool, &peer_b));
+        assert_eq!(custody_rows(&pool, &shard_b).len(), 1, "B replayed");
+        assert!(custody_rows(&pool, &shard_a).is_empty(), "A untouched");
+        assert_eq!(held_count(&pool), 1);
+        schedule_replay(&pool, vec![peer_a]);
+        assert_eq!(custody_rows(&pool, &shard_a).len(), 1);
+        assert_eq!(held_count(&pool), 0);
+    }
+
+    /// The same signed core re-gossiped — under any anchor — is judged once.
+    #[test]
+    fn binding_gossip_dedups_on_the_signed_core() {
+        let pool = crate::test_util::test_pool();
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = custody_ctx(&pool, &dedup);
+        let first = crate::test_util::cross_signed_gossip("uhCAkDedup", [97u8; 32], "uhCkkFirst");
+        gossip_binding(&ctx, &first);
+        let mut again = first.clone();
+        again.binding_action_hash = "uhCkkSecond".into();
+        gossip_binding(&ctx, &again);
+        assert!(binding_row(&pool, &first.peer_id, "uhCkkFirst").is_some());
+        assert!(
+            binding_row(&pool, &first.peer_id, "uhCkkSecond").is_none(),
+            "the same signed core under another anchor is a duplicate"
+        );
+    }
+
+    /// The held-claim worker's queue is bounded; when full, Hold jobs give way and a
+    /// Replay is always queued (or merged), never dropped.
+    #[test]
+    fn held_queue_is_bounded_and_replay_is_never_starved() {
+        let hold = |i: usize| {
+            HeldJob::Hold(crate::db::held_unbound::HeldClaim {
+                topic: "t".into(),
+                author_peer: format!("a{i}"),
+                plane: crate::db::held_unbound::HeldPlane::Iroh,
+                gossipsub_source: None,
+                bytes: i.to_be_bytes().to_vec(),
+            })
+        };
+        let mut queue: HeldQueue<()> = HeldQueue {
+            running: false,
+            jobs: std::collections::VecDeque::new(),
+        };
+        for i in 0..HELD_QUEUE_CAP {
+            assert_eq!(queue.push((), hold(i)), Pushed::Queued);
+        }
+        assert_eq!(queue.push((), hold(HELD_QUEUE_CAP)), Pushed::DroppedHold);
+        assert_eq!(queue.jobs.len(), HELD_QUEUE_CAP);
+        // A Replay into a full queue evicts the oldest Hold, every time there is one.
+        for i in 0..HELD_QUEUE_CAP {
+            assert_eq!(
+                queue.push((), HeldJob::Replay(vec![format!("p{i}")])),
+                Pushed::EvictedHold
+            );
+        }
+        assert!(queue
+            .jobs
+            .iter()
+            .all(|(_, j)| matches!(j, HeldJob::Replay(_))));
+        // Full of Replays: the next one is merged, never lost.
+        assert_eq!(
+            queue.push((), HeldJob::Replay(vec!["late".into()])),
+            Pushed::Coalesced
+        );
+        assert_eq!(queue.jobs.len(), HELD_QUEUE_CAP);
+        assert!(matches!(
+            queue.jobs.back(),
+            Some((_, HeldJob::Replay(authors))) if authors.contains(&"late".to_string())
+        ));
+    }
+
     #[test]
     fn custody_announce_projects_a_peer_announced_row_and_dedups_replay() {
         use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
@@ -1176,12 +2547,12 @@ mod tests {
         let dedup = crate::p2p::dedup::DedupLru::new();
         let ctx = custody_ctx(&pool, &dedup);
         let (keypair, peer) = custody_signer([21u8; 32]);
-        bind_agent(&pool, "uhCAkRemoteHolder", &peer);
+        bind_agent(&pool, "uhCAkRemoteHolder", [21u8; 32]);
         let shard = elohim_epr::address::compute_bytes_cid(b"shard xyz");
         let bytes = SignedCustodyAnnouncement::sign(
             &keypair,
             &peer,
-            custody_claim(shard, "uhCAkRemoteHolder"),
+            custody_claim(shard, &agent("uhCAkRemoteHolder")),
         )
         .to_bytes()
         .expect("encode");
@@ -1195,7 +2566,7 @@ mod tests {
         );
         let rows = custody_rows(&pool, &shard);
         assert_eq!(rows.len(), 1, "one peer-announced row projected");
-        assert_eq!(rows[0].peer_id, "uhCAkRemoteHolder");
+        assert_eq!(rows[0].peer_id, agent("uhCAkRemoteHolder"));
         assert_eq!(
             rows[0].status,
             crate::db::shard_locations::PEER_ANNOUNCED_STATUS
@@ -1225,12 +2596,12 @@ mod tests {
         // binds only that NodeId (no libp2p PeerId), as in the household.
         let keypair = elohim_epr::AgentKeypair::from_secret(&[22u8; 32]).unwrap();
         let node = hex::encode(keypair.public_key_bytes());
-        bind_iroh_agent(&pool, "uhCAkIrohHolder", &node);
+        bind_iroh_agent(&pool, "uhCAkIrohHolder", [22u8; 32]);
         let shard = elohim_epr::address::compute_bytes_cid(b"iroh shard");
         let bytes = SignedCustodyAnnouncement::sign(
             &keypair,
             &node,
-            custody_claim(shard, "uhCAkIrohHolder"),
+            custody_claim(shard, &agent("uhCAkIrohHolder")),
         )
         .to_bytes()
         .unwrap();
@@ -1243,7 +2614,7 @@ mod tests {
         );
         let rows = custody_rows(&pool, &shard);
         assert_eq!(rows.len(), 1, "the iroh-delivered signed claim projects");
-        assert_eq!(rows[0].peer_id, "uhCAkIrohHolder");
+        assert_eq!(rows[0].peer_id, agent("uhCAkIrohHolder"));
     }
 
     /// No C1 regression: an unsigned claim — the pre-envelope v2 wire — projects
@@ -1255,9 +2626,9 @@ mod tests {
         let dedup = crate::p2p::dedup::DedupLru::new();
         let ctx = custody_ctx(&pool, &dedup);
         let (_, peer) = custody_signer([23u8; 32]);
-        bind_agent(&pool, "uhCAkUnsignedHolder", &peer);
+        bind_agent(&pool, "uhCAkUnsignedHolder", [23u8; 32]);
         let shard = elohim_epr::address::compute_bytes_cid(b"unsigned shard");
-        let bytes = custody_claim(shard, "uhCAkUnsignedHolder")
+        let bytes = custody_claim(shard, &agent("uhCAkUnsignedHolder"))
             .to_bytes()
             .unwrap();
 
@@ -1290,13 +2661,13 @@ mod tests {
         let ctx = custody_ctx(&pool, &dedup);
         let (keypair, peer) = custody_signer([24u8; 32]);
         let (_, stranger) = custody_signer([25u8; 32]);
-        bind_agent(&pool, "uhCAkMismatchHolder", &peer);
-        bind_agent(&pool, "uhCAkStranger", &stranger);
+        bind_agent(&pool, "uhCAkMismatchHolder", [24u8; 32]);
+        bind_agent(&pool, "uhCAkStranger", [25u8; 32]);
         let shard = elohim_epr::address::compute_bytes_cid(b"mismatch shard");
         let bytes = SignedCustodyAnnouncement::sign(
             &keypair,
             &peer,
-            custody_claim(shard, "uhCAkMismatchHolder"),
+            custody_claim(shard, &agent("uhCAkMismatchHolder")),
         )
         .to_bytes()
         .unwrap();
@@ -1326,10 +2697,10 @@ mod tests {
     }
 
     /// The household shape (2026-11-06, matthew/jessica refusing james): a claim
-    /// signed with james's iroh key, the manifest binding only his NodeId, arriving
-    /// over gossipsub under his libp2p PeerId that no binding names. The relay source
-    /// does not contradict the claim, so it projects; a source an identity binding
-    /// attributes to another agent refuses.
+    /// signed with james's iroh key (bound through his transport link to his
+    /// cross-signed PeerId), arriving over gossipsub under a libp2p PeerId that no
+    /// binding names. The relay source does not contradict the claim, so it projects;
+    /// a source cross-signed to another agent refuses.
     #[test]
     fn an_iroh_signed_claim_relayed_over_gossipsub_projects_unless_the_relay_is_another_agent() {
         use crate::p2p::custody_announce::{SignedCustodyAnnouncement, CUSTODY_ANNOUNCE_TOPIC};
@@ -1338,33 +2709,15 @@ mod tests {
         let ctx = custody_ctx(&pool, &dedup);
         let keypair = elohim_epr::AgentKeypair::from_secret(&[27u8; 32]).unwrap();
         let node = hex::encode(keypair.public_key_bytes());
-        bind_iroh_agent(&pool, "uhCAkJames", &node);
-        {
-            let mut conn = pool.get().unwrap();
-            crate::db::peer_identity_bindings::upsert(
-                &mut conn,
-                &crate::db::models::NewPeerIdentityBindingRow {
-                    peer_id: "12D3KooWMallory".into(),
-                    agent_cid: "uhCAkMallory".into(),
-                    dht_anchor_hash: "binding-anchor".into(),
-                    valid_from: "2026-01-01T00:00:00Z".into(),
-                    valid_until: None,
-                    observed_at: "2026-01-01T00:00:00Z".into(),
-                    source: "dht".into(),
-                    device_archetype: "node".into(),
-                    superseded_by: None,
-                    signature: String::new(),
-                    proof_status: crate::p2p::binding_proof_wire::BindingProofStatus::unverified(),
-                },
-            )
-            .unwrap();
-        }
+        bind_iroh_agent(&pool, "uhCAkJames", [27u8; 32]);
+        // Mallory's PeerId is cross-signed to another agent.
+        let mallory = bind_agent(&pool, "uhCAkMallory", [28u8; 32]);
         let claim = |text: &[u8]| {
             let shard = elohim_epr::address::compute_bytes_cid(text);
             let bytes = SignedCustodyAnnouncement::sign(
                 &keypair,
                 &node,
-                custody_claim(shard, "uhCAkJames"),
+                custody_claim(shard, &agent("uhCAkJames")),
             )
             .to_bytes()
             .unwrap();
@@ -1380,14 +2733,14 @@ mod tests {
         );
         let rows = custody_rows(&pool, &shard);
         assert_eq!(rows.len(), 1, "an unbound relay source does not refuse");
-        assert_eq!(rows[0].peer_id, "uhCAkJames");
+        assert_eq!(rows[0].peer_id, agent("uhCAkJames"));
 
         let (shard, bytes) = claim(b"relayed by another agent's peer");
         handle_gossip(
             &ctx,
             CUSTODY_ANNOUNCE_TOPIC,
             &bytes,
-            &libp2p_from(Some("12D3KooWMallory")),
+            &libp2p_from(Some(&mallory)),
         );
         assert!(
             custody_rows(&pool, &shard).is_empty(),
@@ -1474,7 +2827,7 @@ mod tests {
                 &mut conn,
                 &Pantry,
                 &cid,
-                "uhCAkPushHolder",
+                &agent("uhCAkPushHolder"),
                 &scope,
                 1_700_000_000_000,
             )
@@ -1499,7 +2852,7 @@ mod tests {
 
         // The distributor (or any peer) projects the holder from the signed claim.
         let peer_pool = crate::test_util::test_pool();
-        bind_agent(&peer_pool, "uhCAkPushHolder", &holder_peer);
+        bind_agent(&peer_pool, "uhCAkPushHolder", [26u8; 32]);
         let dedup = crate::p2p::dedup::DedupLru::new();
         let ctx = custody_ctx(&peer_pool, &dedup);
         handle_gossip(&ctx, &topic, &bytes, &iroh_from("neighbour"));
@@ -1509,7 +2862,7 @@ mod tests {
             1,
             "the holder's claim projects at the distributor"
         );
-        assert_eq!(rows[0].peer_id, "uhCAkPushHolder");
+        assert_eq!(rows[0].peer_id, agent("uhCAkPushHolder"));
         assert_eq!(rows[0].h_app_id, "lamad");
     }
 
@@ -1528,7 +2881,7 @@ mod tests {
     }
 
     /// End to end on libp2p: a delta signed by the key the author's PeerId embeds,
-    /// from an author the transport manifest binds, projects into
+    /// from an author a cross-signed binding binds, projects into
     /// `peer_blob_inventory`; the same bytes claimed by another author project
     /// nothing.
     #[test]
@@ -1536,7 +2889,6 @@ mod tests {
         use crate::p2p::inventory_gossip::{
             BlobAddress, InventoryDelta, InventoryEnvelope, InventoryLevel, INVENTORY_TOPIC,
         };
-        use diesel::prelude::*;
         let secret = [7u8; 32];
         let peer = libp2p::identity::Keypair::ed25519_from_bytes(secret)
             .unwrap()
@@ -1544,20 +2896,7 @@ mod tests {
             .to_peer_id()
             .to_string();
         let pool = crate::test_util::test_pool();
-        {
-            use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
-            let mut conn = pool.get().unwrap();
-            diesel::insert_into(t::peer_transport_manifest)
-                .values((
-                    t::agent_cid.eq("uhCAkInventoryHolder"),
-                    t::libp2p_peer_id.eq(peer.as_str()),
-                    t::discovery_methods_json.eq("[]"),
-                    t::capability_level.eq(1),
-                    t::last_observed.eq(1_i64),
-                ))
-                .execute(&mut conn)
-                .unwrap();
-        }
+        assert_eq!(bind_agent(&pool, "uhCAkInventoryHolder", secret), peer);
         let dedup = crate::p2p::dedup::DedupLru::new();
         let ctx = GossipDispatchCtx {
             db_pool: Some(&pool),

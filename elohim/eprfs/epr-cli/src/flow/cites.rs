@@ -735,6 +735,212 @@ fn looks_like_repo_path(reference: &str) -> bool {
     p.extension().is_some() && !p.is_absolute()
 }
 
+// ---------------------------------------------------------------------------
+// Cites into a git submodule: judged at the superproject's pin
+// ---------------------------------------------------------------------------
+
+/// One `[submodule "<name>"]` section of the superproject's `.gitmodules`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Submodule {
+    name: String,
+    path: String,
+}
+
+/// The `path =` declarations of a `.gitmodules` text, longest path first so the most specific
+/// declaration wins. A section with no `path` declares nothing.
+fn parse_gitmodules(text: &str) -> Vec<Submodule> {
+    let mut out = Vec::new();
+    let mut name: Option<String> = None;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if let Some(section) = line.strip_prefix('[') {
+            name = section
+                .strip_suffix(']')
+                .and_then(|s| s.trim().strip_prefix("submodule"))
+                .map(|s| s.trim().trim_matches('"').to_owned())
+                .filter(|s| !s.is_empty());
+            continue;
+        }
+        let (Some(name), Some((key, value))) = (&name, line.split_once('=')) else {
+            continue;
+        };
+        if key.trim() != "path" {
+            continue;
+        }
+        let path = value.trim().trim_matches('"').trim_end_matches('/');
+        if !path.is_empty() {
+            out.push(Submodule {
+                name: name.clone(),
+                path: path.to_owned(),
+            });
+        }
+    }
+    out.sort_by(|a, b| b.path.len().cmp(&a.path.len()).then(a.path.cmp(&b.path)));
+    out
+}
+
+/// The submodules the superproject's own `.gitmodules` declares; none when it has no such file.
+fn declared_submodules(root: &Path) -> Vec<Submodule> {
+    std::fs::read_to_string(root.join(".gitmodules"))
+        .map(|text| parse_gitmodules(&text))
+        .unwrap_or_default()
+}
+
+/// The declared submodule a repo-relative reference lies inside, with the path beneath it.
+fn under_submodule<'a>(subs: &'a [Submodule], reference: &str) -> Option<(&'a Submodule, String)> {
+    let reference = reference.strip_prefix("./").unwrap_or(reference);
+    subs.iter().find_map(|sub| {
+        reference
+            .strip_prefix(sub.path.as_str())
+            .and_then(|rest| rest.strip_prefix('/'))
+            .filter(|rest| !rest.is_empty())
+            .map(|rest| (sub, rest.to_owned()))
+    })
+}
+
+/// How a cite target inside a submodule reads at the commit the superproject pins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PinnedTarget {
+    /// `.gitmodules` names the path but the index holds no gitlink there: an ordinary path.
+    NotPinned,
+    /// The pinned commit's tree holds the path.
+    Present,
+    /// The pinned commit is in the submodule's object store and its tree lacks the path.
+    Absent { pin: String },
+    /// This checkout cannot answer: the submodule's objects, or the pin itself, are not here.
+    Unverifiable {
+        pin: Option<String>,
+        why: &'static str,
+    },
+}
+
+/// The gitlink the superproject index records at `path`: `Ok(None)` when there is none,
+/// `Err(())` when the index cannot be read.
+fn gitlink_pin(root: &Path, path: &str) -> Result<Option<String>, ()> {
+    let output =
+        crate::process::build_command("git", &["ls-files", "--stage", "-z", "--", path], root, &[])
+            .output()
+            .map_err(|_| ())?;
+    if !output.status.success() {
+        return Err(());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.split('\0').find_map(|record| {
+        let (meta, entry) = record.split_once('\t')?;
+        let mut fields = meta.split_whitespace();
+        let mode = fields.next()?;
+        let object = fields.next()?;
+        (mode == "160000" && entry == path).then(|| object.to_owned())
+    }))
+}
+
+/// Where a submodule's objects can be read on this checkout, if anywhere.
+enum SubmoduleStore {
+    /// A checked-out working tree (its `.git` names the object store).
+    WorkTree(PathBuf),
+    /// The superproject's `modules/<name>` git directory, without a working tree.
+    GitDir(PathBuf),
+}
+
+impl SubmoduleStore {
+    fn locate(root: &Path, sub: &Submodule) -> Option<Self> {
+        let tree = root.join(&sub.path);
+        if tree.join(".git").exists() {
+            return Some(SubmoduleStore::WorkTree(tree));
+        }
+        let modules = format!("modules/{}", sub.name);
+        let output =
+            crate::process::build_command("git", &["rev-parse", "--git-path", &modules], root, &[])
+                .output()
+                .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let printed = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        let dir = if Path::new(&printed).is_absolute() {
+            PathBuf::from(printed)
+        } else {
+            root.join(printed)
+        };
+        dir.join("objects")
+            .is_dir()
+            .then_some(SubmoduleStore::GitDir(dir))
+    }
+
+    /// Run one read-only git query against the store; `None` when git itself fails.
+    fn query(&self, root: &Path, args: &[&str]) -> Option<String> {
+        let mut command = match self {
+            SubmoduleStore::WorkTree(tree) => crate::process::build_command("git", args, tree, &[]),
+            SubmoduleStore::GitDir(dir) => {
+                let git_dir = dir.to_string_lossy().into_owned();
+                let mut full = vec!["--git-dir", git_dir.as_str()];
+                full.extend_from_slice(args);
+                crate::process::build_command("git", &full, root, &[])
+            }
+        };
+        let output = command.output().ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+}
+
+/// Judge `<pin>:<rest>` for a cite into `sub`. Only a pin whose commit this checkout HOLDS can make
+/// a target absent; every failure to read is unverifiable, never dead.
+fn judge_pinned(root: &Path, sub: &Submodule, rest: &str) -> PinnedTarget {
+    let pin = match gitlink_pin(root, &sub.path) {
+        Ok(Some(pin)) => pin,
+        Ok(None) => return PinnedTarget::NotPinned,
+        Err(()) => {
+            return PinnedTarget::Unverifiable {
+                pin: None,
+                why: "the superproject index could not be read",
+            }
+        }
+    };
+    let unverifiable = |why| PinnedTarget::Unverifiable {
+        pin: Some(pin.clone()),
+        why,
+    };
+    let Some(store) = SubmoduleStore::locate(root, sub) else {
+        return unverifiable("the submodule is not initialised on this checkout");
+    };
+    let commit = format!("{pin}^{{commit}}");
+    if store.query(root, &["cat-file", "-e", &commit]).is_none() {
+        return unverifiable("the pinned commit is not in the submodule's object store");
+    }
+    let Some(listing) = store.query(root, &["ls-tree", "--full-tree", "-z", &pin, "--", rest])
+    else {
+        return unverifiable("the pinned tree could not be read");
+    };
+    let present = listing.split('\0').any(|record| {
+        record
+            .split_once('\t')
+            .is_some_and(|(_, entry)| entry == rest)
+    });
+    if present {
+        return PinnedTarget::Present;
+    }
+    // A path beneath a submodule OF the submodule is not in this tree at all; that is a further
+    // pin this verifier does not follow, so it cannot call the target absent.
+    let nested = store
+        .query(root, &["cat-file", "blob", &format!("{pin}:.gitmodules")])
+        .is_some_and(|text| under_submodule(&parse_gitmodules(&text), rest).is_some());
+    if nested {
+        return unverifiable("the target lies inside a nested submodule");
+    }
+    PinnedTarget::Absent { pin }
+}
+
+/// The short form a verdict names a pin by.
+fn short_pin(pin: &str) -> &str {
+    pin.get(..12).unwrap_or(pin)
+}
+
 /// Doc-root membership: under `genesis/docs` / `.claude/memory`, or a gospel `CLAUDE.md`.
 fn is_doc_root(root: &Path, path: &Path) -> bool {
     let s = path.to_string_lossy().to_string();
@@ -992,41 +1198,97 @@ fn rewrite_into(root: &Path, doc: &Path) -> FlowResult<(usize, usize, usize)> {
     Ok((converted, left, stamped))
 }
 
+/// What the dissolution gate found in one document.
+#[derive(Debug, Default)]
+struct VerifyReport {
+    /// Failures: legacy-migratable doc cites, dead targets, unresolvable slugs.
+    problems: Vec<String>,
+    /// Cites into a git submodule this checkout cannot judge (its objects, or its pin, are not
+    /// here). Reported, never failed: the pin, not this checkout's working tree, decides them.
+    unverifiable: Vec<String>,
+}
+
 /// The dissolution gate: legacy cites that should be envelopes, dead targets, unresolvable slugs.
 fn verify_doc(root: &Path, doc: &Path) -> FlowResult<Vec<String>> {
+    verify_report(root, doc).map(|report| report.problems)
+}
+
+/// [`verify_doc`] with its unverifiable cites kept.
+///
+/// A repo-path cite beneath a submodule `.gitmodules` declares (and the index pins with a gitlink)
+/// is judged at `<pin>:<subpath>`, never against the working tree: present at the pin resolves,
+/// absent from a pinned commit this checkout holds is DEAD (naming the pin), and anything this
+/// checkout cannot read is UNVERIFIABLE. Every other cite is judged exactly as before.
+fn verify_report(root: &Path, doc: &Path) -> FlowResult<VerifyReport> {
     let text = read_text(doc)?;
     let Some((fm_lines, _)) = split_frontmatter(&text) else {
-        return Ok(Vec::new());
+        return Ok(VerifyReport::default());
     };
     let index = slug_index(root);
-    let mut problems = Vec::new();
+    let submodules = declared_submodules(root);
+    let mut report = VerifyReport::default();
     for item in read_cite_items(&fm_lines) {
         let cite = parse_cite(&item);
         if cite.legacy_path {
-            match resolve_doc(root, &cite.reference, &index) {
+            let resolved = resolve_doc(root, &cite.reference, &index);
+            let pinned = (resolved.is_some() || looks_like_repo_path(&cite.reference))
+                .then(|| under_submodule(&submodules, &cite.reference))
+                .flatten()
+                .map(|(sub, rest)| (sub, judge_pinned(root, sub, &rest)));
+            match &pinned {
+                Some((sub, PinnedTarget::Absent { pin })) => {
+                    report.problems.push(format!(
+                        "DEAD-CITE (target missing at pin {}@{}): {}",
+                        sub.path,
+                        short_pin(pin),
+                        cite.reference
+                    ));
+                    continue;
+                }
+                Some((sub, PinnedTarget::Unverifiable { pin, why })) => {
+                    let pinned_at = pin
+                        .as_deref()
+                        .map(|p| format!("pinned at {}", short_pin(p)))
+                        .unwrap_or_else(|| "pin unread".to_owned());
+                    report.unverifiable.push(format!(
+                        "UNVERIFIABLE-CITE (submodule {} {pinned_at}; {why}): {}",
+                        sub.path, cite.reference
+                    ));
+                    continue;
+                }
+                _ => {}
+            }
+            let present_at_pin = matches!(pinned, Some((_, PinnedTarget::Present)));
+            match resolved {
                 Some(target) => {
                     let has_id = read_lossy(&target)
                         .map(|t| !doc_id(&target, &t).is_empty())
                         .unwrap_or(false);
                     if is_doc_root(root, &target) && has_id {
-                        problems.push(format!(
+                        report.problems.push(format!(
                             "legacy doc cite (migrate to envelope): {}",
                             cite.reference
                         ));
                     }
                 }
                 None => {
-                    if looks_like_repo_path(&cite.reference) && !root.join(&cite.reference).exists()
+                    if !present_at_pin
+                        && looks_like_repo_path(&cite.reference)
+                        && !root.join(&cite.reference).exists()
                     {
-                        problems.push(format!("DEAD-CITE (target missing): {}", cite.reference));
+                        report
+                            .problems
+                            .push(format!("DEAD-CITE (target missing): {}", cite.reference));
                     }
                 }
             }
         } else if !index.contains_key(&cite.reference) {
-            problems.push(format!("unresolvable slug: {}", cite.reference));
+            report
+                .problems
+                .push(format!("unresolvable slug: {}", cite.reference));
         }
     }
-    Ok(problems)
+    Ok(report)
 }
 
 /// Envelope cites still carrying the title-default description — the progressive-discovery debt a
@@ -1626,7 +1888,8 @@ pub fn usage() -> &'static str {
      describe <doc> --slug <s> --desc <text> [--slug … --desc …]\n  \
      describe <doc> '<json {ref: desc}>'\n  \
      verify <doc>          the dissolution gate alone; exit 1 if any cite is legacy-migratable, \
-     dead or unresolvable\n  \
+     dead or unresolvable (a cite into a submodule is judged at its pinned commit; one this \
+     checkout cannot read is UNVERIFIABLE, not dead)\n  \
      refresh <doc> [<slug>…]  DELIBERATE stale-dequeue after re-verifying the claim\n  \
      stamp [<doc>…|--all] [--write]   fan each target's verdict onto every citing edge as inline \
      status:/path:; dry run unless --write\n  \
@@ -1755,15 +2018,28 @@ pub fn run(root: &Path, json: bool, rest: &[String]) -> FlowResult<ExitCode> {
                 .first()
                 .ok_or_else(|| FlowError::InvalidArguments("verify needs a <doc>".into()))?;
             let doc = resolve_doc_arg(root, target)?;
-            let problems = verify_doc(root, &doc)?;
+            let VerifyReport {
+                problems,
+                unverifiable,
+            } = verify_report(root, &doc)?;
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({ "doc": rel_locator(root, &doc), "problems": problems })
+                    serde_json::json!({
+                        "doc": rel_locator(root, &doc),
+                        "problems": problems,
+                        "unverifiable": unverifiable,
+                    })
+                );
+            } else if problems.is_empty() && unverifiable.is_empty() {
+                println!(
+                    "epr flow cites verify {target}: ✅ all cites content-addressed + resolvable"
                 );
             } else if problems.is_empty() {
                 println!(
-                    "epr flow cites verify {target}: ✅ all cites content-addressed + resolvable"
+                    "epr flow cites verify {target}: ✅ no dead or unresolved cite; {} submodule \
+                     cite(s) unverifiable on this checkout:",
+                    unverifiable.len()
                 );
             } else {
                 println!(
@@ -1772,6 +2048,12 @@ pub fn run(root: &Path, json: bool, rest: &[String]) -> FlowResult<ExitCode> {
                 );
                 for p in &problems {
                     println!("   - {p}");
+                }
+            }
+            if !json {
+                // `~`, not `-`: a problem line is `   - `, and unverifiable is not a problem.
+                for u in &unverifiable {
+                    println!("   ~ {u}");
                 }
             }
             Ok(if problems.is_empty() {
@@ -1906,6 +2188,34 @@ fn parse_describe_args(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gitmodules_declarations_are_read_longest_path_first() {
+        let subs = parse_gitmodules(
+            "[submodule \"sophia\"]\n\tpath = sophia\n\turl = x\n\
+             # a comment\n\
+             [submodule \"elohim/brit\"]\n\tpath = elohim/brit/\n\
+             [submodule \"nested\"]\n\tpath = elohim/brit/vendor/git\n\
+             [core]\n\tpath = not-a-submodule\n",
+        );
+        let paths: Vec<&str> = subs.iter().map(|s| s.path.as_str()).collect();
+        assert_eq!(paths, ["elohim/brit/vendor/git", "elohim/brit", "sophia"]);
+        assert_eq!(subs[1].name, "elohim/brit");
+    }
+
+    #[test]
+    fn a_reference_is_under_a_submodule_only_beneath_its_directory() {
+        let subs = parse_gitmodules("[submodule \"b\"]\n\tpath = elohim/brit\n");
+        let (sub, rest) = under_submodule(&subs, "elohim/brit/docs/x.md").expect("under");
+        assert_eq!(
+            (sub.path.as_str(), rest.as_str()),
+            ("elohim/brit", "docs/x.md")
+        );
+        assert!(under_submodule(&subs, "./elohim/brit/docs/x.md").is_some());
+        assert!(under_submodule(&subs, "elohim/britney/x.md").is_none());
+        assert!(under_submodule(&subs, "elohim/brit").is_none());
+        assert!(under_submodule(&subs, "genesis/docs/x.md").is_none());
+    }
 
     #[test]
     fn a_native_memory_entry_is_identified_by_its_name() {

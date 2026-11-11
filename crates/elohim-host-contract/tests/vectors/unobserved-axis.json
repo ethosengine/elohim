@@ -1,0 +1,27 @@
+{
+  "requires": [
+    {
+      "axis": "future.axis",
+      "predicate": {
+        "kind": "equal",
+        "value": "ready"
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {},
+    "unobserved": [
+      "future.axis"
+    ]
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unobserved",
+      "axis": "future.axis"
+    }
+  ]
+}

@@ -198,8 +198,8 @@ impl CommitmentAuthor for SalvageCommitmentAuthor {
 /// set each candidate's `household_id` from the result. Failure domain comes from
 /// the notarized projection, never peer self-report (option A, rejected on trust
 /// grounds). A candidate with no matching human (or a human whose `household_id`
-/// is NULL) keeps `household_id: None` — and the diversity strategy treats `None`
-/// as the candidate's own domain, degrading to XOR for it.
+/// is NULL) is given the shared [`UNDECLARED_HOUSEHOLD`] domain — never its own — so
+/// undeclared keys cannot pose as independent failure domains.
 ///
 /// **Namespace note.** The match is sound only in that it never produces a
 /// *wrong* binding (a cid receives one of its OWN humans rows or nothing). It is
@@ -285,9 +285,22 @@ fn build_salvage_candidates(
         }
         // No matching human → leave None (already the default).
     }
+    // A candidate with no declared household is never its own failure domain: every
+    // such candidate shares ONE domain, so keys without a notarized household — free
+    // to mint by the hundred — cannot pass as that many independent places for a
+    // replica. (An all-undeclared pool still ranks exactly as XOR: one domain.)
+    for c in &mut candidates {
+        if c.household_id.is_none() {
+            c.household_id = Some(UNDECLARED_HOUSEHOLD.to_string());
+        }
+    }
 
     Ok(candidates)
 }
+
+/// The one failure domain every salvage candidate without a declared household shares.
+/// A NUL byte never occurs in a notarized household id.
+pub const UNDECLARED_HOUSEHOLD: &str = "\u{0}undeclared-household";
 
 /// P3-6/P3-8: Run one salvage pass against the local projection.
 ///
@@ -424,7 +437,7 @@ mod tests {
     //! `reconcile::placement`; here we cover (a) the join that gives salvage real
     //! household data and (b) that the knob routes to the right strategy.
 
-    use super::{build_salvage_candidates, select_placement_strategy};
+    use super::{build_salvage_candidates, select_placement_strategy, UNDECLARED_HOUSEHOLD};
     use crate::db::diesel_schema::humans;
     use crate::db::models::NewHuman;
     use crate::db::salvage_capacity::apply_capacity;
@@ -509,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn unmatched_and_null_household_and_dormant_stay_none() {
+    fn unmatched_and_null_household_share_the_undeclared_domain() {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         // cid-c has a salvage row but NO matching human → unmatched.
@@ -523,13 +536,15 @@ mod tests {
 
         let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
 
-        assert!(
-            hh_of(&cands, "uhCAk-c").is_none(),
-            "unmatched cid stays None"
+        assert_eq!(
+            hh_of(&cands, "uhCAk-c"),
+            Some(UNDECLARED_HOUSEHOLD),
+            "unmatched cid shares the undeclared domain"
         );
-        assert!(
-            hh_of(&cands, "uhCAk-d").is_none(),
-            "known human with NULL household stays None"
+        assert_eq!(
+            hh_of(&cands, "uhCAk-d"),
+            Some(UNDECLARED_HOUSEHOLD),
+            "known human with NULL household shares the undeclared domain"
         );
         assert!(
             cands
@@ -580,8 +595,9 @@ mod tests {
             "lamad",
         );
         let cands = build_salvage_candidates(&mut conn, "uhCAk-self", &fresh_cutoff()).unwrap();
-        assert!(
-            hh_of(&cands, "uhCAk-a").is_none(),
+        assert_eq!(
+            hh_of(&cands, "uhCAk-a"),
+            Some(UNDECLARED_HOUSEHOLD),
             "lamad-scoped human must not match the canonical imagodei join"
         );
 
@@ -699,8 +715,10 @@ mod tests {
         }
         let cands = build_salvage_candidates(&mut conn, "uhCAk-a", &fresh_cutoff()).unwrap();
         assert!(
-            cands.iter().all(|c| c.household_id.is_none()),
-            "no humans → no household enrichment"
+            cands
+                .iter()
+                .all(|c| c.household_id.as_deref() == Some(UNDECLARED_HOUSEHOLD)),
+            "no humans → every candidate shares the undeclared domain"
         );
 
         let expected = XorDistanceStrategy.rank("uhblob-Y", &cands, 3);
@@ -784,6 +802,7 @@ mod tests {
             &[],
             1,
             &when,
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
         )
         .unwrap();
     }

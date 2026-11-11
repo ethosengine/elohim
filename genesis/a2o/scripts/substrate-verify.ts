@@ -777,6 +777,37 @@ function buildProbeBlob(env: NodeJS.ProcessEnv, buildStartIso: string): Buffer {
   );
 }
 
+/**
+ * The upload leg's exports, declared ONCE. Key = the environment variable later legs (and the
+ * genesis Jenkinsfile) read; value = the state file this script writes. The Jenkinsfile spells no
+ * state-file name: it reads `exports.env`, written from this map, line by line. A rename here is a
+ * rename everywhere; a missing value refuses the upload leg instead of leaving a downstream stage to
+ * skip on an empty variable (the 2026-11 `content_blob_hash` → `content_blob_cid` drift skipped // address-lint: allow (history)
+ * custody seeding, propagation and delivery for two genesis builds).
+ */
+export const UPLOAD_EXPORTS = {
+  SUBSTRATE_BUILD_START_ISO: 'build_start_iso',
+  CONTENT_BLOB_HASH: 'content_blob_cid',
+  CONTENT_BLOB_SIZE_BYTES: 'content_blob_size',
+  PROBE_BLOB_HASH: 'probe_blob_cid',
+} as const;
+export type UploadExport = keyof typeof UPLOAD_EXPORTS;
+export const UPLOAD_EXPORTS_FILE = 'exports.env';
+
+/** Write `exports.env` (`KEY=value` per line) from the declared map; refuse on any empty value. */
+function writeUploadExports(run: Run): string[] {
+  const missing: string[] = [];
+  const lines: string[] = [];
+  for (const [key, file] of Object.entries(UPLOAD_EXPORTS)) {
+    const value = run.readState(file);
+    if (!value || /[\r\n=]/.test(value)) missing.push(`${key} (${file})`);
+    else lines.push(`${key}=${value}`);
+  }
+  if (missing.length === 0)
+    writeFileSync(join(run.stateDir, UPLOAD_EXPORTS_FILE), `${lines.join('\n')}\n`);
+  return missing;
+}
+
 async function cmdUpload(run: Run): Promise<RunResult> {
   const env = run.ctx.env;
   const contentPath = env['CONTENT_PATH'] || 'genesis/docs/content/elohim-protocol/manifesto.md';
@@ -793,7 +824,7 @@ async function cmdUpload(run: Run): Promise<RunResult> {
   // bash writes build_start_iso BEFORE the content-file check — a missing
   // content file still leaves a usable build-start timestamp behind.
   const buildStartIso = isoUtcSeconds();
-  run.writeState('build_start_iso', buildStartIso);
+  run.writeState(UPLOAD_EXPORTS.SUBSTRATE_BUILD_START_ISO, buildStartIso);
 
   const absContent = resolve(run.ctx.cwd, contentPath);
   if (!existsSync(absContent)) {
@@ -802,19 +833,24 @@ async function cmdUpload(run: Run): Promise<RunResult> {
   }
 
   const contentUp = await uploadOne(run, readFileSync(absContent), 'content');
-  run.writeState('content_blob_cid', contentUp.cid);
-  run.writeState('content_blob_size', String(contentUp.size));
+  run.writeState(UPLOAD_EXPORTS.CONTENT_BLOB_HASH, contentUp.cid);
+  run.writeState(UPLOAD_EXPORTS.CONTENT_BLOB_SIZE_BYTES, String(contentUp.size));
 
   const probeBytes = buildProbeBlob(env, buildStartIso);
   // bash keeps the probe on disk at $STATE_DIR/propagation-probe.txt.
   writeFileSync(join(run.stateDir, 'propagation-probe.txt'), probeBytes);
 
   const probeUp = await uploadOne(run, probeBytes, 'probe');
-  run.writeState('probe_blob_cid', probeUp.cid);
+  run.writeState(UPLOAD_EXPORTS.PROBE_BLOB_HASH, probeUp.cid);
   run.writeState('probe_blob_size', String(probeUp.size));
   run.note(
     'probe blob is build-unique — a fossil copy on the target is impossible by construction'
   );
+
+  const missingExports = writeUploadExports(run);
+  if (missingExports.length > 0) {
+    run.fail(A.uploadContent, `exports refused — empty: ${missingExports.join(', ')}`);
+  }
 
   return run.finish('upload', {
     contentBlobCid: contentUp.cid,
@@ -843,8 +879,8 @@ function propagationPreflight(
 ): PropagationTargets {
   const env = run.ctx.env;
   // Env override wins; the STATE_DIR file is the cross-stage fallback.
-  const contentHash = env['CONTENT_BLOB_HASH'] || run.readState('content_blob_cid');
-  const probeHash = env['PROBE_BLOB_HASH'] || run.readState('probe_blob_cid');
+  const contentHash = env['CONTENT_BLOB_HASH'] || run.readState(UPLOAD_EXPORTS.CONTENT_BLOB_HASH);
+  const probeHash = env['PROBE_BLOB_HASH'] || run.readState(UPLOAD_EXPORTS.PROBE_BLOB_HASH);
   const blocked = { ok: false, contentHash, probeHash };
 
   if (!contentHash) {
@@ -1168,7 +1204,8 @@ async function countServeBlobEvents(
 
 async function cmdDelivery(run: Run): Promise<RunResult> {
   const env = run.ctx.env;
-  const after = env['SUBSTRATE_BUILD_START_ISO'] || run.readState('build_start_iso');
+  const after =
+    env['SUBSTRATE_BUILD_START_ISO'] || run.readState(UPLOAD_EXPORTS.SUBSTRATE_BUILD_START_ISO);
   const minEvents = numEnv(env['DELIVERY_MIN_EVENTS'], 1);
 
   run.ctx.log(HR);

@@ -25,7 +25,7 @@
 //!    only the neighbour that relayed it.
 //! 4. The holder key is the one independently expected for `author_peer`
 //!    ([`HolderResolver`]: the key a libp2p PeerId or iroh NodeId embeds, admitted only
-//!    when `peer_transport_manifest` binds the peer), and the envelope's signing key
+//!    when the cross-signed chain (`p2p::transport_authority`) binds the peer), and the envelope's signing key
 //!    must be that key.
 //! 5. The signature verifies.
 //!
@@ -261,7 +261,7 @@ pub enum AuthorWitness<'a> {
 
 /// Resolves the holder key a receiver independently expects for a transport author.
 pub trait HolderResolver {
-    /// `Some(key)` when `author_peer` is bound in `peer_transport_manifest` and its key
+    /// `Some(key)` when `author_peer` is bound by the cross-signed chain (`p2p::transport_authority`) and its key
     /// can be derived from the peer id itself; `None` otherwise.
     fn expected_holder(&self, author_peer: &str) -> Option<Multikey>;
 }

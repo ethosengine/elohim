@@ -32,7 +32,7 @@
 //! curl http://localhost:8090/manifest/sha256-xyz789
 //! ```
 
-use crate::blob_store::{BlobStore, Exists};
+use crate::blob_store::BlobStore;
 use crate::db::content_diesel::ContentQuery;
 use crate::db::policy_cache::{
     ContentMetadata, PolicyDecision, PolicyEnforcement, PolicyEvent, PolicyEventType,
@@ -3954,14 +3954,13 @@ impl HttpServer {
             Err(refusal) => return Ok(refusal),
         };
         // The length read first: it separates absence (404) from a storage failure
-        // (an error), which the structural `exists` probe folds together.
+        // (an error), which the structural `present` probe folds together. A HEAD
+        // never hashes the payload; a GET verifies on read.
         match self.blob_store.size(&cid).await {
-            Ok(_) if self.blob_store.exists(&cid).await != Exists::Verified => {
-                Ok(Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(Full::new(Bytes::new()))
-                    .unwrap())
-            }
+            Ok(_) if !self.blob_store.present(&cid).await => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(Full::new(Bytes::new()))
+                .unwrap()),
             Ok(size) => Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/octet-stream")
@@ -4413,7 +4412,8 @@ impl HttpServer {
         let Ok(cid) = ByteCid::parse(address) else {
             return false;
         };
-        if self.blob_store.exists(&cid).await == Exists::Verified {
+        // Structural, as the doc says: no payload byte is hashed on this read path.
+        if self.blob_store.present(&cid).await {
             return true;
         }
         match self.resolve_manifest(address).await {
@@ -15890,7 +15890,9 @@ impl HttpServer {
         }
 
         let size = match ByteCid::parse(cid_str) {
-            Ok(byte_cid) if self.blob_store.exists(&byte_cid).await == Exists::Verified => {
+            // Structural probe: a remote HEAD never makes this node hash the payload;
+            // the GET that follows verifies.
+            Ok(byte_cid) if self.blob_store.present(&byte_cid).await => {
                 self.blob_store.size(&byte_cid).await.ok()
             }
             Ok(_) => None,
@@ -22406,6 +22408,7 @@ mod request_future_size_tests {
 #[cfg(test)]
 mod apps_resolver_heal_tests {
     use super::*;
+    use crate::blob_store::Exists;
     use http_body_util::BodyExt;
     use std::io::Write;
 
@@ -22811,6 +22814,32 @@ mod apps_resolver_heal_tests {
             resp.headers().get("X-Content-Slug").is_none(),
             "a content address is never a slug"
         );
+    }
+
+    #[tokio::test]
+    async fn remote_probes_never_hash_the_payload() {
+        use crate::blob_store::tests::{nothing_quarantined, spoil_inline_payload};
+        let server = test_server().await;
+        let stored = server
+            .blob_store
+            .store(b"a payload a peer probes")
+            .await
+            .unwrap();
+        spoil_inline_payload(&server.blob_store, &stored.cid);
+        let cid = stored.cid.to_string();
+        // `HEAD /ipfs/{cid}` and the candidate-head presence read answer structurally:
+        // they hash nothing and move nothing.
+        let head = server.handle_head_ipfs_block(&cid).await.unwrap();
+        assert_eq!(head.status(), StatusCode::OK);
+        assert!(server.blob_available_locally(&cid).await);
+        assert!(nothing_quarantined(&server.blob_store));
+        // The reading path is the one that verifies.
+        assert_eq!(
+            server.blob_store.exists(&stored.cid).await,
+            Exists::Quarantined
+        );
+        let head = server.handle_head_ipfs_block(&cid).await.unwrap();
+        assert_eq!(head.status(), StatusCode::NOT_FOUND);
     }
 }
 

@@ -6,6 +6,8 @@
 
 pub mod actor;
 pub mod approver;
+#[cfg(feature = "peer")]
+pub mod artifact;
 pub mod authority;
 pub mod canon_lift;
 pub mod check;
@@ -24,6 +26,8 @@ pub mod hint;
 pub mod integrate;
 #[cfg(feature = "lsp")]
 pub mod lsp;
+#[cfg(feature = "peer")]
+pub mod payload;
 #[cfg(feature = "peer")]
 pub mod peer;
 pub mod process;

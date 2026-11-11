@@ -42,6 +42,12 @@ pub struct AnnouncerInputs {
     /// seeded, and cannot seed its book without gossip — is discoverable at
     /// all. `None` leaves the announcer exactly as it was: gossip only.
     pub doorway_url: Option<String>,
+    /// This node's two-key transport link (its libp2p identity key and this iroh key
+    /// each signing the pair), when it is dual-stack. Rides every announcement so a
+    /// receiver can resolve an iroh-signed claim to the agent its libp2p PeerId's
+    /// cross-signed binding names (`p2p::transport_authority`). `None` on a pure-iroh
+    /// node: its iroh-signed claims then bind to no agent.
+    pub transport_link: Option<crate::p2p::transport_link::TransportLink>,
 }
 
 /// Cadence from env (`ELOHIM_TRANSPORT_MANIFEST_INTERVAL_SECS`) or default.
@@ -71,7 +77,7 @@ pub fn build_announcement(
     if direct.is_empty() && relay.is_none() {
         return None;
     }
-    Some(TransportManifestAnnouncement::sign_with_user_agent(
+    let mut ann = TransportManifestAnnouncement::sign_with_user_agent(
         &inputs.secret,
         direct,
         relay,
@@ -80,7 +86,10 @@ pub fn build_announcement(
         inputs.planes.clone(),
         Some(elohim_compute::BuildInfo::new("elohim-storage").user_agent()),
         now_ms,
-    ))
+    );
+    // Outside the v1 signing bytes, with its own two signatures.
+    ann.transport_link = inputs.transport_link.clone();
+    Some(ann)
 }
 
 /// Spawn the announcer: wait for the endpoint's first address, then publish
@@ -178,6 +187,7 @@ mod tests {
             planes: vec!["sync".into()],
             publisher: publisher.clone(),
             doorway_url: None,
+            transport_link: None,
         };
         let handle = spawn_transport_manifest_announcer(inputs, Duration::from_millis(200));
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);

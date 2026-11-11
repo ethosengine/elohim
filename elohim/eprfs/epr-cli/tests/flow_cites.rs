@@ -1031,6 +1031,8 @@ fn cite_fingerprint_stays_the_citation_profile_after_the_address_crossing() {
 #[test]
 fn research_corpus_has_no_dead_cite_after_the_address_crossing() {
     // gate-reads: genesis/research
+    // `verify` reads `.gitmodules` to judge a cite into a submodule at its pin.
+    // gate-reads: .gitmodules
     let root = repo_root();
     let research = root.join("genesis/research");
     if !research.is_dir() {
@@ -1052,6 +1054,260 @@ fn research_corpus_has_no_dead_cite_after_the_address_crossing() {
         assert!(
             !verified.contains("DEAD-CITE"),
             "{doc} carries a DEAD-CITE:\n{verified}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cites into a git submodule are judged at the superproject's pin
+// ---------------------------------------------------------------------------
+
+/// Run a fixture git command (location env cleared, fixed identity) and return its stdout.
+fn fixture_git(cwd: &Path, args: &[&str]) -> String {
+    let out = elohim_epr_cli::process::build_command("git", args, cwd, &[])
+        .env("GIT_AUTHOR_NAME", "Fixture Author")
+        .env("GIT_COMMITTER_NAME", "Fixture Author")
+        .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+        .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+        .output()
+        .expect("git runs");
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
+}
+
+/// Record a gitlink in a fixture superproject's index without fetching its objects.
+fn add_gitlink(superproject: &Path, path: &str, pin: &str) {
+    let cacheinfo = format!("160000,{pin},{path}");
+    fixture_git(
+        superproject,
+        &["update-index", "--add", "--cacheinfo", &cacheinfo],
+    );
+}
+
+/// A superproject whose `.gitmodules` declares `vendor/sub`, gitlinked at a real commit of a
+/// sibling repository holding `docs/pinned.md`. The submodule's working tree is never checked
+/// out — the CI shape. With `objects`, its object store is reachable as `.git/modules/sub`
+/// (an initialised-but-not-checked-out submodule); without, it is uninitialised.
+///
+/// Returns `(guard, superproject, pin)`.
+fn submodule_fixture(objects: bool) -> (tempfile::TempDir, PathBuf, String) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let source = dir.path().join("sub-src");
+    std::fs::create_dir_all(source.join("docs")).unwrap();
+    std::fs::write(source.join("docs/pinned.md"), "# Pinned\n").unwrap();
+    fixture_git(&source, &["init", "-q"]);
+    fixture_git(&source, &["add", "-A"]);
+    fixture_git(&source, &["commit", "-qm", "sub"]);
+    let pin = fixture_git(&source, &["rev-parse", "HEAD"]);
+
+    let root = dir.path().join("super");
+    std::fs::create_dir_all(root.join("genesis/docs")).unwrap();
+    std::fs::write(
+        root.join(".gitmodules"),
+        "[submodule \"sub\"]\n\tpath = vendor/sub\n\turl = ../sub-src\n",
+    )
+    .unwrap();
+    fixture_git(&root, &["init", "-q"]);
+    add_gitlink(&root, "vendor/sub", &pin);
+    if objects {
+        let modules = root.join(".git/modules/sub");
+        fixture_git(
+            &root,
+            &[
+                "clone",
+                "-q",
+                "--bare",
+                source.to_str().unwrap(),
+                modules.to_str().unwrap(),
+            ],
+        );
+    }
+    (dir, root, pin)
+}
+
+/// Write a citing document whose `cites:` are the given legacy path strings; returns its path.
+fn citer(root: &Path, cites: &[&str]) -> String {
+    let mut text = String::from("---\ntitle: Citer\nid: citer\ncites:\n");
+    for cite in cites {
+        text.push_str(&format!("  - {cite}\n"));
+    }
+    text.push_str("---\n\nBody.\n");
+    let path = root.join("genesis/docs/citer.md");
+    std::fs::write(&path, text).unwrap();
+    path.to_string_lossy().into_owned()
+}
+
+#[test]
+fn a_cite_present_at_the_pin_with_no_submodule_working_tree_is_not_dead() {
+    // Objects reachable: the pin answers, and the target resolves although nothing is on disk.
+    let (_guard, root, _) = submodule_fixture(true);
+    assert!(!root.join("vendor/sub/docs/pinned.md").exists());
+    let doc = citer(&root, &["vendor/sub/docs/pinned.md"]);
+    let (code, out) = run_cites(&root, &["verify", &doc]);
+    assert_eq!(code, 0, "{out}");
+    assert!(!out.contains("DEAD-CITE"), "{out}");
+    assert!(!out.contains("UNVERIFIABLE-CITE"), "{out}");
+    assert!(
+        out.contains("all cites content-addressed + resolvable"),
+        "{out}"
+    );
+
+    // Uninitialised (the eprfs CI pod): nothing here can judge the pin, so the cite is
+    // UNVERIFIABLE — reported, never failed, never DEAD.
+    let (_guard, root, pin) = submodule_fixture(false);
+    let doc = citer(&root, &["vendor/sub/docs/pinned.md"]);
+    let (code, out) = run_cites(&root, &["verify", &doc, "--json"]);
+    assert_eq!(code, 0, "{out}");
+    let report: serde_json::Value = serde_json::from_str(&out).expect("verify --json");
+    assert_eq!(report["problems"], serde_json::json!([]), "{out}");
+    let unverifiable = report["unverifiable"]
+        .as_array()
+        .expect("unverifiable list");
+    assert_eq!(unverifiable.len(), 1, "{out}");
+    let line = unverifiable[0].as_str().unwrap();
+    assert!(line.starts_with("UNVERIFIABLE-CITE"), "{line}");
+    assert!(line.contains(&pin[..12]), "names the pin: {line}");
+    assert!(line.ends_with("vendor/sub/docs/pinned.md"), "{line}");
+}
+
+#[test]
+fn a_cite_absent_at_the_pin_is_dead_and_names_the_pin() {
+    let (_guard, root, pin) = submodule_fixture(true);
+    // A file on disk that the pin does not hold is still dead: the pin, not the working tree,
+    // decides a submodule cite.
+    std::fs::create_dir_all(root.join("vendor/sub/docs")).unwrap();
+    std::fs::write(root.join("vendor/sub/docs/unpinned.md"), "# Not pinned\n").unwrap();
+    let doc = citer(
+        &root,
+        &["vendor/sub/docs/never.md", "vendor/sub/docs/unpinned.md"],
+    );
+    let (code, out) = run_cites(&root, &["verify", &doc]);
+    assert_eq!(code, 1, "{out}");
+    let want = format!(
+        "DEAD-CITE (target missing at pin vendor/sub@{})",
+        &pin[..12]
+    );
+    assert_eq!(out.matches(want.as_str()).count(), 2, "{out}");
+    assert!(out.contains("vendor/sub/docs/never.md"), "{out}");
+    assert!(out.contains("vendor/sub/docs/unpinned.md"), "{out}");
+    assert!(!out.contains("UNVERIFIABLE-CITE"), "{out}");
+}
+
+#[test]
+fn a_missing_path_outside_every_submodule_is_dead_exactly_as_before() {
+    // `vendor/subway` shares the submodule's prefix but not its directory.
+    let (_guard, root, _) = submodule_fixture(false);
+    let doc = citer(&root, &["genesis/docs/missing.md", "vendor/subway/x.rs"]);
+    let (code, out) = run_cites(&root, &["verify", &doc]);
+    assert_eq!(code, 1, "{out}");
+    assert_eq!(out.matches("   - ").count(), 2, "{out}");
+    assert!(
+        out.contains("   - DEAD-CITE (target missing): genesis/docs/missing.md\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("   - DEAD-CITE (target missing): vendor/subway/x.rs\n"),
+        "{out}"
+    );
+    assert!(!out.contains("UNVERIFIABLE-CITE"), "{out}");
+}
+
+#[test]
+fn research_corpus_has_no_dead_cite_with_no_submodule_checked_out() {
+    // The eprfs CI pod checks out the superproject but no submodule. Rebuild that shape from the
+    // live checkout without touching it: the real `.gitmodules`, the real gitlink pins, the
+    // research documents, and an empty placeholder at every non-submodule target that exists
+    // live (`verify` asks only whether such a target exists) — and no submodule at all.
+    // gate-reads: genesis/research
+    // gate-reads: .gitmodules
+    let live = repo_root();
+    let research = live.join("genesis/research");
+    let Ok(gitmodules) = std::fs::read_to_string(live.join(".gitmodules")) else {
+        return; // not a live checkout; the fixture legs carry the claim
+    };
+    if !research.is_dir() {
+        return;
+    }
+    let submodules: Vec<String> = gitmodules
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("path"))
+        .filter_map(|l| l.trim().strip_prefix('='))
+        .map(|p| p.trim().to_owned())
+        .collect();
+    let under_submodule = |reference: &str| {
+        submodules
+            .iter()
+            .any(|s| reference.starts_with(&format!("{s}/")))
+    };
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join("ci");
+    std::fs::create_dir_all(root.join("genesis/research")).unwrap();
+    std::fs::write(root.join(".gitmodules"), &gitmodules).unwrap();
+    fixture_git(&root, &["init", "-q"]);
+    for path in &submodules {
+        let staged = fixture_git(&live, &["ls-files", "--stage", "--", path]);
+        let Some(pin) = staged
+            .split_whitespace()
+            .nth(1)
+            .filter(|_| staged.starts_with("160000 "))
+        else {
+            continue;
+        };
+        add_gitlink(&root, path, pin);
+    }
+
+    let mut docs: Vec<PathBuf> = std::fs::read_dir(&research)
+        .expect("read genesis/research")
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "md"))
+        .collect();
+    docs.sort();
+    let mut submodule_citers = Vec::new();
+    for doc in &docs {
+        let text = std::fs::read_to_string(doc).expect("read research doc");
+        let name = doc.file_name().unwrap();
+        std::fs::write(root.join("genesis/research").join(name), &text).unwrap();
+        for item in verify_cite_items(&text) {
+            let cite = parse_cite(&item);
+            if !cite.legacy_path || !looks_like_repo_path(&cite.reference) {
+                continue;
+            }
+            if under_submodule(&cite.reference) {
+                submodule_citers.push(name.to_string_lossy().into_owned());
+            } else if live.join(&cite.reference).exists() {
+                let placeholder = root.join(&cite.reference);
+                std::fs::create_dir_all(placeholder.parent().unwrap()).unwrap();
+                if !placeholder.exists() {
+                    std::fs::write(&placeholder, "").unwrap();
+                }
+            }
+        }
+    }
+    for doc in &docs {
+        let rel = format!(
+            "genesis/research/{}",
+            doc.file_name().unwrap().to_string_lossy()
+        );
+        let (_, verified) = run_cites(&root, &["verify", &rel]);
+        assert!(
+            !verified.contains("DEAD-CITE"),
+            "{rel} carries a DEAD-CITE with no submodule checked out:\n{verified}"
+        );
+    }
+    // The shape is real only if a research cite does point into a submodule; each such
+    // document must say so rather than stay silent.
+    for name in submodule_citers {
+        let rel = format!("genesis/research/{name}");
+        let (_, verified) = run_cites(&root, &["verify", &rel]);
+        assert!(
+            verified.contains("UNVERIFIABLE-CITE"),
+            "{rel}: a submodule cite must read UNVERIFIABLE here:\n{verified}"
         );
     }
 }

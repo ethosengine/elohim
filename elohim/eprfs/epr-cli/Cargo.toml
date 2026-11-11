@@ -20,9 +20,17 @@ path = "src/main.rs"
 # `epr peer` and `epr flow fold` (the steward channel). On for the `epr` binary; the bridges that
 # reuse this crate's library take it without them, so they carry no iroh stack.
 default = ["peer", "lsp"]
-peer = ["dep:eprfs-peer", "dep:tokio"]
+# The payload opener (`src/payload.rs`) reads and claims the format marker through
+# elohim-blob-store's `marker` module, the one implementation of it, so `peer` links the crate
+# (its eprfs tier stays behind `blob-store`).
+peer = ["dep:eprfs-peer", "dep:tokio", "dep:elohim-blob-store"]
 # `epr lsp`: one shared, session-attributed language server per toolchain per checkout root.
 lsp = ["dep:elohim-epr-lsp", "dep:tokio"]
+# The `blob-store-v1` payload format (artifact-store E4): `src/payload.rs` creates new payload
+# directories in it and opens marked ones through elohim-blob-store's owner/shared store. Off by
+# default in this slice: without it, new directories are `directory-v1` and a `blob-store-v1`
+# marker is refused, never opened beside.
+blob-store = ["peer", "elohim-blob-store/tier"]
 
 [dependencies]
 # Declared-view wire types (`epr view`): TS derivations of the captured projection shapes.
@@ -40,6 +48,9 @@ elohim-epr-rea = { path = "../../epr-rea" }
 # `epr peer` and `epr flow fold`: this device on its person's steward channel. The crate holds the
 # iroh peer; this binary supplies the device key as a signer and verifier, never the key itself.
 eprfs-peer = { path = "../eprfs-peer", optional = true }
+# The payload store's format marker (`peer`) and, with `blob-store`, the store itself (one store
+# per device, shared with elohim-storage's tier).
+elohim-blob-store = { version = "0.1.0", path = "../../../crates/elohim-blob-store", optional = true }
 # The peer daemon's runtime (`epr peer serve`, `epr flow fold`).
 tokio = { workspace = true, features = ["rt-multi-thread", "signal", "time"], optional = true }
 # The canonical CID codec. `canon_lift` mints every atom through `elohim_epr::cid::compute_cid`
@@ -66,6 +77,10 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 chrono = "0.4"
 cid = "0.11"
 glob = "0.3"
+# ELF section bytes for the artifact's post-build linker check.
+object = { version = "0.37.3", default-features = false, features = ["read", "std"] }
+# Parse the Cargo configuration already included in artifact keys.
+toml = "0.8.23"
 # Advisory file locking for the recall executor's session continuation — a safe `flock`
 # wrapper, so the lock needs no `unsafe` block in this crate.
 rustix = { version = "1", features = ["fs"] }
@@ -87,6 +102,8 @@ unicode-normalization = "0.1.25"
 tempfile = "3"
 
 [dev-dependencies]
+# `Bytes` for the payload-store tests (`tests/payload.rs`), which put through `EprfsStorage`.
+bytes.workspace = true
 jsonschema = { version = "0.28", default-features = false }
 # The index-parity harness pins the projector's expected bytes by digest, so a fixture that
 # silently changes fails loudly rather than re-baselining itself.

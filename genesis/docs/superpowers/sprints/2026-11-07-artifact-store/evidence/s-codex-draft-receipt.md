@@ -1,0 +1,3 @@
+- `genesis/a2o/features/devflow/sibling-fetches-the-build.feature` — 11 scenarios
+- `genesis/a2o/features/storage/artifact-custody.feature` — 9 scenarios
+- Unexpressed brief rules: none.

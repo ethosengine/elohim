@@ -1,0 +1,24 @@
+{
+  "requires": [
+    {
+      "axis": "isa.x86",
+      "predicate": {
+        "kind": "subset",
+        "value": []
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "isa.x86": {
+        "kind": "names",
+        "value": []
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "permit"
+  }
+}

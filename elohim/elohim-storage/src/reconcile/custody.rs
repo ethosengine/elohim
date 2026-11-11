@@ -45,7 +45,7 @@ pub trait FetchKicker: Send + Sync {
     fn kick(&self, blob_cid: &ByteCid, candidates: Vec<String>);
 }
 
-/// Snapshot of the local blob store taken at reconcile-pass start.
+/// Snapshot of the local blob store's payload NAMES taken at reconcile-pass start.
 ///
 /// Implements [`LocalBlobStore`] for the duration of a single pass by
 /// pre-fetching the full CID set once via [`crate::blob_store::BlobStore::list_cids`]
@@ -53,6 +53,13 @@ pub trait FetchKicker: Send + Sync {
 /// (and avoids holding the blob store across diesel queries) than calling
 /// `BlobStore::exists` per commitment. Comparison is by [`ByteCid`] value (C4):
 /// a commitment marker is parsed by full decode before it is compared.
+///
+/// It is a filename set, not a verification (see [`VerifiedPantry`] for the verified one): a payload whose marker is present but
+/// whose bytes are corrupt or whose chunks are missing is still listed, and chunk or
+/// shard units are not listed at all. It answers "is a fetch needed?" (a wrong yes
+/// costs a skipped fetch, healed by verify-on-read). It must never gate a custody
+/// row, a pledge or an announcement — those rest on a verified read
+/// (`BlobStore::get` / `get_chunk`, or `exists` == `Verified`).
 pub struct BlobStoreSnapshot {
     cids: std::collections::HashSet<ByteCid>,
 }
@@ -80,6 +87,26 @@ impl BlobStoreSnapshot {
 impl LocalBlobStore for BlobStoreSnapshot {
     fn has(&self, blob_cid: &ByteCid) -> bool {
         self.cids.contains(blob_cid)
+    }
+}
+
+/// A [`LocalBlobStore`] that answers `has` from a verified read, per query: the payload's
+/// bytes (or the unit's) hash to their CID, or the answer is no. Use it wherever `has`
+/// gates a custody act or a "do I still need to fetch this?" decision; a corrupt local
+/// copy is "not held" (and quarantined), so it is re-fetched rather than pledged or
+/// advertised. Cost is the bytes of each queried CID, so it suits the few CIDs a pass
+/// asks about, not a whole-store scan.
+pub struct VerifiedPantry<'a>(&'a crate::blob_store::BlobStore);
+
+impl<'a> VerifiedPantry<'a> {
+    pub fn new(store: &'a crate::blob_store::BlobStore) -> Self {
+        Self(store)
+    }
+}
+
+impl LocalBlobStore for VerifiedPantry<'_> {
+    fn has(&self, blob_cid: &ByteCid) -> bool {
+        self.0.holds_verified(blob_cid)
     }
 }
 
@@ -149,7 +176,10 @@ pub fn resolve_self_agent_cid(
 }
 
 /// then degrades to transport-only (the pre-existing behavior — no regression).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is an independent seam (two self identities, the local store, the fetch kicker, timing config, clock, connected peers) that tests substitute; a bundling struct would only rename them"
+)]
 pub fn reconcile_pass(
     conn: &mut SqliteConnection,
     self_cid: &str,
@@ -407,6 +437,25 @@ pub struct SalvageOutcome {
     pub skipped_opted_out: u32,
 }
 
+/// The spellings one holder's custody evidence may be keyed by: the provider itself
+/// (a legacy commitment naming a transport id directly) and every transport id the
+/// cross-signed chain authenticates to it (`p2p::transport_authority`: the libp2p
+/// PeerIds its `AgentPeerBinding`s cross-sign, and the iroh NodeIds verified two-key
+/// links tie to those). Never `peer_transport_manifest`: its `agent_cid` is a
+/// self-asserted dial hint, and a forged manifest must not inflate or deflate a floor.
+fn holder_identities(
+    conn: &mut SqliteConnection,
+    provider: &str,
+) -> Result<Vec<String>, StorageError> {
+    let mut identities = vec![provider.to_string()];
+    for id in crate::p2p::transport_authority::authenticated_transports_for_agent(conn, provider) {
+        if !identities.contains(&id) {
+            identities.push(id);
+        }
+    }
+    Ok(identities)
+}
+
 /// Run one salvage pass (Phase 3). For each under-replicated `custody-blob`
 /// blob, if this node is opted in, not already a provider, and among the
 /// deterministic closest-N holders for the blob (per `strategy`), author a new
@@ -488,23 +537,25 @@ pub fn salvage_pass(
     for (blob, want) in wants {
         outcome.blobs_examined += 1;
 
-        // honored = distinct committed providers currently hosting (fresh inventory).
-        // Only admitted, projected inventory counts: a HELD envelope (unknown epoch
-        // or scheme) is never projected into `peer_blob_inventory`, so it can never
-        // inflate this count.
-        // Joins provider against `peer_blob_inventory.peer_id` exactly as the
-        // receiver-role check in `reconcile_pass` does; the pool is resolved to
-        // `agent_cid` upstream (P3-6) so the namespaces line up.
+        // honored = distinct committed providers with BOUND, unexpired custody
+        // evidence. A row counts only when its witness bound the peer id to the
+        // speaker (signed author, end-to-end signature, recon over the peer's own
+        // connection, a verified fetch, this node's own verified store); a
+        // `legacy-hint` row stays a fetch hint and an expired row is no evidence. A
+        // HELD envelope (unknown epoch or scheme) is never projected at all.
+        //
+        // Inventory rows are keyed by the author's TRANSPORT id while a provider is
+        // an `agent_cid` (or, for legacy rows, a transport id), so a provider's
+        // evidence is read under every spelling `peer_transport_manifest` binds to it.
         let mut honored = 0usize;
         for provider in &want.providers {
-            let fresh: i64 = peer_blob_inventory::table
-                .filter(peer_blob_inventory::peer_id.eq(provider))
-                .filter(peer_blob_inventory::blob_cid.eq(&blob))
-                .filter(peer_blob_inventory::last_seen_at.gt(&fresh_before))
-                .count()
-                .get_result(conn)
-                .map_err(|e| StorageError::Database(format!("count honored providers: {e}")))?;
-            if fresh > 0 {
+            let identities = holder_identities(conn, provider)?;
+            if crate::db::peer_blob_inventory::holds_bound_fresh(
+                conn,
+                &identities,
+                &blob,
+                &fresh_before,
+            )? {
                 honored += 1;
             }
         }
@@ -598,6 +649,10 @@ pub struct ManifestBackfillOutcome {
     /// `self_held_recorded` so "the node re-attributed old custody to its live
     /// key" is distinguishable in logs from "the node manifested new bytes".
     pub self_held_reclaimed: usize,
+    /// Self-held rows recorded by the unit sweep: a custody unit (a chunk file, an inline
+    /// payload or a received shard) the store read back verified that no row named yet.
+    /// This is how a striped upload's chunks and a received shard get a row.
+    pub units_recorded: usize,
     /// Candidates that turned out to already have a manifest (pre-filter hit,
     /// or a race detected at the write-time re-check).
     pub skipped_existing: usize,
@@ -664,6 +719,36 @@ fn claim_units(
     recorded
 }
 
+/// Row every custody unit the store holds that no self-held row names yet. The candidates
+/// are `BlobStore::unit_names` (a filename set, never evidence); each is read back through
+/// `get_chunk`, which re-derives its CID and quarantines a failure, and only a verified
+/// unit is recorded. This reaches what the per-payload pass cannot: the chunks of a payload
+/// whose manifest is striped (its shards are derived, but the node serves its chunks) and
+/// a shard another node pushed here. At most `cap` rows are recorded per pass.
+async fn claim_held_units(
+    conn: &mut SqliteConnection,
+    blob_store: &BlobStore,
+    agent_cid: &str,
+    h_app_id: &str,
+    cap: usize,
+    errors: &mut usize,
+) -> usize {
+    let mut recorded = 0;
+    for unit in blob_store.unit_names() {
+        if recorded >= cap {
+            break;
+        }
+        let already = crate::db::shard_locations::get_locations_for_shard(conn, &unit.to_string())
+            .map(|rows| rows.iter().any(|l| l.peer_id == agent_cid))
+            .unwrap_or(false);
+        if already || blob_store.get_chunk(&unit).await.is_err() {
+            continue;
+        }
+        recorded += claim_units(conn, &[unit], agent_cid, h_app_id, errors);
+    }
+    recorded
+}
+
 /// Run one bounded custody-backfill pass. Idempotent — safe to call on every tick.
 ///
 /// For every payload the local store lists with no `shard_manifests` row under
@@ -676,7 +761,7 @@ fn claim_units(
 /// candidate. This node's `agent_cid` changes across a non-prod DNA reinstall, and a
 /// manifest written by the ingest path records no self-held row, so the claim is
 /// re-asserted under the live identity (`self_held_reclaimed`) when the store still
-/// holds the payload structurally whole ([`Exists::Verified`]). Steady state writes
+/// holds the payload hash-verified ([`Exists::Verified`]). Steady state writes
 /// nothing.
 ///
 /// `self_agent_cid` is this node's resolved `agent_cid` (`uhCAk…`); `None` skips
@@ -812,10 +897,23 @@ pub async fn manifest_backfill_pass(
         }
     }
 
+    if let Some(agent_cid) = agent {
+        outcome.units_recorded += claim_held_units(
+            conn,
+            blob_store,
+            agent_cid,
+            h_app_id,
+            batch_cap,
+            &mut outcome.errors,
+        )
+        .await;
+    }
+
     tracing::info!(
         target: "elohim_storage::reconcile",
         blobs_scanned = outcome.blobs_scanned,
         manifests_written = outcome.manifests_written,
+        units_recorded = outcome.units_recorded,
         self_held_recorded = outcome.self_held_recorded,
         self_held_reclaimed = outcome.self_held_reclaimed,
         skipped_existing = outcome.skipped_existing,
@@ -846,8 +944,16 @@ mod tests {
         sequence: i64,
         when: &str,
     ) -> Result<(), StorageError> {
-        crate::db::peer_blob_inventory::apply_delta(conn, peer, cids, &[], sequence, when)
-            .map(|_| ())
+        crate::db::peer_blob_inventory::apply_delta(
+            conn,
+            peer,
+            cids,
+            &[],
+            sequence,
+            when,
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
+        )
+        .map(|_| ())
     }
     use crate::db::{run_migrations, DbPool};
     use diesel::r2d2::{ConnectionManager, Pool};
@@ -898,7 +1004,7 @@ mod tests {
         id: &str,
         provider: &str,
         receiver: &str,
-        blob_hash: &str,
+        blob_cid: &str,
     ) {
         let row = NewReaCommitment {
             id,
@@ -907,7 +1013,7 @@ mod tests {
             provider,
             receiver,
             resource_conforms_to: None,
-            resource_classified_as: Some(blob_hash),
+            resource_classified_as: Some(blob_cid),
             resource_quantity_value: Some(1024.0),
             resource_quantity_unit: Some("bytes"),
             effort_quantity_value: None,
@@ -961,8 +1067,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         // Use a fresh timestamp so the inventory entry is within freshness window.
         let now = chrono::Utc::now();
@@ -970,7 +1076,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -994,7 +1100,7 @@ mod tests {
         assert_eq!(outcome.kicks_fired, 1);
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
-        assert_eq!(kicks[0].0, blob_hash);
+        assert_eq!(kicks[0].0, blob_cid);
         assert_eq!(kicks[0].1, vec!["peer_X".to_string()]);
     }
 
@@ -1008,9 +1114,9 @@ mod tests {
         id: &str,
         provider: &str,
         receiver: &str,
-        blob_hash: &str,
+        blob_cid: &str,
     ) {
-        let classified = serde_json::to_string(&vec![blob_hash]).unwrap();
+        let classified = serde_json::to_string(&vec![blob_cid]).unwrap();
         let row = NewReaCommitment {
             id,
             h_app_id: "test",
@@ -1051,15 +1157,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('b');
-        insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('b');
+        insert_custody_commitment_list(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1087,7 +1193,7 @@ mod tests {
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
         assert_eq!(
-            kicks[0].0, blob_hash,
+            kicks[0].0, blob_cid,
             "the kicked hash is the unwrapped real blob hash, not the [..] literal"
         );
     }
@@ -1099,15 +1205,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('c');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('c');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1129,7 +1235,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(outcome.kicks_fired, 1, "bare custody row still resolves");
-        assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_hash);
+        assert_eq!(kicker.kicks.lock().unwrap()[0].0, blob_cid);
     }
 
     /// Retry hygiene: a marker that is not a byte CID — a `sha256-<hex>`, bare hex,
@@ -1205,8 +1311,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1228,7 +1334,7 @@ mod tests {
         assert_eq!(outcome.fallback_kicks, 1);
         let kicks = kicker.kicks.lock().unwrap();
         assert_eq!(kicks.len(), 1);
-        assert_eq!(kicks[0].0, blob_hash);
+        assert_eq!(kicks[0].0, blob_cid);
         assert_eq!(kicks[0].1, connected);
     }
 
@@ -1239,8 +1345,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1271,15 +1377,15 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1311,8 +1417,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1348,8 +1454,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         // Fresh inventory entry from other_cid.
         let now = chrono::Utc::now();
@@ -1357,7 +1463,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "other_cid",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1386,8 +1492,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "self_cid", &blob_cid);
 
         // First pass: emit gap.
         let now = chrono::Utc::now();
@@ -1435,16 +1541,16 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
+        let blob_cid = cid_of('a');
         // provider = agent_cid (NOT the transport self_cid).
-        insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_hash);
+        insert_custody_commitment(&mut conn, "c1", "uhCAk-self", "steward-Z", &blob_cid);
 
         let now = chrono::Utc::now();
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1479,14 +1585,14 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
+        let blob_cid = cid_of('a');
         // provider = transport self_cid (legacy write).
         insert_custody_commitment(
             &mut conn,
             "c1",
             "12D3KooTransportSelfId",
             "steward-Z",
-            &blob_hash,
+            &blob_cid,
         );
 
         let now = chrono::Utc::now();
@@ -1494,7 +1600,7 @@ mod tests {
         apply_snapshot(
             &mut conn,
             "peer_X",
-            std::slice::from_ref(&blob_hash),
+            std::slice::from_ref(&blob_cid),
             1,
             &when,
         )
@@ -1528,8 +1634,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
 
-        let blob_hash = cid_of('a');
-        insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_hash);
+        let blob_cid = cid_of('a');
+        insert_custody_commitment(&mut conn, "c1", "other_cid", "uhCAk-self", &blob_cid);
 
         let kicker = RecordingKicker {
             kicks: Mutex::new(Vec::new()),
@@ -1693,11 +1799,171 @@ mod tests {
             .collect()
     }
 
-    /// Mark a provider as currently hosting a blob (fresh inventory row).
+    /// Mark a provider as currently hosting a blob: a fresh inventory row under a
+    /// bound witness (an admitted signed delta), the only kind a custody floor counts.
     fn mark_hosting(conn: &mut SqliteConnection, peer: &str, blob: &str, now: DateTime<Utc>) {
         let when = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let b = blob.to_string();
         apply_snapshot(conn, peer, std::slice::from_ref(&b), 1, &when).unwrap();
+    }
+
+    /// A fresh inventory row with no recorded witness — what every row written before
+    /// the witness column reads as (`legacy-hint`).
+    fn mark_legacy_hint(conn: &mut SqliteConnection, peer: &str, blob: &str, now: DateTime<Utc>) {
+        diesel::insert_into(peer_blob_inventory::table)
+            .values(&crate::db::models::NewPeerBlobInventoryRow {
+                peer_id: peer.to_string(),
+                blob_cid: blob.to_string(),
+                last_seen_at: now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                source: "gossip-delta".to_string(),
+                sequence: 1,
+            })
+            .execute(conn)
+            .unwrap();
+    }
+
+    /// A cross-signed `AgentPeerBinding` binds `test_agent(name)` to the libp2p
+    /// PeerId of `secret`. Returns `(agent_cid, peer_id)`.
+    fn bind_transport(
+        conn: &mut SqliteConnection,
+        name: &str,
+        secret: [u8; 32],
+    ) -> (String, String) {
+        let peer = crate::test_util::bind_cross_signed(conn, name, secret);
+        (crate::test_util::test_agent(name), peer)
+    }
+
+    fn run_salvage(
+        conn: &mut SqliteConnection,
+        now: DateTime<Utc>,
+    ) -> (SalvageOutcome, RecordingAuthor) {
+        let author = RecordingAuthor::new();
+        let outcome = salvage_pass(
+            conn,
+            "self",
+            "self",
+            &StaticStrategy(vec!["self".into()]),
+            &author,
+            &pool(&["self"]),
+            salvage_cfg(true, 2),
+            now,
+        )
+        .unwrap();
+        (outcome, author)
+    }
+
+    /// R2: two committed providers whose only evidence is fresh `legacy-hint` rows (no
+    /// recorded witness) do not hold the floor: the blob is under-replicated and the
+    /// closest volunteer adopts it. The rows stay fetch hints.
+    #[test]
+    fn custody_count_ignores_unbound_legacy_rows() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('l');
+        insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
+        mark_legacy_hint(&mut conn, "prov-A", &blob, now);
+        mark_legacy_hint(&mut conn, "prov-B", &blob, now);
+
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(outcome.under_replicated, 1, "legacy rows hold no floor");
+        assert_eq!(outcome.commitments_authored, 1);
+        assert_eq!(author.authored.lock().unwrap().len(), 1);
+        let stale_before = (now - chrono::Duration::seconds(600))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        assert_eq!(
+            crate::db::peer_blob_inventory::lookup_hosts(&mut conn, &blob, &stale_before)
+                .unwrap()
+                .len(),
+            2,
+            "legacy rows remain fetch hints"
+        );
+    }
+
+    /// R2: a bound row inside the freshness window counts; the same bound evidence
+    /// past it does not. Evidence keyed by a provider's bound transport id counts for
+    /// the provider's `agent_cid`.
+    #[test]
+    fn bound_fresh_row_counts_and_expired_one_does_not() {
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('x');
+        let (prov_a, peer_a) = bind_transport(&mut conn, "uhCAkProvA", [71u8; 32]);
+        let (prov_b, peer_b) = bind_transport(&mut conn, "uhCAkProvB", [72u8; 32]);
+        insert_custody_commitment(&mut conn, "c1", &prov_a, "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", &prov_b, "steward-Z", &blob);
+        // A: fresh, bound, keyed by its transport id. B: bound, but an hour old.
+        mark_hosting(&mut conn, &peer_a, &blob, now);
+        mark_hosting(
+            &mut conn,
+            &peer_b,
+            &blob,
+            now - chrono::Duration::seconds(3600),
+        );
+        let (outcome, _) = run_salvage(&mut conn, now);
+        assert_eq!(
+            outcome.under_replicated, 1,
+            "one fresh bound holder of two: the expired row does not count"
+        );
+
+        // B re-announces inside the window (the next in-order delta): the floor holds.
+        apply_snapshot(
+            &mut conn,
+            &peer_b,
+            std::slice::from_ref(&blob),
+            2,
+            &now.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        )
+        .unwrap();
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(outcome.under_replicated, 0, "two fresh bound holders");
+        assert!(author.authored.lock().unwrap().is_empty());
+    }
+
+    /// The red-team inflation: a forged transport manifest naming a provider agent
+    /// (`{iroh_node_id: forger, agent_cid: provider}`) must not make the forger's own
+    /// bound inventory rows count as that provider's custody — nor may the floor
+    /// read any manifest row at all. Only the provider's cross-signed transports count.
+    #[test]
+    fn custody_floor_ignores_rows_from_a_hijacked_transport() {
+        use crate::db::diesel_schema::peer_transport_manifest::dsl as t;
+        let p = test_pool();
+        let mut conn = p.get().unwrap();
+        let now = chrono::Utc::now();
+        let blob = cid_of('h');
+        let (prov_a, peer_a) = bind_transport(&mut conn, "uhCAkProvA", [73u8; 32]);
+        let prov_b = crate::test_util::test_agent("uhCAkProvB");
+        insert_custody_commitment(&mut conn, "c1", &prov_a, "steward-Z", &blob);
+        insert_custody_commitment(&mut conn, "c2", &prov_b, "steward-Z", &blob);
+        mark_hosting(&mut conn, &peer_a, &blob, now);
+        // The forger's own transports, hosting under bound witnesses (its signed
+        // deltas are genuinely its own), hijack B's agent in the manifest table on
+        // both columns.
+        let forger_peer = crate::test_util::bind_cross_signed(&mut conn, "uhCAkForger", [74u8; 32]);
+        let forger_node = hex::encode([75u8; 32]);
+        mark_hosting(&mut conn, &forger_peer, &blob, now);
+        mark_hosting(&mut conn, &forger_node, &blob, now);
+        diesel::insert_into(t::peer_transport_manifest)
+            .values((
+                t::agent_cid.eq(&prov_b),
+                t::libp2p_peer_id.eq(&forger_peer),
+                t::iroh_node_id.eq(&forger_node),
+                t::discovery_methods_json.eq("[]"),
+                t::capability_level.eq(1),
+                t::last_observed.eq(1_i64),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+
+        let (outcome, author) = run_salvage(&mut conn, now);
+        assert_eq!(
+            outcome.under_replicated, 1,
+            "B holds no floor: the hijacked transports speak for the forger, not for B"
+        );
+        assert_eq!(author.authored.lock().unwrap().len(), 1);
     }
 
     #[test]
@@ -1742,6 +2008,9 @@ mod tests {
         let blob = cid_of('c');
         insert_custody_commitment(&mut conn, "c1", "prov-A", "steward-Z", &blob);
         insert_custody_commitment(&mut conn, "c2", "prov-B", "steward-Z", &blob);
+        // R2: "hosting" means BOUND, unexpired evidence — an admitted signed delta
+        // from each provider (`mark_hosting`). Unwitnessed rows would not hold the
+        // floor (`custody_count_ignores_unbound_legacy_rows`).
         mark_hosting(&mut conn, "prov-A", &blob, now);
         mark_hosting(&mut conn, "prov-B", &blob, now);
 
@@ -2039,5 +2308,189 @@ mod tests {
                 .map(|l| l.peer_id)
                 .collect();
         assert_eq!(holders, vec!["uhCAkRealAgentKey".to_string()]);
+    }
+
+    const UNIT_AGENT: &str = "uhCAkUnitSweepUploaderAgentKey";
+
+    fn self_rows(conn: &mut SqliteConnection, unit: &ByteCid) -> Vec<String> {
+        crate::db::shard_locations::get_locations_for_shard(conn, &unit.to_string())
+            .expect("load locations")
+            .into_iter()
+            .filter(|l| l.peer_id == UNIT_AGENT)
+            .map(|l| l.status)
+            .collect()
+    }
+
+    /// A payload cut into several chunks (under the striping threshold): the backfill
+    /// rows every chunk the store serves, not only the payload.
+    #[tokio::test]
+    async fn multi_chunk_payload_rows_every_chunk() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        assert!(stored.chunks.len() > 1, "fixture must be chunked");
+
+        let outcome = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert_eq!(outcome.errors, 0);
+        for chunk in &stored.chunks {
+            assert_eq!(
+                self_rows(&mut conn, &chunk.cid),
+                vec!["self-held".to_string()],
+                "chunk {} has its own self-held row",
+                chunk.cid
+            );
+        }
+        assert!(
+            self_rows(&mut conn, &stored.cid).is_empty(),
+            "the marker names a payload, not a unit: no row for it"
+        );
+
+        // Steady state: nothing new to record.
+        let again = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("second pass");
+        assert_eq!(again.units_recorded, 0);
+    }
+
+    /// An upload whose manifest is erasure-coded: the per-payload arm never self-claims
+    /// a striped manifest's derived shards, so the unit sweep is what rows the chunks
+    /// the node serves and any shard another node pushed here.
+    #[tokio::test]
+    async fn striped_upload_rows_cover_every_served_unit() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let data = crate::blob_store::tests::xorshift_bytes(3 * 1024 * 1024);
+        let stored = store.store(&data).await.expect("store");
+
+        // The upload's manifest is striped (threshold lowered so the fixture stays small).
+        let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig {
+            rs_threshold: 0,
+            ..crate::sharding::ShardConfig::default()
+        });
+        let (manifest, shards) = encoder
+            .encode(&data, "application/octet-stream", "commons")
+            .expect("encode");
+        assert!(!manifest.stripes.is_empty(), "fixture must be striped");
+        crate::db::shard_manifests::record_generated_manifest(
+            &mut conn,
+            &format!("blob:{}", stored.cid),
+            "lamad",
+            &manifest,
+        )
+        .expect("manifest");
+        // One shard another node pushed here, held under its own CID.
+        let pushed = store.store(&shards[0][0]).await.expect("pushed shard");
+        assert_eq!(pushed.chunks.len(), 1, "a small shard is one inline unit");
+
+        let outcome = manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert_eq!(outcome.errors, 0);
+
+        let served = store.list_units().expect("list_units");
+        assert!(served.contains(&pushed.cid), "the pushed shard is a unit");
+        for chunk in &stored.chunks {
+            assert!(served.contains(&chunk.cid), "every chunk is a unit");
+        }
+        for unit in &served {
+            assert_eq!(
+                self_rows(&mut conn, unit),
+                vec!["self-held".to_string()],
+                "served unit {unit} has a self-held row"
+            );
+        }
+    }
+
+    /// A unit whose bytes do not hash to its name is quarantined by the sweep and never
+    /// rowed, however the name looks on disk.
+    #[tokio::test]
+    async fn unit_sweep_rows_nothing_it_cannot_read_back_verified() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        let victim = stored.chunks[1].cid;
+        let path = {
+            let root = store.root_dir().join("chunks");
+            let name = victim.to_string();
+            root.join(name.get(7..11).unwrap()).join(&name)
+        };
+        let mut bytes = std::fs::read(&path).expect("chunk file");
+        bytes[3] ^= 0xff;
+        std::fs::write(&path, bytes).expect("corrupt");
+
+        manifest_backfill_pass(&mut conn, &store, Some(UNIT_AGENT), "lamad", 64)
+            .await
+            .expect("pass");
+        assert!(self_rows(&mut conn, &victim).is_empty());
+        assert!(!store.list_units().unwrap().contains(&victim));
+    }
+
+    /// A local copy that is named but corrupt is not a held copy: the pass kicks a
+    /// re-fetch for it, and stops kicking once the copy is whole again.
+    #[tokio::test]
+    async fn reconcile_refetches_a_corrupt_local_copy() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let store = BlobStore::new_memory();
+        let stored = store
+            .store(&crate::blob_store::tests::xorshift_bytes(6 * 1024 * 1024))
+            .await
+            .expect("store");
+        let blob_cid = stored.cid.to_string();
+        insert_custody_commitment(&mut conn, "c1", "self_cid", "other_cid", &blob_cid);
+        let when = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        apply_snapshot(
+            &mut conn,
+            "peer_X",
+            std::slice::from_ref(&blob_cid),
+            1,
+            &when,
+        )
+        .unwrap();
+
+        let run = |conn: &mut SqliteConnection| {
+            let kicker = RecordingKicker {
+                kicks: Mutex::new(Vec::new()),
+            };
+            reconcile_pass(
+                conn,
+                "self_cid",
+                None,
+                &VerifiedPantry::new(&store),
+                &kicker,
+                default_cfg(),
+                chrono::Utc::now(),
+                &[],
+            )
+            .unwrap();
+            let kicks = kicker.kicks.lock().unwrap().len();
+            kicks
+        };
+        assert_eq!(run(&mut conn), 0, "a whole local copy needs no fetch");
+
+        let victim = stored.chunks[1].cid.to_string();
+        let path = {
+            let root = store.root_dir().join("chunks");
+            root.join(victim.get(7..11).unwrap()).join(&victim)
+        };
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[2] ^= 0xff;
+        std::fs::write(&path, bytes).unwrap();
+        // The filename snapshot still says "held"; the verified pantry does not.
+        assert!(BlobStoreSnapshot::from_store(&store)
+            .unwrap()
+            .has(&stored.cid));
+        assert_eq!(run(&mut conn), 1, "a corrupt local copy is re-fetched");
     }
 }

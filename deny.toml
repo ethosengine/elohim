@@ -37,7 +37,7 @@ wrappers = [
 [licenses]
 allow = [
     "MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC",
-    "Unicode-DFS-2016", "CAL-1.0", "MPL-2.0", "Zlib", "OpenSSL",
+    "Unicode-DFS-2016", "CAL-1.0", "MPL-2.0", "AGPL-3.0", "Zlib", "OpenSSL",
 ]
 exceptions = []
 unlicensed = "warn"

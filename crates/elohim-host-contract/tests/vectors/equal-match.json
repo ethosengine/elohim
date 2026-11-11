@@ -1,0 +1,24 @@
+{
+  "requires": [
+    {
+      "axis": "arch",
+      "predicate": {
+        "kind": "equal",
+        "value": "x86_64"
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "arch": {
+        "kind": "scalar",
+        "value": "x86_64"
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "permit"
+  }
+}

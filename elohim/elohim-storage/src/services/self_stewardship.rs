@@ -69,6 +69,10 @@ pub const SELF_HELD_STATUS: &str = "self-held";
 pub enum SelfHeldOutcome {
     /// Bytes verified present locally; a `shard_locations` row was written.
     Recorded,
+    /// Bytes verified present locally and the row already said exactly this (same
+    /// holder, app and `self-held` status): nothing was written, so nothing changed and
+    /// there is nothing new to announce. The caller still counts the unit as held.
+    Unchanged,
     /// The local blob store does NOT hold this shard's bytes — nothing written,
     /// the placement gap stays honestly visible.
     BytesAbsent,
@@ -79,8 +83,9 @@ pub enum SelfHeldOutcome {
 
 /// Record that THIS node holds `shard_cid`, but only if it verifiably does.
 ///
-/// Returns [`SelfHeldOutcome::Recorded`] iff `local_store.has(shard_cid)` and
-/// `self_agent_cid` is a well-formed `agent_cid`. Never dials, never pushes.
+/// Returns [`SelfHeldOutcome::Recorded`] iff `local_store.has(shard_cid)`,
+/// `self_agent_cid` is a well-formed `agent_cid` and the row is new or differs from the
+/// one held; an identical row is [`SelfHeldOutcome::Unchanged`] and is not rewritten. Never dials, never pushes.
 pub fn record_self_held_shard(
     conn: &mut SqliteConnection,
     local_store: &dyn LocalBlobStore,
@@ -106,6 +111,17 @@ pub fn record_self_held_shard(
              (gap left honestly visible)"
         );
         return Ok(SelfHeldOutcome::BytesAbsent);
+    }
+
+    let held_already = crate::db::shard_locations::get_locations_for_shard(conn, &shard_cid)?
+        .iter()
+        .any(|row| {
+            row.peer_id == self_agent_cid
+                && row.h_app_id == h_app_id
+                && row.status == SELF_HELD_STATUS
+        });
+    if held_already {
+        return Ok(SelfHeldOutcome::Unchanged);
     }
 
     crate::db::shard_locations::upsert_location(
@@ -231,7 +247,8 @@ mod tests {
         );
     }
 
-    /// Re-running the same recording is idempotent (upsert semantics) — one row.
+    /// Re-running the same recording is idempotent — one row, and only the first run
+    /// reports a change.
     #[test]
     fn self_held_recording_is_idempotent() {
         let pool = test_pool();
@@ -240,16 +257,27 @@ mod tests {
             "bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4",
         ]);
 
+        let mut outcomes = Vec::new();
         for _ in 0..3 {
-            record_self_held_shard(
-                &mut conn,
-                &store,
-                &cid("bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"),
-                "uhCAkSelfAgent",
-                "lamad",
-            )
-            .expect("record");
+            outcomes.push(
+                record_self_held_shard(
+                    &mut conn,
+                    &store,
+                    &cid("bafkr4iadfjivtkoki4lzk4jw6lousll5b5fdld2w6xjnuzod6abvcj4pr4"),
+                    "uhCAkSelfAgent",
+                    "lamad",
+                )
+                .expect("record"),
+            );
         }
+        assert_eq!(
+            outcomes,
+            vec![
+                SelfHeldOutcome::Recorded,
+                SelfHeldOutcome::Unchanged,
+                SelfHeldOutcome::Unchanged
+            ]
+        );
 
         let rows = get_locations_for_shard(
             &mut conn,

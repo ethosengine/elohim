@@ -102,9 +102,13 @@ components:
       # Built via Jenkins (devspaces-udi-plus, devspaces-rust-nix-dev). Image name
       # rust-nix-dev:latest is historical — current source folder is rust-dev/.
       #
-      # The image TAG and the memory/CPU numbers are set by each child (the LAN node
-      # runs the x86-64-v3 build, shem's Sandy Bridge Xeons need the x86-64-v2 build).
-      # This default is what a child gets if it overrides nothing.
+      # The image TAG and the memory/CPU numbers are set by each child: every device runs
+      # the flavor native to its hardware (the LAN node the x86-64-v3 build, shem's Sandy
+      # Bridge Xeons the x86-64-v2 build). Do not level devices onto one flavor so their
+      # build keys agree: different toolchains are bridged in the artifact store, which keys
+      # each build by its real toolchain and admits a sibling's build when this host meets
+      # what that build requires (artifact-store K1). This default is what a child gets if
+      # it overrides nothing.
       image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
       memoryLimit: 30Gi
       memoryRequest: 8Gi

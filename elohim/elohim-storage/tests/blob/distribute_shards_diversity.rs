@@ -460,3 +460,245 @@ async fn uploader_not_selected_without_a_verified_copy_records_nothing() {
         "no announcement without a verified copy"
     );
 }
+
+// ── R7: the selected self-placement path records only after a verified read ──
+//
+// A self-held row, its custody announcement and the pledge rest on bytes this node
+// read back VERIFIED — never on the payload names `BlobStore::list_cids` reports.
+
+/// The file named `name` anywhere under `root` (the store's fan-out buckets).
+fn find_file(root: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+    for entry in std::fs::read_dir(root).ok()?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_file(&path, name) {
+                return Some(found);
+            }
+        } else if entry.file_name().to_string_lossy() == name {
+            return Some(path);
+        }
+    }
+    None
+}
+
+/// Every custody announcement the handle emitted; any other command fails the test
+/// (a self-selected unit must never push or dial).
+fn drain_announcements(
+    cmd_rx: &mut tokio::sync::mpsc::Receiver<elohim_storage::p2p::P2PCommand>,
+) -> Vec<String> {
+    let mut announced = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        match cmd {
+            elohim_storage::p2p::P2PCommand::AnnounceCustody(ann) => {
+                announced.push(ann.shard_cid.to_string())
+            }
+            _ => panic!("a self-selected unit emitted a non-announce P2P command"),
+        }
+    }
+    announced
+}
+
+/// Deterministic, non-repeating bytes, so the chunker cuts distinct chunks.
+fn varied_bytes(len: usize) -> Vec<u8> {
+    let mut state: u64 = 0x5241_5348_4f4d;
+    let mut out = Vec::with_capacity(len + 8);
+    while out.len() < len {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        out.extend_from_slice(&state.to_le_bytes());
+    }
+    out.truncate(len);
+    out
+}
+
+/// Self-selected, and the payload's file is present under its name at its full
+/// length — but its bytes are wrong. The name is in `list_cids`; the bytes do not
+/// read back verified. No row, no announcement.
+#[tokio::test]
+async fn selected_path_refuses_corrupt_payload() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[("uhCAkSelfAgent", "home-self", "accepting")],
+    )
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    // One chunk, unstriped: the single custody unit is the payload itself.
+    let blob = vec![3u8; 4096];
+    let stored = store.store(&blob).await.expect("stock blob");
+    let path = find_file(&tmp.path().join("blobs"), &stored.cid.to_string())
+        .expect("the stored payload's file");
+    let mut bytes = std::fs::read(&path).unwrap();
+    bytes[100] ^= 0xff; // same length: only a hash can tell
+    std::fs::write(&path, &bytes).unwrap();
+    assert!(
+        store.list_cids().unwrap().contains(&stored.cid),
+        "precondition: the corrupt payload is still listed by name"
+    );
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+    let distributed = handle
+        .distribute_shards("content-self-corrupt", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    assert_eq!(distributed, 0, "corrupt bytes place nothing");
+
+    let mut conn = pool.get().unwrap();
+    let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+        &mut conn,
+        &stored.cid.to_string(),
+    )
+    .unwrap();
+    assert!(
+        rows.is_empty(),
+        "no custody row over corrupt bytes, got {rows:?}"
+    );
+    assert!(
+        drain_announcements(&mut cmd_rx).is_empty(),
+        "no custody announcement over corrupt bytes"
+    );
+}
+
+/// Self-selected for every chunk of a chunked payload whose marker is present and
+/// listed, but one chunk file is gone. The missing unit gets no row and no
+/// announcement; each chunk that reads back verified is its own unit and does.
+#[tokio::test]
+async fn selected_path_refuses_missing_chunk_payload() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[("uhCAkSelfAgent", "home-self", "accepting")],
+    )
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    // Several chunks, under the striping threshold: the units are the chunks.
+    let blob = varied_bytes(6 * 1024 * 1024);
+    let stored = store.store(&blob).await.expect("stock blob");
+    assert!(stored.chunks.len() > 1, "fixture must be chunked");
+    let missing = stored.chunks[1].cid;
+    let chunk_file =
+        find_file(&tmp.path().join("chunks"), &missing.to_string()).expect("the chunk's file");
+    std::fs::remove_file(&chunk_file).unwrap();
+    assert!(
+        store.list_cids().unwrap().contains(&stored.cid),
+        "precondition: the payload is still listed by name"
+    );
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+    handle
+        .distribute_shards("content-self-missing-chunk", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+
+    let mut conn = pool.get().unwrap();
+    let rows_for = |conn: &mut _, cid: &str| {
+        elohim_storage::db::shard_locations::get_locations_for_shard(conn, cid).unwrap()
+    };
+    assert!(
+        rows_for(&mut conn, &missing.to_string()).is_empty(),
+        "no row for a unit whose bytes are missing"
+    );
+    assert!(
+        rows_for(&mut conn, &stored.cid.to_string()).is_empty(),
+        "no payload-level row"
+    );
+    let announced = drain_announcements(&mut cmd_rx);
+    assert!(
+        !announced.contains(&missing.to_string()),
+        "no announcement for the missing unit"
+    );
+    for chunk in stored.chunks.iter().filter(|c| c.cid != missing) {
+        let rows = rows_for(&mut conn, &chunk.cid.to_string());
+        assert_eq!(rows.len(), 1, "a verified chunk is its own self-held unit");
+        assert_eq!(rows[0].status, "self-held");
+        assert!(announced.contains(&chunk.cid.to_string()));
+    }
+}
+
+/// A second distribution of the same payload finds the self-held rows exactly as the
+/// first left them: it counts the units as held, changes nothing and announces nothing.
+/// (Liveness after a restart is inventory freshness and recon, not a re-announcement.)
+#[tokio::test]
+async fn redistribution_emits_no_unchanged_announcement() {
+    use std::sync::Arc;
+
+    let pool = test_pool();
+    let _seed = spawn_p2p_with_peers(
+        pool.clone(),
+        &[
+            ("uhCAkAAAOtherAgent", "home-self", "accepting"),
+            ("uhCAkSelfAgent", "home-self", "accepting"),
+        ],
+    )
+    .await;
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(
+        elohim_storage::BlobStore::new(tmp.path())
+            .await
+            .expect("blob store"),
+    );
+    let blob = varied_bytes(6 * 1024 * 1024);
+    let stored = store.store(&blob).await.expect("stock blob");
+    assert!(stored.chunks.len() > 1, "fixture must be chunked");
+
+    let (handle, mut cmd_rx) = elohim_storage::p2p::P2PHandle::for_testing_capturing_commands(
+        "uhCAkSelfAgent".to_string(),
+    );
+    let handle = handle.with_blob_store_for_testing(Arc::clone(&store));
+
+    handle
+        .distribute_shards("content-redistributed", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    let first = drain_announcements(&mut cmd_rx);
+    for chunk in &stored.chunks {
+        assert!(
+            first.contains(&chunk.cid.to_string()),
+            "first distribution announces chunk {}",
+            chunk.cid
+        );
+    }
+
+    handle
+        .distribute_shards("content-redistributed", &blob, &pool, "lamad")
+        .await
+        .unwrap();
+    let second = drain_announcements(&mut cmd_rx);
+    assert!(
+        second.is_empty(),
+        "identical custody is not re-announced, got {second:?}"
+    );
+
+    // One row per chunk, still self-held.
+    let mut conn = pool.get().unwrap();
+    for chunk in &stored.chunks {
+        let rows = elohim_storage::db::shard_locations::get_locations_for_shard(
+            &mut conn,
+            &chunk.cid.to_string(),
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 1, "one row per unit, got {rows:?}");
+        assert_eq!(rows[0].status, "self-held");
+    }
+}

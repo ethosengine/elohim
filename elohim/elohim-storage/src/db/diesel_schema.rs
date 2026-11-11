@@ -1271,6 +1271,7 @@ diesel::table! {
         last_seen_at       -> Text,
         source             -> Text,
         sequence           -> BigInt,
+        witness            -> Text,
     }
 }
 
@@ -2114,6 +2115,38 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    transport_links (iroh_node_id) {
+        iroh_node_id -> Text,
+        libp2p_peer_id -> Text,
+        issued_at_ms -> BigInt,
+        recorded_at -> Text,
+    }
+}
+
+diesel::table! {
+    held_unbound_claims (id) {
+        id -> Integer,
+        topic -> Text,
+        author_peer -> Text,
+        plane -> Text,
+        gossipsub_source -> Nullable<Text>,
+        bytes -> Binary,
+        held_at_ms -> BigInt,
+    }
+}
+
+diesel::table! {
+    binding_confirmations (peer_id, dht_anchor_hash) {
+        peer_id -> Text,
+        dht_anchor_hash -> Text,
+        agent_cid -> Text,
+        valid_from -> Text,
+        valid_until -> Nullable<Text>,
+        confirmed_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     acquisition_pins,
     accumulation_status,
@@ -2192,6 +2225,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     projection_events,
     proposals,
     peer_transport_manifest,
+    transport_links,
+    binding_confirmations,
+    held_unbound_claims,
     ranked_votes,
     key_revocations,
     key_rotations,

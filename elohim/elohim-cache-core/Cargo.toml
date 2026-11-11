@@ -2,6 +2,7 @@
 name = "elohim-cache-core"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 authors = ["Elohim Protocol"]
 description = "High-performance O(log n) cache for Elohim Protocol applications"
 

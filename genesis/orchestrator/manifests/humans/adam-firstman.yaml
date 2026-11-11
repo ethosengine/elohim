@@ -226,6 +226,50 @@ spec:
               value: "ws://CONDUCTOR_WS_HOST_PLACEHOLDER:8445"
             - name: HOLOCHAIN_APP_ID
               value: "elohim"
+            # Gate for the deterministic /admin/seed/shard-manifest lever
+            # (elohim-storage/src/http.rs, seed_shard_manifest.rs) — writes a
+            # shard manifest + agent-keyed shard_locations for blob-backed
+            # content WITHOUT waiting on full P2P gossip, so the blob-durability
+            # a2o suite + the resilience card's "stewarding" column can light
+            # deterministically on household-nodes. Off (403) by default so a
+            # real deployment can never fabricate distribution; rows it writes
+            # are stamped status="seeded" (never confused with runtime
+            # distribute_shards rows). Same per-env rendering as
+            # ALLOW_DNA_REINSTALL: true for alpha/staging (ephemeral,
+            # test/demo-seeded), false for prod.
+            - name: ALLOW_SEED_SHARD_MANIFEST
+              value: "ALLOW_SEED_SHARD_MANIFEST_PLACEHOLDER"
+            # Gate for the declared network-stakes seed lever
+            # (PUT /admin/seed/network-stakes, seed_network_stakes.rs) — the
+            # genesis seeder PUTs the corpus-declared trustBootstrap grant
+            # (corpus.json, e.g. simulacra scoped to genesis-lamad, granted by
+            # human-adam-firstman) so ManifestStakesResolver prices adoption
+            # ceremony from the MODELED trust relationship instead of full
+            # bootstrap scrutiny. Off (403) by default; the endpoint itself
+            # also refuses stage=simulacra unless environment=preproduction.
+            # Same per-env rendering as ALLOW_SEED_SHARD_MANIFEST: true for
+            # alpha/staging, false for prod.
+            - name: ALLOW_SEED_NETWORK_STAKES
+              value: "ALLOW_SEED_NETWORK_STAKES_PLACEHOLDER"
+            # Gate for the delegates-compute grant seed lever
+            # (POST /admin/seed/delegates-compute, seed_delegates_compute.rs) —
+            # the fixture writer for commitment-gated operator verbs (habit
+            # operator-runtime-surface: a2o @concern:operator-runtime-surface
+            # seeds/revokes an operator-reconcile grant through it). Off (403)
+            # by default; same per-env rendering as its seed-lever siblings:
+            # true for alpha/staging (preproduction fixtures), false for prod.
+            - name: ALLOW_SEED_DELEGATES_COMPUTE
+              value: "ALLOW_SEED_DELEGATES_COMPUTE_PLACEHOLDER"
+            # Corpus-key -> h_app_id bridge for the stakes resolver
+            # (trust/manifest_resolver.rs leg 3): a grant is scoped by corpus
+            # id (genesis-lamad) but the adoption hot path resolves by
+            # h_app_id (lamad). Only the DOCUMENTED mappings — aliases are
+            # explicit declarations, never derived (genesis-humans' h_app_id
+            # is imagodei, so prefix arithmetic is wrong in general). Static
+            # across envs: without a seeded grant manifest the alias leg
+            # resolves nothing, and the resolver stays fail-closed Bootstrap.
+            - name: ELOHIM_NETWORK_STAKES_SCOPE_ALIASES
+              value: "genesis-lamad=lamad,genesis-humans=imagodei"
             # Adopt-before-author gate — hand-rendered (adam is alpha). See the
             # template's inline comment; adam is a supplier peer, so the
             # both-sides-missing exit needs him on.
@@ -303,11 +347,45 @@ spec:
               value: "archival"
             - name: REGION
               value: "us-central"
+            # Display name for cluster_view topology UI
+            - name: ELOHIM_DISPLAY_NAME
+              value: "HUMAN_LABEL_PLACEHOLDER"
+            # Blob storage path for filesystem capacity calculations
+            - name: ELOHIM_BLOB_PATH
+              value: "/data/blobs"
             # Dataplane transport backend (storage layer, NOT the conductor transport).
             # "dual" runs libp2p + iroh side-by-side — campaign Wave-2 E3, decision 2026-08-04.
             # Boot sentinel: "Dual: DualGossipPublisher wired into P2PNode". Rollback: "libp2p".
             - name: ELOHIM_TRANSPORT_BACKEND
               value: "dual"
+            # Storage-side iroh relay — distinct from the conductor's network.relay_url
+            # above; read by p2p_iroh/config.rs and, until now, set by nothing (the
+            # dead-config note in scripts/ci/dead-config-lint.sh). Without it the iroh
+            # half of "dual" is direct-only: pod IPs, unreachable from any peer outside
+            # the namespace (measured 2026-08-30 — a workspace peer's iroh 0.92 attached
+            # to this relay in 3 s; the fleet could not dial back). One relay per premises,
+            # the same value the conductor gets.
+            - name: ELOHIM_IROH_RELAY_URL
+              value: "RELAY_URL_PLACEHOLDER"
+            # Doorway ORIGIN for the storage-side iroh bootstrap: the transport-manifest
+            # announcer POSTs to, and the joiner reads, `${ELOHIM_DOORWAY_URL}/p2p/manifests`
+            # (p2p_iroh/doorway_bootstrap.rs). Unset, doorway_base_url() is None and the
+            # storage never announces — measured 2026-08-30 with the board open: its only
+            # entry was an outside workspace peer's. Rendered from the bootstrap URL's origin
+            # (elohim/holochain/Jenkinsfile) so bootstrap and board always name one doorway.
+            # NOT DOORWAY_CAPABILITY_URL — that env also drives the SSR render-capability
+            # fetch (main.rs) and must stay pointed at the capability document.
+            - name: ELOHIM_DOORWAY_URL
+              value: "DOORWAY_ORIGIN_PLACEHOLDER"
+            # CPU profiling exposition — arms GET /debug/pprof/profile?seconds=N
+            # on the storage-http port for the Alloy/Pyroscope scraper (see the
+            # profiles.grafana.com/cpu.* annotations on this pod template).
+            # Default OFF in the binary; ON here because the alpha fleet IS the
+            # profiling target — the profile is what discriminates the shem
+            # host-starvation remedy (gossip-n² vs corpus-size vs write-backlog).
+            # Sampling is 100Hz for the requested window only, no steady-state cost.
+            - name: ELOHIM_PPROF_ENABLED
+              value: "true"
           ports:
             # Conductor admin/app WS (8444/8445) are NOT served here since
             # rung 2 — they belong to the conductor StatefulSet's ws-proxy.

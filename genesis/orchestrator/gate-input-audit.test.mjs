@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { auditProject, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { auditProject, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
@@ -385,6 +386,8 @@ function realReadSet(name) {
 
 test('REAL eprfs names its governance walk as the .epr-meta file kind, not the whole repository', () => {
   const result = realReadSet('eprfs');
+  assert.deepEqual(result.unresolved, []);
+  assert.ok(result.paths.includes('genesis/agentic/agent-runtimes.json'));
   assert.ok(result.paths.includes('**/.epr-meta'), 'the governance walk must remain visible as its file kind');
   assert.ok(!result.paths.includes('.'), 'no eprfs read may name the whole repository');
   assert.ok(!result.unresolved.some(row => row.file.endsWith('/live_manifest_integrity.rs')));
@@ -392,6 +395,36 @@ test('REAL eprfs names its governance walk as the .epr-meta file kind, not the w
   for (const name of ['recall-contract', 'recall-semantic-index', 'recall-lexical-index']) {
     assert.ok(result.paths.includes(`.epr-meta/elohim/algorithms/${name}.json`));
   }
+});
+
+test('exhaust promise rejects sources, recipe references and audited reads, including future files', () => {
+  for (const input of ['.claude/data/future.jsonl', '.claude/data/**', '.claude/**', '.claude/**/*.jsonl', '**', '.']) {
+    assert.deepEqual(exhaustInputs({ exhaust: GATE_EXHAUST, sources: [input] }), [input]);
+  }
+  assert.deepEqual(exhaustInputs({ exhaust: GATE_EXHAUST, reads: ['**/future.jsonl'] }), ['**/future.jsonl']);
+  assert.deepEqual(exhaustInputs({ exhaust: GATE_EXHAUST, recipe: 'cat .claude/data/future.jsonl' }), ['.claude/data/future.jsonl']);
+  assert.deepEqual(exhaustInputs({ exhaust: GATE_EXHAUST, reads: ['.claude/data/runtime-cursor.json'] }), ['.claude/data/runtime-cursor.json']);
+  assert.deepEqual(exhaustInputs({ exhaust: GATE_EXHAUST, sources: ['**/*.rs', '.claude/data/failure-taxonomy.json'],
+    recipe: '# explains .claude/data/foo.jsonl\nnode tests.mjs' }), []);
+});
+
+test('REAL every gate keeps declared sources, recipes and audited reads disjoint from exhaust', () => {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const files = readdirSync(resolve(repo, '.claude/data')).map(name => `.claude/data/${name}`);
+  const failures = [];
+  for (const project of loadGateRegistry(repo).values()) {
+    const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
+    const sources = [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs?.sources || []))];
+    const reads = readSet({ root: repo, sources }).paths;
+    let recipe = '';
+    if (project.run.kind !== 'attested') {
+      const local = resolve(repo, project.dir, 'justfile');
+      recipe = readFileSync(project.run.kind !== 'root-just' && existsSync(local) ? local : resolve(repo, 'justfile'), 'utf8');
+    }
+    const conflicts = exhaustInputs({ exhaust: GATE_EXHAUST, files, sources, reads, recipe });
+    if (conflicts.length) failures.push({ project: project.name, conflicts });
+  }
+  assert.deepEqual(failures, [], 'remove a real input from GATE_EXHAUST; never silently ignore it');
 });
 
 // One list with the preflight that runs this same assertion before the gates (gate-preflight.mjs).

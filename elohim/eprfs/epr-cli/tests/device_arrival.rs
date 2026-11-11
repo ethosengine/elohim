@@ -117,9 +117,19 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "berth moored",
             "repository trusted",
             "peer daemon",
-            "device supervisor"
+            "device supervisor",
+            "rust toolchain",
+            "git hooks",
+            "brit trust",
+            "object packs"
         ]
     );
+    // No serve lock is held: siblings read this device as silent.
+    assert_eq!(checks[8]["state"], "degraded");
+    assert!(checks[8]["detail"].as_str().unwrap().contains("silent"));
+    // The fixture pins no toolchain and declares no governed hooks.
+    assert_eq!(checks[10]["state"], "ok");
+    assert_eq!(checks[11]["state"], "ok");
     assert_eq!(checks[2]["state"], "refused");
     assert_eq!(checks[4]["state"], "degraded");
     assert_eq!(checks[5]["state"], "degraded");
@@ -187,6 +197,8 @@ fn peer_daemon_status_compares_live_lease_with_current() {
         .unwrap();
     };
     write(&older, start);
+    // A live daemon holds its serve lock; liveness is the lock, never a recorded pid.
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&base.join("config/epr/peer")).unwrap();
     let (_, rows) = checks(base);
     let peer = rows.iter().find(|r| r["name"] == "peer daemon").unwrap();
     assert_eq!(peer["state"], "degraded");

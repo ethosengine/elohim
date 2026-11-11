@@ -24,24 +24,17 @@ fn test_pool(label: &str) -> DbPool {
     pool
 }
 
-/// A pool whose transport manifest binds `author_peer` to an agent, so the author's
-/// signed inventory envelopes are admitted (the holder key is the one its PeerId
-/// embeds).
-fn bound_pool(label: &str, author_peer: &str) -> DbPool {
-    use diesel::prelude::*;
-    use elohim_storage::db::diesel_schema::peer_transport_manifest::dsl as t;
+/// A pool where a cross-signed `AgentPeerBinding` binds the libp2p PeerId of
+/// `transport_secret` to an agent, so that author's signed inventory envelopes are
+/// admitted (the holder key is the one its PeerId embeds).
+fn bound_pool(label: &str, transport_secret: [u8; 32]) -> DbPool {
     let pool = test_pool(label);
     let mut conn = pool.get().unwrap();
-    diesel::insert_into(t::peer_transport_manifest)
-        .values((
-            t::agent_cid.eq("uhCAkTransportParityHolder"),
-            t::libp2p_peer_id.eq(author_peer),
-            t::discovery_methods_json.eq("[]"),
-            t::capability_level.eq(1),
-            t::last_observed.eq(1_i64),
-        ))
-        .execute(&mut conn)
-        .unwrap();
+    elohim_storage::test_util::bind_cross_signed(
+        &mut conn,
+        "uhCAkTransportParityHolder",
+        transport_secret,
+    );
     drop(conn);
     pool
 }
@@ -95,7 +88,7 @@ fn iroh_and_libp2p_dispatch_queue_identical_inventory_work() {
     let iroh_fetch = IrohInventoryFetch::new(Some(iroh_tx));
 
     dispatch(
-        &bound_pool("libp2p", &author),
+        &bound_pool("libp2p", secret),
         &libp2p_fetch,
         GossipSource::Libp2p {
             peer: "12D3KooWRelay".to_string(),
@@ -105,7 +98,7 @@ fn iroh_and_libp2p_dispatch_queue_identical_inventory_work() {
         &payload,
     );
     dispatch(
-        &bound_pool("iroh", &author),
+        &bound_pool("iroh", secret),
         &iroh_fetch,
         GossipSource::Iroh {
             node: "iroh-node-matrix".to_string(),

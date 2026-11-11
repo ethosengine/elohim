@@ -23,6 +23,10 @@ elohim-placement-core = { path = "../placement/core" }
 # eprfs-core and eprfs-serve, never on eprfs-storage or eprfs-local
 # (`boundary::eprfs_direction`, src/boundary.rs). Approved by the operator, 2026-10-20.
 eprfs-core = { version = "0.3.2", path = "../eprfs/eprfs-core" }
+# The payload store itself (artifact-store E4): `src/blob_store.rs` is a newtype shim over its
+# `BlobStore` (unlocked, for the `/blob` route), and `eprfs_tier::BlobStoreTier` is its `tier`
+# adapter re-exported. Its own workspace and lockfile, like crates/elohim-address.
+elohim-blob-store = { version = "0.1.0", path = "../../crates/elohim-blob-store", features = ["tier"] }
 
 # The pure parts of an EPR index (post-station-4 sprint, Lane S, ruling R-S1): the declared
 # chunk rule, the FTS5 fold store keyed by an opaque unit id, rank fusion and the fold

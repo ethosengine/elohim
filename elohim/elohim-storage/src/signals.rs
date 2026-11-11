@@ -139,7 +139,9 @@ impl SignalHandler {
             debug!(hash = %hash, "Blob request names no byte CID; ignored");
             return Ok(None);
         };
-        if self.store.exists(&cid).await != Exists::Verified {
+        // A peer's request must not make this node hash the payload; the transfer
+        // that follows reads (and so verifies) it.
+        if !self.store.present(&cid).await {
             debug!(hash = %hash, "Blob request received but we don't have it");
             return Ok(None);
         }
@@ -4450,5 +4452,30 @@ mod mishpat_replication_mirror_tests {
                 .state,
             "cancelled"
         );
+    }
+}
+
+#[cfg(test)]
+mod remote_probe_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn remote_probes_never_hash_the_payload() {
+        use crate::blob_store::tests::{nothing_quarantined, spoil_inline_payload};
+        let store = Arc::new(BlobStore::new_memory());
+        let stored = store.store(b"a payload a peer asks us for").await.unwrap();
+        spoil_inline_payload(&store, &stored.cid);
+        let handler = SignalHandler::new(Arc::clone(&store), "agent".to_string());
+        // A peer's request is answered from structure: no payload byte is hashed on
+        // its behalf and nothing is quarantined by it.
+        let reply = handler
+            .handle_signal(BlobSignal::Request {
+                hash: stored.cid.to_string(),
+                requester: "peer".to_string(),
+            })
+            .await
+            .unwrap();
+        assert!(matches!(reply, Some(BlobSignal::Announce { .. })));
+        assert!(nothing_quarantined(&store));
     }
 }

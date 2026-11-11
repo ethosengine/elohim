@@ -3,12 +3,12 @@
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, onRedPolicy,
+  checkArk, checkCargoDeny, checkCargoLocks, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -106,6 +106,66 @@ test('cargo-deny keeps its old scope: any selection, cargo or not', () => {
   assert.ok(calls.some(call => call.includes('deny --manifest-path elohim/Cargo.toml check bans')));
 });
 
+function cargoTree(t) {
+  const root = scratch(t);
+  put(root, 'ws/Cargo.toml', '[workspace]\nmembers = ["a", "b"]\n');
+  put(root, 'ws/Cargo.lock', '# lock\n');
+  put(root, 'ws/a/Cargo.toml', '[package]\nname = "a"\n');
+  put(root, 'ws/b/Cargo.toml', '[package]\nname = "b"\n');
+  return root;
+}
+const pa = { name: 'a', dir: 'ws/a', run: { kind: 'just', cargo: {} } };
+const pb = { name: 'b', dir: 'ws/b', run: { kind: 'just', cargo: {} } };
+const STALE = 'error: the lock file /x/ws/Cargo.lock needs to be updated but --locked was passed to prevent this\nIf you want to try to generate the lock file without accessing the network, remove the --locked flag and use --offline instead.';
+
+test('cargo-locks: a lock its manifests agree with is ok, checked --locked --offline, never writing', (t) => {
+  const root = cargoTree(t);
+  const before = readFileSync(join(root, 'ws/Cargo.lock'));
+  const calls = [];
+  const spawn = (cmd, args, opts) => { calls.push({ cmd, args, opts }); return { status: 0, stderr: '' }; };
+  const rows = checkCargoLocks({ root, projects: [pa], spawn, env: { RUSTFLAGS: '--cfg x' } });
+  assert.deepEqual(rows.map(r => [r.check, r.level]), [['cargo-lock:ws', 'ok']]);
+  assert.deepEqual(calls[0].args.slice(0, 4), ['metadata', '--locked', '--offline', '--format-version']);
+  assert.equal(calls[0].opts.env.RUSTFLAGS, '');
+  assert.equal(calls[0].opts.env.RUSTUP_TOOLCHAIN, '1.96.1');
+  assert.deepEqual(readFileSync(join(root, 'ws/Cargo.lock')), before, 'the check must not modify the lockfile');
+});
+
+test('cargo-locks: a stale lock is REFUSED naming the lockfile with the cure', (t) => {
+  const root = cargoTree(t);
+  const before = readFileSync(join(root, 'ws/Cargo.lock'));
+  const [r] = checkCargoLocks({ root, projects: [pa], spawn: () => ({ status: 101, stderr: STALE }) });
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, /ws\/Cargo\.lock/);
+  assert.match(r.cure, /cargo update --workspace --offline --manifest-path ws\/Cargo\.toml/);
+  assert.match(r.cure, /commit the lockfile with the manifest change/);
+  assert.deepEqual(readFileSync(join(root, 'ws/Cargo.lock')), before);
+});
+
+test('cargo-locks: a crate absent from the offline cache is a WARN, not a lock mismatch', (t) => {
+  const root = cargoTree(t);
+  const stderr = 'error: failed to download `foo v1.0.0`\nCaused by: attempting to make an HTTP request, but --offline was specified';
+  const [r] = checkCargoLocks({ root, projects: [pa], spawn: () => ({ status: 101, stderr }) });
+  assert.equal(r.level, 'WARN');
+  assert.match(r.why, /not a lock mismatch/);
+});
+
+test('cargo-locks: two projects in one workspace run cargo once', (t) => {
+  const root = cargoTree(t);
+  let n = 0;
+  const rows = checkCargoLocks({ root, projects: [pa, pb], spawn: () => { n += 1; return { status: 0 }; } });
+  assert.equal(n, 1);
+  assert.equal(rows.length, 1);
+});
+
+test('cargo-locks: a non-cargo project, and a DNA workspace, are not checked', (t) => {
+  const root = cargoTree(t);
+  put(root, 'elohim/holochain/dna/Cargo.toml', '[workspace]\n');
+  const dna = { name: 'dna', dir: 'elohim/holochain/dna', run: { kind: 'just', cargo: {} } };
+  const spawn = () => { throw new Error('cargo must not run'); };
+  assert.equal(checkCargoLocks({ root, projects: [app, dna], spawn }), null);
+});
+
 test('rows stream as each check completes', (t) => {
   const root = scratch(t);
   const seen = [];
@@ -117,12 +177,22 @@ test('rows stream as each check completes', (t) => {
 function readSetFixture(t) {
   const root = scratch(t);
   const registry = new Map();
-  for (const name of NAMED_READ_SET_PROJECTS) {
+  for (const name of PREFLIGHT_READ_SET_PROJECTS) {
     put(root, `${name}/build-manifest.json`, JSON.stringify({ steps: { s: { inputs: { sources: [`${name}/**`] } } } }));
     registry.set(name, { name, dir: name, manifestPath: `${name}/build-manifest.json`, steps: ['s'] });
   }
   return { root, registry };
 }
+
+test('read sets: eprfs is audited, so a new unnamed test-file read refuses before the gates', (t) => {
+  const { root, registry } = readSetFixture(t);
+  const read = ({ project }) => (project.name === 'eprfs'
+    ? { paths: [], unresolved: [{ file: 'eprfs/epr-cli/tests/session_envelope.rs', line: 269, expr: 'CARGO_MANIFEST_DIR/../../..' }] }
+    : { paths: [], unresolved: [] });
+  const red = checkReadSets({ root, registry, projects: [{ name: 'eprfs' }], changed: ['eprfs/epr-cli/tests/session_envelope.rs'], read });
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /session_envelope\.rs:269/);
+});
 
 test('read sets: an unnamed read in a changed crate refuses with file:line, unchanged crates are not audited', (t) => {
   const { root, registry } = readSetFixture(t);

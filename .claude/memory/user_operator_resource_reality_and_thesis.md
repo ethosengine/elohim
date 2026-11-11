@@ -7,7 +7,7 @@ metadata:
   node_type: memory
   type: user
   originSessionId: aaee4a8a-c291-4f19-ae5b-cb16a9fa706a
-  modified: 2026-08-05T14:54:29.636Z
+  modified: 2026-11-07T02:20:33.194Z
 cites:
   - genesis/research/playnet-free-association-cross-pollination-2026-08-05.md
 ---
@@ -46,5 +46,8 @@ existing at this resourcing is itself the evidence that the moment has arrived.
 - Treat what already exists as proof-of-concept for the human+AI leverage claim — it is the
   strongest empirical argument the project has, and it is worth making explicitly.
 
+**What the protocol owes its maker (steward, 2026-11-07, while adopting the licence):** "my attention and time is my labor.. the elohim protocol owes me that.. not sure what outside of our network it's worth in what denominator... but it's owed unaccounted for now, and I'm ok with that." Under the licence's Georgist split his attention, time and direction are labour's produce; the commons owes him in labour's kind; the debt is recorded as owed and unaccounted, in no outside denominator, with the seat held — the covenant's own rule turned toward its own maker (no default allocation; any valuation is a claim with its method cited; settled at the table, never announced). Recorded in COVENANT.md and the licence's holder-of-record section. **Never propose a valuation, allocation or compensation scheme for his contribution on his behalf;** record reliance as fact and leave the settlement to the table.
+
 Pairs with [[feedback_peer_collectives_starved_of_coordination_scale]] (their scarcity is shared
-condition, not defect) and [[feedback_human_loop_not_terminal_authority]].
+condition, not defect), [[feedback_human_loop_not_terminal_authority]] and
+[[feedback_dayjob_feedback_flows_through_matthew_only]].

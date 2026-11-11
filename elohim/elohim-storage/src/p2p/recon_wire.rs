@@ -23,6 +23,13 @@ pub const RECON_MAX_FRAME: usize = RECON_PAGE_LIMIT + ENVELOPE_ROOM;
 /// reads as "no ranges left" and finishes on.
 pub const RECON_EMPTY_REPLY: [u8; 1] = [0x61];
 
+/// The typed busy refusal: a single byte that is not a negentropy version (`0x62`, one
+/// past [`RECON_EMPTY_REPLY`]'s `0x61`). An initiator's reconcile rejects it as an
+/// unsupported version, so its session ends with the cursor unmoved; it should retry
+/// later, not immediately. Sent when a peer is over the per-peer inbound limit
+/// (`recon_limit`).
+pub const RECON_BUSY_REPLY: [u8; 1] = [0x62];
+
 #[derive(Debug, Clone)]
 pub struct ReconProtocol;
 

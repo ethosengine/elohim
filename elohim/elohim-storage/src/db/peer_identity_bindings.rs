@@ -52,6 +52,9 @@ pub fn upsert(
 /// into the incoming row before delegating to [`upsert`].
 ///
 /// Behavior:
+/// - A row that already exists for `(peer_id, dht_anchor_hash)` and classified
+///   `cross_signed` is never replaced: a non-authoritative writer can never lower a
+///   proof (the anchor is unsigned, so anyone can reuse it).
 /// - If a row already exists for `(peer_id, dht_anchor_hash)` with
 ///   `superseded_by = Some(_)` and the incoming row has `superseded_by =
 ///   None`, the prior value is preserved.
@@ -62,6 +65,20 @@ pub fn upsert_preserving_supersession(
     row: &NewPeerIdentityBindingRow,
 ) -> Result<(), StorageError> {
     use peer_identity_bindings::dsl;
+
+    // Never lower a proof. `dht_anchor_hash` is unsigned, so a copy that reuses a
+    // cross-signed row's anchor with a junk (or merely different) signature would
+    // otherwise REPLACE it and strip it to unverified. A cross-signed row is left
+    // exactly as it is by every non-authoritative writer.
+    let existing_proof: Option<PeerIdentityBindingRow> = dsl::peer_identity_bindings
+        .filter(dsl::peer_id.eq(&row.peer_id))
+        .filter(dsl::dht_anchor_hash.eq(&row.dht_anchor_hash))
+        .first::<PeerIdentityBindingRow>(conn)
+        .optional()
+        .map_err(|e| StorageError::Database(format!("peer_identity_bindings proof-lookup: {e}")))?;
+    if existing_proof.is_some_and(|existing| existing.is_cross_signed()) {
+        return Ok(());
+    }
 
     let existing_superseded_by: Option<Option<String>> = dsl::peer_identity_bindings
         .filter(dsl::peer_id.eq(&row.peer_id))

@@ -702,6 +702,32 @@ pub fn reset_refusals_for_new_head(channel_id: &str) {
     }
 }
 
+/// Clear the refusal streak and backoff of every channel whose last verdict
+/// is `conductor_unavailable`, returning how many it cleared.
+///
+/// Called once, when a controller built without a conductor is replaced by
+/// one wired through it ([`super::watch::spawn_late_bound`]). The verdict is
+/// kept — it is still the latest thing this node knows until the next sweep
+/// overwrites it — only the timer goes, because a refusal that said "this node
+/// has no conductor" carries no information once it has one.
+pub fn clear_conductor_unavailable_backoff() -> usize {
+    let mut channels = REGISTRY.channels.lock().unwrap();
+    let mut cleared = 0;
+    for state in channels.values_mut() {
+        let waiting_on_conductor = matches!(
+            &state.verdict,
+            Some(Verdict::Refused { refusal })
+                if refusal.reason_code() == RefusalReason::ConductorUnavailable
+        );
+        if waiting_on_conductor {
+            state.consecutive_refusals = 0;
+            state.next_check_not_before = None;
+            cleared += 1;
+        }
+    }
+    cleared
+}
+
 /// Record a completed check for one channel.
 pub fn record_check(
     channel_id: &str,

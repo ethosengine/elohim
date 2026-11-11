@@ -24,6 +24,7 @@
           "elohim/elohim-cache-core/**",
           "elohim/epr/**",
           "crates/elohim-address/**",
+          "crates/elohim-blob-store/**",
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/Cargo.toml",
@@ -103,6 +104,7 @@
             "genesis/scripts/ci/edge-1672-inputs.json",
             "app/elohim-app/scripts/hc-mesh.sh",
             "app/elohim-app/scripts/__tests__/hc-mesh-storage-port.test.sh",
+            "app/elohim-app/scripts/__tests__/hc-mesh-closure-staleness.test.sh",
             "genesis/agentic/bin/berth",
             "genesis/agentic/berth_test.py",
             "genesis/agentic/pool-policy.json"

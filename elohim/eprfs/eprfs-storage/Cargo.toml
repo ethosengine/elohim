@@ -1,6 +1,6 @@
 [package]
 name = "eprfs-storage"
-version = "0.3.6"
+version = "0.3.7"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -20,6 +20,8 @@ blake3 = "1"
 serde.workspace = true
 serde_json.workspace = true
 serde_ipld_dagcbor = "0.6"
+# Retained `ext` namespace content (D7), decoded as opaque DAG-CBOR data.
+ipld-core = "0.4"
 sha2 = "0.10"
 # Explicit cleanup control used when retaining failed object writes.
 tempfile = "3.27"

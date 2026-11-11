@@ -1,6 +1,7 @@
 {
   "name": "elohim-steward",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "description": "Elohim Steward - Run Holochain as a steward of creation",
   "type": "module",
   "scripts": {

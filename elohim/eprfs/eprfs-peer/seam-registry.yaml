@@ -698,3 +698,162 @@ decisionPoints:
       Classification is the spec's Private (B) self-reach custody. The worst local holder sees
       artifact bytes, closure identity and sizes; no cross-holon join or network disclosure is
       added. The serve-blob scope predicate and unauthorized-CID refusal remain out of slice 1.
+
+  - name: resolve_holders
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/fetch.rs
+      modulePath: eprfs_peer::resolve_holders
+    summary: "Select one output by explicit expectation, own Produce or strict distinct-device plurality; preserve unresolved ties and record divergence in the CLI's existing flow store."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Custody availability over the existing Produce fold; not head selection, reach expansion or remote authority."
+      - id: C1
+        status: answered
+        justification: "The CLI admits sibling records through the existing roster; claimed outputs never admit their devices."
+      - id: C2
+        status: n-a
+        justification: "This local preference does not promote standing or mutate source records."
+      - id: C3
+        status: answered
+        justification: "Pure local selection terminates without waiting on a peer; existing fetch deadlines bound the subsequent transfer."
+      - id: C4
+        status: answered
+        justification: "Absent expected output has a typed CID-bearing gap, no records are NoRecord, and unresolved ties remain Mismatch."
+      - id: C5
+        status: answered
+        justification: "Expected output, own Produce, then distinct-device plurality narrow candidates; daemon admission and CID checks still judge every byte."
+      - id: C6a
+        status: answered
+        justification: "One ordered map fold over existing records; custody is held per device, key and output, so a later production does not erase an earlier output the device still serves."
+      - id: C6b
+        status: answered
+        justification: "The selection is pure; CLI divergence check and append share an exclusive flow transaction, deduplicated by key and sorted output set."
+      - id: C7
+        status: n-a
+        justification: "This query introduces no advertisement or serving path."
+      - id: C8
+        status: answered
+        justification: "The result names expected, own or plurality; CLI prints divergence and records own/plurality divergence as Cite observation."
+      - id: C9
+        status: answered
+        justification: "Existing key and output CIDs and roster device DIDs are retained; membership is per device, key and output, and the latest own production is only the preference input for the own rule, which applies only when another device holds that output (fetch sources and counts exclude this device)."
+      - id: C10
+        status: answered
+        justification: "Optional expectOutput defaults to None for existing queued requests; daemon refuses a contradictory expected output."
+      - id: C11
+        status: n-a
+        justification: "Pure selection adds no remote fan-out; existing fetch budgets govern transfer."
+      - id: C12
+        status: answered
+        justification: "Same steward roster boundary; local records must name this device as receiver, remote records must be crossed Produce from admitted siblings."
+      - id: C13
+        status: n-a
+        justification: "No authority tier is introduced."
+      - id: C14
+        status: partial
+        justification: "Custody claims are not live availability or failure-domain independence; the byte transfer can still return existing typed gaps."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: holder_selection_prefers_expected_then_latest_own_with_remote_custody
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: plurality_fetch_uses_only_the_chosen_outputs_holders
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetch
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/artifact.rs
+        testName: fetch_plurality_queues_only_chosen_holders_and_records_divergence_once
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/artifact.rs
+        testName: holders_by_output_and_key_share_distinct_counts_and_advisory_warning
+        kind: integration
+
+  - name: resolve_output_holders
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/fetch.rs
+      modulePath: eprfs_peer::resolve_output_holders
+    summary: "Resolve a pinned output across the existing custody fold; queue explicit Output authority, rechecked by the daemon, with no claim of a locally computed key. Verify the producer's method through the artifact's existing serve grant."
+    concernIds:
+      - { id: C0, status: answered, justification: "Existing private custody and tier primitives; no DHT entity, route or head." }
+      - { id: C1, status: answered, justification: "CLI roster admission and daemon admission both apply; CID equality does not confer standing." }
+      - { id: C2, status: n-a, justification: "No promotion or standing mutation." }
+      - { id: C3, status: answered, justification: "Existing total deadline and manifest cap cover method retrieval as well as payload transfer." }
+      - { id: C4, status: answered, justification: "Missing output, local-only custody, invalid authority and integrity failures remain typed gaps." }
+      - { id: C5, status: answered, justification: "Output authority pins bytes; Derivation authority still requires exact key equality. Neither bypasses grants or install scope." }
+      - { id: C6a, status: answered, justification: "One newest claim per remote device for the pinned output; identical output under several keys selects the newest manifest the serving index holds." }
+      - { id: C6b, status: answered, justification: "Existing queue rename, request nonce, whole-blob verification and atomic install remain the write boundary." }
+      - { id: C7, status: answered, justification: "Method becomes an artifact member under the same root and object admission; no unrelated blob is exposed." }
+      - { id: C8, status: answered, justification: "CLI reports authority and output; output fetch has null keyCid instead of claiming a derived key." }
+      - { id: C9, status: answered, justification: "Existing byte CIDs, derivation method CIDs and device DIDs are reused." }
+      - { id: C10, status: partial, justification: "Queue wire shape now requires explicit authority; old queued key-only requests must be reissued after daemon upgrade." }
+      - { id: C11, status: answered, justification: "One bounded method fetch before chunks, existing holder and transfer limits." }
+      - { id: C12, status: answered, justification: "Same steward boundary; the sysroot-pack grant names only admitted steward devices." }
+      - { id: C13, status: n-a, justification: "No authority tier added." }
+      - { id: C14, status: partial, justification: "Custody is a claim of possession, not live availability or ISA admission." }
+    contractTests:
+      - { path: elohim/eprfs/eprfs-peer/tests/fetch.rs, testName: output_holders_fold_across_keys_and_report_missing_or_local_only, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/fetch.rs, testName: output_authority_fetches_producer_method_and_exact_bytes_without_a_local_key, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/fetch.rs, testName: a_queued_expected_fetch_installs_retained_output_after_a_newer_production, kind: integration }
+      - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: artifact_sysroot_put_then_output_fetch_uses_explicit_cid_authority, kind: integration }
+  - name: admit_method
+    kind: verdict-fn
+    sourceLocation:
+      file: src/gate.rs
+      modulePath: eprfs_peer::StewardDevicesGate::admit_method
+    summary: "Method descriptors require an existing audience grant AND digest-covered berth.artifacts.discloseMethod membership, default deny. Reload takes effect per request. Both tier answers and direct object admission filter descriptor bytes; holding a descriptor does not authorize disclosure."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "A stranger receives the same refusal, carrying no standing label, for a held root and an unknown one; its request never reaches the store."
+      - id: C1
+        status: answered
+        justification: "The requester's identity is the node id iroh authenticated in the handshake, mapped through the device's own roster; nothing the peer sends names it."
+      - id: C2
+        status: n-a
+        justification: "No head order."
+      - id: C3
+        status: answered
+        justification: "Synchronous read of the shared admission; a poisoned lock refuses rather than waits."
+      - id: C4
+        status: answered
+        justification: "Not admitted is one refusal (OutsideStanding, no label) whatever the reason: unknown, contested, rotated away or anonymous."
+      - id: C5
+        status: answered
+        justification: "Admission re-verifies every roster row on reload; the gate only reads its verdict."
+      - id: C6a
+        status: answered
+        justification: "Two map reads per request."
+      - id: C6b
+        status: answered
+        justification: "Read-only; reload replaces admission under the write lock."
+      - id: C7
+        status: n-a
+        justification: "Nothing is advertised."
+      - id: C8
+        status: answered
+        justification: "Admitted refusals carry disclose-method:<name>; strangers receive uniform refusals. The existing served/refused ledger records each answer."
+      - id: C9
+        status: answered
+        justification: "Admission is read on every request, so a reload that contests or rotates a device takes effect at its next request on an already-open connection."
+      - id: C10
+        status: answered
+        justification: "Old serves-only policies continue serving manifests/chunks, but do not disclose methods; adding disclosure changes the rules digest."
+      - id: C11
+        status: n-a
+        justification: "No fan-out."
+      - id: C12
+        status: answered
+        justification: "Default deny; no admit-on-error path, and a poisoned lock admits nobody."
+      - id: C13
+        status: n-a
+        justification: "The same at every stage."
+      - id: C14
+        status: partial
+        justification: "Refusals are counted, not witnessed."
+    contractTests:
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: descriptor_disclosure_requires_explicit_permission_and_revokes_on_reload, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/rules.rs, testName: descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant, kind: unit }

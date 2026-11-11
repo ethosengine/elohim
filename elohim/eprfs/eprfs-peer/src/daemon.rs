@@ -7,6 +7,9 @@
 //!   device at once, with no restart;
 //! - re-reads the policy when it changed, keeping the last loaded rules on an unreadable or
 //!   malformed replacement and re-projecting when the enforced rules change;
+//! - re-indexes the artifact mount, when the daemon has a payload store, from the custody
+//!   manifests the flow store records, and records each closed `serve-blob` session as one Use
+//!   event ([`BlobMount`]);
 //! - re-projects the channel tree when the flow store changed, and installs it in the store the
 //!   tier serves (a failure is recorded in the head table, where `epr peer status` reads it, and
 //!   the same state of the store is retried with a growing wait: [`ProjectionRetry`]);
@@ -28,8 +31,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use elohim_epr_rea::{ParticipantRow, SidecarFlowStore, SignatureVerifier};
-use eprfs_core::TreeLimits;
+use elohim_epr_rea::{FlowRecord, FlowStore, ParticipantRow, SidecarFlowStore, SignatureVerifier};
+use eprfs_core::{EprfsStorage, TreeLimits};
 use futures_lite::StreamExt;
 use iroh::protocol::Router;
 use iroh::{Endpoint, NodeAddr, NodeId};
@@ -42,17 +45,25 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
+use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw, INDEX_RETRY_FIRST};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
+use crate::fetch::{
+    admitted_holders, ensure_queue_dir, fetch_authorized_until, fetch_cancel_path, fetch_done_path,
+    fetch_queue_dir, install_fetched, queue_dir_is_private, read_queue_file, write_queue_file,
+    FetchDone, FetchFor, FetchGap, FetchRequest, InstallScope,
+};
 use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldReport, FoldTarget};
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
+use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesState};
+use crate::serves::ArtifactServeList;
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -273,6 +284,11 @@ pub struct PeerConfig {
     pub verifier: Arc<dyn SignatureVerifier + Send + Sync>,
     /// Where the daemon reports what it did, one line at a time.
     pub log: Arc<dyn Fn(&str) + Send + Sync>,
+    /// The device's payload store, whose custody artifacts the tier serves to the devices
+    /// `rules.serves()` grants; `None` for a channel-only daemon, which serves no artifact.
+    pub payload_store: Option<Arc<dyn EprfsStorage>>,
+    /// Where a queued sibling fetch may install its artifact; the default admits nothing.
+    pub install: InstallScope,
 }
 
 /// A running device daemon.
@@ -312,15 +328,34 @@ impl PeerDaemon {
             });
         }
         table.save(&config.state_dir)?;
+        // The fetch queue is this device's own: created 0700 before anything can be queued.
+        ensure_queue_dir(&fetch_queue_dir(&config.state_dir))
+            .map_err(|e| ended(format!("the fetch queue cannot be created: {e}")))?;
         let store = Arc::new(ChannelStore::default());
         let limits = TierLimits::default();
         let book = ConnectionBook::default();
         book.name(roster_named_nodes(&rows, &config.chain_root));
-        let tier = TierProtocol::new(
+        let serves = Arc::new(RwLock::new(config.rules.serves().clone()));
+        let (mount, served_rx) = match &config.payload_store {
+            Some(payload) => {
+                let (mount, served_rx) = BlobMount::new(payload.clone(), config.device.clone());
+                (Some(Arc::new(mount)), Some(served_rx))
+            }
+            None => (None, None),
+        };
+        let scope = DeviceScope::new(
+            store.clone(),
+            mount.clone(),
+            serves.clone(),
+            admission.clone(),
+        );
+        let tier = TierProtocol::with_scope(
             channel_tier_id(),
             store.clone(),
             admission.clone(),
             limits.clone(),
+            Arc::new(scope),
+            mount.clone(),
         )
         .map_err(|e| PeerError::ChannelTree {
             reason: e.to_string(),
@@ -390,6 +425,16 @@ impl PeerDaemon {
             waiting: HashMap::new(),
             held: HashMap::new(),
             stats: stats.clone(),
+            mount,
+            served_rx,
+            index_stamp: None,
+            indexed_once: false,
+            index_task: None,
+            index_retry_at: None,
+            serves,
+            fetch_task: None,
+            queue_pruned: None,
+            queue_open_logged: false,
             config,
         };
         let (stop, stopped) = oneshot::channel();
@@ -516,6 +561,42 @@ fn seed_endpoint(
     }
 }
 
+/// How long answered and withdrawn queue files are kept.
+const QUEUE_RETAIN: Duration = Duration::from_secs(3600);
+
+/// The oldest-named queued fetch request in `queue` and its stem (`<key>-<nonce>`): a `.json`
+/// entry, never an answer (`.done.json`). An entry that is not a regular file (a link, a FIFO, a
+/// device) is removed without being opened.
+fn next_request(
+    queue: &std::path::Path,
+    log: &(dyn Fn(&str) + Send + Sync),
+) -> Option<(PathBuf, String)> {
+    let mut requests: Vec<(PathBuf, String)> = Vec::new();
+    for entry in std::fs::read_dir(queue).ok()?.filter_map(Result::ok) {
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
+        };
+        let Some(stem) = name.strip_suffix(".json") else {
+            continue;
+        };
+        if stem.ends_with(".done") {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::symlink_metadata(&path) {
+            Ok(meta) if meta.file_type().is_file() => requests.push((path, stem.to_string())),
+            _ => {
+                log(&format!(
+                    "fetch queue entry {name} is not a regular file; removed unread"
+                ));
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    requests.sort();
+    requests.into_iter().next()
+}
+
 /// A file's length and modification time, to notice it changed.
 type Stamp = Option<(u64, SystemTime)>;
 
@@ -595,6 +676,28 @@ struct Run {
     /// Original event CIDs held from each device, rebuilt lazily after start or any uncertain fold.
     held: HashMap<String, Arc<HashSet<cid::Cid>>>,
     stats: Arc<RunStats>,
+    /// The artifact mount, when this device has a payload store.
+    mount: Option<Arc<BlobMount>>,
+    /// Closed `serve-blob` sessions, recorded on the tick.
+    served_rx: Option<mpsc::Receiver<ServedDraw>>,
+    /// The state of the flow log the mount was last indexed from.
+    index_stamp: Stamp,
+    indexed_once: bool,
+    /// The one rebuild of the mount in flight, off the loop: reading and hashing artifacts never
+    /// delays a tick (a roster or policy reload, a projection, an announce).
+    index_task: Option<JoinHandle<Vec<PeerError>>>,
+    /// When a rebuild next falls due with no change to the log, so a manifest whose backoff has
+    /// run out is tried again.
+    index_retry_at: Option<Instant>,
+    /// The artifact grant the tier's scope reads; replaced when the rules reload.
+    serves: Arc<RwLock<ArtifactServeList>>,
+    /// The one queued sibling fetch in flight, off the loop (artifact-store design §3.b.2): its
+    /// task, its queue stem and who its answer is for.
+    fetch_task: Option<(JoinHandle<()>, String, FetchFor)>,
+    /// When answered and withdrawn queue files were last pruned.
+    queue_pruned: Option<Instant>,
+    /// Whether a queue directory that is not private has been reported.
+    queue_open_logged: bool,
 }
 
 impl Run {
@@ -687,6 +790,12 @@ impl Run {
                 },
             }
         };
+        if let Some(task) = self.index_task.take() {
+            task.abort();
+        }
+        if let Some((task, _, _)) = self.fetch_task.take() {
+            task.abort();
+        }
         // Best effort on the way out: the counters are worth keeping, the head is already saved.
         let _ = self.save();
         ended
@@ -851,6 +960,9 @@ impl Run {
     async fn tick(&mut self) -> Result<(), PeerError> {
         self.reload_roster().await;
         self.reload_rules()?;
+        self.reindex().await;
+        self.record_serves();
+        self.fetch_queued();
         self.maintain_rejoins().await;
         // Refused connections reach the head table `epr peer status` reads: kept in memory every
         // tick, written with the next announce, or on their own at most once per re-announce
@@ -981,8 +1093,10 @@ impl Run {
         }
     }
 
-    /// Re-read both enforced rule sets when their policy file changed. A bad replacement keeps
-    /// the loaded rules and is recorded for status readers.
+    /// Re-read the enforced rule sets when their policy file changed. A bad replacement keeps
+    /// the loaded crossing and steward rules and is recorded for status readers, but revokes
+    /// serving: the artifact grant is empty (deny) until a policy that reads loads again. A grant
+    /// is never carried past a policy that no longer says it.
     fn reload_rules(&mut self) -> Result<(), PeerError> {
         let Some(policy) = self.config.policy.clone() else {
             return Ok(());
@@ -994,6 +1108,10 @@ impl Run {
         self.policy_stamp = now;
         match Rules::from_policy_file(&policy) {
             Ok(rules) => {
+                // Restored on every policy that reads, a revocation's included.
+                if let Ok(mut serves) = self.serves.write() {
+                    *serves = rules.serves().clone();
+                }
                 let old = self.config.rules.digest();
                 let new = rules.digest();
                 if old == new {
@@ -1023,6 +1141,10 @@ impl Run {
                 self.save()
             }
             Err(error) => {
+                // Fail closed for serving, every time the file fails to read.
+                if let Ok(mut serves) = self.serves.write() {
+                    *serves = ArtifactServeList::default();
+                }
                 let reason = error.to_string();
                 let digest = self.config.rules.digest();
                 let already_pending = self
@@ -1035,7 +1157,8 @@ impl Run {
                     return Ok(());
                 }
                 self.log(&format!(
-                    "rules not reloaded, keeping {}: {reason}",
+                    "rules not reloaded, keeping {} and serving no artifact until a policy \
+                     reads: {reason}",
                     digest.short()
                 ));
                 if let Some(state) = self.channel.rules_state_mut().as_mut() {
@@ -1043,6 +1166,303 @@ impl Run {
                 }
                 self.save()
             }
+        }
+    }
+
+    /// Re-index the artifact mount from the flow store when the log moved, on a task of its own
+    /// and one at a time: a finished rebuild reports what it could not index, and a log that
+    /// moved meanwhile is rebuilt next. The tick itself only reads the log.
+    async fn reindex(&mut self) {
+        let Some(mount) = self.mount.clone() else {
+            return;
+        };
+        if self
+            .index_task
+            .as_ref()
+            .is_some_and(JoinHandle::is_finished)
+        {
+            if let Some(task) = self.index_task.take() {
+                match task.await {
+                    Ok(unindexed) => {
+                        for error in unindexed {
+                            self.log(&error.to_string());
+                        }
+                    }
+                    Err(e) => self.log(&format!("artifact index rebuild failed: {e}")),
+                }
+            }
+        }
+        if self.index_task.is_some() {
+            return;
+        }
+        let now = stamp(self.flow.log_path());
+        // A rebuild also falls due when a failed manifest's backoff may have run out.
+        let retry_due = self.index_retry_at.is_some_and(|at| Instant::now() >= at);
+        if self.indexed_once && now == self.index_stamp && !retry_due {
+            return;
+        }
+        // Settled per state of the log, failed or not: the next append is the next try.
+        self.index_stamp = now;
+        self.indexed_once = true;
+        self.index_retry_at = Some(Instant::now() + INDEX_RETRY_FIRST);
+        let events = match self.flow.events() {
+            Ok(events) => events,
+            Err(e) => {
+                self.log(&format!(
+                    "artifacts not indexed: the flow store failed: {e}"
+                ));
+                return;
+            }
+        };
+        self.index_task = Some(tokio::spawn(async move {
+            mount.rebuild_from_flow(&events).await
+        }));
+    }
+
+    /// Close idle `serve-blob` sessions and record every closed one as one Use event provided by
+    /// this device to its requester. A record that cannot be appended is reported, never retried
+    /// into a second event.
+    fn record_serves(&mut self) {
+        let (Some(mount), Some(served_rx)) = (self.mount.as_ref(), self.served_rx.as_mut()) else {
+            return;
+        };
+        mount.sweep_idle(Instant::now());
+        let mut draws = Vec::new();
+        while let Ok(draw) = served_rx.try_recv() {
+            draws.push(draw);
+        }
+        for draw in draws {
+            let event = draw.use_event(&self.config.device, rfc3339_utc(SystemTime::now()));
+            if let Err(source) = self.flow.append(FlowRecord::Event(event)) {
+                let error = PeerError::ServeUnrecorded {
+                    artifact: Box::new(draw.artifact.clone()),
+                    source,
+                };
+                self.log(&error.to_string());
+            }
+        }
+    }
+
+    /// Start the next fetch `epr artifact fetch` queued in `<state dir>/fetch-queue`, one at a
+    /// time and on a task of its own (design §3.b.2): only this daemon holds the device's peer key,
+    /// so only it dials.
+    ///
+    /// The queue is read only while it is private (0700). An entry is read only when it is a
+    /// regular file within the size cap, opened without following a link and without blocking;
+    /// anything else is removed unread. A request is claimed (removed) before it runs, is answered
+    /// in `<key>-<nonce>.done.json` naming its nonce, key, output and destination, and is withdrawn
+    /// by `<key>-<nonce>.cancel`. Holders are re-resolved under this daemon's admission now, the
+    /// destination must lie in its install scope, and every integrity rule is `fetch_artifact`'s
+    /// and `install_fetched`'s, under one deadline from the first dial through the install.
+    fn fetch_queued(&mut self) {
+        let queue = fetch_queue_dir(&self.config.state_dir);
+        if let Some((task, stem, for_request)) = &self.fetch_task {
+            if !task.is_finished() {
+                let cancel = fetch_cancel_path(&queue, stem);
+                if std::fs::symlink_metadata(&cancel).is_ok() {
+                    task.abort();
+                    let _ = std::fs::remove_file(&cancel);
+                    let (stem, for_request) = (stem.clone(), for_request.clone());
+                    self.write_done(
+                        &fetch_done_path(&queue, &stem),
+                        &FetchDone::gap(for_request, FetchGap::Cancelled),
+                    );
+                    self.log(&format!("fetch {stem} withdrawn by its requester"));
+                    self.fetch_task = None;
+                }
+                return;
+            }
+        }
+        self.fetch_task = None;
+        if !queue_dir_is_private(&queue) {
+            if !self.queue_open_logged {
+                self.queue_open_logged = true;
+                self.log(&format!(
+                    "the fetch queue {} is not a private (0700) directory; nothing in it is read",
+                    queue.display()
+                ));
+            }
+            return;
+        }
+        self.queue_open_logged = false;
+        self.prune_queue(&queue);
+        let Some((path, stem)) = next_request(&queue, &*self.config.log) else {
+            return;
+        };
+        let read = read_queue_file(&path);
+        // Claimed: a request runs once, whatever it holds.
+        let _ = std::fs::remove_file(&path);
+        let request = match read.and_then(|bytes| {
+            serde_json::from_slice::<FetchRequest>(&bytes).map_err(|e| e.to_string())
+        }) {
+            Ok(request) => request,
+            Err(e) => {
+                // Unreadable: nobody can be answered, because nothing names who asked.
+                self.log(&format!("fetch request {stem} dropped: {e}"));
+                return;
+            }
+        };
+        let for_request = FetchFor::of(&request);
+        let done = fetch_done_path(&queue, &stem);
+        let refused = |reason: String| {
+            FetchDone::gap(
+                for_request.clone(),
+                FetchGap::InstallRefused {
+                    dest: request.dest.display().to_string(),
+                    reason,
+                },
+            )
+        };
+        if request.stem() != stem || request.authority.validate(&request.output).is_err() {
+            let answer =
+                refused("the request's key and nonce do not name the file it was queued in".into());
+            self.write_done(&done, &answer);
+            return;
+        }
+        if request
+            .expect_output
+            .as_ref()
+            .is_some_and(|output| output != &request.output)
+        {
+            let answer =
+                refused("the selected output differs from the caller's expected output".into());
+            self.write_done(&done, &answer);
+            return;
+        }
+        let dest = match self.config.install.admits(&request.dest) {
+            Ok(dest) => dest,
+            Err(reason) => {
+                let answer = refused(reason);
+                self.write_done(&done, &answer);
+                return;
+            }
+        };
+        let Ok(scope) = request.scope.parse::<cid::Cid>() else {
+            let answer = refused(format!("the queued scope {} is not a CID", request.scope));
+            self.write_done(&done, &answer);
+            return;
+        };
+        let Some(mount) = self.mount.clone() else {
+            self.write_done(
+                &done,
+                &FetchDone::gap(for_request.clone(), FetchGap::DaemonDown),
+            );
+            return;
+        };
+        let holders = admitted_holders(&request.holders, &self.config.device, |device| {
+            let node = self.admission.read().ok()?.node_for(device)?;
+            Some(self.peers.get(&node).cloned().unwrap_or_else(|| {
+                let addr = NodeAddr::new(node);
+                match &self.config.relay {
+                    Some(relay) => addr.with_relay_url(relay.clone().into()),
+                    None => addr,
+                }
+            }))
+        });
+        let endpoint = self.endpoint.clone();
+        let flow_root = self.config.flow_root.clone();
+        let device = self.config.device.clone();
+        let log = self.config.log.clone();
+        self.log(&format!(
+            "fetching {} from {} holder(s) into {}",
+            request.output,
+            holders.len(),
+            dest.display()
+        ));
+        let answer_for = for_request.clone();
+        let task = tokio::spawn(async move {
+            let store = mount.store().clone();
+            let budget = request.budget();
+            let deadline = Instant::now() + budget.total;
+            let outcome = async {
+                let fetched = fetch_authorized_until(
+                    &endpoint,
+                    store.as_ref(),
+                    &request.authority,
+                    &request.output,
+                    &holders,
+                    &budget,
+                    deadline,
+                )
+                .await?;
+                let mut flow =
+                    SidecarFlowStore::open(&flow_root).map_err(|e| FetchGap::LocalStore {
+                        reason: e.to_string(),
+                    })?;
+                let context = LocalBlobContext {
+                    custodian: elohim_epr_rea::AgentRef(device),
+                    in_scope_of: scope,
+                    occurred_at: rfc3339_utc(SystemTime::now()),
+                    crossing: None,
+                };
+                let installing =
+                    install_fetched(store.as_ref(), &mut flow, &fetched, &context, &dest);
+                let until = tokio::time::Instant::from_std(deadline);
+                match tokio::time::timeout_at(until, installing).await {
+                    Ok(installed) => installed?,
+                    Err(_) => {
+                        return Err(FetchGap::DeadlineExceeded {
+                            fetched: fetched.manifest.byte_len,
+                            total: fetched.manifest.byte_len,
+                        })
+                    }
+                }
+                Ok::<_, FetchGap>(fetched)
+            }
+            .await;
+            let written = match &outcome {
+                Ok(fetched) => FetchDone::installed(answer_for.clone(), fetched),
+                Err(gap) => FetchDone::gap(answer_for.clone(), gap.clone()),
+            };
+            match &outcome {
+                Ok(fetched) => log(&format!(
+                    "fetched {} ({} chunks, {} resumed, {} bytes wasted)",
+                    request.output, fetched.chunks_fetched, fetched.chunks_resumed, fetched.wasted
+                )),
+                Err(gap) => log(&format!("fetch of {} gap: {gap}", request.output)),
+            }
+            if let Err(e) = write_queue_file(&done, &written) {
+                log(&format!("fetch answer {} not written: {e}", done.display()));
+            }
+        });
+        self.fetch_task = Some((task, stem, for_request));
+    }
+
+    /// Remove answers and withdrawals older than [`QUEUE_RETAIN`] (nobody waits that long), at
+    /// most once per [`REANNOUNCE_EVERY`].
+    fn prune_queue(&mut self, queue: &std::path::Path) {
+        let now = Instant::now();
+        if self
+            .queue_pruned
+            .is_some_and(|at| now.duration_since(at) < REANNOUNCE_EVERY)
+        {
+            return;
+        }
+        self.queue_pruned = Some(now);
+        let Ok(entries) = std::fs::read_dir(queue) else {
+            return;
+        };
+        for entry in entries.filter_map(Result::ok) {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if !(name.ends_with(".done.json") || name.ends_with(".cancel")) {
+                continue;
+            }
+            let old = entry
+                .metadata()
+                .ok()
+                .and_then(|meta| meta.modified().ok())
+                .and_then(|at| at.elapsed().ok())
+                .is_some_and(|age| age >= QUEUE_RETAIN);
+            if old {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    fn write_done(&self, path: &std::path::Path, done: &FetchDone) {
+        if let Err(e) = write_queue_file(path, done) {
+            self.log(&format!("fetch answer {} not written: {e}", path.display()));
         }
     }
 

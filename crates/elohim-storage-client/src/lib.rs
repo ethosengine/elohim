@@ -39,6 +39,7 @@ pub mod types;
 
 // Re-export main types
 pub use client::StorageClient;
+pub use elohim_address::ByteCid;
 pub use error::{Result, StorageError};
 pub use sync::{AutomergeSync, SyncResult};
 pub use types::*;

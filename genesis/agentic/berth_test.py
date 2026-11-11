@@ -1662,8 +1662,9 @@ class StewardClaimTest(unittest.TestCase):
         # 2026-10-30, after a power loss: the view had not folded the override row yet, the
         # pending verdict carried no device, and the reason formatter raised. The claim then
         # released and every retry wrote a fresh lease and a fresh override, never converging.
-        # The clock and sleep are virtual: do not race real Python startup against the final
-        # 100 ms read budget. Keep the parser and timeout calculation, supplying only process I/O.
+        # The clock and sleep are virtual: do not race real Python startup against the final read's
+        # budget (READ_FLOOR_S since 2026-11-10). Keep the parser and timeout calculation, supplying
+        # only process I/O.
         answers = iter([view(), view(dev_integration=unconfirmed_a())])
 
         def read(command, **kwargs):
@@ -1672,7 +1673,8 @@ class StewardClaimTest(unittest.TestCase):
 
         with mock.patch("subprocess.run", side_effect=read) as runner:
             ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
-        self.assertEqual(runner.call_args.kwargs["timeout"], 0.1)
+        # The last read past the deadline still gets the floor, never the leftover.
+        self.assertEqual(runner.call_args.kwargs["timeout"], _NS["READ_FLOOR_S"])
         self.assertFalse(ok)
         self.assertEqual(reason, f"unconfirmed: {DEVICE_A} has not acknowledged yet — override on the record")
         self.assertEqual(self.berth.who("dev-integration")["holder"], "codex-1")
@@ -1682,7 +1684,7 @@ class StewardClaimTest(unittest.TestCase):
         answers = iter([view(), view(dev_integration=unconfirmed_a())])
 
         def read(command, **kwargs):
-            if kwargs["timeout"] == 0.1:
+            if kwargs["timeout"] == _NS["READ_FLOOR_S"]:
                 raise subprocess.TimeoutExpired(command, kwargs["timeout"])
             answer = next(answers, view(dev_integration=pending()))
             return subprocess.CompletedProcess(command, 0, json.dumps(answer), "")
@@ -1692,7 +1694,7 @@ class StewardClaimTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIsNone(lease)
         self.assertIn("the steward lease view did not answer:", reason)
-        self.assertIn("timed out after 0.1 seconds", reason)
+        self.assertIn(f"timed out after {_NS['READ_FLOOR_S']} seconds", reason)
         local = self.berth.who("dev-integration")
         self.assertEqual(local["holder"], "codex-1")
         self.assertEqual(self.berth.override_wait,
@@ -2179,6 +2181,31 @@ class StewardClaimTest(unittest.TestCase):
         self.assertTrue(all(t <= self.berth.confirm_wait_s + 1 for t in timeouts[1:]), timeouts)
         self.assertLess(timeouts[-1], timeouts[1])
 
+    def test_the_last_settle_read_is_never_starved_below_the_views_cost(self):
+        # 2026-11-10 (shem): the lease view took ~0.53 s; polling `pending` to the deadline left the final
+        # read ~0.3 s, it timed out, and the claim refused, even under --offline-ok. A slow view that
+        # settles just before the deadline must be read in full and claim.
+        cost, timeouts, settle = 0.53, [], []
+
+        def leases(timeout=10):
+            self.berth._channel_read = True
+            self.berth.channel_root, self.berth.channel_standing = CHANNEL_STORE, "device"
+            timeouts.append(timeout)
+            if timeout < cost:
+                self.clock[0] += timeout
+                return None, f"the steward lease view did not answer: timed out after {timeout:.2f} s"
+            self.clock[0] += cost
+            if len(timeouts) == 1:
+                settle.append(self.clock[0])
+                return view(), None
+            done = self.clock[0] >= settle[0] + self.berth.confirm_wait_s + 0.5
+            return view(dev_integration=effective() if done else pending()), None
+
+        self.berth.peer_leases = leases
+        ok, _, reason, _ = self.claim()
+        self.assertTrue(ok, (reason, timeouts))
+        self.assertTrue(all(t >= _NS["READ_FLOOR_S"] for t in timeouts[1:]), timeouts)
+
     def test_a_policy_that_does_not_parse_or_names_an_unknown_scope_refuses(self):
         for text in ('{"berth": {"resources": {"dev-integration": ', 
                      json.dumps({"berth": {"resources": {"dev-integration": {"capacity": 1, "scope": "stewart"}}}})):
@@ -2398,6 +2425,127 @@ fi
         self.assertFalse(os.path.exists(f"/proc/{lane}"), "the fenced lane outlived its lease")
         rival = self.berth("claim", "mesh", "--session", "rival", "--ttl", "60")
         self.assertEqual(rival.returncode, 0, rival.stderr)
+
+
+class ReleaseAndGenerationTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.berth = Berth(str(self.root / "berth"), obs=FakeObservation(),
+                           policy_path=MISSING_POLICY)
+        self.berth.pid_alive = lambda pid: True
+        self.berth.pid_start = lambda pid: 100
+
+    def cli(self, *args):
+        out, err = io.StringIO(), io.StringIO()
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda **kw: self.berth}), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(["berth", *args])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_verify_released_absent_mooring_single_and_slot_leases(self):
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0:2],
+                         (0, '{"released": true}\n'))
+        self.berth.moor("a")
+        code, out, _ = self.cli("verify-released", "--session", "a", "--generation", "2")
+        self.assertEqual(code, 3)
+        self.assertEqual(len(json.loads(out)["moorings"]), 1)
+        self.berth.unmoor("a")
+        for leases in ({"cargo": {"holder": "a", "generation": 1}},
+                       {"cargo/slots": [{"holder": "a"}, {"holder": "b"}]}):
+            self.berth._write_leases(leases)
+            before = Path(self.berth.leases_path).read_bytes()
+            code, out, _ = self.cli("verify-released", "--session", "a", "--generation", "2")
+            self.assertEqual(code, 3)
+            self.assertEqual(len(json.loads(out)["leases"]), 1)
+            self.assertEqual(Path(self.berth.leases_path).read_bytes(), before)
+
+    def test_corrupt_leases_fail_closed_for_callers(self):
+        self.berth.moor("a")
+        mooring = Path(self.berth._moor_path("a")).read_bytes()
+        for corrupt in ('{', '[]', '{"cargo": null}', '{"cargo/slots": {}}'):
+            Path(self.berth.leases_path).write_text(corrupt)
+            for args in (("verify-released", "--session", "a"),
+                         ("claim", "cargo", "--session", "a"),
+                         ("release", "cargo", "--session", "a"),
+                         ("unmoor", "--session", "a"), ("reap",), ("status",),
+                         ("who", "cargo"), ("session-show", "--session", "a"),
+                         ("owner-check", "cargo", "--session", "a"), ("overrun-check", "cargo")):
+                code, out, err = self.cli(*args)
+                self.assertEqual(code, 2, (args, err))
+                self.assertIn("cannot read leases", err)
+                self.assertEqual(out, "")
+            self.assertEqual(Path(self.berth.leases_path).read_text(), corrupt)
+            self.assertEqual(Path(self.berth._moor_path("a")).read_bytes(), mooring)
+
+    def test_unreadable_leases_and_corrupt_or_unreadable_moorings(self):
+        Path(self.berth.leases_path).mkdir()  # unreadable as a file, even for root
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0], 2)
+        self.assertEqual(self.cli("claim", "cargo", "--session", "a")[0], 2)
+        Path(self.berth.leases_path).rmdir()
+        path = Path(self.berth._moor_path("a"))
+        for corrupt in ('{', '[]', '{}'):
+            path.write_text(corrupt)
+            code, out, err = self.cli("verify-released", "--session", "a")
+            self.assertEqual(code, 2)
+            self.assertEqual(out, "")
+            self.assertIn("cannot read moorings", err)
+        path.unlink()
+        path.mkdir()
+        self.assertEqual(self.cli("verify-released", "--session", "a")[0], 2)
+
+    def test_verify_missing_store_is_read_only_and_requires_explicit_session(self):
+        store = self.root / "absent"
+        env = dict(os.environ, BERTH_DIR=str(store), EPR_UNDER_TEST="1")
+        for args, code in ((("--session", "a"), 0), ((), 2),
+                           (("--session", "a", "--generation", "bad"), 2)):
+            result = subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"),
+                                     "verify-released", *args], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, code, result.stderr)
+            self.assertFalse(store.exists())
+
+    def test_old_generation_never_refreshes_or_counts_live(self):
+        b = self.berth
+        guard_globals = Berth.moor.__globals__
+        with mock.patch.dict(guard_globals, {"envelope_guard": lambda *args: contextlib.nullcontext(1)}):
+            b.moor("a", pid=10)
+            ok, lease, _ = b.claim("cargo", "a")
+        self.assertTrue(ok)
+        self.assertEqual(lease["generation"], 1)
+        self.assertEqual(b.mooring("a")["generation"], 1)
+        before = Path(b._moor_path("a")).read_bytes()
+        key = self.root / "device/ed25519.seed"
+        sessions = key.parent / "sessions"
+        sessions.mkdir(parents=True)
+        (sessions / "a.json").write_text('{"generation": 2}')
+        with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key)}), \
+                mock.patch.dict(guard_globals, {"envelope_guard": lambda *args: contextlib.nullcontext(2)}):
+            self.assertFalse(b.holder_is_live(lease))
+            self.assertFalse(b.is_live(b.mooring("a")))
+            for action in (b.moor, b.touch):
+                with self.assertRaises(BerthUsage):
+                    action("a", pid=20)
+            self.assertEqual(Path(b._moor_path("a")).read_bytes(), before)
+            self.assertEqual(b.leases()["cargo"], lease)
+            b.unmoor("a")
+            b.moor("a", pid=20)
+            self.assertEqual(b.claim("cargo", "a")[1]["generation"], 2)
+            self.assertFalse(b.holder_is_live(lease))
+
+    def test_prepare_berth_generation_is_yielded(self):
+        key = self.root / "device/ed25519.seed"
+        (key.parent / "sessions").mkdir(parents=True)
+        key.write_bytes(b"0" * 32)
+        guard = Berth.moor.__globals__["envelope_guard"]
+        for payload, expected in (({"generation": 2}, 2), ({}, None)):
+            results = [subprocess.CompletedProcess([], 0, json.dumps(payload), ""),
+                       subprocess.CompletedProcess([], 0, "", "")]
+            with mock.patch.dict(os.environ, {"ELOHIM_DEVICE_KEY_FILE": str(key)}), \
+                    mock.patch("subprocess.run", side_effect=results):
+                with guard("a", self.berth.dir) as generation:
+                    self.assertEqual(generation, expected)
 
 
 class EnvelopeGuardTest(unittest.TestCase):

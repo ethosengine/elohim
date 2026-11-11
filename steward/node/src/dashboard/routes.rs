@@ -157,7 +157,10 @@ pub async fn api_approve_pairing(
 #[derive(Deserialize)]
 pub struct RejectRequest {
     pub request_id: String,
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "accepted on the wire for symmetry with the pairing API; the handler does not read it yet"
+    )]
     pub reason: Option<String>,
 }
 

@@ -6,7 +6,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use elohim_epr::address::compute_bytes_cid;
 use elohim_storage::db::peer_blob_inventory::{
-    apply_delta, lookup_hosts, rebase_after_recon, DeltaApplyOutcome,
+    apply_delta, lookup_hosts, rebase_after_recon, DeltaApplyOutcome, InventoryWitness,
 };
 
 fn cid(label: &str) -> String {
@@ -50,6 +50,7 @@ fn writer_applies_recon_rebase_then_in_order_deltas() {
         &[],
         2,
         "2026-05-02T00:00:30Z",
+        InventoryWitness::SignedAuthor,
     )
     .expect("delta");
     assert_eq!(outcome, DeltaApplyOutcome::Applied);
@@ -81,6 +82,7 @@ fn writer_detects_gap_on_out_of_order_delta() {
         &[],
         5,
         "2026-05-02T00:01:00Z",
+        InventoryWitness::SignedAuthor,
     )
     .expect("delta");
     match outcome {

@@ -1,0 +1,25 @@
+# Standalone nested workspace, with its own lockfile like the other crates/ leaves.
+[workspace]
+
+[package]
+name = "elohim-host-contract"
+version = "0.1.0"
+edition = "2021"
+# The sibling source floor is 1.83; this lockfile's EPR dependency closure reaches
+# 1.88 through sha2 0.11.1. Declare that higher floor rather than promise 1.83.
+rust-version = "1.88"
+description = "Pure host compatibility requirements, bundles and admission predicate"
+authors = ["Elohim Protocol"]
+license = "MPL-2.0"
+repository = "https://github.com/ethosengine/elohim"
+readme = "README.md"
+publish = ["elohim"]
+
+[lib]
+name = "host_contract"
+path = "src/lib.rs"
+
+[dependencies]
+elohim-epr = { path = "../../elohim/epr", version = "0.2.0", registry = "elohim" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

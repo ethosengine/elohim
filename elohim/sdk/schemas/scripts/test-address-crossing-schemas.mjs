@@ -71,7 +71,7 @@ const CITE_CID = 'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e';
   empty.chunks = [];
   empty.blobCid = CID_C;
   check(v(empty), 'put-blob-response accepts the empty blob (zero chunks)');
-  for (const field of ['blobHash', 'blake3Hash', 'encoding', 'dataShards', 'totalShards', 'shardSize', 'shardHashes', 'totalSize']) {
+  for (const field of ['blobHash', 'blake3Hash', 'encoding', 'dataShards', 'totalShards', 'shardSize', 'shardHashes', 'totalSize']) { // address-lint: allow (asserts retired fields are refused)
     check(!v({ ...base(), [field]: 'x' }), `put-blob-response refuses the retired field ${field}`);
   }
   for (const [name, bad] of [
@@ -151,7 +151,7 @@ for (const [file, pointer] of [
 ]) {
   const text = readFileSync(resolve(here, '../v1', file), 'utf8');
   check(text.includes('^bafkr4i[a-z2-7]'), `${file} pattern is bafkr4i`);
-  check(!text.includes('bafkrei[a-z2-7]'), `${file} keeps no bafkrei pattern`);
+  check(!text.includes('bafkrei[a-z2-7]'), `${file} keeps no bafkrei pattern`); // address-lint: allow (asserts the gate is absent)
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

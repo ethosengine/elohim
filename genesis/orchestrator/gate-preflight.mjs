@@ -37,6 +37,12 @@ export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
  * Rust-style checker. The checker consumes published EPRFS crates and does not read their source tree.
  */
 export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-node', 'elohim-epr'];
+// Every path-scoped gate whose key one unnamed read would widen to the whole tree. eprfs keys on
+// named paths since 6cba5805a but is audited separately from the list above (whose REAL test also
+// asserts the runtime services' shared-crate reads). Without it here, one new test-file read
+// (epr-cli/tests/session_envelope.rs, 2026-11-10) put eprfs back on whole-tree keying unseen, and a
+// dirty ledger then cost a 47-minute re-run.
+export const PREFLIGHT_READ_SET_PROJECTS = [...NAMED_READ_SET_PROJECTS, 'eprfs'];
 
 const ELEMENTS_DIR = 'app/elohim-elements';
 const STORAGE_CLIENT_DIST = 'elohim/sdk/storage-client-ts/dist/index.js';
@@ -233,11 +239,11 @@ function memoRead(read) {
  */
 export function checkReadSets({ root, projects, registry, changed = null, read = readSet }) {
   const names = new Set(projects.map(p => p.name));
-  if (!names.has('orchestrator') && !NAMED_READ_SET_PROJECTS.some(n => names.has(n)) && !names.has('epr-storage')) return null;
+  if (!names.has('orchestrator') && !PREFLIGHT_READ_SET_PROJECTS.some(n => names.has(n)) && !names.has('epr-storage')) return null;
   const relevant = changed === null ? null : changed.filter(f => f.endsWith('.rs') || f.endsWith('build-manifest.json'));
   const problems = [];
   let audited = 0;
-  for (const name of NAMED_READ_SET_PROJECTS) {
+  for (const name of PREFLIGHT_READ_SET_PROJECTS) {
     const project = registry.get(name);
     if (!project) continue;
     const sources = sourcesOf(root, project);
@@ -264,6 +270,61 @@ export function checkCargoDeny({ root, projects, spawn = spawnSync }) {
   if (r.status === 0) return row('cargo-deny-bans', 'ok');
   const tail = String(r.stderr || r.stdout).trim().split('\n').filter(Boolean).slice(-2).join(' | ');
   return row('cargo-deny-bans', 'REFUSED', `deny.toml boundary violation — ${tail}`, 'see deny.toml; cargo deny --manifest-path elohim/Cargo.toml check bans');
+}
+
+/**
+ * The cargo workspace root above `dir` (repo-relative, inclusive): the nearest ancestor whose Cargo.toml declares
+ * `[workspace]` or that owns a Cargo.lock (an `exclude`d crate such as elohim-storage is its own root, though a
+ * parent workspace sits above it); else the nearest Cargo.toml.
+ */
+function cargoWorkspaceOf(root, dir) {
+  let nearest = null;
+  for (let d = dir; d && d !== '.' && d !== '/'; d = dirname(d)) {
+    const manifest = join(root, d, 'Cargo.toml');
+    if (!existsSync(manifest)) continue;
+    nearest ??= d;
+    if (existsSync(join(root, d, 'Cargo.lock')) || /^\s*\[workspace[\].]/m.test(readFileSync(manifest, 'utf8'))) return d;
+  }
+  return nearest;
+}
+
+const LOCK_STALE = /lock file .*needs to be updated|--locked was passed/i;
+
+/**
+ * A manifest edit that outran its Cargo.lock passes the local gate (its cargo rewrites the lock)
+ * and fails the first `--locked` CI build; on 2026-11-07 it surfaced only as a dirty tree after a
+ * 65-minute eprfs gate. `cargo metadata --locked --offline` resolves without writing, in seconds.
+ * Only the lock-update refusal is a red; a crate missing from the offline cache is a WARN.
+ */
+export function checkCargoLocks({ root, projects, spawn = spawnSync, env = process.env }) {
+  const workspaces = new Set();
+  for (const p of projects) {
+    if (!p.run?.cargo || !p.dir || p.dir.startsWith('elohim/holochain/dna')) continue;
+    const ws = cargoWorkspaceOf(root, p.dir);
+    if (ws && !ws.startsWith('elohim/holochain/dna')) workspaces.add(ws);
+  }
+  if (!workspaces.size) return null;
+  let toolchain = '1.96.1';
+  try { toolchain = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).cargo_env_overrides?.['*']?.RUSTUP_TOOLCHAIN || toolchain; }
+  catch { /* The pin is a default; an unreadable policy keeps it. */ }
+  const rows = [];
+  for (const ws of [...workspaces].sort()) {
+    const manifest = join(root, ws, 'Cargo.toml');
+    const r = spawn('cargo', ['metadata', '--locked', '--offline', '--format-version', '1', '--manifest-path', manifest],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'], env: { ...env, RUSTFLAGS: '', RUSTUP_TOOLCHAIN: toolchain } });
+    const name = `cargo-lock:${ws}`;
+    if (r.status === 0) { rows.push(row(name, 'ok')); continue; }
+    const err = String(r.stderr || r.error?.message || '').trim();
+    const first = err.split('\n').filter(Boolean).slice(0, 2).join(' | ');
+    if (LOCK_STALE.test(err)) {
+      rows.push(row(name, 'REFUSED', `${ws}/Cargo.lock lags its manifests — a --locked CI build refuses it, and this gate would silently rewrite it`,
+        `cargo update --workspace --offline --manifest-path ${ws}/Cargo.toml, then commit the lockfile with the manifest change`));
+    } else {
+      rows.push(row(name, 'WARN', `could not check ${ws}/Cargo.lock offline (not a lock mismatch) — ${first || 'cargo unavailable'}`,
+        `cargo metadata --locked --format-version 1 --manifest-path ${ws}/Cargo.toml > /dev/null`));
+    }
+  }
+  return rows;
 }
 
 /**
@@ -318,6 +379,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkSophiaUmd({ root, projects })),
     ...timed(() => checkArk({ projects, env })),
     ...timed(() => checkCargoDeny({ root, projects, spawn })),
+    ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
   ];

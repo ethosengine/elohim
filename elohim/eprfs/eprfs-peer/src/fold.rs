@@ -714,3 +714,67 @@ fn unanswered(what: String, answer: &TierAnswer) -> PeerError {
         what: format!("{what}{why}"),
     }
 }
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+    use elohim_epr_rea::{AgentRef, Magnitude, ReaVerb};
+
+    #[test]
+    fn old_reader_decodes_and_folds_produce_with_additive_family_requires_tags() {
+        let output = BlobCid::compute_bytes(b"artifact");
+        let event = FlowEvent {
+            action: ReaVerb::Produce,
+            provider: AgentRef("builder".into()),
+            receiver: AgentRef("device".into()),
+            resource: *output.as_cid(),
+            quantity: Magnitude::Count {
+                value: 8.0,
+                unit: "bytes".into(),
+            },
+            process: None,
+            in_scope_of: atom_cid(&"scope").unwrap(),
+            fulfills: vec![],
+            satisfies: vec![],
+            occurred_at: "2026-11-11T00:00:00Z".into(),
+            classified_as: vec![
+                "custody-blob".into(),
+                output.to_string(),
+                "measure:artifact-produce@1".into(),
+                "reason:produce".into(),
+                format!("env:key={}", BlobCid::compute(b"key")),
+                format!("env:output={output}"),
+                format!("env:family={}", BlobCid::compute(b"family")),
+                format!("env:requires={}", BlobCid::compute_bytes(b"[]")),
+            ],
+        };
+        let cid = atom_cid(&event).unwrap();
+        // These are the pre-K3 decoder and fold, unchanged: neither interprets env:* tags.
+        let decoded = decode_event(&cid, &canonical_bytes(&event).unwrap()).unwrap();
+        assert_eq!(decoded, event);
+        let root = tempfile::tempdir().unwrap();
+        let store = SidecarFlowStore::open(root.path()).unwrap();
+        let policy = root.path().join("policy.json");
+        std::fs::write(
+            &policy,
+            r#"{"berth":{"channel":{"crosses":{"artifact-produce@1":["produce"]}}}}"#,
+        )
+        .unwrap();
+        let allow = CrossingAllowList::from_policy_file(&policy).unwrap();
+        let outcome = fold_events(
+            &store,
+            "device",
+            &[ChannelEvent {
+                cid,
+                event: decoded,
+            }],
+            &allow,
+        )
+        .unwrap();
+        assert_eq!((outcome.appended, outcome.refused), (1, 0));
+        let folded = store.events().unwrap().pop().unwrap().1;
+        for slot in &event.classified_as {
+            assert!(folded.classified_as.contains(slot));
+        }
+    }
+}

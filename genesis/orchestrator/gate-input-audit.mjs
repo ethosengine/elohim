@@ -5,7 +5,7 @@
 
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
-import { dirname, relative, resolve } from 'path';
+import { dirname, matchesGlob, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
@@ -38,6 +38,22 @@ export function globCovers(glob, path) {
   if (!glob.endsWith('/**')) return glob === path;
   const prefix = glob.slice(0, -3);
   return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/** Reject exhaust in declared sources, recipe path references, or audited reads.
+ * Include prospective names as well as today's files: a newly named ledger must
+ * not evade the promise just because it hasn't been written yet.
+ */
+export function exhaustInputs({ exhaust, files = [], sources = [], reads = [], recipe = '' }) {
+  const references = [...recipe.replace(/^\s*#.*$/gm, '').matchAll(/\.claude\/data(?:\/[\w.*?{}[\]/-]+)?/g)]
+    .map(match => match[0]);
+  const inputs = [...sources, ...reads, ...references];
+  const candidates = [...files, ...exhaust, ...inputs].map(path => path.replace(/\*\*/g, 'probe').replace(/[?*]/g, 'probe'));
+  // A basename read can name a future ledger without its directory prefix.
+  candidates.push(...reads.filter(isReadPattern).map(path => `.claude/data/${path.slice(3)}`));
+  const excluded = candidates.filter(path => exhaust.some(pattern => matchesGlob(path, pattern)));
+  return [...new Set(inputs.filter(input => excluded.some(path =>
+    globCovers(input, path) || matchesGlob(path, input) || readCovers(input.replace(/\/\*\*$/, ''), path))))];
 }
 
 function repositoryFiles(root) {

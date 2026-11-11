@@ -3,7 +3,7 @@ name = "elohim-node"
 version = "0.1.0"
 edition = "2021"
 description = "Always-on infrastructure runtime for the Elohim Protocol"
-license = "Apache-2.0"
+license = "AGPL-3.0"
 
 [dependencies]
 # Async runtime

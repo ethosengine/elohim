@@ -236,4 +236,100 @@ mod tests {
             assert!(seen.insert(*t), "duplicate inbound topic: {t}");
         }
     }
+
+    /// The iroh plane has no transport-level origin, so admission rests on the envelope
+    /// alone: an inventory page signed by one node's key but naming another node's id
+    /// as its holder projects nothing, whichever field the forger falsifies, and the
+    /// holder's own page over the same plane lands as an end-to-end row.
+    #[test]
+    fn forged_iroh_inventory_holder_is_refused() {
+        use crate::p2p::inventory_gossip::{
+            BlobAddress, InventoryDelta, InventoryEnvelope, InventoryLevel, INVENTORY_TOPIC,
+        };
+
+        let pool = crate::test_util::test_pool();
+        let victim = elohim_epr::AgentKeypair::from_secret(&[51u8; 32]).unwrap();
+        let forger = elohim_epr::AgentKeypair::from_secret(&[52u8; 32]).unwrap();
+        let victim_node = hex::encode(victim.public_key_bytes());
+        let forger_node = hex::encode(forger.public_key_bytes());
+        {
+            // Each node's agent cross-signs its libp2p PeerId, and that PeerId's key and
+            // the node's iroh key link each other — the only chain that binds an iroh
+            // author (`p2p::transport_authority`).
+            let mut conn = pool.get().unwrap();
+            for (agent, iroh_secret) in [
+                ("uhCAkIrohVictim", [51u8; 32]),
+                ("uhCAkIrohForger", [52u8; 32]),
+            ] {
+                let libp2p_secret = iroh_secret.map(|b| b ^ 0x5a);
+                crate::test_util::bind_cross_signed(&mut conn, agent, libp2p_secret);
+                crate::test_util::link_transports(&mut conn, libp2p_secret, iroh_secret);
+            }
+        }
+        let cid = elohim_epr::address::compute_bytes_cid(b"a payload the victim never held");
+        let page = |sequence| InventoryDelta {
+            added: vec![BlobAddress::from(cid)],
+            hints: vec![],
+            removed: vec![],
+            sequence,
+            emitted_at: 1_700_000_000_000_000,
+        };
+        let hosts = || {
+            let mut conn = pool.get().unwrap();
+            crate::db::peer_blob_inventory::lookup_hosts(
+                &mut conn,
+                &cid.to_string(),
+                "2000-01-01T00:00:00Z",
+            )
+            .unwrap()
+        };
+        let dedup = crate::p2p::dedup::DedupLru::new();
+        let ctx = GossipDispatchCtx {
+            db_pool: Some(&pool),
+            dedup: &dedup,
+            agent_info_inbound_tx: None,
+            inventory_fetch: None,
+            transport_manifest_sink: None,
+            self_iroh_node_id: None,
+        };
+        let delivered_by = |node: &str| GossipSource::Iroh {
+            node: node.to_string(),
+        };
+
+        // The forger signs with its own key and names the victim as the author…
+        let as_victim_author =
+            InventoryEnvelope::sign(&forger, &victim_node, InventoryLevel::Full, page(1));
+        // …or names the victim's key as the holder while signing with its own.
+        let mut as_victim_holder =
+            InventoryEnvelope::sign(&forger, &forger_node, InventoryLevel::Full, page(2));
+        as_victim_holder.holder =
+            elohim_epr::signature::Multikey::ed25519(&victim.public_key_bytes());
+        for forged in [as_victim_author, as_victim_holder] {
+            // Whoever delivered it, the delivering node is not evidence.
+            for relay in [&victim_node, &forger_node] {
+                handle_gossip(
+                    &ctx,
+                    INVENTORY_TOPIC,
+                    &forged.to_bytes(),
+                    &delivered_by(relay),
+                );
+            }
+        }
+        assert!(
+            hosts().is_empty(),
+            "a page the victim did not sign projects no holder"
+        );
+
+        // The victim's own page, relayed by anyone, is authenticated end to end.
+        let genuine = InventoryEnvelope::sign(&victim, &victim_node, InventoryLevel::Full, page(3));
+        handle_gossip(
+            &ctx,
+            INVENTORY_TOPIC,
+            &genuine.to_bytes(),
+            &delivered_by(&forger_node),
+        );
+        let rows = hosts();
+        assert_eq!(rows.len(), 1, "exactly the victim's own row, got {rows:?}");
+        assert_eq!(rows[0].peer_id, victim_node);
+    }
 }

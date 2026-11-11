@@ -23,7 +23,7 @@ use elohim_epr::profile::{
 use reed_solomon_erasure::galois_8::ReedSolomon;
 use serde::{Deserialize, Serialize};
 
-use crate::blob_store::{byte_cid_serde, BlobStore, ChunkRef, Exists};
+use crate::blob_store::{byte_cid_serde, BlobStore, ChunkRef};
 
 /// The most original bytes one stripe covers (16 MiB).
 pub const STRIPE_MAX: usize = 16 * 1024 * 1024;
@@ -562,16 +562,19 @@ fn reconstruct_stripe(
     Ok(stripe)
 }
 
-/// Do we hold a payload as its custody units? Under `none`, the payload itself must
-/// verify; erasure-coded, every stripe needs `data` verified shards.
+/// Do we hold a payload as its custody units? Under `none`, the payload itself must be
+/// present; erasure-coded, every stripe needs `data` present shards. Structural
+/// ([`BlobStore::present`]: names and lengths, no hashing): this answers probes, and a
+/// reader verifies on read. A custody act that must know the bytes are whole asks
+/// [`BlobStore::holds_verified`] instead.
 pub async fn holds_as_shards(store: &BlobStore, manifest: &ShardManifest) -> bool {
     if manifest.stripes.is_empty() {
-        return store.exists(&manifest.blob_cid).await == Exists::Verified;
+        return store.present(&manifest.blob_cid).await;
     }
     for stripe in &manifest.stripes {
         let mut present = 0usize;
         for shard in &stripe.shards {
-            if store.exists(&shard.cid).await == Exists::Verified {
+            if store.present(&shard.cid).await {
                 present += 1;
             }
         }
@@ -586,6 +589,7 @@ pub async fn holds_as_shards(store: &BlobStore, manifest: &ShardManifest) -> boo
 mod tests {
     use super::*;
     use crate::blob_store::tests::xorshift_bytes;
+    use crate::blob_store::Exists;
 
     fn small_stripes() -> ShardEncoder {
         ShardEncoder {
@@ -946,5 +950,28 @@ mod tests {
         let out = ShardEncoder::reconstruct(&manifest, &supplied).unwrap();
         assert_eq!(out.len(), LEN);
         assert!(out == data);
+    }
+
+    #[tokio::test]
+    async fn remote_probes_never_hash_the_payload() {
+        use crate::blob_store::tests::{nothing_quarantined, spoil_inline_payload};
+        let store = BlobStore::new_memory();
+        let data = b"an inline payload a remote peer probes for".to_vec();
+        let encoder = ShardEncoder::new(ShardConfig {
+            rs_threshold: usize::MAX,
+            ..ShardConfig::default()
+        });
+        let manifest = encoder
+            .create_manifest(&data, "text/plain", "public")
+            .unwrap();
+        assert!(manifest.stripes.is_empty(), "erasure none");
+        store.store(&data).await.unwrap();
+        spoil_inline_payload(&store, &manifest.blob_cid);
+        // The structural probe still says held (a reader verifies on read) and moved
+        // nothing; the hashing check is what condemns the spoiled copy.
+        assert!(holds_as_shards(&store, &manifest).await);
+        assert!(nothing_quarantined(&store));
+        assert_eq!(store.exists(&manifest.blob_cid).await, Exists::Quarantined);
+        assert!(!holds_as_shards(&store, &manifest).await);
     }
 }

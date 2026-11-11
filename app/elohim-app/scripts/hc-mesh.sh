@@ -429,6 +429,9 @@ storage_bin_in_gate_slot() {
 # The doorway's own copy, for the same reason as _storage_mesh: the gate's `cargo test --lib
 # --bins` never refreshes dev/debug/doorway, and a hand build there is overwritten by the next one.
 _doorway_mesh="$POOL/doorway__doorway-service/mesh-bin/doorway"
+# Same meaning as STORAGE_BIN_EXPLICIT: a caller-named doorway keeps the src mtime rule.
+DOORWAY_BIN_EXPLICIT=0
+[ -n "${DOORWAY_BIN:-}" ] && DOORWAY_BIN_EXPLICIT=1
 if [ -z "${DOORWAY_BIN:-}" ] && [ -x "$_doorway_mesh" ]; then
   DOORWAY_BIN="$_doorway_mesh"
 fi
@@ -2009,26 +2012,199 @@ for k, v in merged.items():
 PY
 }
 
+# One declaration for the material slots shared by `mesh build` and preflight's closure check.
+# The method path is derived from the destination so both callers name the same projection.
+mesh_build_project_spec() { # <storage|elohim-storage|doorway|beacon>
+  case "$1" in
+    storage|elohim-storage)
+      MESH_BUILD_PROJECT=elohim-storage
+      MESH_BUILD_CRATE=elohim/elohim-storage
+      MESH_BUILD_SLOT=elohim__elohim-storage
+      MESH_BUILD_BIN=elohim-storage
+      MESH_BUILD_RUSTFLAGS='--cfg getrandom_backend="custom"'
+      MESH_BUILD_FEATURES="p2p p2p-iroh"
+      MESH_BUILD_DEST="$_storage_mesh"
+      MESH_BUILD_SOURCES=elohim/holochain/build-manifest.json#cargo-build-storage
+      ;;
+    doorway)
+      MESH_BUILD_PROJECT=doorway
+      MESH_BUILD_CRATE=doorway/doorway-service
+      MESH_BUILD_SLOT=doorway__doorway-service
+      MESH_BUILD_BIN=doorway
+      MESH_BUILD_RUSTFLAGS=""
+      MESH_BUILD_FEATURES=""
+      MESH_BUILD_DEST="$_doorway_mesh"
+      MESH_BUILD_SOURCES=elohim/holochain/build-manifest.json#cargo-build-doorway
+      ;;
+    beacon)
+      MESH_BUILD_PROJECT=relay-addr-beacon
+      MESH_BUILD_CRATE=doorway/relay-addr-beacon
+      MESH_BUILD_SLOT=relay-addr-beacon
+      MESH_BUILD_BIN=relay-addr-beacon
+      MESH_BUILD_RUSTFLAGS=""
+      MESH_BUILD_FEATURES=""
+      MESH_BUILD_DEST="$_beacon_pool"
+      MESH_BUILD_SOURCES=""
+      ;;
+    *) return 1 ;;
+  esac
+  MESH_BUILD_METHOD="$(dirname "$MESH_BUILD_DEST")/.method-$MESH_BUILD_BIN.json"
+}
+
+# Reconstruct the exact recorded environment used by artifact describe/key/put. Arrays are globals
+# so a preflight caller can reuse them without serializing values through text.
+mesh_build_record_env() { # <project> <rustflags>
+  local project="$1" rustflags="$2" line v
+  MESH_BUILD_ENVS=()
+  MESH_BUILD_REC=(env)
+  MESH_BUILD_PATH="${CARGO_HOME:-$HOME/.cargo}/bin:/usr/local/bin:/usr/bin:/bin"
+  while IFS= read -r line; do
+    [ -n "$line" ] && MESH_BUILD_ENVS+=("$line")
+  done < <(mesh_build_env "$project")
+  while IFS= read -r v; do
+    case "$v" in CARGO_HOME|RUSTUP_HOME) ;; CARGO_*|RUST*) MESH_BUILD_REC+=(-u "$v") ;; esac
+  done < <(compgen -e)
+  MESH_BUILD_REC+=("${MESH_BUILD_ENVS[@]}" "RUSTFLAGS=$rustflags")
+}
+
+mesh_describe_method() { # <out> <project> <bin> <rustflags> <sources> <crate> <features>
+  local out="$1" project="$2" bin="$3" rustflags="$4" sources="$5" crate="$6" features="$7"
+  local line describe=("${MESH_BUILD_REC[@]}" "$(_mesh_epr)" artifact describe \
+    --project "$project" --bin "$bin" --rustflags "$rustflags" --sources "$sources" \
+    --crate "$crate" --repo "$REPO_ROOT" --out "$out")
+  [ -n "$features" ] && describe+=(--features "$features")
+  for line in "${MESH_BUILD_ENVS[@]}"; do describe+=(--env "$line"); done
+  describe+=(--env "PATH=$MESH_BUILD_PATH")
+  "${describe[@]}"
+}
+
+# Best-effort, atomic projection of the closure installed at the mesh slot. It is never authority:
+# inability to compute or write it removes any stale projection and never changes the build result.
+mesh_write_derivation_projection() { # <dest> <bin> <key-json> <commit> <fetched|built>
+  local dest="$1" bin="$2" key_json="$3" commit="$4" via="$5" record tmp at
+  record="$(dirname "$dest")/.derivation-$bin.json"
+  if [ -z "$key_json" ]; then
+    rm -f "$record" 2>/dev/null || true
+    return 0
+  fi
+  tmp="$(mktemp "$(dirname "$record")/.derivation-$bin.json.tmp.XXXXXX" 2>/dev/null)" || {
+    rm -f "$record" 2>/dev/null || true
+    return 0
+  }
+  at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if ! python3 - "$tmp" "$commit" "$via" "$at" "$key_json" <<'PY'
+import json, pathlib, sys
+path, head, via, at, raw = sys.argv[1:]
+key = json.loads(raw)
+projection = {
+    "key": key["keyCid"],
+    "method": key["method"],
+    "input": key["input"],
+    "head": head,
+    "via": via,
+    "at": at,
+}
+pathlib.Path(path).write_text(json.dumps(projection, separators=(",", ":")) + "\n")
+PY
+  then
+    rm -f "$tmp" "$record" 2>/dev/null || true
+    return 0
+  fi
+  mv -f "$tmp" "$record" 2>/dev/null || {
+    rm -f "$tmp" "$record" 2>/dev/null || true
+  }
+}
+
+# The epr the mesh build records and fetches artifacts through (artifact-store design §3).
+_mesh_epr() { printf '%s\n' "${EPR_BIN:-epr}"; }
+
+# mesh_fetch <method.json> <dest> — draw the artifact the method's key names at this checkout's
+# HEAD from one of the person's other devices, through this device's running `epr peer serve`
+# (artifact-store design §3.b.4). 0 only when the whole-blob-verified artifact is installed at
+# <dest>; every gap (no record, mismatch, daemon down, refused, deadline, integrity, transport)
+# prints its typed reason and returns 1, and the caller builds here.
+mesh_fetch() {
+  local method="$1" dest="$2" out rc=0
+  out=$("$(_mesh_epr)" artifact fetch --method "$method" --repo "$REPO_ROOT" --dest "$dest" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    chmod 0755 "$dest" || return 1
+    echo "[mesh build] $out"
+    return 0
+  fi
+  echo "[mesh build] ${out:-fetch gap: epr artifact fetch exited $rc} — building here" >&2
+  return 1
+}
+
 mesh_build() { # [storage|doorway|beacon] (default all three)
   local which="${1:-all}" dry="${MESH_BUILD_DRY_RUN:-0}" rc=0
   case "$which" in all|storage|doorway|beacon) ;; *)
     echo "usage: hc-mesh.sh build [storage|doorway|beacon]" >&2; return 2 ;; esac
-  _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest>
+  # <sources> names the build step whose declared inputs are the artifact's view
+  # (`elohim/holochain/build-manifest.json#cargo-build-storage`); empty = not recorded or fetched.
+  _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest> [sources]
     local project="$1" crate="$2" slot="$3" bin="$4" rustflags="$5" features="$6" dest="$7"
-    local envs=() line
+    local sources="${8:-}" method="" input="" key_json="" commit="" unrecorded="" started=0 out=""
+    local envs=() rec=() line
     # Declared values win over the caller's environment, exactly as run-local-gate.sh exports
     # them: the workspace shell carries CARGO_BUILD_JOBS=4, and storage's measured cap is 1.
-    while IFS= read -r line; do
-      [ -n "$line" ] && envs+=("$line")
-    done < <(mesh_build_env "$project")
+    mesh_build_record_env "$project" "$rustflags"
+    envs=("${MESH_BUILD_ENVS[@]}")
+    rec=("${MESH_BUILD_REC[@]}")
     local cmd=(env "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
       cargo build --bin "$bin")
+    # A recorded build (artifact-store review H3) runs cargo in an explicit environment: the
+    # method's non-path inputs (the declared caps and toolchain, RUSTFLAGS, the native toolchain
+    # variables `describe` records, and a FIXED PATH, recorded too, under which the key also names
+    # the cc and ld it resolves) plus HOME/LANG/TMPDIR and where the toolchain lives.
+    # Nothing else the caller exported (CARGO_ENCODED_RUSTFLAGS, CARGO_PROFILE_*, RUSTC_WRAPPER...)
+    # reaches it, and `epr artifact key|put` refuse when anything unrecorded is set.
+    local build_path="$MESH_BUILD_PATH"
+    if [ -n "$sources" ]; then
+      local base=("PATH=$build_path" "HOME=$HOME" "LANG=${LANG:-C.UTF-8}") v
+      for v in TMPDIR CARGO_HOME RUSTUP_HOME CC CXX AR LIBCLANG_PATH PKG_CONFIG_PATH \
+        OPENSSL_DIR OPENSSL_LIB_DIR OPENSSL_INCLUDE_DIR PROTOC; do
+        [ -n "${!v+x}" ] && base+=("$v=${!v}")
+      done
+      cmd=(env -i "${base[@]}" "${envs[@]}" "CARGO_TARGET_DIR=$POOL/$slot/dev" "RUSTFLAGS=$rustflags"
+        cargo build --bin "$bin")
+    fi
     [ -n "$features" ] && cmd+=(--features "$features")
     local built="$POOL/$slot/dev/debug/$bin"
     echo "[mesh build] $project -> $dest"
     printf '  (cd %q &&' "$REPO_ROOT/$crate"; printf ' %q' "${cmd[@]}"; printf ')\n'
     [ "$built" = "$dest" ] || printf '  install -D -m 0755 %q %q\n' "$built" "$dest"
+    if [ -n "$sources" ]; then
+      method="$(dirname "$dest")/.method-$bin.json"
+      [ "${MESH_BUILD_FETCH:-1}" = "0" ] || printf '  %q artifact fetch --method %q --repo %q --dest %q   # first; any gap builds here\n' \
+        "$(_mesh_epr)" "$method" "$REPO_ROOT" "$dest"
+      printf '  %q artifact put --method %q --input <key input> --bytes %q --project %q --cross   # after the install\n' \
+        "$(_mesh_epr)" "$method" "$dest" "$project"
+    fi
     [ "$dry" = "1" ] && return 0
+    if [ -n "$sources" ]; then
+      # The method and its key, computed BEFORE the build: the record names the closure the
+      # build started from, and `put` refuses if it moved meanwhile.
+      if ! out=$(mesh_describe_method "$method" "$project" "$bin" "$rustflags" "$sources" \
+          "$crate" "$features" 2>&1); then
+        unrecorded="the method is not described: ${out:-epr artifact describe failed}"
+        method=""
+      elif ! input=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+          --print input 2>"$method.key-why"); then
+        unrecorded="no key: $(tail -n 1 "$method.key-why" 2>/dev/null || true)"
+        input=""
+      elif ! key_json=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+          --json 2>>"$method.key-why"); then
+        key_json=""
+      fi
+      commit=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)
+      if [ -n "$input" ] && [ "${MESH_BUILD_FETCH:-1}" != "0" ] && mesh_fetch "$method" "$dest"; then
+        rm -f "$(dirname "$dest")/.unrecorded"
+        mesh_write_derivation_projection "$dest" "$bin" "$key_json" "$commit" fetched
+        echo "[mesh build] ok $dest (fetched from a sibling)"
+        return 0
+      fi
+      started=$(date +%s%3N)
+    fi
     (cd "$REPO_ROOT/$crate" && "${cmd[@]}") || { echo "[mesh build] REFUSED $project: cargo build failed — $dest left unchanged" >&2; return 1; }
     [ "$built" = "$dest" ] || install -D -m 0755 "$built" "$dest" || return 1
     # An install has returned 0 over a copy that differed from its source (2026-10-12:
@@ -2039,27 +2215,59 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       install -D -m 0755 "$built" "$dest" && cmp -s "$built" "$dest" || {
         echo "[mesh build] REFUSED $project: $dest does not match the built binary" >&2; return 1; }
     fi
+    if [ -n "$sources" ]; then
+      # Record the install (design §3.a.4): one custody Produce that crosses. A failure is
+      # explicit, never silent, and never fails the build.
+      if [ -z "$unrecorded" ]; then
+        out=$("${rec[@]}" "$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$dest" \
+          --project "$project" --commit "$commit" --duration-ms "$(( $(date +%s%3N) - started ))" \
+          --cross --repo "$REPO_ROOT" 2>&1) || unrecorded="${out:-epr artifact put failed}"
+      fi
+      if [ -n "$unrecorded" ]; then
+        unrecorded="${unrecorded#unrecorded: }"
+        echo "[mesh build] unrecorded: $unrecorded" >&2
+        printf '%s\n' "$unrecorded" > "$(dirname "$dest")/.unrecorded" || true
+        # The pre-build key is not evidence for these bytes when the record was refused (e.g. the
+        # sources moved during the compile): drop the projection so preflight uses the mtime rule.
+        key_json=""
+      else
+        rm -f "$(dirname "$dest")/.unrecorded"
+        echo "[mesh build] $out"
+      fi
+      mesh_write_derivation_projection "$dest" "$bin" "$key_json" "$commit" built
+    fi
     echo "[mesh build] ok $dest"
   }
   if [ "$which" = all ] || [ "$which" = storage ]; then
-    _mesh_build_one elohim-storage elohim/elohim-storage elohim__elohim-storage elohim-storage \
-      '--cfg getrandom_backend="custom"' "p2p p2p-iroh" "$_storage_mesh" || rc=1
+    mesh_build_project_spec storage
+    _mesh_build_one "$MESH_BUILD_PROJECT" "$MESH_BUILD_CRATE" "$MESH_BUILD_SLOT" \
+      "$MESH_BUILD_BIN" "$MESH_BUILD_RUSTFLAGS" "$MESH_BUILD_FEATURES" "$MESH_BUILD_DEST" \
+      "$MESH_BUILD_SOURCES" || rc=1
   fi
   if [ "$which" = all ] || [ "$which" = doorway ]; then
-    _mesh_build_one doorway doorway/doorway-service doorway__doorway-service doorway \
-      "" "" "$_doorway_mesh" || rc=1
+    mesh_build_project_spec doorway
+    _mesh_build_one "$MESH_BUILD_PROJECT" "$MESH_BUILD_CRATE" "$MESH_BUILD_SLOT" \
+      "$MESH_BUILD_BIN" "$MESH_BUILD_RUSTFLAGS" "$MESH_BUILD_FEATURES" "$MESH_BUILD_DEST" \
+      "$MESH_BUILD_SOURCES" || rc=1
   fi
   if [ "$which" = all ] || [ "$which" = beacon ]; then
     # Its own workspace root and slot; nothing else writes that binary, so it is run in place.
-    _mesh_build_one relay-addr-beacon doorway/relay-addr-beacon relay-addr-beacon relay-addr-beacon \
-      "" "" "$_beacon_pool" || rc=1
+    mesh_build_project_spec beacon
+    _mesh_build_one "$MESH_BUILD_PROJECT" "$MESH_BUILD_CRATE" "$MESH_BUILD_SLOT" \
+      "$MESH_BUILD_BIN" "$MESH_BUILD_RUSTFLAGS" "$MESH_BUILD_FEATURES" "$MESH_BUILD_DEST" || rc=1
   fi
   [ "$dry" = "1" ] && echo "[mesh build] MESH_BUILD_DRY_RUN=1 — nothing was run"
   return "$rc"
 }
 
-# A pool binary that PREDATES the source it is built from is the quietest way to
-# spend a household run measuring code that is not running. Measured 2026-09-11:
+# A pool binary from a DIFFERENT closure is the quietest way to spend a household run measuring
+# code that is not running. Mesh-slot installs carry a rebuildable derivation projection; preflight
+# recomputes the same F2 key (method + full declared input view) and refuses a changed closure.
+# Missing projections, unavailable key support, dirty views, and key failures deliberately fall
+# back to the prior tracked-src mtime rule and say so. Explicit/non-mesh binaries keep that rule.
+#
+# The original mtime failure was measured 2026-09-11: a binary that PREDATED its source caused
+# a household run to measure code that was not running:
 # the doorway's canonical-agent-key and capacity-recount fixes were committed at
 # 03:49/03:50, the pool slot still held 02:16 bytes (the gate's
 # `cargo test --lib --bins` does not refresh the `--bin` artifact), and a full
@@ -2086,6 +2294,163 @@ assert_binary_newer_than_source() { # <binary> <src-path…>
   [ "$bin_ts" -ge "$src_ts" ] && return 0
   echo "built $(date -u -d "@$bin_ts" +%Y-%m-%dT%H:%M:%SZ), newest tracked source file under $* was modified $(date -u -d "@$src_ts" +%Y-%m-%dT%H:%M:%SZ) (HEAD $(git -C "$REPO_ROOT" log -1 --format=%h -- "$@"))" >&2
   return 1
+}
+
+mesh_derivation_fields() { # <record|current> <json> -> key<TAB>method<TAB>input<TAB>clean
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+kind, raw = sys.argv[1:]
+value = json.loads(raw)
+key_name = "key" if kind == "record" else "keyCid"
+fields = [value[key_name], value["method"], value["input"]]
+if not all(isinstance(field, str) and field for field in fields):
+    raise ValueError("missing derivation field")
+clean = kind == "record" or value.get("dirty") == []
+print("\t".join(fields + ["clean" if clean else "dirty"]))
+PY
+}
+
+binary_mtime_fallback() { # <binary> <project> <reason> <src-path…>
+  local binary="$1" project="$2" reason="$3" detail tmp
+  shift 3
+  tmp="$(mktemp)"
+  if assert_binary_newer_than_source "$binary" "$@" 2>"$tmp"; then
+    rm -f "$tmp"
+    echo "ok $project binary is not older than $* (mtime rule: $reason)"
+    return 0
+  fi
+  detail="$(tr -d '\n' < "$tmp")"
+  rm -f "$tmp"
+  echo "$detail (mtime rule: $reason)" >&2
+  return 1
+}
+
+assert_binary_matches_closure() { # <binary> <bin-name> <project> <src-path…>
+  local binary="$1" bin="$2" project="$3" record method current_method key_json="" key_rc=0 reason=""
+  local record_json record_fields current_fields recorded_key recorded_method recorded_input ignored
+  local current_key current_method_cid current_input current_clean why describe_why
+  shift 3
+  mesh_build_project_spec "$project" || {
+    binary_mtime_fallback "$binary" "$project" "unknown project" "$@"
+    return
+  }
+
+  # A caller-named binary (STORAGE_BIN/DOORWAY_BIN set explicitly, even to the canonical mesh-slot
+  # path) and any binary outside the mesh slot keep the legacy src mtime judgement, announced.
+  local explicit=0
+  case "$MESH_BUILD_PROJECT" in
+    elohim-storage) explicit="${STORAGE_BIN_EXPLICIT:-0}" ;;
+    doorway) explicit="${DOORWAY_BIN_EXPLICIT:-0}" ;;
+  esac
+  if [ "$explicit" = "1" ]; then
+    binary_mtime_fallback "$binary" "$project" "explicit binary" "$@"
+    return
+  fi
+  if [ "$binary" != "$MESH_BUILD_DEST" ]; then
+    binary_mtime_fallback "$binary" "$project" "not the mesh slot" "$@"
+    return
+  fi
+
+  record="$(dirname "$binary")/.derivation-$bin.json"
+  method="$MESH_BUILD_METHOD"
+  if [ ! -f "$record" ]; then
+    binary_mtime_fallback "$binary" "$project" "no derivation record" "$@"
+    return
+  fi
+  if [ ! -f "$method" ]; then
+    binary_mtime_fallback "$binary" "$project" "no method file" "$@"
+    return
+  fi
+  record_json="$(cat "$record" 2>/dev/null)" || record_json=""
+  if ! record_fields="$(mesh_derivation_fields record "$record_json" 2>/dev/null)"; then
+    binary_mtime_fallback "$binary" "$project" "invalid derivation record" "$@"
+    return
+  fi
+
+  mesh_build_record_env "$MESH_BUILD_PROJECT" "$MESH_BUILD_RUSTFLAGS"
+  current_method="$(mktemp)"
+  describe_why="$(mktemp)"
+  if ! mesh_describe_method "$current_method" "$MESH_BUILD_PROJECT" "$MESH_BUILD_BIN" \
+      "$MESH_BUILD_RUSTFLAGS" "$MESH_BUILD_SOURCES" "$MESH_BUILD_CRATE" \
+      "$MESH_BUILD_FEATURES" > /dev/null 2>"$describe_why"; then
+    if grep -qiE 'usage:|unknown (command|subcommand).*artifact|unrecognized.*artifact' "$describe_why"; then
+      reason="artifact verb unavailable"
+    else
+      reason="method describe failed"
+    fi
+    rm -f "$current_method" "$describe_why"
+    binary_mtime_fallback "$binary" "$project" "$reason" "$@"
+    return
+  fi
+  rm -f "$describe_why"
+  why="$(mktemp)"
+  if key_json=$("${MESH_BUILD_REC[@]}" "$(_mesh_epr)" artifact key --method "$current_method" \
+      --repo "$REPO_ROOT" --json 2>"$why"); then
+    key_rc=0
+  else
+    key_rc=$?
+  fi
+  if [ "$key_rc" -ne 0 ]; then
+    if [ "$key_rc" -eq 3 ]; then
+      reason="dirty closure"
+    elif grep -qiE 'usage:|unknown (command|subcommand).*artifact|unrecognized.*artifact' "$why"; then
+      reason="artifact verb unavailable"
+    else
+      reason="key failed"
+    fi
+    rm -f "$why" "$current_method"
+    binary_mtime_fallback "$binary" "$project" "$reason" "$@"
+    return
+  fi
+  rm -f "$why" "$current_method"
+  if ! current_fields="$(mesh_derivation_fields current "$key_json" 2>/dev/null)"; then
+    binary_mtime_fallback "$binary" "$project" "invalid key output" "$@"
+    return
+  fi
+  IFS=$'\t' read -r recorded_key recorded_method recorded_input ignored <<<"$record_fields"
+  IFS=$'\t' read -r current_key current_method_cid current_input current_clean <<<"$current_fields"
+  if [ "$current_clean" != clean ]; then
+    binary_mtime_fallback "$binary" "$project" "dirty closure" "$@"
+    return
+  fi
+  if [ "$recorded_key" = "$current_key" ]; then
+    echo "ok $project binary matches its closure (key ${current_key:0:12})"
+    return 0
+  fi
+  if [ "$recorded_method" != "$current_method_cid" ] && [ "$recorded_input" != "$current_input" ]; then
+    reason="toolchain/flags/env (method) changed and source view (input) changed"
+  elif [ "$recorded_method" != "$current_method_cid" ]; then
+    reason="toolchain/flags/env (method) changed"
+  elif [ "$recorded_input" != "$current_input" ]; then
+    reason="source view (input) changed"
+  else
+    reason="derivation key changed"
+  fi
+  echo "recorded key ${recorded_key:0:12}, current key ${current_key:0:12}; $reason" >&2
+  return 1
+}
+
+preflight_binary_freshness() {
+  local failed=0 tmp
+  if [ "${MESH_ALLOW_STALE_BINARY:-0}" = "1" ]; then
+    echo "ok binary freshness: skipped (MESH_ALLOW_STALE_BINARY=1)"
+    return 0
+  fi
+  tmp="$(mktemp)"
+  if ! assert_binary_matches_closure "$STORAGE_BIN" elohim-storage elohim-storage \
+      elohim/elohim-storage/src 2>"$tmp"; then
+    echo "REFUSED elohim-storage binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build storage (the gate's default-feature \`cargo test\` never refreshes the mesh copy) or set MESH_ALLOW_STALE_BINARY=1"
+    failed=1
+  fi
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    if ! assert_binary_matches_closure "$DOORWAY_BIN" doorway doorway \
+        doorway/doorway-service/src 2>"$tmp"; then
+      echo "REFUSED doorway binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build doorway (the gate's \`cargo test --lib --bins\` does NOT refresh the --bin artifact) or set MESH_ALLOW_STALE_BINARY=1"
+      failed=1
+    fi
+  fi
+  rm -f "$tmp"
+  return "$failed"
 }
 
 # ---------------------------------------------------------------------------
@@ -5084,29 +5449,10 @@ preflight() {
     echo "ok iroh-relay binary: skipped (relay_url=$relay_url MESH_RELAY=${MESH_RELAY:-1} MESH_DOORWAYS=$MESH_DOORWAYS_EFFECTIVE)"
   fi
 
-  # 5b. the pool binaries are not older than the source they are built from.
-  #     A stale artifact is measured as if it were the fix (see
-  #     assert_binary_newer_than_source).
-  if [ "${MESH_ALLOW_STALE_BINARY:-0}" = "1" ]; then
-    echo "ok binary freshness: skipped (MESH_ALLOW_STALE_BINARY=1)"
-  else
-    tmp="$(mktemp)"
-    if assert_binary_newer_than_source "$STORAGE_BIN" elohim/elohim-storage/src 2>"$tmp"; then
-      echo "ok elohim-storage binary is not older than elohim/elohim-storage/src"
-    else
-      echo "REFUSED elohim-storage binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build storage (the gate's default-feature \`cargo test\` never refreshes the mesh copy) or set MESH_ALLOW_STALE_BINARY=1"
-      fail=1
-    fi
-    if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
-      if assert_binary_newer_than_source "$DOORWAY_BIN" doorway/doorway-service/src 2>"$tmp"; then
-        echo "ok doorway binary is not older than doorway/doorway-service/src"
-      else
-        echo "REFUSED doorway binary is STALE: $(tr -d '\n' < "$tmp") — rebuild it: just mesh build doorway (the gate's \`cargo test --lib --bins\` does NOT refresh the --bin artifact) or set MESH_ALLOW_STALE_BINARY=1"
-        fail=1
-      fi
-    fi
-    rm -f "$tmp"
-  fi
+  # 5b. mesh-slot binaries match the full recorded build closure. A missing/unavailable key
+  #     falls back to the tracked-src mtime rule and says so; explicit paths retain that rule.
+  #     A stale artifact is measured as if it were the fix (see assert_binary_matches_closure).
+  preflight_binary_freshness || fail=1
 
   # 5c. hApp coordinator bundle freshness — same class of check as 5b, one
   #     layer down (the packed Holochain bundle rather than a --bin

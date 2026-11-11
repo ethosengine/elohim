@@ -113,10 +113,10 @@ habits:
       - "a2o @concern:household-follows-head (genesis/a2o/features/devflow/epr-follows-its-head.feature — Act I host, the binary class of this invariant: a device that missed a landing heals at its next session, a session keeps its pinned CID, a failed health check or a dirty build never becomes the head, and moving back is a revert. Spec genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md, slices 1–2 = epr plus brit following its attested gitlink pin on one workspace)"
       - "a2o @device-declared-target (genesis/a2o/features/devflow/device-declared-target.feature, @concern:dataplane-convergence) — offline private declaration, projection replay, pinned-session notice and committed-base recovery; slice M"
     evidence: >
-      DELTA 2026-11-06 R1 (re-genesis 1, orchestrator 184beb01, RED preserved — flip authority is the fleet lane): custody over iroh restored on the integrated head e77465c37 (afadfb5c9 signed custody announcements through the fan-out + holder-claimed pushes; 33bf2b742 a relay source refuses only when bound to another agent). ethosengine recast MESH_RESET=1, transport dual, node-registry DNA rebuilt on the shard-index ceiling: resilience/chaos-peer-churn 3/3 (was REFUSED at its baseline step on 6a31ed270 on both devices), @concern:blob-durability 8 passed / 0 failed / 3 pending / 3 skipped (was 7/1/3/3), dataplane/epr-app-deliverability 7/7 (135 steps); elohim_custody_announce_total after the lanes: matthew received 6 applied 6, james received 7 applied 6, every refused_* direction 0 on all three peers (was refused_binding 3 per receiver). Open: jessica received 0 (sent 1) on this run — topology or defect, decided by the shem recast on the landed head; catch-up arm still dormant (custody rows seeded before a fix are never re-announced); inventory envelope still signs with the libp2p key. Evidence: genesis/local-dev/regenesis-1/household-r1b-*.log, sprint-report-household-20261106T174704Z-9301a31c.json.
-    evidence-fingerprint: sha256:291716cd750d0fb7
-    evidence-bytes: 280612
-    evidence-entries: 182
+      DELTA 2026-11-08 (re-genesis 1 alpha, orchestrator 184beb01, RED preserved — the habit's other checks are not this measure): alpha re-genesised on the address-crossing DNA (live cells = the five bundle hashes, seven conductors on fork 993cf597a); both doorways serve `/` and `/lamad/` and resolve the landing head to one CID (bafyreif4j…aehu); Dataplane Validation green on edge #1839 (validate-only, 10 passed / 0 failed, after #1838 rolled the late-bind storage image). Convergence defect found and cured: storage snapshotted its conductor client at boot, so a peer whose storage beat its conductor never adopted a release nor minted a binding (fix 9faf54076; three tests; live cold-boot log proof owed). Open: doorway /health/serving is blind to a conductor restart (backlog doorway-readiness-blind-to-conductor-restart; station 2 of app-delivery-refuses-fast red twice). Evidence: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/{STATE.md,RESULT.md,regression-classes.md}.
+    evidence-fingerprint: sha256:47f4ab55a85468fa
+    evidence-bytes: 281601
+    evidence-entries: 183
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach
@@ -185,10 +185,10 @@ habits:
     checks:
       - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
     evidence: >
-      DELTA 2026-10-18 (flip red→green on household evidence; ruling recorded): the three chaos-peer-churn scenarios whose custody guard refused on 2026-10-17 pass on this household — `features/resilience/chaos-peer-churn.feature` 3/3, 34/34 (sprint-report-household-20261018T154019Z-58ef1c20) and the habit's own `@concern:blob-durability` tag lane 14 scenarios: 10 passed, 1 pending, 3 skipped, 0 failed (…154413Z-e42c7f45; the pending and skipped set is the one the lane carried before the 10-17 flip, when the habit was green). The custody substrate is present: `genesis/local-dev/household-dowell/drill-custody-pairs.json` holds 9 pairs (matthew, jessica, james × manifesto, chaos-ladder, heal-target blobs) and jessica's `/api/v1/commitments?action=custody-blob&limit=5000` lists active rows for all three blobs × three providers. The 10-17 red was that household's state, and its most likely cause is now impossible to miss: the prologue's `seed-drill-custody` leg skipped with exit 0 when `seed-drill-fixtures` wrote no pairs; e42c7f453 makes it print `REFUSED seed-drill-custody:` with the pairs path, the fixtures leg's exit code and the consequence, and return nonzero. Side finding for the clients of that route: `/api/v1/commitments` without `limit` returns only the newest 100 rows (the a2o steps pass `limit=500`). Fleet half still unmeasured (the 2026-09-11 Dataplane Validation red stands on its own evidence); green holds on the household's Act I checks.
-    evidence-fingerprint: sha256:5995c43382339aab
-    evidence-bytes: 34407
-    evidence-entries: 24
+      DELTA 2026-11-08 (GREEN preserved; artifact-store sprint 2, closure L3 landed on dev 1b76c2327): the storage hardening residual (H passes 1–5: ingress author binding, BlobStore crash, race and ENOSPC tests, custody follow-ups) plus E2 and P/R1.4 were accepted on the shem household on storage and doorway built from 86e1395e0. The household was resumed, not reset, with conductor hc-fork-993cf597a19b. chaos-peer-churn passed 3/3 scenarios, 34/34 steps (sprint-report-household-20261108T181831Z-86e1395e). The `@concern:blob-durability` tag lane had 8 passed, 0 failed, 3 pending and 3 skipped (…182219Z-86e1395e). The 3 pending need stewards in 3 distinct households; that is a fixture shape (`MESH_HOSTED_CAST=all`), not code. epr-app-deliverability, the pre-push serving receipt, passed 7/7 scenarios and 135/135 steps. Pre-push: the elohim-storage gate re-ran green (25 min) and the eprfs gate re-ran green (18 min). Edge #1840 and #1841 rolled SUCCESS from orchestrator #2260. One named red, not a durability verdict: a first chaos attempt failed its After hook ("jessica sees 1 neighbours") because the hook's 120 s restore window is shorter than the ~5 min mDNS re-query, and the rerun was green. That is filed as `genesis/data/timeline/backlog/household-chaos-restore-window-shorter-than-mdns-requery.md`. Debt handed back: 3 new `blob_hash` identifiers in `src/reconcile/custody.rs` are to be renamed `blob_cid` (the address-profile-lint ratchet baseline was raised to record them). Fleet clause measured on the deployed build: edge #1840 deferred Dataplane Validation to its sibling run. Edge #1841's validation stage passed fleet-quiesce, sustained 362 s from 21:12Z (A and B caughtUp, A actionable=0, unmeasured=0, both doorways answering 200), and read `[OK] blob-durability: passed=1 failed=0 pending=13`. Green on both planes.
+    evidence-fingerprint: sha256:d1b8f2ca4e934bd5
+    evidence-bytes: 36254
+    evidence-entries: 25
     refs:
       - "genesis/data/timeline/backlog/dataplane-peer-fallback-and-blob-replication.md"
       - "memory: project_dataplane_next_lens_diversity_placement (1a+1b landed; prod join dormant)"
@@ -743,6 +743,50 @@ habits:
       - "elohim/eprfs/epr-cli/src/flow/memory/import.rs — `acting_author` and the rewrite-on-change path"
       - "elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md — the sibling: this habit makes attribution REPRESENTABLE; that one makes it ADMISSIBLE for economic joins"
 
+  - id: commons-held-by-the-network
+    declared: .epr-meta/commons-held-by-the-network.habit.md
+    invariant: >-
+      The commons is held by the network itself and no person's goodwill is what holds it: value
+      drawn from the common inheritance flows, witnessed, to the holons it was drawn from without
+      the steward's hand on the flow; a hand reaching for the commons is refused in the open by an
+      elohim and the refusal stands, the steward's hand included; a challenge to the licence's terms
+      is heard at the layer its reach confers and carries no further; an addition offered under
+      other terms is refused by the record itself, not by a person; a council of people drawn by lot
+      has audited an elohim at at least one layer; and two independently established networks have
+      reconciled a common layer holding their intersection. While any of these lacks a record the
+      holder-of-record seat is special and EPR-LICENSE-1.0.md §7 binds the steward as written; when
+      all six have one the seat is ordinary without amending the text.
+    status: unwired
+    active: false
+    checks: []
+    evidence: >
+      DELTA 2026-11-07 (born UNWIRED; declared by the steward's adoption of EPR-LICENSE-1.0.md as the working commitment to the constitution): §13 of the licence names the point at which the holder-of-record seat stops being special, and declares it the protocol's way: a measure, flipped only on evidence. None of the six conditions has a record today. What runs of the machinery (README "What runs today"): the authoring gate's reach classification and the feedback back-propagation with the standing projection in elohim-storage. Designed, not running: the agent runtime (no elohim takes part in any gate), reach gated by standing (written and tested, not on the storage path), every council at every layer, the sortition floor, the commons pools and their witnessed flows, any second network. The steward may not flip this habit; until any council exists the register is read in the open. Checks arrive one condition at a time, the fourth first.
+    evidence-fingerprint: sha256:b776a56d8a3a8bda
+    evidence-bytes: 944
+    evidence-entries: 1
+    first_move: >-
+      The first of the six to become observable is the fourth: refuse, at the authoring gate and
+      not by a person, an addition to the canon or the primitives offered under terms other than the
+      licence's and its border licences. licence-tiers-check.mjs already refuses a manifest field
+      outside the allowed set; extend the same refusal to a new canon document without the canon
+      directory's licence, and to a new crate declaring a licence outside its tier, so the record
+      refuses the addition. The second observable is the first: a witnessed REA flow from a commons
+      pool to a holon with no steward signature on the event (shefa, once the pool exists).
+    refs:
+      - EPR-LICENSE-1.0.md
+      - LICENSING.md
+      - COVENANT.md
+      - genesis/docs/content/elohim-protocol/values-forward.md
+      - genesis/docs/content/elohim-protocol/shefa.md
+      - genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md
+      - genesis/orchestrator/licence-tiers-check.mjs
+      - .epr-meta/licence-tiers-declared.habit.md
+    retire-when: >-
+      the six conditions are each enforced by construction in the machinery that performs them (the
+      authoring gate, the commons pools, the council and sortition records, the cross-network
+      settlement) and every one has its own habit, so this cross-seam roll-up names nothing those
+      habits do not.
+
   - id: guards-sense-frames
     declared: .epr-meta/guards-sense-frames.habit.md
     invariant: >
@@ -803,6 +847,42 @@ habits:
     retire-when: >
       when the scripts that mint dev findings obtain their writer from epr flow by construction and
       no .claude/data/*.jsonl appender remains.
+
+  - id: licence-tiers-declared
+    declared: .epr-meta/licence-tiers-declared.habit.md
+    invariant: >-
+      Every tracked first-party crate and package declares a licence from the three tiers the steward
+      ruled on 2026-11-06 — primitives MPL-2.0, services that serve people AGPL-3.0, everything else
+      Apache-2.0 under the root LICENSE — and CAL-1.0 appears nowhere but the conductor fork. A
+      reusable path with no licence is all-rights-reserved and cannot be relied on, so a missing field
+      is a refusal, never a warning. The canon prose under genesis/docs/content/elohim-protocol/ is
+      CC BY-SA 4.0 (owned by no one, constitution I.1; the steward its holder of record, bound by the
+      irrevocable grant and the covenant's no-other-terms commitment) and carries that LICENSE in its
+      own directory.
+    status: green
+    active: false
+    checks:
+      - "node genesis/orchestrator/licence-tiers-check.mjs (walks tracked Cargo.toml [package] tables and package.json manifests; refuses a missing field, a licence outside the allowed set, CAL-1.0 outside the fork, a named tier member on the wrong tier, a zome that is not MPL-2.0, or a missing LICENSE/LICENSES text)"
+    evidence: >
+      DELTA 2026-11-07b (GREEN; the border licences gain their primary instrument): the steward adopted `EPR-LICENSE-1.0.md` as "the working commitment to the constitution" — the protocol's own licence, with the four border licences as its outward face, the governance settlement of this era. This habit now also refuses a tree without the licence file and without `.epr-meta/commons-held-by-the-network.habit.md` (the licence's §13 measure, born `unwired`); the root manifest declares the licence and guards its amendment (`licence-amendment-by-reach`). Pre-adoption review of the licence, recorded here because the licence has no habit of its own yet: a five-lens verified workflow (canon fidelity · present-tense claims against README "What runs today" · internal consistency · border-law accuracy · structure and voice; 76 agents) returned 70 findings, 58 refuted by an adversarial pass, 12 confirmed, plus 6 from a completeness critic; applied: reach is read from the record, never allocated by a council (stance III.2); the elohim's deference ratio restored to the constitution's (defer on ordinary life and most governance, hold only what has graduated); "holds the rights to the commons" → holds the commons in trust, three places; §3's "unconditionally" → on each border licence's own conditions; every maker is holder of record for what they wrote (no CLA, inbound = outbound); demurrage's direction corrected to shefa's (the idle balance decays back to the commons); the manifesto's imagodei sentence no longer transposed to the commons; the §5 "language is common inheritance" attribution made the licence's own step; the layer list stated once; shefa linked; the minted term "the holon that upholds a person" marked as the licence's own composition of two glossary words, and the glossary entry made to point at the licence rather than vouch for it. The steward's rulings of the same evening are in: the Georgist split completed in kind (labour its produce, thrift its return, the inheritance's yield — the elohim's, as a produce of the land itself — to the commons), the Jubilee→George→protocol lineage named, and the steward's own seat recorded as owed and unaccounted ("and that it is good"). Check: `licence-tiers-check: 85 Cargo.toml packages, 33 package.json manifests, 0 refusal(s)`; the register projects 64 habits. Blind-reader rounds after the review: the licence, R1 READY (0 correctness · 8 interpretability · 3 preference; applied: a gloss of what a "stance" citation names, REA and shefa glossed at first use, the §4.3 sanction's argument made explicit, demurrage given its own sentence, the minted term's plural use declared, one §11 antecedent fixed, §7 broken into paragraphs; the three preference findings on §1's long entries left, since the steward adopted them). The README's License section, R6 REVISE (0 · 2 · 1: the legal relationship between the protocol's licence and a crate's declared licence stated plainly) and R7 READY (0 · 2 · 0: genre and mechanism named in one clause). Closed at R7 by the author's judgment, with no correctness finding at any round. README loop continued for the canon paragraph: R4 READY (0 correctness · 4 interpretability · 1 preference, read against the pre-correction text; the two that survived the correction — is the trust legal or moral, and "pillar papers" narrowing the directory rule — fixed: no deed exists, the irrevocable grant is the floor, every document under the path is covered; CC text location and checker coverage stated). R5 REVISE (1 correctness · 4 interpretability · 1 preference): the correctness finding stands — irrevocability covers only what is already shared and does not stop dual-licensing or private additions, and "trustee" without a deed is a costume. Fixed: "trustee of record" → "holder of record" in every text; the gap named; the covenant's no-other-terms commitment recorded as what closes it, labelled a public pledge not an instrument; succession by inheritance stated with the grant surviving; "commercially or not" added; referent and the overloaded "trust" disambiguated. Closed by the author's judgment at round 5 (5 rounds, 5 fresh readers): the remaining question — whether the pledge should get an instrument — is the steward's, recorded in the spec's open items.
+    evidence-fingerprint: sha256:f6180e8571671262
+    evidence-bytes: 7550
+    evidence-entries: 3
+    guard: >-
+      Never change a tier's licence or move a crate between tiers in a sweep; that is a steward ruling
+      recorded in the decision spec first. Never add a licence to upstream code held in the tree
+      (conductor fork, sophia, vendor/); their terms come with them. Never weaken the canon's share-alike
+      to a gift licence from this habit, and never record a transfer of the canon's copyright to an
+      owner: the constitution says it is owned by no one, and a holder of record is not an owner in its
+      sense. Never call the holder a trustee unless an instrument makes them one. This file states no
+      legal advice.
+    refs:
+      - LICENSING.md
+      - genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md
+      - genesis/orchestrator/licence-tiers-check.mjs
+      - deny.toml
+      - COVENANT.md
+    retire-when: "cargo-deny's licence check and a package-manifest lint run the same refusals in the pre-push gate and CI, including the canon directory's LICENSE, so this script has no reader of its own"
 
   - id: recall-reaches-authority
     declared: .epr-meta/recall-reaches-authority.habit.md
@@ -977,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-10-26 (RED, measured after a restart): shem's workspace restarted at 22:19:51Z on 2026-10-25 and did not re-arrive. At 02:25Z on 2026-10-26, `just status device` exits 1 with REFUSED epr binary and REFUSED brit binary (temporary links stand in front of a launcher that was never installed). `epr device arrive` refuses `pass --launcher PATH`, because `bin-launch` only ever lived in /tmp/eprfs-gate-target. Recovery took six manual steps, and the peer daemon was down for 2 h 14 min. The cure the REFUSED line names cannot run without a build. Plan: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md (R1–R5); the R5 restart-to-connected receipt returns it to green.
-    evidence-fingerprint: sha256:a185145523c1b8bb
-    evidence-bytes: 10923
-    evidence-entries: 13
+      DELTA 2026-11-11 (RED preserved): S3 adds the @wip `devflow/unseen-device-builds-its-variant.feature` (spec §7.5): a device of an unseen class participates through the seed's portable tier, builds and proves its own variant, and a later device of its class resolves it. Its correctness finding (an unobservable audience) is fixed. Measured on shem: it is a v2-only host (no avx2/bmi2/movbe/lzcnt/fma), so an arriving shem must refuse a v3 epr before adoption; A2/A3 and V5 carry that.
+    evidence-fingerprint: sha256:c7a99e2d5454b035
+    evidence-bytes: 11410
+    evidence-entries: 14
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
@@ -2324,10 +2404,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-11-01 (status stays RED; Jenkins observation): Genesis #1719 archived 26 passed, 426 skipped, 37 undefined and 5 pending API scenarios, with no peer-stage report; Edge #1776 refused activation because the persisted checkout failed Git HEAD validation. The Cucumber reader now includes failing hooks and refuses empty/unknown results as passes (35 reader/aggregate checks passed); separate lane summaries explicitly label absent reports unmeasured. A read-only validate-only worker observation and bounded image/persisted Git metadata probes pass 31 pipeline-contract and 40 activation-capture checks. No live worker activation, native task admission or off-host BDD pass is claimed.
-    evidence-fingerprint: sha256:8bdd8f01cf8422d4
-    evidence-bytes: 13406
-    evidence-entries: 15
+      DELTA 2026-11-11 (RED preserved): S1 refines the harvest's four stations into `compute/measure-on-a-peer.feature`, `peer-executed-stage.feature` and `ci-runner-stewarded.feature`; the provider selects a variant it can run or refuses before launch, and missing compatibility evidence never becomes permission to launch. One fresh blind read per file under the steward-granted floor; the one correctness finding (a grant assertion after the submission) is fixed. Steps are unbound (@wip); P1-P2 wire them.
+    evidence-fingerprint: sha256:e2c2cb693e4ff66c
+    evidence-bytes: 13911
+    evidence-entries: 16
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks
@@ -2528,10 +2608,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-06b (status unchanged; validation limit): receipt tests 35/35 and mesh freshness 13/13; broad orchestrator gate remains red on the unchanged source-state validator requiring bafkr4i while the installed EPR emits bafkrei (clean=true). Two additional launcher-alias errors cleared when checked with the concrete installed binary. No heavy build or push under Matthew's landing hold; this pass does not claim a green reach gate.
-    evidence-fingerprint: sha256:134b04c375eb28bb
-    evidence-bytes: 14088
-    evidence-entries: 18
+      DELTA 2026-11-10 (status unchanged; a passing gate no longer loses its verdict to exhaust): the restart-envelope push (dev 227be88db) paid eprfs twice, 2819 s and then 1111 s, and recorded neither. Two causes. (1) Dirty exhaust: gate-cycle's ceiling finding and the governance hook wrote tracked .claude/data ledgers into the worktree, and tree scope counts any dirty path. (2) A regression to tree scope: one new unnamed read (epr-cli/tests/session_envelope.rs:269) that the REAL eprfs test missed, because it asserted named files only, and the preflight missed, because eprfs was not on its list. Fixes in gate-exhaust: GATE_EXHAUST (.claude/data/*.jsonl + three cursors) is excluded from every scope's dirt check, with an audit test that any gate input naming exhaust fails; governance and architecture ledgers resolve to the main checkout from a linked worktree (file reads only, no git subprocess); the read is declared, so eprfs is 0 unresolved again; the REAL test asserts unresolved == []; and PREFLIGHT_READ_SET_PROJECTS adds eprfs to the seconds check. Tests: gate-evidence, gate-input-audit, gate-cycle and epr_meta_eval (48 checks) green; gate-runner 51/51; gate-preflight 24/24. Owed: the next push showing `eprfs evidence: recorded` with a ledger dirty.
+    evidence-fingerprint: sha256:fb897cf7a4ffc371
+    evidence-bytes: 16522
+    evidence-entries: 20
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
@@ -2593,10 +2673,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-01 (RED preserved, inactive; S3 stories, evidence only): landing-queue.feature written, 21 stations / 26 scenarios, every one @wip (Phase L lands in S4, Phase V in S5); fixture, seed and steps defined (dry-run 26 scenarios, 0 undefined, 0 ambiguous; fixture unit test 13/13). checks[0] selects 0 scenarios until a station drops @wip, so it is vacuous and is never cited as passing. checks: amended to these stations. Moved out: offer fetched by oid (A7b, staged); note to lane:X reaches its holder (staged); sibling green reused and its gate-evidence.test.mjs sibling-signer cases (push-gate-pays-once); duplicate claim refused naming holder, which covers a backlog lane: claim (devices-share-one-berth claim stations, same mechanism); the joined @requires:shem receipt (staged until A7b); edge train waits on alpha-fleet (devices-share-one-berth push outline). Override-by-rule covers exactly one silent sibling. Berth suite repaired as far as S3 owns it: the ENOENT (household() copied into an uncreated genesis/orchestrator/manifests/runtime) hid seven more harness gaps (launcher-alias epr, no flow store, .claude/scripts link, session envelope env, recall-contract seed, two step timeouts, a stale status assertion), now 9/10 green; the tenth (override binds the silent device) expects the pre-R-K override and turns in S4's rewrite. Blind-reader (a2o-story, covenant variesRule bafyreigneie4oj4unizwqdtqzccpmtz5y4oa7nimsswvhmss3xlyby3ke4, a fresh reader per round): r1 REVISE (0/9/2), r2 READY (0/13/1), r3 READY (0/8/3); closed by the author's judgment; open interpretability: fence margin defined only in the glossary, long scenario titles. The devices-share-one-berth rewrite is S4's (K6).
-    evidence-fingerprint: sha256:e0c155d5dd9a5547
-    evidence-bytes: 2562
-    evidence-entries: 3
+      DELTA 2026-11-11k (RED preserved, inactive; lane K review dispositions, ledger item 5, and compiler posture): shem's independent review of lane K as landed (0cd6cf411..56471d732, Codex astra, receipt kreview.receipt.md on shem) is answered finding by finding. (1) HIGH, a fixed LINK_INPUTS list: FIXED by hostcompat/k1-link-libs (keyed libraries derived from the recorded rustc's native-static-libs, with the compiler identity verified and the driver's startup objects listed explicitly); libraries a dependency's build script adds wait for the K6 slice 2 link trace. (2) MED, host tool lines in the key input rather than the method: RULED-DELIBERATE interim; for host-bound builds they belong to the key, and K6 slice 2 replaces them with the sysroot CID for declared builds. (3) MED, family keeps host tools: RULED-DELIBERATE; cc, ld and the link inputs are input lines, so family carries rustc/cargo identity and target.* only. (4) MED, a tie refuses and an expected output records no divergence: RULED-DELIBERATE K4 choices (refuse rather than guess; an expected output is the caller's choice); open to the steward. (6) PLAUSIBLE, the daemon hashes the queued key: RULED-DELIBERATE; the daemon serves its own device's CLI, which derived the key. Compiler closure (ledger item 4, ruling H13 asked): posture B, per-compiler variants share a family, not a key (shem and ethosengine differ in cc1 and as, agree in crtbeginS.o); a CID-pinned compiler closure is a later optimisation. Floor serving (ledger item 3): the per-method sysroot-pack grant is withdrawn for spec §7.8 and ruling H12 (reach on the object), branch spec/hostcompat-floor-reach 40a0cc74b; implementation held until H12 is ruled.
+    evidence-fingerprint: sha256:800ab07d3f09efff
+    evidence-bytes: 28279
+    evidence-entries: 19
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

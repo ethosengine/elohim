@@ -115,3 +115,78 @@ fn a_malformed_policy_is_refused() {
 
     assert!(Rules::from_policy_file(policy.path()).is_err());
 }
+
+#[test]
+fn serves_enters_the_rules_digest_and_relays_still_do_not() {
+    let base = json!({
+        "berth": {
+            "channel": {"crosses": {"dev-berth-events@1": ["claim"]}},
+            "resources": {"dev-integration": {"capacity": 1, "scope": "steward"}}
+        }
+    });
+    let mut serving = base.clone();
+    serving["berth"]["artifacts"] = json!({
+        "_comment": "prose never moves the digest",
+        "serves": {"mesh-build": ["steward"]}
+    });
+    let mut other_method = base.clone();
+    other_method["berth"]["artifacts"] = json!({"serves": {"other-build": ["steward"]}});
+    let mut serving_with_relays = serving.clone();
+    serving_with_relays["berth"]["channel"]["relays"] = json!([
+        "https://relay.alpha.elohim.host",
+        "https://relay.elohim.host"
+    ]);
+    serving_with_relays["berth"]["channel"]["relay_mode"] = json!("single");
+    serving_with_relays["berth"]["artifacts"]["_comment"] = json!("different prose");
+    let mut serving_nothing = base.clone();
+    serving_nothing["berth"]["artifacts"] = json!({"serves": {}});
+
+    let digest = |policy: &serde_json::Value| Rules::from_policy(policy).expect("policy").digest();
+    // A grant is enforced, so a sibling with another grant shows as skew.
+    assert_ne!(digest(&base), digest(&serving));
+    assert_ne!(digest(&serving), digest(&other_method));
+    // Relays and prose stay outside the digest, grant or no grant.
+    assert_eq!(digest(&serving), digest(&serving_with_relays));
+    // A policy that serves nothing keeps the digest it had before the grant existed.
+    assert_eq!(digest(&base), digest(&serving_nothing));
+    // The serve grant is loaded with the rest.
+    assert!(!Rules::from_policy(&serving)
+        .expect("serving")
+        .serves()
+        .is_empty());
+}
+
+#[test]
+fn descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant() {
+    let base = json!({"berth":{"artifacts":{"serves":{"mesh-build":["steward"]}}}});
+    let original = Rules::from_policy(&base).unwrap();
+    assert!(!original.serves().discloses_method("mesh-build"));
+    let mut explicit = base.clone();
+    explicit["berth"]["artifacts"]["discloseMethod"] = json!(["mesh-build"]);
+    let granted = Rules::from_policy(&explicit).unwrap();
+    assert_ne!(original.digest(), granted.digest());
+    assert!(granted.serves().discloses_method("mesh-build"));
+    assert!(!granted.serves().discloses_method("sysroot-pack"));
+    let disclosure_only =
+        Rules::from_policy(&json!({"berth":{"artifacts":{"discloseMethod":["sysroot-pack"]}}}))
+            .unwrap();
+    assert!(disclosure_only.serves().is_empty());
+    assert_ne!(
+        disclosure_only.digest(),
+        Rules::from_policy(&json!({})).unwrap().digest()
+    );
+    explicit["berth"]["artifacts"]["discloseMethod"] = json!([]);
+    assert_eq!(
+        original.digest(),
+        Rules::from_policy(&explicit).unwrap().digest()
+    );
+    for malformed in [
+        json!(true),
+        json!({"mesh-build":true}),
+        json!([""]),
+        json!([1]),
+    ] {
+        explicit["berth"]["artifacts"]["discloseMethod"] = malformed;
+        assert!(Rules::from_policy(&explicit).is_err());
+    }
+}

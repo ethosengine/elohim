@@ -1,0 +1,31 @@
+{
+  "requires": [
+    {
+      "axis": "lib",
+      "predicate": {
+        "kind": "present",
+        "value": [
+          "libgcc_s.so.1",
+          "libc.so.6"
+        ]
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "lib": {
+        "kind": "names",
+        "value": [
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libextra.so"
+        ]
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "permit"
+  }
+}

@@ -1,4 +1,5 @@
-//! The advisory digest of the crossing and steward-scope rules one device enforces.
+//! The advisory digest of the crossing, steward-scope and artifact-serve rules one device
+//! enforces.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -10,26 +11,30 @@ use sha2::{Digest, Sha256};
 
 use crate::allow::CrossingAllowList;
 use crate::error::PeerError;
+use crate::serves::ArtifactServeList;
 use crate::steward_scope::StewardScope;
 
-/// The crossing allow-list and steward scope loaded together from one policy.
+/// The crossing allow-list, steward scope and artifact serve grant loaded together from one
+/// policy.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rules {
     allow: CrossingAllowList,
     scope: StewardScope,
+    serves: ArtifactServeList,
 }
 
 impl Rules {
-    /// Load both enforced rule sets from one parsed policy.
+    /// Load every enforced rule set from one parsed policy.
     ///
     /// # Errors
     ///
-    /// [`PeerError::Policy`] when either rule set is malformed.
+    /// [`PeerError::Policy`] when any rule set is malformed.
     pub fn from_policy(policy: &Value) -> Result<Rules, PeerError> {
         Ok(Rules::new(
             CrossingAllowList::from_policy(policy)?,
             StewardScope::from_policy(policy)?,
-        ))
+        )
+        .with_serves(ArtifactServeList::from_policy(policy)?))
     }
 
     /// Load both enforced rule sets from one `pool-policy.json` file.
@@ -55,9 +60,20 @@ impl Rules {
         })
     }
 
-    /// Combine an already-loaded crossing allow-list and steward scope.
+    /// Combine an already-loaded crossing allow-list and steward scope; nothing is served.
     pub fn new(allow: CrossingAllowList, scope: StewardScope) -> Rules {
-        Rules { allow, scope }
+        Rules {
+            allow,
+            scope,
+            serves: ArtifactServeList::default(),
+        }
+    }
+
+    /// These rules with `serves` as the artifact serve grant.
+    #[must_use]
+    pub fn with_serves(mut self, serves: ArtifactServeList) -> Rules {
+        self.serves = serves;
+        self
     }
 
     /// The crossing allow-list this device enforces.
@@ -70,7 +86,14 @@ impl Rules {
         &self.scope
     }
 
-    /// The digest of only the crossing kinds and steward-scoped resource names and prefixes.
+    /// The artifact serve grant this device enforces.
+    pub fn serves(&self) -> &ArtifactServeList {
+        &self.serves
+    }
+
+    /// The digest of only the crossing kinds, the steward-scoped resource names and prefixes, and
+    /// the artifact serve grant. An empty grant is left out of the canonical form, so a policy
+    /// that serves nothing keeps the digest it had before the grant existed.
     pub fn digest(&self) -> RulesDigest {
         #[derive(Serialize)]
         struct Steward<'a> {
@@ -82,6 +105,10 @@ impl Rules {
         struct Canonical<'a> {
             crosses: &'a BTreeMap<String, BTreeSet<String>>,
             steward: Steward<'a>,
+            #[serde(skip_serializing_if = "serves_nothing")]
+            serves: &'a BTreeMap<String, BTreeSet<String>>,
+            #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+            disclose_method: &'a BTreeSet<String>,
         }
 
         let canonical = Canonical {
@@ -90,11 +117,18 @@ impl Rules {
                 names: self.scope.names(),
                 prefixes: self.scope.prefixes(),
             },
+            serves: self.serves.by_method(),
+            disclose_method: self.serves.disclosed_methods(),
         };
         let bytes = serde_json::to_vec(&canonical)
             .expect("canonical rules contain only JSON strings and ordered collections");
         RulesDigest(format!("{:x}", Sha256::digest(bytes)))
     }
+}
+
+/// Whether a canonical serve grant is empty, and so left out of the digest.
+fn serves_nothing(serves: &&BTreeMap<String, BTreeSet<String>>) -> bool {
+    serves.is_empty()
 }
 
 /// A lowercase hexadecimal SHA-256 digest of the rules a device enforces.

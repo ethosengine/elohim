@@ -3,7 +3,7 @@ title: Cycle-time harvest from re-genesis 1 — handoff for a fresh session
 id: cycle-time-harvest-handoff
 date: 2026-11-06
 from: re-genesis 1 orchestrator session 184beb01 (Claude Fable 5.1), /btw fork
-status: proposal; nothing below is implemented
+status: three of four items landed by the Codex session 2026-11-06 (see RESULT.md "Follow-ups"); item 2 (receipt narrowing) deferred to the import-closure form
 durable copy: /projects/elohim/genesis/local-dev/regenesis-1/cycle-time-harvest-handoff.md
 ---
 

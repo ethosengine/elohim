@@ -29,6 +29,7 @@
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/epr/**",
           "crates/elohim-address/**",
+          "crates/elohim-blob-store/**",
           "elohim/epr-rea/**",
           "elohim/epr-index/**",
           "elohim/Cargo.toml",

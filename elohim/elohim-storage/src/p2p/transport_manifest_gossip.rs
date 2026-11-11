@@ -27,7 +27,9 @@
 //! negotiation. The signature also does NOT prove that `agent_cid` /
 //! `libp2p_peer_id` belong to the same operator — that binding is the
 //! identity-binding gossip's job (DHT-anchored). Here they are routing hints,
-//! never authority.
+//! never authority. The optional `transport_link` is the one exception that
+//! carries its own proof: two signatures, one per key, verified on receipt
+//! (`p2p::transport_link`).
 //!
 //! This is a transport-neutral wire type (sibling of `custody_announce`); it
 //! depends on ed25519 only, never on the iroh crate, so it compiles with
@@ -73,6 +75,15 @@ pub struct TransportManifestAnnouncement {
     /// this value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
+    /// The node's two-key [`TransportLink`] (its libp2p identity key and its iroh
+    /// key each signing the pair), when it is dual-stack. Additive and outside the v1
+    /// signing bytes like `user_agent`: it carries its own two signatures, which the
+    /// receiver verifies independently before recording the link. It is the only
+    /// path by which an iroh NodeId reaches an agent (`p2p::transport_authority`).
+    ///
+    /// [`TransportLink`]: crate::p2p::transport_link::TransportLink
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport_link: Option<crate::p2p::transport_link::TransportLink>,
     /// Wall-clock ms at signing. Receivers keep the newest per NodeId.
     pub announced_at_ms: i64,
     /// ed25519 signature (64 bytes, hex) over [`Self::signing_bytes`].
@@ -139,6 +150,7 @@ impl TransportManifestAnnouncement {
             libp2p_peer_id,
             planes,
             user_agent,
+            transport_link: None,
             announced_at_ms,
             signature: String::new(),
         };

@@ -1,0 +1,37 @@
+{
+  "requires": [
+    {
+      "axis": "abi.libc",
+      "predicate": {
+        "kind": "at-least",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            34
+          ]
+        }
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "abi.libc": {
+        "kind": "version",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            34,
+            0
+          ]
+        }
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "permit"
+  }
+}

@@ -113,7 +113,18 @@ Given(
       ].join('\n')
     );
     chmodSync(join(bin, 'gh'), 0o755);
-    writeFileSync(join(bin, 'epr'), `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> '${eprLog}'\n`);
+    // The gate-runner itself asks `epr session id --json` to label its own live run when no
+    // GATE_LIVE_RUN is inherited (CI has none). That is not an observation: answer it as "no
+    // session" and keep it out of the log so the log holds only what the gate recorded.
+    writeFileSync(
+      join(bin, 'epr'),
+      [
+        '#!/usr/bin/env bash',
+        `if [ "$1 $2" = "session id" ]; then echo '{"source":"none"}'; exit 0; fi`,
+        String.raw`printf '%s\n' "$*" >> '${eprLog}'`,
+        '',
+      ].join('\n')
+    );
     chmodSync(join(bin, 'epr'), 0o755);
 
     fx = { base, root, sub, gitlink, bin, eprLog, conclusion: 'success' };
@@ -197,12 +208,21 @@ Given('the upstream cannot be read', function () {
 
 function runGate(args: string[], extraEnv: NodeJS.ProcessEnv = {}, input?: string): void {
   assert.ok(fx);
+  // Hermetic: the gate's live-run and session context come from the fixture, never the developer's
+  // shell. A pre-push or agent shell exports GATE_LIVE_RUN, which made this scenario pass locally
+  // and fail in the Jenkins pod (genesis #1752/#1753): the ambient run hid the runner's own
+  // `epr session id` probe. Strip every inherited GATE_* / session variable so local == CI.
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([k]) => !/^(GATE_|ELOHIM_SESSION|EPR_SESSION|CLAUDE_SESSION|CODEX_SESSION)/.test(k)
+    )
+  );
   const r = spawnSync(process.execPath, [GATE_RUNNER, ...args], {
     cwd: fx.root,
     encoding: 'utf8',
     input,
     env: {
-      ...process.env,
+      ...inherited,
       GATE_ROOT: fx.root,
       GH_BIN: join(fx.bin, 'gh'),
       EPR_BIN: join(fx.bin, 'epr'),

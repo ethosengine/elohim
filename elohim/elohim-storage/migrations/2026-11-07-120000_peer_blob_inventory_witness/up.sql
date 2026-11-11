@@ -1,0 +1,21 @@
+-- Source of truth: authenticated inventory gossip (signed `elohim/inventory/blob/2`
+-- envelopes admitted by `p2p::inventory_gossip::admit`), authenticated recon sessions,
+-- verified fetches and this node's own verified store. `peer_blob_inventory` is a
+-- Category C projection of that evidence; this column records which witness admitted
+-- each row, so custody floors can count only bound rows.
+--
+-- `witness` values:
+--   'signed-author'  libp2p gossipsub: the signed `message.source` is the envelope's
+--                    author and the author is bound in `peer_transport_manifest`.
+--   'end-to-end'     iroh-gossip (or a held page later applied): the envelope
+--                    signature over the bound author's key is the authentication.
+--   'recon'          a negentropy recon session over the peer's own authenticated
+--                    libp2p connection.
+--   'fetch-verified' this node fetched the bytes from the peer and they hashed to
+--                    their CID.
+--   'self'           this node's own store verified the bytes.
+--   'legacy-hint'    anything else, including every row that predates this column:
+--                    a fetch hint only, never custody evidence.
+--
+-- Existing rows become 'legacy-hint' (fail closed): their witness was never recorded.
+ALTER TABLE peer_blob_inventory ADD COLUMN witness TEXT NOT NULL DEFAULT 'legacy-hint';

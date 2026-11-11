@@ -110,6 +110,34 @@ export function manifestBlob(root, commit, manifestPath, spawn = spawnSync) {
 }
 
 /**
+ * A habit atom (`<dir>/…/.epr-meta/<id>.habit.md`) is a habit's evidence ledger. No gate recipe
+ * reads one, and a DELTA line in one is the deliverable every finished lane writes, so keying a
+ * project's tree on it made a docs-only DELTA re-run that crate's whole gate (elohim-storage,
+ * 25–86 min; backlog gate-key-dirtree-rekeys-on-habit-atom-edit). A gate that does read habit
+ * atoms names them in its audited reads, or keys on the whole commit tree; both stay in the
+ * material independently of this.
+ */
+export const isHabitAtom = path => /(^|\/)\.epr-meta\/[^/]+\.habit\.md$/.test(path);
+
+/**
+ * The project directory's tree at `commit`, minus its habit atoms. With no atom to drop it is the
+ * plain tree OID, so keys for such directories are unchanged; with atoms it is a digest of the
+ * remaining `<mode> <type> <oid>\t<path>` entries. Null when the directory is absent; an unreadable
+ * listing keeps the plain tree OID (conservative: the atoms stay in the key).
+ */
+export function projectTree(root, commit, dir, spawn = spawnSync) {
+  const oid = manifestBlob(root, commit, dir, spawn);
+  if (!oid) return null;
+  const rel = relative(root, resolve(root, dir)).split('\\').join('/');
+  const listing = gitRead(root, ['ls-tree', '-r', '-z', commit, '--', rel], spawn);
+  if (listing === null) return oid;
+  const entries = listing.split('\0').filter(Boolean);
+  const kept = entries.filter(entry => !isHabitAtom(entry.slice(entry.indexOf('\t') + 1)));
+  if (kept.length === entries.length) return oid;
+  return `tree-minus-habit-atoms:${createHash('sha256').update(kept.sort().join('\n')).digest('hex')}`;
+}
+
+/**
  * One digest for a `**\/<name>` read: sha256 over the sorted `<blob oid> <path>` lines of every
  * tracked file at `commit` whose basename is `<name>`. Null when the listing cannot be read.
  */
@@ -322,6 +350,16 @@ export function closureKey(closure) {
   return createHash('sha256').update(closureMaterial(closure)).digest('hex');
 }
 
+// Machine-written observations, never recipe inputs. Keep this promise beside the
+// dirty-tree decision; gate-input-audit.test.mjs checks every registered gate.
+// Cursors are the harvesters' progress, not configuration (other JSON stays input).
+export const GATE_EXHAUST = Object.freeze([
+  '.claude/data/*.jsonl',
+  '.claude/data/ci-cursor.json',
+  '.claude/data/governance-cursor.json',
+  '.claude/data/runtime-cursor.json',
+]);
+
 /**
  * Paths under the project's dir, manifest, declared inputs, reads and recipe that are modified,
  * staged, or untracked. The closure key names the COMMIT's bytes; the recipe runs
@@ -334,7 +372,8 @@ export function dirtyPaths(project, { root, spawn = spawnSync, commit = 'HEAD', 
   const pathspec = path => (isReadPattern(path) ? `:(glob)${path}` : path);
   const paths = [project.dir, project.manifestPath, ...sources.map(source => source.endsWith('/**') ? source.slice(0, -2) : source), recipePath,
     ...(reads.scope === 'paths' ? reads.oids.map(row => pathspec(row.path)) : ['.'])];
-  const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths)], spawn);
+  const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths),
+    ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)], spawn);
   if (out === null) return null;
   return out.split('\n').map(line => line.slice(3).trim()).filter(Boolean);
 }
@@ -531,7 +570,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const runner = manifestBlob(root, commit, 'genesis/orchestrator/run-local-gate.sh', spawn);
   const dirTree = project.dir === '.'
     ? gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null
-    : manifestBlob(root, commit, project.dir, spawn);
+    : projectTree(root, commit, project.dir, spawn);
   for (const [piece, oid] of Object.entries({ recipeFile: recipe.blob, runner, dirTree })) {
     if (!oid) return { line: `unavailable (${piece} absent at ${String(commit).slice(0, 9)})` };
   }

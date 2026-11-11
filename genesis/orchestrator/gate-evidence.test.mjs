@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -16,16 +16,20 @@ import { join } from 'node:path';
 import { dirname } from 'node:path';
 import { noteEpoch, noteSignature } from './scripts/brit-attest.mjs';
 import { nativeGateState } from './gate-source-state.mjs';
-import { COST_FIELDS } from './gate-cycle.mjs';
+import { COST_FIELDS, recordCycle } from './gate-cycle.mjs';
+import { architectureLedgerPath } from './gate-runner.mjs';
 import {
   attestationStep,
   closureKey,
   describeEvidence,
   dirtyPaths,
+  GATE_EXHAUST,
   emitGateVerdict,
   findEvidence,
   gateEvidence,
+  isHabitAtom,
   patternDigest,
+  projectTree,
   recordEvidence,
   reusableHit,
   resolveBin,
@@ -153,7 +157,8 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     assert.equal(result.line, 'hit green (signer did:key:zSIG, 30m ago, commit ffffffff1); closure scope tree (unknown reads)');
     assert.equal(result.dirty, false);
     const status = calls.find(c => isStatus(c.bin, c.args));
-    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.']);
+    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
+      ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)]);
     const find = calls.filter(c => isFind(c.bin, c.args));
     assert.equal(find.length, 1, 'one lookup per project');
     assert.deepEqual(find[0].args, ['--repo', '/repo', 'build', 'find', '--step', 'gate:elohim-storage', '--inputs-hash', expectedKey]);
@@ -686,14 +691,14 @@ test('D5: one unverifiable note under the step vetoes reuse even beside a green 
   assert.match(decided.why, /vetoes/);
 });
 
-test('dirtyPaths checks read files, directories and absent paths, or the whole tree including hook ledgers', t => {
+test('dirtyPaths checks read files, directories and absent paths, or the whole tree except exhaust', t => {
   const resolved = readEvidenceFixture(t)({ status: ' M fixtures/data.json\n' });
   assert.equal(resolved.result.dirty, true);
   const paths = resolved.calls.find(c => isStatus(c.bin, c.args)).args;
   for (const path of ['fixtures/absent.json', 'fixtures/data.json', 'fixtures/schemas']) assert.ok(paths.includes(path));
   assert.ok(!paths.includes('.'));
   const tree = readEvidenceFixture(t, { text: 'include_str!(unknown!());', declared: [`${project.dir}/src/**`] })({
-    status: ' M .claude/data/governance-findings.jsonl\n',
+    status: ' M .claude/data/failure-taxonomy.json\n',
   });
   assert.equal(tree.result.dirty, true);
   assert.ok(tree.calls.find(c => isStatus(c.bin, c.args)).args.includes('.'));
@@ -1024,17 +1029,71 @@ test('root recipes, missing local justfiles and the root directory use the root 
   }
 });
 
-test('dirtyPaths passes declared source pathspecs and the recipe, including hook ledgers', () => {
+test('dirtyPaths passes declared sources and recipe with exhaust exclusions', () => {
   const { spawn, calls } = fakeSpawn([
     ...closureReplies,
-    [isStatus, { status: 0, stdout: ' M .claude/data/governance-findings.jsonl\n' }],
+    [isStatus, { status: 0, stdout: ' M .claude/data/failure-taxonomy.json\n' }],
   ]);
-  assert.deepEqual(dirtyPaths(project, { root: '/repo', spawn }), ['.claude/data/governance-findings.jsonl']);
+  assert.deepEqual(dirtyPaths(project, { root: '/repo', spawn }), ['.claude/data/failure-taxonomy.json']);
   assert.deepEqual(calls.find(c => isStatus(c.bin, c.args)).args, [
     'status', '--porcelain', '--untracked-files=normal', '--', project.dir, project.manifestPath,
     'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
+    ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`),
   ]);
   assert.equal(dirtyPaths(project, { root: '/repo', env: {}, spawn: () => { throw new Error('unreadable'); } }), null);
+});
+
+test('real Git excludes staged, modified and untracked exhaust for both scopes, retaining input refusals', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-exhaust-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git('init', '-q');
+  mkdirSync(join(root, '.claude/data'), { recursive: true });
+  for (const name of ['governance-findings.jsonl', 'architecture-findings.jsonl', 'ci-cursor.json', 'governance-cursor.json', 'runtime-cursor.json']) {
+    writeFileSync(join(root, '.claude/data', name), '{}\n');
+  }
+  git('add', '--', '.claude/data/governance-findings.jsonl');
+  writeFileSync(join(root, '.claude/data/governance-findings.jsonl'), '{}\n{}\n');
+  const p = { ...project, dir: '.' };
+  for (const reads of [{ scope: 'tree' }, { scope: 'paths', oids: [{ path: '.claude/data' }] }]) {
+    const inspect = () => dirtyPaths(p, { root, sources: [], recipePath: 'justfile', reads });
+    assert.deepEqual(inspect(), []);
+    const dirty = inspect().length > 0;
+    assert.equal(reusableHit({ rows: [greenRow], dirty }, { ...reuseContext, selectorCheck: () => ({ ok: true }) }).reuse, true);
+    const { spawn, calls } = fakeSpawn([[isGet, getMiss], [isPut, { status: 0 }]]);
+    assert.equal(recordEvidence(p, 'closure', { success: true, seconds: 2819, commit: 'abc',
+      buildRefBin: '/x/brit-build-ref', root, dirty, spawn, warn: () => {} }).status, 0);
+    assert.ok(calls.some(c => isPut(c.bin, c.args)));
+    for (const name of ['source.rs', '.claude/data/failure-taxonomy.json', '.claude/data/nested/input.jsonl']) {
+      mkdirSync(dirname(join(root, name)), { recursive: true });
+      writeFileSync(join(root, name), 'real input');
+      assert.ok(inspect().length > 0, name);
+      assert.equal(reusableHit({ rows: [greenRow], dirty: true }, reuseContext).reuse, false);
+      assert.equal(recordEvidence(p, 'closure', { root, dirty: true }).status, 1);
+      rmSync(join(root, name));
+    }
+  }
+});
+
+test('gate-cycle writes architecture findings to the main checkout and keeps recipe context local', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-ledger-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const main = join(root, 'main');
+  const linked = join(root, 'linked');
+  mkdirSync(main); mkdirSync(linked);
+  const commonDir = join(main, '.git');
+  assert.equal(architectureLedgerPath(main, () => ({ gitDir: commonDir, commonDir })), join(main, '.claude/data/architecture-findings.jsonl'));
+  assert.equal(architectureLedgerPath(linked, () => null), join(linked, '.claude/data/architecture-findings.jsonl'));
+  const ledgerPath = architectureLedgerPath(linked, () => ({ gitDir: join(commonDir, 'worktrees/linked'), commonDir }));
+  const measuresPath = join(linked, 'measures.yaml');
+  writeFileSync(measuresPath, 'lenses:\n  - id: gate-cycle-full-ceiling\n    version: 1\n    consumes: [gate-cycle-seconds@1]\n    env: { run-kind: full-gate, exit: ok }\n    soft: 1\n    hard: 2\n');
+  recordCycle(project, 2819, 0, {}, { root: linked, ledgerPath, measuresPath,
+    runEpr: () => 0, print: () => {}, now: () => '2026-11-10T00:00:00Z' });
+  assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).stock, 2819);
+  assert.ok(!existsSync(join(linked, '.claude/data/architecture-findings.jsonl')));
 });
 
 test('an unreadable step declaration leaves the working tree state unknown', t => {
@@ -1286,6 +1345,10 @@ test('a native evaluator older than the verb names itself, not the closure', fun
   const dirty = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/new/epr' }, toolchain: '1.96.1',
     run: fake({ status: 0, stdout: JSON.stringify({ clean: false, status: ' M x', closureCid: '', closure: [] }) }) });
   assert.equal(dirty.miss, 'source closure dirty');
+  const sha2 = nativeGateState(project, { root: '/nowhere', env: { EPR_BIN: '/pre/epr' }, toolchain: '1.96.1',
+    run: fake({ status: 0, stdout: JSON.stringify({ clean: true, status: '', closureCid: 'bafkreihox342' + 'a'.repeat(47), closure: ['x'] }) }) });
+  assert.match(sha2.miss, /\/pre\/epr emitted closureCid bafkrei…, not a byte CID \(\^bafkr4i\); it predates abd66bdb1/);
+  assert.equal(sha2.key, undefined);
   assert.equal(nativeGateState(project, { root: '/nowhere', env: {} }).miss, 'no toolchain declared');
 });
 
@@ -1338,4 +1401,54 @@ test('a basename read keys on every tracked match, and its dirt check finds a ne
   });
   assert.ok(dirty.some(path => path.startsWith('d/')), `a new untracked manifest is dirt: ${dirty}`);
   assert.ok(!dirty.includes('loose.txt'), 'an unread untracked file is not dirt');
+});
+
+// backlog gate-key-dirtree-rekeys-on-habit-atom-edit: a DELTA line in a habit atom under the
+// crate re-ran elohim-storage's whole gate on unchanged source.
+const lsTreeEntry = (oid, path) => `100644 blob ${oid}\t${path}`;
+const dirListing = atomOid => [
+  lsTreeEntry('aaa', 'elohim/elohim-storage/Cargo.toml'),
+  lsTreeEntry('bbb', 'elohim/elohim-storage/src/lib.rs'),
+  lsTreeEntry(atomOid, 'elohim/elohim-storage/.epr-meta/blob-durability.habit.md'),
+  lsTreeEntry('ddd', 'elohim/elohim-storage/.epr-meta/policies.yaml'),
+].join('\0') + '\0';
+const treeSpawn = (treeOid, listing) => fakeSpawn([
+  [isRevParse, { status: 0, stdout: `${treeOid}\n`, stderr: '' }],
+  [isTree, { status: 0, stdout: listing, stderr: '' }],
+]).spawn;
+
+test('a habit atom is a .epr-meta/<id>.habit.md file at any depth, nothing else', () => {
+  assert.ok(isHabitAtom('elohim/elohim-storage/.epr-meta/blob-durability.habit.md'));
+  assert.ok(isHabitAtom('.epr-meta/x.habit.md'));
+  assert.ok(isHabitAtom('a/src/.epr-meta/y.habit.md'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/.epr-meta/policies.yaml'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/docs/x.habit.md'));
+  assert.ok(!isHabitAtom('elohim/elohim-storage/.epr-meta/sub/x.habit.md'));
+});
+
+test('a commit that edits only a habit atom under the project keeps the project tree key', () => {
+  const before = projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', dirListing('atom-1')));
+  const after = projectTree('/r', 'c2', 'elohim/elohim-storage', treeSpawn('tree-2', dirListing('atom-2')));
+  assert.match(before, /^tree-minus-habit-atoms:[0-9a-f]{64}$/);
+  assert.equal(after, before);
+});
+
+test('every other edit under the project, governance files included, moves the project tree key', () => {
+  const base = projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', dirListing('atom-1')));
+  const source = dirListing('atom-1').replace('bbb', 'bbb2');
+  const policy = dirListing('atom-1').replace('ddd', 'ddd2');
+  assert.notEqual(projectTree('/r', 'c2', 'elohim/elohim-storage', treeSpawn('tree-2', source)), base);
+  assert.notEqual(projectTree('/r', 'c3', 'elohim/elohim-storage', treeSpawn('tree-3', policy)), base);
+});
+
+test('a project with no habit atom keys on its plain tree OID; an unreadable listing keeps the atoms in', () => {
+  const noAtoms = [lsTreeEntry('aaa', 'elohim/elohim-storage/Cargo.toml')].join('\0') + '\0';
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', treeSpawn('tree-1', noAtoms)), 'tree-1');
+  const unreadable = fakeSpawn([
+    [isRevParse, { status: 0, stdout: 'tree-1\n', stderr: '' }],
+    [isTree, { status: 128, stdout: '', stderr: 'fatal' }],
+  ]).spawn;
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', unreadable), 'tree-1');
+  const absent = fakeSpawn([[isRevParse, { status: 128, stdout: '', stderr: '' }]]).spawn;
+  assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', absent), null);
 });

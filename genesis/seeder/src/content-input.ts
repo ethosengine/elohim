@@ -286,7 +286,9 @@ export function buildContentInput(json: ConceptJson, opts: BuildContentOptions =
     contentType: (json.contentType ?? 'concept') as ContentType,
     contentFormat: normalizeContentFormat(json.contentFormat),
     contentBody: contentBody ?? undefined,
-    blobCid: opts.blobCid ?? json.blobCid ?? undefined,
+    // `||`, not `??`: an empty blobCid means "populated at deploy" (spa-bundle
+    // rows), and storage's byte-CID validator refuses "" for the whole batch.
+    blobCid: opts.blobCid || json.blobCid || undefined,
     contentSizeBytes: contentSizeBytes,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     reach: resolveContentReach(json, opts.advisoryReach),

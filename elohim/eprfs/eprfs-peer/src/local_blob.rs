@@ -11,6 +11,7 @@ use eprfs_storage::{
     TierBlobStreamDraw,
 };
 
+use crate::allow::{KIND_SLOT, MEASURE_SLOT};
 use crate::PeerError;
 
 /// Attribution and scope supplied by the local caller. The storage path has no clock or identity
@@ -21,6 +22,11 @@ pub struct LocalBlobContext {
     pub in_scope_of: cid::Cid,
     /// RFC 3339 timestamp supplied by the caller.
     pub occurred_at: String,
+    /// `(measure, kind)` for a Produce event that is to cross to the person's other devices: the
+    /// event then carries `measure:<measure>` and `reason:<kind>`, and crosses exactly when the
+    /// crossing allow-list lists that kind for that measure. `None` keeps the event local. Use
+    /// events never carry it.
+    pub crossing: Option<(String, String)>,
 }
 
 /// Put a chunked derivation artifact and record its Produce event without a daemon.
@@ -41,9 +47,42 @@ where
     S: EprfsStorage + ?Sized,
     F: FlowStore + ?Sized,
 {
+    put_local_blob_with(store, flow, record, bytes, context, Vec::new()).await
+}
+
+/// [`put_local_blob`], with `extra` classification slots appended after the crossing slots: a
+/// crossing record's own fields, as `env:<k>=<v>` (artifact-store design §3.a.3). With no extra
+/// slot the event is byte-for-byte the one [`put_local_blob`] records.
+///
+/// # Errors
+///
+/// As [`put_local_blob`].
+pub async fn put_local_blob_with<S, F>(
+    store: &S,
+    flow: &mut F,
+    record: DerivationRecord,
+    bytes: Bytes,
+    context: &LocalBlobContext,
+    extra: Vec<String>,
+) -> Result<TierBlobPut, PeerError>
+where
+    S: EprfsStorage + ?Sized,
+    F: FlowStore + ?Sized,
+{
     let put = put_tier_blob(store, record, bytes)
         .await
         .map_err(PeerError::LocalBlob)?;
+    let mut classified_as = vec![
+        "custody-blob".into(),
+        put.manifest.record.output.to_string(),
+        format!("manifest:{}", put.manifest_cid),
+        "copy:self".into(),
+    ];
+    if let Some((measure, kind)) = &context.crossing {
+        classified_as.push(format!("{MEASURE_SLOT}{measure}"));
+        classified_as.push(format!("{KIND_SLOT}{kind}"));
+    }
+    classified_as.extend(extra);
     let event = FlowEvent {
         action: ReaVerb::Produce,
         provider: AgentRef(put.manifest.record.computed_by.clone()),
@@ -58,12 +97,7 @@ where
         fulfills: Vec::new(),
         satisfies: Vec::new(),
         occurred_at: context.occurred_at.clone(),
-        classified_as: vec![
-            "custody-blob".into(),
-            put.manifest.record.output.to_string(),
-            format!("manifest:{}", put.manifest_cid),
-            "copy:self".into(),
-        ],
+        classified_as,
     };
     flow.append(FlowRecord::Event(event))
         .map_err(|source| PeerError::LocalBlobUnrecorded {
@@ -91,6 +125,29 @@ where
     F: FlowStore + ?Sized,
     T: TierBlobSink + ?Sized,
 {
+    stream_local_blob_with(store, flow, manifest_cid, context, sink, Vec::new()).await
+}
+
+/// [`stream_local_blob`], with `extra` classification slots after `copy:self` (a sibling fetch's
+/// install read adds `basis:sibling`, `fetched-from:<did>` and `wasted:<n>`). With no extra slot
+/// the event is byte-for-byte the one [`stream_local_blob`] records.
+///
+/// # Errors
+///
+/// As [`stream_local_blob`].
+pub async fn stream_local_blob_with<S, F, T>(
+    store: &S,
+    flow: &mut F,
+    manifest_cid: &BlobCid,
+    context: &LocalBlobContext,
+    sink: &mut T,
+    extra: Vec<String>,
+) -> Result<TierBlobStreamDraw, PeerError>
+where
+    S: EprfsStorage + ?Sized,
+    F: FlowStore + ?Sized,
+    T: TierBlobSink + ?Sized,
+{
     let draw = stream_tier_blob(store, manifest_cid, sink).await;
     let (resource, byte_len, outcome) = match &draw {
         TierBlobStreamDraw::Completed { manifest } => (
@@ -103,22 +160,45 @@ where
             (*manifest_cid.as_cid(), 0.0, "draw:unavailable".to_string())
         }
     };
-    let mut classified_as = vec![
-        "custody-blob".into(),
-        manifest_cid.to_string(),
-        outcome,
-        "copy:self".into(),
-    ];
+    let mut slots = vec![outcome, "copy:self".into()];
+    slots.extend(extra);
     if let Some(reason) = draw.reason() {
-        classified_as.push(format!("reason:{reason}"));
+        slots.push(format!("reason:{reason}"));
     }
-    let event = FlowEvent {
+    let event = custody_use_event(
+        context,
+        &manifest_cid.to_string(),
+        resource,
+        byte_len,
+        slots,
+    );
+    flow.append(FlowRecord::Event(event))
+        .map_err(|source| PeerError::LocalBlobDrawUnrecorded {
+            manifest: Box::new(manifest_cid.clone()),
+            source,
+        })?;
+    Ok(draw)
+}
+
+/// The one shape of a custody `Use` event: `custody-blob` and its subject, then `slots`, drawn by
+/// and for `context.custodian` (a serve sets its own receiver). It carries no `measure:` slot, so
+/// it never crosses (`CrossingAllowList::crosses`); `context.crossing` is a Produce's alone.
+pub(crate) fn custody_use_event(
+    context: &LocalBlobContext,
+    subject: &str,
+    resource: cid::Cid,
+    bytes: f64,
+    slots: Vec<String>,
+) -> FlowEvent {
+    let mut classified_as = vec!["custody-blob".to_string(), subject.to_string()];
+    classified_as.extend(slots);
+    FlowEvent {
         action: ReaVerb::Use,
         provider: context.custodian.clone(),
         receiver: context.custodian.clone(),
         resource,
         quantity: Magnitude::Count {
-            value: byte_len,
+            value: bytes,
             unit: "bytes".into(),
         },
         process: None,
@@ -127,13 +207,7 @@ where
         satisfies: Vec::new(),
         occurred_at: context.occurred_at.clone(),
         classified_as,
-    };
-    flow.append(FlowRecord::Event(event))
-        .map_err(|source| PeerError::LocalBlobDrawUnrecorded {
-            manifest: Box::new(manifest_cid.clone()),
-            source,
-        })?;
-    Ok(draw)
+    }
 }
 
 /// Read a complete local chunked artifact into memory and record exactly one Use event.

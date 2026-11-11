@@ -1,0 +1,10 @@
+{
+  "requires": [],
+  "provides": {
+    "observed": {},
+    "unobserved": []
+  },
+  "expected": {
+    "type": "permit"
+  }
+}

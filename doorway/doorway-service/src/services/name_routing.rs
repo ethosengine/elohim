@@ -1545,18 +1545,20 @@ pub enum RelayTrigger {
 /// dispatch sites.
 ///
 /// All must hold:
-/// 1. `is_get` — only reads relay; a write is never replayed at a sibling.
+/// 1. `is_read` — only reads relay (a GET, or a HEAD the doorway serves as the
+///    GET it stands for — `server::http::MethodClass`); a write is never
+///    replayed at a sibling.
 /// 2. `!is_service_path` — a name is a projected root, not `/db/*`, `/admin/*`
 ///    or any other doorway/storage service surface.
 /// 3. `!hop_seen` — the ONE-hop budget (see [`MAX_FEDERATION_HOPS`]).
 /// 4. the trigger admits it (see [`RelayTrigger`]).
 pub fn relay_precondition(
-    is_get: bool,
+    is_read: bool,
     is_service_path: bool,
     hop_seen: bool,
     trigger: RelayTrigger,
 ) -> bool {
-    if !is_get || is_service_path || hop_seen {
+    if !is_read || is_service_path || hop_seen {
         return false;
     }
     match trigger {

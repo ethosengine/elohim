@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-core"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1472,13 +1472,14 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "async-trait",
  "blake3",
  "bytes",
  "elohim-epr",
  "eprfs-core",
+ "ipld-core",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

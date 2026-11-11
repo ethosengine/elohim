@@ -61,6 +61,324 @@ enum Disposition {
     NotFound,
 }
 
+/// How a request's METHOD is served — decided ONCE, at the single entry
+/// (`handle_request_under_names`), before any dispatch site reads a method.
+///
+/// The defect this exists to make unrepeatable: the EPR-router block, the
+/// name-standing and relay paths, the exact-commitment relay and roughly a
+/// hundred explicit match arms each guarded READ serving on
+/// `method == Method::GET`, so a `HEAD /` fell past every one of them into the
+/// registry, matched nothing, and answered 404 while `GET /` answered 200. Any
+/// probe that used HEAD read the landing as missing. Patching `|| HEAD` into
+/// each guard is how that class recurs, so instead a HEAD is turned into a GET
+/// for dispatch (RFC 9110 §9.3.2: the same status and header fields as GET,
+/// no content) and its body is stripped at the one exit
+/// ([`MethodClass::finish`]). Every GET guard, present and future, therefore
+/// serves HEAD identically without knowing HEAD exists.
+///
+/// The only HEADs dispatched as HEAD are the ones the doorway answers with a
+/// HEAD-specific handler — see [`native_head`], which is also the guard on
+/// each of those arms, so the exception list and the arms cannot drift apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MethodClass {
+    /// GET, or a HEAD served exactly as a GET (`head: true`) whose body is
+    /// stripped at the exit.
+    Read { head: bool },
+    /// A HEAD with its own doorway handler (an existence/capability probe),
+    /// dispatched as HEAD. Draws from the read admission pool.
+    NativeHead(NativeHead),
+    /// POST / PUT / PATCH / DELETE. Never served as a read: nothing here can
+    /// route a write into a read-only serving site (the OP-GATE invariant on
+    /// `serve_ssr_route` depends on that).
+    Write,
+    /// OPTIONS, CONNECT, TRACE and extension methods — dispatched unchanged.
+    Other,
+}
+
+/// HEAD routes the doorway answers with a HEAD-specific handler. These are
+/// the only HEADs NOT served as a GET; each main-match `(Method::HEAD, …)` arm
+/// guards on [`native_head`] returning its variant (pinned by
+/// `every_head_arm_is_a_declared_native_head`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NativeHead {
+    /// `HEAD /admin/seed/blob/{cid}` — does the projection cache hold it?
+    SeedBlobExists,
+    /// `HEAD /apps/{app_id}/_capability` — delivery capability probe.
+    AppCapability,
+}
+
+/// Which native HEAD handler, if any, owns `path`. Pure.
+fn native_head(path: &str) -> Option<NativeHead> {
+    if path.starts_with("/admin/seed/blob/") {
+        Some(NativeHead::SeedBlobExists)
+    } else if path.starts_with("/apps/") && path.ends_with("/_capability") {
+        Some(NativeHead::AppCapability)
+    } else {
+        None
+    }
+}
+
+impl MethodClass {
+    /// Classify an inbound method for `path`. Pure.
+    fn of(method: &Method, path: &str) -> Self {
+        match *method {
+            Method::GET => MethodClass::Read { head: false },
+            Method::HEAD => match native_head(path) {
+                Some(native) => MethodClass::NativeHead(native),
+                None => MethodClass::Read { head: true },
+            },
+            Method::POST | Method::PUT | Method::PATCH | Method::DELETE => MethodClass::Write,
+            _ => MethodClass::Other,
+        }
+    }
+
+    /// True for the read-serving class: GET, and every HEAD served as a GET.
+    /// This — never `method == Method::GET` — is what a READ-serving guard
+    /// (projection, relay, name standing) asks.
+    fn is_read(self) -> bool {
+        matches!(self, MethodClass::Read { .. })
+    }
+
+    /// True for every safe method that draws from the read admission pool.
+    fn admits_as_read(self) -> bool {
+        matches!(self, MethodClass::Read { .. } | MethodClass::NativeHead(_))
+    }
+
+    /// True when the inbound request was a HEAD (served as GET or natively).
+    fn inbound_head(self) -> bool {
+        matches!(
+            self,
+            MethodClass::Read { head: true } | MethodClass::NativeHead(_)
+        )
+    }
+
+    /// Classify `req` and rewrite it for dispatch: a HEAD served as a GET
+    /// becomes a GET, and — because HEAD can never switch protocols — any
+    /// `Upgrade` header it carried is dropped, so it is served as the plain
+    /// GET it stands for rather than as a websocket handshake. Every other
+    /// request is returned untouched.
+    fn admit<B>(mut req: Request<B>) -> (Request<B>, Self) {
+        let class = MethodClass::of(req.method(), req.uri().path());
+        if class == (MethodClass::Read { head: true }) {
+            *req.method_mut() = Method::GET;
+            req.headers_mut().remove(hyper::header::UPGRADE);
+        }
+        (req, class)
+    }
+
+    /// The ONE place a HEAD's body is removed. Status and every header —
+    /// content-type, `X-Content-Address`, an explicit `content-length` the GET
+    /// path set — are the GET's, untouched. An unset `content-length` stays
+    /// unset (hyper adds none for an empty HEAD body). Anything not a HEAD
+    /// passes through unchanged.
+    fn finish(self, response: Response<BoxBody>) -> Response<BoxBody> {
+        if !self.inbound_head() {
+            return response;
+        }
+        let (parts, _discarded_get_body) = response.into_parts();
+        Response::from_parts(
+            parts,
+            http_body_util::Empty::<Bytes>::new()
+                .map_err(|never| match never {})
+                .boxed(),
+        )
+    }
+}
+
+#[cfg(test)]
+mod method_class_tests {
+    //! `MethodClass` is the one place a request's method is turned into a
+    //! dispatch decision. These pin its contract; the wire-level parity table
+    //! lives in `root_projection_shadow_regression_tests`
+    //! (`head_answers_with_the_get_status_and_headers_on_every_read_route_family`).
+    use super::*;
+
+    #[test]
+    fn a_head_is_a_read_served_as_get_except_the_declared_native_heads() {
+        for (method, path, expected) in [
+            (Method::GET, "/", MethodClass::Read { head: false }),
+            (Method::HEAD, "/", MethodClass::Read { head: true }),
+            (Method::HEAD, "/lamad/", MethodClass::Read { head: true }),
+            (Method::HEAD, "/db/humans", MethodClass::Read { head: true }),
+            (Method::HEAD, "/health", MethodClass::Read { head: true }),
+            (
+                Method::HEAD,
+                "/admin/seed/blob/bafkr4ic4zyhz6nttt7mnjh6wzd6ufhj44hviewaw7kmm7fijkja2e3vyei",
+                MethodClass::NativeHead(NativeHead::SeedBlobExists),
+            ),
+            (
+                Method::HEAD,
+                "/apps/some-app/_capability",
+                MethodClass::NativeHead(NativeHead::AppCapability),
+            ),
+            // The GET of a native-HEAD path is an ordinary read.
+            (
+                Method::GET,
+                "/apps/some-app/_capability",
+                MethodClass::Read { head: false },
+            ),
+            (Method::POST, "/db/content", MethodClass::Write),
+            (Method::PUT, "/admin/seed/blob", MethodClass::Write),
+            (Method::PATCH, "/db/content/x", MethodClass::Write),
+            (Method::DELETE, "/admin/hosted-users/x", MethodClass::Write),
+            (Method::OPTIONS, "/", MethodClass::Other),
+        ] {
+            assert_eq!(MethodClass::of(&method, path), expected, "{method} {path}");
+        }
+    }
+
+    /// OP-GATE invariant, at the classification: no write method is ever a
+    /// read, so no write can enter a read-only serving site (the EPR-router
+    /// block, and through it the un-gated SSR fallback).
+    #[test]
+    fn no_write_method_classifies_as_a_read() {
+        for method in [Method::POST, Method::PUT, Method::PATCH, Method::DELETE] {
+            for path in ["/", "/db/content", "/db/content/bulk", "/lamad/x"] {
+                let class = MethodClass::of(&method, path);
+                assert!(
+                    !class.is_read(),
+                    "{method} {path} must never serve as a read"
+                );
+                assert!(
+                    !class.admits_as_read(),
+                    "{method} {path} draws the write pool"
+                );
+                assert!(!class.inbound_head(), "{method} {path} keeps its body");
+            }
+        }
+    }
+
+    #[test]
+    fn admit_dispatches_a_head_as_get_and_never_as_an_upgrade() {
+        let req = Request::builder()
+            .method(Method::HEAD)
+            .uri("/debug/stream")
+            .header(hyper::header::CONNECTION, "upgrade")
+            .header(hyper::header::UPGRADE, "websocket")
+            .header("sec-websocket-version", "13")
+            .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .body(())
+            .unwrap();
+        assert!(hyper_tungstenite::is_upgrade_request(&req));
+        let (req, class) = MethodClass::admit(req);
+        assert_eq!(class, MethodClass::Read { head: true });
+        assert_eq!(
+            req.method(),
+            Method::GET,
+            "dispatched as the GET it stands for"
+        );
+        assert!(
+            !hyper_tungstenite::is_upgrade_request(&req),
+            "a HEAD can never switch protocols, so it is served as the plain GET"
+        );
+
+        let native = Request::builder()
+            .method(Method::HEAD)
+            .uri("/apps/some-app/_capability")
+            .body(())
+            .unwrap();
+        let (native, class) = MethodClass::admit(native);
+        assert_eq!(class, MethodClass::NativeHead(NativeHead::AppCapability));
+        assert_eq!(
+            native.method(),
+            Method::HEAD,
+            "a native HEAD keeps its own arm"
+        );
+
+        let write = Request::builder()
+            .method(Method::POST)
+            .uri("/db/content")
+            .body(())
+            .unwrap();
+        let (write, class) = MethodClass::admit(write);
+        assert_eq!(class, MethodClass::Write);
+        assert_eq!(write.method(), Method::POST, "a write is never rewritten");
+    }
+
+    /// The explicit strip: status and headers are the GET's, the body is
+    /// gone, and an explicit content-length the GET set stays as GET set it.
+    #[tokio::test]
+    async fn finish_strips_only_a_heads_body_and_keeps_the_gets_status_and_headers() {
+        let get_response = || {
+            to_boxed(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "application/octet-stream")
+                    .header(crate::routes::CONTENT_ADDRESS_HEADER, "bafkr4iexample")
+                    .header("content-length", "5")
+                    .body(Full::new(Bytes::from_static(b"bytes")))
+                    .unwrap(),
+            )
+        };
+
+        let head = MethodClass::Read { head: true }.finish(get_response());
+        assert_eq!(head.status(), StatusCode::OK);
+        assert_eq!(head.headers()["content-type"], "application/octet-stream");
+        assert_eq!(
+            head.headers()[crate::routes::CONTENT_ADDRESS_HEADER],
+            "bafkr4iexample"
+        );
+        assert_eq!(
+            head.headers()["content-length"],
+            "5",
+            "the GET's length stands"
+        );
+        let body = head.into_body().collect().await.unwrap().to_bytes();
+        assert!(body.is_empty(), "a HEAD carries no content: {body:?}");
+
+        let native = MethodClass::NativeHead(NativeHead::SeedBlobExists).finish(get_response());
+        assert!(native
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .is_empty());
+
+        for class in [
+            MethodClass::Read { head: false },
+            MethodClass::Write,
+            MethodClass::Other,
+        ] {
+            let kept = class.finish(get_response());
+            let body = kept.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(&body[..], b"bytes", "{class:?} keeps its body");
+        }
+    }
+
+    /// Tripwire for the drift `native_head` exists to prevent: a new
+    /// `(Method::HEAD, …)` arm whose guard does not consult `native_head`
+    /// would be DEAD (`MethodClass::admit` dispatches every other HEAD as a
+    /// GET), and the compiler cannot see a dead guarded arm. So read the
+    /// dispatch source and require every HEAD arm to name its `NativeHead`.
+    #[test]
+    fn every_head_arm_is_a_declared_native_head() {
+        let source = include_str!("http.rs");
+        let head_arms: Vec<&str> = source
+            .lines()
+            .map(str::trim_start)
+            .filter(|line| line.starts_with("(Method::HEAD,") && line.contains("=>"))
+            .collect();
+        assert!(
+            head_arms.len() >= 2,
+            "expected the native HEAD arms in the dispatch match: {head_arms:?}"
+        );
+        for arm in &head_arms {
+            assert!(
+                arm.contains("native_head(") && arm.contains("NativeHead::"),
+                "a HEAD arm must guard on `native_head(p) == Some(NativeHead::…)`, or \
+                 MethodClass dispatches its HEADs as GETs and the arm never fires: {arm}"
+            );
+        }
+        for variant in ["NativeHead::SeedBlobExists", "NativeHead::AppCapability"] {
+            assert!(
+                head_arms.iter().any(|arm| arm.contains(variant)),
+                "{variant} is declared native but no HEAD arm answers it"
+            );
+        }
+    }
+}
+
 /// Classify how an unmatched request should be dispatched.
 ///
 /// Called from `handle_request` after all explicit match arms have been tried.
@@ -2166,12 +2484,28 @@ mod root_unavailable_tests {
 /// OS-thread runtime. `/ready` and `/startup` delegate to cached-state handlers;
 /// `/health/serving` makes one bounded async observation of primary storage's
 /// serving verdict. Anything else 404s.
+///
+/// A second listener is a second entry, so it admits the method the same way
+/// the main one does ([`MethodClass`]): a HEAD probe answers with the GET's
+/// status and headers and no body.
 async fn handle_watchdog_probe(
     state: Arc<AppState>,
     start: std::time::Instant,
     heartbeat: Arc<std::sync::atomic::AtomicU64>,
     threshold_ms: u64,
     req: Request<Incoming>,
+) -> Response<BoxBody> {
+    let (req, method_class) = MethodClass::admit(req);
+    let response = watchdog_probe_response(state, start, heartbeat, threshold_ms, &req).await;
+    method_class.finish(to_boxed(response))
+}
+
+async fn watchdog_probe_response<B>(
+    state: Arc<AppState>,
+    start: std::time::Instant,
+    heartbeat: Arc<std::sync::atomic::AtomicU64>,
+    threshold_ms: u64,
+    req: &Request<B>,
 ) -> Response<Full<Bytes>> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/health") | (&Method::GET, "/healthz") => {
@@ -6452,7 +6786,8 @@ async fn fetch_shell_from_upstream(
 /// write (`POST /db/content*`) as StorageProxy, never SsrRoute (no
 /// server-controlled render_spec — pinned by
 /// `gated_writes_classify_as_storage_proxy_not_ssr`), and the EPR-router block
-/// is guarded by `method == Method::GET`. A gated write can never reach here. If
+/// is guarded by `MethodClass::is_read()` (GET, or a HEAD served as a GET; a
+/// write is `MethodClass::Write`). A gated write can never reach here. If
 /// a manifest ever attaches a render_spec to `/db/content*`, hoist the gate into
 /// `forward_to_storage` rather than relying on this invariant.
 async fn serve_ssr_route(
@@ -7605,7 +7940,7 @@ fn self_origins(args: &Args) -> Vec<String> {
 /// name staying up outranks its freshness).
 async fn answer_under_name_standing(
     state: &Arc<AppState>,
-    is_get: bool,
+    is_read: bool,
     is_upgrade: bool,
     path: &str,
     query: Option<&str>,
@@ -7634,7 +7969,7 @@ async fn answer_under_name_standing(
     };
     let shape = RequestShape {
         relayable: relay_precondition(
-            is_get,
+            is_read,
             is_service_path(path),
             ctx.hop_seen,
             RelayTrigger::LessSpecificThanHolder,
@@ -7748,10 +8083,13 @@ async fn answer_under_name_standing(
 /// GET only, non-service path only, no inbound hop header, and a local verdict
 /// of 404 (no contract for this root here) or 503 (our own primary + pool are
 /// shedding).
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each argument is one independent input of the single relay decision (method class, path, query, hop context, trigger, channel, host boundary, local mount) captured before the dispatch match moves `req`; bundling them would only rename the same nine facts"
+)]
 async fn relay_by_name(
     state: &Arc<AppState>,
-    is_get: bool,
+    is_read: bool,
     path: &str,
     query: Option<&str>,
     ctx: &RelayContext,
@@ -7774,7 +8112,7 @@ async fn relay_by_name(
         RelayVerdict,
     };
 
-    if !relay_precondition(is_get, is_service_path(path), ctx.hop_seen, trigger) {
+    if !relay_precondition(is_read, is_service_path(path), ctx.hop_seen, trigger) {
         return None;
     }
 
@@ -7857,11 +8195,18 @@ async fn relay_by_name(
 /// refusal). Stamped here, at the one exit, so no early return inside
 /// `handle_request` can forget it. With no membership configured this is
 /// exactly `handle_request`.
+///
+/// It is also the one entry and the one exit for the request's method: the
+/// method is classified here ONCE ([`MethodClass::admit`] — a HEAD is
+/// dispatched as the GET it stands for), and a HEAD's body is stripped here
+/// ONCE ([`MethodClass::finish`]), so no early return inside `handle_request`
+/// can answer a HEAD differently from its GET.
 async fn handle_request_under_names(
     state: Arc<AppState>,
     addr: SocketAddr,
     req: Request<Incoming>,
 ) -> Result<Response<BoxBody>, hyper::Error> {
+    let (req, method_class) = MethodClass::admit(req);
     let public_name_served_by = {
         let membership = state.public_names.snapshot();
         if membership.is_empty() {
@@ -7876,7 +8221,7 @@ async fn handle_request_under_names(
                 .map(|_| self_doorway_id(&state.args))
         }
     };
-    let mut response = handle_request(state, addr, req).await?;
+    let mut response = handle_request(state, addr, req, method_class).await?;
     if let Some(self_id) = public_name_served_by {
         let served_by =
             crate::services::name_routing::standing::served_by_for_response(&response, &self_id);
@@ -7886,17 +8231,29 @@ async fn handle_request_under_names(
                 .insert(crate::services::name_routing::SERVED_BY_HEADER, v);
         }
     }
-    Ok(response)
+    Ok(method_class.finish(response))
 }
 
-/// Route incoming HTTP requests
+/// Route incoming HTTP requests.
+///
+/// `req` arrives already admitted by [`MethodClass::admit`]: its method is the
+/// DISPATCH method (a HEAD served as a GET reads `GET` here), and
+/// `method_class` says what the client actually sent. Read-serving guards ask
+/// `method_class.is_read()`; the match below dispatches on the dispatch method.
 async fn handle_request(
     state: Arc<AppState>,
     addr: SocketAddr,
     req: Request<Incoming>,
+    method_class: MethodClass,
 ) -> Result<Response<BoxBody>, hyper::Error> {
     let method = req.method().clone();
-    let method_str = method.to_string();
+    // The method the CLIENT sent, for logs and observation records — `method`
+    // is the dispatch method and reads GET for a HEAD.
+    let method_str = if method_class.inbound_head() {
+        Method::HEAD.to_string()
+    } else {
+        method.to_string()
+    };
     let path = req.uri().path().to_string();
     // Captured once, up front: neither match arm below that reads it moves
     // `req` beforehand, and a cheap `HeaderValue` clone lets the EPR-router
@@ -7974,8 +8331,8 @@ async fn handle_request(
         // Reads (GET/HEAD) draw from a separate, larger pool than writes so a
         // write burst (proxied seed storm) can't starve cheap projection reads —
         // the `/epr/*` read-path shed in genesis #1272 E2E.
-        let is_read = method == hyper::Method::GET || method == hyper::Method::HEAD;
-        let sem = if is_read {
+        let read_pool = method_class.admits_as_read();
+        let sem = if read_pool {
             &state.read_semaphore
         } else {
             &state.inbound_semaphore
@@ -7990,7 +8347,7 @@ async fn handle_request(
                     target: "admission_busy",
                     counter = "doorway_admission_shed_total",
                     path = %path,
-                    pool = if is_read { "read" } else { "write" },
+                    pool = if read_pool { "read" } else { "write" },
                     available = sem.available_permits(),
                     "inbound admission at ceiling — shedding (503 + Retry-After)"
                 );
@@ -8016,10 +8373,10 @@ async fn handle_request(
 
     // ── Name-route relay snapshot ─────────────────────────────────────────────
     // Taken HERE because the dispatch match below consumes both `req` and
-    // `method`. `is_get` outlives the move; `RelayContext` carries the inbound
-    // hop header (the one-hop budget) and the session headers a relay forwards
-    // as-is. See `relay_by_name`.
-    let is_get = method == Method::GET;
+    // `method`. `is_read` (GET, or a HEAD served as one) outlives the move;
+    // `RelayContext` carries the inbound hop header (the one-hop budget) and
+    // the session headers a relay forwards as-is. See `relay_by_name`.
+    let is_read = method_class.is_read();
     let relay_query: Option<String> = req.uri().query().map(|q| q.to_string());
     let relay_ctx = match RelayContext::from_request(&req) {
         Ok(context) => context,
@@ -8046,7 +8403,7 @@ async fn handle_request(
     // below exactly as before (not a public name, or a member serving it).
     if let Some(response) = answer_under_name_standing(
         &state,
-        is_get,
+        is_read,
         hyper_tungstenite::is_upgrade_request(&req),
         &path,
         relay_query.as_deref(),
@@ -8061,7 +8418,7 @@ async fn handle_request(
     // whose current advertised contract named it. Resolve that one holder
     // before the generic local storage proxy: an unrelated stale local row may
     // answer 200 and still contradict the authoritative refusal.
-    if is_get {
+    if is_read {
         if let Some(commitment_id) = exact_commitment_reference(&path) {
             if let Some(response) =
                 relay_exact_commitment_reference(&state, &path, commitment_id, &relay_ctx).await
@@ -8079,7 +8436,7 @@ async fn handle_request(
         .unwrap_or("");
     let is_signal_host = host.starts_with("signal.") || host.contains(".signal.");
 
-    info!("[{}] {} {} (host: {})", addr, method, path, host);
+    info!("[{}] {} {} (host: {})", addr, method_str, path, host);
 
     // Signal subdomain: route /{pubkey} to signal handler (tx5 protocol)
     // Path should be /{pubkey} where pubkey has no additional slashes
@@ -8108,14 +8465,15 @@ async fn handle_request(
 
     // ── B13: EPR router — consult BEFORE the main match block ─────────────────
     //
-    // Only fires for GET requests on non-service paths. Service paths (health,
+    // Only fires for READS (GET, and a HEAD served as one — `MethodClass`) on
+    // non-service paths. Service paths (health,
     // admin, api/v1/*, db/*, apps/*, etc.) are listed in `is_service_path` and
     // must reach their own explicit match arms — even when a root projection
     // (url_path = "/") is registered.
     //
     // WebSocket upgrades are also excluded: the EPR router only serves static
     // SPA/asset bundles, never WebSocket streams.
-    if method == Method::GET
+    if method_class.is_read()
         && !hyper_tungstenite::is_upgrade_request(&req)
         && !is_service_path(&path)
     {
@@ -8165,7 +8523,7 @@ async fn handle_request(
             };
             if let Some(relayed) = relay_by_name(
                 &state,
-                is_get,
+                is_read,
                 &path,
                 relay_query.as_deref(),
                 &relay_ctx,
@@ -8185,9 +8543,10 @@ async fn handle_request(
             // serve through the V8 SSR engine (peer-capability-gated), not the
             // static projected bundle — the EPR router would otherwise shadow it
             // (Loki-verified: zero SSR renders reached the main-match arm). Also
-            // consult the registry; ONLY the SsrRoute disposition diverts. GET-
-            // only (the enclosing `method == Method::GET` guard), so a gated write
-            // can never reach the SSR helper — the op-gate invariant holds.
+            // consult the registry; ONLY the SsrRoute disposition diverts. Read-
+            // only (the enclosing `method_class.is_read()` guard — a write is
+            // `MethodClass::Write`, never `Read`), so a gated write can never
+            // reach the SSR helper — the op-gate invariant holds.
             let dispo = classify_dispatch(&state.route_registry, &method, &path).await;
             if epr_should_serve_ssr(
                 projection.channel,
@@ -8286,7 +8645,7 @@ async fn handle_request(
             if local.status() == StatusCode::SERVICE_UNAVAILABLE {
                 if let Some(relayed) = relay_by_name(
                     &state,
-                    is_get,
+                    is_read,
                     &path,
                     relay_query.as_deref(),
                     &relay_ctx,
@@ -8314,7 +8673,7 @@ async fn handle_request(
         if relay_ctx.host.is_some() && local_path_requires_exact_host(&state.epr_router, &path) {
             if let Some(relayed) = relay_by_name(
                 &state,
-                is_get,
+                is_read,
                 &path,
                 relay_query.as_deref(),
                 &relay_ctx,
@@ -8875,8 +9234,9 @@ async fn handle_request(
                 routes::handle_seed_blob(req, Arc::clone(&state), peer_is_loopback(&addr)).await,
             )
         }
-        // HEAD /admin/seed/blob/{cid} - Check if blob exists
-        (Method::HEAD, p) if p.starts_with("/admin/seed/blob/") => {
+        // HEAD /admin/seed/blob/{cid} - Check if blob exists. A native HEAD:
+        // `MethodClass` dispatches it as HEAD because `native_head` names it.
+        (Method::HEAD, p) if native_head(p) == Some(NativeHead::SeedBlobExists) => {
             let address = p.strip_prefix("/admin/seed/blob/").unwrap_or("");
             to_boxed(routes::handle_check_blob(address, Arc::clone(&state)).await)
         }
@@ -9147,7 +9507,9 @@ async fn handle_request(
 
         // Delivery capability probe (must match before GET /apps/)
         // HEAD /apps/{app_id}/_capability — lightweight probe, no body
-        (Method::HEAD, p) if p.starts_with("/apps/") && p.ends_with("/_capability") => {
+        // A native HEAD: `MethodClass` dispatches it as HEAD because
+        // `native_head` names it.
+        (Method::HEAD, p) if native_head(p) == Some(NativeHead::AppCapability) => {
             debug!(path = %p, "Handling app capability probe");
             return Ok(to_boxed(
                 routes::handle_app_capability(Arc::clone(&state), p).await,
@@ -9748,7 +10110,7 @@ async fn handle_request(
     // `None` means nothing was relayed and the local response stands verbatim.
     let response = match relay_by_name(
         &relay_state,
-        is_get,
+        is_read,
         &path,
         relay_query.as_deref(),
         &relay_ctx,
@@ -13396,6 +13758,178 @@ mod root_projection_shadow_regression_tests {
                 .any(|(m, p)| *m == Method::GET && p == "/epr-head/some-concept"),
             "the GET still reaches storage: {seen:?}"
         );
+    }
+
+    // ── HEAD is served exactly as GET (MethodClass) ─────────────────────────
+
+    /// One request of `method` through a real listener: status, headers, and
+    /// the body bytes as received.
+    async fn send_method(
+        addr: SocketAddr,
+        method: reqwest::Method,
+        path: &str,
+    ) -> (reqwest::StatusCode, reqwest::header::HeaderMap, Bytes) {
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            reqwest::Client::new()
+                .request(method.clone(), format!("http://{addr}{path}"))
+                .send(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("{method} {path} did not answer within 5s"))
+        .unwrap_or_else(|e| panic!("{method} {path} transport error: {e}"));
+        let status = response.status();
+        let headers = response.headers().clone();
+        let body = response.bytes().await.expect("response body");
+        (status, headers, body)
+    }
+
+    /// A doorway in front of a storage that answers GET ONLY, holding the
+    /// landing projection at "/", a registry StorageProxy read route and the
+    /// manifest blob proxy. Storage answering GET only means a HEAD that
+    /// reached storage as a HEAD would 404 there — so HEAD/GET parity below
+    /// also proves a HEAD is forwarded as the GET it stands for.
+    async fn doorway_over_get_only_storage() -> (SocketAddr, wiremock::MockServer, String) {
+        use doorway_client::{BlobProxyConfig, DoorwayRoutes, Route};
+        use wiremock::matchers::{method, path, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let blob_bytes: &[u8] = b"head-parity blob bytes";
+        let blob_cid = elohim_address::compute_bytes_cid(blob_bytes).to_string();
+        let storage = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(format!("/blob/{blob_cid}")))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "application/octet-stream")
+                    .insert_header(crate::routes::CONTENT_ADDRESS_HEADER, blob_cid.as_str())
+                    .set_body_bytes(blob_bytes),
+            )
+            .mount(&storage)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/db/humans"))
+            .respond_with(
+                // `set_body_raw`, not `set_body_string`: the latter stamps
+                // `text/plain` over any content-type set beside it.
+                ResponseTemplate::new(200).set_body_raw(r#"{"humans":[]}"#, "application/json"),
+            )
+            .mount(&storage)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("^/apps/"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                "<html><body><app-root></app-root></body></html>",
+                "text/html",
+            ))
+            .mount(&storage)
+            .await;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(storage.uri());
+        let state = AppState::new(args);
+        state.epr_router.replace_all(vec![root_projection()]);
+        let manifest = DoorwayRoutes {
+            routes: vec![Route::get("/db/humans").handler("list_humans").build()],
+            blob_proxy: Some(BlobProxyConfig {
+                base_path: "/blob".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        state
+            .route_registry
+            .install_steward_routes(&storage.uri(), &manifest)
+            .await;
+        let addr = spawn_test_doorway(Arc::new(state)).await;
+        (addr, storage, format!("/blob/{blob_cid}"))
+    }
+
+    /// THE REGRESSION (alpha, 2026-11): `HEAD /` and `HEAD /lamad/` answered
+    /// 404 application/json while `GET` answered 200 — the EPR router fired
+    /// for GET only, so every HEAD probe read the landing as missing. For
+    /// every read route family this doorway serves, a HEAD must answer with
+    /// the GET's status and headers and an empty body.
+    #[tokio::test]
+    async fn head_answers_with_the_get_status_and_headers_on_every_read_route_family() {
+        let (addr, storage, blob_path) = doorway_over_get_only_storage().await;
+        for (family, path, must_serve) in [
+            ("EPR-router root projection", "/", true),
+            ("EPR-router SPA deep link under the root", "/lamad/", true),
+            ("registry StorageProxy read route", "/db/humans", true),
+            ("manifest blob read", blob_path.as_str(), true),
+            // Status depends on what this bare fixture can reach (no
+            // conductor), so only parity is pinned — the point is that a
+            // HEAD gets the SAME answer, whatever it is.
+            ("health", "/health", false),
+            ("version", "/version", true),
+        ] {
+            let (get_status, get_headers, get_body) =
+                send_method(addr, reqwest::Method::GET, path).await;
+            let (head_status, head_headers, head_body) =
+                send_method(addr, reqwest::Method::HEAD, path).await;
+            if must_serve {
+                assert_eq!(
+                    get_status,
+                    reqwest::StatusCode::OK,
+                    "{family}: the GET {path} itself must serve, or parity proves nothing \
+                     — got {get_status}: {get_body:?}"
+                );
+            }
+            assert_eq!(
+                head_status, get_status,
+                "{family}: HEAD {path} must answer with GET's status"
+            );
+            assert_eq!(
+                head_headers.get("content-type"),
+                get_headers.get("content-type"),
+                "{family}: HEAD {path} must carry GET's content-type"
+            );
+            assert_eq!(
+                head_headers.get(crate::routes::CONTENT_ADDRESS_HEADER),
+                get_headers.get(crate::routes::CONTENT_ADDRESS_HEADER),
+                "{family}: HEAD {path} must carry GET's X-Content-Address"
+            );
+            assert!(
+                head_body.is_empty(),
+                "{family}: HEAD {path} carries no content: {head_body:?}"
+            );
+        }
+        let received = storage.received_requests().await.expect("recording on");
+        assert!(
+            received.iter().all(|r| r.method.as_str() == "GET"),
+            "every HEAD reaches storage as the GET it stands for: {:?}",
+            received
+                .iter()
+                .map(|r| format!("{} {}", r.method, r.url.path()))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            received.iter().any(|r| r.url.path() == blob_path.as_str()),
+            "the blob read must reach storage (not only a pantry hit)"
+        );
+    }
+
+    /// The focused alpha defect: the landing projection at "/" answers a HEAD
+    /// with 200, not the registry's 404 application/json.
+    #[tokio::test]
+    async fn head_of_the_root_projection_answers_200_not_the_registry_404() {
+        let (addr, _storage, _) = doorway_over_get_only_storage().await;
+        let (status, headers, body) = send_method(addr, reqwest::Method::HEAD, "/").await;
+        assert_eq!(
+            status,
+            reqwest::StatusCode::OK,
+            "HEAD / must serve the landing"
+        );
+        let content_type = headers
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        assert!(
+            content_type.starts_with("text/html"),
+            "HEAD / describes the landing shell, not a JSON 404: {content_type}"
+        );
+        assert!(body.is_empty(), "HEAD / carries no content: {body:?}");
     }
 
     /// A bare `AppState` at the default declared stage — deliberately NO root

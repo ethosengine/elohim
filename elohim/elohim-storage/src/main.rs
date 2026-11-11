@@ -1495,6 +1495,12 @@ async fn async_main(
 
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
+    // The device payload store as this process's tier (artifact-store E4): composed, shared,
+    // only when EPR_PAYLOAD_STORE names a root whose marker is `blob-store-v1` and that does not
+    // overlap the `/blob` root above; unset composes nothing. Held for the process's life;
+    // nothing reads it yet beyond `eprfs_tier`'s exports.
+    let _payload_tier =
+        elohim_storage::eprfs_tier::compose_payload_tier_from_env(&config.blobs_dir()).await;
     // The head-adoption trigger's courier (see `services::courier_obey`): the
     // trigger starts before the peer plane exists, so it gets a slot that is
     // filled once the reconcile peers are built.
@@ -2734,15 +2740,11 @@ async fn async_main(
                                             );
                                             continue;
                                         };
-                                        let pantry = match elohim_storage::reconcile::custody::BlobStoreSnapshot::from_store(
+                                        // A verified pantry: the pledge is authored only over bytes that read
+                                        // back verified, never over a name `blobs/` lists.
+                                        let pantry = elohim_storage::reconcile::custody::VerifiedPantry::new(
                                             &rotation_blob_store,
-                                        ) {
-                                            Ok(p) => p,
-                                            Err(e) => {
-                                                tracing::warn!(error = %e, "custody rotation tick: pantry snapshot failed (retry next tick)");
-                                                continue;
-                                            }
-                                        };
+                                        );
                                         match elohim_storage::services::custody_rotation::run_rotation_pass(
                                             &mut conn,
                                             &ctx,
@@ -3642,32 +3644,58 @@ async fn async_main(
         //
         // `ELOHIM_BINDING_MINT=off` is the fleet kill switch; the env is read
         // exactly ONCE, here, and threaded as a bool.
+        //
+        // The imagodei bridge may not be connected yet: on a cold fleet storage
+        // boots before its conductor has installed the app (alpha, 2026-11-08 —
+        // matthew's and adam's storage never minted, because this read a
+        // boot-time `None` once and gave up). With a registry the mint WAITS
+        // for the supervised handle instead; "no conductor bridge" is reserved
+        // for a node with no registry at all.
         {
             let mint_enabled = elohim_storage::p2p::binding_mint::mint_enabled_from_env();
-            let mint_hc = hc_registry_for_http
-                .as_ref()
-                .and_then(|r| r.imagodei_client());
-            match (mint_enabled, mint_hc, db_pool.clone()) {
-                (true, Some(hc), Some(pool)) => {
+            let mint_registry = hc_registry_for_http.clone();
+            match (mint_enabled, mint_registry, db_pool.clone()) {
+                (true, Some(registry), Some(pool)) => {
                     // The zome accepts only these four archetypes; anything else
                     // is a hard Guest error, so normalise rather than fail.
                     let archetype = match config.device_archetype.as_deref() {
                         Some(a @ ("node" | "desktop" | "mobile" | "steward")) => a.to_string(),
                         _ => "node".to_string(),
                     };
-                    info!(
-                        agent_cid = %mint_agent_cid,
-                        device_archetype = %archetype,
-                        "binding mint: scheduling own cross-signed AgentPeerBinding"
-                    );
-                    elohim_storage::p2p::binding_mint::spawn_binding_mint_task(
-                        hc,
-                        pool,
-                        mint_agent_cid.clone(),
-                        mint_transport_keypair.clone(),
-                        archetype,
-                        binding_subscription_ready_rx,
-                    );
+                    let schedule = move |hc| {
+                        info!(
+                            agent_cid = %mint_agent_cid,
+                            device_archetype = %archetype,
+                            "binding mint: scheduling own cross-signed AgentPeerBinding"
+                        );
+                        elohim_storage::p2p::binding_mint::spawn_binding_mint_task(
+                            hc,
+                            pool,
+                            mint_agent_cid,
+                            mint_transport_keypair,
+                            archetype,
+                            binding_subscription_ready_rx,
+                        );
+                    };
+                    match registry.imagodei_client() {
+                        Some(hc) => schedule(hc),
+                        None => {
+                            info!(
+                                "binding mint: imagodei conductor bridge not connected yet — \
+                                 waiting for it; the binding stays self-asserted until it lands"
+                            );
+                            let mint_shutdown = shutdown_tx.subscribe();
+                            tokio::spawn(async move {
+                                // `None` only on shutdown.
+                                if let Some(hc) =
+                                    registry.supervised_client("imagodei", mint_shutdown).await
+                                {
+                                    info!("binding mint: imagodei conductor bridge acquired");
+                                    schedule(hc);
+                                }
+                            });
+                        }
+                    }
                 }
                 (false, _, _) => info!(
                     "binding mint: disabled by {}",
@@ -3760,7 +3788,10 @@ async fn async_main(
     // branch constructs its own SyncManager pointing at the same on-disk
     // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
-    #[allow(clippy::type_complexity)]
+    #[allow(
+        clippy::type_complexity,
+        reason = "one-shot boot destructure of the iroh branch's four handles; a named type adds nothing"
+    )]
     let (_iroh_node, iroh_blob_store_for_http, iroh_sync_manager, iroh_sync_backend): (
         Option<elohim_storage::p2p_iroh::IrohNode>,
         Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,
@@ -4221,6 +4252,34 @@ async fn async_main(
                     e
                 })?
                 .to_bytes();
+        // The two-key transport link: on a dual node the libp2p identity key (whose
+        // PeerId this node's AgentPeerBinding cross-signs) and the iroh key each sign
+        // the pair, so receivers can resolve this node's iroh-signed claims to its
+        // agent (`p2p::transport_authority`). Signed once; both keys live for the
+        // process. A pure-iroh node has no libp2p identity and carries none.
+        let announce_transport_link = if p2p_node.is_some() {
+            let link = elohim_storage::identity::NodeIdentity::load(
+                &config.storage_dir.join("identity.key"),
+                String::new(),
+            )
+            .ok()
+            .and_then(|identity| identity.keypair().clone().try_into_ed25519().ok())
+            .and_then(|ed| elohim_epr::proof::AgentKeypair::from_secret(ed.secret().as_ref()).ok())
+            .zip(elohim_epr::proof::AgentKeypair::from_secret(&iroh_announce_secret).ok())
+            .and_then(|(libp2p_key, iroh_key)| {
+                elohim_storage::p2p::transport_link::TransportLink::sign(
+                    &libp2p_key,
+                    &iroh_key,
+                    chrono::Utc::now().timestamp_millis(),
+                )
+            });
+            if link.is_none() {
+                warn!("iroh: no transport link signed — this node's iroh-signed claims bind to no agent");
+            }
+            link
+        } else {
+            None
+        };
         // One resolution, two consumers (the announcer's POST leg and the
         // bootstrap joiner's GET leg) — they must agree on the same doorway.
         let doorway_base_url = elohim_storage::p2p_iroh::doorway_base_url();
@@ -4246,6 +4305,7 @@ async fn async_main(
                 .collect(),
                 publisher: announce_publisher,
                 doorway_url: doorway_base_url.clone(),
+                transport_link: announce_transport_link,
             },
             elohim_storage::p2p_iroh::announcer::announce_interval(),
         );
@@ -5549,6 +5609,31 @@ async fn async_main(
             // no-swarm-path in on_agent_peer_binding).
             #[cfg(feature = "p2p")]
             let swarm_tx_opt = p2p_node.as_ref().map(|n| n.handle().command_sender());
+            // This node's own agent: its own binding signals are DHT confirmation as they
+            // stand; any other agent's are routed through the confirmer.
+            #[cfg(feature = "p2p")]
+            let own_agent_opt = p2p_node
+                .as_ref()
+                .map(|n| n.handle().agent_pubkey().to_string());
+            #[cfg(not(feature = "p2p"))]
+            let own_agent_opt: Option<String> = None;
+            // DHT confirmation of cross-signed bindings learned by gossip or handshake:
+            // only a binding the DHT confirms is authority (`p2p::transport_authority`).
+            // Started even when the imagodei bridge is not up yet: the client is
+            // acquired through the registry on every attempt, and the startup and
+            // periodic sweeps re-request unconfirmed rows.
+            #[cfg(feature = "p2p")]
+            if let Some(pool) = db_pool.clone() {
+                let registry = hc_registry_for_http.clone();
+                elohim_storage::p2p::transport_authority::confirm::spawn_binding_confirmer(
+                    pool,
+                    elohim_storage::p2p::transport_authority::confirm::conductor_reader(
+                        std::sync::Arc::new(move || {
+                            registry.as_ref().and_then(|r| r.imagodei_client())
+                        }),
+                    ),
+                );
+            }
 
             // genesis #1122 fix: the imagodei conductor needs 6+ minutes to
             // enable its cells after a rolling restart. The old code connected
@@ -5657,6 +5742,12 @@ async fn async_main(
                         }
                     }
 
+                    // The conductor app answers (boot, or a reconnect after a cold
+                    // fleet installs it): wake the binding mint and sweep unconfirmed
+                    // bindings into the DHT confirmer now, not after a backoff timer.
+                    #[cfg(feature = "p2p")]
+                    elohim_storage::p2p::binding_mint::conductor_app_available();
+
                     // Build controller. new_with_storage when db_pool available
                     // (enables sweep + compromise_at derivation); new() otherwise.
                     let mut controller = match reconcile_pool.clone() {
@@ -5665,7 +5756,8 @@ async fn async_main(
                                 stream,
                                 pool,
                                 Arc::clone(&pubkey_cache),
-                            );
+                            )
+                            .with_own_agent_cid(own_agent_opt.clone());
                             #[cfg(feature = "p2p")]
                             let c = match swarm_tx_opt.clone() {
                                 Some(tx) => c.with_swarm_tx(tx),
@@ -6357,226 +6449,298 @@ async fn async_main(
             _ => config.storage_dir.join("release-adoption"),
         };
 
-        let hc_for_adoption = hc_registry_for_http.as_ref().and_then(|r| r.lamad_client());
         // Same admin-connection resolution as POST /admin/coordinators/sync:
         // the embedded conductor's handle, else any live external-conductor
         // bridge. The external path is load-bearing for a split-conductor or
         // local-mesh peer, which receives coordinator hot-swaps by no other
-        // route.
-        let admin_for_adoption = agent_info_admin_ws.as_deref().cloned().or_else(|| {
-            hc_registry_for_http
-                .as_ref()
-                .and_then(|r| r.any_admin_websocket())
-        });
-
-        // The vehicles. Each is registered ONLY when the machinery it routes to
-        // actually exists on this node — an unregistered class refuses
-        // `no_vehicle_for_class`, which is the honest answer, rather than
-        // failing at the moment of apply with something that reads like a bug.
-        let mut vehicles = apply::ApplyRegistry::new();
-        // Task 13a: the lineage vehicle doubles as the revert seam, so it is
-        // captured here and handed to the controller below.
-        let mut lineage_reverter: Option<
-            std::sync::Arc<dyn elohim_storage::services::release_adoption::revert::LineageReverter>,
-        > = None;
-        // Task 14b: and as the sunset seam, for the same reason — the object
-        // that opened a window is the only one that can name its side app.
-        let mut lineage_sunsetter: Option<
-            std::sync::Arc<
-                dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
-            >,
-        > = None;
-        if let Some(ref admin) = admin_for_adoption {
-            vehicles = vehicles
-                .with(std::sync::Arc::new(apply::CoordinatorBundleVehicle::new(
-                    admin.clone(),
-                    args.app_id.clone(),
-                )))
-                .with(std::sync::Arc::new(apply::HappBundleVehicle::new(
-                    admin.clone(),
-                    args.app_id.clone(),
-                )));
-            // Rung 6. Registered only alongside the other conductor-touching
-            // vehicles AND only when a registry exists to dial the side app
-            // through — a lineage apply that could install v2 but never
-            // connect to it would leave a side app it can neither carry into
-            // nor account for. Unregistered, `happ-lineage` refuses
-            // `no_vehicle_for_class`, which is the honest answer.
-            if let Some(ref registry) = hc_registry_for_http {
-                let mut vehicle = apply::HappLineageVehicle::new(
-                    admin.clone(),
-                    args.app_id.clone(),
-                    std::sync::Arc::clone(&lineage_roles),
-                    std::sync::Arc::clone(registry),
-                );
-                // Task 13a: a revert drops the trailing sweep's cursors for
-                // the reverted role — they are ordinals into a view of the
-                // side app the revert has just disabled.
-                if let Some(ref bridge) = lineage_bridge {
-                    vehicle = vehicle.with_bridge(std::sync::Arc::clone(bridge)
-                        as std::sync::Arc<
-                            dyn elohim_storage::services::release_adoption::revert::RoleSweepState,
-                        >);
-                }
-                // Kept beside the registry rather than only inside it: Task
-                // 13a's revert arm needs the SAME object that opens a window
-                // to close it, so the two halves cannot derive different side
-                // app ids.
-                let vehicle = std::sync::Arc::new(vehicle);
-                lineage_reverter = Some(std::sync::Arc::clone(&vehicle)
-                    as std::sync::Arc<
-                        dyn elohim_storage::services::release_adoption::revert::LineageReverter,
-                    >);
-                lineage_sunsetter = Some(std::sync::Arc::clone(&vehicle)
-                    as std::sync::Arc<
-                        dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
-                    >);
-                vehicles = vehicles.with(vehicle);
+        // route. A closure, because it is asked again when a late lamad bridge
+        // lands (below): an external conductor's admin handle exists only once
+        // some role has connected.
+        let adoption_admin = {
+            let embedded = agent_info_admin_ws.clone();
+            let registry = hc_registry_for_http.clone();
+            move || {
+                embedded
+                    .as_deref()
+                    .cloned()
+                    .or_else(|| registry.as_ref().and_then(|r| r.any_admin_websocket()))
             }
-        }
-        if elohim_storage::runtime_config::config_path().is_some() {
-            vehicles = vehicles.with(std::sync::Arc::new(apply::ConfigEprVehicle::new()));
-        }
-        // Slice 2 (elected-content spec §12.8): the app-mount pointer vehicle.
-        // Registered wherever there are content rows to point — it touches no
-        // conductor, only the slug rows its release binds, and only those
-        // whose own metadata names the channel. Without a pool `app-bundle`
-        // refuses `no_vehicle_for_class`, the honest answer.
-        if let Some(ref pool) = db_pool {
-            vehicles = vehicles.with(std::sync::Arc::new(apply::AppBundleVehicle::new(
-                pool.clone(),
-                elohim_storage::db::AppContext::default_lamad(),
-                content_events_for_adoption.clone(),
-            )));
-        }
-        // The storage-binary vehicle is registered on every node and refuses at
-        // APPLY time on the declared stakes — deliberately, so the refusal is a
-        // typed, reported `binary_stakes_not_simulacra` rather than an absence
-        // an operator has to infer. Fail-closed either way: with no declared
-        // stakes the resolver answers Bootstrap and the gate stays shut.
-        {
-            let stakes: std::sync::Arc<dyn elohim_storage::trust::StakesResolver + Send + Sync> =
-                match reconcile_stakes_resolver.clone() {
-                    Some(resolver) => resolver,
-                    None => std::sync::Arc::new(
-                        elohim_storage::trust::FixedStakesResolver::bootstrap_default(),
-                    ),
-                };
-            vehicles = vehicles.with(std::sync::Arc::new(apply::StorageBinaryVehicle::new(
-                staging_root.clone(),
-                stakes,
-                "lamad",
-            )));
-        }
+        };
+        let hc_for_adoption = hc_registry_for_http.as_ref().and_then(|r| r.lamad_client());
 
-        // The artifact source. The local blob store is the floor and the fast
-        // path; when this node has a libp2p plane AND a pool to finalize
-        // through, it is WRAPPED so a local miss becomes one bounded peer pull
-        // through the same `race_fetch` helper `GET /blob/{hash}` and the
-        // custody controller already use. Without either, the local-only source
-        // stands exactly as before — `artifact_unavailable` stays transient and
-        // the next sweep asks again.
-        let local_artifacts: std::sync::Arc<dyn watch::ArtifactSource> =
-            std::sync::Arc::new(watch::BlobStoreArtifactSource::new(blob_store.clone()));
-        #[cfg(feature = "p2p")]
-        let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = match (
-            p2p_node.as_ref().map(|n| n.handle()),
-            db_pool.clone(),
-        ) {
-            (Some(handle), Some(pool)) => {
-                let command_tx = handle.command_sender();
-                let peers: std::sync::Arc<
-                    dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers,
-                > = std::sync::Arc::new(handle);
-                info!("  Release adoption: peer-pull artifact source wired (libp2p)");
-                std::sync::Arc::new(
-                    elohim_storage::services::release_adoption::artifact_pull::PeerPullArtifactSource::new(
-                        local_artifacts.clone(),
+        // Everything conductor-touching in the controller — head reads, the
+        // soak attestor, installed reality, the conductor vehicles and the
+        // lineage revert/sunset arms — is fixed by the lamad bridge and admin
+        // handle present when it is BUILT. So the build is a closure: run now
+        // with what boot has, and again, whole, if the bridge lands later.
+        let build_controller = {
+            let app_id = args.app_id.clone();
+            let agent_pubkey = args.agent_pubkey.clone();
+            let lineage_roles = std::sync::Arc::clone(&lineage_roles);
+            let registry = hc_registry_for_http.clone();
+            let lineage_bridge = lineage_bridge.clone();
+            let db_pool = db_pool.clone();
+            let content_events = content_events_for_adoption.clone();
+            let stakes_resolver = reconcile_stakes_resolver.clone();
+            let staging_root = staging_root.clone();
+            let blob_store = blob_store.clone();
+            #[cfg(feature = "p2p")]
+            let p2p_handle = p2p_node.as_ref().map(|n| n.handle());
+            let config = config.clone();
+            move |hc_for_adoption: Option<Arc<elohim_storage::HcClient>>,
+                  admin_for_adoption: Option<holochain_client::AdminWebsocket>|
+                  -> watch::AdoptionController {
+                // The vehicles. Each is registered ONLY when the machinery it routes to
+                // actually exists on this node — an unregistered class refuses
+                // `no_vehicle_for_class`, which is the honest answer, rather than
+                // failing at the moment of apply with something that reads like a bug.
+                let mut vehicles = apply::ApplyRegistry::new();
+                // Task 13a: the lineage vehicle doubles as the revert seam, so it is
+                // captured here and handed to the controller below.
+                let mut lineage_reverter: Option<
+                    std::sync::Arc<
+                        dyn elohim_storage::services::release_adoption::revert::LineageReverter,
+                    >,
+                > = None;
+                // Task 14b: and as the sunset seam, for the same reason — the object
+                // that opened a window is the only one that can name its side app.
+                let mut lineage_sunsetter: Option<
+                    std::sync::Arc<
+                        dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
+                    >,
+                > = None;
+                if let Some(ref admin) = admin_for_adoption {
+                    vehicles = vehicles
+                        .with(std::sync::Arc::new(apply::CoordinatorBundleVehicle::new(
+                            admin.clone(),
+                            app_id.clone(),
+                        )))
+                        .with(std::sync::Arc::new(apply::HappBundleVehicle::new(
+                            admin.clone(),
+                            app_id.clone(),
+                        )));
+                    // Rung 6. Registered only alongside the other conductor-touching
+                    // vehicles AND only when a registry exists to dial the side app
+                    // through — a lineage apply that could install v2 but never
+                    // connect to it would leave a side app it can neither carry into
+                    // nor account for. Unregistered, `happ-lineage` refuses
+                    // `no_vehicle_for_class`, which is the honest answer.
+                    if let Some(ref registry) = registry {
+                        let mut vehicle = apply::HappLineageVehicle::new(
+                            admin.clone(),
+                            app_id.clone(),
+                            std::sync::Arc::clone(&lineage_roles),
+                            std::sync::Arc::clone(registry),
+                        );
+                        // Task 13a: a revert drops the trailing sweep's cursors for
+                        // the reverted role — they are ordinals into a view of the
+                        // side app the revert has just disabled.
+                        if let Some(ref bridge) = lineage_bridge {
+                            vehicle = vehicle.with_bridge(std::sync::Arc::clone(bridge)
+                            as std::sync::Arc<
+                                dyn elohim_storage::services::release_adoption::revert::RoleSweepState,
+                            >);
+                        }
+                        // Kept beside the registry rather than only inside it: Task
+                        // 13a's revert arm needs the SAME object that opens a window
+                        // to close it, so the two halves cannot derive different side
+                        // app ids.
+                        let vehicle = std::sync::Arc::new(vehicle);
+                        lineage_reverter = Some(std::sync::Arc::clone(&vehicle)
+                        as std::sync::Arc<
+                            dyn elohim_storage::services::release_adoption::revert::LineageReverter,
+                        >);
+                        lineage_sunsetter = Some(std::sync::Arc::clone(&vehicle)
+                        as std::sync::Arc<
+                            dyn elohim_storage::services::release_adoption::sunset::LineageSunsetter,
+                        >);
+                        vehicles = vehicles.with(vehicle);
+                    }
+                }
+                if elohim_storage::runtime_config::config_path().is_some() {
+                    vehicles = vehicles.with(std::sync::Arc::new(apply::ConfigEprVehicle::new()));
+                }
+                // Slice 2 (elected-content spec §12.8): the app-mount pointer vehicle.
+                // Registered wherever there are content rows to point — it touches no
+                // conductor, only the slug rows its release binds, and only those
+                // whose own metadata names the channel. Without a pool `app-bundle`
+                // refuses `no_vehicle_for_class`, the honest answer.
+                if let Some(ref pool) = db_pool {
+                    vehicles = vehicles.with(std::sync::Arc::new(apply::AppBundleVehicle::new(
+                        pool.clone(),
+                        elohim_storage::db::AppContext::default_lamad(),
+                        content_events.clone(),
+                    )));
+                }
+                // The storage-binary vehicle is registered on every node and refuses at
+                // APPLY time on the declared stakes — deliberately, so the refusal is a
+                // typed, reported `binary_stakes_not_simulacra` rather than an absence
+                // an operator has to infer. Fail-closed either way: with no declared
+                // stakes the resolver answers Bootstrap and the gate stays shut.
+                {
+                    let stakes: std::sync::Arc<
+                        dyn elohim_storage::trust::StakesResolver + Send + Sync,
+                    > = match stakes_resolver.clone() {
+                        Some(resolver) => resolver,
+                        None => std::sync::Arc::new(
+                            elohim_storage::trust::FixedStakesResolver::bootstrap_default(),
+                        ),
+                    };
+                    vehicles = vehicles.with(std::sync::Arc::new(
+                        apply::StorageBinaryVehicle::new(staging_root.clone(), stakes, "lamad"),
+                    ));
+                }
+
+                // The artifact source. The local blob store is the floor and the fast
+                // path; when this node has a libp2p plane AND a pool to finalize
+                // through, it is WRAPPED so a local miss becomes one bounded peer pull
+                // through the same `race_fetch` helper `GET /blob/{hash}` and the
+                // custody controller already use. Without either, the local-only source
+                // stands exactly as before — `artifact_unavailable` stays transient and
+                // the next sweep asks again.
+                let local_artifacts: std::sync::Arc<dyn watch::ArtifactSource> =
+                    std::sync::Arc::new(watch::BlobStoreArtifactSource::new(blob_store.clone()));
+                #[cfg(feature = "p2p")]
+                let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = match (
+                    p2p_handle.clone(),
+                    db_pool.clone(),
+                ) {
+                    (Some(handle), Some(pool)) => {
+                        let command_tx = handle.command_sender();
+                        let peers: std::sync::Arc<
+                            dyn elohim_storage::p2p::reconcile_peers::ReconcilePeers,
+                        > = std::sync::Arc::new(handle);
+                        info!("  Release adoption: peer-pull artifact source wired (libp2p)");
                         std::sync::Arc::new(
-                            elohim_storage::services::release_adoption::artifact_pull::RaceFetchPuller::new(
-                                command_tx,
-                                peers,
-                                pool,
-                                blob_store.clone(),
-                                // The `serve-blob` receiver: the canonical
-                                // agent identity when we have one, the
-                                // transport id only as a fallback — the same
-                                // preference `RaceFetchKicker` applies.
-                                args.agent_pubkey
-                                    .clone()
-                                    .or_else(|| {
-                                        hc_for_adoption.as_ref().map(|hc| hc.agent_key_uhcak())
-                                    })
-                                    .or_else(|| config.self_cid.clone())
-                                    .unwrap_or_default(),
-                                &config,
+                        elohim_storage::services::release_adoption::artifact_pull::PeerPullArtifactSource::new(
+                            local_artifacts.clone(),
+                            std::sync::Arc::new(
+                                elohim_storage::services::release_adoption::artifact_pull::RaceFetchPuller::new(
+                                    command_tx,
+                                    peers,
+                                    pool,
+                                    blob_store.clone(),
+                                    // The `serve-blob` receiver: the canonical
+                                    // agent identity when we have one, the
+                                    // transport id only as a fallback — the same
+                                    // preference `RaceFetchKicker` applies.
+                                    agent_pubkey
+                                        .clone()
+                                        .or_else(|| {
+                                            hc_for_adoption.as_ref().map(|hc| hc.agent_key_uhcak())
+                                        })
+                                        .or_else(|| config.self_cid.clone())
+                                        .unwrap_or_default(),
+                                    &config,
+                                ),
                             ),
                         ),
-                    ),
-                )
-            }
-            _ => local_artifacts.clone(),
-        };
-        #[cfg(not(feature = "p2p"))]
-        let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = local_artifacts.clone();
+                    )
+                    }
+                    _ => local_artifacts.clone(),
+                };
+                #[cfg(not(feature = "p2p"))]
+                let artifacts: std::sync::Arc<dyn watch::ArtifactSource> = local_artifacts.clone();
 
-        let mut controller = watch::AdoptionController::new(staging_root.clone())
-            .with_artifact_source(artifacts)
-            .with_apply_vehicles(std::sync::Arc::new(vehicles));
-        // Rung 6's path evidence pairs the commitment's DHT body with its
-        // PROJECTED lifecycle (`state`/`revoked_at`), which lives here.
-        if let Some(ref pool) = db_pool {
-            controller = controller.with_db(pool.clone());
-        }
-        if let Some(hc) = hc_for_adoption.clone() {
-            controller = controller.with_conductor(hc.clone());
-            // T5's rail. Requires a conductor to author through, so it is
-            // wired here and nowhere else; without it an apply is un-attested
-            // rather than falsely attested.
-            controller = controller.with_soak_attestor(std::sync::Arc::new(
-                apply::SoakAttestor::from_runtime(
-                    hc.clone(),
-                    &config,
-                    args.agent_pubkey
-                        .clone()
-                        .unwrap_or_else(|| hc.agent_key_uhcak()),
-                    0,
-                    // The RUNNING binary's own build info — never a pin tag.
-                    // Re-read here rather than threaded from the startup line
-                    // because it is a compile-time constant read, and a
-                    // thread-through across the runtime boundary would be a
-                    // second place for it to go stale.
-                    &elohim_compute::BuildInfo::new("elohim-storage"),
-                ),
-            ));
-        }
-        if let Some(ref admin) = admin_for_adoption {
-            controller = controller.with_installed_reality(std::sync::Arc::new(
-                watch::PassportInstalledReality {
-                    admin_websocket: Some(admin.clone()),
-                    app_id: args.app_id.clone(),
-                },
-            ));
-        }
-        // **Task 13a (Station 7) — the revert arm.** Both halves or neither:
-        // `lineage_roles` names which windows are open, and the lineage
-        // vehicle is the only thing that may close one. Absent a vehicle (no
-        // conductor admin, or no client registry) the arm stays dark, which is
-        // correct — a node that could not have crossed has no window to
-        // revert.
-        if let Some(reverter) = lineage_reverter {
-            controller =
-                controller.with_lineage_revert(std::sync::Arc::clone(&lineage_roles), reverter);
-        }
-        // **Task 14b (Station 8) — the sunset arm.** Wired beside the revert
-        // arm and gated on the same vehicle. It additionally needs the
-        // resolver the line above supplies, so a sunsetter without a revert
-        // arm is inert rather than dangerous — and the arm itself never seals
-        // without an active path, an active sunset commitment naming it, and
-        // this peer's own carry complete.
-        if let Some(sunsetter) = lineage_sunsetter {
-            controller = controller.with_lineage_sunset(sunsetter);
-        }
+                let mut controller = watch::AdoptionController::new(staging_root.clone())
+                    .with_artifact_source(artifacts)
+                    .with_apply_vehicles(std::sync::Arc::new(vehicles));
+                // Rung 6's path evidence pairs the commitment's DHT body with its
+                // PROJECTED lifecycle (`state`/`revoked_at`), which lives here.
+                if let Some(ref pool) = db_pool {
+                    controller = controller.with_db(pool.clone());
+                }
+                if let Some(hc) = hc_for_adoption.clone() {
+                    controller = controller.with_conductor(hc.clone());
+                    // T5's rail. Requires a conductor to author through, so it is
+                    // wired here and nowhere else; without it an apply is un-attested
+                    // rather than falsely attested.
+                    controller = controller.with_soak_attestor(std::sync::Arc::new(
+                        apply::SoakAttestor::from_runtime(
+                            hc.clone(),
+                            &config,
+                            agent_pubkey.clone().unwrap_or_else(|| hc.agent_key_uhcak()),
+                            0,
+                            // The RUNNING binary's own build info — never a pin tag.
+                            // Re-read here rather than threaded from the startup line
+                            // because it is a compile-time constant read, and a
+                            // thread-through across the runtime boundary would be a
+                            // second place for it to go stale.
+                            &elohim_compute::BuildInfo::new("elohim-storage"),
+                        ),
+                    ));
+                }
+                if let Some(ref admin) = admin_for_adoption {
+                    controller = controller.with_installed_reality(std::sync::Arc::new(
+                        watch::PassportInstalledReality {
+                            admin_websocket: Some(admin.clone()),
+                            app_id: app_id.clone(),
+                        },
+                    ));
+                }
+                // **Task 13a (Station 7) — the revert arm.** Both halves or neither:
+                // `lineage_roles` names which windows are open, and the lineage
+                // vehicle is the only thing that may close one. Absent a vehicle (no
+                // conductor admin, or no client registry) the arm stays dark, which is
+                // correct — a node that could not have crossed has no window to
+                // revert.
+                if let Some(reverter) = lineage_reverter {
+                    controller = controller
+                        .with_lineage_revert(std::sync::Arc::clone(&lineage_roles), reverter);
+                }
+                // **Task 14b (Station 8) — the sunset arm.** Wired beside the revert
+                // arm and gated on the same vehicle. It additionally needs the
+                // resolver the line above supplies, so a sunsetter without a revert
+                // arm is inert rather than dangerous — and the arm itself never seals
+                // without an active path, an active sunset commitment naming it, and
+                // this peer's own carry complete.
+                if let Some(sunsetter) = lineage_sunsetter {
+                    controller = controller.with_lineage_sunset(sunsetter);
+                }
+                controller
+            }
+        };
+        let controller = build_controller(hc_for_adoption.clone(), adoption_admin());
+
+        // Boot order (alpha, 2026-11-08): on a cold fleet storage boots before
+        // its conductor has installed the app, so `lamad` is not connected
+        // yet. Before this the controller kept that boot-time `None` for the
+        // life of the process — a permanent `conductor_unavailable`, and both
+        // doorways serving "App not found" for every release-channel app. Now,
+        // when a registry exists, wait for the SUPERVISED handle (it is the one
+        // the supervisor re-mints after a conductor restart) and hand the
+        // running loop the same build wired through it. Until then every
+        // followed channel reports the transient `conductor_unavailable`,
+        // which the CI release stage reads as pending.
+        let late_wiring = match (&hc_for_adoption, hc_registry_for_http.clone()) {
+            (None, Some(registry)) => {
+                let (wired_tx, wired_rx) = tokio::sync::oneshot::channel();
+                let acquire_shutdown = shutdown_tx.subscribe();
+                info!(
+                    "release-adoption: lamad conductor bridge not connected at boot — waiting \
+                     for it; followed channels report conductor_unavailable until it lands"
+                );
+                tokio::spawn(async move {
+                    // `None` only on shutdown.
+                    let Some(hc) = registry.supervised_client("lamad", acquire_shutdown).await
+                    else {
+                        return;
+                    };
+                    info!(
+                        "release-adoption: lamad conductor bridge acquired — wiring the \
+                         controller through it"
+                    );
+                    if wired_tx
+                        .send(build_controller(Some(hc), adoption_admin()))
+                        .is_err()
+                    {
+                        warn!("release-adoption: controller loop gone before the late wiring");
+                    }
+                });
+                Some(wired_rx)
+            }
+            _ => None,
+        };
 
         // Release retention: the latest releases of each followed channel are
         // kept, older ones' bytes are let go from every store that holds them.
@@ -6604,7 +6768,7 @@ async fn async_main(
             retention::spawn(sweeper);
         }
 
-        if watch::spawn(controller) {
+        if watch::spawn_late_bound(controller, late_wiring) {
             info!(
                 staging_root = %staging_root.display(),
                 slot = %apply::slot_path(&staging_root).display(),

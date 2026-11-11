@@ -417,6 +417,10 @@ mesh action="status" *args="":
       preflight) exec "{{ app_dir }}/scripts/hc-mesh.sh" preflight ;;
       # build the mesh's OWN storage (p2p p2p-iroh) + doorway binaries and install them into the
       # pool's mesh-bin/ paths, which the gate never writes; MESH_BUILD_DRY_RUN=1 prints the commands.
+      # Storage and doorway first try `epr artifact fetch` (the same closure built on a sibling
+      # device, whole-blob verified; MESH_BUILD_FETCH=0 opts out) and fall through to cargo on any
+      # typed gap; a cargo build is recorded with `epr artifact put --cross` (`unrecorded:` + a
+      # `<slot>/mesh-bin/.unrecorded` marker on failure; the build still succeeds).
       # build writes the mesh-bin paths every running household doorway/storage re-execs from, so it
       # is held to the same owner-check as the restart arms below.
       build)
@@ -783,6 +787,13 @@ _gate-elohim-address:
     cd crates/elohim-address && cargo fmt --check
     cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
+# The storage client is the only Rust reader of storage's blob wire shapes; its contract test
+# round-trips the producer's own view serializer, so a rename on either side fails here.
+_gate-elohim-storage-client:
+    cd crates/elohim-storage-client && cargo test
+    cd crates/elohim-storage-client && cargo clippy --all-targets -- -D warnings
+    cd crates/elohim-storage-client && cargo fmt --check
+
 _gate-consent-grant:
     cd crates/consent-grant && cargo test
     cd crates/consent-grant && cargo clippy --all-targets -- -D warnings
@@ -844,11 +855,8 @@ _gate-constants-sync:
 # gate, until Phase 3. The flip to refuse is this recipe's body becoming just
 # `bash scripts/ci/address-profile-lint.sh`.
 _gate-address-profile-lint:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    if ! bash scripts/ci/address-profile-lint.sh; then
-        echo "address-profile-lint: WARN-CLASS (not yet refusing) — see violations above"
-    fi
+    bash scripts/ci/address-profile-lint.test.sh
+    bash scripts/ci/address-profile-lint.sh
 
 _gate-genesis-a2o:
     cd genesis/a2o && pnpm run lint && pnpm run format:check && pnpm run typecheck

@@ -737,8 +737,16 @@ mod tests {
 
     fn seed_inventory(conn: &mut SqliteConnection, peer_id: &str, blobs: &[&str], at: &str) {
         let owned: Vec<String> = blobs.iter().map(|b| b.to_string()).collect();
-        crate::db::peer_blob_inventory::apply_delta(conn, peer_id, &owned, &[], 1, at)
-            .expect("apply inventory delta");
+        crate::db::peer_blob_inventory::apply_delta(
+            conn,
+            peer_id,
+            &owned,
+            &[],
+            1,
+            at,
+            crate::db::peer_blob_inventory::InventoryWitness::SignedAuthor,
+        )
+        .expect("apply inventory delta");
     }
 
     fn seed_binding(conn: &mut SqliteConnection, peer_id: &str, agent_cid: &str, at: &str) {

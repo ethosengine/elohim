@@ -16,7 +16,8 @@
           "crates/elohim-views/**",
           "crates/seam-contracts/**",
           "crates/doorway-client/**",
-          "crates/elohim-storage-client/**"
+          "crates/elohim-storage-client/**",
+          "crates/elohim-address/**"
         ],
         "buildProcess": []
       },
@@ -42,7 +43,8 @@
             "crates/elohim-views/**",
             "crates/seam-contracts/**",
             "crates/doorway-client/**",
-            "crates/elohim-storage-client/**"
+            "crates/elohim-storage-client/**",
+            "crates/elohim-address/**"
           ],
           "buildProcess": []
         },

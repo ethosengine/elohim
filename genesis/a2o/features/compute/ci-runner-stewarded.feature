@@ -4,7 +4,7 @@
 # @requires:household-nodes: the feature needs a running household mesh. @requires:owned-substrate
 # on each scenario: the scenario writes and withdraws real grants, so it runs only on a mesh this
 # run owns outright, never on a shared fleet other people are using.
-# @requires:compute-executor on one scenario: it needs the program that RUNS a stage, which this
+# @requires:compute-executor: those scenarios need the program that RUNS a stage, which this
 # substrate does not have at present (a temporary gap, not a design limit); it is held until then.
 # Fixture: CI_RUNNER_A2O_CONFIG, written by genesis/agentic/compute/runner-fixture.sh (absent ⇒
 # every step is pending). Run it from the requester's desk, NOT under `just test mesh`: a stage's
@@ -46,8 +46,15 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
   that name. How a pin is checked is proven by its own story
   (features/compute/peer-executed-stage.feature).
   Here a validly pinned stage is simply a starting fact: no scenario below tests how a pin is
-  checked, and this story proves only who may submit a stage, and why. A grant that is withdrawn refuses the next request; work already running
+  checked. This story proves who may submit a stage, and why, and whether the target provider
+  can boot the chosen runtime and return the stage's result. A grant that is withdrawn refuses the next request; work already running
   is not part of this story.
+
+  For the target execution scenario, the provider's steward reviews the image that packages
+  the runtime. Startup evidence identifies the image actually booted. The provider signs a
+  completion claim and returns an execution receipt binding the run to the request and grant;
+  the scenario report supplies the individual results. The signature identifies the claimant,
+  rather than making the claimed results true.
 
   Any steward may sponsor a runner, and any peer may provide capacity to one. Nobody's runner can
   spend a promise that was made to someone else's runner.
@@ -62,6 +69,39 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
     And two more stewards, the first provider and the second provider, each running a peer, who will provide capacity and sponsor no runner
     And neither of those two providers has granted any capacity yet
     And a stage taken from the household's own checks and pinned by the fingerprints of its bytes
+
+  # Host-compatibility steps are not wired yet. These are independent admission checks:
+  # each row leaves the other authority, resource and deadline conditions satisfied.
+  @wip @requires:owned-substrate @concern:measure-runs-on-a-peer
+  Scenario Outline: A compatible stage still needs authority and enforceable bounds
+    Given the first steward has sponsored a runner
+    And the first provider has granted that runner capacity for the pinned stage
+    And the provider observes that the stage's CPU and runtime library requirements fit its machine
+    And the stage requests stated memory and CPU limits and a completion deadline
+    But <condition>
+    When the runner submits the stage to the first provider
+    Then the provider refuses before launching the stage, naming <reason>
+    And no successful completion is reported
+
+    Examples:
+      | condition                                                | reason                    |
+      | the capacity grant has been withdrawn                     | "current grant authority" |
+      | the provider cannot enforce the requested resource limits | "resource envelope"       |
+      | the task's completion deadline has already passed         | "task deadline"           |
+
+  # On-target execution steps are not wired yet; this station requires the actual
+  # worker image and returned report, not a successful build or a host-side CLI check.
+  @wip @requires:owned-substrate @requires:compute-executor @concern:measure-runs-on-a-peer
+  Scenario: The target provider boots the reviewed image and returns the stage's actual result
+    Given the first steward has sponsored a runner
+    And the first provider has a reviewed image compatible with its observed CPU and runtime libraries
+    And its current grant authorizes this runner and pinned stage within enforceable resource and time bounds
+    When the runner submits the stage to the provider
+    And the provider boots that exact image on its own machine
+    Then the startup evidence names the reviewed image's exact fingerprint
+    And the provider runs the stage within the granted bounds
+    And the runner verifies that the signed completion and execution receipt name this request, grant and pinned stage
+    And the runner publishes the exact returned scenario report with its actual outcomes, including any failures
 
   @requires:owned-substrate
   Scenario: A sponsored runner has a key of its own and no record of a person
@@ -78,9 +118,9 @@ Feature: A steward sponsors a runner, and the runner works only inside the promi
   Scenario: A provider lends capacity, and the runner's stage runs and reports back
     Given the first steward has sponsored a runner
     When the first provider grants the runner capacity to run stages
-    And the runner submits a pinned stage to the first provider
     Then the capacity grant states its reach and when it ends
-    And the first provider accepts the stage under that capacity grant
+    When the runner submits a pinned stage to the first provider
+    Then the first provider accepts the stage under that capacity grant
     And the runner reads back from the first provider a report that names the pinned stage and each scenario's outcome
 
   @requires:owned-substrate

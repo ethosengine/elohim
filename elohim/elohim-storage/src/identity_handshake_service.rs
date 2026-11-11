@@ -85,6 +85,17 @@ impl IdentityHandshakeService {
                                         agent_cid = %row.agent_cid,
                                         "Identity handshake: binding recorded"
                                     );
+                                    // A cross-signed binding learned by handshake is a
+                                    // hint like a gossiped one: authority only once the
+                                    // DHT confirms it.
+                                    #[cfg(feature = "p2p")]
+                                    if row.proof_status.is_cross_signed() {
+                                        crate::p2p::transport_authority::confirm::request_confirmation(
+                                            &row.peer_id,
+                                            &row.dht_anchor_hash,
+                                            Some(peer_id_str),
+                                        );
+                                    }
                                     IdentityHandshakeResponse::Accepted
                                 }
                                 Err(e) => {
