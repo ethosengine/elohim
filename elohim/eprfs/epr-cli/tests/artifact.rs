@@ -945,15 +945,24 @@ fn fake_tool(dir: &Path, name: &str, body: &str) {
     std::fs::write(&file, format!("#!/bin/sh\n{body}\n")).unwrap();
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
     wait_for_stub(&file);
+    // A fixture toolchain must also answer the key-time std native-library probe.
+    if name != "rustc" && !dir.join("rustc").exists() {
+        fake_tool(
+            dir,
+            "rustc",
+            "echo 'note: native-static-libs: -lgcc_s -lc' >&2",
+        );
+    }
 }
 
 #[test]
-fn artifact_no_linker_selection_preserves_pre_k1_followup_key() {
+fn artifact_descriptor_without_path_preserves_legacy_key() {
     let repo = checkout();
     let scratch = TempDir::new().unwrap();
     let (_, descriptor) = method_file(scratch.path(), &["crate/src"]);
     let key = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
-    // Captured at dev 6b8006579 before the explicit-driver correction.
+    // Captured at dev 6b8006579. This synthetic descriptor has no recorded PATH and
+    // probes no host tools: this golden covers legacy descriptors, not link inputs.
     assert_eq!(
         key.key_cid.to_string(),
         "bafyreiccytmiybrzfdgsbctsti6jq3pmtflee4iadyezcxfaeng6d2wsvm"
@@ -1582,6 +1591,11 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
     descriptor
         .tools
         .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
+    for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME"] {
+        if let Ok(value) = std::env::var(name) {
+            descriptor.non_path_inputs.insert(name.into(), value);
+        }
+    }
     elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
     eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
 }
