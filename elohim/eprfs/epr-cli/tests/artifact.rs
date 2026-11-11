@@ -306,8 +306,16 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
 
     let requires_file = scratch.path().join("requires.json");
     std::fs::write(&requires_file, r#"[ {"source":"declared", "predicate":{"value":["avx2"], "kind":"subset"}, "axis":"isa.x86"} ]"#).unwrap();
-    let canonical_requires = br#"[{"axis":"isa.x86","predicate":{"kind":"subset","value":["avx2"]},"source":"declared"}]"#;
-    let requires_cid = BlobCid::compute_bytes(canonical_requires);
+    let mut expected = serde_json::json!([
+        {"axis":host_contract::names::axis::ARCH,"predicate":{"kind":"equal","value":"x86_64"},"source":"extracted"},
+        {"axis":host_contract::names::axis::OS,"predicate":{"kind":"equal","value":"linux"},"source":"extracted"}
+    ]);
+    if with_requires {
+        expected.as_array_mut().unwrap().insert(1, serde_json::json!({"axis":host_contract::names::axis::ISA_X86,"predicate":{"kind":"subset","value":["avx2"]},"source":"declared"}));
+    }
+    expected.sort_all_objects();
+    let canonical_requires = serde_json::to_vec(&expected).unwrap();
+    let requires_cid = BlobCid::compute_bytes(&canonical_requires);
     let put = |input: &str| {
         let mut command = command();
         command.env("BRIT_BUILD_REF_BIN", &stub).args([
@@ -397,7 +405,7 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
             .classified_as
             .iter()
             .find_map(|s| s.strip_prefix("env:requires=")),
-        with_requires.then(|| requires_cid.to_string()).as_deref()
+        Some(requires_cid.to_string()).as_deref()
     );
 
     // It crosses under the repository's own allow-list …
@@ -422,7 +430,7 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
         .unwrap();
     assert_eq!(BlobCid::compute(&stored.bytes).to_string(), key["method"]);
     assert_eq!(stored.cid, effective.cid().unwrap());
-    if with_requires {
+    {
         let stored = store
             .fetch_blob(&requires_cid, eprfs_core::FetchPolicy::LocalOnly)
             .await
@@ -430,6 +438,23 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
         assert_eq!(stored.bytes.as_ref(), canonical_requires);
         assert_eq!(BlobCid::compute_bytes(&stored.bytes), requires_cid);
     }
+    let evidence_cid = produce
+        .classified_as
+        .iter()
+        .find_map(|s| s.strip_prefix("env:requires-evidence="))
+        .unwrap();
+    let evidence_cid = BlobCid::parse(evidence_cid).unwrap();
+    let stored = store
+        .fetch_blob(&evidence_cid, eprfs_core::FetchPolicy::LocalOnly)
+        .await
+        .unwrap();
+    assert_eq!(BlobCid::compute_bytes(&stored.bytes), evidence_cid);
+    let evidence: serde_json::Value = serde_json::from_slice(&stored.bytes).unwrap();
+    assert_eq!(evidence[host_contract::names::axis::ARCH]["e_machine"], 62);
+    assert_eq!(
+        evidence[host_contract::names::axis::ISA_X86]["instructions"],
+        1
+    );
     let (mount, _served) = BlobMount::new(store, did.clone());
     let indexed: Vec<_> = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
     let unindexed = mount.rebuild_from_flow(&indexed).await;
@@ -438,6 +463,53 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
         .held(&BlobCid::parse(&output).unwrap())
         .expect("indexed as custody");
     assert_eq!(held.manifest.to_string(), manifest);
+
+    // A readable ELF with unknown OS must fail extraction before even a brit attestation.
+    let calls_before = std::fs::read(&log).unwrap();
+    let events_before =
+        serde_json::to_value(SidecarFlowStore::open(a.root()).unwrap().events().unwrap()).unwrap();
+    let mut unknown_os = artifact.clone();
+    unknown_os[7] = 0; // Generic System V, with neither interpreter nor ABI tag.
+    std::fs::write(&bytes, &unknown_os).unwrap();
+    let out = put(&input);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("Requires extraction") && text(&out).contains("os unknown"),
+        "{}",
+        text(&out)
+    );
+    assert!(
+        text(&out).contains(bytes.to_str().unwrap()),
+        "{}",
+        text(&out)
+    );
+    assert_eq!(std::fs::read(&log).unwrap(), calls_before);
+    let reopened = elohim_epr_cli::payload::open_payload_store(
+        &a.payload(),
+        elohim_epr_cli::payload::Access::Shared,
+    )
+    .await
+    .unwrap()
+    .store;
+    let rejected_cid = BlobCid::compute_bytes(&unknown_os);
+    let absence = reopened
+        .fetch_blob(&rejected_cid, eprfs_core::FetchPolicy::LocalOnly)
+        .await;
+    assert!(
+        matches!(absence,
+            Err(eprfs_core::EprfsError::BlobNotFound(ref cid) | eprfs_core::EprfsError::BlobNotLocal(ref cid))
+                if cid == &rejected_cid
+        ),
+        "expected local payload absence: {absence:?}"
+    );
+    let after = SidecarFlowStore::open(a.root()).unwrap().events().unwrap();
+    assert_eq!(serde_json::to_value(&after).unwrap(), events_before);
+    let (fresh_mount, _) = BlobMount::new(reopened, did.clone());
+    assert!(fresh_mount.rebuild_from_flow(&after).await.is_empty());
+    assert!(fresh_mount
+        .held(&BlobCid::compute_bytes(&unknown_os))
+        .is_none());
+    std::fs::write(&bytes, &artifact).unwrap();
 
     // A closure that moved since the build started is never recorded.
     let out = put("bafkr4ihkr4ld3m4gqkjf4reryxsy2s5tkbxprqkow6fin2iiyvreuzzab4");

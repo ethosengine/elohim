@@ -1,0 +1,1643 @@
+{
+  "task": "host-compatibility-foundation K8",
+  "status": "round-5 complete: N1 and N2 fixed; all four required Cargo checks green; no push",
+  "measurement": [
+    {
+      "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
+      "bytes": 128590816,
+      "elapsed_ms": 5135.686756,
+      "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+      "evidence": {
+        "abi.libc": {
+          "GLIBC_versions": [
+            "GLIBC_2.10",
+            "GLIBC_2.12",
+            "GLIBC_2.14",
+            "GLIBC_2.15",
+            "GLIBC_2.16",
+            "GLIBC_2.17",
+            "GLIBC_2.18",
+            "GLIBC_2.2.5",
+            "GLIBC_2.25",
+            "GLIBC_2.28",
+            "GLIBC_2.29",
+            "GLIBC_2.3",
+            "GLIBC_2.3.2",
+            "GLIBC_2.3.4",
+            "GLIBC_2.30",
+            "GLIBC_2.32",
+            "GLIBC_2.33",
+            "GLIBC_2.34",
+            "GLIBC_2.39",
+            "GLIBC_2.4",
+            "GLIBC_2.6",
+            "GLIBC_2.7",
+            "GLIBC_2.9"
+          ],
+          "library": "libc.so.6"
+        },
+        "abi.loader": {
+          "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+        },
+        "arch": {
+          "e_machine": 62
+        },
+        "elf.loader-view": {
+          "segment-uncovered": {
+            "bytes": 8,
+            "examples": [
+              {
+                "file_offset": 57932603,
+                "length": 1
+              },
+              {
+                "file_offset": 57932617,
+                "length": 7
+              }
+            ]
+          }
+        },
+        "isa.x86": {
+          "instructions": 8698106,
+          "notRequired": [
+            {
+              "count": 4,
+              "examples": [
+                {
+                  "address": 15540608,
+                  "section": ".text",
+                  "symbol": "_start"
+                },
+                {
+                  "address": 57936656,
+                  "section": ".text",
+                  "symbol": "pthread_atfork"
+                },
+                {
+                  "address": 57936672,
+                  "section": ".init"
+                }
+              ],
+              "feature": "ibt",
+              "reason": "executes as NOP where unsupported"
+            }
+          ],
+          "sections": [
+            {
+              "covered_bytes": 41280132,
+              "section": ".text",
+              "total_bytes": 42396064,
+              "uncovered_bytes": 1115932,
+              "uncovered_examples": [
+                {
+                  "length": 202,
+                  "nearest_preceding_symbol": "_start",
+                  "start": 15540646
+                },
+                {
+                  "length": 3,
+                  "nearest_preceding_symbol": "_ZN4core3num23_$LT$impl$u20$usize$GT$13unchecked_add18precondition_check17h0ee87e4357b9d01fE",
+                  "start": 15540893
+                },
+                {
+                  "length": 12,
+                  "nearest_preceding_symbol": "_ZN68_$LT$std..process..ExitCode$u20$as$u20$std..process..Termination$GT$6report17h4eb264367045dfdcE",
+                  "start": 15540900
+                },
+                {
+                  "length": 12,
+                  "nearest_preceding_symbol": "_ZN72_$LT$std..process..ExitCode$u20$as$u20$core..convert..From$LT$u8$GT$$GT$4from17h18bb8d005ce4d42cE",
+                  "start": 15540916
+                },
+                {
+                  "length": 8,
+                  "nearest_preceding_symbol": "_ZN4core4iter6traits8iterator8Iterator12try_for_each4call28_$u7b$$u7b$closure$u7d$$u7d$17hfc1dc18c17766c4bE",
+                  "start": 15540936
+                }
+              ]
+            },
+            {
+              "covered_bytes": 27,
+              "section": ".init",
+              "total_bytes": 27,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            },
+            {
+              "covered_bytes": 13,
+              "section": ".fini",
+              "total_bytes": 13,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            },
+            {
+              "covered_bytes": 736,
+              "section": ".plt",
+              "total_bytes": 736,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            }
+          ],
+          "used": {
+            "adx": {
+              "count": 520,
+              "examples": [
+                {
+                  "address": 53006892,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+                },
+                {
+                  "address": 53007485,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+                },
+                {
+                  "address": 53037768,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__bn_mulx4x_mont"
+                }
+              ]
+            },
+            "aes": {
+              "count": 362,
+              "examples": [
+                {
+                  "address": 53021889,
+                  "section": ".text",
+                  "symbol": "_aesni_ctr32_ghash_6x"
+                },
+                {
+                  "address": 53023616,
+                  "section": ".text",
+                  "symbol": "_aesni_ctr32_6x"
+                },
+                {
+                  "address": 53025024,
+                  "section": ".text",
+                  "symbol": "_aesni_encrypt2"
+                }
+              ]
+            },
+            "avx": {
+              "count": 18306,
+              "examples": [
+                {
+                  "address": 35809602,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 35810675,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 35811348,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                }
+              ]
+            },
+            "avx2": {
+              "count": 5421,
+              "examples": [
+                {
+                  "address": 35879254,
+                  "section": ".text",
+                  "symbol": "walIndexTryHdr"
+                },
+                {
+                  "address": 36199249,
+                  "section": ".text",
+                  "symbol": "walTryBeginRead"
+                },
+                {
+                  "address": 36316968,
+                  "section": ".text",
+                  "symbol": "sqlite3_randomness"
+                }
+              ]
+            },
+            "bmi1": {
+              "count": 1339,
+              "examples": [
+                {
+                  "address": 31487838,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw13RawTableInner16fix_insert_index17h4c54bdbc8daa3fd8E"
+                },
+                {
+                  "address": 31488512,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw13RawTableInner26find_insert_index_in_group17h78a942481f18d0daE"
+                },
+                {
+                  "address": 31489021,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw13RawTableInner31find_or_find_insert_index_inner17h258e6e9e0783aeb8E"
+                }
+              ]
+            },
+            "bmi2": {
+              "count": 1338,
+              "examples": [
+                {
+                  "address": 35809602,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 35812126,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                },
+                {
+                  "address": 35815769,
+                  "section": ".text",
+                  "symbol": "sqlite3LogEstToInt"
+                }
+              ]
+            },
+            "cmov": {
+              "count": 74867,
+              "examples": [
+                {
+                  "address": 15543135,
+                  "section": ".text",
+                  "symbol": "_ZN5alloc5boxed14box_new_uninit17hc4d19523af7c273dE"
+                },
+                {
+                  "address": 15543305,
+                  "section": ".text",
+                  "symbol": "_ZN4core4iter6traits8iterator8Iterator3nth17hc7584d86076b67deE"
+                },
+                {
+                  "address": 15543533,
+                  "section": ".text",
+                  "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17h77a77d623f9b6fa3E"
+                }
+              ]
+            },
+            "cpuid": {
+              "count": 51,
+              "examples": [
+                {
+                  "address": 47242954,
+                  "section": ".text",
+                  "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner11cpuid_count17h9387750168fd42fcE"
+                },
+                {
+                  "address": 47243082,
+                  "section": ".text",
+                  "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner5cpuid17h208137b4b6d26847E"
+                },
+                {
+                  "address": 47245610,
+                  "section": ".text",
+                  "symbol": "_ZN8poly13057backend10autodetect10avx2_cpuid8init_get10init_inner11cpuid_count17h1508bbfce5032fdfE.llvm.10503493605127406368"
+                }
+              ]
+            },
+            "fma": {
+              "count": 14,
+              "examples": [
+                {
+                  "address": 35810754,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 35858795,
+                  "section": ".text",
+                  "symbol": "computeJD.part.0"
+                },
+                {
+                  "address": 35865174,
+                  "section": ".text",
+                  "symbol": "parseHhMmSs"
+                }
+              ]
+            },
+            "fma4": {
+              "count": 1,
+              "examples": [
+                {
+                  "address": 57936064,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma13fma_with_fma4"
+                }
+              ]
+            },
+            "lzcnt": {
+              "count": 6,
+              "examples": [
+                {
+                  "address": 35847479,
+                  "section": ".text",
+                  "symbol": "sqlite3LogEst"
+                },
+                {
+                  "address": 36149019,
+                  "section": ".text",
+                  "symbol": "whereLoopAddBtreeIndex"
+                },
+                {
+                  "address": 36159101,
+                  "section": ".text",
+                  "symbol": "wherePathSolver.isra.0"
+                }
+              ]
+            },
+            "movbe": {
+              "count": 309,
+              "examples": [
+                {
+                  "address": 35820352,
+                  "section": ".text",
+                  "symbol": "serialGet7"
+                },
+                {
+                  "address": 35820496,
+                  "section": ".text",
+                  "symbol": "sqlite3VdbeSerialGet"
+                },
+                {
+                  "address": 35835744,
+                  "section": ".text",
+                  "symbol": "fts5GetU64"
+                }
+              ]
+            },
+            "osxsave": {
+              "count": 18306,
+              "examples": [
+                {
+                  "address": 35809602,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 35810675,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 35811348,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                }
+              ]
+            },
+            "pclmulqdq": {
+              "count": 210,
+              "examples": [
+                {
+                  "address": 53017832,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+                },
+                {
+                  "address": 53018219,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_ghash_vpclmulqdq_avx2_1"
+                },
+                {
+                  "address": 53020042,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                }
+              ]
+            },
+            "sha_ni": {
+              "count": 168,
+              "examples": [
+                {
+                  "address": 53119083,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__sha256_block_data_order_hw"
+                },
+                {
+                  "address": 57058910,
+                  "section": ".text",
+                  "symbol": "_ZN4sha26sha2563x8613digest_blocks17hdcd58eced56c0880E"
+                },
+                {
+                  "address": 57297198,
+                  "section": ".text",
+                  "symbol": "_ZN4sha26sha2567x86_sha8compress17h632160eef136f407E"
+                }
+              ]
+            },
+            "sse": {
+              "count": 336613,
+              "examples": [
+                {
+                  "address": 15541892,
+                  "section": ".text",
+                  "symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17h1c4c4eebe63e726aE"
+                },
+                {
+                  "address": 15543555,
+                  "section": ".text",
+                  "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17h77a77d623f9b6fa3E"
+                },
+                {
+                  "address": 15543941,
+                  "section": ".text",
+                  "symbol": "_ZN4core4iter6traits8iterator8Iterator8try_fold17he4730c52799d6d10E"
+                }
+              ]
+            },
+            "sse2": {
+              "count": 34221,
+              "examples": [
+                {
+                  "address": 15670882,
+                  "section": ".text",
+                  "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$3map17heee12e0ba96b2511E"
+                },
+                {
+                  "address": 15695480,
+                  "section": ".text",
+                  "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17h293e56b2c745461eE"
+                },
+                {
+                  "address": 15729971,
+                  "section": ".text",
+                  "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17h89cfb4d9a134e27bE"
+                }
+              ]
+            },
+            "sse3": {
+              "count": 1,
+              "examples": [
+                {
+                  "address": 53259480,
+                  "section": ".text",
+                  "symbol": "_ZN8httparse4simd5sse4227match_header_value_vectored17h136e01b7aa129f56E.llvm.6939497599259762489"
+                }
+              ]
+            },
+            "sse4_1": {
+              "count": 29,
+              "examples": [
+                {
+                  "address": 49760783,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+                },
+                {
+                  "address": 49762566,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+                },
+                {
+                  "address": 51882957,
+                  "section": ".text",
+                  "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hf9a479d8a95e3716E"
+                }
+              ]
+            },
+            "ssse3": {
+              "count": 730,
+              "examples": [
+                {
+                  "address": 49759381,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+                },
+                {
+                  "address": 49761985,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+                },
+                {
+                  "address": 51210811,
+                  "section": ".text",
+                  "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hd62de5c423b0872dE"
+                }
+              ]
+            },
+            "syscall": {
+              "count": 20,
+              "examples": [
+                {
+                  "address": 19394282,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix7backend2io8syscalls3dup17ha86812b9d16114c1E"
+                },
+                {
+                  "address": 28342248,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix2fs3abs4open28_$u7b$$u7b$closure$u7d$$u7d$17h148648d9b8b9e4c8E"
+                },
+                {
+                  "address": 28342344,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix2fs3abs4open28_$u7b$$u7b$closure$u7d$$u7d$17h4518b77bc20151dbE"
+                }
+              ]
+            },
+            "vaes": {
+              "count": 136,
+              "examples": [
+                {
+                  "address": 53018480,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                },
+                {
+                  "address": 53020449,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+                }
+              ]
+            },
+            "vpclmulqdq": {
+              "count": 88,
+              "examples": [
+                {
+                  "address": 53017910,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+                },
+                {
+                  "address": 53018812,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                },
+                {
+                  "address": 53020588,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+                }
+              ]
+            },
+            "xsave": {
+              "count": 9,
+              "examples": [
+                {
+                  "address": 47242930,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv"
+                },
+                {
+                  "address": 47245458,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv.llvm.10503493605127406368"
+                },
+                {
+                  "address": 53001594,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__OPENSSL_cpuid_setup"
+                }
+              ]
+            }
+          }
+        },
+        "kernel.linux": {
+          "NT_GNU_ABI_TAG": [
+            0,
+            3,
+            2,
+            0
+          ]
+        },
+        "lib": {
+          "DT_NEEDED": [
+            "ld-linux-x86-64.so.2",
+            "libc.so.6",
+            "libgcc_s.so.1",
+            "libm.so.6"
+          ]
+        },
+        "os": {
+          "ELF_OSABI": 0,
+          "NT_GNU_ABI_TAG": [
+            0,
+            3,
+            2,
+            0
+          ],
+          "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+        }
+      },
+      "requires_document": "genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-installed.requires.json",
+      "round_3_canonical_bytes_identical": true,
+      "admissions": {
+        "v2": {
+          "vector": "crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v2.json",
+          "decision": "refuse",
+          "failures": [
+            {
+              "axis": "isa.x86",
+              "missing": [
+                "adx",
+                "aes",
+                "avx",
+                "avx2",
+                "bmi1",
+                "bmi2",
+                "f16c",
+                "fma",
+                "fma4",
+                "lzcnt",
+                "movbe",
+                "osxsave",
+                "pclmulqdq",
+                "sha_ni",
+                "vaes",
+                "vpclmulqdq"
+              ]
+            }
+          ]
+        },
+        "v3": {
+          "vector": "crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v3.json",
+          "decision": "refuse",
+          "failures": [
+            {
+              "axis": "isa.x86",
+              "missing": [
+                "adx",
+                "aes",
+                "fma4",
+                "pclmulqdq",
+                "sha_ni",
+                "vaes",
+                "vpclmulqdq"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+      "bytes": 136092536,
+      "elapsed_ms": 5338.3834480000005,
+      "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+      "evidence": {
+        "abi.libc": {
+          "GLIBC_versions": [
+            "GLIBC_2.10",
+            "GLIBC_2.12",
+            "GLIBC_2.14",
+            "GLIBC_2.15",
+            "GLIBC_2.16",
+            "GLIBC_2.17",
+            "GLIBC_2.18",
+            "GLIBC_2.2.5",
+            "GLIBC_2.25",
+            "GLIBC_2.28",
+            "GLIBC_2.29",
+            "GLIBC_2.3",
+            "GLIBC_2.3.2",
+            "GLIBC_2.3.4",
+            "GLIBC_2.30",
+            "GLIBC_2.32",
+            "GLIBC_2.33",
+            "GLIBC_2.34",
+            "GLIBC_2.39",
+            "GLIBC_2.4",
+            "GLIBC_2.6",
+            "GLIBC_2.7",
+            "GLIBC_2.9"
+          ],
+          "library": "libc.so.6"
+        },
+        "abi.loader": {
+          "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+        },
+        "arch": {
+          "e_machine": 62
+        },
+        "elf.loader-view": {
+          "segment-uncovered": {
+            "bytes": 8,
+            "examples": [
+              {
+                "file_offset": 61128139,
+                "length": 1
+              },
+              {
+                "file_offset": 61128153,
+                "length": 7
+              }
+            ]
+          }
+        },
+        "isa.x86": {
+          "instructions": 9122279,
+          "notRequired": [
+            {
+              "count": 4,
+              "examples": [
+                {
+                  "address": 16587136,
+                  "section": ".text",
+                  "symbol": "_start"
+                },
+                {
+                  "address": 61132192,
+                  "section": ".text",
+                  "symbol": "pthread_atfork"
+                },
+                {
+                  "address": 61132208,
+                  "section": ".init"
+                }
+              ],
+              "feature": "ibt",
+              "reason": "executes as NOP where unsupported"
+            }
+          ],
+          "sections": [
+            {
+              "covered_bytes": 43374315,
+              "section": ".text",
+              "total_bytes": 44545072,
+              "uncovered_bytes": 1170757,
+              "uncovered_examples": [
+                {
+                  "length": 202,
+                  "nearest_preceding_symbol": "_start",
+                  "start": 16587174
+                },
+                {
+                  "length": 11,
+                  "nearest_preceding_symbol": "_ZN5alloc5boxed14box_new_uninit17h5733e23d6f951867E",
+                  "start": 16587461
+                },
+                {
+                  "length": 9,
+                  "nearest_preceding_symbol": "_ZN3epr10ready_args28_$u7b$$u7b$closure$u7d$$u7d$17h482a1ec366c27c2eE",
+                  "start": 16587559
+                },
+                {
+                  "length": 11,
+                  "nearest_preceding_symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17h2fbf01af09fb4f1bE",
+                  "start": 16587717
+                },
+                {
+                  "length": 15,
+                  "nearest_preceding_symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17hf621eb7b0d9b7e4eE",
+                  "start": 16587985
+                }
+              ]
+            },
+            {
+              "covered_bytes": 27,
+              "section": ".init",
+              "total_bytes": 27,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            },
+            {
+              "covered_bytes": 13,
+              "section": ".fini",
+              "total_bytes": 13,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            },
+            {
+              "covered_bytes": 736,
+              "section": ".plt",
+              "total_bytes": 736,
+              "uncovered_bytes": 0,
+              "uncovered_examples": []
+            }
+          ],
+          "used": {
+            "adx": {
+              "count": 520,
+              "examples": [
+                {
+                  "address": 56170284,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+                },
+                {
+                  "address": 56170877,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+                },
+                {
+                  "address": 56201160,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__bn_mulx4x_mont"
+                }
+              ]
+            },
+            "aes": {
+              "count": 362,
+              "examples": [
+                {
+                  "address": 56185281,
+                  "section": ".text",
+                  "symbol": "_aesni_ctr32_ghash_6x"
+                },
+                {
+                  "address": 56187008,
+                  "section": ".text",
+                  "symbol": "_aesni_ctr32_6x"
+                },
+                {
+                  "address": 56188416,
+                  "section": ".text",
+                  "symbol": "_aesni_encrypt2"
+                }
+              ]
+            },
+            "avx": {
+              "count": 18306,
+              "examples": [
+                {
+                  "address": 38245826,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 38246899,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 38247572,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                }
+              ]
+            },
+            "avx2": {
+              "count": 5421,
+              "examples": [
+                {
+                  "address": 38315478,
+                  "section": ".text",
+                  "symbol": "walIndexTryHdr"
+                },
+                {
+                  "address": 38635473,
+                  "section": ".text",
+                  "symbol": "walTryBeginRead"
+                },
+                {
+                  "address": 38753192,
+                  "section": ".text",
+                  "symbol": "sqlite3_randomness"
+                }
+              ]
+            },
+            "bmi1": {
+              "count": 1345,
+              "examples": [
+                {
+                  "address": 22629024,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h275b069b7b3d4cfeE"
+                },
+                {
+                  "address": 22629392,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h2f41e52e012280adE"
+                },
+                {
+                  "address": 22629760,
+                  "section": ".text",
+                  "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h543525591e9b0c51E"
+                }
+              ]
+            },
+            "bmi2": {
+              "count": 1338,
+              "examples": [
+                {
+                  "address": 38245826,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 38248350,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                },
+                {
+                  "address": 38251993,
+                  "section": ".text",
+                  "symbol": "sqlite3LogEstToInt"
+                }
+              ]
+            },
+            "cmov": {
+              "count": 79129,
+              "examples": [
+                {
+                  "address": 16587423,
+                  "section": ".text",
+                  "symbol": "_ZN5alloc5boxed14box_new_uninit17h5733e23d6f951867E"
+                },
+                {
+                  "address": 16589221,
+                  "section": ".text",
+                  "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$6expect17h1bda24ac2e3190dfE"
+                },
+                {
+                  "address": 16589417,
+                  "section": ".text",
+                  "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17hb20e996d475a2361E"
+                }
+              ]
+            },
+            "cpuid": {
+              "count": 51,
+              "examples": [
+                {
+                  "address": 50406586,
+                  "section": ".text",
+                  "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner11cpuid_count17h9387750168fd42fcE"
+                },
+                {
+                  "address": 50406714,
+                  "section": ".text",
+                  "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner5cpuid17h208137b4b6d26847E"
+                },
+                {
+                  "address": 50409242,
+                  "section": ".text",
+                  "symbol": "_ZN8poly13057backend10autodetect10avx2_cpuid8init_get10init_inner11cpuid_count17h1508bbfce5032fdfE.llvm.10503493605127406368"
+                }
+              ]
+            },
+            "fma": {
+              "count": 14,
+              "examples": [
+                {
+                  "address": 38246978,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 38295019,
+                  "section": ".text",
+                  "symbol": "computeJD.part.0"
+                },
+                {
+                  "address": 38301398,
+                  "section": ".text",
+                  "symbol": "parseHhMmSs"
+                }
+              ]
+            },
+            "fma4": {
+              "count": 1,
+              "examples": [
+                {
+                  "address": 61131600,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma13fma_with_fma4"
+                }
+              ]
+            },
+            "lzcnt": {
+              "count": 6,
+              "examples": [
+                {
+                  "address": 38283703,
+                  "section": ".text",
+                  "symbol": "sqlite3LogEst"
+                },
+                {
+                  "address": 38585243,
+                  "section": ".text",
+                  "symbol": "whereLoopAddBtreeIndex"
+                },
+                {
+                  "address": 38595325,
+                  "section": ".text",
+                  "symbol": "wherePathSolver.isra.0"
+                }
+              ]
+            },
+            "movbe": {
+              "count": 309,
+              "examples": [
+                {
+                  "address": 38256576,
+                  "section": ".text",
+                  "symbol": "serialGet7"
+                },
+                {
+                  "address": 38256720,
+                  "section": ".text",
+                  "symbol": "sqlite3VdbeSerialGet"
+                },
+                {
+                  "address": 38271968,
+                  "section": ".text",
+                  "symbol": "fts5GetU64"
+                }
+              ]
+            },
+            "osxsave": {
+              "count": 18306,
+              "examples": [
+                {
+                  "address": 38245826,
+                  "section": ".text",
+                  "symbol": "computeFloor"
+                },
+                {
+                  "address": 38246899,
+                  "section": ".text",
+                  "symbol": "dekkerMul2"
+                },
+                {
+                  "address": 38247572,
+                  "section": ".text",
+                  "symbol": "sqlite3AtoF"
+                }
+              ]
+            },
+            "pclmulqdq": {
+              "count": 210,
+              "examples": [
+                {
+                  "address": 56181224,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+                },
+                {
+                  "address": 56181611,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_ghash_vpclmulqdq_avx2_1"
+                },
+                {
+                  "address": 56183434,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                }
+              ]
+            },
+            "sha_ni": {
+              "count": 168,
+              "examples": [
+                {
+                  "address": 56282475,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__sha256_block_data_order_hw"
+                },
+                {
+                  "address": 60253838,
+                  "section": ".text",
+                  "symbol": "_ZN4sha26sha2563x8613digest_blocks17hdcd58eced56c0880E"
+                },
+                {
+                  "address": 60492126,
+                  "section": ".text",
+                  "symbol": "_ZN4sha26sha2567x86_sha8compress17h632160eef136f407E"
+                }
+              ]
+            },
+            "sse": {
+              "count": 355646,
+              "examples": [
+                {
+                  "address": 16587812,
+                  "section": ".text",
+                  "symbol": "_ZN3epr11govern_main28_$u7b$$u7b$closure$u7d$$u7d$17hf621eb7b0d9b7e4eE"
+                },
+                {
+                  "address": 16591664,
+                  "section": ".text",
+                  "symbol": "_ZN3epr10ready_args17h1c7420655c31ed04E"
+                },
+                {
+                  "address": 16593686,
+                  "section": ".text",
+                  "symbol": "_ZN3epr11global_args17h9780dfd3765909efE"
+                }
+              ]
+            },
+            "sse2": {
+              "count": 34578,
+              "examples": [
+                {
+                  "address": 16730050,
+                  "section": ".text",
+                  "symbol": "_ZN14elohim_epr_cli4flow6memory6recall9discovery15discover_scored28_$u7b$$u7b$closure$u7d$$u7d$17h98409cf6a6e579bbE"
+                },
+                {
+                  "address": 16731388,
+                  "section": ".text",
+                  "symbol": "_ZN14elohim_epr_cli4flow6memory6recall9discovery15discover_scored28_$u7b$$u7b$closure$u7d$$u7d$28_$u7b$$u7b$closure$u7d$$u7d$28_$u7b$$u7b$closure$u7d$$u7d$17h3a73883670fccea6E"
+                },
+                {
+                  "address": 16740330,
+                  "section": ".text",
+                  "symbol": "_ZN14elohim_epr_cli4flow8measures10bound_from28_$u7b$$u7b$closure$u7d$$u7d$17hff57ebc3138d21a9E"
+                }
+              ]
+            },
+            "sse3": {
+              "count": 1,
+              "examples": [
+                {
+                  "address": 56422872,
+                  "section": ".text",
+                  "symbol": "_ZN8httparse4simd5sse4227match_header_value_vectored17h136e01b7aa129f56E.llvm.6939497599259762489"
+                }
+              ]
+            },
+            "sse4_1": {
+              "count": 29,
+              "examples": [
+                {
+                  "address": 52924399,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+                },
+                {
+                  "address": 52926182,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+                },
+                {
+                  "address": 55046333,
+                  "section": ".text",
+                  "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hf9a479d8a95e3716E"
+                }
+              ]
+            },
+            "ssse3": {
+              "count": 730,
+              "examples": [
+                {
+                  "address": 52922997,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4219validate_utf8_basic17h0f6dfc80590ed3a0E"
+                },
+                {
+                  "address": 52925601,
+                  "section": ".text",
+                  "symbol": "_ZN8simdutf814implementation3x865sse4220validate_utf8_compat17hbf3a0537e09526d4E"
+                },
+                {
+                  "address": 54374187,
+                  "section": ".text",
+                  "symbol": "_ZN11rand_chacha4guts11refill_wide10impl_sse4117hd62de5c423b0872dE"
+                }
+              ]
+            },
+            "syscall": {
+              "count": 20,
+              "examples": [
+                {
+                  "address": 21303375,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix7backend2fs8syscalls11fcntl_getfl17hedd8e6552c86cc25E"
+                },
+                {
+                  "address": 21303657,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix7backend2fs8syscalls6linkat17h32b0232c3efe3260E"
+                },
+                {
+                  "address": 21303796,
+                  "section": ".text",
+                  "symbol": "_ZN6rustix7backend2fs8syscalls6openat17h85db73239b688913E"
+                }
+              ]
+            },
+            "vaes": {
+              "count": 136,
+              "examples": [
+                {
+                  "address": 56181872,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                },
+                {
+                  "address": 56183841,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+                }
+              ]
+            },
+            "vpclmulqdq": {
+              "count": 88,
+              "examples": [
+                {
+                  "address": 56181302,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+                },
+                {
+                  "address": 56182204,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+                },
+                {
+                  "address": 56183980,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+                }
+              ]
+            },
+            "xsave": {
+              "count": 9,
+              "examples": [
+                {
+                  "address": 50406562,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv"
+                },
+                {
+                  "address": 50409090,
+                  "section": ".text",
+                  "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv.llvm.10503493605127406368"
+                },
+                {
+                  "address": 56164986,
+                  "section": ".text",
+                  "symbol": "ring_core_0_17_14__OPENSSL_cpuid_setup"
+                }
+              ]
+            }
+          }
+        },
+        "kernel.linux": {
+          "NT_GNU_ABI_TAG": [
+            0,
+            3,
+            2,
+            0
+          ]
+        },
+        "lib": {
+          "DT_NEEDED": [
+            "ld-linux-x86-64.so.2",
+            "libc.so.6",
+            "libgcc_s.so.1",
+            "libm.so.6"
+          ]
+        },
+        "os": {
+          "ELF_OSABI": 0,
+          "NT_GNU_ABI_TAG": [
+            0,
+            3,
+            2,
+            0
+          ],
+          "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+        }
+      },
+      "requires_document": "genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-built.requires.json",
+      "round_3_canonical_bytes_identical": true,
+      "admissions": {
+        "v2": {
+          "vector": "crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v2.json",
+          "decision": "refuse",
+          "failures": [
+            {
+              "axis": "isa.x86",
+              "missing": [
+                "adx",
+                "aes",
+                "avx",
+                "avx2",
+                "bmi1",
+                "bmi2",
+                "f16c",
+                "fma",
+                "fma4",
+                "lzcnt",
+                "movbe",
+                "osxsave",
+                "pclmulqdq",
+                "sha_ni",
+                "vaes",
+                "vpclmulqdq"
+              ]
+            }
+          ]
+        },
+        "v3": {
+          "vector": "crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v3.json",
+          "decision": "refuse",
+          "failures": [
+            {
+              "axis": "isa.x86",
+              "missing": [
+                "adx",
+                "aes",
+                "fma4",
+                "pclmulqdq",
+                "sha_ni",
+                "vaes",
+                "vpclmulqdq"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "comparison": {
+    "round_3_head": "026b4c326",
+    "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+    "installed_and_built_documents_byte_identical": true,
+    "round_3_installed_bytes": 128590816,
+    "round_3_built_bytes": 135522544,
+    "round_3_extraction_ms": [
+      3481.361504,
+      3776.864791
+    ],
+    "timing_scope": "File read and extraction; final measurements ran sequentially alongside the Rust-style gate, so timings are not a controlled performance comparison."
+  },
+  "policy": [
+    "Encoding prerequisites enter used features before psABI level selection: VEX/XOP imply avx+osxsave, EVEX implies avx512f+osxsave, narrow EVEX vectors also imply avx512vl. Extras retained; no dispatch narrowing.",
+    "All six exact ABI stub sections always decode whole. Other executable sections use sized STT_FUNC/FDE ranges; gaps remain evidence, and sections with unknown boundaries refuse.",
+    "PT_LOAD bounds, executable section offset/address correspondence and disjoint file ranges are validated before decoding. Executable segment gaps are evidence; segments without executable sections refuse.",
+    "PT_DYNAMIC and its loader-mapped string/version tables must agree with sections. Version needs validate format 1, counts, progress, boundaries, non-overlap and chain termination, while permitting LLD grouped headers.",
+    "Every big-endian ELF and ELF32 refuses. No byte-order observation axis is invented.",
+    "Metadata caps derive from input length: symbols/24, dynamic entries/16, version records/16, CIE/FDE records/8; section-note bytes are also bounded. Executable sections cannot alias; instruction decoding visits at most the file length. Symbol attribution uses a sorted disjoint interval index. Symbols are grouped by section, and overlapping FDEs are merged/indexed once to avoid per-section metadata rescans.",
+    "Evidence names truncate at a UTF-8 boundary within 256 bytes; at most 3 examples per feature and 5 gaps per section/segment view; the compact evidence document refuses above 1048576 bytes.",
+    "Rejected put verification reopens both payload storage and flow storage, verifies direct payload absence and byte-equivalent event snapshots, and rebuilds custody from the fresh events. Payload absence must be BlobNotFound/BlobNotLocal for the rejected CID, not an unrelated I/O error."
+  ],
+  "regressions": {
+    "1": [
+      "artifact_standalone_encoding_prerequisites_precede_level_selection"
+    ],
+    "2": [
+      "artifact_partial_symbol_never_disables_whole_abi_stub_decode"
+    ],
+    "3": [
+      "artifact_loader_decoy_and_past_eof_refuse",
+      "artifact_segment_uncovered_is_evidence_and_missing_sections_refuse",
+      "artifact_dynamic_loader_and_sections_must_agree"
+    ],
+    "4": [
+      "artifact_big_endian_all_architectures_and_elf32_refuse"
+    ],
+    "5": [
+      "artifact_version_chains_validate_counts_progress_and_termination",
+      "artifact_version_chains_allow_grouped_need_headers"
+    ],
+    "6": [
+      "artifact_aliasing_executable_sections_refuse_before_decode",
+      "artifact_metadata_and_evidence_budgets_and_name_truncation",
+      "artifact_metadata_aliases_exhaust_file_sized_symbol_budget",
+      "artifact_symbol_lookup_handles_nested_and_expired_aliases",
+      "artifact_oversized_extraction_evidence_refuses"
+    ],
+    "7": [
+      "artifact_overridden_flags_store_the_keyed_method_and_mount"
+    ]
+  },
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+      "exit": 0,
+      "passed": 119,
+      "log": "artifact-post-lint.log"
+    },
+    {
+      "command": "cargo test --offline --locked -p elohim-epr-cli",
+      "exit": 0,
+      "passed": 1461,
+      "log": "full-tests-pass.log",
+      "scope_note": "Full suite passed before the sole Clippy nonminimal-bool rewrite to equivalent is_none_or; all 119 focused tests reran green afterward."
+    },
+    {
+      "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+      "exit": 0,
+      "log": "clippy-final.log"
+    },
+    {
+      "command": "cargo fmt -p elohim-epr-cli -- --check",
+      "exit": 0,
+      "log": "fmt.log"
+    },
+    {
+      "command": "just gate rust-style",
+      "exit": 0,
+      "log": "rust-style-gate.log",
+      "debt": "epr-cli 0 -> 0; no new suppressions",
+      "preflight_note": "cargo-deny is unavailable locally; wrapper warns, CI owns that check."
+    },
+    {
+      "command": "epr check",
+      "exit": 0,
+      "log": "epr-check.log"
+    },
+    {
+      "command": "artifact_measure_requested_elf (installed and built)",
+      "exit": 0,
+      "logs": [
+        "installed-commit.log",
+        "built-commit.log"
+      ],
+      "requires_byte_comparison": true
+    }
+  ],
+  "validation_environment": {
+    "CARGO_TARGET_DIR": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev",
+    "RUSTUP_TOOLCHAIN": "1.96.1",
+    "RUSTFLAGS": "",
+    "CARGO_BUILD_JOBS": "6",
+    "TMPDIR": "/var/tmp/hc-k8/t",
+    "serialization": "while pgrep -x rustc >/dev/null || pgrep -x cargo >/dev/null; do sleep 15; done before each cargo; exported guarding function for the Rust-style gate internal cargo calls",
+    "execution": "host access for process visibility and existing chown/socket/key fixtures"
+  },
+  "validation_history": [
+    {
+      "exit": 101,
+      "log": "artifact-first.log",
+      "reason": "Initial compile: object string-table errors are unit values, corrected the explicit error mapping and removed an unused import."
+    },
+    {
+      "exit": 101,
+      "log": "artifact-second.log",
+      "reason": "Command invoked from repository root without Cargo.toml; rerun from elohim/eprfs."
+    },
+    {
+      "exit": 101,
+      "log": "artifact-third.log",
+      "reason": "71 unit tests passed; existing sysroot chown fixture needs host access."
+    },
+    {
+      "exit": 101,
+      "log": "artifact.log",
+      "reason": "Fresh event comparison used FlowEvent vs (CID, FlowEvent); corrected both snapshots to the native store representation."
+    },
+    {
+      "exit": 0,
+      "log": "artifact-final.log",
+      "reason": "Focused pass before grouped-version-layout correction."
+    },
+    {
+      "exit": 101,
+      "log": "installed.log",
+      "reason": "Remeasurement exposed valid LLD grouped version headers; replaced ordering assumption with distinct-record validation and added regression."
+    },
+    {
+      "exit": 101,
+      "log": "full-tests.log",
+      "reason": "Concurrent sandbox invocation exposed a synthetic /var/tmp/hc-k8/.git to a device-key fixture. Rerun with host-only tool calls while full tests execute."
+    },
+    {
+      "exit": 0,
+      "log": "full-tests-verified.log",
+      "reason": "Full suite passed before final bounds-test and metadata-index refinements."
+    },
+    {
+      "exit": 101,
+      "log": "artifact-complete.log",
+      "reason": "10,000 compact section records still fit under the evidence limit; increased the actual-extraction fixture to 20,000 distinct sections."
+    },
+    {
+      "exit": 101,
+      "log": "clippy.log",
+      "reason": "Single nonminimal-bool finding; changed !is_some_and to equivalent is_none_or, without suppression, then reran focused tests, Clippy and fmt."
+    }
+  ],
+  "log_directory": "genesis/a2o/reports/recovery/hostcompat-k8-round4/",
+  "story_harvest": {
+    "chain": "host-compatibility K8 -> K10",
+    "between": "ELF sections -> extracted Requires",
+    "missing_node": "Loader-visible bytes and metadata agree with sections before any code decode or floor claim.",
+    "probe": "544-byte decoy, past-EOF PT_LOAD, contradictory PT_DYNAMIC, 1000 aliased sections and malformed version chain refuse before recording.",
+    "current_state": "covered by round-4 native regressions",
+    "scenario": "@regression Given an ELF whose loader executes AVX2 while its section points to baseline decoy bytes; When Matthew puts the artifact; Then extraction refuses before any payload or event is recorded.",
+    "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regressions are executable today)",
+    "parameters": {
+      "evidence_bytes_max": 1048576,
+      "evidence_name_bytes_max": 256,
+      "alias_headers": 1000,
+      "decoy_elf_bytes": 544,
+      "oversized_evidence_sections": 20000
+    }
+  },
+  "repository_operations": "Direct installed Brit and epr used after launcher read-only failures. epr doctor coherent; shell invocation adapter explicitly unsupported/unmeasured. Brit diff --stat is unsupported; used literal-path diff instead. Native commit trailers measure gpt-6-astra and this Codex session. No push. Brit diff cannot accept directory arguments; protected-path equality was verified with enumerated literal files instead. Native actor claim registered; all Cargo calls were guarded, including gate-internal calls. All local required checks passed; no Cargo.lock or crates/elohim-host-contract changes. Brit path-scoped staging succeeded, but commit returned EXIT=1: refusing to ignore an untrusted core.hooksPath. Inspection confirmed HEAD remained 026b4c3265ef75f99784e5000fc1600a223cc93f and exactly the 13 intended paths were staged. Git fallback creates the authorized new local commit with hooks enabled; no amend, force or push. The Brit-first hook blocked the first fallback before execution because it required a leading Brit fallback comment (rather than Git fallback); corrected that invocation without bypassing hooks.",
+  "references": [
+    {
+      "title": "ELF gABI, Special Sections",
+      "url": "https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.sheader.html"
+    },
+    {
+      "title": "x86-64 psABI, Dynamic Linking / Procedure Linkage Table",
+      "url": "https://gitlab.com/x86-psABIs/x86-64-ABI"
+    },
+    {
+      "title": "Intel SDM Vol. 1, Control-flow Enforcement Technology (ENDBR32/64 legacy NOP semantics); Vol. 2 ENDBR64 instruction",
+      "url": "https://cdrdv2-public.intel.com/789574/253665-sdm-vol-1.pdf"
+    },
+    {
+      "title": "Intel SDM Vol. 2 sections 2.3 and 2.6; Vol. 1 chapter 14: VEX/EVEX and AVX state prerequisites"
+    },
+    {
+      "title": "AMD64 Architecture Programmer Manual Vol. 6: 128-bit and 256-bit media instructions, XOP/FMA4 exception conditions"
+    }
+  ],
+  "remaining": [
+    "K10 runtime-dispatch narrowing remains outside K8.",
+    "Uncovered section data islands and segment padding are explicitly reported, not claimed as decoded instructions."
+  ],
+  "round5": {
+    "review": "/projects/elohim/genesis/local-dev/one-image/astra-k8/review-r2.md",
+    "base": "b679507c4",
+    "findings": [
+      {
+        "id": "N1",
+        "severity": "P1",
+        "decision": "Refuse page-rounded virtual overlap between any PT_LOAD pair with at least one executable member, naming both program-header indices. Round each range by its p_align, or 4096 for 0/1. Overflow refuses. Sorted sweep avoids quadratic load-pair work.",
+        "test": "artifact_overlapping_rx_loads_refuse_before_stub_decode",
+        "coverage": "8960-byte overlapping RX replacement with AVX2 at entry; disjoint adjacent pages succeed; page-only overlaps refuse for RX/RX, RX/R and R/RX, with alignments 0, 1, 4096 and 8192."
+      },
+      {
+        "id": "N2",
+        "severity": "P2",
+        "decision": "Charge program-header and section note payload sizes to one file-sized budget before any note iterator runs; refuse exhaustion.",
+        "test": "artifact_thousand_aliased_program_notes_exhaust_shared_budget",
+        "coverage": "1000 PT_NOTE headers aliasing 10000 valid notes refuse with the shared-budget reason. One payload succeeds; adding a section alias refuses, proving both tables use the same budget."
+      }
+    ],
+    "measurement": [
+      {
+        "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
+        "bytes": 128590816,
+        "elapsed_ms": 5210.820687,
+        "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+        "requires_bytes_unchanged": true,
+        "requires_cid_unchanged": true,
+        "exit": 0
+      },
+      {
+        "path": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev/debug/epr",
+        "bytes": 136156696,
+        "elapsed_ms": 5224.701483,
+        "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+        "requires_bytes_unchanged": true,
+        "requires_cid_unchanged": true,
+        "exit": 0
+      }
+    ],
+    "checks": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 0,
+        "log": "artifact-host.log",
+        "passed": 121
+      },
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli",
+        "exit": 0,
+        "passed": 1463,
+        "log": "full.log"
+      },
+      {
+        "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+        "exit": 0,
+        "log": "clippy.log"
+      },
+      {
+        "command": "cargo fmt -p elohim-epr-cli -- --check",
+        "exit": 0,
+        "log": "fmt.log"
+      },
+      {
+        "command": "epr check",
+        "exit": 0,
+        "log": "epr-check.log"
+      },
+      {
+        "command": "just gate rust-style",
+        "exit": 0,
+        "log": "rust-style.log",
+        "debt": "epr-cli 0 -> 0; no suppressions added"
+      }
+    ],
+    "validation_history": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 101,
+        "log": "artifact.log",
+        "reason": "Fixed new fixture string-length typo; existing sysroot ownership fixture requires host access (chown EINVAL in sandbox). Host rerun passes."
+      }
+    ],
+    "log_directory": "genesis/a2o/reports/recovery/hostcompat-k8-round5/",
+    "story_harvest": {
+      "chain": "host-compatibility K8 -> K10",
+      "between": "loader mappings / note metadata -> extracted Requires",
+      "missing_node": "Executable virtual pages have one load mapping; total note visits are bounded by file size across both tables.",
+      "probe": "The two round-5 regressions above.",
+      "current_state": "green by focused native regressions",
+      "scenario": "@regression Given two loads sharing an executable page or 1000 headers aliasing 10000 notes; When Matthew puts the artifact; Then extraction refuses before recording.",
+      "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regressions execute now)"
+    },
+    "repository_operations": "Installed launchers refused read-only filesystem access; direct installed Brit/epr binaries used for initial inspection. epr doctor coherent; Codex shell invocation adapter unsupported/unmeasured. All Cargo commands serialized with the requested process guard. no Cargo.lock or host_contract edits; no push. Native commit trailers measured gpt-6-astra and Codex session 01a1cc50-bb54-7a62-bd5e-af9c54d23e82; native envelope opened and implementer claim registered. Brit path-scoped staging succeeded; commit refused untrusted core.hooksPath with EXIT=1. Inspection confirmed HEAD still b679507c4 and exactly the six intended paths staged. The authorized new local commit uses Git fallback with hooks enabled; no amend, force or push."
+  }
+}

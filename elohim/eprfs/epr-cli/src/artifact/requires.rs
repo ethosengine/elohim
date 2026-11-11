@@ -1,4 +1,4 @@
-//! Canonical Requires bytes. Semantics/admission belong to host_contract, not put.
+//! Canonical local documents and caller declarations merged through host_contract.
 use std::path::Path;
 
 use eprfs_core::BlobCid;
@@ -7,7 +7,8 @@ use eprfs_peer::Bytes;
 use super::{ArtifactError, ArtifactResult};
 
 /// Sorted object keys, compact UTF-8, unchanged arrays and only plain-decimal u64 numbers.
-/// Absence means no claim, not "requires nothing". The document remains local in part 1.
+/// Used for caller input and the unchanged optional sysroot document; executable put always
+/// adds extracted clauses. Both documents remain local.
 pub(super) fn read_requires(path: &Path) -> ArtifactResult<(BlobCid, Bytes)> {
     let input = std::fs::read(path)?;
     check_numbers(&input)?;
@@ -20,6 +21,100 @@ pub(super) fn read_requires(path: &Path) -> ArtifactResult<(BlobCid, Bytes)> {
     value.sort_all_objects();
     let bytes = Bytes::from(serde_json::to_vec(&value)?);
     Ok((BlobCid::compute_bytes(&bytes), bytes))
+}
+
+type Document = (BlobCid, Bytes);
+
+pub(super) fn canonical(value: &impl serde::Serialize) -> ArtifactResult<Document> {
+    let mut value = serde_json::to_value(value)?;
+    value.sort_all_objects();
+    let bytes = Bytes::from(serde_json::to_vec(&value)?);
+    Ok((BlobCid::compute_bytes(&bytes), bytes))
+}
+
+pub(super) fn documents(
+    bytes: &[u8],
+    output: &Path,
+    caller: Option<&Path>,
+    archive: bool,
+) -> ArtifactResult<(Option<Document>, Option<Document>)> {
+    if archive {
+        return Ok((caller.map(read_requires).transpose()?, None));
+    }
+    let mut extraction = super::extract::extract(output, bytes)?;
+    if let Some(path) = caller {
+        merge_declared(&mut extraction.requires, path)?;
+    }
+    Ok((
+        Some(canonical(&extraction.requires)?),
+        Some(canonical(&extraction.evidence)?),
+    ))
+}
+
+fn merge_declared(requires: &mut host_contract::Requires, path: &Path) -> ArtifactResult<()> {
+    use host_contract::{Clause, ClauseSource, MergeError, Predicate};
+    let (_, bytes) = read_requires(path)?; // Retain the lexical number check before serde.
+    let mut values: serde_json::Value = serde_json::from_slice(&bytes)?;
+    for value in values.as_array_mut().expect("read_requires checked array") {
+        let object = value
+            .as_object_mut()
+            .ok_or_else(|| super::unrecorded("--requires clauses must be objects"))?;
+        object.insert("source".into(), serde_json::json!("declared"));
+        if object
+            .get("narrowing")
+            .is_some_and(|value| !value.is_null())
+        {
+            return Err(super::unrecorded(
+                "--requires cannot supply dispatch narrowing (K10)",
+            ));
+        }
+    }
+    let clauses: Vec<Clause> = serde_json::from_value(values)?;
+    for mut clause in clauses {
+        clause.source = ClauseSource::Declared;
+        clause.narrowing = None;
+        // insert supplies the canonical conjunction and typed conflicts. An additional guard
+        // rejects attempts to weaken an existing axis, including partially overlapping sets.
+        let existing = requires
+            .clauses()
+            .find(|c| c.axis() == &clause.axis)
+            .map(|c| c.predicate().clone());
+        if let Some(existing) = existing {
+            let covers = match (&existing, &clause.predicate) {
+                (Predicate::Subset(a), Predicate::Subset(b))
+                | (Predicate::Present(a), Predicate::Present(b)) => a.is_subset(b),
+                (Predicate::AtLeast(a), Predicate::AtLeast(b)) if a.line == b.line => {
+                    let length = a.components.len().max(b.components.len());
+                    b.components
+                        .iter()
+                        .copied()
+                        .chain(std::iter::repeat(0))
+                        .take(length)
+                        .cmp(
+                            a.components
+                                .iter()
+                                .copied()
+                                .chain(std::iter::repeat(0))
+                                .take(length),
+                        )
+                        .is_ge()
+                }
+                (a, b) => a == b,
+            };
+            if !covers {
+                let error = MergeError {
+                    axis: clause.axis,
+                    existing: Box::new(existing),
+                    incoming: Box::new(clause.predicate),
+                };
+                return Err(super::unrecorded(format!("--requires {}: MergeError: {error}; declaration must not weaken extracted requirements", path.display())));
+            }
+        }
+        requires
+            .insert(clause)
+            .map_err(|e| super::unrecorded(format!("MergeError: {e}")))?;
+    }
+    Ok(())
 }
 
 /// Tracks JSON Pointer components while scanning original tokens. This is only a lexical
