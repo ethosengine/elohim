@@ -1252,6 +1252,19 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
             descriptor.step
         )));
     }
+    // A declared target is recorded and keyed, but nothing yet applies it to the compiler: the
+    // bytes would be the host default's build under a variant's key. Until the declared target is
+    // realized by the build itself (plan K6: pinned sysroot and the flags it implies), refuse.
+    if let Some(name) = descriptor
+        .non_path_inputs
+        .keys()
+        .find(|name| name.starts_with("target."))
+    {
+        return Err(unrecorded(format!(
+            "the method declares {name}, and no build applies a declared target yet (K6); \
+             these bytes would be recorded under a variant key they were not built for"
+        )));
+    }
     // The environment recording runs in must be the one the method records (the mesh build runs
     // cargo in exactly it), and the closure must be the one the build started from.
     check_build_env(&descriptor).map_err(unrecorded)?;

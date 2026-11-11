@@ -1088,6 +1088,45 @@ fn artifact_put_checks_elf_linker_before_recording() {
     }
 }
 
+#[test]
+fn artifact_put_refuses_a_declared_target_no_build_applies_yet() {
+    let keys = TempDir::new().unwrap();
+    let device = Device::new(&keys, "declared-target");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
+    descriptor
+        .non_path_inputs
+        .insert("target.isa".into(), "x86-64-v3".into());
+    std::fs::write(&method, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let (stub, log) = brit_stub(scratch.path());
+    let bytes = scratch.path().join("binary");
+    std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
+    let out = device
+        .command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .args([
+            "artifact",
+            "put",
+            "--method",
+            method.to_str().unwrap(),
+            "--input",
+            "bafkreiaaaa",
+            "--bytes",
+            bytes.to_str().unwrap(),
+            "--project",
+            "elohim-storage",
+            "--repo",
+            device.root().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("target.isa"), "{}", text(&out));
+    assert!(text(&out).contains("K6"), "{}", text(&out));
+    assert!(!log.exists(), "refused before any brit call");
+    assert!(events(device.root()).is_empty());
+}
+
 fn fixture_driver(dir: &Path, name: &str, version: &str, macros: &str, input: &Path) {
     fake_tool(dir, name, &format!(
         "case \"$1\" in\n--version) echo '{version}' ;;\n-E) test \"$*\" = '-E -dM -x c -' || exit 1; read ignored && exit 1; printf '%s\\n' '{macros}' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\n*) exit 1 ;;\nesac", input.display()
