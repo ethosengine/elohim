@@ -11,7 +11,10 @@
       "description": "Verify owning native contract boundary",
       "inputs": {
         "sources": [
-          "crates/elohim-host-contract/**"
+          "crates/elohim-host-contract/**",
+          "crates/elohim-address/**",
+          "elohim/epr/**",
+          "elohim/Cargo.toml"
         ],
         "buildProcess": []
       },
@@ -32,7 +35,10 @@
         "dir": "crates/elohim-host-contract",
         "inputs": {
           "sources": [
-            "crates/elohim-host-contract/**"
+            "crates/elohim-host-contract/**",
+            "crates/elohim-address/**",
+            "elohim/epr/**",
+            "elohim/Cargo.toml"
           ],
           "buildProcess": []
         },
