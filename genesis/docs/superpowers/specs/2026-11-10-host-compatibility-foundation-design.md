@@ -423,10 +423,19 @@ nobody has seen: it works on day one, and what they contribute later carries oth
 contribution as an attributed event, not anonymous lineage. The **governance** is the conformance
 suite, the immune loop's rules (§7.4) and reach widening by proof.
 
-What the artifact store does not own: custody targets, holder independence and collection health
-belong to elohim-storage's blob plane. The gaps found while writing this section went to its own
-backlog (`arch-dataplane-refactor-backlog` row 23), so every consumer of the blob plane inherits the
-fix. Missing nodes:
+elohim-storage and the artifact store are mutual, not separate. The artifact store's bytes live in
+storage's blob plane, and storage's own binaries move through the artifact store (the F2r receipt
+is elohim-storage moving through it). Each one's needs shape the other's primitives. Code
+ownership decides who implements a piece; the concern is shared. Custody targets, holder
+independence and collection health are implemented in the blob plane, so the gaps found while
+writing this section went to storage as its own work (`arch-dataplane-refactor-backlog` row 23),
+and every consumer of the blob plane, the artifact store included, inherits the fix.
+
+The seam between them is kept for our own discipline and mastery: knowing what each part is for,
+so we can master it ("know thyself"). It is not a wall between strangers. It is also an act of
+empathy: knowing and loving ourselves well is what lets us fully know and love others, and the
+clarity built at our own seams is what we can then offer the peers, protocols and systems beyond
+us. The question it asks is "inside or beyond the protocol", not "whose problem". Missing nodes:
 
 - `collective / between "variant contributed with lineage" → "contributor credited when others rely on it" / missing node: the contribution recorded as a Commitment naming the collective, with REA events on use / current state: lineage is recorded; nothing credits it; the commons-pool slice it would use is held`.
 - `collective / between "family published" → "family healthy" / missing node: a collection-health fold over the family's leaves reading per-object custody targets / current state: owed by elohim-storage (backlog row above)`.
