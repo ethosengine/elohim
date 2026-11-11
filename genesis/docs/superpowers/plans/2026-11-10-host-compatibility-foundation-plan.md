@@ -73,15 +73,15 @@ code item. Lane X is named and not scheduled.
 
 Chain: these stories are the specification each later lane is accepted against.
 
-- [ ] **S1 — refine the four harvest stations (backlog 2026-10-22, spec rung H5) into `compute/measure-on-a-peer.feature`, `compute/peer-executed-stage.feature` and `compute/ci-runner-stewarded.feature`; the on-target station carries `@requires:owned-substrate`** (serves measure-runs-on-a-peer)
+- [x] **S1 — refine the four harvest stations (backlog 2026-10-22, spec rung H5) into `compute/measure-on-a-peer.feature`, `compute/peer-executed-stage.feature` and `compute/ci-runner-stewarded.feature`; the on-target station carries `@requires:owned-substrate`** (serves measure-runs-on-a-peer)
 
 Verify: each scenario carries `@concern:measure-runs-on-a-peer`; one fresh blind reader returns READY with no correctness finding; round counts recorded.
 
-- [ ] **S2 — variant selection and typed refusal in `devflow/device-declared-target.feature` and `devflow/sibling-fetches-the-build.feature`: a v2 device refuses a v3 variant before launch naming the unmet axis, and takes the v2 variant of the same pin** (serves sprint-lands-each-closure-once)
+- [x] **S2 — variant selection and typed refusal in `devflow/device-declared-target.feature` and `devflow/sibling-fetches-the-build.feature`: a v2 device refuses a v3 variant before launch naming the unmet axis, and takes the v2 variant of the same pin** (serves sprint-lands-each-closure-once)
 
 Verify: as S1, with `@concern:sprint-lands-each-closure-once` and `@concern:dataplane-convergence` where the scenario already carries it.
 
-- [ ] **S3 — a `@wip` story for a device the network has not seen: it runs the portable tier from a seed, builds its own variant, and a later device of its class resolves that variant directly (spec §7.5)** (serves workspace-device-arrival)
+- [x] **S3 — a `@wip` story for a device the network has not seen: it runs the portable tier from a seed, builds its own variant, and a later device of its class resolves that variant directly (spec §7.5)** (serves workspace-device-arrival)
 
 Verify: as S1, with `@concern:workspace-device-arrival`.
 
@@ -89,7 +89,7 @@ Verify: as S1, with `@concern:workspace-device-arrival`.
 
 Chain: S2 → spec §3.3 refusals → the contract crate → vector tests.
 
-- [ ] **A1 — a small pure crate under `crates/` holding the axis vocabulary, bundles, `Requires`, `Provides` and `admit`, returning `elohim_epr::verdict::Verdict`; registered in its `seam-registry.yaml`; vectors include requirements extracted from binaries built on the other device** (serves sprint-lands-each-closure-once)
+- [x] **A1 — a small pure crate under `crates/` holding the axis vocabulary, bundles, `Requires`, `Provides` and `admit`, returning `elohim_epr::verdict::Verdict`; registered in its `seam-registry.yaml`; vectors include requirements extracted from binaries built on the other device** (serves sprint-lands-each-closure-once)
 
 Verify: the crate's vector tests pass (v2 on v3 admitted, v3 on v2 refused, glibc floor both ways, unknown axis refused); `just gate rust-style` clean for the crate; the report states whether an unknown axis is a `Refuse` or a `Refer` and why.
 

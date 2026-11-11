@@ -1057,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-10-26 (RED, measured after a restart): shem's workspace restarted at 22:19:51Z on 2026-10-25 and did not re-arrive. At 02:25Z on 2026-10-26, `just status device` exits 1 with REFUSED epr binary and REFUSED brit binary (temporary links stand in front of a launcher that was never installed). `epr device arrive` refuses `pass --launcher PATH`, because `bin-launch` only ever lived in /tmp/eprfs-gate-target. Recovery took six manual steps, and the peer daemon was down for 2 h 14 min. The cure the REFUSED line names cannot run without a build. Plan: genesis/docs/superpowers/sprints/2026-10-26-restart-to-connected-sprint-plan.md (R1–R5); the R5 restart-to-connected receipt returns it to green.
-    evidence-fingerprint: sha256:a185145523c1b8bb
-    evidence-bytes: 10923
-    evidence-entries: 13
+      DELTA 2026-11-11 (RED preserved): S3 adds the @wip `devflow/unseen-device-builds-its-variant.feature` (spec §7.5): a device of an unseen class participates through the seed's portable tier, builds and proves its own variant, and a later device of its class resolves it. Its correctness finding (an unobservable audience) is fixed. Measured on shem: it is a v2-only host (no avx2/bmi2/movbe/lzcnt/fma), so an arriving shem must refuse a v3 epr before adoption; A2/A3 and V5 carry that.
+    evidence-fingerprint: sha256:c7a99e2d5454b035
+    evidence-bytes: 11410
+    evidence-entries: 14
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
@@ -2375,10 +2375,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-11-01 (status stays RED; Jenkins observation): Genesis #1719 archived 26 passed, 426 skipped, 37 undefined and 5 pending API scenarios, with no peer-stage report; Edge #1776 refused activation because the persisted checkout failed Git HEAD validation. The Cucumber reader now includes failing hooks and refuses empty/unknown results as passes (35 reader/aggregate checks passed); separate lane summaries explicitly label absent reports unmeasured. A read-only validate-only worker observation and bounded image/persisted Git metadata probes pass 31 pipeline-contract and 40 activation-capture checks. No live worker activation, native task admission or off-host BDD pass is claimed.
-    evidence-fingerprint: sha256:8bdd8f01cf8422d4
-    evidence-bytes: 13406
-    evidence-entries: 15
+      DELTA 2026-11-11 (RED preserved): S1 refines the harvest's four stations into `compute/measure-on-a-peer.feature`, `peer-executed-stage.feature` and `ci-runner-stewarded.feature`; the provider selects a variant it can run or refuses before launch, and missing compatibility evidence never becomes permission to launch. One fresh blind read per file under the steward-granted floor; the one correctness finding (a grant assertion after the submission) is fixed. Steps are unbound (@wip); P1-P2 wire them.
+    evidence-fingerprint: sha256:e2c2cb693e4ff66c
+    evidence-bytes: 13911
+    evidence-entries: 16
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks
@@ -2644,10 +2644,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-10 (RED preserved, inactive; F2r cause refined, levelling withdrawn): the key split is confirmed as ld alone. Under the key's own rule (env -i, fixed PATH, LANG=C, CID of the full --version), cc agrees (/usr/bin/gcc 36697f6ba6bcc4e4 on both) and ld differs (/usr/bin/ld.bfd: ethosengine 133c5a276a129a6d, shem 2b04d7be6c01cb4f). Yet ld is not in the link: rust-lld links both (.comment 'Linker: LLD 22.1.2'). The input that really differs, glibc-devel's crt1.o/Scrt1.o (2.39-145.el10_2 vs 2.39-128.el10_2.alma.1), is not keyed at all. So today's key keys a tool the build does not use and misses the link inputs it does; K1 keys the effective linker (rustc -vV) and the link inputs by CID. The 2026-11-09 line's 'until the workspace images match' is withdrawn: the operator ruled against levelling devices onto one image (a916ddcfa reverted by b929983ca). The route is spec/host-compatibility-foundation 6cadf5657 (declared target: pinned sysroot + C flags in the method; variant sets), with rulings H1-H7 open and ethosengine's review findings F1-F6 sent to its author.
-    evidence-fingerprint: sha256:0d080419fbaba12a
-    evidence-bytes: 4795
-    evidence-entries: 5
+      DELTA 2026-11-11 (RED preserved; host-compatibility wave 1 on shem): the contract a fetch must admit against now exists. `crates/elohim-host-contract` (A1) holds `Requires`, a non-serializable `Provides` and `admit` returning the epr `Verdict`; 21 vectors pass, including v3 on v2 refused naming the missing features, and `just gate host-contract` is green on rustc 1.96.1. S2 states the v2 device's pre-launch refusal and the divergence-as-evidence fetch in `devflow/sibling-fetches-the-build.feature` and `device-declared-target.feature` (@wip until bound). Also measured: shem compiles C at -march=x86-64-v2, and ethosengine at v3, so an epr cc-built on ethosengine carries BMI2/MOVBE in sqlite3 and ring and cannot run here; the key cannot see that (lane K, ethosengine). Nothing in the invariant is kept yet: K1-K7 own the receipt.
+    evidence-fingerprint: sha256:5c1cf721fbd5ad17
+    evidence-bytes: 5633
+    evidence-entries: 6
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
