@@ -89,14 +89,15 @@ pub fn usage() -> String {
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
-     [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
+     [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
-     crosses with --cross; exits 3 `unrecorded: <reason>`)\n  \
+     crosses with --cross; absent --requires makes no compatibility claim; \
+     exits 3 `unrecorded: <reason>`)\n  \
      | fetch --method FILE --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
      [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
      serve; exits 3 `fetch gap: <kind>: <reason>`)\n  \
-     | holders (--key CID | --output CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
+     | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
         .to_string()
 }
 
@@ -153,6 +154,7 @@ struct Options {
     target: Vec<(String, String)>,
     out: Option<PathBuf>,
     method: Option<PathBuf>,
+    requires: Option<PathBuf>,
     print: Option<String>,
     input: Option<String>,
     bytes: Option<PathBuf>,
@@ -167,6 +169,7 @@ struct Options {
     total: Option<u64>,
     expect_output: Option<BlobCid>,
     key: Option<BlobCid>,
+    family: Option<BlobCid>,
     output: Option<BlobCid>,
     min: Option<u64>,
     json: bool,
@@ -217,6 +220,7 @@ impl Options {
                 }
                 "--out" => options.out = Some(PathBuf::from(value)),
                 "--method" => options.method = Some(PathBuf::from(value)),
+                "--requires" => options.requires = Some(PathBuf::from(value)),
                 "--print" => options.print = Some(value),
                 "--input" => options.input = Some(value),
                 "--bytes" => options.bytes = Some(PathBuf::from(value)),
@@ -227,6 +231,7 @@ impl Options {
                 "--handle" => options.handle = Some(value),
                 "--expect-output" => options.expect_output = Some(custody::parse_cid(&value)?),
                 "--key" => options.key = Some(custody::parse_cid(&value)?),
+                "--family" => options.family = Some(custody::parse_cid(&value)?),
                 "--output" => options.output = Some(custody::parse_cid(&value)?),
                 "--min" => options.min = Some(seconds(&value)?),
                 "--transport" => {
@@ -1249,6 +1254,8 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
 }
 
 fn put(options: &Options) -> ArtifactResult<ExitCode> {
+    // Shape only: host_contract will decode and merge clauses at the consumer in K3 part 2.
+    let requires = options.requires.as_deref().map(read_requires).transpose()?;
     let project = Options::required(&options.project, "--project")?;
     let input = Options::required(&options.input, "--input")?;
     let bytes_path = options.bytes.as_ref().ok_or_else(|| {
@@ -1379,10 +1386,11 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         }),
     };
     let byte_len = bytes.len() as u64;
-    let extra = vec![
+    let mut extra = vec![
         BASIS_KEY_SLOT.to_string(),
         format!("env:project={project}"),
         format!("env:method={}", key.method),
+        format!("env:family={}", effective.family_cid().map_err(unrecorded)?),
         format!("env:input={}", key.input),
         format!("env:key={}", key.key_cid),
         format!("env:output={output}"),
@@ -1390,10 +1398,19 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         format!("env:commit={}", key.head),
         format!("env:agentId={agent_id}"),
     ];
+    if let Some((cid, _)) = &requires {
+        extra.push(format!("env:requires={cid}"));
+    }
     let put = runtime.block_on(async {
         put_method_record(store.as_ref(), &effective)
             .await
             .map_err(|e| unrecorded(format!("the method record is not stored: {e}")))?;
+        if let Some((cid, bytes)) = requires {
+            store
+                .put_blob_verified(&cid, bytes)
+                .await
+                .map_err(|e| unrecorded(format!("the Requires document is not stored: {e}")))?;
+        }
         let mut flow = SidecarFlowStore::open(&flow_root)
             .map_err(|e| unrecorded(format!("the flow store does not open: {e}")))?;
         put_local_blob_with(store.as_ref(), &mut flow, record, bytes, &context, extra)
@@ -1425,6 +1442,21 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         );
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Opaque JSON with sorted object keys, compact UTF-8 encoding and unchanged array order.
+/// Absence of this document means nothing is claimed, not "requires nothing". Even a supplied
+/// array is only a claim: semantic validation and admission belong to host_contract, not put.
+fn read_requires(path: &Path) -> ArtifactResult<(BlobCid, Bytes)> {
+    let mut value: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
+    if !value.is_array() {
+        return Err(ArtifactError::InvalidArguments(
+            "--requires must contain a JSON array".into(),
+        ));
+    }
+    value.sort_all_objects();
+    let bytes = Bytes::from(serde_json::to_vec(&value)?);
+    Ok((BlobCid::compute_bytes(&bytes), bytes))
 }
 
 // ---------------------------------------------------------------------------

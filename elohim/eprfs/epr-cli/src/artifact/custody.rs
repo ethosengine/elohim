@@ -7,7 +7,7 @@ use elohim_epr_rea::{
     AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
 };
 use eprfs_core::BlobCid;
-use eprfs_peer::{fold_holders, HolderSelection, SiblingRecord};
+use eprfs_peer::{family_variants, fold_holders, HolderSelection, SiblingRecord};
 
 use super::{ArtifactError, ArtifactResult, Options};
 use crate::peer::{self, SiblingArtifacts};
@@ -23,6 +23,14 @@ pub(super) fn records(found: &SiblingArtifacts) -> Vec<SiblingRecord> {
         .filter_map(|row| {
             Some(SiblingRecord {
                 key: BlobCid::parse(&row.key).ok()?,
+                family: row
+                    .family
+                    .as_deref()
+                    .and_then(|cid| BlobCid::parse(cid).ok()),
+                requires: row
+                    .requires
+                    .as_deref()
+                    .and_then(|cid| BlobCid::parse(cid).ok()),
                 device: row.device.clone(),
                 output: BlobCid::parse(&row.output).ok()?,
                 manifest: BlobCid::parse(&row.manifest).ok()?,
@@ -32,13 +40,71 @@ pub(super) fn records(found: &SiblingArtifacts) -> Vec<SiblingRecord> {
 }
 
 pub(super) fn holders(options: &Options) -> ArtifactResult<ExitCode> {
-    if options.key.is_some() == options.output.is_some() {
+    if [
+        options.key.is_some(),
+        options.output.is_some(),
+        options.family.is_some(),
+    ]
+    .into_iter()
+    .filter(|present| *present)
+    .count()
+        != 1
+    {
         return Err(ArtifactError::InvalidArguments(
-            "holders needs exactly one of --key or --output".into(),
+            "holders needs exactly one of --key, --output or --family".into(),
         ));
     }
     let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())?;
     let records = records(&found);
+    if let Some(family) = &options.family {
+        let variants: Vec<_> = family_variants(&records, family)
+            .into_iter()
+            .map(|variant| {
+                let holders: Vec<_> = variant
+                    .holders
+                    .iter()
+                    .map(|row| {
+                        serde_json::json!({"device": row.device, "output": row.output,
+                    "requires": row.requires, "self": row.device == found.device})
+                    })
+                    .collect();
+                if !options.json {
+                    println!(
+                        "key {} requires {}",
+                        variant.key,
+                        variant
+                            .requires
+                            .as_ref()
+                            .map_or_else(|| "unclaimed or conflicting".into(), ToString::to_string)
+                    );
+                    for row in &variant.holders {
+                        let marker = if row.device == found.device {
+                            " self"
+                        } else {
+                            ""
+                        };
+                        println!(
+                            "  {} {} requires {}{marker}",
+                            row.device,
+                            row.output,
+                            row.requires
+                                .as_ref()
+                                .map_or_else(|| "unclaimed".into(), ToString::to_string)
+                        );
+                    }
+                }
+                serde_json::json!({"key": variant.key, "outputs": variant.outputs,
+                "requires": variant.requires, "holders": holders})
+            })
+            .collect();
+        if options.json {
+            println!(
+                "{}",
+                serde_json::json!({"family": family, "variants": variants})
+            );
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
     let mut outputs: BTreeMap<BlobCid, BTreeSet<String>> = BTreeMap::new();
     // An output with no recorded holders still has a meaningful zero-custody warning.
     if let Some(output) = &options.output {

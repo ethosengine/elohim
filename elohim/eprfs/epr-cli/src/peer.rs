@@ -1419,6 +1419,10 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
 pub struct SiblingArtifact {
     #[serde(skip_serializing)]
     pub key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires: Option<String>,
     pub device: String,
     pub output: String,
     pub manifest: String,
@@ -1469,6 +1473,8 @@ fn artifact_from_event(
     let manifest = one_slot(event, "manifest:")?;
     Some(SiblingArtifact {
         key: key.to_string(),
+        family: one_slot(event, "env:family=").map(str::to_string),
+        requires: one_slot(event, "env:requires=").map(str::to_string),
         device: device.to_string(),
         output: output.to_string(),
         manifest: manifest.to_string(),
