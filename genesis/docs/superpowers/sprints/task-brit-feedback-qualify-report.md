@@ -2,11 +2,11 @@
 id: task-brit-feedback-qualify-report-20261111
 gap: plans__2026-11-11-brit-feedback-operation#4
 actor: agent:orchestrator@gpt-6-astra
-status: HOLD
-commits: []
+status: DONE
+commits: [7ba27c3f497b382e72431d75a294339ac16bf54c, 11f3045be7c9443f39f95418e313ff5e31be48e5]
 ---
 
-# Native feedback qualification implemented; combined gate pending
+# Native feedback qualification implementation verified
 
 `epr feedback qualify --brit PATH --root ROOT --json` now exercises the invoked recorder and explicit producer in a disposable store. It applies the resolved contextual policy snapshot, checks both outcomes and the Brit producer identity, reopening, private argument exclusion, exact native Intent scope, no admission or recovery, and recorder failure preserving producer exits. `--recorder-only` performs the recorder half and explicitly reports `pairQualified: false`.
 
@@ -29,7 +29,11 @@ Evidence is in `genesis/a2o/reports/recovery/brit-feedback-20261111/`.
 
 Native tests used `RUSTFLAGS=`, `RUSTUP_TOOLCHAIN=1.96.1`, `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__eprfs/dev`, and one build/test thread under the retained orchestrator cargo berth.
 
-Gate-evidence: **`just gate eprfs` and `just gate genesis-a2o` remain pending the integrator's frozen combined source.** This report therefore holds the station open and records no terminal fulfilment. The root integrator owns publication, installed replay, appointed acceptance and the terminal native act.
+Gate-evidence: **`just gate eprfs` passed, EXIT=0**, at integrated source `7ba27c3f497b382e72431d75a294339ac16bf54c`: 2,292 Rust tests across 147 suites, zero failures or ignored tests, plus the invoked Python fixtures (`delivery-eprfs-boundary-retry.log`). The preceding full run exposed a dependency-boundary walker that treated the new source directory as a file; the recursive production-source check preserves its assertions and test-file exclusion. The interrupted package-only rebuild is not passing evidence. **`just gate genesis-a2o` and `just gate gherkin-prepush-lint` also passed, EXIT=0**, in `final-a2o-gate.log` and `final-gherkin-gate.log`.
+
+The qualifier implementation is unchanged at `11f3045be7c9443f39f95418e313ff5e31be48e5`. The integrated candidate pair returned `outcome: passed`, `fixtureOnly: true`, `pairQualified: true`, `admitted: false`, and `recorderFailurePreservesExit: true` (`integrated-candidate-pair-qualification.json`). This establishes technical implementation closure, not installed delivery. The root integrator owns fulfilment, publication, installed replay and appointed acceptance; stations 3 and 5 remain separate.
+
+Independent technical review found no remaining actionable issue. The missing-policy finding was corrected: fresh arrival records an explicit unmeasured witness; an established qualification cannot be silently removed by deleting policy. Promotion snapshots the counterpart and policy and revalidates under ordered store locks. Recorder-only arrival never claims pair qualification. Named technical review does not establish authenticated independence or appointed acceptance.
 
 ## Changed surfaces
 
@@ -37,5 +41,6 @@ Gate-evidence: **`just gate eprfs` and `just gate genesis-a2o` remain pending th
 - `elohim/eprfs/epr-cli/src/flow/memory/recall/{mod,providers}.rs` for shared bounded execution.
 - The qualifier verdict entry in `elohim/eprfs/epr-cli/seam-registry.yaml`; the source reconciliation entry belongs to the other implementation task.
 - `genesis/a2o/scripts/verify-brit-feedback.ts` and its existing test file.
+- Root-owned `elohim/eprfs/device-runtime/src/bin_store/feedback_health.rs`, its tests, landing integration, and `src/bin/bin-launch.rs` with launcher tests.
 
-The task did not commit, promote releases, alter actor claims, or write to the real feedback store. Root-owned landing and launcher changes are verified separately after their final source freeze.
+The implementation delegate did not commit, promote releases, alter actor claims, or write to the real feedback store. Root integrated the source commits above. This report records candidate and gate evidence only; it grants no installed-delivery or experienced-recovery claim.
