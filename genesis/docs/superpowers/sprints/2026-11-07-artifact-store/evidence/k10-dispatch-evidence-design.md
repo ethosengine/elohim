@@ -1,5 +1,6 @@
 ---
 title: "K10 design note: dispatch evidence bound to the complete executable"
+id: k10-dispatch-evidence-design
 written: "2026-11-11"
 author: "gpt-6-astra (Codex), read-only design pass dispatched by claude-opus-5-5"
 status: "design input; not a ruling"
