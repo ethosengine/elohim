@@ -1,0 +1,80 @@
+# Schema: elohim/sdk/schemas/v1/manifest/seam-registry.schema.json
+seamRegistryVersion: 1
+crate: elohim-host-contract
+crateRoot: crates/elohim-host-contract
+seamLocus: Pure host compatibility comparison over artifact requirements and device-local observations.
+decisionPoints:
+  - name: admit
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/admission.rs
+      modulePath: host_contract::admit
+    summary: Conjoin all required axes and return the EPR verdict spine with one witness per effective clause.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Compatibility only; Requires is an artifact attribute and Provides is ephemeral local observation, with no heads or projections.
+      - id: C1
+        status: n-a
+        justification: No candidate election, author selection, or custody claim; identical inputs produce identical results irrespective of author.
+      - id: C2
+        status: n-a
+        justification: No authority or canonical head is acquired or moved by this pure predicate.
+      - id: C3
+        status: partial
+        justification: Evaluation terminates over finite inputs; selecting or building another variant after refusal belongs to consumers and is not wired here.
+      - id: C4
+        status: answered
+        justification: Unknown-axis, unobserved and unmet are distinct typed failures; an absent clause imposes no constraint.
+      - id: C5
+        status: partial
+        justification: Original clause sources survive merging and no proof is fabricated; observers and reach-specific proof validation are consumer responsibilities.
+      - id: C6a
+        status: partial
+        justification: One pass over effective clauses with ordered-set comparisons and no retries; callers must bound input bytes, axes, evidence and feature counts before decoding.
+      - id: C6b
+        status: answered
+        justification: Repeated evaluation returns identical witnesses and has no mutation or external effects; repeated merges retain set semantics.
+      - id: C7
+        status: partial
+        justification: No variant is advertised or served here; the serving consumer must verify custody of offered bytes.
+      - id: C8
+        status: partial
+        justification: Each clause has a witness and failures have typed stable labels; counters belong to consumers because this function has no I/O.
+      - id: C9
+        status: n-a
+        justification: No agent keys, rotations or agent-scoped records are represented.
+      - id: C10
+        status: answered
+        justification: Unknown axes refuse by spec rule 3; unknown predicate kinds and fields reject decoding, and bundle changes change their CID.
+      - id: C11
+        status: partial
+        justification: No traffic, queue or scheduling occurs here; network-facing consumers must enforce request budgets before allocating inputs.
+      - id: C12
+        status: partial
+        justification: Compatibility grants no consent, execution authority or reach; consumers must enforce those gates separately and keep host-bearing diagnostics local.
+      - id: C13
+        status: n-a
+        justification: This mechanical predicate has no graduated authority; proof sufficiency at broader reach belongs to the existing reach ladder.
+      - id: C14
+        status: partial
+        justification: No launch or death occurs here; ark must witness counter-evidence and withdraw compatibility claims in a later leg.
+    contractTests:
+      - path: crates/elohim-host-contract/tests/vectors.rs
+        testName: every_json_vector
+        kind: unit
+      - path: crates/elohim-host-contract/tests/contracts.rs
+        testName: incompatible_merges_are_atomic_and_cannot_enter_through_serde
+        kind: unit
+      - path: crates/elohim-host-contract/tests/contracts.rs
+        testName: merging_preserves_sources_and_disagreements_through_later_evidence
+        kind: unit
+      - path: crates/elohim-host-contract/tests/contracts.rs
+        testName: observations_replace_stale_values_and_only_check_required_axes
+        kind: unit
+      - path: crates/elohim-host-contract/tests/contracts.rs
+        testName: bundle_identity_is_canonical_and_changes_with_every_document_field
+        kind: unit
+      - path: crates/elohim-host-contract/tests/contracts.rs
+        testName: unknown_predicate_kinds_and_fields_are_rejected
+        kind: unit

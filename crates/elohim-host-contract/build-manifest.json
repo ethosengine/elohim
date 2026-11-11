@@ -1,0 +1,58 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "host-contract",
+  "manualOnly": true,
+  "triggersGenesis": false,
+  "cascades": false,
+  "dependsOn": [],
+  "description": "Pure host compatibility contract and H0 conformance vectors; no deployment claim",
+  "steps": {
+    "gate-contract": {
+      "description": "Verify owning native contract boundary",
+      "inputs": {
+        "sources": [
+          "crates/elohim-host-contract/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Contract Gate",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "host-contract": {
+        "dir": "crates/elohim-host-contract",
+        "inputs": {
+          "sources": [
+            "crates/elohim-host-contract/**"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "crates/elohim-host-contract",
+            "profile": "dev",
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
+          }
+        },
+        "steps": [
+          "gate-contract"
+        ]
+      }
+    }
+  },
+  "deployment": {}
+}

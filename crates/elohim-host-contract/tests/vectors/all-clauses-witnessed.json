@@ -1,0 +1,57 @@
+{
+  "requires": [
+    {
+      "axis": "arch",
+      "predicate": {
+        "kind": "equal",
+        "value": "x86_64"
+      },
+      "source": "declared"
+    },
+    {
+      "axis": "lib",
+      "predicate": {
+        "kind": "present",
+        "value": [
+          "libc.so.6"
+        ]
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "lib": {
+        "kind": "names",
+        "value": []
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unknown-axis",
+      "axis": "arch"
+    },
+    {
+      "kind": "unmet",
+      "axis": "lib",
+      "required": {
+        "kind": "present",
+        "value": [
+          "libc.so.6"
+        ]
+      },
+      "host": {
+        "kind": "names",
+        "value": []
+      },
+      "missing": [
+        "libc.so.6"
+      ]
+    }
+  ]
+}

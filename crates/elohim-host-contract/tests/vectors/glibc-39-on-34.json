@@ -1,0 +1,63 @@
+{
+  "requires": [
+    {
+      "axis": "abi.libc",
+      "predicate": {
+        "kind": "at-least",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            39
+          ]
+        }
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "abi.libc": {
+        "kind": "version",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            34
+          ]
+        }
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unmet",
+      "axis": "abi.libc",
+      "required": {
+        "kind": "at-least",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            39
+          ]
+        }
+      },
+      "host": {
+        "kind": "version",
+        "value": {
+          "line": "glibc",
+          "components": [
+            2,
+            34
+          ]
+        }
+      },
+      "missing": []
+    }
+  ]
+}

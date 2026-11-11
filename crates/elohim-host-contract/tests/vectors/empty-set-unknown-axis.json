@@ -1,0 +1,25 @@
+{
+  "requires": [
+    {
+      "axis": "isa.x86",
+      "predicate": {
+        "kind": "subset",
+        "value": []
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {},
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unknown-axis",
+      "axis": "isa.x86"
+    }
+  ]
+}

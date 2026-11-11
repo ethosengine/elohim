@@ -1,0 +1,51 @@
+{
+  "requires": [
+    {
+      "axis": "lib",
+      "predicate": {
+        "kind": "present",
+        "value": [
+          "libgcc_s.so.1",
+          "libc.so.6"
+        ]
+      },
+      "source": "declared"
+    }
+  ],
+  "provides": {
+    "observed": {
+      "lib": {
+        "kind": "names",
+        "value": [
+          "libgcc_s.so.1"
+        ]
+      }
+    },
+    "unobserved": []
+  },
+  "expected": {
+    "type": "refuse"
+  },
+  "expected_refusals": [
+    {
+      "kind": "unmet",
+      "axis": "lib",
+      "required": {
+        "kind": "present",
+        "value": [
+          "libgcc_s.so.1",
+          "libc.so.6"
+        ]
+      },
+      "host": {
+        "kind": "names",
+        "value": [
+          "libgcc_s.so.1"
+        ]
+      },
+      "missing": [
+        "libc.so.6"
+      ]
+    }
+  ]
+}
