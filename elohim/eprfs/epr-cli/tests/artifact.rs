@@ -25,6 +25,9 @@ use tempfile::TempDir;
 mod fixture;
 use fixture::{artifact_elf, wait_for_stub};
 
+#[path = "support/artifact_native_libraries.rs"]
+mod native_libraries;
+
 const HANDLE: &str = "matthew";
 const AGENT_ID: &str = "4f5e3d2c1b0a99887766554433221100ffeeddccbbaa00998877665544332211";
 
@@ -1587,6 +1590,7 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
         &[
             ("PATH", &std::env::var("PATH").unwrap()),
             ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
+            ("RUSTUP_TOOLCHAIN", "1.96.1"),
         ],
     );
     descriptor

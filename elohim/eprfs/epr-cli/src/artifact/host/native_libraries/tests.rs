@@ -37,7 +37,11 @@ fn descriptor(path: &str) -> MethodDescriptor {
         step: None,
         embedder: None,
         view: vec![TreePath::from_slash_bytes(b"main.rs").unwrap()],
-        non_path_inputs: [(PATH_INPUT.into(), path.into())].into(),
+        non_path_inputs: [
+            (PATH_INPUT.into(), path.into()),
+            ("RUSTUP_TOOLCHAIN".into(), "1.96.1".into()),
+        ]
+        .into(),
         deterministic: false,
     }
 }
@@ -298,6 +302,9 @@ fn artifact_native_library_missing_toolchain_refuses_without_installing() {
     descriptor
         .tools
         .insert("toolchain".into(), "9.99.99".into());
+    descriptor
+        .non_path_inputs
+        .insert("RUSTUP_TOOLCHAIN".into(), "9.99.99".into());
     let Err(ArtifactError::Gap(message)) = probe(&descriptor, &path) else {
         panic!("uninstalled toolchain must refuse");
     };

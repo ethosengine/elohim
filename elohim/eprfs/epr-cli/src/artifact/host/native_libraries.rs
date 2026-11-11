@@ -3,8 +3,8 @@
 //! are outside std's set; closing that limit needs the verified link trace of K6 slice 2.
 
 use std::collections::BTreeSet;
-use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use super::{ArtifactError, ArtifactResult, MethodDescriptor};
@@ -57,12 +57,12 @@ pub(super) fn probe(descriptor: &MethodDescriptor, path: &str) -> ArtifactResult
         .non_path_inputs
         .get("RUSTC")
         .map_or("rustc", String::as_str);
-    // Do not canonicalize rustc's executable: a rustup proxy dispatches by argv[0].
     let rustc = crate::artifact::resolve_tool_path(rustc, path).ok_or_else(|| {
         ArtifactError::Gap(format!(
             "rustc {rustc} does not resolve under recorded PATH"
         ))
     })?;
+    let rustc = compiler(&rustc, descriptor)?;
     let mut command = Command::new(rustc);
     command
         .current_dir(scratch.path())
@@ -72,7 +72,7 @@ pub(super) fn probe(descriptor: &MethodDescriptor, path: &str) -> ArtifactResult
         .env("PATH", path)
         .env("LANG", "C")
         .env("RUSTUP_TOOLCHAIN", toolchain)
-        // Proxy invocation may only use an installed toolchain, never install/update one.
+        // Defense in depth; compiler() never returns a rustup proxy.
         .env("RUSTUP_AUTO_INSTALL", "0")
         .env("TMPDIR", scratch.path());
     // Location context is process-local, not descriptor/key material. Remove stale recorded
@@ -142,6 +142,106 @@ pub(super) fn probe(descriptor: &MethodDescriptor, path: &str) -> ArtifactResult
         ));
     }
     Ok(names)
+}
+
+/// Resolve an installed compiler without executing rustup, which creates its home even with
+/// RUSTUP_AUTO_INSTALL=0. Location context stays process-local and outside the descriptor/key.
+fn compiler(executable: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<PathBuf> {
+    let resolved = std::fs::canonicalize(executable).map_err(|e| {
+        ArtifactError::Gap(format!(
+            "rustc {} does not resolve: {e}",
+            executable.display()
+        ))
+    })?;
+    if !is_rustup_proxy(executable, &resolved) {
+        return Ok(resolved);
+    }
+    let proxy = resolved;
+    let toolchain = descriptor
+        .non_path_inputs
+        .get("RUSTUP_TOOLCHAIN")
+        .filter(|value| !value.is_empty() && value.as_str() != "unpinned")
+        .ok_or_else(|| {
+            ArtifactError::Gap("rustc proxy needs recorded RUSTUP_TOOLCHAIN; describe again".into())
+        })?;
+    let home = std::env::var_os("RUSTUP_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".rustup")))
+        .ok_or_else(|| {
+            ArtifactError::Gap("rustc proxy needs process RUSTUP_HOME or HOME".into())
+        })?;
+    if !home.is_dir() {
+        return Err(ArtifactError::Gap(format!(
+            "RUSTUP_HOME {} must be an existing directory; it will not be created",
+            home.display()
+        )));
+    }
+    // Use the compiler's host, never --target (which may name a cross-compilation target).
+    let host = descriptor
+        .tools
+        .get("rustc")
+        .and_then(|identity| {
+            identity
+                .lines()
+                .find_map(|line| line.strip_prefix("host: "))
+        })
+        .filter(|host| !host.is_empty())
+        .ok_or_else(|| ArtifactError::Gap("rustc proxy needs a recorded host triple".into()))?;
+    let installed = if toolchain.ends_with(&format!("-{host}")) {
+        toolchain.clone()
+    } else {
+        format!("{toolchain}-{host}")
+    };
+    // A rustup selector here must name one installed toolchain, not escape its directory.
+    if Path::new(&installed).components().count() != 1
+        || !matches!(
+            Path::new(&installed).components().next(),
+            Some(std::path::Component::Normal(_))
+        )
+    {
+        return Err(ArtifactError::Gap(format!(
+            "RUSTUP_TOOLCHAIN {toolchain} does not name an installed toolchain"
+        )));
+    }
+    let executable = home.join("toolchains").join(installed).join("bin/rustc");
+    if !std::fs::metadata(&executable)
+        .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+    {
+        return Err(ArtifactError::Gap(format!(
+            "rustc toolchain not installed as a regular executable file: {}",
+            executable.display()
+        )));
+    }
+    let resolved = std::fs::canonicalize(&executable).map_err(|e| {
+        ArtifactError::Gap(format!(
+            "rustc {} does not resolve: {e}",
+            executable.display()
+        ))
+    })?;
+    if is_rustup_proxy(&executable, &resolved) || same_file(&resolved, &proxy) {
+        return Err(ArtifactError::Gap(format!(
+            "installed rustc {} is itself a rustup proxy",
+            executable.display()
+        )));
+    }
+    Ok(resolved)
+}
+
+fn is_rustup_proxy(executable: &Path, resolved: &Path) -> bool {
+    if resolved.file_name().is_some_and(|name| name == "rustup") {
+        return true;
+    }
+    // Rustup also installs hard-linked proxies: canonicalize alone preserves their rustc name.
+    [executable, resolved]
+        .iter()
+        .any(|path| same_file(path, &path.with_file_name("rustup")))
+}
+
+fn same_file(left: &Path, right: &Path) -> bool {
+    std::fs::metadata(left).is_ok_and(|left| {
+        std::fs::metadata(right)
+            .is_ok_and(|right| left.dev() == right.dev() && left.ino() == right.ino())
+    })
 }
 
 fn verify_identity(command: &mut Command, recorded: &str) -> ArtifactResult<()> {
