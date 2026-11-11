@@ -65,3 +65,31 @@ bafyreifpy6oz3yohb6y4ocnq7he6mm3oahhsphcuwdwmhuwkda5tjk3uhq.
 - README loop for the A1 crate: 0/4/0, 0/3/2, 0/3/2, 0/2/3 over four fresh readers.
   It was stopped short of zero interpretability findings because each reader names
   new gaps; the round-4 fixes have had no fresh read. Deferral is the steward's call.
+- A push from a fresh worktree runs the MAIN checkout's `.husky/pre-push`: the
+  hooksPath shim resolves the script next to itself. Copying only `h` and `pre-push`
+  into `<worktree>/.husky/_` and pushing with `-c core.hooksPath=<worktree>/.husky/_`
+  runs the worktree's own hook. This is a candidate gate-preflight check.
+- A TMPDIR under `/projects` (mode 2775) inherits setgid, so the orchestrator's
+  `hc-mesh-initialization-continuation.test.sh` sees 2700, not 700, on its private
+  directory and fails silently inside `test-suite`. `chmod g-s` on the TMPDIR fixes
+  it. Another candidate preflight check, beside the in-repo TMPDIR one.
+- The first gate run also exposed an A1 defect: the host-contract manifest did not
+  watch its Cargo path-dependency closure (elohim/epr, crates/elohim-address,
+  elohim/Cargo.toml). Fixed in 6667cc748.
+- The bin-store `epr` (bafyreibrqq…) predates abd66bdb1, so the orchestrator's
+  gate-evidence test fails with it. Gates ran with EPR_BIN at the pool gate build.
+
+## Steward asks for the morning
+1. A parked local rebase (stasis 3dd97e3d…:17): one unpushed shem commit was
+   replayed onto hostcompat/a1 after `brit rebase` failed. No shared ref was rewritten.
+   Does this kind of local replay need a standing ruling?
+2. The README blind-reader loop (above) stopped at round 4. Defer, or reopen?
+3. Sysroot grant (lane K6): shem serving its v2 sysroot to ethosengine needs a new
+   `berth.artifacts.serves` grant. It was not added, so the fetch refuses as not granted.
+4. Compiler closure (lane K): `cc1` and `as` differ between shem (an AlmaLinux 10.2
+   x86_64_v2 rebuild) and ethosengine; `crtbeginS.o` is the same. Option A: one
+   CID-pinned gcc closure mounted beside each native toolchain. Option B: distinct
+   variants per compiler, sharing a family but never a key.
+5. Lane K review (Codex astra, quotes grep-verified, relayed to ethosengine): a fixed
+   LINK_INPUTS list; host tools in the key input rather than the method; the family
+   keeps host tools; Mismatch on tied holder counts. ethosengine judges each.
