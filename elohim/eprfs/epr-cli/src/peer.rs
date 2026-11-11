@@ -1417,6 +1417,8 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SiblingArtifact {
+    #[serde(skip_serializing)]
+    pub key: String,
     pub device: String,
     pub output: String,
     pub manifest: String,
@@ -1429,40 +1431,44 @@ pub struct SiblingArtifact {
     pub head_seq: Option<u64>,
 }
 
-/// The record `event` is, when it is an `artifact-produce@1` custody Produce for `key` folded
-/// from an admitted device other than `me`, and consistent with itself: its resource, subject
+/// A local custody Produce or an admitted sibling's crossed custody Produce, consistent with
+/// itself: its resource, subject
 /// and `env:output` name one output, and it names exactly one manifest.
 fn artifact_from_event(
     event: &FlowEvent,
     me: &str,
-    key: &str,
     admission: &Admission,
     heads: &HeadTable,
 ) -> Option<SiblingArtifact> {
-    let device = via_device(event)?;
-    if device == me || !admission.admits_device(device) {
-        return None;
-    }
+    let device = match via_device(event) {
+        Some(device) if device != me && admission.admits_device(device) => {
+            if one_slot(event, MEASURE_SLOT)? != ARTIFACT_PRODUCE_MEASURE
+                || one_slot(event, KIND_SLOT)? != ARTIFACT_PRODUCE_KIND
+            {
+                return None;
+            }
+            device
+        }
+        None if event.receiver.0 == me => me,
+        _ => return None,
+    };
     if event.action != elohim_epr_rea::ReaVerb::Produce
         || event.classified_as.first().map(String::as_str) != Some("custody-blob")
-        || one_slot(event, MEASURE_SLOT)? != ARTIFACT_PRODUCE_MEASURE
-        || one_slot(event, KIND_SLOT)? != ARTIFACT_PRODUCE_KIND
     {
         return None;
     }
     let env: std::collections::BTreeMap<&str, &str> = slots(event)
         .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
         .collect();
-    if env.get("key").copied()? != key {
-        return None;
-    }
-    let output = env.get("output").copied()?;
+    let key = one_slot(event, "env:key=")?;
+    let output = one_slot(event, "env:output=")?;
     let resource = event.resource.to_string();
     if output != resource || event.classified_as.get(1).map(String::as_str) != Some(output) {
         return None;
     }
     let manifest = one_slot(event, "manifest:")?;
     Some(SiblingArtifact {
+        key: key.to_string(),
         device: device.to_string(),
         output: output.to_string(),
         manifest: manifest.to_string(),
@@ -1517,6 +1523,15 @@ pub fn sibling_artifacts(
     handle: Option<&str>,
     key: &str,
 ) -> PeerResult<SiblingArtifacts> {
+    let mut found = custody_artifacts(root, handle)?;
+    found
+        .rows
+        .retain(|row| row.device != found.device && row.key == key);
+    Ok(found)
+}
+
+/// Read the same admitted custody fold for both key and output lookups, including local Produce.
+pub fn custody_artifacts(root: &Path, handle: Option<&str>) -> PeerResult<SiblingArtifacts> {
     let table = HeadTable::load(&peer_dir()?)?;
     let root = served_root(root)?;
     let (device, admission) = match standing(&root, handle)? {
@@ -1543,7 +1558,7 @@ pub fn sibling_artifacts(
         .events()
         .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?
         .into_iter()
-        .filter_map(|(_, event)| artifact_from_event(&event, &did, key, &admission, &table))
+        .filter_map(|(_, event)| artifact_from_event(&event, &did, &admission, &table))
         .collect();
     Ok(SiblingArtifacts {
         rows,

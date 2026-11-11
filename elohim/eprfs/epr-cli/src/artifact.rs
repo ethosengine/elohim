@@ -40,10 +40,11 @@ use eprfs_peer::{
     ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
     key_cid, put_local_blob_with, put_method_record, read_queue_file, resolve_holders,
     write_queue_file, Bytes, FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport,
-    LocalBlobContext, SiblingRecord, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL,
-    FETCH_TOTAL,
+    LocalBlobContext, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
 };
 use serde::Serialize;
+
+mod custody;
 
 use crate::device_key::{self, DeviceKey};
 use crate::peer::{self, PeerCliError, ServeLock};
@@ -92,9 +93,10 @@ pub fn usage() -> String {
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
      crosses with --cross; exits 3 `unrecorded: <reason>`)\n  \
      | fetch --method FILE --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
-     [--stall S] [--total S] [--json] \
+     [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
-     serve; exits 3 `fetch gap: <kind>: <reason>`)>"
+     serve; exits 3 `fetch gap: <kind>: <reason>`)\n  \
+     | holders (--key CID | --output CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
         .to_string()
 }
 
@@ -111,13 +113,14 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         Some("key") => key(&options),
         Some("put") => put(&options),
         Some("fetch") => fetch(&options),
+        Some("holders") => custody::holders(&options),
         Some(other) => {
             return Err(ArtifactError::InvalidArguments(format!(
                 "unknown artifact verb `{other}`{}\n{}",
                 crate::hint::did_you_mean(
                     other,
                     "epr artifact",
-                    &["describe", "key", "put", "fetch"]
+                    &["describe", "key", "put", "fetch", "holders"]
                 ),
                 usage()
             )))
@@ -162,6 +165,10 @@ struct Options {
     transport: FetchTransport,
     stall: Option<u64>,
     total: Option<u64>,
+    expect_output: Option<BlobCid>,
+    key: Option<BlobCid>,
+    output: Option<BlobCid>,
+    min: Option<u64>,
     json: bool,
 }
 
@@ -218,6 +225,10 @@ impl Options {
                 "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
                 "--dest" => options.dest = Some(PathBuf::from(value)),
                 "--handle" => options.handle = Some(value),
+                "--expect-output" => options.expect_output = Some(custody::parse_cid(&value)?),
+                "--key" => options.key = Some(custody::parse_cid(&value)?),
+                "--output" => options.output = Some(custody::parse_cid(&value)?),
+                "--min" => options.min = Some(seconds(&value)?),
                 "--transport" => {
                     options.transport = match value.as_str() {
                         "tier" => FetchTransport::Tier,
@@ -1469,26 +1480,33 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     if ServeLock::held(&peer_dir) != Some(true) {
         return Err(gap(&FetchGap::DaemonDown));
     }
-    let found = peer::sibling_artifacts(
-        &options.repo,
-        options.handle.as_deref(),
-        &key.key_cid.to_string(),
+    let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())
+        .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-record: {e}")))?;
+    let records = custody::records(&found);
+    let selection = resolve_holders(
+        &key.key_cid,
+        &records,
+        &found.device,
+        options.expect_output.as_ref(),
     )
-    .map_err(|e| ArtifactError::Gap(format!("fetch gap: no-record: {e}")))?;
-    let records: Vec<SiblingRecord> = found
-        .rows
-        .iter()
-        .filter_map(|row| {
-            Some(SiblingRecord {
-                device: row.device.clone(),
-                output: BlobCid::parse(&row.output).ok()?,
-                manifest: BlobCid::parse(&row.manifest).ok()?,
-            })
-        })
-        .collect();
-    let (output, holders) = resolve_holders(&records).map_err(|why| gap(&why))?;
+    .map_err(|why| gap(&why))?;
     let scope = crate::flow::repository::repository_scope(&options.repo)
         .map_err(|e| ArtifactError::Gap(format!("fetch gap: local-store: {e}")))?;
+    custody::record_divergence(&found.served_root, &found.device, &key.key_cid, &selection)?;
+    if !options.json && selection.outputs.len() > 1 {
+        println!(
+            "divergence: key {} outputs {} chosen {} rule {}",
+            key.key_cid,
+            selection
+                .outputs
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+            selection.output,
+            selection.rule
+        );
+    }
     let (stall, total) = (
         options.stall.unwrap_or(FETCH_STALL.as_secs()),
         options.total.unwrap_or(FETCH_TOTAL.as_secs()),
@@ -1497,8 +1515,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         nonce: FetchRequest::fresh_nonce(),
         key: key.key.clone(),
         key_cid: key.key_cid.clone(),
-        output,
-        holders,
+        output: selection.output.clone(),
+        expect_output: options.expect_output.clone(),
+        holders: selection.holders.clone(),
         dest: dest.clone(),
         scope: scope.to_string(),
         transport: options.transport,
@@ -1541,6 +1560,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
                     serde_json::json!({
                         "installed": dest,
                         "keyCid": key.key_cid,
+                        "output": selection.output,
+                        "rule": selection.rule,
+                        "outputs": selection.outputs,
                         "manifest": manifest,
                         "fetchedFrom": fetched_from,
                         "chunksFetched": chunks_fetched,
@@ -1551,10 +1573,11 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
                 );
             } else {
                 println!(
-                    "fetched {} from {} ({chunks_fetched} chunks, {chunks_resumed} resumed, \
+                    "fetched {} from {} (rule {}, {chunks_fetched} chunks, {chunks_resumed} resumed, \
                      {wasted} bytes wasted, {seconds:.1} s)",
                     dest.display(),
-                    fetched_from.join(", ")
+                    fetched_from.join(", "),
+                    selection.rule
                 );
             }
             Ok(ExitCode::SUCCESS)

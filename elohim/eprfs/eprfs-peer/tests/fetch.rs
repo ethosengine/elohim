@@ -881,17 +881,20 @@ async fn two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetc
     let y = held_artifact(&key, artifact_bytes(52, 300 * 1024)).await;
     let records = vec![
         SiblingRecord {
+            key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceA".into(),
             output: x.manifest.record.output.clone(),
             manifest: x.manifest_cid.clone(),
         },
         SiblingRecord {
+            key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceB".into(),
             output: y.manifest.record.output.clone(),
             manifest: y.manifest_cid.clone(),
         },
     ];
-    let gap = resolve_holders(&records).expect_err("a mismatch");
+    let gap =
+        resolve_holders(&key_cid(&key).unwrap(), &records, "self", None).expect_err("a mismatch");
     let mut expected = vec![
         x.manifest.record.output.clone(),
         y.manifest.record.output.clone(),
@@ -905,15 +908,20 @@ async fn two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetc
         records[0].clone(),
         records[1].clone(),
         SiblingRecord {
+            key: key_cid(&key).unwrap(),
             device: "did:key:zDeviceB".into(),
             output: x.manifest.record.output.clone(),
             manifest: x.manifest_cid.clone(),
         },
     ];
-    let (output, holders) = resolve_holders(&agreeing).expect("one output");
-    assert_eq!(output, x.manifest.record.output);
-    assert_eq!(holders.len(), 2);
-    assert_eq!(resolve_holders(&[]), Err(FetchGap::NoRecord));
+    let chosen =
+        resolve_holders(&key_cid(&key).unwrap(), &agreeing, "self", None).expect("one output");
+    assert_eq!(chosen.output, x.manifest.record.output);
+    assert_eq!(chosen.holders.len(), 2);
+    assert_eq!(
+        resolve_holders(&key_cid(&key).unwrap(), &[], "self", None),
+        Err(FetchGap::NoRecord)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1480,6 +1488,7 @@ fn request_for(
         key: key.clone(),
         key_cid: key_cid(key).expect("key cid"),
         output: output.clone(),
+        expect_output: None,
         holders,
         dest,
         scope: atom_cid(&"artifact-scope").expect("scope").to_string(),
@@ -1640,6 +1649,22 @@ async fn a_queue_entry_naming_an_outside_destination_is_refused() {
         }
         assert!(!dest.exists(), "nothing written outside the install scope");
     }
+    let mut request = request_for(
+        &key,
+        &output,
+        Vec::new(),
+        c_side.install_root().join("expected"),
+    );
+    request.expect_output = Some(BlobCid::compute_bytes(b"different-output"));
+    match queue_and_wait(&c_side.queue(), &request).await {
+        eprfs_peer::FetchDone::Gap {
+            gap: FetchGap::InstallRefused { .. },
+            reason,
+            ..
+        } => assert!(reason.contains("expected output"), "{reason}"),
+        other => panic!("expected output constraint must be checked by the daemon: {other:?}"),
+    }
+    assert!(!request.dest.exists());
     c_daemon.shutdown().await;
 }
 
@@ -1745,4 +1770,129 @@ async fn an_orphaned_staging_dir_from_a_killed_run_is_removed_by_the_next_instal
         "another destination's staging is not this install's to sweep"
     );
     drop(held_lock);
+}
+
+#[test]
+fn holder_selection_prefers_expected_then_own_then_distinct_plurality() {
+    let key = BlobCid::compute(b"key");
+    let x = BlobCid::compute_bytes(b"x");
+    let y = BlobCid::compute_bytes(b"y");
+    let row = |device: &str, output: &BlobCid| SiblingRecord {
+        key: key.clone(),
+        device: device.into(),
+        output: output.clone(),
+        manifest: BlobCid::compute(device.as_bytes()),
+    };
+    let mut records = vec![row("a", &x), row("b", &x), row("own", &y)];
+    records.extend([row("own", &y), row("own", &y)]);
+    let expected = resolve_holders(&key, &records, "own", Some(&x)).unwrap();
+    assert_eq!(
+        (expected.output, expected.rule, expected.holders.len()),
+        (x.clone(), "expected", 2)
+    );
+    let minority = resolve_holders(&key, &records, "a", Some(&y)).unwrap();
+    assert_eq!(
+        (minority.output, minority.rule, minority.holders.len()),
+        (y.clone(), "expected", 1)
+    );
+    let own = resolve_holders(&key, &records, "own", None).unwrap();
+    assert_eq!((own.output, own.rule), (y.clone(), "own"));
+    let plurality = resolve_holders(&key, &records, "elsewhere", None).unwrap();
+    assert_eq!((plurality.output, plurality.rule), (x.clone(), "plurality"));
+    assert_eq!(
+        plurality
+            .holders
+            .iter()
+            .map(|h| h.device.as_str())
+            .collect::<Vec<_>>(),
+        ["a", "b"]
+    );
+    let absent = BlobCid::compute_bytes(b"absent");
+    assert_eq!(
+        resolve_holders(&key, &records, "own", Some(&absent)),
+        Err(FetchGap::ExpectedOutputUnavailable {
+            output: absent.clone()
+        })
+    );
+    assert_eq!(
+        resolve_holders(&key, &[], "own", Some(&absent)),
+        Err(FetchGap::ExpectedOutputUnavailable { output: absent })
+    );
+    records.push(row("b", &y));
+    assert_eq!(
+        resolve_holders(&key, &records, "elsewhere", None)
+            .unwrap()
+            .output,
+        y
+    );
+    let mut unrelated = row("a", &y);
+    unrelated.key = BlobCid::compute(b"other-key");
+    records.push(unrelated);
+    let held = eprfs_peer::fold_holders(&records);
+    assert_eq!(held.len(), 4);
+    assert!(held
+        .iter()
+        .any(|r| r.device == "a" && r.output == x && r.key == key));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn plurality_fetch_uses_only_the_chosen_outputs_holders() {
+    let key = key_for("divergent-builds");
+    let x = held_artifact(&key, artifact_bytes(71, 300 * 1024)).await;
+    let y = held_artifact(&key, artifact_bytes(72, 300 * 1024)).await;
+    let a = scripted(&x, Faults::default()).await;
+    let b = scripted(&x, Faults::default()).await;
+    let c = scripted(&y, Faults::default()).await;
+    let candidates = [
+        a.holder("a", &x.manifest_cid),
+        b.holder("b", &x.manifest_cid),
+        c.holder("c", &y.manifest_cid),
+    ];
+    let records: Vec<_> = candidates
+        .iter()
+        .map(|h| SiblingRecord {
+            key: key_cid(&key).unwrap(),
+            device: h.device.clone(),
+            manifest: h.manifest.clone(),
+            output: if h.device == "c" {
+                y.manifest.record.output.clone()
+            } else {
+                x.manifest.record.output.clone()
+            },
+        })
+        .collect();
+    let chosen = resolve_holders(&key_cid(&key).unwrap(), &records, "fetcher", None).unwrap();
+    let holders: Vec<_> = chosen
+        .holders
+        .iter()
+        .map(|h| {
+            candidates
+                .iter()
+                .find(|c| c.device == h.device)
+                .unwrap()
+                .clone()
+        })
+        .collect();
+    let (_dir, peer) = peer_key();
+    let endpoint = fetcher(&peer).await;
+    let (_store_dir, store) = payload();
+    let fetched = within(
+        "plurality fetch",
+        fetch_artifact(
+            &endpoint,
+            store.as_ref(),
+            &key,
+            &chosen.output,
+            &holders,
+            &budget(),
+        ),
+    )
+    .await
+    .unwrap();
+    assert_eq!(fetched.manifest.record.output, x.manifest.record.output);
+    assert!(fetched.fetched_from.iter().all(|d| d == "a" || d == "b"));
+    assert!(
+        c.tier.asked.lock().unwrap().is_empty(),
+        "the divergent holder receives no request"
+    );
 }

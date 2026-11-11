@@ -698,3 +698,75 @@ decisionPoints:
       Classification is the spec's Private (B) self-reach custody. The worst local holder sees
       artifact bytes, closure identity and sizes; no cross-holon join or network disclosure is
       added. The serve-blob scope predicate and unauthorized-CID refusal remain out of slice 1.
+
+  - name: resolve_holders
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/fetch.rs
+      modulePath: eprfs_peer::resolve_holders
+    summary: "Select one output by explicit expectation, own Produce or strict distinct-device plurality; preserve unresolved ties and record divergence in the CLI's existing flow store."
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Custody availability over the existing Produce fold; not head selection, reach expansion or remote authority."
+      - id: C1
+        status: answered
+        justification: "The CLI admits sibling records through the existing roster; claimed outputs never admit their devices."
+      - id: C2
+        status: n-a
+        justification: "This local preference does not promote standing or mutate source records."
+      - id: C3
+        status: answered
+        justification: "Pure local selection terminates without waiting on a peer; existing fetch deadlines bound the subsequent transfer."
+      - id: C4
+        status: answered
+        justification: "Absent expected output has a typed CID-bearing gap, no records are NoRecord, and unresolved ties remain Mismatch."
+      - id: C5
+        status: answered
+        justification: "Expected output, own Produce, then distinct-device plurality narrow candidates; daemon admission and CID checks still judge every byte."
+      - id: C6a
+        status: answered
+        justification: "One ordered map fold over existing records; one current claim per device and key."
+      - id: C6b
+        status: answered
+        justification: "The selection is pure; CLI divergence check and append share an exclusive flow transaction, deduplicated by key and sorted output set."
+      - id: C7
+        status: n-a
+        justification: "This query introduces no advertisement or serving path."
+      - id: C8
+        status: answered
+        justification: "The result names expected, own or plurality; CLI prints divergence and records own/plurality divergence as Cite observation."
+      - id: C9
+        status: answered
+        justification: "Existing key and output CIDs and roster device DIDs are retained; newest claim is scoped by both device and key."
+      - id: C10
+        status: answered
+        justification: "Optional expectOutput defaults to None for existing queued requests; daemon refuses a contradictory expected output."
+      - id: C11
+        status: n-a
+        justification: "Pure selection adds no remote fan-out; existing fetch budgets govern transfer."
+      - id: C12
+        status: answered
+        justification: "Same steward roster boundary; local records must name this device as receiver, remote records must be crossed Produce from admitted siblings."
+      - id: C13
+        status: n-a
+        justification: "No authority tier is introduced."
+      - id: C14
+        status: partial
+        justification: "Custody claims are not live availability or failure-domain independence; the byte transfer can still return existing typed gaps."
+    contractTests:
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: holder_selection_prefers_expected_then_own_then_distinct_plurality
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: plurality_fetch_uses_only_the_chosen_outputs_holders
+        kind: integration
+      - path: elohim/eprfs/eprfs-peer/tests/fetch.rs
+        testName: two_holders_with_different_outputs_for_one_key_is_a_mismatch_not_a_fetch
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/artifact.rs
+        testName: fetch_plurality_queues_only_chosen_holders_and_records_divergence_once
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/artifact.rs
+        testName: holders_by_output_and_key_share_distinct_counts_and_advisory_warning
+        kind: integration
