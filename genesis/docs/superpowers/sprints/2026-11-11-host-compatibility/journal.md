@@ -103,7 +103,7 @@ working posture, so none is left open. A steward ruling overrides any posture.
 |---|---|---|---|---|
 | 1 | Parked local rebase (stasis :17) | shem | No standing ruling asked; shem integrates by merge only, never a local rebase | adopted |
 | 2 | A1 README loop close | shem | Round 5 fresh read: 0 correctness, 3 interpretability; its glosses applied (psABI, DAG-CBOR, `compile_fail`, toolchain), with no fresh read of them; closed under the 2026-10-20 no-fixed-point ruling. Rounds: 0/4/0, 0/3/2, 0/3/2, 0/2/3, 0/3/0 | closed |
-| 3 | Sysroot serves grant | steward signs; ethosengine drafts | Unapplied `berth.artifacts.serves` proposal (shem to ethosengine, sysroot-pack only, private reach, with expiry); until signed, K6 proves with a sysroot packed on the consuming device | awaiting steward |
+| 3 | Who may draw a floor (was: sysroot serves grant) | steward rules; ethosengine designs | Changed at the steward's direction: no grant row. Spec §7.8 (6e8c1e2a1) puts reach on the object: every Produce carries `env:reach`, the peer gate serves when the requester's relationship meets it, and `berth.artifacts.serves` becomes a narrowing list. The sysroot-pack grant proposal is withdrawn. New rulings **H12** (reach on the object) and **H13** (compiler posture B). Implementation is lane K, held until H12 is ruled | awaiting steward: H12, H13 |
 | 4 | Compiler closure, A or B | ethosengine (lane K designer) | **B**: per-compiler variants share a family, never a key. A (a CID-pinned gcc closure as a seed member, X1) is a later optimisation | decided; steward ratifies |
 | 5 | Lane K review findings | ethosengine | (1) HIGH, fixed by deriving keyed libs from rustc's native-static-libs; (2) host tool lines stay in the key input until K6 slice 2; (3) the family carries rustc/cargo identity plus target.* only; (4) a tie refuses rather than guess, open to the steward; (6) the daemon serves its own CLI, which derived the key | dispositions in the K DELTA |
 | 6 | ethosengine's extracted vectors | shem | Raw extraction kept under `tests/vectors/extracted/`; two derived vectors: epr on a synthetic v3 host (permit) and on a synthetic v2 host (refuse; missing avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave). A mutation check confirmed both are evaluated | landed with this commit |
@@ -118,6 +118,15 @@ working posture, so none is left open. A steward ruling overrides any posture.
 | 15 | ethosengine's merged worktrees | ethosengine | Remove the merged ones; keep hc-k6 and hc-k1c until they land | in hand |
 | 16 | Explicit `-C linker` plus bare `-fuse-ld=lld` may lose the rustc gcc-ld shim | ethosengine | K6 slice 2 | planned |
 | 17 | Sibling notes dropped by an exact-id filter | ethosengine | Watcher now matches by prefix | done |
+
+### Finding after the ledger: build notes do not cross device versions
+
+The vectors gate run could not reuse genesis, steward-node or elohim-storage evidence:
+"unverifiable note under this step … does not decode: unknown field `body`". The
+notes at those commits are epoch-2 records (`{"body":…,"epoch":2,…}`) that the
+decoder this device's gate ran with does not accept, so a green result recorded under
+one format cannot stand in for the other. All three gates ran in full and passed.
+Owner: lane K (ethosengine), as the brit build-note reader is its seam; noted to it.
 
 ### Backlog-ready rows (to be filed by whoever holds the backlog write-set)
 
