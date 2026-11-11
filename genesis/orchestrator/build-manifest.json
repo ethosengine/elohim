@@ -32,6 +32,7 @@
           "bridges/did/did-bridge/**",
           "bridges/did/did-types/**",
           "crates/consent-grant/**",
+          "crates/elohim-host-contract/**",
           "crates/seam-contracts/**",
           "vendor/iroh-quinn-proto-0.13.0/**"
         ],
