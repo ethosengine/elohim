@@ -29,6 +29,103 @@ seamLocus: >
   plant, both in this crate.
 
 decisionPoints:
+  - name: feedback_store::FeedbackStore::reclaim
+    kind: state-transition
+    sourceLocation:
+      file: src/feedback_store/generation.rs
+      modulePath: elohim_epr_rea::feedback_store
+    summary: Pinned local retention, stable reference coordination, bounded atomic generations and explicit history expiry.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: "Private operational store; no DHT, network or publication."
+      - id: C1
+        status: answered
+        justification: "A threshold cannot elect a deletion authority; only a validated operator-established pinned binding permits it."
+      - id: C2
+        status: answered
+        justification: "Surviving bytes and policy snapshots never move; recovery verifies checkpoint and generation CIDs."
+      - id: C3
+        status: answered
+        justification: "One replacement attempt; interrupted writes recover on the next mutation. Pressure with no eligible groups remains visible."
+      - id: C4
+        status: answered
+        justification: "Corrupt files, unknown references, absent measurements and future timestamps refuse or protect; never zero."
+      - id: C5
+        status: answered
+        justification: "Bound crossing supplies evidence only; the resolved retention policy supplies permission."
+      - id: C6a
+        status: answered
+        justification: "Active plus replacement plus bounded control fits the total managed file-byte contract; no spill archive."
+      - id: C6b
+        status: answered
+        justification: "Source retries deduplicate within the retained window; recovery is idempotent and expired history is explicitly unknown."
+      - id: C7
+        status: answered
+        justification: "Capacity and dry-run use the same selection and accounting functions as enforcement."
+      - id: C8
+        status: answered
+        justification: "Read-only capacity shows policy CID, measurements, eligibility, waiting reasons and bounded receipts."
+      - id: C9
+        status: answered
+        justification: "No participant identity inference; experienced recovery retains the original participant and subject checks."
+      - id: C10
+        status: answered
+        justification: "Explicit format cutover with quiesced legacy writers; poison-pill marker refuses legacy append; atoms keep addresses."
+      - id: C11
+        status: answered
+        justification: "Adapter timeouts interrupt a recoverable transaction; capture never changes the producer result."
+      - id: C12
+        status: answered
+        justification: "No network or unrelated repair permission. Constitutional and counter-evidence records remain protected."
+      - id: C13
+        status: partial
+        justification: "Operator provenance is local declared standing, not verified network authority."
+      - id: C14
+        status: answered
+        justification: "Pressure and unknown eligibility remain reported after an insufficient reclamation attempt."
+    contractTests:
+      - path: elohim/epr-rea/tests/feedback_capacity.rs
+        testName: oldest_successes_reclaim_but_protected_bytes_and_addresses_survive
+        kind: integration
+      - path: elohim/epr-rea/src/feedback_store/generation.rs
+        testName: feedback_crash_and_disk_full_at_every_transition_preserve_acknowledged_survivors
+        kind: unit
+  - name: feedback_store::FeedbackStore::append
+    kind: state-transition
+    sourceLocation:
+      file: src/feedback_store.rs
+      modulePath: elohim_epr_rea::feedback_store::FeedbackStore
+    summary: >
+      Private offline experience retention with contextual policy, serialized append,
+      source idempotence, immutable evidence links and a separate participant recovery claim.
+      No publication or execution is admitted by capture.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Private retained atoms on the existing sidecar floor; no DHT or head-plane additions.
+      - id: C4
+        status: answered
+        justification: CID verification and corruption refusal preserve bytes; validation does not imply recovery.
+      - id: C6a
+        status: answered
+        justification: A single resolved capacity contract bounds all owned file contents; only eligible policy-authorized groups may be reclaimed.
+      - id: C13
+        status: partial
+        justification: Policy authority and participant are explicit local declarations, not verified network standing.
+    contractTests:
+      - path: elohim/epr-rea/tests/feedback.rs
+        testName: feedback_build_green_is_not_recovery_and_recurrence_reopens
+        kind: integration
+      - path: elohim/epr-rea/tests/feedback.rs
+        testName: feedback_corruption_limits_and_missing_policy_preserve_bytes
+        kind: integration
+      - path: elohim/epr-rea/tests/feedback.rs
+        testName: feedback_full_store_preserves_evidence_and_accepts_idempotent_retries
+        kind: integration
+      - path: elohim/epr-rea/tests/feedback.rs
+        testName: feedback_racing_writers_cannot_exceed_carry_capacity
+        kind: integration
   - name: ExternalClaim::new / ExternalClaim::read
     kind: boundary-answer-type
     sourceLocation:

@@ -14,6 +14,15 @@ fn main() -> ExitCode {
     // `flow` is its own command family (value-chain projection + walk); it renders its own
     // output rather than a Report, so it is dispatched before the Report-shaped commands.
     let raw: Vec<String> = env::args().skip(1).collect();
+    if raw.first().map(String::as_str) == Some("feedback") {
+        return match elohim_epr_cli::feedback::run(&raw[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("epr feedback: {error}");
+                ExitCode::from(2)
+            }
+        };
+    }
     // `--help` is a QUESTION, not a malformed command. It is answered on stdout with a zero exit
     // at every layer of this CLI, because an agent discovering the surface should not pay a
     // refusal per layer to find out what the layer offers.
@@ -408,5 +417,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|feedback <qualify|capacity|measure|reclaim|migrate|policy|record|capture|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> ...|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|lsp <attach|serve|show> ...>"
 }

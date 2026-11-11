@@ -14,6 +14,101 @@ seamLocus: 'Two loci in the `epr flow` command family, joined by one sidecar. Th
 
   '
 decisionPoints:
+- name: feedback::qualify::run
+  kind: verdict-fn
+  sourceLocation:
+    file: src/feedback/qualify.rs
+    modulePath: elohim_epr_cli::feedback::qualify
+  summary: >
+    Qualifies recorder or explicit producer/recorder pair against the contextual policy
+    in a disposable private store. This CheckWitness reports observed capability and never
+    promotes a release, creates session pins or admits repair. Recorder-only success cannot
+    qualify the pair; native installation owns promotion and rechecks executable identities.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Private local feedback and its existing native flow proposal are the evidence plane.
+  - id: C1
+    status: answered
+    justification: Qualifier emits evidence only; the native landing boundary alone elects current.
+  - id: C2
+    status: answered
+    justification: No real record, actor claim, session pin or current head is changed by qualification.
+  - id: C3
+    status: answered
+    justification: Child exit and output drain share a deadline; killed descendants cannot hold the check open.
+  - id: C4
+    status: answered
+    justification: Missing policy, executable or execution budget remains skipped and nonzero; incompatible behavior fails.
+  - id: C5
+    status: answered
+    justification: The fixture proves exact Intent scope and absence of admission, commitment and experienced recovery.
+  - id: C6a
+    status: answered
+    justification: Every child is bounded to ten seconds and one MiB; pipe drain is covered by the deadline.
+  - id: C6b
+    status: answered
+    justification: Each run owns a disposable store and leaves the actual private history and tool selections unchanged.
+  - id: C7
+    status: answered
+    justification: Recorder-only and full pair are separate reported capabilities; neither advertises network service.
+  - id: C8
+    status: answered
+    justification: Existing CheckWitness shape names outcome, mode, policy and explicit executable paths.
+  - id: C9
+    status: answered
+    justification: Returned fixture addresses are explicitly fixtureOnly and confer no participant or identity claim.
+  - id: C10
+    status: answered
+    justification: Recorder-only arrival is explicit and cannot be mistaken for qualified producer compatibility.
+  - id: C11
+    status: answered
+    justification: Existing capacity and capture policy is applied unchanged; refusal never increases its budget.
+  - id: C12
+    status: answered
+    justification: Explicit contextual policy must enable Brit capture and deliberate proposals before exercising them.
+  - id: C13
+    status: answered
+    justification: Qualification neither grants repair admission nor appoints acceptance; those remain existing flow acts.
+  - id: C14
+    status: answered
+    justification: Missing prerequisites and incomplete execution report unmeasured with a nonzero exit.
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/feedback_qualify.rs
+    testName: recorder_only_is_explicit_and_leaves_the_real_store_untouched
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/feedback_qualify.rs
+    testName: pair_qualification_exercises_capture_proposal_and_recorder_failure
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/feedback_qualify.rs
+    testName: unavailable_prerequisites_are_unmeasured_and_never_green
+    kind: integration
+- name: feedback::response::triage
+  kind: pure-decision-predicate
+  sourceLocation:
+    file: src/feedback/response.rs
+    modulePath: elohim_epr_cli::feedback::response
+  summary: >
+    Contextual feedback reader exposes policy, existing commitment ownership and budget gaps.
+    Proposal authors an existing REA Intent; execution still needs existing shift admission.
+    The feedback reader never claims to grant authority or infer recovery from validation.
+  concernIds:
+  - id: C1
+    status: partial
+    justification: Local declared policy explains authority; existing execution admission remains required.
+  - id: C4
+    status: answered
+    justification: Missing coverage and cost stay unknown; attempts and recovery are explicit evidence links.
+  - id: C6a
+    status: answered
+    justification: Input is capped at two MiB; adapters time out capture without changing operation results.
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/feedback.rs
+    testName: feedback_cli_contextual_policy_refuses_missing_and_filters_capture
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/feedback.rs
+    testName: feedback_cli_human_proposal_is_not_admitted_repair
+    kind: integration
 - name: seam::classify::classify
   kind: pure-decision-predicate
   sourceLocation:
@@ -866,7 +961,8 @@ decisionPoints:
   sourceLocation:
     file: src/flow/reconciliation.rs
   summary: Derives scoped remaining work from separate fulfillment, technical review and appointed acceptance
-    facts, preserving adverse evidence and historical uncertainty.
+    facts, preserving adverse evidence and historical uncertainty. Feedback repair intents resolve
+    their original private occurrence through the explicit EvidenceResources boundary.
   concernIds:
   - id: C0
     status: answered
@@ -887,7 +983,8 @@ decisionPoints:
   - id: C4
     status: answered
     justification: Unestablished acceptance, changed evidence and contested decisions remain visible instead
-      of defaulting to accepted.
+      of defaulting to accepted. A retained feedback occurrence is CID-verified; corrupt stores refuse.
+      Not-retained records keep absent-or-reclaimed history unknown because bounded receipts are not tombstones.
   - id: C5
     status: partial
     justification: Pinned local evidence is re-derived on read. Experiential fitness remains the appointed
@@ -899,7 +996,8 @@ decisionPoints:
   - id: C6b
     status: answered
     justification: Native note admission retains the flow transaction and exact-record deduplication;
-      reconciliation is read-only.
+      reconciliation is read-only. Feedback reads obey the existing contextual capacity bound and
+      create no records, fetches, labels or acceptance acts. Immutable views require explicitly captured resources.
   - id: C7
     status: answered
     justification: Human and JSON context expose the same derived acceptance state while preserving authored
@@ -935,6 +1033,12 @@ decisionPoints:
   contractTests:
   - path: elohim/eprfs/epr-cli/tests/flow_reconciliation.rs
     testName: production_and_review_remain_visible_without_inventing_acceptance
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_feedback_source.rs
+    testName: retained_feedback_establishes_original_source_without_granting_acceptance
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_feedback_source.rs
+    testName: reclaimed_feedback_is_not_retained_with_honestly_unknown_history
     kind: integration
 - name: concerns::concerns
   kind: pure-decision-predicate

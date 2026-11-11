@@ -27,6 +27,48 @@
 
 epr-meta-policies-version: 1
 policies:
+  - id: feedback-local-retention
+    version: 1
+    contentHash: sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7
+    title: Governed capacity for private local feedback
+    permits: [reclaim-eligible-feedback]
+    parameter-bounds:
+      routineDays: { min: 7 }
+      resolvedDays: { min: 30 }
+      controlBytes: { min: 65536 }
+      recentReceipts: { min: 1, max: 32 }
+    consumes: [feedback-retained-bytes@1, feedback-managed-bytes@1, feedback-reclaimable-bytes@1, feedback-protected-bytes@1, feedback-rejected-capture@1]
+    binding: binding-local
+    class: measure
+    scope: { path: .eprfs/status/feedback }
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    status: active
+    supersedes: null
+    why: >
+      Bound local feedback without evicting unresolved, constitutional, counter-evidence
+      or referenced experience. Pressure is evidence; this delegated retention policy
+      alone permits deletion. Surviving bytes and historical policies never change.
+      Routine automatic successes wait seven days; resolved dependency groups wait
+      thirty days after experienced recovery, never validation or release alone.
+    measure:
+      totalBytes: 16777216
+      activeBytes: 7340032
+      replacementBytes: 7340032
+      controlBytes: 2097152
+      recordBytes: 65536
+      triggerPercent: 85
+      resetPercent: 70
+      routineDays: 7
+      resolvedDays: 30
+      recentReceipts: 8
+      dwellSeconds: 0
+    permitted-local-parameters: [totalBytes, activeBytes, replacementBytes, controlBytes, recordBytes, triggerPercent, resetPercent, routineDays, resolvedDays, recentReceipts, dwellSeconds]
+    constraints: >
+      Local variance must preserve total >= active + replacement + control,
+      replacement >= active, control >= 65536, record <= active,
+      0 <= reset < trigger <= 100, routineDays >= 7, resolvedDays >= 30,
+      recentReceipts <= 32. No spool, overflow archive, recursive capture or network.
+
   - id: source-file-loc-ceiling
     version: 1
     contentHash: sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d

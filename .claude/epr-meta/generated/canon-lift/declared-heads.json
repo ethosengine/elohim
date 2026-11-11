@@ -535,6 +535,28 @@
       ]
     },
     {
+      "id": "feedback-local-retention",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24",
+        "sha256Pin": "sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "governance-escalation-ladder",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",

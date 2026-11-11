@@ -15,6 +15,7 @@ pub mod device_key;
 pub mod doctor;
 pub mod error;
 pub mod explain;
+pub mod feedback;
 pub mod flow;
 pub mod frames;
 pub mod git;

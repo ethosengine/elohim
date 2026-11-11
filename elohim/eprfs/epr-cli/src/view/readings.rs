@@ -247,3 +247,29 @@ pub fn fields(reader: &ArtifactReader, bytes: &[u8]) -> Result<Value> {
         _ => Ok(json!({})),
     }
 }
+
+#[cfg(test)]
+mod feedback_isolation_tests {
+    use super::*;
+
+    #[test]
+    fn captured_view_never_opens_private_feedback_as_an_implicit_resource() {
+        let declaration: Declaration = serde_json::from_str(include_str!(
+            "../../tests/fixtures/views/workshop/view.json"
+        ))
+        .expect("declaration");
+        let bytes = BTreeMap::new();
+        let files = BTreeMap::from([
+            ("items".to_owned(), Vec::new()),
+            ("ledger".to_owned(), Vec::new()),
+        ]);
+        let inputs = Inputs::new(&declaration, &bytes, &files).expect("captured inputs");
+        let error = inputs
+            .feedback_entry(&flow::body_cid("a private occurrence address"))
+            .expect_err("private resource was not explicitly captured");
+        assert!(error
+            .to_string()
+            .contains("private feedback resource not captured"));
+        assert!(inputs.used.borrow().is_empty());
+    }
+}

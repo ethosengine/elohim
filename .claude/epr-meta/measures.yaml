@@ -74,6 +74,81 @@
 
 measures-version: 1
 measures:
+  - id: feedback-retained-bytes
+    version: 1
+    family: feedback-capacity
+    unit: byte
+    procedure: "Verified active feedback generation, including serialized record overhead."
+    probe:
+      run: "epr feedback measure --measure feedback-retained-bytes@1 --json"
+      emits: count
+      due: session
+      timeout-seconds: 10
+    env-sensitivity: [workspace, policyCid]
+    default-authority: observation
+    status: active
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    why: "One resolved policy and one read-only observation serve enforcement, inspection and native flow sense. Unknown/corrupt observations refuse; automatic capture never appends secondary flow observations."
+  - id: feedback-managed-bytes
+    version: 1
+    family: feedback-capacity
+    unit: byte
+    procedure: "All feedback-owned regular file contents, including generations, temporary metadata, control and receipts; not filesystem bookkeeping."
+    probe:
+      run: "epr feedback measure --measure feedback-managed-bytes@1 --json"
+      emits: count
+      due: session
+      timeout-seconds: 10
+    env-sensitivity: [workspace, policyCid]
+    default-authority: observation
+    status: active
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    why: "One resolved policy and one read-only observation serve enforcement, inspection and native flow sense. Unknown/corrupt observations refuse; automatic capture never appends secondary flow observations."
+  - id: feedback-reclaimable-bytes
+    version: 1
+    family: feedback-capacity
+    unit: byte
+    procedure: "Age-eligible dependency groups with known references and policy permission."
+    probe:
+      run: "epr feedback measure --measure feedback-reclaimable-bytes@1 --json"
+      emits: count
+      due: session
+      timeout-seconds: 10
+    env-sensitivity: [workspace, policyCid]
+    default-authority: observation
+    status: active
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    why: "One resolved policy and one read-only observation serve enforcement, inspection and native flow sense. Unknown/corrupt observations refuse; automatic capture never appends secondary flow observations."
+  - id: feedback-protected-bytes
+    version: 1
+    family: feedback-capacity
+    unit: byte
+    procedure: "Evidence currently ineligible for reclamation, including unresolved and unknown dependencies."
+    probe:
+      run: "epr feedback measure --measure feedback-protected-bytes@1 --json"
+      emits: count
+      due: session
+      timeout-seconds: 10
+    env-sensitivity: [workspace, policyCid]
+    default-authority: observation
+    status: active
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    why: "One resolved policy and one read-only observation serve enforcement, inspection and native flow sense. Unknown/corrupt observations refuse; automatic capture never appends secondary flow observations."
+  - id: feedback-rejected-capture
+    version: 1
+    family: feedback-capacity
+    unit: capture
+    procedure: "Capacity refusals witnessed in the bounded current checkpoint; missing checkpoint is unknown."
+    probe:
+      run: "epr feedback measure --measure feedback-rejected-capture@1 --json"
+      emits: count
+      due: session
+      timeout-seconds: 10
+    env-sensitivity: [workspace, policyCid]
+    default-authority: observation
+    status: active
+    established_by: operator-2026-11-08-feedback-capacity-plan
+    why: "One resolved policy and one read-only observation serve enforcement, inspection and native flow sense. Unknown/corrupt observations refuse; automatic capture never appends secondary flow observations."
   - id: clippy-standard
     version: 1
     family: clippy

@@ -21,6 +21,7 @@ const addFormatsFn: (ajv: AjvNs.default) => void =
 
 import { aggregate } from './lib/aggregate.js';
 import { readDeclaredConcerns } from './lib/declared-concerns.js';
+import { captureFeedback } from './lib/feedback.js';
 import { publishHouseholdEvidence } from './lib/household-attestation.js';
 import { loadConsoleArtifacts } from './lib/load-console.js';
 import { loadCoverageGap } from './lib/load-coverage-gap.js';
@@ -137,6 +138,7 @@ function main() {
     process.exit(2);
   }
 
+  captureFeedback(report, REPO_ROOT);
   ensureDir(args.outJson);
   writeFileSync(args.outJson, JSON.stringify(report, null, 2));
   ensureDir(args.outMd);

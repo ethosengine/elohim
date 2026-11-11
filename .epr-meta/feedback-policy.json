@@ -1,0 +1,10 @@
+{
+  "id": "developer-workspace-feedback@1",
+  "authority": "workspace operator's feedback delivery instruction; delegated local capture and bounded repair, existing execution admission required",
+  "participant": null,
+  "producers": ["human", "genesis", "brit", "brit-guard"],
+  "automaticCapture": true,
+  "deliberateEvidence": true,
+  "response": "repair",
+  "sharing": "separately-authorized"
+}

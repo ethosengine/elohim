@@ -13,8 +13,9 @@ pub use canonical::{canonical_body, canonical_json, hex_lower, CanonError, HASH_
 
 pub use evaluation::{
     evaluate_path, evaluate_path_with, policy_established_by, resolve_decision,
-    GovernanceEvaluation, GovernanceVerdict, GovernanceWrite, NoValidators, PolicyContentRef,
-    PolicyDiagnostic, ResolvedDecision, ValidatorOutcome, ValidatorProvider, ValidatorRequest,
+    resolved_policy_snapshot, GovernanceEvaluation, GovernanceVerdict, GovernanceWrite,
+    NoValidators, PolicyContentRef, PolicyDiagnostic, ResolvedDecision, ValidatorOutcome,
+    ValidatorProvider, ValidatorRequest,
 };
 
 pub use integrity::{cascade_problems, targets_manifest, validate_meta, ManifestProblems};

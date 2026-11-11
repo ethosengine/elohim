@@ -1661,6 +1661,35 @@ habits:
       attention-witnessed-privately's retire-when — a row that cannot be appended unsigned leaves
       nothing to say "absent" about.
 
+  - id: private-feedback-loop
+    declared: elohim/epr/.epr-meta/private-feedback-loop.habit.md
+    invariant: >
+      Retained private experience survives restart, and recorder failure preserves the producer's
+      result, without capture creating commitments, publications, or recovery claims from validation alone.
+    status: red
+    active: false
+    checks:
+      - "cd genesis/a2o && node --import tsx scripts/verify-brit-feedback.ts (installed current pair; explicit --epr/--brit is candidate evidence only)"
+      - "a2o @concern:private-feedback-loop (genesis/a2o/features/devflow/private-feedback.feature)"
+      - "cargo test -p elohim-epr-rea --test feedback (owning elohim gate/pool environment)"
+      - "cargo test -p elohim-epr-rea --test feedback_capacity (owning elohim gate/pool environment)"
+      - "cargo test -p elohim-epr-rea --lib feedback_store::generation::tests (owning elohim gate/pool environment)"
+      - "cargo test -p elohim-epr-cli --test feedback (owning eprfs gate/pool environment)"
+    evidence: >
+      DELTA 2026-11-11 (installed boundary RED): Ambient and independently resolved current EPR both refuse `feedback` (exit 2); the workspace retained two historical Brit refusals, not a continuing usage stream. Explicit native capacity migration preserves both experiences and their CIDs (2,716 protected bytes, zero reclaimed). A real candidate-selected `brit log -5` through the native launcher exits 0, returns five entries and retains its invocation, without changing installed heads or claiming participant recovery. Native `feedback record/group/propose`, actor-bound `flow claim`, and `feedback link` carry the installation gap into commitment `bafyreifzvj7zvkpzntflxmxt2yxl2vcyfvvhcnoypzzkcdv6rte47nejuq` under steward human:matthew. `flow context` exposes the next missing node: the retained occurrence is readable but its scope has no filesystem source, so reconciliation requires revalidation. The ordered sprint is `genesis/docs/superpowers/plans/2026-11-11-brit-feedback-operation.md`; private proof is `genesis/a2o/reports/recovery/brit-feedback-20261111/`. Prior core/fixture proof remains valid within its stated boundary; installed delivery and native feedback-source reconciliation are open. The new diagnostic passes eight focused tests and four host scenarios/24 steps; final `just gate genesis-a2o` and `just gate gherkin-prepush-lint` exit 0. It returns failed for the installed pair, passed for the explicit candidate pair, and unmeasured for absent tooling/current heads. Review corrected launcher pin writes and exact native Intent scope checking; the early session-pin side effect is retained in `early-probe-pin.json`, and corrected-run head/pin preservation in `probe-pin-preservation.json`. No installed head moved. Detailed evidence: `genesis/docs/superpowers/sprints/task-brit-feedback-probe-report.md`.
+    evidence-fingerprint: sha256:54c31d5456958818
+    evidence-bytes: 6152
+    evidence-entries: 6
+    guard: >
+      An aggregate count is not a set of individually witnessed occurrences. A proposal,
+      validation attestation, available release and experienced recovery are distinct acts.
+      Total stored bytes and per-record bytes are bounded by contextual policy; a full store
+      refuses new evidence without overflow spooling or recursive capture. Policy-authorized
+      reclamation preserves protected evidence, references, surviving bytes and historical CIDs.
+    retire-when: >
+      Every supported daily-use adapter has preserved these distinctions through a quarter
+      of ordinary operation and the shared contract checks run at every release boundary.
+
   - id: addresses-are-declared-profiles
     declared: elohim/eprfs/.epr-meta/addresses-are-declared-profiles.habit.md
     invariant: >

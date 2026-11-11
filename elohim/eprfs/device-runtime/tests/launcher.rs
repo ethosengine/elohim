@@ -60,6 +60,55 @@ fn setup(tool: &str, binary: &Path) -> (tempfile::TempDir, Store, std::path::Pat
     (tmp, store, bin, release.cid)
 }
 #[test]
+fn inspect_current_ignores_overrides_and_does_not_publish_a_pin_or_usage_lease() {
+    let (tmp, store, bin, cid) = setup("epr", Path::new("/bin/bash"));
+    let before = fs::read_link(store.root().join("current")).unwrap();
+    let output = Command::new(bin.join("bin-launch"))
+        .args(["resolve", "--tool", "epr", "--current", "--json"])
+        .env_clear()
+        .env("BIN_STORE", store.root().parent().unwrap())
+        .env("ELOHIM_SESSION_ID", "inspection-must-not-pin")
+        .env("EPR_BIN", "/missing/candidate")
+        .env("EPR_PIN_CID", "invalid-override")
+        .current_dir(tmp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["cid"], cid);
+    assert_eq!(value["source"], "current");
+    assert_eq!(
+        value["path"],
+        store.root().join(&cid).join("epr").to_str().unwrap()
+    );
+    assert_eq!(fs::read_link(store.root().join("current")).unwrap(), before);
+    assert!(!store.root().join("sessions").exists());
+    assert!(!store.root().join(cid).join(".used").exists());
+}
+
+#[test]
+fn inspect_absent_current_refuses_without_creating_store_state() {
+    let (tmp, store, bin, _) = setup("epr", Path::new("/bin/bash"));
+    fs::remove_file(store.root().join("current")).unwrap();
+    let output = Command::new(bin.join("bin-launch"))
+        .args(["resolve", "--tool", "epr", "--current", "--json"])
+        .env_clear()
+        .env("BIN_STORE", store.root().parent().unwrap())
+        .env("ELOHIM_SESSION_ID", "inspection-must-not-pin")
+        .current_dir(tmp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("head-absent"));
+    assert!(!store.root().join("sessions").exists());
+    assert!(!store.root().join("current").exists());
+}
+
+#[test]
 fn exec_keeps_pid_current_exe_and_daemon_lease_outside_checkout() {
     let (tmp, store, bin, cid) = setup("epr", Path::new("/bin/bash"));
     let child = Command::new(bin.join("epr"))

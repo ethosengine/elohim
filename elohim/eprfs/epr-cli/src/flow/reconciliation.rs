@@ -80,6 +80,29 @@ fn source_issues(
     }
 }
 
+fn feedback_source_issues(
+    root: &(impl acceptance::EvidenceResources + ?Sized),
+    scope: &Cid,
+) -> Vec<String> {
+    let checked = root.feedback_entry(scope).and_then(|entry| {
+        entry.verify()?;
+        if entry.cid != *scope
+            || !matches!(
+                entry.record,
+                elohim_epr_rea::feedback::Feedback::Occurrence(_)
+            )
+        {
+            return Err(super::FlowError::Unavailable(
+                "feedback source must be the exact retained occurrence".into(),
+            ));
+        }
+        Ok(())
+    });
+    checked.err().map_or_else(Vec::new, |error| {
+        vec![format!("current feedback source unestablished: {error}")]
+    })
+}
+
 /// All decisions use this borrowed append-order snapshot. Labels supply candidate
 /// discovery only; they never establish continuity between different content addresses.
 pub fn reconcile(
@@ -111,16 +134,27 @@ pub fn reconcile_with(
     labels: &Labels,
     evaluator: serde_json::Value,
 ) -> Reconciliation {
-    let issues = source_issues(
-        root,
-        scope,
-        path.or_else(|| {
-            labels
-                .get(&scope.to_string())
-                .map(String::as_str)
-                .filter(|label| !label.starts_with("repo:"))
-        }),
-    );
+    // The existing proposal names its source kind. A label is discovery metadata, never
+    // substitute authority for private occurrence bytes (or permission to read them in a view).
+    let feedback_source = records.iter().any(|(_, record)| {
+        matches!(record, FlowRecord::Intent(intent)
+            if intent.in_scope_of == *scope
+                && intent.resource_spec.classified_as.first().is_some_and(|tag| tag == "feedback:repair"))
+    });
+    let issues = if feedback_source {
+        feedback_source_issues(root, scope)
+    } else {
+        source_issues(
+            root,
+            scope,
+            path.or_else(|| {
+                labels
+                    .get(&scope.to_string())
+                    .map(String::as_str)
+                    .filter(|label| !label.starts_with("repo:"))
+            }),
+        )
+    };
     let mut assertions = Vec::new();
     let mut linked = HashSet::new();
     for (id, record) in records {

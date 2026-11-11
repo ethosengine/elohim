@@ -65,6 +65,14 @@ impl Drop for LockedLog {
 }
 
 impl LockedLog {
+    pub(crate) fn contents_bounded(&self, max_bytes: u64) -> Result<String> {
+        if self.file.metadata()?.len() > max_bytes {
+            return Err(FabricError::InvalidFeedback(
+                "feedback store exceeds retention limit".into(),
+            ));
+        }
+        self.contents()
+    }
     pub(crate) fn exclusive(path: &Path) -> Result<Self> {
         let file = OpenOptions::new().read(true).append(true).open(path)?;
         file.lock()?;

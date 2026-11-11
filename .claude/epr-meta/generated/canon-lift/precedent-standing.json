@@ -573,6 +573,27 @@
       }
     },
     {
+      "citesContentCid": "bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24",
+      "citesContentSha256": "sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "feedback-local-retention@1",
+        "title": "Governed capacity for private local feedback",
+        "summary": "Governed capacity for private local feedback",
+        "full_reasoning": "Bound local feedback without evicting unresolved, constitutional, counter-evidence or referenced experience. Pressure is evidence; this delegated retention policy alone permits deletion. Surviving bytes and historical policies never change. Routine automatic successes wait seven days; resolved dependency groups wait thirty days after experienced recovery, never validation or release alone.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"path\":\".eprfs/status/feedback\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "operator-2026-11-08-feedback-capacity-plan",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"measure\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq",
       "citesContentSha256": "sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954",
       "registry": "policies.yaml",

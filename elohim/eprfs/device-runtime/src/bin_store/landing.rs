@@ -169,7 +169,14 @@ impl Store {
             };
             self.require_attestation(&mut record, commit, repo, false)?;
             let health_note = self.health(cid, commit, repo)?;
-            let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+            let feedback = self.feedback_health(cid, repo)?;
+            let _locks = match &feedback {
+                Some(qualified) => qualified.locks(self)?,
+                None => vec![files::Lock::acquire(&self.root, files::MUTATION_WAIT)?],
+            };
+            if let Some(qualified) = &feedback {
+                qualified.revalidate(self, repo)?;
+            }
             let found = self
                 .root
                 .join("current.json")
@@ -188,7 +195,12 @@ impl Store {
                     ),
                 ));
             }
-            let has_health_note = health_note.is_some();
+            let has_health_note = health_note.is_some() || feedback.is_some();
+            if let Some(qualified) = feedback {
+                latest
+                    .extra
+                    .insert("feedbackQualification".into(), qualified.witness);
+            }
             if let Some((kind, detail)) = health_note {
                 Self::add_note(&mut latest, kind, detail);
             }

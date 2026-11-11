@@ -1,5 +1,6 @@
 //! Device-private executable custody. Ingest owns bytes; land owns the committed head.
 //! Status is a projection, never an authority. CLI parsing lives in the consuming binary.
+mod feedback_health;
 pub(crate) mod files;
 mod ingest;
 mod install;
@@ -318,6 +319,7 @@ pub struct Store {
     root: PathBuf,
     tool: String,
     config: Tool,
+    registry: Registry,
     runner: Arc<dyn Runner>,
 }
 impl Store {
@@ -327,6 +329,7 @@ impl Store {
             root: files::absolute(root.as_ref())?,
             tool: tool.into(),
             config: registry.tool(tool)?,
+            registry: registry.clone(),
             runner: Arc::new(SystemRunner),
         })
     }
