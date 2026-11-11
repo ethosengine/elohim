@@ -391,6 +391,46 @@ this spec does not pick one for all binaries:
 
 ## 7. Variant sets
 
+### Framing: a binary is a collective artifact
+
+Added 2026-11-11 at the steward's direction. The artifact store was the forcing function: it
+revealed that holding, tuning and growing binaries is the same discipline the protocol already
+applies to shared content. So this section points every later builder at EPR's existing collective,
+stewardship, lens and custody concepts, and away from inventing artifact-store-specific ones.
+
+A binary is not one file. Its **family** is a cloud: every variant built from one recipe, the floors
+they were built against (sysroots, later compiler closures) and their ingredients, each an ordinary
+content-addressed blob held by many peers. What one device needs is a **lens** over that cloud: the
+variant its own `admit` accepts. When none fits, the device needs the ingredients and a floor it can
+use to build one. A device of a class the network has not seen falls back to the family's portable
+variant, whenever the family carries one (§7.5, the portable floor). When it adapts the recipe for its own hardware, it contributes that
+adaptation back with lineage. As proofs converge, the adaptation rises into what others of its class
+rely on, which is the belonging layer.
+
+| This picture | Reuses | Where |
+|---|---|---|
+| The family's cloud is a collective holding a shared resource | `Collective`, and the commons pool as a collective party: it holds a resource classified by an open label, has no key, and admits draws by membership and reach | qahal collective membership spec (2026-05-19); commons-pool-as-collective-party spec (2026-10-04) §2, held with no habit |
+| Contributing an adaptation, a floor or replication | a `Commitment` naming the collective (`replicates-content`, `delegates-compute`), with value as REA `EconomicEvent`s | commons-pool §2; multi-collective EPR design §6–§7 |
+| Who is responsible for the cloud | stewardship (responsibility held for something larger; graduated, accountable, visible; documented as a `Mishpat::Commitment`) and the commons steward of record | `genesis/docs/architecture/stewardship-over-sovereignty.md`; contributor-presence commons-stewardship spec §3 |
+| A device's view of the cloud | a lens: select → fold → aggregate over existing projections, classifying rather than attesting. `admit` is this device's private fold | reach-projection facing-lens spec (2026-06-19) |
+| The cloud is healthy | every leaf meets its declared custody target across independent holders, with five diverse peers as the high-availability benchmark. Owned by the blob plane, not the artifact store | storage physics benchmark (2026-10-05) §8; elohim-storage `CoverageRollup`; feedback row: `arch-dataplane-refactor-backlog` row 23 |
+| Rising to the belonging layer | conformance-suite membership (§7.1) plus the reach ladder (§3.2), widening by proof, not by vote or authority | §7.1, §7.4, §7.8 |
+
+The collective here is not a special kind. It is an ordinary `Collective`: a network-type collective, held across many peers and governed by proof. The binary cloud is only the case that made it visible. It is a protocol primitive that every collective relies on to keep the protocol's evolution sound at scale, which is why it is worth mastering here first.
+
+Read as EPR, this is story, value and governance again. The **story** is a person whose device
+nobody has seen: it works on day one, and what they contribute later carries others. The **value** is
+contribution as an attributed event, not anonymous lineage. The **governance** is the conformance
+suite, the immune loop's rules (§7.4) and reach widening by proof.
+
+What the artifact store does not own: custody targets, holder independence and collection health
+belong to elohim-storage's blob plane. The gaps found while writing this section went to its own
+backlog (`arch-dataplane-refactor-backlog` row 23), so every consumer of the blob plane inherits the
+fix. Missing nodes:
+
+- `collective / between "variant contributed with lineage" → "contributor credited when others rely on it" / missing node: the contribution recorded as a Commitment naming the collective, with REA events on use / current state: lineage is recorded; nothing credits it; the commons-pool slice it would use is held`.
+- `collective / between "family published" → "family healthy" / missing node: a collection-health fold over the family's leaves reading per-object custody targets / current state: owed by elohim-storage (backlog row above)`.
+
 One logical artifact has several variants. A **variant set** is a small content-addressed document:
 
 ```
@@ -923,7 +963,7 @@ Recording a partial artifact as if it were complete is the failure this rule exi
 | Born with | What it lets another host do | Where it lives |
 |---|---|---|
 | The recipe: the method descriptor, the view's tree and the source commit | rebuild the same thing | method record by CID (exists) |
-| The build inputs as a document, line by line: compiler identity and its default target, link driver, link inputs and the libraries std links, all by content | see which host input made its key differ, and why | a stored document by the key input's CID, readable like the method record (K9) |
+| The build inputs as a document, line by line: compiler identity and its default target, link driver, link inputs and the libraries std links, all by content | see which host input made its key differ, and why | a stored document by the key input's CID, at reach `self` only: its lines reveal the building host's default ISA and sysroot layout, a host fact §4 keeps local; at wider reach a declared-target build names its floor by CID instead (K9) |
 | The family | find every variant of the same recipe | `env:family` (exists) |
 | `Requires`, extracted from the bytes at record time, with each clause's source | admit or refuse before fetching or launching | `env:requires` filled by `put` itself, not by the caller (K8) |
 | Dispatch evidence for code above the floor (§3.2) | not treat runtime-dispatched paths as requirements | inside the Requires document (K10) |

@@ -143,17 +143,19 @@ record alone. State at addition: K1, K2, K3 part 1, K4, K5 and K6 slice 1 are on
 
 - [ ] **K8 — `put` extracts `Requires` from the bytes itself (arch, OS, loader, needed libraries, libc symbol floor, kernel ABI note, ISA level) with `host_contract::Requires` and writes `env:requires`; a caller-supplied `--requires` may only make a clause stricter; an artifact whose requirements cannot be extracted refuses** (serves sprint-lands-each-closure-once)
 
-Constraints from the A1 owner (shem, 2026-11-11): `put` builds `Requires` through `Requires::try_from(Vec<Clause>)` or `insert`, so a conflict between a declared and an extracted clause surfaces as `MergeError` and never silently weakens; extracted clauses carry `source: extracted`; the building host's `Provides` is never recorded (it is not serializable by design).
+Axis ids and version lines come from the `host_contract` constants the A1 owner is adding (arch, os, isa.x86, kernel.linux, abi.libc, abi.loader, lib; lines glibc, musl, linux), never from literal strings, so two spellings cannot silently fail to compare. K8 starts after those constants land. Constraints from the A1 owner (shem, 2026-11-11): `put` builds `Requires` through `Requires::try_from(Vec<Clause>)` or `insert`, so a conflict between a declared and an extracted clause surfaces as `MergeError` and never silently weakens; extracted clauses carry `source: extracted`; the building host's `Provides` is never recorded (it is not serializable by design).
 
 Verify: recording the epr built on ethosengine yields `isa.x86` at v3 with `source: extracted` and its sqlite3 evidence, plus `abi.libc ≥ glibc 2.39`; the same record admitted against a synthetic v2 `Provides` refuses naming the missing features; an unreadable artifact refuses.
 
-- [ ] **K9 — the key's input lines are stored as a document by the input CID, readable by an admitted device like the method record, so another host can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
+- [ ] **K9 — the key's input lines are stored as a document by the input CID, readable by the person's own devices (reach `self`) like the method record, so another of their devices can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
 
-Verify: on two devices, the same descriptor's input documents are fetched and diffed, and the diff names exactly the differing lines (on ethosengine and shem: `link:Scrt1.o`, `link:crt1.o` and the macro dump); the stored document's CID equals the key's input CID.
+Reach: `self`, not wider. The lines include the compiler's predefined-macro dump and the link-input paths, which reveal the building host's default ISA and sysroot layout: a host fact, which spec §4 keeps local. Between one person's devices that disclosure is within the roster's trust (H12). Beyond them, a declared-target build (K6) keys the floor by its CID in place of host lines, so what crosses at wider reach is the floor's identity, not the host's.
+
+Verify: on two devices of one person, the same descriptor's input documents are fetched and diffed, and the diff names exactly the differing lines (on ethosengine and shem: `link:Scrt1.o`, `link:crt1.o` and the macro dump); the stored document's CID equals the key's input CID; a requester that is not one of the person's devices is refused the document.
 
 - [ ] **K10 — dispatch evidence (spec §3.2): the ISA extraction counts only code reached without a runtime feature check, on evidence bound to the bytes (compiler multi-versioning metadata or a build-time attestation naming guarded functions by content), not a symbol-name pattern; unproven dispatch counts as a requirement** (serves sprint-lands-each-closure-once)
 
-Constraint from the A1 owner: dispatch evidence never adds an `isa` clause; it removes the above-floor features it covers from the extracted clause, and when nothing above the floor remains the clause is absent (spec §3.1 rule 4: an absent clause requires nothing).
+Recording: a clause narrowed by dispatch evidence carries `Clause.narrowing` (`Narrowing { removed, evidence }`, host_contract, provenance only: admit ignores it), so a reader sees why the requirement shrank (A1 owner's review note, 2026-11-11). When narrowing removes every above-floor feature, the clause is omitted, not kept empty (an empty clause is refused as unknown-axis by a host that does not observe the axis), and the `Narrowing` record travels on the artifact's Produce instead. Constraint from the A1 owner: dispatch evidence never adds an `isa` clause; it removes the above-floor features it covers from the extracted clause, and when nothing above the floor remains the clause is absent (spec §3.1 rule 4: an absent clause requires nothing).
 
 Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when their guard is evidenced; with the evidence withheld, the same bytes extract v3; epr's sqlite3 v3 code stays a requirement.
 
@@ -184,6 +186,10 @@ Verify: one admitted and three refused fetches, each refusal naming its reason; 
 - [ ] **V4 — landing a set member as a device tool is judged by membership in an accepted set, through an explicit recorded transition shaped like the bin store's lineage rebase** (serves sprint-lands-each-closure-once)
 
 Verify: an adapted member lands with its recorded transition; a non-member is refused as before.
+
+- [ ] **V6 — contribution to a binary family as an attributed, valued event (spec §7 framing): an adapted variant, a packed floor or a replication of a family's leaves is recorded as a `Commitment` naming the collective (an ordinary, network-type `Collective`; nothing binary-specific), reusing the commons-pool-as-collective-party shape (no new entry type), with REA `EconomicEvent`s when others draw on it. BLOCKED on the commons-pool slice (held, no habit) and on elohim-storage's per-object custody and collection health (`arch-dataplane-refactor-backlog` row 23)** (serves dataplane-convergence)
+
+Verify: an adapted variant appended to a family on one device is credited to its contributor; a second device's fetch of it records a draw against the collective; the family's health reads the collection-health fold from elohim-storage, not an artifact-store count.
 
 ## Lane P — placement, measure and rakia (spec §7.3, §10; rung H5; H10)
 
@@ -275,6 +281,10 @@ steward-space head move → a repair reused by a second device.
 - [ ] **S5 — a story for reuse through a channel: one device's elohim repairs a variant and publishes it on a repair channel at the steward's reach; a second device of the same class follows that channel and adopts the repair after probation; a third device of another class follows it and is told nothing there fits it** (serves dataplane-convergence)
 
 Verify: `@concern:dataplane-convergence`; one fresh blind reader returns READY with no correctness finding.
+
+- [ ] **S6 — the next scenarios in the unseen-device arc, extending S3's `devflow/unseen-device-builds-its-variant.feature` (or a new file that cites it, so the story stays in one place), for the binary as a collective (spec §7 framing): a person whose device class nobody has seen runs the family's portable variant on day one, contributes an adaptation for their hardware, and later sees that adaptation become what other devices of their class rely on, with the contribution credited to them** (serves dataplane-convergence)
+
+Verify: `@concern:dataplane-convergence`; its author runs the a2o blind-reader loop (one fresh reader returns READY with no correctness finding; S3's run does not carry over); the story speaks of a generic collective and names no artifact-store-specific mechanism the framing table does not map to an existing EPR concept.
 
 - [ ] **C1 — a channel head names a variant-set CID: resolve ark's `ArtifactRef::Channel` through the device's declared `follows`, reusing storage's release-channel id rule (`elohim/elohim-storage/src/release_channel.rs`) and the steward-space compare-and-swap head move** (serves dataplane-convergence)
 
