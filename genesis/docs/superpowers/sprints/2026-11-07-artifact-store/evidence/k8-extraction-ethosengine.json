@@ -1,6 +1,6 @@
 {
   "task": "host-compatibility-foundation K8",
-  "status": "round-5 complete: N1 and N2 fixed; all four required Cargo checks green; no push",
+  "status": "K8 V8 fallback complete: both real binaries extract; all required checks green; no push",
   "measurement": [
     {
       "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
@@ -1639,5 +1639,337 @@
       "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regressions execute now)"
     },
     "repository_operations": "Installed launchers refused read-only filesystem access; direct installed Brit/epr binaries used for initial inspection. epr doctor coherent; Codex shell invocation adapter unsupported/unmeasured. All Cargo commands serialized with the requested process guard. no Cargo.lock or host_contract edits; no push. Native commit trailers measured gpt-6-astra and Codex session 01a1cc50-bb54-7a62-bd5e-af9c54d23e82; native envelope opened and implementer claim registered. Brit path-scoped staging succeeded; commit refused untrusted core.hooksPath with EXIT=1. Inspection confirmed HEAD still b679507c4 and exactly the six intended paths staged. The authorized new local commit uses Git fallback with hooks enabled; no amend, force or push."
+  },
+  "v8_fallback": {
+    "date": "2026-11-12",
+    "base": "0df9d45aa",
+    "decision": "Linear decoding first; only invalid/truncated non-stub ranges retry from the range start with bounded control flow. Reached invalid instructions still refuse. Direct calls/branches add in-range targets; ret, direct jmp, indirect jmp/call, ud2, int3 and hlt stop paths. No symbol-name special cases.",
+    "measurement": [
+      {
+        "path": "/projects/.cargo-target-pool/family/dev/doorway__doorway-service/mesh-bin/doorway",
+        "bytes": 208090280,
+        "elapsed_ms": 10402.981,
+        "requires_cid": "bafkr4ih3jp3c3wkq7fyog5shw2pbhhfzcharwhjdkwqhaczvvqa2bup5ra",
+        "exit": 0,
+        "measured_copy": "/var/tmp/hc-k8b/doorway",
+        "requires": [
+          {
+            "axis": "abi.libc",
+            "predicate": {
+              "kind": "at-least",
+              "value": {
+                "components": [
+                  2,
+                  34
+                ],
+                "line": "glibc"
+              }
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "abi.loader",
+            "predicate": {
+              "kind": "present",
+              "value": [
+                "/lib64/ld-linux-x86-64.so.2"
+              ]
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "arch",
+            "predicate": {
+              "kind": "equal",
+              "value": "x86_64"
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "isa.x86",
+            "predicate": {
+              "kind": "subset",
+              "value": [
+                "adx",
+                "aes",
+                "avx",
+                "avx2",
+                "avx512_vbmi2",
+                "avx512_vpopcntdq",
+                "avx512bw",
+                "avx512cd",
+                "avx512dq",
+                "avx512f",
+                "avx512vbmi",
+                "avx512vl",
+                "bmi1",
+                "bmi2",
+                "cx16",
+                "f16c",
+                "fma",
+                "lahf_lm",
+                "lzcnt",
+                "movbe",
+                "osxsave",
+                "pclmulqdq",
+                "popcnt",
+                "rdrand",
+                "rdseed",
+                "sha_ni",
+                "sse3",
+                "sse4_1",
+                "sse4_2",
+                "ssse3",
+                "vaes",
+                "vpclmulqdq"
+              ]
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "kernel.linux",
+            "predicate": {
+              "kind": "at-least",
+              "value": {
+                "components": [
+                  3,
+                  2,
+                  0
+                ],
+                "line": "linux"
+              }
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "lib",
+            "predicate": {
+              "kind": "present",
+              "value": [
+                "ld-linux-x86-64.so.2",
+                "libc.so.6",
+                "libgcc_s.so.1",
+                "libm.so.6"
+              ]
+            },
+            "source": "extracted"
+          },
+          {
+            "axis": "os",
+            "predicate": {
+              "kind": "equal",
+              "value": "linux"
+            },
+            "source": "extracted"
+          }
+        ],
+        "partialFunctions": {
+          "count": 120,
+          "examples": [
+            {
+              "decodedBytes": 986,
+              "rangeLength": 1312,
+              "rangeStart": 87806976,
+              "symbol": "Builtins_StringFromCodePointAt",
+              "unreachedBytes": 326
+            },
+            {
+              "decodedBytes": 3198,
+              "rangeLength": 3752,
+              "rangeStart": 87811520,
+              "symbol": "Builtins_StringSubstring",
+              "unreachedBytes": 554
+            },
+            {
+              "decodedBytes": 374,
+              "rangeLength": 728,
+              "rangeStart": 87819712,
+              "symbol": "Builtins_CompileLazy",
+              "unreachedBytes": 354
+            },
+            {
+              "decodedBytes": 126,
+              "rangeLength": 456,
+              "rangeStart": 87825984,
+              "symbol": "Builtins_DebugBreakTrampoline",
+              "unreachedBytes": 330
+            },
+            {
+              "decodedBytes": 3131,
+              "rangeLength": 4128,
+              "rangeStart": 87830976,
+              "symbol": "Builtins_KeyedLoadIC_PolymorphicName",
+              "unreachedBytes": 997
+            }
+          ],
+          "unreachedBytes": 224426
+        },
+        "coverage": {
+          "total_bytes": 80097839,
+          "covered_bytes": 77433343,
+          "uncovered_bytes": 2664496,
+          "covered_percent": 96.673448,
+          "sections": [
+            {
+              "section": ".text",
+              "total_bytes": 80093792,
+              "covered_bytes": 77429296,
+              "uncovered_bytes": 2664496
+            },
+            {
+              "section": ".init",
+              "total_bytes": 32,
+              "covered_bytes": 32,
+              "uncovered_bytes": 0
+            },
+            {
+              "section": ".fini",
+              "total_bytes": 13,
+              "covered_bytes": 13,
+              "uncovered_bytes": 0
+            },
+            {
+              "section": "malloc_hook",
+              "total_bytes": 562,
+              "covered_bytes": 562,
+              "uncovered_bytes": 0
+            },
+            {
+              "section": ".plt",
+              "total_bytes": 3440,
+              "covered_bytes": 3440,
+              "uncovered_bytes": 0
+            }
+          ]
+        }
+      },
+      {
+        "path": "/projects/.claude-config/tools/bin-store/epr/current/epr",
+        "bytes": 128590816,
+        "elapsed_ms": 5617.995,
+        "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+        "exit": 0,
+        "requires_document": "genesis/docs/superpowers/sprints/2026-11-07-artifact-store/evidence/k8-installed.requires.json",
+        "requires_bytes": 924,
+        "requires_bytes_unchanged": true,
+        "requires_cid_unchanged": true,
+        "previous_evidence_unchanged": true,
+        "partialFunctions": {
+          "count": 0,
+          "examples": [],
+          "unreachedBytes": 0
+        },
+        "coverage": {
+          "total_bytes": 42396840,
+          "covered_bytes": 41280908,
+          "uncovered_bytes": 1115932,
+          "covered_percent": 97.367889,
+          "sections": [
+            {
+              "section": ".text",
+              "total_bytes": 42396064,
+              "covered_bytes": 41280132,
+              "uncovered_bytes": 1115932
+            },
+            {
+              "section": ".init",
+              "total_bytes": 27,
+              "covered_bytes": 27,
+              "uncovered_bytes": 0
+            },
+            {
+              "section": ".fini",
+              "total_bytes": 13,
+              "covered_bytes": 13,
+              "uncovered_bytes": 0
+            },
+            {
+              "section": ".plt",
+              "total_bytes": 736,
+              "covered_bytes": 736,
+              "uncovered_bytes": 0
+            }
+          ]
+        }
+      }
+    ],
+    "timing_scope": "File read plus extraction in the debug test harness, run sequentially before the full suite; not a controlled performance comparison.",
+    "regressions": [
+      "inline 4-byte table -> reached AVX2/v3 and exact uncovered counts",
+      "reached invalid branch target refuses with symbol/address",
+      "clean linear code keeps unreachable features and empty partialFunctions",
+      "all six ABI stubs refuse invalid bytes after ret",
+      "4096 conditional self-loops plus unconditional self-loop terminate at 4097 reached instructions",
+      "all path terminators; direct call target and fallthrough; ENDBR accounting",
+      "failed linear features discarded; seven partial ranges cap examples at five and UTF-8 names at 256 bytes"
+    ],
+    "checks": [
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli artifact",
+        "exit": 0,
+        "passed": 130,
+        "log": "artifact-test-host.log"
+      },
+      {
+        "command": "cargo test --offline --locked -p elohim-epr-cli",
+        "exit": 0,
+        "passed": 1475,
+        "log": "full-test.log"
+      },
+      {
+        "command": "cargo clippy --offline --locked -p elohim-epr-cli --all-targets -- -D warnings",
+        "exit": 0,
+        "log": "clippy.log"
+      },
+      {
+        "command": "cargo fmt -p elohim-epr-cli -- --check",
+        "exit": 0,
+        "log": "fmt.log"
+      },
+      {
+        "command": "just gate rust-style",
+        "exit": 0,
+        "log": "rust-style-host.log",
+        "debt": "epr-cli 0 -> 0; no suppressions added"
+      },
+      {
+        "command": "epr check",
+        "exit": 0
+      }
+    ],
+    "validation_history": [
+      {
+        "check": "artifact tests (sandbox)",
+        "exit": 101,
+        "reason": "Existing sysroot ownership fixture: chown(1234,1234) returned EINVAL; host rerun passed."
+      },
+      {
+        "check": "rust-style gate (sandbox)",
+        "exit": 1,
+        "reason": "Separate rust-style pool slot is read-only; failed before source checking."
+      }
+    ],
+    "story_harvest": {
+      "chain": "host-compatibility K8 -> artifact Produce",
+      "between": "function ranges -> extracted Requires",
+      "missing_node": "A sized function can contain inline data; reached instruction validation and uncovered-byte evidence precede the requirement claim.",
+      "probe": "Synthetic jump over a 4-byte relative table into AVX2, plus the copied real doorway binary.",
+      "current_state": "green by artifact regressions and doorway extraction",
+      "scenario": "@regression Given a sized function with an inline 4-byte-offset table skipped by a direct jump; When Matthew records the artifact; Then reached AVX2 contributes v3 and unreached bytes are reported, while any reached invalid instruction refuses.",
+      "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regression is runnable)"
+    },
+    "repository_operations": "Installed launchers refused read-only bookkeeping; direct installed Brit/epr used. Doctor/check coherent; Codex shell adapter coverage remains unmeasured. Native session opened with host access and trailers measured. No Cargo.lock or host-contract edits; no push. Brit staged exactly seven task paths, then refused commit with \"refusing to ignore an untrusted core.hooksPath\" (exit 1); HEAD remained 0df9d45aa. Git fallback for the authorized new local commit retains hooks; no amend or push.",
+    "remaining": [
+      "K10 dispatch narrowing remains outside this change. Unreached bytes are disclosed, not certified as code."
+    ],
+    "validation_environment": {
+      "CARGO_TARGET_DIR": "/projects/.cargo-target-pool/family/hostcompat/elohim__eprfs/dev",
+      "RUSTUP_TOOLCHAIN": "1.96.1",
+      "RUSTFLAGS": "",
+      "CARGO_BUILD_JOBS": "6",
+      "TMPDIR": "/var/tmp/hc-k8b/t",
+      "serialization": "Host-visible pgrep cargo/rustc guard before each proving Cargo invocation; exported guarding function for the rust-style gate."
+    },
+    "log_directory": "genesis/a2o/reports/recovery/hc-k8b/"
   }
 }

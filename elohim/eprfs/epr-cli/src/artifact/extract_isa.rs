@@ -8,6 +8,9 @@ use serde::Serialize;
 
 use super::{layout::name as bounded_name, unrecorded, ArtifactResult, Elf};
 
+#[path = "extract_control_flow.rs"]
+mod control_flow;
+
 const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
     "fpu", "cx8", "cmov", "mmx", "fxsr", "sse", "sse2", "syscall", "clflush", "tsc", "msr", "cpuid",
@@ -66,6 +69,26 @@ pub(super) struct Scan {
     not_required: Vec<NotRequired>,
     instructions: u64,
     sections: Vec<Coverage>,
+    #[serde(rename = "partialFunctions")]
+    partial_functions: PartialFunctions,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialFunctions {
+    count: u64,
+    unreached_bytes: u64,
+    examples: Vec<PartialFunction>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialFunction {
+    symbol: Option<String>,
+    range_start: u64,
+    range_length: u64,
+    decoded_bytes: u64,
+    unreached_bytes: u64,
 }
 
 #[derive(Serialize)]
@@ -206,6 +229,7 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
         not_required: Vec::new(),
         instructions: 0,
         sections: Vec::new(),
+        partial_functions: PartialFunctions::default(),
     };
     // A present .symtab is authoritative; use .dynsym only when it is absent.
     let table = if file.elf_section_table().iter().any(|s| {
@@ -291,10 +315,61 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
                 &local,
                 &mut coverage.uncovered_examples,
             );
-            coverage.covered_bytes += range.end - range.start;
             cursor = range.end;
             let code = &data[(range.start - start) as usize..(range.end - start) as usize];
-            decode(code, range.start, name, &intervals, &mut scan)?;
+            let reached = control_flow::validate(code, range.start, !ABI_STUB_SECTIONS.contains(&name))
+                .map_err(|address| unrecorded(format!(
+                    "isa.x86: invalid instruction or instruction past range end in {name} at 0x{address:x}, containing symbol {}",
+                    intervals.containing(address).unwrap_or("<unknown; FDE range>")
+                )))?;
+            let decoded_bytes = if let Some(reached) = &reached {
+                let decoded = reached.bytes.iter().filter(|&&b| b).count() as u64;
+                let unreached = code.len() as u64 - decoded;
+                if unreached != 0 {
+                    scan.partial_functions.count += 1;
+                    scan.partial_functions.unreached_bytes += unreached;
+                    if scan.partial_functions.examples.len() < 5 {
+                        scan.partial_functions.examples.push(PartialFunction {
+                            symbol: intervals
+                                .containing(range.start)
+                                .map(|s| bounded_name(s).into()),
+                            range_start: range.start,
+                            range_length: code.len() as u64,
+                            decoded_bytes: decoded,
+                            unreached_bytes: unreached,
+                        });
+                    }
+                    let mut offset = 0;
+                    while offset < code.len() && coverage.uncovered_examples.len() < 5 {
+                        if reached.bytes[offset] {
+                            offset += 1;
+                            continue;
+                        }
+                        let from = offset;
+                        while offset < code.len() && !reached.bytes[offset] {
+                            offset += 1;
+                        }
+                        uncovered(
+                            range.start + from as u64,
+                            range.start + offset as u64,
+                            &local,
+                            &mut coverage.uncovered_examples,
+                        );
+                    }
+                }
+                decoded
+            } else {
+                code.len() as u64
+            };
+            coverage.covered_bytes += decoded_bytes;
+            decode(
+                code,
+                range.start,
+                name,
+                &intervals,
+                reached.as_ref(),
+                &mut scan,
+            )?;
         }
         uncovered(cursor, end, &local, &mut coverage.uncovered_examples);
         coverage.uncovered_bytes = coverage.total_bytes - coverage.covered_bytes;
@@ -326,18 +401,26 @@ fn decode(
     start: u64,
     section: &str,
     symbols: &SymbolIntervals<'_>,
+    reached: Option<&control_flow::Reached>,
     scan: &mut Scan,
 ) -> ArtifactResult<()> {
     let mut decoder = Decoder::with_ip(64, data, start, DecoderOptions::NONE);
     let mut instruction = Instruction::default();
     while decoder.can_decode() {
+        if let Some(reached) = reached {
+            let position = decoder.position();
+            let Some(next) = reached.starts[position..].iter().position(|&b| b) else {
+                break;
+            };
+            decoder.set_position(position + next).map_err(unrecorded)?;
+            decoder.set_ip(start + (position + next) as u64);
+        }
         decoder.decode_out(&mut instruction);
         let symbol = symbols.containing(instruction.ip());
-        if instruction.is_invalid() || instruction.next_ip() > start + data.len() as u64 {
-            return Err(unrecorded(format!(
-                "isa.x86: invalid instruction or instruction past range end in {section} at 0x{:x}, containing symbol {}",
-                instruction.ip(), symbol.unwrap_or("<unknown; FDE range>")
-            )));
+        if reached.is_some() {
+            let next = (instruction.ip() - start) as usize + 1;
+            decoder.set_position(next).map_err(unrecorded)?;
+            decoder.set_ip(start + next as u64);
         }
         scan.instructions += 1;
         let mut features = Vec::new();

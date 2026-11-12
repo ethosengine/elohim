@@ -311,3 +311,160 @@ fn artifact_fde_reader_pc_relative_v3_and_dwarf64() {
     wide[end - 9..end - 1].copy_from_slice(&u64::MAX.to_le_bytes());
     assert!(super::super::frames::read(&wide, 0).is_err());
 }
+
+#[test]
+fn artifact_inline_table_fallback_counts_avx2_and_unreached_bytes() {
+    // nop; jmp over a four-byte relative offset; vpxor ymm0,ymm0,ymm0; ret; data.
+    let code = [0x90, 0xeb, 4, 6, 0, 0, 0, 0xc5, 0xfd, 0xef, 0xc0, 0xc3, 6];
+    let result = extract(Path::new("inline.elf"), &sized(&code, code.len() as u64)).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ISA_X86),
+        &Predicate::Subset(names(X86_64_V3.features))
+    );
+    let scan = &result.evidence[axis::ISA_X86];
+    assert_eq!(scan["instructions"], 4);
+    assert_eq!(scan["used"]["avx2"]["count"], 1);
+    assert_eq!(scan["used"]["osxsave"]["count"], 1);
+    assert_eq!(
+        scan["partialFunctions"],
+        json!({
+            "count": 1, "unreachedBytes": 5,
+            "examples": [{"symbol": "sized_function", "rangeStart": 0x400078,
+                "rangeLength": 13, "decodedBytes": 8, "unreachedBytes": 5}]
+        })
+    );
+    assert_eq!(scan["sections"][0]["covered_bytes"], 8);
+    assert_eq!(scan["sections"][0]["uncovered_bytes"], 5);
+    assert_eq!(
+        scan["sections"][0]["uncovered_examples"],
+        json!([
+            {"start": 0x40007b, "length": 4, "nearest_preceding_symbol": "sized_function"},
+            {"start": 0x400084, "length": 1, "nearest_preceding_symbol": "sized_function"}
+        ])
+    );
+}
+
+#[test]
+fn artifact_fallback_reached_invalid_target_still_refuses() {
+    // The first invalid byte triggers fallback; the jump reaches the second one.
+    let code = [0xeb, 1, 6, 6];
+    let error = extract(Path::new("reached.elf"), &sized(&code, 4))
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(
+        error.contains("sized_function") && error.contains("0x40007b"),
+        "{error}"
+    );
+}
+
+#[test]
+fn artifact_clean_linear_function_keeps_unreachable_features() {
+    // Even code after ret stays counted when the entire range decodes linearly.
+    let code = [0xc3, 0xc5, 0xfd, 0xef, 0xc0];
+    let result = extract(Path::new("linear.elf"), &sized(&code, 5)).unwrap();
+    let scan = &result.evidence[axis::ISA_X86];
+    assert_eq!(
+        scan["partialFunctions"],
+        json!({"count": 0, "unreachedBytes": 0, "examples": []})
+    );
+    assert_eq!(scan["instructions"], 2);
+    assert_eq!(scan["sections"][0]["covered_bytes"], 5);
+    assert_eq!(scan["used"]["avx2"]["count"], 1);
+}
+
+#[test]
+fn artifact_stub_invalid_after_return_never_falls_back() {
+    for name in [".init", ".fini", ".plt", ".plt.got", ".plt.sec", ".iplt"] {
+        let mut bytes = sized(&[0xc3, 6], 2);
+        rename_text(&mut bytes, name);
+        let error = extract(Path::new("stub.elf"), &bytes)
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(
+            error.contains(name) && error.contains("0x400079"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn artifact_fallback_self_loops_and_many_branches_are_bounded() {
+    let mut code = [0x75, 0xfe].repeat(4096); // jne self, with fallthrough to next branch
+    code.extend([0xeb, 0xfe, 6]); // jmp self; invalid unreachable data
+    let result = extract(Path::new("loops.elf"), &sized(&code, code.len() as u64)).unwrap();
+    let scan = &result.evidence[axis::ISA_X86];
+    assert_eq!(scan["instructions"], 4097);
+    assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
+    assert_eq!(scan["sections"][0]["covered_bytes"], 8194);
+}
+
+#[test]
+fn artifact_fallback_stops_at_each_terminator() {
+    for terminator in [
+        &[0xc3][..],
+        &[0x0f, 0x0b],
+        &[0xcc],
+        &[0xf4],
+        &[0xff, 0xe0],
+        &[0xff, 0xd0],
+    ] {
+        let mut code = terminator.to_vec();
+        code.push(6);
+        let result = extract(Path::new("stop.elf"), &sized(&code, code.len() as u64)).unwrap();
+        let scan = &result.evidence[axis::ISA_X86];
+        assert_eq!(scan["instructions"], 1);
+        assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
+    }
+}
+
+#[test]
+fn artifact_fallback_follows_direct_calls_and_their_fallthrough() {
+    // call +2; ENDBR at target; ret in fallthrough; invalid data separates paths.
+    let code = [0xe8, 2, 0, 0, 0, 0xc3, 6, 0xf3, 0x0f, 0x1e, 0xfa, 0xc3];
+    let result = extract(Path::new("call.elf"), &sized(&code, code.len() as u64)).unwrap();
+    let scan = &result.evidence[axis::ISA_X86];
+    assert_eq!(scan["instructions"], 4);
+    assert_eq!(scan["notRequired"][0]["feature"], "ibt");
+    assert_eq!(scan["notRequired"][0]["count"], 1);
+    assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
+}
+
+#[test]
+fn artifact_fallback_discards_features_from_failed_linear_attempt() {
+    let code = [0xeb, 5, 0xc5, 0xfd, 0xef, 0xc0, 6, 0xc3];
+    let result = extract(Path::new("discard.elf"), &sized(&code, 8)).unwrap();
+    assert!(result.evidence[axis::ISA_X86]["used"]
+        .as_object()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        result.evidence[axis::ISA_X86]["partialFunctions"]["unreachedBytes"],
+        5
+    );
+}
+
+#[test]
+fn artifact_partial_function_evidence_is_bounded() {
+    let mut bytes = fixture(
+        elf::EM_X86_64,
+        elf::ELFOSABI_LINUX,
+        &[0xc3, 6].repeat(7),
+        None,
+        None,
+    );
+    no_frames(&mut bytes);
+    let name = "é".repeat(200);
+    let functions: Vec<_> = (0..7).map(|i| (i * 2, 2, name.as_str())).collect();
+    add_symbols(&mut bytes, &functions, false);
+    let result = extract(Path::new("bounded.elf"), &bytes).unwrap();
+    let partial = &result.evidence[axis::ISA_X86]["partialFunctions"];
+    assert_eq!(partial["count"], 7);
+    assert_eq!(partial["unreachedBytes"], 7);
+    assert_eq!(partial["examples"].as_array().unwrap().len(), 5);
+    assert_eq!(
+        partial["examples"][0]["symbol"].as_str().unwrap().len(),
+        256
+    );
+}
