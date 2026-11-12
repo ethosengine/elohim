@@ -1329,19 +1329,6 @@ impl Run {
             self.write_done(&done, &answer);
             return;
         }
-        let dest = match self.config.install.admits(&request.dest) {
-            Ok(dest) => dest,
-            Err(reason) => {
-                let answer = refused(reason);
-                self.write_done(&done, &answer);
-                return;
-            }
-        };
-        let Ok(scope) = request.scope.parse::<cid::Cid>() else {
-            let answer = refused(format!("the queued scope {} is not a CID", request.scope));
-            self.write_done(&done, &answer);
-            return;
-        };
         let Some(mount) = self.mount.clone() else {
             self.write_done(
                 &done,
@@ -1359,6 +1346,68 @@ impl Run {
                 }
             }))
         });
+        if request.inputs_only {
+            let Some(key) = request.authority.key().cloned() else {
+                self.write_done(
+                    &done,
+                    &refused("input documents require a derivation key".into()),
+                );
+                return;
+            };
+            let endpoint = self.endpoint.clone();
+            let log = self.config.log.clone();
+            let answer_for = for_request.clone();
+            let task = tokio::spawn(async move {
+                let outcome = crate::fetch::fetch_input_document(
+                    &endpoint,
+                    &key,
+                    &request.output,
+                    &holders,
+                    &request.budget(),
+                )
+                .await;
+                let result = match outcome {
+                    Ok(bytes) => crate::fetch::put_input_document(
+                        mount.store().as_ref(),
+                        key.input.cid(),
+                        bytes,
+                    )
+                    .await
+                    .map_err(|e| FetchGap::LocalStore {
+                        reason: e.to_string(),
+                    }),
+                    Err(gap) => Err(gap),
+                };
+                let answer = match result {
+                    Ok(cid) => FetchDone::InputDocument {
+                        for_request: answer_for,
+                        cid,
+                    },
+                    Err(gap) => FetchDone::gap(answer_for, gap),
+                };
+                if let Err(error) = write_queue_file(&done, &answer) {
+                    log(&format!(
+                        "input document answer {} not written: {error}",
+                        done.display()
+                    ));
+                }
+            });
+            self.fetch_task = Some((task, stem, for_request));
+            return;
+        }
+        let dest = match self.config.install.admits(&request.dest) {
+            Ok(dest) => dest,
+            Err(reason) => {
+                let answer = refused(reason);
+                self.write_done(&done, &answer);
+                return;
+            }
+        };
+        let Ok(scope) = request.scope.parse::<cid::Cid>() else {
+            let answer = refused(format!("the queued scope {} is not a CID", request.scope));
+            self.write_done(&done, &answer);
+            return;
+        };
         let endpoint = self.endpoint.clone();
         let flow_root = self.config.flow_root.clone();
         let device = self.config.device.clone();

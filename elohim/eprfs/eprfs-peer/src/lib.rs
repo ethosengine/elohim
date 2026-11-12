@@ -96,13 +96,13 @@ pub use error::PeerError;
 pub use family::{family_variants, Requires, RequiresClaim, Variant};
 pub use fetch::{
     ensure_queue_dir, fetch_artifact, fetch_artifact_until, fetch_authorized_until,
-    fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path, fold_holders,
-    install_fetched, key_cid, put_method_record, queue_dir_is_private, read_queue_file,
-    resolve_holders, resolve_output_holders, write_queue_file, FetchAuthority, FetchBudget,
-    FetchDone, FetchFor, FetchGap, FetchRequest, FetchTransport, FetchedArtifact, Holder,
-    HolderSelection, InstallScope, RequestedHolder, SiblingRecord, ARTIFACT_PRODUCE_KIND,
-    ARTIFACT_PRODUCE_MEASURE, FETCH_IN_FLIGHT, FETCH_MANIFEST_CAP, FETCH_QUEUE, FETCH_STALL,
-    FETCH_TOTAL, MAX_QUEUE_FILE_BYTES,
+    fetch_cancel_path, fetch_done_path, fetch_input_document, fetch_queue_dir, fetch_request_path,
+    fold_holders, install_fetched, key_cid, put_input_document, put_method_record,
+    queue_dir_is_private, read_queue_file, resolve_holders, resolve_output_holders,
+    write_queue_file, FetchAuthority, FetchBudget, FetchDone, FetchFor, FetchGap, FetchRequest,
+    FetchTransport, FetchedArtifact, Holder, HolderSelection, InstallScope, RequestedHolder,
+    SiblingRecord, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, FETCH_IN_FLIGHT,
+    FETCH_MANIFEST_CAP, FETCH_QUEUE, FETCH_STALL, FETCH_TOTAL, MAX_QUEUE_FILE_BYTES,
 };
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,

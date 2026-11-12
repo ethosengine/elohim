@@ -99,6 +99,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         head,
         dirty: Vec::new(),
         key: derivation,
+        input_lines: None,
     };
     record_artifact(
         options,
@@ -145,6 +146,7 @@ mod tests {
                 head: "test".into(),
                 dirty: vec![],
                 key: derivation,
+                input_lines: None,
             };
             // No repository or signer exists here: pairing must refuse before inspecting or writing either.
             let options = Options {

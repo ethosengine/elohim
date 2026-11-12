@@ -163,7 +163,16 @@ Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when t
 
 Design input (read-only pass, 2026-11-11, `sprints/2026-11-07-artifact-store/evidence/k10-dispatch-evidence-design.md`): a function hash proves identity, not guarded reachability. The evidence is a certificate produced after the final link, bound to the whole artifact's CID, naming each guarded region, its detector, every incoming edge and the pointer or object invariants. `put` checks it and rescans every occurrence, and another device re-checks it without running the code. The scope is wider than ring and compiler_builtins: `sha_ni` also comes from two `sha2` versions. The three real mechanisms (ring's capability tokens and key variants, compiler_builtins' cached function pointer, blake3's public platform enum) each defeat a branch-dominance check, so the first slice covers one ELF and link configuration and these named contracts only. Unsupported or unresolved paths keep the requirement.
 
+Second-device receipt (shem, 2026-11-12, `k8-extraction-shem-built.json`): an epr built natively on shem extracts the identical Requires CID, but for other causes. Its sqlite is v2 C, and the v3 level comes only from dispatched code (chacha20's avx2 backend, ring, sha2, compiler_builtins). shem's own Sandy Bridge CPU (no avx2, bmi, fma, adx or sha_ni) runs this epr, yet the recorded clause refuses it: the motivating case for K10. A second narrowing class comes from the same receipt. 1,277 of 1,281 `bmi1` sites are `tzcnt`, which LLVM emits in baseline code as `rep bsf`, and which runs as BSF without BMI1. Unlike ENDBR it is not a pure NOP: the two differ on a zero input, and code compiled with bmi1 may rely on the zero result. So K8 keeps counting it. K10 removes it only on evidence that the containing code was compiled at baseline (a build attestation naming the code's target features); without that, a v2-targeted build would be refused on v2 hosts for bmi1.
+
 - [ ] **K11 — `epr artifact describe|put` generalised beyond the mesh's cargo binaries: a fresh lvi workspace with only the installed `epr` can record a cargo project of its own, and a recipe kind that cannot yet satisfy spec §7.9 refuses with the missing items named, rather than recording a thinner artifact** (serves workspace-device-arrival)
+
+Order (steward, 2026-11-12): K9 first, then K11 on top of it. A read-only scoping pass (2026-11-11) found that K11 cannot be honest alone:
+- **The build-input document** is K9.
+- **Reach** is K12, blocked on H12. K11 reports reach as pending H12 rather than enforcing it, so the mesh's own recordings are not refused meanwhile.
+- **The source commit:** a git-free project cannot supply one, and a snapshot CID must not pose as a commit, so the first fixture makes its own commit.
+- **Brit attribution:** `put` also depends on an external `brit-build-ref` and on `.epr-meta/repository.yaml`.
+- **Two thin-record paths:** metadata runs `--offline` without `--locked`, and an unrecorded `PATH` yields empty link-input lines. Preflight must refuse both before any write.
 
 Verify: a fresh workspace records a small cargo binary end to end; a non-cargo recipe refuses naming each missing §7.9 item.
 

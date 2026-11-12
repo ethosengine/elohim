@@ -103,6 +103,8 @@ pub struct Held {
     pub output: BlobCid,
     /// The method CID the derivation record keys.
     pub method: BlobCid,
+    /// The input document named by the derivation key (self reach, like its method).
+    pub input: BlobCid,
     /// The method descriptor's name: what the grant is judged on.
     pub method_name: String,
     /// The chunks the manifest names, in order (a repeated chunk appears once per use).
@@ -140,6 +142,7 @@ impl ArtifactIndex {
         self.remove_output(&held.output);
         for object in std::iter::once(&held.manifest)
             .chain(std::iter::once(&held.method))
+            .chain(std::iter::once(&held.input))
             .chain(&held.chunks)
         {
             self.by_object
@@ -155,6 +158,7 @@ impl ArtifactIndex {
         let old = self.by_output.remove(output)?;
         for object in std::iter::once(&old.manifest)
             .chain(std::iter::once(&old.method))
+            .chain(std::iter::once(&old.input))
             .chain(&old.chunks)
         {
             let emptied = self.by_object.get_mut(object).is_some_and(|outputs| {
@@ -515,6 +519,7 @@ impl BlobMount {
             manifest: manifest_cid.clone(),
             output: manifest.record.output.clone(),
             method,
+            input: manifest.record.key.input.cid().clone(),
             method_name: descriptor.name,
             chunks: manifest
                 .chunks
@@ -673,7 +678,10 @@ impl BlobMount {
             .into_iter()
             .flatten()
             .filter_map(|output| index.by_output.get(output))
-            .filter(|held| held.method != *cid || serves.discloses_method(&held.method_name))
+            .filter(|held| {
+                (held.method != *cid && held.input != *cid)
+                    || serves.discloses_method(&held.method_name)
+            })
             .map(|held| held.method_name.clone())
             .collect()
     }
@@ -877,7 +885,7 @@ pub(crate) async fn answer(
         return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
     };
     let object = asked.unwrap_or(&held.manifest);
-    if *object == held.method {
+    if *object == held.method || *object == held.input {
         if let Err(refusal) = gate.admit_method(who, &held.method_name) {
             return refuse(refusal);
         }
@@ -886,8 +894,10 @@ pub(crate) async fn answer(
         return refuse(refusal);
     }
     // Membership in the very entry whose method admitted the root, and in the index now.
-    let in_held =
-        *object == held.manifest || *object == held.method || held.chunks.contains(object);
+    let in_held = *object == held.manifest
+        || *object == held.method
+        || *object == held.input
+        || held.chunks.contains(object);
     if !in_held || !mount.object_of(artifact, object) {
         return refuse(ReachRefusal::new(ReachReason::NotUnderRoot, None));
     }

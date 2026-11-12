@@ -348,6 +348,18 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
     assert_eq!(recorded["output"], output);
     assert_eq!(recorded["key"], key_cid);
     let manifest = recorded["manifest"].as_str().unwrap().to_string();
+    // The document is the exact byte-profile input, not a reconstructed diagnostic summary.
+    let shown = command()
+        .args(["artifact", "inputs", "show", &method, "--repo", &repo])
+        .output()
+        .unwrap();
+    assert!(shown.status.success(), "{}", text(&shown));
+    assert_eq!(BlobCid::compute_bytes(&shown.stdout).to_string(), input);
+    let expected_lines = elohim_epr_cli::artifact::closure_key(a.root(), &descriptor)
+        .unwrap()
+        .input_lines
+        .unwrap();
+    assert_eq!(shown.stdout, expected_lines.as_bytes());
 
     // brit's attestation is keyed by the DerivationKey CID, never a sha256 hex.
     let calls = std::fs::read_to_string(&log).unwrap();
@@ -821,6 +833,7 @@ fn a_completion_for_another_request_is_never_accepted() {
     use eprfs_peer::{FetchDone, FetchFor, FetchGap};
     let queue = TempDir::new().unwrap();
     let ours = FetchFor {
+        inputs_only: false,
         nonce: "0123456789abcdef0123456789abcdef".into(),
         authority: eprfs_peer::FetchAuthority::Output {
             cid: BlobCid::compute(b"\xa1\x61k\x61v"),
@@ -843,6 +856,10 @@ fn a_completion_for_another_request_is_never_accepted() {
     let wait = std::time::Duration::from_millis(600);
     // Another request's answer, at our very path, differing in each field: never taken for ours.
     let others = [
+        FetchFor {
+            inputs_only: true,
+            ..ours.clone()
+        },
         FetchFor {
             nonce: "ffffffffffffffffffffffffffffffff".into(),
             ..ours.clone()
@@ -3038,3 +3055,6 @@ fn artifact_sysroot_put_bounds_initial_archive_read() {
         text(&out)
     );
 }
+
+#[path = "support/artifact_inputs.rs"]
+mod inputs;
