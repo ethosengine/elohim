@@ -57,6 +57,16 @@ reordered or removed.
   shape reused by the other REA-native markets. The observed `Provides` stays on the device as
   A2 requires (its test asserts it is in no serialized record); only the verdict is recorded.
   Amends A3, P1 and P2 below.
+- **A sibling's gate verdict may stand in for a local run** (steward, 2026-11-12), when the
+  evidence supports it: deterministic floor, elohim ceiling. The floor is what a program can
+  check: the same input closure, a valid attestation signed by a device on the steward's roster,
+  a green result, clean inputs. Above the floor an elohim is called to validate the call (for
+  example a gate whose result may depend on the host, or a record with declared gaps), and it is
+  the party that repairs when an accepted verdict proves wrong, by the reconciliation walk of
+  lane R. This widens `GATE_EVIDENCE=reuse`, which accepts only this workspace's own attestation
+  today (habit `push-gate-pays-once`, `genesis/orchestrator/.epr-meta/`). The mechanism is not
+  designed here; it is owed as an item in that habit's lane, and an accepted sibling verdict is
+  accounted like any other supplied work (ruling above).
 - **Rails, not one pipe**: feedback is judged against five rails (spec §9); several channels may
   remain.
 - **No habit is set active.** The two-slot fence is held by `dataplane-convergence` and
