@@ -203,3 +203,9 @@ genesis/research/repos/
 
 # Persistent kernel-lock inode shared by deployment projection writers.
 /genesis/orchestrator/data/deployments.json.lock
+
+# Dependabot harvester cache: GitHub is the source of truth; each device re-polls (dependabot-harvest.py)
+.claude/data/dependabot-findings.jsonl
+.claude/data/dependabot-findings.jsonl.lock
+.claude/data/dependabot-closed.jsonl
+.claude/data/dependabot-cursor.json

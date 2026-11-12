@@ -47,6 +47,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/dependabot-harvest.py\" --hook",
+            "timeout": 90,
+            "statusMessage": "Harvesting Dependabot alerts...",
+            "async": true
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/runtime-harvest.py\" --hook",
             "timeout": 90,
             "statusMessage": "Harvesting runtime self-reports from the alpha doorways...",

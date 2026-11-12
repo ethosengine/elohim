@@ -34,6 +34,7 @@ import sys
 # A harness may load this file by path; its own directory is not then on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _lib import epr_client  # noqa: E402
+from _lib.dependabot_harvest import pressure as dependabot_pressure  # noqa: E402
 
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,6 +44,7 @@ AS_JSON = "--json" in sys.argv[1:]
 CI_CURSOR = ".claude/data/ci-cursor.json"
 CI_FINDINGS = ".claude/data/ci-findings.jsonl"
 DEPRECATIONS = ".claude/data/deprecations.jsonl"
+DEPENDABOT = ".claude/data/dependabot-findings.jsonl"
 RED = ("FAILURE", "ABORTED")
 
 
@@ -140,9 +142,12 @@ def ledgers():
         if s in ci_c:
             ci_c[s] += 1
     dep_live = sum(1 for d in dep if d.get("status") != "fixed")
+    dependabot = dependabot_pressure(_jsonl(DEPENDABOT))
     line = (f"ci-findings: open={ci_c['open']} triaged={ci_c['triaged']} "
-            f"blocked={ci_c['blocked']}   |   dep/sec live: {dep_live}")
-    return [line] if not AS_JSON else {"ci": ci_c, "dep_live": dep_live}
+            f"blocked={ci_c['blocked']}   |   {dep_live} live deprecation/warning findings"
+            f"   |   {dependabot['open']} live Dependabot alerts "
+            f"({dependabot['critical']} critical) (→ /deprecation-stasis)")
+    return [line] if not AS_JSON else {"ci": ci_c, "dep_live": dep_live, "dependabot": dependabot}
 
 
 @section
