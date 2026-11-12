@@ -185,3 +185,14 @@ here ran the pack above on this CPU, yet admit would refuse it against this host
 features (by the clause; no Provides observer exists until A2), until K10 proves the
 dispatch. That is the strongest case for K10 the sprint has measured. These are K8 and K10
 facts; neither changes the host-contract crate.
+
+**Branch push without the hook (steward ruling, 2026-11-12).** ethosengine was waiting on
+these docs, so at the steward's direction the docs-only branch `hostcompat/k6-v2-sysroot` was
+pushed to origin at 89e42f17e with `--no-verify`. Two hooked attempts failed first. One saw
+`EPR_BIN` vanish from this device's own new cargo-pool slot (`family/hc-k6v2`) between the
+build and the gate. The other had one orchestrator red, `gate-runner.test.mjs` "gate evidence
+rejects dirty external dependency…" (`recordEvidence` returned 1). That test passes alone,
+with either epr build, and under each of the hook's variables tried (`GIT_CONFIG_PARAMETERS`,
+`GATE_EVIDENCE`, `CARGO_TARGET_DIR`, `GATE_RUN_KIND`), while Codex 01a1cbeb's gates ran
+alongside. Re-gating was blocked by the one-build guard during that session's elohim-storage
+gate. Cause not found; the dev landing runs the full gate. The bypass covers only that branch.
