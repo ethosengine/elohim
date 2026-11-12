@@ -155,7 +155,9 @@ impl StewardDevicesGate {
         })
     }
 
-    /// Descriptor disclosure requires both the audience grant and its explicit extra permission.
+    /// Method and input documents share both gates: steward audience and explicit disclosure.
+    /// H12 (host-compatibility spec §7.8, reach on the object) would replace both gates.
+    /// Until then these host facts remain self-only; carrier audiences grant nothing.
     pub(crate) fn admit_method(&self, who: &Requester, method: &str) -> Result<(), ReachRefusal> {
         let device = self.admit(who)?;
         if self.scope.grants(device, method) && self.scope.discloses_method(method) {

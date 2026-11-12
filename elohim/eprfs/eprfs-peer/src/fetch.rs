@@ -57,6 +57,9 @@ use iroh::{Endpoint, NodeAddr};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 
+mod inputs;
+pub use inputs::{fetch_input_document, put_input_document};
+
 use crate::error::PeerError;
 use crate::local_blob::{stream_local_blob_with, LocalBlobContext};
 use crate::tier::{tier_request_counted, TierAnswer, TierRequest, FRAME_DEADLINE, TIER_ALPN};
@@ -1577,6 +1580,9 @@ pub struct RequestedHolder {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FetchRequest {
+    /// Fetch only the key input document; no artifact installation or Use is recorded.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inputs_only: bool,
     /// This request alone: its file names and its answer carry it, so no other request's answer is
     /// ever taken for it.
     pub nonce: String,
@@ -1626,6 +1632,8 @@ impl FetchRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FetchFor {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inputs_only: bool,
     pub nonce: String,
     pub authority: FetchAuthority,
     pub output: BlobCid,
@@ -1636,6 +1644,7 @@ impl FetchFor {
     /// The identity of `request`.
     pub fn of(request: &FetchRequest) -> FetchFor {
         FetchFor {
+            inputs_only: request.inputs_only,
             nonce: request.nonce.clone(),
             authority: request.authority.clone(),
             output: request.output.clone(),
@@ -1652,6 +1661,11 @@ impl FetchFor {
     rename_all_fields = "camelCase"
 )]
 pub enum FetchDone {
+    InputDocument {
+        #[serde(rename = "for")]
+        for_request: FetchFor,
+        cid: BlobCid,
+    },
     Installed {
         #[serde(rename = "for")]
         for_request: FetchFor,
@@ -1700,9 +1714,9 @@ impl FetchDone {
     /// The request this answer is for.
     pub fn for_request(&self) -> &FetchFor {
         match self {
-            FetchDone::Installed { for_request, .. } | FetchDone::Gap { for_request, .. } => {
-                for_request
-            }
+            FetchDone::Installed { for_request, .. }
+            | FetchDone::Gap { for_request, .. }
+            | FetchDone::InputDocument { for_request, .. } => for_request,
         }
     }
 }
