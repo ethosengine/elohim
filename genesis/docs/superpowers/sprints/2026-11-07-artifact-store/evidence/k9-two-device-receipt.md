@@ -33,7 +33,9 @@ input line agrees, including the compiler's predefined-macro dump.
 
 ethosengine's direction: [stdout](k9/inputs-diff-ethosengine.stdout),
 [stderr](k9/inputs-diff-ethosengine.stderr), [exit](k9/inputs-diff-ethosengine.exit). shem's
-direction is kept on shem at `genesis/local-dev/hostcompat-wave1/k9/inputs-diff-6060.{stdout,stderr,exit}`.
+direction, with shem's package list:
+[k9-inputs-diff-shem.txt](../../2026-11-11-host-compatibility/evidence/k9-inputs-diff-shem.txt)
+(in each file `-` lines are the running device's, `+` the sibling's).
 
 ## Reading
 
