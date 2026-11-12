@@ -14,8 +14,8 @@
 name = "elohim-blob-store"
 version = "0.1.0"
 edition = "2021"
-# `File::lock` / `File::try_lock` (owner and operation locks) are stable since 1.89.
-rust-version = "1.89"
+# `File::lock` / `File::try_lock` require 1.89; `AtomicU64::try_update` requires 1.95.
+rust-version = "1.95"
 description = "Elohim Protocol content-addressed payload store: byte-profile-0 chunked payloads behind a marker, a dag-cbor record lane, verify-on-read with quarantine, and an owner/shared split for one store opened by several processes."
 authors = ["Elohim Protocol"]
 # A reusable primitive, relicensed from AGPL-3.0 to MPL-2.0 by the steward's ruling ("Relicense

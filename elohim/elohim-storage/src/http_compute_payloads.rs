@@ -60,7 +60,7 @@ impl HttpServer {
                     .await
                 {
                     Ok(owner) => owner,
-                    Err(refusal) => return Ok(refusal),
+                    Err(refusal) => return Ok(*refusal),
                 }
             }
             _ => client_owner,
@@ -126,9 +126,13 @@ impl HttpServer {
         performer: &str,
         client_owner: &str,
         cid: &str,
-    ) -> Result<String, Response<Full<Bytes>>> {
+    ) -> Result<String, Box<Response<Full<Bytes>>>> {
         use crate::api::hosted_custody as custody;
-        let refuse = |reason: &str| response::forbidden(&serde_json::json!({ "reason": reason }));
+        let refuse = |reason: &str| {
+            Box::new(response::forbidden(
+                &serde_json::json!({ "reason": reason }),
+            ))
+        };
         // The reach the runner declares for the bytes it stocks; absent ⇒ the
         // hosting grant's own reach.
         let declared_reach = req
@@ -137,10 +141,14 @@ impl HttpServer {
             .and_then(|v| v.to_str().ok())
             .map(str::to_owned);
         let Some(pool) = self.db_pool.as_ref() else {
-            return Err(response::service_unavailable("db pool not available"));
+            return Err(Box::new(response::service_unavailable(
+                "db pool not available",
+            )));
         };
         let Some(hc) = self.hc_registry.as_ref().and_then(|r| r.lamad_client()) else {
-            return Err(response::service_unavailable("local conductor unavailable"));
+            return Err(Box::new(response::service_unavailable(
+                "local conductor unavailable",
+            )));
         };
         let native = custody::HcCustodyNative(hc);
         let now = chrono::Utc::now().to_rfc3339();
@@ -148,9 +156,9 @@ impl HttpServer {
             custody::authorize_custody(pool, &native, performer, &now, declared_reach.as_deref())
                 .await
                 .map_err(|r| match r.grant_reach() {
-                    Some(reach) => response::forbidden(
+                    Some(reach) => Box::new(response::forbidden(
                         &serde_json::json!({ "reason": r.reason(), "grantReach": reach }),
-                    ),
+                    )),
                     None => refuse(r.reason()),
                 })?;
         let owner = custody::hosted_owner(performer, client_owner)

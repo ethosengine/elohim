@@ -319,7 +319,7 @@ where
 fn reserve_hosting_record(reads: &std::sync::atomic::AtomicUsize) -> bool {
     use std::sync::atomic::Ordering;
     reads
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
             (n < 64).then_some(n + 1)
         })
         .is_ok()

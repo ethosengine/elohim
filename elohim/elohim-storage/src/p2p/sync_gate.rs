@@ -277,7 +277,7 @@ impl SyncGate {
             SyncSuppressReason::BulkWriteInProgress => &self.bulk_ops,
             _ => return,
         };
-        let _ = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+        let _ = counter.try_update(Ordering::AcqRel, Ordering::Acquire, |v| {
             Some(v.saturating_sub(1))
         });
     }

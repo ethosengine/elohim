@@ -128,7 +128,7 @@ fn note_suppressed_terminal(capture: &WindowCapture) {
 
 fn reserve_log_events(count: u64) -> bool {
     if LOG_EVENTS_REMAINING
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+        .try_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
             remaining.checked_sub(count)
         })
         .is_ok()

@@ -257,13 +257,8 @@ fn fixtures() -> PathBuf {
 }
 
 fn epr_binary() -> PathBuf {
-    // The integration-test binary lives beside the `epr` binary cargo just built.
-    let mut dir = std::env::current_exe().expect("test binary path");
-    dir.pop();
-    if dir.ends_with("deps") {
-        dir.pop();
-    }
-    dir.join("epr")
+    // Cargo owns artifact placement; the test executable need not sit beside epr.
+    PathBuf::from(env!("CARGO_BIN_EXE_epr"))
 }
 
 fn copy_tree(src: &Path, dst: &Path) {

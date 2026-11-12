@@ -2471,18 +2471,21 @@ mod tests {
         }
         .keep_in(dir.path())
         .unwrap();
-        join_in(
-            &[
-                "--label".into(),
-                "che-shem".into(),
-                "--approver".into(),
-                format!("http://127.0.0.1:{approver}"),
-                "--node".into(),
-                node,
-            ],
-            dir.path(),
-        )
-        .unwrap();
+        assert_eq!(
+            join_in(
+                &[
+                    "--label".into(),
+                    "che-shem".into(),
+                    "--approver".into(),
+                    format!("http://127.0.0.1:{approver}"),
+                    "--node".into(),
+                    node,
+                ],
+                dir.path(),
+            )
+            .unwrap(),
+            ExitCode::SUCCESS
+        );
         assert!(asked_of_approver.lock().unwrap().is_empty());
         let asked = asked_of_node.lock().unwrap();
         assert!(
@@ -2735,7 +2738,10 @@ mod tests {
         // An approving node whose clock is an hour behind does not shorten it.
         let mut delivered = handed_over(&pending);
         delivered.consent.record.agreed_at_micros -= 3_600_000_000;
-        keep_then_enroll(pending, delivered, &node, None, dir.path()).unwrap();
+        assert_eq!(
+            keep_then_enroll(pending, delivered, &node, None, dir.path()).unwrap(),
+            ExitCode::SUCCESS
+        );
         assert!(
             was_kept.load(Ordering::SeqCst),
             "kept before the node was asked"

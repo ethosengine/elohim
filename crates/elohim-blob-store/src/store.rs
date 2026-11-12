@@ -2676,7 +2676,7 @@ impl BlobTally {
     fn remove(&self, footprint: Footprint) {
         let saturating_sub = |counter: &AtomicU64, amount: u64| {
             // The closure always returns `Some`, so the update cannot fail.
-            let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            let _ = counter.try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                 Some(current.saturating_sub(amount))
             });
         };

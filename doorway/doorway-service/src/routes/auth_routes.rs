@@ -1094,7 +1094,7 @@ fn identity_recovery_gated(state: &AppState) -> bool {
 enum RegistrationBindError {
     /// A finished HTTP refusal: the recovery was not authorised (403), or the
     /// agent is busy with another registration (503).
-    Refused(Response<BoxBody>),
+    Refused(Box<Response<BoxBody>>),
     /// The conductor failed; the arm decides what that means for it.
     Conductor(crate::types::DoorwayError),
 }
@@ -1181,16 +1181,18 @@ async fn bind_registration_human(
                 "Refusing to attach the Human that already exists on this agent to a \
                  registration with no evidence that it is this registrant's"
             );
-            Err(RegistrationBindError::Refused(identity_recovery_refused()))
+            Err(RegistrationBindError::Refused(Box::new(
+                identity_recovery_refused(),
+            )))
         }
-        Err(BindError::Busy) => Err(RegistrationBindError::Refused(json_response(
+        Err(BindError::Busy) => Err(RegistrationBindError::Refused(Box::new(json_response(
             StatusCode::SERVICE_UNAVAILABLE,
             &ErrorResponse {
                 error: "Another registration is creating an identity on this agent; try again"
                     .into(),
                 code: Some("IDENTITY_BUSY".into()),
             },
-        ))),
+        )))),
         Err(BindError::Conductor(e)) => Err(RegistrationBindError::Conductor(e)),
     }
 }
@@ -1813,7 +1815,7 @@ async fn handle_register(
             .await
             {
                 Ok(human_output) => Ok(human_output),
-                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Refused(response)) => return *response,
                 Err(RegistrationBindError::Conductor(e)) => Err(e),
             };
 
@@ -1976,7 +1978,7 @@ async fn handle_register(
             .await
             {
                 Ok(human_output) => Ok(human_output),
-                Err(RegistrationBindError::Refused(response)) => return response,
+                Err(RegistrationBindError::Refused(response)) => return *response,
                 Err(RegistrationBindError::Conductor(e)) => Err(e),
             };
 
@@ -5901,7 +5903,10 @@ pub(crate) fn get_jwt_validator(state: &AppState) -> Result<JwtValidator, Respon
 /// the session off to the peer-native OAuth portal — doorway is the relying
 /// party, the portal host is the identity provider. Mirrors the probe used
 /// by `handle_exchange_session`.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The shared auth response boundary receives the token claims and response metadata explicitly from each registration or login arm"
+)]
 pub(crate) async fn generate_auth_response(
     jwt: &JwtValidator,
     state: &AppState,

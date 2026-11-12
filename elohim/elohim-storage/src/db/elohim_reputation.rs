@@ -33,7 +33,10 @@ struct DecisionRow {
     pub elohim_substance_cid: String,
     /// Populated by ORDER BY decided_at DESC so the first row is the most-recent substance.
     /// Field value is not used in Rust — the ordering is what matters.
-    #[allow(dead_code)]
+    #[allow(
+        dead_code,
+        reason = "The raw SQL row decodes decided_at, but SQL ordering selects the most recent substance without reading this field in Rust"
+    )]
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub decided_at: String,
 }

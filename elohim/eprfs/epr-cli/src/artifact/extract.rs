@@ -251,8 +251,7 @@ fn read_tags(
             return Err(unrecorded("invalid NT_GNU_ABI_TAG size"));
         }
         let mut tag = [0; 4];
-        for (value, bytes) in tag.iter_mut().zip(note.desc().chunks_exact(4)) {
-            let bytes = <[u8; 4]>::try_from(bytes).map_err(unrecorded)?;
+        for (value, &bytes) in tag.iter_mut().zip(note.desc().as_chunks::<4>().0) {
             *value = match endian {
                 Endianness::Little => u32::from_le_bytes(bytes),
                 Endianness::Big => u32::from_be_bytes(bytes),
