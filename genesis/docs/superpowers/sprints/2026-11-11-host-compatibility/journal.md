@@ -143,3 +143,45 @@ Owner: lane K (ethosengine), as the brit build-note reader is its seam; noted to
   envelope is bound to the main checkout. That checkout's flow store may also lack items
   minted only on the worktree's tree. Plan items in a sprint that runs in worktrees go
   unclaimed. Habit `sprint-lands-each-closure-once`.
+
+## K6 slice 2 on shem: the v2 floor, and a second-device K8 extraction (2026-11-12)
+
+Steward direction, relayed by ethosengine at 23:50Z and confirmed by the steward ("ethosengine
+sent you what you can pickup now"); recorded as a purpose clause, covenant
+`bafyreicxdtrpc4m24rijpndwqjurerftwxayka4o5pbbwa63nawz6vvcl4`. ethosengine took K9 then K11.
+
+**The floor.** Only shem can supply it: ethosengine's RHEL 10 glibc declares v3. The file set
+comes from the installed packages' own lists (`rpm -ql`), not a hand list: glibc-devel,
+kernel-headers, the shared libraries of glibc and libgcc, gcc 14.3.1's support objects under
+`usr/lib/gcc/x86_64-redhat-linux/14/`, and `lib64/` copies of what the linker scripts name
+(`evidence/k6-v2-floor-assemble.sh.txt`). Packed with an epr built natively at dev d32131dfa:
+1,655 members, three linker scripts, libc 2.39. ISA notes: 28 members need baseline plus v2,
+20 carry none, none is above v2. Two packs were byte-identical. Recorded with
+`epr artifact sysroot put --cross` and a declared requirement (arch x86_64, os linux,
+`abi.libc` at least glibc 2.39, `isa.x86` within the v2 set): output
+`bafkr4ic3gyme6ajwr7ctshk4jbarcby7vss75fhviiugl477rv4weqbhxq`, key
+`bafyreih25tuk4bubq7672wf44zi3ee63hp72elmjiv3ldo3gznorshh4qi`, `env:requires`
+`bafkr4igfy7nkuttfkd2qq7dofxipermlhcykqvv7txlhyq74s4ptmx2cv4` (`evidence/k6-v2-floor.json`).
+The first put omitted `--requires`, so the output has two Produces from shem, one without the
+slot. Serving the floor to ethosengine waits on H12. gcc's support objects do not move with
+`--sysroot` alone; a builder points `-B` at them.
+
+**The extraction.** K8's measurement of that natively built epr (136,592,296 bytes, 9.6 s)
+yields Requires `bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy`, byte-identical
+to ethosengine's (`evidence/k8-extraction-shem-built.json`). The equality hides different
+causes. shem's build has no `lzcnt` and no `f16c` anywhere: its C code (sqlite) was compiled
+for v2, where ethosengine's carried v3 sqlite evidence. The v3 level here is selected by
+features that live in runtime-dispatched code: chacha20's AVX2 backend and `core::arch`
+intrinsics (`avx`, `avx2`, `osxsave`), ring (`adx`, `bmi2`, `aes`, `pclmulqdq`, `vaes`,
+`vpclmulqdq`, `movbe`, `sha_ni`), sha2 (`sha_ni`), and compiler_builtins (`fma`, `fma4`).
+
+**Two findings for the K8 owner.** (1) `bmi1` is counted from 1,281 sites, and 1,277 of them
+are `tzcnt` in hashbrown and similar code: LLVM's baseline `rep bsf`, which executes as BSF on
+a CPU without BMI1 and is emitted only where the two agree. The remaining 4 genuine BMI1
+operations are in ring's `__bn_postx4x_internal`, a dispatched path. Like ENDBR, the encoding
+alone is not a requirement. (2) This device's CPU (Xeon E5-2667, Sandy Bridge) has `avx`,
+`aes` and `pclmulqdq` but no `avx2`, `bmi1`, `bmi2`, `fma`, `adx` or `sha_ni`. The epr built
+here ran the pack above on this CPU, yet admit would refuse it against this host's observed
+features (by the clause; no Provides observer exists until A2), until K10 proves the
+dispatch. That is the strongest case for K10 the sprint has measured. These are K8 and K10
+facts; neither changes the host-contract crate.

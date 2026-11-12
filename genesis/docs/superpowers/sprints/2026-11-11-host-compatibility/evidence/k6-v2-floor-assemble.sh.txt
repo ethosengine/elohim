@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# K6 slice 2: assemble shem's x86-64-v2 floor (AlmaLinux 10.2 x86_64_v2, glibc 2.39-128) as a
+# sysroot directory for `epr artifact sysroot pack`. The file set is derived from the installed
+# packages' own file lists (rpm -ql), never from a hand list of paths:
+#   glibc-devel     everything (startup objects, linker scripts, static stubs, glibc headers)
+#   kernel-headers  everything (linux/, asm/, asm-generic/ ... that the libc headers include)
+#   glibc           the shared libraries directly under /usr/lib64 (no gconv, audit, locale, bin)
+#   libgcc          the shared libraries directly under /usr/lib64 (libgcc_s.so.1)
+#   gcc             the target support objects and archives under /usr/lib/gcc/<triple>/<ver>/
+#                   (crt*.o, libgcc*.a, libgcc_s.so) -- a builder points -B at them; posture B
+#                   keeps cc1/as per-compiler, these are link inputs.
+# Linker scripts name /lib64/... (libc.so -> /lib64/libc.so.6, ld-linux); on this host /lib64 is a
+# symlink to usr/lib64, so the shared objects those scripts name are copied to lib64/ as well.
+# Usage: assemble-sysroot.sh OUT_DIR   (OUT_DIR must not exist)
+set -euo pipefail
+out=${1:?usage: assemble-sysroot.sh OUT_DIR}
+[ -e "$out" ] && { echo "refused: $out exists" >&2; exit 2; }
+mkdir -p "$out"
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
+{
+  rpm -ql glibc-devel kernel-headers
+  rpm -ql glibc libgcc | grep -E '^/usr/lib64/[^/]+\.so[.0-9]*$'
+  rpm -ql gcc | grep -E '^/usr/lib/gcc/x86_64-redhat-linux/[0-9]+/(crt[^/]*\.o|libgcc[^/]*\.a|libgcc_s\.so)$'
+} | sort -u > "$list"
+n=0
+while IFS= read -r f; do
+  [ -f "$f" ] || continue            # directories and dangling entries carry no bytes
+  dest="$out${f}"
+  mkdir -p "$(dirname "$dest")"
+  cp -L --preserve=mode "$f" "$dest"
+  n=$((n+1))
+done < "$list"
+# Script referents under /lib64 (resolved inside the sysroot by the linker).
+for s in "$out"/usr/lib64/*.so "$out"/usr/lib/gcc/*/*/*.so; do
+  [ -f "$s" ] || continue
+  if head -c 4 "$s" | grep -q $'\x7fELF'; then continue; fi
+  for ref in $(grep -oE '(^|[ (])/lib64/[^ )]+' "$s" | tr -d ' (' || true); do
+    src="/usr${ref}"; [ -f "$src" ] || src="$ref"
+    mkdir -p "$out/lib64"
+    [ -e "$out$ref" ] || { cp -L --preserve=mode "$src" "$out$ref"; n=$((n+1)); }
+  done
+done
+echo "files=$n"
+rpm -q glibc glibc-devel kernel-headers libgcc gcc
