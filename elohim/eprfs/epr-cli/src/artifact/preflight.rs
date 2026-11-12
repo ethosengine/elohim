@@ -68,7 +68,8 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
         ] { missing.push(item.into()); }
     } else {
         gaps = cargo_project::checklist(&options.repo, descriptor, &mut missing);
-        compiler_inputs::check(options, descriptor, &mut missing);
+        let build_scripts = gaps.iter().any(|gap| gap == cargo_project::SCRIPTS_GAP);
+        compiler_inputs::check(options, descriptor, build_scripts, &mut missing);
     }
     print_gaps(&gaps);
     if descriptor.step

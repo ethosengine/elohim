@@ -1,7 +1,15 @@
 //! Check Cargo dep-info target/freshness and listed inputs; a build receipt must bind bytes.
 use super::*;
 
-pub(super) fn check(options: &Options, descriptor: &MethodDescriptor, missing: &mut Vec<String>) {
+/// `build_scripts` is true when the closure declares the `build-inputs.build-scripts` gap: then a
+/// file a build script generated into its OUT_DIR (this build's `<profile>/build/<pkg>-<hash>/out/`)
+/// is that declared gap, not a missing fact. Without the gap such a path still refuses.
+pub(super) fn check(
+    options: &Options,
+    descriptor: &MethodDescriptor,
+    build_scripts: bool,
+    missing: &mut Vec<String>,
+) {
     // Cargo writes <bin>.d alongside <bin>. The mesh passes its pool slot's dev/debug/bin
     // to put after verifying its installed copy. Never search another build's target tree.
     let Some(binary) = &options.bytes else { return };
@@ -69,6 +77,10 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor, missing: &
         .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cargo")))
         .and_then(|p| p.join("registry/src").canonicalize().ok());
     let toolchain = host::compiler_root(descriptor).ok();
+    let script_outputs = binary
+        .canonicalize()
+        .ok()
+        .and_then(|b| b.parent().map(|profile| profile.join("build")));
     for source in sources {
         match source.canonicalize() {
             Ok(p) if p.starts_with(&options.repo) => {
@@ -77,12 +89,22 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor, missing: &
             Ok(p)
                 if registry.as_ref().is_some_and(|r| p.starts_with(r))
                     || toolchain.as_ref().is_some_and(|r| p.starts_with(r)) => {}
+            Ok(p) if build_scripts && is_script_output(&p, script_outputs.as_deref()) => {}
             _ => missing.push(format!(
                 "missing build-inputs: compiler input outside captured view: {}",
                 source.display()
             )),
         }
     }
+}
+
+/// `<profile>/build/<pkg>-<hash>/out/...`: a file a build script wrote into its OUT_DIR.
+fn is_script_output(path: &Path, build_dir: Option<&Path>) -> bool {
+    let Some(rest) = build_dir.and_then(|dir| path.strip_prefix(dir).ok()) else {
+        return false;
+    };
+    let mut parts = rest.components();
+    parts.next().is_some() && parts.next().is_some_and(|c| c.as_os_str() == "out")
 }
 
 // Cargo dep-info is make syntax: escaped spaces/backslashes/#, $$ for a literal dollar.
@@ -123,5 +145,20 @@ mod tests {
             super::words(r"/a/b\ c /a/\#d /a/$$e /a/back\\slash"),
             ["/a/b c", "/a/#d", "/a/$e", r"/a/back\slash"]
         );
+    }
+
+    #[test]
+    fn build_script_out_dir_is_recognised_only_under_this_builds_profile() {
+        use std::path::Path;
+        let build = Path::new("/pool/dev/debug/build");
+        let out = Path::new("/pool/dev/debug/build/elohim-chrome-asset-6e61/out/omni.js");
+        assert!(super::is_script_output(out, Some(build)));
+        // The package directory itself, or anything not under `out`, is not an OUT_DIR file.
+        let script = Path::new("/pool/dev/debug/build/elohim-chrome-asset-6e61/build-script-build");
+        assert!(!super::is_script_output(script, Some(build)));
+        // Another build's tree is never accepted.
+        let other = Path::new("/other/debug/build/pkg-1/out/x.js");
+        assert!(!super::is_script_output(other, Some(build)));
+        assert!(!super::is_script_output(out, None));
     }
 }
