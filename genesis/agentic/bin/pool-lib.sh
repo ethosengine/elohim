@@ -399,10 +399,11 @@ probe_cargo_target_slot() {
   )"; then
     state=ok
     detail=""
-  elif printf '%s\n' "$output" | grep -q '\.fingerprint/' \
+  # Cargo <1.100: <profile>/.fingerprint/<pkg>-<hash>/; 1.100: <profile>/build/<pkg>/<hash>/fingerprint/.
+  elif printf '%s\n' "$output" | grep -qE '(\.fingerprint|/build/[^/]+/[0-9a-f]+/fingerprint)/' \
     && printf '%s\n' "$output" | grep -qE 'No such file or directory|os error 2'; then
     state=fingerprint-enoent
-    detail="$(printf '%s\n' "$output" | grep '\.fingerprint/' | head -1)"
+    detail="$(printf '%s\n' "$output" | grep -E '(\.fingerprint|/build/[^/]+/[0-9a-f]+/fingerprint)/' | head -1)"
   else
     state=probe-failed
     detail="$(printf '%s\n' "$output" | head -1)"

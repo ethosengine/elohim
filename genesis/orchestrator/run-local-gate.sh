@@ -57,7 +57,9 @@ if [[ -n "$target_dir" ]]; then
     dropped=0
     while IFS= read -r name; do
       [[ -n "$name" ]] || continue
-      for fp in "$backing"/*/.fingerprint/"$name"-*; do
+      # Cargo <1.100 keeps <profile>/.fingerprint/<pkg>-<hash>; 1.100's build-dir layout keeps
+      # <profile>/build/<pkg>/<hash>/fingerprint. Forget both so a toolchain move keeps the guard.
+      for fp in "$backing"/*/.fingerprint/"$name"-* "$backing"/*/build/"$name"/*/fingerprint; do
         [[ -e "$fp" ]] || continue
         rm -rf "$fp"
         dropped=$((dropped + 1))
