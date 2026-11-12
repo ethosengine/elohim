@@ -14,8 +14,13 @@
 //!   (`via:`), is never local custody. A manifest whose method record is not held here is
 //!   [`Unindexed::MethodUnknown`], one whose chunks do not reconstruct its output here is
 //!   [`Unindexed::OutputUnverified`] or [`Unindexed::ManifestInvalid`], and neither is served. For
-//!   an explicit request, the named custody manifest is served; an indexed manifest that no longer reads is dropped at the next rebuild. A failed manifest is
-//!   retried with a backoff, an invalid one only after a new custody event;
+//!   an explicit request, the named custody manifest is served. The index's full entries and
+//!   rebuild revalidation follow the distinct outputs of this device's custody events, never
+//!   its history. Older local manifests are retained only as CIDs per output, without reads
+//!   at rebuild; they are validated on demand and cached in at most [`RECORD_CACHE_CAPACITY`]
+//!   full entries across the mount. Rebuilds clear that cache. An indexed manifest that no
+//!   longer reads is dropped at the next rebuild. A failed designated manifest is retried
+//!   with a backoff, an invalid one only after a new custody event;
 //! - one `serve-blob` session per (requester, manifest), closed on the last distinct chunk, when
 //!   the connection closes, or after [`SERVE_IDLE`]; each closed session (and each refusal of an
 //!   admitted device) becomes one [`ServedDraw`], which the daemon records as one `Use` event.
@@ -27,7 +32,7 @@
 //! A stranger is only counted. Every refusal it receives is the uniform form, byte-identical to
 //! the tree endpoint's, whether the artifact is granted, held ungranted, or unknown.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -66,6 +71,9 @@ pub const REFUSALS_PER_WINDOW: usize = 16;
 /// The most closed sessions and refusals waiting for the daemon to record them; past it a draw is
 /// dropped and counted ([`BlobMount::dropped_draws`]), never queued without bound.
 pub const SERVED_QUEUE: usize = 1024;
+
+/// Maximum validated non-designated custody records retained across the mount (FIFO).
+pub const RECORD_CACHE_CAPACITY: usize = 4;
 
 /// Why a custody manifest is held but not served.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,7 +120,7 @@ pub struct Held {
     pub chunks: Vec<BlobCid>,
     /// The complete artifact's length.
     pub byte_len: u64,
-    /// The scope of the Produce event that put it in custody.
+    /// The output's designated custody scope (also used for on-demand historical records).
     pub in_scope_of: cid::Cid,
 }
 
@@ -122,12 +130,16 @@ impl Held {
     }
 }
 
-/// What the mount may serve, by custody manifest and by object.
+/// Designated records the mount may serve, plus CID-only local custody history.
 #[derive(Debug, Default)]
 pub struct ArtifactIndex {
     by_manifest: BTreeMap<BlobCid, Held>,
     /// Latest custody manifest per output, for legacy output-only requests.
-    latest: BTreeMap<BlobCid, BlobCid>,
+    latest: BTreeMap<BlobCid, Designated>,
+    /// Other local custody manifest CIDs per output; never read during rebuild.
+    other_local: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
+    /// Validated on-demand records, oldest insertion first; not part of the object index.
+    records: VecDeque<Held>,
     /// Object CIDs → the manifests naming them.
     by_object: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
     /// Designated manifests held and not served, with why.
@@ -137,7 +149,7 @@ pub struct ArtifactIndex {
 }
 
 impl ArtifactIndex {
-    /// Index one custody record without replacing other records of the same output.
+    /// Index the designated custody record of an output.
     fn insert(&mut self, held: Held) {
         self.unindexed.remove(&held.manifest);
         self.retry.remove(&held.manifest);
@@ -174,7 +186,7 @@ impl ArtifactIndex {
         Some(old)
     }
 
-    /// Retain the distinct manifests named by local custody, including older records.
+    /// Retain only the designated manifest of each distinct output.
     fn retain_designated(&mut self, designated: &BTreeMap<BlobCid, Designated>) {
         let stale: Vec<_> = self
             .by_manifest
@@ -204,7 +216,7 @@ impl ArtifactIndex {
     }
 }
 
-/// The latest local custody event for one manifest.
+/// The latest local custody event for one output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Designated {
     manifest: BlobCid,
@@ -267,7 +279,7 @@ pub struct ServedDraw {
     /// Distinct chunks the artifact has.
     pub of: usize,
     pub outcome: DrawOutcome,
-    /// The custody Produce event's scope, when the artifact is indexed.
+    /// The output's designated custody scope, when the artifact is locally held.
     pub in_scope_of: Option<cid::Cid>,
 }
 
@@ -539,8 +551,8 @@ impl BlobMount {
 
     /// Rebuild the index from `events` as of `now`.
     ///
-    /// - Every distinct local custody manifest is indexed. Event order selects only the
-    ///   legacy output-only default; late indexing never changes that default.
+    /// - Only the latest local custody manifest per output is indexed. Other local manifest
+    ///   CIDs remain eligible for validation on demand, with no reads here.
     /// - Everything else leaves the index: entries of undesignated manifests and their
     ///   memberships, and failure records of manifests no longer designated.
     /// - A designated manifest already indexed is re-read, and dropped when it no longer reads.
@@ -554,8 +566,8 @@ impl BlobMount {
         events: &[(cid::Cid, FlowEvent)],
         now: Instant,
     ) -> Vec<PeerError> {
-        let mut designated: BTreeMap<BlobCid, Designated> = BTreeMap::new();
         let mut latest = BTreeMap::new();
+        let mut other_local: BTreeMap<BlobCid, BTreeSet<BlobCid>> = BTreeMap::new();
         for (event_cid, event) in events {
             let Some(manifest) = custody_manifest(event, &self.custodian) else {
                 continue;
@@ -563,9 +575,12 @@ impl BlobMount {
             let Ok(output) = BlobCid::parse(&event.resource.to_string()) else {
                 continue;
             };
-            latest.insert(output, manifest.clone());
-            designated.insert(
-                manifest.clone(),
+            other_local
+                .entry(output.clone())
+                .or_default()
+                .insert(manifest.clone());
+            latest.insert(
+                output,
                 Designated {
                     manifest,
                     event: *event_cid,
@@ -574,9 +589,20 @@ impl BlobMount {
                 },
             );
         }
+        for (output, designation) in &latest {
+            if let Some(others) = other_local.get_mut(output) {
+                others.remove(&designation.manifest);
+            }
+        }
+        let designated = latest
+            .values()
+            .map(|d| (d.manifest.clone(), d.clone()))
+            .collect();
         if let Ok(mut index) = self.index.write() {
             index.retain_designated(&designated);
             index.latest = latest;
+            index.other_local = other_local;
+            index.records.clear();
         }
         let mut unindexed = Vec::new();
         for (manifest, designation) in &designated {
@@ -637,20 +663,84 @@ impl BlobMount {
     }
 
     /// How many manifests the index tracks, served, unindexed or waiting to retry: bounded by
-    /// the distinct manifests of this device's custody events.
+    /// the distinct outputs of this device's custody events. Excludes the bounded on-demand cache.
     pub fn tracked_manifests(&self) -> usize {
         self.index.read().map_or(0, |index| index.tracked())
     }
 
     /// A specific custody record, never substituted by another record of its output.
-    fn held_record(&self, manifest: &BlobCid) -> Option<Held> {
-        self.index.read().ok()?.by_manifest.get(manifest).cloned()
+    async fn held_record(&self, output: &BlobCid, manifest: &BlobCid) -> Option<Held> {
+        let designation = {
+            let index = self.index.read().ok()?;
+            let designation = index.latest.get(output)?;
+            if designation.manifest == *manifest {
+                return index.by_manifest.get(manifest).cloned();
+            }
+            if !index.other_local.get(output)?.contains(manifest) {
+                return None;
+            }
+            if let Some(held) = index
+                .records
+                .iter()
+                .find(|held| held.output == *output && held.manifest == *manifest)
+            {
+                return Some(held.clone());
+            }
+            designation.clone()
+        };
+        self.reconstructions.fetch_add(1, Ordering::Relaxed);
+        // The output's current custody scope supplies serve-use bookkeeping. Historical
+        // records retain their exact manifest/key/producer provenance, but no event metadata.
+        let held = self
+            .read_held(manifest, designation.in_scope_of, Some(output.as_cid()))
+            .await
+            .ok()?;
+        let mut index = self.index.write().ok()?;
+        // A rebuild may have withdrawn custody while validation was in flight.
+        if index.latest.get(output) != Some(&designation)
+            || !index
+                .other_local
+                .get(output)
+                .is_some_and(|others| others.contains(manifest))
+        {
+            return None;
+        }
+        // Concurrent requests may have validated the same record; keep one cache entry.
+        index
+            .records
+            .retain(|entry| entry.manifest != *manifest || entry.output != *output);
+        if index.records.len() == RECORD_CACHE_CAPACITY {
+            index.records.pop_front();
+        }
+        index.records.push_back(held.clone());
+        Some(held)
+    }
+
+    /// Number of non-designated full records cached, at most [`RECORD_CACHE_CAPACITY`].
+    pub fn cached_records(&self) -> usize {
+        self.index.read().map_or(0, |index| index.records.len())
+    }
+
+    fn has_record(&self, output: &BlobCid, manifest: &BlobCid) -> bool {
+        self.index.read().is_ok_and(|index| {
+            index
+                .latest
+                .get(output)
+                .is_some_and(|d| d.manifest == *manifest)
+                || index
+                    .other_local
+                    .get(output)
+                    .is_some_and(|others| others.contains(manifest))
+        })
     }
 
     /// The latest custody record of `output`, when indexed (legacy output-only lookup).
     pub fn held(&self, output: &BlobCid) -> Option<Held> {
         let index = self.index.read().ok()?;
-        index.by_manifest.get(index.latest.get(output)?).cloned()
+        index
+            .by_manifest
+            .get(&index.latest.get(output)?.manifest)
+            .cloned()
     }
 
     /// Why the manifest `manifest` is held and not served, when it is.
@@ -891,7 +981,13 @@ pub(crate) async fn answer(
         if gate.admitted(who).is_none() {
             return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
         }
-        let selected = mount.and_then(|mount| Some((mount, mount.held_record(manifest)?)));
+        let selected = match mount {
+            Some(mount) => mount
+                .held_record(artifact, manifest)
+                .await
+                .map(|held| (mount, held)),
+            None => None,
+        };
         let Some((mount, held)) = selected.filter(|(_, held)| {
             held.output == *artifact && key.as_ref().is_none_or(|key| *key == held.key)
         }) else {
@@ -919,15 +1015,25 @@ pub(crate) async fn answer(
             return refuse(refusal);
         }
     }
-    if let Err(refusal) = gate.admit_object(who, object) {
-        return refuse(refusal);
+    let record_bound = matches!(request, TierRequest::Record { .. });
+    if !record_bound {
+        if let Err(refusal) = gate.admit_object(who, object) {
+            return refuse(refusal);
+        }
     }
-    // Membership in the very entry whose method admitted the root, and in the index now.
+    // Record requests use the validated entry's membership and current local custody.
+    // Their method grant and disclosure were judged above; the legacy object index contains
+    // only designated records and must not substitute its method for the selected record's.
     let in_held = *object == held.manifest
         || *object == held.method
         || *object == held.input
         || held.chunks.contains(object);
-    if !in_held || !mount.object_of(artifact, object) {
+    let still_local = if record_bound {
+        mount.has_record(artifact, &held.manifest)
+    } else {
+        mount.object_of(artifact, object)
+    };
+    if !in_held || !still_local {
         return refuse(ReachRefusal::new(ReachReason::NotUnderRoot, None));
     }
     // Admitted by every rule: only now is a byte read.

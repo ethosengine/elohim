@@ -244,3 +244,95 @@ async fn input_document_shares_method_disclosure_and_steward_only_admission() {
     b.close().await;
     a.router.shutdown().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn historical_record_is_validated_only_on_demand_and_cannot_borrow_membership() {
+    let h = household();
+    let mut a = holder(&h).await;
+    let bytes = Bytes::from_static(b"historical validation");
+    let old = put_with(
+        a.payload.as_ref(),
+        &mut a.flow,
+        granted_variant("old"),
+        bytes.clone(),
+        true,
+        &context(),
+    )
+    .await;
+    let latest = put_with(
+        a.payload.as_ref(),
+        &mut a.flow,
+        granted_variant("latest"),
+        bytes,
+        true,
+        &context(),
+    )
+    .await;
+    let method = &old.manifest.record.key.method;
+    let method_bytes = std::fs::read(a.object_path(method)).unwrap();
+    std::fs::remove_file(a.object_path(method)).unwrap();
+    assert!(
+        a.reindex().await.is_empty(),
+        "older method is not read at rebuild"
+    );
+    assert_eq!(a.mount.reconstructions(), 1);
+    let b = client(&h.key_b).await;
+    let request = TierRequest::Record {
+        artifact: output(&old),
+        manifest: old.manifest_cid.clone(),
+        key: None,
+        cid: None,
+    };
+    let refused = typed(
+        &output(&old),
+        ReachReason::NoRecord,
+        Some(&format!("manifest:{}", old.manifest_cid)),
+    );
+    assert_eq!(call(&b, &a.addr, request.clone()).await, refused);
+    assert_eq!(a.mount.cached_records(), 0);
+    write_object(&a.object_path(method), &method_bytes);
+    // Even with a held method, the historical chunks must reconstruct this output.
+    let chunk = &old.manifest.chunks[0].cid;
+    let chunk_bytes = std::fs::read(a.object_path(chunk)).unwrap();
+    std::fs::remove_file(a.object_path(chunk)).unwrap();
+    assert_eq!(call(&b, &a.addr, request.clone()).await, refused);
+    assert_eq!(a.mount.cached_records(), 0);
+    write_object(&a.object_path(chunk), &chunk_bytes);
+    served_bytes(call(&b, &a.addr, request).await, &old.manifest_cid);
+    // The latest manifest is locally held, but is not a member of the old record.
+    assert_eq!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Record {
+                artifact: output(&old),
+                manifest: old.manifest_cid.clone(),
+                key: None,
+                cid: Some(latest.manifest_cid.clone()),
+            }
+        )
+        .await,
+        typed(&output(&old), ReachReason::NotUnderRoot, None)
+    );
+    // Corrupt history is not read by a rebuild, but cannot be served on demand afterwards.
+    std::fs::remove_file(a.object_path(&old.manifest_cid)).unwrap();
+    write_object(&a.object_path(&old.manifest_cid), b"not a manifest");
+    assert!(a.reindex().await.is_empty());
+    assert_eq!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Record {
+                artifact: output(&old),
+                manifest: old.manifest_cid.clone(),
+                key: None,
+                cid: None,
+            }
+        )
+        .await,
+        refused
+    );
+    assert_eq!(a.mount.cached_records(), 0);
+    b.close().await;
+    a.router.shutdown().await.unwrap();
+}
