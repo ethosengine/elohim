@@ -111,13 +111,22 @@ pub(super) fn check(
     watched_absent
 }
 
-/// `<profile>/build/<pkg>-<hash>/out/...`: a file a build script wrote into its OUT_DIR.
+/// A file a build script wrote into its OUT_DIR: `<profile>/build/<pkg>-<hash>/out/...` before
+/// Cargo 1.100, `<profile>/build/<pkg>/<hash>/out/...` in 1.100's build-dir layout.
 fn is_script_output(path: &Path, build_dir: Option<&Path>) -> bool {
     let Some(rest) = build_dir.and_then(|dir| path.strip_prefix(dir).ok()) else {
         return false;
     };
-    let mut parts = rest.components();
-    parts.next().is_some() && parts.next().is_some_and(|c| c.as_os_str() == "out")
+    let parts: Vec<_> = rest.components().map(|c| c.as_os_str()).collect();
+    let is_hash = |s: &std::ffi::OsStr| {
+        s.to_str()
+            .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    };
+    match parts.as_slice() {
+        [_, out, _, ..] if *out == "out" => true,
+        [_, hash, out, _, ..] => is_hash(hash) && *out == "out",
+        _ => false,
+    }
 }
 
 // Cargo dep-info is make syntax: escaped spaces/backslashes/#, $$ for a literal dollar.
@@ -249,5 +258,14 @@ mod tests {
         let other = Path::new("/other/debug/build/pkg-1/out/x.js");
         assert!(!super::is_script_output(other, Some(build)));
         assert!(!super::is_script_output(out, None));
+        // Cargo 1.100 moves the hash into a parent directory: build/<pkg>/<hash>/out/.
+        let layout =
+            Path::new("/pool/dev/debug/build/elohim-chrome-asset/654945da8b2298ec/out/omni.js");
+        assert!(super::is_script_output(layout, Some(build)));
+        let fingerprint =
+            Path::new("/pool/dev/debug/build/elohim-chrome-asset/654945da8b2298ec/fingerprint/x");
+        assert!(!super::is_script_output(fingerprint, Some(build)));
+        let bare_out = Path::new("/pool/dev/debug/build/elohim-chrome-asset/654945da8b2298ec/out");
+        assert!(!super::is_script_output(bare_out, Some(build)));
     }
 }
