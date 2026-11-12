@@ -63,7 +63,12 @@ reordered or removed.
   a green result, clean inputs. Above the floor an elohim is called to validate the call (for
   example a gate whose result may depend on the host, or a record with declared gaps), and it is
   the party that repairs when an accepted verdict proves wrong, by the reconciliation walk of
-  lane R. This widens `GATE_EVIDENCE=reuse`, which accepts only this workspace's own attestation
+  lane R. The ceiling is meant to be called rarely, and for questions of diversity, resilience,
+  governance, integrity and witness. The contract, the extraction and the recorded inputs exist
+  so that a job and the peer under it can know before a run whether it will fit, refuse early,
+  and send that refusal back as feedback. Each time an elohim is called for something a program
+  could have checked, that is a finding, and its repair is a new floor check. This widens
+  `GATE_EVIDENCE=reuse`, which accepts only this workspace's own attestation
   today (habit `push-gate-pays-once`, `genesis/orchestrator/.epr-meta/`). The mechanism is not
   designed here; it is owed as an item in that habit's lane, and an accepted sibling verdict is
   accounted like any other supplied work (ruling above).
