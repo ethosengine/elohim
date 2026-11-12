@@ -1489,6 +1489,7 @@ fn request_for(
     dest: std::path::PathBuf,
 ) -> eprfs_peer::FetchRequest {
     eprfs_peer::FetchRequest {
+        inputs_only: false,
         nonce: eprfs_peer::FetchRequest::fresh_nonce(),
         authority: eprfs_peer::FetchAuthority::Derivation {
             key: key.clone(),
@@ -2203,3 +2204,6 @@ async fn output_fetch_rejects_wrong_manifest_output_and_corrupt_method_before_ch
         "only the method, no payload chunk, was asked"
     );
 }
+
+#[path = "support/fetch_inputs.rs"]
+mod inputs;

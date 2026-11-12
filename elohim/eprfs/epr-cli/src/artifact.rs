@@ -47,6 +47,7 @@ use serde::Serialize;
 
 mod custody;
 mod extract;
+mod inputs;
 mod requires;
 #[cfg(test)]
 use requires::read_requires;
@@ -115,6 +116,12 @@ pub fn usage() -> String {
      [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
      serve; exits 3 `fetch gap: <kind>: <reason>`)\n  \
+     | inputs show <key-or-descriptor> [--repo ROOT] [--payload-store DIR]\n  \
+     | inputs diff <key-or-descriptor> --device <did:key> [--repo ROOT] [--handle H] \
+     [--payload-store DIR] [--stall S] [--total S] \
+     (verified input lines at reach self; descriptor FILE compares the latest sibling record of \
+     the same method, key CID pins that exact key; diff: - this device, + sibling, sorted without context; \
+     exits 0 identical, 1 different, 3 refused/unavailable)\n  \
      | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
         .to_string()
 }
@@ -125,6 +132,9 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     if matches!(verb, Some("--help" | "-h" | "help")) {
         println!("{}", usage());
         return Ok(ExitCode::SUCCESS);
+    }
+    if verb == Some("inputs") {
+        return inputs::run(&args[1..]);
     }
     let sysroot_verb = (verb == Some("sysroot"))
         .then(|| args.get(1).map(String::as_str))
@@ -322,6 +332,9 @@ pub struct ClosureKey {
     pub dirty: Vec<String>,
     #[serde(skip)]
     pub key: DerivationKey,
+    /// Exact bytes hashed for a mesh-build input; absent for the sysroot manifest basis.
+    #[serde(skip)]
+    pub input_lines: Option<String>,
 }
 
 fn git(repo: &Path, args: &[&str]) -> ArtifactResult<crate::process::CommandOutput> {
@@ -879,6 +892,7 @@ fn closure_selection(
             head,
             dirty,
             key,
+            input_lines: Some(lines),
         },
         selections,
         effective,
@@ -1370,6 +1384,15 @@ fn record_artifact(
     sysroot_manifest: Option<&sysroot::Manifest>,
 ) -> ArtifactResult<ExitCode> {
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
+    if let Some(lines) = &key.input_lines {
+        if BlobCid::compute_bytes(lines.as_bytes()) != key.input {
+            return Err(unrecorded(
+                "input document CID differs from the key's input CID",
+            ));
+        }
+    } else if sysroot_manifest.is_none() {
+        return Err(unrecorded("the key has no input document"));
+    }
     // Validate and canonicalize both documents before any attestation or blob is written.
     // Archives retain their existing validator and optional caller document.
     let (requires, requires_evidence) = requires::documents(
@@ -1497,6 +1520,11 @@ fn record_artifact(
         if let Some(manifest) = sysroot_manifest {
             store
                 .put_blob_verified(&manifest.cid()?, Bytes::from(manifest.canonical_bytes()?))
+                .await
+                .map_err(unrecorded)?;
+        }
+        if let Some(lines) = &key.input_lines {
+            eprfs_peer::put_input_document(store.as_ref(), &key.input, Bytes::from(lines.clone()))
                 .await
                 .map_err(unrecorded)?;
         }
@@ -1642,6 +1670,7 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     );
     let request = FetchRequest {
         nonce: FetchRequest::fresh_nonce(),
+        inputs_only: false,
         authority: authority.clone(),
         output: selection.output.clone(),
         expect_output: options.expect_output.clone(),
@@ -1729,6 +1758,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         FetchDone::Gap { gap: why, .. } => Err(gap(&why)),
+        FetchDone::InputDocument { .. } => Err(ArtifactError::Gap(
+            "unexpected input document answer".into(),
+        )),
     }
 }
 

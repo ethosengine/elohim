@@ -2067,3 +2067,6 @@ async fn descriptor_disclosure_requires_explicit_permission_and_revokes_on_reloa
     b.close().await;
     a.router.shutdown().await.unwrap();
 }
+
+#[path = "support/serve_inputs.rs"]
+mod inputs;
