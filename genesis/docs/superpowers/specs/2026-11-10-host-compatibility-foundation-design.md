@@ -335,8 +335,10 @@ declared target = { arch, isa bundle, os, floor: sysroot CID, C compiler flags }
 Consequences:
 
 1. Two devices on different native images that build the same source for the same declared target
-   use identical link inputs. Their derivation keys match and they share an identity hit. This
-   closes F2r for the common case without levelling either device.
+   use identical link inputs and share one family. Their derivation keys match, and they share an
+   identity hit, only when their compilers are also the same; with different native compilers
+   each records its own key in that family and the other fetches it as a variant (H13, ruled
+   2026-11-12). This closes F2r without levelling either device.
 2. The artifact's `declared` clauses are known before the build runs: the ISA bundle and the
    libc floor the sysroot implies.
 3. A device may also build a second variant tuned to its own hardware. That is another member of
@@ -930,7 +932,7 @@ suite checks, and that is a proof (§7.1), not a copy count.
 
 **Compiler closures.** shem's and ethosengine's `cc1` and `as` differ byte for byte (their
 `crtbeginS.o` agree), so one floor alone does not make their keys equal. The working posture,
-ruled by the lane K owner on 2026-11-11 and asked of the steward as H13, is per-compiler variants:
+ruled by the lane K owner on 2026-11-11 and ratified as H13 on 2026-11-12, is per-compiler variants:
 the two builds share a family, not a key, and both join a variant set through the conformance
 suite. A CID-pinned compiler closure, held as a floor member and mounted beside each device's native
 toolchain, is a later optimisation. It would let keys match without levelling either device onto
@@ -1317,7 +1319,7 @@ Until then they are named axes with no supported claim.
 ## 12. Rulings asked of the steward
 
 State on 2026-11-10: the steward ruled H1 to H7 as recommended. H8 and H9 were agreed in
-conversation the same day. H10 and H11 remain open. H12 and H13 were added on 2026-11-11 from §7.8 and are open. The sprint plan
+conversation the same day. H10 and H11 remain open. H12 and H13 were added on 2026-11-11 from §7.8 and were ruled on 2026-11-12 by the Fable lane K agent under the steward's delegation (`genesis/docs/superpowers/sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`, with conditions, exit criteria and reversal). The sprint plan
 (`genesis/docs/superpowers/plans/2026-11-10-host-compatibility-foundation-plan.md`) builds on the
 ruled items only.
 
@@ -1334,8 +1336,8 @@ ruled items only.
 | H9 | Are variant sets open, with membership decided by a named conformance suite and not by who built the variant (§7.1)? | Yes, same agreement. Adapted variants join by attestation; wider reach needs the device's own run or converging independent proofs |
 | H11 | Do the six rules of §7.4 bind every later change to this contract, and is the seed (§7.5) a design constraint on the native kernel? | Yes. The direction was ruled by the steward in conversation on 2026-11-10; the six rules and the seed are this spec's reading of it and need the steward's confirmation as written |
 | H10 | Does rakia plan native builds with the declared target as a step input and building and proving as separate steps, with admission inside `ark task run` on the provider (§7.3)? | Yes, pending the rakia steward's check. rakia's plan today is topological levels of steps with no host field, and its manifest schema carries no target |
-| H12 | Does an artifact's own declared reach (`env:reach`, derived from its inputs) decide who may draw it, with `berth.artifacts.serves` kept only as a narrowing list, so that no new grant is needed per kind of artifact between one person's devices (§7.8)? | Yes. It replaces the per-method `sysroot-pack` grant proposed on 2026-11-11, which is withdrawn. Widening above `self` keeps the reach ladder and the floor licence reading |
-| H13 | Until a pinned compiler closure exists, do builds from different native compilers stay distinct variants that share a family but not a key (§7.8)? | Yes (posture B, ruled by the lane K owner 2026-11-11). A CID-pinned compiler closure as a floor member is a later optimisation, not a prerequisite |
+| H12 | Does an artifact's own declared reach (`env:reach`, derived from its inputs) decide who may draw it, with `berth.artifacts.serves` kept only as a narrowing list, so that no new grant is needed per kind of artifact between one person's devices (§7.8)? | Ruled 2026-11-12: yes (option B). It replaces the per-method `sysroot-pack` grant, which is withdrawn. A record with no `env:reach` slot keeps today's method-row rule until none remains; an unattributed floor is `self`, an unclassifiable input `private` and unserved; nothing above `self` is served, and widening keeps the reach ladder and the floor licence reading |
+| H13 | Until a pinned compiler closure exists, do builds from different native compilers stay distinct variants that share a family but not a key (§7.8)? | Ruled 2026-11-12: yes (posture B ratified). A CID-pinned compiler closure as a floor member is a later optimisation under X1, taken up on a measured trigger (a third device or compiler; V1 to V3 landed and reuse between two compilers still fails; or the variant count costs more than the closure) |
 
 ## 13. Review asks, by session
 

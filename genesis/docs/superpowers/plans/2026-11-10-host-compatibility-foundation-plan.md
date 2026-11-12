@@ -156,11 +156,11 @@ Verify: a test with two differing outputs under one key fetches from the agreein
 
 Verify: a lookup by `env:output` returns the same holders as the key lookup for a single-variant family.
 
-- [ ] **K6 — a declared target with a pinned sysroot (itself a recorded derivation with a key and a requirement); F2r closes with equal keys in both directions, including the v3-on-v2 refusal under emulation** (serves sprint-lands-each-closure-once)
+- [ ] **K6 — a declared target with a pinned sysroot (itself a recorded derivation with a key and a requirement); F2r closes with one family in both directions (each device records its own key under it; H13), including the v3-on-v2 refusal under emulation** (serves sprint-lands-each-closure-once)
 
-Verify: the F2r receipt names the sysroot CID and shows one identity hit each way; the emulated v2 run refuses the v3 variant before launch.
+Verify: the F2r receipt names the sysroot CID; each device records its own key under one family; each fetches the other's variant by family and admits or refuses it; the emulated v2 run refuses the v3 variant before launch. Keys are equal only when the compilers are too (H13, ruled 2026-11-12, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`).
 
-- [ ] **K7 — re-run the artifact-store sprint's owed receipts (F1r sibling reuse, the F2r fetch half) on the new key** (serves sprint-lands-each-closure-once)
+- [ ] **K7 — re-run the artifact-store sprint's owed receipts (F1r sibling reuse, the F2r fetch half) on the new key, reuse by family between devices with different compilers (H13)** (serves sprint-lands-each-closure-once)
 
 Verify: both receipts in `sprints/2026-11-07-artifact-store/evidence/`, linked from its `RESULT.md`.
 
@@ -188,6 +188,8 @@ Receipt 2026-11-12 (`k9-two-device-receipt.md`): both directions paired the 8b27
 
 Recording: a clause narrowed by dispatch evidence carries `Clause.narrowing` (`Narrowing { removed, evidence }`, host_contract, provenance only: admit ignores it), so a reader sees why the requirement shrank (A1 owner's review note, 2026-11-11). When narrowing removes every above-floor feature, the clause is omitted, not kept empty (an empty clause is refused as unknown-axis by a host that does not observe the axis), and the `Narrowing` record travels on the artifact's Produce instead. Constraint from the A1 owner: dispatch evidence never adds an `isa` clause; it removes the above-floor features it covers from the extracted clause, and when nothing above the floor remains the clause is absent (spec §3.1 rule 4: an absent clause requires nothing).
 
+Scope (ruled 2026-11-12, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`): the sequence C, then B, then A. Step 1, now: a narrow own-build rule. A device may run a build whose recorded requirement it does not meet only when every unmet clause is `isa.x86` with source `extracted`, the `Produce` was recorded by that same device, and the verdict is recorded as an own-build permit naming each unmet clause. It never applies to a sibling, and an illegal-instruction death of that artifact on that device withdraws it. Spec §3.2 and A3's verify are amended to state the rule before any code relies on it. Step 2 (baseline-compile attestation, the `tzcnt`/`bmi1` class) starts when K11's build receipt exists. Step 3 (the K10 note's minimum certificate slice) starts on a measured trigger: a second same-level device needs a dispatched build, the own-build rule has stood 30 days for one artifact with no certificate work begun, or the variant count becomes a held cost. K8 keeps counting the seven extras meanwhile.
+
 Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when their guard is evidenced; with the evidence withheld, the same bytes extract v3; epr's sqlite3 v3 code stays a requirement. For epr, exactly v3 is an outcome of complete coverage, not a preset target: narrowing removes a feature only when every occurrence of it is certified, and the remaining instructions then decide the level. Withheld evidence keeps all seven K8 extras and refuses against the synthetic v3 `Provides`.
 
 Design input (read-only pass, 2026-11-11, `sprints/2026-11-07-artifact-store/evidence/k10-dispatch-evidence-design.md`): a function hash proves identity, not guarded reachability. The evidence is a certificate produced after the final link, bound to the whole artifact's CID, naming each guarded region, its detector, every incoming edge and the pointer or object invariants. `put` checks it and rescans every occurrence, and another device re-checks it without running the code. The scope is wider than ring and compiler_builtins: `sha_ni` also comes from two `sha2` versions. The three real mechanisms (ring's capability tokens and key variants, compiler_builtins' cached function pointer, blake3's public platform enum) each defeat a branch-dominance check, so the first slice covers one ELF and link configuration and these named contracts only. Unsupported or unresolved paths keep the requirement.
@@ -200,9 +202,9 @@ The steward's uniform rule (2026-11-12) classifies every §7.9 item as present, 
 
 Verify: a fresh workspace records a small cargo binary end to end; a non-cargo recipe refuses naming each missing §7.9 item.
 
-- [ ] **K12 — `env:reach` on every `Produce`, derived as the narrowest input reach (`epr::Reach`), and the peer gate serving when the requester's relationship meets it, with `berth.artifacts.serves` as a narrowing list (spec §7.8). BLOCKED on steward ruling H12; do not start before it is ruled** (serves dataplane-convergence)
+- [ ] **K12 — `env:reach` on every `Produce`, derived as the narrowest input reach (`epr::Reach`), and the peer gate serving when the requester's relationship meets it, with `berth.artifacts.serves` as a narrowing list (spec §7.8). H12 ruled 2026-11-12 (option B, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`); K12 may start** (serves dataplane-convergence)
 
-Verify: with an unchanged `pool-policy.json`, an admitted device of the person draws a `public` floor and a `self` mesh build without a new grant row; a `private` artifact refuses; a `serves` row naming a method denies it even when reach allows.
+Verify: with an unchanged `pool-policy.json`, an admitted device of the person draws a `self` floor (an unattributed floor is `self`) and a `self` mesh build without a new grant row; a `private` artifact, or one with an input the derivation cannot classify, refuses; a record with no `env:reach` slot is served only by a `serves` row naming its method, as today; a `serves` row whose audience excludes the requester denies even when reach allows; nothing above `self` is served under H12.
 
 ## Lane V — variant sets and conformance (spec §7, §7.1; rungs H4, H9; reviews G2, G3, B5)
 
