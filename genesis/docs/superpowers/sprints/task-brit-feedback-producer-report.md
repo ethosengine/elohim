@@ -257,3 +257,28 @@ This seat changed no installed tool heads. Native installation, release provenan
 ingest, monorepo pin attestation, attributable installed replay, appointed acceptance,
 and the terminal native promise act remain integrator-owned. This report supplies
 published technical evidence, not an installed acceptance or fulfilment claim.
+
+## Integrator delivery evidence — 2026-11-12
+
+Root completed the producer seat's remaining installation and operational work.
+The parent `dd9001e7f0cc32934c93f62a779fe077fc31341a` passed all 27 gates and a
+normal hooked Brit push. Native CAS landed the exact four-binary Brit release
+as `bafyreiayutlx35qywcwbcexx7zc32rsc37xbi2qbmx6gmmon342coyxhbu` with EPR
+`bafyreieu2hiydfq2n5pkhanqvsybhgs3q5s557swxbslsskqmo6bg3a3fu`. Full-pair
+qualification and the installed-current native-launcher diagnostic passed.
+
+An owned new-session ordinary replay returned exactly five history entries for
+`brit log -5`, exit 0; its expected diff refusal remained exit 2. Both anonymous
+automatic outcomes reopened from the existing private store. Original records,
+the capacity policy and old session-pin bytes remain unchanged. Deliberate agent
+witness `bafyreia5qskgv6gswcsozvptzxm5ldsa5owx3pbh35gy3hiwkm6ijvzgpe` and link
+`bafyreicutdxoxzyyvetwxi6br4lvcbqyb5cju4ba42vavuz7vxenaeb2zm` establish the agent's
+experienced recovery. The witness shares the actual automatic run identity and
+does not count another attempt. Matthew's original experience receives available
+release evidence, not an invented participant recovery.
+
+See `task-brit-feedback-install-report.md` and
+`task-brit-feedback-operation-report.md` for the exact installed selections,
+qualification, protection checks and retained concerns. Technical completion
+does not establish appointed acceptance. The original upstream CI concerns above
+remain accurately scoped; this addendum does not rewrite them.
