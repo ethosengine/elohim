@@ -1,0 +1,55 @@
+{
+ "what": "K6 slice 2: shem's x86-64-v2 floor recorded as a sysroot derivation",
+ "device": "shem (did:key:z6Mkm5deEA87WrC3PDDGjkZwnWhUGhwHS43UinXhy5N6bowj), AlmaLinux 10.2 x86_64_v2",
+ "packages": [
+  "glibc-2.39-128.el10_2.alma.1.x86_64_v2",
+  "glibc-devel-2.39-128.el10_2.alma.1.x86_64_v2",
+  "kernel-headers-6.12.0-211.56.1.el10_2.x86_64_v2",
+  "libgcc-14.3.1-4.4.el10.alma.2.x86_64_v2",
+  "gcc-14.3.1-4.4.el10.alma.2.x86_64_v2"
+ ],
+ "packer": "epr built natively on shem at dev d32131dfa (debug, 136,592,296 bytes)",
+ "assembly": "k6-v2-floor-assemble.sh.txt (file set from rpm -ql; 1,573 copied paths)",
+ "pack": {
+  "members": 1655,
+  "scripts": [
+   "usr/lib/gcc/x86_64-redhat-linux/14/libgcc_s.so",
+   "usr/lib64/libc.so",
+   "usr/lib64/libm.so"
+  ],
+  "libcVersion": "2.39",
+  "isaNotes": {
+   "baseline+v2": 28,
+   "none": 20,
+   "above v2": 0
+  },
+  "deterministic": "two packs byte-identical"
+ },
+ "put_without_requires": {
+  "project": "sysroot-x86_64-v2-alma10.2-glibc2.39",
+  "method": "bafyreid6mmtqqioxcev253tvbujjkjzwecxwujcxlxt76vr3uhp3zwpfxe",
+  "input": "bafkr4ifzokvovxypze7absrmj7njjkki2ad3255w7wmbxgx54qbkjlov5e",
+  "key": "bafyreih25tuk4bubq7672wf44zi3ee63hp72elmjiv3ldo3gznorshh4qi",
+  "output": "bafkr4ic3gyme6ajwr7ctshk4jbarcby7vss75fhviiugl477rv4weqbhxq",
+  "manifest": "bafyreifzcnd3qk7frl437w3kucnqpswkfqzbmmibsckoqupe3snsph7bra",
+  "bytes": 25468580,
+  "commit": "6d994a931669def18b7a979a12ed66424f7a823a",
+  "agentId": "8b4cf6856d651a114fe8909386c7d42625eeca8ff851beb22df6342988292a4c",
+  "crosses": true
+ },
+ "put_with_requires": {
+  "project": "sysroot-x86_64-v2-alma10.2-glibc2.39",
+  "method": "bafyreid6mmtqqioxcev253tvbujjkjzwecxwujcxlxt76vr3uhp3zwpfxe",
+  "input": "bafkr4ifzokvovxypze7absrmj7njjkki2ad3255w7wmbxgx54qbkjlov5e",
+  "key": "bafyreih25tuk4bubq7672wf44zi3ee63hp72elmjiv3ldo3gznorshh4qi",
+  "output": "bafkr4ic3gyme6ajwr7ctshk4jbarcby7vss75fhviiugl477rv4weqbhxq",
+  "manifest": "bafyreifzcnd3qk7frl437w3kucnqpswkfqzbmmibsckoqupe3snsph7bra",
+  "bytes": 25468580,
+  "commit": "6d994a931669def18b7a979a12ed66424f7a823a",
+  "agentId": "8b4cf6856d651a114fe8909386c7d42625eeca8ff851beb22df6342988292a4c",
+  "crosses": true
+ },
+ "requires_document": "k6-v2-floor.requires.json",
+ "env_requires": "bafkr4igfy7nkuttfkd2qq7dofxipermlhcykqvv7txlhyq74s4ptmx2cv4",
+ "note": "The first put omitted --requires, so this output carries two Produces from shem: one without env:requires and one with it. Serving it to another device waits on H12 (reach on the object)."
+}

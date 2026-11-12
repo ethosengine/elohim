@@ -1,0 +1,1585 @@
+{
+  "admissions": {
+    "v2": {
+      "provides": {
+        "observed": {
+          "abi.libc": {
+            "kind": "version",
+            "value": {
+              "components": [
+                2,
+                39
+              ],
+              "line": "glibc"
+            }
+          },
+          "abi.loader": {
+            "kind": "names",
+            "value": [
+              "/lib64/ld-linux-x86-64.so.2"
+            ]
+          },
+          "arch": {
+            "kind": "scalar",
+            "value": "x86_64"
+          },
+          "isa.x86": {
+            "kind": "names",
+            "value": [
+              "cx16",
+              "lahf_lm",
+              "popcnt",
+              "sse3",
+              "sse4_1",
+              "sse4_2",
+              "ssse3"
+            ]
+          },
+          "kernel.linux": {
+            "kind": "version",
+            "value": {
+              "components": [
+                6,
+                8,
+                0
+              ],
+              "line": "linux"
+            }
+          },
+          "lib": {
+            "kind": "names",
+            "value": [
+              "ld-linux-x86-64.so.2",
+              "libc.so.6",
+              "libgcc_s.so.1",
+              "libm.so.6"
+            ]
+          },
+          "os": {
+            "kind": "scalar",
+            "value": "linux"
+          }
+        },
+        "unobserved": []
+      },
+      "vector": "../../../crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v2.json",
+      "verdict": {
+        "axis": "host-compatibility",
+        "decision": {
+          "type": "refuse"
+        },
+        "policyRef": null,
+        "subject": null,
+        "witness": {
+          "checks": [
+            {
+              "checkId": "host-compatibility:abi.libc",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "abi.libc",
+                    "predicate": {
+                      "kind": "at-least",
+                      "value": {
+                        "components": [
+                          2,
+                          39
+                        ],
+                        "line": "glibc"
+                      }
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "version",
+                  "value": {
+                    "components": [
+                      2,
+                      39
+                    ],
+                    "line": "glibc"
+                  }
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "at-least",
+                  "value": {
+                    "components": [
+                      2,
+                      39
+                    ],
+                    "line": "glibc"
+                  }
+                }
+              },
+              "outcome": "passed",
+              "summary": "abi.libc: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:abi.loader",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "abi.loader",
+                    "predicate": {
+                      "kind": "present",
+                      "value": [
+                        "/lib64/ld-linux-x86-64.so.2"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "/lib64/ld-linux-x86-64.so.2"
+                  ]
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "present",
+                  "value": [
+                    "/lib64/ld-linux-x86-64.so.2"
+                  ]
+                }
+              },
+              "outcome": "passed",
+              "summary": "abi.loader: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:arch",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "arch",
+                    "predicate": {
+                      "kind": "equal",
+                      "value": "x86_64"
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "scalar",
+                  "value": "x86_64"
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "equal",
+                  "value": "x86_64"
+                }
+              },
+              "outcome": "passed",
+              "summary": "arch: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:isa.x86",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "isa.x86",
+                    "predicate": {
+                      "kind": "subset",
+                      "value": [
+                        "adx",
+                        "aes",
+                        "avx",
+                        "avx2",
+                        "bmi1",
+                        "bmi2",
+                        "cx16",
+                        "f16c",
+                        "fma",
+                        "fma4",
+                        "lahf_lm",
+                        "lzcnt",
+                        "movbe",
+                        "osxsave",
+                        "pclmulqdq",
+                        "popcnt",
+                        "sha_ni",
+                        "sse3",
+                        "sse4_1",
+                        "sse4_2",
+                        "ssse3",
+                        "vaes",
+                        "vpclmulqdq"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "cx16",
+                    "lahf_lm",
+                    "popcnt",
+                    "sse3",
+                    "sse4_1",
+                    "sse4_2",
+                    "ssse3"
+                  ]
+                },
+                "refusal": {
+                  "axis": "isa.x86",
+                  "host": {
+                    "kind": "names",
+                    "value": [
+                      "cx16",
+                      "lahf_lm",
+                      "popcnt",
+                      "sse3",
+                      "sse4_1",
+                      "sse4_2",
+                      "ssse3"
+                    ]
+                  },
+                  "kind": "unmet",
+                  "missing": [
+                    "adx",
+                    "aes",
+                    "avx",
+                    "avx2",
+                    "bmi1",
+                    "bmi2",
+                    "f16c",
+                    "fma",
+                    "fma4",
+                    "lzcnt",
+                    "movbe",
+                    "osxsave",
+                    "pclmulqdq",
+                    "sha_ni",
+                    "vaes",
+                    "vpclmulqdq"
+                  ],
+                  "required": {
+                    "kind": "subset",
+                    "value": [
+                      "adx",
+                      "aes",
+                      "avx",
+                      "avx2",
+                      "bmi1",
+                      "bmi2",
+                      "cx16",
+                      "f16c",
+                      "fma",
+                      "fma4",
+                      "lahf_lm",
+                      "lzcnt",
+                      "movbe",
+                      "osxsave",
+                      "pclmulqdq",
+                      "popcnt",
+                      "sha_ni",
+                      "sse3",
+                      "sse4_1",
+                      "sse4_2",
+                      "ssse3",
+                      "vaes",
+                      "vpclmulqdq"
+                    ]
+                  }
+                },
+                "required": {
+                  "kind": "subset",
+                  "value": [
+                    "adx",
+                    "aes",
+                    "avx",
+                    "avx2",
+                    "bmi1",
+                    "bmi2",
+                    "cx16",
+                    "f16c",
+                    "fma",
+                    "fma4",
+                    "lahf_lm",
+                    "lzcnt",
+                    "movbe",
+                    "osxsave",
+                    "pclmulqdq",
+                    "popcnt",
+                    "sha_ni",
+                    "sse3",
+                    "sse4_1",
+                    "sse4_2",
+                    "ssse3",
+                    "vaes",
+                    "vpclmulqdq"
+                  ]
+                }
+              },
+              "outcome": "failed",
+              "summary": "isa.x86: unmet"
+            },
+            {
+              "checkId": "host-compatibility:kernel.linux",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "kernel.linux",
+                    "predicate": {
+                      "kind": "at-least",
+                      "value": {
+                        "components": [
+                          3,
+                          2,
+                          0
+                        ],
+                        "line": "linux"
+                      }
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "version",
+                  "value": {
+                    "components": [
+                      6,
+                      8,
+                      0
+                    ],
+                    "line": "linux"
+                  }
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "at-least",
+                  "value": {
+                    "components": [
+                      3,
+                      2,
+                      0
+                    ],
+                    "line": "linux"
+                  }
+                }
+              },
+              "outcome": "passed",
+              "summary": "kernel.linux: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:lib",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "lib",
+                    "predicate": {
+                      "kind": "present",
+                      "value": [
+                        "ld-linux-x86-64.so.2",
+                        "libc.so.6",
+                        "libgcc_s.so.1",
+                        "libm.so.6"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "ld-linux-x86-64.so.2",
+                    "libc.so.6",
+                    "libgcc_s.so.1",
+                    "libm.so.6"
+                  ]
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "present",
+                  "value": [
+                    "ld-linux-x86-64.so.2",
+                    "libc.so.6",
+                    "libgcc_s.so.1",
+                    "libm.so.6"
+                  ]
+                }
+              },
+              "outcome": "passed",
+              "summary": "lib: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:os",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "os",
+                    "predicate": {
+                      "kind": "equal",
+                      "value": "linux"
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "scalar",
+                  "value": "linux"
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "equal",
+                  "value": "linux"
+                }
+              },
+              "outcome": "passed",
+              "summary": "os: satisfied"
+            }
+          ]
+        }
+      }
+    },
+    "v3": {
+      "provides": {
+        "observed": {
+          "abi.libc": {
+            "kind": "version",
+            "value": {
+              "components": [
+                2,
+                39
+              ],
+              "line": "glibc"
+            }
+          },
+          "abi.loader": {
+            "kind": "names",
+            "value": [
+              "/lib64/ld-linux-x86-64.so.2"
+            ]
+          },
+          "arch": {
+            "kind": "scalar",
+            "value": "x86_64"
+          },
+          "isa.x86": {
+            "kind": "names",
+            "value": [
+              "avx",
+              "avx2",
+              "bmi1",
+              "bmi2",
+              "cx16",
+              "f16c",
+              "fma",
+              "lahf_lm",
+              "lzcnt",
+              "movbe",
+              "osxsave",
+              "popcnt",
+              "sse3",
+              "sse4_1",
+              "sse4_2",
+              "ssse3"
+            ]
+          },
+          "kernel.linux": {
+            "kind": "version",
+            "value": {
+              "components": [
+                6,
+                8,
+                0
+              ],
+              "line": "linux"
+            }
+          },
+          "lib": {
+            "kind": "names",
+            "value": [
+              "ld-linux-x86-64.so.2",
+              "libc.so.6",
+              "libgcc_s.so.1",
+              "libm.so.6"
+            ]
+          },
+          "os": {
+            "kind": "scalar",
+            "value": "linux"
+          }
+        },
+        "unobserved": []
+      },
+      "vector": "../../../crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-v3.json",
+      "verdict": {
+        "axis": "host-compatibility",
+        "decision": {
+          "type": "refuse"
+        },
+        "policyRef": null,
+        "subject": null,
+        "witness": {
+          "checks": [
+            {
+              "checkId": "host-compatibility:abi.libc",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "abi.libc",
+                    "predicate": {
+                      "kind": "at-least",
+                      "value": {
+                        "components": [
+                          2,
+                          39
+                        ],
+                        "line": "glibc"
+                      }
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "version",
+                  "value": {
+                    "components": [
+                      2,
+                      39
+                    ],
+                    "line": "glibc"
+                  }
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "at-least",
+                  "value": {
+                    "components": [
+                      2,
+                      39
+                    ],
+                    "line": "glibc"
+                  }
+                }
+              },
+              "outcome": "passed",
+              "summary": "abi.libc: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:abi.loader",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "abi.loader",
+                    "predicate": {
+                      "kind": "present",
+                      "value": [
+                        "/lib64/ld-linux-x86-64.so.2"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "/lib64/ld-linux-x86-64.so.2"
+                  ]
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "present",
+                  "value": [
+                    "/lib64/ld-linux-x86-64.so.2"
+                  ]
+                }
+              },
+              "outcome": "passed",
+              "summary": "abi.loader: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:arch",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "arch",
+                    "predicate": {
+                      "kind": "equal",
+                      "value": "x86_64"
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "scalar",
+                  "value": "x86_64"
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "equal",
+                  "value": "x86_64"
+                }
+              },
+              "outcome": "passed",
+              "summary": "arch: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:isa.x86",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "isa.x86",
+                    "predicate": {
+                      "kind": "subset",
+                      "value": [
+                        "adx",
+                        "aes",
+                        "avx",
+                        "avx2",
+                        "bmi1",
+                        "bmi2",
+                        "cx16",
+                        "f16c",
+                        "fma",
+                        "fma4",
+                        "lahf_lm",
+                        "lzcnt",
+                        "movbe",
+                        "osxsave",
+                        "pclmulqdq",
+                        "popcnt",
+                        "sha_ni",
+                        "sse3",
+                        "sse4_1",
+                        "sse4_2",
+                        "ssse3",
+                        "vaes",
+                        "vpclmulqdq"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "avx",
+                    "avx2",
+                    "bmi1",
+                    "bmi2",
+                    "cx16",
+                    "f16c",
+                    "fma",
+                    "lahf_lm",
+                    "lzcnt",
+                    "movbe",
+                    "osxsave",
+                    "popcnt",
+                    "sse3",
+                    "sse4_1",
+                    "sse4_2",
+                    "ssse3"
+                  ]
+                },
+                "refusal": {
+                  "axis": "isa.x86",
+                  "host": {
+                    "kind": "names",
+                    "value": [
+                      "avx",
+                      "avx2",
+                      "bmi1",
+                      "bmi2",
+                      "cx16",
+                      "f16c",
+                      "fma",
+                      "lahf_lm",
+                      "lzcnt",
+                      "movbe",
+                      "osxsave",
+                      "popcnt",
+                      "sse3",
+                      "sse4_1",
+                      "sse4_2",
+                      "ssse3"
+                    ]
+                  },
+                  "kind": "unmet",
+                  "missing": [
+                    "adx",
+                    "aes",
+                    "fma4",
+                    "pclmulqdq",
+                    "sha_ni",
+                    "vaes",
+                    "vpclmulqdq"
+                  ],
+                  "required": {
+                    "kind": "subset",
+                    "value": [
+                      "adx",
+                      "aes",
+                      "avx",
+                      "avx2",
+                      "bmi1",
+                      "bmi2",
+                      "cx16",
+                      "f16c",
+                      "fma",
+                      "fma4",
+                      "lahf_lm",
+                      "lzcnt",
+                      "movbe",
+                      "osxsave",
+                      "pclmulqdq",
+                      "popcnt",
+                      "sha_ni",
+                      "sse3",
+                      "sse4_1",
+                      "sse4_2",
+                      "ssse3",
+                      "vaes",
+                      "vpclmulqdq"
+                    ]
+                  }
+                },
+                "required": {
+                  "kind": "subset",
+                  "value": [
+                    "adx",
+                    "aes",
+                    "avx",
+                    "avx2",
+                    "bmi1",
+                    "bmi2",
+                    "cx16",
+                    "f16c",
+                    "fma",
+                    "fma4",
+                    "lahf_lm",
+                    "lzcnt",
+                    "movbe",
+                    "osxsave",
+                    "pclmulqdq",
+                    "popcnt",
+                    "sha_ni",
+                    "sse3",
+                    "sse4_1",
+                    "sse4_2",
+                    "ssse3",
+                    "vaes",
+                    "vpclmulqdq"
+                  ]
+                }
+              },
+              "outcome": "failed",
+              "summary": "isa.x86: unmet"
+            },
+            {
+              "checkId": "host-compatibility:kernel.linux",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "kernel.linux",
+                    "predicate": {
+                      "kind": "at-least",
+                      "value": {
+                        "components": [
+                          3,
+                          2,
+                          0
+                        ],
+                        "line": "linux"
+                      }
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "version",
+                  "value": {
+                    "components": [
+                      6,
+                      8,
+                      0
+                    ],
+                    "line": "linux"
+                  }
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "at-least",
+                  "value": {
+                    "components": [
+                      3,
+                      2,
+                      0
+                    ],
+                    "line": "linux"
+                  }
+                }
+              },
+              "outcome": "passed",
+              "summary": "kernel.linux: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:lib",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "lib",
+                    "predicate": {
+                      "kind": "present",
+                      "value": [
+                        "ld-linux-x86-64.so.2",
+                        "libc.so.6",
+                        "libgcc_s.so.1",
+                        "libm.so.6"
+                      ]
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "names",
+                  "value": [
+                    "ld-linux-x86-64.so.2",
+                    "libc.so.6",
+                    "libgcc_s.so.1",
+                    "libm.so.6"
+                  ]
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "present",
+                  "value": [
+                    "ld-linux-x86-64.so.2",
+                    "libc.so.6",
+                    "libgcc_s.so.1",
+                    "libm.so.6"
+                  ]
+                }
+              },
+              "outcome": "passed",
+              "summary": "lib: satisfied"
+            },
+            {
+              "checkId": "host-compatibility:os",
+              "observed": {
+                "evidence": [
+                  {
+                    "axis": "os",
+                    "predicate": {
+                      "kind": "equal",
+                      "value": "linux"
+                    },
+                    "source": "extracted"
+                  }
+                ],
+                "host": {
+                  "kind": "scalar",
+                  "value": "linux"
+                },
+                "refusal": null,
+                "required": {
+                  "kind": "equal",
+                  "value": "linux"
+                }
+              },
+              "outcome": "passed",
+              "summary": "os: satisfied"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "bytes": 136592296,
+  "elapsed_ms": 9551.794985,
+  "evidence": {
+    "abi.libc": {
+      "GLIBC_versions": [
+        "GLIBC_2.10",
+        "GLIBC_2.12",
+        "GLIBC_2.14",
+        "GLIBC_2.15",
+        "GLIBC_2.16",
+        "GLIBC_2.17",
+        "GLIBC_2.18",
+        "GLIBC_2.2.5",
+        "GLIBC_2.25",
+        "GLIBC_2.28",
+        "GLIBC_2.29",
+        "GLIBC_2.3",
+        "GLIBC_2.3.2",
+        "GLIBC_2.3.4",
+        "GLIBC_2.30",
+        "GLIBC_2.32",
+        "GLIBC_2.33",
+        "GLIBC_2.34",
+        "GLIBC_2.39",
+        "GLIBC_2.4",
+        "GLIBC_2.6",
+        "GLIBC_2.7",
+        "GLIBC_2.9"
+      ],
+      "library": "libc.so.6"
+    },
+    "abi.loader": {
+      "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+    },
+    "arch": {
+      "e_machine": 62
+    },
+    "elf.loader-view": {
+      "segment-uncovered": {
+        "bytes": 8,
+        "examples": [
+          {
+            "file_offset": 61098379,
+            "length": 1
+          },
+          {
+            "file_offset": 61098393,
+            "length": 7
+          }
+        ]
+      }
+    },
+    "isa.x86": {
+      "instructions": 9118007,
+      "notRequired": [
+        {
+          "count": 4,
+          "examples": [
+            {
+              "address": 16602624,
+              "section": ".text",
+              "symbol": "_start"
+            },
+            {
+              "address": 61102432,
+              "section": ".text",
+              "symbol": "pthread_atfork"
+            },
+            {
+              "address": 61102448,
+              "section": ".init"
+            }
+          ],
+          "feature": "ibt",
+          "reason": "executes as NOP where unsupported"
+        }
+      ],
+      "sections": [
+        {
+          "covered_bytes": 43329793,
+          "section": ".text",
+          "total_bytes": 44499824,
+          "uncovered_bytes": 1170031,
+          "uncovered_examples": [
+            {
+              "length": 202,
+              "nearest_preceding_symbol": "_start",
+              "start": 16602662
+            },
+            {
+              "length": 12,
+              "nearest_preceding_symbol": "_ZN4core3ptr9const_ptr33_$LT$impl$u20$$BP$const$u20$T$GT$20offset_from_unsigned18precondition_check17h2e675919c1a0c4e6E",
+              "start": 16602900
+            },
+            {
+              "length": 5,
+              "nearest_preceding_symbol": "_ZN4core3ops8function6FnOnce40call_once$u7b$$u7b$vtable.shim$u7d$$u7d$17h7b53d0aad622bd6fE",
+              "start": 16602923
+            },
+            {
+              "length": 11,
+              "nearest_preceding_symbol": "_ZN4core3ops8function6FnOnce9call_once17h452ea2b6635b25b6E",
+              "start": 16602933
+            },
+            {
+              "length": 4,
+              "nearest_preceding_symbol": "_ZN4core3ops8function6FnOnce9call_once17h99d1bc3ef3ec786fE",
+              "start": 16603004
+            }
+          ]
+        },
+        {
+          "covered_bytes": 27,
+          "section": ".init",
+          "total_bytes": 27,
+          "uncovered_bytes": 0,
+          "uncovered_examples": []
+        },
+        {
+          "covered_bytes": 13,
+          "section": ".fini",
+          "total_bytes": 13,
+          "uncovered_bytes": 0,
+          "uncovered_examples": []
+        },
+        {
+          "covered_bytes": 736,
+          "section": ".plt",
+          "total_bytes": 736,
+          "uncovered_bytes": 0,
+          "uncovered_examples": []
+        }
+      ],
+      "used": {
+        "adx": {
+          "count": 520,
+          "examples": [
+            {
+              "address": 56139273,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+            },
+            {
+              "address": 56139866,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+            },
+            {
+              "address": 56170440,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__bn_mulx4x_mont"
+            }
+          ]
+        },
+        "aes": {
+          "count": 362,
+          "examples": [
+            {
+              "address": 56154561,
+              "section": ".text",
+              "symbol": "_aesni_ctr32_ghash_6x"
+            },
+            {
+              "address": 56156288,
+              "section": ".text",
+              "symbol": "_aesni_ctr32_6x"
+            },
+            {
+              "address": 56157696,
+              "section": ".text",
+              "symbol": "_aesni_encrypt2"
+            }
+          ]
+        },
+        "avx": {
+          "count": 10534,
+          "examples": [
+            {
+              "address": 49152868,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17h741752865a5f62b8E"
+            },
+            {
+              "address": 49153608,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17ha2dc71f4ad2a8dd2E"
+            },
+            {
+              "address": 50378643,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x863avx16__mm256_set_epi32"
+            }
+          ]
+        },
+        "avx2": {
+          "count": 5183,
+          "examples": [
+            {
+              "address": 49153066,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17h741752865a5f62b8E"
+            },
+            {
+              "address": 49153659,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17ha2dc71f4ad2a8dd2E"
+            },
+            {
+              "address": 50378727,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x864avx216__mm256_add_epi64"
+            }
+          ]
+        },
+        "bmi1": {
+          "count": 1281,
+          "examples": [
+            {
+              "address": 27711760,
+              "section": ".text",
+              "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h02d8af2394900f7cE"
+            },
+            {
+              "address": 27712128,
+              "section": ".text",
+              "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h092300390ef586d1E"
+            },
+            {
+              "address": 27712496,
+              "section": ".text",
+              "symbol": "_ZN9hashbrown3raw21RawIterRange$LT$T$GT$9next_impl17h0c54edebf2cf3644E"
+            }
+          ]
+        },
+        "bmi2": {
+          "count": 371,
+          "examples": [
+            {
+              "address": 56134210,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__x25519_scalar_mult_adx"
+            },
+            {
+              "address": 56139165,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__fiat_curve25519_adx_mul"
+            },
+            {
+              "address": 56139848,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__fiat_curve25519_adx_square"
+            }
+          ]
+        },
+        "cmov": {
+          "count": 79106,
+          "examples": [
+            {
+              "address": 16603093,
+              "section": ".text",
+              "symbol": "_ZN4core3ptr63drop_in_place$LT$elohim_epr_cli..canon_lift..CanonLiftError$GT$17h0b99112ab4918d99E"
+            },
+            {
+              "address": 16604117,
+              "section": ".text",
+              "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$6expect17h57736e321449ff64E"
+            },
+            {
+              "address": 16604313,
+              "section": ".text",
+              "symbol": "_ZN4core6result19Result$LT$T$C$E$GT$7map_err17h434a66a893993953E"
+            }
+          ]
+        },
+        "cpuid": {
+          "count": 51,
+          "examples": [
+            {
+              "address": 50376346,
+              "section": ".text",
+              "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner11cpuid_count17h9387750168fd42fcE"
+            },
+            {
+              "address": 50376474,
+              "section": ".text",
+              "symbol": "_ZN8chacha2010avx2_cpuid8init_get10init_inner5cpuid17h208137b4b6d26847E"
+            },
+            {
+              "address": 50379002,
+              "section": ".text",
+              "symbol": "_ZN8poly13057backend10autodetect10avx2_cpuid8init_get10init_inner11cpuid_count17h1508bbfce5032fdfE.llvm.11989669258853329822"
+            }
+          ]
+        },
+        "fma": {
+          "count": 1,
+          "examples": [
+            {
+              "address": 61101824,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma12fma_with_fma"
+            }
+          ]
+        },
+        "fma4": {
+          "count": 1,
+          "examples": [
+            {
+              "address": 61101840,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtNtNtCsNDsy69z6bA_17compiler_builtins4math9libm_math4arch3x863fma13fma_with_fma4"
+            }
+          ]
+        },
+        "movbe": {
+          "count": 12,
+          "examples": [
+            {
+              "address": 56154703,
+              "section": ".text",
+              "symbol": "_aesni_ctr32_ghash_6x"
+            }
+          ]
+        },
+        "osxsave": {
+          "count": 10534,
+          "examples": [
+            {
+              "address": 49152868,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17h741752865a5f62b8E"
+            },
+            {
+              "address": 49153608,
+              "section": ".text",
+              "symbol": "_ZN8chacha208backends4avx25inner17ha2dc71f4ad2a8dd2E"
+            },
+            {
+              "address": 50378643,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x863avx16__mm256_set_epi32"
+            }
+          ]
+        },
+        "pclmulqdq": {
+          "count": 210,
+          "examples": [
+            {
+              "address": 56150504,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+            },
+            {
+              "address": 56150891,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__gcm_ghash_vpclmulqdq_avx2_1"
+            },
+            {
+              "address": 56152714,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+            }
+          ]
+        },
+        "sha_ni": {
+          "count": 168,
+          "examples": [
+            {
+              "address": 56251755,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__sha256_block_data_order_hw"
+            },
+            {
+              "address": 60224046,
+              "section": ".text",
+              "symbol": "_ZN4sha26sha2563x8613digest_blocks17hdcd58eced56c0880E"
+            },
+            {
+              "address": 60462334,
+              "section": ".text",
+              "symbol": "_ZN4sha26sha2567x86_sha8compress17h632160eef136f407E"
+            }
+          ]
+        },
+        "sse": {
+          "count": 357991,
+          "examples": [
+            {
+              "address": 16605446,
+              "section": ".text",
+              "symbol": "_ZN111_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$9from_iter17h45b598ab09740b5cE"
+            },
+            {
+              "address": 16605716,
+              "section": ".text",
+              "symbol": "_ZN111_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$9from_iter17h6dbdaba176e3f3aeE"
+            },
+            {
+              "address": 16606494,
+              "section": ".text",
+              "symbol": "_ZN5alloc3vec16Vec$LT$T$C$A$GT$14extend_trusted17h37b3c939749c0dc4E"
+            }
+          ]
+        },
+        "sse2": {
+          "count": 38197,
+          "examples": [
+            {
+              "address": 16659958,
+              "section": ".text",
+              "symbol": "_ZN14elohim_epr_cli4flow4note11Observation14derived_reason17h801c5e64c79e1f4bE"
+            },
+            {
+              "address": 16660838,
+              "section": ".text",
+              "symbol": "_ZN14elohim_epr_cli4flow4note11Observation5slots17h07cde5c537b3ae46E"
+            },
+            {
+              "address": 16670401,
+              "section": ".text",
+              "symbol": "_ZN14elohim_epr_cli4flow4note16canonical_number17hcd098486e87cdd9eE"
+            }
+          ]
+        },
+        "sse3": {
+          "count": 23,
+          "examples": [
+            {
+              "address": 38563075,
+              "section": ".text",
+              "symbol": "sqlite3AddReturning"
+            },
+            {
+              "address": 38591608,
+              "section": ".text",
+              "symbol": "fkActionTrigger"
+            },
+            {
+              "address": 39015285,
+              "section": ".text",
+              "symbol": "sqlite3WhereBegin"
+            }
+          ]
+        },
+        "sse4_1": {
+          "count": 482,
+          "examples": [
+            {
+              "address": 38291437,
+              "section": ".text",
+              "symbol": "btreeGetPage"
+            },
+            {
+              "address": 38300818,
+              "section": ".text",
+              "symbol": "fts3EvalUpdateCounts"
+            },
+            {
+              "address": 38302850,
+              "section": ".text",
+              "symbol": "fts3ExprLoadDoclistsCb"
+            }
+          ]
+        },
+        "ssse3": {
+          "count": 750,
+          "examples": [
+            {
+              "address": 38302681,
+              "section": ".text",
+              "symbol": "fts3SegReaderSort"
+            },
+            {
+              "address": 38375681,
+              "section": ".text",
+              "symbol": "pcache1Create"
+            },
+            {
+              "address": 38800899,
+              "section": ".text",
+              "symbol": "pagerWalFrames"
+            }
+          ]
+        },
+        "syscall": {
+          "count": 20,
+          "examples": [
+            {
+              "address": 18549807,
+              "section": ".text",
+              "symbol": "_ZN6rustix7backend2fs8syscalls11fcntl_getfl17h7c27d8cc5dc5e1b5E"
+            },
+            {
+              "address": 18550089,
+              "section": ".text",
+              "symbol": "_ZN6rustix7backend2fs8syscalls6linkat17hcce6ab4e99a1ede5E"
+            },
+            {
+              "address": 18550228,
+              "section": ".text",
+              "symbol": "_ZN6rustix7backend2fs8syscalls6openat17hc0f6fbb6d635777bE"
+            }
+          ]
+        },
+        "vaes": {
+          "count": 136,
+          "examples": [
+            {
+              "address": 56151152,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+            },
+            {
+              "address": 56153121,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+            }
+          ]
+        },
+        "vpclmulqdq": {
+          "count": 88,
+          "examples": [
+            {
+              "address": 56150582,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__gcm_init_vpclmulqdq_avx2"
+            },
+            {
+              "address": 56151484,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__aes_gcm_enc_update_vaes_avx2"
+            },
+            {
+              "address": 56153260,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__aes_gcm_dec_update_vaes_avx2"
+            }
+          ]
+        },
+        "xsave": {
+          "count": 9,
+          "examples": [
+            {
+              "address": 50376322,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv"
+            },
+            {
+              "address": 50378850,
+              "section": ".text",
+              "symbol": "_RNvNtNtNtCs3BFokC4QLxY_4core9core_arch3x865xsave7__xgetbv.llvm.11989669258853329822"
+            },
+            {
+              "address": 56132602,
+              "section": ".text",
+              "symbol": "ring_core_0_17_14__OPENSSL_cpuid_setup"
+            }
+          ]
+        }
+      }
+    },
+    "kernel.linux": {
+      "NT_GNU_ABI_TAG": [
+        0,
+        3,
+        2,
+        0
+      ]
+    },
+    "lib": {
+      "DT_NEEDED": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6"
+      ]
+    },
+    "os": {
+      "ELF_OSABI": 0,
+      "NT_GNU_ABI_TAG": [
+        0,
+        3,
+        2,
+        0
+      ],
+      "PT_INTERP": "/lib64/ld-linux-x86-64.so.2"
+    }
+  },
+  "path": "/projects/elohim/genesis/local-dev/hostcompat-wave1/k6v2/epr-shem-d32131dfa",
+  "requires": [
+    {
+      "axis": "abi.libc",
+      "predicate": {
+        "kind": "at-least",
+        "value": {
+          "components": [
+            2,
+            39
+          ],
+          "line": "glibc"
+        }
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "abi.loader",
+      "predicate": {
+        "kind": "present",
+        "value": [
+          "/lib64/ld-linux-x86-64.so.2"
+        ]
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "arch",
+      "predicate": {
+        "kind": "equal",
+        "value": "x86_64"
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "isa.x86",
+      "predicate": {
+        "kind": "subset",
+        "value": [
+          "adx",
+          "aes",
+          "avx",
+          "avx2",
+          "bmi1",
+          "bmi2",
+          "cx16",
+          "f16c",
+          "fma",
+          "fma4",
+          "lahf_lm",
+          "lzcnt",
+          "movbe",
+          "osxsave",
+          "pclmulqdq",
+          "popcnt",
+          "sha_ni",
+          "sse3",
+          "sse4_1",
+          "sse4_2",
+          "ssse3",
+          "vaes",
+          "vpclmulqdq"
+        ]
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "kernel.linux",
+      "predicate": {
+        "kind": "at-least",
+        "value": {
+          "components": [
+            3,
+            2,
+            0
+          ],
+          "line": "linux"
+        }
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "lib",
+      "predicate": {
+        "kind": "present",
+        "value": [
+          "ld-linux-x86-64.so.2",
+          "libc.so.6",
+          "libgcc_s.so.1",
+          "libm.so.6"
+        ]
+      },
+      "source": "extracted"
+    },
+    {
+      "axis": "os",
+      "predicate": {
+        "kind": "equal",
+        "value": "linux"
+      },
+      "source": "extracted"
+    }
+  ],
+  "requires_canonical_json": "[{\"axis\":\"abi.libc\",\"predicate\":{\"kind\":\"at-least\",\"value\":{\"components\":[2,39],\"line\":\"glibc\"}},\"source\":\"extracted\"},{\"axis\":\"abi.loader\",\"predicate\":{\"kind\":\"present\",\"value\":[\"/lib64/ld-linux-x86-64.so.2\"]},\"source\":\"extracted\"},{\"axis\":\"arch\",\"predicate\":{\"kind\":\"equal\",\"value\":\"x86_64\"},\"source\":\"extracted\"},{\"axis\":\"isa.x86\",\"predicate\":{\"kind\":\"subset\",\"value\":[\"adx\",\"aes\",\"avx\",\"avx2\",\"bmi1\",\"bmi2\",\"cx16\",\"f16c\",\"fma\",\"fma4\",\"lahf_lm\",\"lzcnt\",\"movbe\",\"osxsave\",\"pclmulqdq\",\"popcnt\",\"sha_ni\",\"sse3\",\"sse4_1\",\"sse4_2\",\"ssse3\",\"vaes\",\"vpclmulqdq\"]},\"source\":\"extracted\"},{\"axis\":\"kernel.linux\",\"predicate\":{\"kind\":\"at-least\",\"value\":{\"components\":[3,2,0],\"line\":\"linux\"}},\"source\":\"extracted\"},{\"axis\":\"lib\",\"predicate\":{\"kind\":\"present\",\"value\":[\"ld-linux-x86-64.so.2\",\"libc.so.6\",\"libgcc_s.so.1\",\"libm.so.6\"]},\"source\":\"extracted\"},{\"axis\":\"os\",\"predicate\":{\"kind\":\"equal\",\"value\":\"linux\"},\"source\":\"extracted\"}]",
+  "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy"
+}
