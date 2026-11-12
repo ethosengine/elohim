@@ -13,6 +13,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const HEAD = "bafkreipriorpriorpriorpriorpriorpriorpriorpriorpriorprior";
 const CID = "bafkreiexampleexampleexampleexampleexampleexampleexample";
 
 function hookBlock() {
@@ -24,7 +25,7 @@ function hookBlock() {
 }
 
 // A stub epr: logs `<args>` per call. `candidate` (a file) holds the CID ingested at the pushed
-// commit; `status --commit` answers from it, `land` succeeds, `resolve --current` names this stub.
+// commit; `status --commit` answers from it, `land` enforces CAS, `resolve --current` names this stub.
 const STUB_EPR = `#!/usr/bin/env bash
 here="$(cd "$(dirname "$0")" && pwd)"
 echo "$*" >> "$here/calls.log"
@@ -35,12 +36,27 @@ case "$1" in
       cid="$(cat "$here/candidate" 2>/dev/null)"
       if [ -n "$cid" ]; then printf '{"candidates":[{"cid":"%s"}]}\\n' "$cid"; else echo '{"candidates":[]}'; fi
     else
-      printf '{"store":"%s/store/epr"}\\n' "$here"
+      cat "$here/status.json"
+      if [ -f "$here/status-fails" ]; then exit 2; fi
     fi ;;
   land)
+    candidate="$2"
+    shift 2
+    expected=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = --expect ]; then expected="$2"; shift; fi
+      shift
+    done
+    if [ -z "$expected" ]; then
+      echo "land requires --expect <cid|none>" >&2; exit 2
+    fi
+    if [ "$expected" != "$(cat "$here/current")" ]; then
+      echo "REFUSED current-moved: committed head changed" >&2; exit 2
+    fi
     if [ -f "$here/unpublished" ]; then
       echo "REFUSED unpublished: commit is not contained in any publishedRef" >&2; exit 2
-    fi ;;
+    fi
+    printf '%s' "$candidate" > "$here/current" ;;
   resolve) echo "$here/epr" ;;
   install-launcher) exit 0 ;;
 esac
@@ -70,7 +86,7 @@ const cleanEnv = Object.fromEntries(
 );
 
 /** A scratch checkout at the pushed commit, with a stub store and gate-runner. */
-function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, installed = "old launcher", unpublished = false } = {}) {
+function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, installed = "old launcher", unpublished = false, prior = HEAD, current = prior, status = undefined, statusFails = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-head-landing-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const git = (...args) => {
@@ -86,6 +102,9 @@ function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, instal
   writeFileSync(join(bin, "epr"), STUB_EPR);
   chmodSync(join(bin, "epr"), 0o755);
   writeFileSync(join(bin, "store/bin/bin-launch"), installed);
+  writeFileSync(join(bin, "status.json"), status ?? JSON.stringify({ store: join(bin, "store/epr"), head: prior, sessionCid: CID, resolvedCid: CID }));
+  writeFileSync(join(bin, "current"), current ?? "none");
+  if (statusFails) writeFileSync(join(bin, "status-fails"), "");
   if (candidate) writeFileSync(join(bin, "candidate"), candidate);
   if (deliver) writeFileSync(join(bin, "deliver"), deliver);
   if (unpublished) writeFileSync(join(bin, "unpublished"), "");
@@ -128,11 +147,12 @@ test("receipt_attested_push_builds_ingests_and_lands_the_pushed_commit", (t) => 
   assert.ok(r.out.includes(`[pre-push] epr household head landed: ${CID}`), r.out);
   assert.ok(!r.out.includes("not landed"), r.out);
   const land = r.calls.find((c) => c.startsWith("bin --tool epr land"));
-  assert.equal(land, `bin --tool epr land ${CID} --commit ${fx.head} --repo ${fx.dir}`);
+  assert.equal(land, `bin --tool epr land ${CID} --expect ${HEAD} --commit ${fx.head} --repo ${fx.dir}`);
   assert.ok(
     r.calls.indexOf("gate-runner --target eprfs --recipe _eprfs-deliver") < r.calls.indexOf(land),
     `the pushed commit is built and ingested before it lands:\n${r.calls.join("\n")}`,
   );
+  assert.ok(r.calls.indexOf("bin --tool epr status --json") < r.calls.findIndex((c) => c.startsWith("bin --tool epr status --commit")), "capture committed head before candidate preparation");
   // The landing build carried a new launcher, so the landed epr installs it.
   assert.ok(
     r.calls.includes(`bin --tool epr install-launcher --launcher ${fx.dir}/slot/debug/bin-launch --repo ${fx.dir}`),
@@ -186,3 +206,47 @@ test("pushes_that_do_not_land_on_dev_touch_nothing", (t) => {
   assert.deepEqual(noEprfs.calls, []);
   assert.ok(!existsSync(join(fx.dir, "slot")), "no build ran");
 });
+
+
+test("a_valid_absent_committed_head_uses_explicit_none", (t) => {
+  const fx = fixture(t, { prior: null, candidate: CID });
+  const r = runBlock(fx);
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.calls.includes(`bin --tool epr land ${CID} --expect none --commit ${fx.head} --repo ${fx.dir}`), r.calls.join("\n"));
+  assert.equal(readFileSync(join(fx.bin, "current"), "utf8"), CID);
+});
+
+test("a_changed_committed_head_refuses_once_without_installing_or_retrying", (t) => {
+  const moved = "bafkreiconcurrentconcurrentconcurrentconcurrentconcurrent";
+  const fx = fixture(t, { current: moved });
+  const r = runBlock(fx);
+  assert.equal(r.status, 0, "CAS refusal is advisory to the push");
+  assert.ok(r.out.includes("not landed: bin-store refused"), r.out);
+  assert.equal(r.calls.filter((c) => c === "bin --tool epr status --json").length, 1);
+  assert.equal(r.calls.filter((c) => c.startsWith("bin --tool epr land")).length, 1);
+  assert.ok(r.calls.includes(`bin --tool epr land ${CID} --expect ${HEAD} --commit ${fx.head} --repo ${fx.dir}`));
+  assert.equal(readFileSync(join(fx.bin, "current"), "utf8"), moved);
+  assert.equal(readFileSync(join(fx.bin, "store/bin/bin-launch"), "utf8"), "old launcher");
+  assert.ok(!r.calls.some((c) => c.includes("install-launcher")));
+});
+
+for (const [label, options] of [
+  ["malformed JSON", { status: "{" }],
+  ["missing head", { status: "{}" }],
+  ["non-object status", { status: "null" }],
+  ["wrong head type", { status: '{"head":false}' }],
+  ["empty head", { status: '{"head":""}' }],
+  ["none string", { status: '{"head":"none"}' }],
+  ["whitespace head", { status: JSON.stringify({ head: " " }) }],
+  ["failed status with valid absent head JSON", { prior: null, statusFails: true }],
+]) {
+  test(`invalid status (${label}) never prepares or lands a candidate`, (t) => {
+    const fx = fixture(t, options);
+    const r = runBlock(fx);
+    assert.equal(r.status, 0, "status refusal is advisory to the push");
+    assert.ok(r.out.includes("head for compare-and-swap") || r.out.includes("head status for compare-and-swap"), r.out);
+    assert.deepEqual(r.calls, ["bin --tool epr status --json"]);
+    assert.equal(readFileSync(join(fx.bin, "current"), "utf8"), options.prior === null ? "none" : HEAD);
+    assert.equal(readFileSync(join(fx.bin, "store/bin/bin-launch"), "utf8"), "old launcher");
+  });
+}
