@@ -78,6 +78,58 @@ fn sized(code: &[u8], size: u64) -> Vec<u8> {
 }
 
 #[test]
+fn artifact_partial_decode_preflight_gap_reaches_produce_annotation() {
+    use crate::artifact::preflight;
+    // Indirect jump; AVX2 case body; invalid inline byte triggers the fallback.
+    let code = [0xff, 0xe0, 0xc5, 0xfd, 0xef, 0xc0, 0xc3, 6];
+    let bytes = sized(&code, code.len() as u64);
+    let mut gaps = vec![
+        "reach".into(),
+        "build-inputs.build-scripts".into(),
+        "reach".into(),
+    ];
+    for _ in 0..2 {
+        preflight::requires_gaps(&bytes, Path::new("partial.elf"), None, &mut gaps).unwrap();
+    }
+    assert_eq!(
+        gaps,
+        [
+            "build-inputs.build-scripts",
+            preflight::PARTIAL_DECODE_GAP,
+            "reach"
+        ]
+    );
+    assert_eq!(
+        preflight::gap_annotation(&gaps),
+        "env:gaps=build-inputs.build-scripts,isa.x86.partial-decode,reach"
+    );
+    let result = extract(Path::new("partial.elf"), &bytes).unwrap();
+    assert_eq!(
+        result.evidence[axis::ISA_X86]["partialFunctions"]["unreachedBytes"],
+        6
+    );
+    assert!(!result
+        .requires
+        .clauses()
+        .any(|c| c.axis().0 == axis::ISA_X86));
+    let report =
+        isa::speculative::measure(&Elf::parse(&*bytes).unwrap(), &result.requires).unwrap();
+    assert_eq!(report["unvisited_bytes"], 6);
+    assert_eq!(report["valid_instruction_bytes"], 5);
+    assert_eq!(report["features_not_in_requires"]["avx2"]["count"], 1);
+}
+
+#[test]
+fn artifact_complete_decode_preflight_has_no_partial_gap() {
+    use crate::artifact::preflight;
+    let bytes = sized(&[0xc3], 1);
+    let mut gaps = vec!["reach".into()];
+    preflight::requires_gaps(&bytes, Path::new("complete.elf"), None, &mut gaps).unwrap();
+    assert_eq!(gaps, ["reach"]);
+    assert_eq!(preflight::gap_annotation(&gaps), "env:gaps=reach");
+}
+
+#[test]
 fn artifact_data_after_sized_function_is_uncovered() {
     let bytes = sized(&[0xc3, 0x06, 0x0f, 0xff], 1);
     let result = extract(Path::new("data.elf"), &bytes).unwrap();

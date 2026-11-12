@@ -6,6 +6,8 @@ use object::Object;
 // The unconditional declared gap: K12 is blocked on H12. Dependency gaps are detected
 // separately by cargo_project. Never claim env:reach from this observation.
 pub(super) const REACH: &str = "reach: pending, not enforced";
+// Admission owns this gap: partial extraction is evidence, never a refusal or ISA clause.
+pub(super) const PARTIAL_DECODE_GAP: &str = "isa.x86.partial-decode";
 const COMPILER: &str = "missing build-inputs: compiler/linker inputs incomplete";
 const REQUIRES: &str = "missing Requires: unsupported artifact format or architecture";
 
@@ -79,7 +81,6 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
             );
         }
     }
-    print_gaps(&gaps);
     if descriptor.step
         != options
             .project
@@ -143,8 +144,7 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
                     missing.push(format!("{COMPILER}: {e}"));
                 }
             }
-            if let Err(e) =
-                requires::documents(bytes, bytes_path, options.requires.as_deref(), false)
+            if let Err(e) = requires_gaps(bytes, bytes_path, options.requires.as_deref(), &mut gaps)
             {
                 let label = if e.to_string().contains("dispatch narrowing") {
                     "missing dispatch-evidence: requested narrowing is unproved"
@@ -156,6 +156,7 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
         }
         Err(e) => missing.push(format!("{REQUIRES}: {}: {e}", bytes_path.display())),
     }
+    print_gaps(&gaps);
     if let Err(e) = repository_scope(options) {
         missing.push(e.to_string().trim_start_matches("unrecorded: ").into());
     }
@@ -207,6 +208,37 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
         bytes: Bytes::from(bytes?),
         gaps,
     })
+}
+
+/// Use the same extraction/merge validation as recording, including its evidence document.
+pub(super) fn requires_gaps(
+    bytes: &[u8],
+    output: &Path,
+    caller: Option<&Path>,
+    gaps: &mut Vec<String>,
+) -> ArtifactResult<()> {
+    let (_, evidence) = requires::documents(bytes, output, caller, false)?;
+    if let Some((_, evidence)) = evidence {
+        let evidence: serde_json::Value = serde_json::from_slice(&evidence)?;
+        if evidence[host_contract::names::axis::ISA_X86]["partialFunctions"]["count"]
+            .as_u64()
+            .is_some_and(|count| count > 0)
+        {
+            gaps.push(PARTIAL_DECODE_GAP.into());
+        }
+    }
+    gaps.sort();
+    gaps.dedup();
+    Ok(())
+}
+
+/// The Produce annotation shared by executable and archive recording.
+pub(super) fn gap_annotation(gaps: &[String]) -> String {
+    let mut gaps = gaps.to_vec();
+    gaps.push("reach".into());
+    gaps.sort();
+    gaps.dedup();
+    format!("env:gaps={}", gaps.join(","))
 }
 
 pub(super) fn print_gaps(gaps: &[String]) {

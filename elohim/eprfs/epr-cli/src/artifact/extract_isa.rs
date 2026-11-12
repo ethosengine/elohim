@@ -14,6 +14,10 @@ mod control_flow;
 mod cpuid;
 use cpuid::cpu_name;
 
+#[cfg(test)]
+#[path = "extract_speculative.rs"]
+pub(super) mod speculative;
+
 const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
     "fpu", "cx8", "cmov", "mmx", "fxsr", "sse", "sse2", "syscall", "clflush", "tsc", "msr", "cpuid",
@@ -227,6 +231,14 @@ pub(super) fn scan(file: &Elf<'_>) -> ArtifactResult<Scan> {
 
 // An audit can describe unknown coverage, but scan() must refuse before producing Requires.
 pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
+    // Monomorphized no-op: production retains no additional bytes or measurement state.
+    scan_ranges_observing(file, |_, _, _, _| {})
+}
+
+fn scan_ranges_observing(
+    file: &Elf<'_>,
+    mut partial: impl FnMut(&[u8], u64, &[bool], Option<&str>),
+) -> ArtifactResult<Scan> {
     let mut scan = Scan {
         used: BTreeMap::new(),
         not_required: Vec::new(),
@@ -329,6 +341,12 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
                 let decoded = reached.bytes.iter().filter(|&&b| b).count() as u64;
                 let unreached = code.len() as u64 - decoded;
                 if unreached != 0 {
+                    partial(
+                        code,
+                        range.start,
+                        &reached.bytes,
+                        intervals.containing(range.start),
+                    );
                     scan.partial_functions.count += 1;
                     scan.partial_functions.unreached_bytes += unreached;
                     if scan.partial_functions.examples.len() < 5 {
