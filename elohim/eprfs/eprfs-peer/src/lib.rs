@@ -70,7 +70,9 @@ mod steward_scope;
 mod tier;
 
 pub use admission::{roster_rows_from_file, Admission};
-pub use allow::{slots, via_device, CrossingAllowList, KIND_SLOT, MEASURE_SLOT, VIA_SLOT};
+pub use allow::{
+    slots, via_device, CrossingAllowList, WithheldCrossing, KIND_SLOT, MEASURE_SLOT, VIA_SLOT,
+};
 pub use announce::{
     topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
 };

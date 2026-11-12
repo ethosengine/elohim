@@ -19,7 +19,8 @@
     "dropped",
     "channel",
     "refusedConnections",
-    "refusedStrangers"
+    "refusedStrangers",
+    "withheldCrossings"
   ],
   "properties": {
     "cliCid": {
@@ -244,6 +245,31 @@
     "refusedStrangers": {
       "type": "integer",
       "minimum": 0
+    },
+    "withheldCrossings": {
+      "description": "This device's own crossing-intent records that the policy file the daemon loaded does not cross. Empty when every one crosses, or when no daemon has recorded its store and rules.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "measure",
+          "kind",
+          "events"
+        ],
+        "properties": {
+          "measure": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "events": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
     }
   }
 }
