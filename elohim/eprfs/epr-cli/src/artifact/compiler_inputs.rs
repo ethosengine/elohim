@@ -3,25 +3,30 @@ use super::*;
 
 /// `build_scripts` is true when the closure declares the `build-inputs.build-scripts` gap: then a
 /// file a build script generated into its OUT_DIR (this build's `<profile>/build/<pkg>-<hash>/out/`)
-/// is that declared gap, not a missing fact. Without the gap such a path still refuses.
+/// is that declared gap, not a missing fact. Cargo also merges build-script watch paths into
+/// dep-info: absent watches contributed no bytes and are returned as preflight evidence only
+/// under the same declared gap. Without the gap either kind of path still refuses.
 pub(super) fn check(
     options: &Options,
     descriptor: &MethodDescriptor,
     build_scripts: bool,
     missing: &mut Vec<String>,
-) {
+) -> Vec<PathBuf> {
+    let mut watched_absent = Vec::new();
     // Cargo writes <bin>.d alongside <bin>. The mesh passes its pool slot's dev/debug/bin
     // to put after verifying its installed copy. Never search another build's target tree.
-    let Some(binary) = &options.bytes else { return };
+    let Some(binary) = &options.bytes else {
+        return watched_absent;
+    };
     let dep_info = binary.with_extension("d");
     let Ok(text) = std::fs::read_to_string(&dep_info) else {
         missing.push("missing build-inputs: compiler inputs unverifiable (no dep-info)".into());
-        return;
+        return watched_absent;
     };
     let Some((target, sources)) = text.split_once(": ") else {
         missing
             .push("missing build-inputs: compiler inputs unverifiable (invalid dep-info)".into());
-        return;
+        return watched_absent;
     };
     let crate_path = options.repo.join(
         descriptor
@@ -90,12 +95,20 @@ pub(super) fn check(
                 if registry.as_ref().is_some_and(|r| p.starts_with(r))
                     || toolchain.as_ref().is_some_and(|r| p.starts_with(r)) => {}
             Ok(p) if build_scripts && is_script_output(&p, script_outputs.as_deref()) => {}
+            // Only definite absence qualifies. Permission errors, symlink loops and existing
+            // files outside the view remain refusals even with the build-script gap.
+            Err(error) if build_scripts && error.kind() == std::io::ErrorKind::NotFound => {
+                watched_absent.push(source);
+            }
             _ => missing.push(format!(
                 "missing build-inputs: compiler input outside captured view: {}",
                 source.display()
             )),
         }
     }
+    watched_absent.sort();
+    watched_absent.dedup();
+    watched_absent
 }
 
 /// `<profile>/build/<pkg>-<hash>/out/...`: a file a build script wrote into its OUT_DIR.
@@ -139,6 +152,82 @@ fn words(text: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    fn input_check(
+        build_scripts: bool,
+        existing: bool,
+    ) -> (Vec<String>, Vec<PathBuf>, Vec<PathBuf>) {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir(&repo).unwrap();
+        let binary = dir.path().join("binary");
+        std::fs::write(&binary, b"fixture").unwrap();
+        let sources = vec![repo.join(".git/HEAD"), dir.path().join("outside.rs")];
+        if existing {
+            std::fs::write(&sources[1], b"outside captured view").unwrap();
+        }
+        std::fs::write(
+            binary.with_extension("d"),
+            format!(
+                "{}: {} {}\n",
+                binary.display(),
+                sources[0].display(),
+                sources[1].display()
+            ),
+        )
+        .unwrap();
+        let descriptor: MethodDescriptor = serde_json::from_value(serde_json::json!({
+            "name": "mesh-build", "tools": {}, "flags": [], "params": null,
+            "exec": null, "step": null, "embedder": null, "view": [],
+            "nonPathInputs": {}, "deterministic": false
+        }))
+        .unwrap();
+        let options = Options {
+            repo,
+            bytes: Some(binary),
+            ..Default::default()
+        };
+        let mut missing = Vec::new();
+        let absent = check(&options, &descriptor, build_scripts, &mut missing);
+        (missing, absent, sources)
+    }
+
+    #[test]
+    fn absent_watch_paths_with_build_script_gap_are_accepted_and_listed() {
+        let (missing, mut absent, mut sources) = input_check(true, false);
+        assert!(missing.is_empty(), "{missing:?}");
+        absent.sort();
+        sources.sort();
+        assert_eq!(absent, sources);
+    }
+
+    #[test]
+    fn absent_watch_paths_without_build_script_gap_refuse() {
+        let (missing, absent, sources) = input_check(false, false);
+        assert!(absent.is_empty());
+        assert_eq!(missing.len(), 2, "{missing:?}");
+        for path in sources {
+            assert!(missing.iter().any(|m| m.contains(&format!(
+                "compiler input outside captured view: {}",
+                path.display()
+            ))));
+        }
+    }
+
+    #[test]
+    fn existing_outside_input_still_refuses_with_build_script_gap() {
+        let (missing, absent, sources) = input_check(true, true);
+        assert_eq!(absent, vec![sources[0].clone()]);
+        assert_eq!(
+            missing,
+            vec![format!(
+                "missing build-inputs: compiler input outside captured view: {}",
+                sources[1].display()
+            )]
+        );
+    }
+
     #[test]
     fn dep_info_escaped_paths() {
         assert_eq!(

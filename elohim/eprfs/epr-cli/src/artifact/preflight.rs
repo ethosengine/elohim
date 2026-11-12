@@ -69,7 +69,15 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
     } else {
         gaps = cargo_project::checklist(&options.repo, descriptor, &mut missing);
         let build_scripts = gaps.iter().any(|gap| gap == cargo_project::SCRIPTS_GAP);
-        compiler_inputs::check(options, descriptor, build_scripts, &mut missing);
+        let watched_absent =
+            compiler_inputs::check(options, descriptor, build_scripts, &mut missing);
+        for path in watched_absent {
+            eprintln!(
+                "{}: watched-but-absent input: {}",
+                cargo_project::SCRIPTS_GAP,
+                path.display()
+            );
+        }
     }
     print_gaps(&gaps);
     if descriptor.step

@@ -10,6 +10,9 @@ use super::{layout::name as bounded_name, unrecorded, ArtifactResult, Elf};
 
 #[path = "extract_control_flow.rs"]
 mod control_flow;
+#[path = "extract_cpuid.rs"]
+mod cpuid;
+use cpuid::cpu_name;
 
 const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
@@ -491,117 +494,4 @@ fn prerequisites(instruction: &Instruction) -> Vec<&'static str> {
         .filter(|(kind, narrow_only, _)| *kind == encoding && (!narrow_only || narrow))
         .flat_map(|(_, _, features)| features.iter().copied())
         .collect()
-}
-
-/// Explicit decoder-to-contract spelling. Unknown extensions refuse rather than disappear or
-/// invent a name. These are psABI names (sse3/lzcnt), with Linux flag names for other extensions.
-fn cpu_name(feature: CpuidFeature) -> ArtifactResult<Option<&'static str>> {
-    use CpuidFeature::*;
-    let name = match feature {
-        INTEL8086 | INTEL186 | INTEL286 | INTEL386 | INTEL486 | X64 | MULTIBYTENOP | PAUSE => {
-            return Ok(None)
-        }
-        FPU | FPU287 | FPU387 => "fpu",
-        CMOV => "cmov",
-        CPUID => "cpuid",
-        CX8 => "cx8",
-        FXSR => "fxsr",
-        MMX => "mmx",
-        SSE => "sse",
-        SSE2 => "sse2",
-        SYSCALL => "syscall",
-        CLFSH => "clflush",
-        TSC => "tsc",
-        MSR => "msr",
-        CMPXCHG16B => "cx16",
-        SSE3 => "sse3",
-        SSSE3 => "ssse3",
-        SSE4_1 => "sse4_1",
-        SSE4_2 => "sse4_2",
-        POPCNT => "popcnt",
-        AVX => "avx",
-        AVX2 => "avx2",
-        BMI1 => "bmi1",
-        BMI2 => "bmi2",
-        F16C => "f16c",
-        FMA => "fma",
-        LZCNT => "lzcnt",
-        MOVBE => "movbe",
-        AVX512F => "avx512f",
-        AVX512BW => "avx512bw",
-        AVX512CD => "avx512cd",
-        AVX512DQ => "avx512dq",
-        AVX512VL => "avx512vl",
-        AVX512ER => "avx512er",
-        AVX512PF => "avx512pf",
-        AVX512_4FMAPS => "avx512_4fmaps",
-        AVX512_4VNNIW => "avx512_4vnniw",
-        AVX512_BF16 => "avx512_bf16",
-        AVX512_BITALG => "avx512_bitalg",
-        AVX512_IFMA => "avx512ifma",
-        AVX512_VBMI => "avx512vbmi",
-        AVX512_VBMI2 => "avx512_vbmi2",
-        AVX512_VNNI => "avx512_vnni",
-        AVX512_VP2INTERSECT => "avx512_vp2intersect",
-        AVX512_VPOPCNTDQ => "avx512_vpopcntdq",
-        AVX512_FP16 => "avx512_fp16",
-        AES => "aes",
-        PCLMULQDQ => "pclmulqdq",
-        SHA => "sha_ni",
-        RDRAND => "rdrand",
-        RDSEED => "rdseed",
-        ADX => "adx",
-        VAES => "vaes",
-        VPCLMULQDQ => "vpclmulqdq",
-        GFNI => "gfni",
-        FSGSBASE => "fsgsbase",
-        RDPID => "rdpid",
-        RDTSCP => "rdtscp",
-        XSAVE => "xsave",
-        XSAVEC => "xsavec",
-        XSAVEOPT => "xsaveopt",
-        XSAVES => "xsaves",
-        CET_IBT => "ibt",
-        CET_SS => "user_shstk",
-        CLDEMOTE => "cldemote",
-        CLFLUSHOPT => "clflushopt",
-        CLWB => "clwb",
-        CLZERO => "clzero",
-        FMA4 => "fma4",
-        SSE4A => "sse4a",
-        XOP => "xop",
-        TBM => "tbm",
-        D3NOW => "3dnow",
-        D3NOWEXT => "3dnowext",
-        MONITOR => "monitor",
-        MONITORX => "mwaitx",
-        MOVDIR64B => "movdir64b",
-        MOVDIRI => "movdiri",
-        MPX => "mpx",
-        PKU => "pku",
-        PREFETCHW => "3dnowprefetch",
-        PREFETCHWT1 => "prefetchwt1",
-        PTWRITE => "ptwrite",
-        RTM => "rtm",
-        HLE => "hle",
-        SEP => "sep",
-        SMAP => "smap",
-        SMX => "smx",
-        VMX => "vmx",
-        SVM => "svm",
-        SKINIT => "skinit",
-        INVPCID => "invpcid",
-        ENQCMD => "enqcmd",
-        SERIALIZE => "serialize",
-        WAITPKG => "waitpkg",
-        WBNOINVD => "wbnoinvd",
-        TSXLDTRK => "tsxldtrk",
-        AMX_BF16 => "amx_bf16",
-        AMX_TILE => "amx_tile",
-        AMX_INT8 => "amx_int8",
-        AMX_FP16 => "amx_fp16",
-        AVX_VNNI => "avx_vnni",
-        _ => return Err(unrecorded(format!("unmapped CPUID feature {feature:?}"))),
-    };
-    Ok(Some(name))
 }
