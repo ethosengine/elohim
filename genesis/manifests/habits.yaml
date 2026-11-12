@@ -2674,9 +2674,9 @@ habits:
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
       DELTA 2026-11-12i (RED preserved, inactive; K9 receipt): two devices diffed doorway input lines both ways at 8b273f826 records (epr and daemons at 6060f8347): 11 differing lines, mirrored, the whole glibc/gcc link floor at identical paths (RHEL 10.0 glibc -145 vs AlmaLinux 10.2 -128 x86_64_v2); macro dump agrees. Needed dev crossing policy on both daemons (main-checkout policy lacked artifact-produce@1, denying crossing silently) and record-exact serving/pairing. Evidence: sprints/2026-11-07-artifact-store/evidence/k9-two-device-receipt.md. Open: stale daemon policy unannounced; relay-only manifest errors read as transport-cannot-deliver; device current epr predates K9.
-    evidence-fingerprint: sha256:b2fa0a66352e6cbb
-    evidence-bytes: 52439
-    evidence-entries: 37
+    evidence-fingerprint: sha256:df389a5ca0a5d21b
+    evidence-bytes: 53869
+    evidence-entries: 38
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
