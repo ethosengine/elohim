@@ -36,7 +36,9 @@ if [[ "${1:-}" == "--hook" ]]; then
   exec "$style_binary" --root "$style_root" "$@"
 fi
 # Cargo's fingerprint checks are the freshness authority. Never use an arbitrary PATH binary.
-cargo build --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml"
+if [[ "${1:-}" != "--verify" ]]; then
+  cargo build --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml"
+fi
 if [[ "${1:-}" == "--acceptance" ]]; then
   shift
   [[ $# == 1 ]] || { echo '--acceptance requires one fixture name' >&2; exit 2; }
@@ -44,10 +46,13 @@ if [[ "${1:-}" == "--acceptance" ]]; then
 fi
 if [[ "${1:-}" == "--verify" ]]; then
   shift
-  cargo fmt --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --check
-  cargo clippy --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --all-targets -- -D warnings
-  cargo test --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml"
-  python3 "$style_root/genesis/orchestrator/rust-style/hook_test.py"
-  python3 -m unittest discover -s "$style_root/genesis/orchestrator/rust-style" -p test_source_distribution.py
+  bash "$style_root/genesis/orchestrator/gate-steps.sh" \
+    fmt -- cargo fmt --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --check \
+    ::: lint -- node "$style_root/genesis/orchestrator/cargo-lint.mjs" --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --all-targets -- -D warnings \
+    ::: test -- cargo test --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" \
+    ::: hooks -- python3 "$style_root/genesis/orchestrator/rust-style/hook_test.py" \
+    ::: distribution -- python3 -m unittest discover -s "$style_root/genesis/orchestrator/rust-style" -p test_source_distribution.py \
+    ::: check -- bash -c 'cargo build --quiet --locked --manifest-path "$1/genesis/orchestrator/rust-style/Cargo.toml" && "$CARGO_TARGET_DIR/debug/epr-rust-style" --root "$1" "${@:2}"' _ "$style_root" "$@"
+  exit $?
 fi
 exec "$style_target/debug/epr-rust-style" --root "$style_root" "$@"

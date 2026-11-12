@@ -49,13 +49,14 @@ const RULES = [
   { cls: 'test', re: /\bAssertionError\b/, signalOnly: true },
   { cls: 'compile', re: /^(.+?)\((\d+),\d+\): error (TS\d+): (.+)$/, locus: m => ({ file: m[1], line: Number(m[2]) }) },
   { cls: 'compile', re: /^(.+?):(\d+):\d+ - error (TS\d+): (.+)$/, locus: m => ({ file: m[1], line: Number(m[2]) }) },
-  { cls: 'compile', re: /^error(?:\[E\d+\])?: (?!could not compile|aborting due to|test failed|Recipe `|\d+ previous error)(.+)$/, locus: () => ({}), rust: true },
+  { cls: 'compile', re: /^error(?:\[E\d+\])?: (?!could not compile|aborting due to|test failed|[Rr]ecipe `|\d+ previous error)(.+)$/, locus: () => ({}), rust: true },
   { cls: 'format', re: /^Diff in (\S+?)(?::(\d+))?(?: at line (\d+))?:?\s*$/, locus: m => ({ file: m[1], line: Number(m[2] || m[3]) || undefined }) },
   { cls: 'lint', re: /^\s+(\d+):\d+\s+error\s+(.+?)\s{2,}(\S+)$/, locus: (m, ctx) => ({ file: ctx.lastPath, line: Number(m[1]) }) },
   { cls: 'env', re: /No space left on device|Cannot allocate memory|signal: 9, SIGKILL|\(signal: 15, SIGTERM/, locus: () => ({}) },
 ];
 
-const STEP_FAILED = /^error: Recipe `(.+?)` failed(?: on line \d+)? with exit code (\d+)/;
+const STEP_FAILED = /^error: [Rr]ecipe `(.+?)` failed(?: on line \d+)? with exit code (\d+)/;
+const GATE_STEP_FAILED = /^gate-steps: ([a-zA-Z0-9_-]+) failed with exit code (\d+)$/;
 const CARGO_TEST_BLOCK = /^---- (.+?) stdout ----$/;
 const PANIC = /panicked at (?:'.*?', )?([^\s:]+\.rs):(\d+)(?::\d+)?/;
 const RUST_LOCUS = /^\s*--> ([^\s:]+):(\d+)(?::\d+)?/;
@@ -156,7 +157,7 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
     const testBlock = CARGO_TEST_BLOCK.exec(line);
     if (testBlock) { block = { kind: 'cargo-test', ref: testBlock[1], lines: [] }; return; }
 
-    const step = STEP_FAILED.exec(line);
+    const step = STEP_FAILED.exec(line) || GATE_STEP_FAILED.exec(line);
     if (step) {
       signals.recipeStarted = true;
       emit({ kind: 'step-failed', project, step: step[1], exit: Number(step[2]) });

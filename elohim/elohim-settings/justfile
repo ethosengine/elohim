@@ -43,11 +43,14 @@ fmt-check:
 
 # Lint — warnings are errors
 clippy:
-    cargo clippy --all-targets -- -D warnings
+    node ../../genesis/orchestrator/cargo-lint.mjs --all-targets -- -D warnings
 
 # Remove build artifacts
 clean:
     cargo clean
 
 # Quality gate: fmt-check + clippy + test (the boundary test rides in `test`)
-gate: fmt-check clippy test
+gate:
+    bash ../../genesis/orchestrator/gate-steps.sh fmt -- just fmt-check \
+      ::: lint -- just clippy \
+      ::: test -- just test

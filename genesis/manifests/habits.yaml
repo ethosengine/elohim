@@ -2480,10 +2480,10 @@ habits:
       - "python3 .claude/hooks/tests/test_gate_live_inject.py (every agent hears a red at its next tool call, one cursor per agent; a background push gets the Monitor command)"
       - "@concern:gate-failures-arrive-live"
     evidence: >
-      DELTA 2026-10-27 (still RED; delivery no longer opt-in): push 9 (de1d22eab) proved the tap and the gap. The tap logged elohim-storage's red (`request_metrics_guard_observes_a_dropped_unfinished_request`, metrics.rs:7900) at 19:40:00Z, 7 min before the gate's verdict, but no agent heard it: delivery needed the pushing agent to arm `follow`, and it had not. Now the native `gate-live-inject` PostToolUse hook (every tool, package-mastered) adds each new red from the session's run to the next tool call with a cursor per agent, and a background push or gate gets the Monitor command for an idle wait. `gate-live.mjs unseen` formats and moves the cursor; the hook spawns node only when the run file grew (77 ms silent path, replayed push 9's storage red verbatim against the live log). Checks: gate-live 44/44, hook 6/6. Green still needs a real push whose first red reaches the agent mid-run.
-    evidence-fingerprint: sha256:70a21fc8ee6e5cf1
-    evidence-bytes: 2280
-    evidence-entries: 3
+      DELTA 2026-11-12 (still RED; no push requested): native Rust gates now collect workspace warnings through cargo-lint and continue fmt/lint/test through gate-steps, with compiler helpers keyed in the closure and gate-tap remaining the sole live emitter; eprfs candidate ingestion stays behind all-green checks. Evidence: focused node:test 199/199 (including real Cargo verdict equivalence, step continuation under bash -e, and closure regression checks); the two-member dependency fixture reports first + second + integration lints (old EXIT=101, new EXIT=1), while clean and outside-dependency-only warnings pass both and compile errors retain 101; Rust 1.100 blob-store reports 1 old / 2 new rendered instances of the same fetch_update finding (EXIT=101/1). Deliberate-red run 20261112T210245Z-0088755ecd2c-059ea1 recorded a lint at 21:02:48.248Z while cargo-clippy, cargo and clippy-driver were alive, before lint step EXIT=1 at 21:02:48.799Z; both test variants passed, the temporary edit was restored byte-for-byte, and the restored gate passed. Raw logs and process observations: genesis/a2o/reports/recovery/lint-fail-at-end/.
+    evidence-fingerprint: sha256:f9e7ee8042ad3766
+    evidence-bytes: 3414
+    evidence-entries: 4
     guard: >-
       Preserve output bytes, exit status, and termination signals. Keep excerpts
       device-only. Require real-push evidence of first_red_s, continued later

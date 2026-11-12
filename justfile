@@ -655,17 +655,25 @@ _gate-elements-codegen:
     pnpm --filter elohim-core test
 
 _gate-elohim-compute:
-    cd elohim/elohim-compute && cargo fmt --check && cargo clippy -- -D warnings && cargo test
+    cd elohim/elohim-compute && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -- -D warnings \
+      ::: test -- cargo test
 
 _gate-elohim-epr:
-    cd elohim && cargo fmt --check && cargo clippy -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings && cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
+    cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings \
+      ::: test -- cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
 
 _gate-elohim-live-session:
-    cd elohim && cargo fmt --check -p elohim-live-session && cargo clippy -p elohim-live-session --all-targets -- -D warnings && cargo test -p elohim-live-session --all-targets
+    cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check -p elohim-live-session \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-live-session --all-targets -- -D warnings \
+      ::: test -- cargo test -p elohim-live-session --all-targets
 
 _gate-elohim-ark:
-    cd elohim && cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark && cargo clippy -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings && cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets
-    cd elohim && cargo test -p elohim-ark-core --doc
+    cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings \
+      ::: test -- cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets \
+      ::: test-doc -- cargo test -p elohim-ark-core --doc
 
 # Private sensor, consultation and delivery contracts; no live model calls.
 _gate-dialogue-stasis:
@@ -687,14 +695,17 @@ _gate-epr-ts:
 
 # elohim/eprfs is its own native workspace with no per-project justfile; the
 # recipe lives here so the manifest's typed contract has a real target.
-# Refuse published version collisions before building, without Cargo registry credentials.
+# Check published version collisions before building, without Cargo registry credentials.
 _gate-eprfs:
-    python3 scripts/ci/publish_eprfs.py --precheck
-    cd elohim/eprfs && cargo fmt --check
     @set -- --workspace; \
       if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
-      cd elohim/eprfs && cargo clippy "$@" --all-targets -- -D warnings
-    @just _eprfs-ingest-around test
+      cd elohim/eprfs && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" \
+        fmt -- cargo fmt --check \
+        ::: precheck -- python3 "{{justfile_directory()}}/scripts/ci/publish_eprfs.py" --precheck \
+        ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
+        ::: test -- cargo test "$@"
+    # Ingest is a write: only deliver a candidate after every check passed.
+    @just _eprfs-ingest-around build
 
 # Native seam guidance's non-Rust contracts: the declaration and method schemas hold every
 # declaration the opt-in binding names, and the hook adapter stays private and fails visibly.
@@ -771,38 +782,38 @@ _gate-memory-ceremony:
     cd genesis/a2o && EPR_BIN="$CARGO_TARGET_DIR/debug/epr" pnpm exec cucumber-js --profile collective-memory
 
 _gate-seam-contracts:
-    cd crates/seam-contracts && cargo test --all-features
-    cd crates/seam-contracts && cargo clippy --all-features -- -D warnings
-    cd crates/seam-contracts && cargo fmt --check
-    cd crates/seam-contracts && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
+    cd crates/seam-contracts && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-features -- -D warnings \
+      ::: test -- cargo test --all-features \
+      ::: build-wasm -- env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
 # The addressing kernel links into the DNA zomes and browser builds: the wasm build is part
 # of the gate, and tests/boundary.rs reads the crate's own lockfile. The wasm leg drops the
 # gate's RUSTUP_TOOLCHAIN pin (the pinned toolchain carries no wasm32 std here), as the LSP's
 # env_wasm_roots does in genesis/agentic/pool-policy.json.
 _gate-elohim-address:
-    cd crates/elohim-address && cargo test --all-features
-    cd crates/elohim-address && cargo test --release --test parse_never_panics
-    cd crates/elohim-address && cargo clippy --all-features --all-targets -- -D warnings
-    cd crates/elohim-address && cargo fmt --check
-    cd crates/elohim-address && env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
+    cd crates/elohim-address && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-features --all-targets -- -D warnings \
+      ::: test -- cargo test --all-features \
+      ::: test-release -- cargo test --release --test parse_never_panics \
+      ::: build-wasm -- env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
 # The storage client is the only Rust reader of storage's blob wire shapes; its contract test
 # round-trips the producer's own view serializer, so a rename on either side fails here.
 _gate-elohim-storage-client:
-    cd crates/elohim-storage-client && cargo test
-    cd crates/elohim-storage-client && cargo clippy --all-targets -- -D warnings
-    cd crates/elohim-storage-client && cargo fmt --check
+    cd crates/elohim-storage-client && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
+      ::: test -- cargo test
 
 _gate-consent-grant:
-    cd crates/consent-grant && cargo test
-    cd crates/consent-grant && cargo clippy --all-targets -- -D warnings
-    cd crates/consent-grant && cargo fmt --check
+    cd crates/consent-grant && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
+      ::: test -- cargo test
 
 _gate-hc-dbtool:
-    cd elohim/holochain/tools/hc-dbtool && cargo test
-    cd elohim/holochain/tools/hc-dbtool && cargo clippy --all-targets -- -D warnings
-    cd elohim/holochain/tools/hc-dbtool && cargo fmt --check
+    cd elohim/holochain/tools/hc-dbtool && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
+      ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
+      ::: test -- cargo test
 
 _gate-epr-storage:
     cd elohim/elohim-storage && cargo build && cargo test --test schema_contract && cargo test --test schema_contract_diesel_epr

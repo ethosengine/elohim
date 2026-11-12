@@ -56,6 +56,8 @@ test('governance covers the runner import closure', async function governance_co
     'genesis/orchestrator/cargo-affected.mjs',
     'genesis/orchestrator/run-local-gate.sh',
     'genesis/orchestrator/rust-style.sh',
+    'genesis/orchestrator/cargo-lint.mjs',
+    'genesis/orchestrator/gate-steps.sh',
     'genesis/agentic/bin/cargo-pool',
     'genesis/agentic/bin/berth',
   ];

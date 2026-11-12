@@ -34,11 +34,14 @@ fmt-check:
 
 # Lint with clippy (warnings are errors)
 clippy:
-    cargo clippy --all-targets -- -D warnings
+    node ../../genesis/orchestrator/cargo-lint.mjs --all-targets -- -D warnings
 
 # Run tests
 test:
     cargo test
 
 # Full pre-commit gate: format check, clippy, tests.
-gate: fmt-check clippy test
+gate:
+    bash ../../genesis/orchestrator/gate-steps.sh fmt -- just fmt-check \
+      ::: lint -- just clippy \
+      ::: test -- just test
