@@ -18,7 +18,8 @@ The one-click devspace carries the gesture the rest of the way. Anything a perso
 experiences in a client can be opened from that client as something they can develop: the screen,
 a card on it, the lesson inside the card, the rule that decided what the card showed.
 
-Three people show the range.
+Three people show the range. Each story describes what the vision aims for; "What is missing"
+below names the parts that are not yet designed.
 
 **A developer** is reading a component in the repository explorer. They follow its link. A space
 opens on that component's source, with the directory's own rules and context loaded. The space
@@ -32,7 +33,8 @@ browser, as Eclipse Che allows today.
 
 **A grandmother** is using a recipe app and the text is too small on one screen. Today she can
 complain, if she can find where. Here she opens the thing she is looking at and says what she
-wants. Her elohim (the agent that works alongside her) finds the element's source, makes the
+wants. Her elohim (lowercase: an agent that works alongside a person, as distinct from the Elohim
+Protocol as a whole) finds the element's source, makes the
 change as a variant, and shows it to her. If she likes it, she keeps it for herself. If she wants,
 it is offered back as a proposal that carries her name and her reason. She did not write code. She
 did more than give feedback: she suggested something that could be acted on, and it was.
@@ -61,8 +63,10 @@ builds it and proves it. A person's tooling (a language server, an agent, a prev
 Kubernetes taught this lesson with pods: one way of composing and placing a unit of work serves
 the editor, the tools beside it and the pipeline that integrates the result.
 
-lvi carries that lesson to the protocol's own concepts. An `ark` holds a running unit and a berth
-is where it runs. The kinds, as analogues and not as a design:
+lvi (the protocol's devspace runtime module, whose docs hold this spec) carries that lesson to
+the protocol's own concepts. An `ark` (the supervisor that launches and watches one unit of work)
+holds a running unit, and a berth (a device's declared capacity and leases for such units) is
+where it runs. The kinds, as analogues and not as a design:
 
 | Kind | What it is for | The pod it resembles |
 |---|---|---|
@@ -75,7 +79,8 @@ registry such as Harbor supplies the images. Here the composition is resolved fr
 dataplane and the runtimes peers already hold: the seed names what is needed, admission says which
 devices can carry it, placement finds one that has agreed, and the bytes arrive as verified
 artifacts. This is the module's thesis, hyperscale powers brought to peers, applied to more than
-the editor. EPR supplies what makes that responsible at scale: identity for every part, declared
+the editor. EPR (the protocol's content-addressed record layer, which gives each thing an
+identity and its metadata) supplies what makes that responsible at scale: identity for every part, declared
 reach, attribution, and an account of who supplied what.
 
 "Describe before running" still holds for the person opening a link. It does not mean lvi starts
@@ -107,7 +112,7 @@ change outward:
    they can work on the deeper affordance that would give every client accessible, well-composed
    large print, and on how the network should evolve to provide it.
 5. **Reach, graduated.** What they produce earns wider reach by the same ladder as anything else:
-   from one person, to those who trust her, to a community, to the commons. Elohim facilitate
+   from one person, to those who trust her, to a community, to the commons (what the whole network holds in common). Elohim facilitate
    each integration along the way; the people and rules at each rung decide.
 
 So the grandmothers are not only users whose feedback is collected. They are collaborators in the
