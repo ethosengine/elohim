@@ -276,6 +276,14 @@ Verify: a table of members, sizes and what each carries, in the item's report.
 
 Verify: each frontier item has a named home (backlog entry or spec section) before this plan closes.
 
+- [ ] **X3 — the one-click devspace as a consumer of these floor checks (steward's vision, 2026-11-12; a later plan, with lvi)** (serves workspace-device-arrival)
+
+A person follows an EPR link, from a repository explorer or from a running client app (as one would inspect an element), into a devspace focused on the source of one component, governed by that directory's `.epr-meta`. Its dependencies arrive as recorded artifacts from the peer mesh, not as checkouts. Before anything starts, the space says what the component is and what this device can do with it: whether it can build and run here and how (`admit` over the recorded `Requires`), and which attestations this device could produce. A device that cannot carry it, such as a thin client, is offered a workspace started on another steward's device with the capacity (the person's own or a friend's) and carried on over the web, under a commitment accounted by the ruling above. An agent in that context shows how a proposed change flows into the build and its queue, and which queues the device could serve while idle. The aim is that development, artifacts and integration stay legible to the people who explore and join, at a thousand agents across a hundred machines.
+
+What it reuses from this plan, so that none is built twice: `Requires`, `Provides` and `admit` (lane A); the method and input records and family lookup (lane K); variant sets and conformance (lane V); placement eligibility and the commitment and fulfilment (lane P); typed refusals as feedback (lane F). What it needs that this plan does not hold: the devspace seed and arrival (`elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`), a source tree composed from artifacts, and the link and explorer surfaces.
+
+Verify: this item has a named home in an lvi spec or a backlog entry before this plan closes, and that home cites the lanes above.
+
 ## Lane R — the reconciliation walk (spec §7.6; appended 2026-11-10)
 
 Appended after lane X so earlier gap ids stay stable. It runs after F3 and V1, beside V and P.
