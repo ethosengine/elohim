@@ -465,7 +465,6 @@ fn artifact_fallback_stops_at_each_terminator() {
         &[0xcc],
         &[0xf4],
         &[0xff, 0xe0],
-        &[0xff, 0xd0],
     ] {
         let mut code = terminator.to_vec();
         code.push(6);
@@ -474,6 +473,21 @@ fn artifact_fallback_stops_at_each_terminator() {
         assert_eq!(scan["instructions"], 1);
         assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
     }
+}
+
+#[test]
+fn artifact_fallback_indirect_call_continuation_counts_avx2() {
+    // call rax; AVX2 in the return continuation; ret; invalid data forces the fallback.
+    let code = [0xff, 0xd0, 0xc5, 0xfd, 0xef, 0xc0, 0xc3, 6];
+    let result = extract(Path::new("icall.elf"), &sized(&code, code.len() as u64)).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ISA_X86),
+        &Predicate::Subset(names(X86_64_V3.features))
+    );
+    let scan = &result.evidence[axis::ISA_X86];
+    assert_eq!(scan["used"]["avx2"]["count"], 1);
+    assert_eq!(scan["instructions"], 3);
+    assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
 }
 
 #[test]

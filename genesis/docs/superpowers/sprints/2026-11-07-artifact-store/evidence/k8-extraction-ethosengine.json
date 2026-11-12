@@ -2378,5 +2378,22 @@
       "serialization": "Host-visible pgrep cargo/rustc guard before each proving Cargo invocation; exported guarding function for the rust-style gate."
     },
     "status": "F1/P1 addressed; required suites and Rust-style passed; measurements unchanged; no push"
+  },
+  "indirect_call_continuation": {
+    "date": "2026-11-12",
+    "change": "FlowControl::IndirectCall now falls through to the return continuation (the callee stays unresolved); stopping there left continuations unreached and their features uncounted",
+    "doorway": {
+      "requires_cid": "bafkr4ih3jp3c3wkq7fyog5shw2pbhhfzcharwhjdkwqhaczvvqa2bup5ra",
+      "requires_cid_unchanged": true,
+      "partialFunctions": 120,
+      "unreachedBytes_before": 224426,
+      "unreachedBytes_after": 185753
+    },
+    "installed_epr": {
+      "requires_cid": "bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy",
+      "requires_cid_unchanged": true,
+      "unreachedBytes": 0
+    },
+    "harness": "EPR_EXTRACT_MEASURE=<elf> cargo test -p elohim-epr-cli artifact_measure_requested_elf -- --nocapture"
   }
 }

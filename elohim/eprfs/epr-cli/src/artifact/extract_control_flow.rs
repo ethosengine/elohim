@@ -70,9 +70,10 @@ fn walk(data: &[u8], start: u64) -> Result<Reached, u64> {
                 FlowControl::Return => (false, false),
                 // Stop: the jump target needs register/memory state we do not resolve.
                 FlowControl::IndirectBranch => (false, false),
-                // Stop by the fallback contract, even though CALL can return: we
-                // do not resolve indirect callees or infer their continuation.
-                FlowControl::IndirectCall => (false, false),
+                // The callee is unresolved, but CALL returns to the next instruction,
+                // as a direct call does: fall through. Stopping here would leave the
+                // continuation unreached and its features uncounted (a weaker clause).
+                FlowControl::IndirectCall => (false, true),
                 // INT saves a continuation for IRET: conservatively fall through.
                 // INT3 remains an explicit breakpoint stop under this contract.
                 FlowControl::Interrupt => (false, instruction.mnemonic() != Mnemonic::Int3),
