@@ -187,7 +187,7 @@ When(
     assert.ok(fixture.capture);
     const artifact = join(fixture.base, 'fixture');
     const rustc = process.env.RUSTC_BIN;
-    assert.ok(rustc && isAbsolute(rustc), 'set RUSTC_BIN to the absolute pinned 1.96.1 compiler');
+    assert.ok(rustc && isAbsolute(rustc), 'set RUSTC_BIN to the absolute pinned 1.100.0 compiler');
     execute(fixture, rustc, [
       '--edition=2021',
       '-C',

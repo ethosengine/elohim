@@ -71,7 +71,7 @@ export CARGO_BUILD_JOBS=1
 case "$workspace/" in
   elohim/holochain/dna/*) unset RUSTUP_TOOLCHAIN ;;
   *)
-    export RUSTUP_TOOLCHAIN=1.96.1
+    export RUSTUP_TOOLCHAIN=1.100.0
     # The storage crate supplies the custom getrandom backend; other native crates do not.
     [[ $workspace == elohim/elohim-storage ]] || export RUSTFLAGS=
     ;;

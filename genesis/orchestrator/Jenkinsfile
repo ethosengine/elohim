@@ -2449,7 +2449,7 @@ spec:
     node-type: edge
   containers:
   - name: rust-style
-    image: rust:1.96.1-bookworm
+    image: rust:1.100.0-bookworm
     command: [cat]
     tty: true
     resources:

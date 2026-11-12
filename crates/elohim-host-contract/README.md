@@ -2,7 +2,7 @@
 
 `elohim-host-contract` (Rust library `host_contract`) is the pure comparison layer
 (at `crates/elohim-host-contract`; every path in this README is relative to the
-repository root) for its consumers: ark (`elohim/ark`, the envelope that launches a device's
+repository root unless stated otherwise) for its consumers: ark (`elohim/ark`, the envelope that launches a device's
 programs), placement (`elohim/placement`, which decides which peer runs a task) and
 the artifact store (`elohim/eprfs`, which shares build outputs between devices). It has no host discovery, I/O,
 launch, fetch, authorization or capacity accounting. Its one first-party
@@ -62,11 +62,12 @@ just gate host-contract
 ```
 
 The gate runs `cargo fmt --check`, clippy with `-D warnings` and `cargo test` in the
-cargo target slot its `build-manifest.json` names, on the repository's pinned
-Rust toolchain (1.96.1, edition 2021). Success means
+cargo target slot `crates/elohim-host-contract/build-manifest.json` names, on the repository's pinned
+Rust toolchain (1.100.0, edition 2021). Success means
 passing contract tests, vector tests and the `compile_fail` doctests, which prove that
 serializing `Provides` does not compile.
 
+For the fixture paths below, start in `crates/elohim-host-contract/`.
 To add a synthetic conformance case, copy a JSON file in `tests/vectors/`. Every
 `*.json` there is loaded automatically. Required fields are `requires` (an array
 of original clauses), `provides` (`observed` axis map and `unobserved` axis list),

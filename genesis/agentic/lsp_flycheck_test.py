@@ -170,7 +170,7 @@ def running_heavy():
         self.assertEqual(row['argv'], ['check', '--workspace', '--message-format=json', '--all-targets'])
         self.assertEqual(row['cwd'], str(self.saved.parents[2]))
         self.assertEqual(row['env'], {
-            'RUSTUP_TOOLCHAIN': '1.96.1', 'CARGO_BUILD_JOBS': '1', 'RUSTFLAGS': '',
+            'RUSTUP_TOOLCHAIN': '1.100.0', 'CARGO_BUILD_JOBS': '1', 'RUSTFLAGS': '',
             'ELOHIM_LSP_FLYCHECK': '1',
             'CARGO_TARGET_DIR': str(self.root / 'pool/family/test-family/crates__demo/lsp')})
         leases = row['leases'].get('cargo/slots') or [row['leases']['cargo']]
@@ -242,7 +242,7 @@ def running_heavy():
                 self.assertEqual(row['argv'], ['check', '--message-format=json', '-p', 'example', '--all-targets'])
                 self.assertEqual(row['cwd'], str(self.saved.parents[1]))
                 self.assertEqual(row['env'], {
-                    'RUSTUP_TOOLCHAIN': '1.96.1', 'CARGO_BUILD_JOBS': '1', 'RUSTFLAGS': '',
+                    'RUSTUP_TOOLCHAIN': '1.100.0', 'CARGO_BUILD_JOBS': '1', 'RUSTFLAGS': '',
                     'ELOHIM_LSP_FLYCHECK': '1',
                     'CARGO_TARGET_DIR': str(self.root / 'pool/family/test-family/crates__demo/lsp')})
                 leases = row['leases'].get('cargo/slots') or [row['leases']['cargo']]
@@ -343,7 +343,7 @@ def running_heavy():
         process = self.proc_dir / '4242'
         process.mkdir()
         (process / 'environ').write_bytes(b'')
-        for command in (b'/bin/cargo\0+1.96.1\0check\0', b'/bin/rustc\0--crate-name\0demo\0'):
+        for command in (b'/bin/cargo\0+1.100.0\0check\0', b'/bin/rustc\0--crate-name\0demo\0'):
             with self.subTest(command=command):
                 (process / 'cmdline').write_bytes(command)
                 result = self.run_check()

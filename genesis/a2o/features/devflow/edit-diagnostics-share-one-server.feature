@@ -45,13 +45,13 @@ Feature: Matthew's editing sessions share diagnostics without competing for buil
     Given Matthew has an isolated native Rust workspace with packages "core", "client", and "other"
     And package "client" uses the public types of package "core"
     And sessions "A" and "B" have distinct session identities in that checkout
-    And the Rust language server policy pins toolchain "1.96.1" with an idle timeout of 900 seconds
+    And the Rust language server policy pins toolchain "1.100.0" with an idle timeout of 900 seconds
     And the attribution window for new diagnostics is 30 seconds
 
   Scenario: Two sessions share an analyzer that exits when both leave
     Given the device supervisor is running the device mux
     When sessions "A" and "B" attach to Rust diagnostics for that checkout
-    Then both sessions use the same language server process on toolchain "1.96.1"
+    Then both sessions use the same language server process on toolchain "1.100.0"
     And the device mux holds one berth lease named "toolchain:lsp" for its whole lifetime
     And Matthew can read diagnostics in either session without starting a second language server
     When session "A" detaches and 900 seconds pass

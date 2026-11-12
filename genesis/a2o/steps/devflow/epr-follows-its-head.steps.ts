@@ -580,7 +580,7 @@ Given(
     );
     const cargo = object(object(object(object(object(manifest.gate).projects).eprfs).run).cargo);
     cargo.targetDir = target;
-    cargo.env = { RUSTUP_TOOLCHAIN: '1.96.1' };
+    cargo.env = { RUSTUP_TOOLCHAIN: '1.100.0' };
     writeFileSync(join(state.repo, 'elohim/eprfs/build-manifest.json'), JSON.stringify(manifest));
     writeFileSync(join(state.repo, '.gitignore'), 'genesis/local-dev/\n.eprfs/\n');
     git(state, ['add', '.gitignore', 'elohim/eprfs/build-manifest.json']);
@@ -591,7 +591,7 @@ Given(
       `#!/usr/bin/env python3
 import os, pathlib, shutil, sys
 assert sys.argv[1:] == ['build', '--manifest-path', 'elohim/eprfs/Cargo.toml', '-p', 'elohim-epr-cli', '-p', 'elohim-device-runtime', '--bins']
-assert os.environ['RUSTUP_TOOLCHAIN'] == '1.96.1'
+assert os.environ['RUSTUP_TOOLCHAIN'] == '1.100.0'
 assert os.environ['RUSTFLAGS'] == ''
 out = pathlib.Path(os.environ['CARGO_TARGET_DIR']) / 'debug'
 out.mkdir(parents=True, exist_ok=True)
