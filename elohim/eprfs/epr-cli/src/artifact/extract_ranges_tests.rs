@@ -359,6 +359,61 @@ fn artifact_fallback_reached_invalid_target_still_refuses() {
 }
 
 #[test]
+fn artifact_fallback_xbegin_abort_target_counts_avx2_rel16_and_rel32() {
+    for xbegin in [&[0x66, 0xc7, 0xf8, 5, 0][..], &[0xc7, 0xf8, 5, 0, 0, 0]] {
+        // XBEGIN +5; XABORT 0; ret; invalid data; abort target: AVX2; ret.
+        let mut code = xbegin.to_vec();
+        code.extend([0xc6, 0xf8, 0, 0xc3, 6, 0xc5, 0xfd, 0xef, 0xc0, 0xc3]);
+        let result = extract(Path::new("xbegin.elf"), &sized(&code, code.len() as u64)).unwrap();
+        let mut required = names(X86_64_V3.features);
+        required.insert("rtm".into());
+        assert_eq!(
+            predicate(&result.requires, axis::ISA_X86),
+            &Predicate::Subset(required)
+        );
+        let scan = &result.evidence[axis::ISA_X86];
+        for feature in ["avx2", "avx", "osxsave"] {
+            assert_eq!(scan["used"][feature]["count"], 1, "{feature}");
+        }
+        assert_eq!(scan["used"]["rtm"]["count"], 2); // XBEGIN and fallthrough XABORT
+        assert_eq!(scan["instructions"], 5);
+        assert_eq!(scan["partialFunctions"]["unreachedBytes"], 1);
+        assert_eq!(scan["sections"][0]["covered_bytes"], code.len() - 1);
+    }
+}
+
+#[test]
+fn artifact_fallback_xbegin_invalid_abort_target_refuses_rel16_and_rel32() {
+    for xbegin in [&[0x66, 0xc7, 0xf8, 5, 0][..], &[0xc7, 0xf8, 5, 0, 0, 0]] {
+        let mut code = xbegin.to_vec();
+        code.extend([0xc6, 0xf8, 0, 0xc3, 6, 6]);
+        let error = extract(
+            Path::new("xbegin-invalid.elf"),
+            &sized(&code, code.len() as u64),
+        )
+        .err()
+        .unwrap()
+        .to_string();
+        let target = format!("0x{:x}", 0x400078 + xbegin.len() + 5);
+        assert!(
+            error.contains("sized_function") && error.contains(&target),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn artifact_fallback_interrupt_return_continuation_is_reached() {
+    // INT imm8 and INT1 can return; unlike the explicit INT3 stop, keep their continuation.
+    for interrupt in [&[0xcd, 0x80][..], &[0xf1]] {
+        let mut code = interrupt.to_vec();
+        code.extend([0xc5, 0xfd, 0xef, 0xc0, 0xc3, 6]);
+        let result = extract(Path::new("interrupt.elf"), &sized(&code, code.len() as u64)).unwrap();
+        assert_eq!(result.evidence[axis::ISA_X86]["used"]["avx2"]["count"], 1);
+    }
+}
+
+#[test]
 fn artifact_clean_linear_function_keeps_unreachable_features() {
     // Even code after ret stays counted when the entire range decodes linearly.
     let code = [0xc3, 0xc5, 0xfd, 0xef, 0xc0];
@@ -404,7 +459,9 @@ fn artifact_fallback_self_loops_and_many_branches_are_bounded() {
 fn artifact_fallback_stops_at_each_terminator() {
     for terminator in [
         &[0xc3][..],
-        &[0x0f, 0x0b],
+        &[0x0f, 0x0b],       // UD2
+        &[0x0f, 0xff, 0xc0], // UD0
+        &[0x0f, 0xb9, 0xc0], // UD1
         &[0xcc],
         &[0xf4],
         &[0xff, 0xe0],

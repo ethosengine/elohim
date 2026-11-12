@@ -55,28 +55,45 @@ fn walk(data: &[u8], start: u64) -> Result<Reached, u64> {
             }
             // Count byte union, including when branch targets overlap instructions.
             reached.bytes[offset..offset + instruction.len()].fill(true);
-            let flow = instruction.flow_control();
-            if matches!(
-                flow,
-                FlowControl::ConditionalBranch
-                    | FlowControl::UnconditionalBranch
-                    | FlowControl::Call
-            ) {
+            // Intel SDM Vol. 2: CALL, JMP, Jcc/LOOP, RET/IRET, INT, UD, HLT,
+            // XBEGIN/XABORT/XEND. This is a bounded static walk, not CPU emulation.
+            // Keep exhaustive: a new iced flow class must get an explicit policy.
+            let (follow_target, fall_through) = match instruction.flow_control() {
+                // Follow the taken target and fall through for the not-taken case.
+                FlowControl::ConditionalBranch => (true, true),
+                // Follow the target, then stop: JMP has no sequential continuation.
+                FlowControl::UnconditionalBranch => (true, false),
+                // Follow an in-range direct target and fall through for a return.
+                // iced also puts system/VM calls here; they have no near operand.
+                FlowControl::Call => (true, true),
+                // Stop: the return destination comes from runtime state.
+                FlowControl::Return => (false, false),
+                // Stop: the jump target needs register/memory state we do not resolve.
+                FlowControl::IndirectBranch => (false, false),
+                // Stop by the fallback contract, even though CALL can return: we
+                // do not resolve indirect callees or infer their continuation.
+                FlowControl::IndirectCall => (false, false),
+                // INT saves a continuation for IRET: conservatively fall through.
+                // INT3 remains an explicit breakpoint stop under this contract.
+                FlowControl::Interrupt => (false, instruction.mnemonic() != Mnemonic::Int3),
+                // iced assigns only XBEGIN to this class: follow its abort target
+                // AND fall through into the transaction on successful entry.
+                FlowControl::XbeginXabortXend => (true, true),
+                // Stop at UD0/UD1/UD2: #UD faults, with no normal fallthrough.
+                // Invalid decodes already refused above, before this match.
+                FlowControl::Exception => (false, false),
+                // Fall through ordinary instructions (also XEND, and XABORT,
+                // a NOP outside RTM; XBEGIN already queues the abort edge).
+                // HLT stays a contract stop despite possible interrupt resumption.
+                FlowControl::Next => (false, instruction.mnemonic() != Mnemonic::Hlt),
+            };
+            if follow_target {
                 let target = instruction.near_branch_target();
                 if (start..end).contains(&target) && !reached.starts[(target - start) as usize] {
                     pending.push(target);
                 }
             }
-            if matches!(
-                flow,
-                FlowControl::Return
-                    | FlowControl::UnconditionalBranch
-                    | FlowControl::IndirectBranch
-                    | FlowControl::IndirectCall
-            ) || matches!(
-                instruction.mnemonic(),
-                Mnemonic::Ud2 | Mnemonic::Int3 | Mnemonic::Hlt
-            ) {
+            if !fall_through {
                 break;
             }
         }
