@@ -1279,11 +1279,7 @@ fn record_artifact(
         format!("env:agentId={agent_id}"),
     ];
     // Reach is pending for every recorder, including sysroot archives (K12, pending H12).
-    let mut gaps = gaps.to_vec();
-    gaps.push("reach".into());
-    gaps.sort();
-    gaps.dedup();
-    extra.push(format!("env:gaps={}", gaps.join(",")));
+    extra.push(preflight::gap_annotation(gaps));
     if let Some((cid, _)) = &requires {
         extra.push(format!("env:requires={cid}"));
     }

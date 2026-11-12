@@ -2395,5 +2395,101 @@
       "unreachedBytes": 0
     },
     "harness": "EPR_EXTRACT_MEASURE=<elf> cargo test -p elohim-epr-cli artifact_measure_requested_elf -- --nocapture"
+  },
+  "speculative_unreached": {
+    "date": "2026-11-12",
+    "base": "8b273f826f33",
+    "status": "declared gap implemented; measurement only; no push",
+    "method": "Re-scan the same merged function/FDE ranges with a test-only observer of the existing visited-byte bitmap. Within each unvisited span, consume valid instructions at instruction strides; on invalid decode skip exactly one byte and start a fresh run. Never cross a visited byte, revisit a valid instruction interior, or count a byte twice. Offsets in examples are relative to range_start, with its containing symbol named. No claim of indirect-jump target resolution.",
+    "feature_policy": "Reuse exhaustive extract_cpuid::cpu_name, LAHF/SAHF long-mode and encoding prerequisites, ENDBR hint exemption. Additional features exclude the implicit baseline and XSAVE when already implied by required OSXSAVE. Counts are per instruction per feature; up to three examples per additional feature.",
+    "production_cost": "scan_ranges uses a monomorphized no-op callback (one trivial call/symbol lookup per partial range in unoptimized builds); speculative module and measurement state compile only under cfg(test). No extra production bitmap or decode.",
+    "measurement": {
+      "doorway": {
+        "path": "/projects/.cargo-target-pool/family/dev/doorway__doorway-service/mesh-bin/doorway",
+        "binary_sha256": "33fcd7fd5ed93e4492c523d5bcb09811d6eefc21d964e1f9b7bf810e7d4a5aa6",
+        "binary_bytes": 208108504,
+        "partial_functions": 120,
+        "requires_cid": "bafkr4ih3jp3c3wkq7fyog5shw2pbhhfzcharwhjdkwqhaczvvqa2bup5ra",
+        "requires_and_evidence_unchanged_between_measurement_runs": true,
+        "features_already_required": {
+          "lahf_lm": 3
+        },
+        "features_not_in_requires": {},
+        "invalid_bytes_skipped": 4151,
+        "privileged_runs": 551,
+        "unvisited_bytes": 185753,
+        "valid_instruction_bytes": 181602,
+        "valid_runs": 4577
+      },
+      "storage": {
+        "path": "/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/mesh-bin/elohim-storage",
+        "binary_sha256": "0ff5c0976d50440ce1e47e835fbc2ea083d9d02e36057aba09b7401a3afc85f0",
+        "binary_bytes": 467724480,
+        "partial_functions": 1,
+        "requires_cid": "bafkr4igx63nsywjlysbk7ur5xj2j2aqspvthfjwsbmf4t4nbonkafzal4m",
+        "requires_and_evidence_unchanged_between_measurement_runs": true,
+        "features_already_required": {},
+        "features_not_in_requires": {},
+        "invalid_bytes_skipped": 4,
+        "privileged_runs": 3,
+        "unvisited_bytes": 167,
+        "valid_instruction_bytes": 163,
+        "valid_runs": 5
+      }
+    },
+    "interpretation": "Doorway contains three speculative LAHF/SAHF (lahf_lm) candidates, already covered by Requires; neither binary yields any additional nonbaseline feature. The high valid-byte ratio does not prove code: doorway has 551/4577 valid runs containing privileged instructions; storage has 3/5. Inspect candidate alignment, neighboring invalid/privileged opcodes and actual jump-table targets before treating a decode as live code. No novel feature in this one linear partition does not establish complete coverage or safe admission.",
+    "gap_wiring": "preflight::check -> requires_gaps (canonical extraction evidence partialFunctions.count > 0) -> sorted/deduplicated Prepared.gaps and print_gaps -> put -> record_artifact -> gap_annotation -> extra -> put_local_blob_with -> Produce env:gaps. Complete scan omits gap; no refusal, reachability or Requires change.",
+    "checks": {
+      "cargo test -p elohim-epr-cli artifact_": {
+        "passed": 141,
+        "exit": 0
+      },
+      "cargo fmt --check": {
+        "exit": 0
+      },
+      "cargo clippy -p elohim-epr-cli --all-targets -- -D warnings": {
+        "exit": 0
+      },
+      "just gate rust-style": {
+        "exit": 0,
+        "cli_debt": "0 -> 0"
+      },
+      "artifact_measure_requested_elf doorway": {
+        "exit": 0
+      },
+      "artifact_measure_requested_elf elohim-storage": {
+        "exit": 0
+      },
+      "epr flow cites seal plan": {
+        "exit": 0,
+        "result": "all cites content-addressed + resolvable"
+      }
+    },
+    "regressions": [
+      "artifact_partial_decode_preflight_gap_reaches_produce_annotation",
+      "artifact_complete_decode_preflight_has_no_partial_gap"
+    ],
+    "validation_history": [
+      "Initial compile EXIT=101: corrected test-only measure visibility.",
+      "Initial artifact suite EXIT=101: sandbox launcher read-only errors and fixture keys under /var/tmp/hc-k11 (itself a checkout). TMPDIR=/tmp host-access rerun passed.",
+      "Initial fmt check EXIT=1 after visibility edit; cargo fmt and final fmt --check EXIT=0.",
+      "Initial Rust-style gate EXIT=1: declared cargo-pool slot read-only; host-access rerun EXIT=0."
+    ],
+    "log_directory": "genesis/a2o/reports/recovery/hostcompat-k8-partial-decode",
+    "repository_operations": [
+      "Used installed Brit executable directly after launcher failed with read-only filesystem error.",
+      "Git commit fallback authorized by operator: Brit refuses worktree hooksPath; hooks retained.",
+      "Sandbox Brit add could not write index.lock; status confirmed no staged changes, and commit refused with nothing staged. Retried explicit-path Brit add with host access."
+    ],
+    "story_harvest": {
+      "chain": "host-compatibility K8 -> artifact Produce",
+      "between": "partial extraction -> host admission",
+      "missing_node": "Indirect-jump targets need evidence before the lower-bound ISA clause can establish complete feature coverage.",
+      "probe": "AVX2 case body behind an unresolved indirect jump in artifact_partial_decode_preflight_gap_reaches_produce_annotation; speculative real-binary scan.",
+      "current_state": "gap propagation green; full case-body coverage remains unproved",
+      "scenario": "@regression Given an indirect jump hiding a 4-byte AVX2 case body and an invalid inline byte; When Matthew records the artifact; Then env:gaps contains isa.x86.partial-decode and stderr says pending, not enforced; speculative AVX2 stays out of Requires.",
+      "constraint": "Valid speculative instruction bytes can be inline data or misaligned code, never admission proof.",
+      "placement": "genesis/a2o/features/devflow/device-declared-target.feature (suggested; native regression runnable)"
+    }
   }
 }

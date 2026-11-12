@@ -448,6 +448,10 @@ fn artifact_measure_requested_elf() {
             report["requires_cid"] = json!(cid.to_string());
             report["requires_canonical_json"] = json!(std::str::from_utf8(&document).unwrap());
             report["evidence"] = json!(result.evidence);
+            // Measurement stays separate from the canonical Requires/evidence documents.
+            let file = Elf::parse(&*bytes).unwrap();
+            report["speculative_unreached"] =
+                isa::speculative::measure(&file, &result.requires).unwrap();
             let recorded: Requires = serde_json::from_slice(&document).unwrap();
             for level in ["v2", "v3"] {
                 let vector_path = format!("../../../crates/elohim-host-contract/tests/vectors/ethosengine-epr-on-synthetic-{level}.json");
