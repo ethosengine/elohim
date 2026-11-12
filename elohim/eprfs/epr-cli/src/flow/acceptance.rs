@@ -223,6 +223,12 @@ fn validate_binding(
 pub trait EvidenceResources {
     fn read_text(&self, path: &str) -> FlowResult<String>;
     fn actor_identity(&self, id: &Cid) -> FlowResult<String>;
+    /// Private feedback is supplied explicitly. Captured views never fall back to device files.
+    fn feedback_entry(&self, id: &Cid) -> FlowResult<elohim_epr_rea::feedback::Entry> {
+        Err(FlowError::Unavailable(format!(
+            "private feedback resource not captured: {id}"
+        )))
+    }
     /// The declared repository agent, read through this same boundary.
     fn repository_agent(&self) -> FlowResult<elohim_epr_rea::AgentRef> {
         let text = self.read_text(super::repository::DECLARATION)?;
@@ -239,6 +245,20 @@ impl EvidenceResources for Path {
     fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
         actor_identity(self, id)
     }
+    fn feedback_entry(&self, id: &Cid) -> FlowResult<elohim_epr_rea::feedback::Entry> {
+        let policy = crate::feedback::load_policy(self).map_err(|error| {
+            FlowError::Unavailable(format!("contextual feedback policy unavailable: {error}"))
+        })?;
+        elohim_epr_rea::feedback_store::FeedbackStore::new(self, policy)?
+            .read()?
+            .into_iter()
+            .find(|entry| entry.cid == *id)
+            .ok_or_else(|| {
+                FlowError::Unavailable(format!(
+                    "feedback not retained: {id}; absent or reclaimed history is unknown"
+                ))
+            })
+    }
 }
 
 impl EvidenceResources for std::path::PathBuf {
@@ -247,6 +267,9 @@ impl EvidenceResources for std::path::PathBuf {
     }
     fn actor_identity(&self, id: &Cid) -> FlowResult<String> {
         self.as_path().actor_identity(id)
+    }
+    fn feedback_entry(&self, id: &Cid) -> FlowResult<elohim_epr_rea::feedback::Entry> {
+        self.as_path().feedback_entry(id)
     }
 }
 

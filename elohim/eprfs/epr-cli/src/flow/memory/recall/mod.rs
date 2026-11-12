@@ -72,7 +72,7 @@ pub use discovery::{discover, discover_scored};
 use passage::outline;
 
 mod providers;
-pub use providers::bounded_process;
+pub use providers::{bounded_command, bounded_process, ProcessOutcome};
 
 // The embedding step of the semantic route: a pinned fold procedure behind the bounded envelope,
 // and a fixture embedder for tests (governed-discovery station 4, task 4.2).

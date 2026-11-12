@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**42 rows across both registry homes -> 42 CIDv1(dag-cbor, sha2-256) atoms** (42 pin-verified, 31 declared heads).
+**43 rows across both registry homes -> 43 CIDv1(dag-cbor, sha2-256) atoms** (43 pin-verified, 32 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -35,6 +35,7 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `commit-format-ratchet` | `policies.yaml@1` | `sha256:4fab53ae0c2205e0512e168994ab717b0bc87c4c801ba527ed8411b6160da47e` | `bafyreicpvnj24dbcaxqfclqwrgkkw4l3bpehyteadossp3mecg3bmdnepy` |
 | `destructive-git-requires-tier` | `policies.yaml@1` | `sha256:86fe423b56c621999bf45c5601d81da4603a457958f47ef3527660f0e9f87504` | `bafyreieg7zbdwvwgegmzx5c4kya5qhnema5ek6ky6r7pgutwmdyot6dvaq` |
 | `eprfs-meta-domain-neutrality` | `policies.yaml@2` | `sha256:307b4f47ccc93aeb4bf58cfcdf0e4756d18cb768fc6e279f4638370ff09b09da` | `bafyreibqpnhuptgjhlvux5mm7tpq4r2w2gglo2h4nytz6rryg4h7bgyj3i` |
+| `feedback-local-retention` | `policies.yaml@1` | `sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7` | `bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
 | `habit-declaration-at-birth` | `policies.yaml@1` | `sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2` | `bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi` |
 | `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |

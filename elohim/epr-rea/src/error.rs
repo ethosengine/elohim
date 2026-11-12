@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum FabricError {
+    #[error("invalid feedback: {0}")]
+    InvalidFeedback(String),
     #[error("canonical encode failed: {0}")]
     Encode(String),
 

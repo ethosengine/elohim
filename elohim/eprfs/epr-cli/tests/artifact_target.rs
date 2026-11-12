@@ -20,15 +20,50 @@ impl Fixture {
             r#"{"steps":{"build":{"inputs":{"sources":["crate/src/**"]}}}}"#,
         )
         .unwrap();
+        std::fs::create_dir_all(root.join("crate/src")).unwrap();
+        std::fs::write(
+            root.join("crate/Cargo.toml"),
+            "[package]\nname='doorway'\nversion='0.1.0'\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("crate/src/main.rs"), "fn main() {}\n").unwrap();
+        let metadata = serde_json::json!({"packages": [{"source": null, "manifest_path": root.join("crate/Cargo.toml"), "targets": [{"name": "doorway", "kind": ["bin"], "src_path": root.join("crate/src/main.rs")}]}]});
+        let cargo = format!("case \"$1\" in -V) echo 'cargo fixture';; metadata) echo '{metadata}';; *) exit 1;; esac");
         // Tool responses are fixed; describe still exercises its real argument parser, metadata
         // reader and descriptor writer without launching a nested Cargo process in cargo test.
         for (name, body) in [
-            ("rustc", "printf 'rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n'"),
-            ("cargo", "case \"$1\" in -V) printf 'cargo fixture\\n';; metadata) printf '{\"packages\":[]}';; *) exit 1;; esac"),
+            (
+                "rustc",
+                "printf 'rustc fixture\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.1.2\n'",
+            ),
+            ("cargo", cargo.as_str()),
         ] {
             let path = root.join("bin").join(name);
             std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        std::fs::write(root.join("crate/Cargo.lock"), "version = 4\n").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "crate", "manifest.json"],
+            vec![
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.test",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+        ] {
+            let out = elohim_epr_cli::process::build_command("git", &args, root, &[])
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
         }
         fixture
     }
@@ -36,7 +71,10 @@ impl Fixture {
     fn describe(&self, extra: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_epr"))
             .env_clear()
-            .env("PATH", self.0.path().join("bin"))
+            .env(
+                "PATH",
+                format!("{}:/bin", self.0.path().join("bin").display()),
+            )
             .env("CARGO_HOME", self.0.path().join("cargo-home"))
             .env("XDG_CONFIG_HOME", self.0.path().join("config"))
             .args([

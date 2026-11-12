@@ -54,7 +54,15 @@ fn checkout() -> TempDir {
     std::fs::write(dir.path().join("crate/src/main.rs"), "fn main() {}\n").unwrap();
     std::fs::write(dir.path().join("README.md"), "fixture\n").unwrap();
     git(dir.path(), &["init", "-q"]);
-    git(dir.path(), &["add", "-A"]);
+    git(
+        dir.path(),
+        &[
+            "add",
+            ".epr-meta/repository.yaml",
+            "crate/src/main.rs",
+            "README.md",
+        ],
+    );
     git(dir.path(), &["commit", "-q", "-m", "fixture"]);
     dir
 }
@@ -202,15 +210,15 @@ fn method_file_with(
     (path, descriptor)
 }
 
-/// A stub `brit-build-ref`: `signer --json` names a signer, `build put` succeeds; every call is
-/// logged one line per invocation.
+/// A stub `brit-build-ref`: `signer --json` names a signer, `build put` succeeds; each write is
+/// logged one line per invocation; read-only signer probes do not mutate this log.
 fn brit_stub(dir: &Path) -> (PathBuf, PathBuf) {
     let log = dir.join("brit.log");
     let stub = dir.join("brit-build-ref");
     std::fs::write(
         &stub,
         format!(
-            "#!/bin/sh\necho \"$*\" >> '{}'\ncase \"$*\" in\n  *signer*) echo '{{\"agentId\":\"{AGENT_ID}\"}}' ;;\n  *) echo '{{}}' ;;\nesac\n",
+            "#!/bin/sh\ncase \"$*\" in\n  *signer*) echo '{{\"agentId\":\"{AGENT_ID}\"}}' ;;\n  *) echo \"$*\" >> '{}'; echo '{{}}' ;;\nesac\n",
             log.display()
         ),
     )
@@ -244,7 +252,7 @@ fn events(root: &Path) -> Vec<FlowEvent> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn put_records_one_produce_that_both_stays_local_custody_and_crosses() {
+async fn artifact_mesh_fixture_passes_preflight_and_records_one_produce() {
     put_and_mount(false, false).await;
 }
 
@@ -253,11 +261,70 @@ async fn artifact_overridden_flags_store_the_keyed_method_and_mount() {
     put_and_mount(true, true).await;
 }
 
+fn recordable_mesh_fixture(
+    root: &Path,
+    scratch: &Path,
+    method: &Path,
+    descriptor: &mut MethodDescriptor,
+) {
+    std::fs::write(
+        root.join("crate/Cargo.toml"),
+        "[package]\nname = \"elohim-storage\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("crate/Cargo.lock"),
+        "version = 4\n[[package]]\nname = \"elohim-storage\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    git(root, &["add", "crate/Cargo.toml", "crate/Cargo.lock"]);
+    git(root, &["commit", "-qm", "cargo closure"]);
+    for bin in ["elohim-storage", "artifact"] {
+        std::fs::write(
+            scratch.join(format!("{bin}.d")),
+            format!(
+                "{}: {}\n",
+                scratch.join(bin).display(),
+                root.join("crate/src/main.rs").display()
+            ),
+        )
+        .unwrap();
+    }
+    let tools = scratch.join("tools");
+    fake_cc(&tools, "cc fixture");
+    fake_tool(
+        &tools,
+        "cargo",
+        &format!(
+            r#"echo '{{"packages":[{{"manifest_path":"{}/crate/Cargo.toml","source":null,"targets":[{{"name":"elohim-storage","kind":["bin"],"src_path":"{}/crate/src/main.rs"}}]}}]}}'"#,
+            root.display(),
+            root.display()
+        ),
+    );
+    descriptor
+        .non_path_inputs
+        .insert("crate".into(), "crate".into());
+    descriptor
+        .non_path_inputs
+        .insert("PATH".into(), format!("{}:/bin", tools.display()));
+    for path in ["crate/Cargo.toml", "crate/Cargo.lock"] {
+        descriptor
+            .view
+            .push(TreePath::from_slash_bytes(path.as_bytes()).unwrap());
+    }
+    std::fs::write(method, serde_json::to_vec(descriptor).unwrap()).unwrap();
+}
+
 async fn put_and_mount(overridden: bool, with_requires: bool) {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
     let (method, mut descriptor) = method_file(scratch.path(), &["crate/src", "README.md"]);
+    let bytes = scratch.path().join("elohim-storage");
+    let mut artifact = artifact_elf(b"Linker: LLD 22.1.2\0");
+    artifact.extend((0..700_000u32).map(|i| (i * 31 % 251) as u8));
+    std::fs::write(&bytes, &artifact).unwrap();
+    recordable_mesh_fixture(a.root(), scratch.path(), &method, &mut descriptor);
     if overridden {
         descriptor.non_path_inputs.insert(
             "CARGO_ENCODED_RUSTFLAGS".into(),
@@ -280,10 +347,6 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
     }
     let method_cid = effective.cid().unwrap();
     let (stub, log) = brit_stub(scratch.path());
-    let bytes = scratch.path().join("elohim-storage");
-    let mut artifact = artifact_elf(b"Linker: LLD 22.1.2\0");
-    artifact.extend((0..700_000u32).map(|i| (i * 31 % 251) as u8));
-    std::fs::write(&bytes, &artifact).unwrap();
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
 
@@ -526,11 +589,7 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
     // A closure that moved since the build started is never recorded.
     let out = put("bafkr4ihkr4ld3m4gqkjf4reryxsy2s5tkbxprqkow6fin2iiyvreuzzab4");
     assert_eq!(out.status.code(), Some(3), "{}", text(&out));
-    assert!(
-        text(&out).contains("unrecorded: the closure moved"),
-        "{}",
-        text(&out)
-    );
+    assert!(text(&out).contains("the closure moved"), "{}", text(&out));
     // Nor a dirty one: the bytes would not be HEAD's.
     std::fs::write(
         a.root().join("crate/src/main.rs"),
@@ -900,7 +959,7 @@ fn a_completion_for_another_request_is_never_accepted() {
 /// An executable `cc` in `dir` that answers `--version` with `version`.
 fn fake_cc(dir: &Path, version: &str) {
     fake_tool(dir, "cc", &format!(
-        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac\n"
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=*) exec /usr/bin/cc \"$1\" ;;\nesac\n"
     ));
 }
 
@@ -955,21 +1014,28 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
-    let (method, _) = method_file(scratch.path(), &["crate/src"]);
-    let (stub, _log) = brit_stub(scratch.path());
+    let (method, mut descriptor) = method_file(scratch.path(), &["crate/src"]);
     let bytes = scratch.path().join("elohim-storage");
     std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
+    recordable_mesh_fixture(a.root(), scratch.path(), &method, &mut descriptor);
+    let (stub, _log) = brit_stub(scratch.path());
     let repo = a.root().to_str().unwrap().to_string();
     let method = method.to_str().unwrap().to_string();
     let input = {
-        let out = a.epr(&[
-            "artifact", "key", "--method", &method, "--repo", &repo, "--print", "input",
-        ]);
+        let out = a
+            .command()
+            .envs(&descriptor.non_path_inputs)
+            .args([
+                "artifact", "key", "--method", &method, "--repo", &repo, "--print", "input",
+            ])
+            .output()
+            .unwrap();
         assert!(out.status.success(), "{}", text(&out));
         String::from_utf8(out.stdout).unwrap().trim().to_string()
     };
     let put = || {
         a.command()
+            .envs(&descriptor.non_path_inputs)
             .env("BRIT_BUILD_REF_BIN", &stub)
             .args([
                 "artifact",
@@ -1013,6 +1079,13 @@ fn a_served_daemon_without_a_store_record_refuses_put() {
         text(&out)
     );
     // The record naming this put's own store lets it through.
+    assert!(
+        !a.payload().exists(),
+        "refused preflight never opens the store"
+    );
+    std::fs::create_dir_all(a.payload()).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(a.payload(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let ours = std::fs::canonicalize(a.payload()).unwrap();
     std::fs::write(&marker, format!("{}\n", ours.display())).unwrap();
     let out = put();
@@ -1177,7 +1250,7 @@ fn artifact_put_explicit_driver_without_gnu_ld_witness_refuses_before_recording(
         "{}",
         text(&out)
     );
-    assert!(!log.exists(), "refused before any brit call");
+    assert!(!log.exists(), "refused before any brit write");
     assert!(events(device.root()).is_empty());
 }
 
@@ -1188,7 +1261,7 @@ fn artifact_link_input_bytes_move_key() {
     let input = tools.path().join("Scrt1.o");
     std::fs::write(&input, b"glibc 2.39-128").unwrap();
     fake_tool(tools.path(), "cc", &format!(
-        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac",
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define __SSE2__ 1' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) exec /usr/bin/cc \"$1\" ;;\nesac",
         input.display()
     ));
     let (_, descriptor) = method_file_with(
@@ -1208,7 +1281,7 @@ fn artifact_cc_target_defaults_move_key() {
     let tools = TempDir::new().unwrap();
     let cc = |march| {
         fake_tool(tools.path(), "cc", &format!(
-        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define {march} 1' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\nesac"
+        "case \"$1\" in\n--version) echo 'cc fixture' ;;\n-E) echo '#define {march} 1' ;;\n-print-file-name=*) exec /usr/bin/cc \"$1\" ;;\nesac"
     ))
     };
     cc("__SSE2__");
@@ -1294,7 +1367,7 @@ fn artifact_put_checks_elf_linker_before_recording() {
             .unwrap();
         assert_eq!(out.status.code(), Some(3), "{}", text(&out));
         {
-            assert!(!log.exists(), "refused before any brit call");
+            assert!(!log.exists(), "refused before any brit write");
             assert!(events(device.root()).is_empty());
             assert!(text(&out).contains("Linker"), "{}", text(&out));
             if comment.starts_with("Linker:") {
@@ -1348,13 +1421,13 @@ fn artifact_put_refuses_a_declared_target_no_build_applies_yet() {
     assert_eq!(out.status.code(), Some(3), "{}", text(&out));
     assert!(text(&out).contains("target.isa"), "{}", text(&out));
     assert!(text(&out).contains("K6"), "{}", text(&out));
-    assert!(!log.exists(), "refused before any brit call");
+    assert!(!log.exists(), "refused before any brit write");
     assert!(events(device.root()).is_empty());
 }
 
 fn fixture_driver(dir: &Path, name: &str, version: &str, macros: &str, input: &Path) {
     fake_tool(dir, name, &format!(
-        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) test \"$*\" = '-E -dM -x c -' || exit 1; read ignored && exit 1; printf '%s\\n' '{macros}' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) echo \"${{1#*=}}\" ;;\n*) exit 1 ;;\nesac", input.display()
+        "case \"$1\" in\n--version) echo '{version}' ;;\n-E) test \"$*\" = '-E -dM -x c -' || exit 1; read ignored && exit 1; printf '%s\\n' '{macros}' ;;\n-print-file-name=Scrt1.o) echo '{}' ;;\n-print-file-name=*) exec /usr/bin/cc \"$1\" ;;\n*) exit 1 ;;\nesac", input.display()
     ));
 }
 
@@ -1697,7 +1770,8 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
     std::fs::create_dir_all(&tools).unwrap();
     // Keep Cargo's metadata response synthetic: describe runs its actual parser/writer and
     // the real rustc, without nesting another cargo command inside the test's cargo process.
-    fake_tool(&tools, "cargo", "case \"$1\" in -V|--version) echo 'cargo fixture';; metadata) echo '{\"packages\":[]}';; *) exit 1;; esac");
+    let metadata = serde_json::json!({"packages": [{"source": null, "manifest_path": repo.path().join("crate/Cargo.toml"), "targets": [{"name": "fixture", "kind": ["bin"], "src_path": repo.path().join("crate/src/main.rs")}]}]});
+    fake_tool(&tools, "cargo", &format!("case \"$1\" in -V|--version) echo 'cargo fixture';; metadata) echo '{metadata}';; *) exit 1;; esac"));
     // fake_tool supplies rustc for other fixtures; this test must resolve the real proxy.
     std::fs::remove_file(tools.join("rustc")).unwrap();
     std::fs::write(
@@ -1710,7 +1784,16 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
         r#"{"steps":{"build":{"inputs":{"sources":["crate/src/**"]}}}}"#,
     )
     .unwrap();
-    git(repo.path(), &["add", "crate/Cargo.toml", "manifest.json"]);
+    std::fs::write(repo.path().join("crate/Cargo.lock"), "version = 4\n").unwrap();
+    git(
+        repo.path(),
+        &[
+            "add",
+            "crate/Cargo.toml",
+            "crate/Cargo.lock",
+            "manifest.json",
+        ],
+    );
     git(repo.path(), &["commit", "-qm", "describe fixture"]);
 
     let build_path = std::env::var("PATH").unwrap();
@@ -2809,6 +2892,7 @@ fn sysroot_put_then_output_fetch(with_requires: bool) {
     }
     let put = command.output().unwrap();
     assert!(put.status.success(), "{}", text(&put));
+    assert!(String::from_utf8_lossy(&put.stderr).starts_with("reach: pending, not enforced\n"));
     let recorded: serde_json::Value = serde_json::from_slice(&put.stdout).unwrap();
     assert_eq!(recorded["output"], output.to_string());
     let verified = elohim_epr_cli::artifact::sysroot::verify(&bytes).unwrap();
@@ -2849,6 +2933,14 @@ fn sysroot_put_then_output_fetch(with_requires: bool) {
         .filter(|e| e.action == ReaVerb::Produce)
         .collect();
     assert_eq!(produces.len(), 1);
+    let gaps: Vec<_> = produces[0]
+        .classified_as
+        .iter()
+        .filter(|s| s.starts_with("env:gaps="))
+        .map(String::as_str)
+        .collect();
+    assert_eq!(gaps, ["env:gaps=reach"]);
+
     assert!(produces[0]
         .classified_as
         .contains(&format!("env:family={family}")));
@@ -3058,3 +3150,6 @@ fn artifact_sysroot_put_bounds_initial_archive_read() {
 
 #[path = "support/artifact_inputs.rs"]
 mod inputs;
+
+#[path = "support/artifact_preflight.rs"]
+mod preflight;

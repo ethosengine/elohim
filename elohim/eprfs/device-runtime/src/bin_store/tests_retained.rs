@@ -120,6 +120,44 @@ fn helper_is_registered_and_override_is_explicit() -> Result<()> {
 }
 
 #[test]
+fn published_sha256_transport_preserves_native_identity_and_rejects_tamper() -> Result<()> {
+    let f = Fixture::new("brit");
+    let source = f.path("published");
+    fs::create_dir(&source)?;
+    let mut names = f.store.config.bins.clone();
+    names.sort();
+    // NIST SHA-256("abc"), independent of the native BLAKE3 byte-profile identity.
+    let sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    let mut checksums = String::new();
+    for name in &names {
+        atomic_bytes(&source.join(name), b"abc", 0o755)?;
+        checksums.push_str(&format!("{sha256}  {name}\n"));
+    }
+    fs::write(source.join("SHA256SUMS"), checksums)?;
+    let options = IngestOptions {
+        source_commit: Some(f.commit()),
+        tree_clean: Some(true),
+        ..Default::default()
+    };
+    let release = f.store.ingest(&source, &options)?;
+    let native_cid = eprfs_core::BlobCid::compute_bytes(b"abc").to_string();
+    assert!(release.bins.values().all(|cid| cid == &native_cid));
+    assert_eq!(
+        fs::read(f.store.artifact(&release.cid)?.join("sums.cbor"))?,
+        sums_manifest(&release.bins)?
+    );
+    assert!(f.store.verified(&release.cid));
+
+    fs::write(source.join("brit"), b"abx")?;
+    assert_eq!(
+        f.store.ingest(&source, &options).unwrap_err().kind,
+        "checksums-mismatch"
+    );
+    assert!(f.store.verified(&release.cid));
+    Ok(())
+}
+
+#[test]
 fn declared_helper_cannot_be_missing_or_corrupt() -> Result<()> {
     let f = Fixture::new("brit");
     let release = f.release("fresh");
@@ -142,12 +180,13 @@ fn declared_helper_cannot_be_missing_or_corrupt() -> Result<()> {
     );
     // The same failures through the published SHA256SUMS transport.
     fs::remove_file(f.path("fresh/sums.cbor"))?;
+    let artifact = f.store.artifact(&release.cid)?;
     let sums = release
         .bins
         .iter()
         .filter(|(name, _)| name.as_str() != "rakia")
-        .map(|(name, cid)| {
-            let cid = require_cid(cid).expect("fixture CID");
+        .map(|(name, _)| {
+            let cid = eprfs_core::BlobCid::compute_raw(&fs::read(artifact.join(name))?);
             let digest = cid
                 .as_cid()
                 .hash()
@@ -155,9 +194,10 @@ fn declared_helper_cannot_be_missing_or_corrupt() -> Result<()> {
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect::<String>();
-            format!("{digest}  {name}\n")
+            Ok(format!("{digest}  {name}\n"))
         })
-        .collect::<String>();
+        .collect::<Result<Vec<_>>>()?
+        .concat();
     fs::write(f.path("fresh/SHA256SUMS"), sums)?;
     assert_eq!(
         f.store.ingest(&f.path("fresh"), &options).unwrap_err().kind,

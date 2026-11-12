@@ -911,6 +911,32 @@ pub fn policy_established_by(repo_root: impl AsRef<Path>, policy_key: &str) -> O
         .and_then(|policy| policy.established_by.clone())
 }
 
+/// Resolve one declared local policy version with its authored content pin. Consumers keep
+/// this snapshot when an act needs durable policy identity; no recency selection is permitted.
+pub fn resolved_policy_snapshot(
+    repo_root: impl AsRef<Path>,
+    policy_key: &str,
+) -> std::result::Result<Value, String> {
+    let (policies, _) = load_policies(repo_root.as_ref());
+    let policy = policies
+        .get(policy_key)
+        .ok_or("declared policy version unavailable")?;
+    if let Some(error) = &policy.import_error {
+        return Err(error.clone());
+    }
+    let pin = policy
+        .content_hash
+        .as_deref()
+        .ok_or("policy content pin missing")?;
+    if compute_row_hash(&policy.raw_row).as_deref() != Some(pin) {
+        return Err("policy content pin mismatch".into());
+    }
+    if policy.established_by.as_deref().is_none_or(str::is_empty) {
+        return Err("policy authority missing".into());
+    }
+    serde_json::to_value(&policy.raw_row).map_err(|e| e.to_string())
+}
+
 fn evaluate_rule(
     repo_root: &Path,
     rule: &GovernanceRule,

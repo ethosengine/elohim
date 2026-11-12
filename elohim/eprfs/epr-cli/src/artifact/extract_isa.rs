@@ -8,6 +8,12 @@ use serde::Serialize;
 
 use super::{layout::name as bounded_name, unrecorded, ArtifactResult, Elf};
 
+#[path = "extract_control_flow.rs"]
+mod control_flow;
+#[path = "extract_cpuid.rs"]
+mod cpuid;
+use cpuid::cpu_name;
+
 const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
     "fpu", "cx8", "cmov", "mmx", "fxsr", "sse", "sse2", "syscall", "clflush", "tsc", "msr", "cpuid",
@@ -66,6 +72,26 @@ pub(super) struct Scan {
     not_required: Vec<NotRequired>,
     instructions: u64,
     sections: Vec<Coverage>,
+    #[serde(rename = "partialFunctions")]
+    partial_functions: PartialFunctions,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialFunctions {
+    count: u64,
+    unreached_bytes: u64,
+    examples: Vec<PartialFunction>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialFunction {
+    symbol: Option<String>,
+    range_start: u64,
+    range_length: u64,
+    decoded_bytes: u64,
+    unreached_bytes: u64,
 }
 
 #[derive(Serialize)]
@@ -206,6 +232,7 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
         not_required: Vec::new(),
         instructions: 0,
         sections: Vec::new(),
+        partial_functions: PartialFunctions::default(),
     };
     // A present .symtab is authoritative; use .dynsym only when it is absent.
     let table = if file.elf_section_table().iter().any(|s| {
@@ -291,10 +318,61 @@ pub(super) fn scan_ranges(file: &Elf<'_>) -> ArtifactResult<Scan> {
                 &local,
                 &mut coverage.uncovered_examples,
             );
-            coverage.covered_bytes += range.end - range.start;
             cursor = range.end;
             let code = &data[(range.start - start) as usize..(range.end - start) as usize];
-            decode(code, range.start, name, &intervals, &mut scan)?;
+            let reached = control_flow::validate(code, range.start, !ABI_STUB_SECTIONS.contains(&name))
+                .map_err(|address| unrecorded(format!(
+                    "isa.x86: invalid instruction or instruction past range end in {name} at 0x{address:x}, containing symbol {}",
+                    intervals.containing(address).unwrap_or("<unknown; FDE range>")
+                )))?;
+            let decoded_bytes = if let Some(reached) = &reached {
+                let decoded = reached.bytes.iter().filter(|&&b| b).count() as u64;
+                let unreached = code.len() as u64 - decoded;
+                if unreached != 0 {
+                    scan.partial_functions.count += 1;
+                    scan.partial_functions.unreached_bytes += unreached;
+                    if scan.partial_functions.examples.len() < 5 {
+                        scan.partial_functions.examples.push(PartialFunction {
+                            symbol: intervals
+                                .containing(range.start)
+                                .map(|s| bounded_name(s).into()),
+                            range_start: range.start,
+                            range_length: code.len() as u64,
+                            decoded_bytes: decoded,
+                            unreached_bytes: unreached,
+                        });
+                    }
+                    let mut offset = 0;
+                    while offset < code.len() && coverage.uncovered_examples.len() < 5 {
+                        if reached.bytes[offset] {
+                            offset += 1;
+                            continue;
+                        }
+                        let from = offset;
+                        while offset < code.len() && !reached.bytes[offset] {
+                            offset += 1;
+                        }
+                        uncovered(
+                            range.start + from as u64,
+                            range.start + offset as u64,
+                            &local,
+                            &mut coverage.uncovered_examples,
+                        );
+                    }
+                }
+                decoded
+            } else {
+                code.len() as u64
+            };
+            coverage.covered_bytes += decoded_bytes;
+            decode(
+                code,
+                range.start,
+                name,
+                &intervals,
+                reached.as_ref(),
+                &mut scan,
+            )?;
         }
         uncovered(cursor, end, &local, &mut coverage.uncovered_examples);
         coverage.uncovered_bytes = coverage.total_bytes - coverage.covered_bytes;
@@ -326,18 +404,26 @@ fn decode(
     start: u64,
     section: &str,
     symbols: &SymbolIntervals<'_>,
+    reached: Option<&control_flow::Reached>,
     scan: &mut Scan,
 ) -> ArtifactResult<()> {
     let mut decoder = Decoder::with_ip(64, data, start, DecoderOptions::NONE);
     let mut instruction = Instruction::default();
     while decoder.can_decode() {
+        if let Some(reached) = reached {
+            let position = decoder.position();
+            let Some(next) = reached.starts[position..].iter().position(|&b| b) else {
+                break;
+            };
+            decoder.set_position(position + next).map_err(unrecorded)?;
+            decoder.set_ip(start + (position + next) as u64);
+        }
         decoder.decode_out(&mut instruction);
         let symbol = symbols.containing(instruction.ip());
-        if instruction.is_invalid() || instruction.next_ip() > start + data.len() as u64 {
-            return Err(unrecorded(format!(
-                "isa.x86: invalid instruction or instruction past range end in {section} at 0x{:x}, containing symbol {}",
-                instruction.ip(), symbol.unwrap_or("<unknown; FDE range>")
-            )));
+        if reached.is_some() {
+            let next = (instruction.ip() - start) as usize + 1;
+            decoder.set_position(next).map_err(unrecorded)?;
+            decoder.set_ip(start + next as u64);
         }
         scan.instructions += 1;
         let mut features = Vec::new();
@@ -408,117 +494,4 @@ fn prerequisites(instruction: &Instruction) -> Vec<&'static str> {
         .filter(|(kind, narrow_only, _)| *kind == encoding && (!narrow_only || narrow))
         .flat_map(|(_, _, features)| features.iter().copied())
         .collect()
-}
-
-/// Explicit decoder-to-contract spelling. Unknown extensions refuse rather than disappear or
-/// invent a name. These are psABI names (sse3/lzcnt), with Linux flag names for other extensions.
-fn cpu_name(feature: CpuidFeature) -> ArtifactResult<Option<&'static str>> {
-    use CpuidFeature::*;
-    let name = match feature {
-        INTEL8086 | INTEL186 | INTEL286 | INTEL386 | INTEL486 | X64 | MULTIBYTENOP | PAUSE => {
-            return Ok(None)
-        }
-        FPU | FPU287 | FPU387 => "fpu",
-        CMOV => "cmov",
-        CPUID => "cpuid",
-        CX8 => "cx8",
-        FXSR => "fxsr",
-        MMX => "mmx",
-        SSE => "sse",
-        SSE2 => "sse2",
-        SYSCALL => "syscall",
-        CLFSH => "clflush",
-        TSC => "tsc",
-        MSR => "msr",
-        CMPXCHG16B => "cx16",
-        SSE3 => "sse3",
-        SSSE3 => "ssse3",
-        SSE4_1 => "sse4_1",
-        SSE4_2 => "sse4_2",
-        POPCNT => "popcnt",
-        AVX => "avx",
-        AVX2 => "avx2",
-        BMI1 => "bmi1",
-        BMI2 => "bmi2",
-        F16C => "f16c",
-        FMA => "fma",
-        LZCNT => "lzcnt",
-        MOVBE => "movbe",
-        AVX512F => "avx512f",
-        AVX512BW => "avx512bw",
-        AVX512CD => "avx512cd",
-        AVX512DQ => "avx512dq",
-        AVX512VL => "avx512vl",
-        AVX512ER => "avx512er",
-        AVX512PF => "avx512pf",
-        AVX512_4FMAPS => "avx512_4fmaps",
-        AVX512_4VNNIW => "avx512_4vnniw",
-        AVX512_BF16 => "avx512_bf16",
-        AVX512_BITALG => "avx512_bitalg",
-        AVX512_IFMA => "avx512ifma",
-        AVX512_VBMI => "avx512vbmi",
-        AVX512_VBMI2 => "avx512_vbmi2",
-        AVX512_VNNI => "avx512_vnni",
-        AVX512_VP2INTERSECT => "avx512_vp2intersect",
-        AVX512_VPOPCNTDQ => "avx512_vpopcntdq",
-        AVX512_FP16 => "avx512_fp16",
-        AES => "aes",
-        PCLMULQDQ => "pclmulqdq",
-        SHA => "sha_ni",
-        RDRAND => "rdrand",
-        RDSEED => "rdseed",
-        ADX => "adx",
-        VAES => "vaes",
-        VPCLMULQDQ => "vpclmulqdq",
-        GFNI => "gfni",
-        FSGSBASE => "fsgsbase",
-        RDPID => "rdpid",
-        RDTSCP => "rdtscp",
-        XSAVE => "xsave",
-        XSAVEC => "xsavec",
-        XSAVEOPT => "xsaveopt",
-        XSAVES => "xsaves",
-        CET_IBT => "ibt",
-        CET_SS => "user_shstk",
-        CLDEMOTE => "cldemote",
-        CLFLUSHOPT => "clflushopt",
-        CLWB => "clwb",
-        CLZERO => "clzero",
-        FMA4 => "fma4",
-        SSE4A => "sse4a",
-        XOP => "xop",
-        TBM => "tbm",
-        D3NOW => "3dnow",
-        D3NOWEXT => "3dnowext",
-        MONITOR => "monitor",
-        MONITORX => "mwaitx",
-        MOVDIR64B => "movdir64b",
-        MOVDIRI => "movdiri",
-        MPX => "mpx",
-        PKU => "pku",
-        PREFETCHW => "3dnowprefetch",
-        PREFETCHWT1 => "prefetchwt1",
-        PTWRITE => "ptwrite",
-        RTM => "rtm",
-        HLE => "hle",
-        SEP => "sep",
-        SMAP => "smap",
-        SMX => "smx",
-        VMX => "vmx",
-        SVM => "svm",
-        SKINIT => "skinit",
-        INVPCID => "invpcid",
-        ENQCMD => "enqcmd",
-        SERIALIZE => "serialize",
-        WAITPKG => "waitpkg",
-        WBNOINVD => "wbnoinvd",
-        TSXLDTRK => "tsxldtrk",
-        AMX_BF16 => "amx_bf16",
-        AMX_TILE => "amx_tile",
-        AMX_INT8 => "amx_int8",
-        AMX_FP16 => "amx_fp16",
-        AVX_VNNI => "avx_vnni",
-        _ => return Err(unrecorded(format!("unmapped CPUID feature {feature:?}"))),
-    };
-    Ok(Some(name))
 }

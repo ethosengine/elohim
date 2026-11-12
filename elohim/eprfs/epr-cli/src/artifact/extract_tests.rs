@@ -629,3 +629,22 @@ fn artifact_glibc_floor_is_numeric_and_scoped_to_libc() {
         .to_string()
         .contains("unsupported libc.so.6 version"));
 }
+
+#[test]
+fn artifact_vex_avx_ifma_requires_linux_feature_name() {
+    // VEX.256.66.0F38.W1 B4 /r: vpmadd52luq ymm0, ymm1, ymm2.
+    let code = [0xc4, 0xe2, 0xf5, 0xb4, 0xc2, 0xc3];
+    let bytes = fixture(elf::EM_X86_64, elf::ELFOSABI_LINUX, &code, None, None);
+    let result = extract(Path::new("avx-ifma.elf"), &bytes).unwrap();
+    let mut expected = names(X86_64_V3.features);
+    expected.insert("avx_ifma".into());
+    assert_eq!(
+        predicate(&result.requires, axis::ISA_X86),
+        &Predicate::Subset(expected)
+    );
+    assert_eq!(
+        result.evidence[axis::ISA_X86]["used"]["avx_ifma"]["count"],
+        1
+    );
+    assert!(result.evidence[axis::ISA_X86]["used"]["avx512f"].is_null());
+}

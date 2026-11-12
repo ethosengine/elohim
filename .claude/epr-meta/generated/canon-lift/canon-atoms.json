@@ -484,6 +484,21 @@
       "supersededBy": null
     },
     {
+      "id": "feedback-local-retention",
+      "version": 1,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7",
+      "sha256Computed": "sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7",
+      "pinState": "verified",
+      "cid": "bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24",
+      "bodyBytes": 1730,
+      "supersedes": [],
+      "supersededBy": null
+    },
+    {
       "id": "governance-escalation-ladder",
       "version": 1,
       "registry": "policies.yaml",

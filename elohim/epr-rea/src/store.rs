@@ -209,7 +209,15 @@ pub struct SidecarFlowStore {
 impl SidecarFlowStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
     pub fn open(root: &Path) -> Result<Self> {
-        let log_path = crate::sidecar::open_log(root, "flows.jsonl")?;
+        let log_path = if root.join(".eprfs/status/feedback/state.json").exists() {
+            // Once feedback can reclaim, a lost reference log must not be silently
+            // recreated as an empty inventory by an unrelated flow operation.
+            let path = root.join(".eprfs/status/flows.jsonl");
+            std::fs::File::open(&path)?;
+            path
+        } else {
+            crate::sidecar::open_log(root, "flows.jsonl")?
+        };
         Ok(Self { log_path })
     }
 
@@ -222,7 +230,17 @@ impl SidecarFlowStore {
     /// The lock lasts until this handle drops. Appends are individually synced, not rolled
     /// back if a subsequent append or check fails. No recovery rewrites damaged bytes.
     pub fn transaction(&self) -> Result<SidecarFlowTransaction> {
+        let root = self
+            .log_path
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .ok_or_else(|| FabricError::InvalidFeedback("invalid flow store root".into()))?;
+        let guard = crate::feedback_store::coordination(root)?;
         Ok(SidecarFlowTransaction {
+            feedback_guard: Some(guard),
+            feedback_seen: None,
+            root: root.to_path_buf(),
             log: crate::sidecar::LockedLog::exclusive(&self.log_path)?,
         })
     }
@@ -231,7 +249,29 @@ impl SidecarFlowStore {
 /// A process-exclusive view of the existing flow store, implementing the same store seam.
 #[cfg(feature = "sidecar")]
 pub struct SidecarFlowTransaction {
+    feedback_guard: Option<crate::sidecar::LockedLog>,
+    feedback_seen: Option<HashSet<Cid>>,
+    root: PathBuf,
     log: crate::sidecar::LockedLog,
+}
+
+#[cfg(feature = "sidecar")]
+impl SidecarFlowTransaction {
+    /// Inspect evidence while retaining the same lock through reference admission.
+    pub fn feedback_records(
+        &mut self,
+        policy: crate::feedback::Policy,
+    ) -> Result<Vec<crate::feedback::Entry>> {
+        if self.feedback_guard.is_none() {
+            return Err(FabricError::InvalidFeedback(
+                "reference admission requires exclusive coordination".into(),
+            ));
+        }
+        let entries =
+            crate::feedback_store::FeedbackStore::new(&self.root, policy)?.read_locked()?;
+        self.feedback_seen = Some(entries.iter().map(|entry| entry.cid).collect());
+        Ok(entries)
+    }
 }
 
 #[cfg(feature = "sidecar")]
@@ -249,6 +289,9 @@ impl FlowStore for SidecarFlowStore {
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
         SidecarFlowTransaction {
+            feedback_guard: None,
+            feedback_seen: None,
+            root: PathBuf::new(),
             log: crate::sidecar::LockedLog::shared(&self.log_path)?,
         }
         .records()
@@ -258,6 +301,21 @@ impl FlowStore for SidecarFlowStore {
 #[cfg(feature = "sidecar")]
 impl FlowStore for SidecarFlowTransaction {
     fn append(&mut self, record: FlowRecord) -> Result<Cid> {
+        if let FlowRecord::Intent(intent) = &record {
+            if intent
+                .resource_spec
+                .classified_as
+                .iter()
+                .any(|tag| tag == "feedback:repair")
+                && !self
+                    .feedback_seen
+                    .as_ref()
+                    .is_some_and(|ids| ids.contains(&intent.in_scope_of))
+            {
+                return Err(FabricError::InvalidFeedback(
+                    "feedback reference admission requires retained evidence read in this transaction".into()));
+            }
+        }
         // Refuse to append behind broken evidence, including a valid JSON tail lacking its
         // record terminator. Verification is under the same lock as the append.
         if !self.log.validated() {

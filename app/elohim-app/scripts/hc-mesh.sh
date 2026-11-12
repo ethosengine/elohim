@@ -2178,7 +2178,7 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       [ "${MESH_BUILD_FETCH:-1}" = "0" ] || printf '  %q artifact fetch --method %q --repo %q --dest %q   # first; any gap builds here\n' \
         "$(_mesh_epr)" "$method" "$REPO_ROOT" "$dest"
       printf '  %q artifact put --method %q --input <key input> --bytes %q --project %q --cross   # after the install\n' \
-        "$(_mesh_epr)" "$method" "$dest" "$project"
+        "$(_mesh_epr)" "$method" "$built" "$project"
     fi
     [ "$dry" = "1" ] && return 0
     if [ -n "$sources" ]; then
@@ -2219,7 +2219,8 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
       # Record the install (design §3.a.4): one custody Produce that crosses. A failure is
       # explicit, never silent, and never fails the build.
       if [ -z "$unrecorded" ]; then
-        out=$("${rec[@]}" "$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$dest" \
+        # Record Cargo's binary beside its dep-info; the installed copy was byte-verified above.
+        out=$("${rec[@]}" "$(_mesh_epr)" artifact put --method "$method" --input "$input" --bytes "$built" \
           --project "$project" --commit "$commit" --duration-ms "$(( $(date +%s%3N) - started ))" \
           --cross --repo "$REPO_ROOT" 2>&1) || unrecorded="${out:-epr artifact put failed}"
       fi

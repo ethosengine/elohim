@@ -178,7 +178,10 @@ fn location_env(
     env
 }
 
-fn compiler(executable: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<PathBuf> {
+pub(super) fn compiler(
+    executable: &Path,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<PathBuf> {
     let resolved = std::fs::canonicalize(executable).map_err(|e| {
         ArtifactError::Gap(format!(
             "rustc {} does not resolve: {e}",
@@ -190,8 +193,8 @@ fn compiler(executable: &Path, descriptor: &MethodDescriptor) -> ArtifactResult<
     }
     let proxy = resolved;
     let toolchain = descriptor
-        .non_path_inputs
-        .get("RUSTUP_TOOLCHAIN")
+        .tools
+        .get("toolchain")
         .filter(|value| !value.is_empty() && value.as_str() != "unpinned")
         .ok_or_else(|| {
             ArtifactError::Gap("rustc proxy needs recorded RUSTUP_TOOLCHAIN; describe again".into())

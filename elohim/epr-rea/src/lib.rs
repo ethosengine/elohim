@@ -67,6 +67,10 @@ pub mod actor;
 pub mod epistemic;
 pub mod error;
 pub mod external;
+pub mod feedback;
+pub mod feedback_capacity;
+#[cfg(feature = "sidecar")]
+pub mod feedback_store;
 pub mod fold;
 pub mod index;
 pub mod model;

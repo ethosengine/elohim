@@ -3171,6 +3171,24 @@ decisionPoints:
   contractTests:
   - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_deadline_includes_descendant_pipe_drain, kind: unit}
   - {path: elohim/eprfs/device-runtime/src/bin_store/tests.rs, testName: f2_ingest_deadline_releases_mutation_lock_after_fork, kind: unit}
+- name: bin_store::feedback_qualification
+  kind: pure-decision-predicate
+  sourceLocation: {file: src/bin_store/feedback_health.rs, modulePath: elohim_device_runtime::bin_store::Store::feedback_health}
+  summary: Policy-enabled promotion qualifies exact recorder and producer bytes outside the lock, then holds both stores in stable order and rechecks counterpart and policy before advancing current. Initial recorder arrival is explicitly not pair readiness; a failed or unmeasured witness cannot qualify. Evidence remains device-private and grants no repair acceptance.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/src/bin_store/feedback_health/tests.rs, testName: first_recorder_arrives_without_claiming_pair_readiness, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/feedback_health/tests.rs, testName: producer_requires_pair_and_next_recorder_requalifies_that_producer, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/feedback_health/tests.rs, testName: skipped_or_failed_witness_cannot_qualify_even_with_zero_command_exit, kind: unit}
+  - {path: elohim/eprfs/device-runtime/src/bin_store/feedback_health/tests.rs, testName: policy_and_counterpart_changes_invalidate_the_prepared_witness, kind: unit}
+- name: bin_store::launcher_inspection
+  kind: boundary-answer-type
+  sourceLocation: {file: src/bin/bin-launch.rs, modulePath: bin_launch::resolve_current}
+  summary: Standalone launcher inspection delegates to native current resolution without entering execution, observing candidate overrides, publishing a session pin or leasing executable usage. Absent current refuses without creating authority.
+  concernIds: *f2_custody_concerns
+  contractTests:
+  - {path: elohim/eprfs/device-runtime/tests/launcher.rs, testName: inspect_current_ignores_overrides_and_does_not_publish_a_pin_or_usage_lease, kind: integration}
+  - {path: elohim/eprfs/device-runtime/tests/launcher.rs, testName: inspect_absent_current_refuses_without_creating_store_state, kind: integration}
 - name: bin_store::launcher_recovery
   kind: state-transition
   sourceLocation: {file: src/bin_store/launch.rs, modulePath: elohim_device_runtime::bin_store::launch_os}

@@ -46,11 +46,8 @@ impl ProxyFixture {
             compiler_marker.display(), fixture::RUSTC_IDENTITY
         ));
         let path = format!("{}:/bin", tools.display());
-        let (method, descriptor) = method_file_with(
-            scratch.path(),
-            &["crate/src"],
-            &[("PATH", &path), ("RUSTUP_TOOLCHAIN", "1.96.1")],
-        );
+        let (method, descriptor) =
+            method_file_with(scratch.path(), &["crate/src"], &[("PATH", &path)]);
         Self {
             repo,
             scratch,
@@ -126,10 +123,10 @@ fn artifact_proxy_uses_installed_compiler_without_executing_symlink_or_hardlink(
             assert!(out.status.success(), "{}", text(&out));
         }
         // Also accept an explicitly host-qualified recorded selector.
-        fixture.descriptor.non_path_inputs.insert(
-            "RUSTUP_TOOLCHAIN".into(),
-            "1.96.1-x86_64-unknown-linux-gnu".into(),
-        );
+        fixture
+            .descriptor
+            .tools
+            .insert("toolchain".into(), "1.96.1-x86_64-unknown-linux-gnu".into());
         let out = fixture.key(Some(&fixture.home));
         assert!(out.status.success(), "{}", text(&out));
         let calls = std::fs::read_to_string(&fixture.compiler_marker).unwrap();
@@ -147,14 +144,11 @@ fn artifact_proxy_uses_installed_compiler_without_executing_symlink_or_hardlink(
 #[test]
 fn artifact_proxy_without_recorded_toolchain_refuses() {
     let mut fixture = ProxyFixture::new(false);
-    fixture
-        .descriptor
-        .non_path_inputs
-        .remove("RUSTUP_TOOLCHAIN");
+    fixture.descriptor.tools.remove("toolchain");
     let out = fixture.key(Some(&fixture.home));
     assert!(!out.status.success());
     assert!(
-        text(&out).contains("needs recorded RUSTUP_TOOLCHAIN"),
+        text(&out).contains("needs a recorded rustc toolchain"),
         "{}",
         text(&out)
     );

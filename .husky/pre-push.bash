@@ -1717,6 +1717,27 @@ fi
 if [ -z "$EPR_LAND_REASON" ] && [ ! -x "$BIN_STORE_CLI" ]; then
   EPR_LAND_REASON="bin-store is not executable"
 fi
+# Capture the committed head once, before preparing a candidate. A failed or malformed status
+# never means an absent head; a concurrent promotion must refuse without rereading/retrying.
+if [ -z "$EPR_LAND_REASON" ]; then
+  if ! EPR_HEAD_STATUS=$("$BIN_STORE_CLI" bin --tool epr status --json 2>/dev/null); then
+    EPR_LAND_REASON="could not read the committed epr head for compare-and-swap"
+  elif ! EPR_EXPECT=$(printf '%s' "$EPR_HEAD_STATUS" | python3 -c '
+import json,sys
+value=json.load(sys.stdin)
+if not isinstance(value,dict) or "head" not in value:
+    sys.exit(1)
+head=value["head"]
+if head is None:
+    print("none")
+elif isinstance(head,str) and head and head != "none" and not any(c.isspace() for c in head):
+    print(head)
+else:
+    sys.exit(1)
+' 2>/dev/null); then
+    EPR_LAND_REASON="invalid committed epr head status for compare-and-swap"
+  fi
+fi
 epr_candidate_at_sha() {
   "$BIN_STORE_CLI" bin --tool epr status --commit "$DEV_LOCAL_SHA" --json 2>/dev/null |
     python3 -c 'import json,sys; rows=json.load(sys.stdin).get("candidates", []); print(rows[0].get("cid", "") if rows else "")' \
@@ -1731,7 +1752,7 @@ if [ -z "$EPR_LAND_REASON" ]; then
   fi
   if [ -z "$EPR_CANDIDATE_CID" ]; then
     EPR_LAND_REASON="no ingested epr candidate names the SHA targeting dev"
-  elif EPR_LAND_ERROR=$("$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" 2>&1 >/dev/null); then
+  elif EPR_LAND_ERROR=$("$BIN_STORE_CLI" bin --tool epr land "$EPR_CANDIDATE_CID" --expect "$EPR_EXPECT" --commit "$DEV_LOCAL_SHA" --repo "$HOOK_WORK_TREE" 2>&1 >/dev/null); then
     echo "[pre-push] epr household head landed: $EPR_CANDIDATE_CID"
     # The launcher is built beside the landed epr in the gate's slot. A session's PATH execs it,
     # so a changed bin-launch is installed by the epr just landed (install-launcher verifies current).
@@ -1755,7 +1776,7 @@ if [ -z "$EPR_LAND_REASON" ]; then
     # completes. The candidate is ingested; the next session arrival's `follow` lands it.
     echo "[pre-push] epr household head deferred: $EPR_CANDIDATE_CID lands at the next session arrival once $DEV_LOCAL_SHA is on dev"
   else
-    EPR_LAND_REASON="bin-store refused epr candidate health or provenance"
+    EPR_LAND_REASON="bin-store refused epr candidate compare-and-swap, health or provenance"
   fi
 fi
 if [ -n "$EPR_LAND_REASON" ]; then

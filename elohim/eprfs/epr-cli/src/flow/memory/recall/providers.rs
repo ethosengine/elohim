@@ -176,8 +176,23 @@ pub fn bounded_process(
             command.env_remove(key);
         }
     }
+    command.args(args);
+    bounded_command(command, output_limit, seconds, input)
+}
+
+/// The same bounded executor for callers that must isolate cwd and environment.
+pub fn bounded_command(
+    mut command: Command,
+    output_limit: usize,
+    seconds: f64,
+    input: Option<&[u8]>,
+) -> std::io::Result<ProcessOutcome> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
     let mut child = command
-        .args(args)
         .stdin(if input.is_some() {
             Stdio::piped()
         } else {
@@ -212,21 +227,30 @@ pub fn bounded_process(
     let mut reason = None;
     let mut status = None;
     loop {
-        match child.try_wait()? {
-            Some(exit) => {
-                status = exit.code();
-                break;
-            }
-            None => {
-                if began.elapsed().as_secs_f64() >= seconds {
-                    reason = Some("provider timed out".to_string());
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
+        let exited = child.try_wait()?;
+        if let Some(exit) = exited {
+            status = exit.code();
         }
+        if exited.is_some()
+            && out_handle.is_finished()
+            && err_handle.is_finished()
+            && in_handle.as_ref().is_none_or(|handle| handle.is_finished())
+        {
+            break;
+        }
+        if began.elapsed().as_secs_f64() >= seconds {
+            reason = Some("provider timed out".to_string());
+            #[cfg(unix)]
+            // SAFETY: this child was spawned in its own process group above. Killing the
+            // group also closes inherited pipes held by descendants after the child exits.
+            unsafe {
+                libc::kill(-(child.id() as i32), libc::SIGKILL);
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
     }
     if let Some(handle) = in_handle {
         let _ = handle.join();

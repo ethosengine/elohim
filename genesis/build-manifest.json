@@ -321,7 +321,7 @@
           "kind": "root-just",
           "recipe": "_gate-memory-ceremony",
           "cargo": {
-            "targetDir": "/tmp/eprfs-gate-target",
+            "workspace": "elohim/eprfs",
             "profile": "dev",
             "rustflags": ""
           }
