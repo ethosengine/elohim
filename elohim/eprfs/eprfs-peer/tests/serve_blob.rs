@@ -1630,9 +1630,10 @@ async fn a_late_indexable_older_derivation_never_evicts_a_newer_one() {
     let newer_put = holder.put(GRANTED, bytes, true).await;
     let artifact = output(&newer_put);
     assert_eq!(output(&older_put), artifact);
-    assert!(
-        holder.reindex_at(t0).await.is_empty(),
-        "only the newer is designated"
+    assert_eq!(
+        holder.reindex_at(t0).await.len(),
+        0,
+        "only the designated record is read at rebuild"
     );
     assert_eq!(
         holder.mount.held(&artifact).map(|held| held.manifest),
@@ -1937,38 +1938,62 @@ impl HeadTableView {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn superseded_history_is_bounded() {
+async fn custody_index_tracks_outputs_and_serves_oldest_record_on_demand() {
     let h = household();
     let mut holder = holder(&h).await;
     let bytes = artifact_bytes(141, 300 * 1024);
-    let mut last = None;
+    let mut records = Vec::new();
     for n in 0..8 {
-        let variant = granted_variant(&format!("v{n}"));
-        let put = put_with(
-            holder.payload.as_ref(),
-            &mut holder.flow,
-            variant,
-            bytes.clone(),
-            true,
-            &context(),
-        )
-        .await;
+        records.push(
+            put_with(
+                holder.payload.as_ref(),
+                &mut holder.flow,
+                granted_variant(&format!("v{n}")),
+                bytes.clone(),
+                true,
+                &context(),
+            )
+            .await,
+        );
         assert!(holder.reindex().await.is_empty());
-        // One output, eight derivations: the index tracks one manifest, never the history.
         assert_eq!(holder.mount.tracked_manifests(), 1);
-        last = Some(put);
+        assert_eq!(holder.mount.cached_records(), 0);
+        assert_eq!(holder.mount.reconstructions(), n + 1);
     }
-    let last = last.expect("a put");
+    let last = records.last().unwrap();
     assert_eq!(
-        holder.mount.held(&output(&last)).map(|held| held.manifest),
-        Some(last.manifest_cid.clone())
+        holder.mount.held(&output(last)).unwrap().manifest,
+        last.manifest_cid
     );
-    // A designated manifest that fails is the one record kept for its output.
-    let failing = granted_variant("unrecorded");
+    // An unrelated flow append/rebuild does not reconstruct any historical record.
+    assert!(holder.reindex().await.is_empty());
+    assert_eq!(holder.mount.reconstructions(), 8);
+    let b = client(&h.key_b).await;
+    let old = &records[0];
+    let request = TierRequest::Record {
+        artifact: output(old),
+        manifest: old.manifest_cid.clone(),
+        key: Some(eprfs_peer::key_cid(&old.manifest.record.key).unwrap()),
+        cid: None,
+    };
+    let served = served_bytes(
+        call(&b, &holder.addr, request.clone()).await,
+        &old.manifest_cid,
+    );
+    assert_eq!(served, serde_ipld_dagcbor::to_vec(&old.manifest).unwrap());
+    assert_eq!(holder.mount.reconstructions(), 9);
+    assert_eq!(holder.mount.tracked_manifests(), 1);
+    assert_eq!(holder.mount.cached_records(), 1);
+    served_bytes(
+        call(&b, &holder.addr, request.clone()).await,
+        &old.manifest_cid,
+    );
+    assert_eq!(holder.mount.reconstructions(), 9, "cache hit");
+    // A failing latest designation neither revives an older legacy default nor grows tracking.
     put_with(
         holder.payload.as_ref(),
         &mut holder.flow,
-        failing,
+        granted_variant("unrecorded"),
         bytes,
         false,
         &context(),
@@ -1976,8 +2001,104 @@ async fn superseded_history_is_bounded() {
     .await;
     assert_eq!(holder.reindex().await.len(), 1);
     assert_eq!(holder.mount.tracked_manifests(), 1);
-    assert!(holder.mount.held(&output(&last)).is_none());
+    assert_eq!(holder.mount.cached_records(), 0);
+    assert!(holder.mount.held(&output(last)).is_none());
+    served_bytes(call(&b, &holder.addr, request).await, &old.manifest_cid);
+    b.close().await;
     holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_demand_record_cache_is_bounded_and_evicted_records_are_revalidated() {
+    let h = household();
+    let mut a = holder(&h).await;
+    let mut records = Vec::new();
+    for n in 0..eprfs_peer::RECORD_CACHE_CAPACITY + 3 {
+        records.push(
+            put_with(
+                a.payload.as_ref(),
+                &mut a.flow,
+                granted_variant(&format!("v{n}")),
+                Bytes::from_static(b"same output"),
+                true,
+                &context(),
+            )
+            .await,
+        );
+    }
+    assert!(a.reindex().await.is_empty());
+    assert_eq!(
+        a.mount.reconstructions(),
+        1,
+        "only the latest is read at rebuild"
+    );
+    let b = client(&h.key_b).await;
+    for (n, record) in records[..records.len() - 1].iter().enumerate() {
+        served_bytes(
+            call(
+                &b,
+                &a.addr,
+                TierRequest::Record {
+                    artifact: output(record),
+                    manifest: record.manifest_cid.clone(),
+                    key: None,
+                    cid: None,
+                },
+            )
+            .await,
+            &record.manifest_cid,
+        );
+        assert_eq!(
+            a.mount.cached_records(),
+            (n + 1).min(eprfs_peer::RECORD_CACHE_CAPACITY)
+        );
+        assert_eq!(a.mount.tracked_manifests(), 1);
+    }
+    let before = a.mount.reconstructions();
+    let oldest = &records[0];
+    served_bytes(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Record {
+                artifact: output(oldest),
+                manifest: oldest.manifest_cid.clone(),
+                key: None,
+                cid: None,
+            },
+        )
+        .await,
+        &oldest.manifest_cid,
+    );
+    assert_eq!(
+        a.mount.reconstructions(),
+        before + 1,
+        "evicted record is validated again"
+    );
+    assert_eq!(a.mount.cached_records(), eprfs_peer::RECORD_CACHE_CAPACITY);
+    // A rebuild withdraws every local CID and clears the cache, even for a previously served record.
+    assert!(a.mount.rebuild_from_flow(&[]).await.is_empty());
+    assert_eq!(a.mount.cached_records(), 0);
+    assert_eq!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Record {
+                artifact: output(oldest),
+                manifest: oldest.manifest_cid.clone(),
+                key: None,
+                cid: None,
+            }
+        )
+        .await,
+        typed(
+            &output(oldest),
+            ReachReason::NoRecord,
+            Some(&format!("manifest:{}", oldest.manifest_cid))
+        )
+    );
+    b.close().await;
+    a.router.shutdown().await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

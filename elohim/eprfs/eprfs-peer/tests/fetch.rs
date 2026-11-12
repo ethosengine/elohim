@@ -48,7 +48,7 @@ struct Three {
     b: Device,
     c: Device,
     key_a: PeerKey,
-    _key_b: PeerKey,
+    key_b: PeerKey,
     key_c: PeerKey,
     rows: Vec<elohim_epr_rea::ParticipantRow>,
     /// The peer key directories of A, B and C, in that order.
@@ -77,7 +77,7 @@ fn three() -> Three {
         b,
         c,
         key_a,
-        _key_b: key_b,
+        key_b,
         key_c,
         rows,
         _dirs: vec![da, db, dc],
@@ -331,11 +331,13 @@ impl Scripted {
         };
         self.asked.lock().expect("asked").push(request.clone());
         let answer = match &request {
-            TierRequest::Manifest { .. } => TierAnswer::Blob {
-                cid: self.manifest.0.clone(),
-                bytes: self.manifest.1.clone(),
-            },
-            TierRequest::Blob { cid, .. } => {
+            TierRequest::Manifest { .. } | TierRequest::Record { cid: None, .. } => {
+                TierAnswer::Blob {
+                    cid: self.manifest.0.clone(),
+                    bytes: self.manifest.1.clone(),
+                }
+            }
+            TierRequest::Blob { cid, .. } | TierRequest::Record { cid: Some(cid), .. } => {
                 let answered = self.answered.fetch_add(1, Ordering::SeqCst) + 1;
                 if self
                     .faults
@@ -377,7 +379,9 @@ impl Scripted {
             .expect("asked")
             .iter()
             .filter_map(|request| match request {
-                TierRequest::Blob { cid, .. } => Some(cid.clone()),
+                TierRequest::Blob { cid, .. } | TierRequest::Record { cid: Some(cid), .. } => {
+                    Some(cid.clone())
+                }
                 _ => None,
             })
             .collect()
@@ -388,7 +392,12 @@ impl Scripted {
             .lock()
             .expect("asked")
             .iter()
-            .filter(|request| matches!(request, TierRequest::Manifest { .. }))
+            .filter(|request| {
+                matches!(
+                    request,
+                    TierRequest::Manifest { .. } | TierRequest::Record { cid: None, .. }
+                )
+            })
             .count()
     }
 }
@@ -2042,6 +2051,9 @@ async fn output_authority_fetches_producer_method_and_exact_bytes_without_a_loca
     let key = key_for("only-the-producer-has-this-closure");
     let bytes = artifact_bytes(23, 700_000);
     let manifest = a.put(&t.a.did, &key, bytes.clone()).await;
+    let mut b = real_holder(&t, &t.b, &t.key_b).await;
+    let other_key = key_for("another-producer-closure");
+    let other_manifest = b.put(&t.b.did, &other_key, bytes.clone()).await;
     let output = BlobCid::compute_bytes(&bytes);
     let authority = FetchAuthority::Output {
         cid: output.clone(),
@@ -2053,7 +2065,10 @@ async fn output_authority_fetches_producer_method_and_exact_bytes_without_a_loca
         store.as_ref(),
         &authority,
         &output,
-        &[a.holder(&t.a.did, &manifest)],
+        &[
+            a.holder(&t.a.did, &manifest),
+            b.holder(&t.b.did, &other_manifest),
+        ],
         &budget(),
         Instant::now() + WITHIN,
     )

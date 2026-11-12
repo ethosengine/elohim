@@ -3,7 +3,7 @@
 //!
 //! The order is fixed and every step fails closed:
 //!
-//! 1. **Manifest first, capped.** [`TierRequest::Manifest`] from the first holder that answers,
+//! 1. **Manifest first, capped.** [`TierRequest::Record`] from the first holder that answers,
 //!    its answer frame capped at [`FetchBudget::manifest_cap`] so an oversized manifest is refused
 //!    before any chunk moves. The served bytes must be the manifest the holder's crossed record
 //!    named, must decode under this reader's epoch, and must carry a record whose `key` equals the
@@ -358,6 +358,7 @@ enum Abandon {
 /// One holder's connection in the race.
 struct Link {
     device: String,
+    manifest: BlobCid,
     connection: Connection,
     relay_only: bool,
     in_flight: usize,
@@ -518,8 +519,16 @@ async fn accept_manifest(
             };
             continue;
         };
-        let request = TierRequest::Manifest {
+        let request = TierRequest::Record {
             artifact: output.clone(),
+            manifest: holder.manifest.clone(),
+            key: key
+                .map(crate::key_cid)
+                .transpose()
+                .map_err(|e| FetchGap::ManifestRejected {
+                    reason: e.to_string(),
+                })?,
+            cid: None,
         };
         let received = AtomicU64::new(0);
         let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
@@ -557,7 +566,9 @@ async fn accept_manifest(
                         )),
                         Ok(manifest) => {
                             let method = if key.is_none() {
-                                match fetch_method(&connection, &manifest, bounds, relay).await {
+                                match fetch_method(&connection, &cid, &manifest, bounds, relay)
+                                    .await
+                                {
                                     Ok(bytes) => Some(bytes),
                                     Err(reason) => {
                                         connection.close(VarInt::from_u32(0), b"");
@@ -628,14 +639,17 @@ async fn accept_manifest(
 // A method is an existing member of an admitted artifact, served under that artifact's grant.
 async fn fetch_method(
     connection: &Connection,
+    manifest_cid: &BlobCid,
     manifest: &TierBlobManifest,
     bounds: &Bounds<'_>,
     relay: bool,
 ) -> Result<Bytes, String> {
     let cid = &manifest.record.key.method;
-    let request = TierRequest::Blob {
+    let request = TierRequest::Record {
         artifact: manifest.record.output.clone(),
-        cid: cid.clone(),
+        manifest: manifest_cid.clone(),
+        key: Some(crate::key_cid(&manifest.record.key).map_err(|e| e.to_string())?),
+        cid: Some(cid.clone()),
     };
     let received = AtomicU64::new(0);
     let bound = request_bound(
@@ -816,6 +830,7 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
     // not already found unreachable or refusing, dialled together within the deadline.
     let mut links = vec![Link {
         device: holders[manifest_holder].device.clone(),
+        manifest: holders[manifest_holder].manifest.clone(),
         connection,
         relay_only: relay_only(&holders[manifest_holder].addr),
         in_flight: 0,
@@ -841,6 +856,7 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
         for (index, connection) in dialled {
             links.push(Link {
                 device: holders[index].device.clone(),
+                manifest: holders[index].manifest.clone(),
                 connection,
                 relay_only: relay_only(&holders[index].addr),
                 in_flight: 0,
@@ -883,9 +899,15 @@ async fn fetch_within<S: EprfsStorage + ?Sized>(
                 deadline,
             );
             // A chunk is asked under the artifact (its output), never alone.
-            let request = TierRequest::Blob {
+            let request = TierRequest::Record {
                 artifact: output.clone(),
-                cid: chunk.cid.clone(),
+                manifest: links[chosen].manifest.clone(),
+                key: key.map(crate::key_cid).transpose().map_err(|e| {
+                    FetchGap::ManifestRejected {
+                        reason: e.to_string(),
+                    }
+                })?,
+                cid: Some(chunk.cid.clone()),
             };
             tasks.spawn(async move {
                 let frame_cap = chunk.byte_len.saturating_add(CHUNK_FRAME_OVERHEAD);
@@ -1486,8 +1508,8 @@ pub fn resolve_output_holders(
         });
     }
     let mut devices = BTreeSet::new();
-    // The serving index retains the latest manifest for an output. If one device produced
-    // identical bytes under several keys, choose its newest claim, not the first sorted key.
+    // Output-only discovery prefers the last folded claim per device across keys. The fetch
+    // pins that exact manifest; serving no longer relies on it being the holder's latest.
     let holders: Vec<_> = records
         .iter()
         .rev()

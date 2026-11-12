@@ -84,12 +84,13 @@ fn recorded_key(row: &peer::SiblingArtifact) -> ArtifactResult<DerivationKey> {
 fn local_key(subject: &str, options: &Options) -> ArtifactResult<DerivationKey> {
     if let Ok(cid) = BlobCid::parse(subject) {
         let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())?;
-        let row = found
-            .rows
-            .iter()
-            .rev()
-            .find(|row| row.device == found.device && row.key == cid.to_string())
-            .ok_or_else(|| ArtifactError::Gap(format!("no local record for key {cid}")))?;
+        let row = newest_record(
+            found
+                .rows
+                .iter()
+                .filter(|row| row.device == found.device && row.key == cid.to_string()),
+        )?
+        .ok_or_else(|| ArtifactError::Gap(format!("no local record for key {cid}")))?;
         recorded_key(row)
     } else {
         let descriptor: MethodDescriptor = serde_json::from_slice(&std::fs::read(subject)?)?;
@@ -146,6 +147,33 @@ fn candidate(row: &peer::SiblingArtifact) -> String {
     )
 }
 
+/// Select by parsed occurred_at, with commit/manifest/output as a stable ascending tie-break.
+/// This also defines literal-key selection, independent of local append or sibling fold order.
+fn newest_record<'a>(
+    rows: impl Iterator<Item = &'a peer::SiblingArtifact>,
+) -> ArtifactResult<Option<&'a peer::SiblingArtifact>> {
+    let mut ordered = Vec::new();
+    for row in rows {
+        let at = chrono::DateTime::parse_from_rfc3339(&row.at).map_err(|error| {
+            ArtifactError::Gap(format!(
+                "invalid Produce occurred_at: {}: {error}",
+                candidate(row)
+            ))
+        })?;
+        ordered.push((at, row));
+    }
+    ordered.sort_by(|(a, left), (b, right)| {
+        b.cmp(a).then_with(|| {
+            (&left.commit, &left.manifest, &left.output).cmp(&(
+                &right.commit,
+                &right.manifest,
+                &right.output,
+            ))
+        })
+    });
+    Ok(ordered.first().map(|(_, row)| *row))
+}
+
 /// Produce carries occurred_at (exposed as at), not a production-ordered fold position.
 fn same_source<'a>(
     rows: &'a [peer::SiblingArtifact],
@@ -156,7 +184,7 @@ fn same_source<'a>(
         .iter()
         .filter(|row| row.device == device && row.method == local.method)
         .collect();
-    candidates.sort_by_key(|row| (&row.input, &row.commit, &row.at));
+    candidates.sort_by_key(|row| (&row.input, &row.commit, &row.at, &row.manifest, &row.output));
     let mut matching = Vec::new();
     for row in &candidates {
         if row.commit == local.commit {
@@ -207,22 +235,35 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
     let local_cid = key_cid(&key)
         .map_err(|e| ArtifactError::Gap(e.to_string()))?
         .to_string();
-    let local_row = found
-        .rows
-        .iter()
-        .rev()
-        .find(|row| row.device == found.device && row.key == local_cid)
-        .ok_or_else(|| ArtifactError::Gap(format!("no local record for key {local_cid}")))?;
-    recorded_key(local_row)?;
-    // The custody reader filters by roster admission. Descriptor comparisons hold source
-    // constant; a literal key retains its exact match, regardless of the recorded commit.
-    let row = match exact {
-        Some(cid) => found
+    let locals = || {
+        found
             .rows
             .iter()
-            .rev()
-            .find(|row| row.device == device && row.key == cid.to_string())
-            .ok_or_else(|| ArtifactError::Gap("no admitted sibling record for this key".into()))?,
+            .filter(|row| row.device == found.device && row.key == local_cid)
+    };
+    let newest = newest_record(locals())?
+        .ok_or_else(|| ArtifactError::Gap(format!("no local record for key {local_cid}")))?;
+    // The custody reader filters by roster admission. Descriptors select the newest local
+    // occurrence with a common commit; literal keys keep exact-key semantics across commits.
+    let local_row = if exact.is_some() {
+        newest
+    } else {
+        newest_record(locals().filter(|local| {
+            found.rows.iter().any(|row| {
+                row.device == device && row.method == local.method && row.commit == local.commit
+            })
+        }))?
+        .unwrap_or(newest)
+    };
+    recorded_key(local_row)?;
+    let row = match exact {
+        Some(cid) => newest_record(
+            found
+                .rows
+                .iter()
+                .filter(|row| row.device == device && row.key == cid.to_string()),
+        )?
+        .ok_or_else(|| ArtifactError::Gap("no admitted sibling record for this key".into()))?,
         None => same_source(&found.rows, device, local_row)?,
     };
     let remote = recorded_key(row)?;
@@ -286,11 +327,12 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
     eprintln!("inputs diff method={}", key.method);
     for (side, record) in [("this device", local_row), ("sibling", row)] {
         eprintln!(
-            "{side}: device={} key={} input={} commit={}",
+            "{side}: device={} key={} input={} commit={} manifest={}",
             record.device,
             record.key,
             record.input.as_deref().unwrap_or("unrecorded"),
-            record.commit
+            record.commit,
+            record.manifest
         );
     }
     print!("{lines}");

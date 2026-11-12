@@ -76,8 +76,8 @@ pub use announce::{
 };
 pub use blob_mount::{
     open_payload_store, ArtifactIndex, BlobMount, DeviceScope, DrawOutcome, Held, ServedDraw,
-    Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, SERVED_QUEUE, SERVE_BLOB,
-    SERVE_IDLE,
+    Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, RECORD_CACHE_CAPACITY, REFUSALS_PER_WINDOW,
+    SERVED_QUEUE, SERVE_BLOB, SERVE_IDLE,
 };
 /// The byte buffer artifacts are put with, so a consumer needs no bytes dependency of its own.
 pub use bytes::Bytes;

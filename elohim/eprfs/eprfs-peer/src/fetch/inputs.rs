@@ -53,9 +53,13 @@ pub async fn fetch_input_document(
     .await?;
     let holder = &holders[accepted.holder];
     let input = key.input.cid();
-    let request = TierRequest::Blob {
+    let request = TierRequest::Record {
         artifact: output.clone(),
-        cid: input.clone(),
+        manifest: accepted.cid.clone(),
+        key: Some(crate::key_cid(key).map_err(|e| FetchGap::ManifestRejected {
+            reason: e.to_string(),
+        })?),
+        cid: Some(input.clone()),
     };
     let bound = request_bound(
         relay_only(&holder.addr),

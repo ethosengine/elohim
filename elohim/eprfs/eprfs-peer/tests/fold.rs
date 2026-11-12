@@ -65,7 +65,9 @@ impl TestChannel {
             TierRequest::Diff { .. } => TierAnswer::Failed {
                 reason: "no diff".into(),
             },
-            TierRequest::Manifest { .. } | TierRequest::Blob { .. } => TierAnswer::Failed {
+            TierRequest::Manifest { .. }
+            | TierRequest::Blob { .. }
+            | TierRequest::Record { .. } => TierAnswer::Failed {
                 reason: "no artifacts".into(),
             },
         }
