@@ -115,7 +115,7 @@ impl Store {
             // Existing release downloads supply SHA256SUMS. It remains a checksum transport,
             // never an identity; canonical local closures instead carry sums.cbor.
             if source.is_dir() && (options.closure || self.config.bins.len() > 1) {
-                self.verify_source_manifest(source, &sums)?;
+                self.verify_source_manifest(source, &stage, &sums)?;
             }
             for (alias, target) in &self.config.aliases {
                 if source.join(alias).is_file()
@@ -197,7 +197,12 @@ impl Store {
         let _ = fs::remove_dir_all(stage);
         result
     }
-    fn verify_source_manifest(&self, source: &Path, sums: &BTreeMap<String, String>) -> Result<()> {
+    fn verify_source_manifest(
+        &self,
+        source: &Path,
+        stage: &Path,
+        sums: &BTreeMap<String, String>,
+    ) -> Result<()> {
         let mut with_aliases = sums.clone();
         for (alias, target) in &self.config.aliases {
             with_aliases.insert(alias.clone(), sums[target].clone());
@@ -218,8 +223,10 @@ impl Store {
             )
         })?;
         let mut expected = String::new();
-        for (name, cid) in sums {
-            let cid = files::require_cid(cid)?;
+        for name in sums.keys() {
+            // Transport SHA-256 authenticates the staged bytes, independently of their
+            // native BLAKE3 identity. Reuse the same SHA2 helper as legacy migration.
+            let cid = BlobCid::compute_raw(&fs::read(stage.join(name))?);
             let digest: String = cid
                 .as_cid()
                 .hash()
