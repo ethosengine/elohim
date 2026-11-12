@@ -282,6 +282,8 @@ A person follows an EPR link, from a repository explorer or from a running clien
 
 What it reuses from this plan, so that none is built twice: `Requires`, `Provides` and `admit` (lane A); the method and input records and family lookup (lane K); variant sets and conformance (lane V); placement eligibility and the commitment and fulfilment (lane P); typed refusals as feedback (lane F). What it needs that this plan does not hold: the devspace seed and arrival (`elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`), a source tree composed from artifacts, and the link and explorer surfaces.
 
+Home (2026-11-12): `elohim/lvi/docs/specs/2026-11-12-view-source-anywhere-one-click-devspace.md`, listed as horizon item H6 in `elohim/lvi/docs/plans/2026-07-20-lvi-devspace-roadmap.md`.
+
 Verify: this item has a named home in an lvi spec or a backlog entry before this plan closes, and that home cites the lanes above.
 
 ## Lane R — the reconciliation walk (spec §7.6; appended 2026-11-10)

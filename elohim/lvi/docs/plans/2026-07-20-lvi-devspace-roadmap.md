@@ -251,6 +251,7 @@ nothing here gets smuggled into v1.
 | **H3** | **Reach-as-promotion / output-convergence** | Reproducibility-as-reach: N diverse stewards build, converge output-CIDs, graduate reach (trusted→community→commons). *The inversion web2 can't make.* | Depends on H1 (`rakia-executor` must exist to converge). The founding differentiator's mechanism — not v1. |
 | **H4** | **Realized-compute metering (REA R4)** + interrupt-grade revocation | "Economically coherent" (a real meter, not a grant); SIGKILL-on-signal (a real interrupt, not lease-expiry). | Likely needs `shem`/cross-DHT rollup — out of the household floor. |
 | **H5** | **Untrusted-tenant isolation tier** + dynamic multi-tenant ingress | Host code from beyond the trust boundary; many devspaces, dynamic ports. | firecracker/microVM tier; dynamic TTL ingress registry + full port ACL. |
+| **H6** | **View source, anywhere — the one-click devspace** | From anything a person uses in a client, one link opens a devspace focused on that component's source. It says what the component is and what this device can do with it before anything runs, offers another steward's device when this one cannot carry it, and lets a person with their elohim keep a variant for themselves or offer it back. | Vision (steward, 2026-11-12): `docs/specs/2026-11-12-view-source-anywhere-one-click-devspace.md`. Consumes the host-compatibility plan's checks (its item X3), H1 for dependencies as artifacts, and H2/H4 for hosting beyond one's own devices. The first step needs only a describing view over a full checkout. |
 
 ---
 
