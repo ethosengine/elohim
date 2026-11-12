@@ -201,8 +201,14 @@ pub enum FetchGap {
     /// No `epr peer serve` holds this device's key, so nothing can dial a sibling.
     DaemonDown,
     /// The transport cannot carry the bytes (`relay` too slow for a 4 MiB frame per 10 s;
-    /// `iroh-blobs` has no byte path this sprint).
-    TransportCannotDeliver { mode: String },
+    /// `iroh-blobs` has no byte path this sprint). `cause` is what was observed on the link when
+    /// the gap was raised (the request's own error, or the bound that elapsed), so a holder that
+    /// answered with an error is not read as a slow relay. Absent from an older writer.
+    TransportCannotDeliver {
+        mode: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cause: Option<String>,
+    },
     /// This device's own payload store or flow store failed.
     LocalStore { reason: String },
     /// The destination is not one this daemon installs into, or the request does not read.
@@ -290,11 +296,17 @@ impl fmt::Display for FetchGap {
                  device's peer key can dial a sibling; cure: start `epr peer serve` on this \
                  device's checkout (or build here)",
             ),
-            FetchGap::TransportCannotDeliver { mode } => write!(
-                f,
-                "the {mode} transport cannot deliver this artifact (relay: below one 4 MiB frame \
-                 per 10 s; iroh-blobs: no byte path this sprint)"
-            ),
+            FetchGap::TransportCannotDeliver { mode, cause } => {
+                write!(
+                    f,
+                    "the {mode} transport cannot deliver this artifact (relay: below one 4 MiB \
+                     frame per 10 s; iroh-blobs: no byte path this sprint)"
+                )?;
+                match cause {
+                    Some(cause) => write!(f, "; observed: {cause}"),
+                    None => Ok(()),
+                }
+            }
             FetchGap::LocalStore { reason } => write!(f, "this device's store failed: {reason}"),
             FetchGap::InstallRefused { dest, reason } => {
                 write!(f, "the daemon refused to install at {dest}: {reason}")
@@ -444,6 +456,44 @@ async fn dial(
         Err(_) => Err(DialFailed::Elapsed {
             by_deadline: bound.by_deadline,
         }),
+    }
+}
+
+/// How a manifest request ended without an answer.
+enum ManifestRequestFailure {
+    /// The request itself failed: the holder closed or reset the stream, or its answer did not
+    /// decode. An older daemon that does not know the request variant ends here.
+    Error(String),
+    /// No answer arrived within the request's own bound (not the fetch's deadline).
+    Elapsed(Duration),
+}
+
+/// The gap for a manifest request that ended without an answer. Over a relay-only link the kind
+/// stays `transport-cannot-deliver` (callers match on it), and the gap carries what was observed,
+/// so an error from the holder is told apart from a relay below the floor.
+fn manifest_request_failed(
+    relay: bool,
+    device: &str,
+    failure: &ManifestRequestFailure,
+) -> FetchGap {
+    if !relay {
+        return FetchGap::NoRoute {
+            device: device.to_owned(),
+        };
+    }
+    let cause = match failure {
+        ManifestRequestFailure::Error(error) => format!(
+            "the manifest request to {device} failed with an error, not a timeout: {error} (a \
+             holder running an older `epr peer serve` rejects a request it does not know this way)"
+        ),
+        ManifestRequestFailure::Elapsed(bound) => format!(
+            "no manifest answer from {device} within {:.1} s",
+            bound.as_secs_f64()
+        ),
+    };
+    FetchGap::TransportCannotDeliver {
+        mode: "relay".into(),
+        cause: Some(cause),
     }
 }
 
@@ -613,17 +663,16 @@ async fn accept_manifest(
                     total: 0,
                 })
             }
-            Ok(Err(_)) | Err(_) => {
-                if relay {
-                    FetchGap::TransportCannotDeliver {
-                        mode: "relay".into(),
-                    }
-                } else {
-                    FetchGap::NoRoute {
-                        device: holder.device.clone(),
-                    }
-                }
-            }
+            Ok(Err(error)) => manifest_request_failed(
+                relay,
+                &holder.device,
+                &ManifestRequestFailure::Error(error.to_string()),
+            ),
+            Err(_) => manifest_request_failed(
+                relay,
+                &holder.device,
+                &ManifestRequestFailure::Elapsed(bound.wait),
+            ),
         };
         // Whatever arrived for a manifest that was not accepted was moved for nothing.
         progress
@@ -751,6 +800,7 @@ pub async fn fetch_authorized_until<S: EprfsStorage + ?Sized>(
     if budget.transport == FetchTransport::IrohBlobs {
         return Err(FetchGap::TransportCannotDeliver {
             mode: FetchTransport::IrohBlobs.name().into(),
+            cause: None,
         });
     }
     if holders.is_empty() {
@@ -1043,8 +1093,18 @@ fn exhausted(links: &[Link], holders: &[Holder], manifest_holder: usize) -> Fetc
             .iter()
             .all(|(link, why)| link.relay_only && carried(why))
     {
+        let stalled = reasons
+            .iter()
+            .filter(|(_, why)| matches!(why, Abandon::Stalled))
+            .count();
         return FetchGap::TransportCannotDeliver {
             mode: "relay".into(),
+            cause: Some(format!(
+                "{} relay-only chunk link(s) abandoned: {stalled} stalled past the relay floor, \
+                 {} lost their stream",
+                reasons.len(),
+                reasons.len() - stalled
+            )),
         };
     }
     if let Some((link, Abandon::Refused(refusal))) = reasons
@@ -1865,4 +1925,74 @@ pub(crate) fn admitted_holders(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_relay_manifest_error_keeps_its_kind_and_carries_the_holders_error() {
+        let gap = manifest_request_failed(
+            true,
+            "did:key:holder",
+            &ManifestRequestFailure::Error("tier answer does not decode: unknown variant".into()),
+        );
+        assert_eq!(gap.kind(), "transport-cannot-deliver");
+        let FetchGap::TransportCannotDeliver { mode, cause } = &gap else {
+            panic!("a relay-only manifest failure stays a transport gap: {gap:?}");
+        };
+        assert_eq!(mode, "relay");
+        let cause = cause.as_deref().expect("the cause is carried");
+        assert!(cause.contains("unknown variant"), "{cause}");
+        assert!(cause.contains("not a timeout"), "{cause}");
+        let printed = gap.to_string();
+        assert!(printed.contains("observed: "), "{printed}");
+        assert!(printed.contains("unknown variant"), "{printed}");
+    }
+
+    #[test]
+    fn a_relay_manifest_timeout_names_the_bound_that_elapsed() {
+        let gap = manifest_request_failed(
+            true,
+            "did:key:holder",
+            &ManifestRequestFailure::Elapsed(Duration::from_secs(10)),
+        );
+        let FetchGap::TransportCannotDeliver { cause, .. } = &gap else {
+            panic!("{gap:?}");
+        };
+        let cause = cause.as_deref().expect("the cause is carried");
+        assert!(cause.contains("within 10.0 s"), "{cause}");
+        assert!(!cause.contains("error"), "{cause}");
+    }
+
+    #[test]
+    fn a_direct_manifest_failure_stays_a_route_gap() {
+        let gap = manifest_request_failed(
+            false,
+            "did:key:holder",
+            &ManifestRequestFailure::Error("connection lost".into()),
+        );
+        assert_eq!(
+            gap,
+            FetchGap::NoRoute {
+                device: "did:key:holder".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_gap_without_a_cause_reads_and_writes_as_before() {
+        let old = r#"{"gap":"transport-cannot-deliver","mode":"iroh-blobs"}"#;
+        let gap: FetchGap = serde_json::from_str(old).expect("an older writer's gap decodes");
+        assert_eq!(
+            gap,
+            FetchGap::TransportCannotDeliver {
+                mode: "iroh-blobs".into(),
+                cause: None
+            }
+        );
+        assert_eq!(serde_json::to_string(&gap).unwrap(), old);
+        assert!(!gap.to_string().contains("observed"));
+    }
 }
