@@ -50,12 +50,13 @@ reordered or removed.
   follows an admission sits under a commitment (the work, its expected budget, and the `Requires`
   or variant set it needs), and its fulfilment's evidence names the variant CID, the providing
   device and its steward, the admission verdict and the measured cost. In kind means the price is
-  zero or self-settled, never that the record is skipped. The rails are the ones
+  zero or self-settled, not that the record is skipped. The rails are the ones
   `elohim/placement/core` already has (`CommitmentDraft`, `FulfilmentDraft`, `settle`); no
   compute-only ledger. Reason: compute accounting is the first market these primitives must be
   mastered on, so that hosting can later be negotiated across the network's boundary and the same
-  shape reused by the other REA-native markets. The observed `Provides` still never leaves the
-  device; only the verdict is recorded. Amends A3, P1 and P2 below.
+  shape reused by the other REA-native markets. The observed `Provides` stays on the device as
+  A2 requires (its test asserts it is in no serialized record); only the verdict is recorded.
+  Amends A3, P1 and P2 below.
 - **Rails, not one pipe**: feedback is judged against five rails (spec §9); several channels may
   remain.
 - **No habit is set active.** The two-slot fence is held by `dataplane-convergence` and
