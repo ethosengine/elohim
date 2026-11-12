@@ -456,7 +456,7 @@ pub fn browser_zip_entries(bytes: &[u8]) -> Option<Vec<(String, Vec<u8>)>> {
         if file.is_dir() {
             continue;
         }
-        let name = file.name().to_string();
+        let name = file.name().ok()?.into_owned();
         let body = if name == "index.html" || name.ends_with("/index.html") {
             let mut contents = Vec::new();
             file.read_to_end(&mut contents).ok()?;

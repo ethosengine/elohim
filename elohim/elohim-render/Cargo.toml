@@ -21,10 +21,11 @@ tokio = { workspace = true }
 deno_core.workspace = true
 deno_error.workspace = true
 url = "2.5"
-zip = "2"
-# Real OS entropy for the WebCrypto `crypto.getRandomValues` shim op. getrandom
-# 0.3 is ALREADY in this crate's native build graph (transitively via `zip` and
-# the `tempfile` dev-dep), so this direct dependency adds zero new compile cost.
+zip = "9.0.5"
+# Real OS entropy for the WebCrypto `crypto.getRandomValues` shim op. Since zip 9
+# (which moved to getrandom 0.4) this direct dependency is the only getrandom 0.3
+# edge in this crate's graph, so it costs one small extra compile; moving it to
+# 0.4 (same `getrandom::fill` API) would remove that.
 # Native builds here run with RUSTFLAGS="" so getrandom uses its default OS
 # backend (the Linux `getrandom(2)` syscall) -- the workspace's custom-backend
 # cfg (`--cfg getrandom_backend="custom"`, set only for the Holochain WASM

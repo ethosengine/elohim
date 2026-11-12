@@ -11625,7 +11625,11 @@ impl HttpServer {
                 if f.is_dir() {
                     continue;
                 }
-                let name = f.name().to_string();
+                // zip 9 decodes the stored name fallibly; an entry whose name
+                // cannot be decoded is skipped like an unreadable entry.
+                let Ok(name) = f.name().map(|n| n.into_owned()) else {
+                    continue;
+                };
                 let mut contents = Vec::new();
                 if f.read_to_end(&mut contents).is_ok() {
                     // Check if this is the requested file (exact or suffix match)

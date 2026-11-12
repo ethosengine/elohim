@@ -378,7 +378,7 @@ chrono = { version = "0.4", features = ["serde"] }
 rrule = "0.14"
 
 # ZIP extraction for HTML5 apps
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 
 # rust-libp2p - same P2P foundation as Holochain (via kitsune_p2p)
 # https://github.com/libp2p/rust-libp2p
