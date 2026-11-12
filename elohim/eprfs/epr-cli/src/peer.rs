@@ -33,7 +33,7 @@ use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
     steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
     NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
-    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
+    WithheldCrossing, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -53,6 +53,44 @@ pub const SERVING_LINE: &str = "epr peer: serving";
 
 /// The crossing measure carrying completed gate runs between one steward's devices.
 const GATE_VERDICT_MEASURE: &str = "gate-verdict@1";
+
+/// The measures a record carries only because its writer asked for it to cross: `epr artifact put
+/// --cross` adds [`ARTIFACT_PRODUCE_MEASURE`] and nothing else writes it. A device holding such
+/// records under a policy that does not cross them is told so at `serve` start and in `status`;
+/// berth and gate measures are left out because some of their kinds stay local by design.
+const CROSSING_INTENT_MEASURES: [&str; 1] = [ARTIFACT_PRODUCE_MEASURE];
+
+/// This device's own crossing-intent records in the flow store at `root` that `allow` withholds.
+fn withheld_crossings(root: &Path, allow: &CrossingAllowList) -> PeerResult<Vec<WithheldCrossing>> {
+    let store = elohim_epr_rea::SidecarFlowStore::open(root)
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    let events = store
+        .events()
+        .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?;
+    Ok(allow.withheld(
+        events.iter().map(|(_, event)| event),
+        &CROSSING_INTENT_MEASURES,
+    ))
+}
+
+/// One line per withheld measure and kind, naming the policy file that omits it and the cure.
+fn withheld_lines(withheld: &[WithheldCrossing], policy: &Path) -> Vec<String> {
+    withheld
+        .iter()
+        .map(|row| {
+            format!(
+                "crossing WITHHELD: {} `{}` {} record(s) of this device do not cross — {} \
+                 berth.channel.crosses does not list that measure and kind, so no sibling sees \
+                 them; if this checkout is behind dev, restart `epr peer serve` with --policy at \
+                 a current pool-policy.json",
+                row.events,
+                row.measure,
+                row.kind,
+                policy.display()
+            )
+        })
+        .collect()
+}
 
 /// Why an `epr peer` verb could not run.
 #[derive(Debug, thiserror::Error)]
@@ -802,6 +840,15 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
              {POLICY_REL} declares berth.channel.crosses"
         );
     }
+    // A warning, never a refusal: the daemon still serves what the policy does cross.
+    match withheld_crossings(&options.root, rules.allow()) {
+        Ok(withheld) => {
+            for line in withheld_lines(&withheld, &policy) {
+                eprintln!("epr peer: {line}");
+            }
+        }
+        Err(error) => eprintln!("epr peer: withheld crossings not checked: {error}"),
+    }
     let did = device.key.did_key();
     let signer_key = device.key;
     let config = PeerConfig {
@@ -886,6 +933,9 @@ struct StatusOutcome {
     refused_connections: Vec<RefusedConnections>,
     /// Connections refused from node ids the roster does not name, in one total.
     refused_strangers: u64,
+    /// This device's own crossing-intent records that the policy file the daemon loaded does
+    /// not cross; empty when every one crosses or no daemon has recorded its store and rules.
+    withheld_crossings: Vec<WithheldCrossing>,
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -993,7 +1043,19 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         .map(|pin| pin.running_cid.unwrap_or(pin.cid))
         .collect();
     let daemon_differs = daemon_cids.iter().any(|cid| Some(cid) != cli_cid.as_ref());
+    // Read against the daemon's recorded store and policy file, never this checkout's: a store
+    // or policy that cannot be read is reported by the lines above, not here.
+    let withheld = match (&table.store, &table.rules) {
+        (Some(place), Some(state)) if place.log.is_file() => {
+            CrossingAllowList::from_policy_file(&state.policy)
+                .map_err(PeerCliError::Peer)
+                .and_then(|allow| withheld_crossings(&place.root, &allow))
+                .unwrap_or_default()
+        }
+        _ => Vec::new(),
+    };
     let outcome = StatusOutcome {
+        withheld_crossings: withheld,
         cli_cid,
         daemon_cids,
         daemon_differs,
@@ -1052,6 +1114,11 @@ fn render(outcome: &StatusOutcome) {
             rules.reason.as_deref().unwrap_or("policy changed")
         ),
         None => println!("rules: unknown — no daemon has recorded the rules it loaded"),
+    }
+    if let Some(rules) = &outcome.rules {
+        for line in withheld_lines(&outcome.withheld_crossings, &rules.policy) {
+            println!("{line}");
+        }
     }
     if outcome.devices.is_empty() {
         println!("no other device is admitted on this roster");
@@ -2314,6 +2381,11 @@ mod status_contract {
                 count: 1,
             }],
             refused_strangers: 1,
+            withheld_crossings: vec![WithheldCrossing {
+                measure: "artifact-produce@1".into(),
+                kind: "produce".into(),
+                events: 2,
+            }],
         })
         .expect("serialize status");
         let schema: serde_json::Value = serde_json::from_str(include_str!(
@@ -2373,5 +2445,104 @@ mod status_contract {
         .expect("change policy");
         let reloading = rules_status(Some(&state)).expect("rules status");
         assert_eq!(reloading.state, "reloading");
+    }
+
+    fn crossing_record(
+        measure: &str,
+        kind: &str,
+        via: Option<&str>,
+        seed: &str,
+    ) -> elohim_epr_rea::FlowEvent {
+        use elohim_epr_rea::{atom_cid, AgentRef, FlowEvent, Magnitude, ReaVerb};
+        let output = eprfs_core::BlobCid::compute_bytes(seed.as_bytes());
+        let mut classified_as = vec![
+            "custody-blob".to_string(),
+            output.to_string(),
+            format!("measure:{measure}"),
+            format!("reason:{kind}"),
+        ];
+        classified_as.extend(via.map(|device| format!("via:{device}")));
+        FlowEvent {
+            action: ReaVerb::Produce,
+            provider: AgentRef("builder".into()),
+            receiver: AgentRef("device".into()),
+            resource: *output.as_cid(),
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: "bytes".into(),
+            },
+            process: None,
+            in_scope_of: atom_cid(&"scope").expect("scope"),
+            fulfills: vec![],
+            satisfies: vec![],
+            occurred_at: "2026-11-12T00:00:00Z".into(),
+            classified_as,
+        }
+    }
+
+    #[test]
+    // The K9 receipt's defect 1: a policy behind dev lacks artifact-produce@1, so this device's
+    // build records stay local with nothing said. The stale policy now names them; dev's does not.
+    fn a_policy_that_omits_a_recorded_crossing_measure_is_named_and_a_current_one_is_silent() {
+        use super::*;
+        let root = tempfile::tempdir().expect("root");
+        let mut store = elohim_epr_rea::SidecarFlowStore::open(root.path()).expect("store");
+        for event in [
+            crossing_record("artifact-produce@1", "produce", None, "first"),
+            crossing_record("artifact-produce@1", "produce", None, "second"),
+            // A sibling's record folded here was never this device's to cross.
+            crossing_record(
+                "artifact-produce@1",
+                "produce",
+                Some("did:key:sibling"),
+                "theirs",
+            ),
+            // A measure nobody declared as crossing-intent stays local without comment.
+            crossing_record("cleanup-pressure-reset@1", "observation", None, "local"),
+        ] {
+            store.append(FlowRecord::Event(event)).expect("append");
+        }
+        let stale = CrossingAllowList::new([("dev-berth-events@1", ["claim", "release"])]);
+        let withheld = withheld_crossings(root.path(), &stale).expect("withheld");
+        assert_eq!(
+            withheld,
+            vec![WithheldCrossing {
+                measure: "artifact-produce@1".into(),
+                kind: "produce".into(),
+                events: 2,
+            }]
+        );
+        let lines = withheld_lines(&withheld, Path::new("/checkout/pool-policy.json"));
+        assert_eq!(lines.len(), 1);
+        for needle in [
+            "crossing WITHHELD: 2 `artifact-produce@1` produce record(s)",
+            "/checkout/pool-policy.json berth.channel.crosses",
+            "--policy",
+        ] {
+            assert!(lines[0].contains(needle), "{}", lines[0]);
+        }
+
+        let current = CrossingAllowList::new([
+            ("dev-berth-events@1", vec!["claim", "release"]),
+            ("artifact-produce@1", vec!["produce"]),
+        ]);
+        assert!(withheld_crossings(root.path(), &current)
+            .expect("withheld")
+            .is_empty());
+    }
+
+    #[test]
+    // The repository's own policy crosses every crossing-intent measure the CLI writes: a new
+    // one added to the code without its policy row fails here, before a device runs it.
+    fn the_repository_policy_crosses_every_crossing_intent_measure() {
+        use super::*;
+        let policy = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .join(POLICY_REL);
+        let allow = CrossingAllowList::from_policy_file(&policy).expect("repository policy");
+        let record = crossing_record(ARTIFACT_PRODUCE_MEASURE, ARTIFACT_PRODUCE_KIND, None, "x");
+        assert!(allow
+            .withheld([&record], &CROSSING_INTENT_MEASURES)
+            .is_empty());
     }
 }

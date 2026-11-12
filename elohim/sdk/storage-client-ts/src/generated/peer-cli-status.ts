@@ -53,4 +53,12 @@ export interface PeerCliStatus {
     count: number;
   }[];
   refusedStrangers: number;
+  /**
+   * This device's own crossing-intent records that the policy file the daemon loaded does not cross. Empty when every one crosses, or when no daemon has recorded its store and rules.
+   */
+  withheldCrossings: {
+    measure: string;
+    kind: string;
+    events: number;
+  }[];
 }
