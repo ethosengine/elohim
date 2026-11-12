@@ -54,6 +54,62 @@ for a build or a run, the space answers five questions:
 5. **What happens to a change?** The path from an edit to a build, a queue, a review and a landing,
    and what this device could contribute to those queues while idle.
 
+## One composition, several kinds of runtime
+
+A devspace is one kind of runtime. An integration job is another: it takes a proposed change,
+builds it and proves it. A person's tooling (a language server, an agent, a preview) is a third.
+Kubernetes taught this lesson with pods: one way of composing and placing a unit of work serves
+the editor, the tools beside it and the pipeline that integrates the result.
+
+lvi carries that lesson to the protocol's own concepts. An `ark` holds a running unit and a berth
+is where it runs. The kinds, as analogues and not as a design:
+
+| Kind | What it is for | The pod it resembles |
+|---|---|---|
+| Devspace | A person, or an agent, working on source | The workspace pod of Eclipse Che |
+| Tooling | Services beside the work: language servers, previews, agents | A sidecar or tooling pod |
+| Integration | Building and proving a proposed change, then recording the result | A CI job pod |
+
+What differs is where the composition is resolved. Under Kubernetes a controller decides and a
+registry such as Harbor supplies the images. Here the composition is resolved from the peer
+dataplane and the runtimes peers already hold: the seed names what is needed, admission says which
+devices can carry it, placement finds one that has agreed, and the bytes arrive as verified
+artifacts. This is the module's thesis, hyperscale powers brought to peers, applied to more than
+the editor. EPR supplies what makes that responsible at scale: identity for every part, declared
+reach, attribution, and an account of who supplied what.
+
+"Describe before running" still holds for the person opening a link. It does not mean lvi starts
+nothing. When someone asks for a build, or a change is proposed under rules that call for proof,
+lvi composes and starts the integration runtime the same way it would start the devspace. Each
+start is asked for, admitted and accounted.
+
+## From one person's variant to everyone's affordance
+
+The grandmother's larger text is where this starts, not where it ends. Diversity of this kind is
+something the network can afford each person because making a variant is a primitive of
+development, not an exception to it. In the network's mature form the same primitive carries the
+change outward:
+
+1. **A variant for herself.** She keeps it. Nobody else is asked.
+2. **A signal.** Her variant, and her reason, are evidence that the original did not fit her. So
+   is the same change made by others. Someone close to her may also raise what she would not ask
+   for herself: a grandson who sees her squinting can surface the concern on her behalf, acting
+   for her under a stewardship grant and not in her name without one.
+3. **A collective.** When signals gather around one need, the people who share it, with their
+   elohim, can form a collective for that space: large print, here. It has members, a purpose and
+   rules like any other collective in the network, and it has a lifecycle. It forms, it works, and
+   it can dissolve when the need is met.
+4. **An architectural change.** The collective's work is not a pile of patches. With their elohim
+   they can work on the deeper affordance that would give every client accessible, well-composed
+   large print, and on how the network should evolve to provide it.
+5. **Reach, graduated.** What they produce earns wider reach by the same ladder as anything else:
+   from one person, to those who trust her, to a community, to the commons. Elohim facilitate
+   each integration along the way; the people and rules at each rung decide.
+
+So the grandmothers are not only users whose feedback is collected. They are collaborators in the
+network's evolution, at the depth they choose, with the elohim doing the work of finding, drafting,
+aggregating and repairing.
+
 ## What it is built from
 
 Little here is new machinery. The vision is a consumer of primitives that exist or are planned.
@@ -109,6 +165,13 @@ Named so that none of it is assumed:
    their client, and kept as the original moves on, is not designed.
 6. **The non-developer path.** The conversation in which a person says what they want and an
    elohim turns it into a variant is not designed, and it needs its own story before any code.
+7. **Runtime kinds.** lvi's design describes the devspace. The tooling and integration kinds, and
+   how one seed composes them over `ark` and a berth, are not designed. `ark task run` and the
+   placed orchestrator gate are the nearest existing pieces.
+8. **From signals to a collective.** How variants and concerns are gathered into evidence of a
+   shared need, how a collective forms around it and ends, and how its work graduates in reach,
+   are not designed here. They belong with the collective and reach designs, and this vision is a
+   consumer of them.
 
 ## Order of approach
 
