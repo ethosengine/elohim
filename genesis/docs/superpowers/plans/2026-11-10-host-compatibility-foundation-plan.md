@@ -45,6 +45,17 @@ reordered or removed.
   **open** and gated below.
 - **Inherit, do not mint** (spec §9): every record is expressed through `elohim/epr` and
   `elohim/epr-rea` primitives unless the item says why not.
+- **In-kind work is still accounted** (steward, 2026-11-12): work the steward's own devices supply
+  to each other is supplied in kind, and it still records the promise and what ran. Every run that
+  follows an admission sits under a commitment (the work, its expected budget, and the `Requires`
+  or variant set it needs), and its fulfilment's evidence names the variant CID, the providing
+  device and its steward, the admission verdict and the measured cost. In kind means the price is
+  zero or self-settled, never that the record is skipped. The rails are the ones
+  `elohim/placement/core` already has (`CommitmentDraft`, `FulfilmentDraft`, `settle`); no
+  compute-only ledger. Reason: compute accounting is the first market these primitives must be
+  mastered on, so that hosting can later be negotiated across the network's boundary and the same
+  shape reused by the other REA-native markets. The observed `Provides` still never leaves the
+  device; only the verdict is recorded. Amends A3, P1 and P2 below.
 - **Rails, not one pipe**: feedback is judged against five rails (spec §9); several channels may
   remain.
 - **No habit is set active.** The two-slot fence is held by `dataplane-convergence` and
@@ -99,7 +110,7 @@ Verify: both devices print their observed `Provides`; they differ in the ISA bun
 
 - [ ] **A3 — `authenticate_candidate` (`elohim/ark/core/src/candidate.rs`) admits against the observed host instead of comparing to the installed runtime's triple; `WrongPlatform` carries the unmet axis** (serves workspace-device-arrival)
 
-Verify: the candidate contract tests cover an admitted and a refused candidate on synthetic `Provides`.
+Verify: the candidate contract tests cover an admitted and a refused candidate on synthetic `Provides`. The admission returns a verdict a caller can record (variant CID, permit or the unmet clause) without exposing `Provides`, so P2 can put it in a fulfilment's evidence (ruling "In-kind work is still accounted").
 
 - [ ] **A4 — `just mesh preflight` prints one admitted-or-refused line per mesh binary** (serves dataplane-convergence)
 
@@ -205,11 +216,11 @@ Chain: S1 → spec §10 → placement `admit`, `ark task run`, `measure.sh` → 
 
 - [ ] **P1 — a compatibility stage in `elohim/placement/core/src/eligibility.rs` between the gate stage and the capacity stage, with its own `IneligibleReason`; the provider evaluates the task's variant set against its own `Provides`, kept beside `DeviceFacts` and not serialized** (serves measure-runs-on-a-peer)
 
-Verify: placement tests refuse an incompatible variant with the new reason and admit the compatible one; consent and gate ordering unchanged.
+Verify: placement tests refuse an incompatible variant with the new reason and admit the compatible one; consent and gate ordering unchanged. The task's `Requires` or variant set is read from its commitment (`CommitmentDraft`), not from a side channel, so what was promised includes what the work needs to run.
 
 - [ ] **P2 — the same admission inside `ark task run` (`elohim/ark/cli/src/task.rs`, the carried-here step) and beside the executor resolution in `genesis/agentic/compute/measure.sh`** (serves measure-runs-on-a-peer)
 
-Verify: `MEASURE_DRY_RUN=1 just measure <feature> --on jessica` prints the admitted variant or the refusal before launch.
+Verify: `MEASURE_DRY_RUN=1 just measure <feature> --on jessica` prints the admitted variant or the refusal before launch. A completed run's fulfilment (`FulfilmentDraft`) carries the admitted variant CID, the providing device and its steward, the admission verdict and the measured cost beside the commitment's expected budget; a run on the steward's own device records the same, settled in kind. A death after admission is joined to that fulfilment by F3's witness.
 
 - [ ] **P3 — ruling H10 put to the rakia steward: the declared target as an input of a rakia step, and building and proving as separate planned steps, with execution staying in `ark task run`; no rakia schema change before the ruling** (serves sprint-lands-each-closure-once)
 
